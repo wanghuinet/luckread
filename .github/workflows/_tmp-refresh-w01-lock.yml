@@ -1,0 +1,41 @@
+name: _tmp refresh W01 lockfile
+
+on:
+  push:
+    branches:
+      - fix/1.1-public-cache-boundary-hardening-20261007
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/1.1-public-cache-boundary-hardening-20261007
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.0.0
+          run_install: false
+      - name: Refresh W01 lockfile
+        working-directory: workers/W01-payload
+        run: pnpm install --lockfile-only --ignore-scripts --no-frozen-lockfile
+      - name: Commit lockfile
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- workers/W01-payload/pnpm-lock.yaml; then
+            echo "W01_LOCKFILE_CHANGED=false" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add workers/W01-payload/pnpm-lock.yaml
+          git commit -m "chore(w01): refresh plugin lockfile"
+          git push origin HEAD:fix/1.1-public-cache-boundary-hardening-20261007
+          echo "W01_LOCKFILE_CHANGED=true" >> "$GITHUB_ENV"
