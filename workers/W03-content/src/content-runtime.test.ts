@@ -51,7 +51,6 @@ describe('W03 content contract core', () => {
         return {
           bind: (...bindings: unknown[]) => ({
             first: async () => {
-              if (query.includes('content_mutation_idempotency')) return null
               expect(bindings).toContain('content_cas_412_123')
               return row
             },
@@ -116,7 +115,6 @@ describe('W03 content contract core', () => {
         return {
           bind: (...bindings: unknown[]) => ({
             first: async () => {
-              if (query.includes('content_mutation_idempotency')) return null
               expect(bindings).toContain('content_unique_123')
               return row
             },
