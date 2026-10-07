@@ -133,7 +133,7 @@ export class ContentRuntimeError extends Error {
 }
 
 const IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1000
-const EDITABLE_STATES = new Set<ContentState>(['DRAFT', 'REJECTED', 'PENDING_REVIEW', 'RESTORED'])
+const EDITABLE_STATES = new Set<ContentState>(['DRAFT', 'REJECTED', 'RESTORED'])
 const ALL_STATES: readonly ContentState[] = [
   'DRAFT','PENDING_REVIEW','REJECTED','APPROVED','SCHEDULED',
   'PUBLISHED','UNPUBLISHED','ARCHIVED','DELETED','RESTORED',
@@ -448,8 +448,14 @@ const atomicGuard = (db: ContentD1): D1PreparedStatement =>
      VALUES (1, changes())`,
   )
 
-const isUniqueConstraint = (error: unknown): boolean =>
-  /unique constraint|constraint failed|UNIQUE constraint/i.test(error instanceof Error ? error.message : String(error))
+const errorMessage = (error: unknown): string =>
+  error instanceof Error ? error.message : String(error)
+
+const isIdempotencyUniqueConstraint = (error: unknown): boolean =>
+  /unique constraint failed: content_mutation_idempotency\.|UNIQUE constraint failed: content_mutation_idempotency\./i.test(errorMessage(error))
+
+const isContentCasGuardFailure = (error: unknown): boolean =>
+  /CHECK constraint failed: successful|content_txn_guard.*CHECK constraint/i.test(errorMessage(error))
 
 const batchMutation = async (
   db: ContentD1,
@@ -458,7 +464,8 @@ const batchMutation = async (
   try {
     await db.batch(statements)
   } catch (error) {
-    if (isUniqueConstraint(error)) throw new ContentRuntimeError('IDEMPOTENCY_IN_PROGRESS', 409)
+    if (isIdempotencyUniqueConstraint(error)) throw new ContentRuntimeError('IDEMPOTENCY_IN_PROGRESS', 409)
+    if (isContentCasGuardFailure(error)) throw new ContentRuntimeError('PRECONDITION_FAILED', 412)
     throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
   }
 }
@@ -664,55 +671,65 @@ export async function createContent(
 
   const replay = inspectIdempotency(existing, ownerUserId, hash, now)
   if (replay.replayed) {
-    const parsed = replay.body as { id?: unknown; state?: unknown; version?: unknown; etag?: unknown; slug?: unknown; title?: unknown; bodyRef?: unknown; contentType?: unknown; mediaRefs?: unknown; coverRef?: unknown } | null
-    if (!parsed || typeof parsed.id !== 'string' || typeof parsed.slug !== 'string' || !isState(parsed.state) || typeof parsed.version !== 'number' || typeof parsed.etag !== 'string' || typeof parsed.title !== 'string' || typeof parsed.bodyRef !== 'string' || !['article','post','video'].includes(String(parsed.contentType)) || !Array.isArray(parsed.mediaRefs) || parsed.mediaRefs.some(ref => typeof ref !== 'string')) {
+    const parsed = replay.body as Partial<ContentRecord> | null
+    if (
+      !parsed ||
+      typeof parsed.id !== 'string' ||
+      !['article', 'post', 'video'].includes(String(parsed.contentType)) ||
+      parsed.ownerUserId !== ownerUserId ||
+      parsed.creatorId !== ownerUserId ||
+      parsed.ipId !== null ||
+      !isState(parsed.state) ||
+      typeof parsed.version !== 'number' ||
+      parsed.version < 1 ||
+      typeof parsed.revision !== 'number' ||
+      parsed.revision < 1 ||
+      typeof parsed.slug !== 'string' ||
+      typeof parsed.title !== 'string' ||
+      typeof parsed.bodyRef !== 'string' ||
+      !Array.isArray(parsed.mediaRefs) ||
+      parsed.mediaRefs.some(ref => typeof ref !== 'string') ||
+      (parsed.coverRef !== null && typeof parsed.coverRef !== 'string') ||
+      typeof parsed.etag !== 'string' ||
+      typeof parsed.createdAt !== 'string' ||
+      typeof parsed.updatedAt !== 'string'
+    ) {
       throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
     }
-    return {
-      id: parsed.id,
-      contentType: parsed.contentType as ContentType,
-      ownerUserId,
-      creatorId: ownerUserId,
-      ipId: null,
-      state: parsed.state,
-      version: parsed.version,
-      revision: 1,
-      slug: parsed.slug,
-      title: parsed.title,
-      bodyRef: parsed.bodyRef,
-      mediaRefs: parsed.mediaRefs as string[],
-      coverRef: typeof parsed.coverRef === 'string' ? parsed.coverRef : null,
-      etag: parsed.etag,
-      createdAt: now.toISOString(),
-      updatedAt: now.toISOString(),
-    }
+    return parsed as ContentRecord
   }
 
   const contentId = crypto.randomUUID()
   const slug = contentSlugFor(normalized.title, contentId)
   const createdAt = now.toISOString()
   const expiresAt = new Date(now.getTime() + IDEMPOTENCY_TTL_MS).toISOString()
-  const responseBody = {
+  const createdContent: ContentRecord = {
     id: contentId,
-    state: 'DRAFT' as const,
+    contentType: normalized.contentType,
+    ownerUserId,
+    creatorId: ownerUserId,
+    ipId: null,
+    state: 'DRAFT',
     version: 1,
-    etag: etagForVersion(1),
+    revision: 1,
     slug,
     title: normalized.title,
     bodyRef: normalized.bodyRef,
-    contentType: normalized.contentType,
     mediaRefs: normalized.mediaRefs,
     coverRef: normalized.coverRef,
+    etag: etagForVersion(1),
+    createdAt,
+    updatedAt: createdAt,
   }
 
   await batchMutation(db, [
     expireMutationRow(db, ownerUserId, operationId, idempotencyKey, createdAt),
-    insertCompletedIdempotency(db, ownerUserId, operationId, idempotencyKey, hash, 201, JSON.stringify(responseBody), createdAt, expiresAt),
+    insertCompletedIdempotency(db, ownerUserId, operationId, idempotencyKey, hash, 201, JSON.stringify(createdContent), createdAt, expiresAt),
     db.prepare(
       `INSERT INTO contents
         (id, content_type, owner_user_id, creator_id, ip_id, state, version, revision, slug, title, body_ref, media_refs_json, cover_ref, etag, created_at, updated_at)
        VALUES (?, ?, ?, ?, NULL, 'DRAFT', 1, 1, ?, ?, ?, ?, ?, ?, ?, ?) `,
-    ).bind(contentId, normalized.contentType, ownerUserId, ownerUserId, slug, normalized.title, normalized.bodyRef, JSON.stringify(normalized.mediaRefs), normalized.coverRef, responseBody.etag, createdAt, createdAt),
+    ).bind(contentId, normalized.contentType, ownerUserId, ownerUserId, slug, normalized.title, normalized.bodyRef, JSON.stringify(normalized.mediaRefs), normalized.coverRef, createdContent.etag, createdAt, createdAt),
     atomicGuard(db),
     insertRevision(db, {
       id: crypto.randomUUID(),
@@ -727,32 +744,15 @@ export async function createContent(
       title: normalized.title,
       bodyRef: normalized.bodyRef,
       mediaRefs: normalized.mediaRefs,
-      coverRef: responseBody.coverRef,
-      etag: responseBody.etag,
+      coverRef: createdContent.coverRef,
+      etag: createdContent.etag,
       reason: null,
       correlationId: normalizeCorrelationId(correlationId),
       createdAt,
     }),
   ])
 
-  return {
-    id: contentId,
-    contentType: normalized.contentType,
-    ownerUserId,
-    creatorId: ownerUserId,
-    ipId: null,
-    state: 'DRAFT',
-    version: 1,
-    revision: 1,
-    slug,
-    title: normalized.title,
-    bodyRef: normalized.bodyRef,
-    mediaRefs: normalized.mediaRefs,
-    coverRef: normalized.coverRef,
-    etag: responseBody.etag,
-    createdAt,
-    updatedAt: createdAt,
-  }
+  return createdContent
 }
 
 export async function updateContent(
@@ -987,8 +987,8 @@ export async function deleteContent(
   ])
 }
 
-const actorKindForLayer = (layer: string): 'CREATOR' | 'MODERATOR' | null =>
-  layer === 'L3' ? 'CREATOR' : ['L6','L7','L8'].includes(layer) ? 'MODERATOR' : null
+const actorKindForLayer = (layer: string): 'CREATOR' | null =>
+  layer === 'L3' ? 'CREATOR' : null
 
 export const canTransitionContentState = (
   from: ContentState,
@@ -1045,8 +1045,12 @@ export async function transitionContentState(
   if (!content) throw new ContentRuntimeError('NOT_FOUND', 404)
 
   assertEtag(content.etag, ifMatch)
-  if (!canTransitionContentState(content.state, to, kind, content.ownerUserId === principalUserId, reason)) {
+  const ownsContent = content.ownerUserId === principalUserId
+  if (kind === 'CREATOR' && !ownsContent) {
     throw new ContentRuntimeError('PERMISSION_DENIED', 403)
+  }
+  if (!canTransitionContentState(content.state, to, kind, ownsContent, reason)) {
+    throw new ContentRuntimeError('INVALID_STATE', 409)
   }
 
   const nextVersion = content.version + 1
