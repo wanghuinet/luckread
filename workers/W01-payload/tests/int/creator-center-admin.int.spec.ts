@@ -20,6 +20,7 @@ describe('Creator Center admin extension', () => {
     const publisher = read('src/app/(frontend)/publish/PublishComposer.tsx')
     expect(publisher).toContain('mediaRefsFromArticleDocument(articleDocument)')
     expect(publisher).toContain("...(type === 'article' ? mediaRefsFromArticleDocument(articleDocument) : [])")
+    expect(publisher).toContain('mediaRefs: Array.from(new Set([')
   })
 
   it('makes the content version explicit inside the publish preview', () => {
