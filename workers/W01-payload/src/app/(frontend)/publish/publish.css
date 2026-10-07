@@ -1066,3 +1066,197 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+
+/* Editor plugin host extensions */
+.lr-editor-plugin-button {
+  min-height: 29px;
+  padding: 0 9px;
+  border: 1px solid #cdd9e8;
+  border-radius: 8px;
+  background: #f8fbff;
+  color: #1d4ed8;
+  font-size: 9px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.lr-editor-plugin-button:hover:not(:disabled) {
+  border-color: #93c5fd;
+  background: #eff6ff;
+}
+
+.lr-editor-plugin-button:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+
+.lr-editor-plugin-panel {
+  margin-top: 10px;
+  padding: 13px;
+  border: 1px solid #dce5f0;
+  border-radius: 11px;
+  background: #f8fbff;
+}
+
+.lr-editor-plugin-panel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.lr-editor-plugin-panel-head > div {
+  display: grid;
+  gap: 4px;
+}
+
+.lr-editor-plugin-panel-head strong {
+  color: #263247;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.lr-editor-plugin-panel-head span {
+  color: #7b8799;
+  font-size: 9px;
+  line-height: 1.5;
+}
+
+.lr-editor-plugin-close {
+  width: 28px;
+  height: 28px;
+  flex: none;
+  border: 1px solid #dbe4ef;
+  border-radius: 7px;
+  background: #fff;
+  color: #64748b;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.lr-editor-markdown-mode {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 11px;
+  color: #526078;
+  font-size: 9px;
+}
+
+.lr-editor-markdown-mode label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.lr-editor-markdown-mode input {
+  width: 13px;
+  height: 13px;
+}
+
+.lr-editor-markdown-input {
+  width: 100%;
+  margin-top: 10px;
+  padding: 10px 11px;
+  min-height: 210px;
+  resize: vertical;
+  border: 1px solid #d6dfeb;
+  border-radius: 9px;
+  background: #fff;
+  color: #172033;
+  outline: none;
+  font: 12px/1.7 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+}
+
+.lr-editor-markdown-input:focus {
+  border-color: #93c5fd;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, .08);
+}
+
+.lr-editor-plugin-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 7px;
+  margin-top: 9px;
+}
+
+.lr-editor-plugin-actions button {
+  min-height: 32px;
+  padding: 0 10px;
+  border-radius: 8px;
+  font-size: 9px;
+  font-weight: 780;
+  cursor: pointer;
+}
+
+.lr-editor-plugin-actions .primary {
+  border: 1px solid #1d4ed8;
+  background: #2563eb;
+  color: #fff;
+}
+
+.lr-editor-plugin-actions .secondary {
+  border: 1px solid #dbe2ec;
+  background: #fff;
+  color: #526078;
+}
+
+.lr-editor-plugin-actions button:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+
+.lr-editor-plugin-error {
+  margin-top: 9px;
+  padding: 9px 10px;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  background: #fff7f7;
+  color: #b91c1c;
+  font-size: 9px;
+  line-height: 1.5;
+}
+
+.lr-editor-markdown-result {
+  margin-top: 9px;
+  padding: 9px 10px;
+  border: 1px solid #dce5f0;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.lr-editor-markdown-result > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.lr-editor-markdown-result strong {
+  color: #334155;
+  font-size: 10px;
+}
+
+.lr-editor-markdown-result span {
+  color: #8b96a8;
+  font-size: 9px;
+}
+
+.lr-editor-markdown-result p {
+  margin: 6px 0 0;
+  color: #66758b;
+  font-size: 9px;
+  line-height: 1.55;
+}
+
+@media (max-width: 640px) {
+  .lr-editor-plugin-actions {
+    flex-direction: column;
+  }
+
+  .lr-editor-plugin-actions button {
+    width: 100%;
+  }
+}
