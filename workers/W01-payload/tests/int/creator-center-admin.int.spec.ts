@@ -106,12 +106,24 @@ describe('Creator Center admin extension', () => {
     expect(members).not.toContain('limit=1000')
   })
 
+  it('manages Creator Studio organization covers through the existing media upload and PATCH flow', () => {
+    const organization = read('src/app/(payload)/v1beta/CreatorContentOrganization.tsx')
+    expect(organization).toContain("method: 'POST'")
+    expect(organization).toContain("formData.append('file', file)")
+    expect(organization).toContain("'/api/v1/media'")
+    expect(organization).toContain("'Idempotency-Key': 'content-organization-cover-upload:'")
+    expect(organization).toContain('accept="image/*"')
+    expect(organization).toContain("coverRef: editForm.coverRef.trim() ? editForm.coverRef.trim() : null")
+    expect(organization).toContain('清除封面')
+    expect(organization).toContain('组织封面必须是图片文件。')
+  })
+
   it('updates Series and Collection metadata through the canonical PATCH API', () => {
     const organization = read('src/app/(payload)/v1beta/CreatorContentOrganization.tsx')
     expect(organization).toContain("method: 'PATCH'")
     expect(organization).toContain("'If-Match': item.etag")
     expect(organization).toContain("'Idempotency-Key': 'content-organization-update:'")
-    expect(organization).toContain("coverRef: item.coverRef ?? null")
+    expect(organization).toContain("coverRef: editForm.coverRef.trim() ? editForm.coverRef.trim() : null")
     expect(organization).toContain("maxLength={512}")
     expect(organization).toContain("maxLength={4096}")
     expect(organization).toContain("setEditingOrganizationId(null)")

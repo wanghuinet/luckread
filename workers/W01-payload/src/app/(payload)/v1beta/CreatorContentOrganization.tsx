@@ -1,6 +1,6 @@
 'use client'
 
-import { FormEvent, Fragment, useCallback, useEffect, useState } from 'react'
+import { ChangeEvent, FormEvent, Fragment, useCallback, useEffect, useState } from 'react'
 
 import CreatorContentOrganizationMembers from './CreatorContentOrganizationMembers'
 import styles from './creator-center.module.css'
@@ -44,6 +44,7 @@ const kindMeta: Record<Kind, { label: string; eyebrow: string; singular: string;
 const emptyForm = {
   title: '',
   description: '',
+  coverRef: '',
 }
 
 function redirectToLogin(loginPath: '/admin/login' | '/login') {
@@ -98,6 +99,7 @@ export default function CreatorContentOrganization({
   const [editingOrganizationId, setEditingOrganizationId] = useState<string | null>(null)
   const [editForm, setEditForm] = useState(emptyForm)
   const [savingEdit, setSavingEdit] = useState(false)
+  const [coverUploading, setCoverUploading] = useState(false)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -200,6 +202,7 @@ export default function CreatorContentOrganization({
     setEditForm({
       title: item.title,
       description: item.description,
+      coverRef: item.coverRef ?? '',
     })
     setError('')
   }
@@ -210,9 +213,49 @@ export default function CreatorContentOrganization({
     setEditForm(emptyForm)
   }
 
+  async function uploadOrganizationCover(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      setError('组织封面必须是图片文件。')
+      return
+    }
+
+    setCoverUploading(true)
+    setError('')
+    try {
+      const formData = new FormData()
+      formData.append('_payload', JSON.stringify({ alt: file.name }))
+      formData.append('file', file)
+      const response = await fetch('/api/v1/media', {
+        method: 'POST',
+        credentials: 'include',
+        cache: 'no-store',
+        headers: { 'Idempotency-Key': 'content-organization-cover-upload:' + crypto.randomUUID() },
+        body: formData,
+      })
+      const data: { doc?: { url?: string }; url?: string; error?: { message?: string } } | null =
+        await response.json().catch((): null => null)
+      if (response.status === 401) {
+        redirectToLogin(loginPath)
+        return
+      }
+      const url = data?.doc?.url ?? data?.url
+      if (!response.ok || typeof url !== 'string' || !url) {
+        throw new Error(data?.error?.message || '组织封面上传失败')
+      }
+      setEditForm((current) => ({ ...current, coverRef: url }))
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : '组织封面上传失败')
+    } finally {
+      setCoverUploading(false)
+    }
+  }
+
   async function updateOrganization(item: OrganizationItem, event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (!editForm.title.trim() || savingEdit) return
+    if (!editForm.title.trim() || savingEdit || coverUploading) return
 
     setSavingEdit(true)
     setError('')
@@ -229,7 +272,7 @@ export default function CreatorContentOrganization({
         body: JSON.stringify({
           title: editForm.title.trim(),
           description: editForm.description.trim(),
-          coverRef: item.coverRef ?? null,
+          coverRef: editForm.coverRef.trim() ? editForm.coverRef.trim() : null,
         }),
       })
       const data: { error?: { message?: string } } | null = await response.json().catch((): null => null)
@@ -456,7 +499,39 @@ export default function CreatorContentOrganization({
                       value={editForm.description}
                     />
                   </label>
-                  <button className={styles.primaryButton + ' btn'} disabled={!editForm.title.trim() || savingEdit} type="submit">
+                  <div className={styles.filterSelect}>
+                    <span>封面</span>
+                    {editForm.coverRef ? (
+                      <div className={styles.contentListThumb}>
+                        <img alt={activeMeta.singular + '封面预览'} loading="lazy" src={editForm.coverRef} />
+                      </div>
+                    ) : (
+                      <span>尚未设置封面</span>
+                    )}
+                    <div className={styles.sectionActions}>
+                      <label className={styles.secondaryButton + ' btn'}>
+                        <span>{coverUploading ? '上传中…' : '上传图片封面'}</span>
+                        <input
+                          accept="image/*"
+                          disabled={coverUploading || savingEdit}
+                          hidden
+                          onChange={(event) => void uploadOrganizationCover(event)}
+                          type="file"
+                        />
+                      </label>
+                      {editForm.coverRef ? (
+                        <button
+                          className={styles.secondaryButton + ' btn'}
+                          disabled={coverUploading || savingEdit}
+                          onClick={() => setEditForm((current) => ({ ...current, coverRef: '' }))}
+                          type="button"
+                        >
+                          清除封面
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
+                  <button className={styles.primaryButton + ' btn'} disabled={!editForm.title.trim() || savingEdit || coverUploading} type="submit">
                     {savingEdit ? '保存中…' : '保存'}
                   </button>
                 </form>
