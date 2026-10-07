@@ -255,7 +255,7 @@ export default function CreatorContentOrganization({
 
   async function updateOrganization(item: OrganizationItem, event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (!editForm.title.trim() || savingEdit) return
+    if (!editForm.title.trim() || savingEdit || coverUploading) return
 
     setSavingEdit(true)
     setError('')
@@ -514,6 +514,7 @@ export default function CreatorContentOrganization({
                         <input
                           accept="image/*"
                           disabled={coverUploading || savingEdit}
+                          hidden
                           onChange={(event) => void uploadOrganizationCover(event)}
                           type="file"
                         />
