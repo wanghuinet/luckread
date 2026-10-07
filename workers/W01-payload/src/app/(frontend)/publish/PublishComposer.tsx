@@ -345,7 +345,7 @@ export default function PublishComposer({
         autoSaveTimerRef.current = null
       }
     }
-  }, [title, body, type, assets, coverRef])
+  }, [title, body, type, assets, coverRef, busy])
 
   function startNewContent() {
     setDraft(null)
@@ -386,6 +386,9 @@ export default function PublishComposer({
     if (type === 'video' && assets.length === 0) throw new Error('视频至少需要添加一个媒体文件。')
 
     const savedDraft = await persistDraft()
+    autoSaveDirtyRef.current = false
+    autoSaveLastSavedAtRef.current = Date.now()
+    setAutoSaveStatus('saved')
     const input = {
       contentType: type,
       title: title.trim(),
@@ -521,6 +524,7 @@ export default function PublishComposer({
           ? { ...current, state: transition.to, version: transition.version, etag: transition.etag }
           : current,
       )
+      autoSaveDirtyRef.current = false
       window.dispatchEvent(new Event(CONTENT_MUTATED_EVENT))
       setMessage('发布前检查通过，已提交审核。审核通过后将进入正式发布状态。')
     } catch (caught) {
