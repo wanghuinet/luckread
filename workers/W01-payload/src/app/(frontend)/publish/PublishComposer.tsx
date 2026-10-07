@@ -89,6 +89,8 @@ export default function PublishComposer({
   const autoSaveLastSavedAtRef = useRef<number | null>(null)
   const autoSaveChangeTokenRef = useRef(0)
   const restoreCompleteRef = useRef(false)
+  const busyRef = useRef(false)
+  busyRef.current = busy
 
   useEffect(() => {
     let cancelled = false
@@ -189,7 +191,6 @@ export default function PublishComposer({
       const uploaded: UploadedAsset[] = []
       for (const file of selected.slice(0, remainingSlots)) uploaded.push(await uploadFile(file))
       setAssets((current) => [...current, ...uploaded])
-      scheduleAutoSave()
       setMessage(`已上传 ${uploaded.length} 个媒体文件`)
       if (selected.length > remainingSlots) setError('已达到 12 个媒体文件上限，其余文件未上传。')
     } catch {
@@ -202,7 +203,6 @@ export default function PublishComposer({
 
   function removeAsset(id: string) {
     setAssets((current) => current.filter((asset) => asset.id !== id))
-    scheduleAutoSave()
   }
 
   const reviewLocked = draft?.state === 'PENDING_REVIEW'
@@ -278,7 +278,7 @@ export default function PublishComposer({
     setAutoSaveStatus('scheduled')
     autoSaveTimerRef.current = window.setTimeout(async () => {
       autoSaveTimerRef.current = null
-      if (changeToken !== autoSaveChangeTokenRef.current || autoSaveInFlightRef.current || !title.trim() || !body.trim() || reviewLocked) {
+      if (changeToken !== autoSaveChangeTokenRef.current || autoSaveInFlightRef.current || busyRef.current || !title.trim() || !body.trim() || reviewLocked) {
         return
       }
 
@@ -299,8 +299,11 @@ export default function PublishComposer({
     }, delay)
   }
 
+  const autoSaveSchedulerRef = useRef<() => void>(() => {})
+  autoSaveSchedulerRef.current = scheduleAutoSave
+
   useEffect(() => {
-    scheduleAutoSave()
+    autoSaveSchedulerRef.current()
     return () => {
       if (autoSaveTimerRef.current) {
         window.clearTimeout(autoSaveTimerRef.current)
@@ -501,7 +504,7 @@ export default function PublishComposer({
             className={type === value ? 'active' : ''}
             key={value}
             disabled={busy || reviewLocked}
-            onClick={() => { setType(value); scheduleAutoSave() }}
+            onClick={() => setType(value)}
             role="tab"
             type="button"
           >
@@ -515,7 +518,7 @@ export default function PublishComposer({
         <input
           maxLength={512}
           disabled={busy || reviewLocked}
-          onChange={(event) => { setTitle(event.target.value); scheduleAutoSave() }}
+          onChange={(event) => setTitle(event.target.value)}
           placeholder={type === 'post' ? '这一刻想分享什么？' : '输入一个清晰、有吸引力的标题'}
           value={title}
         />
@@ -525,7 +528,7 @@ export default function PublishComposer({
         <span>{type === 'post' ? '正文' : type === 'video' ? '视频简介' : '正文'}</span>
         <textarea
           disabled={busy || reviewLocked}
-          onChange={(event) => { setBody(event.target.value); scheduleAutoSave() }}
+          onChange={(event) => setBody(event.target.value)}
           placeholder="写下你的内容…"
           rows={14}
           value={body}
@@ -625,7 +628,7 @@ export default function PublishComposer({
         <span>封面引用（可选）</span>
         <input
           disabled={busy || reviewLocked}
-          onChange={(event) => { setCoverRef(event.target.value); scheduleAutoSave() }}
+          onChange={(event) => setCoverRef(event.target.value)}
           placeholder="默认使用第一个媒体文件"
           value={coverRef}
         />
