@@ -22,6 +22,8 @@ on:
       - 'workers/W01-payload/src/lib/content-list-cache-guard.ts'
       - 'workers/W01-payload/src/lib/content-list-cache-guard.test.ts'
       - 'workers/W01-payload/src/app/api/v1/contents/**'
+      - 'workers/W01-payload/src/app/api/v1/comments/**'
+      - 'workers/W01-payload/src/social/w05-social-client.ts'
       - 'workers/W01-payload/src/app/api/v1/media/[mediaId]/route.ts'
       - 'contracts/resource-budget/1.0-d1-traffic-guard.v1.json'
       - '.github/workflows/1.1-p0-cache-hardening-ci.yml'
