@@ -26,3 +26,23 @@ export type ArticleEditorPlugin = {
   Toolbar?: ComponentType<ArticleEditorPluginContext>
   Panel?: ComponentType<ArticleEditorPluginContext>
 }
+
+
+export const normalizeArticleEditorPlugins = (
+  plugins: readonly ArticleEditorPlugin[],
+): ArticleEditorPlugin[] => {
+  const seen = new Set<string>()
+  return plugins
+    .filter((plugin) => plugin.id.trim())
+    .slice()
+    .sort(
+      (left, right) =>
+        (left.order ?? 0) - (right.order ?? 0) || left.id.localeCompare(right.id),
+    )
+    .map((plugin) => ({ ...plugin, id: plugin.id.trim() }))
+    .filter((plugin) => {
+      if (seen.has(plugin.id)) return false
+      seen.add(plugin.id)
+      return true
+    })
+}

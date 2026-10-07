@@ -186,6 +186,16 @@ export const plainTextFromArticleDocument = (document: ArticleDocument): string 
     .filter(Boolean)
     .join('\n\n')
 
+export const mediaRefsFromArticleDocument = (document: ArticleDocument): string[] =>
+  Array.from(
+    new Set(
+      document.blocks
+        .flatMap((block) => block.mediaRefs ?? [])
+        .map((ref) => ref.trim())
+        .filter(Boolean),
+    ),
+  )
+
 export const articleDocumentFromBody = (raw: string): ArticleDocument => {
   const structured = tryDeserializeArticleDocument(raw)
   if (structured) return structured

@@ -16,12 +16,26 @@ describe('Creator Center admin extension', () => {
     expect(users).toContain('admin: payloadAdminOnly')
   })
 
+  it('persists structured article media references alongside uploaded assets', () => {
+    const publisher = read('src/app/(frontend)/publish/PublishComposer.tsx')
+    expect(publisher).toContain('mediaRefsFromArticleDocument(articleDocument)')
+    expect(publisher).toContain("...(type === 'article' ? mediaRefsFromArticleDocument(articleDocument) : [])")
+    expect(publisher).toContain('mediaRefs: Array.from(new Set([')
+  })
+
   it('makes the content version explicit inside the publish preview', () => {
     const publisher = read('src/app/(frontend)/publish/PublishComposer.tsx')
     expect(publisher).toContain('<strong>发布预览</strong>')
     expect(publisher).toContain("aria-label={'预览版本 ' + draft.version}")
     expect(publisher).toContain('版本 v{draft.version}')
     expect(publisher).toContain('当前草稿版本')
+  })
+
+  it('uses the canonical structured article renderer in publish preview', () => {
+    const publisher = read('src/app/(frontend)/publish/PublishComposer.tsx')
+    expect(publisher).toContain("import ArticleStructuredRenderer from '../../../components/ArticleStructuredRenderer.js'")
+    expect(publisher).toContain('<ArticleStructuredRenderer document={articleDocument} />')
+    expect(publisher).not.toContain('{articleDocument.blocks.map((block) => {')
   })
 
   it('preserves the full publish return path when authentication expires', () => {
@@ -108,6 +122,24 @@ describe('Creator Center admin extension', () => {
     expect(moderation).toContain('if (response.status === 401)')
   })
 
+  it('restores media type hints so restored video drafts remain publishable', () => {
+    const publisher = read('src/app/(frontend)/publish/PublishComposer.tsx')
+    expect(publisher).toContain('const inferRestoredMediaType = (url: string, contentType: ContentType): string => {')
+    expect(publisher).toContain("if (contentType === 'article') return 'image/*'")
+    expect(publisher).toContain("/\\.(?:mp4|webm|mov|m4v|avi|mkv)(?:$|[?#])/.test(pathname)")
+    expect(publisher).toContain('mimeType: inferRestoredMediaType(url, recovered.contentType ?? \'article\')')
+    expect(publisher).not.toContain("mimeType: 'application/octet-stream'")
+  })
+
+  it('preserves the structured article document when switching content types away and back', () => {
+    const publisher = read('src/app/(frontend)/publish/PublishComposer.tsx')
+    expect(publisher).toContain('const existingArticleText = plainTextFromArticleDocument(articleDocument).trim()')
+    expect(publisher).toContain('const nextDocument = existingArticleText')
+    expect(publisher).toContain('  ? articleDocument')
+    expect(publisher).toContain('  : articleDocumentFromBody(body)')
+    expect(publisher).not.toContain('const nextDocument = articleDocumentFromBody(body)')
+  })
+
   it('hardens short-video media validation and cover selection', () => {
     const publisher = read('src/app/(frontend)/publish/PublishComposer.tsx')
 
@@ -115,9 +147,11 @@ describe('Creator Center admin extension', () => {
     expect(publisher).toContain('短视频至少需要添加一个视频素材。')
     expect(publisher).toContain('const resolveCoverRef')
     expect(publisher).toContain('assets.find(isImageAsset)?.url ?? null')
+    expect(publisher).toContain('fallbackRefs[0] ?? assets[0]?.url ?? null')
     expect(publisher).toContain("'当前封面'")
     expect(publisher).toContain('默认使用第一张图片素材')
-    expect(publisher).toContain('resolveCoverRef(type, assets, coverRef)')
+    expect(publisher).toContain('mediaRefsFromArticleDocument(articleDocument)')
+    expect(publisher).toContain('coverRef: resolveCoverRef(')
   })
 
   it('paginates organization members from the canonical cursor response', () => {
@@ -132,12 +166,26 @@ describe('Creator Center admin extension', () => {
     expect(members).toContain('page.hasMore')
   })
 
+  it('registers Word import through the structured editor plugin registry', () => {
+    const registry = read('src/components/article-editor-plugins.ts')
+    const plugin = read('src/components/article-editor-word-import-plugin.tsx')
+    const editor = read('src/components/ArticleStructuredEditor.tsx')
+    expect(registry).toContain("import { articleWordImportPlugin } from './article-editor-word-import-plugin.js'")
+    expect(registry).toContain('export const articleEditorPlugins: readonly ArticleEditorPlugin[] = [articleWordImportPlugin]')
+    expect(plugin).toContain("id: 'word-import'")
+    expect(plugin).toContain('Toolbar: WordImportToolbar')
+    expect(plugin).toContain('onImport={updateDocument}')
+    expect(editor).not.toContain("import ArticleWordImportButton from './ArticleWordImportButton.js'")
+    expect(editor).not.toContain('<ArticleWordImportButton disabled={disabled} onImport={emit} />')
+  })
+
   it('makes Word import available in the Creator Studio structured article editor', () => {
     const editor = read('src/components/ArticleStructuredEditor.tsx')
+    const plugin = read('src/components/article-editor-word-import-plugin.tsx')
     const importer = read('src/components/ArticleWordImportButton.tsx')
     const adapter = read('src/features/word-import/article-document-adapter.ts')
-    expect(editor).toContain("import ArticleWordImportButton from './ArticleWordImportButton.js'")
-    expect(editor).toContain('<ArticleWordImportButton disabled={disabled} onImport={emit} />')
+    expect(plugin).toContain("import ArticleWordImportButton from './ArticleWordImportButton.js'")
+    expect(plugin).toContain('<ArticleWordImportButton disabled={disabled} onImport={updateDocument} />')
     expect(importer).toContain('accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"')
     expect(importer).toContain("fetch('/api/v1/media'")
     expect(importer).toContain("new Blob([bytes as BlobPart], { type: mimeType })")
@@ -161,11 +209,19 @@ describe('Creator Center admin extension', () => {
     expect(plugin).toContain("insertMedia: (type: 'image' | 'gallery', assetUrls?: string[]) => void")
     expect(editor).toContain('plugins?: readonly ArticleEditorPlugin[]')
     expect(editor).toContain('const orderedPlugins = useMemo(')
-    expect(editor).toContain(".sort((left, right) => (left.order ?? 0) - (right.order ?? 0) || left.id.localeCompare(right.id))")
+    expect(editor).toContain('normalizeArticleEditorPlugins(plugins)')
     expect(editor).toContain("<Toolbar key={plugin.id + ':toolbar'}")
     expect(editor).toContain('<Panel key={plugin.id + \':panel\'}')
-    expect(registry).toContain('export const articleEditorPlugins: readonly ArticleEditorPlugin[] = []')
+    expect(registry).toContain('export const articleEditorPlugins: readonly ArticleEditorPlugin[] = [articleWordImportPlugin]')
     expect(publisher).toContain('plugins={articleEditorPlugins}')
+  })
+
+  it('keeps structured article media reusable after draft restore or Word import', () => {
+    const editor = read('src/components/ArticleStructuredEditor.tsx')
+    expect(editor).toContain('mediaRefsFromArticleDocument(value)')
+    expect(editor).toContain("id: 'article-document-media:' + url")
+    expect(editor).toContain("filename: '正文已关联图片'")
+    expect(editor).toContain("mimeType: 'image/*'")
   })
 
   it('filters only already-loaded creator content without adding a search endpoint', () => {

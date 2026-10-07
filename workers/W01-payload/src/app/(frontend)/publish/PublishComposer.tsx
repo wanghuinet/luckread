@@ -2,8 +2,9 @@
 
 import { ChangeEvent, useEffect, useRef, useState } from 'react'
 import { computeAutoSaveDelay } from '../../../lib/content-autosave.js'
-import { articleDocumentFromBody, plainTextFromArticleDocument, serializeArticleDocument, createArticleDocument, tryDeserializeArticleDocument, type ArticleDocument } from '../../../lib/article-document.js'
+import { articleDocumentFromBody, plainTextFromArticleDocument, mediaRefsFromArticleDocument, serializeArticleDocument, createArticleDocument, tryDeserializeArticleDocument, type ArticleDocument } from '../../../lib/article-document.js'
 import ArticleStructuredEditor from '../../../components/ArticleStructuredEditor.js'
+import ArticleStructuredRenderer from '../../../components/ArticleStructuredRenderer.js'
 import { articleEditorPlugins } from '../../../components/article-editor-plugins.js'
 import { useRouter } from 'next/navigation'
 
@@ -65,15 +66,28 @@ async function authorizedFetch(input: RequestInfo | URL, init: RequestInit = {})
 const isVideoAsset = (asset: UploadedAsset): boolean => asset.mimeType.startsWith('video/')
 const isImageAsset = (asset: UploadedAsset): boolean => asset.mimeType.startsWith('image/')
 
+const inferRestoredMediaType = (url: string, contentType: ContentType): string => {
+  if (contentType === 'article') return 'image/*'
+  const pathname = (() => {
+    try {
+      return new URL(url).pathname.toLowerCase()
+    } catch {
+      return url.toLowerCase()
+    }
+  })()
+  return /\.(?:mp4|webm|mov|m4v|avi|mkv)(?:$|[?#])/.test(pathname) ? 'video/*' : 'image/*'
+}
+
 const resolveCoverRef = (
   type: ContentType,
   assets: UploadedAsset[],
   explicitCoverRef: string,
+  fallbackRefs: string[] = [],
 ): string | null => {
   const explicit = explicitCoverRef.trim()
   if (explicit) return explicit
   if (type === 'video') return assets.find(isImageAsset)?.url ?? null
-  return assets[0]?.url ?? null
+  return fallbackRefs[0] ?? assets[0]?.url ?? null
 }
 
 type PublishComposerProps = {
@@ -162,7 +176,7 @@ export default function PublishComposer({
           id: url,
           url,
           filename: '已关联媒体',
-          mimeType: 'application/octet-stream',
+          mimeType: inferRestoredMediaType(url, recovered.contentType ?? 'article'),
         })))
         setMessage(recovered.state === 'PENDING_REVIEW' ? '草稿已恢复，当前正在审核。' : '草稿已恢复。')
         restoreCompleteRef.current = true
@@ -290,8 +304,16 @@ export default function PublishComposer({
       contentType: type,
       title: title.trim(),
       bodyRef,
-      mediaRefs: assets.map((asset) => asset.url),
-      coverRef: resolveCoverRef(type, assets, coverRef),
+      mediaRefs: Array.from(new Set([
+        ...assets.map((asset) => asset.url),
+        ...(type === 'article' ? mediaRefsFromArticleDocument(articleDocument) : []),
+      ])),
+      coverRef: resolveCoverRef(
+        type,
+        assets,
+        coverRef,
+        type === 'article' ? mediaRefsFromArticleDocument(articleDocument) : [],
+      ),
     }
 
     const isUpdate = Boolean(draft?.id && draft.etag)
@@ -331,7 +353,10 @@ export default function PublishComposer({
   function handleContentTypeChange(nextType: ContentType) {
     if (nextType === type) return
     if (nextType === 'article') {
-      const nextDocument = articleDocumentFromBody(body)
+      const existingArticleText = plainTextFromArticleDocument(articleDocument).trim()
+      const nextDocument = existingArticleText
+        ? articleDocument
+        : articleDocumentFromBody(body)
       setArticleDocument(nextDocument)
       setBody(plainTextFromArticleDocument(nextDocument))
     } else if (type === 'article') {
@@ -470,8 +495,16 @@ export default function PublishComposer({
       contentType: type,
       title: title.trim(),
       body,
-      mediaRefs: assets.map((asset) => asset.url),
-      coverRef: coverRef.trim() || assets[0]?.url || null,
+      mediaRefs: Array.from(new Set([
+        ...assets.map((asset) => asset.url),
+        ...(type === 'article' ? mediaRefsFromArticleDocument(articleDocument) : []),
+      ])),
+      coverRef: resolveCoverRef(
+        type,
+        assets,
+        coverRef,
+        type === 'article' ? mediaRefsFromArticleDocument(articleDocument) : [],
+      ),
       aiMode,
       humanContribution: humanConfirmed ? 'substantial' : 'light',
     }
@@ -824,54 +857,27 @@ export default function PublishComposer({
             <span className="lr-preview-type">{type === 'article' ? '文章' : type === 'post' ? '动态' : '视频'}</span>
             <h2>{title.trim() || '未填写标题'}</h2>
             {type === 'article' ? (
-              <div className="lr-article-preview-body">
-                {articleDocument.blocks.map((block) => {
-                  if (block.type === 'divider') return <hr key={block.id} />
-                  if (block.type === 'heading') {
-                    return block.level === 3
-                      ? <h4 key={block.id}>{block.text}</h4>
-                      : <h3 key={block.id}>{block.text}</h3>
-                  }
-                  if (block.type === 'quote') return <blockquote key={block.id}>{block.text}</blockquote>
-                  if (block.type === 'image') {
-                    return (
-                      <figure key={block.id}>
-                        <img alt={block.text || '文章图片'} loading="lazy" src={block.mediaRefs?.[0]} />
-                        {block.text ? <figcaption>{block.text}</figcaption> : null}
-                      </figure>
-                    )
-                  }
-                  if (block.type === 'gallery') {
-                    return (
-                      <figure key={block.id}>
-                        <div className="lr-article-gallery-preview">
-                          {(block.mediaRefs ?? []).map((ref) => (
-                            <img alt={block.text || '文章图库'} key={ref} loading="lazy" src={ref} />
-                          ))}
-                        </div>
-                        {block.text ? <figcaption>{block.text}</figcaption> : null}
-                      </figure>
-                    )
-                  }
-                  if (block.type === 'bulletList' || block.type === 'orderedList') {
-                    const ListTag = block.type === 'bulletList' ? 'ul' : 'ol'
-                    return (
-                      <ListTag key={block.id}>
-                        {block.text.split('\\n').map((item, itemIndex) =>
-                          item.trim() ? <li key={block.id + '-' + itemIndex}>{item.trim()}</li> : null,
-                        )}
-                      </ListTag>
-                    )
-                  }
-                  return <p key={block.id}>{block.text}</p>
-                })}
-              </div>
+              <ArticleStructuredRenderer document={articleDocument} />
             ) : (
               <p className="lr-preview-body">{body.trim() || '暂无正文'}</p>
             )}
-            {resolveCoverRef(type, assets, coverRef) ? (
+            {resolveCoverRef(
+              type,
+              assets,
+              coverRef,
+              type === 'article' ? mediaRefsFromArticleDocument(articleDocument) : [],
+            ) ? (
               <div className="lr-preview-cover">
-                <img alt="" loading="eager" src={resolveCoverRef(type, assets, coverRef) ?? undefined} />
+                <img
+                  alt=""
+                  loading="eager"
+                  src={resolveCoverRef(
+                    type,
+                    assets,
+                    coverRef,
+                    type === 'article' ? mediaRefsFromArticleDocument(articleDocument) : [],
+                  ) ?? undefined}
+                />
               </div>
             ) : null}
             {assets.length ? (

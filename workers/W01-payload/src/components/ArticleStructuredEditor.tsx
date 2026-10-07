@@ -1,8 +1,12 @@
 'use client'
 
 import { useMemo } from 'react'
-import type { ArticleEditorPlugin, ArticleEditorPluginContext, EditorMediaAsset } from './ArticleEditorPlugin.js'
-import ArticleWordImportButton from './ArticleWordImportButton.js'
+import {
+  type ArticleEditorPlugin,
+  type ArticleEditorPluginContext,
+  type EditorMediaAsset,
+  normalizeArticleEditorPlugins,
+} from './ArticleEditorPlugin.js'
 import {
   ARTICLE_MAX_BLOCKS,
   ARTICLE_MAX_BLOCK_TEXT,
@@ -11,6 +15,7 @@ import {
   type ArticleDocument,
   createArticleBlock,
   createArticleMediaBlock,
+  mediaRefsFromArticleDocument,
   normalizeArticleDocument,
   plainTextFromArticleDocument,
 } from '../lib/article-document.js'
@@ -46,10 +51,31 @@ const updateBlock = (
 })
 
 export default function ArticleStructuredEditor({ value, disabled = false, mediaAssets = [], onChange, plugins = [] }: Props) {
-  const imageAssets = useMemo(
-    () => mediaAssets.filter((asset) => asset.mimeType.startsWith('image/')),
-    [mediaAssets],
-  )
+  const imageAssets = useMemo(() => {
+    const seenUrls = new Set<string>()
+    const result: EditorMediaAsset[] = []
+
+    for (const asset of mediaAssets) {
+      const url = asset.url.trim()
+      if (!url || !asset.mimeType.startsWith('image/') || seenUrls.has(url)) continue
+      seenUrls.add(url)
+      result.push(asset)
+    }
+
+    for (const ref of mediaRefsFromArticleDocument(value)) {
+      const url = ref.trim()
+      if (!url || seenUrls.has(url)) continue
+      seenUrls.add(url)
+      result.push({
+        id: 'article-document-media:' + url,
+        url,
+        filename: '正文已关联图片',
+        mimeType: 'image/*',
+      })
+    }
+
+    return result
+  }, [mediaAssets, value])
   const characterCount = useMemo(() => plainTextFromArticleDocument(value).length, [value])
 
   function emit(next: ArticleDocument) {
@@ -87,10 +113,7 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
   }
 
   const orderedPlugins = useMemo(
-    () => plugins
-      .filter((plugin) => plugin.id.trim())
-      .slice()
-      .sort((left, right) => (left.order ?? 0) - (right.order ?? 0) || left.id.localeCompare(right.id)),
+    () => normalizeArticleEditorPlugins(plugins),
     [plugins],
   )
 
@@ -128,7 +151,6 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
           <span>{value.blocks.length} 个区块 · {characterCount} 字</span>
         </div>
         <div className="lr-article-editor-tools" role="toolbar" aria-label="添加正文区块">
-          <ArticleWordImportButton disabled={disabled} onImport={emit} />
           {([
             ['paragraph', '正文'],
             ['heading', '标题'],
