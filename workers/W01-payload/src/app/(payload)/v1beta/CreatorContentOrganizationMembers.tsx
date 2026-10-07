@@ -102,6 +102,9 @@ export default function CreatorContentOrganizationMembers({
   const [currentEtag, setCurrentEtag] = useState(organization.etag)
   const [currentVersion, setCurrentVersion] = useState(organization.version)
   const [candidates, setCandidates] = useState<ContentCandidate[]>([])
+  const [candidateCursor, setCandidateCursor] = useState<string | null>(null)
+  const [candidateHasMore, setCandidateHasMore] = useState(false)
+  const [candidateLoading, setCandidateLoading] = useState(false)
   const [selectedContentId, setSelectedContentId] = useState('')
   const [loading, setLoading] = useState(true)
   const [busyKey, setBusyKey] = useState<string | null>(null)
@@ -135,8 +138,10 @@ export default function CreatorContentOrganizationMembers({
     return { page, nextEtag, nextVersion }
   }, [loginPath, organization.id, organization.etag, organization.version, organizationMeta.etagKey, organizationMeta.path])
 
-  const loadCandidates = useCallback(async (signal: AbortSignal) => {
-    const response = await fetch('/api/creator/contents?limit=50&status=PUBLISHED', {
+  const loadCandidates = useCallback(async (signal: AbortSignal, cursor: string | null = null) => {
+    const params = new URLSearchParams({ limit: '50', status: 'PUBLISHED' })
+    if (cursor) params.set('cursor', cursor)
+    const response = await fetch('/api/creator/contents?' + params.toString(), {
       credentials: 'include',
       headers: { accept: 'application/json' },
       cache: 'no-store',
@@ -209,6 +214,30 @@ export default function CreatorContentOrganizationMembers({
       if (cause instanceof Error && cause.message === 'AUTH_REQUIRED') return
       setError(cause instanceof Error ? cause.message : '组织成员暂时无法加载。')
     } finally {
+      controller.abort()
+    }
+  }
+
+  async function loadMoreCandidates() {
+    if (!candidateHasMore || candidateLoading || !candidateCursor) return
+    setCandidateLoading(true)
+    setError('')
+    const controller = new AbortController()
+    try {
+      const page = await loadCandidates(controller.signal, candidateCursor)
+      if (controller.signal.aborted) return
+      setCandidates((current) => {
+        const seen = new Set(current.map((item) => item.id))
+        return [...current, ...page.items.filter((item) => !seen.has(item.id))]
+      })
+      setCandidateCursor(page.nextCursor)
+      setCandidateHasMore(page.hasMore)
+    } catch (cause) {
+      if (controller.signal.aborted) return
+      if (cause instanceof Error && cause.message === 'AUTH_REQUIRED') return
+      setError(cause instanceof Error ? cause.message : '更多可加入内容暂时无法加载。')
+    } finally {
+      if (!controller.signal.aborted) setCandidateLoading(false)
       controller.abort()
     }
   }
@@ -370,6 +399,16 @@ export default function CreatorContentOrganizationMembers({
           >
             加入{organizationMeta.label}
           </button>
+          {candidateHasMore ? (
+            <button
+              className={styles.secondaryButton + ' btn'}
+              disabled={candidateLoading || busyKey !== null}
+              onClick={() => void loadMoreCandidates()}
+              type="button"
+            >
+              {candidateLoading ? '加载中…' : '加载更多已发布内容'}
+            </button>
+          ) : null}
         </div>
       )}
 
