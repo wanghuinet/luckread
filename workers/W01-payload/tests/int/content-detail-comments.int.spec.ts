@@ -12,8 +12,8 @@ describe('content comments UI', () => {
     expect(comments).not.toContain("请先登录后发表评论。")
   })
 
-  it('renders the comment component from the content detail page', () => {
-    const page = read('src/app/(frontend)/content/[contentId]/page.tsx')
+  it('renders the comment component from the interactive content detail client', () => {
+    const page = read('src/app/(frontend)/content/[contentId]/ContentDetailClient.tsx')
     expect(page).toContain("import ContentComments from './ContentComments'")
     expect(page).toContain('<ContentComments')
     expect(page).toContain('contentId={content.id}')
