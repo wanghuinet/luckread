@@ -5,10 +5,10 @@ import { resolve } from 'node:path'
 describe('v1 collection member adapters', () => {
   it('routes list/attach through W03 and keeps mutation preconditions at the edge', () => {
     const collection = readFileSync(
-      resolve(process.cwd(), 'src/app/api/v1/collection/[collectionId]/members/route.ts'),
+      resolve(process.cwd(), 'src/app/api/v1/collections/[collectionId]/members/route.ts'),
       'utf8',
     )
-    expect(collection).toContain("'/internal/content/collection/'")
+    expect(collection).toContain("'/internal/content/collections/'")
     expect(collection).toContain("'/members'")
     expect(collection).toContain("method: 'GET'")
     expect(collection).toContain("method: 'POST'")
@@ -19,7 +19,7 @@ describe('v1 collection member adapters', () => {
 
   it('routes reorder/delete through W03 and never accepts wildcard If-Match', () => {
     const detail = readFileSync(
-      resolve(process.cwd(), 'src/app/api/v1/collection/[collectionId]/members/[contentId]/route.ts'),
+      resolve(process.cwd(), 'src/app/api/v1/collections/[collectionId]/members/[contentId]/route.ts'),
       'utf8',
     )
     expect(detail).toContain("method: 'PATCH'")
