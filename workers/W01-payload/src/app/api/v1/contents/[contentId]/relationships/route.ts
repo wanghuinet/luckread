@@ -1,14 +1,14 @@
 import {
   cachedPublicGet,
   invalidatePublicContentRelationships,
-} from '../../../../../lib/public-response-cache.js'
-import { TrafficLimitError, enforcePublicReadRateLimit, rateLimitResponse } from '../../../../../auth/traffic-limit.js'
-import { hasAuthenticatedSessionCredential } from '../../../../../lib/content-list-cache-guard.js'
+} from '../../../../../../lib/public-response-cache.js'
+import { TrafficLimitError, enforcePublicReadRateLimit, rateLimitResponse } from '../../../../../../auth/traffic-limit.js'
+import { hasAuthenticatedSessionCredential } from '../../../../../../lib/content-list-cache-guard.js'
 import {
   callW03Content,
   resolveCookieContentPrincipal,
   W03ContentClientError,
-} from '../../../../../content/w03-content-client.js'
+} from '../../../../../../content/w03-content-client.js'
 
 const errorResponse = (status: number, code: string, message: string) =>
   Response.json(
