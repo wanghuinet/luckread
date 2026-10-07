@@ -1656,3 +1656,25 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+
+.lr-editor-history-tools {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  align-items: center;
+}
+
+.lr-editor-history-tools .lr-editor-plugin-button {
+  min-width: 78px;
+}
+
+@media (max-width: 640px) {
+  .lr-editor-history-tools {
+    width: 100%;
+  }
+
+  .lr-editor-history-tools .lr-editor-plugin-button {
+    flex: 1 1 auto;
+  }
+}
