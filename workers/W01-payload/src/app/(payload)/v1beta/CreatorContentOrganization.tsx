@@ -1,6 +1,6 @@
 'use client'
 
-import { FormEvent, useCallback, useEffect, useState } from 'react'
+import { FormEvent, Fragment, useCallback, useEffect, useState } from 'react'
 
 import CreatorContentOrganizationMembers from './CreatorContentOrganizationMembers'
 import styles from './creator-center.module.css'
@@ -283,7 +283,7 @@ export default function CreatorContentOrganization({
       {!loading && activePage.items.length > 0 ? (
         <div className={styles.audienceList}>
           {activePage.items.map((item) => (
-            <article className={styles.contentListItem} key={item.id}>
+            <article className={styles.contentListItem}>
               {item.coverRef ? (
                 <div className={styles.contentListThumb} aria-hidden="true">
                   <img alt="" loading="lazy" src={item.coverRef} />
@@ -328,7 +328,7 @@ export default function CreatorContentOrganization({
                 organization={item}
               />
             ) : null}
-            </>
+            </Fragment>
           ))}
         </div>
       ) : null}
