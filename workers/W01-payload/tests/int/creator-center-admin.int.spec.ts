@@ -531,6 +531,14 @@ describe('Creator Center admin extension', () => {
     expect(styles).toContain('.creatorLayout select:focus-visible')
   })
 
+  it('stabilizes the creator media library loader around its login dependency', () => {
+    const assets = read('src/app/(payload)/v1beta/CreatorAssetLibrary.tsx')
+    expect(assets).toContain("import { ChangeEvent, useCallback, useEffect, useState } from 'react'")
+    expect(assets).toContain('const load = useCallback(async (page = 1, append = false) => {')
+    expect(assets).toContain('}, [loginPath])')
+    expect(assets).toContain('}, [load])')
+  })
+
   it('uses the stable v1 creator media library instead of a second media authority', () => {
     const view = read('src/app/(frontend)/creator-center/CreatorStudio.tsx')
     const assets = read('src/app/(payload)/v1beta/CreatorAssetLibrary.tsx')
