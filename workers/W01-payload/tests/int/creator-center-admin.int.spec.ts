@@ -153,6 +153,8 @@ describe('Creator Center admin extension', () => {
     expect(editor).toContain('const id = plugin.id.trim()')
     expect(editor).toContain('if (!id || seen.has(id)) return false')
     expect(editor).toContain('seen.add(id)')
+    expect(editor).toContain('EditorPluginErrorBoundary')
+    expect(editor).toContain("pluginId={plugin.id}")
   })
 
   it('supports drag sorting article blocks with an accessible fallback', () => {
