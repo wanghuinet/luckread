@@ -39,7 +39,8 @@
     "next": "16.2.6",
     "payload": "3.90.2",
     "react": "19.2.6",
-    "react-dom": "19.2.6"
+    "react-dom": "19.2.6",
+    "@payloadcms/plugin-seo": "3.90.2"
   },
   "devDependencies": {
     "@playwright/test": "1.63.0",
