@@ -546,7 +546,7 @@ export default function CreatorContentOrganizationMembers({
                 <div className={styles.contentMeta}>
                   <span>{contentTypeLabels[member.contentType]}</span>
                   <span>{member.contentState}</span>
-                  <span>位置 {index + 1}</span>
+                  <span>位置 {member.position + 1}</span>
                 </div>
                 <h3>{member.title}</h3>
                 <span className={styles.contentMediaHint}>contentId: {member.contentId}</span>
