@@ -176,4 +176,17 @@ describe('Markdown editor plugin', () => {
     expect(math).toContain("id: 'content.math-block'")
     expect(math).toContain('KaTeX')
   })
+
+  it('registers bounded undo and redo without adding another document authority', () => {
+    const history = read('src/components/UndoRedoPlugin.tsx')
+    const registry = read('src/components/article-editor-plugins.ts')
+    expect(history).toContain('const MAX_HISTORY_ENTRIES = 40')
+    expect(history).toContain('const MAX_HISTORY_CHARS = 2_000_000')
+    expect(history).toContain('pastRef.current')
+    expect(history).toContain('futureRef.current')
+    expect(history).toContain('updateDocument(document)')
+    expect(history).toContain("id: 'content.undo-redo'")
+    expect(registry).toContain("import { undoRedoPlugin } from './UndoRedoPlugin.js'")
+    expect(registry).toContain('undoRedoPlugin')
+  })
 })
