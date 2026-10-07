@@ -58,6 +58,31 @@ const pushBlock = (blocks: ArticleBlock[], block: ArticleBlock): void => {
   if (blocks.length < ARTICLE_MAX_BLOCKS) blocks.push(block)
 }
 
+const prepareDisplayMath = (
+  source: string,
+): { markdown: string; expressions: string[] } => {
+  const expressions: string[] = []
+  const markerPrefix = '__LUCKREAD_DISPLAY_MATH_'
+  const markerSuffix = '__'
+  let markerIndex = 0
+
+  const markdown = source.replace(
+    /(^|\n)\s*\$\$\s*\n?([\s\S]*?)\n?\s*\$\$(?=\s*(?:\n|$))/g,
+    (match, lineBreak: string, expression: string) => {
+      let marker = markerPrefix + markerIndex + markerSuffix
+      while (source.includes(marker)) {
+        markerIndex += 1
+        marker = markerPrefix + markerIndex + markerSuffix
+      }
+      markerIndex += 1
+      expressions.push(expression.trim())
+      return lineBreak + marker
+    },
+  )
+
+  return { markdown, expressions }
+}
+
 const normalizeMarkdownCodeLanguage = (language: string | undefined): ArticleBlock['language'] => {
   const normalized = (language ?? '').trim().toLowerCase()
   const aliases: Record<string, NonNullable<ArticleBlock['language']>> = {
@@ -109,7 +134,8 @@ export const markdownToArticleDocument = (markdown: string): MarkdownImportResul
     throw new Error('ARTICLE_MARKDOWN_TOO_LARGE')
   }
 
-  const tokens = marked.lexer(source, { gfm: true, breaks: false })
+  const prepared = prepareDisplayMath(source)
+  const tokens = marked.lexer(prepared.markdown, { gfm: true, breaks: false })
   const blocks: ArticleBlock[] = []
   const unsupported: string[] = []
 
@@ -135,6 +161,13 @@ export const markdownToArticleDocument = (markdown: string): MarkdownImportResul
 
       case 'paragraph': {
         const raw = token.text.trim()
+        const mathMarkerMatch = raw.match(/^__LUCKREAD_DISPLAY_MATH_(\\d+)__$/)
+        if (mathMarkerMatch) {
+          const expression = prepared.expressions[Number(mathMarkerMatch[1])] ?? ''
+          const bounded = boundedText(expression, unsupported)
+          if (bounded) pushBlock(blocks, createArticleBlock('math', bounded))
+          break
+        }
         const sourceRaw = (token as { raw?: string }).raw?.trim() ?? raw
         const imageMatch = raw.match(
           new RegExp('^!\\[([^\\]]*)\\]\\((https?:\\/\\/[^)\\s]+)(?:\\s+[^)]*)?\\)$'),
