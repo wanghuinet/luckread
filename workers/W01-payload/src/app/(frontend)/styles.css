@@ -1210,3 +1210,70 @@ main[style*="max-width"] p[style*="#666"] {
 @media (min-width: 901px) { .mobile-nav { display: none; } }
 @media (max-width: 560px) { .creator-profile-identity .creator-profile-bio { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; } .creator-profile-card-body h3 { font-size: 13px; } }
 @media (max-width: 420px) { .creator-profile-hero-main { grid-template-columns: auto minmax(0,1fr) auto; } .creator-profile-avatar { margin-bottom: -4px; } .creator-profile-stats { gap: 8px; } }
+
+
+.content-detail-article-code {
+  margin: 1.6em 0;
+  overflow: hidden;
+  border: 1px solid #d9e3ef;
+  border-radius: 14px;
+  background: #0f172a;
+}
+
+.content-detail-article-code figcaption {
+  margin: 0;
+  padding: 8px 12px;
+  border-bottom: 1px solid rgba(255,255,255,.08);
+  color: #9fb0c8;
+  background: rgba(255,255,255,.035);
+  font: 10px/1.4 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  text-transform: lowercase;
+}
+
+.content-detail-article-code pre {
+  margin: 0;
+  overflow-x: auto;
+  padding: 16px;
+}
+
+.content-detail-article-code code {
+  display: block;
+  min-width: max-content;
+  color: #e5edf9;
+  font: 13px/1.75 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  white-space: pre;
+}
+
+.content-detail-article-code .token.comment,
+.content-detail-article-code .token.prolog,
+.content-detail-article-code .token.doctype,
+.content-detail-article-code .token.cdata {
+  color: #78909c;
+}
+
+.content-detail-article-code .token.keyword,
+.content-detail-article-code .token.boolean,
+.content-detail-article-code .token.number {
+  color: #9ec5ff;
+}
+
+.content-detail-article-code .token.string,
+.content-detail-article-code .token.char,
+.content-detail-article-code .token.regex {
+  color: #9ed9b0;
+}
+
+.content-detail-article-code .token.function,
+.content-detail-article-code .token.class-name {
+  color: #b9c8ff;
+}
+
+@media (max-width: 640px) {
+  .content-detail-article-code pre {
+    padding: 13px;
+  }
+
+  .content-detail-article-code code {
+    font-size: 12px;
+  }
+}
