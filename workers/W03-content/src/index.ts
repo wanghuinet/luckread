@@ -186,10 +186,10 @@ const getPath = (pathname: string): {id?: string; state?: boolean; preflight?: b
   if (parts.length === 3 && parts[0] === 'internal' && parts[1] === 'content' && parts[2] === 'series') {
     return { series: true }
   }
-  if (parts.length === 6 && parts[0] === 'internal' && parts[1] === 'content' && parts[2] === 'series' && parts[4] === 'members') {
+  if (parts.length === 5 && parts[0] === 'internal' && parts[1] === 'content' && parts[2] === 'series' && parts[4] === 'members') {
     return { id: decodePathSegment(parts[3]), seriesMembers: true }
   }
-  if (parts.length === 7 && parts[0] === 'internal' && parts[1] === 'content' && parts[2] === 'series' && parts[4] === 'members') {
+  if (parts.length === 6 && parts[0] === 'internal' && parts[1] === 'content' && parts[2] === 'series' && parts[4] === 'members') {
     return { id: decodePathSegment(parts[3]), seriesMembers: true, seriesMemberContentId: decodePathSegment(parts[5]) }
   }
   if (parts.length === 6 && parts[0] === 'internal' && parts[1] === 'content' && parts[2] === 'contents' && parts[4] === 'revisions') {
