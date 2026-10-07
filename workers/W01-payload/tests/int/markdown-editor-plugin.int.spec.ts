@@ -106,6 +106,18 @@ describe('Markdown editor plugin', () => {
     )
   })
 
+  it('registers the find and replace plugin without changing the document authority', () => {
+    const plugin = read('src/components/FindReplacePlugin.tsx')
+    const registry = read('src/components/article-editor-plugins.ts')
+    expect(plugin).toContain('function replaceAllTextCaseAware(')
+    expect(plugin).toContain('ARTICLE_TABLE_MAX_CELL_TEXT')
+    expect(plugin).toContain("id: 'content.find-replace'")
+    expect(plugin).toContain('当前匹配 {matchCount} 处')
+    expect(plugin).toContain('全部替换')
+    expect(registry).toContain("import { findReplacePlugin } from './FindReplacePlugin.js'")
+    expect(registry).toContain('findReplacePlugin')
+  })
+
   it('registers the open-source plugin through the existing host', () => {
     const registry = read(
       'src/components/article-editor-plugins.ts',
@@ -122,6 +134,7 @@ describe('Markdown editor plugin', () => {
     expect(registry).toContain("id: 'content.table-block'")
     expect(registry).toContain("id: 'content.markdown-export'")
     expect(registry).toContain("id: 'content.math-block'")
+    expect(registry).toContain("id: 'content.find-replace'")
     expect(plugin).toContain(
       "import { markdownToArticleDocument } from '../lib/markdown-to-article-document.js'",
     )
