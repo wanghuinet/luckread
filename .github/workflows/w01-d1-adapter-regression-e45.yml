@@ -45,7 +45,7 @@ jobs:
         working-directory: workers/W01-payload
         run: |
           set -euo pipefail
-          node -e 'const p=require("./package.json"); if(p.dependencies.payload!=="3.87.1") process.exit(1); if(p.dependencies["@payloadcms/db-d1-sqlite"]!=="3.87.1") process.exit(1); if(p.devDependencies.wrangler!=="~4.116.0") process.exit(1)'
+          node -e 'const p=require("./package.json"); if(p.dependencies.payload!=="3.90.2") process.exit(1); if(p.dependencies["@payloadcms/db-d1-sqlite"]!=="3.90.2") process.exit(1); if(p.devDependencies.wrangler!=="~4.116.0") process.exit(1)'
 
       - name: Run E4.5 controlled remote regression probe
         env:
@@ -90,8 +90,8 @@ jobs:
             data.evidenceType === "AUTH_002_E4_5_D1_ADAPTER_REGRESSION" &&
             data.testedCommitSha === expectedSha &&
             Number(data.runId) === expectedRunId &&
-            data.payloadVersion === "3.87.1" &&
-            data.d1AdapterVersion === "3.87.1" &&
+            data.payloadVersion === "3.90.2" &&
+            data.d1AdapterVersion === "3.90.2" &&
             data.environmentClass === "CONTROLLED_REMOTE_D1" &&
             data.databaseName === "luckread" &&
             data.operation === "payload.db.upsert(payload-preferences)" &&

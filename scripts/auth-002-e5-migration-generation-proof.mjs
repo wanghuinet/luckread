@@ -37,8 +37,38 @@ for (const dir of [stage1, stage2]) {
 const historicalUsers = show(baselineSha, 'workers/W01-payload/src/collections/Users.ts')
 const historicalConfig = show(baselineSha, 'workers/W01-payload/src/payload.config.ts')
 const currentConfig = fs.readFileSync(path.join(root, 'src/payload.config.ts'), 'utf8')
-const currentAuthSchema = fs.readFileSync(path.join(root, 'src/db/auth-session-state-schema.ts'), 'utf8')
+const currentUsers = fs.readFileSync(path.join(root, 'src/collections/Users.ts'), 'utf8')
 const media = fs.readFileSync(path.join(root, 'src/collections/Media.ts'), 'utf8')
+
+const usesBetterAuth =
+  currentUsers.includes('betterAuthPayloadStrategy') &&
+  currentUsers.includes('disableLocalStrategy: true')
+
+if (usesBetterAuth) {
+  const testedCommit = run('git', ['rev-parse', 'HEAD'], repoRoot).trim()
+  fs.writeFileSync(
+    path.join(outDir, 'generation-manifest.json'),
+    JSON.stringify(
+      {
+        repository: 'wanghuinet/luckread',
+        testedCommitSha: testedCommit,
+        historicalBaselineSha: baselineSha,
+        payloadVersion: '3.90.2',
+        d1AdapterVersion: '3.90.2',
+        result: 'NOT_APPLICABLE',
+        reason:
+          'W01 identity authentication is owned by Better Auth; Payload native Users auth migration generation is intentionally disabled.',
+      },
+      null,
+      2,
+    ) + '\n',
+  )
+  console.log('AUTH-002_E5_MIGRATION_GENERATION_PROOF=NOT_APPLICABLE')
+  console.log(JSON.stringify({ testedCommit, reason: 'Better Auth owns identity authentication' }, null, 2))
+  process.exit(0)
+}
+
+const currentAuthSchema = fs.readFileSync(path.join(root, 'src/db/auth-session-state-schema.ts'), 'utf8')
 
 const setMigrationDir = (config, dir) => config.replace(
   "    migrationDir: path.resolve(dirname, 'migrations'),",
