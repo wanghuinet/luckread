@@ -196,6 +196,27 @@ export const mediaRefsFromArticleDocument = (document: ArticleDocument): string[
     ),
   )
 
+export const removeMediaRefFromArticleDocument = (
+  document: ArticleDocument,
+  mediaRef: string,
+): ArticleDocument => {
+  const target = mediaRef.trim()
+  if (!target) return document
+
+  const blocks = document.blocks.map((block) => {
+    if (!block.mediaRefs?.length) return block
+
+    const mediaRefs = block.mediaRefs.filter((ref) => ref !== target)
+    if (mediaRefs.length === block.mediaRefs.length) return block
+
+    return mediaRefs.length
+      ? { ...block, mediaRefs }
+      : { ...block, mediaRefs: undefined }
+  })
+
+  return { ...document, blocks }
+}
+
 export const hasArticleDocumentContent = (document: ArticleDocument): boolean =>
   Boolean(plainTextFromArticleDocument(document).trim()) ||
   mediaRefsFromArticleDocument(document).length > 0
