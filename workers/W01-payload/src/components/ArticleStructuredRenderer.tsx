@@ -48,6 +48,39 @@ export default function ArticleStructuredRenderer({ document }: Props) {
           )
         }
 
+        if (block.type === 'table') {
+          const table = block.table
+          if (!table) return null
+          return (
+            <figure className="content-detail-article-table" key={block.id}>
+              <div className="content-detail-article-table-scroll">
+                <table>
+                  <thead>
+                    <tr>
+                      {table.headers.map((header, index) => (
+                        <th key={block.id + ':header:' + index} scope="col">
+                          {header}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {table.rows.map((row, rowIndex) => (
+                      <tr key={block.id + ':row:' + rowIndex}>
+                        {row.map((cell, columnIndex) => (
+                          <td key={block.id + ':cell:' + rowIndex + ':' + columnIndex}>
+                            {cell}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </figure>
+          )
+        }
+
         if (block.type === 'code') {
           const grammarKey: ArticleCodeLanguage | 'markup' =
             block.language === 'html' ? 'markup' : (block.language ?? 'plaintext')
