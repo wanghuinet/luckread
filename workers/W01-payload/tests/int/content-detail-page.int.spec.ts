@@ -6,7 +6,7 @@ const read = (relativePath: string) => readFileSync(resolve(process.cwd(), relat
 
 describe('content detail page', () => {
   it('hides follow action when the relationship graph is blocked', () => {
-    const page = read('src/app/(frontend)/content/[contentId]/page.tsx')
+    const page = read('src/app/(frontend)/content/[contentId]/ContentDetailClient.tsx')
     expect(page).toContain('followRestricted')
     expect(page).toContain('relationship?.blocked')
     expect(page).toContain('relationship?.blockedBy')
