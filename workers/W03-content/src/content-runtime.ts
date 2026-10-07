@@ -40,6 +40,28 @@ export interface ContentRecord {
   updatedAt: string
 }
 
+
+export type ContentRevisionOperation = 'CREATE' | 'UPDATE' | 'ROLLBACK'
+
+export interface ContentRevision {
+  id: string
+  contentId: string
+  revision: number
+  contentVersion: number
+  actorUserId: string
+  sourceRevision: number | null
+  operation: ContentRevisionOperation
+  state: ContentState
+  title: string
+  bodyRef: string
+  mediaRefs: string[]
+  coverRef: string | null
+  etag: string
+  reason: string | null
+  correlationId: string
+  createdAt: string
+}
+
 export interface ContentD1 {
   prepare(query: string): D1PreparedStatement
   batch(statements: D1PreparedStatement[]): Promise<D1Result<unknown>[]>
@@ -61,6 +83,26 @@ interface ContentRow {
   etag: string
   created_at: string
   updated_at: string
+}
+
+
+interface ContentRevisionRow {
+  id: string
+  content_id: string
+  revision: number
+  content_version: number
+  actor_user_id: string
+  source_revision: number | null
+  operation: ContentRevisionOperation
+  state: ContentState
+  title: string
+  body_ref: string
+  media_refs_json: string
+  cover_ref: string | null
+  etag: string
+  reason: string | null
+  correlation_id: string
+  created_at: string
 }
 
 interface IdempotencyRow {
@@ -249,6 +291,45 @@ const inspectIdempotency = (
   }
 }
 
+
+const toRevision = (row: ContentRevisionRow): ContentRevision => ({
+  id: row.id,
+  contentId: row.content_id,
+  revision: row.revision,
+  contentVersion: row.content_version,
+  actorUserId: row.actor_user_id,
+  sourceRevision: row.source_revision,
+  operation: row.operation,
+  state: row.state,
+  title: row.title,
+  bodyRef: row.body_ref,
+  mediaRefs: JSON.parse(row.media_refs_json || '[]') as string[],
+  coverRef: row.cover_ref,
+  etag: row.etag,
+  reason: row.reason,
+  correlationId: row.correlation_id,
+  createdAt: row.created_at,
+})
+
+const revisionPageSize = (limit: number): number =>
+  Math.min(Math.max(Number.isSafeInteger(limit) ? limit : 20, 1), 100)
+
+const normalizeCorrelationId = (value: string): string => {
+  const normalized = value.trim()
+  if (!normalized || normalized.length > 256) throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+  return normalized
+}
+
+const insertRevision = (db: ContentD1, revision: ContentRevision): D1PreparedStatement =>
+  db.prepare(`INSERT INTO content_revisions
+    (id, content_id, revision, content_version, actor_user_id, source_revision, operation,
+     state, title, body_ref, media_refs_json, cover_ref, etag, reason, correlation_id, created_at)
+   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).bind(
+    revision.id, revision.contentId, revision.revision, revision.contentVersion,
+    revision.actorUserId, revision.sourceRevision, revision.operation, revision.state,
+    revision.title, revision.bodyRef, JSON.stringify(revision.mediaRefs), revision.coverRef,
+    revision.etag, revision.reason, revision.correlationId, revision.createdAt,
+  )
 const emptyIdempotency = (): IdempotencyRow => ({
   idem_id: null,
   idem_owner_user_id: null,
