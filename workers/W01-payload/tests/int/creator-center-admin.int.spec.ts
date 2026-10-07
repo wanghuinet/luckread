@@ -147,6 +147,14 @@ describe('Creator Center admin extension', () => {
     expect(publisher).toContain('plugins={articleEditorPlugins}')
   })
 
+  it('ignores duplicate plugin ids in the editor host', () => {
+    const editor = read('src/components/ArticleStructuredEditor.tsx')
+    expect(editor).toContain('const seen = new Set<string>()')
+    expect(editor).toContain('const id = plugin.id.trim()')
+    expect(editor).toContain('if (!id || seen.has(id)) return false')
+    expect(editor).toContain('seen.add(id)')
+  })
+
   it('supports drag sorting article blocks with an accessible fallback', () => {
     const editor = read('src/components/ArticleStructuredEditor.tsx')
     expect(editor).toContain('const [draggingIndex, setDraggingIndex] = useState<number | null>(null)')
