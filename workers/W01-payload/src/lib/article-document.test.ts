@@ -3,6 +3,9 @@ import { describe, expect, it } from 'vitest'
 import {
   ARTICLE_MAX_BLOCKS,
   ARTICLE_MAX_MEDIA_PER_BLOCK,
+  ARTICLE_TABLE_MAX_COLUMNS,
+  ARTICLE_TABLE_MAX_ROWS,
+  createArticleTableBlock,
   createArticleMediaBlock,
   articleDocumentFromBody,
   createArticleDocument,
@@ -26,6 +29,24 @@ describe('article structured document', () => {
     const restored = tryDeserializeArticleDocument(serializeArticleDocument(document))
     expect(restored).toEqual(document)
     expect(plainTextFromArticleDocument(document)).toBe('第一节\n\n正文内容\n\n第一项\n\n第二项\n\nconst answer = 42')
+  })
+
+  it('round-trips structured table blocks and extracts tabular text', () => {
+    const document = {
+      version: 2 as const,
+      blocks: [
+        createArticleTableBlock(
+          ['名称', '状态'],
+          [
+            ['Markdown', '已完成'],
+            ['代码块', '已完成'],
+          ],
+        ),
+      ],
+    }
+    const restored = tryDeserializeArticleDocument(serializeArticleDocument(document))
+    expect(restored).toEqual(document)
+    expect(plainTextFromArticleDocument(document)).toBe('名称\t状态\nMarkdown\t已完成\n代码块\t已完成')
   })
 
   it('round-trips image and gallery blocks and keeps media out of extracted text', () => {
@@ -74,6 +95,16 @@ describe('article structured document', () => {
     })).toThrow('ARTICLE_DOCUMENT_EMPTY')
 
     expect(() => createArticleMediaBlock('gallery', ['https://media.example/only.jpg'])).toThrow('INVALID_ARTICLE_BLOCK')
+
+    expect(() => createArticleTableBlock(
+      Array.from({ length: ARTICLE_TABLE_MAX_COLUMNS + 1 }, () => 'x'),
+      [['x', 'x']],
+    )).toThrow('INVALID_ARTICLE_BLOCK')
+
+    expect(() => createArticleTableBlock(
+      ['x'],
+      Array.from({ length: ARTICLE_TABLE_MAX_ROWS + 1 }, () => ['x']),
+    )).toThrow('INVALID_ARTICLE_BLOCK')
 
     expect(() => normalizeArticleDocument({
       version: 2,
