@@ -122,7 +122,7 @@ export const markdownToArticleDocument = (markdown: string): MarkdownImportResul
       case 'paragraph': {
         const raw = token.text.trim()
         const imageMatch = raw.match(
-          new RegExp(/^!\[([^\]]*)\]\((https?:\\/\\/[^)\\s]+)(?:\\s+[^)]*)?\)$/),
+          new RegExp('^!\\[([^\\]]*)\\]\\((https?:\\/\\/[^)\\s]+)(?:\\s+[^)]*)?\\)$'),
         )
         if (imageMatch) {
           pushBlock(
