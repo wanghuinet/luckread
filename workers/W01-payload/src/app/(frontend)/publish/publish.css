@@ -1619,3 +1619,40 @@
 .lr-editor-outline-item.is-level-3 {
   padding-left: 18px;
 }
+
+
+.lr-editor-writer-stats {
+  width: 100%;
+}
+
+.lr-editor-writer-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px;
+  margin-top: 10px;
+}
+
+.lr-editor-writer-stats-grid strong {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid #e3eaf2;
+  border-radius: 8px;
+  background: #fff;
+  color: #263247;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.lr-editor-writer-stats-grid span {
+  color: #8b96a8;
+  font-size: 8px;
+  font-weight: 650;
+}
+
+@media (max-width: 640px) {
+  .lr-editor-writer-stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
