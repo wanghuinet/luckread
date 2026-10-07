@@ -146,6 +146,15 @@ export const markdownToArticleDocument = (markdown: string): MarkdownImportResul
           break
         }
 
+        const mathMatch = raw.match(/^\\$\\$\\s*([\\s\\S]*?)\\s*\\$\\$/)
+        if (mathMatch) {
+          const expression = boundedText(mathMatch[1].trim(), unsupported)
+          if (expression) {
+            pushBlock(blocks, createArticleBlock('math', expression))
+          }
+          break
+        }
+
         if (new RegExp('!\\[[^\\]]*\\]\\(').test(raw)) {
           pushUnsupported(unsupported, '内嵌图片')
           continue
