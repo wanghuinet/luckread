@@ -141,6 +141,17 @@ describe('Creator Center admin extension', () => {
     expect(publisher).toContain('plugins={articleEditorPlugins}')
   })
 
+  it('supports duplicating article blocks without sharing nested state', () => {
+    const editor = read('src/components/ArticleStructuredEditor.tsx')
+    expect(editor).toContain('function duplicateBlock(index: number)')
+    expect(editor).toContain('id: crypto.randomUUID()')
+    expect(editor).toContain('mediaRefs: [...source.mediaRefs]')
+    expect(editor).toContain('headers: [...source.table.headers]')
+    expect(editor).toContain('rows: source.table.rows.map((row) => [...row])')
+    expect(editor).toContain('disabled={disabled || value.blocks.length >= ARTICLE_MAX_BLOCKS}')
+    expect(editor).toContain('aria-label="复制区块"')
+  })
+
   it('exposes table row and column editing controls', () => {
     const editor = read('src/components/ArticleStructuredEditor.tsx')
     expect(editor).toContain("aria-label={'删除第 ' + (columnIndex + 1) + ' 列'}")
