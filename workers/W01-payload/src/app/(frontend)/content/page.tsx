@@ -9,6 +9,7 @@ import { getPublicCopy, type PublicLocale } from '../i18n/public-locale'
 type ContentType = 'article' | 'post' | 'video'
 type ContentItem = {
   id: string
+  slug?: string
   contentType: ContentType
   title: string
   mediaRefs?: string[]
@@ -169,7 +170,7 @@ export default function ContentBrowsePage() {
             {page.items.map((item) => {
               const cover = item.coverRef
               return (
-                <Link className="content-feed-card" href={'/content/' + encodeURIComponent(item.id)} key={item.id}>
+                <Link className="content-feed-card" href={'/content/' + encodeURIComponent(item.slug || item.id)} key={item.id}>
                   <div className="content-feed-cover">
                     {cover ? (
                       <img alt={item.title ? item.title + copy.content.cover : copy.content.cover} loading="lazy" src={cover} />
