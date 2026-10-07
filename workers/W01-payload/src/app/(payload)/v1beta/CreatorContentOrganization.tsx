@@ -292,7 +292,7 @@ export default function CreatorContentOrganization({
               </div>
               <div className={styles.contentListActions}>
                 <button
-                  className={styles.dangerButton}
+                  className={styles.secondaryButton}
                   disabled={actionId !== null}
                   onClick={() => void deleteOrganization(item)}
                   type="button"
