@@ -1,0 +1,52 @@
+import { describe, expect, it } from 'vitest'
+import { articleDocumentToMarkdown } from './article-document-to-markdown.js'
+import { createArticleTableBlock } from './article-document.js'
+
+describe('article document markdown serializer', () => {
+  it('serializes structured blocks without using editor DOM', () => {
+    const document = {
+      version: 2 as const,
+      blocks: [
+        { id: 'h', type: 'heading' as const, text: '标题', level: 2 as const },
+        { id: 'p', type: 'paragraph' as const, text: '正文 *不是格式*' },
+        { id: 'q', type: 'quote' as const, text: '引用' },
+        { id: 'c', type: 'code' as const, text: 'const answer = 42', language: 'javascript' as const },
+        createArticleTableBlock(['名称', '状态'], [['Markdown', '已完成']]),
+        { id: 'd', type: 'divider' as const, text: '' },
+      ],
+    }
+
+    const markdown = articleDocumentToMarkdown(document)
+
+    expect(markdown).toContain('## 标题')
+    expect(markdown).toContain('正文 \\*不是格式\\*')
+    expect(markdown).toContain('> 引用')
+    expect(markdown).toContain('\x60\x60\x60javascript')
+    expect(markdown).toContain('| 名称 | 状态 |')
+    expect(markdown).toContain('| --- | --- |')
+    expect(markdown).toContain('---')
+  })
+
+  it('escapes markdown table cell delimiters safely', () => {
+    const document = {
+      version: 2 as const,
+      blocks: [
+        createArticleTableBlock(['A|B'], [['line 1\nline 2']]),
+      ],
+    }
+
+    const markdown = articleDocumentToMarkdown(document)
+
+    expect(markdown).toContain('| A\\|B |')
+    expect(markdown).toContain('| line 1 line 2 |')
+  })
+
+  it('keeps empty documents deterministic', () => {
+    const document = {
+      version: 2 as const,
+      blocks: [{ id: 'empty', type: 'paragraph' as const, text: '' }],
+    }
+
+    expect(articleDocumentToMarkdown(document)).toBe('')
+  })
+})
