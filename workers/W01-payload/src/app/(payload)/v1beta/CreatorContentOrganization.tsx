@@ -178,6 +178,7 @@ export default function CreatorContentOrganization({
         body: JSON.stringify({
           title: form.title.trim(),
           description: form.description.trim(),
+          coverRef: form.coverRef.trim() ? form.coverRef.trim() : null,
         }),
       })
       const data: { error?: { message?: string } } | null = await response.json().catch((): null => null)
@@ -213,7 +214,7 @@ export default function CreatorContentOrganization({
     setEditForm(emptyForm)
   }
 
-  async function uploadOrganizationCover(event: ChangeEvent<HTMLInputElement>) {
+  async function uploadOrganizationCover(event: ChangeEvent<HTMLInputElement>, target: 'create' | 'edit') {
     const file = event.target.files?.[0]
     event.target.value = ''
     if (!file) return
@@ -245,7 +246,11 @@ export default function CreatorContentOrganization({
       if (!response.ok || typeof url !== 'string' || !url) {
         throw new Error(data?.error?.message || '组织封面上传失败')
       }
-      setEditForm((current) => ({ ...current, coverRef: url }))
+      if (target === 'create') {
+        setForm((current) => ({ ...current, coverRef: url }))
+      } else {
+        setEditForm((current) => ({ ...current, coverRef: url }))
+      }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : '组织封面上传失败')
     } finally {
@@ -394,7 +399,39 @@ export default function CreatorContentOrganization({
               value={form.description}
             />
           </label>
-          <button className={styles.primaryButton + ' btn'} disabled={!form.title.trim() || saving} type="submit">
+          <div className={styles.filterSelect}>
+            <span>封面</span>
+            {form.coverRef ? (
+              <div className={styles.contentListThumb}>
+                <img alt={activeMeta.singular + '封面预览'} loading="lazy" src={form.coverRef} />
+              </div>
+            ) : (
+              <span>尚未设置封面</span>
+            )}
+            <div className={styles.sectionActions}>
+              <label className={styles.secondaryButton + ' btn'}>
+                <span>{coverUploading ? '上传中…' : '上传图片封面'}</span>
+                <input
+                  accept="image/*"
+                  disabled={coverUploading || saving}
+                  hidden
+                  onChange={(event) => void uploadOrganizationCover(event, 'create')}
+                  type="file"
+                />
+              </label>
+              {form.coverRef ? (
+                <button
+                  className={styles.secondaryButton + ' btn'}
+                  disabled={coverUploading || saving}
+                  onClick={() => setForm((current) => ({ ...current, coverRef: '' }))}
+                  type="button"
+                >
+                  清除封面
+                </button>
+              ) : null}
+            </div>
+          </div>
+          <button className={styles.primaryButton + ' btn'} disabled={!form.title.trim() || saving || coverUploading} type="submit">
             {saving ? '创建中…' : '创建'}
           </button>
         </form>
@@ -515,7 +552,7 @@ export default function CreatorContentOrganization({
                           accept="image/*"
                           disabled={coverUploading || savingEdit}
                           hidden
-                          onChange={(event) => void uploadOrganizationCover(event)}
+                          onChange={(event) => void uploadOrganizationCover(event, 'edit')}
                           type="file"
                         />
                       </label>

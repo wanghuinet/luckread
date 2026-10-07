@@ -106,6 +106,14 @@ describe('Creator Center admin extension', () => {
     expect(members).not.toContain('limit=1000')
   })
 
+  it('supports setting a Series or Collection cover during creation', () => {
+    const organization = read('src/app/(payload)/v1beta/CreatorContentOrganization.tsx')
+    expect(organization).toContain("coverRef: form.coverRef.trim() ? form.coverRef.trim() : null")
+    expect(organization).toContain("uploadOrganizationCover(event, 'create')")
+    expect(organization).toContain("setForm((current) => ({ ...current, coverRef: '' }))")
+    expect(organization).toContain('disabled={!form.title.trim() || saving || coverUploading}')
+  })
+
   it('manages Creator Studio organization covers through the existing media upload and PATCH flow', () => {
     const organization = read('src/app/(payload)/v1beta/CreatorContentOrganization.tsx')
     expect(organization).toContain("method: 'POST'")
