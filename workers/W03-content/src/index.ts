@@ -316,6 +316,7 @@ export default {
           data: {
             items: page.items.map(item => ({
               id: item.id,
+              slug: item.slug,
               contentType: item.contentType,
               state: item.state,
               version: item.version,
@@ -408,6 +409,7 @@ export default {
         const content = await getContent(env.D1_02, path.id, principalUserId)
         return json({
           id: content.id,
+          slug: content.slug,
           creatorId: content.creatorId,
           contentType: content.contentType,
           state: content.state,
