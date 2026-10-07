@@ -9,6 +9,7 @@ import {
   normalizeArticleDocument,
   plainTextFromArticleDocument,
   mediaRefsFromArticleDocument,
+  hasArticleDocumentContent,
   serializeArticleDocument,
   tryDeserializeArticleDocument,
 } from './article-document.js'
@@ -103,6 +104,16 @@ describe('article structured document', () => {
       'https://media.example/1.jpg',
       'https://media.example/2.jpg',
     ])
+  })
+
+  it('detects meaningful article content before a destructive import', () => {
+    expect(hasArticleDocumentContent(createArticleDocument())).toBe(false)
+    expect(hasArticleDocumentContent(createArticleDocument('已有正文'))).toBe(true)
+
+    expect(hasArticleDocumentContent({
+      version: 2,
+      blocks: [createArticleMediaBlock('image', ['https://media.example/image.jpg'])],
+    })).toBe(true)
   })
 
   it('strips control characters before persistence', () => {
