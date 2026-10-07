@@ -39,10 +39,10 @@ export const normalizeArticleEditorPlugins = (
       (left, right) =>
         (left.order ?? 0) - (right.order ?? 0) || left.id.localeCompare(right.id),
     )
+    .map((plugin) => ({ ...plugin, id: plugin.id.trim() }))
     .filter((plugin) => {
-      const id = plugin.id.trim()
-      if (seen.has(id)) return false
-      seen.add(id)
+      if (seen.has(plugin.id)) return false
+      seen.add(plugin.id)
       return true
     })
 }
