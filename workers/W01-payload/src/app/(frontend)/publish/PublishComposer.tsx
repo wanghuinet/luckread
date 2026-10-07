@@ -4,6 +4,7 @@ import { ChangeEvent, useEffect, useRef, useState } from 'react'
 import { computeAutoSaveDelay } from '../../../lib/content-autosave.js'
 import { articleDocumentFromBody, plainTextFromArticleDocument, serializeArticleDocument, createArticleDocument, tryDeserializeArticleDocument, type ArticleDocument } from '../../../lib/article-document.js'
 import ArticleStructuredEditor from '../../../components/ArticleStructuredEditor.js'
+import { articleEditorPlugins } from '../../../components/article-editor-plugins.js'
 import { useRouter } from 'next/navigation'
 
 type ContentType = 'article' | 'post' | 'video'
@@ -653,6 +654,7 @@ export default function PublishComposer({
       {type === 'article' ? (
         <ArticleStructuredEditor
           disabled={busy || reviewLocked}
+          plugins={articleEditorPlugins}
           mediaAssets={assets.map((asset) => ({ id: asset.id, url: asset.url, filename: asset.filename, mimeType: asset.mimeType }))}
           onChange={(nextDocument, plainText) => {
             setArticleDocument(nextDocument)
