@@ -19,6 +19,71 @@ describe('W03 content contract core', () => {
     })
   })
 
+  it('maps an authoritative D1 CAS guard failure to HTTP 412', async () => {
+    const row = {
+      id: 'content_cas_412_123',
+      content_type: 'article',
+      owner_user_id: 'user_cas_412',
+      creator_id: 'user_cas_412',
+      ip_id: null,
+      state: 'DRAFT',
+      version: 2,
+      revision: 2,
+      slug: 'cas-412',
+      title: 'CAS guard test',
+      body_ref: 'https://cdn.example.com/body.txt',
+      media_refs_json: '[]',
+      cover_ref: null,
+      etag: 'W/"2"',
+      created_at: '2026-10-07T12:00:00.000Z',
+      updated_at: '2026-10-07T12:01:00.000Z',
+      idem_id: null,
+      idem_owner_user_id: null,
+      idem_request_hash: null,
+      idem_status: null,
+      idem_response_status: null,
+      idem_response_json: null,
+      idem_expires_at: null,
+    }
+
+    const db = {
+      prepare(query: string) {
+        return {
+          bind: (...bindings: unknown[]) => ({
+            first: async () => {
+              if (query.includes('content_mutation_idempotency')) return null
+              expect(bindings).toContain('content_cas_412_123')
+              return row
+            },
+          }),
+        }
+      },
+      batch: async () => {
+        throw new Error('CHECK constraint failed: successful')
+      },
+    } as never
+
+    await expect(
+      updateContent(
+        db,
+        'user_cas_412',
+        'content_cas_412_123',
+        {
+          contentType: 'article',
+          title: 'Updated title',
+          bodyRef: 'https://cdn.example.com/body-v2.txt',
+          mediaRefs: [],
+          coverRef: null,
+        },
+        'W/"2"',
+        'content-cas-412-idem',
+      ),
+    ).rejects.toMatchObject({
+      code: 'PRECONDITION_FAILED',
+      status: 412,
+    })
+  })
+
   it('allows only the contracted creator and moderator transitions', () => {
     expect(canTransitionContentState('DRAFT', 'PENDING_REVIEW', 'CREATOR', true)).toBe(true)
     expect(canTransitionContentState('DRAFT', 'PUBLISHED', 'CREATOR', true)).toBe(false)
