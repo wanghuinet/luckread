@@ -185,7 +185,10 @@ export default function CreatorContentOrganizationMembers({
     const controller = new AbortController()
     void loadCandidates(controller.signal)
       .then((page) => {
-        if (!controller.signal.aborted) setCandidates(page.items)
+        if (controller.signal.aborted) return
+        setCandidates(page.items)
+        setCandidateCursor(page.nextCursor)
+        setCandidateHasMore(page.hasMore)
       })
       .catch((cause: unknown) => {
         if (controller.signal.aborted) return
