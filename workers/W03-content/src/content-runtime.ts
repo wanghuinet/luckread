@@ -781,6 +781,9 @@ export async function updateContent(
   if (!content) throw new ContentRuntimeError('NOT_FOUND', 404)
   if (content.ownerUserId !== principalUserId) throw new ContentRuntimeError('PERMISSION_DENIED', 403)
   assertEtag(content.etag, ifMatch)
+  if (content.contentType !== normalized.contentType) {
+    throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+  }
   if (!EDITABLE_STATES.has(content.state)) throw new ContentRuntimeError('INVALID_STATE', 409)
 
   const nextVersion = content.version + 1
