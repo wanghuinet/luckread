@@ -141,6 +141,15 @@ describe('Creator Center admin extension', () => {
     expect(publisher).toContain('plugins={articleEditorPlugins}')
   })
 
+  it('exposes table row and column editing controls', () => {
+    const editor = read('src/components/ArticleStructuredEditor.tsx')
+    expect(editor).toContain("aria-label={'删除第 ' + (columnIndex + 1) + ' 列'}")
+    expect(editor).toContain("aria-label={'删除第 ' + (rowIndex + 1) + ' 行'}")
+    expect(editor).toContain('block.table.headers.length <= 1')
+    expect(editor).toContain("row.filter((_, currentColumnIndex) => currentColumnIndex !== columnIndex)")
+    expect(editor).toContain("rows: table.rows.filter((_, currentRowIndex) => currentRowIndex !== rowIndex)")
+  })
+
   it('filters only already-loaded creator content without adding a search endpoint', () => {
     const list = read('src/app/(payload)/v1beta/CreatorContentList.tsx')
     expect(list).toContain('const [localFilter, setLocalFilter] = useState(\'\')')
