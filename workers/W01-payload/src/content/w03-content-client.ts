@@ -1,5 +1,6 @@
 import { getCloudflareContext } from '@opennextjs/cloudflare'
 import { TrafficLimitError, enforcePublicReadRateLimit, rateLimitResponse } from '../auth/traffic-limit.js'
+import { hasAuthenticatedSessionCredential } from '../lib/content-list-cache-guard.js'
 import { getBetterAuthPrincipal, W02AuthClientError } from '../auth/w02-session-client.js'
 
 type W03ContentService = {
@@ -50,7 +51,7 @@ export async function resolveCookieContentPrincipal(request: Request): Promise<C
 }
 
 export async function resolveOptionalContentPrincipal(request: Request): Promise<ContentPrincipal | Response | null> {
-  if (!request.headers.get('Authorization') && !request.headers.get('cookie')) return null
+  if (!hasAuthenticatedSessionCredential(request)) return null
   return resolveContentPrincipal(request)
 }
 
