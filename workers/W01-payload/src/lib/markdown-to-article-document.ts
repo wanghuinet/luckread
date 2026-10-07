@@ -2,6 +2,8 @@ import { marked } from 'marked'
 import {
   ARTICLE_MAX_BLOCKS,
   ARTICLE_MAX_BLOCK_TEXT,
+  ARTICLE_TABLE_MAX_COLUMNS,
+  ARTICLE_TABLE_MAX_ROWS,
   createArticleBlock,
   createArticleMediaBlock,
   createArticleTableBlock,
@@ -207,8 +209,8 @@ export const markdownToArticleDocument = (markdown: string): MarkdownImportResul
 
         if (
           !rawHeader.length ||
-          rawHeader.length > 8 ||
-          rawRows.length > 50 ||
+          rawHeader.length > ARTICLE_TABLE_MAX_COLUMNS ||
+          rawRows.length > ARTICLE_TABLE_MAX_ROWS ||
           rawRows.some((row) => row.length !== rawHeader.length)
         ) {
           pushUnsupported(unsupported, '表格尺寸超过当前编辑器限制')
