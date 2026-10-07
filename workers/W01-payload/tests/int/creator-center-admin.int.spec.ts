@@ -146,7 +146,9 @@ describe('Creator Center admin extension', () => {
     expect(registry).toContain('codeBlockPlugin')
     expect(registry).toContain('tableBlockPlugin')
     expect(registry).toContain('wordImportPlugin')
-    expect(registry).toContain("content.word-import")
+    const wordImport = read('src/components/WordImportPlugin.tsx')
+    expect(wordImport).toContain("id: 'content.word-import'")
+    expect(wordImport).toContain('wordArrayBufferToArticleDocument')
     expect(publisher).toContain('plugins={articleEditorPlugins}')
   })
 
