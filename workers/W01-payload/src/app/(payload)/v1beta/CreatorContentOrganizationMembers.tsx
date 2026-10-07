@@ -245,6 +245,25 @@ export default function CreatorContentOrganizationMembers({
     }
   }
 
+  async function shareMemberContent(member: MemberItem) {
+    const shareUrl = window.location.origin + '/content/' + encodeURIComponent(member.contentSlug || member.contentId)
+    try {
+      if (typeof navigator.share === 'function') {
+        try {
+          await navigator.share({ title: member.title, url: shareUrl })
+          return
+        } catch (cause) {
+          if (cause instanceof DOMException && cause.name === 'AbortError') return
+        }
+      }
+      await navigator.clipboard.writeText(shareUrl)
+      setError('公开链接已复制。')
+      window.setTimeout(() => setError(''), 1800)
+    } catch {
+      setError('无法复制公开链接，请从地址栏复制当前页面地址。')
+    }
+  }
+
   async function addMember() {
     if (!selectedContentId || !editable || busyKey) return
     setBusyKey('add')
@@ -439,6 +458,22 @@ export default function CreatorContentOrganizationMembers({
                 <span className={styles.contentMediaHint}>contentId: {member.contentId}</span>
               </div>
               <div className={styles.contentListActions}>
+                <a
+                  className={styles.secondaryButton}
+                  href={'/content/' + encodeURIComponent(member.contentSlug || member.contentId)}
+                  rel="noreferrer"
+                  target="_blank"
+                >
+                  查看内容
+                </a>
+                <button
+                  className={styles.secondaryButton}
+                  disabled={busyKey !== null}
+                  onClick={() => void shareMemberContent(member)}
+                  type="button"
+                >
+                  分享
+                </button>
                 <button
                   className={styles.secondaryButton}
                   disabled={!editable || busyKey !== null || index === 0}
