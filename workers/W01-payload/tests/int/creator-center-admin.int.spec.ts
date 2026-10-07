@@ -16,6 +16,12 @@ describe('Creator Center admin extension', () => {
     expect(users).toContain('admin: payloadAdminOnly')
   })
 
+  it('persists structured article media references alongside uploaded assets', () => {
+    const publisher = read('src/app/(frontend)/publish/PublishComposer.tsx')
+    expect(publisher).toContain('mediaRefsFromArticleDocument(articleDocument)')
+    expect(publisher).toContain("...(type === 'article' ? mediaRefsFromArticleDocument(articleDocument) : [])")
+  })
+
   it('makes the content version explicit inside the publish preview', () => {
     const publisher = read('src/app/(frontend)/publish/PublishComposer.tsx')
     expect(publisher).toContain('<strong>发布预览</strong>')
