@@ -2,6 +2,8 @@
 
 import { ChangeEvent, useEffect, useRef, useState } from 'react'
 import { computeAutoSaveDelay } from '../../../lib/content-autosave.js'
+import { articleDocumentFromBody, plainTextFromArticleDocument, serializeArticleDocument, createArticleDocument, type ArticleDocument } from '../../../lib/article-document.js'
+import ArticleStructuredEditor from '../../../components/ArticleStructuredEditor.js'
 import { useRouter } from 'next/navigation'
 
 type ContentType = 'article' | 'post' | 'video'
@@ -71,6 +73,8 @@ export default function PublishComposer({
   const [type, setType] = useState<ContentType>(initialType)
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
+  const [articleDocument, setArticleDocument] = useState<ArticleDocument>(() => createArticleDocument())
+  const [savedArticleSerialized, setSavedArticleSerialized] = useState('')
   const [assets, setAssets] = useState<UploadedAsset[]>([])
   const [coverRef, setCoverRef] = useState('')
   const [draft, setDraft] = useState<ContentResponse | null>(null)
@@ -124,8 +128,18 @@ export default function PublishComposer({
         setDraft(recovered)
         setType(recovered.contentType ?? 'article')
         setTitle(recovered.title ?? '')
-        setBody(recoveredBody)
-        setSavedBody(recoveredBody)
+        if ((recovered.contentType ?? 'article') === 'article') {
+          const recoveredDocument = articleDocumentFromBody(recoveredBody)
+          setArticleDocument(recoveredDocument)
+          const recoveredPlainText = plainTextFromArticleDocument(recoveredDocument)
+          setBody(recoveredPlainText)
+          setSavedBody(recoveredPlainText)
+          setSavedArticleSerialized(serializeArticleDocument(recoveredDocument))
+        } else {
+          setBody(recoveredBody)
+          setSavedBody(recoveredBody)
+          setSavedArticleSerialized('')
+        }
         setCoverRef(recovered.coverRef ?? '')
         setAssets((recovered.mediaRefs ?? []).map((url: string) => ({
           id: url,
@@ -222,13 +236,25 @@ export default function PublishComposer({
 
   async function persistDraft(): Promise<ContentResponse> {
     let bodyRef = draft?.bodyRef
-    if (!bodyRef || savedBody !== body) {
+    if (type === 'article') {
+      const serialized = serializeArticleDocument(articleDocument)
+      if (!bodyRef || savedArticleSerialized !== serialized) {
+        const bodyFile = new File(
+          [serialized],
+          `luckread-article-${crypto.randomUUID()}.json`,
+          { type: 'application/json;charset=utf-8' },
+        )
+        bodyRef = (await uploadFile(bodyFile)).url
+        setSavedArticleSerialized(serialized)
+      }
+    } else if (!bodyRef || savedBody !== body) {
       const bodyFile = new File(
         [body],
         `luckread-content-${crypto.randomUUID()}.txt`,
         { type: 'text/plain;charset=utf-8' },
       )
       bodyRef = (await uploadFile(bodyFile)).url
+      setSavedArticleSerialized('')
     }
 
     const payload = {
@@ -270,6 +296,20 @@ export default function PublishComposer({
     if (!restoreCompleteRef.current) return
     autoSaveChangeTokenRef.current += 1
     autoSaveDirtyRef.current = true
+  }
+
+  function handleContentTypeChange(nextType: ContentType) {
+    if (nextType === type) return
+    if (nextType === 'article') {
+      const nextDocument = articleDocumentFromBody(body)
+      setArticleDocument(nextDocument)
+      setBody(plainTextFromArticleDocument(nextDocument))
+    } else if (type === 'article') {
+      setBody(plainTextFromArticleDocument(articleDocument))
+    }
+    setType(nextType)
+    setPreflightReport(null)
+    markDirty()
   }
 
   function cancelPendingAutoSave() {
@@ -350,6 +390,8 @@ export default function PublishComposer({
   function startNewContent() {
     setDraft(null)
     setSavedBody('')
+    setSavedArticleSerialized('')
+    setArticleDocument(createArticleDocument())
     setTitle('')
     setBody('')
     setAssets([])
@@ -474,6 +516,8 @@ export default function PublishComposer({
       }
       setDraft(null)
       setSavedBody('')
+      setSavedArticleSerialized('')
+      setArticleDocument(createArticleDocument())
       setTitle('')
       setBody('')
       setAssets([])
@@ -555,7 +599,7 @@ export default function PublishComposer({
             className={type === value ? 'active' : ''}
             key={value}
             disabled={busy || reviewLocked}
-            onClick={() => { setType(value); markDirty() }}
+            onClick={() => handleContentTypeChange(value)}
             role="tab"
             type="button"
           >
@@ -575,16 +619,29 @@ export default function PublishComposer({
         />
       </label>
 
-      <label className="lr-field">
-        <span>{type === 'post' ? '正文' : type === 'video' ? '视频简介' : '正文'}</span>
-        <textarea
+      {type === 'article' ? (
+        <ArticleStructuredEditor
           disabled={busy || reviewLocked}
-          onChange={(event) => { setBody(event.target.value); markDirty() }}
-          placeholder="写下你的内容…"
-          rows={14}
-          value={body}
+          onChange={(nextDocument, plainText) => {
+            setArticleDocument(nextDocument)
+            setBody(plainText)
+            setPreflightReport(null)
+            markDirty()
+          }}
+          value={articleDocument}
         />
-      </label>
+      ) : (
+        <label className="lr-field">
+          <span>{type === 'post' ? '正文' : '视频简介'}</span>
+          <textarea
+            disabled={busy || reviewLocked}
+            onChange={(event) => { setBody(event.target.value); markDirty() }}
+            placeholder="写下你的内容…"
+            rows={14}
+            value={body}
+          />
+        </label>
+      )}
 
       <div className="lr-media-box">
         <div className="lr-media-heading">
@@ -716,7 +773,32 @@ export default function PublishComposer({
           <article className="lr-preview-card">
             <span className="lr-preview-type">{type === 'article' ? '文章' : type === 'post' ? '动态' : '视频'}</span>
             <h2>{title.trim() || '未填写标题'}</h2>
-            <p className="lr-preview-body">{body.trim() || '暂无正文'}</p>
+            {type === 'article' ? (
+              <div className="lr-article-preview-body">
+                {articleDocument.blocks.map((block) => {
+                  if (block.type === 'divider') return <hr key={block.id} />
+                  if (block.type === 'heading') {
+                    return block.level === 3
+                      ? <h4 key={block.id}>{block.text}</h4>
+                      : <h3 key={block.id}>{block.text}</h3>
+                  }
+                  if (block.type === 'quote') return <blockquote key={block.id}>{block.text}</blockquote>
+                  if (block.type === 'bulletList' || block.type === 'orderedList') {
+                    const ListTag = block.type === 'bulletList' ? 'ul' : 'ol'
+                    return (
+                      <ListTag key={block.id}>
+                        {block.text.split('\\n').map((item, itemIndex) =>
+                          item.trim() ? <li key={block.id + '-' + itemIndex}>{item.trim()}</li> : null,
+                        )}
+                      </ListTag>
+                    )
+                  }
+                  return <p key={block.id}>{block.text}</p>
+                })}
+              </div>
+            ) : (
+              <p className="lr-preview-body">{body.trim() || '暂无正文'}</p>
+            )}
             {coverRef.trim() || assets[0]?.url ? (
               <div className="lr-preview-cover">
                 <img alt="" loading="eager" src={coverRef.trim() || assets[0]?.url} />
