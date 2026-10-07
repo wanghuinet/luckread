@@ -332,7 +332,10 @@ export default function PublishComposer({
   function handleContentTypeChange(nextType: ContentType) {
     if (nextType === type) return
     if (nextType === 'article') {
-      const nextDocument = articleDocumentFromBody(body)
+      const existingArticleText = plainTextFromArticleDocument(articleDocument).trim()
+      const nextDocument = existingArticleText
+        ? articleDocument
+        : articleDocumentFromBody(body)
       setArticleDocument(nextDocument)
       setBody(plainTextFromArticleDocument(nextDocument))
     } else if (type === 'article') {
