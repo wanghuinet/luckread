@@ -123,7 +123,7 @@ describe('Creator Center admin extension', () => {
     expect(organization).toContain("method: 'PATCH'")
     expect(organization).toContain("'If-Match': item.etag")
     expect(organization).toContain("'Idempotency-Key': 'content-organization-update:'")
-    expect(organization).toContain("coverRef: item.coverRef ?? null")
+    expect(organization).toContain("coverRef: editForm.coverRef.trim() ? editForm.coverRef.trim() : null")
     expect(organization).toContain("maxLength={512}")
     expect(organization).toContain("maxLength={4096}")
     expect(organization).toContain("setEditingOrganizationId(null)")
