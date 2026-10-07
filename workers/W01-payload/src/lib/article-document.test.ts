@@ -33,7 +33,7 @@ describe('article structured document', () => {
     ])
   })
 
-  it('rejects invalid block counts and empty non-divider blocks', () => {
+  it('rejects invalid block counts and refuses an entirely empty persisted document', () => {
     expect(() => normalizeArticleDocument({
       version: 1,
       blocks: [],
@@ -48,10 +48,10 @@ describe('article structured document', () => {
       })),
     })).toThrow('INVALID_ARTICLE_DOCUMENT')
 
-    expect(() => normalizeArticleDocument({
+    expect(() => serializeArticleDocument({
       version: 1,
       blocks: [{ id: 'empty', type: 'paragraph', text: '   ' }],
-    })).toThrow('INVALID_ARTICLE_DOCUMENT')
+    })).toThrow('ARTICLE_DOCUMENT_EMPTY')
   })
 
   it('strips control characters before persistence', () => {
