@@ -175,6 +175,18 @@ describe('Markdown editor plugin', () => {
     expect(math).toContain('KaTeX')
   })
 
+  it('registers the media manager without relaxing media block constraints', () => {
+    const manager = read('src/components/MediaManagerPlugin.tsx')
+    const registry = read('src/components/article-editor-plugins.ts')
+    expect(manager).toContain("id: 'content.media-manager'")
+    expect(manager).toContain("block.type !== 'image' && block.type !== 'gallery'")
+    expect(manager).toContain("block.type === 'gallery' && refs.length < 2")
+    expect(manager).toContain('moveRef(media.blockIndex, refIndex, -1)')
+    expect(manager).toContain('removeRef(media.blockIndex, refIndex)')
+    expect(registry).toContain("import { mediaManagerPlugin } from './MediaManagerPlugin.js'")
+    expect(registry).toContain('mediaManagerPlugin')
+  })
+
   it('registers bounded undo and redo without adding another document authority', () => {
     const history = read('src/components/UndoRedoPlugin.tsx')
     const registry = read('src/components/article-editor-plugins.ts')
