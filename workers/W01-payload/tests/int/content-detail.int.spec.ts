@@ -37,7 +37,7 @@ describe('public content detail', () => {
 
   it('surfaces normalized mention and hashtag tokens without creating a second taxonomy authority', () => {
     const page = read('src/app/(frontend)/content/[contentId]/ContentDetailClient.tsx')
-    expect(page).toContain("extractSocialTokens(body)")
+    expect(page).toContain("extractSocialTokens(socialTokenBody)")
     expect(page).toContain('copy.detail.tagAria')
     expect(page).toContain('content-detail-social-token')
     expect(page).not.toContain('hashtags/resolve')
