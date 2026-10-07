@@ -6,6 +6,7 @@ import type { ArticleDocument } from '../lib/article-document.js'
 
 const MAX_HISTORY_ENTRIES = 40
 const MAX_HISTORY_CHARS = 2_000_000
+const HISTORY_GROUP_WINDOW_MS = 750
 
 const serializeDocument = (value: ArticleDocument): string => JSON.stringify(value)
 
@@ -41,6 +42,7 @@ function HistoryToolbar({ value, disabled, updateDocument }: ArticleEditorPlugin
   const lastSerializedRef = useRef<string | null>(null)
   const initializedRef = useRef(false)
   const skipRecordRef = useRef(false)
+  const lastChangeAtRef = useRef(0)
 
   useEffect(() => {
     const serialized = serializeDocument(value)
@@ -57,8 +59,12 @@ function HistoryToolbar({ value, disabled, updateDocument }: ArticleEditorPlugin
     if (skipRecordRef.current) {
       skipRecordRef.current = false
     } else if (lastSerializedRef.current !== null) {
-      pastRef.current = trimHistory([...pastRef.current, lastSerializedRef.current])
+      const now = Date.now()
+      if (now - lastChangeAtRef.current >= HISTORY_GROUP_WINDOW_MS) {
+        pastRef.current = trimHistory([...pastRef.current, lastSerializedRef.current])
+      }
       futureRef.current = []
+      lastChangeAtRef.current = now
     }
 
     lastSerializedRef.current = serialized
@@ -78,6 +84,7 @@ function HistoryToolbar({ value, disabled, updateDocument }: ArticleEditorPlugin
 
     if (current) futureRef.current = trimHistory([current, ...futureRef.current])
     skipRecordRef.current = true
+    lastChangeAtRef.current = 0
     updateDocument(document)
     setVersion((count) => count + 1)
   }
@@ -102,6 +109,7 @@ function HistoryToolbar({ value, disabled, updateDocument }: ArticleEditorPlugin
   const clear = () => {
     pastRef.current = []
     futureRef.current = []
+    lastChangeAtRef.current = 0
     setVersion((count) => count + 1)
   }
 
