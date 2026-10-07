@@ -36,6 +36,7 @@ describe('Markdown editor plugin', () => {
       'bulletList',
       'orderedList',
       'divider',
+      'code',
     ])
     expect(result.document.blocks[0]?.level).toBe(2)
     expect(result.document.blocks[3]?.text).toBe('第一项\n第二项')
