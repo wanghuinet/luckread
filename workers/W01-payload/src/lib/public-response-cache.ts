@@ -80,7 +80,8 @@ const CACHE_QUERY_KEYS: Record<string, readonly string[]> = {
 
 const normalizedQuery = (url: URL, namespace: string): string => {
   const allowedKeys = CACHE_QUERY_KEYS[namespace]
-  const keys = (allowedKeys ?? Array.from(url.searchParams.keys())).slice().sort()
+  if (!allowedKeys) throw new Error('PUBLIC_CACHE_NAMESPACE_UNCONFIGURED:' + namespace)
+  const keys = allowedKeys.slice().sort()
   const params = new URLSearchParams()
   for (const key of keys) {
     for (const value of url.searchParams.getAll(key).sort()) params.append(key, value)
@@ -186,6 +187,7 @@ export const cachedPublicGet = async (
   loader: () => Promise<Response>,
   ttlSeconds: number,
 ): Promise<Response> => {
+  if (!CACHE_QUERY_KEYS[namespace]) return loader()
   const cache = (globalThis.caches as unknown as { default: Cache }).default
   let contentListGeneration = DEFAULT_CONTENT_LIST_GENERATION
   if (namespace === 'content-list') {
