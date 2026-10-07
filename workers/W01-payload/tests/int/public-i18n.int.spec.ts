@@ -20,7 +20,8 @@ describe('public frontend i18n', () => {
     const toggle = read('src/app/(frontend)/i18n/PublicLanguageToggle.tsx')
     const home = read('src/app/(frontend)/page.tsx')
     const browse = read('src/app/(frontend)/content/page.tsx')
-    const detail = read('src/app/(frontend)/content/[contentId]/page.tsx')
+    const detail = read('src/app/(frontend)/content/[contentId]/ContentDetailClient.tsx')
+    const detailPage = read('src/app/(frontend)/content/[contentId]/page.tsx')
     const comments = read('src/app/(frontend)/content/[contentId]/ContentComments.tsx')
 
     expect(toggle).toContain('PUBLIC_LOCALES.map')
@@ -38,10 +39,13 @@ describe('public frontend i18n', () => {
   it('keeps public content URLs unchanged for the first multilingual slice', () => {
     const browse = read('src/app/(frontend)/content/page.tsx')
     const feed = read('src/app/(frontend)/HomeContentFeed.tsx')
-    const detail = read('src/app/(frontend)/content/[contentId]/page.tsx')
+    const detail = read('src/app/(frontend)/content/[contentId]/ContentDetailClient.tsx')
+    const detailPage = read('src/app/(frontend)/content/[contentId]/page.tsx')
 
-    expect(browse).toContain("href={'/content/' + encodeURIComponent(item.id)}")
+    expect(browse).toContain("href={'/content/' + encodeURIComponent(item.slug || item.id)}")
     expect(feed).toContain('href={`/content/${encodeURIComponent(item.id)}`}')
     expect(detail).toContain("fetch(`/api/v1/contents/${encodeURIComponent(contentId)}`")
+    expect(detailPage).toContain('alternates:')
+    expect(detailPage).toContain('permanentRedirect')
   })
 })
