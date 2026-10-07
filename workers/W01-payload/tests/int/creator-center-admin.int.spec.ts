@@ -157,6 +157,12 @@ describe('Creator Center admin extension', () => {
     expect(editor).toContain("pluginId={plugin.id}")
   })
 
+  it('restricts editor media insertion to image assets', () => {
+    const editor = read('src/components/ArticleStructuredEditor.tsx')
+    expect(editor).toContain('const refs = imageAssets.map((asset) => asset.url).filter(Boolean)')
+    expect(editor).toContain('const refs = (assetUrls ?? imageAssets.map((asset) => asset.url)).filter(Boolean)')
+  })
+
   it('reuses one derived plain-text snapshot for editor display and plugin context', () => {
     const editor = read('src/components/ArticleStructuredEditor.tsx')
     expect(editor).toContain('const plainText = useMemo(() => plainTextFromArticleDocument(value), [value])')
