@@ -12,6 +12,7 @@ import {
   hasArticleDocumentContent,
   duplicateArticleBlock,
   insertArticleBlockAfter,
+  insertArticleMediaBlockAfter,
   removeMediaRefFromArticleDocument,
   reorderArticleMediaRef,
   transformArticleBlock,
@@ -194,6 +195,49 @@ describe('article structured document', () => {
     expect(next.blocks[1]?.type).toBe('paragraph')
     expect(next.blocks[1]?.text).toBe('')
     expect(document.blocks).toHaveLength(2)
+  })
+
+  it('inserts media after the requested block without mutating the original', () => {
+    const document = {
+      version: 2 as const,
+      blocks: [
+        { id: 'a', type: 'paragraph' as const, text: '前文' },
+        { id: 'b', type: 'paragraph' as const, text: '后文' },
+      ],
+    }
+
+    const next = insertArticleMediaBlockAfter(document, 0, 'gallery', [
+      'https://media.example/1.jpg',
+      'https://media.example/2.jpg',
+      'https://media.example/3.jpg',
+    ])
+
+    expect(next.blocks.map((block) => block.type)).toEqual(['paragraph', 'gallery', 'paragraph'])
+    expect(next.blocks[1]?.mediaRefs).toEqual([
+      'https://media.example/1.jpg',
+      'https://media.example/2.jpg',
+      'https://media.example/3.jpg',
+    ])
+    expect(document.blocks).toHaveLength(2)
+  })
+
+  it('caps contextual media insertion to the gallery media limit', () => {
+    const document = createArticleDocument('正文')
+    const refs = Array.from({ length: ARTICLE_MAX_MEDIA_PER_BLOCK + 5 }, (_, index) =>
+      'https://media.example/' + String(index) + '.jpg',
+    )
+
+    const next = insertArticleMediaBlockAfter(document, 0, 'gallery', refs)
+
+    expect(next.blocks[1]?.mediaRefs).toHaveLength(ARTICLE_MAX_MEDIA_PER_BLOCK)
+  })
+
+  it('returns the original document for invalid contextual media insertion', () => {
+    const document = createArticleDocument('正文')
+
+    expect(insertArticleMediaBlockAfter(document, 99, 'image', ['https://media.example/1.jpg'])).toBe(document)
+    expect(insertArticleMediaBlockAfter(document, 0, 'image', [])).toEqual(document)
+    expect(insertArticleMediaBlockAfter(document, 0, 'gallery', ['https://media.example/1.jpg'])).toEqual(document)
   })
 
   it('does not mutate the document for an invalid insertion index', () => {
