@@ -95,6 +95,9 @@ export default function CreatorContentOrganization({
   const [reloadKey, setReloadKey] = useState(0)
   const [loadingMore, setLoadingMore] = useState(false)
   const [selectedOrganizationId, setSelectedOrganizationId] = useState<string | null>(null)
+  const [editingOrganizationId, setEditingOrganizationId] = useState<string | null>(null)
+  const [editForm, setEditForm] = useState(emptyForm)
+  const [savingEdit, setSavingEdit] = useState(false)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -175,7 +178,7 @@ export default function CreatorContentOrganization({
           description: form.description.trim(),
         }),
       })
-      const data = await response.json().catch((): null => null) as { error?: { message?: string } } | null
+      const data: { error?: { message?: string } } | null = await response.json().catch((): null => null)
       if (response.status === 401) {
         redirectToLogin(loginPath)
         return
@@ -189,6 +192,61 @@ export default function CreatorContentOrganization({
       setError(cause instanceof Error ? cause.message : '创建失败')
     } finally {
       setSaving(false)
+    }
+  }
+
+  function openEdit(item: OrganizationItem) {
+    setEditingOrganizationId(item.id)
+    setEditForm({
+      title: item.title,
+      description: item.description,
+    })
+    setError('')
+  }
+
+  function closeEdit() {
+    if (savingEdit) return
+    setEditingOrganizationId(null)
+    setEditForm(emptyForm)
+  }
+
+  async function updateOrganization(item: OrganizationItem, event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!editForm.title.trim() || savingEdit) return
+
+    setSavingEdit(true)
+    setError('')
+    try {
+      const response = await fetch(kindMeta[kind].path + '/' + encodeURIComponent(item.id), {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: {
+          accept: 'application/json',
+          'content-type': 'application/json',
+          'If-Match': item.etag,
+          'Idempotency-Key': 'content-organization-update:' + crypto.randomUUID(),
+        },
+        body: JSON.stringify({
+          title: editForm.title.trim(),
+          description: editForm.description.trim(),
+          coverRef: item.coverRef ?? null,
+        }),
+      })
+      const data: { error?: { message?: string } } | null = await response.json().catch((): null => null)
+      if (response.status === 401) {
+        redirectToLogin(loginPath)
+        return
+      }
+      if (!response.ok) throw new Error(data?.error?.message || '保存失败')
+      setEditingOrganizationId(null)
+      setEditForm(emptyForm)
+      setSelectedOrganizationId(null)
+      setReloadKey((value) => value + 1)
+    } catch (cause) {
+      if (cause instanceof Error && cause.message === 'AUTH_REQUIRED') return
+      setError(cause instanceof Error ? cause.message : '保存失败')
+    } finally {
+      setSavingEdit(false)
     }
   }
 
@@ -207,7 +265,7 @@ export default function CreatorContentOrganization({
           'Idempotency-Key': 'content-organization-delete:' + crypto.randomUUID(),
         },
       })
-      const data = await response.json().catch((): null => null) as { error?: { message?: string } } | null
+      const data: { error?: { message?: string } } | null = await response.json().catch((): null => null)
       if (response.status === 401) {
         redirectToLogin(loginPath)
         return
@@ -350,6 +408,14 @@ export default function CreatorContentOrganization({
               <div className={styles.contentListActions}>
                 <button
                   className={styles.secondaryButton}
+                  disabled={actionId !== null || !['DRAFT', 'REJECTED', 'UNPUBLISHED', 'RESTORED'].includes(item.state)}
+                  onClick={() => openEdit(item)}
+                  type="button"
+                >
+                  编辑
+                </button>
+                <button
+                  className={styles.secondaryButton}
                   disabled={actionId !== null}
                   onClick={() => setSelectedOrganizationId((current) => current === item.id ? null : item.id)}
                   type="button"
@@ -366,6 +432,35 @@ export default function CreatorContentOrganization({
                 </button>
               </div>
               </article>
+              {editingOrganizationId === item.id ? (
+                <form className={styles.audiencePanel} onSubmit={(event) => void updateOrganization(item, event)}>
+                  <div className={styles.audienceListHeader}>
+                    <strong>编辑{activeMeta.singular}</strong>
+                    <button className={styles.secondaryButton + ' btn'} disabled={savingEdit} onClick={closeEdit} type="button">取消</button>
+                  </div>
+                  <label className={styles.filterSelect}>
+                    <span>名称</span>
+                    <input
+                      autoFocus
+                      maxLength={512}
+                      onChange={(event) => setEditForm((current) => ({ ...current, title: event.target.value }))}
+                      value={editForm.title}
+                    />
+                  </label>
+                  <label className={styles.filterSelect}>
+                    <span>简介</span>
+                    <textarea
+                      maxLength={4096}
+                      onChange={(event) => setEditForm((current) => ({ ...current, description: event.target.value }))}
+                      rows={3}
+                      value={editForm.description}
+                    />
+                  </label>
+                  <button className={styles.primaryButton + ' btn'} disabled={!editForm.title.trim() || savingEdit} type="submit">
+                    {savingEdit ? '保存中…' : '保存'}
+                  </button>
+                </form>
+              ) : null}
               {selectedOrganizationId === item.id ? (
               <CreatorContentOrganizationMembers
                 key={item.id + ':' + item.etag}
