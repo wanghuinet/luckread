@@ -371,11 +371,11 @@ describe('1.1 content revision history', () => {
     const index = readFileSync(resolve(process.cwd(), 'workers/W03-content/src/index.ts'), 'utf8')
     const w01Detail = readFileSync(resolve(process.cwd(), 'workers/W01-payload/src/app/api/v1/contents/[contentId]/revisions/[revisionId]/route.ts'), 'utf8')
     const w01Rollback = readFileSync(resolve(process.cwd(), 'workers/W01-payload/src/app/api/v1/contents/[contentId]/revisions/[revisionId]/rollback/route.ts'), 'utf8')
-    expect(index).toContain('/internal/content/contents/')
-    expect(index).toContain('/revisions/${encodeURIComponent(revisionId)}/rollback')
-    expect(w01Detail).not.toContain("method: 'POST'")
-    expect(w01Rollback).toContain('encodeURIComponent(revisionId)')
-    expect(w01Rollback).toContain('/rollback')
+    expect(index).toContain('rollbackContentRevision')
+    expect(index).toContain('path.rollback')
+    expect(w01Detail).toContain('export async function GET')
+    expect(w01Detail).not.toContain("export async function POST")
+    expect(w01Rollback).toContain("pathname: '/internal/content/contents/' + encodeURIComponent(contentId) + '/revisions/' + encodeURIComponent(revisionId) + '/rollback'")
   })
 
   it('records create, update and rollback history after the authoritative CAS guard', () => {
