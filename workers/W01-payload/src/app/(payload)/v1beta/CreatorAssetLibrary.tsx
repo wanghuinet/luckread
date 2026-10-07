@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { ChangeEvent, useEffect, useState } from 'react'
+import { ChangeEvent, useCallback, useEffect, useState } from 'react'
 
 type MediaItem = {
   id: string | number
@@ -36,7 +36,7 @@ export default function CreatorAssetLibrary({ adminMode = true, loginPath = '/ad
   const [totalPages, setTotalPages] = useState(1)
   const [loadingMore, setLoadingMore] = useState(false)
 
-  async function load(page = 1, append = false) {
+  const load = useCallback(async (page = 1, append = false) => {
     if (append) setLoadingMore(true)
     else setLoading(true)
     setError('')
@@ -69,7 +69,7 @@ export default function CreatorAssetLibrary({ adminMode = true, loginPath = '/ad
       setLoading(false)
       setLoadingMore(false)
     }
-  }
+  }, [loginPath])
 
   async function loadMore() {
     if (loadingMore || pageNumber >= totalPages) return
@@ -81,7 +81,7 @@ export default function CreatorAssetLibrary({ adminMode = true, loginPath = '/ad
       void load()
     }, 0)
     return () => window.clearTimeout(timer)
-  }, [])
+  }, [load])
 
   async function uploadFiles(event: ChangeEvent<HTMLInputElement>) {
     const files = Array.from(event.target.files ?? []).slice(0, 8)
