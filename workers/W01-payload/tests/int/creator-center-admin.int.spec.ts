@@ -75,6 +75,18 @@ describe('Creator Center admin extension', () => {
     expect(moderation).toContain('if (response.status === 401)')
   })
 
+  it('hardens short-video media validation and cover selection', () => {
+    const publisher = read('src/app/(frontend)/publish/PublishComposer.tsx')
+
+    expect(publisher).toContain('const isVideoAsset')
+    expect(publisher).toContain('短视频至少需要添加一个视频素材。')
+    expect(publisher).toContain('const resolveCoverRef')
+    expect(publisher).toContain("type === 'video' ? assets.find(isImageAsset)?.url ?? null")
+    expect(publisher).toContain("'当前封面'")
+    expect(publisher).toContain('默认使用第一张图片素材')
+    expect(publisher).toContain('resolveCoverRef(type, assets, coverRef)')
+  })
+
   it('embeds the existing publisher with a scoped W03 content bridge', () => {
     const view = read('src/app/(frontend)/creator-center/CreatorStudio.tsx')
     const publisher = read('src/app/(frontend)/publish/PublishComposer.tsx')
