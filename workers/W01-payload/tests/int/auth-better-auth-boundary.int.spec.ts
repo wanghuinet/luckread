@@ -49,7 +49,7 @@ describe('W01 Better Auth boundary', () => {
     expect(route).toContain('idempotency')
     expect(route).toContain('Payload projection')
     expect(route).not.toContain("AUTH_REGISTER_LIMITER")
-    const denyIndex = route.indexOf("if (endpoint === 'sign-up/email')")
+    const denyIndex = route.indexOf('canonicalW01AuthEndpoints.has(endpoint)')
     const upstreamIndex = route.indexOf("service.fetch(")
     expect(denyIndex).toBeGreaterThanOrEqual(0)
     expect(upstreamIndex).toBeGreaterThanOrEqual(0)
