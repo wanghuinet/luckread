@@ -11,6 +11,7 @@ import { getPublicCopy, type PublicLocale } from '../../i18n/public-locale'
 type ContentType = 'article' | 'post' | 'video'
 type Content = {
   id: string
+  slug?: string
   creatorId?: string | null
   contentType: ContentType
   state: string

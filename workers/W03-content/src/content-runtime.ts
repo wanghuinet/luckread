@@ -1,5 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
+import { contentSlugFor, isContentSlug } from './content-slug.js'
+
 export type ContentState =
   | 'DRAFT'
   | 'PENDING_REVIEW'
@@ -31,6 +33,7 @@ export interface ContentRecord {
   state: ContentState
   version: number
   revision: number
+  slug: string
   title: string
   bodyRef: string
   mediaRefs: string[]
@@ -52,6 +55,7 @@ export interface ContentRevision {
   sourceRevision: number | null
   operation: ContentRevisionOperation
   state: ContentState
+  slug: string
   title: string
   bodyRef: string
   mediaRefs: string[]
@@ -76,6 +80,7 @@ interface ContentRow {
   state: ContentState
   version: number
   revision: number
+  slug: string
   title: string
   body_ref: string
   media_refs_json: string
@@ -95,6 +100,7 @@ interface ContentRevisionRow {
   source_revision: number | null
   operation: ContentRevisionOperation
   state: ContentState
+  slug: string
   title: string
   body_ref: string
   media_refs_json: string
@@ -176,6 +182,7 @@ const toContent = (row: ContentRow): ContentRecord => ({
   state: row.state,
   version: row.version,
   revision: row.revision,
+  slug: row.slug,
   title: row.title,
   bodyRef: row.body_ref,
   mediaRefs: JSON.parse(row.media_refs_json || '[]') as string[],
@@ -191,6 +198,7 @@ export const publicContent = (content: ContentRecord) => ({
   state: content.state,
   version: content.version,
   etag: content.etag,
+  slug: content.slug,
   title: content.title,
   bodyRef: content.bodyRef,
   mediaRefs: content.mediaRefs,
@@ -216,6 +224,11 @@ const assertResourceId = (value: string): void => {
   if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(value)) {
     throw new ContentRuntimeError('VALIDATION_FAILED', 400)
   }
+}
+
+const assertContentReference = (value: string): void => {
+  if (/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(value) || isContentSlug(value)) return
+  throw new ContentRuntimeError('VALIDATION_FAILED', 400)
 }
 
 export const validateInput = (input: unknown): ContentInput => {
@@ -301,6 +314,7 @@ const toRevision = (row: ContentRevisionRow): ContentRevision => ({
   sourceRevision: row.source_revision,
   operation: row.operation,
   state: row.state,
+  slug: row.slug,
   title: row.title,
   bodyRef: row.body_ref,
   mediaRefs: JSON.parse(row.media_refs_json || '[]') as string[],
@@ -323,11 +337,11 @@ const normalizeCorrelationId = (value: string): string => {
 const insertRevision = (db: ContentD1, revision: ContentRevision): D1PreparedStatement =>
   db.prepare(`INSERT INTO content_revisions
     (id, content_id, revision, content_version, actor_user_id, source_revision, operation,
-     state, title, body_ref, media_refs_json, cover_ref, etag, reason, correlation_id, created_at)
-   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).bind(
+     state, slug, title, body_ref, media_refs_json, cover_ref, etag, reason, correlation_id, created_at)
+   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).bind(
     revision.id, revision.contentId, revision.revision, revision.contentVersion,
     revision.actorUserId, revision.sourceRevision, revision.operation, revision.state,
-    revision.title, revision.bodyRef, JSON.stringify(revision.mediaRefs), revision.coverRef,
+    revision.slug, revision.title, revision.bodyRef, JSON.stringify(revision.mediaRefs), revision.coverRef,
     revision.etag, revision.reason, revision.correlationId, revision.createdAt,
   )
 const emptyIdempotency = (): IdempotencyRow => ({
@@ -350,7 +364,7 @@ const loadMutationRow = async (
   const row = await db.prepare(
     `SELECT
         c.id, c.content_type, c.owner_user_id, c.creator_id, c.ip_id, c.state, c.version, c.revision,
-        c.title, c.body_ref, c.media_refs_json, c.cover_ref, c.etag, c.created_at, c.updated_at,
+        c.slug, c.title, c.body_ref, c.media_refs_json, c.cover_ref, c.etag, c.created_at, c.updated_at,
         i.id AS idem_id,
         i.owner_user_id AS idem_owner_user_id,
         i.request_hash AS idem_request_hash,
@@ -450,14 +464,14 @@ export async function getContent(
   contentId: string,
   principalUserId: string | null,
 ): Promise<ContentRecord> {
-  assertResourceId(contentId)
+  assertContentReference(contentId)
   const row = await db.prepare(
     `SELECT id, content_type, owner_user_id, creator_id, ip_id, state, version, revision,
-            title, body_ref, media_refs_json, cover_ref, etag, created_at, updated_at
+            slug, title, body_ref, media_refs_json, cover_ref, etag, created_at, updated_at
        FROM contents
-      WHERE id = ?
+      WHERE (id = ? OR slug = ?)
         AND (state = 'PUBLISHED' OR owner_user_id = ?)`,
-  ).bind(contentId, principalUserId ?? '').first<ContentRow>()
+  ).bind(contentId, contentId, principalUserId ?? '').first<ContentRow>()
   if (!row) throw new ContentRuntimeError('NOT_FOUND', 404)
   return toContent(row)
 }
@@ -477,7 +491,7 @@ export async function listContentRevisions(
   const cursorBindings = decoded ? [decoded.updatedAt, decoded.updatedAt, decoded.id] : []
   const rows = await db.prepare(`
     SELECT r.id, r.content_id, r.revision, r.content_version, r.actor_user_id,
-           r.source_revision, r.operation, r.state, r.title, r.body_ref,
+           r.source_revision, r.operation, r.state, r.slug, r.title, r.body_ref,
            r.media_refs_json, r.cover_ref, r.etag, r.reason, r.correlation_id, r.created_at
       FROM content_revisions r
       JOIN contents c ON c.id = r.content_id
@@ -501,7 +515,7 @@ export async function getContentRevision(
   assertResourceId(revisionId)
   const row = await db.prepare(`
     SELECT r.id, r.content_id, r.revision, r.content_version, r.actor_user_id,
-           r.source_revision, r.operation, r.state, r.title, r.body_ref,
+           r.source_revision, r.operation, r.state, r.slug, r.title, r.body_ref,
            r.media_refs_json, r.cover_ref, r.etag, r.reason, r.correlation_id, r.created_at
       FROM content_revisions r
       JOIN contents c ON c.id = r.content_id
@@ -552,7 +566,7 @@ export async function listCreatorContents(
   }
   const rows = await db.prepare(
     `SELECT id, content_type, owner_user_id, creator_id, ip_id, state, version, revision,
-            title, body_ref, media_refs_json, cover_ref, etag, created_at, updated_at
+            slug, title, body_ref, media_refs_json, cover_ref, etag, created_at, updated_at
        FROM contents
       WHERE ${conditions.join(' AND ')}
       ORDER BY updated_at DESC, id DESC
@@ -601,7 +615,7 @@ export async function listContents(
 
   const rows = await db.prepare(
     `SELECT id, content_type, owner_user_id, creator_id, ip_id, state, version, revision,
-            title, body_ref, media_refs_json, cover_ref, etag, created_at, updated_at
+            slug, title, body_ref, media_refs_json, cover_ref, etag, created_at, updated_at
        FROM contents
       WHERE ${conditions.join(' AND ')}
       ORDER BY updated_at DESC, id DESC
@@ -646,8 +660,8 @@ export async function createContent(
 
   const replay = inspectIdempotency(existing, ownerUserId, hash, now)
   if (replay.replayed) {
-    const parsed = replay.body as { id?: unknown; state?: unknown; version?: unknown; etag?: unknown; title?: unknown; bodyRef?: unknown; contentType?: unknown; mediaRefs?: unknown; coverRef?: unknown } | null
-    if (!parsed || typeof parsed.id !== 'string' || !isState(parsed.state) || typeof parsed.version !== 'number' || typeof parsed.etag !== 'string' || typeof parsed.title !== 'string' || typeof parsed.bodyRef !== 'string' || !['article','post','video'].includes(String(parsed.contentType)) || !Array.isArray(parsed.mediaRefs) || parsed.mediaRefs.some(ref => typeof ref !== 'string')) {
+    const parsed = replay.body as { id?: unknown; state?: unknown; version?: unknown; etag?: unknown; slug?: unknown; title?: unknown; bodyRef?: unknown; contentType?: unknown; mediaRefs?: unknown; coverRef?: unknown } | null
+    if (!parsed || typeof parsed.id !== 'string' || typeof parsed.slug !== 'string' || !isState(parsed.state) || typeof parsed.version !== 'number' || typeof parsed.etag !== 'string' || typeof parsed.title !== 'string' || typeof parsed.bodyRef !== 'string' || !['article','post','video'].includes(String(parsed.contentType)) || !Array.isArray(parsed.mediaRefs) || parsed.mediaRefs.some(ref => typeof ref !== 'string')) {
       throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
     }
     return {
@@ -659,6 +673,7 @@ export async function createContent(
       state: parsed.state,
       version: parsed.version,
       revision: 1,
+      slug: parsed.slug,
       title: parsed.title,
       bodyRef: parsed.bodyRef,
       mediaRefs: parsed.mediaRefs as string[],
@@ -670,6 +685,7 @@ export async function createContent(
   }
 
   const contentId = crypto.randomUUID()
+  const slug = contentSlugFor(normalized.title, contentId)
   const createdAt = now.toISOString()
   const expiresAt = new Date(now.getTime() + IDEMPOTENCY_TTL_MS).toISOString()
   const responseBody = {
@@ -677,6 +693,7 @@ export async function createContent(
     state: 'DRAFT' as const,
     version: 1,
     etag: etagForVersion(1),
+    slug,
     title: normalized.title,
     bodyRef: normalized.bodyRef,
     contentType: normalized.contentType,
@@ -689,9 +706,9 @@ export async function createContent(
     insertCompletedIdempotency(db, ownerUserId, operationId, idempotencyKey, hash, 201, JSON.stringify(responseBody), createdAt, expiresAt),
     db.prepare(
       `INSERT INTO contents
-        (id, content_type, owner_user_id, creator_id, ip_id, state, version, revision, title, body_ref, media_refs_json, cover_ref, etag, created_at, updated_at)
-       VALUES (?, ?, ?, ?, NULL, 'DRAFT', 1, 1, ?, ?, ?, ?, ?, ?, ?) `,
-    ).bind(contentId, normalized.contentType, ownerUserId, ownerUserId, normalized.title, normalized.bodyRef, JSON.stringify(normalized.mediaRefs), normalized.coverRef, responseBody.etag, createdAt, createdAt),
+        (id, content_type, owner_user_id, creator_id, ip_id, state, version, revision, slug, title, body_ref, media_refs_json, cover_ref, etag, created_at, updated_at)
+       VALUES (?, ?, ?, ?, NULL, 'DRAFT', 1, 1, ?, ?, ?, ?, ?, ?, ?, ?) `,
+    ).bind(contentId, normalized.contentType, ownerUserId, ownerUserId, slug, normalized.title, normalized.bodyRef, JSON.stringify(normalized.mediaRefs), normalized.coverRef, responseBody.etag, createdAt, createdAt),
     atomicGuard(db),
     insertRevision(db, {
       id: crypto.randomUUID(),
@@ -702,6 +719,7 @@ export async function createContent(
       sourceRevision: null,
       operation: 'CREATE',
       state: 'DRAFT',
+      slug,
       title: normalized.title,
       bodyRef: normalized.bodyRef,
       mediaRefs: normalized.mediaRefs,
@@ -722,6 +740,7 @@ export async function createContent(
     state: 'DRAFT',
     version: 1,
     revision: 1,
+    slug,
     title: normalized.title,
     bodyRef: normalized.bodyRef,
     mediaRefs: normalized.mediaRefs,
@@ -795,6 +814,7 @@ export async function updateContent(
       sourceRevision: content.revision,
       operation: 'UPDATE',
       state: content.state,
+      slug: updated.slug,
       title: updated.title,
       bodyRef: updated.bodyRef,
       mediaRefs: updated.mediaRefs,
@@ -844,7 +864,7 @@ export async function rollbackContentRevision(
   }
 
   const source = await db.prepare(`SELECT id, content_id, revision, content_version, actor_user_id, source_revision, operation,
-       state, title, body_ref, media_refs_json, cover_ref, etag, reason, correlation_id, created_at
+       state, slug, title, body_ref, media_refs_json, cover_ref, etag, reason, correlation_id, created_at
   FROM content_revisions
  WHERE id = ? AND content_id = ?`).bind(revisionId, contentId).first<ContentRevisionRow>()
   if (!source) throw new ContentRuntimeError('NOT_FOUND', 404)
@@ -854,6 +874,7 @@ export async function rollbackContentRevision(
   const updatedAt = now.toISOString()
   const updated: ContentRecord = {
     ...content,
+    slug: source.slug,
     title: source.title,
     bodyRef: source.body_ref,
     mediaRefs: JSON.parse(source.media_refs_json || '[]') as string[],
@@ -885,6 +906,7 @@ export async function rollbackContentRevision(
       sourceRevision: source.revision,
       operation: 'ROLLBACK',
       state: content.state,
+      slug: updated.slug,
       title: updated.title,
       bodyRef: updated.bodyRef,
       mediaRefs: updated.mediaRefs,
