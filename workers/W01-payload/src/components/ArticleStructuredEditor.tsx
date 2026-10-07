@@ -131,6 +131,33 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
     insertMedia,
   }
 
+  function duplicateBlock(index: number) {
+    if (value.blocks.length >= ARTICLE_MAX_BLOCKS) return
+    const source = value.blocks[index]
+    if (!source) return
+    const clone: ArticleBlock = {
+      ...source,
+      id: crypto.randomUUID(),
+      ...(source.mediaRefs ? { mediaRefs: [...source.mediaRefs] } : {}),
+      ...(source.table
+        ? {
+            table: {
+              headers: [...source.table.headers],
+              rows: source.table.rows.map((row) => [...row]),
+            },
+          }
+        : {}),
+    }
+    emit({
+      ...value,
+      blocks: [
+        ...value.blocks.slice(0, index + 1),
+        clone,
+        ...value.blocks.slice(index + 1),
+      ],
+    })
+  }
+
   function removeBlock(index: number) {
     if (value.blocks.length === 1) return
     emit({
@@ -236,6 +263,14 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
                   type="button"
                 >
                   ↓
+                </button>
+                <button
+                  aria-label="复制区块"
+                  disabled={disabled || value.blocks.length >= ARTICLE_MAX_BLOCKS}
+                  onClick={() => duplicateBlock(index)}
+                  type="button"
+                >
+                  复制
                 </button>
                 <button
                   aria-label="删除区块"
