@@ -118,7 +118,6 @@ const serializeBlock = (block: ArticleBlock): string => {
         children: [
           {
             type: 'image' as const,
-            title: null,
             url: ref,
             alt: block.text || null,
           },
