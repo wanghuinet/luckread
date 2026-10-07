@@ -17,7 +17,7 @@ import {
 } from './article-document.js'
 
 describe('article structured document', () => {
-  it('round-trips structured blocks without losing ordering or headings', () => {
+  it('round-trips structured math blocks and extracts their plain text', () => {
     const document = createArticleDocument()
     document.blocks = [
       { id: 'math', type: 'math', text: '\\frac{a}{b}' },
@@ -26,9 +26,10 @@ describe('article structured document', () => {
 
     const restored = tryDeserializeArticleDocument(serializeArticleDocument(document))
     expect(restored).toEqual(document)
-    expect(plainTextFromArticleDocument(document)).toBe('\\frac{a}{b}\\n\\n正文')
+    expect(plainTextFromArticleDocument(document)).toBe('\\frac{a}{b}\n\n正文')
   })
 
+  it('round-trips structured blocks without losing ordering or headings', () => {
     const document = createArticleDocument()
     document.blocks = [
       { id: 'a', type: 'heading', text: '第一节', level: 2 },
