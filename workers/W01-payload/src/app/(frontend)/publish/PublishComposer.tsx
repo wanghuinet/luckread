@@ -1,6 +1,7 @@
 'use client'
 
-import { ChangeEvent, useEffect, useState } from 'react'
+import { ChangeEvent, useEffect, useRef, useState } from 'react'
+import { computeAutoSaveDelay } from '../../../lib/content-autosave.js'
 import { useRouter } from 'next/navigation'
 
 type ContentType = 'article' | 'post' | 'video'
@@ -82,6 +83,12 @@ export default function PublishComposer({
   const [aiMode, setAiMode] = useState<AiMode>('none')
   const [humanConfirmed, setHumanConfirmed] = useState(false)
   const [preflightReport, setPreflightReport] = useState<PublishPreflightResult | null>(null)
+  const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'scheduled' | 'saving' | 'saved' | 'error'>('idle')
+  const autoSaveTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null)
+  const autoSaveInFlightRef = useRef(false)
+  const autoSaveLastSavedAtRef = useRef<number | null>(null)
+  const autoSaveChangeTokenRef = useRef(0)
+  const restoreCompleteRef = useRef(false)
 
   useEffect(() => {
     let cancelled = false
@@ -124,6 +131,7 @@ export default function PublishComposer({
           mimeType: 'application/octet-stream',
         })))
         setMessage(recovered.state === 'PENDING_REVIEW' ? '草稿已恢复，当前正在审核。' : '草稿已恢复。')
+        restoreCompleteRef.current = true
       } catch (caught) {
         if (cancelled || controller.signal.aborted) return
         if (caught instanceof DOMException && caught.name === 'AbortError') return
@@ -181,6 +189,7 @@ export default function PublishComposer({
       const uploaded: UploadedAsset[] = []
       for (const file of selected.slice(0, remainingSlots)) uploaded.push(await uploadFile(file))
       setAssets((current) => [...current, ...uploaded])
+      scheduleAutoSave()
       setMessage(`已上传 ${uploaded.length} 个媒体文件`)
       if (selected.length > remainingSlots) setError('已达到 12 个媒体文件上限，其余文件未上传。')
     } catch {
@@ -193,6 +202,7 @@ export default function PublishComposer({
 
   function removeAsset(id: string) {
     setAssets((current) => current.filter((asset) => asset.id !== id))
+    scheduleAutoSave()
   }
 
   const reviewLocked = draft?.state === 'PENDING_REVIEW'
@@ -252,6 +262,53 @@ export default function PublishComposer({
     return saved
   }
 
+  function scheduleAutoSave() {
+    autoSaveChangeTokenRef.current += 1
+    if (autoSaveTimerRef.current) {
+      window.clearTimeout(autoSaveTimerRef.current)
+      autoSaveTimerRef.current = null
+    }
+    if (!restoreCompleteRef.current || reviewLocked || !title.trim() || !body.trim()) {
+      setAutoSaveStatus('idle')
+      return
+    }
+
+    const changeToken = autoSaveChangeTokenRef.current
+    const delay = computeAutoSaveDelay(Date.now(), autoSaveLastSavedAtRef.current)
+    setAutoSaveStatus('scheduled')
+    autoSaveTimerRef.current = window.setTimeout(async () => {
+      autoSaveTimerRef.current = null
+      if (changeToken !== autoSaveChangeTokenRef.current || autoSaveInFlightRef.current || !title.trim() || !body.trim() || reviewLocked) {
+        return
+      }
+
+      autoSaveInFlightRef.current = true
+      setAutoSaveStatus('saving')
+      try {
+        await persistDraft()
+        autoSaveLastSavedAtRef.current = Date.now()
+        setAutoSaveStatus('saved')
+      } catch {
+        setAutoSaveStatus('error')
+      } finally {
+        autoSaveInFlightRef.current = false
+        if (changeToken !== autoSaveChangeTokenRef.current && !reviewLocked) {
+          scheduleAutoSave()
+        }
+      }
+    }, delay)
+  }
+
+  useEffect(() => {
+    scheduleAutoSave()
+    return () => {
+      if (autoSaveTimerRef.current) {
+        window.clearTimeout(autoSaveTimerRef.current)
+        autoSaveTimerRef.current = null
+      }
+    }
+  }, [title, body, type, assets, coverRef])
+
   function startNewContent() {
     setDraft(null)
     setSavedBody('')
@@ -261,6 +318,9 @@ export default function PublishComposer({
     setCoverRef('')
     setPreview(false)
     setCopied(false)
+    autoSaveLastSavedAtRef.current = null
+    autoSaveChangeTokenRef.current += 1
+    setAutoSaveStatus('idle')
     const nextUrl = new URL(window.location.href)
     nextUrl.searchParams.delete('draft')
     window.history.replaceState(null, '', nextUrl.pathname + nextUrl.search + nextUrl.hash)
@@ -441,7 +501,7 @@ export default function PublishComposer({
             className={type === value ? 'active' : ''}
             key={value}
             disabled={busy || reviewLocked}
-            onClick={() => setType(value)}
+            onClick={() => { setType(value); scheduleAutoSave() }}
             role="tab"
             type="button"
           >
@@ -455,7 +515,7 @@ export default function PublishComposer({
         <input
           maxLength={512}
           disabled={busy || reviewLocked}
-          onChange={(event) => setTitle(event.target.value)}
+          onChange={(event) => { setTitle(event.target.value); scheduleAutoSave() }}
           placeholder={type === 'post' ? '这一刻想分享什么？' : '输入一个清晰、有吸引力的标题'}
           value={title}
         />
@@ -465,7 +525,7 @@ export default function PublishComposer({
         <span>{type === 'post' ? '正文' : type === 'video' ? '视频简介' : '正文'}</span>
         <textarea
           disabled={busy || reviewLocked}
-          onChange={(event) => setBody(event.target.value)}
+          onChange={(event) => { setBody(event.target.value); scheduleAutoSave() }}
           placeholder="写下你的内容…"
           rows={14}
           value={body}
@@ -565,7 +625,7 @@ export default function PublishComposer({
         <span>封面引用（可选）</span>
         <input
           disabled={busy || reviewLocked}
-          onChange={(event) => setCoverRef(event.target.value)}
+          onChange={(event) => { setCoverRef(event.target.value); scheduleAutoSave() }}
           placeholder="默认使用第一个媒体文件"
           value={coverRef}
         />
@@ -577,6 +637,18 @@ export default function PublishComposer({
           <strong>{stateLabel}</strong>
           <span>版本 {draft.version}</span>
         </div>
+      {draft?.state === 'DRAFT' ? (
+        <div className="lr-content-status" role="status" aria-live="polite">
+          <span>自动保存</span>
+          <strong>
+            {autoSaveStatus === 'saving' ? '保存中…'
+              : autoSaveStatus === 'scheduled' ? '即将保存'
+                : autoSaveStatus === 'saved' ? '已保存'
+                  : autoSaveStatus === 'error' ? '保存失败'
+                    : '等待编辑'}
+          </strong>
+        </div>
+      ) : null}
       ) : null}
       {message ? <div className="lr-success" role="status">{message}</div> : null}
       {error ? <div className="lr-error" role="alert">{error}</div> : null}
