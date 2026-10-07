@@ -349,3 +349,59 @@ describe('W03 content contract core', () => {
     expect(section).toContain('return updated')
   })
 
+
+
+
+describe('1.1 content revision history', () => {
+  it('defines immutable revision persistence with the required audit fields', () => {
+    const migration = readFileSync(
+      resolve(process.cwd(), 'workers/W03-content/migrations/0004_content_revision_history.sql'),
+      'utf8',
+    )
+    expect(migration).toContain('CREATE TABLE content_revisions')
+    expect(migration).toContain('UNIQUE(content_id, revision)')
+    expect(migration).toContain('actor_user_id TEXT NOT NULL')
+    expect(migration).toContain('source_revision INTEGER')
+    expect(migration).toContain('correlation_id TEXT NOT NULL')
+    expect(migration).toContain('CREATE INDEX content_revisions_content_created_idx')
+    expect(migration).toContain('legacy_backfill')
+  })
+
+  it('keeps the rollback transport path under the revision contract', () => {
+    const index = readFileSync(resolve(process.cwd(), 'workers/W03-content/src/index.ts'), 'utf8')
+    const w01Detail = readFileSync(resolve(process.cwd(), 'workers/W01-payload/src/app/api/v1/contents/[contentId]/revisions/[revisionId]/route.ts'), 'utf8')
+    const w01Rollback = readFileSync(resolve(process.cwd(), 'workers/W01-payload/src/app/api/v1/contents/[contentId]/revisions/[revisionId]/rollback/route.ts'), 'utf8')
+    expect(index).toContain('rollbackContentRevision')
+    expect(index).toContain('path.rollback')
+    expect(w01Detail).toContain('export async function GET')
+    expect(w01Detail).not.toContain("export async function POST")
+    expect(w01Rollback).toContain("pathname: '/internal/content/contents/' + encodeURIComponent(contentId) + '/revisions/' + encodeURIComponent(revisionId) + '/rollback'")
+  })
+
+  it('records create, update and rollback history after the authoritative CAS guard', () => {
+    const runtime = readFileSync(
+      resolve(process.cwd(), 'workers/W03-content/src/content-runtime.ts'),
+      'utf8',
+    )
+    for (const operation of ["operation: 'CREATE'", "operation: 'UPDATE'", "operation: 'ROLLBACK'"]) {
+      expect(runtime).toContain(operation)
+    }
+    expect(runtime).toContain("'content.revision.rolled_back'")
+    for (const marker of ['export async function listContentRevisions', 'export async function getContentRevision', 'export async function rollbackContentRevision']) {
+      expect(runtime).toContain(marker)
+    }
+
+    const updateIndex = runtime.indexOf('UPDATE contents')
+    const updateGuard = runtime.indexOf('atomicGuard(db)', updateIndex)
+    const updateRevision = runtime.indexOf("operation: 'UPDATE'", updateIndex)
+    expect(updateIndex).toBeGreaterThanOrEqual(0)
+    expect(updateGuard).toBeGreaterThan(updateIndex)
+    expect(updateRevision).toBeGreaterThan(updateGuard)
+
+    const rollbackIndex = runtime.indexOf('export async function rollbackContentRevision')
+    expect(runtime.indexOf('UPDATE contents', rollbackIndex)).toBeGreaterThanOrEqual(rollbackIndex)
+    expect(runtime.indexOf("operation: 'ROLLBACK'", rollbackIndex)).toBeGreaterThan(
+      runtime.indexOf('atomicGuard(db)', rollbackIndex),
+    )
+  })
+})

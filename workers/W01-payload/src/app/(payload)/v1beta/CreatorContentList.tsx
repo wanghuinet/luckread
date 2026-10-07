@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import styles from './creator-center.module.css'
+import ContentRevisionHistory from './ContentRevisionHistory'
 
 type ContentState = 'DRAFT' | 'PENDING_REVIEW' | 'REJECTED' | 'APPROVED' | 'SCHEDULED' | 'PUBLISHED' | 'UNPUBLISHED' | 'ARCHIVED' | 'DELETED' | 'RESTORED'
 type ContentType = 'article' | 'post' | 'video'
@@ -54,6 +55,7 @@ export default function CreatorContentList({ loginPath = '/admin/login' }: { log
   const [actionId, setActionId] = useState<string | null>(null)
   const requestIdRef = useRef(0)
   const activeRequestRef = useRef<AbortController | null>(null)
+  const [revisionTarget, setRevisionTarget] = useState<{ id: string; version: number } | null>(null)
 
   const load = useCallback(async (cursor: string | null = null) => {
     activeRequestRef.current?.abort()
@@ -289,6 +291,20 @@ export default function CreatorContentList({ loginPath = '/admin/login' }: { log
         </select>
       </div>
 
+      {revisionTarget ? (
+        <ContentRevisionHistory
+          contentId={revisionTarget.id}
+          currentVersion={revisionTarget.version}
+          loginPath={loginPath}
+          open
+          onChanged={() => {
+            setRevisionTarget(null)
+            void load()
+          }}
+          onClose={() => setRevisionTarget(null)}
+        />
+      ) : null}
+
       {loading ? <div className={styles.contentManageState} role="status" aria-busy="true">正在加载内容…</div> : null}
       {!loading && error ? (
         <div className={styles.contentManageState} role="alert">
@@ -329,6 +345,14 @@ export default function CreatorContentList({ loginPath = '/admin/login' }: { log
                   </time>
                 </div>
                 <div className={styles.contentListActions}>
+                  <button
+                    className={styles.secondaryButton}
+                    disabled={actionId !== null}
+                    onClick={() => setRevisionTarget({ id: item.id, version: item.version })}
+                    type="button"
+                  >
+                    版本历史
+                  </button>
                   {['DRAFT', 'REJECTED'].includes(item.state) ? (
                     <Link className={styles.secondaryButton} href={`/publish?draft=${encodeURIComponent(item.id)}`}>
                       继续编辑

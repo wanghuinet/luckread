@@ -40,6 +40,28 @@ export interface ContentRecord {
   updatedAt: string
 }
 
+
+export type ContentRevisionOperation = 'CREATE' | 'UPDATE' | 'ROLLBACK'
+
+export interface ContentRevision {
+  id: string
+  contentId: string
+  revision: number
+  contentVersion: number
+  actorUserId: string
+  sourceRevision: number | null
+  operation: ContentRevisionOperation
+  state: ContentState
+  title: string
+  bodyRef: string
+  mediaRefs: string[]
+  coverRef: string | null
+  etag: string
+  reason: string | null
+  correlationId: string
+  createdAt: string
+}
+
 export interface ContentD1 {
   prepare(query: string): D1PreparedStatement
   batch(statements: D1PreparedStatement[]): Promise<D1Result<unknown>[]>
@@ -61,6 +83,26 @@ interface ContentRow {
   etag: string
   created_at: string
   updated_at: string
+}
+
+
+interface ContentRevisionRow {
+  id: string
+  content_id: string
+  revision: number
+  content_version: number
+  actor_user_id: string
+  source_revision: number | null
+  operation: ContentRevisionOperation
+  state: ContentState
+  title: string
+  body_ref: string
+  media_refs_json: string
+  cover_ref: string | null
+  etag: string
+  reason: string | null
+  correlation_id: string
+  created_at: string
 }
 
 interface IdempotencyRow {
@@ -249,6 +291,45 @@ const inspectIdempotency = (
   }
 }
 
+
+const toRevision = (row: ContentRevisionRow): ContentRevision => ({
+  id: row.id,
+  contentId: row.content_id,
+  revision: row.revision,
+  contentVersion: row.content_version,
+  actorUserId: row.actor_user_id,
+  sourceRevision: row.source_revision,
+  operation: row.operation,
+  state: row.state,
+  title: row.title,
+  bodyRef: row.body_ref,
+  mediaRefs: JSON.parse(row.media_refs_json || '[]') as string[],
+  coverRef: row.cover_ref,
+  etag: row.etag,
+  reason: row.reason,
+  correlationId: row.correlation_id,
+  createdAt: row.created_at,
+})
+
+const revisionPageSize = (limit: number): number =>
+  Math.min(Math.max(Number.isSafeInteger(limit) ? limit : 20, 1), 100)
+
+const normalizeCorrelationId = (value: string): string => {
+  const normalized = value.trim()
+  if (!normalized || normalized.length > 256) throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+  return normalized
+}
+
+const insertRevision = (db: ContentD1, revision: ContentRevision): D1PreparedStatement =>
+  db.prepare(`INSERT INTO content_revisions
+    (id, content_id, revision, content_version, actor_user_id, source_revision, operation,
+     state, title, body_ref, media_refs_json, cover_ref, etag, reason, correlation_id, created_at)
+   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).bind(
+    revision.id, revision.contentId, revision.revision, revision.contentVersion,
+    revision.actorUserId, revision.sourceRevision, revision.operation, revision.state,
+    revision.title, revision.bodyRef, JSON.stringify(revision.mediaRefs), revision.coverRef,
+    revision.etag, revision.reason, revision.correlationId, revision.createdAt,
+  )
 const emptyIdempotency = (): IdempotencyRow => ({
   idem_id: null,
   idem_owner_user_id: null,
@@ -381,6 +462,54 @@ export async function getContent(
   return toContent(row)
 }
 
+export async function listContentRevisions(
+  db: ContentD1,
+  principalUserId: string,
+  contentId: string,
+  cursor: string | null,
+  limit: number,
+): Promise<{ items: ContentRevision[]; nextCursor: string | null; hasMore: boolean }> {
+  assertResourceId(principalUserId)
+  assertResourceId(contentId)
+  const pageSize = revisionPageSize(limit)
+  const decoded = cursor ? decodeCursor(cursor) : null
+  const cursorClause = decoded ? 'AND (r.created_at < ? OR (r.created_at = ? AND r.id < ?))' : ''
+  const cursorBindings = decoded ? [decoded.updatedAt, decoded.updatedAt, decoded.id] : []
+  const rows = await db.prepare(`
+    SELECT r.id, r.content_id, r.revision, r.content_version, r.actor_user_id,
+           r.source_revision, r.operation, r.state, r.title, r.body_ref,
+           r.media_refs_json, r.cover_ref, r.etag, r.reason, r.correlation_id, r.created_at
+      FROM content_revisions r
+      JOIN contents c ON c.id = r.content_id
+     WHERE r.content_id = ? AND c.owner_user_id = ? ${cursorClause}
+     ORDER BY r.created_at DESC, r.id DESC
+     LIMIT ?`).bind(contentId, principalUserId, ...cursorBindings, pageSize + 1).all<ContentRevisionRow>()
+  const hasMore = rows.results.length > pageSize
+  const page = rows.results.slice(0, pageSize).map(toRevision)
+  const last = page.at(-1)
+  return { items: page, hasMore, nextCursor: hasMore && last ? encodeCursor(last.createdAt, last.id) : null }
+}
+
+export async function getContentRevision(
+  db: ContentD1,
+  principalUserId: string,
+  contentId: string,
+  revisionId: string,
+): Promise<ContentRevision> {
+  assertResourceId(principalUserId)
+  assertResourceId(contentId)
+  assertResourceId(revisionId)
+  const row = await db.prepare(`
+    SELECT r.id, r.content_id, r.revision, r.content_version, r.actor_user_id,
+           r.source_revision, r.operation, r.state, r.title, r.body_ref,
+           r.media_refs_json, r.cover_ref, r.etag, r.reason, r.correlation_id, r.created_at
+      FROM content_revisions r
+      JOIN contents c ON c.id = r.content_id
+     WHERE r.id = ? AND r.content_id = ? AND c.owner_user_id = ?`).bind(revisionId, contentId, principalUserId).first<ContentRevisionRow>()
+  if (!row) throw new ContentRuntimeError('NOT_FOUND', 404)
+  return toRevision(row)
+}
+
 export function validateListFilters(statusValue: string | null, typeValue: string | null): {
   status?: ContentState
   contentType?: ContentType
@@ -495,6 +624,7 @@ export async function createContent(
   input: unknown,
   idempotencyKey: string,
   now = new Date(),
+  correlationId = 'runtime',
 ): Promise<ContentRecord> {
   assertResourceId(ownerUserId)
   if (!idempotencyKey || idempotencyKey.length > 256) {
@@ -563,6 +693,24 @@ export async function createContent(
        VALUES (?, ?, ?, ?, NULL, 'DRAFT', 1, 1, ?, ?, ?, ?, ?, ?, ?) `,
     ).bind(contentId, normalized.contentType, ownerUserId, ownerUserId, normalized.title, normalized.bodyRef, JSON.stringify(normalized.mediaRefs), normalized.coverRef, responseBody.etag, createdAt, createdAt),
     atomicGuard(db),
+    insertRevision(db, {
+      id: crypto.randomUUID(),
+      contentId,
+      revision: 1,
+      contentVersion: 1,
+      actorUserId: ownerUserId,
+      sourceRevision: null,
+      operation: 'CREATE',
+      state: 'DRAFT',
+      title: normalized.title,
+      bodyRef: normalized.bodyRef,
+      mediaRefs: normalized.mediaRefs,
+      coverRef: responseBody.coverRef,
+      etag: responseBody.etag,
+      reason: null,
+      correlationId: normalizeCorrelationId(correlationId),
+      createdAt,
+    }),
   ])
 
   return {
@@ -592,6 +740,7 @@ export async function updateContent(
   ifMatch: string,
   idempotencyKey: string,
   now = new Date(),
+  correlationId = 'runtime',
 ): Promise<ContentRecord> {
   assertResourceId(principalUserId)
   assertResourceId(contentId)
@@ -637,9 +786,136 @@ export async function updateContent(
         WHERE id = ? AND owner_user_id = ? AND version = ? AND etag = ?`,
     ).bind(updated.title, updated.bodyRef, JSON.stringify(updated.mediaRefs), updated.coverRef, nextVersion, nextRevision, updated.etag, updatedAt, content.id, principalUserId, content.version, content.etag),
     atomicGuard(db),
+    insertRevision(db, {
+      id: crypto.randomUUID(),
+      contentId: content.id,
+      revision: nextRevision,
+      contentVersion: nextVersion,
+      actorUserId: principalUserId,
+      sourceRevision: content.revision,
+      operation: 'UPDATE',
+      state: content.state,
+      title: updated.title,
+      bodyRef: updated.bodyRef,
+      mediaRefs: updated.mediaRefs,
+      coverRef: updated.coverRef,
+      etag: updated.etag,
+      reason: null,
+      correlationId: normalizeCorrelationId(correlationId),
+      createdAt: updatedAt,
+    }),
   ])
 
   return updated
+}
+
+export async function rollbackContentRevision(
+  db: ContentD1,
+  principalUserId: string,
+  contentId: string,
+  revisionId: string,
+  ifMatch: string,
+  idempotencyKey: string,
+  reason: string | undefined,
+  correlationId: string,
+  now = new Date(),
+): Promise<{ content: ContentRecord; sourceRevision: number; resultingRevision: number }> {
+  assertResourceId(principalUserId)
+  assertResourceId(contentId)
+  assertResourceId(revisionId)
+  if (!ifMatch || !idempotencyKey) throw new ContentRuntimeError('PRECONDITION_REQUIRED', 428)
+  if (reason !== undefined && reason.length > 2048) throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+  const normalizedCorrelationId = normalizeCorrelationId(correlationId)
+  const operationId = 'rollbackContentRevision'
+  const hash = await requestHash(operationId, {
+    contentId, revisionId, ifMatch: normalizeEtag(ifMatch), reason: reason ?? null,
+  })
+  const { content, idempotency } = await loadMutationRow(db, contentId, operationId, idempotencyKey, principalUserId)
+  const replay = inspectIdempotency(idempotency, principalUserId, hash, now)
+  if (replay.replayed) {
+    if (!replay.body || typeof replay.body !== 'object') throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
+    return replay.body as { content: ContentRecord; sourceRevision: number; resultingRevision: number }
+  }
+  if (!content) throw new ContentRuntimeError('NOT_FOUND', 404)
+  if (content.ownerUserId !== principalUserId) throw new ContentRuntimeError('PERMISSION_DENIED', 403)
+  assertEtag(content.etag, ifMatch)
+  if (!['DRAFT', 'REJECTED', 'UNPUBLISHED', 'RESTORED'].includes(content.state)) {
+    throw new ContentRuntimeError('INVALID_STATE', 409)
+  }
+
+  const source = await db.prepare(`SELECT id, content_id, revision, content_version, actor_user_id, source_revision, operation,
+       state, title, body_ref, media_refs_json, cover_ref, etag, reason, correlation_id, created_at
+  FROM content_revisions
+ WHERE id = ? AND content_id = ?`).bind(revisionId, contentId).first<ContentRevisionRow>()
+  if (!source) throw new ContentRuntimeError('NOT_FOUND', 404)
+
+  const nextVersion = content.version + 1
+  const nextRevision = content.revision + 1
+  const updatedAt = now.toISOString()
+  const updated: ContentRecord = {
+    ...content,
+    title: source.title,
+    bodyRef: source.body_ref,
+    mediaRefs: JSON.parse(source.media_refs_json || '[]') as string[],
+    coverRef: source.cover_ref,
+    version: nextVersion,
+    revision: nextRevision,
+    etag: etagForVersion(nextVersion),
+    updatedAt,
+  }
+  const result = { content: updated, sourceRevision: source.revision, resultingRevision: nextRevision }
+  const expiresAt = new Date(now.getTime() + IDEMPOTENCY_TTL_MS).toISOString()
+  await batchMutation(db, [
+    expireMutationRow(db, principalUserId, operationId, idempotencyKey, updatedAt),
+    insertCompletedIdempotency(db, principalUserId, operationId, idempotencyKey, hash, 200, JSON.stringify(result), updatedAt, expiresAt),
+    db.prepare(`UPDATE contents
+   SET title = ?, body_ref = ?, media_refs_json = ?, cover_ref = ?, version = ?, revision = ?, etag = ?, updated_at = ?
+ WHERE id = ? AND owner_user_id = ? AND version = ? AND etag = ?`).bind(
+      updated.title, updated.bodyRef, JSON.stringify(updated.mediaRefs), updated.coverRef,
+      nextVersion, nextRevision, updated.etag, updatedAt,
+      content.id, principalUserId, content.version, content.etag,
+    ),
+    atomicGuard(db),
+    insertRevision(db, {
+      id: crypto.randomUUID(),
+      contentId: content.id,
+      revision: nextRevision,
+      contentVersion: nextVersion,
+      actorUserId: principalUserId,
+      sourceRevision: source.revision,
+      operation: 'ROLLBACK',
+      state: content.state,
+      title: updated.title,
+      bodyRef: updated.bodyRef,
+      mediaRefs: updated.mediaRefs,
+      coverRef: updated.coverRef,
+      etag: updated.etag,
+      reason: reason?.trim() || null,
+      correlationId: normalizedCorrelationId,
+      createdAt: updatedAt,
+    }),
+    db.prepare(`INSERT INTO content_outbox_events
+      (event_id, operation_id, event_type, content_id, aggregate_version, payload_json, created_at, published_at)
+     VALUES (?, 'rollbackContentRevision', 'content.revision.rolled_back', ?, ?, ?, ?, NULL)`).bind(
+      crypto.randomUUID(),
+      content.id,
+      nextVersion,
+      JSON.stringify({
+        schemaVersion: '1.0',
+        producer: 'W03',
+        contentId: content.id,
+        sourceRevision: source.revision,
+        resultingRevision: nextRevision,
+        contentVersion: nextVersion,
+        actorUserId: principalUserId,
+        reason: reason?.trim() || null,
+        correlationId: normalizedCorrelationId,
+        idempotencyKey,
+      }),
+      updatedAt,
+    ),
+  ])
+  return result
 }
 
 export async function deleteContent(

@@ -11,6 +11,9 @@ import {
   toErrorResponse,
   transitionContentState,
   applyModerationContentTransition,
+  listContentRevisions,
+  getContentRevision,
+  rollbackContentRevision,
   updateContent,
   type ContentState,
   type ContentD1,
@@ -107,6 +110,14 @@ export const parseListLimit = (value: string | null): number => {
   return Number(value)
 }
 
+const parseRevisionListLimit = (value: string | null): number => {
+  if (value === null || value.trim() === '') return 20
+  if (!/^(?:[1-9]|[1-9][0-9]|100)$/.test(value.trim())) {
+    throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+  }
+  return Number(value)
+}
+
 const parseBody = async (request: Request): Promise<Record<string, unknown>> => {
   try {
     const body = await request.json()
@@ -119,7 +130,7 @@ const parseBody = async (request: Request): Promise<Record<string, unknown>> => 
   }
 }
 
-const getPath = (pathname: string): {id?: string; state?: boolean; preflight?: boolean} | null => {
+const getPath = (pathname: string): {id?: string; state?: boolean; preflight?: boolean; revisions?: boolean; revisionId?: string; rollback?: boolean} | null => {
   const parts = pathname.split('/').filter(Boolean)
   if (parts.length === 3 && parts[0] === 'internal' && parts[1] === 'content' && parts[2] === 'contents') {
     return {}
@@ -132,6 +143,15 @@ const getPath = (pathname: string): {id?: string; state?: boolean; preflight?: b
   }
   if (parts.length === 5 && parts[0] === 'internal' && parts[1] === 'content' && parts[2] === 'contents' && parts[4] === 'preflight') {
     return { id: parts[3], preflight: true }
+  }
+  if (parts.length === 5 && parts[0] === 'internal' && parts[1] === 'content' && parts[2] === 'contents' && parts[4] === 'revisions') {
+    return { id: parts[3], revisions: true }
+  }
+  if (parts.length === 6 && parts[0] === 'internal' && parts[1] === 'content' && parts[2] === 'contents' && parts[4] === 'revisions') {
+    return { id: parts[3], revisions: true, revisionId: parts[5] }
+  }
+  if (parts.length === 7 && parts[0] === 'internal' && parts[1] === 'content' && parts[2] === 'contents' && parts[4] === 'revisions' && parts[6] === 'rollback') {
+    return { id: parts[3], revisions: true, revisionId: parts[5], rollback: true }
   }
   return null
 }
@@ -189,6 +209,49 @@ export default {
 
       requireTransport(request)
       const path = getPath(url.pathname)
+
+      if (path && path.revisions && path.id && request.method === 'GET' && !path.revisionId) {
+        const principal = requiredCreatorPrincipal(request)
+        const cursor = url.searchParams.get('cursor')
+        const limit = parseRevisionListLimit(url.searchParams.get('limit'))
+        if (cursor && cursor.length > 2048) throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+        const page = await listContentRevisions(env.D1_02, principal.userId, path.id, cursor, limit)
+        return json({
+          data: {
+            items: page.items,
+            nextCursor: page.nextCursor,
+            hasMore: page.hasMore,
+          },
+          requestId: crypto.randomUUID(),
+        })
+      }
+
+      if (path && path.revisions && path.id && path.revisionId && request.method === 'GET' && !path.rollback) {
+        const principal = requiredCreatorPrincipal(request)
+        return json({
+          data: await getContentRevision(env.D1_02, principal.userId, path.id, path.revisionId),
+          requestId: crypto.randomUUID(),
+        })
+      }
+
+      if (path && path.revisions && path.id && path.revisionId && path.rollback && request.method === 'POST') {
+        const principal = requiredCreatorPrincipal(request)
+        const body = await parseBody(request)
+        const result = await rollbackContentRevision(
+          env.D1_02,
+          principal.userId,
+          path.id,
+          path.revisionId,
+          requireIfMatch(request),
+          requireIdempotency(request),
+          typeof body.reason === 'string' ? body.reason : undefined,
+          request.headers.get('X-LuckRead-Correlation-Id')?.trim() || 'runtime',
+        )
+        return json({
+          ...result,
+          requestId: crypto.randomUUID(),
+        })
+      }
 
       if (request.method === 'GET' && url.pathname === '/internal/content/creator-contents') {
         const principal = requiredCreatorPrincipal(request)
@@ -299,6 +362,7 @@ export default {
           reason,
           requireIfMatch(request),
           requireIdempotency(request),
+          new Date(),
         )
         return json(result)
       }
@@ -311,6 +375,8 @@ export default {
           principal.userId,
           body,
           requireIdempotency(request),
+          new Date(),
+          request.headers.get('X-LuckRead-Correlation-Id')?.trim() || 'runtime',
         )
         return json({
           id: content.id,
@@ -356,6 +422,8 @@ export default {
           body,
           requireIfMatch(request),
           requireIdempotency(request),
+          new Date(),
+          request.headers.get('X-LuckRead-Correlation-Id')?.trim() || 'runtime',
         )
         return json({
           id: content.id,
