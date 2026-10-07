@@ -71,10 +71,8 @@ export default function ContentRevisionHistory({
       setError('当前版本无需恢复。')
       return
     }
-    if (!['DRAFT', 'REJECTED', 'UNPUBLISHED', 'RESTORED'].includes(revision.state)) {
-      setError('当前内容状态不允许直接回滚，请先把内容调整到可编辑状态。')
-      return
-    }
+    // W03 validates the current authoritative content state and ETag.
+    // The historical snapshot state is metadata, not a rollback permission source.
     if (!window.confirm('确定恢复到版本 v' + revision.contentVersion + ' 吗？系统会创建一个新的版本，不会删除历史记录。')) return
 
     setActionId(revision.id)
