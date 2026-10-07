@@ -87,6 +87,24 @@ describe('Creator Center admin extension', () => {
     expect(publisher).toContain('resolveCoverRef(type, assets, coverRef)')
   })
 
+  it('connects Creator Studio organizations to canonical member attach, reorder and remove APIs', () => {
+    const organization = read('src/app/(payload)/v1beta/CreatorContentOrganization.tsx')
+    const members = read('src/app/(payload)/v1beta/CreatorContentOrganizationMembers.tsx')
+
+    expect(organization).toContain('CreatorContentOrganizationMembers')
+    expect(organization).toContain('成员管理')
+    expect(organization).toContain('handleOrganizationChanged')
+    expect(members).toContain("'/api/creator/contents?limit=50&status=PUBLISHED'")
+    expect(members).toContain("method: 'POST'")
+    expect(members).toContain("method: 'PATCH'")
+    expect(members).toContain("method: 'DELETE'")
+    expect(members).toContain("'If-Match': etag")
+    expect(members).toContain('contentId: selectedContentId')
+    expect(members).toContain('position')
+    expect(members).not.toContain('content_relationships')
+    expect(members).not.toContain('getPayload(')
+  })
+
   it('exposes Series and Collection management through the Creator Studio content authority', () => {
     const center = read('src/app/(frontend)/creator-center/CreatorStudio.tsx')
     const organization = read('src/app/(payload)/v1beta/CreatorContentOrganization.tsx')

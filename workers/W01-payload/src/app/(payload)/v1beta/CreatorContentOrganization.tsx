@@ -1,7 +1,8 @@
 'use client'
 
-import { FormEvent, useEffect, useState } from 'react'
+import { FormEvent, Fragment, useCallback, useEffect, useState } from 'react'
 
+import CreatorContentOrganizationMembers from './CreatorContentOrganizationMembers'
 import styles from './creator-center.module.css'
 
 type OrganizationState =
@@ -85,6 +86,7 @@ export default function CreatorContentOrganization({
   const [saving, setSaving] = useState(false)
   const [actionId, setActionId] = useState<string | null>(null)
   const [reloadKey, setReloadKey] = useState(0)
+  const [selectedOrganizationId, setSelectedOrganizationId] = useState<string | null>(null)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -187,6 +189,17 @@ export default function CreatorContentOrganization({
 
   const activePage = pages[kind]
   const activeMeta = kindMeta[kind]
+  const handleOrganizationChanged = useCallback((organizationId: string, etag: string, version: number) => {
+    setPages((current) => ({
+      ...current,
+      [kind]: {
+        ...current[kind],
+        items: current[kind].items.map((item) =>
+          item.id === organizationId ? { ...item, etag, version } : item,
+        ),
+      },
+    }))
+  }, [kind])
 
   return (
     <section className={styles.sectionBlock} id="content-organization">
@@ -249,7 +262,7 @@ export default function CreatorContentOrganization({
             aria-selected={kind === value}
             className={kind === value ? styles.audienceTabActive : styles.audienceTab}
             key={value}
-            onClick={() => setKind(value)}
+            onClick={() => { setKind(value); setSelectedOrganizationId(null) }}
             role="tab"
             type="button"
           >
@@ -270,7 +283,8 @@ export default function CreatorContentOrganization({
       {!loading && activePage.items.length > 0 ? (
         <div className={styles.audienceList}>
           {activePage.items.map((item) => (
-            <article className={styles.contentListItem} key={item.id}>
+            <Fragment key={item.id}>
+              <article className={styles.contentListItem}>
               {item.coverRef ? (
                 <div className={styles.contentListThumb} aria-hidden="true">
                   <img alt="" loading="lazy" src={item.coverRef} />
@@ -292,13 +306,31 @@ export default function CreatorContentOrganization({
                 <button
                   className={styles.secondaryButton}
                   disabled={actionId !== null}
+                  onClick={() => setSelectedOrganizationId((current) => current === item.id ? null : item.id)}
+                  type="button"
+                >
+                  {selectedOrganizationId === item.id ? '收起成员' : '成员管理'}
+                </button>
+                <button
+                  className={styles.secondaryButton}
+                  disabled={actionId !== null}
                   onClick={() => void deleteOrganization(item)}
                   type="button"
                 >
                   {actionId === item.id ? '处理中…' : '删除'}
                 </button>
               </div>
-            </article>
+              </article>
+              {selectedOrganizationId === item.id ? (
+              <CreatorContentOrganizationMembers
+                key={item.id + ':' + item.etag}
+                kind={kind}
+                loginPath={loginPath}
+                onChanged={handleOrganizationChanged}
+                organization={item}
+              />
+            ) : null}
+            </Fragment>
           ))}
         </div>
       ) : null}
