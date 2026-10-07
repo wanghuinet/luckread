@@ -109,6 +109,8 @@ export default function CreatorContentOrganizationMembers({
   const [memberHasMore, setMemberHasMore] = useState(false)
   const [memberLoading, setMemberLoading] = useState(false)
   const [selectedContentId, setSelectedContentId] = useState('')
+  const [candidateFilter, setCandidateFilter] = useState('')
+  const [memberFilter, setMemberFilter] = useState('')
   const [loading, setLoading] = useState(true)
   const [busyKey, setBusyKey] = useState<string | null>(null)
   const [error, setError] = useState('')
@@ -210,6 +212,16 @@ export default function CreatorContentOrganizationMembers({
     () => candidates.filter((item) => item.state === 'PUBLISHED' && !memberIds.has(item.id)),
     [candidates, memberIds],
   )
+  const filteredCandidates = useMemo(() => {
+    const query = candidateFilter.trim().toLocaleLowerCase()
+    if (!query) return availableCandidates
+    return availableCandidates.filter((item) => item.title.toLocaleLowerCase().includes(query) || item.id.toLocaleLowerCase().includes(query))
+  }, [availableCandidates, candidateFilter])
+  const filteredMembers = useMemo(() => {
+    const query = memberFilter.trim().toLocaleLowerCase()
+    if (!query) return members
+    return members.filter((item) => item.title.toLocaleLowerCase().includes(query) || item.contentId.toLocaleLowerCase().includes(query))
+  }, [memberFilter, members])
 
   async function refreshMembers() {
     const controller = new AbortController()
@@ -423,7 +435,12 @@ export default function CreatorContentOrganizationMembers({
       <div className={styles.audienceListHeader}>
         <div>
           <strong>{organization.title} · 成员管理</strong>
-          <span>{members.length} 个已加载成员，版本 v{currentVersion}</span>
+          <span>
+            {memberFilter.trim()
+              ? '筛选显示 ' + filteredMembers.length + ' / 已加载 ' + members.length + ' 个成员'
+              : members.length + ' 个已加载成员'}
+            ，版本 v{currentVersion}
+          </span>
         </div>
         <div className={styles.sectionActions}>
           {memberHasMore ? (
@@ -446,14 +463,28 @@ export default function CreatorContentOrganizationMembers({
         <p className={styles.audienceState}>当前 {organizationMeta.label} 状态为 {organization.state}，成员关系暂不可修改。</p>
       ) : (
         <div className={styles.contentFilters}>
+          <input
+            aria-label="筛选已加载的候选内容"
+            className={styles.filterSelect}
+            onChange={(event) => setCandidateFilter(event.target.value)}
+            placeholder="筛选已加载内容（标题或 ID）"
+            type="search"
+            value={candidateFilter}
+          />
           <select
             aria-label={'选择加入' + organizationMeta.label + '的已发布内容'}
             className={styles.filterSelect}
             onChange={(event) => setSelectedContentId(event.target.value)}
             value={selectedContentId}
           >
-            <option value="">选择已发布内容…</option>
-            {availableCandidates.map((candidate) => (
+            <option value="">
+              {availableCandidates.length === 0
+                ? '暂无可加入内容'
+                : filteredCandidates.length === availableCandidates.length
+                  ? '选择已发布内容…'
+                  : '筛选后选择已发布内容…'}
+            </option>
+            {filteredCandidates.map((candidate) => (
               <option key={candidate.id} value={candidate.id}>
                 [{contentTypeLabels[candidate.contentType]}] {candidate.title}
               </option>
@@ -490,9 +521,26 @@ export default function CreatorContentOrganizationMembers({
         </div>
       ) : null}
 
+      {!loading && members.length > 0 && filteredMembers.length === 0 ? (
+        <div className={styles.contentManageEmpty}>
+          <strong>没有匹配的已加载成员</strong>
+          <span>可调整筛选条件，或加载更多成员后继续查找。</span>
+        </div>
+      ) : null}
+
       {!loading && members.length > 0 ? (
         <div className={styles.audienceList}>
-          {members.map((member, index) => (
+          <input
+            aria-label="筛选已加载成员"
+            className={styles.filterSelect}
+            onChange={(event) => setMemberFilter(event.target.value)}
+            placeholder="筛选已加载成员（标题或 ID）"
+            type="search"
+            value={memberFilter}
+          />
+          {filteredMembers.map((member) => {
+            const index = members.findIndex((item) => item.relationshipId === member.relationshipId)
+            return (
             <article className={styles.contentListItem} key={member.relationshipId}>
               <div className={styles.contentListMain}>
                 <div className={styles.contentMeta}>
@@ -546,7 +594,8 @@ export default function CreatorContentOrganizationMembers({
                 </button>
               </div>
             </article>
-          ))}
+            )
+          })}
         </div>
       ) : null}
     </section>
