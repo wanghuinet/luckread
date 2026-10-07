@@ -3,7 +3,7 @@
 import { useRef, useState } from 'react'
 
 import type { ArticleDocument } from '../lib/article-document.js'
-import type { ImportedBlock, ImportedImage, ImportedInline } from '../features/word-import/model.js'
+import { collectImportedImages } from '../features/word-import/collect-images.js'
 import { parseDocx } from '../features/word-import/docx-parser.js'
 import { normalizeImportedDocument } from '../features/word-import/normalizer.js'
 import { articleDocumentFromImportedDocument } from '../features/word-import/article-document-adapter.js'
@@ -28,42 +28,16 @@ async function sha256(bytes: Uint8Array): Promise<string> {
   return [...new Uint8Array(digest)].map((value) => value.toString(16).padStart(2, '0')).join('')
 }
 
-const collectInlineImages = (inlines: ImportedInline[], result: ImportedImage[]): void => {
-  for (const inline of inlines) {
-    if (inline.kind === 'inlineImage') result.push(inline.image)
-  }
-}
-
-const collectImportedImages = (blocks: ImportedBlock[], result: ImportedImage[] = []): ImportedImage[] => {
-  for (const block of blocks) {
-    if (block.kind === 'image') {
-      result.push(block)
-    } else if (
-      block.kind === 'paragraph' ||
-      block.kind === 'heading' ||
-      block.kind === 'listItem'
-    ) {
-      collectInlineImages(block.inlines, result)
-    } else if (block.kind === 'list') {
-      for (const item of block.items) collectInlineImages(item.inlines, result)
-    } else if (block.kind === 'table') {
-      for (const row of block.rows) {
-        for (const cell of row) collectImportedImages(cell.blocks, result)
-      }
-    }
-  }
-  return result
-}
-
 async function uploadImage(
   bytes: Uint8Array,
   filename: string,
   alt: string | undefined,
+  mimeType: string,
   idempotencyKey: string,
 ): Promise<string> {
   const form = new FormData()
   form.append('_payload', JSON.stringify({ alt: alt?.trim() || 'Imported Word image' }))
-  form.append('file', new Blob([bytes as BlobPart]), filename)
+  form.append('file', new Blob([bytes as BlobPart], { type: mimeType }), filename)
 
   const response = await fetch('/api/v1/media', {
     method: 'POST',
@@ -117,6 +91,7 @@ export default function ArticleWordImportButton({ disabled = false, onImport }: 
           image.bytes,
           image.mediaKey.split('/').pop() || 'word-image',
           image.alt,
+          image.mimeType,
           'word-structured-import-' + hash,
         )
         hashToUrl.set(hash, url)
