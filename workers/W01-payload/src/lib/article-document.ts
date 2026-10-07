@@ -4,6 +4,21 @@ export const ARTICLE_MAX_BLOCK_TEXT = 20_000
 export const ARTICLE_MAX_MEDIA_PER_BLOCK = 12
 export const ARTICLE_MAX_SERIALIZED_BYTES = 256_000
 
+export const ARTICLE_CODE_LANGUAGES = [
+  'plaintext',
+  'javascript',
+  'typescript',
+  'python',
+  'json',
+  'bash',
+  'sql',
+  'css',
+  'html',
+  'markdown',
+] as const
+
+export type ArticleCodeLanguage = typeof ARTICLE_CODE_LANGUAGES[number]
+
 export type ArticleBlockType =
   | 'paragraph'
   | 'heading'
@@ -13,12 +28,14 @@ export type ArticleBlockType =
   | 'divider'
   | 'image'
   | 'gallery'
+  | 'code'
 
 export type ArticleBlock = {
   id: string
   type: ArticleBlockType
   text: string
   level?: 2 | 3
+  language?: ArticleCodeLanguage
   mediaRefs?: string[]
 }
 
@@ -37,10 +54,16 @@ const BLOCK_TYPES: readonly ArticleBlockType[] = [
   'divider',
   'image',
   'gallery',
+  'code',
 ]
 
 const stripUnsafeControls = (value: string): string =>
   value.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '')
+
+const normalizeCodeLanguage = (value: unknown): ArticleCodeLanguage =>
+  typeof value === 'string' && ARTICLE_CODE_LANGUAGES.includes(value as ArticleCodeLanguage)
+    ? value as ArticleCodeLanguage
+    : 'plaintext'
 
 const normalizeMediaRefs = (value: unknown, type: ArticleBlockType): string[] | undefined => {
   if (type !== 'image' && type !== 'gallery') return undefined
@@ -60,6 +83,7 @@ export const createArticleBlock = (
   type,
   text: stripUnsafeControls(text).slice(0, ARTICLE_MAX_BLOCK_TEXT),
   ...(type === 'heading' ? { level: 2 as const } : {}),
+  ...(type === 'code' ? { language: 'plaintext' as const } : {}),
 })
 
 export const createArticleMediaBlock = (
@@ -103,6 +127,7 @@ const normalizeBlock = (value: unknown, index: number): ArticleBlock => {
       ? stripUnsafeControls(candidate.text).slice(0, ARTICLE_MAX_BLOCK_TEXT)
       : ''
   const level = candidate.level === 3 ? 3 : 2
+  const language = blockType === 'code' ? normalizeCodeLanguage(candidate.language) : undefined
   const mediaRefs = normalizeMediaRefs(candidate.mediaRefs, blockType)
 
   if (blockType === 'gallery' && (!mediaRefs || mediaRefs.length < 2)) {
@@ -114,6 +139,7 @@ const normalizeBlock = (value: unknown, index: number): ArticleBlock => {
     type: blockType,
     text,
     ...(blockType === 'heading' ? { level } : {}),
+    ...(blockType === 'code' ? { language } : {}),
     ...(mediaRefs ? { mediaRefs } : {}),
   }
 }
