@@ -37,7 +37,7 @@ importers:
         version: 16.14.2
       katex:
         specifier: 0.19.0
-        version: 0.19.0(commander@15.0.0)
+        version: 0.19.0
       marked:
         specifier: 18.0.12
         version: 18.0.12
