@@ -166,6 +166,17 @@ describe('Creator Center admin extension', () => {
     expect(members).toContain('page.hasMore')
   })
 
+  it('exposes reusable structured block duplication in the editor', () => {
+    const editor = read('src/components/ArticleStructuredEditor.tsx')
+    const document = read('src/lib/article-document.ts')
+
+    expect(document).toContain('export const duplicateArticleBlock')
+    expect(editor).toContain('duplicateArticleBlock(source)')
+    expect(editor).toContain('aria-label="复制区块"')
+    expect(editor).toContain('onClick={() => duplicateBlock(index)}')
+    expect(editor).toContain('value.blocks.length >= ARTICLE_MAX_BLOCKS')
+  })
+
   it('registers Word import through the structured editor plugin registry', () => {
     const registry = read('src/components/article-editor-plugins.ts')
     const plugin = read('src/components/article-editor-word-import-plugin.tsx')
