@@ -110,7 +110,7 @@ describe('Creator Center admin extension', () => {
     const members = read('src/app/(payload)/v1beta/CreatorContentOrganizationMembers.tsx')
     expect(members).toContain("member.contentSlug || member.contentId")
     expect(members).toContain("href={'/content/' + encodeURIComponent(member.contentSlug || member.contentId)}")
-    expect(members).toContain("target="_blank"")
+    expect(members).toContain('target="_blank"')
     expect(members).toContain('async function shareMemberContent(member: MemberItem)')
     expect(members).toContain("await navigator.share({ title: member.title, url: shareUrl })")
     expect(members).toContain('await navigator.clipboard.writeText(shareUrl)')
