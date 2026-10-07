@@ -306,6 +306,61 @@ describe('W03 content contract core', () => {
     })
   })
 
+  it('resolves a published content request by stable slug in one D1 read', async () => {
+    const slug = '中文文章-1234567890abcdef1234567890abcdef'
+    const row = {
+      id: 'content_slug_123',
+      content_type: 'article',
+      owner_user_id: 'user_123',
+      creator_id: 'user_123',
+      ip_id: null,
+      state: 'PUBLISHED',
+      version: 3,
+      revision: 3,
+      slug,
+      title: '中文文章',
+      body_ref: 'https://cdn.example.com/body.json',
+      media_refs_json: '[]',
+      cover_ref: null,
+      etag: 'W/"3"',
+      created_at: '2026-10-01T12:00:00.000Z',
+      updated_at: '2026-10-03T12:01:00.000Z',
+    }
+    const queries: string[] = []
+    const db = {
+      prepare(query: string) {
+        queries.push(query)
+        return {
+          bind: (...bindings: unknown[]) => ({
+            first: async () => {
+              expect(bindings).toEqual([slug, slug, ''])
+              return row
+            },
+          }),
+        }
+      },
+    } as never
+
+    const response = await w03Worker.fetch(
+      new Request('https://luckread-w03.internal/internal/content/contents/' + encodeURIComponent(slug), {
+        headers: {
+          'X-LuckRead-Caller': 'W01',
+          'X-LuckRead-Transport-Version': '1.0',
+          'X-LuckRead-Correlation-Id': 'test-correlation-slug',
+        },
+      }),
+      { D1_02: db },
+    )
+
+    expect(response.status).toBe(200)
+    expect(queries[0]).toContain('WHERE (id = ? OR slug = ?)')
+    await expect(response.json()).resolves.toMatchObject({
+      id: row.id,
+      slug,
+      title: row.title,
+    })
+  })
+
   it('does not expose non-published content to an anonymous detail request', async () => {
     const db = {
       prepare(query: string) {
@@ -365,6 +420,18 @@ describe('1.1 content revision history', () => {
     expect(migration).toContain('correlation_id TEXT NOT NULL')
     expect(migration).toContain('CREATE INDEX content_revisions_content_created_idx')
     expect(migration).toContain('legacy_backfill')
+  })
+
+  it('defines the stable slug migration and trigger payload', () => {
+    const migration = readFileSync(
+      resolve(process.cwd(), 'workers/W03-content/migrations/0005_content_stable_slug.sql'),
+      'utf8',
+    )
+    expect(migration).toContain('ALTER TABLE contents ADD COLUMN slug TEXT NOT NULL DEFAULT')
+    expect(migration).toContain('CREATE UNIQUE INDEX contents_slug_unique_idx')
+    expect(migration).toContain('ALTER TABLE content_revisions ADD COLUMN slug TEXT NOT NULL DEFAULT')
+    expect(migration).toContain("'slug'")
+    expect(migration).toContain('content.created')
   })
 
   it('keeps the rollback transport path under the revision contract', () => {
