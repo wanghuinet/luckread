@@ -264,6 +264,7 @@ export default function PublishComposer({
 
   async function persistDraft(): Promise<ContentResponse> {
     let bodyRef = draft?.bodyRef
+    let nextSavedArticleSerialized: string | null = null
     if (type === 'article') {
       const serialized = serializeArticleDocument(articleDocument)
       if (!bodyRef || savedArticleSerialized !== serialized) {
@@ -273,7 +274,7 @@ export default function PublishComposer({
           { type: 'application/json;charset=utf-8' },
         )
         bodyRef = (await uploadFile(bodyFile)).url
-        setSavedArticleSerialized(serialized)
+        nextSavedArticleSerialized = serialized
       }
     } else if (!bodyRef || savedBody !== body) {
       const bodyFile = new File(
@@ -313,6 +314,7 @@ export default function PublishComposer({
     const saved = data as ContentResponse
     setDraft(saved)
     setSavedBody(body)
+    if (nextSavedArticleSerialized !== null) setSavedArticleSerialized(nextSavedArticleSerialized)
     autoSaveLastSavedAtRef.current = Date.now()
     const nextUrl = new URL(window.location.href)
     nextUrl.searchParams.set('draft', saved.id)
