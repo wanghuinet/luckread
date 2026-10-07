@@ -34,14 +34,12 @@ const trimHistory = (entries: readonly string[]): string[] => {
 }
 
 function HistoryToolbar({ value, disabled, updateDocument }: ArticleEditorPluginContext) {
-  const [, forceRefresh] = useState(0)
+  const [, setVersion] = useState(0)
   const pastRef = useRef<string[]>([])
   const futureRef = useRef<string[]>([])
   const lastSerializedRef = useRef<string | null>(null)
   const initializedRef = useRef(false)
   const skipRecordRef = useRef(false)
-
-  const sync = () => forceRefresh((count) => count + 1)
 
   useEffect(() => {
     const serialized = serializeDocument(value)
@@ -49,7 +47,7 @@ function HistoryToolbar({ value, disabled, updateDocument }: ArticleEditorPlugin
     if (!initializedRef.current) {
       initializedRef.current = true
       lastSerializedRef.current = serialized
-      sync()
+      setVersion((count) => count + 1)
       return
     }
 
@@ -63,7 +61,7 @@ function HistoryToolbar({ value, disabled, updateDocument }: ArticleEditorPlugin
     }
 
     lastSerializedRef.current = serialized
-    sync()
+    setVersion((count) => count + 1)
   }, [value])
 
   const undo = () => {
@@ -73,14 +71,14 @@ function HistoryToolbar({ value, disabled, updateDocument }: ArticleEditorPlugin
     const current = lastSerializedRef.current
     const document = parseDocument(snapshot)
     if (!document) {
-      sync()
+      setVersion((count) => count + 1)
       return
     }
 
     if (current) futureRef.current = trimHistory([current, ...futureRef.current])
     skipRecordRef.current = true
     updateDocument(document)
-    sync()
+    setVersion((count) => count + 1)
   }
 
   const redo = () => {
@@ -90,14 +88,14 @@ function HistoryToolbar({ value, disabled, updateDocument }: ArticleEditorPlugin
     const current = lastSerializedRef.current
     const document = parseDocument(snapshot)
     if (!document) {
-      sync()
+      setVersion((count) => count + 1)
       return
     }
 
     if (current) pastRef.current = trimHistory([...pastRef.current, current])
     skipRecordRef.current = true
     updateDocument(document)
-    sync()
+    setVersion((count) => count + 1)
   }
 
   const clear = () => {
