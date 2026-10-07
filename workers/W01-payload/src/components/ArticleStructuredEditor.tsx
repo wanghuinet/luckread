@@ -4,6 +4,7 @@ import { useMemo } from 'react'
 import type { ArticleEditorPlugin, ArticleEditorPluginContext, EditorMediaAsset } from './ArticleEditorPlugin.js'
 import {
   ARTICLE_MAX_BLOCKS,
+  ARTICLE_CODE_LANGUAGES,
   ARTICLE_MAX_BLOCK_TEXT,
   type ArticleBlock,
   type ArticleBlockType,
@@ -222,6 +223,43 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
 
             {block.type === 'divider' ? (
               <hr aria-label="内容分隔线" />
+            ) : block.type === 'code' ? (
+              <div className="lr-article-code-editor">
+                <label className="lr-article-code-language">
+                  <span>语言</span>
+                  <select
+                    aria-label="代码语言"
+                    disabled={disabled}
+                    onChange={(event) => {
+                      const language = ARTICLE_CODE_LANGUAGES.includes(
+                        event.target.value as typeof ARTICLE_CODE_LANGUAGES[number],
+                      )
+                        ? event.target.value as typeof ARTICLE_CODE_LANGUAGES[number]
+                        : 'plaintext'
+                      emit(updateBlock(value, index, { language }))
+                    }}
+                    value={block.language ?? 'plaintext'}
+                  >
+                    {ARTICLE_CODE_LANGUAGES.map((language) => (
+                      <option key={language} value={language}>{language}</option>
+                    ))}
+                  </select>
+                </label>
+                <textarea
+                  aria-label="代码内容"
+                  disabled={disabled}
+                  maxLength={ARTICLE_MAX_BLOCK_TEXT}
+                  onChange={(event) => {
+                    const next = updateBlock(value, index, {
+                      text: event.target.value.slice(0, ARTICLE_MAX_BLOCK_TEXT),
+                    })
+                    emit(next)
+                  }}
+                  placeholder="输入代码…"
+                  rows={10}
+                  value={block.text}
+                />
+              </div>
             ) : block.type === 'image' || block.type === 'gallery' ? (
               <div className="lr-article-media-block">
                 <div className={block.type === 'gallery' ? 'lr-article-gallery-grid' : 'lr-article-image-single'}>
