@@ -196,6 +196,10 @@ export const mediaRefsFromArticleDocument = (document: ArticleDocument): string[
     ),
   )
 
+export const hasArticleDocumentContent = (document: ArticleDocument): boolean =>
+  Boolean(plainTextFromArticleDocument(document).trim()) ||
+  mediaRefsFromArticleDocument(document).length > 0
+
 export const articleDocumentFromBody = (raw: string): ArticleDocument => {
   const structured = tryDeserializeArticleDocument(raw)
   if (structured) return structured
