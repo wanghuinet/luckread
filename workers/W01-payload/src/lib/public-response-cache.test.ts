@@ -3,6 +3,8 @@ import {
   cachedPublicGet,
   invalidatePublicContentComments,
   invalidatePublicContentList,
+  invalidatePublicContentVisibility,
+  rememberPublicShareContentId,
   invalidatePublicFollowList,
   invalidatePublicUserProfileByUsername,
   publicCacheKey,
@@ -294,6 +296,80 @@ describe('public response cache', () => {
     expect(second.status).toBe(404)
     expect(loader).toHaveBeenCalledTimes(1)
     expect(second.headers.get('x-luckread-cache')).toBe('HIT')
+  })
+
+  it('uses a content visibility generation for share-detail cache keys', async () => {
+    const cached = new Response(JSON.stringify({ data: 'cached' }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    })
+    cache.match.mockImplementation(async (request: Request) => {
+      if (request.url.includes('__share-detail-content')) {
+        return Response.json({ contentId: 'content-1' })
+      }
+      if (request.url.includes('__content-visibility-generation')) {
+        return generationResponse('g0')
+      }
+      return cached
+    })
+    Object.defineProperty(globalThis, 'caches', { value: { default: cache }, configurable: true })
+
+    const request = new Request('https://luckread.com/api/v1/shares/share-1')
+    const loader = vi.fn(async () => new Response(JSON.stringify({ data: 'origin' }), { status: 200 }))
+    const response = await cachedPublicGet(request, 'share-detail', loader, 60)
+
+    expect(loader).not.toHaveBeenCalled()
+    expect(response.headers.get('X-LuckRead-Cache')).toBe('HIT')
+    expect(cache.match).toHaveBeenCalledWith(
+      new Request('https://cache.luckread.internal/__share-detail-content?v=1&share=share-1'),
+    )
+    expect(cache.match).toHaveBeenCalledWith(
+      new Request('https://cache.luckread.internal/__content-visibility-generation?v=1&content=content-1'),
+    )
+    expect(cache.match).toHaveBeenCalledWith(publicCacheKey(request, 'share-detail', 'g0'))
+  })
+
+  it('requires share content mapping before using the shared share-detail cache', async () => {
+    cache.match.mockResolvedValue(undefined)
+    Object.defineProperty(globalThis, 'caches', { value: { default: cache }, configurable: true })
+    const loader = vi.fn(async () => new Response(JSON.stringify({ data: 'origin' }), { status: 200 }))
+
+    const response = await cachedPublicGet(
+      new Request('https://luckread.com/api/v1/shares/legacy-share'),
+      'share-detail',
+      loader,
+      60,
+    )
+
+    expect(loader).toHaveBeenCalledTimes(1)
+    expect(response.headers.get('X-LuckRead-Cache')).toBeNull()
+  })
+
+  it('stores the immutable share-to-content mapping without deleting share cache pages', async () => {
+    Object.defineProperty(globalThis, 'caches', { value: { default: cache }, configurable: true })
+    await rememberPublicShareContentId('share-1', 'content-1')
+
+    const putCalls = cache.put.mock.calls as unknown as Array<[Request, Response | undefined]>
+    const mappingWrite = putCalls.find(([request]) => request.url.includes('__share-detail-content'))
+    expect(mappingWrite).toBeDefined()
+    expect(mappingWrite?.[0].url).toContain('share=share-1')
+    const body = await mappingWrite?.[1]?.clone().json() as { contentId?: unknown }
+    expect(body.contentId).toBe('content-1')
+  })
+
+  it('bumps content visibility generation for share cache invalidation', async () => {
+    Object.defineProperty(globalThis, 'caches', { value: { default: cache }, configurable: true })
+    await invalidatePublicContentVisibility('content-1')
+
+    const putCalls = cache.put.mock.calls as unknown as Array<[Request, Response | undefined]>
+    const generationWrite = putCalls.find(([request]) =>
+      request.url.includes('__content-visibility-generation') &&
+      request.url.includes('content=content-1'),
+    )
+    expect(generationWrite).toBeDefined()
+    expect(generationWrite?.[1]).toBeInstanceOf(Response)
+    const body = await generationWrite?.[1]?.clone().json() as { generation?: unknown }
+    expect(typeof body.generation).toBe('string')
   })
 
   it('uses a per-content generation for comment-list cache keys', async () => {
