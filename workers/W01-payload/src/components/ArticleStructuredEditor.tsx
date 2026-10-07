@@ -18,6 +18,7 @@ import {
   duplicateArticleBlock,
   insertArticleBlockAfter,
   mediaRefsFromArticleDocument,
+  removeMediaRefFromArticleDocument,
   normalizeArticleDocument,
   plainTextFromArticleDocument,
 } from '../lib/article-document.js'
@@ -239,6 +240,10 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
     })
   }
 
+  function removeMediaReference(mediaRef: string) {
+    emit(removeMediaRefFromArticleDocument(value, mediaRef))
+  }
+
   function moveBlock(index: number, direction: -1 | 1) {
     const target = index + direction
     if (target < 0 || target >= value.blocks.length) return
@@ -388,7 +393,17 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
               <div className="lr-article-media-block">
                 <div className={block.type === 'gallery' ? 'lr-article-gallery-grid' : 'lr-article-image-single'}>
                   {(block.mediaRefs ?? []).map((ref) => (
-                    <img alt={block.text || '文章图片'} key={ref} loading="lazy" src={ref} />
+                    <figure key={ref}>
+                      <img alt={block.text || '文章图片'} loading="lazy" src={ref} />
+                      <button
+                        aria-label="移除正文图片"
+                        disabled={disabled}
+                        onClick={() => removeMediaReference(ref)}
+                        type="button"
+                      >
+                        从正文移除
+                      </button>
+                    </figure>
                   ))}
                 </div>
                 <textarea
