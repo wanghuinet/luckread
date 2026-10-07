@@ -161,7 +161,7 @@ export const markdownToArticleDocument = (markdown: string): MarkdownImportResul
 
       case 'paragraph': {
         const raw = token.text.trim()
-        const mathMarkerMatch = raw.match(/^LUCKREADDISPLAYMATH(\\d+)END$/)
+        const mathMarkerMatch = raw.match(/^LUCKREADDISPLAYMATH(\d+)END$/)
         if (mathMarkerMatch) {
           const expression = prepared.expressions[Number(mathMarkerMatch[1])] ?? ''
           const bounded = boundedText(expression, unsupported)
