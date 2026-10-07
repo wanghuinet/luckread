@@ -153,7 +153,7 @@ it('cancels stale public profile content pagination requests', () => {
 it('keeps arbitrary cookies from bypassing the public content cache', () => {
   const route = read('src/app/api/v1/contents/[contentId]/route.ts')
   expect(route).toContain('resolveOptionalCookieContentPrincipal')
-  expect(route).toContain('if (!principal) {')
+  expect(route).toContain('if (!hasAuthenticatedSessionCredential(request)) {')
   expect(route).not.toContain("!request.headers.get('Authorization') && !request.headers.get('cookie')")
 })
 
