@@ -13,6 +13,7 @@ import {
   duplicateArticleBlock,
   insertArticleBlockAfter,
   removeMediaRefFromArticleDocument,
+  transformArticleBlock,
   serializeArticleDocument,
   tryDeserializeArticleDocument,
 } from './article-document.js'
@@ -225,6 +226,40 @@ describe('article structured document', () => {
   it('is a no-op for an empty media reference', () => {
     const document = createArticleDocument('正文')
     expect(removeMediaRefFromArticleDocument(document, '   ')).toBe(document)
+  })
+
+  it('transforms text blocks while preserving content and identity', () => {
+    const source = { id: 'block-1', type: 'paragraph' as const, text: '核心观点' }
+    const heading = transformArticleBlock(source, 'heading')
+
+    expect(heading).toEqual({
+      id: 'block-1',
+      type: 'heading',
+      text: '核心观点',
+      level: 2,
+    })
+  })
+
+  it('converts a gallery to an image using its first media reference', () => {
+    const source = createArticleMediaBlock('gallery', [
+      'https://media.example/1.jpg',
+      'https://media.example/2.jpg',
+    ], '说明')
+
+    const image = transformArticleBlock(source, 'image')
+
+    expect(image).toEqual({
+      id: source.id,
+      type: 'image',
+      text: '说明',
+      mediaRefs: ['https://media.example/1.jpg'],
+    })
+  })
+
+  it('does not fabricate media when transforming text into image or gallery', () => {
+    const source = createArticleDocument('正文').blocks[0]
+    expect(transformArticleBlock(source, 'image')).toBe(source)
+    expect(transformArticleBlock(source, 'gallery')).toBe(source)
   })
 
   it('strips control characters before persistence', () => {

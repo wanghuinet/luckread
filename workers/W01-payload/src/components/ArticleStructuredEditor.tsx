@@ -19,6 +19,7 @@ import {
   insertArticleBlockAfter,
   mediaRefsFromArticleDocument,
   removeMediaRefFromArticleDocument,
+  transformArticleBlock,
   normalizeArticleDocument,
   plainTextFromArticleDocument,
 } from '../lib/article-document.js'
@@ -210,6 +211,7 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
     addBlock,
     insertMedia,
     insertBlockAfter,
+    transformBlock,
   }
 
   function duplicateBlock(index: number) {
@@ -230,6 +232,23 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
   function insertBlockAfter(index: number) {
     if (value.blocks.length >= ARTICLE_MAX_BLOCKS) return
     emit(insertArticleBlockAfter(value, index, 'paragraph'))
+  }
+
+  function transformBlock(index: number, type: ArticleBlockType) {
+    const source = value.blocks[index]
+    if (!source) return
+    if (type !== source.type && (source.mediaRefs?.length ?? 0) > 0 && type !== 'image' && type !== 'gallery') {
+      const confirmed = window.confirm('转换为文字类区块将从正文结构中移除当前图片，但不会删除素材库中的媒体。确定继续吗？')
+      if (!confirmed) return
+    }
+    const nextBlock = transformArticleBlock(source, type)
+    if (nextBlock === source) return
+    emit({
+      ...value,
+      blocks: value.blocks.map((block, blockIndex) =>
+        blockIndex === index ? nextBlock : block,
+      ),
+    })
   }
 
   function removeBlock(index: number) {
@@ -438,6 +457,29 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
                 value={block.text}
               />
             )}
+
+            <label className="lr-article-block-type">
+              <span>区块类型</span>
+              <select
+                aria-label="区块类型"
+                disabled={disabled}
+                onChange={(event) => transformBlock(index, event.target.value as ArticleBlockType)}
+                value={block.type}
+              >
+                <option value="paragraph">正文</option>
+                <option value="heading">标题</option>
+                <option value="quote">引用</option>
+                <option value="bulletList">无序列表</option>
+                <option value="orderedList">有序列表</option>
+                <option value="divider">分隔线</option>
+                {block.type === 'image' || block.type === 'gallery'
+                  ? <option value={block.type}>{block.type === 'image' ? '图片' : '图库'}</option>
+                  : null}
+                {block.type === 'image' && (block.mediaRefs?.length ?? 0) >= 2
+                  ? <option value="gallery">图库</option>
+                  : null}
+              </select>
+            </label>
 
             {block.type === 'heading' ? (
               <label className="lr-article-heading-level">

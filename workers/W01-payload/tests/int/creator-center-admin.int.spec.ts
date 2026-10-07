@@ -185,6 +185,19 @@ describe('Creator Center admin extension', () => {
     expect(editor).toContain('onClick={() => removeMediaReference(ref)}')
   })
 
+  it('exposes structured article block type conversion', () => {
+    const editor = read('src/components/ArticleStructuredEditor.tsx')
+    const document = read('src/lib/article-document.ts')
+    const plugin = read('src/components/ArticleEditorPlugin.ts')
+
+    expect(document).toContain('export const transformArticleBlock')
+    expect(editor).toContain('transformArticleBlock(source, type)')
+    expect(editor).toContain('aria-label="区块类型"')
+    expect(editor).toContain('onChange={(event) => transformBlock(index, event.target.value as ArticleBlockType)}')
+    expect(editor).toContain("window.confirm('转换为文字类区块将从正文结构中移除当前图片")
+    expect(plugin).toContain('transformBlock: (index: number, type: ArticleBlockType) => void')
+  })
+
   it('exposes contextual article block insertion', () => {
     const editor = read('src/components/ArticleStructuredEditor.tsx')
     const document = read('src/lib/article-document.ts')
