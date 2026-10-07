@@ -25,6 +25,13 @@ import {
   revokeContentRelationship,
   type ContentRelationshipDirection,
 } from './content-relationships.js'
+import {
+  createSeries,
+  deleteSeries,
+  getSeries,
+  listCreatorSeries,
+  updateSeries,
+} from './content-series.js'
 
 type RateLimitBinding = { limit(input: { key: string }): Promise<{ success: boolean }> }
 
@@ -144,7 +151,7 @@ const decodePathSegment = (value: string): string => {
   }
 }
 
-const getPath = (pathname: string): {id?: string; state?: boolean; preflight?: boolean; revisions?: boolean; relationships?: boolean; relationshipId?: string; revisionId?: string; rollback?: boolean} | null => {
+const getPath = (pathname: string): {id?: string; state?: boolean; preflight?: boolean; revisions?: boolean; relationships?: boolean; relationshipId?: string; revisionId?: string; rollback?: boolean; series?: boolean} | null => {
   const parts = pathname.split('/').filter(Boolean)
   if (parts.length === 3 && parts[0] === 'internal' && parts[1] === 'content' && parts[2] === 'contents') {
     return {}
@@ -166,6 +173,12 @@ const getPath = (pathname: string): {id?: string; state?: boolean; preflight?: b
   }
   if (parts.length === 6 && parts[0] === 'internal' && parts[1] === 'content' && parts[2] === 'contents' && parts[4] === 'relationships') {
     return { id: decodePathSegment(parts[3]), relationships: true, relationshipId: decodePathSegment(parts[5]) }
+  }
+  if (parts.length === 4 && parts[0] === 'internal' && parts[1] === 'content' && parts[2] === 'series') {
+    return { id: decodePathSegment(parts[3]), series: true }
+  }
+  if (parts.length === 3 && parts[0] === 'internal' && parts[1] === 'content' && parts[2] === 'series') {
+    return { series: true }
   }
   if (parts.length === 6 && parts[0] === 'internal' && parts[1] === 'content' && parts[2] === 'contents' && parts[4] === 'revisions') {
     return { id: decodePathSegment(parts[3]), revisions: true, revisionId: decodePathSegment(parts[5]) }
@@ -229,6 +242,63 @@ export default {
 
       requireTransport(request)
       const path = getPath(url.pathname)
+
+      if (path && path.series && request.method === 'POST' && path.id === undefined) {
+        const principal = requiredCreatorPrincipal(request)
+        const series = await createSeries(
+          env.D1_02,
+          principal.userId,
+          await parseBody(request),
+          requireIdempotency(request),
+        )
+        return json({ data: series, schemaVersion: '1.0', requestId: crypto.randomUUID() }, 201)
+      }
+
+      if (path && path.series && request.method === 'GET' && path.id === undefined) {
+        const principal = requiredCreatorPrincipal(request)
+        const cursor = url.searchParams.get('cursor')
+        if (cursor && cursor.length > 2048) throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+        const page = await listCreatorSeries(
+          env.D1_02,
+          principal.userId,
+          cursor,
+          parseListLimit(url.searchParams.get('limit')),
+        )
+        return json({ data: page, schemaVersion: '1.0', requestId: crypto.randomUUID() })
+      }
+
+      if (path && path.series && path.id && request.method === 'GET') {
+        const principal = requiredCreatorPrincipal(request)
+        return json({ data: await getSeries(env.D1_02, principal.userId, path.id), schemaVersion: '1.0', requestId: crypto.randomUUID() })
+      }
+
+      if (path && path.series && path.id && request.method === 'PATCH') {
+        const principal = requiredCreatorPrincipal(request)
+        return json({
+          data: await updateSeries(
+            env.D1_02,
+            principal.userId,
+            path.id,
+            await parseBody(request),
+            requireIfMatch(request),
+            requireIdempotency(request),
+          ),
+          schemaVersion: '1.0',
+          requestId: crypto.randomUUID(),
+        })
+      }
+
+      if (path && path.series && path.id && request.method === 'DELETE') {
+        const principal = requiredCreatorPrincipal(request)
+        await deleteSeries(
+          env.D1_02,
+          principal.userId,
+          path.id,
+          requireIfMatch(request),
+          requireIdempotency(request),
+        )
+        return new Response(null, { status: 204 })
+      }
 
       if (path && path.relationships && path.id && request.method === 'GET' && !path.relationshipId) {
         const directionParam = url.searchParams.get('direction')?.trim() || 'out'
