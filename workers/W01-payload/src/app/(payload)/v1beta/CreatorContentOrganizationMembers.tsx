@@ -95,7 +95,7 @@ export default function CreatorContentOrganizationMembers({
   kind: Kind
   organization: OrganizationItem
   loginPath?: '/admin/login' | '/login'
-  onChanged: (etag: string, version: number) => void
+  onChanged: (organizationId: string, etag: string, version: number) => void
 }) {
   const organizationMeta = meta[kind]
   const [members, setMembers] = useState<MemberItem[]>([])
@@ -104,7 +104,6 @@ export default function CreatorContentOrganizationMembers({
   const [candidates, setCandidates] = useState<ContentCandidate[]>([])
   const [selectedContentId, setSelectedContentId] = useState('')
   const [loading, setLoading] = useState(true)
-  const [candidateLoading, setCandidateLoading] = useState(false)
   const [busyKey, setBusyKey] = useState<string | null>(null)
   const [error, setError] = useState('')
 
@@ -167,7 +166,7 @@ export default function CreatorContentOrganizationMembers({
         setMembers(page.items)
         setCurrentEtag(nextEtag)
         setCurrentVersion(nextVersion)
-        onChanged(nextEtag, nextVersion)
+        onChanged(organization.id, nextEtag, nextVersion)
         setError('')
       })
       .catch((cause: unknown) => {
@@ -209,7 +208,7 @@ export default function CreatorContentOrganizationMembers({
       setMembers(page.items)
       setCurrentEtag(nextEtag)
       setCurrentVersion(nextVersion)
-      onChanged(nextEtag, nextVersion)
+      onChanged(organization.id, nextEtag, nextVersion)
       setError('')
     } catch (cause) {
       if (cause instanceof Error && cause.message === 'AUTH_REQUIRED') return
@@ -249,7 +248,7 @@ export default function CreatorContentOrganizationMembers({
       const nextVersion = typeof data.data?.[versionKey] === 'number' ? Number(data.data[versionKey]) : currentVersion + 1
       setCurrentEtag(nextEtag)
       setCurrentVersion(nextVersion)
-      onChanged(nextEtag, nextVersion)
+      onChanged(organization.id, nextEtag, nextVersion)
       setSelectedContentId('')
       await refreshMembers()
     } catch (cause) {
@@ -289,7 +288,7 @@ export default function CreatorContentOrganizationMembers({
       const nextVersion = typeof data.data?.[versionKey] === 'number' ? Number(data.data[versionKey]) : currentVersion + 1
       setCurrentEtag(nextEtag)
       setCurrentVersion(nextVersion)
-      onChanged(nextEtag, nextVersion)
+      onChanged(organization.id, nextEtag, nextVersion)
       await refreshMembers()
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : '移除失败')
@@ -328,7 +327,7 @@ export default function CreatorContentOrganizationMembers({
       const nextVersion = typeof data.data?.[versionKey] === 'number' ? Number(data.data[versionKey]) : currentVersion + 1
       setCurrentEtag(nextEtag)
       setCurrentVersion(nextVersion)
-      onChanged(nextEtag, nextVersion)
+      onChanged(organization.id, nextEtag, nextVersion)
       await refreshMembers()
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : '排序更新失败')
@@ -370,7 +369,7 @@ export default function CreatorContentOrganizationMembers({
           </select>
           <button
             className={styles.primaryButton + ' btn'}
-            disabled={!selectedContentId || busyKey !== null || candidateLoading}
+            disabled={!selectedContentId || busyKey !== null}
             onClick={() => void addMember()}
             type="button"
           >
