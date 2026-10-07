@@ -54,8 +54,11 @@ interface RelationshipRow {
   updated_at: string
 }
 
-interface RelationshipMutationRow extends RelationshipRow {
+interface CreateRelationshipQueryRow {
+  source_id: string
   owner_user_id: string
+  source_version: number
+  target_id: string | null
   idem_id: string | null
   idem_owner_user_id: string | null
   idem_request_hash: string | null
@@ -63,8 +66,16 @@ interface RelationshipMutationRow extends RelationshipRow {
   idem_response_json: string | null
   idem_expires_at: string | null
   active_relationship_id: string | null
-  source_version: number | null
-  target_id: string | null
+}
+
+interface RevokeRelationshipQueryRow extends RelationshipRow {
+  owner_user_id: string
+  idem_id: string | null
+  idem_owner_user_id: string | null
+  idem_request_hash: string | null
+  idem_status: 'IN_PROGRESS' | 'COMPLETED' | null
+  idem_response_json: string | null
+  idem_expires_at: string | null
 }
 
 const MAX_REF_LENGTH = 2048
@@ -123,7 +134,9 @@ const parseStoredRelationship = (value: string | null): ContentRelationship | nu
       typeof parsed.sourceId === 'string' &&
       typeof parsed.targetId === 'string' &&
       parsed.relationType === 'reference' &&
-      parsed.status === 'ACTIVE' || parsed.status === 'REVOKED'
+      (parsed.status === 'ACTIVE' || parsed.status === 'REVOKED') &&
+      typeof parsed.schemaVersion === 'number' &&
+      typeof parsed.actorId === 'string'
     ) {
       return parsed
     }
@@ -136,13 +149,13 @@ const parseStoredRelationship = (value: string | null): ContentRelationship | nu
 const relationLimit = (value: number): number =>
   Math.min(Math.max(Number.isSafeInteger(value) ? value : 20, 1), PAGE_SIZE_MAX)
 
-const idempotencyActive = (row: RelationshipMutationRow, now: Date): boolean =>
+const idempotencyActive = (row: { idem_id: string | null; idem_expires_at: string | null }, now: Date): boolean =>
   !!row.idem_id &&
   !!row.idem_expires_at &&
   Date.parse(row.idem_expires_at) > now.getTime()
 
 const assertIdempotencyReplay = (
-  row: RelationshipMutationRow,
+  row: { idem_id: string | null; idem_expires_at: string | null; idem_owner_user_id: string | null; idem_request_hash: string | null; idem_status: 'IN_PROGRESS' | 'COMPLETED' | null; idem_response_json: string | null },
   ownerUserId: string,
   hash: string,
   now: Date,
@@ -244,7 +257,7 @@ export async function createContentRelationship(
 
   const row = await db.prepare(contentAndIdempotencyQuery(operationId))
     .bind(targetContentId, ownerUserId, operationId, idempotencyKey, sourceContentId)
-    .first<RelationshipMutationRow>()
+    .first<CreateRelationshipQueryRow>()
 
   if (!row) throw new ContentRuntimeError('NOT_FOUND', 404)
 
@@ -421,12 +434,12 @@ export async function revokeContentRelationship(
          LIMIT 1
       ) i ON 1 = 1
      WHERE r.relationship_id = ?`,
-  ).bind(ownerUserId, operationId, idempotencyKey, relationshipId).first<RelationshipMutationRow>()
+  ).bind(ownerUserId, operationId, idempotencyKey, relationshipId).first<RevokeRelationshipQueryRow>()
 
   if (!row) throw new ContentRuntimeError('RELATIONSHIP_NOT_FOUND', 404)
 
   const source = mapRow(row)
-  const hash = await relationshipHash(operationId, { ownerUserId, relationshipId, ifStatus: row.status })
+  const hash = await relationshipHash(operationId, { ownerUserId, relationshipId })
   const replay = assertIdempotencyReplay(row, ownerUserId, hash, now)
   if (replay) return replay
 
