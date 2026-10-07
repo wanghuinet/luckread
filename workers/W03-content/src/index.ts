@@ -33,6 +33,13 @@ import {
   updateSeries,
 } from './content-series.js'
 import {
+  createCollection,
+  deleteCollection,
+  getCollection,
+  listCreatorCollections,
+  updateCollection,
+} from './content-collections.js'
+import {
   attachSeriesMember,
   listSeriesMembers,
   removeSeriesMember,
@@ -157,7 +164,7 @@ const decodePathSegment = (value: string): string => {
   }
 }
 
-const getPath = (pathname: string): {id?: string; state?: boolean; preflight?: boolean; revisions?: boolean; relationships?: boolean; relationshipId?: string; revisionId?: string; rollback?: boolean; series?: boolean; seriesMembers?: boolean; seriesMemberContentId?: string} | null => {
+const getPath = (pathname: string): {id?: string; state?: boolean; preflight?: boolean; revisions?: boolean; relationships?: boolean; relationshipId?: string; revisionId?: string; rollback?: boolean; series?: boolean; seriesMembers?: boolean; seriesMemberContentId?: string; collections?: boolean} | null => {
   const parts = pathname.split('/').filter(Boolean)
   if (parts.length === 3 && parts[0] === 'internal' && parts[1] === 'content' && parts[2] === 'contents') {
     return {}
@@ -185,6 +192,12 @@ const getPath = (pathname: string): {id?: string; state?: boolean; preflight?: b
   }
   if (parts.length === 3 && parts[0] === 'internal' && parts[1] === 'content' && parts[2] === 'series') {
     return { series: true }
+  }
+  if (parts.length === 4 && parts[0] === 'internal' && parts[1] === 'content' && parts[2] === 'collections') {
+    return { id: decodePathSegment(parts[3]), collections: true }
+  }
+  if (parts.length === 3 && parts[0] === 'internal' && parts[1] === 'content' && parts[2] === 'collections') {
+    return { collections: true }
   }
   if (parts.length === 5 && parts[0] === 'internal' && parts[1] === 'content' && parts[2] === 'series' && parts[4] === 'members') {
     return { id: decodePathSegment(parts[3]), seriesMembers: true }
@@ -254,6 +267,63 @@ export default {
 
       requireTransport(request)
       const path = getPath(url.pathname)
+
+      if (path && path.collections && request.method === 'POST' && path.id === undefined) {
+        const principal = requiredCreatorPrincipal(request)
+        const collection = await createCollection(
+          env.D1_02,
+          principal.userId,
+          await parseBody(request),
+          requireIdempotency(request),
+        )
+        return json({ data: collection, schemaVersion: '1.0', requestId: crypto.randomUUID() }, 201)
+      }
+
+      if (path && path.collections && request.method === 'GET' && path.id === undefined) {
+        const principal = requiredCreatorPrincipal(request)
+        const cursor = url.searchParams.get('cursor')
+        if (cursor && cursor.length > 2048) throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+        const page = await listCreatorCollections(
+          env.D1_02,
+          principal.userId,
+          cursor,
+          parseListLimit(url.searchParams.get('limit')),
+        )
+        return json({ data: page, schemaVersion: '1.0', requestId: crypto.randomUUID() })
+      }
+
+      if (path && path.collections && path.id && request.method === 'GET') {
+        const principal = requiredCreatorPrincipal(request)
+        return json({ data: await getCollection(env.D1_02, principal.userId, path.id), schemaVersion: '1.0', requestId: crypto.randomUUID() })
+      }
+
+      if (path && path.collections && path.id && request.method === 'PATCH') {
+        const principal = requiredCreatorPrincipal(request)
+        return json({
+          data: await updateCollection(
+            env.D1_02,
+            principal.userId,
+            path.id,
+            await parseBody(request),
+            requireIfMatch(request),
+            requireIdempotency(request),
+          ),
+          schemaVersion: '1.0',
+          requestId: crypto.randomUUID(),
+        })
+      }
+
+      if (path && path.collections && path.id && request.method === 'DELETE') {
+        const principal = requiredCreatorPrincipal(request)
+        await deleteCollection(
+          env.D1_02,
+          principal.userId,
+          path.id,
+          requireIfMatch(request),
+          requireIdempotency(request),
+        )
+        return new Response(null, { status: 204 })
+      }
 
       if (path && path.series && request.method === 'POST' && path.id === undefined) {
         const principal = requiredCreatorPrincipal(request)
