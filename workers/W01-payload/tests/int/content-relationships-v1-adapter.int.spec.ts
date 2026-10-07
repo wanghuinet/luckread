@@ -28,7 +28,7 @@ describe('v1 content relationship adapters', () => {
   it('enforces idempotency for relationship creation', () => {
     expect(route).toContain("request.headers.get('Idempotency-Key')")
     expect(route).toContain("Idempotency-Key required")
-    expect(route).toContain("idempotencyKey.length > 256")
+    expect(route).toContain("value.length > 256")
   })
 
   it('exposes authenticated relationship revocation and invalidates public cache', () => {
