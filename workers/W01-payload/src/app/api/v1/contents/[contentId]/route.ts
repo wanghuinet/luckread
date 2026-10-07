@@ -5,6 +5,7 @@ import {
 } from '../../../../../lib/public-response-cache.js'
 
 import { TrafficLimitError, enforcePublicReadRateLimit, rateLimitResponse } from '../../../../../auth/traffic-limit.js'
+import { hasAuthenticatedSessionCredential } from '../../../../../lib/content-list-cache-guard.js'
 
 import {
   callW03Content,
@@ -41,7 +42,7 @@ export async function GET(
 ): Promise<Response> {
   try {
     const { contentId } = await context.params
-    if (!request.headers.get('Authorization') && !request.headers.get('cookie')) {
+    if (!hasAuthenticatedSessionCredential(request)) {
       await enforcePublicReadRateLimit(request)
       return await cachedPublicGet(
         request,
