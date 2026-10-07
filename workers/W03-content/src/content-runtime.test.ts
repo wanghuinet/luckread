@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-import { canTransitionContentState, decodeCursor, encodeCursor, isState, listContents, validateInput, validateListFilters } from './content-runtime.js'
+import { canTransitionContentState, decodeCursor, encodeCursor, isState, listContents, updateContent, validateInput, validateListFilters } from './content-runtime.js'
 import w03Worker, { hasCreatorContentPermission, parseListLimit } from './index.js'
 
 describe('W03 content contract core', () => {
@@ -17,6 +17,64 @@ describe('W03 content contract core', () => {
       updatedAt: '2026-09-29T12:00:00.000Z',
       id: 'content_123',
     })
+  })
+
+  it('rejects update requests that change the immutable content type', async () => {
+    const row = {
+      id: 'content_type_guard_123',
+      content_type: 'article',
+      owner_user_id: 'user_type_guard',
+      creator_id: 'user_type_guard',
+      ip_id: null,
+      state: 'DRAFT',
+      version: 1,
+      revision: 1,
+      slug: 'original-slug',
+      title: 'Original article',
+      body_ref: 'https://cdn.example.com/body.txt',
+      media_refs_json: '[]',
+      cover_ref: null,
+      etag: 'W/"1"',
+      created_at: '2026-10-07T12:00:00.000Z',
+      updated_at: '2026-10-07T12:00:00.000Z',
+      idem_id: null,
+      idem_owner_user_id: null,
+      idem_request_hash: null,
+      idem_status: null,
+      idem_response_status: null,
+      idem_response_json: null,
+      idem_expires_at: null,
+    }
+    let prepareCount = 0
+    const db = {
+      prepare() {
+        prepareCount += 1
+        return {
+          bind: () => ({
+            first: async () => row,
+          }),
+        }
+      },
+    } as never
+
+    await expect(
+      updateContent(
+        db,
+        'user_type_guard',
+        'content_type_guard_123',
+        {
+          contentType: 'video',
+          title: 'Attempted type change',
+          bodyRef: 'https://cdn.example.com/video-body.txt',
+          mediaRefs: ['https://cdn.example.com/video.mp4'],
+          coverRef: null,
+        },
+        'W/"1"',
+        'content-type-guard-idem',
+      ),
+    ).rejects.toMatchObject({ code: 'VALIDATION_FAILED' })
+
+    expect(prepareCount).toBe(1)
   })
 
   it('allows only the contracted creator and moderator transitions', () => {
