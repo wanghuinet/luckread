@@ -332,11 +332,11 @@ const normalizeCorrelationId = (value: string): string => {
 const insertRevision = (db: ContentD1, revision: ContentRevision): D1PreparedStatement =>
   db.prepare(`INSERT INTO content_revisions
     (id, content_id, revision, content_version, actor_user_id, source_revision, operation,
-     state, title, body_ref, media_refs_json, cover_ref, etag, reason, correlation_id, created_at)
+     state, slug, title, body_ref, media_refs_json, cover_ref, etag, reason, correlation_id, created_at)
    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).bind(
     revision.id, revision.contentId, revision.revision, revision.contentVersion,
     revision.actorUserId, revision.sourceRevision, revision.operation, revision.state,
-    revision.title, revision.bodyRef, JSON.stringify(revision.mediaRefs), revision.coverRef,
+    revision.slug, revision.title, revision.bodyRef, JSON.stringify(revision.mediaRefs), revision.coverRef,
     revision.etag, revision.reason, revision.correlationId, revision.createdAt,
   )
 const emptyIdempotency = (): IdempotencyRow => ({
@@ -462,11 +462,11 @@ export async function getContent(
   assertResourceId(contentId)
   const row = await db.prepare(
     `SELECT id, content_type, owner_user_id, creator_id, ip_id, state, version, revision,
-            title, body_ref, media_refs_json, cover_ref, etag, created_at, updated_at
+            slug, title, body_ref, media_refs_json, cover_ref, etag, created_at, updated_at
        FROM contents
-      WHERE id = ?
+      WHERE (id = ? OR slug = ?)
         AND (state = 'PUBLISHED' OR owner_user_id = ?)`,
-  ).bind(contentId, principalUserId ?? '').first<ContentRow>()
+  ).bind(contentId, contentId, principalUserId ?? '').first<ContentRow>()
   if (!row) throw new ContentRuntimeError('NOT_FOUND', 404)
   return toContent(row)
 }
