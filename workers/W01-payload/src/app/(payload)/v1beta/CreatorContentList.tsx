@@ -114,7 +114,7 @@ export default function CreatorContentList({ loginPath = '/admin/login' }: { log
       setLoadingMore(false)
       if (activeRequestRef.current === controller) activeRequestRef.current = null
     }
-  }, [status, type])
+  }, [loginPath, status, type])
 
   useEffect(() => {
     const timer = window.setTimeout((): void => {
