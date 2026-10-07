@@ -1,4 +1,6 @@
 import { cachedPublicGet } from '../../../../../../lib/public-response-cache.js'
+import { TrafficLimitError, enforcePublicReadRateLimit, rateLimitResponse } from '../../../../../../auth/traffic-limit.js'
+import { hasAuthenticatedSessionCredential } from '../../../../../../lib/content-list-cache-guard.js'
 
 import {
   callW05Social,
@@ -27,6 +29,7 @@ export async function GET(
   context: { params: Promise<{ contentId: string }> },
 ): Promise<Response> {
   try {
+    await enforcePublicReadRateLimit(request)
     const contentId = await resolveContentId(context)
     const url = new URL(request.url)
     const query = new URLSearchParams()
@@ -39,7 +42,7 @@ export async function GET(
     const viewer = await resolveOptionalCookieSocialPrincipal(request)
     if (viewer instanceof Response) return viewer
 
-    if (!viewer) {
+    if (!viewer && !hasAuthenticatedSessionCredential(request)) {
       return await cachedPublicGet(
         request,
         'content-comments',
@@ -59,6 +62,7 @@ export async function GET(
       principal: viewer,
     })
   } catch (error) {
+    if (error instanceof TrafficLimitError) return rateLimitResponse(request)
     if (error instanceof W05SocialClientError) {
       return errorResponse(error.status, error.code, error.message)
     }

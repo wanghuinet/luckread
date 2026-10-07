@@ -3,6 +3,7 @@ import {
   invalidatePublicContentDetail,
   invalidatePublicContentList,
 } from '../../../../../lib/public-response-cache.js'
+import { TrafficLimitError, enforcePublicReadRateLimit, rateLimitResponse } from '../../../../../auth/traffic-limit.js'
 
 import {
   callW03Content,
@@ -38,6 +39,7 @@ export async function GET(
   context: { params: Promise<{ contentId: string }> },
 ): Promise<Response> {
   try {
+    await enforcePublicReadRateLimit(request)
     const { contentId } = await context.params
     const principal = await resolveOptionalCookieContentPrincipal(request)
     if (principal instanceof Response) return principal
@@ -61,6 +63,7 @@ export async function GET(
       principal: principal ?? undefined,
     })
   } catch (error) {
+    if (error instanceof TrafficLimitError) return rateLimitResponse(request)
     if (error instanceof W03ContentClientError) return errorResponse(error.status, error.code, 'Content service unavailable')
     return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Content service unavailable')
   }

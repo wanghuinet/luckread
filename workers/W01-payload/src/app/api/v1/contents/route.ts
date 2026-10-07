@@ -1,4 +1,5 @@
 import { cachedPublicGet, invalidatePublicContentList } from '../../../../lib/public-response-cache.js'
+import { TrafficLimitError, enforcePublicReadRateLimit, rateLimitResponse } from '../../../../auth/traffic-limit.js'
 import {
   ContentListQueryError,
   hasAuthenticatedSessionCredential,
@@ -21,6 +22,7 @@ export async function GET(request: Request): Promise<Response> {
   try {
     const url = new URL(request.url)
     const query = validateContentListQuery(url)
+    await enforcePublicReadRateLimit(request)
     const suffix = query.toString() ? `?${query.toString()}` : ''
 
     // Never put an authenticated request into the shared public cache. This
@@ -47,6 +49,7 @@ export async function GET(request: Request): Promise<Response> {
       30,
     )
   } catch (error) {
+    if (error instanceof TrafficLimitError) return rateLimitResponse(request)
     if (error instanceof W03ContentClientError) return unavailable(error)
     if (error instanceof ContentListQueryError) {
       return unavailable(new W03ContentClientError(error.status, error.code, 'Invalid content query'))
