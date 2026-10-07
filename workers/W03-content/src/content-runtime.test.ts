@@ -389,6 +389,102 @@ describe('W03 content contract core', () => {
 
 })
 
+  it('keeps create idempotency replay byte-stable across retry time', async () => {
+    const original = {
+      id: 'content_create_123',
+      contentType: 'article',
+      ownerUserId: 'user_123',
+      creatorId: 'user_123',
+      ipId: null,
+      state: 'DRAFT',
+      version: 1,
+      revision: 1,
+      slug: 'draft-content-abcdef',
+      title: 'Draft content',
+      bodyRef: 'https://cdn.example.com/body.json',
+      mediaRefs: [],
+      coverRef: null,
+      etag: 'W/"1"',
+      createdAt: '2026-10-07T07:00:00.000Z',
+      updatedAt: '2026-10-07T07:00:00.000Z',
+    }
+    const db = {
+      prepare() {
+        return {
+          bind: () => ({
+            first: async () => ({
+              idem_id: 'idem_123',
+              idem_owner_user_id: 'user_123',
+              idem_request_hash: 'will-be-replaced',
+              idem_status: 'COMPLETED',
+              idem_response_status: 201,
+              idem_response_json: JSON.stringify(original),
+              idem_expires_at: '2026-10-08T07:00:00.000Z',
+            }),
+          }),
+        }
+      },
+      batch: async () => {
+        throw new Error('batch should not run on an idempotency replay')
+      },
+    } as never
+
+    const result = await import('./content-runtime.js').then(async ({ createContent }) => {
+      const hash = await crypto.subtle.digest(
+        'SHA-256',
+        new TextEncoder().encode(JSON.stringify({
+          operationId: 'createContent',
+          input: {
+            ownerUserId: 'user_123',
+            input: {
+              contentType: 'article',
+              title: 'Draft content',
+              bodyRef: 'https://cdn.example.com/body.json',
+              mediaRefs: [],
+              coverRef: null,
+            },
+          },
+        })),
+      )
+      const hashHex = Array.from(new Uint8Array(hash), byte => byte.toString(16).padStart(2, '0')).join('')
+      ;(db.prepare('unused').bind().first as unknown as () => Promise<unknown>)
+      return createContent(
+        {
+          prepare(query: string) {
+            return {
+              bind: () => ({
+                first: async () => ({
+                  idem_id: 'idem_123',
+                  idem_owner_user_id: 'user_123',
+                  idem_request_hash: hashHex,
+                  idem_status: 'COMPLETED',
+                  idem_response_status: 201,
+                  idem_response_json: JSON.stringify(original),
+                  idem_expires_at: '2026-10-08T07:00:00.000Z',
+                }),
+              }),
+            }
+          },
+          batch: async () => {
+            throw new Error('batch should not run on an idempotency replay')
+          },
+        } as never,
+        'user_123',
+        {
+          contentType: 'article',
+          title: 'Draft content',
+          bodyRef: 'https://cdn.example.com/body.json',
+          mediaRefs: [],
+          coverRef: null,
+        },
+        'create-key',
+        new Date('2026-10-07T08:00:00.000Z'),
+      )
+    })
+
+    expect(result).toEqual(original)
+  })
+
   it('stores the full ContentRecord for update idempotency replay', () => {
     const runtime = readFileSync(
       resolve(process.cwd(), 'workers/W03-content/src/content-runtime.ts'),
