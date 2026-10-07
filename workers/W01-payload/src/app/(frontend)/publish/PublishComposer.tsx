@@ -472,7 +472,7 @@ export default function PublishComposer({
       title: title.trim(),
       body,
       mediaRefs: assets.map((asset) => asset.url),
-      coverRef: coverRef.trim() || assets[0]?.url || null,
+      coverRef: resolveCoverRef(type, assets, coverRef),
       aiMode,
       humanContribution: humanConfirmed ? 'substantial' : 'light',
     }
