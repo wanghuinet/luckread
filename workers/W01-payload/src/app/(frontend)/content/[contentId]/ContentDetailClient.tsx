@@ -32,8 +32,10 @@ const splitBodyIntoParagraphs = (value: string): string[] =>
 
 export default function ContentDetailPage({
   params,
+  initialContent,
 }: {
   params: Promise<{ contentId: string }>
+  initialContent?: Content
 }) {
   const locale = usePublicLocale()
   const copy = getPublicCopy(locale)
@@ -44,9 +46,9 @@ export default function ContentDetailPage({
     video: copy.content.tabs.video,
   }
 
-  const [content, setContent] = useState<Content | null>(null)
+  const [content, setContent] = useState<Content | null>(initialContent ?? null)
   const [body, setBody] = useState('')
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(!initialContent)
   const [error, setError] = useState('')
   const [copied, setCopied] = useState(false)
   const [actionMessage, setActionMessage] = useState('')
@@ -77,28 +79,43 @@ export default function ContentDetailPage({
       void (async () => {
         try {
           const { contentId } = await params
-          const [response, viewerResponse] = await Promise.all([
-            fetch(`/api/v1/contents/${encodeURIComponent(contentId)}`, {
-              credentials: 'omit',
-              headers: { accept: 'application/json' },
-              cache: 'no-store',
-              signal: controller.signal,
-            }),
-            fetch('/api/v1/users/me', {
+          let resolved = initialContent
+          let viewerResponse: Response
+
+          if (!resolved || retryKey > 0) {
+            const [response, nextViewerResponse] = await Promise.all([
+              fetch(`/api/v1/contents/${encodeURIComponent(contentId)}`, {
+                credentials: 'omit',
+                headers: { accept: 'application/json' },
+                cache: 'no-store',
+                signal: controller.signal,
+              }),
+              fetch('/api/v1/users/me', {
+                credentials: 'include',
+                headers: { accept: 'application/json' },
+                cache: 'no-store',
+                signal: controller.signal,
+              }),
+            ])
+            const data = await response.json().catch((): null => null)
+            if (!response.ok || !data?.id || data.state !== 'PUBLISHED') {
+              throw new Error(copy.detail.notFound)
+            }
+            resolved = data as Content
+            viewerResponse = nextViewerResponse
+            if (cancelled) return
+            setContent(resolved)
+          } else {
+            viewerResponse = await fetch('/api/v1/users/me', {
               credentials: 'include',
               headers: { accept: 'application/json' },
               cache: 'no-store',
               signal: controller.signal,
-            }),
-          ])
-          const data = await response.json().catch((): null => null)
-          const viewerData = await viewerResponse.json().catch((): null => null) as { id?: string } | null
-          if (!response.ok || !data?.id || data.state !== 'PUBLISHED') {
-            throw new Error(copy.detail.notFound)
+            })
           }
-          if (cancelled) return
-          const resolved = data as Content
-          setContent(resolved)
+
+          const viewerData = await viewerResponse.json().catch((): null => null) as { id?: string } | null
+          if (cancelled || !resolved) return
           setViewerUserId(typeof viewerData?.id === 'string' ? viewerData.id : null)
           try {
             const likeResponse = await fetch(
@@ -175,7 +192,7 @@ export default function ContentDetailPage({
       controller.abort()
       window.clearTimeout(timer)
     }
-  }, [params, retryKey])
+  }, [initialContent, params, retryKey])
 
   if (loading) {
     return <main aria-busy={loading} className="content-detail"><p className="content-detail-state" role="status">{copy.detail.loading}</p></main>
