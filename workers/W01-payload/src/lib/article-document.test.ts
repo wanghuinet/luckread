@@ -11,6 +11,7 @@ import {
   mediaRefsFromArticleDocument,
   hasArticleDocumentContent,
   duplicateArticleBlock,
+  insertArticleBlockAfter,
   serializeArticleDocument,
   tryDeserializeArticleDocument,
 } from './article-document.js'
@@ -173,6 +174,29 @@ describe('article structured document', () => {
 
     expect(history.past).toHaveLength(2)
     expect(ARTICLE_DOCUMENT_HISTORY_LIMIT).toBeGreaterThanOrEqual(2)
+  })
+
+  it('inserts a new paragraph after the requested article block', () => {
+    const document = {
+      version: 2 as const,
+      blocks: [
+        { id: 'a', type: 'paragraph' as const, text: '第一段' },
+        { id: 'b', type: 'heading' as const, text: '第二节', level: 2 as const },
+      ],
+    }
+
+    const next = insertArticleBlockAfter(document, 0)
+
+    expect(next.blocks.map((block) => block.id)).toEqual(['a', next.blocks[1].id, 'b'])
+    expect(next.blocks[1]?.type).toBe('paragraph')
+    expect(next.blocks[1]?.text).toBe('')
+    expect(document.blocks).toHaveLength(2)
+  })
+
+  it('does not mutate the document for an invalid insertion index', () => {
+    const document = createArticleDocument('正文')
+    expect(insertArticleBlockAfter(document, 99)).toBe(document)
+    expect(insertArticleBlockAfter(document, -2)).toBe(document)
   })
 
   it('strips control characters before persistence', () => {
