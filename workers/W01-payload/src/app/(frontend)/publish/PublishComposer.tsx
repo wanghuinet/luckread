@@ -2,7 +2,7 @@
 
 import { ChangeEvent, useEffect, useRef, useState } from 'react'
 import { computeAutoSaveDelay } from '../../../lib/content-autosave.js'
-import { articleDocumentFromBody, plainTextFromArticleDocument, serializeArticleDocument, createArticleDocument, tryDeserializeArticleDocument, type ArticleDocument } from '../../../lib/article-document.js'
+import { articleDocumentFromBody, plainTextFromArticleDocument, mediaRefsFromArticleDocument, serializeArticleDocument, createArticleDocument, tryDeserializeArticleDocument, type ArticleDocument } from '../../../lib/article-document.js'
 import ArticleStructuredEditor from '../../../components/ArticleStructuredEditor.js'
 import ArticleStructuredRenderer from '../../../components/ArticleStructuredRenderer.js'
 import { articleEditorPlugins } from '../../../components/article-editor-plugins.js'
@@ -291,7 +291,10 @@ export default function PublishComposer({
       contentType: type,
       title: title.trim(),
       bodyRef,
-      mediaRefs: assets.map((asset) => asset.url),
+      mediaRefs: Array.from(new Set([
+        ...assets.map((asset) => asset.url),
+        ...(type === 'article' ? mediaRefsFromArticleDocument(articleDocument) : []),
+      ])),
       coverRef: resolveCoverRef(type, assets, coverRef),
     }
 
