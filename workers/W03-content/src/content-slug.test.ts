@@ -8,7 +8,7 @@ describe('content slug', () => {
     const first = contentSlugFor('Cloudflare 性能优化：缓存与 D1', id)
     const later = contentSlugFor('完全不同的新标题', id)
 
-    expect(first).toBe('cloudflare-性能优化-缓存与-d1-6f4dc6e84f5f')
+    expect(first).toBe('cloudflare-性能优化-缓存与-d1-6f4dc6e84f5f4e7e9a6dd2c1f931fabc')
     expect(first).not.toBe(later)
     expect(isContentSlug(first)).toBe(true)
   })
