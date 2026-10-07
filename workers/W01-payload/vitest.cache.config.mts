@@ -6,6 +6,7 @@ export default defineConfig({
     include: [
       'src/lib/public-response-cache.test.ts',
       'src/lib/content-list-cache-guard.test.ts',
+      'src/content/w03-content-client.test.ts',
     ],
   },
 })
