@@ -283,7 +283,8 @@ export default function CreatorContentOrganization({
       {!loading && activePage.items.length > 0 ? (
         <div className={styles.audienceList}>
           {activePage.items.map((item) => (
-            <article className={styles.contentListItem}>
+            <Fragment key={item.id}>
+              <article className={styles.contentListItem}>
               {item.coverRef ? (
                 <div className={styles.contentListThumb} aria-hidden="true">
                   <img alt="" loading="lazy" src={item.coverRef} />
@@ -319,8 +320,8 @@ export default function CreatorContentOrganization({
                   {actionId === item.id ? '处理中…' : '删除'}
                 </button>
               </div>
-            </article>
-            {selectedOrganizationId === item.id ? (
+              </article>
+              {selectedOrganizationId === item.id ? (
               <CreatorContentOrganizationMembers
                 kind={kind}
                 loginPath={loginPath}
