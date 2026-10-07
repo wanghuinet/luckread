@@ -64,23 +64,48 @@ const prepareDisplayMath = (
   const expressions: string[] = []
   const markerPrefix = 'LUCKREADDISPLAYMATH'
   const markerSuffix = 'END'
+  const lines = source.split(/\\r?\\n/)
+  const output: string[] = []
   let markerIndex = 0
 
-  const markdown = source.replace(
-    /(^|\n)\s*\$\$\s*\n?([\s\S]*?)\n?\s*\$\$(?=\s*(?:\n|$))/g,
-    (match, lineBreak: string, expression: string) => {
-      let marker = markerPrefix + markerIndex + markerSuffix
-      while (source.includes(marker)) {
-        markerIndex += 1
-        marker = markerPrefix + markerIndex + markerSuffix
-      }
+  const nextMarker = (): string => {
+    let marker = markerPrefix + markerIndex + markerSuffix
+    while (source.includes(marker)) {
       markerIndex += 1
-      expressions.push(expression.trim())
-      return lineBreak + marker
-    },
-  )
+      marker = markerPrefix + markerIndex + markerSuffix
+    }
+    markerIndex += 1
+    return marker
+  }
 
-  return { markdown, expressions }
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index] ?? ''
+    const trimmed = line.trim()
+    const inlineMatch = trimmed.match(/^\\$\\$([^$]*)\\$\\$$/)
+
+    if (inlineMatch) {
+      expressions.push(inlineMatch[1].trim())
+      output.push(nextMarker())
+      continue
+    }
+
+    if (/^\\$\\$\\s*$/.test(trimmed)) {
+      let closeIndex = index + 1
+      while (closeIndex < lines.length && !/^\\$\\$\\s*$/.test((lines[closeIndex] ?? '').trim())) {
+        closeIndex += 1
+      }
+      if (closeIndex < lines.length) {
+        expressions.push(lines.slice(index + 1, closeIndex).join('\\n').trim())
+        output.push(nextMarker())
+        index = closeIndex
+        continue
+      }
+    }
+
+    output.push(line)
+  }
+
+  return { markdown: output.join('\\n'), expressions }
 }
 
 const normalizeMarkdownCodeLanguage = (language: string | undefined): ArticleBlock['language'] => {
