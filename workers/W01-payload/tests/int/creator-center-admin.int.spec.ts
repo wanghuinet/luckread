@@ -141,6 +141,17 @@ describe('Creator Center admin extension', () => {
     expect(publisher).toContain('plugins={articleEditorPlugins}')
   })
 
+  it('supports drag sorting article blocks with an accessible fallback', () => {
+    const editor = read('src/components/ArticleStructuredEditor.tsx')
+    expect(editor).toContain('const [draggingIndex, setDraggingIndex] = useState<number | null>(null)')
+    expect(editor).toContain('function moveBlockTo(index: number, target: number)')
+    expect(editor).toContain('draggable={!disabled}')
+    expect(editor).toContain('event.dataTransfer.setData(\'text/plain\', String(index))')
+    expect(editor).toContain('event.dataTransfer.dropEffect = \'move\'')
+    expect(editor).toContain('aria-label="拖动区块重新排序"')
+    expect(editor).toContain('className="lr-article-drag-handle"')
+  })
+
   it('supports duplicating article blocks without sharing nested state', () => {
     const editor = read('src/components/ArticleStructuredEditor.tsx')
     expect(editor).toContain('function duplicateBlock(index: number)')
