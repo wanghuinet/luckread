@@ -70,11 +70,12 @@ const resolveCoverRef = (
   type: ContentType,
   assets: UploadedAsset[],
   explicitCoverRef: string,
+  fallbackRefs: string[] = [],
 ): string | null => {
   const explicit = explicitCoverRef.trim()
   if (explicit) return explicit
   if (type === 'video') return assets.find(isImageAsset)?.url ?? null
-  return assets[0]?.url ?? null
+  return fallbackRefs[0] ?? assets[0]?.url ?? null
 }
 
 type PublishComposerProps = {
@@ -295,7 +296,12 @@ export default function PublishComposer({
         ...assets.map((asset) => asset.url),
         ...(type === 'article' ? mediaRefsFromArticleDocument(articleDocument) : []),
       ])),
-      coverRef: resolveCoverRef(type, assets, coverRef),
+      coverRef: resolveCoverRef(
+        type,
+        assets,
+        coverRef,
+        type === 'article' ? mediaRefsFromArticleDocument(articleDocument) : [],
+      ),
     }
 
     const isUpdate = Boolean(draft?.id && draft.etag)
@@ -478,7 +484,12 @@ export default function PublishComposer({
       title: title.trim(),
       body,
       mediaRefs: assets.map((asset) => asset.url),
-      coverRef: resolveCoverRef(type, assets, coverRef),
+      coverRef: resolveCoverRef(
+        type,
+        assets,
+        coverRef,
+        type === 'article' ? mediaRefsFromArticleDocument(articleDocument) : [],
+      ),
       aiMode,
       humanContribution: humanConfirmed ? 'substantial' : 'light',
     }
