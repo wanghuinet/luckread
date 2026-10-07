@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import type { ArticleEditorPlugin, ArticleEditorPluginContext, EditorMediaAsset } from './ArticleEditorPlugin.js'
 import {
   ARTICLE_MAX_BLOCKS,
@@ -53,6 +53,8 @@ const updateBlock = (
 })
 
 export default function ArticleStructuredEditor({ value, disabled = false, mediaAssets = [], onChange, plugins = [] }: Props) {
+  const [draggingIndex, setDraggingIndex] = useState<number | null>(null)
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
   const imageAssets = useMemo(
     () => mediaAssets.filter((asset) => asset.mimeType.startsWith('image/')),
     [mediaAssets],
@@ -175,6 +177,17 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
     emit({ ...value, blocks })
   }
 
+  function moveBlockTo(index: number, target: number) {
+    if (index === target || index < 0 || target < 0 || index >= value.blocks.length || target >= value.blocks.length) {
+      return
+    }
+    const blocks = [...value.blocks]
+    const [moved] = blocks.splice(index, 1)
+    if (!moved) return
+    blocks.splice(target, 0, moved)
+    emit({ ...value, blocks })
+  }
+
   return (
     <section className="lr-article-editor" aria-label="文章结构化正文编辑器">
       <div className="lr-article-editor-toolbar">
@@ -245,10 +258,69 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
 
       <div className="lr-article-blocks">
         {value.blocks.map((block, index) => (
-          <article className={'lr-article-block lr-article-block-' + block.type} key={block.id}>
+          <article
+            className={
+              'lr-article-block lr-article-block-' + block.type +
+              (dragOverIndex === index ? ' lr-article-block-drag-over' : '')
+            }
+            draggable={!disabled}
+            key={block.id}
+            onDragEnd={() => {
+              setDraggingIndex(null)
+              setDragOverIndex(null)
+            }}
+            onDragOver={(event) => {
+              if (disabled || draggingIndex === null || draggingIndex === index) return
+              event.preventDefault()
+              event.dataTransfer.dropEffect = 'move'
+              setDragOverIndex(index)
+            }}
+            onDrop={(event) => {
+              if (disabled) return
+              event.preventDefault()
+              const sourceIndex = Number(event.dataTransfer.getData('text/plain'))
+              if (Number.isInteger(sourceIndex)) moveBlockTo(sourceIndex, index)
+              setDraggingIndex(null)
+              setDragOverIndex(null)
+            }}
+            onDragStart={(event) => {
+              if (disabled) {
+                event.preventDefault()
+                return
+              }
+              setDraggingIndex(index)
+              setDragOverIndex(null)
+              event.dataTransfer.effectAllowed = 'move'
+              event.dataTransfer.setData('text/plain', String(index))
+            }}
+          >
             <div className="lr-article-block-head">
               <span>{blockLabels[block.type]}</span>
               <div>
+                <span
+                  aria-label="拖动区块重新排序"
+                  className="lr-article-drag-handle"
+                  draggable={!disabled}
+                  title="拖动重新排序"
+                  onDragEnd={() => {
+                    setDraggingIndex(null)
+                    setDragOverIndex(null)
+                  }}
+                  onDragStart={(event) => {
+                    if (disabled) {
+                      event.preventDefault()
+                      return
+                    }
+                    setDraggingIndex(index)
+                    setDragOverIndex(null)
+                    event.dataTransfer.effectAllowed = 'move'
+                    event.dataTransfer.setData('text/plain', String(index))
+                  }}
+                  role="button"
+                  tabIndex={disabled ? -1 : 0}
+                >
+                  ⋮⋮
+                </span>
                 <button
                   aria-label="上移区块"
                   disabled={disabled || index === 0}
