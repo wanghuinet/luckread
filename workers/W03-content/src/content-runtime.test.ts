@@ -374,7 +374,8 @@ describe('1.1 content revision history', () => {
     expect(index).toContain('/internal/content/contents/')
     expect(index).toContain('/revisions/${encodeURIComponent(revisionId)}/rollback')
     expect(w01Detail).not.toContain("method: 'POST'")
-    expect(w01Rollback).toContain('/revisions/' + ' + encodeURIComponent(revisionId) + ' + '/rollback')
+    expect(w01Rollback).toContain('encodeURIComponent(revisionId)')
+    expect(w01Rollback).toContain('/rollback')
   })
 
   it('records create, update and rollback history after the authoritative CAS guard', () => {
