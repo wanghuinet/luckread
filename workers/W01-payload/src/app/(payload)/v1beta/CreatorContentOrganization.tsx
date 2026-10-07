@@ -323,6 +323,7 @@ export default function CreatorContentOrganization({
               </article>
               {selectedOrganizationId === item.id ? (
               <CreatorContentOrganizationMembers
+                key={item.id + ':' + item.etag}
                 kind={kind}
                 loginPath={loginPath}
                 onChanged={handleOrganizationChanged}
