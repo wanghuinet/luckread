@@ -203,18 +203,32 @@ export const removeMediaRefFromArticleDocument = (
   const target = mediaRef.trim()
   if (!target) return document
 
-  const blocks = document.blocks.map((block) => {
-    if (!block.mediaRefs?.length) return block
+  const blocks: ArticleBlock[] = []
+  let changed = false
+
+  for (const block of document.blocks) {
+    if (!block.mediaRefs?.length) {
+      blocks.push(block)
+      continue
+    }
 
     const mediaRefs = block.mediaRefs.filter((ref) => ref !== target)
-    if (mediaRefs.length === block.mediaRefs.length) return block
+    if (mediaRefs.length === block.mediaRefs.length) {
+      blocks.push(block)
+      continue
+    }
 
-    return mediaRefs.length
-      ? { ...block, mediaRefs }
-      : { ...block, mediaRefs: undefined }
-  })
+    changed = true
+    if (mediaRefs.length === 0) {
+      blocks.push(createArticleBlock('paragraph', block.text))
+    } else if (block.type === 'gallery' && mediaRefs.length === 1) {
+      blocks.push({ ...block, type: 'image', mediaRefs })
+    } else {
+      blocks.push({ ...block, mediaRefs })
+    }
+  }
 
-  return { ...document, blocks }
+  return changed ? { ...document, blocks } : document
 }
 
 export const hasArticleDocumentContent = (document: ArticleDocument): boolean =>
