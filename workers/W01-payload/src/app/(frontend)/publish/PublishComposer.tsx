@@ -763,10 +763,10 @@ export default function PublishComposer({
             放弃草稿
           </button>
         ) : null}
-        <button className="secondary" disabled={busy || autoSaveInFlightRef.current} onClick={saveDraft} type="button">
+        <button className="secondary" disabled={busy || autoSaveStatus === 'saving'} onClick={saveDraft} type="button">
           {busy ? '处理中…' : '保存草稿'}
         </button>
-        <button className="primary" disabled={busy || autoSaveInFlightRef.current || draft?.state === 'PENDING_REVIEW'} onClick={submitForReview} type="button">
+        <button className="primary" disabled={busy || autoSaveStatus === 'saving' || draft?.state === 'PENDING_REVIEW'} onClick={submitForReview} type="button">
           {busy ? '处理中…' : draft?.state === 'PENDING_REVIEW' ? '审核中…' : '提交发布'}
         </button>
       </div>
