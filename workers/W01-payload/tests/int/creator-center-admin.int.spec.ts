@@ -125,6 +125,7 @@ describe('Creator Center admin extension', () => {
     expect(publisher).toContain("'当前封面'")
     expect(publisher).toContain('默认使用第一张图片素材')
     expect(publisher).toContain('resolveCoverRef(type, assets, coverRef)')
+    expect(publisher).toContain('coverRef: resolveCoverRef(type, assets, coverRef)')
   })
 
   it('paginates organization members from the canonical cursor response', () => {
