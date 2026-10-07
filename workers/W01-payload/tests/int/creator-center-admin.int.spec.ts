@@ -24,6 +24,12 @@ describe('Creator Center admin extension', () => {
     expect(publisher).toContain('当前草稿版本')
   })
 
+  it('keeps publish preview rendering aligned with the canonical article renderer', () => {
+    const publisher = read('src/app/(frontend)/publish/PublishComposer.tsx')
+    expect(publisher).toContain("import ArticleStructuredRenderer from '../../../components/ArticleStructuredRenderer.js'")
+    expect(publisher).toContain('<ArticleStructuredRenderer document={articleDocument} />')
+  })
+
   it('preserves the full publish return path when authentication expires', () => {
     const publisher = read('src/app/(frontend)/publish/PublishComposer.tsx')
     expect(publisher).toContain('const returnTo = window.location.pathname + window.location.search + window.location.hash')
