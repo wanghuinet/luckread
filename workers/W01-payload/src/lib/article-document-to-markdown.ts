@@ -129,6 +129,9 @@ const serializeBlock = (block: ArticleBlock): string => {
       return serializeRoot([...images, ...caption])
     }
 
+    case 'math':
+      return '$\\n' + block.text.trim() + '\\n$'
+
     case 'table':
       return serializeTable(block)
   }
