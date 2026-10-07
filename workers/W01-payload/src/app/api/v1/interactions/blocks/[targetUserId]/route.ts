@@ -3,6 +3,7 @@ import {
   resolveCookieSocialPrincipal,
   W05SocialClientError,
 } from '../../../../../../social/w05-social-client.js'
+import { invalidatePublicFollowListsForUsers } from '../../../../../../lib/public-response-cache.js'
 
 const errorResponse = (status: number, code: string, message: string) =>
   Response.json(
@@ -22,12 +23,14 @@ export async function DELETE(
     if (!idempotencyKey || idempotencyKey.length > 256) {
       return errorResponse(428, 'PRECONDITION_REQUIRED', 'Idempotency-Key is required')
     }
-    return await callW05Social({
+    const response = await callW05Social({
       request,
       pathname: '/internal/social/interactions/blocks/' + encodeURIComponent(targetUserId),
       method: 'DELETE',
       principal,
     })
+    if (response.ok) await invalidatePublicFollowListsForUsers(principal.userId, targetUserId)
+    return response
   } catch (error) {
     if (error instanceof W05SocialClientError) return errorResponse(error.status, error.code, error.message)
     return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Social service unavailable')
