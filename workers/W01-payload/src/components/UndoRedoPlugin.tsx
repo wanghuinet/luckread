@@ -36,7 +36,8 @@ const trimHistory = (entries: readonly string[]): string[] => {
 }
 
 function HistoryToolbar({ value, disabled, updateDocument }: ArticleEditorPluginContext) {
-  const [, setVersion] = useState(0)
+  const [pastCount, setPastCount] = useState(0)
+  const [futureCount, setFutureCount] = useState(0)
   const pastRef = useRef<string[]>([])
   const futureRef = useRef<string[]>([])
   const lastSerializedRef = useRef<string | null>(null)
@@ -50,7 +51,8 @@ function HistoryToolbar({ value, disabled, updateDocument }: ArticleEditorPlugin
     if (!initializedRef.current) {
       initializedRef.current = true
       lastSerializedRef.current = serialized
-      setVersion((count) => count + 1)
+      setPastCount(pastRef.current.length)
+      setFutureCount(futureRef.current.length)
       return
     }
 
@@ -68,7 +70,8 @@ function HistoryToolbar({ value, disabled, updateDocument }: ArticleEditorPlugin
     }
 
     lastSerializedRef.current = serialized
-    setVersion((count) => count + 1)
+    setPastCount(pastRef.current.length)
+    setFutureCount(futureRef.current.length)
   }, [value])
 
   const undo = () => {
@@ -78,7 +81,8 @@ function HistoryToolbar({ value, disabled, updateDocument }: ArticleEditorPlugin
     const current = lastSerializedRef.current
     const document = parseDocument(snapshot)
     if (!document) {
-      setVersion((count) => count + 1)
+      setPastCount(pastRef.current.length)
+      setFutureCount(futureRef.current.length)
       return
     }
 
@@ -86,7 +90,8 @@ function HistoryToolbar({ value, disabled, updateDocument }: ArticleEditorPlugin
     skipRecordRef.current = true
     lastChangeAtRef.current = 0
     updateDocument(document)
-    setVersion((count) => count + 1)
+    setPastCount(pastRef.current.length)
+    setFutureCount(futureRef.current.length)
   }
 
   const redo = () => {
@@ -96,25 +101,26 @@ function HistoryToolbar({ value, disabled, updateDocument }: ArticleEditorPlugin
     const current = lastSerializedRef.current
     const document = parseDocument(snapshot)
     if (!document) {
-      setVersion((count) => count + 1)
+      setPastCount(pastRef.current.length)
+      setFutureCount(futureRef.current.length)
       return
     }
 
     if (current) pastRef.current = trimHistory([...pastRef.current, current])
     skipRecordRef.current = true
     updateDocument(document)
-    setVersion((count) => count + 1)
+    setPastCount(pastRef.current.length)
+    setFutureCount(futureRef.current.length)
   }
 
   const clear = () => {
     pastRef.current = []
     futureRef.current = []
     lastChangeAtRef.current = 0
-    setVersion((count) => count + 1)
+    setPastCount(0)
+    setFutureCount(0)
   }
 
-  const pastCount = pastRef.current.length
-  const futureCount = futureRef.current.length
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
