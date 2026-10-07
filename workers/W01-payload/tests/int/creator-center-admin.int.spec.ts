@@ -157,6 +157,13 @@ describe('Creator Center admin extension', () => {
     expect(editor).toContain("pluginId={plugin.id}")
   })
 
+  it('reuses one derived plain-text snapshot for editor display and plugin context', () => {
+    const editor = read('src/components/ArticleStructuredEditor.tsx')
+    expect(editor).toContain('const plainText = useMemo(() => plainTextFromArticleDocument(value), [value])')
+    expect(editor).toContain('const characterCount = useMemo(() => Array.from(plainText).length, [plainText])')
+    expect(editor).toContain('plainText,')
+  })
+
   it('supports drag sorting article blocks with an accessible fallback', () => {
     const editor = read('src/components/ArticleStructuredEditor.tsx')
     expect(editor).toContain('const [draggingIndex, setDraggingIndex] = useState<number | null>(null)')
