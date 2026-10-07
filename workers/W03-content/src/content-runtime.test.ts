@@ -84,6 +84,71 @@ describe('W03 content contract core', () => {
     })
   })
 
+  it('does not misclassify unrelated UNIQUE violations as idempotency conflicts', async () => {
+    const row = {
+      id: 'content_unique_123',
+      content_type: 'article',
+      owner_user_id: 'user_unique',
+      creator_id: 'user_unique',
+      ip_id: null,
+      state: 'DRAFT',
+      version: 1,
+      revision: 1,
+      slug: 'unique-test',
+      title: 'Unique test',
+      body_ref: 'https://cdn.example.com/body.txt',
+      media_refs_json: '[]',
+      cover_ref: null,
+      etag: 'W/"1"',
+      created_at: '2026-10-07T12:00:00.000Z',
+      updated_at: '2026-10-07T12:00:00.000Z',
+      idem_id: null,
+      idem_owner_user_id: null,
+      idem_request_hash: null,
+      idem_status: null,
+      idem_response_status: null,
+      idem_response_json: null,
+      idem_expires_at: null,
+    }
+
+    const db = {
+      prepare(query: string) {
+        return {
+          bind: (...bindings: unknown[]) => ({
+            first: async () => {
+              if (query.includes('content_mutation_idempotency')) return null
+              expect(bindings).toContain('content_unique_123')
+              return row
+            },
+          }),
+        }
+      },
+      batch: async () => {
+        throw new Error('UNIQUE constraint failed: contents.body_ref')
+      },
+    } as never
+
+    await expect(
+      updateContent(
+        db,
+        'user_unique',
+        'content_unique_123',
+        {
+          contentType: 'article',
+          title: 'Updated title',
+          bodyRef: 'https://cdn.example.com/body-v2.txt',
+          mediaRefs: [],
+          coverRef: null,
+        },
+        'W/"1"',
+        'content-unique-idem',
+      ),
+    ).rejects.toMatchObject({
+      code: 'SERVICE_UNAVAILABLE',
+      status: 503,
+    })
+  })
+
   it('allows only the contracted creator and moderator transitions', () => {
     expect(canTransitionContentState('DRAFT', 'PENDING_REVIEW', 'CREATOR', true)).toBe(true)
     expect(canTransitionContentState('DRAFT', 'PUBLISHED', 'CREATOR', true)).toBe(false)
