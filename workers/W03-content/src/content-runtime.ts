@@ -624,6 +624,7 @@ export async function createContent(
   input: unknown,
   idempotencyKey: string,
   now = new Date(),
+  correlationId = 'runtime',
 ): Promise<ContentRecord> {
   assertResourceId(ownerUserId)
   if (!idempotencyKey || idempotencyKey.length > 256) {
@@ -691,6 +692,24 @@ export async function createContent(
         (id, content_type, owner_user_id, creator_id, ip_id, state, version, revision, title, body_ref, media_refs_json, cover_ref, etag, created_at, updated_at)
        VALUES (?, ?, ?, ?, NULL, 'DRAFT', 1, 1, ?, ?, ?, ?, ?, ?, ?) `,
     ).bind(contentId, normalized.contentType, ownerUserId, ownerUserId, normalized.title, normalized.bodyRef, JSON.stringify(normalized.mediaRefs), normalized.coverRef, responseBody.etag, createdAt, createdAt),
+    insertRevision(db, {
+      id: crypto.randomUUID(),
+      contentId,
+      revision: 1,
+      contentVersion: 1,
+      actorUserId: ownerUserId,
+      sourceRevision: null,
+      operation: 'CREATE',
+      state: 'DRAFT',
+      title: normalized.title,
+      bodyRef: normalized.bodyRef,
+      mediaRefs: normalized.mediaRefs,
+      coverRef: normalized.coverRef,
+      etag: responseBody.etag,
+      reason: null,
+      correlationId: normalizeCorrelationId(correlationId),
+      createdAt,
+    }),
     atomicGuard(db),
   ])
 
@@ -721,6 +740,7 @@ export async function updateContent(
   ifMatch: string,
   idempotencyKey: string,
   now = new Date(),
+  correlationId = 'runtime',
 ): Promise<ContentRecord> {
   assertResourceId(principalUserId)
   assertResourceId(contentId)
@@ -765,6 +785,24 @@ export async function updateContent(
           SET title = ?, body_ref = ?, media_refs_json = ?, cover_ref = ?, version = ?, revision = ?, etag = ?, updated_at = ?
         WHERE id = ? AND owner_user_id = ? AND version = ? AND etag = ?`,
     ).bind(updated.title, updated.bodyRef, JSON.stringify(updated.mediaRefs), updated.coverRef, nextVersion, nextRevision, updated.etag, updatedAt, content.id, principalUserId, content.version, content.etag),
+    insertRevision(db, {
+      id: crypto.randomUUID(),
+      contentId: content.id,
+      revision: nextRevision,
+      contentVersion: nextVersion,
+      actorUserId: principalUserId,
+      sourceRevision: content.revision,
+      operation: 'UPDATE',
+      state: content.state,
+      title: updated.title,
+      bodyRef: updated.bodyRef,
+      mediaRefs: updated.mediaRefs,
+      coverRef: updated.coverRef,
+      etag: updated.etag,
+      reason: null,
+      correlationId: normalizeCorrelationId(correlationId),
+      createdAt: updatedAt,
+    }),
     atomicGuard(db),
   ])
 
