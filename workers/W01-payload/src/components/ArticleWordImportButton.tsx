@@ -2,13 +2,14 @@
 
 import { useRef, useState } from 'react'
 
+import type { ArticleDocument } from '../lib/article-document.js'
 import { parseDocx } from '../features/word-import/docx-parser.js'
 import { normalizeImportedDocument } from '../features/word-import/normalizer.js'
 import { articleDocumentFromImportedDocument } from '../features/word-import/article-document-adapter.js'
 
 type Props = {
   disabled?: boolean
-  onImport: (document: Parameters<NonNullable<unknown>>[0] extends never ? never : import('../lib/article-document.js').ArticleDocument) => void
+  onImport: (document: ArticleDocument) => void
 }
 
 type UploadedMedia = {
