@@ -105,6 +105,9 @@ export default function CreatorContentOrganizationMembers({
   const [candidateCursor, setCandidateCursor] = useState<string | null>(null)
   const [candidateHasMore, setCandidateHasMore] = useState(false)
   const [candidateLoading, setCandidateLoading] = useState(false)
+  const [memberCursor, setMemberCursor] = useState<string | null>(null)
+  const [memberHasMore, setMemberHasMore] = useState(false)
+  const [memberLoading, setMemberLoading] = useState(false)
   const [selectedContentId, setSelectedContentId] = useState('')
   const [loading, setLoading] = useState(true)
   const [busyKey, setBusyKey] = useState<string | null>(null)
@@ -112,9 +115,11 @@ export default function CreatorContentOrganizationMembers({
 
   const editable = ['DRAFT', 'REJECTED', 'UNPUBLISHED', 'RESTORED'].includes(organization.state)
 
-  const loadMembers = useCallback(async (signal: AbortSignal) => {
+  const loadMembers = useCallback(async (signal: AbortSignal, cursor: string | null = null) => {
+    const params = new URLSearchParams({ limit: '50' })
+    if (cursor) params.set('cursor', cursor)
     const response = await fetch(
-      organizationMeta.path + '/' + encodeURIComponent(organization.id) + '/members?limit=50',
+      organizationMeta.path + '/' + encodeURIComponent(organization.id) + '/members?' + params.toString(),
       {
         credentials: 'include',
         headers: { accept: 'application/json' },
@@ -164,6 +169,8 @@ export default function CreatorContentOrganizationMembers({
       .then(({ page, nextEtag, nextVersion }) => {
         if (controller.signal.aborted) return
         setMembers(page.items)
+        setMemberCursor(page.nextCursor)
+        setMemberHasMore(page.hasMore)
         setCurrentEtag(nextEtag)
         setCurrentVersion(nextVersion)
         onChanged(organization.id, nextEtag, nextVersion)
@@ -209,6 +216,8 @@ export default function CreatorContentOrganizationMembers({
     try {
       const { page, nextEtag, nextVersion } = await loadMembers(controller.signal)
       setMembers(page.items)
+      setMemberCursor(page.nextCursor)
+      setMemberHasMore(page.hasMore)
       setCurrentEtag(nextEtag)
       setCurrentVersion(nextVersion)
       onChanged(organization.id, nextEtag, nextVersion)
@@ -217,6 +226,33 @@ export default function CreatorContentOrganizationMembers({
       if (cause instanceof Error && cause.message === 'AUTH_REQUIRED') return
       setError(cause instanceof Error ? cause.message : '组织成员暂时无法加载。')
     } finally {
+      controller.abort()
+    }
+  }
+
+  async function loadMoreMembers() {
+    if (!memberHasMore || memberLoading || !memberCursor) return
+    setMemberLoading(true)
+    setError('')
+    const controller = new AbortController()
+    try {
+      const { page, nextEtag, nextVersion } = await loadMembers(controller.signal, memberCursor)
+      if (controller.signal.aborted) return
+      setMembers((current) => {
+        const seen = new Set(current.map((item) => item.relationshipId))
+        return [...current, ...page.items.filter((item) => !seen.has(item.relationshipId))]
+      })
+      setMemberCursor(page.nextCursor)
+      setMemberHasMore(page.hasMore)
+      setCurrentEtag(nextEtag)
+      setCurrentVersion(nextVersion)
+      onChanged(organization.id, nextEtag, nextVersion)
+    } catch (cause) {
+      if (controller.signal.aborted) return
+      if (cause instanceof Error && cause.message === 'AUTH_REQUIRED') return
+      setError(cause instanceof Error ? cause.message : '更多组织成员暂时无法加载。')
+    } finally {
+      if (!controller.signal.aborted) setMemberLoading(false)
       controller.abort()
     }
   }
@@ -390,7 +426,17 @@ export default function CreatorContentOrganizationMembers({
           <span>{members.length} 个已加载成员，版本 v{currentVersion}</span>
         </div>
         <div className={styles.sectionActions}>
-          <button className={styles.secondaryButton + ' btn'} onClick={() => void refreshMembers()} type="button" disabled={busyKey !== null}>
+          {memberHasMore ? (
+            <button
+              className={styles.secondaryButton + ' btn'}
+              disabled={memberLoading || busyKey !== null}
+              onClick={() => void loadMoreMembers()}
+              type="button"
+            >
+              {memberLoading ? '加载中…' : '加载更多成员'}
+            </button>
+          ) : null}
+          <button className={styles.secondaryButton + ' btn'} onClick={() => void refreshMembers()} type="button" disabled={busyKey !== null || memberLoading}>
             刷新
           </button>
         </div>
