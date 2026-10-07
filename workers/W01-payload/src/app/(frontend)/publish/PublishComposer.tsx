@@ -90,9 +90,6 @@ export default function PublishComposer({
   const autoSaveChangeTokenRef = useRef(0)
   const autoSaveDirtyRef = useRef(false)
   const restoreCompleteRef = useRef(false)
-  const busyRef = useRef(false)
-  busyRef.current = busy
-
   useEffect(() => {
     let cancelled = false
     const controller = new AbortController()
@@ -301,7 +298,7 @@ export default function PublishComposer({
       if (
         changeToken !== autoSaveChangeTokenRef.current ||
         autoSaveInFlightRef.current ||
-        busyRef.current ||
+        busy ||
         !autoSaveDirtyRef.current ||
         !title.trim() ||
         !body.trim() ||
@@ -335,7 +332,10 @@ export default function PublishComposer({
   }
 
   const autoSaveSchedulerRef = useRef<() => void>(() => {})
-  autoSaveSchedulerRef.current = scheduleAutoSave
+
+  useEffect(() => {
+    autoSaveSchedulerRef.current = scheduleAutoSave
+  }, [scheduleAutoSave])
 
   useEffect(() => {
     if (autoSaveDirtyRef.current) autoSaveSchedulerRef.current()
