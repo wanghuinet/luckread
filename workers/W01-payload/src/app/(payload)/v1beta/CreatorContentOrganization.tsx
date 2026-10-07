@@ -324,7 +324,7 @@ export default function CreatorContentOrganization({
               <CreatorContentOrganizationMembers
                 kind={kind}
                 loginPath={loginPath}
-                onChanged={(etag, version) => handleOrganizationChanged(item.id, etag, version)}
+                onChanged={handleOrganizationChanged}
                 organization={item}
               />
             ) : null}
