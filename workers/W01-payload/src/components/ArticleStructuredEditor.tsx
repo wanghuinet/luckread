@@ -8,13 +8,22 @@ import {
   type ArticleBlockType,
   type ArticleDocument,
   createArticleBlock,
+  createArticleMediaBlock,
   normalizeArticleDocument,
   plainTextFromArticleDocument,
 } from '../lib/article-document.js'
 
+type EditorMediaAsset = {
+  id: string
+  url: string
+  filename?: string
+  mimeType: string
+}
+
 type Props = {
   value: ArticleDocument
   disabled?: boolean
+  mediaAssets?: EditorMediaAsset[]
   onChange: (value: ArticleDocument, plainText: string) => void
 }
 
@@ -25,6 +34,8 @@ const blockLabels: Record<ArticleBlockType, string> = {
   bulletList: '无序列表',
   orderedList: '有序列表',
   divider: '分隔线',
+  image: '图片',
+  gallery: '图库',
 }
 
 const updateBlock = (
@@ -38,7 +49,11 @@ const updateBlock = (
   ),
 })
 
-export default function ArticleStructuredEditor({ value, disabled = false, onChange }: Props) {
+export default function ArticleStructuredEditor({ value, disabled = false, mediaAssets = [], onChange }: Props) {
+  const imageAssets = useMemo(
+    () => mediaAssets.filter((asset) => asset.mimeType.startsWith('image/')),
+    [mediaAssets],
+  )
   const characterCount = useMemo(() => plainTextFromArticleDocument(value).length, [value])
 
   function emit(next: ArticleDocument) {
@@ -48,9 +63,30 @@ export default function ArticleStructuredEditor({ value, disabled = false, onCha
 
   function addBlock(type: ArticleBlockType) {
     if (value.blocks.length >= ARTICLE_MAX_BLOCKS) return
+    if (type === 'image' || type === 'gallery') {
+      const refs = mediaAssets.map((asset) => asset.url).filter(Boolean)
+      if (type === 'image' && refs.length < 1) return
+      if (type === 'gallery' && refs.length < 2) return
+      emit({
+        ...value,
+        blocks: [...value.blocks, createArticleMediaBlock(type, type === 'image' ? refs.slice(0, 1) : refs.slice(0, 12))],
+      })
+      return
+    }
     emit({
       ...value,
       blocks: [...value.blocks, createArticleBlock(type)],
+    })
+  }
+
+  function insertMedia(type: 'image' | 'gallery', assetUrls?: string[]) {
+    if (value.blocks.length >= ARTICLE_MAX_BLOCKS) return
+    const refs = (assetUrls ?? mediaAssets.map((asset) => asset.url)).filter(Boolean)
+    if (type === 'image' && refs.length < 1) return
+    if (type === 'gallery' && refs.length < 2) return
+    emit({
+      ...value,
+      blocks: [...value.blocks, createArticleMediaBlock(type, type === 'image' ? refs.slice(0, 1) : refs.slice(0, 12))],
     })
   }
 
@@ -99,6 +135,33 @@ export default function ArticleStructuredEditor({ value, disabled = false, onCha
         </div>
       </div>
 
+      <div className="lr-article-media-picker" aria-label="插入图片和图库">
+        <div className="lr-article-media-picker-head">
+          <strong>正文媒体</strong>
+          <span>{imageAssets.length ? imageAssets.length + ' 个可插入图片' : '请先上传图片'}</span>
+        </div>
+        {imageAssets.length ? (
+          <div className="lr-article-media-picker-grid">
+            {imageAssets.map((asset) => (
+              <div className="lr-article-media-picker-item" key={asset.id}>
+                <img alt={asset.filename ?? ''} loading="lazy" src={asset.url} />
+                <div>
+                  <button disabled={disabled} onClick={() => insertMedia('image', [asset.url])} type="button">插入图片</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : null}
+        <button
+          className="lr-article-gallery-button"
+          disabled={disabled || imageAssets.length < 2}
+          onClick={() => insertMedia('gallery', imageAssets.map((asset) => asset.url))}
+          type="button"
+        >
+          插入全部图库（最多 12 个）
+        </button>
+      </div>
+
       <div className="lr-article-editor-hint">
         每个区块可以独立调整顺序和类型。列表区块使用换行分隔条目；正文内容最终会以版本化 JSON 资产保存，发布前检查仍使用纯文本抽取结果。
       </div>
@@ -138,6 +201,23 @@ export default function ArticleStructuredEditor({ value, disabled = false, onCha
 
             {block.type === 'divider' ? (
               <hr aria-label="内容分隔线" />
+            ) : block.type === 'image' || block.type === 'gallery' ? (
+              <div className="lr-article-media-block">
+                <div className={block.type === 'gallery' ? 'lr-article-gallery-grid' : 'lr-article-image-single'}>
+                  {(block.mediaRefs ?? []).map((ref) => (
+                    <img alt={block.text || '文章图片'} key={ref} loading="lazy" src={ref} />
+                  ))}
+                </div>
+                <textarea
+                  aria-label="媒体说明"
+                  disabled={disabled}
+                  maxLength={ARTICLE_MAX_BLOCK_TEXT}
+                  onChange={(event) => emit(updateBlock(value, index, { text: event.target.value.slice(0, ARTICLE_MAX_BLOCK_TEXT) }))}
+                  placeholder="可选：添加图片说明…"
+                  rows={2}
+                  value={block.text}
+                />
+              </div>
             ) : (
               <textarea
                 aria-label={blockLabels[block.type]}

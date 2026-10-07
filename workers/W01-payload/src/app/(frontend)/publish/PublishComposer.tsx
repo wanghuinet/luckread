@@ -2,7 +2,7 @@
 
 import { ChangeEvent, useEffect, useRef, useState } from 'react'
 import { computeAutoSaveDelay } from '../../../lib/content-autosave.js'
-import { articleDocumentFromBody, plainTextFromArticleDocument, serializeArticleDocument, createArticleDocument, type ArticleDocument } from '../../../lib/article-document.js'
+import { articleDocumentFromBody, plainTextFromArticleDocument, serializeArticleDocument, createArticleDocument, tryDeserializeArticleDocument, type ArticleDocument } from '../../../lib/article-document.js'
 import ArticleStructuredEditor from '../../../components/ArticleStructuredEditor.js'
 import { useRouter } from 'next/navigation'
 
@@ -130,11 +130,12 @@ export default function PublishComposer({
         setTitle(recovered.title ?? '')
         if ((recovered.contentType ?? 'article') === 'article') {
           const recoveredDocument = articleDocumentFromBody(recoveredBody)
+          const wasStructured = tryDeserializeArticleDocument(recoveredBody) !== null
           setArticleDocument(recoveredDocument)
           const recoveredPlainText = plainTextFromArticleDocument(recoveredDocument)
           setBody(recoveredPlainText)
           setSavedBody(recoveredPlainText)
-          setSavedArticleSerialized(serializeArticleDocument(recoveredDocument))
+          setSavedArticleSerialized(wasStructured ? serializeArticleDocument(recoveredDocument) : '')
         } else {
           setBody(recoveredBody)
           setSavedBody(recoveredBody)
@@ -385,7 +386,7 @@ export default function PublishComposer({
         autoSaveTimerRef.current = null
       }
     }
-  }, [title, body, type, assets, coverRef, busy])
+  }, [title, body, type, assets, coverRef, busy, articleDocument])
 
   function startNewContent() {
     setDraft(null)
@@ -622,6 +623,7 @@ export default function PublishComposer({
       {type === 'article' ? (
         <ArticleStructuredEditor
           disabled={busy || reviewLocked}
+          mediaAssets={assets.map((asset) => ({ id: asset.id, url: asset.url, filename: asset.filename, mimeType: asset.mimeType }))}
           onChange={(nextDocument, plainText) => {
             setArticleDocument(nextDocument)
             setBody(plainText)
@@ -652,7 +654,7 @@ export default function PublishComposer({
           <label className="lr-upload-button">
             添加媒体
             <input
-              accept="image/*,video/*"
+              accept={type === 'article' ? 'image/*' : 'image/*,video/*'}
               hidden
               multiple
               disabled={busy || reviewLocked}
@@ -783,6 +785,26 @@ export default function PublishComposer({
                       : <h3 key={block.id}>{block.text}</h3>
                   }
                   if (block.type === 'quote') return <blockquote key={block.id}>{block.text}</blockquote>
+                  if (block.type === 'image') {
+                    return (
+                      <figure key={block.id}>
+                        <img alt={block.text || '文章图片'} loading="lazy" src={block.mediaRefs?.[0]} />
+                        {block.text ? <figcaption>{block.text}</figcaption> : null}
+                      </figure>
+                    )
+                  }
+                  if (block.type === 'gallery') {
+                    return (
+                      <figure key={block.id}>
+                        <div className="lr-article-gallery-preview">
+                          {(block.mediaRefs ?? []).map((ref) => (
+                            <img alt={block.text || '文章图库'} key={ref} loading="lazy" src={ref} />
+                          ))}
+                        </div>
+                        {block.text ? <figcaption>{block.text}</figcaption> : null}
+                      </figure>
+                    )
+                  }
                   if (block.type === 'bulletList' || block.type === 'orderedList') {
                     const ListTag = block.type === 'bulletList' ? 'ul' : 'ol'
                     return (
