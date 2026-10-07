@@ -5,6 +5,7 @@ import {
   ARTICLE_MAX_MEDIA_PER_BLOCK,
   ARTICLE_TABLE_MAX_COLUMNS,
   ARTICLE_TABLE_MAX_ROWS,
+  ARTICLE_TABLE_MAX_CELL_TEXT,
   createArticleTableBlock,
   createArticleMediaBlock,
   articleDocumentFromBody,
@@ -105,6 +106,21 @@ describe('article structured document', () => {
       ['x'],
       Array.from({ length: ARTICLE_TABLE_MAX_ROWS + 1 }, () => ['x']),
     )).toThrow('INVALID_ARTICLE_BLOCK')
+
+    expect(() => createArticleTableBlock(
+      ['x'],
+      [['x'.repeat(ARTICLE_TABLE_MAX_CELL_TEXT + 1)]],
+    )).toThrow('INVALID_ARTICLE_BLOCK')
+
+    expect(() => normalizeArticleDocument({
+      version: 2,
+      blocks: [{
+        id: 'table',
+        type: 'table',
+        text: '',
+        table: { headers: ['x'], rows: [['x'.repeat(ARTICLE_TABLE_MAX_CELL_TEXT + 1)]] },
+      }],
+    })).toThrow('INVALID_ARTICLE_BLOCK')
 
     expect(() => normalizeArticleDocument({
       version: 2,
