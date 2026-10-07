@@ -655,8 +655,8 @@ export async function createContent(
 
   const replay = inspectIdempotency(existing, ownerUserId, hash, now)
   if (replay.replayed) {
-    const parsed = replay.body as { id?: unknown; state?: unknown; version?: unknown; etag?: unknown; title?: unknown; bodyRef?: unknown; contentType?: unknown; mediaRefs?: unknown; coverRef?: unknown } | null
-    if (!parsed || typeof parsed.id !== 'string' || !isState(parsed.state) || typeof parsed.version !== 'number' || typeof parsed.etag !== 'string' || typeof parsed.title !== 'string' || typeof parsed.bodyRef !== 'string' || !['article','post','video'].includes(String(parsed.contentType)) || !Array.isArray(parsed.mediaRefs) || parsed.mediaRefs.some(ref => typeof ref !== 'string')) {
+    const parsed = replay.body as { id?: unknown; state?: unknown; version?: unknown; etag?: unknown; slug?: unknown; title?: unknown; bodyRef?: unknown; contentType?: unknown; mediaRefs?: unknown; coverRef?: unknown } | null
+    if (!parsed || typeof parsed.id !== 'string' || typeof parsed.slug !== 'string' || !isState(parsed.state) || typeof parsed.version !== 'number' || typeof parsed.etag !== 'string' || typeof parsed.title !== 'string' || typeof parsed.bodyRef !== 'string' || !['article','post','video'].includes(String(parsed.contentType)) || !Array.isArray(parsed.mediaRefs) || parsed.mediaRefs.some(ref => typeof ref !== 'string')) {
       throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
     }
     return {
@@ -668,6 +668,7 @@ export async function createContent(
       state: parsed.state,
       version: parsed.version,
       revision: 1,
+      slug: parsed.slug,
       title: parsed.title,
       bodyRef: parsed.bodyRef,
       mediaRefs: parsed.mediaRefs as string[],
@@ -679,6 +680,7 @@ export async function createContent(
   }
 
   const contentId = crypto.randomUUID()
+  const slug = contentSlugFor(normalized.title, contentId)
   const createdAt = now.toISOString()
   const expiresAt = new Date(now.getTime() + IDEMPOTENCY_TTL_MS).toISOString()
   const responseBody = {
@@ -686,6 +688,7 @@ export async function createContent(
     state: 'DRAFT' as const,
     version: 1,
     etag: etagForVersion(1),
+    slug,
     title: normalized.title,
     bodyRef: normalized.bodyRef,
     contentType: normalized.contentType,
@@ -698,9 +701,9 @@ export async function createContent(
     insertCompletedIdempotency(db, ownerUserId, operationId, idempotencyKey, hash, 201, JSON.stringify(responseBody), createdAt, expiresAt),
     db.prepare(
       `INSERT INTO contents
-        (id, content_type, owner_user_id, creator_id, ip_id, state, version, revision, title, body_ref, media_refs_json, cover_ref, etag, created_at, updated_at)
-       VALUES (?, ?, ?, ?, NULL, 'DRAFT', 1, 1, ?, ?, ?, ?, ?, ?, ?) `,
-    ).bind(contentId, normalized.contentType, ownerUserId, ownerUserId, normalized.title, normalized.bodyRef, JSON.stringify(normalized.mediaRefs), normalized.coverRef, responseBody.etag, createdAt, createdAt),
+        (id, content_type, owner_user_id, creator_id, ip_id, state, version, revision, slug, title, body_ref, media_refs_json, cover_ref, etag, created_at, updated_at)
+       VALUES (?, ?, ?, ?, NULL, 'DRAFT', 1, 1, ?, ?, ?, ?, ?, ?, ?, ?) `,
+    ).bind(contentId, normalized.contentType, ownerUserId, ownerUserId, slug, normalized.title, normalized.bodyRef, JSON.stringify(normalized.mediaRefs), normalized.coverRef, responseBody.etag, createdAt, createdAt),
     atomicGuard(db),
     insertRevision(db, {
       id: crypto.randomUUID(),
@@ -711,6 +714,7 @@ export async function createContent(
       sourceRevision: null,
       operation: 'CREATE',
       state: 'DRAFT',
+      slug,
       title: normalized.title,
       bodyRef: normalized.bodyRef,
       mediaRefs: normalized.mediaRefs,
@@ -731,6 +735,7 @@ export async function createContent(
     state: 'DRAFT',
     version: 1,
     revision: 1,
+    slug,
     title: normalized.title,
     bodyRef: normalized.bodyRef,
     mediaRefs: normalized.mediaRefs,
@@ -804,6 +809,7 @@ export async function updateContent(
       sourceRevision: content.revision,
       operation: 'UPDATE',
       state: content.state,
+      slug: updated.slug,
       title: updated.title,
       bodyRef: updated.bodyRef,
       mediaRefs: updated.mediaRefs,
@@ -853,7 +859,7 @@ export async function rollbackContentRevision(
   }
 
   const source = await db.prepare(`SELECT id, content_id, revision, content_version, actor_user_id, source_revision, operation,
-       state, title, body_ref, media_refs_json, cover_ref, etag, reason, correlation_id, created_at
+       state, slug, title, body_ref, media_refs_json, cover_ref, etag, reason, correlation_id, created_at
   FROM content_revisions
  WHERE id = ? AND content_id = ?`).bind(revisionId, contentId).first<ContentRevisionRow>()
   if (!source) throw new ContentRuntimeError('NOT_FOUND', 404)
@@ -863,6 +869,7 @@ export async function rollbackContentRevision(
   const updatedAt = now.toISOString()
   const updated: ContentRecord = {
     ...content,
+    slug: source.slug,
     title: source.title,
     bodyRef: source.body_ref,
     mediaRefs: JSON.parse(source.media_refs_json || '[]') as string[],
@@ -894,6 +901,7 @@ export async function rollbackContentRevision(
       sourceRevision: source.revision,
       operation: 'ROLLBACK',
       state: content.state,
+      slug: updated.slug,
       title: updated.title,
       bodyRef: updated.bodyRef,
       mediaRefs: updated.mediaRefs,
