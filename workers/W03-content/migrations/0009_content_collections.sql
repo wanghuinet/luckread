@@ -6,7 +6,6 @@ CREATE TABLE content_collections (
   id TEXT NOT NULL PRIMARY KEY,
   owner_user_id TEXT NOT NULL,
   creator_id TEXT NOT NULL,
-  ip_id TEXT,
   state TEXT NOT NULL CHECK (
     state IN (
       'DRAFT','PENDING_REVIEW','REJECTED','APPROVED','SCHEDULED',
