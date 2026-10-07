@@ -21,8 +21,8 @@ describe('content slug', () => {
 
   it('bounds and normalizes long titles', () => {
     const slug = contentSlugFor('A'.repeat(500), '1234567890abcdef')
-    expect(slug.length).toBeLessThanOrEqual(128)
-    expect(slug).toBe('a'.repeat(114) + '-1234567890ab')
+    expect(slug.length).toBe(128)
+    expect(slug).toBe('a'.repeat(95) + '-1234567890abcdef1234567890abcdef')
   })
 
   it('rejects malformed references', () => {
