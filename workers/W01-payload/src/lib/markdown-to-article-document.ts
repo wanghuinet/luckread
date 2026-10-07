@@ -36,6 +36,10 @@ const stripInlineMarkdown = (value: string): string =>
     .replace(new RegExp('\\n{3,}', 'g'), '\\n\\n')
     .trim()
 
+const pushUnsupported = (unsupported: string[], kind: string): void => {
+  if (!unsupported.includes(kind)) unsupported.push(kind)
+}
+
 const boundedText = (
   value: string,
   unsupported: string[],
@@ -49,10 +53,6 @@ const boundedText = (
 
 const pushBlock = (blocks: ArticleBlock[], block: ArticleBlock): void => {
   if (blocks.length < ARTICLE_MAX_BLOCKS) blocks.push(block)
-}
-
-const pushUnsupported = (unsupported: string[], kind: string): void => {
-  if (!unsupported.includes(kind)) unsupported.push(kind)
 }
 
 const normalizeMarkdownCodeLanguage = (language: string | undefined): ArticleBlock['language'] => {
@@ -186,8 +186,10 @@ export const markdownToArticleDocument = (markdown: string): MarkdownImportResul
           pushUnsupported(unsupported, '代码语言：' + (token.lang ?? 'unknown'))
           break
         }
+        const text = boundedText(token.text, unsupported)
+        if (text === null) break
         pushBlock(blocks, {
-          ...createArticleBlock('code', boundedText(token.text, unsupported) ?? ''),
+          ...createArticleBlock('code', text),
           language,
         })
         break
