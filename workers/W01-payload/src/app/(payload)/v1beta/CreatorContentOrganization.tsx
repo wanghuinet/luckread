@@ -51,8 +51,15 @@ function redirectToLogin(loginPath: '/admin/login' | '/login') {
   window.location.assign(loginPath + '?returnTo=' + encodeURIComponent(returnTo))
 }
 
-async function readPage(kind: Kind, signal: AbortSignal, loginPath: '/admin/login' | '/login') {
-  const response = await fetch(kindMeta[kind].path + '?limit=20', {
+async function readPage(
+  kind: Kind,
+  signal: AbortSignal,
+  loginPath: '/admin/login' | '/login',
+  cursor: string | null = null,
+) {
+  const params = new URLSearchParams({ limit: '20' })
+  if (cursor) params.set('cursor', cursor)
+  const response = await fetch(kindMeta[kind].path + '?' + params.toString(), {
     credentials: 'include',
     headers: { accept: 'application/json' },
     cache: 'no-store',
@@ -86,6 +93,7 @@ export default function CreatorContentOrganization({
   const [saving, setSaving] = useState(false)
   const [actionId, setActionId] = useState<string | null>(null)
   const [reloadKey, setReloadKey] = useState(0)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [selectedOrganizationId, setSelectedOrganizationId] = useState<string | null>(null)
 
   useEffect(() => {
@@ -113,6 +121,33 @@ export default function CreatorContentOrganization({
       controller.abort()
     }
   }, [loginPath, reloadKey])
+
+  async function loadMoreOrganizations() {
+    const page = pages[kind]
+    if (!page.hasMore || !page.nextCursor || loading || loadingMore) return
+    setLoadingMore(true)
+    setError('')
+    const controller = new AbortController()
+    try {
+      const next = await readPage(kind, controller.signal, loginPath, page.nextCursor)
+      if (controller.signal.aborted) return
+      setPages((current) => ({
+        ...current,
+        [kind]: {
+          items: [...current[kind].items, ...next.items],
+          nextCursor: next.nextCursor,
+          hasMore: next.hasMore,
+        },
+      }))
+    } catch (cause) {
+      if (controller.signal.aborted) return
+      if (cause instanceof Error && cause.message === 'AUTH_REQUIRED') return
+      setError(cause instanceof Error ? cause.message : '更多内容组织暂时无法加载。')
+    } finally {
+      if (!controller.signal.aborted) setLoadingMore(false)
+      controller.abort()
+    }
+  }
 
   function openCreate(nextKind: Kind) {
     setKind(nextKind)
@@ -212,6 +247,16 @@ export default function CreatorContentOrganization({
         <div className={styles.sectionActions}>
           <button className={styles.secondaryButton + ' btn'} onClick={() => openCreate('series')} type="button">新建系列</button>
           <button className={styles.secondaryButton + ' btn'} onClick={() => openCreate('collections')} type="button">新建合集</button>
+          {activePage.hasMore ? (
+            <button
+              className={styles.secondaryButton + ' btn'}
+              disabled={loadingMore || loading}
+              onClick={() => void loadMoreOrganizations()}
+              type="button"
+            >
+              {loadingMore ? '加载中…' : '加载更多'}
+            </button>
+          ) : null}
           <button className={styles.secondaryButton + ' btn'} onClick={() => setReloadKey((value) => value + 1)} type="button">刷新</button>
         </div>
       </div>
