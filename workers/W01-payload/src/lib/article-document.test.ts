@@ -8,6 +8,7 @@ import {
   createArticleDocument,
   normalizeArticleDocument,
   plainTextFromArticleDocument,
+  mediaRefsFromArticleDocument,
   serializeArticleDocument,
   tryDeserializeArticleDocument,
 } from './article-document.js'
@@ -83,6 +84,25 @@ describe('article structured document', () => {
         mediaRefs: Array.from({ length: ARTICLE_MAX_MEDIA_PER_BLOCK + 1 }, (_, index) => 'https://media.example/' + index + '.jpg'),
       }],
     })).toThrow('INVALID_ARTICLE_BLOCK')
+  })
+
+  it('collects canonical media references from structured article blocks', () => {
+    const document = {
+      version: 2 as const,
+      blocks: [
+        createArticleMediaBlock('image', ['https://media.example/1.jpg']),
+        createArticleMediaBlock('gallery', [
+          'https://media.example/1.jpg',
+          'https://media.example/2.jpg',
+        ]),
+        { id: 'p', type: 'paragraph' as const, text: '正文' },
+      ],
+    }
+
+    expect(mediaRefsFromArticleDocument(document)).toEqual([
+      'https://media.example/1.jpg',
+      'https://media.example/2.jpg',
+    ])
   })
 
   it('strips control characters before persistence', () => {
