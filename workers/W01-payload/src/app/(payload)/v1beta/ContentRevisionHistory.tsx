@@ -79,7 +79,7 @@ export default function ContentRevisionHistory({
     setError('')
     try {
       const response = await fetch(
-        '/api/v1/contents/' + encodeURIComponent(contentId) + '/revisions/' + encodeURIComponent(revision.id),
+        '/api/v1/contents/' + encodeURIComponent(contentId) + '/revisions/' + encodeURIComponent(revision.id) + '/rollback',
         {
           method: 'POST',
           credentials: 'include',
