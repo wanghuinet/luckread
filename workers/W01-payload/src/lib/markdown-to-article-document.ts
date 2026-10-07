@@ -36,8 +36,16 @@ const stripInlineMarkdown = (value: string): string =>
     .replace(new RegExp('\\n{3,}', 'g'), '\\n\\n')
     .trim()
 
-const safeText = (value: string): string =>
-  value.slice(0, ARTICLE_MAX_BLOCK_TEXT)
+const boundedText = (
+  value: string,
+  unsupported: string[],
+): string | null => {
+  if (value.length > ARTICLE_MAX_BLOCK_TEXT) {
+    pushUnsupported(unsupported, '单个正文区块超过 20,000 字符')
+    return null
+  }
+  return value
+}
 
 const pushBlock = (blocks: ArticleBlock[], block: ArticleBlock): void => {
   if (blocks.length < ARTICLE_MAX_BLOCKS) blocks.push(block)
@@ -103,15 +111,18 @@ export const markdownToArticleDocument = (markdown: string): MarkdownImportResul
   const unsupported: string[] = []
 
   for (const token of tokens) {
-    if (blocks.length >= ARTICLE_MAX_BLOCKS) break
+    if (blocks.length >= ARTICLE_MAX_BLOCKS) {
+      pushUnsupported(unsupported, '正文区块数量超过 200')
+      break
+    }
 
     switch (token.type) {
       case 'space':
         continue
 
       case 'heading': {
-        const text = safeText(stripInlineMarkdown(token.text))
-        if (!text) continue
+        const text = boundedText(stripInlineMarkdown(token.text), unsupported)
+        if (text === null || !text) continue
         pushBlock(blocks, {
           ...createArticleBlock('heading', text),
           level: token.depth >= 3 ? 3 : 2,
@@ -141,21 +152,21 @@ export const markdownToArticleDocument = (markdown: string): MarkdownImportResul
           continue
         }
 
-        const text = safeText(stripInlineMarkdown(token.text))
+        const text = boundedText(stripInlineMarkdown(token.text), unsupported)
         if (text) pushBlock(blocks, createArticleBlock('paragraph', text))
         break
       }
 
       case 'blockquote': {
-        const text = safeText(stripInlineMarkdown(token.text))
+        const text = boundedText(stripInlineMarkdown(token.text), unsupported)
         if (text) pushBlock(blocks, createArticleBlock('quote', text))
         break
       }
 
       case 'list': {
         const text = token.items
-          .map((item) => safeText(stripInlineMarkdown(item.text)))
-          .filter(Boolean)
+          .map((item) => boundedText(stripInlineMarkdown(item.text), unsupported))
+          .filter((item): item is string => item !== null && Boolean(item))
           .join('\n')
         if (!text) continue
         pushBlock(
@@ -176,7 +187,7 @@ export const markdownToArticleDocument = (markdown: string): MarkdownImportResul
           break
         }
         pushBlock(blocks, {
-          ...createArticleBlock('code', safeText(token.text)),
+          ...createArticleBlock('code', boundedText(token.text, unsupported) ?? ''),
           language,
         })
         break
