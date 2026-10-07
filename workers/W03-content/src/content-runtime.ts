@@ -809,6 +809,95 @@ export async function updateContent(
   return updated
 }
 
+export async function rollbackContentRevision(
+  db: ContentD1,
+  principalUserId: string,
+  contentId: string,
+  revisionId: string,
+  ifMatch: string,
+  idempotencyKey: string,
+  reason: string | undefined,
+  correlationId: string,
+  now = new Date(),
+): Promise<{ content: ContentRecord; sourceRevision: number; resultingRevision: number }> {
+  assertResourceId(principalUserId)
+  assertResourceId(contentId)
+  assertResourceId(revisionId)
+  if (!ifMatch || !idempotencyKey) throw new ContentRuntimeError('PRECONDITION_REQUIRED', 428)
+  if (reason !== undefined && reason.length > 2048) throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+  const normalizedCorrelationId = normalizeCorrelationId(correlationId)
+  const operationId = 'rollbackContentRevision'
+  const hash = await requestHash(operationId, {
+    contentId, revisionId, ifMatch: normalizeEtag(ifMatch), reason: reason ?? null,
+  })
+  const { content, idempotency } = await loadMutationRow(db, contentId, operationId, idempotencyKey, principalUserId)
+  const replay = inspectIdempotency(idempotency, principalUserId, hash, now)
+  if (replay.replayed) {
+    if (!replay.body || typeof replay.body !== 'object') throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
+    return replay.body as { content: ContentRecord; sourceRevision: number; resultingRevision: number }
+  }
+  if (!content) throw new ContentRuntimeError('NOT_FOUND', 404)
+  if (content.ownerUserId !== principalUserId) throw new ContentRuntimeError('PERMISSION_DENIED', 403)
+  assertEtag(content.etag, ifMatch)
+  if (!['DRAFT', 'REJECTED', 'UNPUBLISHED', 'RESTORED'].includes(content.state)) {
+    throw new ContentRuntimeError('INVALID_STATE', 409)
+  }
+
+  const source = await db.prepare(`SELECT id, content_id, revision, content_version, actor_user_id, source_revision, operation,
+       state, title, body_ref, media_refs_json, cover_ref, etag, reason, correlation_id, created_at
+  FROM content_revisions
+ WHERE id = ? AND content_id = ?`).bind(revisionId, contentId).first<ContentRevisionRow>()
+  if (!source) throw new ContentRuntimeError('NOT_FOUND', 404)
+
+  const nextVersion = content.version + 1
+  const nextRevision = content.revision + 1
+  const updatedAt = now.toISOString()
+  const updated: ContentRecord = {
+    ...content,
+    title: source.title,
+    bodyRef: source.body_ref,
+    mediaRefs: JSON.parse(source.media_refs_json || '[]') as string[],
+    coverRef: source.cover_ref,
+    version: nextVersion,
+    revision: nextRevision,
+    etag: etagForVersion(nextVersion),
+    updatedAt,
+  }
+  const result = { content: updated, sourceRevision: source.revision, resultingRevision: nextRevision }
+  const expiresAt = new Date(now.getTime() + IDEMPOTENCY_TTL_MS).toISOString()
+  await batchMutation(db, [
+    expireMutationRow(db, principalUserId, operationId, idempotencyKey, updatedAt),
+    insertCompletedIdempotency(db, principalUserId, operationId, idempotencyKey, hash, 200, JSON.stringify(result), updatedAt, expiresAt),
+    db.prepare(`UPDATE contents
+   SET title = ?, body_ref = ?, media_refs_json = ?, cover_ref = ?, version = ?, revision = ?, etag = ?, updated_at = ?
+ WHERE id = ? AND owner_user_id = ? AND version = ? AND etag = ?`).bind(
+      updated.title, updated.bodyRef, JSON.stringify(updated.mediaRefs), updated.coverRef,
+      nextVersion, nextRevision, updated.etag, updatedAt,
+      content.id, principalUserId, content.version, content.etag,
+    ),
+    insertRevision(db, {
+      id: crypto.randomUUID(),
+      contentId: content.id,
+      revision: nextRevision,
+      contentVersion: nextVersion,
+      actorUserId: principalUserId,
+      sourceRevision: source.revision,
+      operation: 'ROLLBACK',
+      state: content.state,
+      title: updated.title,
+      bodyRef: updated.bodyRef,
+      mediaRefs: updated.mediaRefs,
+      coverRef: updated.coverRef,
+      etag: updated.etag,
+      reason: reason?.trim() || null,
+      correlationId: normalizedCorrelationId,
+      createdAt: updatedAt,
+    }),
+    atomicGuard(db),
+  ])
+  return result
+}
+
 export async function deleteContent(
   db: ContentD1,
   principalUserId: string,
