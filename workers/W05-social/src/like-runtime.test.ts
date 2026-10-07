@@ -15,6 +15,12 @@ const db = (firstResults: unknown[] = []) => {
 
 
 describe('like runtime', () => {
+  it('invalidates aggregate cache on like/unlike mutations', () => {
+    const runtime = readFileSync(resolve(process.cwd(), 'src/like-runtime.ts'), 'utf8')
+    expect(runtime).toContain('invalidateCachedLikeAggregate')
+    expect(runtime).toContain('likeAggregateCacheKey(targetType, targetId)')
+  })
+
   afterEach(() => { delete (globalThis as Record<string, unknown>).caches })
 
   it('serves cached viewer state plus shared aggregate without touching D1', async () => {

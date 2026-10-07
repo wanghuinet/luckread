@@ -123,6 +123,15 @@ const invalidateCachedLikeViewerState = async (
   await cache.delete(likeViewerStateCacheKey(actorUserId, targetType, targetId))
 }
 
+const invalidateCachedLikeAggregate = async (
+  targetType: string,
+  targetId: string,
+): Promise<void> => {
+  const cache = getDefaultCache()
+  if (!cache) return
+  await cache.delete(likeAggregateCacheKey(targetType, targetId))
+}
+
 const validateTarget = (target: LikeTarget): { targetType: 'content' | 'comment'; targetId: string } => {
   if (target.targetType !== 'content' && target.targetType !== 'comment') {
     throw new LikeRuntimeError('VALIDATION_FAILED', 400)
@@ -268,7 +277,10 @@ export async function like(
 
   if (!row) throw new LikeRuntimeError('NOT_FOUND', 404)
 
-  await invalidateCachedLikeViewerState(actor, targetType, targetId)
+  await Promise.all([
+    invalidateCachedLikeViewerState(actor, targetType, targetId),
+    invalidateCachedLikeAggregate(targetType, targetId),
+  ])
 
   return {
     relationshipId: row.relationship_id,
@@ -396,5 +408,8 @@ export async function unlike(
   await db.prepare(
     'DELETE FROM interaction_likes WHERE actor_user_id = ? AND target_type = ? AND target_id = ?',
   ).bind(actor, targetType, targetId).run()
-  await invalidateCachedLikeViewerState(actor, targetType, targetId)
+  await Promise.all([
+    invalidateCachedLikeViewerState(actor, targetType, targetId),
+    invalidateCachedLikeAggregate(targetType, targetId),
+  ])
 }
