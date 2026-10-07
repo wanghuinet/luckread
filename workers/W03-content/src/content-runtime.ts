@@ -1042,8 +1042,12 @@ export async function transitionContentState(
   if (!content) throw new ContentRuntimeError('NOT_FOUND', 404)
 
   assertEtag(content.etag, ifMatch)
-  if (!canTransitionContentState(content.state, to, kind, content.ownerUserId === principalUserId, reason)) {
+  const ownsContent = content.ownerUserId === principalUserId
+  if (kind === 'CREATOR' && !ownsContent) {
     throw new ContentRuntimeError('PERMISSION_DENIED', 403)
+  }
+  if (!canTransitionContentState(content.state, to, kind, ownsContent, reason)) {
+    throw new ContentRuntimeError('INVALID_STATE', 409)
   }
 
   const nextVersion = content.version + 1
