@@ -32,6 +32,12 @@ import {
   listCreatorSeries,
   updateSeries,
 } from './content-series.js'
+import {
+  attachSeriesMember,
+  listSeriesMembers,
+  removeSeriesMember,
+  reorderSeriesMember,
+} from './content-series-members.js'
 
 type RateLimitBinding = { limit(input: { key: string }): Promise<{ success: boolean }> }
 
@@ -151,7 +157,7 @@ const decodePathSegment = (value: string): string => {
   }
 }
 
-const getPath = (pathname: string): {id?: string; state?: boolean; preflight?: boolean; revisions?: boolean; relationships?: boolean; relationshipId?: string; revisionId?: string; rollback?: boolean; series?: boolean} | null => {
+const getPath = (pathname: string): {id?: string; state?: boolean; preflight?: boolean; revisions?: boolean; relationships?: boolean; relationshipId?: string; revisionId?: string; rollback?: boolean; series?: boolean; seriesMembers?: boolean; seriesMemberContentId?: string} | null => {
   const parts = pathname.split('/').filter(Boolean)
   if (parts.length === 3 && parts[0] === 'internal' && parts[1] === 'content' && parts[2] === 'contents') {
     return {}
@@ -179,6 +185,12 @@ const getPath = (pathname: string): {id?: string; state?: boolean; preflight?: b
   }
   if (parts.length === 3 && parts[0] === 'internal' && parts[1] === 'content' && parts[2] === 'series') {
     return { series: true }
+  }
+  if (parts.length === 5 && parts[0] === 'internal' && parts[1] === 'content' && parts[2] === 'series' && parts[4] === 'members') {
+    return { id: decodePathSegment(parts[3]), seriesMembers: true }
+  }
+  if (parts.length === 6 && parts[0] === 'internal' && parts[1] === 'content' && parts[2] === 'series' && parts[4] === 'members') {
+    return { id: decodePathSegment(parts[3]), seriesMembers: true, seriesMemberContentId: decodePathSegment(parts[5]) }
   }
   if (parts.length === 6 && parts[0] === 'internal' && parts[1] === 'content' && parts[2] === 'contents' && parts[4] === 'revisions') {
     return { id: decodePathSegment(parts[3]), revisions: true, revisionId: decodePathSegment(parts[5]) }
@@ -252,6 +264,73 @@ export default {
           requireIdempotency(request),
         )
         return json({ data: series, schemaVersion: '1.0', requestId: crypto.randomUUID() }, 201)
+      }
+
+      if (path && path.seriesMembers && path.id && request.method === 'GET') {
+        const principal = requiredCreatorPrincipal(request)
+        const cursor = url.searchParams.get('cursor')
+        if (cursor && cursor.length > 2048) throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+        const page = await listSeriesMembers(
+          env.D1_02,
+          principal.userId,
+          path.id,
+          cursor,
+          parseListLimit(url.searchParams.get('limit')),
+        )
+        return json({ data: page, schemaVersion: '1.0', requestId: crypto.randomUUID() })
+      }
+
+      if (path && path.seriesMembers && path.id && request.method === 'POST' && !path.seriesMemberContentId) {
+        const principal = requiredCreatorPrincipal(request)
+        return json({
+          data: await attachSeriesMember(
+            env.D1_02,
+            principal.userId,
+            path.id,
+            await parseBody(request),
+            requireIfMatch(request),
+            requireIdempotency(request),
+          ),
+          schemaVersion: '1.0',
+          requestId: crypto.randomUUID(),
+        }, 201)
+      }
+
+      if (path && path.seriesMembers && path.id && path.seriesMemberContentId && request.method === 'DELETE') {
+        const principal = requiredCreatorPrincipal(request)
+        return json({
+          data: await removeSeriesMember(
+            env.D1_02,
+            principal.userId,
+            path.id,
+            path.seriesMemberContentId,
+            requireIfMatch(request),
+            requireIdempotency(request),
+          ),
+          schemaVersion: '1.0',
+          requestId: crypto.randomUUID(),
+        })
+      }
+
+      if (path && path.seriesMembers && path.id && path.seriesMemberContentId && request.method === 'PATCH') {
+        const principal = requiredCreatorPrincipal(request)
+        const body = await parseBody(request)
+        if (!Number.isSafeInteger(body.position)) {
+          throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+        }
+        return json({
+          data: await reorderSeriesMember(
+            env.D1_02,
+            principal.userId,
+            path.id,
+            path.seriesMemberContentId,
+            Number(body.position),
+            requireIfMatch(request),
+            requireIdempotency(request),
+          ),
+          schemaVersion: '1.0',
+          requestId: crypto.randomUUID(),
+        })
       }
 
       if (path && path.series && request.method === 'GET' && path.id === undefined) {
