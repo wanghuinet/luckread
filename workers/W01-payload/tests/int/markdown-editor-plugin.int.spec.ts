@@ -182,6 +182,7 @@ describe('Markdown editor plugin', () => {
     const registry = read('src/components/article-editor-plugins.ts')
     expect(history).toContain('const MAX_HISTORY_ENTRIES = 40')
     expect(history).toContain('const MAX_HISTORY_CHARS = 2_000_000')
+    expect(history).toContain('const HISTORY_GROUP_WINDOW_MS = 750')
     expect(history).toContain('pastRef.current')
     expect(history).toContain('futureRef.current')
     expect(history).toContain('updateDocument(document)')
