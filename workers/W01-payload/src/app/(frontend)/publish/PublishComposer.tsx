@@ -846,9 +846,23 @@ export default function PublishComposer({
             ) : (
               <p className="lr-preview-body">{body.trim() || '暂无正文'}</p>
             )}
-            {resolveCoverRef(type, assets, coverRef) ? (
+            {resolveCoverRef(
+              type,
+              assets,
+              coverRef,
+              type === 'article' ? mediaRefsFromArticleDocument(articleDocument) : [],
+            ) ? (
               <div className="lr-preview-cover">
-                <img alt="" loading="eager" src={resolveCoverRef(type, assets, coverRef) ?? undefined} />
+                <img
+                  alt=""
+                  loading="eager"
+                  src={resolveCoverRef(
+                    type,
+                    assets,
+                    coverRef,
+                    type === 'article' ? mediaRefsFromArticleDocument(articleDocument) : [],
+                  ) ?? undefined}
+                />
               </div>
             ) : null}
             {assets.length ? (
