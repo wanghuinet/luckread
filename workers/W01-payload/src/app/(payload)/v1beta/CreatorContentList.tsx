@@ -11,6 +11,7 @@ type ContentType = 'article' | 'post' | 'video'
 
 type Item = {
   id: string
+  slug?: string
   contentType: ContentType
   state: ContentState
   version: number
@@ -371,7 +372,7 @@ export default function CreatorContentList({ loginPath = '/admin/login' }: { log
                   ) : null}
                   {item.state === 'PUBLISHED' ? (
                     <>
-                      <Link className={styles.secondaryButton} href={`/content/${encodeURIComponent(item.id)}`}>
+                      <Link className={styles.secondaryButton} href={`/content/${encodeURIComponent(item.slug || item.id)}`}>
                         查看内容
                       </Link>
                       <button
