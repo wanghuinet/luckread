@@ -118,6 +118,17 @@ describe('Creator Center admin extension', () => {
     expect(members).toContain('page.hasMore')
   })
 
+  it('filters only already-loaded organization members and candidates', () => {
+    const members = read('src/app/(payload)/v1beta/CreatorContentOrganizationMembers.tsx')
+    expect(members).toContain("const [candidateFilter, setCandidateFilter] = useState('')")
+    expect(members).toContain("const [memberFilter, setMemberFilter] = useState('')")
+    expect(members).toContain('const filteredCandidates = useMemo(() => {')
+    expect(members).toContain('const filteredMembers = useMemo(() => {')
+    expect(members).toContain('筛选已加载内容（标题或 ID）')
+    expect(members).toContain('筛选已加载成员（标题或 ID）')
+    expect(members).toContain('members.findIndex((item) => item.relationshipId === member.relationshipId)')
+  })
+
   it('exposes canonical public actions for organization members', () => {
     const members = read('src/app/(payload)/v1beta/CreatorContentOrganizationMembers.tsx')
     expect(members).toContain("member.contentSlug || member.contentId")
