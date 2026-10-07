@@ -133,6 +133,7 @@ export const createArticleTableBlock = (
     text: table.rows.map((row) => row.join('\t')).join('\n'),
     table,
   }
+}
 
 const normalizeMediaRefs = (value: unknown, type: ArticleBlockType): string[] | undefined => {
   if (type !== 'image' && type !== 'gallery') return undefined
