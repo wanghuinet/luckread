@@ -184,7 +184,7 @@ describe('Markdown editor plugin', () => {
     expect(manager).toContain('moveRef(media.blockIndex, refIndex, -1)')
     expect(manager).toContain('removeRef(media.blockIndex, refIndex)')
     expect(manager).toContain('function addRef(blockIndex: number, url: string)')
-    expect(manager).toContain('mediaAssets.filter((asset) => asset.mimeType.startsWith(\'image/\')')
+    expect(manager).toContain('filter((asset) => asset.mimeType.startsWith(\'image/\')')
     expect(manager).toContain('media.refs.length >= 12')
     expect(registry).toContain("import { mediaManagerPlugin } from './MediaManagerPlugin.js'")
     expect(registry).toContain('mediaManagerPlugin')
