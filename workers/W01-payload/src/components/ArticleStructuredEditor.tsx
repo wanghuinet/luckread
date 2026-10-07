@@ -32,6 +32,7 @@ const blockLabels: Record<ArticleBlockType, string> = {
   divider: '分隔线',
   image: '图片',
   gallery: '图库',
+  code: '代码',
 }
 
 const updateBlock = (
