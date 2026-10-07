@@ -106,6 +106,19 @@ describe('Markdown editor plugin', () => {
     )
   })
 
+  it('registers writer statistics and plain text copy tools without new network dependencies', () => {
+    const tools = read('src/components/WriterToolsPlugin.tsx')
+    const registry = read('src/components/article-editor-plugins.ts')
+    expect(tools).toContain('const characters = Array.from(plainText).length')
+    expect(tools).toContain('value.blocks.filter((block) => block.type === \'math\').length')
+    expect(tools).toContain("id: 'content.writer-stats'")
+    expect(tools).toContain("id: 'content.copy-plain-text'")
+    expect(tools).toContain('navigator.clipboard.writeText(plainText)')
+    expect(registry).toContain("import { copyPlainTextPlugin, writerStatsPlugin } from './WriterToolsPlugin.js'")
+    expect(registry).toContain('writerStatsPlugin')
+    expect(registry).toContain('copyPlainTextPlugin')
+  })
+
   it('registers the article outline plugin against stable block anchors', () => {
     const editor = read('src/components/ArticleStructuredEditor.tsx')
     const outline = read('src/components/ArticleOutlinePlugin.tsx')
