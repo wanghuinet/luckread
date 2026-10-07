@@ -267,7 +267,7 @@ export default function CreatorContentOrganization({
           'Idempotency-Key': 'content-organization-delete:' + crypto.randomUUID(),
         },
       })
-      const data = await response.json().catch((): null => null) as { error?: { message?: string } } | null
+      const data: { error?: { message?: string } } | null = await response.json().catch(() => null)
       if (response.status === 401) {
         redirectToLogin(loginPath)
         return
