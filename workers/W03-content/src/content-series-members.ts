@@ -432,7 +432,7 @@ export async function listSeriesMembers(
     content_slug: string
     content_type: 'article' | 'post' | 'video'
     content_state: string
-    title: string
+    content_title: string
   }>()
 
   const hasMore = rows.results.length > pageSize
