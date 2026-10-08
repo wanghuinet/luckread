@@ -179,6 +179,7 @@ export default async function HomePage() {
             <div className="hero-actions">
               <Link className="button button-primary" href={CREATOR_CENTER_URL}>{copy.common.createNow}<span aria-hidden="true">↗</span></Link>
               <Link className="button button-quiet" href="/content">{copy.common.explore}</Link>
+              <Link className="button button-quiet" href="/shorts">短视频</Link>
             </div>
           </div>
 
