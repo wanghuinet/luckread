@@ -5,7 +5,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
-const read = (relative: string) => fs.readFileSync(path.resolve(here, '..', relative), 'utf8')
+const read = (relative: string) => fs.readFileSync(path.resolve(here, '..', '..', relative), 'utf8')
 
 describe('autosave body asset rollback', () => {
   it('does not leave an uploaded body asset when the content write fails', () => {
