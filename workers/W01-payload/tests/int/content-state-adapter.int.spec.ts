@@ -140,6 +140,13 @@ describe('1.1 content lifecycle closeout', () => {
     expect(detailClient).toContain("if (!response.ok || !data?.id || data.state !== 'PUBLISHED')")
   })
 
+  it('locks the immutable content type after a draft exists', () => {
+    const publisher = read('src/app/(frontend)/publish/PublishComposer.tsx')
+    expect(publisher).toContain('disabled={busy || reviewLocked || Boolean(draft)}')
+    expect(publisher).toContain('草稿创建后内容类型不可变更')
+    expect(publisher).toContain('需要更换类型请新建内容')
+  })
+
   it('keeps autosave and manual save on the same authoritative content mutation path', () => {
     const publisher = read('src/app/(frontend)/publish/PublishComposer.tsx')
     expect(publisher).toContain("method: isUpdate ? 'PATCH' : 'POST'")
