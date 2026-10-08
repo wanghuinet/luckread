@@ -115,6 +115,14 @@ describe('short video playback polish', () => {
     expect(feed).toContain('const followResult = followIndex >= 0 ? fulfilledResult(followIndex) : null')
   })
 
+  it('supports accessible comment dismissal with Escape', () => {
+    const feed = read('src/app/(frontend)/shorts/ShortVideoFeed.tsx')
+    expect(feed).toContain('event.key === \'Escape\'')
+    expect(feed).toContain('handleCommentsKeyDown')
+    expect(feed).toContain('window.addEventListener(\'keydown\', handleCommentsKeyDown)')
+    expect(feed).toContain('closeComments()')
+  })
+
   it('polishes mobile comments and controls around safe-area insets', () => {
     const css = read('src/app/(frontend)/shorts/short-video.module.css')
     expect(css).toContain('bottom: calc(75px + env(safe-area-inset-bottom))')
