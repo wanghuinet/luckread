@@ -664,7 +664,7 @@ export default function ShortVideoFeed() {
                 <div className={styles.bottomFade} />
 
                 <div className={styles.slideHeader}>
-                  <span>为你推荐</span>
+                  <span>短视频</span>
                   <span className={styles.indexMark}>{index + 1}/{visibleItems.length}</span>
                 </div>
 
@@ -694,7 +694,7 @@ export default function ShortVideoFeed() {
                     </div>
                   </div>
                   <h1>{item.title}</h1>
-                  <p>{locale === 'en' ? 'Watch more on LuckRead.' : '在 LuckRead 继续发现更多内容。'}</p>
+                  <p>{locale === 'en' ? 'Swipe to keep watching.' : '上下滑动继续刷视频。'}</p>
                   <Link className={styles.detailLink} href={'/content/' + encodeURIComponent(item.slug || item.id)}>
                     打开详情
                   </Link>
