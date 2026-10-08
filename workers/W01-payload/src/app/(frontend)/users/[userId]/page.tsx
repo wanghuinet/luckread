@@ -211,7 +211,7 @@ export default function PublicProfilePage({
         'limit=6',
         'type=' + encodeURIComponent(nextFilter),
       ].join('&')
-      const { response, data } = await fetchJson<ContentListResponse | { error?: { message?: string } }>('/api/v1/contents?' + query, {
+      const { response, data } = await fetchJson<ContentListResponse & { error?: { message?: string } }>('/api/v1/contents?' + query, {
         headers: { accept: 'application/json' },
         credentials: 'omit',
         cache: 'no-store',
@@ -249,7 +249,7 @@ export default function PublicProfilePage({
       })
       params.set('type', filter)
 
-      const { response, data } = await fetchJson<ContentListResponse | { error?: { message?: string } }>('/api/v1/contents?' + params.toString(), {
+      const { response, data } = await fetchJson<ContentListResponse & { error?: { message?: string } }>('/api/v1/contents?' + params.toString(), {
         headers: { accept: 'application/json' },
         credentials: 'omit',
         cache: 'no-store',
