@@ -270,7 +270,7 @@ describe('article structured document', () => {
     expect(next.blocks[0]).toEqual({
       id: 'first',
       type: 'paragraph',
-      text: '第一段\\n\\n第二段',
+      text: '第一段\n\n第二段',
     })
     expect(next.blocks[0]?.id).toBe('first')
     expect(document.blocks).toHaveLength(3)
