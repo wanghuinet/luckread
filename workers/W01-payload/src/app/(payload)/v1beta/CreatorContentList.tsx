@@ -314,7 +314,7 @@ export default function CreatorContentList({ loginPath = '/admin/login' }: { log
           <span className={styles.eyebrow}>CONTENT MANAGEMENT</span>
           <h2>我的内容</h2>
         </div>
-        <Link className={styles.primaryButton} href="/publish">
+        <CreatorActionButton el="anchor" href="/publish" tone="primary">
           新建内容
         </CreatorActionButton>
       </div>
