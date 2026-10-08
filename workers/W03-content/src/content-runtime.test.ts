@@ -250,9 +250,57 @@ describe('W03 content contract core', () => {
     expect(preparedQueries[0]).toContain("WHERE state = 'PUBLISHED' AND content_type = ?")
   })
 
-  it('requires L3 or higher for creator content operations', () => {
+  it('allows an L4 principal to complete an owned content state transition', async () => {
+    const content = {
+      id: 'content_l4_123',
+      content_type: 'article',
+      owner_user_id: 'user_l4_123',
+      creator_id: 'user_l4_123',
+      ip_id: null,
+      state: 'APPROVED',
+      version: 1,
+      revision: 1,
+      slug: 'l4-content-123',
+      title: 'L4 owned article',
+      body_ref: 'https://cdn.example.com/body.json',
+      media_refs_json: '[]',
+      cover_ref: null,
+      etag: 'W/"1"',
+      created_at: '2026-10-08T12:00:00.000Z',
+      updated_at: '2026-10-08T12:00:00.000Z',
+    }
+    const db = {
+      prepare() {
+        return { bind: () => ({ first: async () => content }) }
+      },
+      batch: async () => [],
+    } as never
+
+    await expect(transitionContentState(
+      db,
+      'user_l4_123',
+      'L4',
+      'content_l4_123',
+      'PUBLISHED',
+      undefined,
+      'W/"1"',
+      'l4-publish-idem',
+      new Date('2026-10-08T12:01:00.000Z'),
+    )).resolves.toMatchObject({
+      from: 'APPROVED',
+      to: 'PUBLISHED',
+      version: 2,
+      etag: 'W/"2"',
+    })
+  })
+
+  it('allows creator content operations only for L3-L4 layers', () => {
     expect(hasCreatorContentPermission('L3')).toBe(true)
-    expect(hasCreatorContentPermission('L8')).toBe(true)
+    expect(hasCreatorContentPermission('L4')).toBe(true)
+    expect(hasCreatorContentPermission('L5')).toBe(false)
+    expect(hasCreatorContentPermission('L6')).toBe(false)
+    expect(hasCreatorContentPermission('L7')).toBe(false)
+    expect(hasCreatorContentPermission('L8')).toBe(false)
     expect(hasCreatorContentPermission('L2')).toBe(false)
     expect(hasCreatorContentPermission('')).toBe(false)
     expect(hasCreatorContentPermission('creator')).toBe(false)

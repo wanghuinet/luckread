@@ -110,10 +110,8 @@ const requiredPrincipal = (request: Request): { userId: string; layer: string } 
   return { userId, layer }
 }
 
-export const hasCreatorContentPermission = (layer: string): boolean => {
-  if (!/^L[0-8]$/.test(layer)) return false
-  return Number(layer.slice(1)) >= 3
-}
+export const hasCreatorContentPermission = (layer: string): boolean =>
+  /^L[3-4]$/.test(layer)
 
 const requiredCreatorPrincipal = (request: Request): { userId: string; layer: string } => {
   const principal = requiredPrincipal(request)
