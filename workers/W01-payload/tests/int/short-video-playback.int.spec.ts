@@ -46,6 +46,7 @@ describe('short video playback polish', () => {
     expect(feed).toContain('resumeAfterVisibilityRef.current = Boolean(video && !video.paused && !video.ended)')
     expect(feed).toContain('if (commentsOpen || !resumeAfterVisibilityRef.current)')
     expect(feed).toContain('resumeAfterVisibilityRef.current = false')
+    expect(feed).toContain("mediaErrorById[id] || document.visibilityState === 'hidden'")
   })
 
   it('exposes a recoverable media error path without changing the feed authority', () => {
