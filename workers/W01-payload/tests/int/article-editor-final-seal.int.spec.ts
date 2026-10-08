@@ -154,7 +154,7 @@ describe('ArticleStructuredEditor final interaction closure', () => {
       />,
     )
 
-    expect(screen.getByRole('button', { name: '在下方添加正文区块' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: '复制区块' })).toBeDisabled()
+    expect(screen.getAllByRole('button', { name: '在下方添加正文区块' }).every((button) => (button as HTMLButtonElement).disabled)).toBe(true)
+    expect(screen.getAllByRole('button', { name: '复制区块' }).every((button) => (button as HTMLButtonElement).disabled)).toBe(true)
   })
 })
