@@ -11,7 +11,6 @@ import { r2Storage } from '@payloadcms/storage-r2'
 
 import { Users } from './collections/Users'
 import { Media } from './collections/Media'
-import { WordImportFeature } from './features/word-import/feature.server'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -68,7 +67,6 @@ export default buildConfig({
     features: ({ defaultFeatures }) => [
       ...defaultFeatures.filter((feature) => feature.key !== 'upload'),
       UploadFeature({ enabledCollections: ['media'] }),
-      WordImportFeature(),
     ],
   }),
   secret: process.env.PAYLOAD_SECRET || '',
