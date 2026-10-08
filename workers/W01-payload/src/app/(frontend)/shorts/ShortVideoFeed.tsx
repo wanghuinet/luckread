@@ -85,6 +85,7 @@ export default function ShortVideoFeed() {
   const feedRef = useRef<HTMLElement | null>(null)
   const loadMoreSentinelRef = useRef<HTMLDivElement | null>(null)
   const activeIndexRef = useRef(0)
+  const resumeAfterVisibilityRef = useRef(false)
   const requestRef = useRef<AbortController | null>(null)
   const profileCacheRef = useRef<Record<string, Profile>>({})
   const interactionCacheRef = useRef<Record<string, InteractionState>>({})
@@ -231,14 +232,20 @@ export default function ShortVideoFeed() {
 
   useEffect(() => {
     const handleVisibilityChange = () => {
+      const activeVideo = visibleItems[activeIndexRef.current]?.id
       if (document.visibilityState === 'hidden') {
+        const video = activeVideo ? videoRefs.current[activeVideo] : null
+        resumeAfterVisibilityRef.current = Boolean(video && !video.paused && !video.ended)
         Object.values(videoRefs.current).forEach((video) => video?.pause())
         return
       }
 
-      if (commentsOpen) return
-      const activeVideo = visibleItems[activeIndexRef.current]?.id
+      if (commentsOpen || !resumeAfterVisibilityRef.current) {
+        resumeAfterVisibilityRef.current = false
+        return
+      }
       const video = activeVideo ? videoRefs.current[activeVideo] : null
+      resumeAfterVisibilityRef.current = false
       if (video) void video.play().catch(() => {})
     }
 
@@ -584,8 +591,11 @@ export default function ShortVideoFeed() {
   const togglePlay = (item: ContentItem) => {
     const video = videoRefs.current[item.id]
     if (!video) return
-    if (video.paused) void video.play()
-    else video.pause()
+    if (video.paused) {
+      void video.play().catch(() => {})
+    } else {
+      video.pause()
+    }
   }
 
   const retryPlayback = (item: ContentItem) => {
