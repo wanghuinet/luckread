@@ -370,6 +370,8 @@ export default function ShortVideoFeed() {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (commentsOpen) return
+      const target = event.target instanceof HTMLElement ? event.target : null
+      if (target?.closest('button, a, input, textarea, select, [contenteditable="true"]')) return
       if (event.key === 'ArrowDown' || event.key === 'PageDown' || event.key === ' ') {
         event.preventDefault()
         scrollToIndex(Math.min(activeIndexRef.current + 1, visibleItems.length - 1))

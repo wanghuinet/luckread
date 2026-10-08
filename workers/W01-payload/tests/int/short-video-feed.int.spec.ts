@@ -21,6 +21,7 @@ describe('TikTok-style short video feed', () => {
     expect(feed).toContain('video.play()')
     expect(feed).toContain('video.pause()')
     expect(feed).toContain("event.key === 'ArrowDown'")
+    expect(feed).toContain("target?.closest('button, a, input, textarea, select, [contenteditable=\"true\"]')")
     expect(feed).toContain('<span className={styles.feedTabActive}>短视频</span>')
     expect(feed).not.toContain('<span className={styles.feedTabActive}>为你</span>')
         expect(feed).toContain('loadMoreSentinelRef')
