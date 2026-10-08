@@ -677,10 +677,9 @@ export default function ShortVideoFeed() {
             ? (profileById[item.creatorId]?.displayName || creatorName)
             : 'LuckRead'
           const avatar = item.creatorId ? profileById[item.creatorId]?.avatar : null
+          const creatorUsername = item.creatorId ? profileById[item.creatorId]?.username : null
           const creatorHref = item.creatorId
-            ? (profileById[item.creatorId]?.username
-              ? '/' + encodeURIComponent(profileById[item.creatorId].username)
-              : '/users/' + encodeURIComponent(item.creatorId))
+            ? (creatorUsername ? '/' + encodeURIComponent(creatorUsername) : '/users/' + encodeURIComponent(item.creatorId))
             : '/'
 
           return (
