@@ -38,6 +38,12 @@ type UploadedAsset = {
   mimeType: string
 }
 
+type VideoMetadata = {
+  duration: number
+  width: number
+  height: number
+}
+
 type ContentResponse = {
   id: string
   slug?: string
@@ -65,6 +71,18 @@ async function authorizedFetch(input: RequestInfo | URL, init: RequestInit = {})
 
 const isVideoAsset = (asset: UploadedAsset): boolean => asset.mimeType.startsWith('video/')
 const isImageAsset = (asset: UploadedAsset): boolean => asset.mimeType.startsWith('image/')
+
+const formatVideoDuration = (seconds: number): string => {
+  if (!Number.isFinite(seconds) || seconds < 0) return '--:--'
+  const total = Math.floor(seconds)
+  const minutes = Math.floor(total / 60)
+  const remaining = total % 60
+  const hours = Math.floor(minutes / 60)
+  const minutePart = hours > 0 ? minutes % 60 : minutes
+  return hours > 0
+    ? hours + ':' + String(minutePart).padStart(2, '0') + ':' + String(remaining).padStart(2, '0')
+    : minutePart + ':' + String(remaining).padStart(2, '0')
+}
 
 const inferRestoredMediaType = (url: string, contentType: ContentType): string => {
   if (contentType === 'article') return 'image/*'
@@ -107,6 +125,7 @@ export default function PublishComposer({
   const [savedArticleSerialized, setSavedArticleSerialized] = useState('')
   const [assets, setAssets] = useState<UploadedAsset[]>([])
   const [coverRef, setCoverRef] = useState('')
+  const [videoMetadataByAssetId, setVideoMetadataByAssetId] = useState<Record<string, VideoMetadata>>({})
   const [draft, setDraft] = useState<ContentResponse | null>(null)
   const [savedBody, setSavedBody] = useState('')
   const [busy, setBusy] = useState(false)
