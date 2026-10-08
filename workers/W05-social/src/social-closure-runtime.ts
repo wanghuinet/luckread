@@ -18,7 +18,7 @@ const MAX_TEXT = 10000
 const MAX_LIMIT = 50
 const DEFAULT_LIMIT = 20
 const MAX_CURSOR = 2048
-const tokenPattern = /(^|[\\s([{"'“‘，。！？；：、])([@#])([\\p{L}\\p{N}_]{1,64})/gu
+const tokenPattern = /(^|[\s([{"'“‘，。！？；：、])([@#])([\p{L}\p{N}_]{1,64})/gu
 
 const id = (value: string, code: 'VALIDATION_FAILED' | 'UNAUTHENTICATED' = 'VALIDATION_FAILED') => {
   const normalized = value.trim()
@@ -46,8 +46,8 @@ const parseLimit = (value: string | null): number => {
 
 const encodeCursor = (createdAt: string, notificationId: string): string =>
   btoa(JSON.stringify({ v: 1, createdAt, notificationId }))
-    .replace(/\\+/g, '-')
-    .replace(/\\//g, '_')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
     .replace(/=+$/g, '')
 
 const decodeCursor = (value: string | null): { createdAt: string; notificationId: string } | null => {
