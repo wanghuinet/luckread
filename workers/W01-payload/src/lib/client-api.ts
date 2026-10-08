@@ -11,7 +11,7 @@ export type JsonResponse<T> = {
 }
 
 export async function readJson<T = unknown>(response: Response): Promise<T | null> {
-  return response.json().catch(() => null) as Promise<T | null>
+  return response.json().catch((): null => null) as Promise<T | null>
 }
 
 export async function fetchJson<T = unknown>(
