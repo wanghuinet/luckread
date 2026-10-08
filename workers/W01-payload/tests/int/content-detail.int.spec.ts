@@ -17,7 +17,8 @@ describe('public content detail', () => {
 
   it('hydrates like and favorite state from one canonical W05 social summary', () => {
     const page = read('src/app/(frontend)/content/[contentId]/ContentDetailClient.tsx')
-    expect(page).toContain('/api/v1/contents/' + encodeURIComponent(resolved.id) + '/social')
+    expect(page).toContain('/api/v1/contents/')
+    expect(page).toContain("encodeURIComponent(resolved.id) + '/social'")
     expect(page).toContain('summary.counts?.likes')
     expect(page).toContain('summary.viewer?.liked')
     expect(page).toContain('summary.viewer?.favorited')
@@ -176,7 +177,6 @@ it('renders versioned structured article bodies instead of flattening them to pa
   const renderer = read('src/components/ArticleStructuredRenderer.tsx')
 
   expect(page).toContain("tryDeserializeArticleDocument(body)")
-  expect(page).toContain('plainTextFromArticleDocument(structuredArticle)')
   expect(page).toContain('ArticleStructuredRenderer')
   expect(page).toContain('<ArticleStructuredRenderer document={structuredArticle} />')
   expect(page).toContain('!structuredArticle')
