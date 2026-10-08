@@ -9,7 +9,7 @@ describe('public content browse delivery', () => {
   it('keeps public list fetches anonymous so signed-in browsers remain on the shared-cache path', () => {
     const page = read('src/app/(frontend)/content/page.tsx')
 
-    expect(page).toContain("fetch('/api/v1/contents?' + params.toString()")
+    expect(page).toContain("fetchJson<ContentApiResponse>('/api/v1/contents?' + params.toString()")
     expect(page).toContain("credentials: 'omit'")
     expect(page).toContain("headers: { accept: 'application/json' }")
     expect(page).toContain("cache: 'no-store'")
