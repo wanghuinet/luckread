@@ -1041,7 +1041,7 @@ export async function transitionContentState(
   idempotencyKey: string,
   now = new Date(),
   options: { scheduledAt?: string | null } = {},
-): Promise<{ from: ContentState; to: ContentState; version: number; etag: string; scheduledAt: string | null }> {
+): Promise<{ from: ContentState; to: ContentState; version: number; etag: string; scheduledAt?: string | null }> {
   assertResourceId(principalUserId)
   assertResourceId(contentId)
   if (!isState(to) || !ifMatch || !idempotencyKey) {
