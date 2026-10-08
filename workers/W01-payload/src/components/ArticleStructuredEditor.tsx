@@ -29,6 +29,7 @@ import {
   parseArticleBlockFromClipboard,
   serializeArticleBlockForClipboard,
 } from '../lib/article-document.js'
+import { articleBlockDomId } from './ArticleOutlinePlugin.js'
 import {
   createArticleDocumentHistory,
   recordArticleDocumentHistory,
@@ -522,6 +523,7 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
         {value.blocks.map((block, index) => (
           <article
             className={'lr-article-block lr-article-block-' + block.type}
+            id={articleBlockDomId(block.id)}
             key={block.id}
             ref={(element) => {
               blockRefs.current[block.id] = element
