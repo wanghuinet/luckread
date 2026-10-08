@@ -11,6 +11,7 @@ describe('short video playback polish', () => {
     expect(feed).toContain('showDoubleTapHeart')
     expect(feed).toContain('onDoubleClick={() => {')
     expect(feed).toContain('setActiveProgress(0)')
+    expect(feed).toContain('setActiveIndex(index)')
     expect(feed).toContain('onTimeUpdate')
     expect(feed).toContain('current.duration > 0')
     expect(feed).toContain('styles.heartBurst')
@@ -24,7 +25,10 @@ describe('short video playback polish', () => {
   it('does not turn scroll events into high-frequency React state updates', () => {
     const feed = read('src/app/(frontend)/shorts/ShortVideoFeed.tsx')
     expect(feed).not.toContain('onScroll={() => setActiveProgress(0)}')
-    expect(feed).toContain("useEffect(() => {\n    setActiveProgress(0)\n  }, [activeIndex])")
+    expect(feed).not.toContain("useEffect(() => {\n    setActiveProgress(0)\n  }, [activeIndex])")
+    expect(feed).toContain('setActiveProgress(0)')
+    expect(feed).toContain('loadMoreSentinelRef')
+    expect(feed).toContain('root: feedRef.current')
   })
 
   it('keeps the simple TikTok-style social rail and swipe flow intact', () => {
