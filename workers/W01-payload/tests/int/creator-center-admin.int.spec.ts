@@ -741,8 +741,14 @@ describe('Creator Center admin extension', () => {
     expect(publisher).toContain("const CONTENT_MUTATED_EVENT = 'luckread:content-mutated'")
     expect(publisher).toContain('window.dispatchEvent(new Event(CONTENT_MUTATED_EVENT))')
     expect(publisher).toContain("type === 'video' && !assets.some(isVideoAsset)")
+    expect(publisher).toContain("videoAssets.length > 1")
+    expect(publisher).toContain('videoMetadataByAssetId')
+    expect(publisher).toContain('onLoadedMetadata')
+    expect(publisher).toContain('formatVideoDuration')
+    expect(publisher).toContain('1 个主视频 + 可选封面')
+    expect(publisher).toContain('poster={type === \'video\' && coverRef ? coverRef : undefined}')
     expect(publisher).toContain('className="lr-asset-preview"')
-    expect(publisher).toContain('asset.mimeType.startsWith(\'video/\')')
+    expect(publisher).toContain("asset.mimeType.startsWith('video/')")
 
 
     expect(updateRoute).toContain('export async function GET')
