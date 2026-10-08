@@ -115,6 +115,15 @@ describe('short video playback polish', () => {
     expect(feed).toContain('const followResult = followIndex >= 0 ? fulfilledResult(followIndex) : null')
   })
 
+  it('polishes mobile comments and controls around safe-area insets', () => {
+    const css = read('src/app/(frontend)/shorts/short-video.module.css')
+    expect(css).toContain('bottom: calc(75px + env(safe-area-inset-bottom))')
+    expect(css).toContain('bottom: calc(76px + env(safe-area-inset-bottom))')
+    expect(css).toContain('height: min(78dvh, 720px)')
+    expect(css).toContain('border-radius: 18px 18px 0 0')
+    expect(css).toContain('padding-bottom: max(10px, env(safe-area-inset-bottom))')
+  })
+
   it('keeps the simple TikTok-style social rail and swipe flow intact', () => {
     const feed = read('src/app/(frontend)/shorts/ShortVideoFeed.tsx')
     const css = read('src/app/(frontend)/shorts/short-video.module.css')
