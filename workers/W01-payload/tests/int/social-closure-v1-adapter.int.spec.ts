@@ -24,7 +24,8 @@ describe('unified W05 social closure adapters', () => {
 
   it('keeps report authority on the governance path rather than duplicating reports in W05', () => {
     const reports = read('src/app/api/v1/reports/route.ts')
-    expect(reports).toContain('W06_MODERATION')
+    expect(reports).toContain('callW06Moderation')
+    expect(reports).toContain('W06ModerationClientError')
     expect(reports).not.toContain('/internal/social/reports')
   })
 
