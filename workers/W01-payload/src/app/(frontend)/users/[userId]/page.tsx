@@ -112,6 +112,7 @@ export default function PublicProfilePage({
           }),
           fetch('/api/v1/contents?creatorId=' + encodeURIComponent(userId) + '&limit=6&type=post', {
             headers: { accept: 'application/json' },
+            credentials: 'omit',
             cache: 'no-store',
             signal: controller.signal,
           }),
@@ -202,6 +203,7 @@ export default function PublicProfilePage({
       ].join('&')
       const response = await fetch('/api/v1/contents?' + query, {
         headers: { accept: 'application/json' },
+        credentials: 'omit',
         cache: 'no-store',
         signal: controller.signal,
       })
@@ -240,6 +242,7 @@ export default function PublicProfilePage({
 
       const response = await fetch('/api/v1/contents?' + params.toString(), {
         headers: { accept: 'application/json' },
+        credentials: 'omit',
         cache: 'no-store',
         signal: controller.signal,
       })
