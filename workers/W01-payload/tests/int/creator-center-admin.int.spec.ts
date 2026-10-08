@@ -194,7 +194,7 @@ describe('Creator Center admin extension', () => {
     const styles = read('src/app/(frontend)/publish/publish.css')
 
     expect(plugin).toContain('export const getWriterStats')
-    expect(plugin).toContain('const characters = Array.from(plainText).length')
+    expect(plugin).toContain('characters: Array.from(plainText).length')
     expect(plugin).toContain("id: 'content.writer-stats'")
     expect(plugin).toContain("id: 'content.copy-plain-text'")
     expect(plugin).toContain('navigator.clipboard.writeText(plainText)')
