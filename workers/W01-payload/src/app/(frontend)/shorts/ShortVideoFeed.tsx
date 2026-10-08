@@ -742,7 +742,12 @@ export default function ShortVideoFeed() {
                   muted={muted}
                   playsInline
                   poster={item.coverRef || undefined}
-                  preload={Math.abs(index - activeIndex) <= 1 ? 'metadata' : 'none'}
+                  preload={
+                    index === activeIndex ? 'auto' :
+                    index > activeIndex && index <= activeIndex + 2 ? 'auto' :
+                    index === activeIndex - 1 ? 'metadata' :
+                    'none'
+                  }
                   ref={setVideoRef(item.id)}
                   src={videoUrl}
                   onClick={(event) => handleVideoTap(item, event)}
