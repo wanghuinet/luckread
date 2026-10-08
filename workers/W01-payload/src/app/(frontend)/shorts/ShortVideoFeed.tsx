@@ -79,6 +79,7 @@ export default function ShortVideoFeed() {
   const [activeProgress, setActiveProgress] = useState(0)
   const [doubleTapHeart, setDoubleTapHeart] = useState(false)
   const [mediaErrorById, setMediaErrorById] = useState<Record<string, boolean>>({})
+  const [bufferingById, setBufferingById] = useState<Record<string, boolean>>({})
   const heartTimerRef = useRef<number | null>(null)
   const itemRefs = useRef<Record<string, HTMLElement | null>>({})
   const videoRefs = useRef<Record<string, HTMLVideoElement | null>>({})
@@ -734,6 +735,25 @@ export default function ShortVideoFeed() {
                     const current = event.currentTarget
                     setActiveProgress(current.duration > 0 ? Math.min(100, Math.max(0, (current.currentTime / current.duration) * 100)) : 0)
                   }}
+                  onWaiting={() => {
+                    setBufferingById((current) => ({ ...current, [item.id]: true }))
+                  }}
+                  onCanPlay={() => {
+                    setBufferingById((current) => {
+                      if (!current[item.id]) return current
+                      const next = { ...current }
+                      delete next[item.id]
+                      return next
+                    })
+                  }}
+                  onPlaying={() => {
+                    setBufferingById((current) => {
+                      if (!current[item.id]) return current
+                      const next = { ...current }
+                      delete next[item.id]
+                      return next
+                    })
+                  }}
                   onLoadedMetadata={(event) => {
                     if (item.id !== visibleItems[activeIndexRef.current]?.id) return
                     const current = event.currentTarget
@@ -744,6 +764,12 @@ export default function ShortVideoFeed() {
                     setMediaErrorById((current) => ({ ...current, [item.id]: true }))
                   }}
                 />
+                {bufferingById[item.id] && !mediaErrorById[item.id] ? (
+                  <div className={styles.mediaBuffering} aria-live="polite">
+                    <span className={styles.mediaSpinner} aria-hidden="true" />
+                    <span>{locale === 'en' ? 'Loading video…' : '视频加载中…'}</span>
+                  </div>
+                ) : null}
                 {mediaErrorById[item.id] ? (
                   <div className={styles.mediaError} role="alert">
                     <strong>{locale === 'en' ? 'Video unavailable' : '视频暂时无法播放'}</strong>
