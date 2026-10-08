@@ -240,6 +240,20 @@ describe('Creator Center admin extension', () => {
     expect(editor).toContain('focusTarget.id')
   })
 
+  it('exposes keyboard article block movement with cursor preservation', () => {
+    const editor = read('src/components/ArticleStructuredEditor.tsx')
+
+    expect(editor).toContain('function moveBlock(index: number, direction: -1 | 1, focusOffset = 0)')
+    expect(editor).toContain("event.key === 'ArrowUp' || event.key === 'ArrowDown'")
+    expect(editor).toContain('event.altKey')
+    expect(editor).toContain('!event.ctrlKey')
+    expect(editor).toContain('!event.metaKey')
+    expect(editor).toContain('!event.shiftKey')
+    expect(editor).toContain("moveBlock(index, event.key === 'ArrowUp' ? -1 : 1, event.currentTarget.selectionStart)")
+    expect(editor).toContain('Math.min(focusOffset, moved.text.length)')
+    expect(editor).toContain('Alt+↑/↓ 移动当前区块并保留光标')
+  })
+
   it('exposes article block split and merge actions', () => {
     const editor = read('src/components/ArticleStructuredEditor.tsx')
     const document = read('src/lib/article-document.ts')
