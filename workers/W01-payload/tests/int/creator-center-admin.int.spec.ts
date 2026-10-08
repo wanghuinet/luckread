@@ -18,6 +18,7 @@ describe('Creator Center admin extension', () => {
 
   it('persists structured article media references alongside uploaded assets', () => {
     const publisher = read('src/app/(frontend)/publish/PublishComposer.tsx')
+    const list = read('src/app/(payload)/v1beta/CreatorContentList.tsx')
     expect(publisher).toContain('mediaRefsFromArticleDocument(articleDocument)')
     expect(publisher).toContain("...(type === 'article' ? mediaRefsFromArticleDocument(articleDocument) : [])")
     expect(publisher).toContain('mediaRefs: Array.from(new Set([')
