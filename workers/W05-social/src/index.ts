@@ -460,9 +460,20 @@ export default {
 
         const bodyValue = (body as { body?: unknown }).body
         const parentId = (body as { parentId?: unknown }).parentId
+        const rawMentions = (body as { mentions?: unknown }).mentions
         if (
           typeof bodyValue !== 'string' ||
-          (parentId !== undefined && parentId !== null && typeof parentId !== 'string')
+          (parentId !== undefined && parentId !== null && typeof parentId !== 'string') ||
+          (rawMentions !== undefined &&
+            (!Array.isArray(rawMentions) ||
+              rawMentions.length > 20 ||
+              rawMentions.some((value) =>
+                !value ||
+                typeof value !== 'object' ||
+                Array.isArray(value) ||
+                typeof (value as { userId?: unknown }).userId !== 'string' ||
+                typeof (value as { handle?: unknown }).handle !== 'string'
+              )))
         ) {
           throw new CommentRuntimeError('VALIDATION_FAILED', 400)
         }
@@ -472,6 +483,10 @@ export default {
           parentId: parentId ?? null,
           idempotencyKey,
         })
+        const mentionTargets = rawMentions === undefined ? [] : rawMentions as Array<{ userId: string; handle: string }>
+        ctx.waitUntil(
+          syncSocialTokens(env.DB, viewerUserId, 'comment', comment.id, bodyValue, mentionTargets).catch(() => undefined),
+        )
         const contentOwner = await env.DB.prepare(
           'SELECT owner_user_id FROM contents WHERE id = ? AND state = \'PUBLISHED\' LIMIT 1',
         ).bind(commentContentId).first<{ owner_user_id: string | null }>()
