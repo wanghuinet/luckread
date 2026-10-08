@@ -11,6 +11,19 @@ import { ShareRuntimeError, createShare, resolveShare } from './share-runtime.js
 import { BlockMuteRuntimeError, removeRelation, setRelation } from './block-mute-runtime.js'
 import { getRelationshipGraph, invalidateRelationshipGraph, RelationshipGraphRuntimeError } from './relationship-graph-runtime.js'
 import {
+  SocialClosureRuntimeError,
+  enqueueNotification,
+  getContentSocialSummary,
+  getNotificationPreferences,
+  getSocialTargets,
+  getTopicPage,
+  listNotifications,
+  markAllNotificationsRead,
+  markNotificationRead,
+  setNotificationPreferences,
+  syncSocialTokens,
+} from './social-closure-runtime.js'
+import {
   FollowRuntimeError,
   follow,
   invalidateFollowListCountCache,
@@ -94,6 +107,27 @@ const parseJsonTarget = async (request: Request) => {
   } catch {
     throw new LikeRuntimeError('VALIDATION_FAILED', 400)
   }
+}
+
+
+const getInteractionRecipient = async (
+  db: D1Database,
+  targetType: string,
+  targetId: string,
+): Promise<string | null> => {
+  if (targetType === 'content') {
+    const row = await db.prepare(
+      'SELECT owner_user_id FROM contents WHERE id = ? AND state = \'PUBLISHED\' LIMIT 1',
+    ).bind(targetId).first<{ owner_user_id: string | null }>()
+    return row?.owner_user_id ?? null
+  }
+  if (targetType === 'comment') {
+    const row = await db.prepare(
+      'SELECT author_user_id FROM social_comments WHERE id = ? AND state = \'PUBLISHED\' LIMIT 1',
+    ).bind(targetId).first<{ author_user_id: string | null }>()
+    return row?.author_user_id ?? null
+  }
+  return null
 }
 
 const decodePathPart = (value: string): string | null => {
@@ -291,6 +325,108 @@ export default {
         })
       }
 
+      if (url.pathname.match(/^\/internal\/social\/contents\/[^/]+\/summary$/)) {
+        const parts = url.pathname.split('/').filter(Boolean)
+        if (parts.length !== 5 || parts[0] !== 'internal' || parts[1] !== 'social' || parts[2] !== 'contents' || parts[4] !== 'summary') {
+          return new Response(null, { status: 404 })
+        }
+        if (request.method !== 'GET') return new Response(null, { status: 405, headers: { Allow: 'GET' } })
+        requireTransport(request)
+        const contentId = decodePathPart(parts[3])
+        if (contentId === null) throw new SocialClosureRuntimeError('VALIDATION_FAILED', 400)
+        const viewerUserId = request.headers.get('X-LuckRead-Principal-User-Id')?.trim() || null
+        return json({ data: await getContentSocialSummary(env.DB, contentId, viewerUserId), requestId: crypto.randomUUID() })
+      }
+
+      if (url.pathname.match(/^\/internal\/social\/contents\/[^/]+\/tokens$/)) {
+        const parts = url.pathname.split('/').filter(Boolean)
+        if (parts.length !== 5 || parts[0] !== 'internal' || parts[1] !== 'social' || parts[2] !== 'contents' || parts[4] !== 'tokens') {
+          return new Response(null, { status: 404 })
+        }
+        const contentId = decodePathPart(parts[3])
+        if (contentId === null) throw new SocialClosureRuntimeError('VALIDATION_FAILED', 400)
+        if (request.method === 'GET') {
+          requireTransport(request)
+          return json({ data: await getSocialTargets(env.DB, 'content', contentId), requestId: crypto.randomUUID() })
+        }
+        if (request.method !== 'POST') return new Response(null, { status: 405, headers: { Allow: 'GET, POST' } })
+        const actorUserId = requirePrincipal(request)
+        requireInteractionLayer(request)
+        let body: unknown
+        try { body = await request.json() } catch { throw new SocialClosureRuntimeError('VALIDATION_FAILED', 400) }
+        if (!body || typeof body !== 'object' || Array.isArray(body)) throw new SocialClosureRuntimeError('VALIDATION_FAILED', 400)
+        const rawText = (body as { text?: unknown }).text
+        const rawMentions = (body as { mentions?: unknown }).mentions
+        if (typeof rawText !== 'string' || rawText.length > 10000) throw new SocialClosureRuntimeError('VALIDATION_FAILED', 400)
+        const mentions = rawMentions === undefined
+          ? []
+          : Array.isArray(rawMentions) && rawMentions.every((value) => value && typeof value === 'object' && !Array.isArray(value) && typeof (value as { userId?: unknown }).userId === 'string' && typeof (value as { handle?: unknown }).handle === 'string')
+            ? rawMentions as Array<{ userId: string; handle: string }>
+            : (() => { throw new SocialClosureRuntimeError('VALIDATION_FAILED', 400) })()
+        const result = await syncSocialTokens(env.DB, actorUserId, 'content', contentId, rawText, mentions)
+        return json({ data: result, requestId: crypto.randomUUID() })
+      }
+
+      if (url.pathname.startsWith('/internal/social/topics/')) {
+        const parts = url.pathname.split('/').filter(Boolean)
+        if (parts.length !== 4 || parts[0] !== 'internal' || parts[1] !== 'social' || parts[2] !== 'topics') return new Response(null, { status: 404 })
+        if (request.method !== 'GET') return new Response(null, { status: 405, headers: { Allow: 'GET' } })
+        requireTransport(request)
+        const topicName = decodePathPart(parts[3])
+        if (topicName === null) throw new SocialClosureRuntimeError('VALIDATION_FAILED', 400)
+        return json({ data: await getTopicPage(env.DB, topicName, new URL(request.url).searchParams.get('limit')), requestId: crypto.randomUUID() })
+      }
+
+      if (url.pathname === '/internal/social/notifications') {
+        if (request.method !== 'GET') return new Response(null, { status: 405, headers: { Allow: 'GET' } })
+        const actorUserId = requirePrincipal(request)
+        requireInteractionLayer(request)
+        const url = new URL(request.url)
+        return json({
+          data: await listNotifications(env.DB, actorUserId, url.searchParams.get('cursor'), url.searchParams.get('limit')),
+          requestId: crypto.randomUUID(),
+        })
+      }
+
+      const notificationReadMatch = /^\/internal\/social\/notifications\/([^/]+)\/read$/.exec(url.pathname)
+      if (notificationReadMatch) {
+        if (request.method !== 'PATCH' && request.method !== 'POST') return new Response(null, { status: 405, headers: { Allow: 'PATCH, POST' } })
+        const actorUserId = requirePrincipal(request)
+        requireInteractionLayer(request)
+        const notificationId = decodePathPart(notificationReadMatch[1])
+        if (notificationId === null) throw new SocialClosureRuntimeError('VALIDATION_FAILED', 400)
+        await markNotificationRead(env.DB, actorUserId, notificationId)
+        return new Response(null, { status: 204 })
+      }
+
+      if (url.pathname === '/internal/social/notifications/read-all') {
+        if (request.method !== 'POST') return new Response(null, { status: 405, headers: { Allow: 'POST' } })
+        const actorUserId = requirePrincipal(request)
+        requireInteractionLayer(request)
+        await markAllNotificationsRead(env.DB, actorUserId)
+        return new Response(null, { status: 204 })
+      }
+
+      if (url.pathname === '/internal/social/notification-preferences') {
+        const actorUserId = requirePrincipal(request)
+        requireInteractionLayer(request)
+        if (request.method === 'GET') {
+          return json({ data: await getNotificationPreferences(env.DB, actorUserId), requestId: crypto.randomUUID() })
+        }
+        if (request.method !== 'PATCH') return new Response(null, { status: 405, headers: { Allow: 'GET, PATCH' } })
+        let body: unknown
+        try { body = await request.json() } catch { throw new SocialClosureRuntimeError('VALIDATION_FAILED', 400) }
+        if (!body || typeof body !== 'object' || Array.isArray(body)) throw new SocialClosureRuntimeError('VALIDATION_FAILED', 400)
+        const raw = body as Record<string, unknown>
+        const input = {
+          ...(raw.follow === undefined ? {} : { follow: Boolean(raw.follow) }),
+          ...(raw.like === undefined ? {} : { like: Boolean(raw.like) }),
+          ...(raw.comment === undefined ? {} : { comment: Boolean(raw.comment) }),
+          ...(raw.mention === undefined ? {} : { mention: Boolean(raw.mention) }),
+        }
+        return json({ data: await setNotificationPreferences(env.DB, actorUserId, input), requestId: crypto.randomUUID() })
+      }
+
       const commentContentId = parseCommentPath(url.pathname)
       if (commentContentId !== null) {
         if (request.method === 'GET') {
@@ -336,6 +472,31 @@ export default {
           parentId: parentId ?? null,
           idempotencyKey,
         })
+        const contentOwner = await env.DB.prepare(
+          'SELECT owner_user_id FROM contents WHERE id = ? AND state = \'PUBLISHED\' LIMIT 1',
+        ).bind(commentContentId).first<{ owner_user_id: string | null }>()
+        if (parentId) {
+          const parent = await env.DB.prepare(
+            'SELECT author_user_id FROM social_comments WHERE id = ? AND state = \'PUBLISHED\' LIMIT 1',
+          ).bind(parentId).first<{ author_user_id: string | null }>()
+          if (parent?.author_user_id) {
+            await enqueueNotification(env.DB, {
+              recipientUserId: parent.author_user_id,
+              actorUserId: viewerUserId,
+              type: 'REPLY',
+              targetType: 'comment',
+              targetId: comment.id,
+            })
+          }
+        } else if (contentOwner?.owner_user_id) {
+          await enqueueNotification(env.DB, {
+            recipientUserId: contentOwner.owner_user_id,
+            actorUserId: viewerUserId,
+            type: 'COMMENT',
+            targetType: 'content',
+            targetId: commentContentId,
+          })
+        }
         return json({ data: comment }, 201)
       }
 
@@ -402,6 +563,16 @@ export default {
 
         if (request.method === 'POST') {
           const result = await like(env.DB, viewerUserId, target)
+          const recipientUserId = await getInteractionRecipient(env.DB, target.targetType, target.targetId)
+          if (recipientUserId) {
+            await enqueueNotification(env.DB, {
+              recipientUserId,
+              actorUserId: viewerUserId,
+              type: 'LIKE',
+              targetType: target.targetType as 'content' | 'comment',
+              targetId: target.targetId,
+            })
+          }
           return json({ data: result, requestId: crypto.randomUUID() }, 200)
         }
         await unlike(env.DB, viewerUserId, target)
@@ -421,6 +592,13 @@ export default {
           }
           const row = await follow(env.DB, viewerUserId, path.userId)
           await invalidateRelationshipGraph(viewerUserId, path.userId)
+          await enqueueNotification(env.DB, {
+            recipientUserId: path.userId,
+            actorUserId: viewerUserId,
+            type: 'FOLLOW',
+            targetType: 'user',
+            targetId: path.userId,
+          })
           return json({
             data: {
               following: true,
@@ -495,7 +673,8 @@ export default {
         error instanceof FavoriteRuntimeError ||
         error instanceof ShareRuntimeError ||
         error instanceof BlockMuteRuntimeError ||
-        error instanceof RelationshipGraphRuntimeError
+        error instanceof RelationshipGraphRuntimeError ||
+        error instanceof SocialClosureRuntimeError
       ) {
         return json({
           error: {
