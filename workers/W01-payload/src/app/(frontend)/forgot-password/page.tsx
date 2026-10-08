@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { FormEvent, useState } from 'react'
+import { fetchJson, getApiErrorMessage } from '../../../lib/client-api.js'
 
 export default function ForgotPasswordPage() {
   const [identifier, setIdentifier] = useState('')
@@ -23,7 +24,7 @@ export default function ForgotPasswordPage() {
 
     setBusy(true)
     try {
-      const response = await fetch('/api/v1/auth/password/reset/request', {
+      const { response, data } = await fetchJson<{ error?: { message?: string } }>('/api/v1/auth/password/reset/request', {
         method: 'POST',
         credentials: 'include',
         cache: 'no-store',
@@ -33,12 +34,9 @@ export default function ForgotPasswordPage() {
         },
         body: JSON.stringify({ identifier: value }),
       })
-      const data = await response.json().catch((): null => null) as {
-        error?: { message?: string }
-      } | null
 
       if (!response.ok) {
-        throw new Error(data?.error?.message || '暂时无法发送找回邮件，请稍后重试。')
+        throw new Error(getApiErrorMessage(data, '暂时无法发送找回邮件，请稍后重试。'))
       }
 
       setMessage('如果该邮箱对应 LuckRead 账号，系统会发送密码找回邮件。请检查收件箱和垃圾邮件。')
