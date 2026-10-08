@@ -56,6 +56,18 @@ describe('short video playback polish', () => {
     expect(feed).toContain('const closeComments = () => {')
   })
 
+  it('shows paused feedback for the active short video', () => {
+    const feed = read('src/app/(frontend)/shorts/ShortVideoFeed.tsx')
+    const css = read('src/app/(frontend)/shorts/short-video.module.css')
+    expect(feed).toContain('const [playingById, setPlayingById]')
+    expect(feed).toContain('onPlay={() => {')
+    expect(feed).toContain('onPause={() => {')
+    expect(feed).toContain('styles.pausedFeedback')
+    expect(feed).toContain('fa-play')
+    expect(feed).not.toContain('controls={true}')
+    expect(css).toContain('.pausedFeedback')
+  })
+
   it('shows an explicit buffering state for slow short-video playback', () => {
     const feed = read('src/app/(frontend)/shorts/ShortVideoFeed.tsx')
     const css = read('src/app/(frontend)/shorts/short-video.module.css')
