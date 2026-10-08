@@ -307,9 +307,14 @@ export const insertArticleMediaBlockAfter = (
     return document
   }
 
+  const refs = Array.from(new Set(mediaRefs.map((ref) => ref.trim()).filter(Boolean)))
+  if ((type === 'image' && refs.length < 1) || (type === 'gallery' && refs.length < 2)) {
+    return document
+  }
+
   const block = createArticleMediaBlock(
     type,
-    type === 'image' ? mediaRefs.slice(0, 1) : mediaRefs.slice(0, ARTICLE_MAX_MEDIA_PER_BLOCK),
+    type === 'image' ? refs.slice(0, 1) : refs.slice(0, ARTICLE_MAX_MEDIA_PER_BLOCK),
   )
   const insertAt = index + 1
 
