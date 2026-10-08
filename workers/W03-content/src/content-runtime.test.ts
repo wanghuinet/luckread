@@ -253,15 +253,21 @@ describe('W03 content contract core', () => {
   it('keeps creator state-transition actor mapping aligned with L3-L8 permissions', () => {
     expect(actorKindForLayer('L3')).toBe('CREATOR')
     expect(actorKindForLayer('L4')).toBe('CREATOR')
-    expect(actorKindForLayer('L8')).toBe('CREATOR')
+    expect(actorKindForLayer('L4')).toBe('CREATOR')
+    expect(actorKindForLayer('L5')).toBeNull()
+    expect(actorKindForLayer('L8')).toBeNull()
     expect(actorKindForLayer('L2')).toBeNull()
     expect(actorKindForLayer('L9')).toBeNull()
     expect(actorKindForLayer('creator')).toBeNull()
   })
 
-  it('requires L3 or higher for creator content operations', () => {
+  it('allows creator content operations only for L3-L4 layers', () => {
     expect(hasCreatorContentPermission('L3')).toBe(true)
-    expect(hasCreatorContentPermission('L8')).toBe(true)
+    expect(hasCreatorContentPermission('L4')).toBe(true)
+    expect(hasCreatorContentPermission('L5')).toBe(false)
+    expect(hasCreatorContentPermission('L6')).toBe(false)
+    expect(hasCreatorContentPermission('L7')).toBe(false)
+    expect(hasCreatorContentPermission('L8')).toBe(false)
     expect(hasCreatorContentPermission('L2')).toBe(false)
     expect(hasCreatorContentPermission('')).toBe(false)
     expect(hasCreatorContentPermission('creator')).toBe(false)
