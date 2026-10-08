@@ -7,6 +7,7 @@ import { plainTextFromArticleDocument, tryDeserializeArticleDocument } from '../
 import { extractSocialTokens } from '../../../../social/social-token-parser.js'
 import { useEffect, useMemo, useState } from 'react'
 
+import { fetchJson, getApiErrorMessage } from '../../../../lib/client-api.js'
 import PublicLanguageToggle, { usePublicLocale } from '../../i18n/PublicLanguageToggle'
 import { getPublicCopy, type PublicLocale } from '../../i18n/public-locale'
 
@@ -83,46 +84,47 @@ export default function ContentDetailPage({
           let viewerResponse: Response
 
           if (!resolved || retryKey > 0) {
-            const [response, nextViewerResponse] = await Promise.all([
-              fetch(`/api/v1/contents/${encodeURIComponent(contentId)}`, {
+            const [contentResult, viewerResult] = await Promise.all([
+              fetchJson<Content>(`/api/v1/contents/${encodeURIComponent(contentId)}`, {
                 credentials: 'omit',
                 headers: { accept: 'application/json' },
                 cache: 'no-store',
                 signal: controller.signal,
               }),
-              fetch('/api/v1/users/me', {
+              fetchJson<{ id?: string }>('/api/v1/users/me', {
                 credentials: 'include',
                 headers: { accept: 'application/json' },
                 cache: 'no-store',
                 signal: controller.signal,
               }),
             ])
-            const data = await response.json().catch((): null => null)
+            const { response, data } = contentResult
+            const viewerResponse = viewerResult.response
+            const viewerData = viewerResult.data
             if (!response.ok || !data?.id || data.state !== 'PUBLISHED') {
               throw new Error(copy.detail.notFound)
             }
-            resolved = data as Content
-            viewerResponse = nextViewerResponse
+            resolved = data
             if (cancelled) return
             setContent(resolved)
           } else {
-            viewerResponse = await fetch('/api/v1/users/me', {
+            const viewerResult = await fetchJson<{ id?: string }>('/api/v1/users/me', {
               credentials: 'include',
               headers: { accept: 'application/json' },
               cache: 'no-store',
               signal: controller.signal,
             })
+            const viewerResponse = viewerResult.response
+            const viewerData = viewerResult.data
           }
 
-          const viewerData = await viewerResponse.json().catch((): null => null) as { id?: string } | null
           if (cancelled || !resolved) return
           setViewerUserId(typeof viewerData?.id === 'string' ? viewerData.id : null)
           try {
-            const likeResponse = await fetch(
+            const { response: likeResponse, data: likeData } = await fetchJson<{ data?: { liked?: boolean; likeCount?: number } }>(
               '/api/v1/interactions/likes?targetType=content&targetId=' + encodeURIComponent(resolved.id),
               { credentials: 'include', headers: { accept: 'application/json' }, cache: 'no-store', signal: controller.signal },
             )
-            const likeData = await likeResponse.json().catch((): null => null) as { data?: { liked?: boolean; likeCount?: number } } | null
             if (!cancelled && likeResponse.ok && typeof likeData?.data?.liked === 'boolean') {
               setLiked(likeData.data.liked)
               setLikeCount(
@@ -135,11 +137,10 @@ export default function ContentDetailPage({
             // Like state is optional; content remains readable when the status query fails.
           }
           try {
-            const bookmarkResponse = await fetch(
+            const { response: bookmarkResponse, data: bookmarkData } = await fetchJson<{ data?: { favorited?: boolean } }>(
               '/api/v1/interactions/bookmarks?targetType=content&targetId=' + encodeURIComponent(resolved.id),
               { credentials: 'include', headers: { accept: 'application/json' }, cache: 'no-store', signal: controller.signal },
             )
-            const bookmarkData = await bookmarkResponse.json().catch((): null => null) as { data?: { favorited?: boolean } } | null
             if (!cancelled && bookmarkResponse.ok && typeof bookmarkData?.data?.favorited === 'boolean') {
               setBookmarked(bookmarkData.data.favorited)
             }
@@ -148,16 +149,15 @@ export default function ContentDetailPage({
           }
           if (resolved.creatorId) {
             try {
-              const followResponse = await fetch(
-                '/api/v1/social/follows/' + encodeURIComponent(resolved.creatorId),
-                { credentials: 'include', headers: { accept: 'application/json' }, cache: 'no-store', signal: controller.signal },
-              )
-              const followData = await followResponse.json().catch((): null => null) as {
+              const { response: followResponse, data: followData } = await fetchJson<{
                 data?: {
                   following?: boolean
                   relationship?: { blocked?: boolean; blockedBy?: boolean }
                 }
-              } | null
+              }>(
+                '/api/v1/social/follows/' + encodeURIComponent(resolved.creatorId),
+                { credentials: 'include', headers: { accept: 'application/json' }, cache: 'no-store', signal: controller.signal },
+              )
               if (!cancelled && followResponse.ok) {
                 const blocked = Boolean(followData?.data?.relationship?.blocked)
                 const blockedBy = Boolean(followData?.data?.relationship?.blockedBy)
@@ -216,7 +216,7 @@ export default function ContentDetailPage({
     setLikeBusy(true)
     setActionMessage('')
     try {
-      const response = await fetch('/api/v1/interactions/likes', {
+      const { response, data } = await fetchJson<{ error?: { message?: string } }>('/api/v1/interactions/likes', {
         method: liked ? 'DELETE' : 'POST',
         credentials: 'include',
         headers: {
@@ -232,8 +232,7 @@ export default function ContentDetailPage({
         return
       }
       if (!response.ok) {
-        const data = await response.json().catch((): null => null)
-        setActionMessage(data?.error?.message || copy.detail.networkError)
+        setActionMessage(getApiErrorMessage(data, copy.detail.networkError))
         return
       }
       const nextLiked = !liked
@@ -254,7 +253,7 @@ export default function ContentDetailPage({
     setBookmarkBusy(true)
     setActionMessage('')
     try {
-      const response = await fetch('/api/v1/interactions/bookmarks', {
+      const { response, data } = await fetchJson<{ error?: { message?: string } }>('/api/v1/interactions/bookmarks', {
         method: bookmarked ? 'DELETE' : 'POST',
         credentials: 'include',
         headers: {
@@ -270,8 +269,7 @@ export default function ContentDetailPage({
         return
       }
       if (!response.ok) {
-        const data = await response.json().catch((): null => null)
-        setActionMessage(data?.error?.message || copy.detail.networkError)
+        setActionMessage(getApiErrorMessage(data, copy.detail.networkError))
         return
       }
       setBookmarked((value) => !value)
@@ -287,7 +285,7 @@ export default function ContentDetailPage({
     setFollowBusy(true)
     setActionMessage('')
     try {
-      const response = await fetch(
+      const { response, data } = await fetchJson<{ data?: { following?: boolean }; error?: { message?: string } }>(
         '/api/v1/social/follows/' + encodeURIComponent(content.creatorId),
         {
           method: following ? 'DELETE' : 'POST',
@@ -312,7 +310,6 @@ export default function ContentDetailPage({
         setFollowing(false)
         return
       }
-      const data = await response.json().catch((): null => null) as { data?: { following?: boolean } } | null
       if (typeof data?.data?.following !== 'boolean') {
         setActionMessage(copy.detail.networkError)
         return
@@ -340,7 +337,7 @@ export default function ContentDetailPage({
     setReportBusy(true)
     setActionMessage('')
     try {
-      const response = await fetch('/api/v1/reports', {
+      const { response, data } = await fetchJson<{ data?: { status?: string }; error?: { message?: string } }>('/api/v1/reports', {
         method: 'POST',
         credentials: 'include',
         headers: {
@@ -359,8 +356,7 @@ export default function ContentDetailPage({
         window.location.assign('/login?returnTo=' + encodeURIComponent(returnTo))
         return
       }
-      const data = await response.json().catch((): null => null) as { data?: { status?: string } } | null
-      if (!response.ok || !data?.data) throw new Error('REPORT_FAILED')
+      if (!response.ok || !data?.data) throw new Error(getApiErrorMessage(data, 'REPORT_FAILED'))
       setActionMessage(
         data.data.status === 'DEDUPLICATED'
           ? (locale === 'en' ? 'Report recorded: you have already reported this content.' : locale === 'tw' ? '檢舉已記錄：你先前已檢舉過此內容。' : '举报已记录：你此前已举报过该内容。')
@@ -378,7 +374,7 @@ export default function ContentDetailPage({
     setShareBusy(true)
     setActionMessage('')
     try {
-      const response = await fetch(
+      const { response, data } = await fetchJson<{ data?: { shareId?: string }; error?: { message?: string } }>(
         '/api/v1/content/' + encodeURIComponent(content.id) + '/shares',
         {
           method: 'POST',
@@ -397,7 +393,6 @@ export default function ContentDetailPage({
         window.location.assign('/login?returnTo=' + encodeURIComponent(returnTo))
         return
       }
-      const data = await response.json().catch((): null => null) as { data?: { shareId?: string } } | null
       const shareId = data?.data?.shareId
       if (!response.ok || typeof shareId !== 'string' || !shareId) {
         setActionMessage(copy.detail.linkError)
