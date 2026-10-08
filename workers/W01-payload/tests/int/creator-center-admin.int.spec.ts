@@ -188,6 +188,26 @@ describe('Creator Center admin extension', () => {
     expect(editor).toContain('onClick={() => removeMediaReference(ref)}')
   })
 
+  it('registers article editor find and replace without a new data or network authority', () => {
+    const plugin = read('src/components/FindReplacePlugin.tsx')
+    const registry = read('src/components/article-editor-plugins.ts')
+    const styles = read('src/app/(frontend)/publish/publish.css')
+
+    expect(plugin).toContain("id: 'content.find-replace'")
+    expect(plugin).toContain("event.shiftKey &&")
+    expect(plugin).toContain("event.key.toLowerCase() === 'f'")
+    expect(plugin).toContain("event.key === 'Escape'")
+    expect(plugin).toContain('window.addEventListener(\'keydown\', onKeyDown)')
+    expect(plugin).toContain('当前匹配 {matchCount} 处')
+    expect(plugin).toContain('全部替换')
+    expect(plugin).toContain('replaceTextInArticleDocument(value, search, replacement, caseSensitive)')
+    expect(plugin).toContain('ARTICLE_MAX_BLOCK_TEXT')
+    expect(registry).toContain("import { findReplacePlugin } from './FindReplacePlugin.js'")
+    expect(registry).toContain('findReplacePlugin')
+    expect(styles).toContain('.lr-editor-find-replace')
+    expect(styles).toContain('.lr-editor-find-replace-fields')
+  })
+
   it('exposes structured article block type conversion', () => {
     const editor = read('src/components/ArticleStructuredEditor.tsx')
     const document = read('src/lib/article-document.ts')
@@ -393,7 +413,7 @@ describe('Creator Center admin extension', () => {
     const plugin = read('src/components/article-editor-word-import-plugin.tsx')
     const editor = read('src/components/ArticleStructuredEditor.tsx')
     expect(registry).toContain("import { articleWordImportPlugin } from './article-editor-word-import-plugin.js'")
-    expect(registry).toContain('export const articleEditorPlugins: readonly ArticleEditorPlugin[] = [articleWordImportPlugin]')
+    expect(registry).toContain('export const articleEditorPlugins: readonly ArticleEditorPlugin[] = [')
     expect(plugin).toContain("id: 'word-import'")
     expect(plugin).toContain('Toolbar: WordImportToolbar')
     expect(plugin).toContain('onImport={updateDocument}')
@@ -443,7 +463,7 @@ describe('Creator Center admin extension', () => {
     expect(editor).toContain('normalizeArticleEditorPlugins(plugins)')
     expect(editor).toContain("<Toolbar key={plugin.id + ':toolbar'}")
     expect(editor).toContain('<Panel key={plugin.id + \':panel\'}')
-    expect(registry).toContain('export const articleEditorPlugins: readonly ArticleEditorPlugin[] = [articleWordImportPlugin]')
+    expect(registry).toContain('export const articleEditorPlugins: readonly ArticleEditorPlugin[] = [')
     expect(publisher).toContain('plugins={articleEditorPlugins}')
   })
 
