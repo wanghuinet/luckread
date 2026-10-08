@@ -1,30 +1,5 @@
 -- SOCIAL-CLOSURE-V1
 -- W05 / D1-02 unified social closure for article, post and video.
-PRAGMA foreign_keys=OFF;
-
-CREATE TABLE IF NOT EXISTS interaction_likes_v2 (
-  relationship_id TEXT NOT NULL PRIMARY KEY,
-  actor_user_id TEXT NOT NULL,
-  target_type TEXT NOT NULL CHECK (target_type IN ('content','comment')),
-  target_id TEXT NOT NULL,
-  created_at TEXT NOT NULL
-);
-
-INSERT OR IGNORE INTO interaction_likes_v2
-  (relationship_id, actor_user_id, target_type, target_id, created_at)
-SELECT relationship_id, actor_user_id, target_type, target_id, created_at
-FROM interaction_likes;
-
-DROP TABLE interaction_likes;
-ALTER TABLE interaction_likes_v2 RENAME TO interaction_likes;
-
-CREATE UNIQUE INDEX IF NOT EXISTS uq_interaction_like_actor_target
-  ON interaction_likes (actor_user_id, target_type, target_id);
-CREATE INDEX IF NOT EXISTS ix_interaction_like_target_created
-  ON interaction_likes (target_type, target_id, created_at);
-CREATE INDEX IF NOT EXISTS ix_interaction_like_actor_created
-  ON interaction_likes (actor_user_id, created_at);
-
 CREATE TABLE IF NOT EXISTS social_topics (
   topic_id TEXT NOT NULL PRIMARY KEY,
   normalized_name TEXT NOT NULL UNIQUE,
@@ -116,4 +91,3 @@ CREATE TABLE IF NOT EXISTS social_notification_preferences (
   updated_at TEXT NOT NULL
 );
 
-PRAGMA foreign_keys=ON;
