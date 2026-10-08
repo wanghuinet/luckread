@@ -202,7 +202,16 @@ export default function PublishComposer({
     }
   }, [contentBasePath, router])
 
-  async function uploadFile(file: File): Promise<UploadedAsset> {
+  
+async function cleanupUploadedBodyAsset(mediaId: string): Promise<void> {
+  await fetch('/api/v1/media/' + encodeURIComponent(mediaId), {
+    method: 'DELETE',
+    credentials: 'include',
+    headers: { 'Idempotency-Key': 'content-body-cleanup:' + mediaId + ':' + crypto.randomUUID() },
+  }).catch(() => undefined)
+}
+
+async function uploadFile(file: File): Promise<UploadedAsset> {
     const form = new FormData()
     form.append('_payload', JSON.stringify({ alt: file.name }))
     form.append('file', file)
@@ -290,69 +299,92 @@ export default function PublishComposer({
   async function persistDraft(): Promise<ContentResponse> {
     let bodyRef = draft?.bodyRef
     let nextSavedArticleSerialized: string | null = null
-    if (type === 'article') {
-      const serialized = serializeArticleDocument(articleDocument)
-      if (!bodyRef || savedArticleSerialized !== serialized) {
+    let rollbackBodyAssetId: string | null = null
+
+    try {
+      if (type === 'article') {
+        const serialized = serializeArticleDocument(articleDocument)
+        if (!bodyRef || savedArticleSerialized !== serialized) {
+          const bodyFile = new File(
+            [serialized],
+            `luckread-article-${crypto.randomUUID()}.json`,
+            { type: 'application/json;charset=utf-8' },
+          )
+          const uploadedBody = await uploadFile(bodyFile)
+          bodyRef = uploadedBody.url
+          rollbackBodyAssetId = uploadedBody.id
+          nextSavedArticleSerialized = serialized
+        }
+      } else if (!bodyRef || savedBody !== body) {
         const bodyFile = new File(
-          [serialized],
-          `luckread-article-${crypto.randomUUID()}.json`,
-          { type: 'application/json;charset=utf-8' },
+          [body],
+          `luckread-content-${crypto.randomUUID()}.txt`,
+          { type: 'text/plain;charset=utf-8' },
         )
-        bodyRef = (await uploadFile(bodyFile)).url
-        nextSavedArticleSerialized = serialized
+        const uploadedBody = await uploadFile(bodyFile)
+        bodyRef = uploadedBody.url
+        rollbackBodyAssetId = uploadedBody.id
+        setSavedArticleSerialized('')
       }
-    } else if (!bodyRef || savedBody !== body) {
-      const bodyFile = new File(
-        [body],
-        `luckread-content-${crypto.randomUUID()}.txt`,
-        { type: 'text/plain;charset=utf-8' },
-      )
-      bodyRef = (await uploadFile(bodyFile)).url
-      setSavedArticleSerialized('')
-    }
 
-    const payload = {
-      contentType: type,
-      title: title.trim(),
-      bodyRef,
-      mediaRefs: Array.from(new Set([
-        ...assets.map((asset) => asset.url),
-        ...(type === 'article' ? mediaRefsFromArticleDocument(articleDocument) : []),
-      ])),
-      coverRef: resolveCoverRef(
-        type,
-        assets,
-        coverRef,
-        type === 'article' ? mediaRefsFromArticleDocument(articleDocument) : [],
-      ),
-    }
+      const payload = {
+        contentType: type,
+        title: title.trim(),
+        bodyRef,
+        mediaRefs: Array.from(new Set([
+          ...assets.map((asset) => asset.url),
+          ...(type === 'article' ? mediaRefsFromArticleDocument(articleDocument) : []),
+        ])),
+        coverRef: resolveCoverRef(
+          type,
+          assets,
+          coverRef,
+          type === 'article' ? mediaRefsFromArticleDocument(articleDocument) : [],
+        ),
+      }
 
-    const isUpdate = Boolean(draft?.id && draft.etag)
-    const response = await authorizedFetch(
-      isUpdate
-        ? `${contentBasePath}/${encodeURIComponent(draft!.id)}`
-        : contentBasePath,
-      {
-        method: isUpdate ? 'PATCH' : 'POST',
-        headers: {
-          'content-type': 'application/json',
-          ...(isUpdate ? { 'If-Match': draft!.etag } : {}),
-          'Idempotency-Key': crypto.randomUUID(),
+      const isUpdate = Boolean(draft?.id && draft.etag)
+      const response = await authorizedFetch(
+        isUpdate
+          ? `${contentBasePath}/${encodeURIComponent(draft!.id)}`
+          : contentBasePath,
+        {
+          method: isUpdate ? 'PATCH' : 'POST',
+          headers: {
+            'content-type': 'application/json',
+            ...(isUpdate ? { 'If-Match': draft!.etag } : {}),
+            'Idempotency-Key': crypto.randomUUID(),
+          },
+          body: JSON.stringify(payload),
         },
-        body: JSON.stringify(payload),
-      },
-    )
-    const data = await response.json().catch((): null => null)
-    if (!response.ok) throw new Error(data?.error?.message || 'CONTENT_SAVE_FAILED')
-    const saved = data as ContentResponse
-    setDraft(saved)
-    setSavedBody(body)
-    if (nextSavedArticleSerialized !== null) setSavedArticleSerialized(nextSavedArticleSerialized)
-    autoSaveLastSavedAtRef.current = Date.now()
-    const nextUrl = new URL(window.location.href)
-    nextUrl.searchParams.set('draft', saved.id)
-    window.history.replaceState(null, '', nextUrl.pathname + nextUrl.search + nextUrl.hash)
-    return saved
+      )
+
+      if (!response.ok) {
+        const data = await response.json().catch((): null => null)
+        throw new Error(data?.error?.message || 'CONTENT_SAVE_FAILED')
+      }
+
+      // Once the content write has returned success, the body asset is now an
+      // authoritative reference. Do not roll it back even if response parsing
+      // or local state handling fails afterward.
+      rollbackBodyAssetId = null
+
+      const data = await response.json().catch((): null => null)
+      const saved = data as ContentResponse | null
+      if (!saved?.id || !saved.etag) throw new Error('CONTENT_SAVE_FAILED')
+
+      setDraft(saved)
+      setSavedBody(body)
+      if (nextSavedArticleSerialized !== null) setSavedArticleSerialized(nextSavedArticleSerialized)
+      autoSaveLastSavedAtRef.current = Date.now()
+      const nextUrl = new URL(window.location.href)
+      nextUrl.searchParams.set('draft', saved.id)
+      window.history.replaceState(null, '', nextUrl.pathname + nextUrl.search + nextUrl.hash)
+      return saved
+    } catch (error) {
+      if (rollbackBodyAssetId) await cleanupUploadedBodyAsset(rollbackBodyAssetId)
+      throw error
+    }
   }
 
   function markDirty() {
