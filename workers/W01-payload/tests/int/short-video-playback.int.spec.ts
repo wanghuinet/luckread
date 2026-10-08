@@ -40,6 +40,21 @@ describe('short video playback polish', () => {
     expect(feed).toContain("document.removeEventListener('visibilitychange', handleVisibilityChange)")
   })
 
+  it('preserves user pause state across page visibility changes', () => {
+    const feed = read('src/app/(frontend)/shorts/ShortVideoFeed.tsx')
+    expect(feed).toContain('const resumeAfterVisibilityRef = useRef(false)')
+    expect(feed).toContain('resumeAfterVisibilityRef.current = Boolean(video && !video.paused && !video.ended)')
+    expect(feed).toContain('if (commentsOpen || !resumeAfterVisibilityRef.current)')
+    expect(feed).toContain('resumeAfterVisibilityRef.current = false')
+    expect(feed).toContain("mediaErrorById[id] || document.visibilityState === 'hidden'")
+    expect(feed).toContain('const playbackIntentRef = useRef(true)')
+    expect(feed).toContain('playbackIntentRef.current = true')
+    expect(feed).toContain('playbackIntentRef.current = false')
+    expect(feed).toContain('const resumeAfterCommentsRef = useRef(false)')
+    expect(feed).toContain('resumeAfterCommentsRef.current = Boolean(video && !video.paused && !video.ended)')
+    expect(feed).toContain('const closeComments = () => {')
+  })
+
   it('exposes a recoverable media error path without changing the feed authority', () => {
     const feed = read('src/app/(frontend)/shorts/ShortVideoFeed.tsx')
     expect(feed).toContain('const [mediaErrorById, setMediaErrorById]')
