@@ -10,7 +10,6 @@ import {
   resolveSocialMentionTargets,
   W05SocialClientError,
 } from '../../../../../../social/w05-social-client.js'
-import { resolveCookieContentPrincipal } from '../../../../../../content/w03-content-client.js'
 
 const errorResponse = (status: number, code: string, message: string) =>
   Response.json({ error: { code, message, details: {} }, requestId: crypto.randomUUID() }, { status })
@@ -70,13 +69,11 @@ export async function POST(
 
     let text = (value as { text?: unknown }).text
     if (text === undefined) {
-      const contentPrincipal = await resolveCookieContentPrincipal(request)
-      if (contentPrincipal instanceof Response) return contentPrincipal
       const contentResponse = await callW03Content({
         request,
         pathname: '/internal/content/contents/' + encodeURIComponent(contentId),
         method: 'GET',
-        principal: contentPrincipal,
+        principal,
       })
       if (!contentResponse.ok) return contentResponse
       let contentData: unknown
