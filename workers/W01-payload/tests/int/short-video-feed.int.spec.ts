@@ -58,7 +58,7 @@ describe('TikTok-style short video feed', () => {
     expect(feed).toContain("aria-label={muted ? '打开声音' : '关闭声音'}")
     expect(feed).toContain('const handleVideoTap')
     expect(feed).toContain('if (event.detail >= 2)')
-    expect(feed).toContain('showDoubleTapHeart()')
+    expect(feed).toContain('showDoubleTapHeart(item.id)')
     expect(feed).toContain('toggleLike(item)')
     expect(feed).toContain('onClick={(event) => handleVideoTap(item, event)}')
     expect(feed).not.toContain('onDoubleClick={() =>')

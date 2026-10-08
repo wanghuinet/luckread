@@ -5,6 +5,15 @@ import { resolve } from 'node:path'
 const read = (relativePath: string) => readFileSync(resolve(process.cwd(), relativePath), 'utf8')
 
 describe('short video playback polish', () => {
+  it('scopes double-tap heart feedback to the tapped video', () => {
+    const feed = read('src/app/(frontend)/shorts/ShortVideoFeed.tsx')
+    expect(feed).toContain('const [doubleTapHeartId, setDoubleTapHeartId] = useState<string | null>(null)')
+    expect(feed).toContain('showDoubleTapHeart(item.id)')
+    expect(feed).toContain('doubleTapHeartId === item.id')
+    expect(feed).toContain('setDoubleTapHeartId(null)')
+    expect(feed).not.toContain('const [doubleTapHeart, setDoubleTapHeart] = useState(false)')
+  })
+
   it('supports double-tap like feedback and active-video progress', () => {
     const feed = read('src/app/(frontend)/shorts/ShortVideoFeed.tsx')
     const css = read('src/app/(frontend)/shorts/short-video.module.css')
@@ -91,7 +100,7 @@ describe('short video playback polish', () => {
     expect(feed).toContain('if (event.detail >= 2) {')
     expect(feed).toContain('window.clearTimeout(singleTapTimerRef.current)')
     expect(feed).toContain('togglePlay(item)')
-    expect(feed).toContain('showDoubleTapHeart()')
+    expect(feed).toContain('showDoubleTapHeart(item.id)')
     expect(feed).not.toContain('onDoubleClick={() =>')
   })
 
