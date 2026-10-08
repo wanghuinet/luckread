@@ -12,8 +12,8 @@ describe('personal social relationship pages', () => {
 
     expect(followers).toContain('<MeFollowList direction="followers" />')
     expect(following).toContain('<MeFollowList direction="following" />')
-    expect(component).toContain("fetch('/api/v1/users/me'")
-    expect(component).toContain('/api/v1/users/')
+    expect(component).toContain("fetchJson<ProfileResponse>('/api/v1/users/me'")
+    expect(component).toContain("fetchJson<FollowListResponse>")
     expect(component).toContain("'/' + direction")
     expect(component).toContain('nextCursor')
     expect(component).toContain('加载更多')
