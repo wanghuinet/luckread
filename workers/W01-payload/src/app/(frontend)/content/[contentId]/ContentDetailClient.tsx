@@ -81,7 +81,7 @@ export default function ContentDetailPage({
         try {
           const { contentId } = await params
           let resolved = initialContent
-          let viewerResponse: Response
+          let viewerData: { id?: string } | null = null
 
           if (!resolved || retryKey > 0) {
             const [contentResult, viewerResult] = await Promise.all([
@@ -99,8 +99,7 @@ export default function ContentDetailPage({
               }),
             ])
             const { response, data } = contentResult
-            const viewerResponse = viewerResult.response
-            const viewerData = viewerResult.data
+            viewerData = viewerResult.data
             if (!response.ok || !data?.id || data.state !== 'PUBLISHED') {
               throw new Error(copy.detail.notFound)
             }
@@ -114,8 +113,7 @@ export default function ContentDetailPage({
               cache: 'no-store',
               signal: controller.signal,
             })
-            const viewerResponse = viewerResult.response
-            const viewerData = viewerResult.data
+            viewerData = viewerResult.data
           }
 
           if (cancelled || !resolved) return
