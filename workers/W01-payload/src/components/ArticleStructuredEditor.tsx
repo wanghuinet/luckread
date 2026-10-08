@@ -480,7 +480,7 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
       </div>
 
       <div className="lr-article-editor-hint">
-        每个区块可以独立调整顺序和类型。支持复制结构化区块并在正文中粘贴恢复类型、正文和媒体；文本区块支持 Ctrl/Cmd+Enter 新建正文、Alt+↑/↓ 移动当前区块并保留光标；列表区块使用换行分隔条目；正文内容最终会以版本化 JSON 资产保存，发布前检查仍使用纯文本抽取结果。
+        每个区块可以独立调整顺序和类型。支持复制结构化区块并在正文中粘贴恢复类型、正文和媒体；文本区块支持开头 Backspace 与上一同类区块合并、Ctrl/Cmd+Enter 新建正文、Alt+↑/↓ 移动当前区块并保留光标；列表区块使用换行分隔条目；正文内容最终会以版本化 JSON 资产保存，发布前检查仍使用纯文本抽取结果。
       </div>
 
       <div className="lr-article-blocks">
@@ -685,6 +685,23 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
                 rows={block.type === 'heading' ? 2 : block.type === 'quote' ? 4 : 5}
                 value={block.text}
                 onKeyDown={(event) => {
+                  if (
+                    event.key === 'Backspace' &&
+                    event.currentTarget.selectionStart === 0 &&
+                    event.currentTarget.selectionEnd === 0
+                  ) {
+                    const previous = value.blocks[index - 1]
+                    if (
+                      previous &&
+                      ['paragraph', 'quote', 'bulletList', 'orderedList'].includes(block.type) &&
+                      previous.type === block.type
+                    ) {
+                      event.preventDefault()
+                      mergeBlockWithPrevious(index)
+                      return
+                    }
+                  }
+
                   if (
                     (event.key === 'ArrowUp' || event.key === 'ArrowDown') &&
                     event.altKey &&
