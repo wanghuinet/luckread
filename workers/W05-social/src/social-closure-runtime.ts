@@ -76,7 +76,7 @@ export const extractSocialTokens = (input: string): SocialToken[] => {
   for (const match of source.matchAll(tokenPattern)) {
     const prefix = match[2]
     const raw = match[3]
-    const normalized = prefix === '@' ? raw.toLocaleLowerCase() : raw.normalize('NFKC')
+    const normalized = raw.normalize('NFKC').toLocaleLowerCase('en-US')
     const key = prefix + normalized
     if (seen.has(key)) continue
     seen.add(key)
@@ -229,21 +229,32 @@ export async function getTopicPage(
   db: D1Database,
   topicNameValue: string,
   limitValue: string | null,
+  cursorValue: string | null = null,
 ): Promise<{
   topic: { topicId: string; name: string; displayName: string; status: string }
   contents: Array<{ id: string; contentType: string; title: string; updatedAt: string }>
   hasMore: boolean
-  nextCursor: null
+  nextCursor: string | null
 }> {
-  const normalizedName = topicNameValue.trim().replace(/^#/, '').normalize('NFKC')
+  const normalizedName = topicNameValue.trim().replace(/^#/, '').normalize('NFKC').toLocaleLowerCase('en-US')
   if (!normalizedName || normalizedName.length > 64) {
     throw new SocialClosureRuntimeError('VALIDATION_FAILED', 400)
   }
   const limit = parseLimit(limitValue)
+  const cursor = cursorValue
+    ? decodeCursor(cursorValue)
+    : null
   const topic = await db.prepare(
     'SELECT topic_id, normalized_name, display_name, status FROM social_topics WHERE normalized_name = ? LIMIT 1',
   ).bind(normalizedName).first<{ topic_id: string; normalized_name: string; display_name: string; status: string }>()
   if (!topic || topic.status !== 'ACTIVE') throw new SocialClosureRuntimeError('NOT_FOUND', 404)
+
+  const where = cursor
+    ? ' AND (c.updated_at < ? OR (c.updated_at = ? AND c.id < ?))'
+    : ''
+  const binds = cursor
+    ? [topic.topic_id, cursor.createdAt, cursor.createdAt, cursor.notificationId, limit + 1]
+    : [topic.topic_id, limit + 1]
 
   const rows = await db.prepare(
     `SELECT c.id, c.content_type, c.title, c.updated_at
@@ -251,12 +262,14 @@ export async function getTopicPage(
        JOIN contents c ON c.id = st.target_id
       WHERE st.target_type = 'content'
         AND st.topic_id = ?
-        AND c.state = 'PUBLISHED'
+        AND c.state = 'PUBLISHED'${where}
       ORDER BY c.updated_at DESC, c.id DESC
       LIMIT ?`,
-  ).bind(topic.topic_id, limit + 1).all<{ id: string; content_type: string; title: string; updated_at: string }>()
+  ).bind(...binds).all<{ id: string; content_type: string; title: string; updated_at: string }>()
 
   const items = rows.results ?? []
+  const visible = items.slice(0, limit)
+  const last = visible.at(-1)
   return {
     topic: {
       topicId: topic.topic_id,
@@ -264,14 +277,14 @@ export async function getTopicPage(
       displayName: topic.display_name,
       status: topic.status,
     },
-    contents: items.slice(0, limit).map((row) => ({
+    contents: visible.map((row) => ({
       id: row.id,
       contentType: row.content_type,
       title: row.title,
       updatedAt: row.updated_at,
     })),
     hasMore: items.length > limit,
-    nextCursor: null,
+    nextCursor: items.length > limit && last ? encodeCursor(last.updated_at, last.id) : null,
   }
 }
 
