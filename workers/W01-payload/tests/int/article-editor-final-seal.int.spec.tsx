@@ -57,7 +57,8 @@ describe('ArticleStructuredEditor final interaction closure', () => {
 
     const textareas = screen.getAllByRole('textbox', { name: '正文' })
     textareas[1].focus()
-    (textareas[1] as HTMLTextAreaElement).setSelectionRange(0, 0)
+    (textareas[1] as HTMLTextAreaElement).selectionStart = 0
+    ;(textareas[1] as HTMLTextAreaElement).selectionEnd = 0
 
     fireEvent.keyDown(textareas[1], {
       key: 'Backspace',
@@ -84,7 +85,8 @@ describe('ArticleStructuredEditor final interaction closure', () => {
 
     const textareas = screen.getAllByRole('textbox', { name: '正文' })
     textareas[0].focus()
-    (textareas[0] as HTMLTextAreaElement).setSelectionRange(1, 1)
+    (textareas[0] as HTMLTextAreaElement).selectionStart = 1
+    ;(textareas[0] as HTMLTextAreaElement).selectionEnd = 1
 
     fireEvent.keyDown(textareas[0], {
       key: 'ArrowDown',
