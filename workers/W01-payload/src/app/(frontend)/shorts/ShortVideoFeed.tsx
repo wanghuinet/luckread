@@ -259,7 +259,7 @@ export default function ShortVideoFeed() {
     Object.entries(videoRefs.current).forEach(([id, video]) => {
       if (!video) return
       const isActive = visibleItems[activeIndexRef.current]?.id === id
-      if (mediaErrorById[id]) {
+      if (mediaErrorById[id] || document.visibilityState === 'hidden') {
         video.pause()
         return
       }
