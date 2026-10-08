@@ -321,21 +321,28 @@ export default function ShortVideoFeed() {
       }
 
       try {
-        const responses = await Promise.all(requests)
-        const likeData = responses[0].data as ApiResponse<{ liked?: boolean; likeCount?: number }> | null
-        const bookmarkData = responses[1].data as ApiResponse<{ favorited?: boolean }> | null
+        const results = await Promise.allSettled(requests)
+        const fulfilledResult = (index: number): { response: Response; data: unknown } | null => {
+          const result = results[index]
+          return result?.status === 'fulfilled' ? result.value : null
+        }
+
+        const likeResult = fulfilledResult(0)
+        const bookmarkResult = fulfilledResult(1)
+        const likeData = likeResult?.data as ApiResponse<{ liked?: boolean; likeCount?: number }> | null
+        const bookmarkData = bookmarkResult?.data as ApiResponse<{ favorited?: boolean }> | null
 
         const followIndex = active.creatorId ? 2 : -1
-        const followData = followIndex >= 0
-          ? responses[followIndex].data as ApiResponse<{ following?: boolean; relationship?: { blocked?: boolean; blockedBy?: boolean } }> | null
-          : null
+        const followResult = followIndex >= 0 ? fulfilledResult(followIndex) : null
+        const followData = followResult?.data as ApiResponse<{ following?: boolean; relationship?: { blocked?: boolean; blockedBy?: boolean } }> | null
 
         let profile: Profile | null = active.creatorId ? profileCacheRef.current[active.creatorId] ?? null : null
         if (active.creatorId && !profile) {
-          const profileResult = responses[responses.length - 1]
-          const profileResponse = profileResult.response
-          const profileData = profileResult.data as Profile | null
-          if (profileResponse.ok && profileData?.id) {
+          const profileIndex = active.creatorId && !profileCacheRef.current[active.creatorId] ? results.length - 1 : -1
+          const profileResult = profileIndex >= 0 ? fulfilledResult(profileIndex) : null
+          const profileResponse = profileResult?.response
+          const profileData = profileResult?.data as Profile | null
+          if (profileResponse?.ok && profileData?.id) {
             profile = profileData
             profileCacheRef.current[active.creatorId] = profile
           }
