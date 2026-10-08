@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { FormEvent, useCallback, useEffect, useRef, useState } from 'react'
 
+import { fetchJson, getApiErrorMessage } from '../../../../lib/client-api.js'
 import { getPublicCopy, type PublicLocale } from '../../i18n/public-locale'
 
 type CommentItem = {
@@ -64,7 +65,7 @@ export default function ContentComments({
     try {
       const params = new URLSearchParams({ limit: '20' })
       if (nextCursor) params.set('cursor', nextCursor)
-      const response = await fetch(
+      const { response, data } = await fetchJson<{ data?: CommentPage; error?: { message?: string } }>(
         '/api/v1/contents/' + encodeURIComponent(contentId) + '/comments?' + params.toString(),
         {
           headers: { accept: 'application/json' },
@@ -72,9 +73,8 @@ export default function ContentComments({
           signal: controller.signal,
         },
       )
-      const data = await response.json().catch((): null => null)
       if (!response.ok || !data?.data) {
-        throw new Error(data?.error?.message || copy.comments.loadError)
+        throw new Error(getApiErrorMessage(data, copy.comments.loadError))
       }
       const page = data.data as CommentPage
       if (requestId !== commentsRequestIdRef.current) return
@@ -112,7 +112,7 @@ export default function ContentComments({
     setLikingCommentId(comment.id)
     setMessage('')
     try {
-      const statusResponse = await fetch(
+      const { response: statusResponse, data: statusData } = await fetchJson<{ data?: { liked?: boolean }; error?: { message?: string } }>(
         '/api/v1/interactions/likes?targetType=comment&targetId=' + encodeURIComponent(comment.id),
         {
           credentials: 'include',
@@ -127,7 +127,6 @@ export default function ContentComments({
         return
       }
 
-      const statusData = await statusResponse.json().catch((): null => null) as { data?: { liked?: boolean } } | null
       if (!statusResponse.ok || typeof statusData?.data?.liked !== 'boolean') {
         setMessage(statusData?.data ? (locale === 'en' ? 'Could not read comment like status.' : locale === 'tw' ? '留言按讚狀態讀取失敗。' : '评论点赞状态读取失败。') : copy.comments.likeError)
         return
@@ -135,7 +134,7 @@ export default function ContentComments({
 
       const liked = statusData.data.liked
       const method = liked ? 'DELETE' : 'POST'
-      const response = await fetch('/api/v1/comments/' + encodeURIComponent(comment.id) + '/likes', {
+      const { response, data } = await fetchJson<{ error?: { message?: string } }>('/api/v1/comments/' + encodeURIComponent(comment.id) + '/likes', {
         method,
         credentials: 'include',
         headers: {
@@ -144,14 +143,13 @@ export default function ContentComments({
         },
       })
 
-      const data = await response.json().catch((): null => null)
       if (response.status === 401) {
         const returnTo = window.location.pathname + window.location.search + window.location.hash
         window.location.assign('/login?returnTo=' + encodeURIComponent(returnTo))
         return
       }
       if (!response.ok && response.status !== 204) {
-        setMessage(data?.error?.message || copy.comments.likeError)
+        setMessage(getApiErrorMessage(data, copy.comments.likeError))
         return
       }
 
@@ -168,7 +166,7 @@ export default function ContentComments({
     setDeletingId(comment.id)
     setMessage('')
     try {
-      const response = await fetch(
+      const { response, data } = await fetchJson<{ error?: { code?: string; message?: string } }>(
         '/api/v1/comments/' + encodeURIComponent(comment.id),
         {
           method: 'DELETE',
@@ -185,11 +183,10 @@ export default function ContentComments({
         return
       }
       if (!response.ok) {
-        const data = await response.json().catch((): null => null)
         setMessage(
           data?.error?.code === 'COMMENT_HAS_REPLIES'
             ? copy.comments.tooManyReplies
-            : data?.error?.message || copy.comments.deleteError,
+            : getApiErrorMessage(data, copy.comments.deleteError),
         )
         return
       }
@@ -206,7 +203,7 @@ export default function ContentComments({
     setSavingEdit(true)
     setMessage('')
     try {
-      const response = await fetch(
+      const { response, data } = await fetchJson<{ data?: CommentItem; error?: { message?: string } }>(
         '/api/v1/comments/' + encodeURIComponent(comment.id),
         {
           method: 'PATCH',
@@ -220,7 +217,6 @@ export default function ContentComments({
           body: JSON.stringify({ body: editBody.trim() }),
         },
       )
-      const data = await response.json().catch((): null => null)
       if (response.status === 401) {
         const returnTo = window.location.pathname + window.location.search + window.location.hash
         window.location.assign('/login?returnTo=' + encodeURIComponent(returnTo))
@@ -231,7 +227,7 @@ export default function ContentComments({
         return
       }
       if (!response.ok || !data?.data) {
-        setMessage(data?.error?.message || copy.comments.updateError)
+        setMessage(getApiErrorMessage(data, copy.comments.updateError))
         return
       }
       const updated = data.data as CommentItem
@@ -252,7 +248,7 @@ export default function ContentComments({
     setMessage('')
     const idempotencyKey = crypto.randomUUID()
     try {
-      const response = await fetch(
+      const { response, data } = await fetchJson<{ data?: CommentItem; error?: { message?: string } }>(
         '/api/v1/contents/' + encodeURIComponent(contentId) + '/comments',
         {
           method: 'POST',
@@ -265,14 +261,13 @@ export default function ContentComments({
           body: JSON.stringify({ body: body.trim(), parentId: replyingTo }),
         },
       )
-      const data = await response.json().catch((): null => null)
       if (response.status === 401) {
         const returnTo = window.location.pathname + window.location.search + window.location.hash
         window.location.assign('/login?returnTo=' + encodeURIComponent(returnTo))
         return
       }
       if (!response.ok || !data?.data) {
-        setMessage(data?.error?.message || copy.comments.submitError)
+        setMessage(getApiErrorMessage(data, copy.comments.submitError))
         return
       }
       const created = data.data as CommentItem

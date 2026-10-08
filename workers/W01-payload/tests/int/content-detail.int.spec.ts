@@ -46,7 +46,7 @@ describe('public content detail', () => {
 
   it('connects the content detail page to the canonical report API', () => {
     const page = read('src/app/(frontend)/content/[contentId]/ContentDetailClient.tsx')
-    expect(page).toContain("fetch('/api/v1/reports'")
+    expect(page).toContain("fetchJson<{ data?: { status?: string }; error?: { message?: string } }>('/api/v1/reports'")
     expect(page).toContain("targetType: 'content'")
     expect(page).toContain('targetId: content.id')
     expect(page).toContain('reasonCode')
@@ -70,7 +70,7 @@ describe('public content detail', () => {
 
   it('hides self-follow on the viewer own content', () => {
     const page = read('src/app/(frontend)/content/[contentId]/ContentDetailClient.tsx')
-    expect(page).toContain("fetch('/api/v1/users/me'")
+    expect(page).toContain("fetchJson<{ id?: string }>('/api/v1/users/me'")
     expect(page).toContain("setViewerUserId(typeof viewerData?.id === 'string' ? viewerData.id : null)")
     expect(page).toContain('viewerUserId === content.creatorId')
     expect(page).toContain('copy.detail.own')
@@ -125,7 +125,7 @@ describe('public content detail', () => {
 
   it('connects the content detail page to the authenticated like API', () => {
     const page = read('src/app/(frontend)/content/[contentId]/ContentDetailClient.tsx')
-    expect(page).toContain("fetch('/api/v1/interactions/likes'")
+    expect(page).toContain("fetchJson<{ error?: { message?: string } }>('/api/v1/interactions/likes'")
     expect(page).toContain("credentials: 'include'")
     expect(page).toContain("targetType: 'content'")
     expect(page).toContain("liked ? 'DELETE' : 'POST'")
@@ -201,5 +201,5 @@ it('handles the follow DELETE no-body response without attempting JSON parsing',
   const page = read('src/app/(frontend)/content/[contentId]/ContentDetailClient.tsx')
   expect(page).toContain('if (following) {')
   expect(page).toContain('setFollowing(false)')
-  expect(page).toContain("const data = await response.json().catch((): null => null) as { data?: { following?: boolean } } | null")
+  expect(page).toContain("fetchJson<{ data?: { following?: boolean }; error?: { message?: string } }>")
 })
