@@ -119,3 +119,12 @@ describe('public creator profile', () => {
     expect(page).not.toContain('style={{')
   })
 })
+
+
+it('handles the profile follow DELETE no-body response without requiring a JSON payload', () => {
+  const page = read('src/app/(frontend)/users/[userId]/page.tsx')
+  expect(page).toContain('if (isFollowing) {')
+  expect(page).toContain('setIsFollowing(false)')
+  expect(page).toContain('setFollowers((value) => value === null ? value : Math.max(0, value - 1))')
+  expect(page).toContain("const data = await response.json().catch((): null => null) as { data?: { following?: boolean } } | null")
+})
