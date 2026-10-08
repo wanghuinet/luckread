@@ -211,15 +211,17 @@ export default function ShortVideoFeed() {
       if (!video) return
       const isActive = visibleItems[activeIndexRef.current]?.id === id
       video.muted = muted
-      if (isActive) {
+      if (isActive && !commentsOpen) {
         void video.play().catch(() => {
           // Autoplay may be blocked until the first user gesture.
         })
+      } else if (isActive) {
+        video.pause()
       } else {
         video.pause()
       }
     })
-  }, [activeIndex, muted, visibleItems])
+  }, [activeIndex, commentsOpen, muted, visibleItems])
 
   useEffect(() => {
     const active = visibleItems[activeIndex]
@@ -324,6 +326,18 @@ export default function ShortVideoFeed() {
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [commentsOpen, scrollToIndex, visibleItems.length])
+
+  useEffect(() => {
+    if (activeIndexRef.current >= visibleItems.length && visibleItems.length > 0) {
+      setActive(visibleItems.length - 1)
+    }
+  }, [setActive, visibleItems.length])
+
+  useEffect(() => {
+    if (!page.hasMore || !page.nextCursor || loadingMore) return
+    if (activeIndex < Math.max(visibleItems.length - 3, 0)) return
+    void loadPage(page.nextCursor)
+  }, [activeIndex, loadPage, loadingMore, page.hasMore, page.nextCursor, visibleItems.length])
 
   const updateBusy = (id: string, action: string | null) => {
     setBusyById((current) => {
@@ -527,10 +541,6 @@ export default function ShortVideoFeed() {
   }
 
   const activeItem = visibleItems[activeIndex]
-  const activeProfile = activeItem?.creatorId ? profileById[activeItem.creatorId] : undefined
-  const activeInteraction = activeItem ? interactionById[activeItem.id] ?? initialInteraction : initialInteraction
-  const activeBusy = activeItem ? busyById[activeItem.id] : undefined
-
   if (loading) {
     return <main className={styles.shell}><div className={styles.loading}>正在加载短视频…</div></main>
   }
@@ -713,7 +723,7 @@ export default function ShortVideoFeed() {
         <Link href="/content?type=video" className={styles.navItem}><i className="fa-solid fa-compass" aria-hidden="true" /><span>探索</span></Link>
         <Link href="/publish?type=video" className={styles.navCreate}><i className="fa-solid fa-plus" aria-hidden="true" /></Link>
         <Link href="/creator-center" className={styles.navItem}><i className="fa-solid fa-user-pen" aria-hidden="true" /><span>创作</span></Link>
-        <Link href="/users/" className={styles.navItem}><i className="fa-solid fa-user" aria-hidden="true" /><span>我</span></Link>
+        <Link href="/me/profile" className={styles.navItem}><i className="fa-solid fa-user" aria-hidden="true" /><span>我</span></Link>
       </nav>
 
       {commentsOpen && commentsContentId ? (
