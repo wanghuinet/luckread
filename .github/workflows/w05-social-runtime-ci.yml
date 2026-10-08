@@ -86,7 +86,7 @@ jobs:
 
       - name: Run W05 Social and W01 adapter tests
         working-directory: workers/W01-payload
-        run: pnpm exec vitest run --config ./vitest.config.mts ../../workers/W05-social/src/follow-runtime.test.ts ../../workers/W05-social/src/like-runtime.test.ts ../../workers/W05-social/src/comment-runtime.test.ts ../../workers/W05-social/src/favorite-runtime.test.ts ../../workers/W05-social/src/share-runtime.test.ts ../../workers/W05-social/src/block-policy.test.ts ../../workers/W05-social/src/relationship-graph-runtime.test.ts ../../workers/W05-social/src/block-mute-runtime.test.ts ../../workers/W05-social/src/index.test.ts ../../workers/W05-social/src/d1-traffic-guard.test.ts tests/int/social-followers-v1-adapter.int.spec.ts tests/int/social-likes-v1-adapter.int.spec.ts tests/int/social-comments-v1-adapter.int.spec.ts tests/int/social-comment-likes-v1-adapter.int.spec.ts tests/int/social-bookmarks-v1-adapter.int.spec.ts tests/int/social-shares-v1-adapter.int.spec.ts tests/int/social-shares-landing.int.spec.ts tests/int/social-block-mute-v1-adapter.int.spec.ts tests/int/content-detail.int.spec.ts tests/int/content-detail-comments.int.spec.ts
+        run: pnpm exec vitest run --config ./vitest.config.mts ../../workers/W05-social/src/follow-runtime.test.ts ../../workers/W05-social/src/like-runtime.test.ts ../../workers/W05-social/src/comment-runtime.test.ts ../../workers/W05-social/src/favorite-runtime.test.ts ../../workers/W05-social/src/share-runtime.test.ts ../../workers/W05-social/src/block-policy.test.ts ../../workers/W05-social/src/relationship-graph-runtime.test.ts ../../workers/W05-social/src/block-mute-runtime.test.ts ../../workers/W05-social/src/index.test.ts ../../workers/W05-social/src/d1-traffic-guard.test.ts ../../workers/W05-social/src/social-closure-runtime.test.ts tests/int/social-closure-v1-adapter.int.spec.ts tests/int/social-followers-v1-adapter.int.spec.ts tests/int/social-likes-v1-adapter.int.spec.ts tests/int/social-comments-v1-adapter.int.spec.ts tests/int/social-comment-likes-v1-adapter.int.spec.ts tests/int/social-bookmarks-v1-adapter.int.spec.ts tests/int/social-shares-v1-adapter.int.spec.ts tests/int/social-shares-landing.int.spec.ts tests/int/social-block-mute-v1-adapter.int.spec.ts tests/int/content-detail.int.spec.ts tests/int/content-detail-comments.int.spec.ts
 
       - name: Verify comment delete tombstone migration
         run: |
@@ -193,4 +193,23 @@ jobs:
           if indexes.get('sqlite_autoindex_social_comments_1') != 1:
               raise SystemExit('comment idempotency uniqueness boundary missing')
           print('SOCIAL_004_COMMENT_MIGRATION_STATIC=PASS')
+          PY
+
+      - name: Verify unified social closure migration shape
+        run: |
+          python - <<'PY'
+          import sqlite3
+          from pathlib import Path
+          db = sqlite3.connect(':memory:')
+          base = Path('workers/W05-social/migrations/20261002_002_social_003_like_v1.sql').read_text()
+          closure = Path('workers/W05-social/migrations/20261008_011_social_closure_v1.sql').read_text()
+          db.executescript(base)
+          db.executescript(closure)
+          like_sql = db.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='interaction_likes'").fetchone()[0]
+          if "target_type IN ('content','comment')" not in like_sql:
+              raise SystemExit('comment-like target boundary missing after closure migration')
+          for table in ['social_topics','social_target_topics','social_mentions','social_notifications','social_notification_outbox','social_notification_preferences']:
+              if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (table,)).fetchone() is None:
+                  raise SystemExit(f'missing {table}')
+          print('SOCIAL_CLOSURE_V1_MIGRATION_STATIC=PASS')
           PY
