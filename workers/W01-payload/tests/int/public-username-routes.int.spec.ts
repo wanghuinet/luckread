@@ -18,7 +18,7 @@ describe('public username routes', () => {
     expect(profile).toContain("import UserProfilePage from '../users/[userId]/page'")
   })
 
-  it('exposes the username article route without introducing another content authority', () => {
+  it('routes username profile works through the canonical content detail authority', () => {
     const article = read('src/app/(frontend)/[username]/article/[contentId]/page.tsx')
     const user = read('src/app/(frontend)/users/[userId]/page.tsx')
 
@@ -26,7 +26,8 @@ describe('public username routes', () => {
     expect(article).toContain('Promise.resolve({ contentId })')
     expect(article).not.toContain('D1Database')
     expect(article).not.toContain('getPayload')
-    expect(user).toContain("encodeURIComponent(profile!.username)")
-    expect(user).toContain("item.contentType + '/'")
+    expect(user).toContain("return '/content/' + encodeURIComponent(item.slug || item.id)")
+    expect(user).toContain("type PublicContent = {")
+    expect(user).toContain("slug?: string")
   })
 })
