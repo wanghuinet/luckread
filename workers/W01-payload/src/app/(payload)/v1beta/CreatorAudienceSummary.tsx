@@ -108,26 +108,54 @@ export default function CreatorAudienceSummary({ userId, loginPath = '/admin/log
   useEffect(() => {
     const controller = new AbortController()
     let cancelled = false
+    const otherDirection: Direction = direction === 'followers' ? 'following' : 'followers'
 
-    void Promise.all([
-      fetchCount('/api/v1/users/' + encodeURIComponent(userId) + '/followers?limit=1', controller.signal, loginPath),
-      fetchCount('/api/v1/users/' + encodeURIComponent(userId) + '/following?limit=1', controller.signal, loginPath),
-    ])
-      .then(([followers, following]) => {
-        if (cancelled) return
-        setState({ followers, following, error: false })
+    void fetchList(userId, direction, null, controller.signal, loginPath)
+      .then(async (page) => {
+        if (cancelled || controller.signal.aborted) return
+        setState((current) => ({
+          ...current,
+          [direction]: page.totalCount,
+        }))
+        setItems(page.items)
+        setNextCursor(page.nextCursor)
+        setHasMore(page.hasMore)
+        setLoadedListKey(listKey)
+        setListErrorKey(null)
+
+        try {
+          const otherCount = await fetchCount(
+            '/api/v1/users/' + encodeURIComponent(userId) + '/' + otherDirection + '?limit=1',
+            controller.signal,
+            loginPath,
+          )
+          if (cancelled || controller.signal.aborted) return
+          setState((current) => ({
+            ...current,
+            [otherDirection]: otherCount,
+            error: false,
+          }))
+        } catch (error: unknown) {
+          if (cancelled || controller.signal.aborted) return
+          setState((current) => ({ ...current, error: true }))
+          console.error('Creator audience secondary count failed', error)
+        }
       })
       .catch((error: unknown) => {
         if (cancelled || controller.signal.aborted) return
-        setState({ followers: null, following: null, error: true })
-        console.error('Creator audience summary failed', error)
+        setListErrorKey(listKey)
+        setState((current) => ({ ...current, error: true }))
+        console.error('Creator audience list failed', error)
+      })
+      .finally(() => {
+        if (!cancelled && !controller.signal.aborted) setListBusy(false)
       })
 
     return () => {
       cancelled = true
       controller.abort()
     }
-  }, [userId, reloadKey])
+  }, [direction, loginPath, listKey, userId])
 
   const listKey = userId + ':' + direction + ':' + reloadKey
 
@@ -138,6 +166,10 @@ export default function CreatorAudienceSummary({ userId, loginPath = '/admin/log
     void fetchList(userId, direction, null, controller.signal, loginPath)
       .then((page) => {
         if (requestId !== listRequestId.current) return
+        setState((current) => ({
+          ...current,
+          [direction]: page.totalCount,
+        }))
         setItems(page.items)
         setNextCursor(page.nextCursor)
         setHasMore(page.hasMore)
