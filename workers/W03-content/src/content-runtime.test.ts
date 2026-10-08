@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-import { canTransitionContentState, createContent, decodeCursor, encodeCursor, isState, listContents, transitionContentState, updateContent, validateInput, validateListFilters } from './content-runtime.js'
+import { canTransitionContentState, createContent, decodeCursor, encodeCursor, isState, listContents, publishDueScheduledContent, transitionContentState, updateContent, validateInput, validateListFilters } from './content-runtime.js'
 import w03Worker, { hasCreatorContentPermission, parseListLimit } from './index.js'
 
 describe('W03 content contract core', () => {
@@ -82,11 +82,81 @@ describe('W03 content contract core', () => {
     expect(canTransitionContentState('DRAFT', 'PUBLISHED', 'CREATOR', true)).toBe(false)
     expect(canTransitionContentState('PENDING_REVIEW', 'APPROVED', 'MODERATOR', false)).toBe(true)
     expect(canTransitionContentState('PENDING_REVIEW', 'REJECTED', 'MODERATOR', false)).toBe(true)
+    expect(canTransitionContentState('APPROVED', 'SCHEDULED', 'CREATOR', true)).toBe(true)
+    expect(canTransitionContentState('SCHEDULED', 'DRAFT', 'CREATOR', true)).toBe(true)
+    expect(canTransitionContentState('SCHEDULED', 'PUBLISHED', 'CREATOR', true)).toBe(false)
     expect(canTransitionContentState('PENDING_REVIEW', 'APPROVED', 'CREATOR', true)).toBe(false)
     expect(canTransitionContentState('PUBLISHED', 'PENDING_REVIEW', 'CREATOR', true, 'material_edit_requires_review')).toBe(true)
     expect(canTransitionContentState('PUBLISHED', 'PENDING_REVIEW', 'CREATOR', true, 'other')).toBe(false)
   })
 
+
+  it('requires a future timestamp before scheduling an approved content item', async () => {
+    const db = {
+      prepare() {
+        throw new Error('database should not be reached for invalid scheduledAt')
+      },
+    } as never
+
+    await expect(
+      transitionContentState(
+        db,
+        'user_schedule',
+        'L3',
+        'content_schedule_123',
+        'SCHEDULED',
+        undefined,
+        'W/"1"',
+        'schedule-idem',
+        new Date('2026-10-08T12:00:00.000Z'),
+        { scheduledAt: '2026-10-08T11:59:59.000Z' },
+      ),
+    ).rejects.toMatchObject({ code: 'VALIDATION_FAILED', status: 400 })
+  })
+
+  it('publishes only due scheduled rows and converges concurrent execution safely', async () => {
+    const statements: Array<{ query: string; bindings: unknown[] }> = []
+    const dueRows = [
+      { id: 'scheduled_due_1', version: 4, scheduled_at: '2026-10-08T12:00:00.000Z' },
+      { id: 'scheduled_due_2', version: 7, scheduled_at: '2026-10-08T12:01:00.000Z' },
+    ]
+    const db = {
+      prepare(query: string) {
+        if (query.includes('FROM contents')) {
+          return {
+            bind: (...bindings: unknown[]) => ({
+              all: async () => ({ results: dueRows }),
+              first: async () => undefined,
+              bindings,
+            }),
+          }
+        }
+        return {
+          bind: (...bindings: unknown[]) => {
+            statements.push({ query, bindings })
+            return { query, bindings }
+          },
+        }
+      },
+      batch: async (items: Array<{ query: string }>) => items.map(() => ({ meta: { changes: 1 } })),
+    } as never
+
+    await expect(
+      publishDueScheduledContent(db, new Date('2026-10-08T12:02:00.000Z'), 50),
+    ).resolves.toEqual({ scanned: 2, published: 2 })
+
+    expect(statements).toHaveLength(2)
+    expect(statements[0]?.query).toContain("SET state = 'PUBLISHED', scheduled_at = NULL")
+    expect(statements[0]?.query).toContain("WHERE id = ? AND state = 'SCHEDULED'")
+    expect(statements[0]?.bindings).toEqual([
+      5,
+      'W/"5"',
+      '2026-10-08T12:02:00.000Z',
+      'scheduled_due_1',
+      '2026-10-08T12:00:00.000Z',
+      4,
+    ])
+  })
 
   it('requires at least one media reference for video content', () => {
     expect(() =>
@@ -478,6 +548,26 @@ describe('1.1 content revision history', () => {
     expect(migration).toContain('correlation_id TEXT NOT NULL')
     expect(migration).toContain('CREATE INDEX content_revisions_content_created_idx')
     expect(migration).toContain('legacy_backfill')
+  })
+
+  it('defines scheduled publication persistence and trigger wiring', () => {
+    const migration = readFileSync(
+      resolve(process.cwd(), 'workers/W03-content/migrations/0011_content_scheduled_publish.sql'),
+      'utf8',
+    )
+    expect(migration).toContain('ALTER TABLE contents ADD COLUMN scheduled_at TEXT')
+    expect(migration).toContain('CREATE INDEX contents_scheduled_due_idx')
+    const wrangler = readFileSync(
+      resolve(process.cwd(), 'workers/W03-content/wrangler.jsonc'),
+      'utf8',
+    )
+    expect(wrangler).toContain('"crons": ["* * * * *"]')
+    const runtime = readFileSync(
+      resolve(process.cwd(), 'workers/W03-content/src/index.ts'),
+      'utf8',
+    )
+    expect(runtime).toContain('async scheduled(controller: ScheduledController, env: Env)')
+    expect(runtime).toContain('publishDueScheduledContent')
   })
 
   it('defines the stable slug migration and trigger payload', () => {
