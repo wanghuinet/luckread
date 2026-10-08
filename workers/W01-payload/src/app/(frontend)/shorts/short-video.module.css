@@ -398,14 +398,13 @@
 }
 
 .loadMoreSentinel {
-  position: fixed;
-  right: 14px;
-  top: 50%;
-  z-index: 6;
-  max-width: 10rem;
+  position: relative;
+  min-height: 48px;
+  display: grid;
+  place-items: center;
   color: rgba(255,255,255,.45);
   font-size: 10px;
-  text-align: right;
+  text-align: center;
   pointer-events: none;
 }
 
