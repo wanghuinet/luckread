@@ -788,3 +788,102 @@ it('keeps create idempotency replay byte-stable across retry time', async () => 
   )
   expect(result).toEqual(original)
 })
+
+describe('1.1 content lifecycle idempotency', () => {
+  it('replays a duplicate publish transition without advancing the content version', async () => {
+    const contentId = 'content_publish_retry_123'
+    const idempotencyKey = 'publish-retry-key'
+    const ifMatch = 'W/"4"'
+    const result = {
+      from: 'APPROVED',
+      to: 'PUBLISHED',
+      version: 5,
+      etag: 'W/"5"',
+    }
+
+    const canonicalize = (value: unknown): unknown => {
+      if (Array.isArray(value)) return value.map(canonicalize)
+      if (value && typeof value === 'object') {
+        return Object.fromEntries(
+          Object.entries(value as Record<string, unknown>)
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([key, nested]) => [key, canonicalize(nested)]),
+        )
+      }
+      return value
+    }
+
+    const hashInput = canonicalize({
+      operationId: 'transitionContentState',
+      input: {
+        contentId,
+        to: 'PUBLISHED',
+        reason: null,
+        ifMatch: '4',
+      },
+    })
+    const digest = await crypto.subtle.digest(
+      'SHA-256',
+      new TextEncoder().encode(JSON.stringify(hashInput)),
+    )
+    const requestHash = Array.from(
+      new Uint8Array(digest),
+      byte => byte.toString(16).padStart(2, '0'),
+    ).join('')
+
+    let batchCalled = false
+    const db = {
+      prepare() {
+        return {
+          bind: () => ({
+            first: async () => ({
+              id: contentId,
+              content_type: 'article',
+              owner_user_id: 'user_publish_retry',
+              creator_id: 'user_publish_retry',
+              ip_id: null,
+              state: 'APPROVED',
+              version: 4,
+              revision: 4,
+              slug: 'publish-retry',
+              title: 'Retry-safe publish',
+              body_ref: 'https://cdn.example.com/body.json',
+              media_refs_json: '[]',
+              cover_ref: null,
+              etag: ifMatch,
+              created_at: '2026-10-08T00:00:00.000Z',
+              updated_at: '2026-10-08T00:01:00.000Z',
+              idem_id: 'idem_publish_retry',
+              idem_owner_user_id: 'user_publish_retry',
+              idem_request_hash: requestHash,
+              idem_status: 'COMPLETED',
+              idem_response_status: 200,
+              idem_response_json: JSON.stringify(result),
+              idem_expires_at: '2026-10-09T00:00:00.000Z',
+            }),
+          }),
+        }
+      },
+      batch: async () => {
+        batchCalled = true
+        throw new Error('duplicate publish must not write a second transition')
+      },
+    } as never
+
+    await expect(
+      transitionContentState(
+        db,
+        'user_publish_retry',
+        'L3',
+        contentId,
+        'PUBLISHED',
+        undefined,
+        ifMatch,
+        idempotencyKey,
+        new Date('2026-10-08T00:02:00.000Z'),
+      ),
+    ).resolves.toEqual(result)
+
+    expect(batchCalled).toBe(false)
+  })
+})
