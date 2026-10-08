@@ -210,6 +210,20 @@ describe('Creator Center admin extension', () => {
     expect(editor).toContain('从正文移除')
   })
 
+  it('exposes contextual article media insertion', () => {
+    const editor = read('src/components/ArticleStructuredEditor.tsx')
+    const document = read('src/lib/article-document.ts')
+    const plugin = read('src/components/ArticleEditorPlugin.ts')
+
+    expect(document).toContain('export const insertArticleMediaBlockAfter')
+    expect(editor).toContain('insertArticleMediaBlockAfter(value, index, type, refs)')
+    expect(editor).toContain('aria-label="在下方插入图片"')
+    expect(editor).toContain('aria-label="在下方插入图库"')
+    expect(editor).toContain('onClick={() => insertMediaAfter(index, \'image\')}')
+    expect(editor).toContain('onClick={() => insertMediaAfter(index, \'gallery\')}')
+    expect(plugin).toContain("insertMediaAfter: (index: number, type: 'image' | 'gallery', assetUrls?: string[]) => void")
+  })
+
   it('exposes contextual article block insertion', () => {
     const editor = read('src/components/ArticleStructuredEditor.tsx')
     const document = read('src/lib/article-document.ts')
