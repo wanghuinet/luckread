@@ -288,14 +288,14 @@ export default function ShortVideoFeed() {
 
     const controller = new AbortController()
     void (async () => {
-      const requests: Promise<Response>[] = [
-        fetch('/api/v1/interactions/likes?targetType=content&targetId=' + encodeURIComponent(active.id), {
+      const requests: Array<Promise<{ response: Response; data: unknown }>> = [
+        fetchJson<ApiResponse<{ liked?: boolean; likeCount?: number }>>('/api/v1/interactions/likes?targetType=content&targetId=' + encodeURIComponent(active.id), {
           credentials: 'include',
           headers: { accept: 'application/json' },
           cache: 'no-store',
           signal: controller.signal,
         }),
-        fetch('/api/v1/interactions/bookmarks?targetType=content&targetId=' + encodeURIComponent(active.id), {
+        fetchJson<ApiResponse<{ favorited?: boolean }>>('/api/v1/interactions/bookmarks?targetType=content&targetId=' + encodeURIComponent(active.id), {
           credentials: 'include',
           headers: { accept: 'application/json' },
           cache: 'no-store',
@@ -304,14 +304,14 @@ export default function ShortVideoFeed() {
       ]
 
       if (active.creatorId) {
-        requests.push(fetch('/api/v1/social/follows/' + encodeURIComponent(active.creatorId), {
+        requests.push(fetchJson<ApiResponse<{ following?: boolean; relationship?: { blocked?: boolean; blockedBy?: boolean } }>>('/api/v1/social/follows/' + encodeURIComponent(active.creatorId), {
           credentials: 'include',
           headers: { accept: 'application/json' },
           cache: 'no-store',
           signal: controller.signal,
         }))
         if (!profileCacheRef.current[active.creatorId]) {
-          requests.push(fetch('/api/v1/users/' + encodeURIComponent(active.creatorId), {
+          requests.push(fetchJson<Profile>('/api/v1/users/' + encodeURIComponent(active.creatorId), {
             credentials: 'omit',
             headers: { accept: 'application/json' },
             cache: 'no-store',
@@ -322,18 +322,19 @@ export default function ShortVideoFeed() {
 
       try {
         const responses = await Promise.all(requests)
-        const likeData = await responses[0].json().catch((): null => null) as ApiResponse<{ liked?: boolean; likeCount?: number }> | null
-        const bookmarkData = await responses[1].json().catch((): null => null) as ApiResponse<{ favorited?: boolean }> | null
+        const likeData = responses[0].data as ApiResponse<{ liked?: boolean; likeCount?: number }> | null
+        const bookmarkData = responses[1].data as ApiResponse<{ favorited?: boolean }> | null
 
         const followIndex = active.creatorId ? 2 : -1
         const followData = followIndex >= 0
-          ? await responses[followIndex].json().catch((): null => null) as ApiResponse<{ following?: boolean; relationship?: { blocked?: boolean; blockedBy?: boolean } }> | null
+          ? responses[followIndex].data as ApiResponse<{ following?: boolean; relationship?: { blocked?: boolean; blockedBy?: boolean } }> | null
           : null
 
         let profile: Profile | null = active.creatorId ? profileCacheRef.current[active.creatorId] ?? null : null
         if (active.creatorId && !profile) {
-          const profileResponse = responses[responses.length - 1]
-          const profileData = await profileResponse.json().catch((): null => null) as Profile | null
+          const profileResult = responses[responses.length - 1]
+          const profileResponse = profileResult.response
+          const profileData = profileResult.data as Profile | null
           if (profileResponse.ok && profileData?.id) {
             profile = profileData
             profileCacheRef.current[active.creatorId] = profile
