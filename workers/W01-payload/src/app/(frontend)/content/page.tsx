@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
+import { fetchJson, getApiErrorMessage } from '../../../lib/client-api.js'
 import PublicLanguageToggle, { usePublicLocale } from '../i18n/PublicLanguageToggle'
 import { getPublicCopy, type PublicLocale } from '../i18n/public-locale'
 
@@ -63,15 +64,14 @@ export default function ContentBrowsePage() {
       if (cursor) params.set('cursor', cursor)
       if (selectedType !== 'all') params.set('type', selectedType)
 
-      const response = await fetch('/api/v1/contents?' + params.toString(), {
+      const { response, data } = await fetchJson<ContentApiResponse>('/api/v1/contents?' + params.toString(), {
         headers: { accept: 'application/json' },
         credentials: 'omit',
         cache: 'no-store',
         signal: controller.signal,
       })
-      const data: ContentApiResponse = await response.json().catch((): null => null)
       if (!response.ok || !data?.data) {
-        throw new Error(data?.error?.message || fallbackError)
+        throw new Error(getApiErrorMessage(data, fallbackError))
       }
 
       if (requestId !== requestIdRef.current) return
