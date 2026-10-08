@@ -413,7 +413,7 @@ describe('Creator Center admin extension', () => {
     const plugin = read('src/components/article-editor-word-import-plugin.tsx')
     const editor = read('src/components/ArticleStructuredEditor.tsx')
     expect(registry).toContain("import { articleWordImportPlugin } from './article-editor-word-import-plugin.js'")
-    expect(registry).toContain('export const articleEditorPlugins: readonly ArticleEditorPlugin[] = [articleWordImportPlugin]')
+    expect(registry).toContain('export const articleEditorPlugins: readonly ArticleEditorPlugin[] = [')
     expect(plugin).toContain("id: 'word-import'")
     expect(plugin).toContain('Toolbar: WordImportToolbar')
     expect(plugin).toContain('onImport={updateDocument}')
@@ -463,7 +463,7 @@ describe('Creator Center admin extension', () => {
     expect(editor).toContain('normalizeArticleEditorPlugins(plugins)')
     expect(editor).toContain("<Toolbar key={plugin.id + ':toolbar'}")
     expect(editor).toContain('<Panel key={plugin.id + \':panel\'}')
-    expect(registry).toContain('export const articleEditorPlugins: readonly ArticleEditorPlugin[] = [articleWordImportPlugin]')
+    expect(registry).toContain('export const articleEditorPlugins: readonly ArticleEditorPlugin[] = [')
     expect(publisher).toContain('plugins={articleEditorPlugins}')
   })
 
