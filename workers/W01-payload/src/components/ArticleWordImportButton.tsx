@@ -19,6 +19,7 @@ type UploadedMedia = {
   id?: string | number
 }
 
+
 const MAX_FILE_BYTES = 50 * 1024 * 1024
 const MAX_MEDIA_BYTES = 50 * 1024 * 1024
 const MAX_IMAGES = 50
@@ -35,7 +36,7 @@ async function uploadImage(
   alt: string | undefined,
   mimeType: string,
   idempotencyKey: string,
-): Promise<string> {
+): Promise<{ id: string; url: string }> {
   const form = new FormData()
   form.append('_payload', JSON.stringify({ alt: alt?.trim() || 'Imported Word image' }))
   form.append('file', new Blob([bytes as BlobPart], { type: mimeType }), filename)
@@ -48,10 +49,25 @@ async function uploadImage(
   })
   const payload = await response.json().catch((): { doc?: UploadedMedia; url?: string; message?: string; error?: { message?: string } } => ({}))
   const url = payload.doc?.url ?? payload.url
-  if (!response.ok || typeof url !== 'string' || !url) {
+  const mediaId = payload.doc?.id ?? payload.id
+  if (!response.ok || typeof url !== 'string' || !url || (typeof mediaId !== 'string' && typeof mediaId !== 'number')) {
     throw new Error(payload.error?.message || payload.message || 'Word 图片上传失败')
   }
-  return url
+  return { id: String(mediaId), url }
+}
+
+async function cleanupUploadedMedia(mediaIds: string[], importScope: string): Promise<void> {
+  await Promise.allSettled(
+    mediaIds.map((mediaId) =>
+      fetch('/api/v1/media/' + encodeURIComponent(mediaId), {
+        method: 'DELETE',
+        credentials: 'include',
+        headers: {
+          'Idempotency-Key': 'word-structured-import-cleanup:' + importScope + ':' + mediaId,
+        },
+      }),
+    ),
+  )
 }
 
 export default function ArticleWordImportButton({ disabled = false, onBeforeImport, onImport }: Props) {
@@ -69,6 +85,8 @@ export default function ArticleWordImportButton({ disabled = false, onBeforeImpo
     }
 
     setBusy(true)
+    const importScope = crypto.randomUUID()
+    const uploadedMediaIds: string[] = []
     try {
       const imported = normalizeImportedDocument(
         await parseDocx(await file.arrayBuffer(), { maxMediaBytes: MAX_MEDIA_BYTES }),
@@ -88,15 +106,16 @@ export default function ArticleWordImportButton({ disabled = false, onBeforeImpo
           mediaRefs.set(image.mediaKey, existing)
           continue
         }
-        const url = await uploadImage(
+        const uploaded = await uploadImage(
           image.bytes,
           image.mediaKey.split('/').pop() || 'word-image',
           image.alt,
           image.mimeType,
-          'word-structured-import-' + hash,
+          'word-structured-import:' + importScope + ':' + hash,
         )
-        hashToUrl.set(hash, url)
-        mediaRefs.set(image.mediaKey, url)
+        uploadedMediaIds.push(uploaded.id)
+        hashToUrl.set(hash, uploaded.url)
+        mediaRefs.set(image.mediaKey, uploaded.url)
       }
 
       const result = articleDocumentFromImportedDocument(imported, mediaRefs)
@@ -105,6 +124,9 @@ export default function ArticleWordImportButton({ disabled = false, onBeforeImpo
         window.alert('Word 导入完成。' + '\n' + result.warnings.slice(0, 5).join('\n'))
       }
     } catch (error) {
+      if (uploadedMediaIds.length > 0) {
+        await cleanupUploadedMedia(uploadedMediaIds, importScope)
+      }
       window.alert(error instanceof Error ? error.message : 'Word 导入失败')
     } finally {
       setBusy(false)
