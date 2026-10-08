@@ -374,7 +374,11 @@ export default {
         requireTransport(request)
         const topicName = decodePathPart(parts[3])
         if (topicName === null) throw new SocialClosureRuntimeError('VALIDATION_FAILED', 400)
-        return json({ data: await getTopicPage(env.DB, topicName, new URL(request.url).searchParams.get('limit')), requestId: crypto.randomUUID() })
+        const topicUrl = new URL(request.url)
+        return json({
+          data: await getTopicPage(env.DB, topicName, topicUrl.searchParams.get('limit'), topicUrl.searchParams.get('cursor')),
+          requestId: crypto.randomUUID(),
+        })
       }
 
       if (url.pathname === '/internal/social/notifications') {
@@ -418,11 +422,11 @@ export default {
         try { body = await request.json() } catch { throw new SocialClosureRuntimeError('VALIDATION_FAILED', 400) }
         if (!body || typeof body !== 'object' || Array.isArray(body)) throw new SocialClosureRuntimeError('VALIDATION_FAILED', 400)
         const raw = body as Record<string, unknown>
-        const input = {
-          ...(raw.follow === undefined ? {} : { follow: Boolean(raw.follow) }),
-          ...(raw.like === undefined ? {} : { like: Boolean(raw.like) }),
-          ...(raw.comment === undefined ? {} : { comment: Boolean(raw.comment) }),
-          ...(raw.mention === undefined ? {} : { mention: Boolean(raw.mention) }),
+        const input: Partial<{ follow: boolean; like: boolean; comment: boolean; mention: boolean }> = {}
+        for (const key of ['follow', 'like', 'comment', 'mention'] as const) {
+          if (raw[key] === undefined) continue
+          if (typeof raw[key] !== 'boolean') throw new SocialClosureRuntimeError('VALIDATION_FAILED', 400)
+          input[key] = raw[key]
         }
         return json({ data: await setNotificationPreferences(env.DB, actorUserId, input), requestId: crypto.randomUUID() })
       }
