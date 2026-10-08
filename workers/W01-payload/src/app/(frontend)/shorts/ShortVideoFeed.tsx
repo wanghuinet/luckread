@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 
 import ContentComments from '../content/[contentId]/ContentComments'
 import { usePublicLocale } from '../i18n/PublicLanguageToggle'
@@ -81,6 +81,7 @@ export default function ShortVideoFeed() {
   const [mediaErrorById, setMediaErrorById] = useState<Record<string, boolean>>({})
   const [bufferingById, setBufferingById] = useState<Record<string, boolean>>({})
   const heartTimerRef = useRef<number | null>(null)
+  const singleTapTimerRef = useRef<number | null>(null)
   const itemRefs = useRef<Record<string, HTMLElement | null>>({})
   const videoRefs = useRef<Record<string, HTMLVideoElement | null>>({})
   const feedRef = useRef<HTMLElement | null>(null)
@@ -615,6 +616,22 @@ export default function ShortVideoFeed() {
     void video.play().catch(() => {})
   }
 
+  const handleVideoTap = (item: ContentItem, event: MouseEvent<HTMLVideoElement>) => {
+    if (singleTapTimerRef.current !== null) window.clearTimeout(singleTapTimerRef.current)
+
+    if (event.detail >= 2) {
+      singleTapTimerRef.current = null
+      if (!interactionById[item.id]?.restricted && !interactionById[item.id]?.liked) void toggleLike(item)
+      showDoubleTapHeart()
+      return
+    }
+
+    singleTapTimerRef.current = window.setTimeout(() => {
+      singleTapTimerRef.current = null
+      togglePlay(item)
+    }, 220)
+  }
+
   const showDoubleTapHeart = () => {
     if (heartTimerRef.current !== null) window.clearTimeout(heartTimerRef.current)
     setDoubleTapHeart(true)
@@ -624,6 +641,7 @@ export default function ShortVideoFeed() {
   useEffect(() => {
     return () => {
       if (heartTimerRef.current !== null) window.clearTimeout(heartTimerRef.current)
+      if (singleTapTimerRef.current !== null) window.clearTimeout(singleTapTimerRef.current)
     }
   }, [])
 
@@ -713,10 +731,6 @@ export default function ShortVideoFeed() {
             >
               <div
                 className={styles.videoStage}
-                onDoubleClick={() => {
-                  if (!interaction.restricted && !interaction.liked) void toggleLike(item)
-                  showDoubleTapHeart()
-                }}
               >
                 <video
                   aria-label={item.title}
@@ -729,7 +743,7 @@ export default function ShortVideoFeed() {
                   preload={Math.abs(index - activeIndex) <= 1 ? 'metadata' : 'none'}
                   ref={setVideoRef(item.id)}
                   src={videoUrl}
-                  onClick={() => togglePlay(item)}
+                  onClick={(event) => handleVideoTap(item, event)}
                   onTimeUpdate={(event) => {
                     if (item.id !== visibleItems[activeIndexRef.current]?.id) return
                     const current = event.currentTarget

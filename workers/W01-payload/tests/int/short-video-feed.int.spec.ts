@@ -48,10 +48,12 @@ describe('TikTok-style short video feed', () => {
     expect(feed).toContain('const [muted, setMuted] = useState(true)')
     expect(feed).toContain('playsInline')
     expect(feed).toContain("aria-label={muted ? '打开声音' : '关闭声音'}")
-    expect(feed).toContain('onDoubleClick={() => {')
+    expect(feed).toContain('const handleVideoTap')
+    expect(feed).toContain('if (event.detail >= 2)')
     expect(feed).toContain('showDoubleTapHeart()')
     expect(feed).toContain('toggleLike(item)')
-    expect(feed).toContain('onClick={() => togglePlay(item)}')
+    expect(feed).toContain('onClick={(event) => handleVideoTap(item, event)}')
+    expect(feed).not.toContain('onDoubleClick={() =>')
   })
 
   it('does not create a second media, feed, or interaction backend authority', () => {

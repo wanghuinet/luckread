@@ -9,7 +9,8 @@ describe('short video playback polish', () => {
     const feed = read('src/app/(frontend)/shorts/ShortVideoFeed.tsx')
     const css = read('src/app/(frontend)/shorts/short-video.module.css')
     expect(feed).toContain('showDoubleTapHeart')
-    expect(feed).toContain('onDoubleClick={() => {')
+    expect(feed).toContain('const handleVideoTap')
+    expect(feed).toContain('if (event.detail >= 2)')
     expect(feed).toContain('setActiveProgress(0)')
     expect(feed).toContain('setActiveIndex(index)')
     expect(feed).toContain('onTimeUpdate')
@@ -68,6 +69,18 @@ describe('short video playback polish', () => {
     expect(css).toContain('.mediaBuffering')
     expect(css).toContain('.mediaSpinner')
     expect(css).toContain('@keyframes media-spinner')
+  })
+
+  it('separates single-tap playback from double-tap like gestures', () => {
+    const feed = read('src/app/(frontend)/shorts/ShortVideoFeed.tsx')
+    expect(feed).toContain('const singleTapTimerRef = useRef<number | null>(null)')
+    expect(feed).toContain('const handleVideoTap = (item: ContentItem, event: MouseEvent<HTMLVideoElement>) =>')
+    expect(feed).toContain('onClick={(event) => handleVideoTap(item, event)}')
+    expect(feed).toContain('if (event.detail >= 2) {')
+    expect(feed).toContain('window.clearTimeout(singleTapTimerRef.current)')
+    expect(feed).toContain('togglePlay(item)')
+    expect(feed).toContain('showDoubleTapHeart()')
+    expect(feed).not.toContain('onDoubleClick={() =>')
   })
 
   it('exposes a recoverable media error path without changing the feed authority', () => {
