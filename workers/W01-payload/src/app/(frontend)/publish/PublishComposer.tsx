@@ -2,6 +2,7 @@
 
 import { ChangeEvent, useEffect, useRef, useState } from 'react'
 import { computeAutoSaveDelay } from '../../../lib/content-autosave.js'
+import { fetchJson, getApiErrorMessage } from '../../../lib/client-api.js'
 import { articleDocumentFromBody, plainTextFromArticleDocument, mediaRefsFromArticleDocument, removeMediaRefFromArticleDocument, serializeArticleDocument, createArticleDocument, tryDeserializeArticleDocument, type ArticleDocument } from '../../../lib/article-document.js'
 import ArticleStructuredEditor from '../../../components/ArticleStructuredEditor.js'
 import ArticleStructuredRenderer from '../../../components/ArticleStructuredRenderer.js'
@@ -59,14 +60,16 @@ type ContentResponse = {
 
 const CONTENT_MUTATED_EVENT = 'luckread:content-mutated'
 
-async function authorizedFetch(input: RequestInfo | URL, init: RequestInit = {}) {
-  const response = await fetch(input, {
+async function authorizedFetch<T = unknown>(
+  input: RequestInfo | URL,
+  init: RequestInit = {},
+): Promise<{ response: Response; data: T | null }> {
+  const result = await fetchJson<T>(input, {
     ...init,
     credentials: 'include',
   })
-
-  if (response.status === 401) throw new Error('AUTH_REQUIRED')
-  return response
+  if (result.response.status === 401) throw new Error('AUTH_REQUIRED')
+  return result
 }
 
 const isVideoAsset = (asset: UploadedAsset): boolean => asset.mimeType.startsWith('video/')
@@ -157,12 +160,13 @@ export default function PublishComposer({
       setError('')
       setMessage('正在恢复草稿…')
       try {
-        const response = await authorizedFetch(
+        const { response, data } = await authorizedFetch<ContentResponse | { error?: { message?: string } }>(
           `${contentBasePath}/${encodeURIComponent(draftId)}`,
           { method: 'GET', signal: controller.signal },
         )
-        const data = await response.json().catch((): null => null)
-        if (!response.ok || !data?.id || !data?.etag) throw new Error(data?.error?.message || 'DRAFT_RECOVERY_FAILED')
+        if (!response.ok || !data || !('id' in data) || !data.id || !('etag' in data) || !data.etag) {
+          throw new Error(getApiErrorMessage(data, 'DRAFT_RECOVERY_FAILED'))
+        }
         const recovered = data as ContentResponse
         let recoveredBody = ''
         if (recovered.bodyRef) {
@@ -234,15 +238,20 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
     const form = new FormData()
     form.append('_payload', JSON.stringify({ alt: file.name }))
     form.append('file', file)
-    const response = await authorizedFetch('/api/v1/media', {
+    const { response, data } = await authorizedFetch<{
+      doc?: { id?: string | number; url?: string; filename?: string }
+      id?: string | number
+      url?: string
+      filename?: string
+      error?: { message?: string }
+    }>('/api/v1/media', {
       method: 'POST',
       body: form,
       headers: { 'Idempotency-Key': 'media-upload:' + crypto.randomUUID() },
     })
-    const data = await response.json().catch((): null => null)
     const doc = data?.doc ?? data
     if (!response.ok || !doc?.id || !doc?.url) {
-      throw new Error('MEDIA_UPLOAD_FAILED')
+      throw new Error(getApiErrorMessage(data, 'MEDIA_UPLOAD_FAILED'))
     }
     return {
       id: String(doc.id),
@@ -376,7 +385,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
       }
 
       const isUpdate = Boolean(draft?.id && draft.etag)
-      const response = await authorizedFetch(
+      const { response, data } = await authorizedFetch<ContentResponse | { error?: { message?: string } }>(
         isUpdate
           ? `${contentBasePath}/${encodeURIComponent(draft!.id)}`
           : contentBasePath,
@@ -392,17 +401,15 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
       )
 
       if (!response.ok) {
-        const data = await response.json().catch((): null => null)
-        throw new Error(data?.error?.message || 'CONTENT_SAVE_FAILED')
+        throw new Error(getApiErrorMessage(data, 'CONTENT_SAVE_FAILED'))
       }
 
       // Once the content write has returned success, the body asset is now an
-      // authoritative reference. Do not roll it back even if response parsing
-      // or local state handling fails afterward.
+      // authoritative reference. Do not roll it back even if local state handling
+      // fails afterward.
       rollbackBodyAssetId = null
 
-      const data = await response.json().catch((): null => null)
-      const saved = data as ContentResponse | null
+      const saved = data && 'id' in data ? data : null
       if (!saved?.id || !saved.etag) throw new Error('CONTENT_SAVE_FAILED')
 
       setDraft(saved)
@@ -587,7 +594,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
       aiMode,
       humanContribution: humanConfirmed ? 'substantial' : 'light',
     }
-    const response = await authorizedFetch(
+    const { response, data: report } = await authorizedFetch<PublishPreflightResult | { error?: { message?: string } }>(
       contentBasePath + '/' + encodeURIComponent(savedDraft.id) + '/preflight',
       {
         method: 'POST',
@@ -595,8 +602,9 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
         body: JSON.stringify(input),
       },
     )
-    const report = await response.json().catch((): null => null) as PublishPreflightResult | null
-    if (!response.ok || !report?.verdict) throw new Error('发布前检查失败，请稍后重试。')
+    if (!response.ok || !report || !('verdict' in report) || !report.verdict) {
+      throw new Error(getApiErrorMessage(report, '发布前检查失败，请稍后重试。'))
+    }
     setPreflightReport(report)
     return { report, input, draft: savedDraft }
   }
@@ -646,7 +654,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
     setError('')
     setMessage('')
     try {
-      const response = await authorizedFetch(
+      const { response, data } = await authorizedFetch<{ error?: { message?: string } }>(
         contentBasePath + '/' + encodeURIComponent(draft.id),
         {
           method: 'DELETE',
@@ -657,8 +665,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
         },
       )
       if (!response.ok) {
-        const data = await response.json().catch((): null => null)
-        throw new Error(data?.error?.message || 'CONTENT_DELETE_FAILED')
+        throw new Error(getApiErrorMessage(data, 'CONTENT_DELETE_FAILED'))
       }
       setDraft(null)
       setSavedBody('')
@@ -696,7 +703,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
         const warnings = report.findings.filter((item) => item.severity === 'WARN').slice(0, 4).map((item) => '• ' + item.title).join('\\n')
         if (!window.confirm(report.summary + '\\n\\n建议先处理：\\n' + warnings + '\\n\\n确认仍然提交审核吗？')) return
       }
-      const response = await authorizedFetch(
+      const { response, data } = await authorizedFetch<{ to?: string; version?: number; etag?: string; error?: { message?: string } }>(
         contentBasePath + '/' + encodeURIComponent(savedDraft.id) + '/state',
         {
           method: 'POST',
@@ -708,9 +715,8 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
           body: JSON.stringify({ to: 'PENDING_REVIEW', preflight: input }),
         },
       )
-      const data = await response.json().catch((): null => null)
-      if (!response.ok) throw new Error(data?.error?.message || 'SUBMIT_FAILED')
-      const transition = data as { to?: string; version?: number; etag?: string }
+      if (!response.ok) throw new Error(getApiErrorMessage(data, 'SUBMIT_FAILED'))
+      const transition = data
       setDraft((current) =>
         current && transition.to && typeof transition.version === 'number' && transition.etag
           ? { ...current, state: transition.to, version: transition.version, etag: transition.etag }
