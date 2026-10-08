@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 
 import ContentComments from '../content/[contentId]/ContentComments'
 import { usePublicLocale } from '../i18n/PublicLanguageToggle'
@@ -616,7 +616,7 @@ export default function ShortVideoFeed() {
     void video.play().catch(() => {})
   }
 
-  const handleVideoTap = (item: ContentItem, event: React.MouseEvent<HTMLVideoElement>) => {
+  const handleVideoTap = (item: ContentItem, event: MouseEvent<HTMLVideoElement>) => {
     if (singleTapTimerRef.current !== null) window.clearTimeout(singleTapTimerRef.current)
 
     if (event.detail >= 2) {
