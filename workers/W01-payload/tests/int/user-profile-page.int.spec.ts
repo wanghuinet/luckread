@@ -60,7 +60,7 @@ describe('user profile page', () => {
 describe('password change page', () => {
   it('uses the versioned password-change API and existing session lifecycle', () => {
     const page = read('src/app/(frontend)/me/password/page.tsx')
-    expect(page).toContain("fetchJson<Profile & { error?: { message?: string } }>('/api/v1/auth/password/change'")
+    expect(page).toContain("fetchJson<{ error?: { message?: string } }>('/api/v1/auth/password/change'")
     expect(page).toContain("method: 'POST'")
     expect(page).toContain("'Idempotency-Key'")
     expect(page).toContain('crypto.randomUUID()')
