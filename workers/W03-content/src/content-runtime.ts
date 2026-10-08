@@ -995,8 +995,8 @@ export async function deleteContent(
   ])
 }
 
-const actorKindForLayer = (layer: string): 'CREATOR' | null =>
-  layer === 'L3' ? 'CREATOR' : null
+export const actorKindForLayer = (layer: string): 'CREATOR' | null =>
+  /^L[3-8]$/.test(layer) ? 'CREATOR' : null
 
 export const canTransitionContentState = (
   from: ContentState,
