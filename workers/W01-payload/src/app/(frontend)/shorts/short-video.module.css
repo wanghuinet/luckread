@@ -172,6 +172,26 @@
   background: #090909;
 }
 
+.pausedFeedback {
+  position: absolute;
+  z-index: 6;
+  left: 50%;
+  top: 50%;
+  width: 72px;
+  height: 72px;
+  display: grid;
+  place-items: center;
+  transform: translate(-50%, -50%);
+  border: 1px solid rgba(255,255,255,.28);
+  border-radius: 999px;
+  background: rgba(0,0,0,.42);
+  box-shadow: 0 12px 30px rgba(0,0,0,.24);
+  color: #fff;
+  font-size: 24px;
+  backdrop-filter: blur(10px);
+  pointer-events: none;
+}
+
 .mediaBuffering {
   position: absolute;
   z-index: 7;
