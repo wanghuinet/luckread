@@ -31,6 +31,15 @@ describe('short video playback polish', () => {
     expect(feed).toContain('root: feedRef.current')
   })
 
+  it('pauses background playback and resumes only the active video when foregrounded', () => {
+    const feed = read('src/app/(frontend)/shorts/ShortVideoFeed.tsx')
+    expect(feed).toContain("document.addEventListener('visibilitychange', handleVisibilityChange)")
+    expect(feed).toContain("document.visibilityState === 'hidden'")
+    expect(feed).toContain('Object.values(videoRefs.current).forEach((video) => video?.pause())')
+    expect(feed).toContain('const activeVideo = visibleItems[activeIndexRef.current]?.id')
+    expect(feed).toContain("document.removeEventListener('visibilitychange', handleVisibilityChange)")
+  })
+
   it('keeps the simple TikTok-style social rail and swipe flow intact', () => {
     const feed = read('src/app/(frontend)/shorts/ShortVideoFeed.tsx')
     const css = read('src/app/(frontend)/shorts/short-video.module.css')
