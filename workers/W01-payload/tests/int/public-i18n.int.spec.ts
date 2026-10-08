@@ -47,7 +47,7 @@ describe('public frontend i18n', () => {
     expect(browse).toContain("href={'/content/' + encodeURIComponent(item.slug || item.id)}")
     expect(feed).toContain('href={`/content/${encodeURIComponent(item.slug || item.id)}`}')
     expect(feed).toContain('if (hasInitialItems && retryKey === 0) return')
-    expect(detail).toContain("fetch(`/api/v1/contents/${encodeURIComponent(contentId)}`")
+    expect(detail).toContain("fetchJson<Content>(`/api/v1/contents/${encodeURIComponent(contentId)}`")
     expect(detailPage).toContain('alternates:')
     expect(detailPage).toContain('permanentRedirect')
   })
