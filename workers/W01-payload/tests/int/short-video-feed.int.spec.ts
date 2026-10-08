@@ -60,6 +60,14 @@ describe('TikTok-style short video feed', () => {
     expect(feed).not.toContain('onDoubleClick={() =>')
   })
 
+  it('preloads the active video and the next two videos while keeping older videos lightweight', () => {
+    const feed = read('src/app/(frontend)/shorts/ShortVideoFeed.tsx')
+    expect(feed).toContain("index === activeIndex ? 'auto'")
+    expect(feed).toContain("index > activeIndex && index <= activeIndex + 2 ? 'auto'")
+    expect(feed).toContain("index === activeIndex - 1 ? 'metadata'")
+    expect(feed).toContain("'none'")
+  })
+
   it('does not create a second media, feed, or interaction backend authority', () => {
     const feed = read('src/app/(frontend)/shorts/ShortVideoFeed.tsx')
     expect(feed).not.toContain('D1Database')
