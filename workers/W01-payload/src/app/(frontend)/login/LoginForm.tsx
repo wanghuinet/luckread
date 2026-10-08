@@ -3,6 +3,7 @@
 import { FormEvent, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { fetchJson, getApiErrorMessage, jsonHeaders } from '../../../lib/client-api.js'
 
 export default function LoginForm() {
   const router = useRouter()
@@ -16,15 +17,14 @@ export default function LoginForm() {
     setError('')
     setBusy(true)
     try {
-      const response = await fetch('/api/v1/auth/login', {
+      const { response, data } = await fetchJson<{ error?: { message?: string } }>('/api/v1/auth/login', {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers: jsonHeaders(),
         credentials: 'include',
         body: JSON.stringify({ identity: email.trim(), credential: password }),
       })
-      const data = await response.json().catch((): null => null)
       if (!response.ok) {
-        setError(data?.error?.message || '登录失败，请检查账号和密码。')
+        setError(getApiErrorMessage(data, '登录失败，请检查账号和密码。'))
         return
       }
       const requestedReturnTo = new URLSearchParams(window.location.search).get('returnTo')

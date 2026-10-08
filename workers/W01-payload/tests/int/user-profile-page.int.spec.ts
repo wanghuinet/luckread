@@ -7,7 +7,7 @@ const read = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8'
 describe('user profile page', () => {
   it('uses the canonical versioned self-profile API and optimistic concurrency', () => {
     const page = read('src/app/(frontend)/me/profile/page.tsx')
-    expect(page).toContain("fetch('/api/v1/users/me'")
+    expect(page).toContain("fetchJson<Profile & { error?: { message?: string } }>('/api/v1/users/me'")
     expect(page).toContain("method: 'PATCH'")
     expect(page).toContain("'If-Match': etag")
     expect(page).toContain("response.status === 412")
@@ -32,7 +32,7 @@ describe('user profile page', () => {
   it('uses the existing authenticated logout API and returns to the public homepage', () => {
     const page = read('src/app/(frontend)/me/profile/page.tsx')
 
-    expect(page).toContain("fetch('/api/v1/auth/logout'")
+    expect(page).toContain("fetchJson('/api/v1/auth/logout'")
     expect(page).toContain("method: 'POST'")
     expect(page).toContain("credentials: 'include'")
     expect(page).toContain("response.status !== 401")
@@ -45,7 +45,7 @@ describe('user profile page', () => {
   it('uploads avatars through the existing authenticated media API and waits for profile save', () => {
     const page = read('src/app/(frontend)/me/profile/page.tsx')
 
-    expect(page).toContain("fetch('/api/v1/media'")
+    expect(page).toContain("fetchJson<{ doc?: { url?: string }; url?: string; error?: { message?: string } }>('/api/v1/media'")
     expect(page).toContain("method: 'POST'")
     expect(page).toContain("form.append('file', file)")
     expect(page).toContain("form.append('_payload', JSON.stringify({ alt: file.name }))")
@@ -60,7 +60,7 @@ describe('user profile page', () => {
 describe('password change page', () => {
   it('uses the versioned password-change API and existing session lifecycle', () => {
     const page = read('src/app/(frontend)/me/password/page.tsx')
-    expect(page).toContain("fetch('/api/v1/auth/password/change'")
+    expect(page).toContain("fetchJson<{ error?: { message?: string } }>('/api/v1/auth/password/change'")
     expect(page).toContain("method: 'POST'")
     expect(page).toContain("'Idempotency-Key'")
     expect(page).toContain('crypto.randomUUID()')

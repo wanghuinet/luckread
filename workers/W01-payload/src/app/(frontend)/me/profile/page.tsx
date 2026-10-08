@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ChangeEvent, FormEvent, useEffect, useState } from 'react'
+import { fetchJson, getApiErrorMessage } from '../../../../lib/client-api.js'
 
 type Profile = {
   id: string
@@ -39,7 +40,7 @@ export default function ProfilePage() {
 
     async function load() {
       try {
-        const response = await fetch('/api/v1/users/me', {
+        const { response, data } = await fetchJson<Profile & { error?: { message?: string } }>('/api/v1/users/me', {
           credentials: 'include',
           headers: { accept: 'application/json' },
         })
@@ -48,9 +49,8 @@ export default function ProfilePage() {
           router.replace('/login?returnTo=' + encodeURIComponent(returnTo))
           return
         }
-        const data = await response.json().catch((): null => null)
         if (!response.ok || !data?.id) {
-          throw new Error(data?.error?.message || '个人资料加载失败')
+          throw new Error(getApiErrorMessage(data, '个人资料加载失败'))
         }
         if (cancelled) return
         setProfile(data as Profile)
@@ -76,7 +76,7 @@ export default function ProfilePage() {
     setLoggingOut(true)
     setError('')
     try {
-      const response = await fetch('/api/v1/auth/logout', {
+      const { response } = await fetchJson('/api/v1/auth/logout', {
         method: 'POST',
         credentials: 'include',
         cache: 'no-store',
@@ -107,17 +107,16 @@ export default function ProfilePage() {
       const form = new FormData()
       form.append('_payload', JSON.stringify({ alt: file.name }))
       form.append('file', file)
-      const response = await fetch('/api/v1/media', {
+      const { response, data } = await fetchJson<{ doc?: { url?: string }; url?: string; error?: { message?: string } }>('/api/v1/media', {
         method: 'POST',
         credentials: 'include',
         cache: 'no-store',
         headers: { 'Idempotency-Key': 'media-upload:' + crypto.randomUUID() },
         body: form,
       })
-      const data = await response.json().catch((): null => null) as { doc?: { url?: string }; url?: string; error?: { message?: string } } | null
       const url = data?.doc?.url ?? data?.url
       if (!response.ok || typeof url !== 'string' || !url) {
-        throw new Error(data?.error?.message || 'AVATAR_UPLOAD_FAILED')
+        throw new Error(getApiErrorMessage(data, 'AVATAR_UPLOAD_FAILED'))
       }
       setProfile((current) => current ? { ...current, avatar: url } : current)
       setMessage('头像已上传，请保存资料以正式更新。')
@@ -140,7 +139,7 @@ export default function ProfilePage() {
     )
 
     try {
-      const response = await fetch('/api/v1/users/me', {
+      const { response, data } = await fetchJson<Profile & { error?: { message?: string } }>('/api/v1/users/me', {
         method: 'PATCH',
         credentials: 'include',
         headers: {
@@ -150,12 +149,11 @@ export default function ProfilePage() {
         },
         body: JSON.stringify(payload),
       })
-      const data = await response.json().catch((): null => null)
       if (response.status === 412) {
         throw new Error('个人资料已被其他页面修改，请刷新后再保存。')
       }
       if (!response.ok || !data?.id) {
-        throw new Error(data?.error?.message || '个人资料保存失败')
+        throw new Error(getApiErrorMessage(data, '个人资料保存失败'))
       }
       setProfile(data as Profile)
       setEtag(response.headers.get('ETag') ?? etag)
