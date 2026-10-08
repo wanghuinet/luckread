@@ -410,7 +410,7 @@ describe('article structured document', () => {
     expect(removeMediaRefFromArticleDocument(document, '   ')).toBe(document)
   })
 
-  it('round-trips a structured block through the clipboard format without reusing its identity', () => {
+  it('round-trips a structured block through the clipboard format', () => {
     const source = {
       id: 'source',
       type: 'heading' as const,
