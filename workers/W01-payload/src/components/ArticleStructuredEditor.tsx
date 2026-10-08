@@ -28,7 +28,6 @@ import {
   plainTextFromArticleDocument,
   parseArticleBlockFromClipboard,
   serializeArticleBlockForClipboard,
-  duplicateArticleBlock,
 } from '../lib/article-document.js'
 import {
   createArticleDocumentHistory,
