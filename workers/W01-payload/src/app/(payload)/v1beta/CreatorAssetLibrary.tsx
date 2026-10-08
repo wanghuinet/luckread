@@ -3,6 +3,8 @@
 import Link from 'next/link'
 import { ChangeEvent, useCallback, useEffect, useState } from 'react'
 
+import { fetchJson, getApiErrorMessage } from '../../../../lib/client-api.js'
+
 type MediaItem = {
   id: string | number
   url?: string | null
@@ -41,18 +43,17 @@ export default function CreatorAssetLibrary({ adminMode = true, loginPath = '/ad
     else setLoading(true)
     setError('')
     try {
-      const response = await fetch('/api/v1/media?limit=8&page=' + String(page), {
+      const { response, data } = await fetchJson<MediaListResponse | { error?: { message?: string } }>('/api/v1/media?limit=8&page=' + String(page), {
         credentials: 'include',
         cache: 'no-store',
         headers: { accept: 'application/json' },
       })
-      const data = await response.json().catch((): null => null) as MediaListResponse | { error?: { message?: string } } | null
       if (response.status === 401) {
         redirectToLogin(loginPath)
         return
       }
       if (!response.ok) {
-        throw new Error(data && 'error' in data ? data.error?.message || '素材读取失败' : '素材读取失败')
+        throw new Error(getApiErrorMessage(data, '素材读取失败'))
       }
       const nextItems = Array.isArray((data as MediaListResponse)?.docs)
         ? (data as MediaListResponse).docs!
@@ -96,20 +97,19 @@ export default function CreatorAssetLibrary({ adminMode = true, loginPath = '/ad
         const form = new FormData()
         form.append('_payload', JSON.stringify({ alt: file.name }))
         form.append('file', file)
-        const response = await fetch('/api/v1/media', {
+        const { response, data } = await fetchJson<MediaItem | { doc?: MediaItem; error?: { message?: string } }>('/api/v1/media', {
           method: 'POST',
           credentials: 'include',
           cache: 'no-store',
           headers: { 'Idempotency-Key': 'media-upload:' + crypto.randomUUID() },
           body: form,
         })
-        const data = await response.json().catch((): null => null) as MediaItem | { doc?: MediaItem; error?: { message?: string } } | null
-        if (response.status === 401) {
+          if (response.status === 401) {
           redirectToLogin(loginPath)
           return
         }
         if (!response.ok) {
-          throw new Error(data && 'error' in data ? data.error?.message || '素材上传失败' : '素材上传失败')
+          throw new Error(getApiErrorMessage(data, '素材上传失败'))
         }
         uploaded += 1
       }
@@ -130,7 +130,7 @@ export default function CreatorAssetLibrary({ adminMode = true, loginPath = '/ad
     setError('')
     setMessage('')
     try {
-      const response = await fetch('/api/v1/media/' + encodeURIComponent(String(item.id)), {
+      const { response, data } = await fetchJson<MediaItem | { error?: { message?: string } }>('/api/v1/media/' + encodeURIComponent(String(item.id)), {
         method: 'PATCH',
         credentials: 'include',
         headers: {
@@ -139,13 +139,12 @@ export default function CreatorAssetLibrary({ adminMode = true, loginPath = '/ad
         },
         body: JSON.stringify({ alt }),
       })
-      const data = await response.json().catch((): null => null) as MediaItem | { error?: { message?: string } } | null
       if (response.status === 401) {
         redirectToLogin(loginPath)
         return
       }
       if (!response.ok) {
-        throw new Error(data && 'error' in data ? data.error?.message || '素材更新失败' : '素材更新失败')
+        throw new Error(getApiErrorMessage(data, '素材更新失败'))
       }
       const updated = data as MediaItem
       setItems((current) => current.map((currentItem) =>
@@ -165,7 +164,7 @@ export default function CreatorAssetLibrary({ adminMode = true, loginPath = '/ad
     setMessage('')
     setError('')
     try {
-      const response = await fetch('/api/v1/media/' + encodeURIComponent(String(id)), {
+      const { response, data } = await fetchJson<{ error?: { message?: string } }>('/api/v1/media/' + encodeURIComponent(String(id)), {
         method: 'DELETE',
         credentials: 'include',
         headers: {
@@ -178,8 +177,7 @@ export default function CreatorAssetLibrary({ adminMode = true, loginPath = '/ad
         return
       }
       if (!response.ok) {
-        const data = await response.json().catch((): null => null) as { error?: { message?: string } } | null
-        throw new Error(data?.error?.message || '素材删除失败')
+        throw new Error(getApiErrorMessage(data, '素材删除失败'))
       }
       setItems((current) => current.filter((item) => String(item.id) !== String(id)))
       setTotalDocs((current) => Math.max(0, current - 1))
