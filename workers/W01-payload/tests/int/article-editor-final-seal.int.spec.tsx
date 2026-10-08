@@ -56,11 +56,12 @@ describe('ArticleStructuredEditor final interaction closure', () => {
     render(<EditorHarness initialValue={initialValue} />)
 
     const textareas = screen.getAllByRole('textbox', { name: '正文' })
-    textareas[1].focus()
-    (textareas[1] as HTMLTextAreaElement).selectionStart = 0
-    ;(textareas[1] as HTMLTextAreaElement).selectionEnd = 0
+    const secondTextarea = textareas[1] as HTMLTextAreaElement
+    secondTextarea.focus()
+    secondTextarea.selectionStart = 0
+    secondTextarea.selectionEnd = 0
 
-    fireEvent.keyDown(textareas[1], {
+    fireEvent.keyDown(secondTextarea, {
       key: 'Backspace',
     })
 
@@ -84,11 +85,12 @@ describe('ArticleStructuredEditor final interaction closure', () => {
     render(<EditorHarness initialValue={initialValue} />)
 
     const textareas = screen.getAllByRole('textbox', { name: '正文' })
-    textareas[0].focus()
-    (textareas[0] as HTMLTextAreaElement).selectionStart = 1
-    ;(textareas[0] as HTMLTextAreaElement).selectionEnd = 1
+    const firstTextarea = textareas[0] as HTMLTextAreaElement
+    firstTextarea.focus()
+    firstTextarea.selectionStart = 1
+    firstTextarea.selectionEnd = 1
 
-    fireEvent.keyDown(textareas[0], {
+    fireEvent.keyDown(firstTextarea, {
       key: 'ArrowDown',
       altKey: true,
     })
