@@ -5,6 +5,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import styles from './creator-center.module.css'
 import ContentRevisionHistory from './ContentRevisionHistory'
+import CreatorActionButton from './CreatorActionButton'
+import { Pill } from '@payloadcms/ui/elements/Pill'
 
 type ContentState = 'DRAFT' | 'PENDING_REVIEW' | 'REJECTED' | 'APPROVED' | 'SCHEDULED' | 'PUBLISHED' | 'UNPUBLISHED' | 'ARCHIVED' | 'DELETED' | 'RESTORED'
 type ContentType = 'article' | 'post' | 'video'
@@ -306,13 +308,13 @@ export default function CreatorContentList({ loginPath = '/admin/login' }: { log
     }
   }
   return (
-    <section aria-busy={loading || actionId !== null} className={styles.contentManageSection}>
+    <section extraButtonProps={{ 'aria-busy': loading || actionId !== null }} className={styles.contentManageSection}>
       <div className={styles.contentManageHeading}>
         <div>
           <span className={styles.eyebrow}>CONTENT MANAGEMENT</span>
           <h2>我的内容</h2>
         </div>
-        <Link className={styles.primaryButton} href="/publish">
+        <Link tone="primary" href="/publish">
           新建内容
         </Link>
       </div>
@@ -331,14 +333,14 @@ export default function CreatorContentList({ loginPath = '/admin/login' }: { log
           ['DELETED', '已删除'],
           ['RESTORED', '已恢复'],
         ].map(([value, label]) => (
-          <button
-            className={status === value ? styles.filterActive : styles.filterButton}
+          <CreatorActionButton
+            buttonStyle={status === value ? 'primary' : 'secondary'}
             key={value}
             onClick={() => setStatus(value)}
             type="button"
           >
             {label}
-          </button>
+          </CreatorActionButton>
         ))}
         <select
           aria-label="内容类型"
@@ -379,14 +381,14 @@ export default function CreatorContentList({ loginPath = '/admin/login' }: { log
       {!loading && error ? (
         <div className={styles.contentManageState} role="alert">
           <span>{error}</span>
-          <button className={styles.secondaryButton} onClick={() => void load()} type="button">重试</button>
+          <CreatorActionButton  onClick={() => void load()} type="button">重试</CreatorActionButton>
         </div>
       ) : null}
       {!loading && !error && page.items.length === 0 ? (
         <div className={styles.contentManageEmpty}>
           <strong>还没有符合条件的内容</strong>
           <span>发布第一篇内容后，这里会自动显示草稿、审核和已发布记录。</span>
-          <Link className={styles.secondaryButton} href="/publish">开始创作</Link>
+          <Link  href="/publish">开始创作</Link>
         </div>
       ) : null}
       {!loading && !error && page.items.length > 0 && visibleItems.length === 0 ? (
@@ -408,8 +410,21 @@ export default function CreatorContentList({ loginPath = '/admin/login' }: { log
                 ) : null}
                 <div className={styles.contentListMain}>
                   <div className={styles.contentMeta}>
-                    <span>{typeLabels[item.contentType]}</span>
-                    <span>{labels[item.state]}</span>
+                    <Pill pillStyle="light-gray" size="small">{typeLabels[item.contentType]}</Pill>
+                    <Pill
+                      pillStyle={
+                        item.state === 'PUBLISHED'
+                          ? 'success'
+                          : item.state === 'REJECTED' || item.state === 'DELETED'
+                            ? 'error'
+                            : item.state === 'PENDING_REVIEW'
+                              ? 'warning'
+                              : 'light-gray'
+                      }
+                      size="small"
+                    >
+                      {labels[item.state]}
+                    </Pill>
                     {item.state === 'SCHEDULED' && item.scheduledAt ? (
                       <time dateTime={item.scheduledAt}>将于 {new Date(item.scheduledAt).toLocaleString('zh-CN', { hour12: false })} 发布</time>
                     ) : null}
@@ -424,184 +439,184 @@ export default function CreatorContentList({ loginPath = '/admin/login' }: { log
                   </time>
                 </div>
                 <div className={styles.contentListActions}>
-                  <button
-                    className={styles.secondaryButton}
+                  <CreatorActionButton
+                    
                     disabled={actionId !== null}
                     onClick={() => setRevisionTarget({ id: item.id, version: item.version })}
                     type="button"
                   >
                     版本历史
-                  </button>
+                  </CreatorActionButton>
                   {item.state === 'DRAFT' ? (
-                    <Link className={styles.secondaryButton} href={`/publish?draft=${encodeURIComponent(item.id)}`}>
+                    <Link  href={`/publish?draft=${encodeURIComponent(item.id)}`}>
                       {item.contentType === 'video' ? '编辑视频资料' : '继续编辑'}
                     </Link>
                   ) : null}
                   {item.state === 'REJECTED' ? (
-                    <button
-                      aria-busy={actionId === item.id}
-                      className={styles.secondaryButton}
+                    <CreatorActionButton
+                      extraButtonProps={{ 'aria-busy': actionId === item.id }}
+                      
                       disabled={actionId !== null}
                       onClick={() => void moveToDraftForEdit(item)}
                       type="button"
                     >
                       {actionId === item.id ? '处理中…' : item.contentType === 'video' ? '编辑视频资料' : '继续编辑'}
-                    </button>
+                    </CreatorActionButton>
                   ) : null}
                   {item.state === 'APPROVED' ? (
                     <>
-                      <button
-                        aria-busy={actionId === item.id}
-                        className={styles.primaryButton}
+                      <CreatorActionButton
+                        extraButtonProps={{ 'aria-busy': actionId === item.id }}
+                        tone="primary"
                         disabled={actionId !== null}
                         onClick={() => void transition(item, 'PUBLISHED')}
                         type="button"
                       >
                         {actionId === item.id ? '处理中…' : '立即发布'}
-                      </button>
-                      <button
-                        aria-busy={actionId === item.id}
-                        className={styles.secondaryButton}
+                      </CreatorActionButton>
+                      <CreatorActionButton
+                        extraButtonProps={{ 'aria-busy': actionId === item.id }}
+                        
                         disabled={actionId !== null}
                         onClick={() => void schedulePublication(item)}
                         type="button"
                       >
                         {actionId === item.id ? '处理中…' : '定时发布'}
-                      </button>
+                      </CreatorActionButton>
                     </>
                   ) : null}
                   {item.state === 'SCHEDULED' ? (
-                    <button
-                      aria-busy={actionId === item.id}
-                      className={styles.secondaryButton}
+                    <CreatorActionButton
+                      extraButtonProps={{ 'aria-busy': actionId === item.id }}
+                      
                       disabled={actionId !== null}
                       onClick={() => void transition(item, 'DRAFT')}
                       type="button"
                     >
                       {actionId === item.id ? '处理中…' : '取消定时并转草稿'}
-                    </button>
+                    </CreatorActionButton>
                   ) : null}
                   {item.state === 'PUBLISHED' ? (
                     <>
-                      <Link className={styles.secondaryButton} href={`/content/${encodeURIComponent(item.slug || item.id)}`}>
+                      <Link  href={`/content/${encodeURIComponent(item.slug || item.id)}`}>
                         查看内容
                       </Link>
-                      <button
-                        className={styles.secondaryButton}
+                      <CreatorActionButton
+                        
                         disabled={actionId !== null}
                         onClick={() => void sharePublishedContent(item)}
                         type="button"
                       >
                         分享
-                      </button>
-                      <button
-                        aria-busy={actionId === item.id}
-                        className={styles.secondaryButton}
+                      </CreatorActionButton>
+                      <CreatorActionButton
+                        extraButtonProps={{ 'aria-busy': actionId === item.id }}
+                        
                         disabled={actionId !== null}
                         onClick={() => void unpublishAndEdit(item)}
                         type="button"
                       >
                         {actionId === item.id ? '处理中…' : item.contentType === 'video' ? '下线并编辑视频资料' : '下线并编辑'}
-                      </button>
-                      <button
-                        aria-busy={actionId === item.id}
-                        className={styles.secondaryButton}
+                      </CreatorActionButton>
+                      <CreatorActionButton
+                        extraButtonProps={{ 'aria-busy': actionId === item.id }}
+                        
                         disabled={actionId !== null}
                         onClick={() => void transition(item, 'UNPUBLISHED')}
                         type="button"
                       >
                         {actionId === item.id ? '处理中…' : '下线'}
-                      </button>
-                      <button
-                        aria-busy={actionId === item.id}
-                        className={styles.secondaryButton}
+                      </CreatorActionButton>
+                      <CreatorActionButton
+                        extraButtonProps={{ 'aria-busy': actionId === item.id }}
+                        
                         disabled={actionId !== null}
                         onClick={() => void transition(item, 'ARCHIVED')}
                         type="button"
                       >
                         {actionId === item.id ? '处理中…' : '归档'}
-                      </button>
+                      </CreatorActionButton>
                     </>
                   ) : null}
                   {item.state === 'UNPUBLISHED' ? (
                     <>
-                      <button
-                        aria-busy={actionId === item.id}
-                        className={styles.secondaryButton}
+                      <CreatorActionButton
+                        extraButtonProps={{ 'aria-busy': actionId === item.id }}
+                        
                         disabled={actionId !== null}
                         onClick={() => void moveToDraftForEdit(item)}
                         type="button"
                       >
                         {actionId === item.id ? '处理中…' : item.contentType === 'video' ? '转为草稿编辑视频资料' : '转为草稿编辑'}
-                      </button>
-                      <button
-                        className={styles.secondaryButton}
+                      </CreatorActionButton>
+                      <CreatorActionButton
+                        
                         disabled={actionId !== null}
                         onClick={() => void transition(item, 'PUBLISHED')}
                         type="button"
                       >
                         {actionId === item.id ? '处理中…' : '重新发布'}
-                      </button>
+                      </CreatorActionButton>
                     </>
                   ) : null}
                   {item.state === 'ARCHIVED' ? (
-                    <button
-                      aria-busy={actionId === item.id}
-                      className={styles.secondaryButton}
+                    <CreatorActionButton
+                      extraButtonProps={{ 'aria-busy': actionId === item.id }}
+                      
                       disabled={actionId !== null}
                       onClick={() => void transition(item, 'DRAFT')}
                       type="button"
                     >
                       {actionId === item.id ? '处理中…' : '恢复为草稿'}
-                    </button>
+                    </CreatorActionButton>
                   ) : null}
                   {item.state === 'DELETED' ? (
-                    <button
-                      aria-busy={actionId === item.id}
-                      className={styles.secondaryButton}
+                    <CreatorActionButton
+                      extraButtonProps={{ 'aria-busy': actionId === item.id }}
+                      
                       disabled={actionId !== null}
                       onClick={() => void transition(item, 'RESTORED')}
                       type="button"
                     >
                       {actionId === item.id ? '处理中…' : '恢复'}
-                    </button>
+                    </CreatorActionButton>
                   ) : null}
                   {item.state === 'RESTORED' ? (
-                    <button
-                      aria-busy={actionId === item.id}
-                      className={styles.secondaryButton}
+                    <CreatorActionButton
+                      extraButtonProps={{ 'aria-busy': actionId === item.id }}
+                      
                       disabled={actionId !== null}
                       onClick={() => void transition(item, 'DRAFT')}
                       type="button"
                     >
                       {actionId === item.id ? '处理中…' : '恢复为草稿'}
-                    </button>
+                    </CreatorActionButton>
                   ) : null}
                   {['DRAFT', 'PUBLISHED', 'UNPUBLISHED', 'ARCHIVED'].includes(item.state) ? (
-                    <button
-                      aria-busy={actionId === item.id}
-                      className={styles.dangerButton}
+                    <CreatorActionButton
+                      extraButtonProps={{ 'aria-busy': actionId === item.id }}
+                      tone="error"
                       disabled={actionId !== null}
                       onClick={() => void deleteContent(item)}
                       type="button"
                     >
                       {actionId === item.id ? '处理中…' : '删除'}
-                    </button>
+                    </CreatorActionButton>
                   ) : null}
                 </div>
               </article>
             ))}
           </div>
           {page.hasMore && page.nextCursor ? (
-            <button
-              aria-busy={loadingMore}
-              className={styles.secondaryButton}
+            <CreatorActionButton
+              extraButtonProps={{ 'aria-busy': loadingMore }}
+              
               disabled={loadingMore}
               onClick={() => void load(page.nextCursor)}
               type="button"
             >
               {loadingMore ? '加载中…' : '加载更多'}
-            </button>
+            </CreatorActionButton>
           ) : null}
         </>
       ) : null}
