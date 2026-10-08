@@ -63,19 +63,19 @@ export const markdownToArticleDocument = (raw: string): MarkdownImportResult => 
   }
   const flushQuote = () => {
     if (quote.length) {
-      blocks.push(createArticleBlock('quote', quote.join('\n').trim()))
+      blocks.push(createMarkdownTextBlock('quote', quote.join('\n').trim()))
       quote = []
     }
   }
   const flushBullet = () => {
     if (bullet.length) {
-      blocks.push(createArticleBlock('bulletList', bullet.join('\n')))
+      blocks.push(createMarkdownTextBlock('bulletList', bullet.join('\n')))
       bullet = []
     }
   }
   const flushOrdered = () => {
     if (ordered.length) {
-      blocks.push(createArticleBlock('orderedList', ordered.join('\n')))
+      blocks.push(createMarkdownTextBlock('orderedList', ordered.join('\n')))
       ordered = []
     }
   }
@@ -121,6 +121,9 @@ export const markdownToArticleDocument = (raw: string): MarkdownImportResult => 
     const image = parseImage(line)
     if (image) {
       flushText()
+      if (image.alt.length > ARTICLE_MAX_BLOCK_TEXT) {
+        throw new Error('MARKDOWN_BLOCK_TOO_LARGE')
+      }
       try {
         blocks.push(createArticleMediaBlock('image', [image.url], image.alt))
       } catch {
