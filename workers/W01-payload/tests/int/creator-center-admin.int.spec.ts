@@ -188,6 +188,26 @@ describe('Creator Center admin extension', () => {
     expect(editor).toContain('onClick={() => removeMediaReference(ref)}')
   })
 
+  it('registers article outline navigation against stable article block anchors', () => {
+    const plugin = read('src/components/ArticleOutlinePlugin.tsx')
+    const editor = read('src/components/ArticleStructuredEditor.tsx')
+    const registry = read('src/components/article-editor-plugins.ts')
+    const styles = read('src/app/(frontend)/publish/publish.css')
+
+    expect(plugin).toContain('export const articleBlockDomId')
+    expect(plugin).toContain("block.type === 'heading'")
+    expect(plugin).toContain('window.document.getElementById(articleBlockDomId(item.id))')
+    expect(plugin).toContain('target.scrollIntoView({ behavior: \'smooth\', block: \'center\' })')
+    expect(plugin).toContain('target.focus({ preventScroll: true })')
+    expect(plugin).toContain("id: 'content.outline'")
+    expect(plugin).toContain('添加 H2/H3 标题后会自动生成导航')
+    expect(editor).toContain("id={articleBlockDomId(block.id)}")
+    expect(registry).toContain("import { articleOutlinePlugin } from './ArticleOutlinePlugin.js'")
+    expect(registry).toContain('articleOutlinePlugin')
+    expect(styles).toContain('.lr-editor-outline')
+    expect(styles).toContain('.lr-editor-outline-item.is-h3')
+  })
+
   it('registers article editor find and replace without a new data or network authority', () => {
     const plugin = read('src/components/FindReplacePlugin.tsx')
     const registry = read('src/components/article-editor-plugins.ts')
