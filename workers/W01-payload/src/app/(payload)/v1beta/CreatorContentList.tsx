@@ -14,6 +14,7 @@ type Item = {
   slug?: string
   contentType: ContentType
   state: ContentState
+  scheduledAt: string | null
   version: number
   title: string
   mediaRefs?: string[]
@@ -136,7 +137,7 @@ export default function CreatorContentList({ loginPath = '/admin/login' }: { log
     return () => window.removeEventListener('luckread:content-mutated', handleContentMutation)
   }, [load])
 
-  async function requestTransition(itemId: string, to: 'PUBLISHED' | 'UNPUBLISHED' | 'ARCHIVED' | 'RESTORED' | 'DRAFT', version: number) {
+  async function requestTransition(itemId: string, to: 'PUBLISHED' | 'UNPUBLISHED' | 'ARCHIVED' | 'RESTORED' | 'DRAFT' | 'SCHEDULED', version: number, scheduledAt?: string) {
     const response = await fetch(`/api/creator/contents/${encodeURIComponent(itemId)}/state`, {
       method: 'POST',
       credentials: 'include',
@@ -146,7 +147,7 @@ export default function CreatorContentList({ loginPath = '/admin/login' }: { log
         'If-Match': `W/"${version}"`,
         'Idempotency-Key': crypto.randomUUID(),
       },
-      body: JSON.stringify({ to }),
+      body: JSON.stringify({ to, ...(scheduledAt ? { scheduledAt } : {}) }),
     })
     const data = await response.json().catch((): null => null)
     if (response.status === 401) {
@@ -156,6 +157,40 @@ export default function CreatorContentList({ loginPath = '/admin/login' }: { log
     }
     if (!response.ok) throw new Error(data?.error?.message || '内容状态更新失败')
     return data as { version?: unknown }
+  }
+
+  function defaultScheduleInputValue(): string {
+    const next = new Date(Date.now() + 60 * 60 * 1000)
+    next.setSeconds(0, 0)
+    const local = new Date(next.getTime() - next.getTimezoneOffset() * 60 * 1000)
+    return local.toISOString().slice(0, 16)
+  }
+
+  async function schedulePublication(item: Item) {
+    const value = window.prompt(
+      '请输入定时发布时间（按当前设备本地时区解释，例如 2026-10-08T20:30）：',
+      defaultScheduleInputValue(),
+    )?.trim()
+    if (!value) return
+
+    const scheduledAt = new Date(value)
+    if (!Number.isFinite(scheduledAt.getTime()) || scheduledAt.getTime() <= Date.now()) {
+      setError('定时发布时间必须是未来时间。')
+      return
+    }
+
+    if (!window.confirm('确定在 ' + scheduledAt.toLocaleString('zh-CN', { hour12: false }) + ' 自动发布“' + item.title + '”吗？')) return
+
+    setActionId(item.id)
+    setError('')
+    try {
+      await requestTransition(item.id, 'SCHEDULED', item.version, scheduledAt.toISOString())
+      await load()
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : '定时发布设置失败')
+    } finally {
+      setActionId(null)
+    }
   }
 
   async function transition(item: Item, to: 'PUBLISHED' | 'UNPUBLISHED' | 'ARCHIVED' | 'RESTORED' | 'DRAFT') {
@@ -375,6 +410,9 @@ export default function CreatorContentList({ loginPath = '/admin/login' }: { log
                   <div className={styles.contentMeta}>
                     <span>{typeLabels[item.contentType]}</span>
                     <span>{labels[item.state]}</span>
+                    {item.state === 'SCHEDULED' && item.scheduledAt ? (
+                      <time dateTime={item.scheduledAt}>将于 {new Date(item.scheduledAt).toLocaleString('zh-CN', { hour12: false })} 发布</time>
+                    ) : null}
                     <span>v{item.version}</span>
                   </div>
                   <h3>{item.title}</h3>
@@ -411,14 +449,36 @@ export default function CreatorContentList({ loginPath = '/admin/login' }: { log
                     </button>
                   ) : null}
                   {item.state === 'APPROVED' ? (
+                    <>
+                      <button
+                        aria-busy={actionId === item.id}
+                        className={styles.primaryButton}
+                        disabled={actionId !== null}
+                        onClick={() => void transition(item, 'PUBLISHED')}
+                        type="button"
+                      >
+                        {actionId === item.id ? '处理中…' : '立即发布'}
+                      </button>
+                      <button
+                        aria-busy={actionId === item.id}
+                        className={styles.secondaryButton}
+                        disabled={actionId !== null}
+                        onClick={() => void schedulePublication(item)}
+                        type="button"
+                      >
+                        {actionId === item.id ? '处理中…' : '定时发布'}
+                      </button>
+                    </>
+                  ) : null}
+                  {item.state === 'SCHEDULED' ? (
                     <button
                       aria-busy={actionId === item.id}
-                      className={styles.primaryButton}
+                      className={styles.secondaryButton}
                       disabled={actionId !== null}
-                      onClick={() => void transition(item, 'PUBLISHED')}
+                      onClick={() => void transition(item, 'DRAFT')}
                       type="button"
                     >
-                      {actionId === item.id ? '处理中…' : '立即发布'}
+                      {actionId === item.id ? '处理中…' : '取消定时并转草稿'}
                     </button>
                   ) : null}
                   {item.state === 'PUBLISHED' ? (
