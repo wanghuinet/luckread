@@ -110,6 +110,12 @@ describe('public creator profile', () => {
     expect(page).toContain('signal: controller.signal')
   })
 
+  it('routes profile works through the canonical content detail route', () => {
+    const page = read('src/app/(frontend)/users/[userId]/page.tsx')
+    expect(page).toContain("return '/content/' + encodeURIComponent(item.slug || item.id)")
+    expect(page).not.toContain("return '/' + encodeURIComponent(profile!.username) + '/' + item.contentType + '/' + encodeURIComponent(item.id)")
+  })
+
   it('uses real public thumbnails without inline image background URLs', () => {
     const page = read('src/app/(frontend)/users/[userId]/page.tsx')
     expect(page).toContain('src={item.coverRef}')
