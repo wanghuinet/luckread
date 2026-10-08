@@ -795,8 +795,8 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
       <div className="lr-media-box">
         <div className="lr-media-heading">
           <div>
-            <strong>图片 / 视频</strong>
-            <span>{assets.length}/12</span>
+            <strong>{type === 'video' ? '短视频素材' : '图片 / 视频'}</strong>
+            <span>{type === 'video' ? '1 个主视频 + 可选封面' : assets.length + '/12'}</span>
           </div>
           <label className="lr-upload-button">
             添加媒体
@@ -816,12 +816,42 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
               <div className="lr-asset" key={asset.id}>
                 <div className="lr-asset-preview">
                   {asset.mimeType.startsWith('video/')
-                    ? <video aria-label={asset.filename ?? '已上传视频'} muted playsInline preload="metadata" src={asset.url} />
+                    ? (
+                      <video
+                        aria-label={asset.filename ?? '已上传视频'}
+                        muted
+                        playsInline
+                        preload="metadata"
+                        src={asset.url}
+                        onLoadedMetadata={(event) => {
+                          const media = event.currentTarget
+                          setVideoMetadataByAssetId((current) => ({
+                            ...current,
+                            [asset.id]: {
+                              duration: media.duration,
+                              width: media.videoWidth,
+                              height: media.videoHeight,
+                            },
+                          }))
+                        }}
+                      />
+                    )
                     : <img alt="" loading="lazy" src={asset.url} />}
                 </div>
                 <div className="lr-asset-info">
                   <strong>{asset.filename ?? asset.id}</strong>
                   <span>{asset.mimeType}</span>
+                  {type === 'video' && isVideoAsset(asset) ? (
+                    videoMetadataByAssetId[asset.id] ? (
+                      <small>
+                        {formatVideoDuration(videoMetadataByAssetId[asset.id].duration)}
+                        {' · '}
+                        {videoMetadataByAssetId[asset.id].width}×{videoMetadataByAssetId[asset.id].height}
+                      </small>
+                    ) : (
+                      <small>正在读取视频信息…</small>
+                    )
+                  ) : null}
                 </div>
                 <div className="lr-asset-actions">
                   {isImageAsset(asset) ? (
@@ -839,7 +869,9 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
             ))}
           </div>
         ) : (
-          <p className="lr-empty">可一次选择多张图片或一个视频，也可以只发纯文字。</p>
+          <p className="lr-empty">
+            {type === 'video' ? '添加 1 个主视频；可再添加 1 张封面图。' : '可一次选择多张图片或一个视频，也可以只发纯文字。'}
+          </p>
         )}
       </div>
 
@@ -964,7 +996,15 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
               <div className="lr-preview-media">
                 {assets.slice(0, 4).map((asset) =>
                   asset.mimeType.startsWith('video/')
-                    ? <video controls key={asset.id} muted playsInline preload="metadata" src={asset.url} />
+                    ? <video
+                        controls
+                        key={asset.id}
+                        muted
+                        playsInline
+                        preload="metadata"
+                        poster={type === 'video' && coverRef ? coverRef : undefined}
+                        src={asset.url}
+                      />
                     : <img alt={asset.filename ?? ''} key={asset.id} loading="lazy" src={asset.url} />,
                 )}
                 {assets.length > 4 ? <span>+{assets.length - 4} 个媒体</span> : null}
