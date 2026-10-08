@@ -173,7 +173,11 @@ export async function transitionSubscription(db: D1Database, subscriberId: strin
   const etag = validateIfMatch(ifMatch)
   const expectedUpdatedAt = updatedAtFromEtag(etag)
   const row = await readSubscriptionRow(db, subscriptionId, subscriber)
-  if (etagForUpdatedAt(row.updated_at) !== etag) throw new SubscriptionRuntimeError('PRECONDITION_FAILED', 412)
+  if (etagForUpdatedAt(row.updated_at) !== etag) {
+    const convergedState = nextState(operation)
+    if (row.status === convergedState) return toPublic(row)
+    throw new SubscriptionRuntimeError('PRECONDITION_FAILED', 412)
+  }
   if (!transitionTargets[operation].includes(row.status)) throw new SubscriptionRuntimeError('INVALID_STATE', 409)
   const updatedAt = nextUpdatedAt(row.updated_at)
   const result = await db.prepare('UPDATE membership_subscriptions SET status = ?, cancel_at = ?, updated_at = ? WHERE subscription_id = ? AND subscriber_id = ? AND updated_at = ?')
@@ -190,7 +194,10 @@ export async function changeSubscriptionPlan(db: D1Database, subscriberId: strin
   const etag = validateIfMatch(ifMatch)
   const expectedUpdatedAt = updatedAtFromEtag(etag)
   const row = await readSubscriptionRow(db, subscriptionId, subscriber)
-  if (etagForUpdatedAt(row.updated_at) !== etag) throw new SubscriptionRuntimeError('PRECONDITION_FAILED', 412)
+  if (etagForUpdatedAt(row.updated_at) !== etag) {
+    if (row.plan_id === nextPlanId) return toPublic(row)
+    throw new SubscriptionRuntimeError('PRECONDITION_FAILED', 412)
+  }
   if (!['ACTIVE', 'PAUSED', 'PAST_DUE'].includes(row.status)) throw new SubscriptionRuntimeError('INVALID_STATE', 409)
   if (row.plan_id === nextPlanId) return toPublic(row)
   const updatedAt = nextUpdatedAt(row.updated_at)

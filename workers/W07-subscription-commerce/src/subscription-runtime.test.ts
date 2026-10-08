@@ -110,8 +110,21 @@ describe('subscription runtime', () => {
     const db = fakeDb([baseRow()]); const before = await getSubscription(db, 'user_1', 'sub_existing'); const after = await transitionSubscription(db, 'user_1', 'sub_existing', 'pause', before.etag)
     expect(after.status).toBe('PAUSED'); expect(after.updatedAt).not.toBe(before.updatedAt)
   })
-  it('fails stale If-Match without changing state', async () => {
+  it('fails stale If-Match without changing state when the requested transition has not converged', async () => {
     const db = fakeDb([baseRow()]); await expect(transitionSubscription(db, 'user_1', 'sub_existing', 'pause', '"lr-stale"')).rejects.toMatchObject({ code: 'PRECONDITION_FAILED', status: 412 })
+  })
+
+  it('treats a repeated pause with a stale If-Match as an idempotent success', async () => {
+    const db = fakeDb([baseRow({ status: 'PAUSED', updated_at: '2026-10-02T12:00:01.000Z' })])
+    const result = await transitionSubscription(db, 'user_1', 'sub_existing', 'pause', etagForUpdatedAt('2026-10-02T12:00:00.000Z'))
+    expect(result.status).toBe('PAUSED')
+    expect(result.updatedAt).toBe('2026-10-02T12:00:01.000Z')
+  })
+
+  it('treats a repeated cancel with a stale If-Match as an idempotent success', async () => {
+    const db = fakeDb([baseRow({ status: 'CANCELED', updated_at: '2026-10-02T12:00:01.000Z', cancel_at: '2026-10-02T12:00:01.000Z' })])
+    const result = await transitionSubscription(db, 'user_1', 'sub_existing', 'cancel', etagForUpdatedAt('2026-10-02T12:00:00.000Z'))
+    expect(result.status).toBe('CANCELED')
   })
 
   it('advances updatedAt when the clock equals the stored timestamp', async () => {
@@ -125,6 +138,13 @@ describe('subscription runtime', () => {
   it('changes plan only for mutable lifecycle states', async () => {
     const db = fakeDb([baseRow()]); const before = await getSubscription(db, 'user_1', 'sub_existing'); const after = await changeSubscriptionPlan(db, 'user_1', 'sub_existing', 'plan_pro', before.etag)
     expect(after.planId).toBe('plan_pro'); expect(after.status).toBe('ACTIVE')
+  })
+
+  it('treats a repeated plan change with a stale If-Match as an idempotent success when the plan already converged', async () => {
+    const db = fakeDb([baseRow({ plan_id: 'plan_pro', updated_at: '2026-10-02T12:00:01.000Z' })])
+    const result = await changeSubscriptionPlan(db, 'user_1', 'sub_existing', 'plan_pro', etagForUpdatedAt('2026-10-02T12:00:00.000Z'))
+    expect(result.planId).toBe('plan_pro')
+    expect(result.updatedAt).toBe('2026-10-02T12:00:01.000Z')
   })
   it('rejects cancel from PENDING according to the state machine', async () => {
     const db = fakeDb([baseRow({ status: 'PENDING' })]); const before = await getSubscription(db, 'user_1', 'sub_existing'); await expect(transitionSubscription(db, 'user_1', 'sub_existing', 'cancel', before.etag)).rejects.toMatchObject({ code: 'INVALID_STATE', status: 409 })
