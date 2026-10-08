@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 
+import { fetchJson, getApiErrorMessage } from '../../../lib/client-api.js'
 import UserProfilePage from '../users/[userId]/page'
 
 type PublicUserLookup = {
@@ -24,14 +25,13 @@ export default function UsernameProfilePage({
     void (async () => {
       try {
         const { username } = await params
-        const response = await fetch('/api/v1/users/by-username/' + encodeURIComponent(username), {
+        const { response, data } = await fetchJson<PublicUserLookup>('/api/v1/users/by-username/' + encodeURIComponent(username), {
           headers: { accept: 'application/json' },
           cache: 'no-store',
           signal: controller.signal,
         })
-        const data = await response.json().catch((): PublicUserLookup | null => null)
         if (!response.ok || typeof data?.id !== 'string' || !data.id) {
-          throw new Error(data?.error?.message || '用户不存在。')
+          throw new Error(getApiErrorMessage(data, '用户不存在。'))
         }
         if (!cancelled) setUserId(data.id)
       } catch (cause) {
