@@ -454,7 +454,7 @@ export default function CreatorContentList({ loginPath = '/admin/login' }: { log
                   ) : null}
                   {item.state === 'REJECTED' ? (
                     <CreatorActionButton
-                      extraButtonProps={{ 'aria-busy': actionId === item.id }}
+                      aria-busy={actionId === item.id}
                       
                       disabled={actionId !== null}
                       onClick={() => void moveToDraftForEdit(item)}
@@ -466,7 +466,7 @@ export default function CreatorContentList({ loginPath = '/admin/login' }: { log
                   {item.state === 'APPROVED' ? (
                     <>
                       <CreatorActionButton
-                        extraButtonProps={{ 'aria-busy': actionId === item.id }}
+                        aria-busy={actionId === item.id}
                         tone="primary"
                         disabled={actionId !== null}
                         onClick={() => void transition(item, 'PUBLISHED')}
@@ -475,7 +475,7 @@ export default function CreatorContentList({ loginPath = '/admin/login' }: { log
                         {actionId === item.id ? '处理中…' : '立即发布'}
                       </CreatorActionButton>
                       <CreatorActionButton
-                        extraButtonProps={{ 'aria-busy': actionId === item.id }}
+                        aria-busy={actionId === item.id}
                         
                         disabled={actionId !== null}
                         onClick={() => void schedulePublication(item)}
@@ -487,7 +487,7 @@ export default function CreatorContentList({ loginPath = '/admin/login' }: { log
                   ) : null}
                   {item.state === 'SCHEDULED' ? (
                     <CreatorActionButton
-                      extraButtonProps={{ 'aria-busy': actionId === item.id }}
+                      aria-busy={actionId === item.id}
                       
                       disabled={actionId !== null}
                       onClick={() => void transition(item, 'DRAFT')}
@@ -510,7 +510,7 @@ export default function CreatorContentList({ loginPath = '/admin/login' }: { log
                         分享
                       </CreatorActionButton>
                       <CreatorActionButton
-                        extraButtonProps={{ 'aria-busy': actionId === item.id }}
+                        aria-busy={actionId === item.id}
                         
                         disabled={actionId !== null}
                         onClick={() => void unpublishAndEdit(item)}
@@ -519,7 +519,7 @@ export default function CreatorContentList({ loginPath = '/admin/login' }: { log
                         {actionId === item.id ? '处理中…' : item.contentType === 'video' ? '下线并编辑视频资料' : '下线并编辑'}
                       </CreatorActionButton>
                       <CreatorActionButton
-                        extraButtonProps={{ 'aria-busy': actionId === item.id }}
+                        aria-busy={actionId === item.id}
                         
                         disabled={actionId !== null}
                         onClick={() => void transition(item, 'UNPUBLISHED')}
@@ -528,7 +528,7 @@ export default function CreatorContentList({ loginPath = '/admin/login' }: { log
                         {actionId === item.id ? '处理中…' : '下线'}
                       </CreatorActionButton>
                       <CreatorActionButton
-                        extraButtonProps={{ 'aria-busy': actionId === item.id }}
+                        aria-busy={actionId === item.id}
                         
                         disabled={actionId !== null}
                         onClick={() => void transition(item, 'ARCHIVED')}
@@ -541,7 +541,7 @@ export default function CreatorContentList({ loginPath = '/admin/login' }: { log
                   {item.state === 'UNPUBLISHED' ? (
                     <>
                       <CreatorActionButton
-                        extraButtonProps={{ 'aria-busy': actionId === item.id }}
+                        aria-busy={actionId === item.id}
                         
                         disabled={actionId !== null}
                         onClick={() => void moveToDraftForEdit(item)}
@@ -561,7 +561,7 @@ export default function CreatorContentList({ loginPath = '/admin/login' }: { log
                   ) : null}
                   {item.state === 'ARCHIVED' ? (
                     <CreatorActionButton
-                      extraButtonProps={{ 'aria-busy': actionId === item.id }}
+                      aria-busy={actionId === item.id}
                       
                       disabled={actionId !== null}
                       onClick={() => void transition(item, 'DRAFT')}
@@ -572,7 +572,7 @@ export default function CreatorContentList({ loginPath = '/admin/login' }: { log
                   ) : null}
                   {item.state === 'DELETED' ? (
                     <CreatorActionButton
-                      extraButtonProps={{ 'aria-busy': actionId === item.id }}
+                      aria-busy={actionId === item.id}
                       
                       disabled={actionId !== null}
                       onClick={() => void transition(item, 'RESTORED')}
@@ -583,7 +583,7 @@ export default function CreatorContentList({ loginPath = '/admin/login' }: { log
                   ) : null}
                   {item.state === 'RESTORED' ? (
                     <CreatorActionButton
-                      extraButtonProps={{ 'aria-busy': actionId === item.id }}
+                      aria-busy={actionId === item.id}
                       
                       disabled={actionId !== null}
                       onClick={() => void transition(item, 'DRAFT')}
@@ -594,7 +594,7 @@ export default function CreatorContentList({ loginPath = '/admin/login' }: { log
                   ) : null}
                   {['DRAFT', 'PUBLISHED', 'UNPUBLISHED', 'ARCHIVED'].includes(item.state) ? (
                     <CreatorActionButton
-                      extraButtonProps={{ 'aria-busy': actionId === item.id }}
+                      aria-busy={actionId === item.id}
                       tone="error"
                       disabled={actionId !== null}
                       onClick={() => void deleteContent(item)}
@@ -609,7 +609,7 @@ export default function CreatorContentList({ loginPath = '/admin/login' }: { log
           </div>
           {page.hasMore && page.nextCursor ? (
             <CreatorActionButton
-              extraButtonProps={{ 'aria-busy': loadingMore }}
+              aria-busy={loadingMore}
               
               disabled={loadingMore}
               onClick={() => void load(page.nextCursor)}
