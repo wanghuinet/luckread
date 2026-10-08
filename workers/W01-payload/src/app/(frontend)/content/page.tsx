@@ -116,6 +116,7 @@ export default function ContentBrowsePage() {
         <div className="content-browse-actions">
           <Link className="button button-quiet" href="/">{copy.common.backHome}</Link>
           <Link className="button button-primary" href="/publish">{copy.common.startCreating} ↗</Link>
+          <Link className="button button-quiet" href="/shorts">短视频</Link>
           <PublicLanguageToggle locale={locale} />
         </div>
       </header>
