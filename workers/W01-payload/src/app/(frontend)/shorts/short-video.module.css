@@ -684,6 +684,28 @@
     left: 12px;
     right: 12px;
   }
+
+  .soundButtonWrap {
+    right: 12px;
+    bottom: calc(12px + env(safe-area-inset-bottom));
+  }
+
+  .bottomNav {
+    min-height: 68px;
+    padding-bottom: max(10px, env(safe-area-inset-bottom));
+  }
+
+  .commentsDrawer {
+    width: 100%;
+    height: min(78dvh, 720px);
+    margin-top: auto;
+    border-radius: 18px 18px 0 0;
+    box-shadow: 0 -20px 60px rgba(0,0,0,.28);
+  }
+
+  .commentsHeader {
+    min-height: 58px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
