@@ -434,7 +434,7 @@ export default function CreatorContentList({ loginPath = '/admin/login' }: { log
                   </button>
                   {item.state === 'DRAFT' ? (
                     <Link className={styles.secondaryButton} href={`/publish?draft=${encodeURIComponent(item.id)}`}>
-                      继续编辑
+                      {item.contentType === 'video' ? '编辑视频资料' : '继续编辑'}
                     </Link>
                   ) : null}
                   {item.state === 'REJECTED' ? (
@@ -445,7 +445,7 @@ export default function CreatorContentList({ loginPath = '/admin/login' }: { log
                       onClick={() => void moveToDraftForEdit(item)}
                       type="button"
                     >
-                      {actionId === item.id ? '处理中…' : '继续编辑'}
+                      {actionId === item.id ? '处理中…' : item.contentType === 'video' ? '编辑视频资料' : '继续编辑'}
                     </button>
                   ) : null}
                   {item.state === 'APPROVED' ? (
@@ -501,7 +501,7 @@ export default function CreatorContentList({ loginPath = '/admin/login' }: { log
                         onClick={() => void unpublishAndEdit(item)}
                         type="button"
                       >
-                        {actionId === item.id ? '处理中…' : '下线并编辑'}
+                        {actionId === item.id ? '处理中…' : item.contentType === 'video' ? '下线并编辑视频资料' : '下线并编辑'}
                       </button>
                       <button
                         aria-busy={actionId === item.id}
@@ -532,7 +532,7 @@ export default function CreatorContentList({ loginPath = '/admin/login' }: { log
                         onClick={() => void moveToDraftForEdit(item)}
                         type="button"
                       >
-                        {actionId === item.id ? '处理中…' : '转为草稿编辑'}
+                        {actionId === item.id ? '处理中…' : item.contentType === 'video' ? '转为草稿编辑视频资料' : '转为草稿编辑'}
                       </button>
                       <button
                         className={styles.secondaryButton}

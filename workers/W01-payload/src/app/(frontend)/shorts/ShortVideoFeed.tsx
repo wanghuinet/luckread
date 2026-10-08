@@ -81,6 +81,8 @@ export default function ShortVideoFeed() {
   const heartTimerRef = useRef<number | null>(null)
   const itemRefs = useRef<Record<string, HTMLElement | null>>({})
   const videoRefs = useRef<Record<string, HTMLVideoElement | null>>({})
+  const feedRef = useRef<HTMLElement | null>(null)
+  const loadMoreSentinelRef = useRef<HTMLDivElement | null>(null)
   const activeIndexRef = useRef(0)
   const requestRef = useRef<AbortController | null>(null)
   const profileCacheRef = useRef<Record<string, Profile>>({})
@@ -94,6 +96,15 @@ export default function ShortVideoFeed() {
   const setActive = useCallback((index: number) => {
     activeIndexRef.current = index
     setActiveIndex(index)
+    setActiveProgress(0)
+  }, [])
+
+  const setItemRef = useCallback((id: string) => (element: HTMLElement | null) => {
+    itemRefs.current[id] = element
+  }, [])
+
+  const setVideoRef = useCallback((id: string) => (element: HTMLVideoElement | null) => {
+    videoRefs.current[id] = element
   }, [])
 
   const loadPage = useCallback(async (cursor: string | null = null) => {
@@ -194,7 +205,17 @@ export default function ShortVideoFeed() {
             }
           }
         }
-        if (bestIndex !== activeIndexRef.current) setActive(bestIndex)
+        if (bestIndex !== activeIndexRef.current) {
+          setActive(bestIndex)
+        }
+        if (
+          page.hasMore &&
+          page.nextCursor &&
+          !loadingMore &&
+          bestIndex >= Math.max(visibleItems.length - 3, 0)
+        ) {
+          void loadPage(page.nextCursor)
+        }
       },
       { threshold: [0.55, 0.75, 0.9] },
     )
@@ -205,7 +226,7 @@ export default function ShortVideoFeed() {
     })
 
     return () => observer.disconnect()
-  }, [visibleItems, setActive])
+  }, [loadPage, loadingMore, page.hasMore, page.nextCursor, setActive, visibleItems])
 
   useEffect(() => {
     if (!visibleItems.length) return
@@ -337,14 +358,18 @@ export default function ShortVideoFeed() {
   }, [setActive, visibleItems.length])
 
   useEffect(() => {
-    setActiveProgress(0)
-  }, [activeIndex])
+    const sentinel = loadMoreSentinelRef.current
+    if (!sentinel || !page.hasMore || !page.nextCursor || loadingMore) return
 
-  useEffect(() => {
-    if (!page.hasMore || !page.nextCursor || loadingMore) return
-    if (activeIndex < Math.max(visibleItems.length - 3, 0)) return
-    void loadPage(page.nextCursor)
-  }, [activeIndex, loadPage, loadingMore, page.hasMore, page.nextCursor, visibleItems.length])
+    const nextCursor = page.nextCursor
+    const observer = new IntersectionObserver((entries) => {
+      if (!entries.some((entry) => entry.isIntersecting)) return
+      void loadPage(nextCursor)
+    }, { root: feedRef.current })
+
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [loadPage, loadingMore, page.hasMore, page.nextCursor])
 
   const updateBusy = (id: string, action: string | null) => {
     setBusyById((current) => {
@@ -596,7 +621,7 @@ export default function ShortVideoFeed() {
       <header className={styles.topbar}>
         <Link href="/" className={styles.brand}>LuckRead</Link>
         <div className={styles.feedTabs} aria-label="短视频频道">
-          <span className={styles.feedTabActive}>为你</span>
+          <span className={styles.feedTabActive}>短视频</span>
           <Link href="/content?type=video" className={styles.feedTab}>视频</Link>
         </div>
         <div className={styles.topbarActions}>
@@ -607,7 +632,7 @@ export default function ShortVideoFeed() {
         </div>
       </header>
 
-      <section className={styles.feed} aria-label="短视频流">
+      <section ref={feedRef} className={styles.feed} aria-label="短视频流">
         {visibleItems.map((item, index) => {
           const videoUrl = item.mediaRefs?.[0]
           const interaction = interactionById[item.id] ?? initialInteraction
@@ -623,7 +648,7 @@ export default function ShortVideoFeed() {
               className={styles.slide}
               data-index={index}
               key={item.id}
-              ref={(element) => { itemRefs.current[item.id] = element }}
+              ref={setItemRef(item.id)}
             >
               <div
                 className={styles.videoStage}
@@ -641,7 +666,7 @@ export default function ShortVideoFeed() {
                   playsInline
                   poster={item.coverRef || undefined}
                   preload={Math.abs(index - activeIndex) <= 1 ? 'metadata' : 'none'}
-                  ref={(element) => { videoRefs.current[item.id] = element }}
+                  ref={setVideoRef(item.id)}
                   src={videoUrl}
                   onClick={() => togglePlay(item)}
                   onTimeUpdate={(event) => {
@@ -664,7 +689,7 @@ export default function ShortVideoFeed() {
                 <div className={styles.bottomFade} />
 
                 <div className={styles.slideHeader}>
-                  <span>为你推荐</span>
+                  <span>短视频</span>
                   <span className={styles.indexMark}>{index + 1}/{visibleItems.length}</span>
                 </div>
 
@@ -694,7 +719,7 @@ export default function ShortVideoFeed() {
                     </div>
                   </div>
                   <h1>{item.title}</h1>
-                  <p>{locale === 'en' ? 'Watch more on LuckRead.' : '在 LuckRead 继续发现更多内容。'}</p>
+                  <p>{locale === 'en' ? 'Swipe to keep watching.' : '上下滑动继续刷视频。'}</p>
                   <Link className={styles.detailLink} href={'/content/' + encodeURIComponent(item.slug || item.id)}>
                     打开详情
                   </Link>
@@ -728,7 +753,7 @@ export default function ShortVideoFeed() {
                 </aside>
 
                 <div className={styles.progressTrack} aria-hidden="true">
-                  <span className={styles.progressValue} style={{ width: activeIndexRef.current === index ? activeProgress + '%' : '0%' }} />
+                  <span className={styles.progressValue} style={{ width: activeIndex === index ? activeProgress + '%' : '0%' }} />
                 </div>
 
                 <div className={styles.soundButtonWrap}>
@@ -740,20 +765,19 @@ export default function ShortVideoFeed() {
             </article>
           )
         })}
+        {page.hasMore && page.nextCursor ? (
+          <div ref={loadMoreSentinelRef} className={styles.loadMoreSentinel} aria-live="polite">
+            {loadingMore ? '正在载入更多视频…' : '继续滑动加载更多'}
+            <button
+              className={styles.hiddenLoadButton}
+              aria-label="加载更多短视频"
+              disabled={loadingMore}
+              onClick={() => void loadPage(page.nextCursor ?? null)}
+              type="button"
+            />
+          </div>
+        ) : null}
       </section>
-
-      {page.hasMore && page.nextCursor ? (
-        <div className={styles.loadMoreSentinel} aria-live="polite">
-          {loadingMore ? '正在载入更多视频…' : '继续滑动加载更多'}
-          <button
-            className={styles.hiddenLoadButton}
-            aria-label="加载更多短视频"
-            disabled={loadingMore}
-            onClick={() => void loadPage(page.nextCursor ?? null)}
-            type="button"
-          />
-        </div>
-      ) : null}
 
       {message ? (
         <div className={styles.toast} role="status">

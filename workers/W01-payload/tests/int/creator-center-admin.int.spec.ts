@@ -641,6 +641,7 @@ describe('Creator Center admin extension', () => {
   it('embeds the existing publisher with a scoped W03 content bridge', () => {
     const view = read('src/app/(frontend)/creator-center/CreatorStudio.tsx')
     const publisher = read('src/app/(frontend)/publish/PublishComposer.tsx')
+    const list = read('src/app/(payload)/v1beta/CreatorContentList.tsx')
     const contentDetail = read('src/app/(frontend)/content/[contentId]/ContentDetailClient.tsx')
     const contentDetailPage = read('src/app/(frontend)/content/[contentId]/page.tsx')
     const homeFeed = read('src/app/(frontend)/HomeContentFeed.tsx')
@@ -745,6 +746,10 @@ describe('Creator Center admin extension', () => {
     expect(publisher).toContain('videoMetadataByAssetId')
     expect(publisher).toContain('onLoadedMetadata')
     expect(publisher).toContain('formatVideoDuration')
+    expect(publisher).toContain('视频资料')
+    expect(publisher).toContain('视频文案')
+    expect(publisher).toContain('上传后可直接修改标题、视频文案、封面并保存')
+    expect(list).toContain('编辑视频资料')
     expect(publisher).toContain('1 个主视频 + 可选封面')
     expect(publisher).toContain('poster={type === \'video\' && coverRef ? coverRef : undefined}')
     expect(publisher).toContain('className="lr-asset-preview"')

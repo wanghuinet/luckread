@@ -781,7 +781,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
         />
       ) : (
         <label className="lr-field">
-          <span>{type === 'post' ? '正文' : '视频简介'}</span>
+          <span>{type === 'post' ? '正文' : '视频文案'}</span>
           <textarea
             disabled={busy || reviewLocked}
             onChange={(event) => { setBody(event.target.value); markDirty() }}
@@ -810,7 +810,26 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
             />
           </label>
         </div>
-        {assets.length ? (
+        {type === 'video' && assets.some(isVideoAsset) ? (
+        <div className="lr-content-status" role="group" aria-label="视频资料">
+          <span>视频资料</span>
+          <strong>上传后可直接修改标题、视频文案、封面并保存</strong>
+          {(() => {
+            const primaryVideo = assets.find(isVideoAsset)
+            const metadata = primaryVideo ? videoMetadataByAssetId[primaryVideo.id] : null
+            return (
+              <>
+                <span>{primaryVideo?.filename || '主视频'}</span>
+                <span>{metadata
+                  ? formatVideoDuration(metadata.duration) + ' · ' + metadata.width + '×' + metadata.height
+                  : '正在读取视频信息…'}</span>
+              </>
+            )
+          })()}
+        </div>
+      ) : null}
+
+      {assets.length ? (
           <div className="lr-asset-list">
             {assets.map((asset) => (
               <div className="lr-asset" key={asset.id}>
