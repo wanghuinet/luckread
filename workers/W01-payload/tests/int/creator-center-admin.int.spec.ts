@@ -253,6 +253,20 @@ describe('Creator Center admin extension', () => {
     expect(editor).toContain('focusTarget.id')
   })
 
+  it('coalesces continuous article text editing into one undo step', () => {
+    const editor = read('src/components/ArticleStructuredEditor.tsx')
+    const history = read('src/lib/article-document-history.ts')
+
+    expect(editor).toContain('function emitTextEdit(next: ArticleDocument, blockId: string)')
+    expect(editor).toContain("coalesceKey: 'text:' + blockId")
+    expect(editor).toContain('onChange={(event) => {')
+    expect(editor).toContain('emitTextEdit(next, block.id)')
+    expect(history).toContain('lastRecordKey: string | null')
+    expect(history).toContain('if (recordKey && history.lastRecordKey === recordKey)')
+    expect(history).toContain('future: []')
+    expect(history).toContain('lastRecordKey: null')
+  })
+
   it('exposes structured article block clipboard copy and paste', () => {
     const editor = read('src/components/ArticleStructuredEditor.tsx')
     const document = read('src/lib/article-document.ts')

@@ -193,6 +193,23 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
     onChange(normalized, plainTextFromArticleDocument(normalized))
   }
 
+  function emitTextEdit(next: ArticleDocument, blockId: string) {
+    const normalized = normalizeArticleDocument(next)
+    const currentSnapshot = JSON.stringify(value)
+    const nextSnapshot = JSON.stringify(normalized)
+    if (currentSnapshot === nextSnapshot) return
+    const nextHistory = recordArticleDocumentHistory(
+      historyRef.current,
+      value,
+      normalized,
+      { coalesceKey: 'text:' + blockId },
+    )
+    pendingHistorySnapshotRef.current = nextSnapshot
+    syncHistoryState(nextHistory)
+    lastDocumentSnapshotRef.current = nextSnapshot
+    onChange(normalized, plainTextFromArticleDocument(normalized))
+  }
+
   function applyHistory(direction: 'undo' | 'redo') {
     const result = direction === 'undo'
       ? undoArticleDocumentHistory(historyRef.current, value)
@@ -679,7 +696,7 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
                   aria-label="媒体说明"
                   disabled={disabled}
                   maxLength={ARTICLE_MAX_BLOCK_TEXT}
-                  onChange={(event) => emit(updateBlock(value, index, { text: event.target.value.slice(0, ARTICLE_MAX_BLOCK_TEXT) }))}
+                  onChange={(event) => emitTextEdit(updateBlock(value, index, { text: event.target.value.slice(0, ARTICLE_MAX_BLOCK_TEXT) }), block.id)}
                   placeholder="可选：添加图片说明…"
                   rows={2}
                   value={block.text}
@@ -697,7 +714,7 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
                   const next = updateBlock(value, index, {
                     text: event.target.value.slice(0, ARTICLE_MAX_BLOCK_TEXT),
                   })
-                  emit(next)
+                  emitTextEdit(next, block.id)
                 }}
                 placeholder={
                   block.type === 'heading' ? '输入小标题…'

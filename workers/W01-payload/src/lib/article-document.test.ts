@@ -167,6 +167,61 @@ describe('article structured document', () => {
     expect(redone.history.future).toHaveLength(0)
   })
 
+  it('coalesces continuous text edits into a single undo step', () => {
+    const first = createArticleDocument('初稿')
+    const second = { ...first, blocks: [{ ...first.blocks[0], text: '初稿A' }] }
+    const third = { ...second, blocks: [{ ...second.blocks[0], text: '初稿AB' }] }
+
+    let history = createArticleDocumentHistory(30)
+    history = recordArticleDocumentHistory(history, first, second, { coalesceKey: 'text:' + first.blocks[0].id })
+    history = recordArticleDocumentHistory(history, second, third, { coalesceKey: 'text:' + first.blocks[0].id })
+
+    expect(history.past).toHaveLength(1)
+    const undone = undoArticleDocumentHistory(history, third)
+    expect(undone.document?.blocks[0].text).toBe('初稿')
+    const redone = redoArticleDocumentHistory(undone.history, undone.document!)
+    expect(redone.document?.blocks[0].text).toBe('初稿AB')
+  })
+
+  it('breaks text coalescing when the edited block changes or a structural action occurs', () => {
+    const first = {
+      version: 2 as const,
+      blocks: [
+        { id: 'a', type: 'paragraph' as const, text: 'A' },
+        { id: 'b', type: 'paragraph' as const, text: 'B' },
+      ],
+    }
+    const second = {
+      ...first,
+      blocks: [
+        { ...first.blocks[0], text: 'AA' },
+        first.blocks[1],
+      ],
+    }
+    const third = {
+      ...second,
+      blocks: [
+        second.blocks[0],
+        { ...second.blocks[1], text: 'BB' },
+      ],
+    }
+    const fourth = {
+      ...third,
+      blocks: [
+        ...third.blocks,
+        { id: 'c', type: 'paragraph' as const, text: '' },
+      ],
+    }
+
+    let history = createArticleDocumentHistory()
+    history = recordArticleDocumentHistory(history, first, second, { coalesceKey: 'text:a' })
+    history = recordArticleDocumentHistory(history, second, third, { coalesceKey: 'text:b' })
+    history = recordArticleDocumentHistory(history, third, fourth)
+
+    expect(history.past).toHaveLength(3)
+    expect(history.lastRecordKey).toBeNull()
+  })
+
   it('caps article document history to the configured limit', () => {
     let history = createArticleDocumentHistory(2)
     const first = createArticleDocument()
