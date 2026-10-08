@@ -188,6 +188,24 @@ describe('Creator Center admin extension', () => {
     expect(editor).toContain('onClick={() => removeMediaReference(ref)}')
   })
 
+  it('registers article writer tools without network dependencies', () => {
+    const plugin = read('src/components/WriterToolsPlugin.tsx')
+    const registry = read('src/components/article-editor-plugins.ts')
+    const styles = read('src/app/(frontend)/publish/publish.css')
+
+    expect(plugin).toContain('export const getWriterStats')
+    expect(plugin).toContain('const characters = Array.from(plainText).length')
+    expect(plugin).toContain("id: 'content.writer-stats'")
+    expect(plugin).toContain("id: 'content.copy-plain-text'")
+    expect(plugin).toContain('navigator.clipboard.writeText(plainText)')
+    expect(plugin).toContain('统计当前文章，不发送正文内容')
+    expect(registry).toContain("import { copyPlainTextPlugin, writerStatsPlugin } from './WriterToolsPlugin.js'")
+    expect(registry).toContain('writerStatsPlugin')
+    expect(registry).toContain('copyPlainTextPlugin')
+    expect(styles).toContain('.lr-editor-writer-stats-grid')
+    expect(styles).toContain('.lr-editor-copy-plain-text')
+  })
+
   it('registers article outline navigation against stable article block anchors', () => {
     const plugin = read('src/components/ArticleOutlinePlugin.tsx')
     const editor = read('src/components/ArticleStructuredEditor.tsx')
