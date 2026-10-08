@@ -75,7 +75,6 @@ export default function ShortVideoFeed() {
   const [profileById, setProfileById] = useState<Record<string, Profile>>({})
   const [busyById, setBusyById] = useState<Record<string, string>>({})
   const [message, setMessage] = useState('')
-  const [notInterestedIds, setNotInterestedIds] = useState<string[]>([])
   const [activeProgress, setActiveProgress] = useState(0)
   const [doubleTapHeart, setDoubleTapHeart] = useState(false)
   const heartTimerRef = useRef<number | null>(null)
@@ -87,8 +86,8 @@ export default function ShortVideoFeed() {
   const interactionCacheRef = useRef<Record<string, InteractionState>>({})
 
   const visibleItems = useMemo(
-    () => (page.items ?? []).filter((item) => item.contentType === 'video' && item.mediaRefs?.[0] && !notInterestedIds.includes(item.id)),
-    [page.items, notInterestedIds],
+    () => (page.items ?? []).filter((item) => item.contentType === 'video' && item.mediaRefs?.[0]),
+    [page.items],
   )
 
   const setActive = useCallback((index: number) => {
@@ -186,7 +185,7 @@ export default function ShortVideoFeed() {
         let bestIndex = activeIndexRef.current
         let bestRatio = 0
         for (const entry of entries) {
-          if (entry.isIntersecting && entry.intersectionRatio >= bestRatio) {
+          if (entry.isIntersecting && entry.intersectionRatio >= 0.75 && entry.intersectionRatio >= bestRatio) {
             const index = Number((entry.target as HTMLElement).dataset.index)
             if (Number.isFinite(index)) {
               bestIndex = index
@@ -196,7 +195,7 @@ export default function ShortVideoFeed() {
         }
         if (bestIndex !== activeIndexRef.current) setActive(bestIndex)
       },
-      { threshold: [0.55, 0.75, 0.9] },
+      { threshold: [0.75] },
     )
 
     visibleItems.forEach((item, index) => {
@@ -529,11 +528,6 @@ export default function ShortVideoFeed() {
     }
   }
 
-  const markNotInterested = (item: ContentItem) => {
-    setNotInterestedIds((current) => [...current, item.id])
-    setMessage(locale === 'en' ? 'Not interested.' : '已减少这类内容。')
-  }
-
   const togglePlay = (item: ContentItem) => {
     const video = videoRefs.current[item.id]
     if (!video) return
@@ -596,8 +590,8 @@ export default function ShortVideoFeed() {
       <header className={styles.topbar}>
         <Link href="/" className={styles.brand}>LuckRead</Link>
         <div className={styles.feedTabs} aria-label="短视频频道">
-          <span className={styles.feedTabActive}>为你</span>
-          <Link href="/content?type=video" className={styles.feedTab}>视频</Link>
+          <span className={styles.feedTabActive}>短视频</span>
+          <Link href="/content?type=video" className={styles.feedTab}>视频列表</Link>
         </div>
         <div className={styles.topbarActions}>
           <button aria-label={muted ? '打开声音' : '关闭声音'} className={styles.iconButton} onClick={() => setMuted((value) => !value)} type="button">
@@ -664,7 +658,7 @@ export default function ShortVideoFeed() {
                 <div className={styles.bottomFade} />
 
                 <div className={styles.slideHeader}>
-                  <span>为你推荐</span>
+                  <span>短视频</span>
                   <span className={styles.indexMark}>{index + 1}/{visibleItems.length}</span>
                 </div>
 
@@ -716,10 +710,6 @@ export default function ShortVideoFeed() {
                   <button className={styles.action} disabled={busy === 'share'} onClick={() => void share(item)} type="button">
                     <i className="fa-solid fa-share" aria-hidden="true" />
                     <span>分享</span>
-                  </button>
-                  <button className={styles.action} onClick={() => markNotInterested(item)} type="button">
-                    <i className="fa-solid fa-minus" aria-hidden="true" />
-                    <span>不感兴趣</span>
                   </button>
                   <button className={styles.action} disabled={busy === 'report'} onClick={() => void report(item)} type="button">
                     <i className="fa-solid fa-ellipsis" aria-hidden="true" />
