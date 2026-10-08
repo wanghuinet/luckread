@@ -220,7 +220,11 @@ export const removeMediaRefFromArticleDocument = (
 
     changed = true
     if (mediaRefs.length === 0) {
-      blocks.push(createArticleBlock('paragraph', block.text))
+      blocks.push({
+        id: block.id,
+        type: 'paragraph',
+        text: block.text,
+      })
     } else if (block.type === 'gallery' && mediaRefs.length === 1) {
       blocks.push({ ...block, type: 'image', mediaRefs })
     } else {

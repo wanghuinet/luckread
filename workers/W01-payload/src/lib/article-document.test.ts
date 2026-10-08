@@ -348,8 +348,10 @@ describe('article structured document', () => {
     expect(next).not.toBe(document)
     expect(next.blocks[0]?.type).toBe('paragraph')
     expect(next.blocks[0]?.text).toBe('单图')
+    expect(next.blocks[0]?.id).toBe(document.blocks[0]?.id)
     expect(next.blocks[1]?.type).toBe('image')
     expect(next.blocks[1]?.mediaRefs).toEqual(['https://media.example/2.jpg'])
+    expect(next.blocks[1]?.id).toBe(document.blocks[1]?.id)
     expect(document.blocks[0]?.mediaRefs).toEqual(['https://media.example/1.jpg'])
   })
 

@@ -180,7 +180,10 @@ describe('Creator Center admin extension', () => {
     const document = read('src/lib/article-document.ts')
 
     expect(document).toContain('export const removeMediaRefFromArticleDocument')
-    expect(editor).toContain('removeMediaRefFromArticleDocument(value, mediaRef)')
+    expect(editor).toContain('removeMediaRefFromArticleDocument(value, target)')
+    expect(editor).toContain('const sourceBlock = value.blocks.find((block) => block.mediaRefs?.includes(target))')
+    expect(editor).toContain('pendingFocusRef.current = {')
+    expect(editor).toContain('offset: nextBlock.text.length')
     expect(editor).toContain('aria-label="移除正文图片"')
     expect(editor).toContain('onClick={() => removeMediaReference(ref)}')
   })

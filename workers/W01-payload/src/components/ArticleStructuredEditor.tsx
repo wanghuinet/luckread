@@ -338,7 +338,19 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
   }
 
   function removeMediaReference(mediaRef: string) {
-    emit(removeMediaRefFromArticleDocument(value, mediaRef))
+    const target = mediaRef.trim()
+    if (!target) return
+    const sourceBlock = value.blocks.find((block) => block.mediaRefs?.includes(target))
+    const next = removeMediaRefFromArticleDocument(value, target)
+    if (next === value) return
+    const nextBlock = sourceBlock ? next.blocks.find((block) => block.id === sourceBlock.id) : undefined
+    if (nextBlock) {
+      pendingFocusRef.current = {
+        blockId: nextBlock.id,
+        offset: nextBlock.text.length,
+      }
+    }
+    emit(next)
   }
 
   function moveMediaReference(blockIndex: number, mediaIndex: number, direction: -1 | 1) {
