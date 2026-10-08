@@ -18,6 +18,8 @@ describe('TikTok-style short video feed', () => {
     const feed = read('src/app/(frontend)/shorts/ShortVideoFeed.tsx')
     const css = read('src/app/(frontend)/shorts/short-video.module.css')
     expect(feed).toContain('IntersectionObserver')
+    expect(feed).toContain('threshold: [0.75]')
+    expect(feed).toContain('entry.intersectionRatio >= 0.75')
     expect(feed).toContain('video.play()')
     expect(feed).toContain('video.pause()')
     expect(feed).toContain("event.key === 'ArrowDown'")
@@ -46,6 +48,14 @@ describe('TikTok-style short video feed', () => {
     expect(feed).toContain("aria-label={muted ? '打开声音' : '关闭声音'}")
     expect(feed).toContain('onDoubleClick={() => void toggleLike(item)}')
     expect(feed).toContain('onClick={() => togglePlay(item)}')
+  })
+
+  it('keeps the MVP feed deterministic and does not claim recommendation-engine behavior', () => {
+    const feed = read('src/app/(frontend)/shorts/ShortVideoFeed.tsx')
+    expect(feed).not.toContain('notInterestedIds')
+    expect(feed).not.toContain('不感兴趣')
+    expect(feed).not.toContain('为你推荐')
+    expect(feed).toContain('短视频')
   })
 
   it('does not create a second media, feed, or interaction backend authority', () => {
