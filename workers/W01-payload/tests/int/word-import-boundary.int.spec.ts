@@ -5,7 +5,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
-const read = (relative: string) => fs.readFileSync(path.resolve(here, '..', relative), 'utf8')
+const read = (relative: string) => fs.readFileSync(path.resolve(here, '../..', relative), 'utf8')
 
 describe('structured Word import boundary', () => {
   it('uses the custom ArticleDocument importer instead of a second Payload Lexical feature', () => {
