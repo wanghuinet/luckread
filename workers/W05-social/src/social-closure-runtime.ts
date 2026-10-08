@@ -299,7 +299,8 @@ export async function enqueueNotification(
     payload?: Record<string, unknown>
   },
 ): Promise<void> {
-  const recipientUserId = id(input.recipientUserId)
+  try {
+    const recipientUserId = id(input.recipientUserId)
   const actorUserId = id(input.actorUserId, 'UNAUTHENTICATED')
   const targetId = id(input.targetId)
   if (recipientUserId === actorUserId) return
@@ -330,8 +331,8 @@ export async function enqueueNotification(
 
   const dedupeKey = [input.type, recipientUserId, actorUserId, input.targetType, targetId].join(':')
   const now = new Date().toISOString()
-  await db.prepare(
-    `INSERT OR IGNORE INTO social_notifications
+    await db.prepare(
+      `INSERT OR IGNORE INTO social_notifications
       (notification_id, recipient_user_id, actor_user_id, notification_type, target_type, target_id, dedupe_key, payload_json, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).bind(
@@ -344,7 +345,12 @@ export async function enqueueNotification(
     dedupeKey,
     JSON.stringify(input.payload ?? {}),
     now,
-  ).run()
+    ).run()
+  } catch {
+    // Notifications are a non-authoritative social side effect.
+    // A missing/temporarily unavailable notification store must not fail
+    // the authoritative follow/like/comment mutation.
+  }
 }
 
 export async function drainNotificationOutbox(db: D1Database, limitValue = 50): Promise<number> {
