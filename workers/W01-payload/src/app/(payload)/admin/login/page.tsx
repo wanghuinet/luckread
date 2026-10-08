@@ -2,7 +2,7 @@
 
 import { FormEvent, useState } from 'react'
 
-import { fetchJson, getApiErrorMessage, jsonHeaders } from '../../../lib/client-api.js'
+import { fetchJson, getApiErrorMessage, jsonHeaders } from '../../../../lib/client-api.js'
 
 export default function AdminLoginPage() {
   const [email, setEmail] = useState('')
