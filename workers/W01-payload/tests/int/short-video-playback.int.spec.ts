@@ -29,6 +29,7 @@ describe('short video playback polish', () => {
 
   it('keeps the simple TikTok-style social rail and swipe flow intact', () => {
     const feed = read('src/app/(frontend)/shorts/ShortVideoFeed.tsx')
+    const css = read('src/app/(frontend)/shorts/short-video.module.css')
     expect(feed).toContain('短视频')
     expect(feed).toContain('上下滑动继续刷视频。')
     expect(feed).toContain('toggleFollow')
@@ -38,7 +39,7 @@ describe('short video playback polish', () => {
     expect(feed).toContain('share(item)')
     expect(feed).toContain('markNotInterested')
     expect(feed).toContain('report(item)')
-    expect(feed).toContain('scroll-snap-type: y mandatory')
+    expect(css).toContain('scroll-snap-type: y mandatory')
   })
 
   it('keeps the short-video route discoverable from the homepage', () => {
