@@ -216,7 +216,7 @@ describe('Creator Center admin extension', () => {
     expect(editor).toContain('pendingFocusRef')
     expect(editor).toContain('textarea.focus()')
     expect(editor).toContain('textarea.setSelectionRange(offset, offset)')
-    expect(editor).toContain("key === 'enter'")
+    expect(editor).toContain("event.key.toLowerCase() === 'enter'")
     expect(editor).toContain('(event.ctrlKey || event.metaKey)')
     expect(editor).toContain('!event.shiftKey')
     expect(editor).toContain('!event.altKey')
