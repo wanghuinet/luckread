@@ -17,6 +17,7 @@ import {
   createArticleMediaBlock,
   duplicateArticleBlock,
   insertArticleBlockAfter,
+  insertArticleMediaBlockAfter,
   mediaRefsFromArticleDocument,
   removeMediaRefFromArticleDocument,
   reorderArticleMediaRef,
@@ -211,6 +212,7 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
     updateDocument: emit,
     addBlock,
     insertMedia,
+    insertMediaAfter,
     insertBlockAfter,
     transformBlock,
   }
@@ -233,6 +235,14 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
   function insertBlockAfter(index: number) {
     if (value.blocks.length >= ARTICLE_MAX_BLOCKS) return
     emit(insertArticleBlockAfter(value, index, 'paragraph'))
+  }
+
+  function insertMediaAfter(index: number, type: 'image' | 'gallery', assetUrls?: string[]) {
+    if (value.blocks.length >= ARTICLE_MAX_BLOCKS) return
+    const refs = (assetUrls ?? imageAssets.map((asset) => asset.url)).filter(Boolean)
+    if (type === 'image' && refs.length < 1) return
+    if (type === 'gallery' && refs.length < 2) return
+    emit(insertArticleMediaBlockAfter(value, index, type, refs))
   }
 
   function transformBlock(index: number, type: ArticleBlockType) {
@@ -400,6 +410,26 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
                 >
                   ＋
                 </button>
+                {imageAssets.length ? (
+                  <>
+                    <button
+                      aria-label="在下方插入图片"
+                      disabled={disabled || value.blocks.length >= ARTICLE_MAX_BLOCKS}
+                      onClick={() => insertMediaAfter(index, 'image')}
+                      type="button"
+                    >
+                      插图
+                    </button>
+                    <button
+                      aria-label="在下方插入图库"
+                      disabled={disabled || value.blocks.length >= ARTICLE_MAX_BLOCKS || imageAssets.length < 2}
+                      onClick={() => insertMediaAfter(index, 'gallery')}
+                      type="button"
+                    >
+                      图库
+                    </button>
+                  </>
+                ) : null}
                 <button
                   aria-label="删除区块"
                   disabled={disabled || value.blocks.length === 1}
