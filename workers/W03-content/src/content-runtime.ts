@@ -31,7 +31,7 @@ export interface ContentRecord {
   creatorId: string | null
   ipId: string | null
   state: ContentState
-  scheduledAt: string | null
+  scheduledAt?: string | null
   version: number
   revision: number
   slug: string
@@ -186,7 +186,7 @@ const toContent = (row: ContentRow): ContentRecord => ({
   creatorId: row.creator_id,
   ipId: row.ip_id,
   state: row.state,
-  scheduledAt: row.scheduled_at,
+  scheduledAt: row.scheduled_at ?? null,
   version: row.version,
   revision: row.revision,
   slug: row.slug,
@@ -701,7 +701,7 @@ export async function createContent(
     ) {
       throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
     }
-    return { ...parsed, scheduledAt: typeof parsed.scheduledAt === 'string' ? parsed.scheduledAt : null } as ContentRecord
+    return parsed as ContentRecord
   }
 
   const contentId = crypto.randomUUID()
@@ -1053,7 +1053,14 @@ export async function transitionContentState(
 
   const operationId = 'transitionContentState'
   const normalizedRequestedScheduledAt = to === 'SCHEDULED' ? normalizeScheduledAt(options.scheduledAt, now) : null
-  const hash = await requestHash(operationId, { contentId, to, reason: reason ?? null, scheduledAt: normalizedRequestedScheduledAt, ifMatch: normalizeEtag(ifMatch) })
+  const hashInput = {
+    contentId,
+    to,
+    reason: reason ?? null,
+    ifMatch: normalizeEtag(ifMatch),
+    ...(to === 'SCHEDULED' ? { scheduledAt: normalizedRequestedScheduledAt } : {}),
+  }
+  const hash = await requestHash(operationId, hashInput)
   const { content, idempotency } = await loadMutationRow(db, contentId, operationId, idempotencyKey, principalUserId)
   const replay = inspectIdempotency(idempotency, principalUserId, hash, now)
   if (replay.replayed) {
