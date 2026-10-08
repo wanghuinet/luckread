@@ -80,6 +80,7 @@ export default function ShortVideoFeed() {
   const [doubleTapHeart, setDoubleTapHeart] = useState(false)
   const [mediaErrorById, setMediaErrorById] = useState<Record<string, boolean>>({})
   const [bufferingById, setBufferingById] = useState<Record<string, boolean>>({})
+  const [playingById, setPlayingById] = useState<Record<string, boolean>>({})
   const heartTimerRef = useRef<number | null>(null)
   const singleTapTimerRef = useRef<number | null>(null)
   const itemRefs = useRef<Record<string, HTMLElement | null>>({})
@@ -751,6 +752,12 @@ export default function ShortVideoFeed() {
                     const current = event.currentTarget
                     setActiveProgress(current.duration > 0 ? Math.min(100, Math.max(0, (current.currentTime / current.duration) * 100)) : 0)
                   }}
+                  onPlay={() => {
+                    setPlayingById((current) => ({ ...current, [item.id]: true }))
+                  }}
+                  onPause={() => {
+                    setPlayingById((current) => ({ ...current, [item.id]: false }))
+                  }}
                   onWaiting={() => {
                     setBufferingById((current) => ({ ...current, [item.id]: true }))
                   }}
@@ -780,6 +787,11 @@ export default function ShortVideoFeed() {
                     setMediaErrorById((current) => ({ ...current, [item.id]: true }))
                   }}
                 />
+                {activeIndex === index && !playingById[item.id] && !bufferingById[item.id] && !mediaErrorById[item.id] ? (
+                  <div className={styles.pausedFeedback} aria-hidden="true">
+                    <i className="fa-solid fa-play" />
+                  </div>
+                ) : null}
                 {bufferingById[item.id] && !mediaErrorById[item.id] ? (
                   <div className={styles.mediaBuffering} aria-live="polite">
                     <span className={styles.mediaSpinner} aria-hidden="true" />
