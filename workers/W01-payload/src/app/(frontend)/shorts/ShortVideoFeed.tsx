@@ -81,6 +81,8 @@ export default function ShortVideoFeed() {
   const heartTimerRef = useRef<number | null>(null)
   const itemRefs = useRef<Record<string, HTMLElement | null>>({})
   const videoRefs = useRef<Record<string, HTMLVideoElement | null>>({})
+  const feedRef = useRef<HTMLElement | null>(null)
+  const loadMoreSentinelRef = useRef<HTMLDivElement | null>(null)
   const activeIndexRef = useRef(0)
   const requestRef = useRef<AbortController | null>(null)
   const profileCacheRef = useRef<Record<string, Profile>>({})
@@ -616,7 +618,7 @@ export default function ShortVideoFeed() {
         </div>
       </header>
 
-      <section className={styles.feed} aria-label="短视频流">
+      <section ref={feedRef} className={styles.feed} aria-label="短视频流">
         {visibleItems.map((item, index) => {
           const videoUrl = item.mediaRefs?.[0]
           const interaction = interactionById[item.id] ?? initialInteraction
@@ -749,10 +751,8 @@ export default function ShortVideoFeed() {
             </article>
           )
         })}
-      </section>
-
-      {page.hasMore && page.nextCursor ? (
-        <div className={styles.loadMoreSentinel} aria-live="polite">
+        {page.hasMore && page.nextCursor ? (
+          <div ref={loadMoreSentinelRef} className={styles.loadMoreSentinel} aria-live="polite">
           {loadingMore ? '正在载入更多视频…' : '继续滑动加载更多'}
           <button
             className={styles.hiddenLoadButton}
