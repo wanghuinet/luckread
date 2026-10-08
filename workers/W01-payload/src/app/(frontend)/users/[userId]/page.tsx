@@ -284,11 +284,23 @@ export default function PublicProfilePage({
         return
       }
 
-      const data = await response.json().catch((): null => null) as { data?: { following?: boolean } } | null
-      if (!response.ok || typeof data?.data?.following !== 'boolean') throw new Error('FOLLOW_FAILED')
+      if (!response.ok) {
+        const data = await response.json().catch((): null => null) as { error?: { message?: string } } | null
+        throw new Error(data?.error?.message || 'FOLLOW_FAILED')
+      }
 
+      if (isFollowing) {
+        setIsFollowing(false)
+        setFollowers((value) => value === null ? value : Math.max(0, value - 1))
+        return
+      }
+
+      const data = await response.json().catch((): null => null) as { data?: { following?: boolean } } | null
+      if (typeof data?.data?.following !== 'boolean') throw new Error('FOLLOW_FAILED')
       setIsFollowing(data.data.following)
-      setFollowers((value) => value === null ? value : Math.max(0, value + (data.data.following ? 1 : -1)))
+      if (data.data.following) {
+        setFollowers((value) => value === null ? value : value + 1)
+      }
     } catch (cause) {
       if (cause instanceof DOMException && cause.name === 'AbortError') return
       setError('关注操作失败，请稍后重试。')
