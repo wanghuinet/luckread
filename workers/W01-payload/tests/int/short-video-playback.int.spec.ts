@@ -100,7 +100,7 @@ describe('short video playback polish', () => {
     expect(feed).toContain('if (event.detail >= 2) {')
     expect(feed).toContain('window.clearTimeout(singleTapTimerRef.current)')
     expect(feed).toContain('togglePlay(item)')
-    expect(feed).toContain('showDoubleTapHeart()')
+    expect(feed).toContain('showDoubleTapHeart(item.id)')
     expect(feed).not.toContain('onDoubleClick={() =>')
   })
 
