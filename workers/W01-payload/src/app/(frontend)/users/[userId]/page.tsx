@@ -435,7 +435,7 @@ export default function PublicProfilePage({
   const visibleContents = contents.filter((item) => item.contentType === filter)
 
   function getContentHref(item: PublicContent) {
-    return '/' + encodeURIComponent(profile!.username) + '/' + item.contentType + '/' + encodeURIComponent(item.id)
+    return '/content/' + encodeURIComponent(item.slug || item.id)
   }
 
   return (
