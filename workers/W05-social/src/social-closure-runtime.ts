@@ -316,9 +316,10 @@ export async function enqueueNotification(
   if (preference && Number(preference.enabled) === 0) return
 
   const dedupeKey = [input.type, recipientUserId, actorUserId, input.targetType, targetId].join(':')
+  const now = new Date().toISOString()
   await db.prepare(
-    `INSERT OR IGNORE INTO social_notification_outbox
-      (event_id, recipient_user_id, actor_user_id, notification_type, target_type, target_id, dedupe_key, payload_json, created_at)
+    `INSERT OR IGNORE INTO social_notifications
+      (notification_id, recipient_user_id, actor_user_id, notification_type, target_type, target_id, dedupe_key, payload_json, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).bind(
     crypto.randomUUID(),
@@ -329,7 +330,7 @@ export async function enqueueNotification(
     targetId,
     dedupeKey,
     JSON.stringify(input.payload ?? {}),
-    new Date().toISOString(),
+    now,
   ).run()
 }
 
