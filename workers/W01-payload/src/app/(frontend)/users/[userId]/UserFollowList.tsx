@@ -89,6 +89,7 @@ export default function UserFollowList({
       const response = await fetch(
         '/api/v1/users/' + encodeURIComponent(userId) + '/' + direction + '?' + params.toString(),
         {
+          credentials: 'omit',
           headers: { accept: 'application/json' },
           cache: 'no-store',
           signal: controller.signal,
@@ -129,6 +130,7 @@ export default function UserFollowList({
             signal: controller.signal,
           }),
           fetch('/api/v1/users/' + encodeURIComponent(userId) + '/' + direction + '?limit=' + String(PAGE_SIZE), {
+            credentials: 'omit',
             headers: { accept: 'application/json' },
             cache: 'no-store',
             signal: controller.signal,
