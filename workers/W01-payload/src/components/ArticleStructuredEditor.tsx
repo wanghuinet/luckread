@@ -357,13 +357,15 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
     emit(reorderArticleMediaRef(value, blockIndex, mediaIndex, mediaIndex + direction))
   }
 
-  function moveBlock(index: number, direction: -1 | 1) {
+  function moveBlock(index: number, direction: -1 | 1, focusOffset = 0) {
     const target = index + direction
     if (target < 0 || target >= value.blocks.length) return
+    const source = value.blocks[index]
+    if (!source) return
     const blocks = [...value.blocks]
     ;[blocks[index], blocks[target]] = [blocks[target], blocks[index]]
     const moved = blocks[target]
-    if (moved) pendingFocusRef.current = { blockId: moved.id, offset: 0 }
+    if (moved) pendingFocusRef.current = { blockId: moved.id, offset: Math.max(0, Math.min(focusOffset, moved.text.length)) }
     emit({ ...value, blocks })
   }
 
@@ -646,6 +648,18 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
                 rows={block.type === 'heading' ? 2 : block.type === 'quote' ? 4 : 5}
                 value={block.text}
                 onKeyDown={(event) => {
+                  if (
+                    (event.key === 'ArrowUp' || event.key === 'ArrowDown') &&
+                    event.altKey &&
+                    !event.ctrlKey &&
+                    !event.metaKey &&
+                    !event.shiftKey
+                  ) {
+                    event.preventDefault()
+                    moveBlock(index, event.key === 'ArrowUp' ? -1 : 1, event.currentTarget.selectionStart)
+                    return
+                  }
+
                   if (
                     event.key.toLowerCase() === 'enter' &&
                     (event.ctrlKey || event.metaKey) &&
