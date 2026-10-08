@@ -3,20 +3,34 @@
 import { useMemo, useState } from 'react'
 import type { ArticleEditorPluginContext } from './ArticleEditorPlugin.js'
 
-function WriterStatsPanel({ plainText, value }: ArticleEditorPluginContext) {
-  const stats = useMemo(() => {
-    const characters = Array.from(plainText).length
-    const words = plainText.trim() ? plainText.trim().split(/\s+/u).length : 0
-    const headings = value.blocks.filter((block) => block.type === 'heading').length
-    const lists = value.blocks.filter(
-      (block) => block.type === 'bulletList' || block.type === 'orderedList',
-    ).length
-    const media = value.blocks.filter(
-      (block) => block.type === 'image' || block.type === 'gallery',
-    ).length
+export type WriterStats = {
+  characters: number
+  words: number
+  headings: number
+  lists: number
+  media: number
+}
 
-    return { characters, words, headings, lists, media }
-  }, [plainText, value.blocks])
+export const getWriterStats = (
+  plainText: string,
+  value: ArticleEditorPluginContext['value'],
+): WriterStats => ({
+  characters: Array.from(plainText).length,
+  words: plainText.trim() ? plainText.trim().split(/\s+/u).length : 0,
+  headings: value.blocks.filter((block) => block.type === 'heading').length,
+  lists: value.blocks.filter(
+    (block) => block.type === 'bulletList' || block.type === 'orderedList',
+  ).length,
+  media: value.blocks.filter(
+    (block) => block.type === 'image' || block.type === 'gallery',
+  ).length,
+})
+
+function WriterStatsPanel({ plainText, value }: ArticleEditorPluginContext) {
+  const stats = useMemo(
+    () => getWriterStats(plainText, value),
+    [plainText, value],
+  )
 
   return (
     <section className="lr-editor-writer-stats lr-editor-plugin-panel" aria-label="写作统计">
