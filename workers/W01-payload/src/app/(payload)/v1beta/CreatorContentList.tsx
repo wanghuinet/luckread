@@ -308,13 +308,13 @@ export default function CreatorContentList({ loginPath = '/admin/login' }: { log
     }
   }
   return (
-    <section extraButtonProps={{ 'aria-busy': loading || actionId !== null }} className={styles.contentManageSection}>
+    <section aria-busy={loading || actionId !== null} className={styles.contentManageSection}>
       <div className={styles.contentManageHeading}>
         <div>
           <span className={styles.eyebrow}>CONTENT MANAGEMENT</span>
           <h2>我的内容</h2>
         </div>
-        <Link tone="primary" href="/publish">
+        <Link className={styles.primaryButton} href="/publish">
           新建内容
         </Link>
       </div>
