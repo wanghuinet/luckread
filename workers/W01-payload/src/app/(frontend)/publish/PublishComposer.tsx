@@ -255,6 +255,13 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
   async function handleFiles(event: ChangeEvent<HTMLInputElement>) {
     const selected = Array.from(event.target.files ?? [])
     const remainingSlots = Math.max(0, 12 - assets.length)
+    const selectedVideoCount = selected.filter((file) => file.type.startsWith('video/')).length
+    const existingVideoCount = assets.filter(isVideoAsset).length
+    if (type === 'video' && selectedVideoCount + existingVideoCount > 1) {
+      setError('短视频只能包含一个主视频；请先移除现有视频后再更换。')
+      event.target.value = ''
+      return
+    }
     if (!selected.length || remainingSlots === 0) {
       setError(remainingSlots === 0 ? '最多添加 12 个媒体文件。' : '')
       return
@@ -284,6 +291,12 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
     const removed = assets.find((asset) => asset.id === id)
     setAssets((current) => current.filter((asset) => asset.id !== id))
     if (removed) {
+      setVideoMetadataByAssetId((current) => {
+        if (!current[removed.id]) return current
+        const next = { ...current }
+        delete next[removed.id]
+        return next
+      })
       const nextDocument = type === 'article'
         ? removeMediaRefFromArticleDocument(articleDocument, removed.url)
         : articleDocument
@@ -547,7 +560,11 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
   async function runPreflight(): Promise<{ report: PublishPreflightResult; input: Record<string, unknown>; draft: ContentResponse }> {
     if (autoSaveInFlightRef.current) throw new Error('自动保存正在进行，请稍后重试。')
     if (!title.trim() || !body.trim()) throw new Error('请先填写标题和正文。')
-    if (type === 'video' && !assets.some(isVideoAsset)) throw new Error('短视频至少需要添加一个视频素材。')
+    if (type === 'video') {
+      const videoAssets = assets.filter(isVideoAsset)
+      if (videoAssets.length === 0) throw new Error('短视频至少需要添加一个视频素材。')
+      if (videoAssets.length > 1) throw new Error('短视频只能提交一个主视频，请移除多余视频后再提交。')
+    }
 
     const savedDraft = await persistDraft()
     autoSaveDirtyRef.current = false
