@@ -362,6 +362,90 @@ export const transformArticleBlock = (
   }
 }
 
+const isMergeableTextBlock = (type: ArticleBlockType): boolean =>
+  type === 'paragraph' ||
+  type === 'quote' ||
+  type === 'bulletList' ||
+  type === 'orderedList'
+
+export const splitArticleBlock = (
+  document: ArticleDocument,
+  index: number,
+  offset: number,
+): ArticleDocument => {
+  const block = document.blocks[index]
+  if (
+    !block ||
+    !isMergeableTextBlock(block.type) ||
+    !Number.isInteger(offset) ||
+    offset <= 0 ||
+    offset >= block.text.length ||
+    document.blocks.length >= ARTICLE_MAX_BLOCKS
+  ) {
+    return document
+  }
+
+  const before = block.text.slice(0, offset)
+  const after = block.text.slice(offset)
+  if (before.length > ARTICLE_MAX_BLOCK_TEXT || after.length > ARTICLE_MAX_BLOCK_TEXT) return document
+
+  const nextBlock: ArticleBlock = {
+    ...block,
+    id: crypto.randomUUID(),
+    text: after,
+    ...(block.mediaRefs ? { mediaRefs: [...block.mediaRefs] } : {}),
+  }
+  const currentBlock: ArticleBlock = {
+    ...block,
+    text: before,
+    ...(block.mediaRefs ? { mediaRefs: [...block.mediaRefs] } : {}),
+  }
+
+  return {
+    ...document,
+    blocks: [
+      ...document.blocks.slice(0, index),
+      currentBlock,
+      nextBlock,
+      ...document.blocks.slice(index + 1),
+    ],
+  }
+}
+
+export const mergeArticleBlockWithPrevious = (
+  document: ArticleDocument,
+  index: number,
+): ArticleDocument => {
+  if (index <= 0 || index >= document.blocks.length) return document
+
+  const previous = document.blocks[index - 1]
+  const current = document.blocks[index]
+  if (
+    !isMergeableTextBlock(previous.type) ||
+    previous.type !== current.type
+  ) {
+    return document
+  }
+
+  const separator = previous.type === 'bulletList' || previous.type === 'orderedList'
+    ? '\\n'
+    : '\\n\\n'
+  const mergedText = previous.text + separator + current.text
+  if (mergedText.length > ARTICLE_MAX_BLOCK_TEXT) return document
+
+  return {
+    ...document,
+    blocks: [
+      ...document.blocks.slice(0, index - 1),
+      {
+        ...previous,
+        text: mergedText,
+      },
+      ...document.blocks.slice(index + 1),
+    ],
+  }
+}
+
 export const articleDocumentFromBody = (raw: string): ArticleDocument => {
   const structured = tryDeserializeArticleDocument(raw)
   if (structured) return structured

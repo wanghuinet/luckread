@@ -13,6 +13,8 @@ import {
   duplicateArticleBlock,
   insertArticleBlockAfter,
   insertArticleMediaBlockAfter,
+  splitArticleBlock,
+  mergeArticleBlockWithPrevious,
   removeMediaRefFromArticleDocument,
   reorderArticleMediaRef,
   transformArticleBlock,
@@ -219,6 +221,89 @@ describe('article structured document', () => {
       'https://media.example/3.jpg',
     ])
     expect(document.blocks).toHaveLength(2)
+  })
+
+  it('splits a text block at the requested cursor offset without mutating the source', () => {
+    const document = createArticleDocument('前半内容后半内容')
+    const next = splitArticleBlock(document, 0, 4)
+
+    expect(next).not.toBe(document)
+    expect(next.blocks).toHaveLength(2)
+    expect(next.blocks[0]?.text).toBe('前半内容')
+    expect(next.blocks[1]?.text).toBe('后半内容')
+    expect(next.blocks[0]?.type).toBe('paragraph')
+    expect(next.blocks[1]?.type).toBe('paragraph')
+    expect(next.blocks[0]?.id).toBe(document.blocks[0]?.id)
+    expect(next.blocks[1]?.id).not.toBe(document.blocks[0]?.id)
+    expect(document.blocks[0]?.text).toBe('前半内容后半内容')
+  })
+
+  it('does not split media, divider, unsupported cursor positions, or a full document', () => {
+    const document = {
+      version: 2 as const,
+      blocks: [
+        createArticleMediaBlock('image', ['https://media.example/1.jpg']),
+        { id: 'divider', type: 'divider' as const, text: '' },
+        { id: 'empty', type: 'paragraph' as const, text: '' },
+      ],
+    }
+
+    expect(splitArticleBlock(document, 0, 1)).toBe(document)
+    expect(splitArticleBlock(document, 1, 1)).toBe(document)
+    expect(splitArticleBlock(document, 2, 0)).toBe(document)
+    expect(splitArticleBlock(document, 2, 1)).toBe(document)
+  })
+
+  it('merges adjacent text blocks of the same kind and keeps the first block identity', () => {
+    const document = {
+      version: 2 as const,
+      blocks: [
+        { id: 'first', type: 'paragraph' as const, text: '第一段' },
+        { id: 'second', type: 'paragraph' as const, text: '第二段' },
+        { id: 'third', type: 'quote' as const, text: '引用' },
+      ],
+    }
+
+    const next = mergeArticleBlockWithPrevious(document, 1)
+
+    expect(next.blocks).toHaveLength(2)
+    expect(next.blocks[0]).toEqual({
+      id: 'first',
+      type: 'paragraph',
+      text: '第一段\n\n第二段',
+    })
+    expect(next.blocks[0]?.id).toBe('first')
+    expect(document.blocks).toHaveLength(3)
+  })
+
+  it('merges list blocks with a single newline and rejects incompatible or oversized merges', () => {
+    const listDocument = {
+      version: 2 as const,
+      blocks: [
+        { id: 'first', type: 'bulletList' as const, text: '一\n二' },
+        { id: 'second', type: 'bulletList' as const, text: '三' },
+      ],
+    }
+
+    expect(mergeArticleBlockWithPrevious(listDocument, 1).blocks[0]?.text).toBe('一\n二\n三')
+
+    const incompatible = {
+      version: 2 as const,
+      blocks: [
+        { id: 'a', type: 'paragraph' as const, text: '正文' },
+        { id: 'b', type: 'heading' as const, text: '标题', level: 2 as const },
+      ],
+    }
+    expect(mergeArticleBlockWithPrevious(incompatible, 1)).toBe(incompatible)
+
+    const oversized = {
+      version: 2 as const,
+      blocks: [
+        { id: 'a', type: 'paragraph' as const, text: 'a'.repeat(19_999) },
+        { id: 'b', type: 'paragraph' as const, text: 'b' },
+      ],
+    }
+    expect(mergeArticleBlockWithPrevious(oversized, 1)).toBe(oversized)
   })
 
   it('caps contextual media insertion to the gallery media limit', () => {

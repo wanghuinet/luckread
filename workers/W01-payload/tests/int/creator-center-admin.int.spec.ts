@@ -210,6 +210,19 @@ describe('Creator Center admin extension', () => {
     expect(editor).toContain('从正文移除')
   })
 
+  it('exposes article block split and merge actions', () => {
+    const editor = read('src/components/ArticleStructuredEditor.tsx')
+    const document = read('src/lib/article-document.ts')
+
+    expect(document).toContain('export const splitArticleBlock')
+    expect(document).toContain('export const mergeArticleBlockWithPrevious')
+    expect(editor).toContain('splitArticleBlock(value, index, textarea.selectionStart)')
+    expect(editor).toContain('mergeArticleBlockWithPrevious(value, index)')
+    expect(editor).toContain('aria-label="在光标处分段"')
+    expect(editor).toContain('aria-label="与上一同类区块合并"')
+    expect(editor).toContain("textAreaRefs.current[block.id]")
+  })
+
   it('exposes contextual article media insertion', () => {
     const editor = read('src/components/ArticleStructuredEditor.tsx')
     const document = read('src/lib/article-document.ts')
