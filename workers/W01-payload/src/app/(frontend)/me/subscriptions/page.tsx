@@ -3,6 +3,8 @@
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 
+import { fetchJson, getApiErrorMessage } from '../../../../lib/client-api.js'
+
 import './subscriptions.css'
 
 type Subscription = {
@@ -55,19 +57,18 @@ export default function MySubscriptionsPage() {
     else setLoading(true)
     setError('')
     try {
-      const response = await fetch('/api/v1/memberships/subscriptions?limit=20&page=' + String(page), {
+      const { response, data } = await fetchJson<ListResponse>('/api/v1/memberships/subscriptions?limit=20&page=' + String(page), {
         credentials: 'include',
         cache: 'no-store',
         headers: { accept: 'application/json' },
       })
-      const data = await response.json().catch((): null => null) as ListResponse | null
       if (response.status === 401) {
         const returnTo = window.location.pathname + window.location.search + window.location.hash
         window.location.assign('/login?returnTo=' + encodeURIComponent(returnTo))
         return
       }
       if (!response.ok || !data?.data?.docs) {
-        throw new Error(data?.error?.message || '订阅读取失败')
+        throw new Error(getApiErrorMessage(data, '订阅读取失败'))
       }
       setItems((current) => append ? [...current, ...data.data!.docs!] : data.data!.docs!)
       setPageNumber(data.data.page ?? page)
@@ -93,7 +94,7 @@ export default function MySubscriptionsPage() {
     setError('')
     setMessage('')
     try {
-      const response = await fetch(
+      const { response, data } = await fetchJson<ListResponse & { data?: Subscription }> (
         '/api/v1/memberships/subscriptions/' + encodeURIComponent(item.subscriptionId) + '/' + operation,
         {
           method: 'POST',
@@ -111,9 +112,8 @@ export default function MySubscriptionsPage() {
         window.location.assign('/login?returnTo=' + encodeURIComponent(returnTo))
         return
       }
-      const data = await response.json().catch((): null => null) as ListResponse & { data?: Subscription } | null
       if (!response.ok || !data?.data?.subscriptionId) {
-        throw new Error(data?.error?.message || '订阅状态更新失败')
+        throw new Error(getApiErrorMessage(data, '订阅状态更新失败'))
       }
       setItems((current) => current.map((currentItem) =>
         currentItem.subscriptionId === item.subscriptionId ? data.data! : currentItem,
