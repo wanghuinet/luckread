@@ -12,6 +12,7 @@ describe('TikTok-style short video feed', () => {
     expect(feed).toContain("credentials: 'omit'")
     expect(feed).toContain("fetch('/api/v1/contents?' + params.toString()")
     expect(feed).toContain('page.nextCursor')
+    expect(feed).toContain("index > activeIndex && index <= activeIndex + 2 ? 'auto'")
   })
 
   it('implements viewport-driven autoplay, pause, snap scrolling, keyboard navigation, and auto-prefetch', () => {
@@ -58,6 +59,14 @@ describe('TikTok-style short video feed', () => {
     expect(feed).toContain('toggleLike(item)')
     expect(feed).toContain('onClick={(event) => handleVideoTap(item, event)}')
     expect(feed).not.toContain('onDoubleClick={() =>')
+  })
+
+  it('preloads the active video and the next two videos while keeping older videos lightweight', () => {
+    const feed = read('src/app/(frontend)/shorts/ShortVideoFeed.tsx')
+    expect(feed).toContain("index === activeIndex ? 'auto'")
+    expect(feed).toContain("index > activeIndex && index <= activeIndex + 2 ? 'auto'")
+    expect(feed).toContain("index === activeIndex - 1 ? 'metadata'")
+    expect(feed).toContain("'none'")
   })
 
   it('does not create a second media, feed, or interaction backend authority', () => {
