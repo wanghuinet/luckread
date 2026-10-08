@@ -46,7 +46,7 @@ export default function PasswordChangePage() {
 
     setBusy(true)
     try {
-      const responseData = await fetchJson<{ error?: { message?: string } }>('/api/v1/auth/password/change', {
+      const { response, data } = await fetchJson<{ error?: { message?: string } }>('/api/v1/auth/password/change', {
         method: 'POST',
         credentials: 'include',
         cache: 'no-store',
@@ -57,17 +57,11 @@ export default function PasswordChangePage() {
         },
         body: JSON.stringify({ currentPassword, newPassword }),
       })
-      const { response, data } = responseData
-
       if (response.status === 401) {
         const returnTo = window.location.pathname + window.location.search + window.location.hash
         router.replace('/login?returnTo=' + encodeURIComponent(returnTo))
         return
       }
-
-      const data = await response.json().catch((): null => null) as {
-        error?: { message?: string }
-      } | null
 
       if (!response.ok) {
         throw new Error(getApiErrorMessage(data, '密码修改失败，请稍后重试。'))
