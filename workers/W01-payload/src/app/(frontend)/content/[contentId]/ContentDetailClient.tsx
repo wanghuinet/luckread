@@ -300,8 +300,7 @@ export default function ContentDetailPage({
         return
       }
       if (!response.ok) {
-        const data = await response.json().catch((): null => null)
-        setActionMessage(data?.error?.message || copy.detail.networkError)
+        setActionMessage(getApiErrorMessage(data, copy.detail.networkError))
         return
       }
       if (following) {
