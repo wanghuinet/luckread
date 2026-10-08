@@ -78,7 +78,7 @@ export default function ShortVideoFeed() {
   const [message, setMessage] = useState('')
   const [notInterestedIds, setNotInterestedIds] = useState<string[]>([])
   const [activeProgress, setActiveProgress] = useState(0)
-  const [doubleTapHeart, setDoubleTapHeart] = useState(false)
+  const [doubleTapHeartId, setDoubleTapHeartId] = useState<string | null>(null)
   const [mediaErrorById, setMediaErrorById] = useState<Record<string, boolean>>({})
   const [bufferingById, setBufferingById] = useState<Record<string, boolean>>({})
   const [playingById, setPlayingById] = useState<Record<string, boolean>>({})
@@ -627,7 +627,7 @@ export default function ShortVideoFeed() {
     if (event.detail >= 2) {
       singleTapTimerRef.current = null
       if (!interactionById[item.id]?.restricted && !interactionById[item.id]?.liked) void toggleLike(item)
-      showDoubleTapHeart()
+      showDoubleTapHeart(item.id)
       return
     }
 
@@ -637,10 +637,10 @@ export default function ShortVideoFeed() {
     }, 220)
   }
 
-  const showDoubleTapHeart = () => {
+  const showDoubleTapHeart = (itemId: string) => {
     if (heartTimerRef.current !== null) window.clearTimeout(heartTimerRef.current)
-    setDoubleTapHeart(true)
-    heartTimerRef.current = window.setTimeout(() => setDoubleTapHeart(false), 720)
+    setDoubleTapHeartId(itemId)
+    heartTimerRef.current = window.setTimeout(() => setDoubleTapHeartId(null), 720)
   }
 
   useEffect(() => {
@@ -826,7 +826,7 @@ export default function ShortVideoFeed() {
                     </button>
                   </div>
                 ) : null}
-                {doubleTapHeart ? (
+                {doubleTapHeartId === item.id ? (
                   <div className={styles.heartBurst} aria-hidden="true">
                     <i className="fa-solid fa-heart" />
                   </div>
