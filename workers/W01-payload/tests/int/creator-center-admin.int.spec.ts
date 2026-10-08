@@ -253,6 +253,18 @@ describe('Creator Center admin extension', () => {
     expect(editor).toContain('focusTarget.id')
   })
 
+  it('keeps document undo and redo shortcuts active inside textareas', () => {
+    const editor = read('src/components/ArticleStructuredEditor.tsx')
+
+    expect(editor).toContain("target.tagName === 'INPUT'")
+    expect(editor).toContain("target.tagName === 'SELECT'")
+    expect(editor).not.toContain("target.tagName === 'TEXTAREA'")
+    expect(editor).toContain("const key = event.key.toLowerCase()")
+    expect(editor).toContain("const redo = key === 'y' || (key === 'z' && event.shiftKey)")
+    expect(editor).toContain('undoArticleDocumentHistory(historyRef.current, value)')
+    expect(editor).toContain('redoArticleDocumentHistory(historyRef.current, value)')
+  })
+
   it('coalesces continuous article text editing into one undo step', () => {
     const editor = read('src/components/ArticleStructuredEditor.tsx')
     const history = read('src/lib/article-document-history.ts')
@@ -362,7 +374,7 @@ describe('Creator Center admin extension', () => {
     expect(editor).toContain('applyHistory(\'redo\')')
     expect(editor).toContain('Ctrl/Cmd+Z')
     expect(editor).toContain('Ctrl/Cmd+Shift+Z / Ctrl+Y')
-    expect(editor).toContain('target.tagName === \'TEXTAREA\'')
+    expect(editor).toContain('target.tagName === \'SELECT\'')
   })
 
   it('exposes reusable structured block duplication in the editor', () => {
