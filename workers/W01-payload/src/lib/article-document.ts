@@ -164,6 +164,27 @@ export const serializeArticleDocument = (document: ArticleDocument): string => {
   return serialized
 }
 
+export const ARTICLE_BLOCK_CLIPBOARD_PREFIX = 'LUCKREAD_ARTICLE_BLOCK_V1:'
+
+export const serializeArticleBlockForClipboard = (block: ArticleBlock): string =>
+  ARTICLE_BLOCK_CLIPBOARD_PREFIX + JSON.stringify(normalizeArticleDocument({
+    version: ARTICLE_DOCUMENT_VERSION,
+    blocks: [block],
+  }).blocks[0])
+
+export const parseArticleBlockFromClipboard = (raw: string): ArticleBlock | null => {
+  if (!raw.startsWith(ARTICLE_BLOCK_CLIPBOARD_PREFIX)) return null
+  try {
+    const payload = raw.slice(ARTICLE_BLOCK_CLIPBOARD_PREFIX.length)
+    return normalizeArticleDocument({
+      version: ARTICLE_DOCUMENT_VERSION,
+      blocks: [JSON.parse(payload)],
+    }).blocks[0] ?? null
+  } catch {
+    return null
+  }
+}
+
 export const tryDeserializeArticleDocument = (
   raw: string,
 ): ArticleDocument | null => {
