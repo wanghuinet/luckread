@@ -4,6 +4,8 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 
+import { fetchJson, getApiErrorMessage } from '../../../../lib/client-api.js'
+
 type SessionItem = {
   sessionId: string
   deviceId: string | null
@@ -39,7 +41,7 @@ export default function SessionsPage() {
     const params = new URLSearchParams({ limit: '20' })
     if (cursor) params.set('cursor', cursor)
 
-    const response = await fetch('/api/v1/auth/sessions?' + params.toString(), {
+    const { response, data } = await fetchJson<SessionResponse | { error?: { message?: string } }>('/api/v1/auth/sessions?' + params.toString(), {
       credentials: 'include',
       cache: 'no-store',
       headers: { accept: 'application/json' },
@@ -51,9 +53,8 @@ export default function SessionsPage() {
       return null
     }
 
-    const data = await response.json().catch((): null => null) as SessionResponse | { error?: { message?: string } } | null
     if (!response.ok || !data || !('currentSessionId' in data) || !Array.isArray(data.items)) {
-      throw new Error(data && 'error' in data ? data.error?.message || '会话列表加载失败' : '会话列表加载失败')
+      throw new Error(getApiErrorMessage(data, '会话列表加载失败'))
     }
 
     return data
@@ -107,7 +108,7 @@ export default function SessionsPage() {
     setError('')
 
     try {
-      const response = await fetch('/api/v1/auth/sessions/' + encodeURIComponent(sessionId), {
+      const { response, data } = await fetchJson<{ error?: { message?: string } }>('/api/v1/auth/sessions/' + encodeURIComponent(sessionId), {
         method: 'DELETE',
         credentials: 'include',
         cache: 'no-store',
@@ -123,8 +124,7 @@ export default function SessionsPage() {
         return
       }
       if (!response.ok) {
-        const data = await response.json().catch((): null => null) as { error?: { message?: string } } | null
-        throw new Error(data?.error?.message || '退出该设备失败')
+        throw new Error(getApiErrorMessage(data, '退出该设备失败'))
       }
 
       setSessions((current) => current.filter((item) => item.sessionId !== sessionId))

@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
 
 import { getPublicCopy, type PublicLocale } from './i18n/public-locale'
+import { fetchJson } from '../../lib/client-api.js'
 
 type ContentType = 'article' | 'post' | 'video'
 
@@ -54,19 +55,18 @@ export default function HomeContentFeed({
         const requestId = ++requestIdRef.current
         try {
           setError(false)
-          const response = await fetch('/api/v1/contents?limit=6', {
+          const { response, data } = await fetchJson<{ data?: Page; error?: { message?: string } }>('/api/v1/contents?limit=6', {
             headers: { accept: 'application/json' },
             cache: 'no-store',
             signal: controller.signal,
           })
-          const data = await response.json().catch((): null => null)
           if (!response.ok || !data?.data) {
             if (requestId !== requestIdRef.current) return
             setError(true)
             return
           }
           if (requestId !== requestIdRef.current) return
-          setItems((data.data as Page).items ?? [])
+          setItems(data.data?.items ?? [])
         } catch (cause) {
           if (requestId !== requestIdRef.current || controller.signal.aborted) return
           if (cause instanceof DOMException && cause.name === 'AbortError') return

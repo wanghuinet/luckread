@@ -9,7 +9,7 @@ describe('frontend session management', () => {
     const page = read('src/app/(frontend)/me/sessions/page.tsx')
     const route = read('src/app/auth/sessions/[[...segments]]/route.ts')
 
-    expect(page).toContain("fetch('/api/v1/auth/sessions?' + params.toString()")
+    expect(page).toContain("fetchJson<SessionResponse | { error?: { message?: string } }>('/api/v1/auth/sessions?' + params.toString()")
     expect(page).toContain('currentSessionId')
     expect(page).toContain("credentials: 'include'")
     expect(page).toContain("cache: 'no-store'")

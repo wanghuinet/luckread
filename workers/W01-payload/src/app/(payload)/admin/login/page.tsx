@@ -2,6 +2,8 @@
 
 import { FormEvent, useState } from 'react'
 
+import { fetchJson, getApiErrorMessage, jsonHeaders } from '../../../../lib/client-api.js'
+
 export default function AdminLoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -11,8 +13,13 @@ export default function AdminLoginPage() {
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setBusy(true); setError('')
     try {
-      const response = await fetch('/api/v1/auth/login', { method: 'POST', headers: { 'content-type': 'application/json' }, credentials: 'include', body: JSON.stringify({ identity: email.trim(), credential: password }) })
-      if (!response.ok) { const payload = await response.json().catch(() => null as { error?: { message?: string } } | null); setError(payload?.error?.message || 'Authentication failed'); return }
+      const { response, data } = await fetchJson<{ error?: { message?: string } }>('/api/v1/auth/login', {
+        method: 'POST',
+        headers: jsonHeaders(),
+        credentials: 'include',
+        body: JSON.stringify({ identity: email.trim(), credential: password }),
+      })
+      if (!response.ok) { setError(getApiErrorMessage(data, 'Authentication failed')); return }
       window.location.assign('/admin')
     } catch { setError('Authentication service unavailable') } finally { setBusy(false) }
   }
