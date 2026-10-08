@@ -26,10 +26,12 @@ export async function fetchJson<T = unknown>(
 }
 
 export function getApiErrorMessage(
-  data: ApiErrorPayload | null | undefined,
+  data: unknown,
   fallback: string,
 ): string {
-  const message = data?.error?.message
+  if (!data || typeof data !== 'object') return fallback
+  const error = 'error' in data && data.error && typeof data.error === 'object' ? data.error : null
+  const message = error && 'message' in error ? error.message : undefined
   return typeof message === 'string' && message.trim() ? message : fallback
 }
 
