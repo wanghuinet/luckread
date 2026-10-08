@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import ContentComments from './ContentComments'
 import ArticleStructuredRenderer from '../../../../components/ArticleStructuredRenderer.js'
-import { plainTextFromArticleDocument, tryDeserializeArticleDocument } from '../../../../lib/article-document.js'
+import { tryDeserializeArticleDocument } from '../../../../lib/article-document.js'
 import { useEffect, useMemo, useState } from 'react'
 
 import { fetchJson, getApiErrorMessage } from '../../../../lib/client-api.js'
