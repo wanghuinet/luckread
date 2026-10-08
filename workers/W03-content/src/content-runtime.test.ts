@@ -250,9 +250,8 @@ describe('W03 content contract core', () => {
     expect(preparedQueries[0]).toContain("WHERE state = 'PUBLISHED' AND content_type = ?")
   })
 
-  it('keeps creator state-transition actor mapping aligned with L3-L8 permissions', () => {
+  it('keeps creator state-transition actor mapping aligned with L3-L4 permissions', () => {
     expect(actorKindForLayer('L3')).toBe('CREATOR')
-    expect(actorKindForLayer('L4')).toBe('CREATOR')
     expect(actorKindForLayer('L4')).toBe('CREATOR')
     expect(actorKindForLayer('L5')).toBeNull()
     expect(actorKindForLayer('L8')).toBeNull()
