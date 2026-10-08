@@ -452,7 +452,7 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
       </div>
 
       <div className="lr-article-editor-hint">
-        每个区块可以独立调整顺序和类型。列表区块使用换行分隔条目；正文内容最终会以版本化 JSON 资产保存，发布前检查仍使用纯文本抽取结果。
+        每个区块可以独立调整顺序和类型。文本区块支持 Ctrl/Cmd+Enter 新建正文、Alt+↑/↓ 移动当前区块并保留光标；列表区块使用换行分隔条目；正文内容最终会以版本化 JSON 资产保存，发布前检查仍使用纯文本抽取结果。
       </div>
 
       <div className="lr-article-blocks">
