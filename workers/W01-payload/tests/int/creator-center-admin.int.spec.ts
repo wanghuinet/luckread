@@ -210,6 +210,21 @@ describe('Creator Center admin extension', () => {
     expect(editor).toContain('从正文移除')
   })
 
+  it('keeps editor structural insertion keyboard-accessible and focus-continuous', () => {
+    const editor = read('src/components/ArticleStructuredEditor.tsx')
+
+    expect(editor).toContain('pendingFocusRef')
+    expect(editor).toContain('textarea.focus()')
+    expect(editor).toContain('textarea.setSelectionRange(offset, offset)')
+    expect(editor).toContain("key === 'enter'")
+    expect(editor).toContain('(event.ctrlKey || event.metaKey)')
+    expect(editor).toContain('!event.shiftKey')
+    expect(editor).toContain('!event.altKey')
+    expect(editor).toContain('insertParagraphAfter(index)')
+    expect(editor).toContain('title="插入正文区块（Ctrl/Cmd+Enter）"')
+    expect(editor).toContain('disabled) return')
+  })
+
   it('exposes article block split and merge actions', () => {
     const editor = read('src/components/ArticleStructuredEditor.tsx')
     const document = read('src/lib/article-document.ts')
