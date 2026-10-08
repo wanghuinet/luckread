@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
-import { fetchJson, getApiErrorMessage } from '../../../lib/client-api.js'
+import { fetchJson, getApiErrorMessage } from '../../../../lib/client-api.js'
 
 type ShareResponse = {
   data?: {
