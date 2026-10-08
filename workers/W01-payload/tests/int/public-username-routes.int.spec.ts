@@ -14,7 +14,7 @@ describe('public username routes', () => {
     expect(route).toContain('overrideAccess: true')
     expect(route).toContain('cachedPublicGet')
     expect(route).toContain('enforcePublicReadRateLimit')
-    expect(profile).toContain('/api/v1/users/by-username/')
+    expect(profile).toContain("fetchJson<PublicUserLookup>('/api/v1/users/by-username/")
     expect(profile).toContain("import UserProfilePage from '../users/[userId]/page'")
   })
 
