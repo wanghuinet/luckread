@@ -3,6 +3,8 @@
 import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
+import { fetchJson, getApiErrorMessage } from '../../../../lib/client-api.js'
+
 type Direction = 'followers' | 'following'
 
 type PublicProfile = {
@@ -86,7 +88,7 @@ export default function UserFollowList({
       const params = new URLSearchParams({ limit: String(PAGE_SIZE) })
       if (cursor) params.set('cursor', cursor)
 
-      const response = await fetch(
+      const { response, data } = await fetchJson<ListResponse>(
         '/api/v1/users/' + encodeURIComponent(userId) + '/' + direction + '?' + params.toString(),
         {
           credentials: 'omit',
@@ -95,10 +97,9 @@ export default function UserFollowList({
           signal: controller.signal,
         },
       )
-      const data = await response.json().catch((): null => null) as ListResponse | null
 
       if (!response.ok || !data?.data || !Array.isArray(data.data.items)) {
-        throw new Error(data?.error?.message || '关系列表加载失败')
+        throw new Error(getApiErrorMessage(data, '关系列表加载失败'))
       }
 
       if (!isCurrentRequest(controller, generation)) return
