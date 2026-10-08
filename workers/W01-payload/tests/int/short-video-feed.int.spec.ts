@@ -45,6 +45,9 @@ describe('TikTok-style short video feed', () => {
     expect(feed).toContain("import ContentComments from '../content/[contentId]/ContentComments'")
     expect(feed).toContain("targetType: 'content'")
     expect(feed).toContain("'Idempotency-Key': 'short-video-like:' + crypto.randomUUID()")
+    expect(feed).toContain("fetchJson<ApiResponse<{ liked?: boolean; likeCount?: number }>>('/api/v1/interactions/likes?targetType=content&targetId=' + encodeURIComponent(active.id)")
+    expect(feed).toContain('const likeData = responses[0].data as')
+    expect(feed).not.toContain('responses[0].json()')
   })
 
   it('keeps autoplay muted by default and supports explicit sound control plus accessible controls', () => {

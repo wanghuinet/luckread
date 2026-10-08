@@ -141,4 +141,7 @@ it('keeps public follower and following pages anonymous for shared-cache deliver
   expect(page).toContain("credentials: 'omit'")
   expect(page).toContain("cache: 'no-store'")
   expect(page).toContain("'/api/v1/users/' + encodeURIComponent(userId) + '/' + direction + '?' + params.toString()")
+  expect(page).toContain("fetchJson<ProfileResponse>('/api/v1/users/' + encodeURIComponent(userId)")
+  expect(page).toContain("fetchJson<ListResponse>('/api/v1/users/' + encodeURIComponent(userId) + '/' + direction")
+  expect(page).not.toContain("fetch('/api/v1/users/' + encodeURIComponent(userId)")
 })
