@@ -78,9 +78,9 @@ describe('Markdown to ArticleDocument', () => {
 
   it('recognizes all supported Markdown divider spellings', () => {
     for (const source of ['---', '___', '***', '* * *']) {
-      const result = markdownToArticleDocument(source)
+      const result = markdownToArticleDocument('正文\\n\\n' + source)
       expect(result.unsupported).toEqual([])
-      expect(result.document.blocks[0]?.type).toBe('divider')
+      expect(result.document.blocks[1]?.type).toBe('divider')
     }
   })
 
