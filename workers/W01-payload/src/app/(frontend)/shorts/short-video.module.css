@@ -658,7 +658,7 @@
   .contentOverlay {
     left: 12px;
     right: 91px;
-    bottom: 75px;
+    bottom: calc(75px + env(safe-area-inset-bottom));
   }
 
   .actionRail {
