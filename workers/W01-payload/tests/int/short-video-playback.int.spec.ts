@@ -40,6 +40,17 @@ describe('short video playback polish', () => {
     expect(feed).toContain("document.removeEventListener('visibilitychange', handleVisibilityChange)")
   })
 
+  it('exposes a recoverable media error path without changing the feed authority', () => {
+    const feed = read('src/app/(frontend)/shorts/ShortVideoFeed.tsx')
+    expect(feed).toContain('const [mediaErrorById, setMediaErrorById]')
+    expect(feed).toContain('onError={(event) => {')
+    expect(feed).toContain('setMediaErrorById((current) => ({ ...current, [item.id]: true }))')
+    expect(feed).toContain('const retryPlayback = (item: ContentItem) =>')
+    expect(feed).toContain('video.load()')
+    expect(feed).toContain('styles.mediaError')
+    expect(feed).toContain('styles.mediaRetryButton')
+  })
+
   it('keeps the simple TikTok-style social rail and swipe flow intact', () => {
     const feed = read('src/app/(frontend)/shorts/ShortVideoFeed.tsx')
     const css = read('src/app/(frontend)/shorts/short-video.module.css')
