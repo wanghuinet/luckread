@@ -10,7 +10,7 @@ describe('TikTok-style short video feed', () => {
     expect(feed).toContain("type: 'video'")
     expect(feed).toContain("limit: '12'")
     expect(feed).toContain("credentials: 'omit'")
-    expect(feed).toContain("fetch('/api/v1/contents?' + params.toString()")
+    expect(feed).toContain("fetchJson<ApiResponse<ContentPage>>('/api/v1/contents?' + params.toString()")
     expect(feed).toContain('page.nextCursor')
   })
 
