@@ -15,7 +15,9 @@ export type MarkdownImportResult = {
 }
 
 const unescapeLeadingMarkdown = (value: string): string =>
-  value.replace(/^\\(?:(?:#{1,6})|>|[-+*]|\\)(?=\\s|$)/u, (match) => match.slice(1))
+  value.replace(/^\\(?:(?:#{1,6})|>|[-+*]|\\|(?:---+|___+|(?:\\*\\s*){3,}))(?:\\s|$)?/u, (match) =>
+    match.slice(1),
+  )
 
 const createMarkdownTextBlock = (
   type: 'paragraph' | 'heading' | 'quote' | 'bulletList' | 'orderedList',
@@ -90,7 +92,8 @@ export const markdownToArticleDocument = (raw: string): MarkdownImportResult => 
   }
 
   for (const line of lines) {
-    const escapedLiteral = /^\s*\\(?:(?:#{1,6})|>|[-+*]|\\)(?=\s|$)/u.test(line)
+    const escapedLiteral = /^\s*\\(?:(?:#{1,6})|>|[-+*]|\\|(?:---+|___+|(?:\*\s*){3,}))\s*$/u.test(line) ||
+      /^\s*\\(?:(?:#{1,6})|>|[-+*]|\\)(?=\s|$)/u.test(line)
     const parsedLine = escapedLiteral ? unescapeLeadingMarkdown(line) : line
 
     if (!escapedLiteral && /^\s*(?:---+|___+|\*\s*\*\s*\*+(?:\s*\*)*)\s*$/u.test(parsedLine)) {
