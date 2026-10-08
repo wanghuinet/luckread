@@ -374,7 +374,7 @@ describe('Creator Center admin extension', () => {
     expect(editor).toContain('applyHistory(\'redo\')')
     expect(editor).toContain('Ctrl/Cmd+Z')
     expect(editor).toContain('Ctrl/Cmd+Shift+Z / Ctrl+Y')
-    expect(editor).toContain('target.tagName === \'TEXTAREA\'')
+    expect(editor).toContain('target.tagName === \'SELECT\'')
   })
 
   it('exposes reusable structured block duplication in the editor', () => {
