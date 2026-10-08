@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { ChangeEvent, useCallback, useEffect, useState } from 'react'
 
-import { fetchJson, getApiErrorMessage } from '../../../../lib/client-api.js'
+import { fetchJson, getApiErrorMessage } from '../../../lib/client-api.js'
 
 type MediaItem = {
   id: string | number
