@@ -64,24 +64,6 @@ CREATE INDEX IF NOT EXISTS ix_social_notifications_recipient_created
 CREATE INDEX IF NOT EXISTS ix_social_notifications_recipient_unread
   ON social_notifications (recipient_user_id, read_at, created_at);
 
-CREATE TABLE IF NOT EXISTS social_notification_outbox (
-  event_id TEXT NOT NULL PRIMARY KEY,
-  recipient_user_id TEXT NOT NULL,
-  actor_user_id TEXT NOT NULL,
-  notification_type TEXT NOT NULL
-    CHECK (notification_type IN ('FOLLOW','LIKE','COMMENT','REPLY','MENTION')),
-  target_type TEXT NOT NULL CHECK (target_type IN ('user','content','comment')),
-  target_id TEXT NOT NULL,
-  dedupe_key TEXT NOT NULL UNIQUE,
-  payload_json TEXT NOT NULL DEFAULT '{}'
-    CHECK (json_valid(payload_json) AND json_type(payload_json) = 'object'),
-  created_at TEXT NOT NULL,
-  dispatched_at TEXT
-);
-
-CREATE INDEX IF NOT EXISTS ix_social_notification_outbox_pending
-  ON social_notification_outbox (dispatched_at, created_at);
-
 CREATE TABLE IF NOT EXISTS social_notification_preferences (
   user_id TEXT NOT NULL PRIMARY KEY,
   follow_enabled INTEGER NOT NULL DEFAULT 1 CHECK (follow_enabled IN (0,1)),
