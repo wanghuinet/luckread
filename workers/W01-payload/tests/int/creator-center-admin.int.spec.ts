@@ -234,7 +234,7 @@ describe('Creator Center admin extension', () => {
     expect(editor).toContain('const blockRefs = useRef<Record<string, HTMLElement | null>>({})')
     expect(editor).toContain('const focusTarget = nextBlocks[index] ?? nextBlocks[index - 1]')
     expect(editor).toContain('pendingFocusRef.current = { blockId: duplicate.id, offset: 0 }')
-    expect(editor).toContain('pendingFocusRef.current = { blockId: moved.id, offset: 0 }')
+    expect(editor).toContain('if (moved) pendingFocusRef.current = { blockId: moved.id, offset: Math.max(0, Math.min(focusOffset, moved.text.length)) }')
     expect(editor).toContain('tabIndex={-1}')
     expect(editor).toContain('block.focus()')
     expect(editor).toContain('focusTarget.id')
