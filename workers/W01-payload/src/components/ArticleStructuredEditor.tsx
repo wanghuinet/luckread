@@ -68,6 +68,7 @@ const updateBlock = (
 export default function ArticleStructuredEditor({ value, disabled = false, mediaAssets = [], onChange, plugins = [] }: Props) {
   const editorRef = useRef<HTMLElement | null>(null)
   const textAreaRefs = useRef<Record<string, HTMLTextAreaElement | null>>({})
+  const pendingFocusRef = useRef<{ blockId: string; offset: number } | null>(null)
   const historyRef = useRef<ArticleDocumentHistory>(createArticleDocumentHistory())
   const pendingHistorySnapshotRef = useRef<string | null>(null)
   const lastDocumentSnapshotRef = useRef(JSON.stringify(value))
@@ -77,6 +78,17 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
     historyRef.current = history
     setHistoryState({ past: history.past.length, future: history.future.length })
   }
+
+  useEffect(() => {
+    const request = pendingFocusRef.current
+    if (!request) return
+    const textarea = textAreaRefs.current[request.blockId]
+    if (!textarea) return
+    pendingFocusRef.current = null
+    textarea.focus()
+    const offset = Math.max(0, Math.min(request.offset, textarea.value.length))
+    textarea.setSelectionRange(offset, offset)
+  }, [value])
 
   useEffect(() => {
     const currentSnapshot = JSON.stringify(value)
@@ -94,7 +106,7 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (!(event.ctrlKey || event.metaKey) || !editorRef.current?.contains(document.activeElement)) return
+      if (!(event.ctrlKey || event.metaKey) || !editorRef.current?.contains(document.activeElement) || disabled) return
       const target = event.target
       if (target instanceof HTMLElement && (
         target.tagName === 'INPUT' ||
@@ -119,7 +131,7 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
 
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [onChange, value])
+  }, [disabled, onChange, value])
 
   const imageAssets = useMemo(() => {
     const seenUrls = new Set<string>()
@@ -277,11 +289,28 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
     const block = value.blocks[index]
     const textarea = block ? textAreaRefs.current[block.id] : null
     if (!textarea || !block) return
-    emit(splitArticleBlock(value, index, textarea.selectionStart))
+    const next = splitArticleBlock(value, index, textarea.selectionStart)
+    if (next === value) return
+    const nextBlock = next.blocks[index + 1]
+    if (nextBlock) pendingFocusRef.current = { blockId: nextBlock.id, offset: 0 }
+    emit(next)
   }
 
   function mergeBlockWithPrevious(index: number) {
-    emit(mergeArticleBlockWithPrevious(value, index))
+    const next = mergeArticleBlockWithPrevious(value, index)
+    if (next === value) return
+    const previous = next.blocks[index - 1]
+    if (previous) pendingFocusRef.current = { blockId: previous.id, offset: previous.text.length }
+    emit(next)
+  }
+
+  function insertParagraphAfter(index: number) {
+    if (value.blocks.length >= ARTICLE_MAX_BLOCKS) return
+    const next = insertArticleBlockAfter(value, index, 'paragraph')
+    if (next === value) return
+    const inserted = next.blocks[index + 1]
+    if (inserted) pendingFocusRef.current = { blockId: inserted.id, offset: 0 }
+    emit(next)
   }
 
   function removeMediaReference(mediaRef: string) {
@@ -430,9 +459,19 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
                       aria-label="在光标处分段"
                       disabled={disabled || value.blocks.length >= ARTICLE_MAX_BLOCKS}
                       onClick={() => splitBlockAtCursor(index)}
+                      title="在当前光标处分段"
                       type="button"
                     >
                       分段
+                    </button>
+                    <button
+                      aria-label="在下方插入并聚焦正文"
+                      disabled={disabled || value.blocks.length >= ARTICLE_MAX_BLOCKS}
+                      onClick={() => insertParagraphAfter(index)}
+                      title="插入正文区块（Ctrl/Cmd+Enter）"
+                      type="button"
+                    >
+                      新段
                     </button>
                     <button
                       aria-label="与上一同类区块合并"
@@ -561,6 +600,17 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
                 }
                 rows={block.type === 'heading' ? 2 : block.type === 'quote' ? 4 : 5}
                 value={block.text}
+                onKeyDown={(event) => {
+                  if (
+                    event.key.toLowerCase() === 'enter' &&
+                    (event.ctrlKey || event.metaKey) &&
+                    !event.shiftKey &&
+                    !event.altKey
+                  ) {
+                    event.preventDefault()
+                    insertParagraphAfter(index)
+                  }
+                }}
               />
             )}
 
