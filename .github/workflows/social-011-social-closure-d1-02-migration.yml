@@ -66,6 +66,7 @@ jobs:
           assert migration.is_file()
           db = sqlite3.connect(':memory:')
           db.executescript(Path('workers/W05-social/migrations/20261002_002_social_003_like_v1.sql').read_text())
+          db.executescript(Path('workers/W05-social/migrations/20261002_005_social_005_comment_likes_v1.sql').read_text())
           db.executescript(migration.read_text())
           like_sql = db.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='interaction_likes'").fetchone()[0]
           assert "target_type IN ('content','comment')" in like_sql
@@ -98,7 +99,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -euo pipefail
-          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$EXPECTED_DB_NAME" --remote --json --config wrangler.jsonc --command 'PRAGMA table_info("interaction_likes"); PRAGMA table_info("social_topics"); PRAGMA table_info("social_mentions"); PRAGMA table_info("social_notifications");' > /tmp/social-011-schema.json
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$EXPECTED_DB_NAME" --remote --json --config wrangler.jsonc --command 'SELECT name, sql FROM sqlite_master WHERE type = "table" AND name IN ("interaction_likes","social_topics","social_mentions","social_notifications","social_notification_outbox","social_notification_preferences") ORDER BY name;' > /tmp/social-011-schema.json
           python - <<'PY'
           import json
           data = json.load(open('/tmp/social-011-schema.json'))
