@@ -2,6 +2,8 @@
 
 import { useState } from 'react'
 
+import { fetchJson, getApiErrorMessage } from '../../../lib/client-api.js'
+
 import styles from './creator-center.module.css'
 
 type Revision = {
@@ -44,18 +46,17 @@ export default function ContentRevisionHistory({
     setLoading(true)
     setError('')
     try {
-      const response = await fetch(
+      const { response, data } = await fetchJson<{ data?: { items?: Revision[] }; error?: { message?: string } }>(
         '/api/v1/contents/' + encodeURIComponent(contentId) + '/revisions?limit=50',
         { credentials: 'include', headers: { accept: 'application/json' }, cache: 'no-store' },
       )
-      const data = await response.json().catch((): null => null)
       if (response.status === 401) {
         const returnTo = window.location.pathname + window.location.search + window.location.hash
         window.location.assign(loginPath + '?returnTo=' + encodeURIComponent(returnTo))
         return
       }
       if (!response.ok || !Array.isArray(data?.data?.items)) {
-        throw new Error(data?.error?.message || '版本历史加载失败')
+        throw new Error(getApiErrorMessage(data, '版本历史加载失败'))
       }
       setItems(data.data.items as Revision[])
       setLoaded(true)
@@ -78,7 +79,7 @@ export default function ContentRevisionHistory({
     setActionId(revision.id)
     setError('')
     try {
-      const response = await fetch(
+      const { response, data } = await fetchJson<{ error?: { message?: string } }>(
         '/api/v1/contents/' + encodeURIComponent(contentId) + '/revisions/' + encodeURIComponent(revision.id) + '/rollback',
         {
           method: 'POST',
@@ -92,13 +93,12 @@ export default function ContentRevisionHistory({
           body: JSON.stringify({ reason: 'Creator Center revision restore' }),
         },
       )
-      const data = await response.json().catch((): null => null)
       if (response.status === 401) {
         const returnTo = window.location.pathname + window.location.search + window.location.hash
         window.location.assign(loginPath + '?returnTo=' + encodeURIComponent(returnTo))
         return
       }
-      if (!response.ok) throw new Error(data?.error?.message || '版本恢复失败')
+      if (!response.ok) throw new Error(getApiErrorMessage(data, '版本恢复失败'))
       await load()
       onChanged()
     } catch (cause) {
