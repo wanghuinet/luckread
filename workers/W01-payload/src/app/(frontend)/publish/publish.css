@@ -1335,3 +1335,54 @@
     min-height: 34px;
   }
 }
+\n
+.lr-editor-writer-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 7px;
+  margin: 0;
+}
+
+.lr-editor-writer-stats-grid > div {
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid #e5eaf2;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.lr-editor-writer-stats-grid dt {
+  margin-bottom: 4px;
+  color: #8b96a8;
+  font-size: 8px;
+}
+
+.lr-editor-writer-stats-grid dd {
+  margin: 0;
+  color: #263247;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.lr-editor-copy-plain-text {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.lr-editor-copy-plain-text > span {
+  color: #7b8799;
+  font-size: 8px;
+}
+
+@media (max-width: 640px) {
+  .lr-editor-writer-stats-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 420px) {
+  .lr-editor-writer-stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
