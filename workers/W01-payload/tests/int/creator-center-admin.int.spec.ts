@@ -225,6 +225,18 @@ describe('Creator Center admin extension', () => {
     expect(editor).toContain('disabled) return')
   })
 
+  it('preserves focus across structural article editor operations', () => {
+    const editor = read('src/components/ArticleStructuredEditor.tsx')
+
+    expect(editor).toContain('const blockRefs = useRef<Record<string, HTMLElement | null>>({})')
+    expect(editor).toContain('const focusTarget = nextBlocks[index] ?? nextBlocks[index - 1]')
+    expect(editor).toContain('pendingFocusRef.current = { blockId: duplicate.id, offset: 0 }')
+    expect(editor).toContain('pendingFocusRef.current = { blockId: moved.id, offset: 0 }')
+    expect(editor).toContain('tabIndex={-1}')
+    expect(editor).toContain('block.focus()')
+    expect(editor).toContain('focusTarget.id')
+  })
+
   it('exposes article block split and merge actions', () => {
     const editor = read('src/components/ArticleStructuredEditor.tsx')
     const document = read('src/lib/article-document.ts')

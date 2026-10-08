@@ -68,6 +68,7 @@ const updateBlock = (
 export default function ArticleStructuredEditor({ value, disabled = false, mediaAssets = [], onChange, plugins = [] }: Props) {
   const editorRef = useRef<HTMLElement | null>(null)
   const textAreaRefs = useRef<Record<string, HTMLTextAreaElement | null>>({})
+  const blockRefs = useRef<Record<string, HTMLElement | null>>({})
   const pendingFocusRef = useRef<{ blockId: string; offset: number } | null>(null)
   const historyRef = useRef<ArticleDocumentHistory>(createArticleDocumentHistory())
   const pendingHistorySnapshotRef = useRef<string | null>(null)
@@ -83,11 +84,17 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
     const request = pendingFocusRef.current
     if (!request) return
     const textarea = textAreaRefs.current[request.blockId]
-    if (!textarea) return
+    if (textarea) {
+      pendingFocusRef.current = null
+      textarea.focus()
+      const offset = Math.max(0, Math.min(request.offset, textarea.value.length))
+      textarea.setSelectionRange(offset, offset)
+      return
+    }
+    const block = blockRefs.current[request.blockId]
+    if (!block) return
     pendingFocusRef.current = null
-    textarea.focus()
-    const offset = Math.max(0, Math.min(request.offset, textarea.value.length))
-    textarea.setSelectionRange(offset, offset)
+    block.focus()
   }, [value])
 
   useEffect(() => {
@@ -237,6 +244,7 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
     const source = value.blocks[index]
     if (!source) return
     const duplicate = duplicateArticleBlock(source)
+    pendingFocusRef.current = { blockId: duplicate.id, offset: 0 }
     emit({
       ...value,
       blocks: [
@@ -249,7 +257,11 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
 
   function insertBlockAfter(index: number) {
     if (value.blocks.length >= ARTICLE_MAX_BLOCKS) return
-    emit(insertArticleBlockAfter(value, index, 'paragraph'))
+    const next = insertArticleBlockAfter(value, index, 'paragraph')
+    if (next === value) return
+    const inserted = next.blocks[index + 1]
+    if (inserted) pendingFocusRef.current = { blockId: inserted.id, offset: 0 }
+    emit(next)
   }
 
   function insertMediaAfter(index: number, type: 'image' | 'gallery', assetUrls?: string[]) {
@@ -257,7 +269,11 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
     const refs = (assetUrls ?? imageAssets.map((asset) => asset.url)).filter(Boolean)
     if (type === 'image' && refs.length < 1) return
     if (type === 'gallery' && refs.length < 2) return
-    emit(insertArticleMediaBlockAfter(value, index, type, refs))
+    const next = insertArticleMediaBlockAfter(value, index, type, refs)
+    if (next === value) return
+    const inserted = next.blocks[index + 1]
+    if (inserted) pendingFocusRef.current = { blockId: inserted.id, offset: 0 }
+    emit(next)
   }
 
   function transformBlock(index: number, type: ArticleBlockType) {
@@ -279,9 +295,17 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
 
   function removeBlock(index: number) {
     if (value.blocks.length === 1) return
+    const nextBlocks = value.blocks.filter((_, blockIndex) => blockIndex !== index)
+    const focusTarget = nextBlocks[index] ?? nextBlocks[index - 1]
+    if (focusTarget) {
+      pendingFocusRef.current = {
+        blockId: focusTarget.id,
+        offset: focusTarget.text.length,
+      }
+    }
     emit({
       ...value,
-      blocks: value.blocks.filter((_, blockIndex) => blockIndex !== index),
+      blocks: nextBlocks,
     })
   }
 
@@ -326,6 +350,8 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
     if (target < 0 || target >= value.blocks.length) return
     const blocks = [...value.blocks]
     ;[blocks[index], blocks[target]] = [blocks[target], blocks[index]]
+    const moved = blocks[target]
+    if (moved) pendingFocusRef.current = { blockId: moved.id, offset: 0 }
     emit({ ...value, blocks })
   }
 
@@ -417,7 +443,14 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
 
       <div className="lr-article-blocks">
         {value.blocks.map((block, index) => (
-          <article className={'lr-article-block lr-article-block-' + block.type} key={block.id}>
+          <article
+            className={'lr-article-block lr-article-block-' + block.type}
+            key={block.id}
+            ref={(element) => {
+              blockRefs.current[block.id] = element
+            }}
+            tabIndex={-1}
+          >
             <div className="lr-article-block-head">
               <span>{blockLabels[block.type]}</span>
               <div>
