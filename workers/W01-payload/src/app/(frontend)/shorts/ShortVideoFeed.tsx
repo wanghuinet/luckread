@@ -355,12 +355,6 @@ export default function ShortVideoFeed() {
     }
   }, [setActive, visibleItems.length])
 
-  useEffect(() => {
-    if (!page.hasMore || !page.nextCursor || loadingMore) return
-    if (activeIndex < Math.max(visibleItems.length - 3, 0)) return
-    void loadPage(page.nextCursor)
-  }, [activeIndex, loadPage, loadingMore, page.hasMore, page.nextCursor, visibleItems.length])
-
   const updateBusy = (id: string, action: string | null) => {
     setBusyById((current) => {
       const next = { ...current }
