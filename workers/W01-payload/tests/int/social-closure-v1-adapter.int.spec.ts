@@ -29,6 +29,15 @@ describe('unified W05 social closure adapters', () => {
     expect(reports).not.toContain('/internal/social/reports')
   })
 
+
+  it('exposes a public topic page backed by W05 topic data', () => {
+    const page = read('src/app/(frontend)/topics/[topicName]/page.tsx')
+    expect(page).toContain('callW05SocialPublic')
+    expect(page).toContain('/internal/social/topics/')
+    expect(page).toContain('nextCursor')
+    expect(page).toContain("'/topics/' + encodeURIComponent(topic.topic.name)")
+  })
+
   it('supports persisted topics and mentions in W05', () => {
     const runtime = read('../../workers/W05-social/src/social-closure-runtime.ts')
     const migration = read('../../workers/W05-social/migrations/20261008_011_social_closure_v1.sql')
