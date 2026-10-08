@@ -58,3 +58,94 @@ describe('creator content lifecycle cache adapters', () => {
     expect(route).toContain("if (response.ok)")
   })
 })
+
+describe('1.1 content lifecycle closeout', () => {
+  it('wires the complete creator lifecycle from draft creation through review and public delivery', () => {
+    const publisher = read('src/app/(frontend)/publish/PublishComposer.tsx')
+    const creatorCreate = read('src/app/(payload)/api/creator/contents/route.ts')
+    const creatorState = read('src/app/(payload)/api/creator/contents/[contentId]/state/route.ts')
+    const publicState = read('src/app/api/v1/contents/[contentId]/state/route.ts')
+    const creatorList = read('src/app/(payload)/v1beta/CreatorContentList.tsx')
+    const publicDetail = read('src/app/(frontend)/content/[contentId]/page.tsx')
+    const publicDetailClient = read('src/app/(frontend)/content/[contentId]/ContentDetailClient.tsx')
+    const w03Client = read('src/content/w03-content-client.ts')
+    const w03Runtime = readFileSync(
+      resolve(process.cwd(), '../W03-content/src/content-runtime.ts'),
+      'utf8',
+    )
+
+    expect(publisher).toContain("contentBasePath = '/api/v1/contents'")
+    expect(publisher).toContain("contentBasePath + '/' + encodeURIComponent(savedDraft.id) + '/state'")
+    expect(publisher).toContain("JSON.stringify({ to: 'PENDING_REVIEW', preflight: input })")
+    expect(publisher).toContain("'If-Match': savedDraft.etag")
+    expect(publisher).toContain("'Idempotency-Key': crypto.randomUUID()")
+    expect(publisher).toContain("window.dispatchEvent(new Event(CONTENT_MUTATED_EVENT))")
+
+    expect(creatorCreate).toContain("pathname: '/internal/content/contents'")
+    expect(creatorCreate).toContain("method: 'POST'")
+    expect(creatorCreate).toContain('resolveCookieContentPrincipal')
+
+    expect(creatorState).toContain("/internal/content/contents/")
+    expect(creatorState).toContain("/state")
+    expect(creatorState).toContain("requireStatePreconditions")
+    expect(creatorState).toContain("invalidatePublicContentDetail(request, contentId)")
+    expect(creatorState).toContain("invalidatePublicContentList(request)")
+
+    expect(publicState).toContain("resolveContentPrincipal")
+    expect(publicState).toContain("/internal/content/contents/")
+    expect(publicState).toContain("/state")
+    expect(publicState).toContain("invalidatePublicContentDetail(request, contentId)")
+    expect(publicState).toContain("invalidatePublicContentList(request)")
+
+    expect(creatorList).toContain("requestTransition(item.id, 'PUBLISHED', item.version)")
+    expect(creatorList).toContain("requestTransition(item.id, 'UNPUBLISHED', item.version)")
+    expect(creatorList).toContain("requestTransition(item.id, 'DRAFT', item.version)")
+    expect(creatorList).toContain("requestTransition(item.id, 'ARCHIVED', item.version)")
+    expect(creatorList).toContain("requestTransition(item.id, 'RESTORED', item.version)")
+    expect(creatorList).toContain("window.addEventListener('luckread:content-mutated'")
+
+    expect(publicDetail).toContain("state !== 'PUBLISHED'")
+    expect(publicDetail).toContain("cachedPublicGet")
+    expect(publicDetail).toContain("permanentRedirect('/content/' + encodeURIComponent(content.slug))")
+    expect(publicDetailClient).toContain("fetch(resolved.bodyRef")
+    expect(publicDetailClient).toContain("<ArticleStructuredRenderer document={structuredArticle} />")
+
+    expect(w03Client).toContain("X-LuckRead-Principal-User-Id")
+    expect(w03Client).toContain("X-LuckRead-Principal-Layer")
+    expect(w03Client).toContain("Idempotency-Key")
+    expect(w03Client).toContain("If-Match")
+
+    expect(w03Runtime).toContain("state: 'DRAFT'")
+    expect(w03Runtime).toContain("from === 'DRAFT' && to === 'PENDING_REVIEW'")
+    expect(w03Runtime).toContain("from === 'APPROVED' && to === 'PUBLISHED'")
+    expect(w03Runtime).toContain("from === 'PUBLISHED' && (to === 'UNPUBLISHED' || to === 'ARCHIVED')")
+    expect(w03Runtime).toContain("from === 'UNPUBLISHED' && (to === 'PUBLISHED' || to === 'DRAFT')")
+    expect(w03Runtime).toContain("from === 'DELETED' && to === 'RESTORED'")
+    expect(w03Runtime).toContain("if (!EDITABLE_STATES.has(content.state))")
+  })
+
+  it('keeps anonymous public delivery closed to non-published lifecycle states', () => {
+    const runtime = readFileSync(
+      resolve(process.cwd(), '../W03-content/src/content-runtime.ts'),
+      'utf8',
+    )
+    const detailPage = read('src/app/(frontend)/content/[contentId]/page.tsx')
+    const detailClient = read('src/app/(frontend)/content/[contentId]/ContentDetailClient.tsx')
+
+    expect(runtime).toContain(
+      "WHERE (id = ? OR slug = ?)\n        AND (state = 'PUBLISHED' OR owner_user_id = ?)",
+    )
+    expect(detailPage).toContain("if (!content || content.state !== 'PUBLISHED')")
+    expect(detailClient).toContain("if (!response.ok || !data?.id || data.state !== 'PUBLISHED')")
+  })
+
+  it('keeps autosave and manual save on the same authoritative content mutation path', () => {
+    const publisher = read('src/app/(frontend)/publish/PublishComposer.tsx')
+    expect(publisher).toContain("method: isUpdate ? 'PATCH' : 'POST'")
+    expect(publisher).toContain("const isUpdate = Boolean(draft?.id && draft.etag)")
+    expect(publisher).toContain("rollbackBodyAssetId = uploadedBody.id")
+    expect(publisher).toContain("if (rollbackBodyAssetId) await cleanupUploadedBodyAsset(rollbackBodyAssetId)")
+    expect(publisher).toContain("rollbackBodyAssetId = null")
+    expect(publisher).toContain("Idempotency-Key': crypto.randomUUID()")
+  })
+})
