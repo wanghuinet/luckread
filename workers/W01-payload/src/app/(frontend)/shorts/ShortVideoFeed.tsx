@@ -357,6 +357,20 @@ export default function ShortVideoFeed() {
     }
   }, [setActive, visibleItems.length])
 
+  useEffect(() => {
+    const sentinel = loadMoreSentinelRef.current
+    if (!sentinel || !page.hasMore || !page.nextCursor || loadingMore) return
+
+    const nextCursor = page.nextCursor
+    const observer = new IntersectionObserver((entries) => {
+      if (!entries.some((entry) => entry.isIntersecting)) return
+      void loadPage(nextCursor)
+    }, { root: feedRef.current })
+
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [loadPage, loadingMore, page.hasMore, page.nextCursor])
+
   const updateBusy = (id: string, action: string | null) => {
     setBusyById((current) => {
       const next = { ...current }
@@ -753,16 +767,17 @@ export default function ShortVideoFeed() {
         })}
         {page.hasMore && page.nextCursor ? (
           <div ref={loadMoreSentinelRef} className={styles.loadMoreSentinel} aria-live="polite">
-          {loadingMore ? '正在载入更多视频…' : '继续滑动加载更多'}
-          <button
-            className={styles.hiddenLoadButton}
-            aria-label="加载更多短视频"
-            disabled={loadingMore}
-            onClick={() => void loadPage(page.nextCursor ?? null)}
-            type="button"
-          />
-        </div>
-      ) : null}
+            {loadingMore ? '正在载入更多视频…' : '继续滑动加载更多'}
+            <button
+              className={styles.hiddenLoadButton}
+              aria-label="加载更多短视频"
+              disabled={loadingMore}
+              onClick={() => void loadPage(page.nextCursor ?? null)}
+              type="button"
+            />
+          </div>
+        ) : null}
+      </section>
 
       {message ? (
         <div className={styles.toast} role="status">
