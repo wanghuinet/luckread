@@ -1386,3 +1386,32 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+\n
+.lr-editor-markdown-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.lr-editor-markdown-actions > span {
+  color: #7b8799;
+  font-size: 8px;
+}
+
+.lr-editor-markdown-input {
+  width: 100%;
+  min-height: 220px;
+  resize: vertical;
+  padding: 10px 11px;
+  border: 1px solid #d9e1ec;
+  border-radius: 9px;
+  background: #fff;
+  color: #172033;
+  outline: none;
+  font: 11px/1.7 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+}
+
+.lr-editor-markdown-input:focus {
+  border-color: #93c5fd;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, .08);
+}
