@@ -27,6 +27,20 @@ describe('short video playback polish', () => {
     expect(feed).toContain("useEffect(() => {\n    setActiveProgress(0)\n  }, [activeIndex])")
   })
 
+  it('keeps the simple TikTok-style social rail and swipe flow intact', () => {
+    const feed = read('src/app/(frontend)/shorts/ShortVideoFeed.tsx')
+    expect(feed).toContain('短视频')
+    expect(feed).toContain('上下滑动继续刷视频。')
+    expect(feed).toContain('toggleFollow')
+    expect(feed).toContain('toggleLike')
+    expect(feed).toContain('toggleComments')
+    expect(feed).toContain('toggleBookmark')
+    expect(feed).toContain('share(item)')
+    expect(feed).toContain('markNotInterested')
+    expect(feed).toContain('report(item)')
+    expect(feed).toContain('scroll-snap-type: y mandatory')
+  })
+
   it('keeps the short-video route discoverable from the homepage', () => {
     const page = read('src/app/(frontend)/page.tsx')
     expect(page).toContain('href="/shorts"')
