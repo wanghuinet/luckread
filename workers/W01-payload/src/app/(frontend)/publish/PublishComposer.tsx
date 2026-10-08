@@ -208,7 +208,7 @@ async function cleanupUploadedBodyAsset(mediaId: string): Promise<void> {
     method: 'DELETE',
     credentials: 'include',
     headers: { 'Idempotency-Key': 'content-body-cleanup:' + mediaId + ':' + crypto.randomUUID() },
-  }).catch(() => undefined)
+  }).catch((): undefined => undefined)
 }
 
 async function uploadFile(file: File): Promise<UploadedAsset> {
