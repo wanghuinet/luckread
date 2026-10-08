@@ -308,7 +308,16 @@ export default function ContentDetailPage({
         setActionMessage(data?.error?.message || copy.detail.networkError)
         return
       }
-      setFollowing((value) => !value)
+      if (following) {
+        setFollowing(false)
+        return
+      }
+      const data = await response.json().catch((): null => null) as { data?: { following?: boolean } } | null
+      if (typeof data?.data?.following !== 'boolean') {
+        setActionMessage(copy.detail.networkError)
+        return
+      }
+      setFollowing(data.data.following)
     } catch {
       setActionMessage('网络异常，请稍后重试。')
     } finally {
