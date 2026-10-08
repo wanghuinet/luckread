@@ -14,13 +14,23 @@ export type MarkdownImportResult = {
   unsupported: string[]
 }
 
+const createMarkdownTextBlock = (
+  type: 'paragraph' | 'heading' | 'quote' | 'bulletList' | 'orderedList',
+  text: string,
+): ArticleBlock => {
+  if (text.length > ARTICLE_MAX_BLOCK_TEXT) {
+    throw new Error('MARKDOWN_BLOCK_TOO_LARGE')
+  }
+  return createArticleBlock(type, text)
+}
+
 const pushParagraph = (blocks: ArticleBlock[], lines: string[]) => {
   const text = lines.join('\n').trim()
   if (!text) return
   if (text.length > ARTICLE_MAX_BLOCK_TEXT) {
     throw new Error('MARKDOWN_BLOCK_TOO_LARGE')
   }
-  blocks.push(createArticleBlock('paragraph', text))
+  blocks.push(createMarkdownTextBlock('paragraph', text))
 }
 
 const hasUnsupportedSyntax = (line: string): string | null => {
@@ -99,7 +109,7 @@ export const markdownToArticleDocument = (raw: string): MarkdownImportResult => 
       flushText()
       const marks = heading[1]?.length ?? 0
       if (marks === 2 || marks === 3) {
-        blocks.push(createArticleBlock('heading', heading[2] ?? ''))
+        blocks.push(createMarkdownTextBlock('heading', heading[2] ?? ''))
         const last = blocks.at(-1)
         if (last) last.level = marks as 2 | 3
       } else {
