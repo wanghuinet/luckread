@@ -2,6 +2,8 @@
 
 import { ChangeEvent, FormEvent, Fragment, useCallback, useEffect, useState } from 'react'
 
+import { fetchJson, getApiErrorMessage } from '../../../lib/client-api.js'
+
 import CreatorContentOrganizationMembers from './CreatorContentOrganizationMembers'
 import styles from './creator-center.module.css'
 
@@ -60,19 +62,21 @@ async function readPage(
 ) {
   const params = new URLSearchParams({ limit: '20' })
   if (cursor) params.set('cursor', cursor)
-  const response = await fetch(kindMeta[kind].path + '?' + params.toString(), {
-    credentials: 'include',
-    headers: { accept: 'application/json' },
-    cache: 'no-store',
-    signal,
-  })
-  const data = await response.json().catch((): null => null) as { data?: OrganizationPage } | null
+  const { response, data } = await fetchJson<{ data?: OrganizationPage; error?: { message?: string } }>(
+    kindMeta[kind].path + '?' + params.toString(),
+    {
+      credentials: 'include',
+      headers: { accept: 'application/json' },
+      cache: 'no-store',
+      signal,
+    },
+  )
   if (response.status === 401) {
     redirectToLogin(loginPath)
     throw new Error('AUTH_REQUIRED')
   }
   if (!response.ok || !data?.data || !Array.isArray(data.data.items)) {
-    throw new Error('ORGANIZATION_LOAD_FAILED')
+    throw new Error(getApiErrorMessage(data, 'ORGANIZATION_LOAD_FAILED'))
   }
   return data.data
 }
@@ -167,7 +171,7 @@ export default function CreatorContentOrganization({
     setSaving(true)
     setError('')
     try {
-      const response = await fetch(kindMeta[kind].path, {
+      const { response, data } = await fetchJson<{ error?: { message?: string } }>(kindMeta[kind].path, {
         method: 'POST',
         credentials: 'include',
         headers: {
@@ -181,12 +185,11 @@ export default function CreatorContentOrganization({
           coverRef: form.coverRef.trim() ? form.coverRef.trim() : null,
         }),
       })
-      const data: { error?: { message?: string } } | null = await response.json().catch((): null => null)
       if (response.status === 401) {
         redirectToLogin(loginPath)
         return
       }
-      if (!response.ok) throw new Error(data?.error?.message || '创建失败')
+      if (!response.ok) throw new Error(getApiErrorMessage(data, '创建失败'))
       setFormOpen(false)
       setForm(emptyForm)
       setReloadKey((value) => value + 1)
@@ -229,22 +232,20 @@ export default function CreatorContentOrganization({
       const formData = new FormData()
       formData.append('_payload', JSON.stringify({ alt: file.name }))
       formData.append('file', file)
-      const response = await fetch('/api/v1/media', {
+      const { response, data } = await fetchJson<{ doc?: { url?: string }; url?: string; error?: { message?: string } }>('/api/v1/media', {
         method: 'POST',
         credentials: 'include',
         cache: 'no-store',
         headers: { 'Idempotency-Key': 'content-organization-cover-upload:' + crypto.randomUUID() },
         body: formData,
       })
-      const data: { doc?: { url?: string }; url?: string; error?: { message?: string } } | null =
-        await response.json().catch((): null => null)
       if (response.status === 401) {
         redirectToLogin(loginPath)
         return
       }
       const url = data?.doc?.url ?? data?.url
       if (!response.ok || typeof url !== 'string' || !url) {
-        throw new Error(data?.error?.message || '组织封面上传失败')
+        throw new Error(getApiErrorMessage(data, '组织封面上传失败'))
       }
       if (target === 'create') {
         setForm((current) => ({ ...current, coverRef: url }))
@@ -265,7 +266,7 @@ export default function CreatorContentOrganization({
     setSavingEdit(true)
     setError('')
     try {
-      const response = await fetch(kindMeta[kind].path + '/' + encodeURIComponent(item.id), {
+      const { response, data } = await fetchJson<{ error?: { message?: string } }>(kindMeta[kind].path + '/' + encodeURIComponent(item.id), {
         method: 'PATCH',
         credentials: 'include',
         headers: {
@@ -280,12 +281,11 @@ export default function CreatorContentOrganization({
           coverRef: editForm.coverRef.trim() ? editForm.coverRef.trim() : null,
         }),
       })
-      const data: { error?: { message?: string } } | null = await response.json().catch((): null => null)
       if (response.status === 401) {
         redirectToLogin(loginPath)
         return
       }
-      if (!response.ok) throw new Error(data?.error?.message || '保存失败')
+      if (!response.ok) throw new Error(getApiErrorMessage(data, '保存失败'))
       setEditingOrganizationId(null)
       setEditForm(emptyForm)
       setSelectedOrganizationId(null)
@@ -304,7 +304,7 @@ export default function CreatorContentOrganization({
     setActionId(item.id)
     setError('')
     try {
-      const response = await fetch(kindMeta[kind].path + '/' + encodeURIComponent(item.id), {
+      const { response, data } = await fetchJson<{ error?: { message?: string } }>(kindMeta[kind].path + '/' + encodeURIComponent(item.id), {
         method: 'DELETE',
         credentials: 'include',
         headers: {
@@ -313,12 +313,11 @@ export default function CreatorContentOrganization({
           'Idempotency-Key': 'content-organization-delete:' + crypto.randomUUID(),
         },
       })
-      const data: { error?: { message?: string } } | null = await response.json().catch((): null => null)
       if (response.status === 401) {
         redirectToLogin(loginPath)
         return
       }
-      if (!response.ok) throw new Error(data?.error?.message || '删除失败')
+      if (!response.ok) throw new Error(getApiErrorMessage(data, '删除失败'))
       setReloadKey((value) => value + 1)
     } catch (cause) {
       if (cause instanceof Error && cause.message === 'AUTH_REQUIRED') return
