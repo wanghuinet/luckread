@@ -93,6 +93,7 @@ describe('public creator profile', () => {
     expect(page).toContain('/api/v1/contents?')
     expect(page).toContain('creatorId=')
     expect(page).toContain('limit=6')
+    expect(page).toContain("credentials: 'omit'")
     expect(page).toContain("params.set('type', filter)")
     expect(page).toContain('loadMoreContents')
     expect(page).toContain('cursor: contentCursor')
