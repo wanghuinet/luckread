@@ -14,6 +14,9 @@ export type MarkdownImportResult = {
   unsupported: string[]
 }
 
+const unescapeLeadingMarkdown = (value: string): string =>
+  value.replace(/^\\(?:(?:#{1,6})|>|[-+*]|\\)(?=\\s|$)/u, (match) => match.slice(1))
+
 const createMarkdownTextBlock = (
   type: 'paragraph' | 'heading' | 'quote' | 'bulletList' | 'orderedList',
   text: string,
@@ -87,24 +90,35 @@ export const markdownToArticleDocument = (raw: string): MarkdownImportResult => 
   }
 
   for (const line of lines) {
-    if (/^\s*(?:---+|___+|\*\s*\*\s*\*+(?:\s*\*)*)\s*$/u.test(line)) {
+    const escapedLiteral = /^\s*\\(?:(?:#{1,6})|>|[-+*]|\\)(?=\s|$)/u.test(line)
+    const parsedLine = escapedLiteral ? unescapeLeadingMarkdown(line) : line
+
+    if (!escapedLiteral && /^\s*(?:---+|___+|\*\s*\*\s*\*+(?:\s*\*)*)\s*$/u.test(parsedLine)) {
       flushText()
       blocks.push({ id: crypto.randomUUID(), type: 'divider', text: '' })
       continue
     }
 
-    const unsupportedKind = hasUnsupportedSyntax(line)
+    const unsupportedKind = hasUnsupportedSyntax(parsedLine)
     if (unsupportedKind) {
       unsupported.add(unsupportedKind)
       continue
     }
 
-    if (!line.trim()) {
+    if (!parsedLine.trim()) {
       flushText()
       continue
     }
 
-    const heading = line.match(/^\s*(#{1,6})\s+(.+?)\s*#*\s*$/u)
+    if (escapedLiteral) {
+      flushQuote()
+      flushBullet()
+      flushOrdered()
+      paragraph.push(parsedLine)
+      continue
+    }
+
+    const heading = parsedLine.match(/^\s*(#{1,6})\s+(.+?)\s*#*\s*$/u)
     if (heading) {
       flushText()
       const marks = heading[1]?.length ?? 0
@@ -118,7 +132,7 @@ export const markdownToArticleDocument = (raw: string): MarkdownImportResult => 
       continue
     }
 
-    const image = parseImage(line)
+    const image = parseImage(parsedLine)
     if (image) {
       flushText()
       if (image.alt.length > ARTICLE_MAX_BLOCK_TEXT) {
@@ -132,7 +146,7 @@ export const markdownToArticleDocument = (raw: string): MarkdownImportResult => 
       continue
     }
 
-    const quoteMatch = line.match(/^\s*> ?(.*)$/u)
+    const quoteMatch = parsedLine.match(/^\s*> ?(.*)$/u)
     if (quoteMatch) {
       flushParagraph()
       flushBullet()
@@ -141,28 +155,28 @@ export const markdownToArticleDocument = (raw: string): MarkdownImportResult => 
       continue
     }
 
-    const bulletMatch = line.match(/^\s*[-*+]\s+(.+)$/u)
+    const bulletMatch = parsedLine.match(/^\s*[-*+]\s+(.+)$/u)
     if (bulletMatch) {
       flushParagraph()
       flushQuote()
       flushOrdered()
-      bullet.push((bulletMatch[1] ?? '').trim())
+      bullet.push(unescapeLeadingMarkdown((bulletMatch[1] ?? '').trim()))
       continue
     }
 
-    const orderedMatch = line.match(/^\s*\d+[.)]\s+(.+)$/u)
+    const orderedMatch = parsedLine.match(/^\s*\d+[.)]\s+(.+)$/u)
     if (orderedMatch) {
       flushParagraph()
       flushQuote()
       flushBullet()
-      ordered.push((orderedMatch[1] ?? '').trim())
+      ordered.push(unescapeLeadingMarkdown((orderedMatch[1] ?? '').trim()))
       continue
     }
 
     flushQuote()
     flushBullet()
     flushOrdered()
-    paragraph.push(line)
+    paragraph.push(parsedLine)
   }
 
   flushText()
