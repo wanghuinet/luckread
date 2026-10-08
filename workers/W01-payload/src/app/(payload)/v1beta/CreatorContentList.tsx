@@ -334,7 +334,7 @@ export default function CreatorContentList({ loginPath = '/admin/login' }: { log
           ['RESTORED', '已恢复'],
         ].map(([value, label]) => (
           <CreatorActionButton
-            buttonStyle={status === value ? 'primary' : 'secondary'}
+            tone={status === value ? 'primary' : 'secondary'}
             key={value}
             onClick={() => setStatus(value)}
             type="button"
