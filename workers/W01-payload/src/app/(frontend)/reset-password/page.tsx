@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { FormEvent, Suspense, useState } from 'react'
+import { fetchJson, getApiErrorMessage } from '../../../lib/client-api.js'
 
 const MIN_PASSWORD_LENGTH = 15
 const MAX_PASSWORD_LENGTH = 128
@@ -43,7 +44,7 @@ function ResetPasswordForm() {
 
     setBusy(true)
     try {
-      const response = await fetch('/api/v1/auth/password/reset/confirm', {
+      const { response, data } = await fetchJson<{ error?: { message?: string } }>('/api/v1/auth/password/reset/confirm', {
         method: 'POST',
         credentials: 'include',
         cache: 'no-store',
@@ -53,12 +54,9 @@ function ResetPasswordForm() {
         },
         body: JSON.stringify({ recoveryToken, newPassword }),
       })
-      const data = await response.json().catch((): null => null) as {
-        error?: { message?: string }
-      } | null
 
       if (!response.ok) {
-        throw new Error(data?.error?.message || '密码重置失败，请重新申请找回邮件。')
+        throw new Error(getApiErrorMessage(data, '密码重置失败，请重新申请找回邮件。'))
       }
 
       setRecoveryToken('')
