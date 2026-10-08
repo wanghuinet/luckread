@@ -65,6 +65,7 @@ export default function ContentBrowsePage() {
 
       const response = await fetch('/api/v1/contents?' + params.toString(), {
         headers: { accept: 'application/json' },
+        credentials: 'omit',
         cache: 'no-store',
         signal: controller.signal,
       })
