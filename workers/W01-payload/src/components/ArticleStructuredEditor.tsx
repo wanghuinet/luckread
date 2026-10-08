@@ -111,14 +111,18 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
       if (target instanceof HTMLElement && target.tagName === 'TEXTAREA') {
         const block = value.blocks.find((candidate) => textAreaRefs.current[candidate.id] === target)
         const key = event.key.toLowerCase()
-        if (key === 'enter' && event.ctrlKey || event.metaKey) {
-          if ((event.ctrlKey || event.metaKey) && !event.shiftKey && !event.altKey && block) {
-            const index = value.blocks.findIndex((candidate) => candidate.id === block.id)
-            if (index >= 0 && value.blocks.length < ARTICLE_MAX_BLOCKS) {
-              event.preventDefault()
-              insertParagraphAfter(index)
-              return
-            }
+        if (
+          key === 'enter' &&
+          (event.ctrlKey || event.metaKey) &&
+          !event.shiftKey &&
+          !event.altKey &&
+          block
+        ) {
+          const index = value.blocks.findIndex((candidate) => candidate.id === block.id)
+          if (index >= 0 && value.blocks.length < ARTICLE_MAX_BLOCKS) {
+            event.preventDefault()
+            insertParagraphAfter(index)
+            return
           }
         }
       }
