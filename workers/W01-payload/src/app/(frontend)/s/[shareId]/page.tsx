@@ -4,6 +4,8 @@ import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
+import { fetchJson, getApiErrorMessage } from '../../../lib/client-api.js'
+
 type ShareResponse = {
   data?: {
     shareId?: string
@@ -27,14 +29,13 @@ export default function ShareLandingPage({
         const { shareId } = await params
         if (!shareId?.trim()) throw new Error('分享链接无效')
 
-        const response = await fetch('/api/v1/shares/' + encodeURIComponent(shareId), {
+        const { response, data } = await fetchJson<ShareResponse>('/api/v1/shares/' + encodeURIComponent(shareId), {
           cache: 'no-store',
           headers: { accept: 'application/json' },
           signal: controller.signal,
         })
-        const data = await response.json().catch((): null => null) as ShareResponse | null
         if (!response.ok || typeof data?.data?.contentId !== 'string' || !data.data.contentId) {
-          throw new Error(data?.error?.message || '分享内容不存在或已下线。')
+          throw new Error(getApiErrorMessage(data, '分享内容不存在或已下线。'))
         }
 
         router.replace('/content/' + encodeURIComponent(data.data.contentId))
