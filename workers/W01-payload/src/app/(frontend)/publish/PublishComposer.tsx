@@ -699,6 +699,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
   return (
     <div className="lr-composer-card" aria-busy={busy}>
       <div className="lr-type-tabs" role="tablist" aria-label="内容类型">
+        {draft ? <p className="lr-type-lock-note">草稿创建后内容类型不可变更；需要更换类型请新建内容。</p> : null}
         {([
           ['article', '文章'],
           ['post', '动态'],
@@ -708,7 +709,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
             aria-selected={type === value}
             className={type === value ? 'active' : ''}
             key={value}
-            disabled={busy || reviewLocked}
+            disabled={busy || reviewLocked || Boolean(draft)}
             onClick={() => handleContentTypeChange(value)}
             role="tab"
             type="button"
