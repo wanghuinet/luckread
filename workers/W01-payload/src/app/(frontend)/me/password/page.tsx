@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { FormEvent, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { fetchJson, getApiErrorMessage } from '../../../../lib/client-api.js'
 
 const MIN_PASSWORD_LENGTH = 15
 const MAX_PASSWORD_LENGTH = 128
@@ -45,7 +46,7 @@ export default function PasswordChangePage() {
 
     setBusy(true)
     try {
-      const response = await fetch('/api/v1/auth/password/change', {
+      const responseData = await fetchJson<{ error?: { message?: string } }>('/api/v1/auth/password/change', {
         method: 'POST',
         credentials: 'include',
         cache: 'no-store',
@@ -56,6 +57,7 @@ export default function PasswordChangePage() {
         },
         body: JSON.stringify({ currentPassword, newPassword }),
       })
+      const { response, data } = responseData
 
       if (response.status === 401) {
         const returnTo = window.location.pathname + window.location.search + window.location.hash
@@ -68,7 +70,7 @@ export default function PasswordChangePage() {
       } | null
 
       if (!response.ok) {
-        throw new Error(data?.error?.message || '密码修改失败，请稍后重试。')
+        throw new Error(getApiErrorMessage(data, '密码修改失败，请稍后重试。'))
       }
 
       setCurrentPassword('')
