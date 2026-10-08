@@ -44,7 +44,9 @@ describe('TikTok-style short video feed', () => {
     expect(feed).toContain('const [muted, setMuted] = useState(true)')
     expect(feed).toContain('playsInline')
     expect(feed).toContain("aria-label={muted ? '打开声音' : '关闭声音'}")
-    expect(feed).toContain('onDoubleClick={() => void toggleLike(item)}')
+    expect(feed).toContain('onDoubleClick={() => {')
+    expect(feed).toContain('showDoubleTapHeart()')
+    expect(feed).toContain('toggleLike(item)')
     expect(feed).toContain('onClick={() => togglePlay(item)}')
   })
 
