@@ -3,6 +3,7 @@ import { articleWordImportPlugin } from './article-editor-word-import-plugin.js'
 import { copyPlainTextPlugin, writerStatsPlugin } from './WriterToolsPlugin.js'
 import { articleOutlinePlugin } from './ArticleOutlinePlugin.js'
 import { findReplacePlugin } from './FindReplacePlugin.js'
+import { markdownEditorPlugin } from './MarkdownEditorPlugin.js'
 
 /**
  * Publish-time editor extensions are registered here.
@@ -16,4 +17,5 @@ export const articleEditorPlugins: readonly ArticleEditorPlugin[] = [
   writerStatsPlugin,
   articleOutlinePlugin,
   findReplacePlugin,
+  markdownEditorPlugin,
 ]
