@@ -229,6 +229,23 @@ export default function ShortVideoFeed() {
   }, [loadPage, loadingMore, page.hasMore, page.nextCursor, setActive, visibleItems])
 
   useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        Object.values(videoRefs.current).forEach((video) => video?.pause())
+        return
+      }
+
+      if (commentsOpen) return
+      const activeVideo = visibleItems[activeIndexRef.current]?.id
+      const video = activeVideo ? videoRefs.current[activeVideo] : null
+      if (video) void video.play().catch(() => {})
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+  }, [commentsOpen, visibleItems])
+
+  useEffect(() => {
     if (!visibleItems.length) return
 
     Object.entries(videoRefs.current).forEach(([id, video]) => {
