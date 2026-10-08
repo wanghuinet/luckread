@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
+import { fetchJson, getApiErrorMessage } from '../../../lib/client-api.js'
+
 import styles from './creator-center.module.css'
 
 type Kind = 'series' | 'collections'
@@ -120,7 +122,7 @@ export default function CreatorContentOrganizationMembers({
   const loadMembers = useCallback(async (signal: AbortSignal, cursor: string | null = null) => {
     const params = new URLSearchParams({ limit: '50' })
     if (cursor) params.set('cursor', cursor)
-    const response = await fetch(
+    const { response, data } = await fetchJson<{ data?: MemberPage; error?: { message?: string } }>(
       organizationMeta.path + '/' + encodeURIComponent(organization.id) + '/members?' + params.toString(),
       {
         credentials: 'include',
@@ -129,13 +131,12 @@ export default function CreatorContentOrganizationMembers({
         signal,
       },
     )
-    const data = await response.json().catch((): null => null) as { data?: MemberPage } | null
     if (response.status === 401) {
       redirectToLogin(loginPath)
       throw new Error('AUTH_REQUIRED')
     }
     if (!response.ok || !data?.data || !Array.isArray(data.data.items)) {
-      throw new Error(data?.data ? 'ORGANIZATION_MEMBERS_LOAD_FAILED' : '组织成员暂时无法加载。')
+      throw new Error(getApiErrorMessage(data, data?.data ? 'ORGANIZATION_MEMBERS_LOAD_FAILED' : '组织成员暂时无法加载。'))
     }
     const page = data.data
     const nextEtag = page[organizationMeta.etagKey] ?? organization.etag
@@ -148,19 +149,18 @@ export default function CreatorContentOrganizationMembers({
   const loadCandidates = useCallback(async (signal: AbortSignal, cursor: string | null = null) => {
     const params = new URLSearchParams({ limit: '50', status: 'PUBLISHED' })
     if (cursor) params.set('cursor', cursor)
-    const response = await fetch('/api/creator/contents?' + params.toString(), {
+    const { response, data } = await fetchJson<{ data?: ContentCandidatePage; error?: { message?: string } }>('/api/creator/contents?' + params.toString(), {
       credentials: 'include',
       headers: { accept: 'application/json' },
       cache: 'no-store',
       signal,
     })
-    const data = await response.json().catch((): null => null) as { data?: ContentCandidatePage } | null
     if (response.status === 401) {
       redirectToLogin(loginPath)
       throw new Error('AUTH_REQUIRED')
     }
     if (!response.ok || !data?.data || !Array.isArray(data.data.items)) {
-      throw new Error('CONTENT_CANDIDATES_LOAD_FAILED')
+      throw new Error(getApiErrorMessage(data, 'CONTENT_CANDIDATES_LOAD_FAILED'))
     }
     return data.data
   }, [loginPath])
@@ -317,7 +317,10 @@ export default function CreatorContentOrganizationMembers({
     setBusyKey('add')
     setError('')
     try {
-      const response = await fetch(
+      const { response, data } = await fetchJson<{
+        error?: { message?: string }
+        data?: { [key: string]: unknown }
+      }>(
         organizationMeta.path + '/' + encodeURIComponent(organization.id) + '/members',
         {
           method: 'POST',
@@ -326,15 +329,11 @@ export default function CreatorContentOrganizationMembers({
           body: JSON.stringify({ contentId: selectedContentId }),
         },
       )
-      const data = await response.json().catch((): null => null) as {
-        error?: { message?: string }
-        data?: { [key: string]: unknown }
-      } | null
       if (response.status === 401) {
         redirectToLogin(loginPath)
         return
       }
-      if (!response.ok) throw new Error(data?.error?.message || '加入失败')
+      if (!response.ok) throw new Error(getApiErrorMessage(data, '加入失败'))
       const nextEtag = typeof data.data?.[organizationMeta.etagKey] === 'string'
         ? String(data.data[organizationMeta.etagKey])
         : currentEtag
@@ -358,7 +357,10 @@ export default function CreatorContentOrganizationMembers({
     setBusyKey('remove:' + member.contentId)
     setError('')
     try {
-      const response = await fetch(
+      const { response, data } = await fetchJson<{
+        error?: { message?: string }
+        data?: { [key: string]: unknown }
+      }>(
         organizationMeta.path + '/' + encodeURIComponent(organization.id) + '/members/' + encodeURIComponent(member.contentId),
         {
           method: 'DELETE',
@@ -366,15 +368,11 @@ export default function CreatorContentOrganizationMembers({
           headers: mutationHeaders(currentEtag, 'content-organization-member-remove:'),
         },
       )
-      const data = await response.json().catch((): null => null) as {
-        error?: { message?: string }
-        data?: { [key: string]: unknown }
-      } | null
       if (response.status === 401) {
         redirectToLogin(loginPath)
         return
       }
-      if (!response.ok) throw new Error(data?.error?.message || '移除失败')
+      if (!response.ok) throw new Error(getApiErrorMessage(data, '移除失败'))
       const nextEtag = typeof data.data?.[organizationMeta.etagKey] === 'string'
         ? String(data.data[organizationMeta.etagKey])
         : currentEtag
@@ -396,7 +394,10 @@ export default function CreatorContentOrganizationMembers({
     setBusyKey('move:' + member.contentId)
     setError('')
     try {
-      const response = await fetch(
+      const { response, data } = await fetchJson<{
+        error?: { message?: string }
+        data?: { [key: string]: unknown }
+      }>(
         organizationMeta.path + '/' + encodeURIComponent(organization.id) + '/members/' + encodeURIComponent(member.contentId),
         {
           method: 'PATCH',
@@ -405,15 +406,11 @@ export default function CreatorContentOrganizationMembers({
           body: JSON.stringify({ position }),
         },
       )
-      const data = await response.json().catch((): null => null) as {
-        error?: { message?: string }
-        data?: { [key: string]: unknown }
-      } | null
       if (response.status === 401) {
         redirectToLogin(loginPath)
         return
       }
-      if (!response.ok) throw new Error(data?.error?.message || '排序更新失败')
+      if (!response.ok) throw new Error(getApiErrorMessage(data, '排序更新失败'))
       const nextEtag = typeof data.data?.[organizationMeta.etagKey] === 'string'
         ? String(data.data[organizationMeta.etagKey])
         : currentEtag
