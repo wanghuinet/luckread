@@ -3,6 +3,8 @@
 import Link from 'next/link'
 import { FormEvent, useState } from 'react'
 
+import { fetchJson, getApiErrorMessage } from '../../../lib/client-api.js'
+
 type RegisterFormProps = {
   policyVersion: string
 }
@@ -58,7 +60,7 @@ export default function RegisterForm({ policyVersion }: RegisterFormProps) {
     setStatus('submitting')
 
     try {
-      const response = await fetch('/api/v1/auth/register', {
+      const { response, data: payload } = await fetchJson<RegistrationResponse | ApiError>('/api/v1/auth/register', {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
@@ -76,15 +78,8 @@ export default function RegisterForm({ policyVersion }: RegisterFormProps) {
         }),
       })
 
-      const payload = (await response.json().catch((): null => null)) as
-        | RegistrationResponse
-        | ApiError
-        | null
-
       if (!response.ok) {
-        const apiMessage: string | undefined =
-          payload && 'error' in payload ? payload.error?.message : undefined
-        throw new Error(apiMessage || '注册暂时无法完成，请稍后重试。')
+        throw new Error(getApiErrorMessage(payload, '注册暂时无法完成，请稍后重试。'))
       }
 
       if (
