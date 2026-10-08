@@ -728,6 +728,8 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
                 rows={block.type === 'heading' ? 2 : block.type === 'quote' ? 4 : 5}
                 value={block.text}
                 onKeyDown={(event) => {
+                  if (disabled) return
+
                   if (
                     event.key === 'Backspace' &&
                     event.currentTarget.selectionStart === 0 &&
