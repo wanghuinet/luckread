@@ -663,7 +663,7 @@
 
   .actionRail {
     right: 7px;
-    bottom: 76px;
+    bottom: calc(76px + env(safe-area-inset-bottom));
     gap: 9px;
   }
 
