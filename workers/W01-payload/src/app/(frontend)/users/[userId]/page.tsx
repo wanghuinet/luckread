@@ -4,6 +4,8 @@ import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
+import { fetchJson, getApiErrorMessage } from '../../../../lib/client-api.js'
+
 type PublicProfile = {
   id: string
   username: string
@@ -89,35 +91,46 @@ export default function PublicProfilePage({
       try {
         const { userId } = await params
         const [profileResponse, followersResponse, followingResponse, followResponse, contentResponse, viewerResponse] = await Promise.all([
-          fetch('/api/v1/users/' + encodeURIComponent(userId), {
+          fetchJson<PublicProfile | { error?: { message?: string } }>('/api/v1/users/' + encodeURIComponent(userId), {
             headers: { accept: 'application/json' },
             cache: 'no-store',
             signal: controller.signal,
           }),
-          fetch('/api/v1/users/' + encodeURIComponent(userId) + '/followers?limit=1', {
+          fetchJson<CountResponse>('/api/v1/users/' + encodeURIComponent(userId) + '/followers?limit=1', {
             headers: { accept: 'application/json' },
             cache: 'no-store',
             signal: controller.signal,
           }),
-          fetch('/api/v1/users/' + encodeURIComponent(userId) + '/following?limit=1', {
+          fetchJson<CountResponse>('/api/v1/users/' + encodeURIComponent(userId) + '/following?limit=1', {
             credentials: 'include',
             headers: { accept: 'application/json' },
             cache: 'no-store',
             signal: controller.signal,
           }),
-          fetch('/api/v1/social/follows/' + encodeURIComponent(userId), {
+          fetchJson<{
+            data?: {
+              following?: boolean
+              relationship?: {
+                mutualFollow?: boolean
+                blocked?: boolean
+                blockedBy?: boolean
+                muted?: boolean
+              }
+            }
+            error?: { message?: string }
+          }>('/api/v1/social/follows/' + encodeURIComponent(userId), {
             credentials: 'include',
             headers: { accept: 'application/json' },
             cache: 'no-store',
             signal: controller.signal,
           }),
-          fetch('/api/v1/contents?creatorId=' + encodeURIComponent(userId) + '&limit=6&type=post', {
+          fetchJson<ContentListResponse>('/api/v1/contents?creatorId=' + encodeURIComponent(userId) + '&limit=6&type=post', {
             headers: { accept: 'application/json' },
             credentials: 'omit',
             cache: 'no-store',
             signal: controller.signal,
           }),
-          fetch('/api/v1/users/me', {
+          fetchJson<{ id?: string }>('/api/v1/users/me', {
             credentials: 'include',
             headers: { accept: 'application/json' },
             cache: 'no-store',
@@ -125,30 +138,26 @@ export default function PublicProfilePage({
           }),
         ])
 
-        const data = await profileResponse.json().catch((): null => null) as PublicProfile | { error?: { message?: string } } | null
-        if (profileResponse.status === 404) throw new Error('USER_NOT_FOUND')
-        if (!profileResponse.ok || !data || !('id' in data)) {
-          throw new Error(data && 'error' in data ? data.error?.message || '资料加载失败' : '资料加载失败')
+        const profileResult = profileResponse
+        const followerResult = followersResponse
+        const followingResult = followingResponse
+        const followResult = followResponse
+        const contentResult = contentResponse
+        const viewerResult = viewerResponse
+        const data = profileResult.data
+        if (profileResult.response.status === 404) throw new Error('USER_NOT_FOUND')
+        if (!profileResult.response.ok || !data || !('id' in data)) {
+          throw new Error(getApiErrorMessage(data, '资料加载失败'))
         }
 
         if (cancelled) return
         setProfile(data)
 
-        const followerData = await followersResponse.json().catch((): null => null) as CountResponse | null
-        const followingData = await followingResponse.json().catch((): null => null) as CountResponse | null
-        const followData = await followResponse.json().catch((): null => null) as {
-          data?: {
-            following?: boolean
-            relationship?: {
-              mutualFollow?: boolean
-              blocked?: boolean
-              blockedBy?: boolean
-              muted?: boolean
-            }
-          }
-        } | null
-        const contentData = await contentResponse.json().catch((): null => null) as ContentListResponse | null
-        const viewerData = await viewerResponse.json().catch((): null => null) as { id?: string } | null
+        const followerData = followerResult.data
+        const followingData = followingResult.data
+        const followData = followResult.data
+        const contentData = contentResult.data
+        const viewerData = viewerResult.data
 
         if (!cancelled) {
           setFollowers(typeof followerData?.data?.totalCount === 'number' ? followerData.data.totalCount : 0)
@@ -163,7 +172,7 @@ export default function PublicProfilePage({
           setContents(items)
           setContentCursor(typeof contentData?.data?.nextCursor === 'string' ? contentData.data.nextCursor : null)
           setContentHasMore(contentData?.data?.hasMore === true)
-          setContentError(contentResponse.ok ? '' : '暂时无法加载作者作品。')
+          setContentError(contentResult.response.ok ? '' : '暂时无法加载作者作品。')
         }
       } catch (cause) {
         if (cancelled || controller.signal.aborted) return
@@ -202,13 +211,12 @@ export default function PublicProfilePage({
         'limit=6',
         'type=' + encodeURIComponent(nextFilter),
       ].join('&')
-      const response = await fetch('/api/v1/contents?' + query, {
+      const { response, data } = await fetchJson<ContentListResponse | { error?: { message?: string } }>('/api/v1/contents?' + query, {
         headers: { accept: 'application/json' },
         credentials: 'omit',
         cache: 'no-store',
         signal: controller.signal,
       })
-      const data = await response.json().catch((): null => null) as ContentListResponse | null
       if (!response.ok || !Array.isArray(data?.data?.items)) {
         throw new Error('CONTENT_LIST_FAILED')
       }
@@ -241,13 +249,12 @@ export default function PublicProfilePage({
       })
       params.set('type', filter)
 
-      const response = await fetch('/api/v1/contents?' + params.toString(), {
+      const { response, data } = await fetchJson<ContentListResponse | { error?: { message?: string } }>('/api/v1/contents?' + params.toString(), {
         headers: { accept: 'application/json' },
         credentials: 'omit',
         cache: 'no-store',
         signal: controller.signal,
       })
-      const data = await response.json().catch((): null => null) as ContentListResponse | null
       if (!response.ok || !Array.isArray(data?.data?.items)) {
         throw new Error('CONTENT_LIST_FAILED')
       }
@@ -270,7 +277,7 @@ export default function PublicProfilePage({
     setError('')
 
     try {
-      const response = await fetch('/api/v1/social/follows/' + encodeURIComponent(profile.id), {
+      const { response, data } = await fetchJson<{ data?: { following?: boolean }; error?: { message?: string } }>('/api/v1/social/follows/' + encodeURIComponent(profile.id), {
         method: isFollowing ? 'DELETE' : 'POST',
         credentials: 'include',
         headers: {
@@ -286,8 +293,7 @@ export default function PublicProfilePage({
       }
 
       if (!response.ok) {
-        const data = await response.json().catch((): null => null) as { error?: { message?: string } } | null
-        throw new Error(data?.error?.message || 'FOLLOW_FAILED')
+        throw new Error(getApiErrorMessage(data, 'FOLLOW_FAILED'))
       }
 
       if (isFollowing) {
@@ -296,7 +302,6 @@ export default function PublicProfilePage({
         return
       }
 
-      const data = await response.json().catch((): null => null) as { data?: { following?: boolean } } | null
       if (typeof data?.data?.following !== 'boolean') throw new Error('FOLLOW_FAILED')
       setIsFollowing(data.data.following)
       if (data.data.following) {
@@ -318,7 +323,7 @@ export default function PublicProfilePage({
     setReportBusy(true)
     setSafetyMessage('')
     try {
-      const response = await fetch('/api/v1/reports', {
+      const { response, data } = await fetchJson<{ data?: { status?: string }; error?: { message?: string } }>('/api/v1/reports', {
         method: 'POST',
         credentials: 'include',
         headers: {
@@ -333,8 +338,7 @@ export default function PublicProfilePage({
         router.replace('/login?returnTo=' + encodeURIComponent(returnTo))
         return
       }
-      const data = await response.json().catch((): null => null) as { data?: { status?: string } } | null
-      if (!response.ok || !data?.data) throw new Error('REPORT_FAILED')
+      if (!response.ok || !data?.data) throw new Error(getApiErrorMessage(data, 'REPORT_FAILED'))
       setSafetyMessage(data.data.status === 'DEDUPLICATED' ? '举报已记录：你此前已举报过该用户。' : '举报已提交。')
     } catch (cause) {
       if (cause instanceof DOMException && cause.name === 'AbortError') return
@@ -356,19 +360,16 @@ export default function PublicProfilePage({
 
     try {
       const relationPath = action === 'block' ? 'blocks' : 'mutes'
-      const response = await fetch(
-        '/api/v1/interactions/' + relationPath + (active ? '/' + encodeURIComponent(profile.id) : ''),
-        {
-          method: active ? 'DELETE' : 'POST',
-          credentials: 'include',
-          headers: {
-            accept: 'application/json',
-            'Idempotency-Key': 'social-' + action + ':' + (active ? 'remove:' : 'set:') + crypto.randomUUID(),
-            ...(active ? {} : { 'content-type': 'application/json' }),
-          },
-          ...(active ? {} : { body: JSON.stringify({ targetUserId: profile.id }) }),
+      const { response } = await fetchJson('/api/v1/interactions/' + relationPath + (active ? '/' + encodeURIComponent(profile.id) : ''), {
+        method: active ? 'DELETE' : 'POST',
+        credentials: 'include',
+        headers: {
+          accept: 'application/json',
+          'Idempotency-Key': 'social-' + action + ':' + (active ? 'remove:' : 'set:') + crypto.randomUUID(),
+          ...(active ? {} : { 'content-type': 'application/json' }),
         },
-      )
+        ...(active ? {} : { body: JSON.stringify({ targetUserId: profile.id }) }),
+      })
 
       if (response.status === 401) {
         const returnTo = window.location.pathname + window.location.search + window.location.hash
