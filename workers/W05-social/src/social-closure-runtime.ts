@@ -353,51 +353,6 @@ export async function enqueueNotification(
   }
 }
 
-export async function drainNotificationOutbox(db: D1Database, limitValue = 50): Promise<number> {
-  const limit = Math.max(1, Math.min(limitValue, 100))
-  const rows = await db.prepare(
-    `SELECT event_id, recipient_user_id, actor_user_id, notification_type, target_type, target_id, dedupe_key, payload_json
-       FROM social_notification_outbox
-      WHERE dispatched_at IS NULL
-      ORDER BY created_at ASC, event_id ASC
-      LIMIT ?`,
-  ).bind(limit).all<{
-    event_id: string
-    recipient_user_id: string
-    actor_user_id: string
-    notification_type: SocialNotificationType
-    target_type: 'user' | 'content' | 'comment'
-    target_id: string
-    dedupe_key: string
-    payload_json: string
-  }>()
-
-  let dispatched = 0
-  for (const row of rows.results ?? []) {
-    const result = await db.prepare(
-      `INSERT OR IGNORE INTO social_notifications
-        (notification_id, recipient_user_id, actor_user_id, notification_type, target_type, target_id, dedupe_key, payload_json, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
-    ).bind(
-      crypto.randomUUID(),
-      row.recipient_user_id,
-      row.actor_user_id,
-      row.notification_type,
-      row.target_type,
-      row.target_id,
-      row.dedupe_key,
-      row.payload_json,
-    ).run()
-    if (result.success) {
-      await db.prepare(
-        'UPDATE social_notification_outbox SET dispatched_at = CURRENT_TIMESTAMP WHERE event_id = ? AND dispatched_at IS NULL',
-      ).bind(row.event_id).run()
-      dispatched += 1
-    }
-  }
-  return dispatched
-}
-
 export async function listNotifications(
   db: D1Database,
   recipientUserIdValue: string,
