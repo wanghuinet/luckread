@@ -3,6 +3,8 @@
 import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
 
+import { fetchJson } from '../../../lib/client-api.js'
+
 import styles from './creator-center.module.css'
 
 type CountValue = number | null
@@ -46,13 +48,12 @@ function redirectToLogin(loginPath: '/admin/login' | '/login') {
 }
 
 async function fetchCount(path: string, signal: AbortSignal, loginPath: '/admin/login' | '/login'): Promise<number> {
-  const response = await fetch(path, {
+  const { response, data } = await fetchJson<{ data?: { totalCount?: number } }>(path, {
     headers: { accept: 'application/json' },
     credentials: 'include',
     cache: 'no-store',
     signal,
   })
-  const data = await response.json().catch((): null => null) as { data?: { totalCount?: number } } | null
   if (response.status === 401) {
     redirectToLogin(loginPath)
     throw new Error('AUTH_REQUIRED')
@@ -73,7 +74,7 @@ async function fetchList(
   const params = new URLSearchParams({ limit: String(PAGE_SIZE) })
   if (cursor) params.set('cursor', cursor)
 
-  const response = await fetch(
+  const { response, data } = await fetchJson<FollowListResponse>(
     '/api/v1/users/' + encodeURIComponent(userId) + '/' + direction + '?' + params.toString(),
     {
       headers: { accept: 'application/json' },
@@ -82,7 +83,6 @@ async function fetchList(
       signal,
     },
   )
-  const data = await response.json().catch((): null => null) as FollowListResponse | null
   if (response.status === 401) {
     redirectToLogin(loginPath)
     throw new Error('AUTH_REQUIRED')
