@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import type { ImportedDocument } from './model.js'
+import type { ImportedDocument, TextMark } from './model.js'
 import { articleDocumentFromImportedDocument } from './article-document-adapter.js'
 
 const baseStats = (): ImportedDocument['stats'] => ({
@@ -18,13 +18,13 @@ describe('Word article document adapter', () => {
   it('maps headings, lists, paragraphs and uploaded images into ArticleDocument blocks', () => {
     const document: ImportedDocument = {
       blocks: [
-        { kind: 'heading', level: 2, inlines: [{ kind: 'text', text: 'Word 标题', marks: [] }] },
-        { kind: 'paragraph', inlines: [{ kind: 'text', text: '正文', marks: [] }] },
+        { kind: 'heading', level: 2, inlines: [{ kind: 'text', text: 'Word 标题', marks: [] as TextMark[] }] },
+        { kind: 'paragraph', inlines: [{ kind: 'text', text: '正文', marks: [] as TextMark[] }] },
         {
           kind: 'list',
           items: [
-            { kind: 'listItem', ordered: false, level: 0, inlines: [{ kind: 'text', text: '第一项', marks: [] }] },
-            { kind: 'listItem', ordered: false, level: 0, inlines: [{ kind: 'text', text: '第二项', marks: [] }] },
+            { kind: 'listItem', ordered: false, level: 0, inlines: [{ kind: 'text', text: '第一项', marks: [] as TextMark[] }] },
+            { kind: 'listItem', ordered: false, level: 0, inlines: [{ kind: 'text', text: '第二项', marks: [] as TextMark[] }] },
           ],
         },
         {
@@ -64,7 +64,7 @@ describe('Word article document adapter', () => {
           blocks: [{
             kind: 'paragraph',
             inlines: [
-              { kind: 'text', text: '单元格', marks: [] },
+              { kind: 'text', text: '单元格', marks: [] as TextMark[] },
               {
                 kind: 'inlineImage',
                 image: {
@@ -91,6 +91,36 @@ describe('Word article document adapter', () => {
     expect(result.document.blocks[1]?.mediaRefs).toEqual(['https://cdn.example/table.png'])
   })
 
+  it('rejects imports that exceed the article block limit instead of silently truncating them', () => {
+    const document: ImportedDocument = {
+      blocks: Array.from({ length: 201 }, (_, index) => ({
+        kind: 'paragraph' as const,
+        inlines: [{ kind: 'text' as const, text: '段落 ' + String(index + 1), marks: [] as TextMark[] }],
+      })),
+      warnings: [],
+      stats: baseStats(),
+    }
+
+    expect(() => articleDocumentFromImportedDocument(document, new Map())).toThrow(
+      'Word 导入结果超过文章最多 200 个区块的限制',
+    )
+  })
+
+  it('rejects imports that exceed the persisted article size limit', () => {
+    const document: ImportedDocument = {
+      blocks: Array.from({ length: 20 }, () => ({
+        kind: 'paragraph' as const,
+        inlines: [{ kind: 'text' as const, text: 'x'.repeat(18_000), marks: [] as TextMark[] }],
+      })),
+      warnings: [],
+      stats: baseStats(),
+    }
+
+    expect(() => articleDocumentFromImportedDocument(document, new Map())).toThrow(
+      'Word 导入结果超过文章保存大小限制',
+    )
+  })
+
   it('maps tables to readable paragraphs and reports the controlled degradation', () => {
     const document: ImportedDocument = {
       blocks: [
@@ -98,8 +128,8 @@ describe('Word article document adapter', () => {
           kind: 'table',
           rows: [
             [
-              { blocks: [{ kind: 'paragraph', inlines: [{ kind: 'text', text: 'A', marks: [] }] }] },
-              { blocks: [{ kind: 'paragraph', inlines: [{ kind: 'text', text: 'B', marks: [] }] }] },
+              { blocks: [{ kind: 'paragraph', inlines: [{ kind: 'text', text: 'A', marks: [] as TextMark[] }] }] },
+              { blocks: [{ kind: 'paragraph', inlines: [{ kind: 'text', text: 'B', marks: [] as TextMark[] }] }] },
             ],
           ],
         },

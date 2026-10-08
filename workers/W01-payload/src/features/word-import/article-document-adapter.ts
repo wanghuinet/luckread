@@ -1,7 +1,9 @@
 import {
+  ARTICLE_MAX_BLOCKS,
   createArticleBlock,
   createArticleMediaBlock,
   createArticleDocument,
+  serializeArticleDocument,
   type ArticleDocument,
 } from '../../lib/article-document.js'
 import type {
@@ -169,11 +171,26 @@ export const articleDocumentFromImportedDocument = (
     return { document: createArticleDocument(), warnings }
   }
 
+  if (blocks.length > ARTICLE_MAX_BLOCKS) {
+    throw new Error('Word 导入结果超过文章最多 ' + String(ARTICLE_MAX_BLOCKS) + ' 个区块的限制，请拆分文档后再导入。')
+  }
+
+  const importedDocument: ArticleDocument = {
+    version: 2,
+    blocks,
+  }
+
+  try {
+    serializeArticleDocument(importedDocument)
+  } catch (error) {
+    if (error instanceof Error && error.message === 'ARTICLE_DOCUMENT_TOO_LARGE') {
+      throw new Error('Word 导入结果超过文章保存大小限制，请拆分文档后再导入。')
+    }
+    throw error
+  }
+
   return {
-    document: {
-      version: 2,
-      blocks: blocks.slice(0, 200),
-    },
+    document: importedDocument,
     warnings,
   }
 }
