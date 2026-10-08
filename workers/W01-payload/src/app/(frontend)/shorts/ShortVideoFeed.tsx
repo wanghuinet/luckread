@@ -94,6 +94,15 @@ export default function ShortVideoFeed() {
   const setActive = useCallback((index: number) => {
     activeIndexRef.current = index
     setActiveIndex(index)
+    setActiveProgress(0)
+  }, [])
+
+  const setItemRef = useCallback((id: string) => (element: HTMLElement | null) => {
+    itemRefs.current[id] = element
+  }, [])
+
+  const setVideoRef = useCallback((id: string) => (element: HTMLVideoElement | null) => {
+    videoRefs.current[id] = element
   }, [])
 
   const loadPage = useCallback(async (cursor: string | null = null) => {
@@ -194,7 +203,17 @@ export default function ShortVideoFeed() {
             }
           }
         }
-        if (bestIndex !== activeIndexRef.current) setActive(bestIndex)
+        if (bestIndex !== activeIndexRef.current) {
+          setActive(bestIndex)
+        }
+        if (
+          page.hasMore &&
+          page.nextCursor &&
+          !loadingMore &&
+          bestIndex >= Math.max(visibleItems.length - 3, 0)
+        ) {
+          void loadPage(page.nextCursor)
+        }
       },
       { threshold: [0.55, 0.75, 0.9] },
     )
@@ -205,7 +224,7 @@ export default function ShortVideoFeed() {
     })
 
     return () => observer.disconnect()
-  }, [visibleItems, setActive])
+  }, [loadPage, loadingMore, page.hasMore, page.nextCursor, setActive, visibleItems])
 
   useEffect(() => {
     if (!visibleItems.length) return
@@ -335,10 +354,6 @@ export default function ShortVideoFeed() {
       setActive(visibleItems.length - 1)
     }
   }, [setActive, visibleItems.length])
-
-  useEffect(() => {
-    setActiveProgress(0)
-  }, [activeIndex])
 
   useEffect(() => {
     if (!page.hasMore || !page.nextCursor || loadingMore) return
@@ -623,7 +638,7 @@ export default function ShortVideoFeed() {
               className={styles.slide}
               data-index={index}
               key={item.id}
-              ref={(element) => { itemRefs.current[item.id] = element }}
+              ref={setItemRef(item.id)}
             >
               <div
                 className={styles.videoStage}
@@ -641,7 +656,7 @@ export default function ShortVideoFeed() {
                   playsInline
                   poster={item.coverRef || undefined}
                   preload={Math.abs(index - activeIndex) <= 1 ? 'metadata' : 'none'}
-                  ref={(element) => { videoRefs.current[item.id] = element }}
+                  ref={setVideoRef(item.id)}
                   src={videoUrl}
                   onClick={() => togglePlay(item)}
                   onTimeUpdate={(event) => {
