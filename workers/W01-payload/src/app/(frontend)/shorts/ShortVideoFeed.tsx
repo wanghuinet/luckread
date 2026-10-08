@@ -621,7 +621,7 @@ export default function ShortVideoFeed() {
       <header className={styles.topbar}>
         <Link href="/" className={styles.brand}>LuckRead</Link>
         <div className={styles.feedTabs} aria-label="短视频频道">
-          <span className={styles.feedTabActive}>为你</span>
+          <span className={styles.feedTabActive}>短视频</span>
           <Link href="/content?type=video" className={styles.feedTab}>视频</Link>
         </div>
         <div className={styles.topbarActions}>
