@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { markdownToArticleDocument } from './markdown-to-article-document.js'
+import { articleDocumentToMarkdown } from './article-document-to-markdown.js'
 
 describe('Markdown to ArticleDocument', () => {
   it('imports the supported structural blocks', () => {
@@ -89,4 +90,19 @@ describe('Markdown to ArticleDocument', () => {
       markdownToArticleDocument('a'.repeat(20_001)),
     ).toThrow('MARKDOWN_BLOCK_TOO_LARGE')
   })
+  it('round-trips paragraph lines that look like Markdown structure', () => {
+    const source = {
+      version: 2 as const,
+      blocks: [
+        { id: 'p', type: 'paragraph' as const, text: '# 不是标题\n- 不是列表\n> 不是引用\n---\n___\n* * *' },
+      ],
+    }
+
+    const markdown = articleDocumentToMarkdown(source)
+    const result = markdownToArticleDocument(markdown)
+
+    expect(result.unsupported).toEqual([])
+    expect(result.document.blocks).toEqual(source.blocks)
+  })
+
 })

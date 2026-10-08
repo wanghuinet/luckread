@@ -4,7 +4,7 @@ const escapeLeadingMarkdown = (value: string): string =>
   value
     .split('\n')
     .map((line) => {
-      if (/^\s*(?:#{1,6}\s|>\s|[-+*]\s|\d+[.)]\s)/u.test(line)) {
+      if (/^\s*(?:#{1,6}\s|>\s|[-+*]\s|\d+[.)]\s|---+$|___+$|(?:\*\s*){3,})/u.test(line)) {
         return '\\' + line
       }
       return line
