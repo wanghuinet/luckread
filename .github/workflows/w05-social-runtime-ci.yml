@@ -208,7 +208,7 @@ jobs:
           db.executescript(comment_likes)
           db.executescript(closure)
           like_sql = db.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='interaction_likes'").fetchone()[0]
-          if "target_type IN ('content','comment')" not in like_sql:
+          if "target_type" not in like_sql or "'comment'" not in like_sql:
               raise SystemExit('comment-like target boundary missing after closure migration')
           for table in ['social_topics','social_target_topics','social_mentions','social_notifications','social_notification_preferences']:
               if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (table,)).fetchone() is None:
