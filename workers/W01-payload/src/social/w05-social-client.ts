@@ -7,6 +7,7 @@ import {
   resolveCookieContentPrincipal,
   type ContentPrincipal,
 } from '../content/w03-content-client.js'
+import { extractSocialTokens } from './social-token-parser.js'
 
 type W05SocialService = {
   fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response>
@@ -45,9 +46,11 @@ export async function resolveOptionalCookieSocialPrincipal(
 export type ResolvedSocialMention = { userId: string; handle: string }
 
 export async function resolveSocialMentionTargets(body: string): Promise<ResolvedSocialMention[]> {
-  const mentions = Array.from(body.normalize('NFKC').matchAll(/(^|[\\s([{"'“‘，。！？；：、])@([\\p{L}\\p{N}_]{1,64})/gu))
-    .map((match) => match[2].toLocaleLowerCase('en-US'))
-  const unique = Array.from(new Set(mentions)).slice(0, 20)
+  const unique = Array.from(new Set(
+    extractSocialTokens(body)
+      .filter((token) => token.kind === 'mention')
+      .map((token) => token.normalized),
+  )).slice(0, 20)
   if (!unique.length) return []
 
   const payload = await getPayload({ config })
