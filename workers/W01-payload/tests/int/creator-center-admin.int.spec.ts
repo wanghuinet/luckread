@@ -256,6 +256,18 @@ describe('Creator Center admin extension', () => {
     expect(editor).toContain('onPaste={(event) => {')
   })
 
+  it('exposes keyboard merge at the start of compatible article blocks', () => {
+    const editor = read('src/components/ArticleStructuredEditor.tsx')
+
+    expect(editor).toContain("event.key === 'Backspace'")
+    expect(editor).toContain('event.currentTarget.selectionStart === 0')
+    expect(editor).toContain('event.currentTarget.selectionEnd === 0')
+    expect(editor).toContain("['paragraph', 'quote', 'bulletList', 'orderedList'].includes(block.type)")
+    expect(editor).toContain('previous.type === block.type')
+    expect(editor).toContain('mergeBlockWithPrevious(index)')
+    expect(editor).toContain('event.preventDefault()')
+  })
+
   it('exposes keyboard article block movement with cursor preservation', () => {
     const editor = read('src/components/ArticleStructuredEditor.tsx')
 
