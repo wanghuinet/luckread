@@ -106,7 +106,7 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (!(event.ctrlKey || event.metaKey) || !editorRef.current?.contains(document.activeElement)) return
+      if (!(event.ctrlKey || event.metaKey) || !editorRef.current?.contains(document.activeElement) || disabled) return
       const target = event.target
       if (target instanceof HTMLElement && target.tagName === 'TEXTAREA') {
         const block = value.blocks.find((candidate) => textAreaRefs.current[candidate.id] === target)
@@ -149,7 +149,7 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
 
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [onChange, value])
+  }, [disabled, onChange, value])
 
   const imageAssets = useMemo(() => {
     const seenUrls = new Set<string>()
