@@ -26,4 +26,16 @@ describe('structured Word import boundary', () => {
     expect(index).toContain("export { normalizeImportedDocument } from './normalizer.js'")
     expect(index).not.toContain('WordImportFeature')
   })
+  it('scopes Word media idempotency to one import and cleans up partial uploads on failure', () => {
+    const importer = read('src/components/ArticleWordImportButton.tsx')
+
+    expect(importer).toContain('const importScope = crypto.randomUUID()')
+    expect(importer).toContain("'word-structured-import:' + importScope + ':' + hash")
+    expect(importer).toContain('uploadedMediaIds.push(uploaded.id)')
+    expect(importer).toContain('async function cleanupUploadedMedia(')
+    expect(importer).toContain("method: 'DELETE'")
+    expect(importer).toContain('Promise.allSettled(')
+    expect(importer).toContain('await cleanupUploadedMedia(uploadedMediaIds, importScope)')
+  })
+
 })
