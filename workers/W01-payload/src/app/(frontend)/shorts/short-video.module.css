@@ -130,6 +130,7 @@
 
 .feed {
   height: 100%;
+  touch-action: pan-y;
   overflow-y: auto;
   scroll-snap-type: y mandatory;
   overscroll-behavior-y: contain;
@@ -151,6 +152,7 @@
 
 .videoStage {
   position: relative;
+  touch-action: pan-y;
   width: min(100%, 720px);
   height: 100%;
   margin: 0 auto;
@@ -164,6 +166,9 @@
   display: block;
   object-fit: cover;
   cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
   background: #090909;
 }
 
