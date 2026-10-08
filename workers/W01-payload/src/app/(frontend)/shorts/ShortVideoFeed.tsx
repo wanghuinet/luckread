@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 
+import { fetchJson, getApiErrorMessage } from '../../../lib/client-api.js'
 import ContentComments from '../content/[contentId]/ContentComments'
 import { usePublicLocale } from '../i18n/PublicLanguageToggle'
 
@@ -131,15 +132,14 @@ export default function ShortVideoFeed() {
       })
       if (cursor) params.set('cursor', cursor)
 
-      const response = await fetch('/api/v1/contents?' + params.toString(), {
+      const { response, data } = await fetchJson<ApiResponse<ContentPage>>('/api/v1/contents?' + params.toString(), {
         credentials: 'omit',
         headers: { accept: 'application/json' },
         cache: 'no-store',
         signal: controller.signal,
       })
-      const data = await response.json().catch((): null => null) as ApiResponse<ContentPage> | null
       if (!response.ok || !data?.data) {
-        throw new Error(data?.error?.message || (locale === 'en' ? 'Could not load videos.' : '短视频加载失败。'))
+        throw new Error(getApiErrorMessage(data, locale === 'en' ? 'Could not load videos.' : '短视频加载失败。'))
       }
 
       const next = data.data
@@ -178,13 +178,12 @@ export default function ShortVideoFeed() {
 
     void (async () => {
       try {
-        const response = await fetch('/api/v1/users/me', {
+        const { data } = await fetchJson<{ id?: string }>('/api/v1/users/me', {
           credentials: 'include',
           headers: { accept: 'application/json' },
           cache: 'no-store',
           signal: controller.signal,
         })
-        const data = await response.json().catch((): null => null) as { id?: string } | null
         if (!cancelled && typeof data?.id === 'string') setViewerUserId(data.id)
       } catch {
         // Anonymous viewing is supported.
@@ -426,7 +425,7 @@ export default function ShortVideoFeed() {
     updateBusy(item.id, 'like')
     setMessage('')
     try {
-      const response = await fetch('/api/v1/interactions/likes', {
+      const { response, data } = await fetchJson<ApiResponse<unknown>>('/api/v1/interactions/likes', {
         method: current.liked ? 'DELETE' : 'POST',
         credentials: 'include',
         headers: {
@@ -438,8 +437,7 @@ export default function ShortVideoFeed() {
       })
       if (response.status === 401) return requireAuth()
       if (!response.ok && response.status !== 204) {
-        const data = await response.json().catch((): null => null) as ApiResponse<unknown> | null
-        throw new Error(data?.error?.message || '点赞操作失败。')
+        throw new Error(getApiErrorMessage(data, '点赞操作失败。'))
       }
 
       const next = { ...current, liked: !current.liked, likeCount: current.likeCount === null ? null : Math.max(0, current.likeCount + (current.liked ? -1 : 1)) }
@@ -458,7 +456,7 @@ export default function ShortVideoFeed() {
     updateBusy(item.id, 'bookmark')
     setMessage('')
     try {
-      const response = await fetch('/api/v1/interactions/bookmarks', {
+      const { response, data } = await fetchJson<ApiResponse<unknown>>('/api/v1/interactions/bookmarks', {
         method: current.bookmarked ? 'DELETE' : 'POST',
         credentials: 'include',
         headers: {
@@ -470,8 +468,7 @@ export default function ShortVideoFeed() {
       })
       if (response.status === 401) return requireAuth()
       if (!response.ok && response.status !== 204) {
-        const data = await response.json().catch((): null => null) as ApiResponse<unknown> | null
-        throw new Error(data?.error?.message || '收藏操作失败。')
+        throw new Error(getApiErrorMessage(data, '收藏操作失败。'))
       }
 
       const next = { ...current, bookmarked: !current.bookmarked }
@@ -493,7 +490,7 @@ export default function ShortVideoFeed() {
     updateBusy(item.id, 'follow')
     setMessage('')
     try {
-      const response = await fetch('/api/v1/social/follows/' + encodeURIComponent(item.creatorId), {
+      const { response, data } = await fetchJson<ApiResponse<unknown>>('/api/v1/social/follows/' + encodeURIComponent(item.creatorId), {
         method: current.following ? 'DELETE' : 'POST',
         credentials: 'include',
         headers: {
@@ -503,8 +500,7 @@ export default function ShortVideoFeed() {
       })
       if (response.status === 401) return requireAuth()
       if (!response.ok && response.status !== 204) {
-        const data = await response.json().catch((): null => null) as ApiResponse<unknown> | null
-        throw new Error(data?.error?.message || '关注操作失败。')
+        throw new Error(getApiErrorMessage(data, '关注操作失败。'))
       }
 
       const following = !current.following
@@ -523,7 +519,7 @@ export default function ShortVideoFeed() {
     updateBusy(item.id, 'share')
     setMessage('')
     try {
-      const response = await fetch('/api/v1/content/' + encodeURIComponent(item.id) + '/shares', {
+      const { response, data } = await fetchJson<ApiResponse<{ shareId?: string }>>('/api/v1/content/' + encodeURIComponent(item.id) + '/shares', {
         method: 'POST',
         credentials: 'include',
         headers: {
@@ -534,7 +530,6 @@ export default function ShortVideoFeed() {
         body: JSON.stringify({ contentId: item.id }),
       })
       if (response.status === 401) return requireAuth()
-      const data = await response.json().catch((): null => null) as ApiResponse<{ shareId?: string }> | null
       const shareId = data?.data?.shareId
       if (!response.ok || !shareId) throw new Error('分享链接生成失败。')
       const shareUrl = window.location.origin + '/s/' + encodeURIComponent(shareId)
@@ -568,7 +563,7 @@ export default function ShortVideoFeed() {
     updateBusy(item.id, 'report')
     setMessage('')
     try {
-      const response = await fetch('/api/v1/reports', {
+      const { response, data } = await fetchJson<ApiResponse<{ status?: string }>>('/api/v1/reports', {
         method: 'POST',
         credentials: 'include',
         headers: {
@@ -579,8 +574,7 @@ export default function ShortVideoFeed() {
         body: JSON.stringify({ targetType: 'content', targetId: item.id, reasonCode }),
       })
       if (response.status === 401) return requireAuth()
-      const data = await response.json().catch((): null => null) as ApiResponse<{ status?: string }> | null
-      if (!response.ok || !data?.data) throw new Error('举报失败。')
+      if (!response.ok || !data?.data) throw new Error(getApiErrorMessage(data, '举报失败。'))
       setMessage(data.data.status === 'DEDUPLICATED' ? '举报已记录。' : '举报已提交。')
     } catch (cause) {
       setMessage(cause instanceof Error ? cause.message : '举报失败。')

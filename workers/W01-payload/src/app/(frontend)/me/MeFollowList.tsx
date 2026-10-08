@@ -3,6 +3,8 @@
 import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
+import { fetchJson, getApiErrorMessage } from '../../../lib/client-api.js'
+
 type Direction = 'followers' | 'following'
 
 type FollowListItem = {
@@ -56,20 +58,19 @@ export default function MeFollowList({ direction }: { direction: Direction }) {
   const requestIdRef = useRef(0)
 
   const loadProfile = useCallback(async (signal?: AbortSignal): Promise<string> => {
-    const response = await fetch('/api/v1/users/me', {
+    const { response, data } = await fetchJson<ProfileResponse>('/api/v1/users/me', {
       credentials: 'include',
       cache: 'no-store',
       headers: { accept: 'application/json' },
       signal,
     })
-    const data = await response.json().catch((): null => null) as ProfileResponse | null
     if (response.status === 401) {
       const returnTo = window.location.pathname + window.location.search + window.location.hash
       window.location.assign('/login?returnTo=' + encodeURIComponent(returnTo))
       throw new Error('UNAUTHENTICATED')
     }
     if (!response.ok || typeof data?.id !== 'string' || !data.id.trim()) {
-      throw new Error(data?.error?.message || '个人资料加载失败')
+      throw new Error(getApiErrorMessage(data, '个人资料加载失败'))
     }
     setDisplayName(data.displayName?.trim() || data.username?.trim() || '我的账号')
     setUserId(data.id)
@@ -85,7 +86,7 @@ export default function MeFollowList({ direction }: { direction: Direction }) {
     const params = new URLSearchParams({ limit: String(PAGE_SIZE) })
     if (cursor) params.set('cursor', cursor)
 
-    const response = await fetch(
+    const { response, data } = await fetchJson<FollowListResponse>(
       '/api/v1/users/' + encodeURIComponent(ownerId) + '/' + direction + '?' + params.toString(),
       {
         credentials: 'include',
@@ -94,9 +95,8 @@ export default function MeFollowList({ direction }: { direction: Direction }) {
         signal,
       },
     )
-    const data = await response.json().catch((): null => null) as FollowListResponse | null
     if (!response.ok || !data?.data || !Array.isArray(data.data.items)) {
-      throw new Error(data?.error?.message || '关系列表加载失败')
+      throw new Error(getApiErrorMessage(data, '关系列表加载失败'))
     }
 
     setItems((current) => append ? [...current, ...data.data!.items] : data.data!.items)
@@ -165,7 +165,7 @@ export default function MeFollowList({ direction }: { direction: Direction }) {
     setUnfollowingId(targetUserId)
     setError('')
     try {
-      const response = await fetch(
+      const { response, data } = await fetchJson<FollowListResponse>(
         '/api/v1/social/follows/' + encodeURIComponent(targetUserId),
         {
           method: 'DELETE',
@@ -183,8 +183,7 @@ export default function MeFollowList({ direction }: { direction: Direction }) {
         return
       }
       if (!response.ok && response.status !== 204) {
-        const data = await response.json().catch((): null => null) as FollowListResponse | null
-        throw new Error(data?.error?.message || '取消关注失败')
+        throw new Error(getApiErrorMessage(data, '取消关注失败'))
       }
       setItems((current) => current.filter((item) => item.userId !== targetUserId))
       setTotalCount((count) => count === null ? count : Math.max(0, count - 1))
