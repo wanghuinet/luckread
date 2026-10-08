@@ -4,7 +4,6 @@ import Link from 'next/link'
 import ContentComments from './ContentComments'
 import ArticleStructuredRenderer from '../../../../components/ArticleStructuredRenderer.js'
 import { plainTextFromArticleDocument, tryDeserializeArticleDocument } from '../../../../lib/article-document.js'
-import { extractSocialTokens } from '../../../../social/social-token-parser.js'
 import { useEffect, useMemo, useState } from 'react'
 
 import { fetchJson, getApiErrorMessage } from '../../../../lib/client-api.js'
@@ -66,12 +65,12 @@ export default function ContentDetailPage({
   const [followRestricted, setFollowRestricted] = useState(false)
   const [followBusy, setFollowBusy] = useState(false)
   const [retryKey, setRetryKey] = useState(0)
+  const [socialTopics, setSocialTopics] = useState<Array<{ topicId: string; name: string; displayName: string }>>([])
+  const [socialMentions, setSocialMentions] = useState<Array<{ userId: string; handle: string }>>([])
   const structuredArticle = useMemo(
     () => content?.contentType === 'article' && body ? tryDeserializeArticleDocument(body) : null,
     [content?.contentType, body],
   )
-  const socialTokenBody = structuredArticle ? plainTextFromArticleDocument(structuredArticle) : body
-  const socialTokens = useMemo(() => extractSocialTokens(socialTokenBody), [socialTokenBody])
 
   useEffect(() => {
     let cancelled = false
@@ -119,31 +118,27 @@ export default function ContentDetailPage({
           if (cancelled || !resolved) return
           setViewerUserId(typeof viewerData?.id === 'string' ? viewerData.id : null)
           try {
-            const { response: likeResponse, data: likeData } = await fetchJson<{ data?: { liked?: boolean; likeCount?: number } }>(
-              '/api/v1/interactions/likes?targetType=content&targetId=' + encodeURIComponent(resolved.id),
+            const { response: socialResponse, data: socialData } = await fetchJson<{
+              data?: {
+                counts?: { likes?: number; comments?: number; favorites?: number; shares?: number }
+                viewer?: { liked?: boolean; favorited?: boolean } | null
+                topics?: Array<{ topicId: string; name: string; displayName: string }>
+                mentions?: Array<{ userId: string; handle: string }>
+              }
+            }>(
+              '/api/v1/contents/' + encodeURIComponent(resolved.id) + '/social',
               { credentials: 'include', headers: { accept: 'application/json' }, cache: 'no-store', signal: controller.signal },
             )
-            if (!cancelled && likeResponse.ok && typeof likeData?.data?.liked === 'boolean') {
-              setLiked(likeData.data.liked)
-              setLikeCount(
-                typeof likeData?.data?.likeCount === 'number'
-                  ? Math.max(0, likeData.data.likeCount)
-                  : null,
-              )
+            if (!cancelled && socialResponse.ok && socialData?.data) {
+              const summary = socialData.data
+              if (typeof summary.counts?.likes === 'number') setLikeCount(Math.max(0, summary.counts.likes))
+              if (typeof summary.viewer?.liked === 'boolean') setLiked(summary.viewer.liked)
+              if (typeof summary.viewer?.favorited === 'boolean') setBookmarked(summary.viewer.favorited)
+              setSocialTopics(Array.isArray(summary.topics) ? summary.topics : [])
+              setSocialMentions(Array.isArray(summary.mentions) ? summary.mentions : [])
             }
           } catch {
-            // Like state is optional; content remains readable when the status query fails.
-          }
-          try {
-            const { response: bookmarkResponse, data: bookmarkData } = await fetchJson<{ data?: { favorited?: boolean } }>(
-              '/api/v1/interactions/bookmarks?targetType=content&targetId=' + encodeURIComponent(resolved.id),
-              { credentials: 'include', headers: { accept: 'application/json' }, cache: 'no-store', signal: controller.signal },
-            )
-            if (!cancelled && bookmarkResponse.ok && typeof bookmarkData?.data?.favorited === 'boolean') {
-              setBookmarked(bookmarkData.data.favorited)
-            }
-          } catch {
-            // Favorite state is optional; content remains readable when the status query fails.
+            // Unified social summary is optional; individual actions remain usable.
           }
           if (resolved.creatorId) {
             try {
@@ -502,12 +497,25 @@ export default function ContentDetailPage({
           </div>
         ) : null}
 
-        {socialTokens.length > 0 ? (
+        {socialTopics.length > 0 || socialMentions.length > 0 ? (
           <section aria-label={copy.detail.tagAria} className="content-detail-social-tokens">
-            {socialTokens.map((token) => (
-              <span className="content-detail-social-token" key={token.kind + ':' + token.normalized}>
-                {token.value}
-              </span>
+            {socialTopics.map((topic) => (
+              <Link
+                className="content-detail-social-token"
+                href={'/topics/' + encodeURIComponent(topic.name)}
+                key={'topic:' + topic.topicId}
+              >
+                #{topic.displayName}
+              </Link>
+            ))}
+            {socialMentions.map((mention) => (
+              <Link
+                className="content-detail-social-token"
+                href={'/users/' + encodeURIComponent(mention.userId)}
+                key={'mention:' + mention.userId}
+              >
+                @{mention.handle}
+              </Link>
             ))}
           </section>
         ) : null}
