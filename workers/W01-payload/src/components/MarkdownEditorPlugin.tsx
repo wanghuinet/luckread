@@ -9,6 +9,48 @@ import { markdownToArticleDocument } from '../lib/markdown-to-article-document.j
 import { articleDocumentToMarkdown } from '../lib/article-document-to-markdown.js'
 import type { ArticleEditorPluginContext } from './ArticleEditorPlugin.js'
 
+function exportArticleMarkdown(value: ArticleDocument): void {
+  const markdown = articleDocumentToMarkdown(value)
+  const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const link = window.document.createElement('a')
+  link.href = url
+  link.download = 'luckread-article.md'
+  window.document.body.appendChild(link)
+  link.click()
+  link.remove()
+  window.setTimeout(() => URL.revokeObjectURL(url), 0)
+}
+
+function MarkdownExportToolbar({ disabled, value }: ArticleEditorPluginContext) {
+  const [message, setMessage] = useState('')
+
+  function exportMarkdown() {
+    setMessage('')
+    try {
+      exportArticleMarkdown(value)
+      setMessage('Markdown 已导出。')
+    } catch {
+      setMessage('Markdown 导出失败。')
+    }
+  }
+
+  return (
+    <span className="lr-editor-markdown-actions">
+      <button
+        className="lr-editor-plugin-button"
+        disabled={disabled || !hasArticleDocumentContent(value)}
+        onClick={exportMarkdown}
+        title="导出当前文章为 Markdown"
+        type="button"
+      >
+        导出 MD
+      </button>
+      {message ? <span aria-live="polite" role="status">{message}</span> : null}
+    </span>
+  )
+}
+
 function MarkdownPanel({ disabled, value, updateDocument }: ArticleEditorPluginContext) {
   const [open, setOpen] = useState(false)
   const [raw, setRaw] = useState('')
@@ -53,45 +95,11 @@ function MarkdownPanel({ disabled, value, updateDocument }: ArticleEditorPluginC
   function exportMarkdown() {
     setMessage('')
     try {
-      const markdown = articleDocumentToMarkdown(value)
-      const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8' })
-      const url = URL.createObjectURL(blob)
-      const link = window.document.createElement('a')
-      link.href = url
-      link.download = 'luckread-article.md'
-      window.document.body.appendChild(link)
-      link.click()
-      link.remove()
-      window.setTimeout(() => URL.revokeObjectURL(url), 0)
+      exportArticleMarkdown(value)
       setMessage('Markdown 已导出。')
     } catch {
       setMessage('Markdown 导出失败。')
     }
-  }
-
-  if (!open) {
-    return (
-      <span className="lr-editor-markdown-actions">
-        <button
-          className="lr-editor-plugin-button"
-          disabled={disabled}
-          onClick={() => setOpen(true)}
-          title="导入或导出 Markdown"
-          type="button"
-        >
-          Markdown
-        </button>
-        <button
-          className="lr-editor-plugin-button"
-          disabled={disabled || !hasArticleDocumentContent(value)}
-          onClick={exportMarkdown}
-          title="导出当前文章为 Markdown"
-          type="button"
-        >
-          导出 MD
-        </button>
-      </span>
-    )
   }
 
   return (
@@ -156,16 +164,10 @@ function MarkdownPanel({ disabled, value, updateDocument }: ArticleEditorPluginC
   )
 }
 
-export const markdownImportPlugin = {
-  id: 'content.markdown-import',
-  label: 'Markdown 导入',
+export const markdownEditorPlugin = {
+  id: 'content.markdown',
+  label: 'Markdown',
   order: 150,
+  Toolbar: MarkdownExportToolbar,
   Panel: MarkdownPanel,
-}
-
-export const markdownExportPlugin = {
-  id: 'content.markdown-export',
-  label: 'Markdown 导出',
-  order: 151,
-  Toolbar: MarkdownPanel,
 }
