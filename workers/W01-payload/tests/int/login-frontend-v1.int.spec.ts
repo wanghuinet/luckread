@@ -9,7 +9,7 @@ describe('login frontend', () => {
       'utf8',
     )
 
-    expect(page).toContain("fetch('/api/v1/auth/login'")
+    expect(page).toContain("fetchJson<{ error?: { message?: string } }>('/api/v1/auth/login'")
     expect(page).not.toContain("fetch('/auth/login'")
     expect(page).not.toContain('deviceId')
     expect(page).toContain("credentials: 'include'")
