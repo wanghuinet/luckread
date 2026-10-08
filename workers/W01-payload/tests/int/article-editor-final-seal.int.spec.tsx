@@ -41,23 +41,23 @@ describe('ArticleStructuredEditor final interaction closure', () => {
 
     const textareas = await screen.findAllByRole('textbox', { name: '正文' })
     expect(textareas).toHaveLength(2)
-    expect(textareas[1]).toHaveValue('')
+    expect((textareas[1] as HTMLTextAreaElement).value).toBe('')
     expect(document.activeElement).toBe(textareas[1])
   })
 
   it('merges an adjacent same-type block from the start of the textarea and restores focus', async () => {
-    const document = {
+    const initialValue = {
       version: 2 as const,
       blocks: [
         { id: 'first', type: 'paragraph' as const, text: '第一段' },
         { id: 'second', type: 'paragraph' as const, text: '第二段' },
       ],
     }
-    render(<EditorHarness initialValue={document} />)
+    render(<EditorHarness initialValue={initialValue} />)
 
     const textareas = screen.getAllByRole('textbox', { name: '正文' })
     textareas[1].focus()
-    textareas[1].setSelectionRange(0, 0)
+    (textareas[1] as HTMLTextAreaElement).setSelectionRange(0, 0)
 
     fireEvent.keyDown(textareas[1], {
       key: 'Backspace',
@@ -66,25 +66,25 @@ describe('ArticleStructuredEditor final interaction closure', () => {
     await waitFor(() => {
       const merged = screen.getAllByRole('textbox', { name: '正文' })
       expect(merged).toHaveLength(1)
-      expect(merged[0]).toHaveValue('第一段\n\n第二段')
-      expect(document.activeElement).toBe(merged[0])
+      expect((merged[0] as HTMLTextAreaElement).value).toBe('第一段\n\n第二段')
+      expect(window.document.activeElement).toBe(merged[0])
       expect(merged[0]).toHaveProperty('selectionStart', '第一段\n\n第二段'.length)
     })
   })
 
   it('moves a block with Alt+ArrowDown and preserves the cursor offset', async () => {
-    const document = {
+    const initialValue = {
       version: 2 as const,
       blocks: [
         { id: 'first', type: 'paragraph' as const, text: '第一段' },
         { id: 'second', type: 'paragraph' as const, text: '第二段' },
       ],
     }
-    render(<EditorHarness initialValue={document} />)
+    render(<EditorHarness initialValue={initialValue} />)
 
     const textareas = screen.getAllByRole('textbox', { name: '正文' })
     textareas[0].focus()
-    textareas[0].setSelectionRange(1, 1)
+    (textareas[0] as HTMLTextAreaElement).setSelectionRange(1, 1)
 
     fireEvent.keyDown(textareas[0], {
       key: 'ArrowDown',
@@ -93,9 +93,9 @@ describe('ArticleStructuredEditor final interaction closure', () => {
 
     await waitFor(() => {
       const moved = screen.getAllByRole('textbox', { name: '正文' })
-      expect(moved[0]).toHaveValue('第二段')
-      expect(moved[1]).toHaveValue('第一段')
-      expect(document.activeElement).toBe(moved[1])
+      expect((moved[0] as HTMLTextAreaElement).value).toBe('第二段')
+      expect((moved[1] as HTMLTextAreaElement).value).toBe('第一段')
+      expect(window.document.activeElement).toBe(moved[1])
       expect(moved[1]).toHaveProperty('selectionStart', 1)
     })
   })
@@ -119,8 +119,8 @@ describe('ArticleStructuredEditor final interaction closure', () => {
 
     await waitFor(() => {
       expect(screen.getAllByRole('textbox', { name: '正文' })).toHaveLength(1)
-      expect(screen.getByRole('textbox', { name: '标题' })).toHaveValue('复制后的标题')
-      expect(document.activeElement).toBe(screen.getByRole('textbox', { name: '标题' }))
+      expect((screen.getByRole('textbox', { name: '标题' }) as HTMLTextAreaElement).value).toBe('复制后的标题')
+      expect(window.document.activeElement).toBe(screen.getByRole('textbox', { name: '标题' }))
     })
   })
 
