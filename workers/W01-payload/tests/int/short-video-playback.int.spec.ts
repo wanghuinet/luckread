@@ -40,6 +40,14 @@ describe('short video playback polish', () => {
     expect(feed).toContain("document.removeEventListener('visibilitychange', handleVisibilityChange)")
   })
 
+  it('preserves user pause state across page visibility changes', () => {
+    const feed = read('src/app/(frontend)/shorts/ShortVideoFeed.tsx')
+    expect(feed).toContain('const resumeAfterVisibilityRef = useRef(false)')
+    expect(feed).toContain('resumeAfterVisibilityRef.current = Boolean(video && !video.paused && !video.ended)')
+    expect(feed).toContain('if (commentsOpen || !resumeAfterVisibilityRef.current)')
+    expect(feed).toContain('resumeAfterVisibilityRef.current = false')
+  })
+
   it('exposes a recoverable media error path without changing the feed authority', () => {
     const feed = read('src/app/(frontend)/shorts/ShortVideoFeed.tsx')
     expect(feed).toContain('const [mediaErrorById, setMediaErrorById]')
