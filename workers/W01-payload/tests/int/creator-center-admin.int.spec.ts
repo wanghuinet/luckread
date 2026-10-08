@@ -18,7 +18,6 @@ describe('Creator Center admin extension', () => {
 
   it('persists structured article media references alongside uploaded assets', () => {
     const publisher = read('src/app/(frontend)/publish/PublishComposer.tsx')
-    const list = read('src/app/(payload)/v1beta/CreatorContentList.tsx')
     expect(publisher).toContain('mediaRefsFromArticleDocument(articleDocument)')
     expect(publisher).toContain("...(type === 'article' ? mediaRefsFromArticleDocument(articleDocument) : [])")
     expect(publisher).toContain('mediaRefs: Array.from(new Set([')
@@ -642,6 +641,7 @@ describe('Creator Center admin extension', () => {
   it('embeds the existing publisher with a scoped W03 content bridge', () => {
     const view = read('src/app/(frontend)/creator-center/CreatorStudio.tsx')
     const publisher = read('src/app/(frontend)/publish/PublishComposer.tsx')
+    const list = read('src/app/(payload)/v1beta/CreatorContentList.tsx')
     const contentDetail = read('src/app/(frontend)/content/[contentId]/ContentDetailClient.tsx')
     const contentDetailPage = read('src/app/(frontend)/content/[contentId]/page.tsx')
     const homeFeed = read('src/app/(frontend)/HomeContentFeed.tsx')
