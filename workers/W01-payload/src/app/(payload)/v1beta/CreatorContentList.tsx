@@ -316,7 +316,7 @@ export default function CreatorContentList({ loginPath = '/admin/login' }: { log
         </div>
         <Link className={styles.primaryButton} href="/publish">
           新建内容
-        </Link>
+        </CreatorActionButton>
       </div>
 
       <div className={styles.contentFilters} role="group" aria-label="内容筛选">
