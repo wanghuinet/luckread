@@ -9,7 +9,8 @@ describe('short video playback polish', () => {
     const feed = read('src/app/(frontend)/shorts/ShortVideoFeed.tsx')
     const css = read('src/app/(frontend)/shorts/short-video.module.css')
     expect(feed).toContain('showDoubleTapHeart')
-    expect(feed).toContain('onDoubleClick={() => {')
+    expect(feed).toContain('const handleVideoTap')
+    expect(feed).toContain('if (event.detail >= 2)')
     expect(feed).toContain('setActiveProgress(0)')
     expect(feed).toContain('setActiveIndex(index)')
     expect(feed).toContain('onTimeUpdate')
@@ -73,7 +74,7 @@ describe('short video playback polish', () => {
   it('separates single-tap playback from double-tap like gestures', () => {
     const feed = read('src/app/(frontend)/shorts/ShortVideoFeed.tsx')
     expect(feed).toContain('const singleTapTimerRef = useRef<number | null>(null)')
-    expect(feed).toContain('const handleVideoTap = (item: ContentItem, event: React.MouseEvent<HTMLVideoElement>) =>')
+    expect(feed).toContain('const handleVideoTap = (item: ContentItem, event: MouseEvent<HTMLVideoElement>) =>')
     expect(feed).toContain('if (event.detail >= 2) {')
     expect(feed).toContain('window.clearTimeout(singleTapTimerRef.current)')
     expect(feed).toContain('togglePlay(item)')
