@@ -132,7 +132,9 @@ it('handles the profile follow DELETE no-body response without requiring a JSON 
   expect(page).toContain('if (isFollowing) {')
   expect(page).toContain('setIsFollowing(false)')
   expect(page).toContain('setFollowers((value) => value === null ? value : Math.max(0, value - 1))')
-  expect(page).toContain("const data = await response.json().catch((): null => null) as { data?: { following?: boolean } } | null")
+  expect(page).toContain('if (isFollowing) {')
+  expect(page).toContain('setIsFollowing(false)')
+  expect(page).toContain('const { response, data } = await fetchJson<{ data?: { following?: boolean }; error?: { message?: string } }>')
 })
 
 
