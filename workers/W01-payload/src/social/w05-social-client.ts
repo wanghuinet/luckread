@@ -60,7 +60,7 @@ export async function resolveSocialMentionTargets(body: string): Promise<Resolve
     depth: 0,
     limit: unique.length,
     overrideAccess: true,
-    select: { username: true },
+    select: { id: true, username: true } as any,
   })
 
   return result.docs
