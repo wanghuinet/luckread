@@ -26,6 +26,8 @@ import {
   transformArticleBlock,
   normalizeArticleDocument,
   plainTextFromArticleDocument,
+  parseArticleBlockFromClipboard,
+  serializeArticleBlockForClipboard,
 } from '../lib/article-document.js'
 import {
   createArticleDocumentHistory,
@@ -237,6 +239,32 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
     insertMediaAfter,
     insertBlockAfter,
     transformBlock,
+  }
+
+  async function copyBlockToClipboard(block: ArticleBlock) {
+    try {
+      await navigator.clipboard.writeText(serializeArticleBlockForClipboard(block))
+    } catch {
+      window.alert('复制区块失败，请检查浏览器剪贴板权限。')
+    }
+  }
+
+  function pasteStructuredBlock(index: number, raw: string) {
+    if (value.blocks.length >= ARTICLE_MAX_BLOCKS) return false
+    const parsed = parseArticleBlockFromClipboard(raw)
+    if (!parsed) return false
+    const pasted = duplicateArticleBlock(parsed)
+    const next = {
+      ...value,
+      blocks: [
+        ...value.blocks.slice(0, index + 1),
+        pasted,
+        ...value.blocks.slice(index + 1),
+      ],
+    }
+    pendingFocusRef.current = { blockId: pasted.id, offset: 0 }
+    emit(next)
+    return true
   }
 
   function duplicateBlock(index: number) {
@@ -452,7 +480,7 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
       </div>
 
       <div className="lr-article-editor-hint">
-        每个区块可以独立调整顺序和类型。文本区块支持 Ctrl/Cmd+Enter 新建正文、Alt+↑/↓ 移动当前区块并保留光标；列表区块使用换行分隔条目；正文内容最终会以版本化 JSON 资产保存，发布前检查仍使用纯文本抽取结果。
+        每个区块可以独立调整顺序和类型。支持复制结构化区块并在正文中粘贴恢复类型、正文和媒体；文本区块支持 Ctrl/Cmd+Enter 新建正文、Alt+↑/↓ 移动当前区块并保留光标；列表区块使用换行分隔条目；正文内容最终会以版本化 JSON 资产保存，发布前检查仍使用纯文本抽取结果。
       </div>
 
       <div className="lr-article-blocks">
@@ -491,6 +519,15 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
                   type="button"
                 >
                   复制
+                </button>
+                <button
+                  aria-label="复制结构化区块到剪贴板"
+                  disabled={disabled}
+                  onClick={() => void copyBlockToClipboard(block)}
+                  title="复制完整结构区块，可粘贴到文章编辑器"
+                  type="button"
+                >
+                  复制区块
                 </button>
                 <button
                   aria-label="在下方添加正文区块"
@@ -669,6 +706,12 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
                     event.preventDefault()
                     insertParagraphAfter(index)
                   }
+                }}
+                onPaste={(event) => {
+                  const raw = event.clipboardData.getData('text/plain')
+                  if (!raw.startsWith('LUCKREAD_ARTICLE_BLOCK_V1:')) return
+                  event.preventDefault()
+                  pasteStructuredBlock(index, raw)
                 }}
               />
             )}

@@ -20,6 +20,9 @@ import {
   transformArticleBlock,
   serializeArticleDocument,
   tryDeserializeArticleDocument,
+  ARTICLE_BLOCK_CLIPBOARD_PREFIX,
+  serializeArticleBlockForClipboard,
+  parseArticleBlockFromClipboard,
 } from './article-document.js'
 import {
   ARTICLE_DOCUMENT_HISTORY_LIMIT,
@@ -405,6 +408,22 @@ describe('article structured document', () => {
   it('is a no-op for an empty media reference', () => {
     const document = createArticleDocument('正文')
     expect(removeMediaRefFromArticleDocument(document, '   ')).toBe(document)
+  })
+
+  it('round-trips a structured block through the clipboard format', () => {
+    const source = {
+      id: 'source',
+      type: 'heading' as const,
+      text: '可复制标题',
+      level: 3 as const,
+    }
+    const raw = serializeArticleBlockForClipboard(source)
+    expect(raw.startsWith(ARTICLE_BLOCK_CLIPBOARD_PREFIX)).toBe(true)
+
+    const parsed = parseArticleBlockFromClipboard(raw)
+
+    expect(parsed).toEqual(source)
+    expect(parseArticleBlockFromClipboard('普通文本')).toBeNull()
   })
 
   it('transforms text blocks while preserving content and identity', () => {

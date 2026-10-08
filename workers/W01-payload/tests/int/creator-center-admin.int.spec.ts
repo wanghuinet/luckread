@@ -240,6 +240,22 @@ describe('Creator Center admin extension', () => {
     expect(editor).toContain('focusTarget.id')
   })
 
+  it('exposes structured article block clipboard copy and paste', () => {
+    const editor = read('src/components/ArticleStructuredEditor.tsx')
+    const document = read('src/lib/article-document.ts')
+
+    expect(document).toContain("export const ARTICLE_BLOCK_CLIPBOARD_PREFIX = 'LUCKREAD_ARTICLE_BLOCK_V1:'")
+    expect(document).toContain('export const serializeArticleBlockForClipboard')
+    expect(document).toContain('export const parseArticleBlockFromClipboard')
+    expect(editor).toContain('navigator.clipboard.writeText(serializeArticleBlockForClipboard(block))')
+    expect(editor).toContain('parseArticleBlockFromClipboard(raw)')
+    expect(editor).toContain('event.clipboardData.getData(\'text/plain\')')
+    expect(editor).toContain("raw.startsWith('LUCKREAD_ARTICLE_BLOCK_V1:')")
+    expect(editor).toContain('duplicateArticleBlock(parsed)')
+    expect(editor).toContain('aria-label="复制结构化区块到剪贴板"')
+    expect(editor).toContain('onPaste={(event) => {')
+  })
+
   it('exposes keyboard article block movement with cursor preservation', () => {
     const editor = read('src/components/ArticleStructuredEditor.tsx')
 
