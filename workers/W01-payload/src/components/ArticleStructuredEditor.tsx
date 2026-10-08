@@ -108,24 +108,6 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
     const handleKeyDown = (event: KeyboardEvent) => {
       if (!(event.ctrlKey || event.metaKey) || !editorRef.current?.contains(document.activeElement) || disabled) return
       const target = event.target
-      if (target instanceof HTMLElement && target.tagName === 'TEXTAREA') {
-        const block = value.blocks.find((candidate) => textAreaRefs.current[candidate.id] === target)
-        const key = event.key.toLowerCase()
-        if (
-          key === 'enter' &&
-          (event.ctrlKey || event.metaKey) &&
-          !event.shiftKey &&
-          !event.altKey &&
-          block
-        ) {
-          const index = value.blocks.findIndex((candidate) => candidate.id === block.id)
-          if (index >= 0 && value.blocks.length < ARTICLE_MAX_BLOCKS) {
-            event.preventDefault()
-            insertParagraphAfter(index)
-            return
-          }
-        }
-      }
       if (target instanceof HTMLElement && (
         target.tagName === 'INPUT' ||
         target.tagName === 'TEXTAREA' ||
@@ -618,6 +600,17 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
                 }
                 rows={block.type === 'heading' ? 2 : block.type === 'quote' ? 4 : 5}
                 value={block.text}
+                onKeyDown={(event) => {
+                  if (
+                    event.key.toLowerCase() === 'enter' &&
+                    (event.ctrlKey || event.metaKey) &&
+                    !event.shiftKey &&
+                    !event.altKey
+                  ) {
+                    event.preventDefault()
+                    insertParagraphAfter(index)
+                  }
+                }}
               />
             )}
 
