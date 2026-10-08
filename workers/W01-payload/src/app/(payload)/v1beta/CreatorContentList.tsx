@@ -394,10 +394,21 @@ export default function CreatorContentList({ loginPath = '/admin/login' }: { log
                   >
                     版本历史
                   </button>
-                  {['DRAFT', 'REJECTED'].includes(item.state) ? (
+                  {item.state === 'DRAFT' ? (
                     <Link className={styles.secondaryButton} href={`/publish?draft=${encodeURIComponent(item.id)}`}>
                       继续编辑
                     </Link>
+                  ) : null}
+                  {item.state === 'REJECTED' ? (
+                    <button
+                      aria-busy={actionId === item.id}
+                      className={styles.secondaryButton}
+                      disabled={actionId !== null}
+                      onClick={() => void moveToDraftForEdit(item)}
+                      type="button"
+                    >
+                      {actionId === item.id ? '处理中…' : '继续编辑'}
+                    </button>
                   ) : null}
                   {item.state === 'APPROVED' ? (
                     <button

@@ -781,7 +781,9 @@ describe('Creator Center admin extension', () => {
     expect(view).toContain('<CreatorContentList loginPath={adminMode ? \'/admin/login\' : \'/login\'} />')
 
     expect(list).toContain("/api/creator/contents?")
-    expect(list).toContain("['DRAFT', 'REJECTED'].includes(item.state)")
+    expect(list).toContain("item.state === 'DRAFT'")
+    expect(list).toContain("item.state === 'REJECTED'")
+    expect(list).toContain("onClick={() => void moveToDraftForEdit(item)}")
     expect(list).toContain("item.state === 'PUBLISHED'")
     expect(list).toContain("async function transition(item: Item, to: 'PUBLISHED' | 'UNPUBLISHED' | 'ARCHIVED' | 'RESTORED' | 'DRAFT')")
     expect(list).toContain("/api/creator/contents/")
