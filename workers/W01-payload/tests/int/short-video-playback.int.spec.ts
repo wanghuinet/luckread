@@ -70,6 +70,17 @@ describe('short video playback polish', () => {
     expect(css).toContain('@keyframes media-spinner')
   })
 
+  it('separates single-tap playback from double-tap like gestures', () => {
+    const feed = read('src/app/(frontend)/shorts/ShortVideoFeed.tsx')
+    expect(feed).toContain('const singleTapTimerRef = useRef<number | null>(null)')
+    expect(feed).toContain('const handleVideoTap = (item: ContentItem, event: React.MouseEvent<HTMLVideoElement>) =>')
+    expect(feed).toContain('if (event.detail >= 2) {')
+    expect(feed).toContain('window.clearTimeout(singleTapTimerRef.current)')
+    expect(feed).toContain('togglePlay(item)')
+    expect(feed).toContain('showDoubleTapHeart()')
+    expect(feed).not.toContain('onDoubleClick={() =>')
+  })
+
   it('exposes a recoverable media error path without changing the feed authority', () => {
     const feed = read('src/app/(frontend)/shorts/ShortVideoFeed.tsx')
     expect(feed).toContain('const [mediaErrorById, setMediaErrorById]')
