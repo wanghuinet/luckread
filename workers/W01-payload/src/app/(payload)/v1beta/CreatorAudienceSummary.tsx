@@ -105,53 +105,55 @@ export default function CreatorAudienceSummary({ userId, loginPath = '/admin/log
   const [listErrorKey, setListErrorKey] = useState<string | null>(null)
   const listRequestId = useRef(0)
 
-  useEffect(() => {
-    const controller = new AbortController()
-    let cancelled = false
-
-    void Promise.all([
-      fetchCount('/api/v1/users/' + encodeURIComponent(userId) + '/followers?limit=1', controller.signal, loginPath),
-      fetchCount('/api/v1/users/' + encodeURIComponent(userId) + '/following?limit=1', controller.signal, loginPath),
-    ])
-      .then(([followers, following]) => {
-        if (cancelled) return
-        setState({ followers, following, error: false })
-      })
-      .catch((error: unknown) => {
-        if (cancelled || controller.signal.aborted) return
-        setState({ followers: null, following: null, error: true })
-        console.error('Creator audience summary failed', error)
-      })
-
-    return () => {
-      cancelled = true
-      controller.abort()
-    }
-  }, [userId, reloadKey])
-
   const listKey = userId + ':' + direction + ':' + reloadKey
 
   useEffect(() => {
     const controller = new AbortController()
     const requestId = ++listRequestId.current
+    const otherDirection: Direction = direction === 'followers' ? 'following' : 'followers'
 
     void fetchList(userId, direction, null, controller.signal, loginPath)
-      .then((page) => {
-        if (requestId !== listRequestId.current) return
+      .then(async (page) => {
+        if (requestId !== listRequestId.current || controller.signal.aborted) return
+
+        setState((current) => ({
+          ...current,
+          [direction]: page.totalCount,
+          error: false,
+        }))
         setItems(page.items)
         setNextCursor(page.nextCursor)
         setHasMore(page.hasMore)
         setLoadedListKey(listKey)
         setListErrorKey(null)
+
+        try {
+          const otherCount = await fetchCount(
+            '/api/v1/users/' + encodeURIComponent(userId) + '/' + otherDirection + '?limit=1',
+            controller.signal,
+            loginPath,
+          )
+          if (requestId !== listRequestId.current || controller.signal.aborted) return
+          setState((current) => ({
+            ...current,
+            [otherDirection]: otherCount,
+            error: false,
+          }))
+        } catch (error: unknown) {
+          if (requestId !== listRequestId.current || controller.signal.aborted) return
+          setState((current) => ({ ...current, error: true }))
+          console.error('Creator audience secondary count failed', error)
+        }
       })
       .catch((error: unknown) => {
         if (requestId !== listRequestId.current || controller.signal.aborted) return
         setListErrorKey(listKey)
+        setState((current) => ({ ...current, error: true }))
         console.error('Creator audience list failed', error)
       })
 
     return () => controller.abort()
-  }, [userId, direction, reloadKey, listKey])
+  }, [direction, loginPath, listKey, userId])
 
   async function loadMore() {
     if (listBusy || loadedListKey !== listKey || !hasMore || !nextCursor) return
