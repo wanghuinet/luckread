@@ -10,6 +10,7 @@ describe('short video playback polish', () => {
     const css = read('src/app/(frontend)/shorts/short-video.module.css')
     expect(feed).toContain('showDoubleTapHeart')
     expect(feed).toContain('const handleVideoTap')
+    expect(feed).toContain('onClick={(event) => handleVideoTap(item, event)}')
     expect(feed).toContain('if (event.detail >= 2)')
     expect(feed).toContain('setActiveProgress(0)')
     expect(feed).toContain('setActiveIndex(index)')
