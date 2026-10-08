@@ -342,6 +342,9 @@ describe('Creator Center admin extension', () => {
     expect(adapter).toContain("createArticleMediaBlock('image'")
     expect(adapter).toContain('Word 表格已转为段落文本')
     expect(adapter).toContain('for (const url of Array.from(new Set(rowImages)))')
+    expect(adapter).toContain('if (blocks.length > ARTICLE_MAX_BLOCKS)')
+    expect(adapter).toContain('serializeArticleDocument(importedDocument)')
+    expect(adapter).toContain('Word 导入结果超过文章保存大小限制')
   })
 
   it('exposes the editor plugin host and publish-time registry', () => {
