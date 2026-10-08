@@ -714,7 +714,7 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
                   const next = updateBlock(value, index, {
                     text: event.target.value.slice(0, ARTICLE_MAX_BLOCK_TEXT),
                   })
-                  emit(next)
+                  emitTextEdit(next, block.id)
                 }}
                 placeholder={
                   block.type === 'heading' ? '输入小标题…'
