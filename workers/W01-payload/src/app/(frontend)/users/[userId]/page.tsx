@@ -20,6 +20,7 @@ type CountResponse = {
 
 type PublicContent = {
   id: string
+  slug?: string
   contentType: 'article' | 'post' | 'video'
   title: string
   coverRef?: string | null
