@@ -97,11 +97,9 @@ describe('1.1 content lifecycle closeout', () => {
     expect(publicState).toContain("invalidatePublicContentDetail(request, contentId)")
     expect(publicState).toContain("invalidatePublicContentList(request)")
 
-    expect(creatorList).toContain("requestTransition(item.id, 'PUBLISHED', item.version)")
-    expect(creatorList).toContain("requestTransition(item.id, 'UNPUBLISHED', item.version)")
-    expect(creatorList).toContain("requestTransition(item.id, 'DRAFT', item.version)")
-    expect(creatorList).toContain("requestTransition(item.id, 'ARCHIVED', item.version)")
-    expect(creatorList).toContain("requestTransition(item.id, 'RESTORED', item.version)")
+    expect(creatorList).toContain("async function requestTransition(itemId: string")
+    expect(creatorList).toContain("'PUBLISHED' | 'UNPUBLISHED' | 'ARCHIVED' | 'RESTORED' | 'DRAFT'")
+    expect(creatorList).toContain("requestTransition(item.id, to, item.version)")
     expect(creatorList).toContain("window.addEventListener('luckread:content-mutated'")
 
     expect(publicDetail).toContain("state !== 'PUBLISHED'")
