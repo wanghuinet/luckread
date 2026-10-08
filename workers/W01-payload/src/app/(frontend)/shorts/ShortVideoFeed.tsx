@@ -743,7 +743,7 @@ export default function ShortVideoFeed() {
                 </aside>
 
                 <div className={styles.progressTrack} aria-hidden="true">
-                  <span className={styles.progressValue} style={{ width: activeIndexRef.current === index ? activeProgress + '%' : '0%' }} />
+                  <span className={styles.progressValue} style={{ width: activeIndex === index ? activeProgress + '%' : '0%' }} />
                 </div>
 
                 <div className={styles.soundButtonWrap}>
