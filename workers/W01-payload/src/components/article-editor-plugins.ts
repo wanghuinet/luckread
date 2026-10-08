@@ -1,7 +1,8 @@
 import type { ArticleEditorPlugin } from './ArticleEditorPlugin.js'
 import { articleWordImportPlugin } from './article-editor-word-import-plugin.js'
-import { findReplacePlugin } from './FindReplacePlugin.js'
+import { copyPlainTextPlugin, writerStatsPlugin } from './WriterToolsPlugin.js'
 import { articleOutlinePlugin } from './ArticleOutlinePlugin.js'
+import { findReplacePlugin } from './FindReplacePlugin.js'
 
 /**
  * Publish-time editor extensions are registered here.
@@ -11,6 +12,8 @@ import { articleOutlinePlugin } from './ArticleOutlinePlugin.js'
  */
 export const articleEditorPlugins: readonly ArticleEditorPlugin[] = [
   articleWordImportPlugin,
+  copyPlainTextPlugin,
+  writerStatsPlugin,
   articleOutlinePlugin,
   findReplacePlugin,
 ]
