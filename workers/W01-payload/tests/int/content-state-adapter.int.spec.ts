@@ -33,3 +33,28 @@ describe('content state adapters', () => {
     expect(route).toContain('callW03Content')
   })
 })
+
+describe('creator content lifecycle cache adapters', () => {
+  it('invalidates public content views after Creator Center state transitions', () => {
+    const route = read('src/app/(payload)/api/creator/contents/[contentId]/state/route.ts')
+    expect(route).toContain("invalidatePublicContentComments(contentId)")
+    expect(route).toContain("invalidatePublicContentVisibility(contentId)")
+    expect(route).toContain("invalidatePublicContentRelationships(contentId)")
+    expect(route).toContain("invalidatePublicContentDetail(request, contentId)")
+    expect(route).toContain("invalidatePublicContentList(request)")
+    expect(route).toContain("if (response.ok)")
+    expect(route).toContain("method: 'POST'")
+  })
+
+  it('invalidates public content views after Creator Center deletion of published content', () => {
+    const route = read('src/app/(payload)/api/creator/contents/[contentId]/route.ts')
+    expect(route).toContain("export async function DELETE")
+    expect(route).toContain("method: 'DELETE'")
+    expect(route).toContain("invalidatePublicContentComments(contentId)")
+    expect(route).toContain("invalidatePublicContentVisibility(contentId)")
+    expect(route).toContain("invalidatePublicContentRelationships(contentId)")
+    expect(route).toContain("invalidatePublicContentDetail(request, contentId)")
+    expect(route).toContain("invalidatePublicContentList(request)")
+    expect(route).toContain("if (response.ok)")
+  })
+})

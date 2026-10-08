@@ -1,4 +1,11 @@
 import {
+  invalidatePublicContentComments,
+  invalidatePublicContentDetail,
+  invalidatePublicContentList,
+  invalidatePublicContentVisibility,
+  invalidatePublicContentRelationships,
+} from '../../../../../../lib/public-response-cache.js'
+import {
   callW03Content,
   resolveCookieContentPrincipal,
   W03ContentClientError,
@@ -41,12 +48,20 @@ export async function DELETE(
     const principal = await resolveCookieContentPrincipal(request)
     if (principal instanceof Response) return principal
 
-    return await callW03Content({
+    const response = await callW03Content({
       request,
       pathname: `/internal/content/contents/${encodeURIComponent(contentId)}`,
       method: 'DELETE',
       principal,
     })
+    if (response.ok) {
+      await invalidatePublicContentComments(contentId)
+      await invalidatePublicContentVisibility(contentId)
+      await invalidatePublicContentRelationships(contentId)
+      await invalidatePublicContentDetail(request, contentId)
+      await invalidatePublicContentList(request)
+    }
+    return response
   } catch (error) {
     if (error instanceof W03ContentClientError) {
       return errorResponse(error.status, error.code, 'Content service unavailable')
