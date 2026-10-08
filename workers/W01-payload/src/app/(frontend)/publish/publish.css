@@ -1262,3 +1262,76 @@
     grid-template-columns: 1fr;
   }
 }
+\n
+.lr-editor-outline nav {
+  min-width: 0;
+}
+
+.lr-editor-outline-list {
+  display: grid;
+  gap: 3px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lr-editor-outline-item button {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  min-height: 31px;
+  padding: 4px 7px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: #526078;
+  text-align: left;
+  cursor: pointer;
+}
+
+.lr-editor-outline-item button:hover:not(:disabled) {
+  border-color: #dce4ef;
+  background: #fff;
+  color: #1d4ed8;
+}
+
+.lr-editor-outline-item button:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+
+.lr-editor-outline-item button > span {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  min-height: 20px;
+  border-radius: 5px;
+  background: #f1f5f9;
+  color: #7b8799;
+  font-size: 8px;
+  font-weight: 800;
+}
+
+.lr-editor-outline-item button > strong {
+  overflow: hidden;
+  font-size: 10px;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lr-editor-outline-item.is-h3 {
+  margin-left: 16px;
+}
+
+.lr-editor-outline-item.is-h3 button > strong {
+  font-weight: 650;
+}
+
+@media (max-width: 640px) {
+  .lr-editor-outline-item button {
+    min-height: 34px;
+  }
+}
