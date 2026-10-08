@@ -31,6 +31,7 @@ export interface ContentRecord {
   creatorId: string | null
   ipId: string | null
   state: ContentState
+  scheduledAt: string | null
   version: number
   revision: number
   slug: string
@@ -78,6 +79,7 @@ interface ContentRow {
   creator_id: string | null
   ip_id: string | null
   state: ContentState
+  scheduled_at: string | null
   version: number
   revision: number
   slug: string
@@ -184,6 +186,7 @@ const toContent = (row: ContentRow): ContentRecord => ({
   creatorId: row.creator_id,
   ipId: row.ip_id,
   state: row.state,
+  scheduledAt: row.scheduled_at,
   version: row.version,
   revision: row.revision,
   slug: row.slug,
@@ -200,6 +203,7 @@ export const publicContent = (content: ContentRecord) => ({
   id: content.id,
   creatorId: content.creatorId,
   state: content.state,
+  scheduledAt: content.scheduledAt,
   version: content.version,
   etag: content.etag,
   slug: content.slug,
@@ -367,7 +371,7 @@ const loadMutationRow = async (
 ): Promise<{ content: ContentRecord | null; idempotency: IdempotencyRow }> => {
   const row = await db.prepare(
     `SELECT
-        c.id, c.content_type, c.owner_user_id, c.creator_id, c.ip_id, c.state, c.version, c.revision,
+        c.id, c.content_type, c.owner_user_id, c.creator_id, c.ip_id, c.state, c.scheduled_at, c.version, c.revision,
         c.slug, c.title, c.body_ref, c.media_refs_json, c.cover_ref, c.etag, c.created_at, c.updated_at,
         i.id AS idem_id,
         i.owner_user_id AS idem_owner_user_id,
@@ -477,7 +481,7 @@ export async function getContent(
 ): Promise<ContentRecord> {
   assertContentReference(contentId)
   const row = await db.prepare(
-    `SELECT id, content_type, owner_user_id, creator_id, ip_id, state, version, revision,
+    `SELECT id, content_type, owner_user_id, creator_id, ip_id, state, scheduled_at, version, revision,
             slug, title, body_ref, media_refs_json, cover_ref, etag, created_at, updated_at
        FROM contents
       WHERE (id = ? OR slug = ?)
@@ -576,7 +580,7 @@ export async function listCreatorContents(
     bindings.push(decoded.updatedAt, decoded.updatedAt, decoded.id)
   }
   const rows = await db.prepare(
-    `SELECT id, content_type, owner_user_id, creator_id, ip_id, state, version, revision,
+    `SELECT id, content_type, owner_user_id, creator_id, ip_id, state, scheduled_at, version, revision,
             slug, title, body_ref, media_refs_json, cover_ref, etag, created_at, updated_at
        FROM contents
       WHERE ${conditions.join(' AND ')}
@@ -625,7 +629,7 @@ export async function listContents(
   }
 
   const rows = await db.prepare(
-    `SELECT id, content_type, owner_user_id, creator_id, ip_id, state, version, revision,
+    `SELECT id, content_type, owner_user_id, creator_id, ip_id, state, scheduled_at, version, revision,
             slug, title, body_ref, media_refs_json, cover_ref, etag, created_at, updated_at
        FROM contents
       WHERE ${conditions.join(' AND ')}
@@ -692,11 +696,12 @@ export async function createContent(
       (parsed.coverRef !== null && typeof parsed.coverRef !== 'string') ||
       typeof parsed.etag !== 'string' ||
       typeof parsed.createdAt !== 'string' ||
-      typeof parsed.updatedAt !== 'string'
+      typeof parsed.updatedAt !== 'string' ||
+      (parsed.scheduledAt !== undefined && parsed.scheduledAt !== null && typeof parsed.scheduledAt !== 'string')
     ) {
       throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
     }
-    return parsed as ContentRecord
+    return { ...parsed, scheduledAt: typeof parsed.scheduledAt === 'string' ? parsed.scheduledAt : null } as ContentRecord
   }
 
   const contentId = crypto.randomUUID()
@@ -710,6 +715,7 @@ export async function createContent(
     creatorId: ownerUserId,
     ipId: null,
     state: 'DRAFT',
+    scheduledAt: null,
     version: 1,
     revision: 1,
     slug,
@@ -727,8 +733,8 @@ export async function createContent(
     insertCompletedIdempotency(db, ownerUserId, operationId, idempotencyKey, hash, 201, JSON.stringify(createdContent), createdAt, expiresAt),
     db.prepare(
       `INSERT INTO contents
-        (id, content_type, owner_user_id, creator_id, ip_id, state, version, revision, slug, title, body_ref, media_refs_json, cover_ref, etag, created_at, updated_at)
-       VALUES (?, ?, ?, ?, NULL, 'DRAFT', 1, 1, ?, ?, ?, ?, ?, ?, ?, ?) `,
+        (id, content_type, owner_user_id, creator_id, ip_id, state, scheduled_at, version, revision, slug, title, body_ref, media_refs_json, cover_ref, etag, created_at, updated_at)
+       VALUES (?, ?, ?, ?, NULL, 'DRAFT', NULL, 1, 1, ?, ?, ?, ?, ?, ?, ?, ?) `,
     ).bind(contentId, normalized.contentType, ownerUserId, ownerUserId, slug, normalized.title, normalized.bodyRef, JSON.stringify(normalized.mediaRefs), normalized.coverRef, createdContent.etag, createdAt, createdAt),
     atomicGuard(db),
     insertRevision(db, {
@@ -791,6 +797,7 @@ export async function updateContent(
   const updatedAt = now.toISOString()
   const updated: ContentRecord = {
     ...content,
+    scheduledAt: content.scheduledAt,
     title: normalized.title,
     bodyRef: normalized.bodyRef,
     mediaRefs: normalized.mediaRefs,
@@ -881,6 +888,7 @@ export async function rollbackContentRevision(
   const updatedAt = now.toISOString()
   const updated: ContentRecord = {
     ...content,
+    scheduledAt: null,
     slug: source.slug,
     title: source.title,
     bodyRef: source.body_ref,
@@ -1004,6 +1012,7 @@ export const canTransitionContentState = (
   if (from === 'DRAFT' && to === 'PENDING_REVIEW') return true
   if (from === 'REJECTED' && to === 'DRAFT') return true
   if (from === 'APPROVED' && to === 'PUBLISHED') return true
+  if (from === 'APPROVED' && to === 'SCHEDULED') return true
   if (from === 'SCHEDULED' && to === 'DRAFT') return true
   if (from === 'PUBLISHED' && (to === 'UNPUBLISHED' || to === 'ARCHIVED')) return true
   if (from === 'PUBLISHED' && to === 'PENDING_REVIEW') return reason === 'material_edit_requires_review'
@@ -1012,6 +1021,13 @@ export const canTransitionContentState = (
   if (from === 'DELETED' && to === 'RESTORED') return true
   if (from === 'RESTORED' && to === 'DRAFT') return true
   return false
+}
+
+const normalizeScheduledAt = (value: unknown, now: Date): string => {
+  if (typeof value !== 'string' || !value.trim()) throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+  const parsed = Date.parse(value)
+  if (!Number.isFinite(parsed) || parsed <= now.getTime()) throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+  return new Date(parsed).toISOString()
 }
 
 export async function transitionContentState(
@@ -1024,7 +1040,8 @@ export async function transitionContentState(
   ifMatch: string,
   idempotencyKey: string,
   now = new Date(),
-): Promise<{ from: ContentState; to: ContentState; version: number; etag: string }> {
+  options: { scheduledAt?: string | null } = {},
+): Promise<{ from: ContentState; to: ContentState; version: number; etag: string; scheduledAt: string | null }> {
   assertResourceId(principalUserId)
   assertResourceId(contentId)
   if (!isState(to) || !ifMatch || !idempotencyKey) {
@@ -1035,7 +1052,8 @@ export async function transitionContentState(
   if (!kind) throw new ContentRuntimeError('PERMISSION_DENIED', 403)
 
   const operationId = 'transitionContentState'
-  const hash = await requestHash(operationId, { contentId, to, reason: reason ?? null, ifMatch: normalizeEtag(ifMatch) })
+  const normalizedRequestedScheduledAt = to === 'SCHEDULED' ? normalizeScheduledAt(options.scheduledAt, now) : null
+  const hash = await requestHash(operationId, { contentId, to, reason: reason ?? null, scheduledAt: normalizedRequestedScheduledAt, ifMatch: normalizeEtag(ifMatch) })
   const { content, idempotency } = await loadMutationRow(db, contentId, operationId, idempotencyKey, principalUserId)
   const replay = inspectIdempotency(idempotency, principalUserId, hash, now)
   if (replay.replayed) {
@@ -1053,22 +1071,64 @@ export async function transitionContentState(
     throw new ContentRuntimeError('INVALID_STATE', 409)
   }
 
+  if (to !== 'SCHEDULED' && options.scheduledAt !== undefined && options.scheduledAt !== null) {
+    throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+  }
+
   const nextVersion = content.version + 1
   const updatedAt = now.toISOString()
-  const result = { from: content.state, to, version: nextVersion, etag: etagForVersion(nextVersion) }
+  const scheduledAt = to === 'SCHEDULED' ? normalizedRequestedScheduledAt : null
+  const result = { from: content.state, to, version: nextVersion, etag: etagForVersion(nextVersion), scheduledAt }
   const expiresAt = new Date(now.getTime() + IDEMPOTENCY_TTL_MS).toISOString()
 
   await batchMutation(db, [
     expireMutationRow(db, principalUserId, operationId, idempotencyKey, updatedAt),
     insertCompletedIdempotency(db, principalUserId, operationId, idempotencyKey, hash, 200, JSON.stringify(result), updatedAt, expiresAt),
     db.prepare(
-      `UPDATE contents SET state=?, version=?, etag=?, updated_at=?
+      `UPDATE contents SET state=?, scheduled_at=?, version=?, etag=?, updated_at=?
         WHERE id=? AND version=? AND etag=?`,
-    ).bind(to, nextVersion, result.etag, updatedAt, content.id, content.version, content.etag),
+    ).bind(to, scheduledAt, nextVersion, result.etag, updatedAt, content.id, content.version, content.etag),
     atomicGuard(db),
   ])
 
   return result
+}
+
+export async function publishDueScheduledContent(
+  db: ContentD1,
+  now = new Date(),
+  limit = 50,
+): Promise<{ scanned: number; published: number }> {
+  const pageSize = Math.min(Math.max(Number.isSafeInteger(limit) ? limit : 50, 1), 50)
+  const nowIso = now.toISOString()
+  const rows = await db.prepare(
+    `SELECT id, version, scheduled_at
+       FROM contents
+      WHERE state = 'SCHEDULED' AND scheduled_at IS NOT NULL AND scheduled_at <= ?
+      ORDER BY scheduled_at ASC, id ASC
+      LIMIT ?`,
+  ).bind(nowIso, pageSize).all<{ id: string; version: number; scheduled_at: string }>()
+
+  if (!rows.results.length) return { scanned: 0, published: 0 }
+
+  const statements = rows.results.map((row) => {
+    const nextVersion = row.version + 1
+    return db.prepare(
+      `UPDATE contents
+          SET state = 'PUBLISHED', scheduled_at = NULL, version = ?, etag = ?, updated_at = ?
+        WHERE id = ? AND state = 'SCHEDULED' AND scheduled_at = ? AND version = ?`,
+    ).bind(
+      nextVersion,
+      etagForVersion(nextVersion),
+      nowIso,
+      row.id,
+      row.scheduled_at,
+      row.version,
+    )
+  })
+  const results = await db.batch(statements)
+  const published = results.reduce((count, result) => count + Number(result.meta?.changes ?? 0), 0)
+  return { scanned: rows.results.length, published }
 }
 
 export function encodeCursor(updatedAt: string, id: string): string {
