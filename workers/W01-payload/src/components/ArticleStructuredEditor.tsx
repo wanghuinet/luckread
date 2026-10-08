@@ -21,6 +21,8 @@ import {
   mediaRefsFromArticleDocument,
   removeMediaRefFromArticleDocument,
   reorderArticleMediaRef,
+  mergeArticleBlockWithPrevious,
+  splitArticleBlock,
   transformArticleBlock,
   normalizeArticleDocument,
   plainTextFromArticleDocument,
@@ -65,6 +67,7 @@ const updateBlock = (
 
 export default function ArticleStructuredEditor({ value, disabled = false, mediaAssets = [], onChange, plugins = [] }: Props) {
   const editorRef = useRef<HTMLElement | null>(null)
+  const textAreaRefs = useRef<Record<string, HTMLTextAreaElement | null>>({})
   const historyRef = useRef<ArticleDocumentHistory>(createArticleDocumentHistory())
   const pendingHistorySnapshotRef = useRef<string | null>(null)
   const lastDocumentSnapshotRef = useRef(JSON.stringify(value))
@@ -270,6 +273,17 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
     })
   }
 
+  function splitBlockAtCursor(index: number) {
+    const block = value.blocks[index]
+    const textarea = block ? textAreaRefs.current[block.id] : null
+    if (!textarea || !block) return
+    emit(splitArticleBlock(value, index, textarea.selectionStart))
+  }
+
+  function mergeBlockWithPrevious(index: number) {
+    emit(mergeArticleBlockWithPrevious(value, index))
+  }
+
   function removeMediaReference(mediaRef: string) {
     emit(removeMediaRefFromArticleDocument(value, mediaRef))
   }
@@ -410,6 +424,31 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
                 >
                   ＋
                 </button>
+                {block.type !== 'divider' && block.type !== 'image' && block.type !== 'gallery' ? (
+                  <>
+                    <button
+                      aria-label="在光标处分段"
+                      disabled={disabled || value.blocks.length >= ARTICLE_MAX_BLOCKS}
+                      onClick={() => splitBlockAtCursor(index)}
+                      type="button"
+                    >
+                      分段
+                    </button>
+                    <button
+                      aria-label="与上一同类区块合并"
+                      disabled={
+                        disabled ||
+                        index === 0 ||
+                        !['paragraph', 'quote', 'bulletList', 'orderedList'].includes(block.type) ||
+                        value.blocks[index - 1]?.type !== block.type
+                      }
+                      onClick={() => mergeBlockWithPrevious(index)}
+                      type="button"
+                    >
+                      合并
+                    </button>
+                  </>
+                ) : null}
                 {imageAssets.length ? (
                   <>
                     <button
@@ -501,6 +540,9 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
               </div>
             ) : (
               <textarea
+                ref={(element) => {
+                  textAreaRefs.current[block.id] = element
+                }}
                 aria-label={blockLabels[block.type]}
                 disabled={disabled}
                 maxLength={ARTICLE_MAX_BLOCK_TEXT}
