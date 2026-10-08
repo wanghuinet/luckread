@@ -2,6 +2,7 @@ import { cachedPublicGet } from '../../../../../../lib/public-response-cache.js'
 import { hasAuthenticatedSessionCredential } from '../../../../../../lib/content-list-cache-guard.js'
 import { TrafficLimitError, enforcePublicReadRateLimit, rateLimitResponse } from '../../../../../../auth/traffic-limit.js'
 import {
+  callW03Content,
   callW05Social,
   callW05SocialPublic,
   resolveCookieSocialPrincipal,
@@ -9,6 +10,7 @@ import {
   resolveSocialMentionTargets,
   W05SocialClientError,
 } from '../../../../../../social/w05-social-client.js'
+import { resolveCookieContentPrincipal } from '../../../../../../content/w03-content-client.js'
 
 const errorResponse = (status: number, code: string, message: string) =>
   Response.json({ error: { code, message, details: {} }, requestId: crypto.randomUUID() }, { status })
@@ -66,7 +68,27 @@ export async function POST(
       return errorResponse(400, 'VALIDATION_FAILED', 'Invalid social metadata request')
     }
 
-    const text = (value as { text?: unknown }).text
+    let text = (value as { text?: unknown }).text
+    if (text === undefined) {
+      const contentPrincipal = await resolveCookieContentPrincipal(request)
+      if (contentPrincipal instanceof Response) return contentPrincipal
+      const contentResponse = await callW03Content({
+        request,
+        pathname: '/internal/content/contents/' + encodeURIComponent(contentId),
+        method: 'GET',
+        principal: contentPrincipal,
+      })
+      if (!contentResponse.ok) return contentResponse
+      let contentData: unknown
+      try { contentData = await contentResponse.json() } catch { return errorResponse(503, 'INVALID_CONTENT_RESPONSE', 'Content response could not be read') }
+      const record = contentData as { bodyRef?: unknown }
+      if (typeof record.bodyRef !== 'string' || !record.bodyRef.trim()) {
+        return errorResponse(409, 'CONTENT_BODY_UNAVAILABLE', 'Content body is unavailable')
+      }
+      const bodyResponse = await fetch(record.bodyRef, { method: 'GET' })
+      if (!bodyResponse.ok) return errorResponse(409, 'CONTENT_BODY_UNAVAILABLE', 'Content body is unavailable')
+      text = await bodyResponse.text()
+    }
     if (typeof text !== 'string' || text.length > 10000) {
       return errorResponse(400, 'VALIDATION_FAILED', 'Invalid social metadata text')
     }
