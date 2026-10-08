@@ -21,6 +21,14 @@ describe('short video playback polish', () => {
     expect(css).toContain('.progressValue')
   })
 
+  it('keeps author and control entry points accessible and public-profile aware', () => {
+    const feed = read('src/app/(frontend)/shorts/ShortVideoFeed.tsx')
+    expect(feed).toContain('const creatorHref = item.creatorId')
+    expect(feed).toContain("'/' + encodeURIComponent(profileById[item.creatorId].username)")
+    expect(feed).toContain("aria-label={muted ? '打开声音' : '关闭声音'}")
+    expect(feed).toContain('aria-label="发布视频"')
+  })
+
   it('does not turn scroll events into high-frequency React state updates', () => {
     const feed = read('src/app/(frontend)/shorts/ShortVideoFeed.tsx')
     expect(feed).not.toContain('onScroll={() => setActiveProgress(0)}')
