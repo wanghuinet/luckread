@@ -658,12 +658,12 @@
   .contentOverlay {
     left: 12px;
     right: 91px;
-    bottom: 75px;
+    bottom: calc(75px + env(safe-area-inset-bottom));
   }
 
   .actionRail {
     right: 7px;
-    bottom: 76px;
+    bottom: calc(76px + env(safe-area-inset-bottom));
     gap: 9px;
   }
 
@@ -683,6 +683,28 @@
     top: 70px;
     left: 12px;
     right: 12px;
+  }
+
+  .soundButtonWrap {
+    right: 12px;
+    bottom: calc(12px + env(safe-area-inset-bottom));
+  }
+
+  .bottomNav {
+    min-height: 68px;
+    padding-bottom: max(10px, env(safe-area-inset-bottom));
+  }
+
+  .commentsDrawer {
+    width: 100%;
+    height: min(78dvh, 720px);
+    margin-top: auto;
+    border-radius: 18px 18px 0 0;
+    box-shadow: 0 -20px 60px rgba(0,0,0,.28);
+  }
+
+  .commentsHeader {
+    min-height: 58px;
   }
 }
 

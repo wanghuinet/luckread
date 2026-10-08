@@ -664,6 +664,18 @@ export default function ShortVideoFeed() {
     setCommentsOpen(false)
   }
 
+  useEffect(() => {
+    if (!commentsOpen) return
+    const handleCommentsKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        closeComments()
+      }
+    }
+    window.addEventListener('keydown', handleCommentsKeyDown)
+    return () => window.removeEventListener('keydown', handleCommentsKeyDown)
+  }, [commentsOpen])
+
   const activeItem = visibleItems[activeIndex]
   if (loading) {
     return <main className={styles.shell}><div className={styles.loading}>正在加载短视频…</div></main>
