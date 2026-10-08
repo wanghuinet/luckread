@@ -131,7 +131,7 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
       const target = event.target
       if (target instanceof HTMLElement && (
         target.tagName === 'INPUT' ||
-        target.tagName === 'TEXTAREA' ||
+        target.tagName === 'SELECT' ||
         target.isContentEditable
       )) return
 
