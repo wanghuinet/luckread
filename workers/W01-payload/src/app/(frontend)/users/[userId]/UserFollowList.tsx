@@ -124,13 +124,14 @@ export default function UserFollowList({
 
     void (async () => {
       try {
-        const [profileResponse, listResponse] = await Promise.all([
-          fetch('/api/v1/users/' + encodeURIComponent(userId), {
+        const [profileResult, listResult] = await Promise.all([
+          fetchJson<ProfileResponse>('/api/v1/users/' + encodeURIComponent(userId), {
+            credentials: 'omit',
             headers: { accept: 'application/json' },
             cache: 'no-store',
             signal: controller.signal,
           }),
-          fetch('/api/v1/users/' + encodeURIComponent(userId) + '/' + direction + '?limit=' + String(PAGE_SIZE), {
+          fetchJson<ListResponse>('/api/v1/users/' + encodeURIComponent(userId) + '/' + direction + '?limit=' + String(PAGE_SIZE), {
             credentials: 'omit',
             headers: { accept: 'application/json' },
             cache: 'no-store',
@@ -138,8 +139,8 @@ export default function UserFollowList({
           }),
         ])
 
-        const profileData = await profileResponse.json().catch((): null => null) as ProfileResponse | null
-        const listData = await listResponse.json().catch((): null => null) as ListResponse | null
+        const { response: profileResponse, data: profileData } = profileResult
+        const { response: listResponse, data: listData } = listResult
 
         if (!profileResponse.ok || !profileData || !('id' in profileData)) {
           throw new Error(profileResponse.status === 404 ? '用户不存在。' : '用户资料加载失败')
