@@ -167,6 +167,38 @@
   background: #090909;
 }
 
+.mediaBuffering {
+  position: absolute;
+  z-index: 7;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 999px;
+  background: rgba(0,0,0,.54);
+  backdrop-filter: blur(10px);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+  pointer-events: none;
+}
+
+.mediaSpinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(255,255,255,.3);
+  border-top-color: #fff;
+  border-radius: 999px;
+  animation: media-spinner 800ms linear infinite;
+}
+
+@keyframes media-spinner {
+  to { transform: rotate(360deg); }
+}
+
 .mediaError {
   position: absolute;
   z-index: 7;

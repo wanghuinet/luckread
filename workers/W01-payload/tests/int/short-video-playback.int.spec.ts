@@ -55,6 +55,21 @@ describe('short video playback polish', () => {
     expect(feed).toContain('const closeComments = () => {')
   })
 
+  it('shows an explicit buffering state for slow short-video playback', () => {
+    const feed = read('src/app/(frontend)/shorts/ShortVideoFeed.tsx')
+    const css = read('src/app/(frontend)/shorts/short-video.module.css')
+    expect(feed).toContain('const [bufferingById, setBufferingById]')
+    expect(feed).toContain('onWaiting={() => {')
+    expect(feed).toContain('onCanPlay={() => {')
+    expect(feed).toContain('onPlaying={() => {')
+    expect(feed).toContain('styles.mediaBuffering')
+    expect(feed).toContain('styles.mediaSpinner')
+    expect(feed).toContain("视频加载中…")
+    expect(css).toContain('.mediaBuffering')
+    expect(css).toContain('.mediaSpinner')
+    expect(css).toContain('@keyframes media-spinner')
+  })
+
   it('exposes a recoverable media error path without changing the feed authority', () => {
     const feed = read('src/app/(frontend)/shorts/ShortVideoFeed.tsx')
     expect(feed).toContain('const [mediaErrorById, setMediaErrorById]')
