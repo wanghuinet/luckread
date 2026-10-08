@@ -21,7 +21,6 @@ type UploadedMedia = {
   id?: string | number
 }
 
-
 const MAX_FILE_BYTES = 50 * 1024 * 1024
 const MAX_MEDIA_BYTES = 50 * 1024 * 1024
 const MAX_IMAGES = 50
@@ -43,14 +42,20 @@ async function uploadImage(
   form.append('_payload', JSON.stringify({ alt: alt?.trim() || 'Imported Word image' }))
   form.append('file', new Blob([bytes as BlobPart], { type: mimeType }), filename)
 
-  const { response, data: payload } = await fetchJson<{ doc?: UploadedMedia; url?: string; message?: string; error?: { message?: string } }>('/api/v1/media', {
+  const { response, data: payload } = await fetchJson<{
+    doc?: UploadedMedia
+    url?: string
+    id?: string | number
+    message?: string
+    error?: { message?: string }
+  }>('/api/v1/media', {
     method: 'POST',
     credentials: 'include',
     headers: { 'Idempotency-Key': idempotencyKey },
     body: form,
   })
-  const url = payload.doc?.url ?? payload.url
-  const mediaId = payload.doc?.id ?? payload.id
+  const url = payload?.doc?.url ?? payload?.url
+  const mediaId = payload?.doc?.id ?? payload?.id
   if (!response.ok || typeof url !== 'string' || !url || (typeof mediaId !== 'string' && typeof mediaId !== 'number')) {
     throw new Error(getApiErrorMessage(payload, payload?.message || 'Word 图片上传失败'))
   }
