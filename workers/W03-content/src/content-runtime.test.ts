@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-import { canTransitionContentState, createContent, decodeCursor, encodeCursor, isState, listContents, publishDueScheduledContent, transitionContentState, updateContent, validateInput, validateListFilters } from './content-runtime.js'
+import { actorKindForLayer, canTransitionContentState, createContent, decodeCursor, encodeCursor, isState, listContents, publishDueScheduledContent, transitionContentState, updateContent, validateInput, validateListFilters } from './content-runtime.js'
 import w03Worker, { hasCreatorContentPermission, parseListLimit } from './index.js'
 
 describe('W03 content contract core', () => {
@@ -248,6 +248,15 @@ describe('W03 content contract core', () => {
 
     expect(page.items[0]?.contentType).toBe('video')
     expect(preparedQueries[0]).toContain("WHERE state = 'PUBLISHED' AND content_type = ?")
+  })
+
+  it('keeps creator state-transition actor mapping aligned with L3-L8 permissions', () => {
+    expect(actorKindForLayer('L3')).toBe('CREATOR')
+    expect(actorKindForLayer('L4')).toBe('CREATOR')
+    expect(actorKindForLayer('L8')).toBe('CREATOR')
+    expect(actorKindForLayer('L2')).toBeNull()
+    expect(actorKindForLayer('L9')).toBeNull()
+    expect(actorKindForLayer('creator')).toBeNull()
   })
 
   it('requires L3 or higher for creator content operations', () => {
