@@ -195,3 +195,11 @@ it('keeps legacy plain-text article bodies on the backward-compatible renderer',
   expect(page).toContain('splitBodyIntoParagraphs(body)')
   expect(page).toContain('content-detail-paragraph')
 })
+
+
+it('handles the follow DELETE no-body response without attempting JSON parsing', () => {
+  const page = read('src/app/(frontend)/content/[contentId]/ContentDetailClient.tsx')
+  expect(page).toContain('if (following) {')
+  expect(page).toContain('setFollowing(false)')
+  expect(page).toContain("const data = await response.json().catch((): null => null) as { data?: { following?: boolean } } | null")
+})
