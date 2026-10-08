@@ -337,6 +337,10 @@ export default function ShortVideoFeed() {
   }, [setActive, visibleItems.length])
 
   useEffect(() => {
+    setActiveProgress(0)
+  }, [activeIndex])
+
+  useEffect(() => {
     if (!page.hasMore || !page.nextCursor || loadingMore) return
     if (activeIndex < Math.max(visibleItems.length - 3, 0)) return
     void loadPage(page.nextCursor)
@@ -603,7 +607,7 @@ export default function ShortVideoFeed() {
         </div>
       </header>
 
-      <section className={styles.feed} aria-label="短视频流" onScroll={() => setActiveProgress(0)}>
+      <section className={styles.feed} aria-label="短视频流">
         {visibleItems.map((item, index) => {
           const videoUrl = item.mediaRefs?.[0]
           const interaction = interactionById[item.id] ?? initialInteraction
