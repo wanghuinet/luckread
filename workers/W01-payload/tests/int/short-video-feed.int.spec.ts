@@ -62,3 +62,15 @@ describe('TikTok-style short video feed', () => {
     expect(feed).not.toContain('new Worker')
   })
 })
+
+
+describe('short video creator profile routing', () => {
+  it('prefers the canonical username profile route and keeps an id fallback while profile data loads', () => {
+    const feed = read('src/app/(frontend)/shorts/ShortVideoFeed.tsx')
+    expect(feed).toContain('const creatorHref = item.creatorId')
+    expect(feed).toContain("const creatorUsername = item.creatorId ? profileById[item.creatorId]?.username : null")
+    expect(feed).toContain("creatorUsername ? '/' + encodeURIComponent(creatorUsername)")
+    expect(feed).toContain("'/users/' + encodeURIComponent(item.creatorId)")
+    expect(feed).toContain('href={creatorHref}')
+  })
+})
