@@ -2,6 +2,8 @@
 
 import { useState } from 'react'
 
+import { fetchJson, getApiErrorMessage } from '../../../lib/client-api.js'
+
 import styles from './creator-center.module.css'
 
 type ModerationItem = {
@@ -42,12 +44,11 @@ export default function CreatorModerationQueue() {
     setLoading(true)
     setError('')
     try {
-      const response = await fetch('/api/v1/admin/moderation/queue?limit=20', {
+      const { response, data } = await fetchJson<QueueResponse>('/api/v1/admin/moderation/queue?limit=20', {
         credentials: 'include',
         cache: 'no-store',
         headers: { accept: 'application/json' },
       })
-      const data = await response.json().catch((): null => null) as QueueResponse | null
       if (response.status === 403) {
         setLoaded(true)
         setItems([])
@@ -60,7 +61,7 @@ export default function CreatorModerationQueue() {
         return
       }
       if (!response.ok || !Array.isArray(data?.items)) {
-        throw new Error(data?.error?.message || '审核队列读取失败')
+        throw new Error(getApiErrorMessage(data, '审核队列读取失败'))
       }
       setItems(data.items)
       setLoaded(true)
@@ -84,7 +85,7 @@ export default function CreatorModerationQueue() {
     setError('')
     setMessage('')
     try {
-      const response = await fetch(
+      const { response, data } = await fetchJson<DecisionResponse>(
         '/api/v1/admin/moderation/cases/' + encodeURIComponent(item.caseId) + '/decision',
         {
           method: 'POST',
@@ -108,14 +109,13 @@ export default function CreatorModerationQueue() {
           }),
         },
       )
-      const data = await response.json().catch((): null => null) as DecisionResponse | null
       if (response.status === 401) {
         const returnTo = window.location.pathname + window.location.search + window.location.hash
         window.location.assign('/admin/login?returnTo=' + encodeURIComponent(returnTo))
         return
       }
       if (!response.ok || data?.outcome !== outcome) {
-        throw new Error(data?.error?.message || '审核决定提交失败')
+        throw new Error(getApiErrorMessage(data, '审核决定提交失败'))
       }
       setMessage(outcome === 'APPROVED' ? '内容已批准，已进入内容发布状态处理。' : '内容已退回。')
       await loadQueue()
