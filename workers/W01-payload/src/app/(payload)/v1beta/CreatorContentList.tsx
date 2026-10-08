@@ -3,6 +3,8 @@
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
+import { fetchJson, getApiErrorMessage } from '../../../lib/client-api.js'
+
 import styles from './creator-center.module.css'
 import ContentRevisionHistory from './ContentRevisionHistory'
 import CreatorActionButton from './CreatorActionButton'
@@ -81,20 +83,19 @@ export default function CreatorContentList({ loginPath = '/admin/login' }: { log
       if (status) params.set('status', status)
       if (type) params.set('type', type)
 
-      const response = await fetch(`/api/creator/contents?${params.toString()}`, {
+      const { response, data } = await fetchJson<{ data?: Page; error?: { message?: string } }>(`/api/creator/contents?${params.toString()}`, {
         method: 'GET',
         credentials: 'include',
         headers: { accept: 'application/json' },
         signal: controller.signal,
       })
-      const data = await response.json().catch((): null => null)
       if (response.status === 401) {
         const returnTo = window.location.pathname + window.location.search + window.location.hash
         window.location.assign(loginPath + '?returnTo=' + encodeURIComponent(returnTo))
         return
       }
       if (!response.ok || !data?.data) {
-        throw new Error(data?.error?.message || '内容列表加载失败')
+        throw new Error(getApiErrorMessage(data, '内容列表加载失败'))
       }
       if (requestId !== requestIdRef.current) return
       const next = data.data as Page
@@ -140,7 +141,7 @@ export default function CreatorContentList({ loginPath = '/admin/login' }: { log
   }, [load])
 
   async function requestTransition(itemId: string, to: 'PUBLISHED' | 'UNPUBLISHED' | 'ARCHIVED' | 'RESTORED' | 'DRAFT' | 'SCHEDULED', version: number, scheduledAt?: string) {
-    const response = await fetch(`/api/creator/contents/${encodeURIComponent(itemId)}/state`, {
+    const { response, data } = await fetchJson<{ version?: unknown; error?: { message?: string } }>(`/api/creator/contents/${encodeURIComponent(itemId)}/state`, {
       method: 'POST',
       credentials: 'include',
       headers: {
@@ -151,13 +152,12 @@ export default function CreatorContentList({ loginPath = '/admin/login' }: { log
       },
       body: JSON.stringify({ to, ...(scheduledAt ? { scheduledAt } : {}) }),
     })
-    const data = await response.json().catch((): null => null)
     if (response.status === 401) {
       const returnTo = window.location.pathname + window.location.search + window.location.hash
       window.location.assign(loginPath + '?returnTo=' + encodeURIComponent(returnTo))
       throw new Error('AUTH_REQUIRED')
     }
-    if (!response.ok) throw new Error(data?.error?.message || '内容状态更新失败')
+    if (!response.ok) throw new Error(getApiErrorMessage(data, '内容状态更新失败'))
     return data as { version?: unknown }
   }
 
@@ -284,7 +284,7 @@ export default function CreatorContentList({ loginPath = '/admin/login' }: { log
     setActionId(item.id)
     setError('')
     try {
-      const response = await fetch(`/api/creator/contents/${encodeURIComponent(item.id)}`, {
+      const { response, data } = await fetchJson<{ error?: { message?: string } }>(`/api/creator/contents/${encodeURIComponent(item.id)}`, {
         method: 'DELETE',
         credentials: 'include',
         headers: {
@@ -293,13 +293,12 @@ export default function CreatorContentList({ loginPath = '/admin/login' }: { log
           'Idempotency-Key': crypto.randomUUID(),
         },
       })
-      const data = await response.json().catch((): null => null)
       if (response.status === 401) {
         const returnTo = window.location.pathname + window.location.search + window.location.hash
         window.location.assign(loginPath + '?returnTo=' + encodeURIComponent(returnTo))
         return
       }
-      if (!response.ok) throw new Error(data?.error?.message || '删除失败')
+      if (!response.ok) throw new Error(getApiErrorMessage(data, '删除失败'))
       await load()
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : '删除失败')
