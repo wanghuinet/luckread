@@ -77,6 +77,12 @@ export const markdownToArticleDocument = (raw: string): MarkdownImportResult => 
   }
 
   for (const line of lines) {
+    if (/^\s*(?:---+|___+|\*\s*\*\s*\*+(?:\s*\*)*)\s*$/u.test(line)) {
+      flushText()
+      blocks.push({ id: crypto.randomUUID(), type: 'divider', text: '' })
+      continue
+    }
+
     const unsupportedKind = hasUnsupportedSyntax(line)
     if (unsupportedKind) {
       unsupported.add(unsupportedKind)
@@ -99,12 +105,6 @@ export const markdownToArticleDocument = (raw: string): MarkdownImportResult => 
       } else {
         unsupported.add('H1/H4-H6 标题层级')
       }
-      continue
-    }
-
-    if (/^\s*(?:---+|___+|\*\*\*+)\s*$/u.test(line)) {
-      flushText()
-      blocks.push({ id: crypto.randomUUID(), type: 'divider', text: '' })
       continue
     }
 
