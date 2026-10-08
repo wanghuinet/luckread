@@ -14,6 +14,7 @@ import {
   listContentRevisions,
   getContentRevision,
   rollbackContentRevision,
+  publishDueScheduledContent,
   updateContent,
   type ContentState,
   type ContentD1,
@@ -226,7 +227,7 @@ const getPath = (pathname: string): {id?: string; state?: boolean; preflight?: b
   return null
 }
 
-export default {
+const worker = {
   async fetch(request: Request, env: Env): Promise<Response> {
     try {
       const url = new URL(request.url)
@@ -641,6 +642,7 @@ export default {
               bodyRef: item.bodyRef,
               mediaRefs: item.mediaRefs,
               coverRef: item.coverRef,
+              scheduledAt: item.scheduledAt,
               updatedAt: item.updatedAt,
             })),
             nextCursor: page.nextCursor,
@@ -683,6 +685,7 @@ export default {
               bodyRef: item.bodyRef,
               mediaRefs: item.mediaRefs,
               coverRef: item.coverRef,
+              scheduledAt: item.scheduledAt,
             })),
             nextCursor: page.nextCursor,
             hasMore: page.hasMore,
@@ -721,6 +724,14 @@ export default {
           if (report.verdict === 'RED') throw new ContentRuntimeError('PREFLIGHT_BLOCKED', 422)
         }
         const reason = typeof body.reason === 'string' ? body.reason : undefined
+        const requestedScheduledAt =
+          body.scheduledAt === undefined
+            ? undefined
+            : body.scheduledAt === null
+              ? null
+              : typeof body.scheduledAt === 'string'
+                ? body.scheduledAt
+                : (() => { throw new ContentRuntimeError('VALIDATION_FAILED', 400) })()
         const result = await transitionContentState(
           env.D1_02,
           principal.userId,
@@ -731,6 +742,7 @@ export default {
           requireIfMatch(request),
           requireIdempotency(request),
           new Date(),
+          { scheduledAt: requestedScheduledAt },
         )
         return json(result)
       }
@@ -778,6 +790,7 @@ export default {
           bodyRef: content.bodyRef,
           mediaRefs: content.mediaRefs,
           coverRef: content.coverRef,
+          scheduledAt: content.scheduledAt,
           updatedAt: content.updatedAt,
         })
       }
@@ -803,6 +816,7 @@ export default {
           etag: content.etag,
           title: content.title,
           bodyRef: content.bodyRef,
+          scheduledAt: content.scheduledAt,
         })
       }
 
@@ -823,4 +837,16 @@ export default {
       return toErrorResponse(error)
     }
   },
+
+  async scheduled(controller: ScheduledController, env: Env): Promise<void> {
+    if (controller.cron !== '* * * * *') return
+    const result = await publishDueScheduledContent(env.D1_02, new Date(controller.scheduledTime), 50)
+    console.log(JSON.stringify({
+      event: 'content.scheduled-publish',
+      cron: controller.cron,
+      scheduledTime: new Date(controller.scheduledTime).toISOString(),
+      ...result,
+    }))
+  },
 }
+export default worker
