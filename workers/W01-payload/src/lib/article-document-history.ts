@@ -105,38 +105,8 @@ export const redoArticleDocumentHistory = (
   return {
     history: {
       ...history,
-      past: history.past.slice(0, -1),
-      future: [...history.future, snapshot(current)],
-      lastRecordKey: null,
-    },
-    document: next,
-  }
-}
-
-export const redoArticleDocumentHistory = (
-  history: ArticleDocumentHistory,
-  current: ArticleDocument,
-): { history: ArticleDocumentHistory; document: ArticleDocument | null } => {
-  const nextSnapshot = history.future.at(-1)
-  if (!nextSnapshot) return { history, document: null }
-
-  const next = tryDeserializeArticleDocument(nextSnapshot)
-  if (!next) {
-    return {
-      history: {
-        ...history,
-        future: history.future.slice(0, -1),
-        lastRecordKey: null,
-      },
-      document: null,
-    }
-  }
-
-  return {
-    history: {
-      ...history,
-      past: [...history.past, snapshot(current)].slice(-history.limit),
       future: history.future.slice(0, -1),
+      past: [...history.past, snapshot(current)].slice(-history.limit),
       lastRecordKey: null,
     },
     document: next,
