@@ -71,7 +71,9 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
   const editorRef = useRef<HTMLElement | null>(null)
   const textAreaRefs = useRef<Record<string, HTMLTextAreaElement | null>>({})
   const blockRefs = useRef<Record<string, HTMLElement | null>>({})
+  const mediaButtonRefs = useRef<Record<string, HTMLButtonElement | null>>({})
   const pendingFocusRef = useRef<{ blockId: string; offset: number } | null>(null)
+  const pendingMediaFocusRef = useRef<string | null>(null)
   const historyRef = useRef<ArticleDocumentHistory>(createArticleDocumentHistory())
   const pendingHistorySnapshotRef = useRef<string | null>(null)
   const lastDocumentSnapshotRef = useRef(JSON.stringify(value))
@@ -83,6 +85,16 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
   }
 
   useEffect(() => {
+    const mediaFocusKey = pendingMediaFocusRef.current
+    if (mediaFocusKey) {
+      const button = mediaButtonRefs.current[mediaFocusKey]
+      if (button && !button.disabled) {
+        pendingMediaFocusRef.current = null
+        button.focus()
+        return
+      }
+    }
+
     const request = pendingFocusRef.current
     if (!request) return
     const textarea = textAreaRefs.current[request.blockId]
@@ -382,7 +394,13 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
   }
 
   function moveMediaReference(blockIndex: number, mediaIndex: number, direction: -1 | 1) {
-    emit(reorderArticleMediaRef(value, blockIndex, mediaIndex, mediaIndex + direction))
+    const sourceBlock = value.blocks[blockIndex]
+    const mediaRef = sourceBlock?.mediaRefs?.[mediaIndex]
+    if (!sourceBlock || !mediaRef) return
+    const next = reorderArticleMediaRef(value, blockIndex, mediaIndex, mediaIndex + direction)
+    if (next === value) return
+    pendingMediaFocusRef.current = sourceBlock.id + ':' + mediaRef
+    emit(next)
   }
 
   function moveBlock(index: number, direction: -1 | 1, focusOffset = 0) {
@@ -630,6 +648,9 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
                             ↓
                           </button>
                           <button
+                            ref={(element) => {
+                              mediaButtonRefs.current[block.id + ':' + ref] = element
+                            }}
                             aria-label="移除正文图片"
                             disabled={disabled}
                             onClick={() => removeMediaReference(ref)}
@@ -640,6 +661,9 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
                         </div>
                       ) : (
                         <button
+                          ref={(element) => {
+                            mediaButtonRefs.current[block.id + ':' + ref] = element
+                          }}
                           aria-label="移除正文图片"
                           disabled={disabled}
                           onClick={() => removeMediaReference(ref)}

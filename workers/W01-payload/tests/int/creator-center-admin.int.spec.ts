@@ -201,6 +201,19 @@ describe('Creator Center admin extension', () => {
     expect(plugin).toContain('transformBlock: (index: number, type: ArticleBlockType) => void')
   })
 
+  it('preserves media control focus when a gallery image is reordered', () => {
+    const editor = read('src/components/ArticleStructuredEditor.tsx')
+
+    expect(editor).toContain('const mediaButtonRefs = useRef<Record<string, HTMLButtonElement | null>>({})')
+    expect(editor).toContain('const pendingMediaFocusRef = useRef<string | null>(null)')
+    expect(editor).toContain("pendingMediaFocusRef.current = sourceBlock.id + ':' + mediaRef")
+    expect(editor).toContain('const mediaFocusKey = pendingMediaFocusRef.current')
+    expect(editor).toContain('if (button && !button.disabled)')
+    expect(editor).toContain('button.focus()')
+    expect(editor).toContain("mediaButtonRefs.current[block.id + ':' + ref] = element")
+    expect(editor).toContain('const next = reorderArticleMediaRef(value, blockIndex, mediaIndex, mediaIndex + direction)')
+  })
+
   it('exposes gallery media reorder controls', () => {
     const editor = read('src/components/ArticleStructuredEditor.tsx')
     const document = read('src/lib/article-document.ts')
