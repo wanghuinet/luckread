@@ -677,6 +677,11 @@ export default function ShortVideoFeed() {
             ? (profileById[item.creatorId]?.displayName || creatorName)
             : 'LuckRead'
           const avatar = item.creatorId ? profileById[item.creatorId]?.avatar : null
+          const creatorHref = item.creatorId
+            ? (profileById[item.creatorId]?.username
+              ? '/' + encodeURIComponent(profileById[item.creatorId].username)
+              : '/users/' + encodeURIComponent(item.creatorId))
+            : '/'
 
           return (
             <article
@@ -745,13 +750,13 @@ export default function ShortVideoFeed() {
                   <div className={styles.authorRow}>
                     <Link
                       className={styles.avatar}
-                      href={item.creatorId ? '/users/' + encodeURIComponent(item.creatorId) : '/'}
+                      href={creatorHref}
                       aria-label={'打开 ' + displayName + ' 的主页'}
                     >
                       {avatar ? <img alt="" src={avatar} /> : avatarFallback(displayName)}
                     </Link>
                     <div className={styles.authorMeta}>
-                      <Link href={item.creatorId ? '/users/' + encodeURIComponent(item.creatorId) : '/'} className={styles.authorName}>
+                      <Link href={creatorHref} className={styles.authorName}>
                         @{creatorName}
                       </Link>
                       {item.creatorId && viewerUserId !== item.creatorId && !interaction.restricted ? (
