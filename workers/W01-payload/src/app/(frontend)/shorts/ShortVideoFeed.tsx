@@ -86,6 +86,8 @@ export default function ShortVideoFeed() {
   const loadMoreSentinelRef = useRef<HTMLDivElement | null>(null)
   const activeIndexRef = useRef(0)
   const resumeAfterVisibilityRef = useRef(false)
+  const resumeAfterCommentsRef = useRef(false)
+  const playbackIntentRef = useRef(true)
   const requestRef = useRef<AbortController | null>(null)
   const profileCacheRef = useRef<Record<string, Profile>>({})
   const interactionCacheRef = useRef<Record<string, InteractionState>>({})
@@ -97,6 +99,7 @@ export default function ShortVideoFeed() {
 
   const setActive = useCallback((index: number) => {
     activeIndexRef.current = index
+    playbackIntentRef.current = true
     setActiveIndex(index)
     setActiveProgress(0)
   }, [])
@@ -264,12 +267,10 @@ export default function ShortVideoFeed() {
         return
       }
       video.muted = muted
-      if (isActive && !commentsOpen) {
+      if (isActive && !commentsOpen && playbackIntentRef.current) {
         void video.play().catch(() => {
           // Autoplay may be blocked until the first user gesture.
         })
-      } else if (isActive) {
-        video.pause()
       } else {
         video.pause()
       }
@@ -592,8 +593,10 @@ export default function ShortVideoFeed() {
     const video = videoRefs.current[item.id]
     if (!video) return
     if (video.paused) {
+      playbackIntentRef.current = true
       void video.play().catch(() => {})
     } else {
+      playbackIntentRef.current = false
       video.pause()
     }
   }
@@ -624,9 +627,17 @@ export default function ShortVideoFeed() {
   }, [])
 
   const toggleComments = (item: ContentItem) => {
+    const video = videoRefs.current[item.id]
+    resumeAfterCommentsRef.current = Boolean(video && !video.paused && !video.ended)
     setCommentsContentId(item.id)
     setCommentsOpen(true)
-    videoRefs.current[item.id]?.pause()
+    video?.pause()
+  }
+
+  const closeComments = () => {
+    playbackIntentRef.current = resumeAfterCommentsRef.current
+    resumeAfterCommentsRef.current = false
+    setCommentsOpen(false)
   }
 
   const activeItem = visibleItems[activeIndex]
@@ -853,11 +864,11 @@ export default function ShortVideoFeed() {
       </nav>
 
       {commentsOpen && commentsContentId ? (
-        <div className={styles.drawerBackdrop} role="presentation" onMouseDown={() => setCommentsOpen(false)}>
+        <div className={styles.drawerBackdrop} role="presentation" onMouseDown={closeComments}>
           <aside className={styles.commentsDrawer} onMouseDown={(event) => event.stopPropagation()} role="dialog" aria-modal="true" aria-label="评论">
             <header className={styles.commentsHeader}>
               <strong>评论</strong>
-              <button onClick={() => setCommentsOpen(false)} type="button" aria-label="关闭评论">×</button>
+              <button onClick={closeComments} type="button" aria-label="关闭评论">×</button>
             </header>
             <div className={styles.commentsBody}>
               <ContentComments
