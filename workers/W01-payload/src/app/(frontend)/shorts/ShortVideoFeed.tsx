@@ -78,6 +78,7 @@ export default function ShortVideoFeed() {
   const [notInterestedIds, setNotInterestedIds] = useState<string[]>([])
   const [activeProgress, setActiveProgress] = useState(0)
   const [doubleTapHeart, setDoubleTapHeart] = useState(false)
+  const [mediaErrorById, setMediaErrorById] = useState<Record<string, boolean>>({})
   const heartTimerRef = useRef<number | null>(null)
   const itemRefs = useRef<Record<string, HTMLElement | null>>({})
   const videoRefs = useRef<Record<string, HTMLVideoElement | null>>({})
@@ -251,6 +252,10 @@ export default function ShortVideoFeed() {
     Object.entries(videoRefs.current).forEach(([id, video]) => {
       if (!video) return
       const isActive = visibleItems[activeIndexRef.current]?.id === id
+      if (mediaErrorById[id]) {
+        video.pause()
+        return
+      }
       video.muted = muted
       if (isActive && !commentsOpen) {
         void video.play().catch(() => {
@@ -262,7 +267,7 @@ export default function ShortVideoFeed() {
         video.pause()
       }
     })
-  }, [activeIndex, commentsOpen, muted, visibleItems])
+  }, [activeIndex, commentsOpen, mediaErrorById, muted, visibleItems])
 
   useEffect(() => {
     const active = visibleItems[activeIndex]
@@ -583,6 +588,19 @@ export default function ShortVideoFeed() {
     else video.pause()
   }
 
+  const retryPlayback = (item: ContentItem) => {
+    const video = videoRefs.current[item.id]
+    if (!video) return
+    setMediaErrorById((current) => {
+      const next = { ...current }
+      delete next[item.id]
+      return next
+    })
+    video.load()
+    if (commentsOpen || document.visibilityState === 'hidden') return
+    void video.play().catch(() => {})
+  }
+
   const showDoubleTapHeart = () => {
     if (heartTimerRef.current !== null) window.clearTimeout(heartTimerRef.current)
     setDoubleTapHeart(true)
@@ -696,7 +714,20 @@ export default function ShortVideoFeed() {
                     const current = event.currentTarget
                     setActiveProgress(current.duration > 0 ? Math.min(100, Math.max(0, (current.currentTime / current.duration) * 100)) : 0)
                   }}
+                  onError={(event) => {
+                    event.currentTarget.pause()
+                    setMediaErrorById((current) => ({ ...current, [item.id]: true }))
+                  }}
                 />
+                {mediaErrorById[item.id] ? (
+                  <div className={styles.mediaError} role="alert">
+                    <strong>{locale === 'en' ? 'Video unavailable' : '视频暂时无法播放'}</strong>
+                    <span>{locale === 'en' ? 'The media could not be loaded.' : '媒体加载失败，可以重新尝试。'}</span>
+                    <button className={styles.mediaRetryButton} onClick={() => retryPlayback(item)} type="button">
+                      {locale === 'en' ? 'Retry' : '重试播放'}
+                    </button>
+                  </div>
+                ) : null}
                 {doubleTapHeart ? (
                   <div className={styles.heartBurst} aria-hidden="true">
                     <i className="fa-solid fa-heart" />
