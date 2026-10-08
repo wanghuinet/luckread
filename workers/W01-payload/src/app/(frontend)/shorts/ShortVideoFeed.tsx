@@ -611,6 +611,11 @@ export default function ShortVideoFeed() {
             ? (profileById[item.creatorId]?.displayName || creatorName)
             : 'LuckRead'
           const avatar = item.creatorId ? profileById[item.creatorId]?.avatar : null
+          const creatorHref = item.creatorId
+            ? (profileById[item.creatorId]?.username
+                ? '/' + encodeURIComponent(profileById[item.creatorId].username)
+                : '/users/' + encodeURIComponent(item.creatorId))
+            : '/'
 
           return (
             <article
@@ -666,7 +671,7 @@ export default function ShortVideoFeed() {
                   <div className={styles.authorRow}>
                     <Link
                       className={styles.avatar}
-                      href={item.creatorId ? '/users/' + encodeURIComponent(item.creatorId) : '/'}
+                      href={creatorHref}
                       aria-label={'打开 ' + displayName + ' 的主页'}
                     >
                       {avatar ? <img alt="" src={avatar} /> : avatarFallback(displayName)}
@@ -722,7 +727,12 @@ export default function ShortVideoFeed() {
                 </div>
 
                 <div className={styles.soundButtonWrap}>
-                  <button className={styles.soundButton} onClick={() => setMuted((value) => !value)} type="button">
+                  <button
+                    aria-label={muted ? '打开声音' : '关闭声音'}
+                    className={styles.soundButton}
+                    onClick={() => setMuted((value) => !value)}
+                    type="button"
+                  >
                     <i className={muted ? 'fa-solid fa-volume-xmark' : 'fa-solid fa-volume-high'} aria-hidden="true" />
                   </button>
                 </div>
@@ -755,7 +765,7 @@ export default function ShortVideoFeed() {
       <nav className={styles.bottomNav} aria-label="主导航">
         <Link href="/" className={styles.navItem}><i className="fa-solid fa-house" aria-hidden="true" /><span>首页</span></Link>
         <Link href="/content?type=video" className={styles.navItem}><i className="fa-solid fa-compass" aria-hidden="true" /><span>探索</span></Link>
-        <Link href="/publish?type=video" className={styles.navCreate}><i className="fa-solid fa-plus" aria-hidden="true" /></Link>
+        <Link aria-label="发布视频" href="/publish?type=video" className={styles.navCreate}><i className="fa-solid fa-plus" aria-hidden="true" /></Link>
         <Link href="/creator-center" className={styles.navItem}><i className="fa-solid fa-user-pen" aria-hidden="true" /><span>创作</span></Link>
         <Link href="/me/profile" className={styles.navItem}><i className="fa-solid fa-user" aria-hidden="true" /><span>我</span></Link>
       </nav>
