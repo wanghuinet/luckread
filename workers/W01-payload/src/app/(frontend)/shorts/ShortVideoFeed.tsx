@@ -76,6 +76,9 @@ export default function ShortVideoFeed() {
   const [busyById, setBusyById] = useState<Record<string, string>>({})
   const [message, setMessage] = useState('')
   const [notInterestedIds, setNotInterestedIds] = useState<string[]>([])
+  const [activeProgress, setActiveProgress] = useState(0)
+  const [doubleTapHeart, setDoubleTapHeart] = useState(false)
+  const heartTimerRef = useRef<number | null>(null)
   const itemRefs = useRef<Record<string, HTMLElement | null>>({})
   const videoRefs = useRef<Record<string, HTMLVideoElement | null>>({})
   const activeIndexRef = useRef(0)
@@ -534,6 +537,18 @@ export default function ShortVideoFeed() {
     else video.pause()
   }
 
+  const showDoubleTapHeart = () => {
+    if (heartTimerRef.current !== null) window.clearTimeout(heartTimerRef.current)
+    setDoubleTapHeart(true)
+    heartTimerRef.current = window.setTimeout(() => setDoubleTapHeart(false), 720)
+  }
+
+  useEffect(() => {
+    return () => {
+      if (heartTimerRef.current !== null) window.clearTimeout(heartTimerRef.current)
+    }
+  }, [])
+
   const toggleComments = (item: ContentItem) => {
     setCommentsContentId(item.id)
     setCommentsOpen(true)
@@ -588,7 +603,7 @@ export default function ShortVideoFeed() {
         </div>
       </header>
 
-      <section className={styles.feed} aria-label="短视频流">
+      <section className={styles.feed} aria-label="短视频流" onScroll={() => setActiveProgress(0)}>
         {visibleItems.map((item, index) => {
           const videoUrl = item.mediaRefs?.[0]
           const interaction = interactionById[item.id] ?? initialInteraction
@@ -606,7 +621,13 @@ export default function ShortVideoFeed() {
               key={item.id}
               ref={(element) => { itemRefs.current[item.id] = element }}
             >
-              <div className={styles.videoStage} onDoubleClick={() => void toggleLike(item)}>
+              <div
+                className={styles.videoStage}
+                onDoubleClick={() => {
+                  if (!interaction.restricted && !interaction.liked) void toggleLike(item)
+                  showDoubleTapHeart()
+                }}
+              >
                 <video
                   aria-label={item.title}
                   className={styles.video}
@@ -619,7 +640,22 @@ export default function ShortVideoFeed() {
                   ref={(element) => { videoRefs.current[item.id] = element }}
                   src={videoUrl}
                   onClick={() => togglePlay(item)}
+                  onTimeUpdate={(event) => {
+                    if (item.id !== visibleItems[activeIndexRef.current]?.id) return
+                    const current = event.currentTarget
+                    setActiveProgress(current.duration > 0 ? Math.min(100, Math.max(0, (current.currentTime / current.duration) * 100)) : 0)
+                  }}
+                  onLoadedMetadata={(event) => {
+                    if (item.id !== visibleItems[activeIndexRef.current]?.id) return
+                    const current = event.currentTarget
+                    setActiveProgress(current.duration > 0 ? Math.min(100, Math.max(0, (current.currentTime / current.duration) * 100)) : 0)
+                  }}
                 />
+                {doubleTapHeart ? (
+                  <div className={styles.heartBurst} aria-hidden="true">
+                    <i className="fa-solid fa-heart" />
+                  </div>
+                ) : null}
                 <div className={styles.topFade} />
                 <div className={styles.bottomFade} />
 
@@ -686,6 +722,10 @@ export default function ShortVideoFeed() {
                     <span>更多</span>
                   </button>
                 </aside>
+
+                <div className={styles.progressTrack} aria-hidden="true">
+                  <span className={styles.progressValue} style={{ width: activeIndexRef.current === index ? activeProgress + '%' : '0%' }} />
+                </div>
 
                 <div className={styles.soundButtonWrap}>
                   <button className={styles.soundButton} onClick={() => setMuted((value) => !value)} type="button">
