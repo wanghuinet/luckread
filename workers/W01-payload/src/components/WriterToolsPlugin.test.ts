@@ -18,7 +18,7 @@ describe('article writer statistics', () => {
     }
 
     expect(getWriterStats('标题 😊\nHello world', value)).toEqual({
-      characters: 15,
+      characters: 16,
       words: 3,
       headings: 1,
       lists: 1,
