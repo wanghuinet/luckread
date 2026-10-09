@@ -52,10 +52,36 @@ const canonicalRequestId = (value?: string): string =>
     ? value
     : 'req_' + crypto.randomUUID().replaceAll('-', '')
 
-const canonicalErrorCode = (code: string): string => {
+const CANONICAL_ERROR_CODES = new Set([
+  'UNAUTHENTICATED',
+  'PERMISSION_DENIED',
+  'INVALID_STATE',
+  'PRECONDITION_FAILED',
+  'PRECONDITION_REQUIRED',
+  'CONFLICT',
+  'NOT_FOUND',
+  'VALIDATION_FAILED',
+  'IDEMPOTENCY_KEY_REQUIRED',
+  'IDEMPOTENCY_IN_PROGRESS',
+  'IDEMPOTENCY_KEY_REUSE_CONFLICT',
+  'RATE_LIMITED',
+  'QUOTA_EXCEEDED',
+  'PAYLOAD_TOO_LARGE',
+  'UNSUPPORTED_MEDIA_TYPE',
+  'UPLOAD_REJECTED',
+  'RESOURCE_LOCKED',
+  'INVALID_CURSOR',
+  'CURSOR_EXPIRED',
+  'DEPENDENCY_FAILED',
+  'INTERNAL_ERROR',
+  'SERVICE_UNAVAILABLE',
+])
+
+export const canonicalErrorCode = (code: string): string => {
+  if (CANONICAL_ERROR_CODES.has(code)) return code
   if (code === 'REPORT_WRITE_FAILED' || code.endsWith('_WRITE_FAILED')) return 'INTERNAL_ERROR'
-  if (code.startsWith('INVALID_')) return 'VALIDATION_FAILED'
   if (code === 'RELATIONSHIP_BLOCKED' || code === 'SELF_FOLLOW_NOT_ALLOWED') return 'CONFLICT'
+  if (code.startsWith('INVALID_')) return 'VALIDATION_FAILED'
   return code
 }
 
