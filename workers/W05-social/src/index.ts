@@ -50,6 +50,8 @@ const enforceRateLimit = async (request: Request, env: Env, operation: string): 
   }
 }
 
+const createRequestId = (): string => 'req_' + crypto.randomUUID()
+
 const json = (body: unknown, status = 200) => {
   const headers = new Headers({
     'content-type': 'application/json; charset=utf-8',
@@ -157,7 +159,7 @@ export default {
         requireTransport(request)
         const shareId = decodePathPart(parts[3])
         if (shareId === null) return new Response(null, { status: 400 })
-        return json({ data: await resolveShare(env.DB, shareId), requestId: crypto.randomUUID() })
+        return json({ data: await resolveShare(env.DB, shareId), requestId: createRequestId() })
       }
 
       if (url.pathname.startsWith('/internal/social/content/')) {
@@ -171,7 +173,7 @@ export default {
         const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
         return json({
           data: await createShare(env.DB, actorUserId, contentId, idempotencyKey),
-          requestId: crypto.randomUUID(),
+          requestId: createRequestId(),
         }, 201)
       }
 
@@ -203,7 +205,7 @@ export default {
           }
           return json({
             data: relation,
-            requestId: crypto.randomUUID(),
+            requestId: createRequestId(),
           })
         }
 
@@ -264,7 +266,7 @@ export default {
             ifMatch,
           })
           return Response.json(
-            { data: result.item, requestId: crypto.randomUUID() },
+            { data: result.item, requestId: createRequestId() },
             {
               status: 200,
               headers: {
@@ -302,7 +304,7 @@ export default {
           }
           const viewerUserId = request.headers.get('X-LuckRead-Principal-User-Id')?.trim() || null
           const page = await listComments(env.DB, commentContentId, cursor, limit, viewerUserId)
-          return json({ data: page, requestId: crypto.randomUUID() })
+          return json({ data: page, requestId: createRequestId() })
         }
 
         const viewerUserId = requirePrincipal(request)
@@ -336,7 +338,7 @@ export default {
           parentId: parentId ?? null,
           idempotencyKey,
         })
-        return json({ data: comment }, 201)
+        return json({ data: comment, requestId: createRequestId() }, 201)
       }
 
       if (url.pathname === '/internal/social/interactions/bookmarks') {
@@ -363,14 +365,14 @@ export default {
         if (request.method === 'GET') {
           return json({
             data: await getFavoriteStatus(env.DB, viewerUserId, target),
-            requestId: crypto.randomUUID(),
+            requestId: createRequestId(),
           })
         }
 
         if (request.method === 'POST') {
           return json({
             data: await favorite(env.DB, viewerUserId, target),
-            requestId: crypto.randomUUID(),
+            requestId: createRequestId(),
           })
         }
 
@@ -392,7 +394,7 @@ export default {
           : await parseJsonTarget(request)
         if (request.method === 'GET') {
           const result = await getLikeStatus(env.DB, viewerUserId, target)
-          return json({ data: result, requestId: crypto.randomUUID() }, 200)
+          return json({ data: result, requestId: createRequestId() }, 200)
         }
 
         const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
@@ -402,7 +404,7 @@ export default {
 
         if (request.method === 'POST') {
           const result = await like(env.DB, viewerUserId, target)
-          return json({ data: result, requestId: crypto.randomUUID() }, 200)
+          return json({ data: result, requestId: createRequestId() }, 200)
         }
         await unlike(env.DB, viewerUserId, target)
         return new Response(null, { status: 204 })
@@ -428,7 +430,7 @@ export default {
               targetUserId: row.target_user_id,
               createdAt: row.created_at,
             },
-            requestId: crypto.randomUUID(),
+            requestId: createRequestId(),
           }, 201)
         }
 
@@ -454,7 +456,7 @@ export default {
               createdAt: relationship.createdAt,
               relationship,
             },
-            requestId: crypto.randomUUID(),
+            requestId: createRequestId(),
           })
         }
 
@@ -485,7 +487,7 @@ export default {
 
       return json({
         data: page,
-        requestId: crypto.randomUUID(),
+        requestId: createRequestId(),
       })
     } catch (error) {
       if (
@@ -503,8 +505,8 @@ export default {
             message: error.code,
             details: {},
           },
-          requestId: crypto.randomUUID(),
-        }, error.status)
+          requestId: createRequestId(),
+        }, error.code === 'VALIDATION_FAILED' && error.status === 400 ? 422 : error.status)
       }
 
       return json({
@@ -513,7 +515,7 @@ export default {
           message: 'Internal error',
           details: {},
         },
-        requestId: crypto.randomUUID(),
+        requestId: createRequestId(),
       }, 500)
     }
   },
