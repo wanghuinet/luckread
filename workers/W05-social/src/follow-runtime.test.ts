@@ -262,6 +262,20 @@ describe('follow runtime', () => {
     })
   })
 
+  it('rejects follow cursors reused for another target user', async () => {
+    const first = await listFollowers(db([], [{
+      results: [
+        { relationship_id: 'r2', user_id: 'u2', followed_at: '2026-10-02T00:01:00.000Z' },
+        { relationship_id: 'r1', user_id: 'u3', followed_at: '2026-10-02T00:00:00.000Z' },
+      ],
+    }]), 'u1', null, 1)
+    expect(first.nextCursor).toEqual(expect.any(String))
+    await expect(listFollowers(db(), 'u9', first.nextCursor, 20)).rejects.toMatchObject({
+      code: 'INVALID_CURSOR',
+      status: 400,
+    })
+  })
+
   it('validates list limits', () => {
     expect(parseFollowListLimit(null)).toBe(20)
     expect(parseFollowListLimit('50')).toBe(50)
