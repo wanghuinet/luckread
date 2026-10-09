@@ -13,7 +13,7 @@ if (policy.policyVersion !== 'DEV-2026-09-28.1') throw new Error('Unexpected dev
 const escapeSql = (value) => "'" + String(value).replaceAll("'", "''") + "'"
 const renderSql = (sql, args) => { let index = 0; return sql.replaceAll('?', () => escapeSql(args[index++])) }
 const d1Json = (command) => {
-  const output = execFileSync('pnpm', ['exec', 'wrangler', 'd1', 'execute', 'luckread', '--local', '--json', '--config', 'wrangler.jsonc', '--command', command], { encoding: 'utf8', cwd: process.cwd(), env: process.env, maxBuffer: 8 * 1024 * 1024 })
+  const output = execFileSync('pnpm', ['exec', 'wrangler', 'd1', 'execute', 'luckread', '--local', '--json', '--persist-to', process.env.CLOUDFLARE_PERSIST_TO || '/tmp/luckread-auth001-state', '--config', 'wrangler.jsonc', '--command', command], { encoding: 'utf8', cwd: process.cwd(), env: process.env, maxBuffer: 8 * 1024 * 1024 })
   return JSON.parse(output)
 }
 const d1Rows = (command) => {
