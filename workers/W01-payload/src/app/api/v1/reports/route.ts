@@ -8,7 +8,7 @@ import { assertSocialTargetUserExists } from '../../../../social/w05-social-clie
 
 const errorResponse = (status: number, code: string, message: string) =>
   Response.json(
-    { error: { code, message, details: {} }, requestId: crypto.randomUUID() },
+    { error: { code, message, details: {} }, requestId: `req_${crypto.randomUUID()}` },
     { status, headers: { 'cache-control': 'no-store' } },
   )
 
