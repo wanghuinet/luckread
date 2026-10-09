@@ -75,7 +75,7 @@ describe('follow runtime', () => {
         'u2',
       ),
     ).rejects.toMatchObject({
-      code: 'RELATIONSHIP_BLOCKED',
+      code: 'CONFLICT',
       status: 409,
     })
   })
@@ -94,7 +94,7 @@ describe('follow runtime', () => {
     }))
 
     await expect(follow(d, 'u1', 'u2')).rejects.toMatchObject({
-      code: 'RELATIONSHIP_BLOCKED',
+      code: 'CONFLICT',
       status: 409,
     })
     expect(String(prepare.mock.calls[1]?.[0])).toContain("block.relation_type = 'block'")
@@ -104,7 +104,7 @@ describe('follow runtime', () => {
 
   it('rejects self follow', async () => {
     await expect(follow(db(), 'u1', 'u1')).rejects.toMatchObject({
-      code: 'SELF_FOLLOW_NOT_ALLOWED',
+      code: 'CONFLICT',
       status: 409,
     })
   })
