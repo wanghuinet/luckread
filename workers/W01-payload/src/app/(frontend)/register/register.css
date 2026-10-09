@@ -1,14 +1,13 @@
 .registerPage {
+  --register-ink: #122544;
+  --register-muted: #71809a;
+  --register-blue: #2563eb;
+  --register-line: #e1e8f2;
   min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 32px 20px;
-  background:
-    radial-gradient(circle at 15% 10%, rgba(37, 99, 235, 0.16), transparent 34%),
-    radial-gradient(circle at 85% 90%, rgba(96, 165, 250, 0.12), transparent 34%),
-    #f4f8ff;
-  color: #102a56;
+  padding: 0;
+  color: var(--register-ink);
+  background: #f7f9fc;
+  font-family: inherit;
 }
 
 .registerPage,
@@ -16,255 +15,595 @@
   box-sizing: border-box;
 }
 
-.registerShell {
-  width: min(100%, 460px);
+.registerLayout {
+  display: grid;
+  grid-template-columns: minmax(0, 0.96fr) minmax(480px, 1.04fr);
+  min-height: 100vh;
+}
+
+.registerStory {
+  position: relative;
+  display: flex;
+  min-height: 100vh;
+  flex-direction: column;
+  overflow: hidden;
+  padding: clamp(32px, 5vw, 68px);
+  background:
+    radial-gradient(ellipse at 18% 90%, rgba(68, 131, 255, 0.2), transparent 36%),
+    radial-gradient(ellipse at 100% 10%, rgba(84, 154, 255, 0.2), transparent 38%),
+    #0d1e3d;
+  color: #fff;
 }
 
 .registerBrand {
-  display: flex;
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  width: fit-content;
   align-items: center;
-  justify-content: center;
-  gap: 10px;
-  margin-bottom: 18px;
-  font-size: 20px;
-  font-weight: 750;
-  letter-spacing: -0.02em;
+  gap: 11px;
+  color: #fff;
+  text-decoration: none;
 }
 
 .registerMark {
-  display: grid;
-  width: 34px;
-  height: 34px;
+  display: inline-grid;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 auto;
   place-items: center;
-  border-radius: 10px;
-  background: #102a56;
-  color: #ffffff;
-  font-size: 18px;
-  font-weight: 800;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 13px;
+  background: linear-gradient(145deg, #5d91ff, #2563eb);
+  box-shadow: 0 8px 22px rgba(22, 91, 230, 0.3);
+  color: #fff;
+  font-size: 21px;
+  font-weight: 850;
+  letter-spacing: -0.06em;
 }
 
-.registerCard {
-  border: 1px solid rgba(17, 24, 39, 0.08);
-  border-radius: 24px;
-  padding: 34px;
-  background: rgba(255, 255, 255, 0.94);
-  box-shadow:
-    0 24px 70px rgba(17, 24, 39, 0.10),
-    0 2px 8px rgba(17, 24, 39, 0.05);
-  backdrop-filter: blur(18px);
-}
-
-.registerIntro {
-  margin-bottom: 26px;
-}
-
-.registerEyebrow {
-  display: inline-block;
-  margin-bottom: 10px;
-  color: #2563eb;
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.14em;
-}
-
-.registerIntro h1 {
-  margin: 0;
-  color: #102a56;
-  font-size: clamp(30px, 7vw, 38px);
-  line-height: 1.12;
+.registerBrandName {
+  font-size: 23px;
+  font-weight: 760;
   letter-spacing: -0.045em;
 }
 
+.registerStoryContent {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 560px);
+  margin: auto 0;
+  padding: 72px 0 84px;
+}
+
+.registerEyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 27px;
+  color: #a9c6ff;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.19em;
+}
+
+.registerEyebrowDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #73a2ff;
+  box-shadow: 0 0 0 5px rgba(115, 162, 255, 0.12);
+}
+
+.registerStoryContent h1 {
+  margin: 0;
+  color: #fff;
+  font-size: clamp(36px, 4.3vw, 58px);
+  font-weight: 760;
+  line-height: 1.23;
+  letter-spacing: -0.065em;
+}
+
+.registerStoryLead {
+  max-width: 440px;
+  margin: 23px 0 0;
+  color: #b9c7df;
+  font-size: 16px;
+  line-height: 1.9;
+}
+
+.registerHighlights {
+  display: grid;
+  gap: 20px;
+  margin-top: 43px;
+}
+
+.registerHighlight {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.registerHighlightIcon {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid rgba(172, 199, 255, 0.18);
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.07);
+  color: #a9c6ff;
+  font-size: 21px;
+}
+
+.registerHighlight strong,
+.registerHighlight small {
+  display: block;
+}
+
+.registerHighlight strong {
+  color: #f5f8ff;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.registerHighlight small {
+  margin-top: 4px;
+  color: #9eafca;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.registerStoryFoot {
+  position: relative;
+  z-index: 1;
+  margin: 0;
+  color: #8799b7;
+  font-size: 12px;
+}
+
+.registerOrb {
+  position: absolute;
+  pointer-events: none;
+  border: 1px solid rgba(145, 181, 255, 0.12);
+  border-radius: 50%;
+}
+
+.registerOrbOne {
+  right: -210px;
+  bottom: -230px;
+  width: 590px;
+  height: 590px;
+  box-shadow: 0 0 0 42px rgba(145, 181, 255, 0.025), 0 0 0 88px rgba(145, 181, 255, 0.02);
+}
+
+.registerOrbTwo {
+  top: 20%;
+  right: -90px;
+  width: 240px;
+  height: 240px;
+  border-color: rgba(145, 181, 255, 0.08);
+  box-shadow: 0 0 0 28px rgba(145, 181, 255, 0.025);
+}
+
+.registerPanel {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(28px, 5vw, 64px);
+  background:
+    radial-gradient(ellipse at 100% 0%, rgba(227, 237, 255, 0.52), transparent 35%),
+    #f7f9fc;
+}
+
+.registerPanelTop {
+  display: flex;
+  width: min(100%, 440px);
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 26px;
+}
+
+.registerMobileBrand {
+  display: none;
+  align-items: center;
+  gap: 9px;
+  font-size: 18px;
+  font-weight: 760;
+  letter-spacing: -0.04em;
+}
+
+.registerMobileBrand .registerMark {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  font-size: 18px;
+}
+
+.registerSecure {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #77869d;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.registerSecure span {
+  color: #2d68e7;
+}
+
+.registerCard {
+  width: min(100%, 440px);
+}
+
+.registerIntro {
+  margin-bottom: 30px;
+}
+
+.registerStep {
+  display: inline-block;
+  margin-bottom: 10px;
+  color: var(--register-blue);
+  font-size: 12px;
+  font-weight: 750;
+  letter-spacing: 0.04em;
+}
+
+.registerIntro h2 {
+  margin: 0;
+  color: var(--register-ink);
+  font-size: 34px;
+  font-weight: 780;
+  line-height: 1.2;
+  letter-spacing: -0.06em;
+}
+
 .registerIntro p {
-  margin: 12px 0 0;
-  color: #5c7191;
-  font-size: 15px;
-  line-height: 1.65;
+  margin: 10px 0 0;
+  color: var(--register-muted);
+  font-size: 14px;
+  line-height: 1.7;
 }
 
 .registerForm {
   display: grid;
-  gap: 16px;
+  gap: 18px;
 }
 
 .registerField {
   display: grid;
-  gap: 7px;
+  gap: 8px;
 }
 
 .registerField > span {
-  color: #29476f;
+  color: #354863;
   font-size: 13px;
-  font-weight: 650;
+  font-weight: 700;
 }
 
 .registerField input {
   width: 100%;
-  height: 50px;
-  border: 1px solid #cbdcf2;
+  height: 51px;
+  border: 1px solid #dbe3ef;
   border-radius: 12px;
-  padding: 0 14px;
-  background: #ffffff;
-  color: #101828;
+  padding: 0 15px;
+  background: #fff;
+  color: #172b49;
   font: inherit;
-  font-size: 15px;
+  font-size: 14px;
   outline: none;
-  transition:
-    border-color 120ms ease,
-    box-shadow 120ms ease,
-    background 120ms ease;
+  box-shadow: 0 1px 2px rgba(16, 34, 65, 0.025);
+  transition: border-color 140ms ease, box-shadow 140ms ease, background 140ms ease;
 }
 
 .registerField input::placeholder {
-  color: #98a2b3;
+  color: #a0adbf;
 }
 
 .registerField input:hover {
-  border-color: #98a2b3;
+  border-color: #b6c6dc;
 }
 
 .registerField input:focus {
-  border-color: #2563eb;
-  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.12);
+  border-color: #5b8df0;
+  background: #fff;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
+}
+
+.registerField small {
+  color: #8794a8;
+  font-size: 11px;
+  line-height: 1.55;
 }
 
 .registerConsent {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
-  color: #5c7191;
-  font-size: 13px;
-  line-height: 1.55;
+  gap: 9px;
+  color: #74839a;
+  font-size: 12px;
+  line-height: 1.7;
 }
 
 .registerConsent input {
-  width: 17px;
-  height: 17px;
+  width: 16px;
+  height: 16px;
   flex: 0 0 auto;
-  margin: 1px 0 0;
-  accent-color: #2563eb;
+  margin: 2px 0 0;
+  accent-color: var(--register-blue);
+}
+
+.registerConsent a,
+.registerFooter a {
+  color: #245ed2;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.registerConsent a:hover,
+.registerFooter a:hover {
+  text-decoration: underline;
 }
 
 .registerError {
   margin: 0;
-  border: 1px solid #fecdca;
-  border-radius: 10px;
-  padding: 10px 12px;
-  background: #fef3f2;
+  border: 1px solid #ffd2d0;
+  border-radius: 11px;
+  padding: 11px 13px;
+  background: #fff5f4;
   color: #b42318;
-  font-size: 13px;
-  line-height: 1.5;
+  font-size: 12px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.registerPrimaryButton,
+.registerSecondaryButton {
+  display: flex;
+  width: 100%;
+  min-height: 51px;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  padding: 0 18px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 750;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+  transition: transform 140ms ease, box-shadow 140ms ease, background 140ms ease, opacity 140ms ease;
 }
 
 .registerPrimaryButton {
-  display: inline-flex;
-  min-height: 50px;
-  align-items: center;
-  justify-content: center;
-  border: 0;
-  border-radius: 12px;
-  padding: 0 18px;
-  background: #102a56;
-  color: #ffffff;
-  font-size: 15px;
-  font-weight: 700;
-  text-decoration: none;
-  cursor: pointer;
-  transition:
-    transform 120ms ease,
-    background 120ms ease,
-    opacity 120ms ease;
+  background: #2563eb;
+  color: #fff;
+  box-shadow: 0 7px 16px rgba(40, 100, 232, 0.19);
 }
 
 .registerPrimaryButton:hover {
-  background: #1d4ed8;
   transform: translateY(-1px);
+  background: #1d4ed8;
+  box-shadow: 0 10px 22px rgba(40, 100, 232, 0.24);
 }
 
-.registerPrimaryButton:focus-visible {
-  outline: 3px solid rgba(59, 130, 246, 0.28);
-  outline-offset: 2px;
+.registerPrimaryButton:focus-visible,
+.registerSecondaryButton:focus-visible {
+  outline: 3px solid rgba(40, 100, 232, 0.25);
+  outline-offset: 3px;
 }
 
 .registerPrimaryButton:disabled {
   cursor: wait;
-  opacity: 0.64;
+  opacity: 0.65;
   transform: none;
+  box-shadow: none;
 }
 
-.registerSuccess {
-  display: grid;
-  justify-items: center;
-  gap: 12px;
-  padding: 14px 0 4px;
+.registerSecondaryButton {
+  border-color: var(--register-line);
+  background: #fff;
+  color: #334761;
+}
+
+.registerSecondaryButton:hover {
+  background: #f6f9ff;
+}
+
+.registerTermsHint {
+  margin: -4px 0 0;
+  color: #9aa6b8;
+  font-size: 11px;
   text-align: center;
-}
-
-.successIcon {
-  display: grid;
-  width: 52px;
-  height: 52px;
-  place-items: center;
-  border-radius: 999px;
-  background: #ecfdf3;
-  color: #039855;
-  font-size: 27px;
-  font-weight: 800;
-}
-
-.registerSuccess h2 {
-  margin: 4px 0 0;
-  color: #102a56;
-  font-size: 24px;
-  letter-spacing: -0.025em;
-}
-
-.registerSuccess p {
-  margin: 0 0 8px;
-  color: #5c7191;
-  font-size: 14px;
-  line-height: 1.7;
-  overflow-wrap: anywhere;
 }
 
 .registerFooter {
   display: flex;
   justify-content: center;
-  gap: 5px;
-  margin-top: 20px;
-  color: #5c7191;
+  gap: 6px;
+  margin-top: 25px;
+  color: #8491a5;
   font-size: 13px;
 }
 
-.registerFooter a {
-  color: #29476f;
-  font-weight: 700;
-  text-decoration: none;
+.registerSuccess {
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+  padding: 8px 0 0;
+  text-align: center;
 }
 
-.registerFooter a:hover {
-  text-decoration: underline;
+.successIcon {
+  display: grid;
+  width: 58px;
+  height: 58px;
+  place-items: center;
+  border: 1px solid #c8f0d9;
+  border-radius: 18px;
+  background: #eafaf1;
+  color: #16834d;
+  font-size: 27px;
+  font-weight: 800;
+}
+
+.registerSuccess h3 {
+  margin: 3px 0 0;
+  color: var(--register-ink);
+  font-size: 25px;
+  letter-spacing: -0.045em;
+}
+
+.registerSuccess p {
+  margin: 0;
+  color: var(--register-muted);
+  font-size: 13px;
+  line-height: 1.75;
+  overflow-wrap: anywhere;
+}
+
+.registerEmailSummary {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--register-line);
+  border-radius: 13px;
+  padding: 13px 15px;
+  background: #fff;
+  text-align: left;
+}
+
+.registerEmailIcon {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 11px;
+  background: #edf3ff;
+  color: #2563eb;
+  font-size: 17px;
+}
+
+.registerEmailSummary small,
+.registerEmailSummary strong {
+  display: block;
+}
+
+.registerEmailSummary small {
+  margin-bottom: 3px;
+  color: #8a97aa;
+  font-size: 11px;
+}
+
+.registerEmailSummary strong {
+  color: #2c3f5a;
+  font-size: 13px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.registerVerificationStatus {
+  width: 100%;
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: #eef8f2;
+  color: #237448 !important;
+  font-size: 12px !important;
 }
 
 .registerCopyright {
-  margin: 16px 0 0;
-  color: #98a2b3;
+  margin: 24px 0 0;
+  color: #9aa6b8;
+  font-size: 11px;
   text-align: center;
-  font-size: 12px;
 }
 
-@media (max-width: 520px) {
-  .registerPage {
-    align-items: flex-start;
-    padding: 20px 14px;
+.registerCopyright span {
+  padding: 0 4px;
+  color: #c0c8d4;
+}
+
+@media (max-width: 980px) {
+  .registerLayout {
+    grid-template-columns: minmax(0, 0.85fr) minmax(440px, 1.15fr);
   }
 
-  .registerCard {
-    border-radius: 20px;
-    padding: 24px 20px;
+  .registerStory {
+    padding: 36px;
   }
 
-  .registerBrand {
-    margin-bottom: 14px;
+  .registerStoryContent h1 {
+    font-size: clamp(34px, 4.3vw, 46px);
+  }
+
+  .registerPanel {
+    padding: 36px;
+  }
+}
+
+@media (max-width: 760px) {
+  .registerLayout {
+    display: block;
+  }
+
+  .registerStory {
+    display: none;
+  }
+
+  .registerPanel {
+    min-height: 100vh;
+    padding: 28px 22px 22px;
+  }
+
+  .registerPanelTop {
+    width: min(100%, 440px);
+    margin-bottom: 32px;
+  }
+
+  .registerMobileBrand {
+    display: inline-flex;
+  }
+
+  .registerIntro {
+    margin-bottom: 25px;
+  }
+
+  .registerIntro h2 {
+    font-size: 31px;
+  }
+
+  .registerForm {
+    gap: 16px;
+  }
+}
+
+@media (max-width: 380px) {
+  .registerPanel {
+    padding-right: 16px;
+    padding-left: 16px;
+  }
+
+  .registerSecure {
+    font-size: 11px;
+  }
+
+  .registerIntro h2 {
+    font-size: 29px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .registerField input,
+  .registerPrimaryButton,
+  .registerSecondaryButton {
+    transition: none;
   }
 }
