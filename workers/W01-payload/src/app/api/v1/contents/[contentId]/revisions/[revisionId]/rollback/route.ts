@@ -50,7 +50,7 @@ export async function POST(
     }
     return response
   } catch (error) {
-    if (error instanceof SyntaxError) return errorResponse(400, 'VALIDATION_FAILED', 'Invalid revision rollback request')
+    if (error instanceof SyntaxError) return errorResponse(422, 'VALIDATION_FAILED', 'Invalid revision rollback request')
     if (error instanceof W03ContentClientError) return errorResponse(error.status, error.code, 'Content revision service unavailable')
     return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Content revision service unavailable')
   }
