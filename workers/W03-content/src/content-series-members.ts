@@ -142,7 +142,7 @@ const batchMutation = async (db: ContentD1, statements: D1PreparedStatement[]): 
       throw new ContentRuntimeError('IDEMPOTENCY_IN_PROGRESS', 409)
     }
     if (/unique constraint failed: content_relationships\./i.test(message)) {
-      throw new ContentRuntimeError('RELATIONSHIP_CONFLICT', 409)
+      throw new ContentRuntimeError('CONFLICT', 409)
     }
     if (/CHECK constraint failed: successful|content_txn_guard/i.test(message)) {
       throw new ContentRuntimeError('PRECONDITION_FAILED', 412)
@@ -307,7 +307,7 @@ export async function attachSeriesMember(
     throw new ContentRuntimeError('IDEMPOTENCY_KEY_REUSE_CONFLICT', 422)
   }
   assertEtag(row.series_etag, ifMatch)
-  if (row.membership_relationship_id) throw new ContentRuntimeError('RELATIONSHIP_ALREADY_EXISTS', 409)
+  if (row.membership_relationship_id) throw new ContentRuntimeError('CONFLICT', 409)
   if (row.series_state === 'DELETED') throw new ContentRuntimeError('INVALID_STATE', 409)
 
   const nowIso = now.toISOString()
@@ -479,7 +479,7 @@ export async function removeSeriesMember(
   }
 
   if (!row.membership_relationship_id || row.membership_position === null) {
-    throw new ContentRuntimeError('RELATIONSHIP_NOT_FOUND', 404)
+    throw new ContentRuntimeError('NOT_FOUND', 404)
   }
   assertSeriesEditable(row.series_state)
   assertEtag(row.series_etag, ifMatch)
@@ -554,7 +554,7 @@ export async function reorderSeriesMember(
   }
 
   if (!row.membership_relationship_id || row.membership_position === null) {
-    throw new ContentRuntimeError('RELATIONSHIP_NOT_FOUND', 404)
+    throw new ContentRuntimeError('NOT_FOUND', 404)
   }
   assertSeriesEditable(row.series_state)
   assertEtag(row.series_etag, ifMatch)
@@ -574,7 +574,7 @@ export async function reorderSeriesMember(
 
   const members = rows.results
   const currentIndex = members.findIndex(item => item.source_id === contentId)
-  if (currentIndex < 0) throw new ContentRuntimeError('RELATIONSHIP_NOT_FOUND', 404)
+  if (currentIndex < 0) throw new ContentRuntimeError('NOT_FOUND', 404)
   if (position >= members.length) throw new ContentRuntimeError('VALIDATION_FAILED', 400)
   if (position === currentIndex) {
     const member = {
