@@ -148,8 +148,8 @@ const decodeCursor = (value: string | null, direction: FollowListDirection, user
       parsed.direction !== direction ||
       typeof parsed.createdAt !== 'string' ||
       typeof parsed.relationshipId !== 'string' ||
-      !parsed.createdAt ||
-      !parsed.relationshipId
+      !Number.isFinite(Date.parse(parsed.createdAt)) ||
+      !/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(parsed.relationshipId)
     ) {
       throw new Error('invalid cursor')
     }
