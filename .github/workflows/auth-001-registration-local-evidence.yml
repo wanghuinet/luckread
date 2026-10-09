@@ -52,6 +52,7 @@ jobs:
     env:
       NODE_ENV: development
       PAYLOAD_SECRET: ignore
+      AUTH001_LOCAL_D1_STATE: /tmp/luckread-auth001-state
     steps:
       - name: Resolve exact source SHA
         id: source
@@ -93,10 +94,6 @@ jobs:
         working-directory: workers/W02-identity
         run: npm install --ignore-scripts --no-audit --no-fund
 
-      - name: Apply exact W02 Better Auth migrations
-        working-directory: workers/W02-identity
-        run: npx --yes wrangler@4.116.0 d1 migrations apply luckread --local --config wrangler.jsonc
-
       - name: Install W01 dependencies
         working-directory: workers/W01-payload
         run: pnpm install --frozen-lockfile
@@ -105,11 +102,9 @@ jobs:
         working-directory: workers/W01-payload
         run: pnpm payload migrate
 
-      - name: Apply already-admitted AUTH-013 D1-01 schema locally
-        working-directory: workers/W01-payload
-        run: |
-          set -euo pipefail
-          pnpm exec wrangler d1 execute luckread --local --config wrangler.jsonc --file ../W02-identity/migrations/0002_auth_013_account_state.sql
+      - name: Apply exact W02 Better Auth migrations
+        working-directory: workers/W02-identity
+        run: npx --yes wrangler@4.116.0 d1 migrations apply luckread --local --persist-to "$AUTH001_LOCAL_D1_STATE" --config wrangler.jsonc
 
       - name: Build exact W01 OpenNext worker
         working-directory: workers/W01-payload
