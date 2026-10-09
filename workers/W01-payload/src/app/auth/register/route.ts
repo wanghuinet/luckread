@@ -187,6 +187,8 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
   if (
     identityType !== 'email' ||
     typeof identity !== 'string' || identity.trim().length === 0 ||
+    identity.trim().length > 254 ||
+    !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(identity.trim()) ||
     typeof credential !== 'string' || credential.length === 0 ||
     typeof username !== 'string' || username.trim().length === 0 || username.length > 128 ||
     consent.purpose !== SCOPE ||
