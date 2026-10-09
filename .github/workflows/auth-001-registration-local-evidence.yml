@@ -128,7 +128,7 @@ jobs:
           NODE_ENV: development
         run: |
           set -euo pipefail
-          pnpm exec wrangler dev --local --persist-to /tmp/luckread-auth001-state --port 8788 --var "CLOUDFLARE_ENV:development" > auth-001-w02-preview.log 2>&1 &
+          pnpm --dir ../W01-payload exec wrangler dev --local --persist-to /tmp/luckread-auth001-state --config ../W02-identity/wrangler.jsonc --port 8788 --var "CLOUDFLARE_ENV:development" > auth-001-w02-preview.log 2>&1 &
           echo $! > auth-001-w02-preview.pid
           ready=0
           for _ in $(seq 1 120); do
