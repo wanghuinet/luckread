@@ -42,4 +42,15 @@ describe('AUTH-001 registration idempotency ordering', () => {
     expect(source).toContain("event: 'auth.register.identity_not_persisted'")
     expect(source).toContain("return errorResponse(422, 'VALIDATION_FAILED', 'Registration could not be completed')")
   })
+
+  it('preserves origin rejection semantics and logs a correlation identifier', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), 'src/app/auth/register/route.ts'),
+      'utf8',
+    )
+
+    expect(source).toContain("authResponse.status === 403 || upstreamCode === 'INVALID_ORIGIN'")
+    expect(source).toContain("errorResponse(403, 'INVALID_ORIGIN'")
+    expect(source).toContain("cfRay: request.headers.get('cf-ray') ?? null")
+  })
 })
