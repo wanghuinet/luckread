@@ -38,6 +38,8 @@ jobs:
         run: npm ci
       - name: Run W02 principal tests
         run: npx vitest@3.2.4 run workers/W02-identity/src/auth/principal.test.ts
+      - name: Run W02 email delivery and role resolution tests
+        run: npx vitest@3.2.4 run workers/W02-identity/src/auth/email-delivery.test.ts workers/W02-identity/src/authz/role-assignment.test.ts
 
   account-state-boundary:
     name: W02 Account State Boundary Tests
