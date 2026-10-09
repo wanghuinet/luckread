@@ -41,6 +41,7 @@ describe('AUTH-001 registration idempotency ordering', () => {
     expect(identityLookup).toBeLessThan(projectionWrite)
     expect(source).toContain("event: 'auth.register.identity_not_persisted'")
     expect(source).toContain("return errorResponse(422, 'VALIDATION_FAILED', 'Registration could not be completed')")
+    expect(source).toContain("env.D1.withSession('first-primary')")
   })
 
   it('preserves origin rejection semantics and logs a correlation identifier', () => {
