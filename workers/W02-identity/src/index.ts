@@ -12,6 +12,7 @@ import { resolveBetterAuthPrincipal } from './auth/principal.js'
 
 interface Env {
   D1_01: D1Database
+  BETTER_AUTH_SECRET?: string
   AUTH013_QUEUE: Queue
   AUTH013_PROJECTION_QUEUE: Queue
   RESEND_API_KEY?: string
@@ -63,6 +64,7 @@ export default {
 
       const authResponse = await createLuckReadAuth({
         D1_01: env.D1_01,
+        BETTER_AUTH_SECRET: env.BETTER_AUTH_SECRET,
         RESEND_API_KEY: env.RESEND_API_KEY,
         AUTH_EMAIL_FROM: env.AUTH_EMAIL_FROM,
         AUTH_PUBLIC_BASE_URL: env.AUTH_PUBLIC_BASE_URL,
@@ -233,7 +235,10 @@ export default {
       }
 
       try {
-        const auth = createLuckReadAuth({ D1_01: env.D1_01 })
+        const auth = createLuckReadAuth({
+          D1_01: env.D1_01,
+          BETTER_AUTH_SECRET: env.BETTER_AUTH_SECRET,
+        })
         const current = await auth.api.getSession({ headers: request.headers, query: {} })
         if (!current?.user?.id) {
           return json({ error: { code: 'UNAUTHENTICATED', message: 'authentication required' } }, 401)
