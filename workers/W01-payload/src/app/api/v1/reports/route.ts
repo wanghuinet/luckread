@@ -15,10 +15,10 @@ const errorResponse = (status: number, code: string, message: string) =>
 const validateBody = async (request: Request): Promise<Record<string, unknown> | Response> => {
   let body: unknown
   try { body = await request.json() } catch {
-    return errorResponse(400, 'VALIDATION_FAILED', 'Invalid request body')
+    return errorResponse(422, 'VALIDATION_FAILED', 'Invalid request body')
   }
   if (!body || typeof body !== 'object' || Array.isArray(body)) {
-    return errorResponse(400, 'VALIDATION_FAILED', 'Invalid request body')
+    return errorResponse(422, 'VALIDATION_FAILED', 'Invalid request body')
   }
   return body as Record<string, unknown>
 }
@@ -52,7 +52,7 @@ export async function POST(request: Request): Promise<Response> {
         evidenceRefs.some((value) => typeof value !== 'string' || value.length > 512)
       ))
     ) {
-      return errorResponse(400, 'VALIDATION_FAILED', 'Invalid report payload')
+      return errorResponse(422, 'VALIDATION_FAILED', 'Invalid report payload')
     }
 
     const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
