@@ -87,20 +87,17 @@ try {
   if (firstResponse.status !== 201) throw new Error('Registration failed: HTTP ' + firstResponse.status)
   if (!first.userId || first.accountState !== 'PENDING_VERIFICATION') throw new Error('Registration response is not the canonical Better Auth registration response')
 
+  // A new account must remain unable to sign in until email verification.
+  // This is expected security behavior, not a registration failure.
   const loginResponse = await request('/auth/login', null, { identity: email, credential: password })
   const login = await responseJson(loginResponse)
-  if (loginResponse.status !== 200 || String(login?.user?.id || '') !== String(first.userId)) throw new Error('Better Auth account could not authenticate through the W01 boundary')
-  const cookie = firstCookieHeader(loginResponse)
-  if (!cookie) throw new Error('Better Auth login did not establish a session cookie')
-
-  const refreshResponse = await request('/auth/refresh', null, {}, cookie)
-  const refresh = await responseJson(refreshResponse)
-  if (refreshResponse.status !== 200 || String(refresh?.user?.id || '') !== String(first.userId) || !refresh?.session?.id) throw new Error('Better Auth session could not be read through the W01 boundary')
-
-  const logoutResponse = await request('/auth/logout', null, undefined, cookie)
-  if (logoutResponse.status !== 204) throw new Error('Better Auth logout did not complete through the W01 boundary')
-  const postLogoutResponse = await request('/auth/refresh', null, {}, cookie)
-  if (postLogoutResponse.status !== 401) throw new Error('Better Auth session remained valid after logout')
+  const loginErrorCode = String(login?.error?.code || '').toUpperCase()
+  if (loginResponse.status !== 403 || loginErrorCode !== 'EMAIL_NOT_VERIFIED') {
+    throw new Error('Unverified registration must be denied with EMAIL_NOT_VERIFIED; HTTP ' + loginResponse.status + ', code ' + (loginErrorCode || 'MISSING'))
+  }
+  if (getSetCookie(loginResponse).some((value) => /(?:^|;\\s*)(?:__Secure-)?better-auth\.session_token=/.test(value))) {
+    throw new Error('Better Auth issued a session before email verification')
+  }
 
   const replay = await responseJson(await request('/auth/register', keySuccess, body))
   if (JSON.stringify(replay) !== JSON.stringify(first)) throw new Error('Idempotent replay did not return the original Better Auth registration response')
@@ -156,8 +153,8 @@ try {
     status: 'PASS',
     evidenceType: 'AUTH-001_BETTER_AUTH_REGISTRATION_W01_BOUNDARY_LOCAL_RUNTIME',
     runId, sourceSha, environment: 'CONTROLLED_LOCAL_D1_SHARED_W02_W01_OPENNEXT_WORKERS',
-    assertions: { successfulRegistration: true, betterAuthIdentityCreated: true, betterAuthSessionCreatedAndRevoked: true, w01ProfileProjectionBoundByIdentityId: true, payloadNativePasswordNotPersisted: true, payloadNativeSessionNotCreated: true, responseDigestMatchesCommitment: true, idempotentReplay: true, idempotencyReuseConflict: true, downstreamRollbackRemovesBetterAuthIdentity: true, concurrentDuplicateIdentitySingleWinner: true, concurrentSameKeySingleWinner: true },
-    observed: { userId: String(first.userId), accountState: first.accountState, refreshSessionId: String(refresh.session.id), concurrentStatuses: statuses, sameKeyStatuses },
+    assertions: { successfulRegistration: true, betterAuthIdentityCreated: true, unverifiedLoginDenied: true, noSessionIssuedBeforeVerification: true, w01ProfileProjectionBoundByIdentityId: true, payloadNativePasswordNotPersisted: true, payloadNativeSessionNotCreated: true, responseDigestMatchesCommitment: true, idempotentReplay: true, idempotencyReuseConflict: true, downstreamRollbackRemovesBetterAuthIdentity: true, concurrentDuplicateIdentitySingleWinner: true, concurrentSameKeySingleWinner: true },
+    observed: { userId: String(first.userId), accountState: first.accountState, loginDeniedCode: loginErrorCode, concurrentStatuses: statuses, sameKeyStatuses },
   }
   writeFileSync(new URL('./runtime-result.json', artifactDir), JSON.stringify(result, null, 2) + '\n')
   console.log(JSON.stringify(result, null, 2))
