@@ -122,6 +122,7 @@ export const parseFollowListLimit = (value: string | null): number => {
 
 type CursorPayload = {
   version: 1
+  userId: string
   direction: FollowListDirection
   createdAt: string
   relationshipId: string
@@ -132,7 +133,7 @@ const encodeCursor = (payload: CursorPayload): string => {
   return btoa(raw).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '')
 }
 
-const decodeCursor = (value: string | null, direction: FollowListDirection): CursorPayload | null => {
+const decodeCursor = (value: string | null, direction: FollowListDirection, userIdValue: string): CursorPayload | null => {
   if (!value) return null
   const normalized = value.trim()
   if (!normalized || normalized.length > MAX_CURSOR_LENGTH) {
@@ -143,6 +144,7 @@ const decodeCursor = (value: string | null, direction: FollowListDirection): Cur
     const parsed = JSON.parse(atob(padded)) as Partial<CursorPayload>
     if (
       parsed.version !== 1 ||
+      parsed.userId !== userIdValue ||
       parsed.direction !== direction ||
       typeof parsed.createdAt !== 'string' ||
       typeof parsed.relationshipId !== 'string' ||
@@ -153,6 +155,7 @@ const decodeCursor = (value: string | null, direction: FollowListDirection): Cur
     }
     return {
       version: 1,
+      userId: userIdValue,
       direction,
       createdAt: parsed.createdAt,
       relationshipId: parsed.relationshipId,
@@ -170,7 +173,7 @@ async function listFollowRelations(
   limit: number,
 ): Promise<FollowListPage> {
   const ownerId = userId(userIdValue)
-  const cursor = decodeCursor(cursorValue, direction)
+  const cursor = decodeCursor(cursorValue, direction, ownerId)
   const isFollowers = direction === 'followers'
   const relationColumn = isFollowers ? 'target_user_id' : 'follower_user_id'
   const itemColumn = isFollowers ? 'follower_user_id' : 'target_user_id'
@@ -247,6 +250,7 @@ async function listFollowRelations(
     nextCursor: hasMore && last
       ? encodeCursor({
           version: 1,
+          userId: ownerId,
           direction,
           createdAt: last.followed_at,
           relationshipId: last.relationship_id,
