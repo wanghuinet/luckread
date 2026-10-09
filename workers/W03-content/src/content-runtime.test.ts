@@ -359,6 +359,29 @@ describe('W03 content contract core', () => {
   })
 
 
+  it('returns the canonical error envelope for an unmatched internal route', async () => {
+    const db = {
+      prepare() {
+        throw new Error('database should not be reached for an unmatched route')
+      },
+    } as never
+    const response = await w03Worker.fetch(
+      new Request('https://luckread-w03.internal/internal/content/unmatched-route', {
+        headers: {
+          'X-LuckRead-Caller': 'W01',
+          'X-LuckRead-Transport-Version': '1.0',
+          'X-LuckRead-Correlation-Id': 'test-unmatched-route',
+        },
+      }),
+      { D1_02: db },
+    )
+    expect(response.status).toBe(404)
+    await expect(response.json()).resolves.toMatchObject({
+      error: { code: 'NOT_FOUND', message: expect.any(String), details: {} },
+      requestId: expect.stringMatching(/^req_[A-Za-z0-9_-]+$/),
+    })
+  })
+
   it('filters public content by content type', async () => {
     const preparedQueries: string[] = []
     const row = {
