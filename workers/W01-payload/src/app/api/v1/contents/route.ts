@@ -12,10 +12,10 @@ import {
   W03ContentClientError,
 } from '../../../../content/w03-content-client.js'
 
-const unavailable = (error: W03ContentClientError) =>
+const unavailable = (error: W03ContentClientError, message = error.message || 'Content service unavailable') =>
   Response.json(
-    { error: { code: error.code, message: 'Content service unavailable', details: {} }, requestId: crypto.randomUUID() },
-    { status: error.status },
+    { error: { code: error.code, message, details: {} }, requestId: `req_${crypto.randomUUID()}` },
+    { status: error.status, headers: { 'cache-control': 'no-store' } },
   )
 
 export async function GET(request: Request): Promise<Response> {
@@ -52,7 +52,7 @@ export async function GET(request: Request): Promise<Response> {
     if (error instanceof TrafficLimitError) return rateLimitResponse(request)
     if (error instanceof W03ContentClientError) return unavailable(error)
     if (error instanceof ContentListQueryError) {
-      return unavailable(new W03ContentClientError(error.status, error.code, 'Invalid content query'))
+      return unavailable(new W03ContentClientError(error.status, error.code, 'Invalid content query'), 'Invalid content query')
     }
     return unavailable(new W03ContentClientError(503, 'SERVICE_UNAVAILABLE', 'Content service unavailable'))
   }
@@ -66,7 +66,7 @@ export async function POST(request: Request): Promise<Response> {
     const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
     if (!idempotencyKey || idempotencyKey.length > 256) {
       return Response.json(
-        { error: { code: 'PRECONDITION_REQUIRED', message: 'Idempotency-Key required', details: {} }, requestId: crypto.randomUUID() },
+        { error: { code: 'PRECONDITION_REQUIRED', message: 'Idempotency-Key required', details: {} }, requestId: `req_${crypto.randomUUID()}` },
         { status: 428 },
       )
     }
@@ -76,8 +76,8 @@ export async function POST(request: Request): Promise<Response> {
       body = await request.json()
     } catch {
       return Response.json(
-        { error: { code: 'VALIDATION_FAILED', message: 'Invalid content request', details: {} }, requestId: crypto.randomUUID() },
-        { status: 400 },
+        { error: { code: 'VALIDATION_FAILED', message: 'Invalid content request', details: {} }, requestId: `req_${crypto.randomUUID()}` },
+        { status: 422 },
       )
     }
 
