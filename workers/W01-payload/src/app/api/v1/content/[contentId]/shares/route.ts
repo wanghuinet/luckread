@@ -20,7 +20,7 @@ export async function POST(
     if (principal instanceof Response) return principal
 
     const { contentId } = await context.params
-    if (!contentId?.trim()) return errorResponse(400, 'VALIDATION_FAILED', 'Invalid content id')
+    if (!contentId?.trim()) return errorResponse(422, 'VALIDATION_FAILED', 'Invalid content id')
 
     const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
     if (!idempotencyKey || idempotencyKey.length > 256) {
