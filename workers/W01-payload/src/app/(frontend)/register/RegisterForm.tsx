@@ -71,6 +71,12 @@ export default function RegisterForm({ policyVersion }: RegisterFormProps) {
       return
     }
 
+    if (normalizedEmail.length > 254 || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(normalizedEmail)) {
+      setStatus('error')
+      setMessage('请输入有效的邮箱地址。')
+      return
+    }
+
     if (password.length < 15 || password.length > 128) {
       setStatus('error')
       setMessage('密码长度必须为 15–128 位。')
