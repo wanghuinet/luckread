@@ -89,11 +89,11 @@ export async function POST(
     try {
       value = await request.json()
     } catch {
-      return errorResponse(400, 'VALIDATION_FAILED', 'Invalid comment request')
+      return errorResponse(422, 'VALIDATION_FAILED', 'Invalid comment request')
     }
 
     if (!value || typeof value !== 'object' || Array.isArray(value)) {
-      return errorResponse(400, 'VALIDATION_FAILED', 'Invalid comment request')
+      return errorResponse(422, 'VALIDATION_FAILED', 'Invalid comment request')
     }
 
     const body = (value as { body?: unknown }).body
@@ -102,7 +102,7 @@ export async function POST(
       typeof body !== 'string' ||
       (parentId !== undefined && parentId !== null && typeof parentId !== 'string')
     ) {
-      return errorResponse(400, 'VALIDATION_FAILED', 'Invalid comment request')
+      return errorResponse(422, 'VALIDATION_FAILED', 'Invalid comment request')
     }
 
     const response = await callW05Social({
