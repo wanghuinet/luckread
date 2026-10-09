@@ -24,12 +24,12 @@ on:
   pull_request:
     paths:
       - ".github/workflows/auth-001-registration-local-evidence.yml"
-      kers/W01-payload/src/auth/w02-session-client.ts"
-      kers/W02-identity/src/auth/**"
-      kers/W02-identity/src/authz/**"
-      kers/W02-identity/src/index.ts"
-      kers/W02-identity/migrations/0005_better_auth_identity_core.sql"
       - "workers/W01-payload/src/app/auth/register/**"
+      - "workers/W01-payload/src/auth/w02-session-client.ts"
+      - "workers/W02-identity/src/auth/**"
+      - "workers/W02-identity/src/authz/**"
+      - "workers/W02-identity/src/index.ts"
+      - "workers/W02-identity/migrations/0005_better_auth_identity_core.sql"
       - "workers/W01-payload/src/collections/Users.ts"
       - "workers/W01-payload/src/migrations/**"
       - "workers/W01-payload/src/payload.config.ts"
