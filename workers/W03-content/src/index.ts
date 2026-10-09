@@ -267,14 +267,17 @@ const worker = {
           throw new ContentRuntimeError('VALIDATION_FAILED', 400)
         }
         const parts = url.pathname.split('/').filter(Boolean)
-        return json(await applyModerationContentTransition(env.D1_02, {
-          contentId: decodeURIComponent(parts[3]),
-          decisionId,
-          policyVersion,
-          outcome: outcome as 'APPROVED' | 'REJECTED',
-          ifMatch,
-          idempotencyKey,
-        }))
+        return json({
+          ...await applyModerationContentTransition(env.D1_02, {
+            contentId: decodeURIComponent(parts[3]),
+            decisionId,
+            policyVersion,
+            outcome: outcome as 'APPROVED' | 'REJECTED',
+            ifMatch,
+            idempotencyKey,
+          }),
+          requestId: createRequestId(),
+        })
       }
 
       requireTransport(request)
@@ -693,13 +696,13 @@ const worker = {
         })
       }
 
-      if (!path) return new Response(null, { status: 404 })
+      if (!path) throw new ContentRuntimeError('NOT_FOUND', 404)
 
       if (request.method === 'POST' && path.id && path.preflight) {
         requiredCreatorPrincipal(request)
         const body = await parseBody(request)
         try {
-          return json(preflightContent(normalizePreflightInput(body)))
+          return json({ ...preflightContent(normalizePreflightInput(body)), requestId: createRequestId() })
         } catch {
           throw new ContentRuntimeError('VALIDATION_FAILED', 400)
         }
@@ -743,7 +746,7 @@ const worker = {
           new Date(),
           { scheduledAt: requestedScheduledAt },
         )
-        return json(result)
+        return json({ ...result, requestId: createRequestId() })
       }
 
       if (request.method === 'POST' && path.id === undefined) {
@@ -769,6 +772,7 @@ const worker = {
           bodyRef: content.bodyRef,
           mediaRefs: content.mediaRefs,
           coverRef: content.coverRef,
+          requestId: createRequestId(),
         }, 201)
       }
 
@@ -791,6 +795,7 @@ const worker = {
           coverRef: content.coverRef,
           scheduledAt: content.scheduledAt,
           updatedAt: content.updatedAt,
+          requestId: createRequestId(),
         })
       }
 
@@ -816,6 +821,7 @@ const worker = {
           title: content.title,
           bodyRef: content.bodyRef,
           scheduledAt: content.scheduledAt,
+          requestId: createRequestId(),
         })
       }
 
@@ -831,7 +837,7 @@ const worker = {
         return new Response(null, { status: 204 })
       }
 
-      return new Response(null, { status: 404 })
+      throw new ContentRuntimeError('NOT_FOUND', 404)
     } catch (error) {
       return toErrorResponse(error)
     }
