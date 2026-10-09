@@ -59,6 +59,12 @@ describe('RoleAssignment global layer resolution', () => {
       .resolves.toEqual({ decision: 'ALLOW', layer: 'L7' })
   })
 
+  it('resolves verified_user to the canonical L2 layer', async () => {
+    const { db } = fakeD1([assignment({ roleId: 'verified_user' })])
+    await expect(resolveGlobalLayer(db, 'user-1', 'ACTIVE', NOW))
+      .resolves.toEqual({ decision: 'ALLOW', layer: 'L2' })
+  })
+
   it('treats equal-layer global assignments as equivalent', async () => {
     const { db } = fakeD1([
       assignment({ id: 'ra-ip', roleId: 'ip_principal' }),
