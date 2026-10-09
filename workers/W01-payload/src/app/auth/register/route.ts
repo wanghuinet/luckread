@@ -6,6 +6,7 @@ import priv004DevPolicy from '../../../../../../artifacts/mapping-0/priv004-appr
 import priv004ProdPolicy from '../../../../../../artifacts/mapping-0/priv004-production-policy-instance-2026-09-27.json'
 import { enforceAuthRateLimit, TrafficLimitError, rateLimitResponse } from '../../../auth/traffic-limit.js'
 import { proxyBetterAuth, rollbackRegistrationUser } from '../../../auth/w02-session-client.js'
+import type { User as PayloadUser } from '../../../payload-types'
 
 const SCOPE = 'ACCOUNT_REGISTRATION'
 const ENDPOINT = 'authRegister'
@@ -421,13 +422,16 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
 
   try {
     const payload = await getPayload({ config })
+    // Import the generated collection type directly so Next's isolated route
+    // type-checker includes Payload's module augmentation for auth fields.
+    const profileData: Pick<PayloadUser, 'identityId' | 'email' | 'username'> = {
+      identityId: userId,
+      email: normalized.identity,
+      username: normalized.username,
+    }
     await payload.create({
       collection: 'users',
-      data: {
-        identityId: userId,
-        email: normalized.identity,
-        username: normalized.username,
-      },
+      data: profileData,
       overrideAccess: true,
       disableTransaction: true,
       req: request,
