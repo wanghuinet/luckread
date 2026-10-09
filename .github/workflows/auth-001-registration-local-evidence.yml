@@ -97,21 +97,17 @@ jobs:
         working-directory: workers/W01-payload
         run: pnpm install --frozen-lockfile
 
-      - name: Apply exact W02 Better Auth migrations
-        working-directory: workers/W01-payload
-        run: pnpm exec wrangler d1 migrations apply luckread --local --persist-to /tmp/luckread-auth001-state --config ../W02-identity/wrangler.jsonc
-
+      # The AUTH-013 migration updates the W01 `users` profile projection,
+      # so create the Payload-owned base tables before applying W02 migrations.
       - name: Apply exact W01 local migrations
         working-directory: workers/W01-payload
         env:
           CLOUDFLARE_PERSIST_TO: /tmp/luckread-auth001-state
         run: pnpm payload migrate
 
-      - name: Apply already-admitted AUTH-013 D1-01 schema locally
+      - name: Apply exact W02 Better Auth migrations
         working-directory: workers/W01-payload
-        run: |
-          set -euo pipefail
-          pnpm exec wrangler d1 execute luckread --local --persist-to /tmp/luckread-auth001-state --config wrangler.jsonc --file ../W02-identity/migrations/0002_auth_013_account_state.sql
+        run: pnpm exec wrangler d1 migrations apply luckread --local --persist-to /tmp/luckread-auth001-state --config ../W02-identity/wrangler.jsonc
 
       - name: Build exact W01 OpenNext worker
         working-directory: workers/W01-payload
