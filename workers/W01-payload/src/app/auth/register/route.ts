@@ -47,7 +47,7 @@ const errorResponse = (status: number, code: string, message: string, headers: R
   json(
     {
       error: { code, message, details: {} },
-      requestId: crypto.randomUUID(),
+      requestId: `req_${crypto.randomUUID()}`,
     },
     status,
     headers,
