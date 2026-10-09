@@ -40,8 +40,11 @@ async function forward(request: Request, method: 'GET' | 'POST' | 'DELETE'): Pro
 
     if (method !== 'GET') {
       const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
-      if (!idempotencyKey || idempotencyKey.length > 256) {
+      if (!idempotencyKey) {
         return errorResponse(428, 'PRECONDITION_REQUIRED', 'Idempotency-Key is required')
+      }
+      if (idempotencyKey.length > 256) {
+        return errorResponse(422, 'VALIDATION_FAILED', 'Invalid Idempotency-Key header')
       }
     }
 
