@@ -73,6 +73,38 @@ const sha256Hex = async (value: string): Promise<string> => {
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === 'object' && !Array.isArray(value)
 
+const betterAuthFailureDiagnostic = (value: unknown) => {
+  const root = isRecord(value) ? value : {}
+  const error = isRecord(root.error) ? root.error : root
+  const rawCode = typeof error.code === 'string' ? error.code : null
+  const upstreamErrorCode =
+    rawCode && /^[A-Z0-9_.-]{1,80}$/i.test(rawCode) ? rawCode : null
+  const message =
+    typeof error.message === 'string'
+      ? error.message
+      : typeof root.message === 'string'
+        ? root.message
+        : ''
+  const signal = `${upstreamErrorCode ?? ''} ${message}`.toLowerCase()
+
+  const failureCategory =
+    /password/.test(signal) && /(short|long|length|minimum|maximum|weak|policy|required)/.test(signal)
+      ? 'PASSWORD_POLICY'
+      : /(already exists|already registered|user exists|email exists|username.*taken|duplicate|user_already_exists|username_taken|email_taken)/.test(signal)
+        ? 'IDENTITY_CONFLICT'
+        : /(origin|csrf|cross.?site|trusted.?origin)/.test(signal)
+          ? 'ORIGIN_OR_CSRF_REJECTION'
+          : /username/.test(signal)
+            ? 'USERNAME_VALIDATION'
+            : /email/.test(signal)
+              ? 'EMAIL_VALIDATION'
+              : /(invalid|required|validation|missing)/.test(signal)
+                ? 'INPUT_VALIDATION'
+                : 'UNCLASSIFIED'
+
+  return { upstreamErrorCode, failureCategory }
+}
+
 type D1Binding = Awaited<ReturnType<typeof getCloudflareContext>>['env']['D1']
 
 const isExpired = (expiresAt: string, now: Date) => {
@@ -344,6 +376,13 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
   let authPayload: unknown = null
   try { authPayload = await authResponse.json() } catch {}
   if (!authResponse.ok) {
+    const diagnostic = betterAuthFailureDiagnostic(authPayload)
+    console.error(JSON.stringify({
+      event: 'auth.register.better_auth_rejected',
+      diagnosticCode: 'AUTH001_BETTER_AUTH_REJECTED',
+      upstreamStatus: authResponse.status,
+      ...diagnostic,
+    }))
     await releaseReservation()
     return errorResponse(
       authResponse.status >= 500 ? 503 : 422,
@@ -362,9 +401,31 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
     return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Registration identity is unavailable')
   }
 
+  let payloadProfileId: string | number | null = null
+  const removePayloadProfileProjection = async (): Promise<void> => {
+    if (payloadProfileId === null) return
+    try {
+      const payload = await getPayload({ config })
+      await payload.delete({
+        collection: 'users',
+        id: payloadProfileId,
+        overrideAccess: true,
+        disableTransaction: true,
+        req: request,
+      })
+      payloadProfileId = null
+    } catch (cleanupError) {
+      console.error(JSON.stringify({
+        event: 'auth.register.profile_projection_rollback_failure',
+        diagnosticCode: 'AUTH001_PROFILE_PROJECTION_ROLLBACK_FAILURE',
+        errorName: cleanupError instanceof Error ? cleanupError.name : typeof cleanupError,
+      }))
+    }
+  }
+
   try {
     const payload = await getPayload({ config })
-    await payload.create({
+    const createdProfile = await payload.create({
       collection: 'users',
       data: {
         identityId: userId,
@@ -375,7 +436,50 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
       disableTransaction: true,
       req: request,
     })
+    payloadProfileId = createdProfile.id
   } catch (error) {
+    // Concurrent sign-ups can both receive a successful Better Auth response
+    // before W01's unique email/username projection rejects one request. If
+    // this identity is already projected, never roll back the shared identity
+    // created by the winning request.
+    let projectedProfile: { id: string; identityId: string | null } | null
+    try {
+      projectedProfile = await env.D1
+        .prepare(
+          'SELECT id, identity_id AS identityId FROM users WHERE identity_id = ? OR email = ? OR username = ? LIMIT 1',
+        )
+        .bind(userId, normalized.identity, normalized.username)
+        .first<{ id: string; identityId: string | null }>()
+    } catch {
+      // If we cannot determine whether the profile belongs to this or another
+      // request, fail closed without deleting a possibly shared identity.
+      await releaseReservation()
+      console.error(JSON.stringify({
+        event: 'auth.register.profile_projection_failure',
+        diagnosticCode: 'AUTH001_PROFILE_PROJECTION_LOOKUP_FAILURE',
+        errorName: error instanceof Error ? error.name : typeof error,
+      }))
+      return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Registration service unavailable')
+    }
+
+    const identityAlreadyProjected = projectedProfile?.identityId === userId
+    const identityOwnedByAnotherProfile = !!projectedProfile && !identityAlreadyProjected
+    if (identityAlreadyProjected) {
+      // The concurrent winner already owns this identity and profile. Do not
+      // invoke W02 rollback, because that would remove the winner's account.
+      await releaseReservation()
+      console.error(JSON.stringify({
+        event: 'auth.register.profile_projection_conflict',
+        diagnosticCode: 'AUTH001_PROFILE_PROJECTION_CONFLICT',
+        failureCategory: 'IDENTITY_ALREADY_PROJECTED',
+      }))
+      return errorResponse(422, 'VALIDATION_FAILED', 'Registration could not be completed')
+    }
+
+    const identityConflict =
+      identityOwnedByAnotherProfile ||
+      isUniqueConstraintError(error) ||
+      (error instanceof Error && /(unique|duplicate|already exists)/i.test(error.message))
     try {
       await rollbackRegistrationUser(request, {
         userId,
@@ -391,11 +495,14 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
     }
     await releaseReservation()
     console.error(JSON.stringify({
-      event: 'auth.register.profile_projection_failure',
-      diagnosticCode: 'AUTH001_PROFILE_PROJECTION_FAILURE',
+      event: identityConflict ? 'auth.register.profile_projection_conflict' : 'auth.register.profile_projection_failure',
+      diagnosticCode: identityConflict ? 'AUTH001_PROFILE_PROJECTION_CONFLICT' : 'AUTH001_PROFILE_PROJECTION_FAILURE',
+      failureCategory: identityConflict ? 'IDENTITY_CONFLICT' : 'PROJECTION_FAILURE',
       errorName: error instanceof Error ? error.name : typeof error,
     }))
-    return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Registration service unavailable')
+    return identityConflict
+      ? errorResponse(422, 'VALIDATION_FAILED', 'Registration could not be completed')
+      : errorResponse(503, 'SERVICE_UNAVAILABLE', 'Registration service unavailable')
   }
 
   const committedResponseFinal = JSON.stringify({ userId, accountState: ACCOUNT_STATE })
@@ -486,6 +593,20 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     if (isUniqueConstraintError(error)) {
+      await removePayloadProfileProjection()
+      const failureCategory =
+        /auth_registration_envelopes|active_key/i.test(message)
+          ? 'IDEMPOTENCY_CONFLICT'
+          : /consents/i.test(message)
+            ? 'CONSENT_CONSTRAINT'
+            : /users/i.test(message)
+              ? 'PAYLOAD_USER_CONSTRAINT'
+              : 'UNCLASSIFIED_UNIQUE_CONSTRAINT'
+      console.error(JSON.stringify({
+        event: 'auth.register.commit_conflict',
+        diagnosticCode: 'AUTH001_COMMIT_CONFLICT',
+        failureCategory,
+      }))
       await rollbackRegistrationUser(request, {
         userId,
         email: normalized.identity,
@@ -514,6 +635,7 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
       )
     }
 
+    await removePayloadProfileProjection()
     try {
       await rollbackRegistrationUser(request, {
         userId,

@@ -24,11 +24,11 @@ on:
   pull_request:
     paths:
       - ".github/workflows/auth-001-registration-local-evidence.yml"
-      kers/W01-payload/src/auth/w02-session-client.ts"
-      kers/W02-identity/src/auth/**"
-      kers/W02-identity/src/authz/**"
-      kers/W02-identity/src/index.ts"
-      kers/W02-identity/migrations/0005_better_auth_identity_core.sql"
+      - "workers/W01-payload/src/auth/w02-session-client.ts"
+      - "workers/W02-identity/src/auth/**"
+      - "workers/W02-identity/src/authz/**"
+      - "workers/W02-identity/src/index.ts"
+      - "workers/W02-identity/migrations/0005_better_auth_identity_core.sql"
       - "workers/W01-payload/src/app/auth/register/**"
       - "workers/W01-payload/src/collections/Users.ts"
       - "workers/W01-payload/src/migrations/**"
@@ -91,11 +91,7 @@ jobs:
 
       - name: Install W02 dependencies
         working-directory: workers/W02-identity
-        run: pnpm install --frozen-lockfile
-
-      - name: Apply exact W02 Better Auth migrations
-        working-directory: workers/W02-identity
-        run: pnpm exec wrangler d1 migrations apply luckread --local --config wrangler.jsonc
+        run: npm install --ignore-scripts --no-audit --no-fund
 
       - name: Install W01 dependencies
         working-directory: workers/W01-payload
@@ -105,11 +101,25 @@ jobs:
         working-directory: workers/W01-payload
         run: pnpm payload migrate
 
-      - name: Apply already-admitted AUTH-013 D1-01 schema locally
+      - name: Apply exact W02 Better Auth migrations to the same local D1
+        working-directory: workers/W02-identity
+        run: npx --yes wrangler@4.116.0 d1 migrations apply luckread --local --persist-to "$GITHUB_WORKSPACE/workers/W01-payload/.wrangler/state" --config wrangler.jsonc
+
+      - name: Prepare conditional rollback trigger before Workers start
         working-directory: workers/W01-payload
+        env:
+          AUTH001_SUFFIX: run${{ github.run_id }}a${{ github.run_attempt }}
         run: |
           set -euo pipefail
-          pnpm exec wrangler d1 execute luckread --local --config wrangler.jsonc --file ../W02-identity/migrations/0002_auth_013_account_state.sql
+          trigger_name="auth001_evidence_fail_${AUTH001_SUFFIX}"
+          rollback_key="auth001-local-rollback-${AUTH001_SUFFIX}"
+          pnpm exec wrangler d1 execute luckread --local --config wrangler.jsonc --command "CREATE TRIGGER ${trigger_name} BEFORE UPDATE ON auth_registration_envelopes WHEN OLD.idempotency_key = '${rollback_key}' BEGIN SELECT RAISE(ABORT, 'AUTH001_FORCED_ROLLBACK'); END"
+
+      - name: Seed in-progress idempotency scenario before Workers start
+        working-directory: workers/W01-payload
+        env:
+          AUTH001_SUFFIX: run${{ github.run_id }}a${{ github.run_attempt }}
+        run: node --import=tsx/esm scripts/auth-001-registration-runtime-evidence-local.mjs --seed-in-progress
 
       - name: Build exact W01 OpenNext worker
         working-directory: workers/W01-payload
@@ -126,7 +136,7 @@ jobs:
           NODE_ENV: development
         run: |
           set -euo pipefail
-          pnpm exec wrangler dev --local --persist-to /tmp/luckread-auth001-state --port 8788 --var "CLOUDFLARE_ENV:development" > auth-001-w02-preview.log 2>&1 &
+          npx --yes wrangler@4.116.0 dev --local --persist-to "$GITHUB_WORKSPACE/workers/W01-payload/.wrangler/state" --port 8788 --var "CLOUDFLARE_ENV:development" > auth-001-w02-preview.log 2>&1 &
           echo $! > auth-001-w02-preview.pid
           ready=0
           for _ in $(seq 1 120); do
@@ -146,7 +156,7 @@ jobs:
           PAYLOAD_SECRET: ignore
         run: |
           set -euo pipefail
-          pnpm exec wrangler dev --local --persist-to /tmp/luckread-auth001-state --port 8787 --var "PAYLOAD_SECRET:auth001-local-evidence-secret-20260928" --var "CLOUDFLARE_ENV:development" > auth-001-preview.log 2>&1 &
+          pnpm exec wrangler dev --local --persist-to "$GITHUB_WORKSPACE/workers/W01-payload/.wrangler/state" --port 8787 --var "PAYLOAD_SECRET:auth001-local-evidence-secret-20260928" --var "CLOUDFLARE_ENV:development" > auth-001-preview.log 2>&1 &
           sleep 5
           echo $! > auth-001-preview.pid
           ready=0
@@ -165,6 +175,7 @@ jobs:
         working-directory: workers/W01-payload
         env:
           AUTH001_BASE_URL: http://127.0.0.1:8787
+          AUTH001_SUFFIX: run${{ github.run_id }}a${{ github.run_attempt }}
         run: |
           set -euo pipefail
           node --import=tsx/esm scripts/auth-001-registration-runtime-evidence-local.mjs

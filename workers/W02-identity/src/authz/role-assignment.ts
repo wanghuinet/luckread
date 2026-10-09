@@ -28,15 +28,45 @@ export async function ensureBaseUserRole(
   }
 
   const roleId = 'base-user-' + subjectId
-  const result = await db
+  await db
     .prepare(
       "INSERT OR IGNORE INTO role_assignments\n        (id, subject_id, role_id, scope_type, scope_id, status, valid_from, valid_until, created_at, updated_at)\n       VALUES (?, ?, 'user', 'global', NULL, 'ACTIVE', ?, NULL, ?, ?)",
     )
     .bind(roleId, subjectId, now, now, now)
     .run()
 
-  if (result.meta?.changes !== undefined && result.meta.changes > 1) {
-    throw new Error('base role materialization was ambiguous')
+  // D1 change counts can include AFTER INSERT trigger effects, such as the
+  // role_authorization_versions projection. Verify the authoritative row
+  // instead of interpreting a count greater than one as an ambiguous insert.
+  const persisted = await db
+    .prepare(
+      'SELECT id, subject_id AS subjectId, role_id AS roleId, scope_type AS scopeType, scope_id AS scopeId, status, valid_from AS validFrom, valid_until AS validUntil FROM role_assignments WHERE id = ? LIMIT 1',
+    )
+    .bind(roleId)
+    .first<{
+      id: string
+      subjectId: string
+      roleId: string
+      scopeType: string
+      scopeId: string | null
+      status: string
+      validFrom: string
+      validUntil: string | null
+    }>()
+
+  if (
+    !persisted ||
+    persisted.id !== roleId ||
+    persisted.subjectId !== subjectId ||
+    persisted.roleId !== 'user' ||
+    persisted.scopeType !== 'global' ||
+    persisted.scopeId !== null ||
+    persisted.status !== 'ACTIVE' ||
+    Number.isNaN(Date.parse(persisted.validFrom)) ||
+    Date.parse(persisted.validFrom) > Date.parse(now) ||
+    persisted.validUntil !== null
+  ) {
+    throw new Error('base role materialization could not be verified')
   }
 }
 const roleToLayer = new Map<string, string>()

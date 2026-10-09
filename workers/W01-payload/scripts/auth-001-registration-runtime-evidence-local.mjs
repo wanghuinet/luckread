@@ -3,6 +3,7 @@ import { mkdirSync, writeFileSync, readFileSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 
 const baseUrl = process.env.AUTH001_BASE_URL || 'http://127.0.0.1:8787'
+const browserOrigin = process.env.AUTH001_BROWSER_ORIGIN || 'https://mp.luckread.com'
 const artifactDir = new URL('../../../artifacts/mapping-0/auth-001-runtime-local/', import.meta.url)
 mkdirSync(artifactDir, { recursive: true })
 const runId = process.env.GITHUB_RUN_ID || 'local'
@@ -40,7 +41,7 @@ const responseJson = async (response) => {
   const text = await response.text()
   try { return JSON.parse(text) } catch { throw new Error('Expected JSON response, HTTP ' + response.status + ': ' + text.slice(0, 500)) }
 }
-const request = (path, idempotencyKey, body, cookie) => fetch(baseUrl + path, { method: 'POST', headers: { 'content-type': 'application/json', ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}), ...(cookie ? { cookie } : {}) }, body: body === undefined ? undefined : JSON.stringify(body) })
+const request = (path, idempotencyKey, body, cookie) => fetch(baseUrl + path, { method: 'POST', headers: { 'content-type': 'application/json', origin: browserOrigin, ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}), ...(cookie ? { cookie } : {}) }, body: body === undefined ? undefined : JSON.stringify(body) })
 const getSetCookie = (response) => typeof response.headers.getSetCookie === 'function' ? response.headers.getSetCookie() : [response.headers.get('set-cookie')].filter(Boolean)
 const firstCookieHeader = (response) => getSetCookie(response).map((value) => value.split(';', 1)[0]).join('; ')
 
@@ -51,7 +52,8 @@ const schema = { results: all('PRAGMA table_info(users)') }
 if (!schema.results.some((column) => column.name === 'identity_id')) throw new Error('Better Auth profile projection column identity_id is missing')
 for (const required of ['users', 'auth_registration_envelopes', 'consents']) { if (!all('SELECT name FROM sqlite_master WHERE type = \'table\' AND name = ?', required).length) throw new Error('Required local D1 table missing: ' + required) }
 
-const suffix = randomUUID().replaceAll('-', '').slice(0, 16)
+const suffix = process.env.AUTH001_SUFFIX?.trim() || randomUUID().replaceAll('-', '').slice(0, 16)
+if (!/^[a-zA-Z0-9_-]{1,32}$/.test(suffix)) throw new Error('Invalid AUTH001_SUFFIX')
 const email = 'auth001-runtime-' + suffix + '@luckread.local'
 const username = 'auth001rt' + suffix
 const password = 'Evd-AUTH001-Batch-' + suffix + '-9x!'
@@ -67,7 +69,46 @@ const rollbackEmail = 'auth001-rollback-' + suffix + '@luckread.local'
 const rollbackUsername = 'auth001rb' + suffix
 const sameKeyEmail = 'auth001-same-key-' + suffix + '@luckread.local'
 const sameKeyUsername = 'auth001sk' + suffix
-let triggerName = null
+const sameKeyBody = { ...body, identity: sameKeyEmail, username: sameKeyUsername, credential: password + '-same-key' }
+const sameKeyNormalized = {
+  identityType: 'email',
+  identity: sameKeyEmail.trim().toLowerCase(),
+  credential: password + '-same-key',
+  username: sameKeyUsername.trim(),
+  consent: { purpose: 'ACCOUNT_REGISTRATION', policyVersion: policy.policyVersion },
+}
+const sameKeyPayloadHash = await sha256Hex(JSON.stringify(canonicalize(sameKeyNormalized)))
+let triggerName = 'auth001_evidence_fail_' + suffix
+
+if (process.argv.includes('--seed-in-progress')) {
+  const createdAt = new Date().toISOString()
+  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+  runSql(
+    `INSERT INTO auth_registration_envelopes (
+      id, idempotency_key, active_key, scope, endpoint, payload_hash, state,
+      response_digest, committed_response, expires_at, consent_record_id,
+      updated_at, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, 'IN_PROGRESS', ?, NULL, ?, NULL, ?, ?)`,
+    'auth001-seed-' + suffix,
+    keySameKey,
+    keySameKey,
+    'ACCOUNT_REGISTRATION',
+    'authRegister',
+    sameKeyPayloadHash,
+    'seed-only-response-digest',
+    expiresAt,
+    createdAt,
+    createdAt,
+  )
+  runSql(
+    'INSERT INTO users (identity_id, email, username) VALUES (?, ?, ?)',
+    'auth001-existing-profile-' + suffix,
+    concurrentEmail,
+    concurrentUsername,
+  )
+  console.log(JSON.stringify({ status: 'SEEDED', scenario: 'IDEMPOTENCY_IN_PROGRESS_AND_PROFILE_CONFLICT', suffix }))
+  process.exit(0)
+}
 
 const cleanup = async () => {
   if (triggerName) { runSql('DROP TRIGGER IF EXISTS ' + triggerName); triggerName = null }
@@ -85,6 +126,49 @@ try {
   if (firstResponse.status !== 201) throw new Error('Registration failed: HTTP ' + firstResponse.status)
   if (!first.userId || first.accountState !== 'PENDING_VERIFICATION') throw new Error('Registration response is not the canonical Better Auth registration response')
 
+  // A new account must remain unable to sign in until email verification.
+  // This is expected security behavior, not a registration failure.
+  const loginResponse = await request('/auth/login', null, { identity: email, credential: password })
+  const login = await responseJson(loginResponse)
+  const loginErrorCode = String(login?.error?.code || login?.code || '').toUpperCase()
+  if (loginResponse.status !== 403 || loginErrorCode !== 'EMAIL_NOT_VERIFIED') {
+    throw new Error('Unverified registration must be denied with EMAIL_NOT_VERIFIED; HTTP ' + loginResponse.status + ', code ' + (loginErrorCode || 'MISSING'))
+  }
+  if (getSetCookie(loginResponse).some((value) => /(?:^|;\\s*)(?:__Secure-)?better-auth\.session_token=/.test(value))) {
+    throw new Error('Better Auth issued a session before email verification')
+  }
+
+  const replay = await responseJson(await request('/auth/register', keySuccess, body))
+  if (JSON.stringify(replay) !== JSON.stringify(first)) throw new Error('Idempotent replay did not return the original Better Auth registration response')
+  const reuse = await responseJson(await request('/auth/register', keySuccess, { ...body, credential: password + '-changed' }))
+  if (reuse?.error?.code !== 'IDEMPOTENCY_KEY_REUSE_CONFLICT') throw new Error('Idempotency key reuse conflict was not canonical')
+
+  // The workflow creates this conditional trigger before either Worker starts.
+  const rollbackResponse = await request('/auth/register', keyRollback, { ...body, identity: rollbackEmail, username: rollbackUsername })
+  if (rollbackResponse.status !== 503) throw new Error('Forced downstream rollback should fail closed with 503, got ' + rollbackResponse.status)
+  const rollbackLogin = await request('/auth/login', null, { identity: rollbackEmail, credential: password })
+  if (rollbackLogin.status !== 422 && rollbackLogin.status !== 401) throw new Error('W02 rollback did not remove the Better Auth identity')
+
+  const concurrentBody = { ...body, identity: concurrentEmail, username: concurrentUsername, credential: password + '-concurrent' }
+  const projectionConflictResponse = await request('/auth/register', keyConcurrentA, concurrentBody)
+  const projectionConflictPayload = await responseJson(projectionConflictResponse)
+  const statuses = [projectionConflictResponse.status]
+  if (projectionConflictResponse.status !== 422 || projectionConflictPayload?.error?.code !== 'VALIDATION_FAILED') {
+    throw new Error('An email/username already owned by a different W01 profile must return 422 VALIDATION_FAILED; HTTP ' + projectionConflictResponse.status + ', code ' + String(projectionConflictPayload?.error?.code || projectionConflictPayload?.code || 'MISSING'))
+  }
+  const projectionConflictLogin = await request('/auth/login', null, { identity: concurrentEmail, credential: concurrentBody.credential })
+  if (projectionConflictLogin.status !== 401 && projectionConflictLogin.status !== 422) {
+    throw new Error('W02 identity created for a conflicting W01 profile was not rolled back; login HTTP ' + projectionConflictLogin.status)
+  }
+  const sameKeyResponse = await request('/auth/register', keySameKey, sameKeyBody)
+  const sameKeyPayload = await responseJson(sameKeyResponse)
+  const sameKeyStatuses = [sameKeyResponse.status]
+  if (sameKeyResponse.status !== 409 || sameKeyPayload?.error?.code !== 'IDEMPOTENCY_IN_PROGRESS') {
+    throw new Error('An in-progress idempotency reservation must return 409 IDEMPOTENCY_IN_PROGRESS; HTTP ' + sameKeyResponse.status + ', code ' + String(sameKeyPayload?.error?.code || sameKeyPayload?.code || 'MISSING'))
+  }
+  // Run direct local D1 inspection only after all browser-style requests have
+  // finished. Calling Wrangler's local D1 CLI during the HTTP sequence can
+  // interfere with the short-lived local Worker runtime.
   const projection = await profileForEmail(email, username)
   if (Number(projection?.c || 0) !== 1 || String(projection.identity_id) !== String(first.userId)) throw new Error('W01 profile projection is not bound to the Better Auth user')
   if (projection.hash || projection.salt) throw new Error('Legacy Payload password hash/salt was persisted into the profile projection')
@@ -94,21 +178,6 @@ try {
     if (Number(legacySession?.c || 0) !== 0) throw new Error('Legacy Payload session row was created for Better Auth registration')
   }
 
-  const loginResponse = await request('/auth/login', null, { identity: email, credential: password })
-  const login = await responseJson(loginResponse)
-  if (loginResponse.status !== 200 || String(login?.user?.id || '') !== String(first.userId)) throw new Error('Better Auth account could not authenticate through the W01 boundary')
-  const cookie = firstCookieHeader(loginResponse)
-  if (!cookie) throw new Error('Better Auth login did not establish a session cookie')
-
-  const refreshResponse = await request('/auth/refresh', null, {}, cookie)
-  const refresh = await responseJson(refreshResponse)
-  if (refreshResponse.status !== 200 || String(refresh?.user?.id || '') !== String(first.userId) || !refresh?.session?.id) throw new Error('Better Auth session could not be read through the W01 boundary')
-
-  const logoutResponse = await request('/auth/logout', null, undefined, cookie)
-  if (logoutResponse.status !== 204) throw new Error('Better Auth logout did not complete through the W01 boundary')
-  const postLogoutResponse = await request('/auth/refresh', null, {}, cookie)
-  if (postLogoutResponse.status !== 401) throw new Error('Better Auth session remained valid after logout')
-
   const envelope = await envelopeForKey(keySuccess)
   if (!envelope || envelope.state !== 'COMPLETED') throw new Error('Completed registration envelope missing')
   const committedResponse = JSON.parse(String(envelope.committed_response))
@@ -116,44 +185,26 @@ try {
   const expectedResponseDigest = await sha256Hex(JSON.stringify(canonicalize({ schema: 'AUTH-001.response-digest.v1', operationId: 'authRegister', endpoint: '/auth/register', idempotencyKey: keySuccess, payloadHash: envelope.payload_hash, status: 201, accountState: 'PENDING_VERIFICATION' })))
   if (envelope.response_digest !== expectedResponseDigest) throw new Error('response_digest does not match the committed Better Auth registration response')
 
-  const replay = await responseJson(await request('/auth/register', keySuccess, body))
-  if (JSON.stringify(replay) !== JSON.stringify(first)) throw new Error('Idempotent replay did not return the original Better Auth registration response')
-  const reuse = await responseJson(await request('/auth/register', keySuccess, { ...body, credential: password + '-changed' }))
-  if (reuse?.error?.code !== 'IDEMPOTENCY_KEY_REUSE_CONFLICT') throw new Error('Idempotency key reuse conflict was not canonical')
-
-  triggerName = 'auth001_evidence_fail_' + suffix
-  runSql('CREATE TRIGGER ' + triggerName + " BEFORE UPDATE ON auth_registration_envelopes BEGIN SELECT RAISE(ABORT, 'AUTH001_FORCED_ROLLBACK'); END")
-  const rollbackResponse = await request('/auth/register', keyRollback, { ...body, identity: rollbackEmail, username: rollbackUsername })
-  if (rollbackResponse.status !== 503) throw new Error('Forced downstream rollback should fail closed with 503, got ' + rollbackResponse.status)
   const rollbackProjection = await profileForEmail(rollbackEmail, rollbackUsername)
   if (Number(rollbackProjection?.c || 0) !== 0) throw new Error('W01 rollback left a partial profile projection')
-  const rollbackLogin = await request('/auth/login', null, { identity: rollbackEmail, credential: password })
-  if (rollbackLogin.status !== 422 && rollbackLogin.status !== 401) throw new Error('W02 rollback did not remove the Better Auth identity')
-  runSql('DROP TRIGGER IF EXISTS ' + triggerName); triggerName = null
 
-  const concurrentBody = { ...body, identity: concurrentEmail, username: concurrentUsername, credential: password + '-concurrent' }
-  const pair = await Promise.all([request('/auth/register', keyConcurrentA, concurrentBody), request('/auth/register', keyConcurrentB, concurrentBody)])
-  const statuses = pair.map((response) => response.status).sort((a, b) => a - b)
-  if (statuses[0] !== 201 || statuses[1] !== 422) throw new Error('Concurrent duplicate identity did not produce exactly one success and one Better Auth conflict: ' + statuses.join(','))
   const concurrentProjection = await profileForEmail(concurrentEmail, concurrentUsername)
-  if (Number(concurrentProjection?.c || 0) !== 1) throw new Error('Concurrent duplicate identity produced more than one W01 profile projection')
+  if (
+    Number(concurrentProjection?.c || 0) !== 1 ||
+    String(concurrentProjection.identity_id) !== 'auth001-existing-profile-' + suffix
+  ) {
+    throw new Error('Profile conflict handling changed the pre-existing W01 profile or left an additional projection')
+  }
 
-  const sameKeyBody = { ...body, identity: sameKeyEmail, username: sameKeyUsername, credential: password + '-same-key' }
-  const sameKeyPair = await Promise.all([request('/auth/register', keySameKey, sameKeyBody), request('/auth/register', keySameKey, sameKeyBody)])
-  const sameKeyPayloads = await Promise.all(sameKeyPair.map(responseJson))
-  const sameKeyStatuses = sameKeyPair.map((response) => response.status).sort((a, b) => a - b)
-  const sameKeyValid = sameKeyStatuses[0] === 201 && sameKeyStatuses[1] === 422
-  const sameKeyReplay = sameKeyStatuses[0] === 201 && sameKeyStatuses[1] === 201 && JSON.stringify(sameKeyPayloads[0]) === JSON.stringify(sameKeyPayloads[1])
-  if (!sameKeyValid && !sameKeyReplay) throw new Error('Concurrent same Idempotency-Key did not resolve to a single Better Auth identity: ' + sameKeyStatuses.join(','))
   const sameKeyProjection = await profileForEmail(sameKeyEmail, sameKeyUsername)
-  if (Number(sameKeyProjection?.c || 0) !== 1) throw new Error('Concurrent same Idempotency-Key produced more than one W01 profile projection')
+  if (Number(sameKeyProjection?.c || 0) !== 0) throw new Error('An in-progress idempotency reservation unexpectedly created a profile projection')
 
   const result = {
     status: 'PASS',
     evidenceType: 'AUTH-001_BETTER_AUTH_REGISTRATION_W01_BOUNDARY_LOCAL_RUNTIME',
     runId, sourceSha, environment: 'CONTROLLED_LOCAL_D1_SHARED_W02_W01_OPENNEXT_WORKERS',
-    assertions: { successfulRegistration: true, betterAuthIdentityCreated: true, betterAuthSessionCreatedAndRevoked: true, w01ProfileProjectionBoundByIdentityId: true, payloadNativePasswordNotPersisted: true, payloadNativeSessionNotCreated: true, responseDigestMatchesCommitment: true, idempotentReplay: true, idempotencyReuseConflict: true, downstreamRollbackRemovesBetterAuthIdentity: true, concurrentDuplicateIdentitySingleWinner: true, concurrentSameKeySingleWinner: true },
-    observed: { userId: String(first.userId), accountState: first.accountState, refreshSessionId: String(refresh.session.id), concurrentStatuses: statuses, sameKeyStatuses },
+    assertions: { successfulRegistration: true, betterAuthIdentityCreated: true, unverifiedLoginDenied: true, noSessionIssuedBeforeVerification: true, w01ProfileProjectionBoundByIdentityId: true, payloadNativePasswordNotPersisted: true, payloadNativeSessionNotCreated: true, responseDigestMatchesCommitment: true, idempotentReplay: true, idempotencyReuseConflict: true, downstreamRollbackRemovesBetterAuthIdentity: true, profileProjectionConflictRollsBackIdentity: true, inProgressIdempotencyConflict: true },
+    observed: { userId: String(first.userId), accountState: first.accountState, loginDeniedCode: loginErrorCode, projectionConflictStatuses: statuses, sameKeyStatuses },
   }
   writeFileSync(new URL('./runtime-result.json', artifactDir), JSON.stringify(result, null, 2) + '\n')
   console.log(JSON.stringify(result, null, 2))

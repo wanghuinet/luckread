@@ -21,6 +21,9 @@ export const Users: CollectionConfig = {
     admin: payloadAdminOnly,
   },
   fields: [
+    // Override Payload's generated auth field explicitly so internal profile
+    // projection writes remain typed while email stays non-editable in Admin.
+    { name: 'email', type: 'email', required: true, unique: true, index: true, admin: { readOnly: true } },
     { name: 'identityId', type: 'text', required: false, unique: true, index: true, admin: { readOnly: true } },
     { name: 'username', type: 'text', required: true, unique: true, index: true },
     { name: 'displayName', type: 'text' },

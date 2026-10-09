@@ -151,17 +151,35 @@ describe('RoleAssignment global layer resolution', () => {
 
 
 describe('Base user role materialization', () => {
-  it('creates one deterministic global L1 role assignment', async () => {
+  const canonicalRole = {
+    id: 'base-user-user-1',
+    subjectId: 'user-1',
+    roleId: 'user',
+    scopeType: 'global',
+    scopeId: null,
+    status: 'ACTIVE',
+    validFrom: NOW,
+    validUntil: null,
+  }
+
+  it('verifies the persisted role even when D1 change counts include trigger writes', async () => {
     const calls: Array<{ sql: string; args: unknown[] }> = []
+    const queries: string[] = []
     const db = {
-      prepare: (sql: string) => ({
-        bind: (...args: unknown[]) => ({
-          run: async () => {
-            calls.push({ sql, args })
-            return { meta: { changes: 1 } }
-          },
-        }),
-      }),
+      prepare: (sql: string) => {
+        queries.push(sql)
+        return {
+          bind: (...args: unknown[]) => ({
+            run: async () => {
+              calls.push({ sql, args })
+              // The role insert plus AFTER INSERT version-trigger write may
+              // correctly produce a change count greater than one.
+              return { meta: { changes: 2 } }
+            },
+            first: async <T>() => canonicalRole as T,
+          }),
+        }
+      },
     } as unknown as D1Database
 
     await expect(ensureBaseUserRole(db, 'user-1', NOW)).resolves.toBeUndefined()
@@ -169,6 +187,21 @@ describe('Base user role materialization', () => {
     expect(calls[0].sql).toContain('INSERT OR IGNORE INTO role_assignments')
     expect(calls[0].sql).toContain("'user', 'global'")
     expect(calls[0].args).toEqual(['base-user-user-1', 'user-1', NOW, NOW, NOW])
+    expect(queries.some((sql) => sql.includes('FROM role_assignments WHERE id = ?'))).toBe(true)
+  })
+
+  it('fails closed when the deterministic role id points to another assignment', async () => {
+    const db = {
+      prepare: () => ({
+        bind: (..._args: unknown[]) => ({
+          run: async () => ({ meta: { changes: 2 } }),
+          first: async <T>() => ({ ...canonicalRole, subjectId: 'different-user' }) as T,
+        }),
+      }),
+    } as unknown as D1Database
+
+    await expect(ensureBaseUserRole(db, 'user-1', NOW))
+      .rejects.toThrow('base role materialization could not be verified')
   })
 
   it('rejects invalid subjects before persistence', async () => {
