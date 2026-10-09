@@ -91,7 +91,7 @@ try {
   // This is expected security behavior, not a registration failure.
   const loginResponse = await request('/auth/login', null, { identity: email, credential: password })
   const login = await responseJson(loginResponse)
-  const loginErrorCode = String(login?.error?.code || '').toUpperCase()
+  const loginErrorCode = String(login?.error?.code || login?.code || '').toUpperCase()
   if (loginResponse.status !== 403 || loginErrorCode !== 'EMAIL_NOT_VERIFIED') {
     throw new Error('Unverified registration must be denied with EMAIL_NOT_VERIFIED; HTTP ' + loginResponse.status + ', code ' + (loginErrorCode || 'MISSING'))
   }
