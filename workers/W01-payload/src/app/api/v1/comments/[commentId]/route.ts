@@ -33,7 +33,7 @@ export async function PATCH(
 ): Promise<Response> {
   try {
     const { commentId } = await context.params
-    if (!commentId?.trim()) return errorResponse(400, 'VALIDATION_FAILED', 'Invalid comment id')
+    if (!commentId?.trim()) return errorResponse(422, 'VALIDATION_FAILED', 'Invalid comment id')
 
     const principal = await resolveCookieSocialPrincipal(request)
     if (principal instanceof Response) return principal
@@ -52,16 +52,16 @@ export async function PATCH(
     try {
       body = await request.json()
     } catch {
-      return errorResponse(400, 'VALIDATION_FAILED', 'Invalid JSON body')
+      return errorResponse(422, 'VALIDATION_FAILED', 'Invalid JSON body')
     }
 
     if (!body || typeof body !== 'object' || Array.isArray(body)) {
-      return errorResponse(400, 'VALIDATION_FAILED', 'Invalid request body')
+      return errorResponse(422, 'VALIDATION_FAILED', 'Invalid request body')
     }
 
     const bodyValue = (body as { body?: unknown }).body
     if (typeof bodyValue !== 'string') {
-      return errorResponse(400, 'VALIDATION_FAILED', 'Comment body is required')
+      return errorResponse(422, 'VALIDATION_FAILED', 'Comment body is required')
     }
 
     return await finalizeCommentMutationResponse(await callW05Social({
@@ -85,7 +85,7 @@ export async function DELETE(
 ): Promise<Response> {
   try {
     const { commentId } = await context.params
-    if (!commentId?.trim()) return errorResponse(400, 'VALIDATION_FAILED', 'Invalid comment id')
+    if (!commentId?.trim()) return errorResponse(422, 'VALIDATION_FAILED', 'Invalid comment id')
 
     const principal = await resolveCookieSocialPrincipal(request)
     if (principal instanceof Response) return principal
