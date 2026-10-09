@@ -167,6 +167,7 @@ jobs:
         working-directory: workers/W01-payload
         env:
           AUTH001_BASE_URL: http://127.0.0.1:8787
+          CLOUDFLARE_PERSIST_TO: /tmp/luckread-auth001-state
         run: |
           set -euo pipefail
           node --import=tsx/esm scripts/auth-001-registration-runtime-evidence-local.mjs
