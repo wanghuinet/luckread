@@ -40,7 +40,12 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   const identity = (body as { identity?: unknown }).identity
-  if (typeof identity !== 'string' || !identity.trim() || identity.trim().length > 254) {
+  if (
+    typeof identity !== 'string' ||
+    identity.trim().length === 0 ||
+    identity.trim().length > 254 ||
+    !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(identity.trim())
+  ) {
     return errorResponse(422, 'VALIDATION_FAILED', 'Invalid verification request')
   }
 
