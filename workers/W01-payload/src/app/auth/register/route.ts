@@ -415,6 +415,42 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
       req: request,
     })
   } catch (error) {
+    // Concurrent sign-ups can both receive a successful Better Auth response
+    // before W01's unique email/username projection rejects one request. If
+    // this identity is already projected, never roll back the shared identity
+    // created by the winning request.
+    let identityAlreadyProjected = false
+    try {
+      const projected = await env.D1
+        .prepare('SELECT id FROM users WHERE identity_id = ? LIMIT 1')
+        .bind(userId)
+        .first<{ id: string }>()
+      identityAlreadyProjected = !!projected
+    } catch {
+      // If we cannot determine whether the identity belongs to the winner,
+      // fail closed without deleting a possibly shared Better Auth identity.
+      await releaseReservation()
+      console.error(JSON.stringify({
+        event: 'auth.register.profile_projection_failure',
+        diagnosticCode: 'AUTH001_PROFILE_PROJECTION_LOOKUP_FAILURE',
+        errorName: error instanceof Error ? error.name : typeof error,
+      }))
+      return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Registration service unavailable')
+    }
+
+    if (identityAlreadyProjected) {
+      await releaseReservation()
+      console.error(JSON.stringify({
+        event: 'auth.register.profile_projection_conflict',
+        diagnosticCode: 'AUTH001_PROFILE_PROJECTION_CONFLICT',
+        failureCategory: 'IDENTITY_ALREADY_PROJECTED',
+      }))
+      return errorResponse(422, 'VALIDATION_FAILED', 'Registration could not be completed')
+    }
+
+    const identityConflict =
+      isUniqueConstraintError(error) ||
+      (error instanceof Error && /(unique|duplicate|already exists)/i.test(error.message))
     try {
       await rollbackRegistrationUser(request, {
         userId,
@@ -430,11 +466,14 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
     }
     await releaseReservation()
     console.error(JSON.stringify({
-      event: 'auth.register.profile_projection_failure',
-      diagnosticCode: 'AUTH001_PROFILE_PROJECTION_FAILURE',
+      event: identityConflict ? 'auth.register.profile_projection_conflict' : 'auth.register.profile_projection_failure',
+      diagnosticCode: identityConflict ? 'AUTH001_PROFILE_PROJECTION_CONFLICT' : 'AUTH001_PROFILE_PROJECTION_FAILURE',
+      failureCategory: identityConflict ? 'IDENTITY_CONFLICT' : 'PROJECTION_FAILURE',
       errorName: error instanceof Error ? error.name : typeof error,
     }))
-    return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Registration service unavailable')
+    return identityConflict
+      ? errorResponse(422, 'VALIDATION_FAILED', 'Registration could not be completed')
+      : errorResponse(503, 'SERVICE_UNAVAILABLE', 'Registration service unavailable')
   }
 
   const committedResponseFinal = JSON.stringify({ userId, accountState: ACCOUNT_STATE })
