@@ -245,7 +245,7 @@ export async function createComment(
   }
 
   if (Number(validation.blocked) === 1) {
-    throw new CommentRuntimeError('RELATIONSHIP_BLOCKED', 409)
+    throw new CommentRuntimeError('CONFLICT', 409)
   }
 
   if (Number(validation.recent_count) >= 10) {
@@ -337,7 +337,7 @@ export async function createComment(
     updated_at: string
   }>()
 
-  if (!inserted) throw new CommentRuntimeError('COMMENT_WRITE_FAILED', 500)
+  if (!inserted) throw new CommentRuntimeError('INTERNAL_ERROR', 500)
   return toCommentItem(inserted)
 
 }
@@ -407,7 +407,7 @@ export async function deleteComment(
     throw new CommentRuntimeError('INVALID_STATE', 409)
   }
   if (Number(row.has_replies) === 1) {
-    throw new CommentRuntimeError('COMMENT_HAS_REPLIES', 409)
+    throw new CommentRuntimeError('CONFLICT', 409)
   }
 
   const now = new Date().toISOString()
@@ -433,7 +433,7 @@ export async function deleteComment(
         LIMIT 1`,
     ).bind(commentId, actorUserId).first<{ state: 'PUBLISHED' | 'AUTHOR_DELETED' | 'PENDING' | 'REJECTED' }>()
     if (afterConflict?.state === 'AUTHOR_DELETED') return row.content_id
-    throw new CommentRuntimeError('COMMENT_HAS_REPLIES', 409)
+    throw new CommentRuntimeError('CONFLICT', 409)
   }
   return row.content_id
 }
