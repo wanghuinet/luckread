@@ -22,14 +22,14 @@ export async function POST(request: Request): Promise<Response> {
     }
     let body: unknown
     try { body = await request.json() } catch {
-      return errorResponse(400, 'VALIDATION_FAILED', 'Invalid request body')
+      return errorResponse(422, 'VALIDATION_FAILED', 'Invalid request body')
     }
     if (!body || typeof body !== 'object' || Array.isArray(body)) {
-      return errorResponse(400, 'VALIDATION_FAILED', 'Invalid request body')
+      return errorResponse(422, 'VALIDATION_FAILED', 'Invalid request body')
     }
     const targetUserId = (body as { targetUserId?: unknown }).targetUserId
     if (typeof targetUserId !== 'string' || !targetUserId.trim()) {
-      return errorResponse(400, 'VALIDATION_FAILED', 'targetUserId is required')
+      return errorResponse(422, 'VALIDATION_FAILED', 'targetUserId is required')
     }
     await assertSocialTargetUserExists(targetUserId)
     const response = await callW05Social({
