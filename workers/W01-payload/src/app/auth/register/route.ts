@@ -452,10 +452,16 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
       }))
     }
     await releaseReservation()
+    const rawProjectionErrorMessage = error instanceof Error ? error.message : 'non-error throwable'
+    const safeProjectionErrorMessage = rawProjectionErrorMessage
+      .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '[redacted-email]')
+      .replace(/\b(password|credential|token)\s*[:=]\s*\S+/gi, '$1=[redacted]')
+      .slice(0, 200)
     console.error(JSON.stringify({
       event: 'auth.register.profile_projection_failure',
       diagnosticCode: 'AUTH001_PROFILE_PROJECTION_FAILURE',
       errorName: error instanceof Error ? error.name : typeof error,
+      errorMessage: safeProjectionErrorMessage,
     }))
     return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Registration service unavailable')
   }
