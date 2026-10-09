@@ -402,6 +402,7 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
       diagnosticCode: 'AUTH001_IDENTITY_CONFIRMATION_FAILURE',
       cfRay: request.headers.get('cf-ray') ?? null,
       errorName: error instanceof Error ? error.name : typeof error,
+      errorMessage: error instanceof Error ? error.message.slice(0, 200) : 'non-error throwable',
     }))
     return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Registration service unavailable')
   }
