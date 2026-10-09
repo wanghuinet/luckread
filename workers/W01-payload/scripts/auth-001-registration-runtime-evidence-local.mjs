@@ -41,6 +41,7 @@ const responseJson = async (response) => {
   try { return JSON.parse(text) } catch { throw new Error('Expected JSON response, HTTP ' + response.status + ': ' + text.slice(0, 500)) }
 }
 const request = (path, idempotencyKey, body, cookie) => fetch(baseUrl + path, { method: 'POST', headers: { 'content-type': 'application/json', ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}), ...(cookie ? { cookie } : {}) }, body: body === undefined ? undefined : JSON.stringify(body) })
+const requestGet = (path) => fetch(baseUrl + path, { method: 'GET', redirect: 'manual' })
 const getSetCookie = (response) => typeof response.headers.getSetCookie === 'function' ? response.headers.getSetCookie() : [response.headers.get('set-cookie')].filter(Boolean)
 const firstCookieHeader = (response) => getSetCookie(response).map((value) => value.split(';', 1)[0]).join('; ')
 
@@ -89,6 +90,37 @@ try {
   if (Number(projection?.c || 0) !== 1 || String(projection.identity_id) !== String(first.userId)) throw new Error('W01 profile projection is not bound to the Better Auth user')
   if (projection.hash || projection.salt) throw new Error('Legacy Payload password hash/salt was persisted into the profile projection')
   if (Number(projection.account_state_version || 0) !== 1) throw new Error('W01 profile lifecycle projection version is not canonical')
+
+  const verification = await scalar(
+    'SELECT identifier, value, expires_at FROM verification WHERE identifier = ? OR identifier = ? OR identifier LIKE ? OR identifier LIKE ? ORDER BY created_at DESC LIMIT 1',
+    email, String(first.userId), '%' + email + '%', '%' + String(first.userId) + '%',
+  )
+  if (!verification || typeof verification.value !== 'string' || !verification.value) {
+    throw new Error('Better Auth email verification token is missing')
+  }
+
+  const verifyURL = new URL('/api/auth/verify-email', baseUrl)
+  verifyURL.searchParams.set('token', verification.value)
+  verifyURL.searchParams.set('callbackURL', baseUrl + '/login?verified=1')
+  const verifyResponse = await requestGet(verifyURL.pathname + verifyURL.search)
+  if (verifyResponse.status < 200 || verifyResponse.status >= 400) {
+    throw new Error('Better Auth email verification failed: HTTP ' + verifyResponse.status)
+  }
+
+  const verifiedIdentity = await scalar(
+    'SELECT email_verified, account_state, account_state_version FROM "user" WHERE id = ?',
+    String(first.userId),
+  )
+  if (Number(verifiedIdentity?.email_verified || 0) !== 1) {
+    throw new Error('Better Auth did not persist the verified-email state')
+  }
+  if (verifiedIdentity.account_state !== 'ACTIVE' || Number(verifiedIdentity.account_state_version || 0) < 2) {
+    throw new Error('Better Auth did not activate the verified account')
+  }
+  const activeProjection = await profileForEmail(email, username)
+  if (activeProjection?.account_state !== 'ACTIVE' || Number(activeProjection?.account_state_version || 0) < 2) {
+    throw new Error('W01 profile lifecycle projection was not activated after email verification')
+  }
   if (all('SELECT name FROM sqlite_master WHERE type = \'table\' AND name = ?', 'users_sessions').length) {
     const legacySession = await scalar('SELECT COUNT(*) AS c FROM users_sessions WHERE _parent_id = ?', projection.id)
     if (Number(legacySession?.c || 0) !== 0) throw new Error('Legacy Payload session row was created for Better Auth registration')
@@ -152,7 +184,7 @@ try {
     status: 'PASS',
     evidenceType: 'AUTH-001_BETTER_AUTH_REGISTRATION_W01_BOUNDARY_LOCAL_RUNTIME',
     runId, sourceSha, environment: 'CONTROLLED_LOCAL_D1_SHARED_W02_W01_OPENNEXT_WORKERS',
-    assertions: { successfulRegistration: true, betterAuthIdentityCreated: true, betterAuthSessionCreatedAndRevoked: true, w01ProfileProjectionBoundByIdentityId: true, payloadNativePasswordNotPersisted: true, payloadNativeSessionNotCreated: true, responseDigestMatchesCommitment: true, idempotentReplay: true, idempotencyReuseConflict: true, downstreamRollbackRemovesBetterAuthIdentity: true, concurrentDuplicateIdentitySingleWinner: true, concurrentSameKeySingleWinner: true },
+    assertions: { successfulRegistration: true, betterAuthIdentityCreated: true, emailVerificationSucceeded: true, canonicalL2AfterVerification: true, betterAuthSessionCreatedAndRevoked: true, w01ProfileProjectionBoundByIdentityId: true, payloadNativePasswordNotPersisted: true, payloadNativeSessionNotCreated: true, responseDigestMatchesCommitment: true, idempotentReplay: true, idempotencyReuseConflict: true, downstreamRollbackRemovesBetterAuthIdentity: true, concurrentDuplicateIdentitySingleWinner: true, concurrentSameKeySingleWinner: true },
     observed: { userId: String(first.userId), accountState: first.accountState, refreshSessionId: String(refresh.session.id), concurrentStatuses: statuses, sameKeyStatuses },
   }
   writeFileSync(new URL('./runtime-result.json', artifactDir), JSON.stringify(result, null, 2) + '\n')
