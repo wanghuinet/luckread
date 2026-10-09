@@ -6,8 +6,8 @@ import {
 
 const errorResponse = (status: number, code: string, message: string) =>
   Response.json(
-    { error: { code, message, details: {} }, requestId: crypto.randomUUID() },
-    { status, headers: { 'cache-control': 'no-store' } },
+    { error: { code, message, details: {} }, requestId: `req_${crypto.randomUUID()}` },
+    { status: code === 'VALIDATION_FAILED' && status === 400 ? 422 : status, headers: { 'cache-control': 'no-store' } },
   )
 
 const parseQueryTarget = (request: Request): { targetType: string; targetId: string } | Response => {
@@ -15,7 +15,7 @@ const parseQueryTarget = (request: Request): { targetType: string; targetId: str
   const targetType = url.searchParams.get('targetType')
   const targetId = url.searchParams.get('targetId')
   if (!targetType || !targetId) {
-    return errorResponse(400, 'VALIDATION_FAILED', 'Invalid bookmark target')
+    return errorResponse(422, 'VALIDATION_FAILED', 'Invalid bookmark target')
   }
   return { targetType, targetId }
 }
@@ -29,7 +29,7 @@ const parseTarget = async (request: Request): Promise<{ targetType: string; targ
     if (typeof targetType !== 'string' || typeof targetId !== 'string') throw new Error('invalid')
     return { targetType, targetId }
   } catch {
-    return errorResponse(400, 'VALIDATION_FAILED', 'Invalid bookmark target')
+    return errorResponse(422, 'VALIDATION_FAILED', 'Invalid bookmark target')
   }
 }
 
@@ -40,8 +40,11 @@ async function forward(request: Request, method: 'GET' | 'POST' | 'DELETE'): Pro
 
     if (method !== 'GET') {
       const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
-      if (!idempotencyKey || idempotencyKey.length > 256) {
+      if (!idempotencyKey) {
         return errorResponse(428, 'PRECONDITION_REQUIRED', 'Idempotency-Key is required')
+      }
+      if (idempotencyKey.length > 256) {
+        return errorResponse(422, 'VALIDATION_FAILED', 'Invalid Idempotency-Key header')
       }
     }
 

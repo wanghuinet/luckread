@@ -70,9 +70,9 @@ describe('Media upload access', () => {
     const route = read('src/app/api/v1/media/route.ts')
 
     expect(route).toContain("const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''")
-    expect(route).toContain("if (!idempotencyKey || idempotencyKey.length > 256)")
-    expect(route).toContain("status: 428")
-    expect(route).toContain("code: 'PRECONDITION_REQUIRED'")
+    expect(route).toContain("if (!idempotencyKey) return apiErrorResponse(428, 'PRECONDITION_REQUIRED'")
+    expect(route).toContain("idempotencyKey.length > 256) return apiErrorResponse(422, 'VALIDATION_FAILED'")
+    expect(route).toContain('normalizeApiErrorResponse')
   })
 
   it('exposes media metadata through the stable v1 resource path', () => {
@@ -119,7 +119,7 @@ describe('Media upload access', () => {
     expect(route).toContain('type PayloadDeleteRouteContext = Parameters<typeof payloadMediaDelete>[1]')
     expect(route).toContain("new URL('/api/media/' + encodeURIComponent(mediaId), request.url)")
     expect(route).toContain("slug: ['media', mediaId]")
-    expect(route).toContain('return payloadMediaDelete')
+    expect(route).toContain('await payloadMediaDelete(')
     expect(route).not.toContain('D1Database')
     expect(route).not.toContain('R2Bucket')
   })
@@ -129,9 +129,9 @@ describe('Media upload access', () => {
     const library = read('src/app/(payload)/v1beta/CreatorAssetLibrary.tsx')
 
     expect(route).toContain("const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''")
-    expect(route).toContain("if (!idempotencyKey || idempotencyKey.length > 256)")
-    expect(route).toContain("status: 428")
-    expect(route).toContain("code: 'PRECONDITION_REQUIRED'")
+    expect(route).toContain("if (!idempotencyKey) return apiErrorResponse(428, 'PRECONDITION_REQUIRED'")
+    expect(route).toContain("idempotencyKey.length > 256) return apiErrorResponse(422, 'VALIDATION_FAILED'")
+    expect(route).toContain('normalizeApiErrorResponse')
     expect(library).toContain("'Idempotency-Key': 'media-delete:' + crypto.randomUUID()")
   })
 
@@ -144,7 +144,7 @@ describe('Media upload access', () => {
     expect(route).toContain('type PayloadPatchRouteContext = Parameters<typeof payloadMediaPatch>[1]')
     expect(route).toContain("new URL('/api/media/' + encodeURIComponent(mediaId), request.url)")
     expect(route).toContain("slug: ['media', mediaId]")
-    expect(route).toContain('return payloadMediaPatch')
+    expect(route).toContain('await payloadMediaPatch(')
     expect(route).not.toContain('D1Database')
     expect(route).not.toContain('R2Bucket')
   })
@@ -154,8 +154,8 @@ describe('Media upload access', () => {
     const route = read('src/app/api/v1/media/route.ts')
     expect(route).toContain("import { getBetterAuthPrincipal, W02AuthClientError }")
     expect(route).toContain('error instanceof W02AuthClientError && error.status === 401')
-    expect(route).toContain("status: 503")
-    expect(route).toContain("code: 'SERVICE_UNAVAILABLE'")
+    expect(route).toContain("apiErrorResponse(401, 'UNAUTHENTICATED'")
+    expect(route).toContain("apiErrorResponse(503, 'SERVICE_UNAVAILABLE'")
   })
 
   it('lists only the authenticated creator media through the stable v1 collection path', () => {
@@ -171,8 +171,8 @@ describe('Media upload access', () => {
     expect(route).toContain("sort: '-createdAt'")
     expect(route).toContain('Math.min(Math.max(requestedLimit, 1), 50)')
     expect(route).toContain('overrideAccess: true')
-    expect(route).toContain("status: 401")
-    expect(route).toContain("status: 503")
+    expect(route).toContain("apiErrorResponse(401, 'UNAUTHENTICATED'")
+    expect(route).toContain("apiErrorResponse(503, 'SERVICE_UNAVAILABLE', 'Media service unavailable')")
     expect(route).not.toContain('D1Database')
     expect(route).not.toContain('R2Bucket')
   })
@@ -218,7 +218,7 @@ it('guards media detail reads before the Payload route', () => {
 it('guards media creation before the Payload upload handler', () => {
   const route = read('src/app/api/v1/media/route.ts')
   const guardIndex = route.indexOf('await enforceW01WriteRateLimit(request)')
-  const payloadIndex = route.indexOf('return payloadMediaPost(')
+  const payloadIndex = route.indexOf('await payloadMediaPost(')
   expect(guardIndex).toBeGreaterThanOrEqual(0)
   expect(payloadIndex).toBeGreaterThanOrEqual(0)
   expect(guardIndex).toBeLessThan(payloadIndex)
@@ -227,8 +227,8 @@ it('guards media creation before the Payload upload handler', () => {
 it('guards media update and delete before the Payload handlers', () => {
   const route = read('src/app/api/v1/media/[mediaId]/route.ts')
   expect(route).toContain('await enforceW01WriteRateLimit(request)')
-  expect(route).toContain('return payloadMediaDelete')
-  expect(route).toContain('return payloadMediaPatch')
+  expect(route).toContain('await payloadMediaDelete(')
+  expect(route).toContain('await payloadMediaPatch(')
   const guards = [...route.matchAll(/await enforceW01WriteRateLimit\(request\)/g)]
   expect(guards.length).toBe(2)
 })

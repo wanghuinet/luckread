@@ -1,7 +1,7 @@
 import {
   ContentRuntimeError,
-  decodeCursor,
-  encodeCursor,
+  decodeScopedCursor,
+  encodeScopedCursor,
   type ContentD1,
 } from './content-runtime.js'
 
@@ -180,7 +180,7 @@ const relationshipMutationBatch = async (
     await db.batch(statements)
   } catch (error) {
     if (/UNIQUE constraint|constraint failed/i.test(error instanceof Error ? error.message : String(error))) {
-      throw new ContentRuntimeError('RELATIONSHIP_CONFLICT', 409)
+      throw new ContentRuntimeError('CONFLICT', 409)
     }
     throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
   }
@@ -266,7 +266,7 @@ export async function createContentRelationship(
 
   if (row.owner_user_id !== ownerUserId) throw new ContentRuntimeError('PERMISSION_DENIED', 403)
   if (!row.target_id) throw new ContentRuntimeError('NOT_FOUND', 404)
-  if (row.active_relationship_id) throw new ContentRuntimeError('RELATIONSHIP_ALREADY_EXISTS', 409)
+  if (row.active_relationship_id) throw new ContentRuntimeError('CONFLICT', 409)
 
   const createdAt = now.toISOString()
   const relationship: ContentRelationship = {
@@ -329,7 +329,8 @@ export async function listContentRelationships(
   }
 
   const pageSize = relationLimit(limit)
-  const decoded = cursor ? decodeCursor(cursor) : null
+  const cursorScope = JSON.stringify({ type: 'content-relationships', contentId, direction })
+  const decoded = cursor ? decodeScopedCursor(cursor, cursorScope) : null
   const cursorClause = decoded
     ? 'AND (r.created_at < ? OR (r.created_at = ? AND r.relationship_id < ?))'
     : ''
@@ -393,7 +394,7 @@ export async function listContentRelationships(
     })),
     hasMore: rows.results.length > pageSize,
     nextCursor: rows.results.length > pageSize && last
-      ? encodeCursor(last.created_at, last.relationship_id)
+      ? encodeScopedCursor(last.created_at, last.relationship_id, cursorScope)
       : null,
   }
 }
@@ -438,7 +439,7 @@ export async function revokeContentRelationship(
      WHERE r.relationship_id = ? AND r.source_id = ?`,
   ).bind(ownerUserId, operationId, idempotencyKey, relationshipId, sourceContentId).first<RevokeRelationshipQueryRow>()
 
-  if (!row) throw new ContentRuntimeError('RELATIONSHIP_NOT_FOUND', 404)
+  if (!row) throw new ContentRuntimeError('NOT_FOUND', 404)
 
   const source = mapRow(row)
   const hash = await relationshipHash(operationId, { ownerUserId, relationshipId })
@@ -446,7 +447,7 @@ export async function revokeContentRelationship(
   if (replay) return replay
 
   if (row.owner_user_id !== ownerUserId) throw new ContentRuntimeError('PERMISSION_DENIED', 403)
-  if (row.status !== 'ACTIVE') throw new ContentRuntimeError('RELATIONSHIP_NOT_ACTIVE', 409)
+  if (row.status !== 'ACTIVE') throw new ContentRuntimeError('INVALID_STATE', 409)
 
   const updatedAt = now.toISOString()
   const response: ContentRelationship = { ...source, status: 'REVOKED', updatedAt }

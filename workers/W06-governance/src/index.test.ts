@@ -31,6 +31,104 @@ function createDb(success = true) {
   }
 }
 
+describe('W06 canonical API error mapping', () => {
+  it('preserves canonical codes before normalizing internal aliases', async () => {
+    const runtime = await import('./index')
+    expect(runtime.canonicalErrorCode('INVALID_STATE')).toBe('INVALID_STATE')
+    expect(runtime.canonicalErrorCode('INVALID_CURSOR')).toBe('INVALID_CURSOR')
+    expect(runtime.canonicalErrorCode('CURSOR_EXPIRED')).toBe('CURSOR_EXPIRED')
+    expect(runtime.canonicalErrorCode('REPORT_WRITE_FAILED')).toBe('INTERNAL_ERROR')
+    expect(runtime.canonicalErrorCode('INVALID_AUDIT_EVENT')).toBe('VALIDATION_FAILED')
+  })
+})
+
+describe('W06 moderation queue pagination scope', () => {
+  it('rejects queue cursors reused by a different reviewer before D1 access', async () => {
+    const rows = [
+      {
+        case_id: 'case_2',
+        target_type: 'content',
+        target_id: 'content_2',
+        target_version: null,
+        policy_version: 'policy-v1',
+        state: 'OPEN',
+        priority: 5,
+        assigned_reviewer_id: null,
+        current_decision_id: null,
+        evidence_bundle_ref: null,
+        version: 1,
+        created_at: '2026-10-07T00:00:00.000Z',
+        updated_at: '2026-10-07T00:00:00.000Z',
+        decision_id: null,
+        case_version: null,
+        outcome: null,
+        decision_policy_version: null,
+        decision_effective_at: null,
+        decision_request_id: null,
+        decision_created_at: null,
+      },
+      {
+        case_id: 'case_3',
+        target_type: 'content',
+        target_id: 'content_3',
+        target_version: null,
+        policy_version: 'policy-v1',
+        state: 'OPEN',
+        priority: 4,
+        assigned_reviewer_id: null,
+        current_decision_id: null,
+        evidence_bundle_ref: null,
+        version: 1,
+        created_at: '2026-10-07T00:01:00.000Z',
+        updated_at: '2026-10-07T00:01:00.000Z',
+        decision_id: null,
+        case_version: null,
+        outcome: null,
+        decision_policy_version: null,
+        decision_effective_at: null,
+        decision_request_id: null,
+        decision_created_at: null,
+      },
+    ]
+    const prepare = vi.fn(() => ({
+      bind: vi.fn(() => ({
+        all: vi.fn(async () => ({ results: rows })),
+      })),
+    }))
+    const db = { prepare } as unknown as D1Database
+    const runtime = await import('./index')
+    const requestFor = (reviewerId: string, requestId: string, cursor?: string) =>
+      new Request('https://w06.internal/admin/moderation/queue?limit=1' + (cursor ? '&cursor=' + encodeURIComponent(cursor) : ''), {
+        headers: {
+          'X-LuckRead-Caller': 'W01',
+          'X-LuckRead-Transport-Version': '1.0',
+          'X-LuckRead-Principal-User-Id': reviewerId,
+          'X-LuckRead-Principal-Layer': 'L6',
+          'X-LuckRead-Correlation-Id': 'correlation-' + reviewerId,
+          'X-LuckRead-Request-Id': requestId,
+        },
+      })
+
+    const first = await runtime.default.fetch(requestFor('reviewer_1', 'req_queue_first'), { D1_03: db })
+    expect(first.status).toBe(200)
+    const payload = await first.json() as { nextCursor?: string }
+    expect(payload.nextCursor).toEqual(expect.any(String))
+    expect(payload.nextCursor).toMatch(/^[A-Za-z0-9_-]+$/)
+    expect(prepare).toHaveBeenCalledTimes(1)
+
+    const reused = await runtime.default.fetch(
+      requestFor('reviewer_2', 'req_queue_second', payload.nextCursor),
+      { D1_03: db },
+    )
+    expect(reused.status).toBe(400)
+    await expect(reused.json()).resolves.toMatchObject({
+      error: { code: 'INVALID_CURSOR', details: {} },
+      requestId: 'req_queue_second',
+    })
+    expect(prepare).toHaveBeenCalledTimes(1)
+  })
+})
+
 describe('W06 runtime', () => {
   it('persists a canonical AUTH-013 account-state AuditEvent', async () => {
     const { db, prepare, bind, run } = createDb(true)

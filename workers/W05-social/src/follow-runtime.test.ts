@@ -75,7 +75,7 @@ describe('follow runtime', () => {
         'u2',
       ),
     ).rejects.toMatchObject({
-      code: 'RELATIONSHIP_BLOCKED',
+      code: 'CONFLICT',
       status: 409,
     })
   })
@@ -94,7 +94,7 @@ describe('follow runtime', () => {
     }))
 
     await expect(follow(d, 'u1', 'u2')).rejects.toMatchObject({
-      code: 'RELATIONSHIP_BLOCKED',
+      code: 'CONFLICT',
       status: 409,
     })
     expect(String(prepare.mock.calls[1]?.[0])).toContain("block.relation_type = 'block'")
@@ -104,7 +104,7 @@ describe('follow runtime', () => {
 
   it('rejects self follow', async () => {
     await expect(follow(db(), 'u1', 'u1')).rejects.toMatchObject({
-      code: 'SELF_FOLLOW_NOT_ALLOWED',
+      code: 'CONFLICT',
       status: 409,
     })
   })
@@ -257,6 +257,20 @@ describe('follow runtime', () => {
       }],
     }]), 'u1', null, 1)
     await expect(listFollowing(d, 'u1', first.nextCursor, 20)).rejects.toMatchObject({
+      code: 'INVALID_CURSOR',
+      status: 400,
+    })
+  })
+
+  it('rejects follow cursors reused for another target user', async () => {
+    const first = await listFollowers(db([], [{
+      results: [
+        { relationship_id: 'r2', user_id: 'u2', followed_at: '2026-10-02T00:01:00.000Z' },
+        { relationship_id: 'r1', user_id: 'u3', followed_at: '2026-10-02T00:00:00.000Z' },
+      ],
+    }]), 'u1', null, 1)
+    expect(first.nextCursor).toEqual(expect.any(String))
+    await expect(listFollowers(db(), 'u9', first.nextCursor, 20)).rejects.toMatchObject({
       code: 'INVALID_CURSOR',
       status: 400,
     })

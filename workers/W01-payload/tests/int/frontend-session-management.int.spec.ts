@@ -15,7 +15,15 @@ describe('frontend session management', () => {
     expect(page).toContain("cache: 'no-store'")
     expect(route).toContain("'/get-session'")
     expect(route).toContain('const currentSessionId =')
-    expect(route).toContain('currentSessionId,')
+    expect(route).toContain('currentSessionId })')
+    expect(route).toContain("return json({ items, nextCursor: null, currentSessionId })")
+    expect(route).toContain("normalizeApiErrorResponse(currentResponse, 'Session service unavailable')")
+    expect(route).toContain("apiErrorResponse(503, 'SERVICE_UNAVAILABLE', 'Current session information is unavailable')")
+    expect(route).not.toContain('currentSessionId: currentSessionId,')
+    const itemProjection = route.slice(route.indexOf('const items = payload.map'), route.indexOf('const currentResponse'))
+    expect(itemProjection).not.toContain('currentSessionId')
+    const pageType = page.slice(page.indexOf('type SessionItem'), page.indexOf('type SessionResponse'))
+    expect(pageType).toContain('deviceId?: string')
   })
 
   it('revokes only non-current sessions through the existing DELETE API with idempotency', () => {

@@ -9,15 +9,14 @@ import {
 
 const errorResponse = (status: number, code: string, message: string) =>
   Response.json(
-    { error: { code, message, details: {} }, requestId: crypto.randomUUID() },
+    { error: { code, message, details: {} }, requestId: `req_${crypto.randomUUID()}` },
     { status, headers: { 'cache-control': 'no-store' } },
   )
 
 const requireIdempotency = (request: Request): Response | null => {
   const value = request.headers.get('Idempotency-Key')?.trim() ?? ''
-  if (!value || value.length > 256) {
-    return errorResponse(428, 'PRECONDITION_REQUIRED', 'Idempotency-Key required')
-  }
+  if (!value) return errorResponse(428, 'PRECONDITION_REQUIRED', 'Idempotency-Key required')
+  if (value.length > 256) return errorResponse(422, 'VALIDATION_FAILED', 'Invalid Idempotency-Key header')
   return null
 }
 

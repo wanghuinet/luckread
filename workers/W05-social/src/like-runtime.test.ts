@@ -73,7 +73,7 @@ describe('like runtime', () => {
   it('hides content like status when either actor or owner is blocked', async () => {
     const d = db([{ liked: 1, like_count: 9, blocked: 1 }])
     await expect(getLikeStatus(d, 'user-1', { targetType: 'content', targetId: 'content-1' })).rejects.toMatchObject({
-      code: 'RELATIONSHIP_BLOCKED',
+      code: 'CONFLICT',
       status: 409,
     })
     expect(d.prepare).toHaveBeenCalledTimes(1)
@@ -82,7 +82,7 @@ describe('like runtime', () => {
   it('hides comment like status when a comment-side relationship is blocked', async () => {
     const d = db([{ liked: 1, like_count: 4, blocked: 1 }])
     await expect(getLikeStatus(d, 'user-1', { targetType: 'comment', targetId: 'comment-1' })).rejects.toMatchObject({
-      code: 'RELATIONSHIP_BLOCKED',
+      code: 'CONFLICT',
       status: 409,
     })
     expect(d.prepare).toHaveBeenCalledTimes(1)
@@ -126,7 +126,7 @@ describe('like runtime', () => {
       { id: 'content-1', state: 'PUBLISHED', owner_user_id: 'user-2', blocked: 1 },
     ])
     await expect(like(d, 'user-1', { targetType: 'content', targetId: 'content-1' })).rejects.toMatchObject({
-      code: 'RELATIONSHIP_BLOCKED',
+      code: 'CONFLICT',
       status: 409,
     })
     expect(d.prepare).toHaveBeenCalledTimes(1)

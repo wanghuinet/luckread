@@ -7,7 +7,7 @@ import { rememberPublicShareContentId } from '../../../../../../lib/public-respo
 
 const errorResponse = (status: number, code: string, message: string) =>
   Response.json(
-    { error: { code, message, details: {} }, requestId: crypto.randomUUID() },
+    { error: { code, message, details: {} }, requestId: `req_${crypto.randomUUID()}` },
     { status, headers: { 'cache-control': 'no-store' } },
   )
 
@@ -20,12 +20,11 @@ export async function POST(
     if (principal instanceof Response) return principal
 
     const { contentId } = await context.params
-    if (!contentId?.trim()) return errorResponse(400, 'VALIDATION_FAILED', 'Invalid content id')
+    if (!contentId?.trim()) return errorResponse(422, 'VALIDATION_FAILED', 'Invalid content id')
 
     const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
-    if (!idempotencyKey || idempotencyKey.length > 256) {
-      return errorResponse(428, 'PRECONDITION_REQUIRED', 'Idempotency-Key is required')
-    }
+    if (!idempotencyKey) return errorResponse(428, 'PRECONDITION_REQUIRED', 'Idempotency-Key is required')
+    if (idempotencyKey.length > 256) return errorResponse(422, 'VALIDATION_FAILED', 'Invalid Idempotency-Key header')
 
     const response = await callW05Social({
       request,

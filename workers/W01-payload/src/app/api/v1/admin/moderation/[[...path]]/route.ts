@@ -6,7 +6,7 @@ import { resolveCookieContentPrincipal } from '../../../../../../content/w03-con
 
 const jsonError = (status: number, code: string, message: string) =>
   Response.json(
-    { error: { code, message, details: {} }, requestId: crypto.randomUUID() },
+    { error: { code, message, details: {} }, requestId: `req_${crypto.randomUUID()}` },
     { status, headers: { 'cache-control': 'no-store' } },
   )
 
@@ -36,7 +36,7 @@ const run = async (request: Request, context: { params: Promise<{ path?: string[
     try {
       body = await request.json()
     } catch {
-      return jsonError(400, 'VALIDATION_FAILED', 'Invalid moderation request')
+      return jsonError(422, 'VALIDATION_FAILED', 'Invalid moderation request')
     }
   }
 

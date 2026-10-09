@@ -47,7 +47,7 @@ const errorResponse = (status: number, code: string, message: string, headers: R
   json(
     {
       error: { code, message, details: {} },
-      requestId: crypto.randomUUID(),
+      requestId: `req_${crypto.randomUUID()}`,
     },
     status,
     headers,
@@ -174,7 +174,8 @@ export async function POST(request: Request): Promise<Response> {
   }
 
 const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
-  if (!idempotencyKey || idempotencyKey.length > 255) return errorResponse(400, 'IDEMPOTENCY_KEY_REQUIRED', 'Idempotency-Key is required')
+  if (!idempotencyKey) return errorResponse(400, 'IDEMPOTENCY_KEY_REQUIRED', 'Idempotency-Key is required')
+  if (idempotencyKey.length > 255) return errorResponse(422, 'VALIDATION_FAILED', 'Invalid Idempotency-Key header')
   let body: unknown
   try { body = await request.json() } catch { return errorResponse(422, 'VALIDATION_FAILED', 'Invalid request body') }
   if (!isRecord(body) || !isRecord(body.consent)) return errorResponse(422, 'VALIDATION_FAILED', 'Invalid registration request')
@@ -227,9 +228,11 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
     if (existing.state === 'IN_PROGRESS') return errorResponse(409, 'IDEMPOTENCY_IN_PROGRESS', 'A registration with this Idempotency-Key is already in progress', { 'retry-after': '1' })
     if (existing.state === 'COMPLETED') {
       const replay = parseReplay(existing.committedResponse)
-      return replay ? json(replay, 201) : errorResponse(503, 'SERVICE_UNAVAILABLE', 'Registration replay record is unavailable')
+      return replay
+        ? json({ ...replay, requestId: `req_${crypto.randomUUID()}` }, 201)
+        : errorResponse(503, 'SERVICE_UNAVAILABLE', 'Registration replay record is unavailable')
     }
-    return errorResponse(409, 'REGISTRATION_RETRY_REQUIRED', 'The prior registration attempt is not replayable')
+    return errorResponse(409, 'CONFLICT', 'The prior registration attempt is not replayable')
   }
 
   const reservationId = crypto.randomUUID()
@@ -304,9 +307,11 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
       }
       if (current?.state === 'COMPLETED') {
         const replay = parseReplay(current.committedResponse)
-        return replay ? json(replay, 201) : errorResponse(503, 'SERVICE_UNAVAILABLE', 'Registration replay record is unavailable')
+        return replay
+          ? json({ ...replay, requestId: `req_${crypto.randomUUID()}` }, 201)
+          : errorResponse(503, 'SERVICE_UNAVAILABLE', 'Registration replay record is unavailable')
       }
-      return errorResponse(409, 'REGISTRATION_RETRY_REQUIRED', 'The prior registration attempt is not replayable')
+      return errorResponse(409, 'CONFLICT', 'The prior registration attempt is not replayable')
     }
     return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Registration service unavailable')
   }
@@ -482,7 +487,7 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
       throw new Error('AUTH001_COMMITTED_RESPONSE_INVALID')
     }
 
-    return json(responseBody, 201)
+    return json({ ...responseBody, requestId: `req_${crypto.randomUUID()}` }, 201)
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     if (isUniqueConstraintError(error)) {

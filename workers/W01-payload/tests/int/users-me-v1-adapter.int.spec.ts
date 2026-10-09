@@ -22,6 +22,14 @@ it('distinguishes unauthenticated profile access from W02 service failure', () =
   expect(route).toContain("errorResponse(503, 'SERVICE_UNAVAILABLE'")
 })
 
+it('uses canonical self-profile error envelopes and response request IDs', () => {
+  const route = readFileSync(resolve(process.cwd(), 'src/app/(payload)/api/users/me/route.ts'), 'utf8')
+  expect(route).toContain("errorResponse(401, 'UNAUTHENTICATED', 'Authentication required')")
+  expect(route).toContain("requestId: `req_${crypto.randomUUID()}`")
+  expect(route).toContain("status: code === 'VALIDATION_FAILED' && status === 400 ? 422 : status")
+  expect(route).toContain("'CONFLICT', 'Username is already in use'")
+})
+
 it('guards viewer profile reads before authentication', () => {
   const route = readFileSync(resolve(process.cwd(), 'src/app/(payload)/api/users/me/route.ts'), 'utf8')
   const guardIndex = route.indexOf('await enforcePublicReadRateLimit(request)')

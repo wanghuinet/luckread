@@ -122,6 +122,7 @@ export const parseFollowListLimit = (value: string | null): number => {
 
 type CursorPayload = {
   version: 1
+  userId: string
   direction: FollowListDirection
   createdAt: string
   relationshipId: string
@@ -132,7 +133,7 @@ const encodeCursor = (payload: CursorPayload): string => {
   return btoa(raw).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '')
 }
 
-const decodeCursor = (value: string | null, direction: FollowListDirection): CursorPayload | null => {
+const decodeCursor = (value: string | null, direction: FollowListDirection, userIdValue: string): CursorPayload | null => {
   if (!value) return null
   const normalized = value.trim()
   if (!normalized || normalized.length > MAX_CURSOR_LENGTH) {
@@ -143,16 +144,18 @@ const decodeCursor = (value: string | null, direction: FollowListDirection): Cur
     const parsed = JSON.parse(atob(padded)) as Partial<CursorPayload>
     if (
       parsed.version !== 1 ||
+      parsed.userId !== userIdValue ||
       parsed.direction !== direction ||
       typeof parsed.createdAt !== 'string' ||
       typeof parsed.relationshipId !== 'string' ||
-      !parsed.createdAt ||
-      !parsed.relationshipId
+      !Number.isFinite(Date.parse(parsed.createdAt)) ||
+      !/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(parsed.relationshipId)
     ) {
       throw new Error('invalid cursor')
     }
     return {
       version: 1,
+      userId: userIdValue,
       direction,
       createdAt: parsed.createdAt,
       relationshipId: parsed.relationshipId,
@@ -170,7 +173,7 @@ async function listFollowRelations(
   limit: number,
 ): Promise<FollowListPage> {
   const ownerId = userId(userIdValue)
-  const cursor = decodeCursor(cursorValue, direction)
+  const cursor = decodeCursor(cursorValue, direction, ownerId)
   const isFollowers = direction === 'followers'
   const relationColumn = isFollowers ? 'target_user_id' : 'follower_user_id'
   const itemColumn = isFollowers ? 'follower_user_id' : 'target_user_id'
@@ -247,6 +250,7 @@ async function listFollowRelations(
     nextCursor: hasMore && last
       ? encodeCursor({
           version: 1,
+          userId: ownerId,
           direction,
           createdAt: last.followed_at,
           relationshipId: last.relationship_id,
@@ -258,7 +262,7 @@ async function listFollowRelations(
 export async function follow(db: D1Database, followerUserId: string, targetUserId: string): Promise<FollowRow> {
   const follower = userId(followerUserId)
   const target = userId(targetUserId)
-  if (follower === target) throw new FollowRuntimeError('SELF_FOLLOW_NOT_ALLOWED', 409)
+  if (follower === target) throw new FollowRuntimeError('CONFLICT', 409)
 
   const state = await db.prepare(
     `SELECT
@@ -289,7 +293,7 @@ export async function follow(db: D1Database, followerUserId: string, targetUserI
   }>()
 
   if (Number(state?.blocked ?? 0) === 1) {
-    throw new FollowRuntimeError('RELATIONSHIP_BLOCKED', 409)
+    throw new FollowRuntimeError('CONFLICT', 409)
   }
 
   if (
@@ -336,14 +340,14 @@ export async function follow(db: D1Database, followerUserId: string, targetUserI
     follower,
   ).first<FollowRow>()
 
-  if (!row) throw new FollowRuntimeError('RELATIONSHIP_BLOCKED', 409)
+  if (!row) throw new FollowRuntimeError('CONFLICT', 409)
   await invalidateFollowListCountCache(follower, target)
   return row
 }
 
 export async function unfollow(db: D1Database, followerUserId: string, targetUserId: string): Promise<void> {
   const follower=userId(followerUserId), target=userId(targetUserId)
-  if (follower===target) throw new FollowRuntimeError('SELF_FOLLOW_NOT_ALLOWED',409)
+  if (follower===target) throw new FollowRuntimeError('CONFLICT',409)
   await db.prepare('DELETE FROM social_follow_relationships WHERE follower_user_id = ? AND target_user_id = ?').bind(follower,target).run()
   await invalidateFollowListCountCache(follower, target)
 }

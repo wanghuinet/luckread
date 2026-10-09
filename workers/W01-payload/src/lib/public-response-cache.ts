@@ -545,10 +545,33 @@ const enforceCacheMissOriginFuse = (keyString: string): boolean => {
 }
 
 
-const withCacheHeader = (response: Response, value: 'HIT' | 'MISS'): Response => {
+const withCacheHeader = async (response: Response, value: 'HIT' | 'MISS'): Promise<Response> => {
   const headers = new Headers(response.headers)
-  headers.set('X-LuckRead-Cache', value)
-  return new Response(response.body, { status: response.status, headers })
+  if (headers.get('X-LuckRead-Cache') !== 'OVERLOADED') {
+    headers.set('X-LuckRead-Cache', value)
+  }
+  const contentType = headers.get('content-type') ?? ''
+  if (contentType.includes('application/json')) {
+    try {
+      const payload = await response.clone().json() as unknown
+      if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
+        const body = payload as Record<string, unknown>
+        if (body.error && typeof body.error === 'object' && !Array.isArray(body.error)) {
+          const error = body.error as Record<string, unknown>
+          if (error.details === undefined || error.details === null) error.details = {}
+        }
+        body.requestId = 'req_' + crypto.randomUUID()
+        return new Response(JSON.stringify(body), {
+          status: response.status,
+          statusText: response.statusText,
+          headers,
+        })
+      }
+    } catch {
+      // Preserve non-JSON or malformed cached data rather than breaking a public read.
+    }
+  }
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers })
 }
 
 export const cachedPublicGet = async (
@@ -596,10 +619,12 @@ export const cachedPublicGet = async (
   if (memoryHit) return withCacheHeader(memoryHit, 'HIT')
   let pending = inflight.get(keyString)
   if (!pending && inflight.size >= MAX_INFLIGHT) {
-    return new Response(JSON.stringify({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Public cache origin is at capacity' } }), {
+    return withCacheHeader(new Response(JSON.stringify({
+      error: { code: 'SERVICE_UNAVAILABLE', message: 'Public cache origin is at capacity', details: {} },
+    }), {
       status: 503,
       headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', 'retry-after': '1', 'x-luckread-cache': 'OVERLOADED' },
-    })
+    }), 'MISS')
   }
 
   if (!pending) {
@@ -633,9 +658,6 @@ export const cachedPublicGet = async (
   }
 
   const response = await pending
-  if (response.status === 503 && response.headers.get('x-luckread-cache') === 'OVERLOADED') {
-    return response
-  }
   return withCacheHeader(response.clone(), 'MISS')
 }
 

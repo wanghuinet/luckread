@@ -2,7 +2,7 @@ import { proxyBetterAuth } from '../../../../auth/w02-session-client.js'
 import { TrafficLimitError, enforceW01WriteRateLimit, rateLimitResponse } from '../../../../auth/traffic-limit.js'
 
 const jsonError = (status: number, code: string, message: string) =>
-  Response.json({ error: { code, message, details: {} }, requestId: crypto.randomUUID() }, {
+  Response.json({ error: { code, message, details: {} }, requestId: `req_${crypto.randomUUID()}` }, {
     status,
     headers: { 'cache-control': 'no-store' },
   })

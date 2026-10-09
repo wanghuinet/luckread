@@ -7,8 +7,8 @@ import { invalidatePublicFollowListsForUsers } from '../../../../../../lib/publi
 
 const errorResponse = (status: number, code: string, message: string) =>
   Response.json(
-    { error: { code, message, details: {} }, requestId: crypto.randomUUID() },
-    { status, headers: { 'cache-control': 'no-store' } },
+    { error: { code, message, details: {} }, requestId: `req_${crypto.randomUUID()}` },
+    { status: code === 'VALIDATION_FAILED' && status === 400 ? 422 : status, headers: { 'cache-control': 'no-store' } },
   )
 
 export async function DELETE(
@@ -20,9 +20,8 @@ export async function DELETE(
     if (principal instanceof Response) return principal
     const { targetUserId } = await context.params
     const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
-    if (!idempotencyKey || idempotencyKey.length > 256) {
-      return errorResponse(428, 'PRECONDITION_REQUIRED', 'Idempotency-Key is required')
-    }
+    if (!idempotencyKey) return errorResponse(428, 'PRECONDITION_REQUIRED', 'Idempotency-Key is required')
+    if (idempotencyKey.length > 256) return errorResponse(422, 'VALIDATION_FAILED', 'Invalid Idempotency-Key header')
     const response = await callW05Social({
       request,
       pathname: '/internal/social/interactions/blocks/' + encodeURIComponent(targetUserId),

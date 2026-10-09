@@ -3,6 +3,7 @@
 import {
   ContentRuntimeError,
   createContent,
+  createRequestId,
   deleteContent,
   getContent,
   listContents,
@@ -124,12 +125,15 @@ const requiredCreatorPrincipal = (request: Request): { userId: string; layer: st
 const requireIfMatch = (request: Request): string => {
   const value = request.headers.get('If-Match')?.trim() ?? ''
   if (!value) throw new ContentRuntimeError('PRECONDITION_REQUIRED', 428)
+  if (value.length > 256) throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+  if (value === '*') throw new ContentRuntimeError('PRECONDITION_FAILED', 412)
   return value
 }
 
 const requireIdempotency = (request: Request): string => {
   const value = request.headers.get('Idempotency-Key')?.trim() ?? ''
-  if (!value || value.length > 256) throw new ContentRuntimeError('PRECONDITION_REQUIRED', 428)
+  if (!value) throw new ContentRuntimeError('PRECONDITION_REQUIRED', 428)
+  if (value.length > 256) throw new ContentRuntimeError('VALIDATION_FAILED', 400)
   return value
 }
 
@@ -266,14 +270,17 @@ const worker = {
           throw new ContentRuntimeError('VALIDATION_FAILED', 400)
         }
         const parts = url.pathname.split('/').filter(Boolean)
-        return json(await applyModerationContentTransition(env.D1_02, {
-          contentId: decodeURIComponent(parts[3]),
-          decisionId,
-          policyVersion,
-          outcome: outcome as 'APPROVED' | 'REJECTED',
-          ifMatch,
-          idempotencyKey,
-        }))
+        return json({
+          ...await applyModerationContentTransition(env.D1_02, {
+            contentId: decodeURIComponent(parts[3]),
+            decisionId,
+            policyVersion,
+            outcome: outcome as 'APPROVED' | 'REJECTED',
+            ifMatch,
+            idempotencyKey,
+          }),
+          requestId: createRequestId(),
+        })
       }
 
       requireTransport(request)
@@ -282,7 +289,7 @@ const worker = {
       if (path && path.collectionMembers && path.id && request.method === 'GET') {
         const principal = requiredCreatorPrincipal(request)
         const cursor = url.searchParams.get('cursor')
-        if (cursor && cursor.length > 2048) throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+        if (cursor && cursor.length > 2048) throw new ContentRuntimeError('INVALID_CURSOR', 400)
         const page = await listCollectionMembers(
           env.D1_02,
           principal.userId,
@@ -290,7 +297,7 @@ const worker = {
           cursor,
           parseListLimit(url.searchParams.get('limit')),
         )
-        return json({ data: page, schemaVersion: '1.0', requestId: crypto.randomUUID() })
+        return json({ data: page, schemaVersion: '1.0', requestId: createRequestId() })
       }
 
       if (path && path.collectionMembers && path.id && request.method === 'POST' && !path.collectionMemberContentId) {
@@ -305,7 +312,7 @@ const worker = {
             requireIdempotency(request),
           ),
           schemaVersion: '1.0',
-          requestId: crypto.randomUUID(),
+          requestId: createRequestId(),
         }, 201)
       }
 
@@ -321,7 +328,7 @@ const worker = {
             requireIdempotency(request),
           ),
           schemaVersion: '1.0',
-          requestId: crypto.randomUUID(),
+          requestId: createRequestId(),
         })
       }
 
@@ -340,7 +347,7 @@ const worker = {
             requireIdempotency(request),
           ),
           schemaVersion: '1.0',
-          requestId: crypto.randomUUID(),
+          requestId: createRequestId(),
         })
       }
 
@@ -352,25 +359,25 @@ const worker = {
           await parseBody(request),
           requireIdempotency(request),
         )
-        return json({ data: collection, schemaVersion: '1.0', requestId: crypto.randomUUID() }, 201)
+        return json({ data: collection, schemaVersion: '1.0', requestId: createRequestId() }, 201)
       }
 
       if (path && path.collections && request.method === 'GET' && path.id === undefined) {
         const principal = requiredCreatorPrincipal(request)
         const cursor = url.searchParams.get('cursor')
-        if (cursor && cursor.length > 2048) throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+        if (cursor && cursor.length > 2048) throw new ContentRuntimeError('INVALID_CURSOR', 400)
         const page = await listCreatorCollections(
           env.D1_02,
           principal.userId,
           cursor,
           parseListLimit(url.searchParams.get('limit')),
         )
-        return json({ data: page, schemaVersion: '1.0', requestId: crypto.randomUUID() })
+        return json({ data: page, schemaVersion: '1.0', requestId: createRequestId() })
       }
 
       if (path && path.collections && path.id && request.method === 'GET') {
         const principal = requiredCreatorPrincipal(request)
-        return json({ data: await getCollection(env.D1_02, principal.userId, path.id), schemaVersion: '1.0', requestId: crypto.randomUUID() })
+        return json({ data: await getCollection(env.D1_02, principal.userId, path.id), schemaVersion: '1.0', requestId: createRequestId() })
       }
 
       if (path && path.collections && path.id && request.method === 'PATCH') {
@@ -385,7 +392,7 @@ const worker = {
             requireIdempotency(request),
           ),
           schemaVersion: '1.0',
-          requestId: crypto.randomUUID(),
+          requestId: createRequestId(),
         })
       }
 
@@ -409,13 +416,13 @@ const worker = {
           await parseBody(request),
           requireIdempotency(request),
         )
-        return json({ data: series, schemaVersion: '1.0', requestId: crypto.randomUUID() }, 201)
+        return json({ data: series, schemaVersion: '1.0', requestId: createRequestId() }, 201)
       }
 
       if (path && path.seriesMembers && path.id && request.method === 'GET') {
         const principal = requiredCreatorPrincipal(request)
         const cursor = url.searchParams.get('cursor')
-        if (cursor && cursor.length > 2048) throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+        if (cursor && cursor.length > 2048) throw new ContentRuntimeError('INVALID_CURSOR', 400)
         const page = await listSeriesMembers(
           env.D1_02,
           principal.userId,
@@ -423,7 +430,7 @@ const worker = {
           cursor,
           parseListLimit(url.searchParams.get('limit')),
         )
-        return json({ data: page, schemaVersion: '1.0', requestId: crypto.randomUUID() })
+        return json({ data: page, schemaVersion: '1.0', requestId: createRequestId() })
       }
 
       if (path && path.seriesMembers && path.id && request.method === 'POST' && !path.seriesMemberContentId) {
@@ -438,7 +445,7 @@ const worker = {
             requireIdempotency(request),
           ),
           schemaVersion: '1.0',
-          requestId: crypto.randomUUID(),
+          requestId: createRequestId(),
         }, 201)
       }
 
@@ -454,7 +461,7 @@ const worker = {
             requireIdempotency(request),
           ),
           schemaVersion: '1.0',
-          requestId: crypto.randomUUID(),
+          requestId: createRequestId(),
         })
       }
 
@@ -475,26 +482,26 @@ const worker = {
             requireIdempotency(request),
           ),
           schemaVersion: '1.0',
-          requestId: crypto.randomUUID(),
+          requestId: createRequestId(),
         })
       }
 
       if (path && path.series && request.method === 'GET' && path.id === undefined) {
         const principal = requiredCreatorPrincipal(request)
         const cursor = url.searchParams.get('cursor')
-        if (cursor && cursor.length > 2048) throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+        if (cursor && cursor.length > 2048) throw new ContentRuntimeError('INVALID_CURSOR', 400)
         const page = await listCreatorSeries(
           env.D1_02,
           principal.userId,
           cursor,
           parseListLimit(url.searchParams.get('limit')),
         )
-        return json({ data: page, schemaVersion: '1.0', requestId: crypto.randomUUID() })
+        return json({ data: page, schemaVersion: '1.0', requestId: createRequestId() })
       }
 
       if (path && path.series && path.id && request.method === 'GET') {
         const principal = requiredCreatorPrincipal(request)
-        return json({ data: await getSeries(env.D1_02, principal.userId, path.id), schemaVersion: '1.0', requestId: crypto.randomUUID() })
+        return json({ data: await getSeries(env.D1_02, principal.userId, path.id), schemaVersion: '1.0', requestId: createRequestId() })
       }
 
       if (path && path.series && path.id && request.method === 'PATCH') {
@@ -509,7 +516,7 @@ const worker = {
             requireIdempotency(request),
           ),
           schemaVersion: '1.0',
-          requestId: crypto.randomUUID(),
+          requestId: createRequestId(),
         })
       }
 
@@ -531,7 +538,7 @@ const worker = {
           throw new ContentRuntimeError('VALIDATION_FAILED', 400)
         }
         const cursor = url.searchParams.get('cursor')
-        if (cursor && cursor.length > 2048) throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+        if (cursor && cursor.length > 2048) throw new ContentRuntimeError('INVALID_CURSOR', 400)
         const page = await listContentRelationships(
           env.D1_02,
           path.id,
@@ -545,7 +552,7 @@ const worker = {
             nextCursor: page.nextCursor,
             hasMore: page.hasMore,
           },
-          requestId: crypto.randomUUID(),
+          requestId: createRequestId(),
         })
       }
 
@@ -559,7 +566,7 @@ const worker = {
           body,
           requireIdempotency(request),
         )
-        return json({ data: relationship, requestId: crypto.randomUUID() }, 201)
+        return json({ data: relationship, requestId: createRequestId() }, 201)
       }
 
       if (path && path.relationships && path.id && path.relationshipId && request.method === 'DELETE') {
@@ -572,14 +579,14 @@ const worker = {
           relationshipId,
           requireIdempotency(request),
         )
-        return json({ data: relationship, requestId: crypto.randomUUID() })
+        return json({ data: relationship, requestId: createRequestId() })
       }
 
       if (path && path.revisions && path.id && request.method === 'GET' && !path.revisionId) {
         const principal = requiredCreatorPrincipal(request)
         const cursor = url.searchParams.get('cursor')
         const limit = parseRevisionListLimit(url.searchParams.get('limit'))
-        if (cursor && cursor.length > 2048) throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+        if (cursor && cursor.length > 2048) throw new ContentRuntimeError('INVALID_CURSOR', 400)
         const page = await listContentRevisions(env.D1_02, principal.userId, path.id, cursor, limit)
         return json({
           data: {
@@ -587,7 +594,7 @@ const worker = {
             nextCursor: page.nextCursor,
             hasMore: page.hasMore,
           },
-          requestId: crypto.randomUUID(),
+          requestId: createRequestId(),
         })
       }
 
@@ -595,7 +602,7 @@ const worker = {
         const principal = requiredCreatorPrincipal(request)
         return json({
           data: await getContentRevision(env.D1_02, principal.userId, path.id, path.revisionId),
-          requestId: crypto.randomUUID(),
+          requestId: createRequestId(),
         })
       }
 
@@ -614,7 +621,7 @@ const worker = {
         )
         return json({
           ...result,
-          requestId: crypto.randomUUID(),
+          requestId: createRequestId(),
         })
       }
 
@@ -623,7 +630,7 @@ const worker = {
         const cursor = url.searchParams.get('cursor')
         const limitParam = url.searchParams.get('limit')
         const limit = parseListLimit(limitParam)
-        if (cursor && cursor.length > 2048) throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+        if (cursor && cursor.length > 2048) throw new ContentRuntimeError('INVALID_CURSOR', 400)
         const filters = validateListFilters(url.searchParams.get('status'), url.searchParams.get('type'))
         const page = await listCreatorContents(env.D1_02, principal.userId, cursor, limit, filters)
         return json({
@@ -646,7 +653,7 @@ const worker = {
             nextCursor: page.nextCursor,
             hasMore: page.hasMore,
           },
-          requestId: crypto.randomUUID(),
+          requestId: createRequestId(),
         })
       }
 
@@ -656,7 +663,7 @@ const worker = {
         const creatorId = url.searchParams.get('creatorId')?.trim() || null
         const contentType = url.searchParams.get('type')?.trim() || null
         const limit = parseListLimit(limitParam)
-        if (cursor && cursor.length > 2048) throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+        if (cursor && cursor.length > 2048) throw new ContentRuntimeError('INVALID_CURSOR', 400)
         if (creatorId && !/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(creatorId)) {
           throw new ContentRuntimeError('VALIDATION_FAILED', 400)
         }
@@ -688,17 +695,17 @@ const worker = {
             nextCursor: page.nextCursor,
             hasMore: page.hasMore,
           },
-          requestId: crypto.randomUUID(),
+          requestId: createRequestId(),
         })
       }
 
-      if (!path) return new Response(null, { status: 404 })
+      if (!path) throw new ContentRuntimeError('NOT_FOUND', 404)
 
       if (request.method === 'POST' && path.id && path.preflight) {
         requiredCreatorPrincipal(request)
         const body = await parseBody(request)
         try {
-          return json(preflightContent(normalizePreflightInput(body)))
+          return json({ ...preflightContent(normalizePreflightInput(body)), requestId: createRequestId() })
         } catch {
           throw new ContentRuntimeError('VALIDATION_FAILED', 400)
         }
@@ -719,7 +726,7 @@ const worker = {
           } catch {
             throw new ContentRuntimeError('VALIDATION_FAILED', 400)
           }
-          if (report.verdict === 'RED') throw new ContentRuntimeError('PREFLIGHT_BLOCKED', 422)
+          if (report.verdict === 'RED') throw new ContentRuntimeError('VALIDATION_FAILED', 422)
         }
         const reason = typeof body.reason === 'string' ? body.reason : undefined
         const requestedScheduledAt =
@@ -742,7 +749,7 @@ const worker = {
           new Date(),
           { scheduledAt: requestedScheduledAt },
         )
-        return json(result)
+        return json({ ...result, requestId: createRequestId() })
       }
 
       if (request.method === 'POST' && path.id === undefined) {
@@ -768,6 +775,7 @@ const worker = {
           bodyRef: content.bodyRef,
           mediaRefs: content.mediaRefs,
           coverRef: content.coverRef,
+          requestId: createRequestId(),
         }, 201)
       }
 
@@ -790,6 +798,7 @@ const worker = {
           coverRef: content.coverRef,
           scheduledAt: content.scheduledAt,
           updatedAt: content.updatedAt,
+          requestId: createRequestId(),
         })
       }
 
@@ -815,6 +824,7 @@ const worker = {
           title: content.title,
           bodyRef: content.bodyRef,
           scheduledAt: content.scheduledAt,
+          requestId: createRequestId(),
         })
       }
 
@@ -830,7 +840,7 @@ const worker = {
         return new Response(null, { status: 204 })
       }
 
-      return new Response(null, { status: 404 })
+      throw new ContentRuntimeError('NOT_FOUND', 404)
     } catch (error) {
       return toErrorResponse(error)
     }

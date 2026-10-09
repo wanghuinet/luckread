@@ -6,8 +6,8 @@ import {
 
 const errorResponse = (status: number, code: string, message: string) =>
   Response.json(
-    { error: { code, message, details: {} }, requestId: crypto.randomUUID() },
-    { status, headers: { 'cache-control': 'no-store' } },
+    { error: { code, message, details: {} }, requestId: `req_${crypto.randomUUID()}` },
+    { status: code === 'VALIDATION_FAILED' && status === 400 ? 422 : status, headers: { 'cache-control': 'no-store' } },
   )
 
 const resolveCommentId = async (
@@ -22,9 +22,8 @@ const resolveCommentId = async (
 
 const requireIdempotencyKey = (request: Request): string | Response => {
   const key = request.headers.get('Idempotency-Key')?.trim() ?? ''
-  if (!key || key.length > 256) {
-    return errorResponse(428, 'PRECONDITION_REQUIRED', 'Idempotency-Key required')
-  }
+  if (!key) return errorResponse(428, 'PRECONDITION_REQUIRED', 'Idempotency-Key required')
+  if (key.length > 256) return errorResponse(422, 'VALIDATION_FAILED', 'Invalid Idempotency-Key header')
   return key
 }
 

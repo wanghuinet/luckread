@@ -2,7 +2,7 @@ import { proxyBetterAuth } from '../../../auth/w02-session-client.js'
 import { enforceAuthRateLimit, TrafficLimitError, rateLimitResponse } from '../../../auth/traffic-limit.js'
 
 const errorResponse = (status: number, code: string, message: string) =>
-  Response.json({ error: { code, message, details: {} }, requestId: crypto.randomUUID() }, {
+  Response.json({ error: { code, message, details: {} }, requestId: `req_${crypto.randomUUID()}` }, {
     status,
     headers: { 'cache-control': 'no-store' },
   })
@@ -18,7 +18,7 @@ export async function POST(request: Request): Promise<Response> {
 
   let body: { identity?: unknown; credential?: unknown }
   try { body = await request.json() as typeof body } catch {
-    return errorResponse(400, 'VALIDATION_FAILED', 'Invalid request body')
+    return errorResponse(422, 'VALIDATION_FAILED', 'Invalid request body')
   }
 
   if (
@@ -27,7 +27,7 @@ export async function POST(request: Request): Promise<Response> {
     typeof body.credential !== 'string' ||
     body.credential.length === 0
   ) {
-    return errorResponse(400, 'VALIDATION_FAILED', 'Invalid authentication request')
+    return errorResponse(422, 'VALIDATION_FAILED', 'Invalid authentication request')
   }
 
   try {

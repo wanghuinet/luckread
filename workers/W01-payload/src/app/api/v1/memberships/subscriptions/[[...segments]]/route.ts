@@ -5,7 +5,7 @@ import {
 } from '../../../../../../subscription/w07-subscription-client.js'
 
 const errorResponse = (status: number, code: string, message: string) =>
-  Response.json({ error: { code, message, details: {} }, requestId: crypto.randomUUID() }, { status, headers: { 'cache-control': 'no-store' } })
+  Response.json({ error: { code, message, details: {} }, requestId: `req_${crypto.randomUUID()}` }, { status, headers: { 'cache-control': 'no-store' } })
 
 type RouteContext = { params: Promise<{ segments?: string[] }> }
 
@@ -23,9 +23,8 @@ const resolveOperation = (method: string, segments: string[] | undefined): { pat
 
 const requireHeader = (request: Request, name: 'Idempotency-Key' | 'If-Match'): Response | null => {
   const value = request.headers.get(name)?.trim() ?? ''
-  if (!value || value.length > 256) {
-    return errorResponse(428, 'PRECONDITION_REQUIRED', name + ' required')
-  }
+  if (!value) return errorResponse(428, 'PRECONDITION_REQUIRED', name + ' required')
+  if (value.length > 256) return errorResponse(422, 'VALIDATION_FAILED', 'Invalid ' + name + ' header')
   if (name === 'If-Match' && value === '*') {
     return errorResponse(412, 'PRECONDITION_FAILED', 'If-Match precondition failed')
   }
@@ -38,7 +37,7 @@ const parseBody = async (request: Request): Promise<unknown | Response> => {
     if (!body || typeof body !== 'object' || Array.isArray(body)) throw new Error('invalid')
     return body
   } catch {
-    return errorResponse(400, 'VALIDATION_FAILED', 'Invalid subscription request')
+    return errorResponse(422, 'VALIDATION_FAILED', 'Invalid subscription request')
   }
 }
 

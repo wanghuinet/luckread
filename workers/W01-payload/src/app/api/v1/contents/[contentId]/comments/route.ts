@@ -13,8 +13,8 @@ import { invalidatePublicContentComments } from '../../../../../../lib/public-re
 
 const errorResponse = (status: number, code: string, message: string) =>
   Response.json(
-    { error: { code, message, details: {} }, requestId: crypto.randomUUID() },
-    { status, headers: { 'cache-control': 'no-store' } },
+    { error: { code, message, details: {} }, requestId: `req_${crypto.randomUUID()}` },
+    { status: code === 'VALIDATION_FAILED' && status === 400 ? 422 : status, headers: { 'cache-control': 'no-store' } },
   )
 
 const resolveContentId = async (
@@ -81,19 +81,18 @@ export async function POST(
 
     const contentId = await resolveContentId(context)
     const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
-    if (!idempotencyKey || idempotencyKey.length > 256) {
-      return errorResponse(428, 'PRECONDITION_REQUIRED', 'Idempotency-Key required')
-    }
+    if (!idempotencyKey) return errorResponse(428, 'PRECONDITION_REQUIRED', 'Idempotency-Key required')
+    if (idempotencyKey.length > 256) return errorResponse(422, 'VALIDATION_FAILED', 'Invalid Idempotency-Key header')
 
     let value: unknown
     try {
       value = await request.json()
     } catch {
-      return errorResponse(400, 'VALIDATION_FAILED', 'Invalid comment request')
+      return errorResponse(422, 'VALIDATION_FAILED', 'Invalid comment request')
     }
 
     if (!value || typeof value !== 'object' || Array.isArray(value)) {
-      return errorResponse(400, 'VALIDATION_FAILED', 'Invalid comment request')
+      return errorResponse(422, 'VALIDATION_FAILED', 'Invalid comment request')
     }
 
     const body = (value as { body?: unknown }).body
@@ -102,7 +101,7 @@ export async function POST(
       typeof body !== 'string' ||
       (parentId !== undefined && parentId !== null && typeof parentId !== 'string')
     ) {
-      return errorResponse(400, 'VALIDATION_FAILED', 'Invalid comment request')
+      return errorResponse(422, 'VALIDATION_FAILED', 'Invalid comment request')
     }
 
     const response = await callW05Social({

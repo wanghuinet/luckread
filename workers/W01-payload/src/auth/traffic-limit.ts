@@ -44,7 +44,7 @@ export const rateLimitResponse = (request: Request): Response =>
         message: 'Too many requests',
         details: { retryAfter: 60 },
       },
-      requestId: crypto.randomUUID(),
+      requestId: `req_${crypto.randomUUID()}`,
     },
     {
       status: 429,

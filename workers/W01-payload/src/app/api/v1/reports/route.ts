@@ -8,17 +8,17 @@ import { assertSocialTargetUserExists } from '../../../../social/w05-social-clie
 
 const errorResponse = (status: number, code: string, message: string) =>
   Response.json(
-    { error: { code, message, details: {} }, requestId: crypto.randomUUID() },
-    { status, headers: { 'cache-control': 'no-store' } },
+    { error: { code, message, details: {} }, requestId: `req_${crypto.randomUUID()}` },
+    { status: code === 'VALIDATION_FAILED' && status === 400 ? 422 : status, headers: { 'cache-control': 'no-store' } },
   )
 
 const validateBody = async (request: Request): Promise<Record<string, unknown> | Response> => {
   let body: unknown
   try { body = await request.json() } catch {
-    return errorResponse(400, 'VALIDATION_FAILED', 'Invalid request body')
+    return errorResponse(422, 'VALIDATION_FAILED', 'Invalid request body')
   }
   if (!body || typeof body !== 'object' || Array.isArray(body)) {
-    return errorResponse(400, 'VALIDATION_FAILED', 'Invalid request body')
+    return errorResponse(422, 'VALIDATION_FAILED', 'Invalid request body')
   }
   return body as Record<string, unknown>
 }
@@ -52,13 +52,12 @@ export async function POST(request: Request): Promise<Response> {
         evidenceRefs.some((value) => typeof value !== 'string' || value.length > 512)
       ))
     ) {
-      return errorResponse(400, 'VALIDATION_FAILED', 'Invalid report payload')
+      return errorResponse(422, 'VALIDATION_FAILED', 'Invalid report payload')
     }
 
     const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
-    if (!idempotencyKey) {
-      return errorResponse(428, 'PRECONDITION_REQUIRED', 'Idempotency-Key is required')
-    }
+    if (!idempotencyKey) return errorResponse(428, 'PRECONDITION_REQUIRED', 'Idempotency-Key is required')
+    if (idempotencyKey.length > 256) return errorResponse(422, 'VALIDATION_FAILED', 'Invalid Idempotency-Key header')
 
     if (targetType === 'creator' || targetType === 'profile') {
       try {
@@ -69,7 +68,7 @@ export async function POST(request: Request): Promise<Response> {
           const clientError = error as { status: number; code: string; message: string }
           return errorResponse(
             clientError.status,
-            clientError.code === 'NOT_FOUND' ? 'RESOURCE_NOT_FOUND' : clientError.code,
+            clientError.code === 'NOT_FOUND' ? 'NOT_FOUND' : clientError.code,
             clientError.message,
           )
         }
@@ -85,11 +84,11 @@ export async function POST(request: Request): Promise<Response> {
         principal,
       })
       if (!targetResponse.ok) {
-        return errorResponse(targetResponse.status === 404 ? 404 : 503, targetResponse.status === 404 ? 'RESOURCE_NOT_FOUND' : 'SERVICE_UNAVAILABLE', targetResponse.status === 404 ? 'Reported content not found' : 'Content service unavailable')
+        return errorResponse(targetResponse.status === 404 ? 404 : 503, targetResponse.status === 404 ? 'NOT_FOUND' : 'SERVICE_UNAVAILABLE', targetResponse.status === 404 ? 'Reported content not found' : 'Content service unavailable')
       }
       const targetData = await targetResponse.json().catch((): null => null) as { id?: string; state?: string } | null
       if (targetData?.id !== targetId || targetData.state !== 'PUBLISHED') {
-        return errorResponse(404, 'RESOURCE_NOT_FOUND', 'Reported content not found')
+        return errorResponse(404, 'NOT_FOUND', 'Reported content not found')
       }
     }
 

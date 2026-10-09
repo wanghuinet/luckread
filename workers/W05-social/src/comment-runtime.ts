@@ -57,6 +57,8 @@ export const parseCommentLimit = (value: string | null): number => {
 
 type Cursor = {
   version: 1
+  contentId: string
+  viewerUserId: string | null
   createdAt: string
   id: string
 }
@@ -67,7 +69,7 @@ const encodeCursor = (cursor: Cursor): string =>
     .replace(/\//g, '_')
     .replace(/=+$/g, '')
 
-const decodeCursor = (value: string | null): Cursor | null => {
+const decodeCursor = (value: string | null, contentId: string, viewerUserId: string | null): Cursor | null => {
   if (!value) return null
   const normalized = value.trim()
   if (!normalized || normalized.length > MAX_CURSOR) {
@@ -80,6 +82,8 @@ const decodeCursor = (value: string | null): Cursor | null => {
     const parsed = JSON.parse(atob(padded)) as Partial<Cursor>
     if (
       parsed.version !== 1 ||
+      parsed.contentId !== contentId ||
+      parsed.viewerUserId !== viewerUserId ||
       typeof parsed.createdAt !== 'string' ||
       typeof parsed.id !== 'string' ||
       !parsed.createdAt ||
@@ -87,7 +91,10 @@ const decodeCursor = (value: string | null): Cursor | null => {
     ) {
       throw new Error('invalid cursor')
     }
-    return { version: 1, createdAt: parsed.createdAt, id: parsed.id }
+    if (!Number.isFinite(Date.parse(parsed.createdAt)) || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(parsed.id)) {
+      throw new Error('invalid cursor')
+    }
+    return { version: 1, contentId, viewerUserId, createdAt: parsed.createdAt, id: parsed.id }
   } catch {
     throw new CommentRuntimeError('INVALID_CURSOR', 400)
   }
@@ -245,7 +252,7 @@ export async function createComment(
   }
 
   if (Number(validation.blocked) === 1) {
-    throw new CommentRuntimeError('RELATIONSHIP_BLOCKED', 409)
+    throw new CommentRuntimeError('CONFLICT', 409)
   }
 
   if (Number(validation.recent_count) >= 10) {
@@ -337,7 +344,7 @@ export async function createComment(
     updated_at: string
   }>()
 
-  if (!inserted) throw new CommentRuntimeError('COMMENT_WRITE_FAILED', 500)
+  if (!inserted) throw new CommentRuntimeError('INTERNAL_ERROR', 500)
   return toCommentItem(inserted)
 
 }
@@ -407,7 +414,7 @@ export async function deleteComment(
     throw new CommentRuntimeError('INVALID_STATE', 409)
   }
   if (Number(row.has_replies) === 1) {
-    throw new CommentRuntimeError('COMMENT_HAS_REPLIES', 409)
+    throw new CommentRuntimeError('CONFLICT', 409)
   }
 
   const now = new Date().toISOString()
@@ -433,7 +440,7 @@ export async function deleteComment(
         LIMIT 1`,
     ).bind(commentId, actorUserId).first<{ state: 'PUBLISHED' | 'AUTHOR_DELETED' | 'PENDING' | 'REJECTED' }>()
     if (afterConflict?.state === 'AUTHOR_DELETED') return row.content_id
-    throw new CommentRuntimeError('COMMENT_HAS_REPLIES', 409)
+    throw new CommentRuntimeError('CONFLICT', 409)
   }
   return row.content_id
 }
@@ -530,8 +537,8 @@ export async function listComments(
   viewerUserIdValue: string | null = null,
 ): Promise<CommentPage> {
   const contentId = validateId(contentIdValue)
-  const cursor = decodeCursor(cursorValue)
   const viewerUserId = viewerUserIdValue ? validateId(viewerUserIdValue, 'UNAUTHENTICATED') : null
+  const cursor = decodeCursor(cursorValue, contentId, viewerUserId)
 
   const whereCursor = cursor
     ? 'AND (c.created_at > ? OR (c.created_at = ? AND c.id > ?))'
@@ -658,7 +665,7 @@ export async function listComments(
     hasMore,
     nextCursor:
       hasMore && last
-        ? encodeCursor({ version: 1, createdAt: last.created_at, id: last.id })
+        ? encodeCursor({ version: 1, contentId, viewerUserId, createdAt: last.created_at, id: last.id })
         : null,
   }
 }

@@ -142,7 +142,7 @@ const batchMutation = async (db: ContentD1, statements: D1PreparedStatement[]): 
       throw new ContentRuntimeError('IDEMPOTENCY_IN_PROGRESS', 409)
     }
     if (/unique constraint failed: content_relationships\./i.test(message)) {
-      throw new ContentRuntimeError('RELATIONSHIP_CONFLICT', 409)
+      throw new ContentRuntimeError('CONFLICT', 409)
     }
     if (/CHECK constraint failed: successful|content_txn_guard/i.test(message)) {
       throw new ContentRuntimeError('PRECONDITION_FAILED', 412)
@@ -307,7 +307,7 @@ export async function attachCollectionMember(
     throw new ContentRuntimeError('IDEMPOTENCY_KEY_REUSE_CONFLICT', 422)
   }
   assertEtag(row.collection_etag, ifMatch)
-  if (row.membership_relationship_id) throw new ContentRuntimeError('RELATIONSHIP_ALREADY_EXISTS', 409)
+  if (row.membership_relationship_id) throw new ContentRuntimeError('CONFLICT', 409)
   if (row.collection_state === 'DELETED') throw new ContentRuntimeError('INVALID_STATE', 409)
 
   const nowIso = now.toISOString()
@@ -372,6 +372,42 @@ export async function attachCollectionMember(
   return response
 }
 
+type CollectionMemberCursor = {
+  version: 1
+  ownerUserId: string
+  collectionId: string
+  position: number
+  id: string
+}
+
+const encodeCollectionMemberCursor = (cursor: CollectionMemberCursor): string =>
+  btoa(JSON.stringify(cursor)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '')
+
+const decodeCollectionMemberCursor = (
+  value: string,
+  ownerUserId: string,
+  collectionId: string,
+): { position: number; id: string } => {
+  try {
+    if (!value || value.length > 2048 || !/^[A-Za-z0-9_-]+$/.test(value)) throw new Error('invalid cursor')
+    const normalized = value.replace(/-/g, '+').replace(/_/g, '/')
+    const padded = normalized + '='.repeat((4 - normalized.length % 4) % 4)
+    const parsed = JSON.parse(atob(padded)) as Partial<CollectionMemberCursor>
+    if (
+      parsed.version !== 1 ||
+      parsed.ownerUserId !== ownerUserId ||
+      parsed.collectionId !== collectionId ||
+      !Number.isSafeInteger(parsed.position) ||
+      Number(parsed.position) < 0 ||
+      typeof parsed.id !== 'string' ||
+      !/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(parsed.id)
+    ) throw new Error('invalid cursor')
+    return { position: Number(parsed.position), id: parsed.id }
+  } catch {
+    throw new ContentRuntimeError('INVALID_CURSOR', 400)
+  }
+}
+
 export async function listCollectionMembers(
   db: ContentD1,
   ownerUserId: string,
@@ -389,16 +425,7 @@ export async function listCollectionMembers(
   assertResourceId(collectionId)
   const pageSize = Math.min(Math.max(Number.isSafeInteger(limit) ? limit : 20, 1), 100)
 
-  let decoded: { position: number; id: string } | null = null
-  if (cursor) {
-    try {
-      const value = JSON.parse(atob(cursor)) as { position?: unknown; id?: unknown }
-      if (!Number.isSafeInteger(value.position) || typeof value.id !== 'string') throw new Error('invalid cursor')
-      decoded = { position: Number(value.position), id: value.id }
-    } catch {
-      throw new ContentRuntimeError('VALIDATION_FAILED', 400)
-    }
-  }
+  const decoded = cursor ? decodeCollectionMemberCursor(cursor, ownerUserId, collectionId) : null
 
   const collection = await db.prepare(
     'SELECT id, version, etag FROM content_collections WHERE id = ? AND owner_user_id = ?',
@@ -442,7 +469,13 @@ export async function listCollectionMembers(
     items: page,
     hasMore,
     nextCursor: hasMore && last
-      ? btoa(JSON.stringify({ position: last.position, id: last.relationshipId }))
+      ? encodeCollectionMemberCursor({
+          version: 1,
+          ownerUserId,
+          collectionId,
+          position: last.position,
+          id: last.relationshipId,
+        })
       : null,
     collectionVersion: collection.version,
     collectionEtag: collection.etag,
@@ -479,7 +512,7 @@ export async function removeCollectionMember(
   }
 
   if (!row.membership_relationship_id || row.membership_position === null) {
-    throw new ContentRuntimeError('RELATIONSHIP_NOT_FOUND', 404)
+    throw new ContentRuntimeError('NOT_FOUND', 404)
   }
   assertCollectionEditable(row.collection_state)
   assertEtag(row.collection_etag, ifMatch)
@@ -554,7 +587,7 @@ export async function reorderCollectionMember(
   }
 
   if (!row.membership_relationship_id || row.membership_position === null) {
-    throw new ContentRuntimeError('RELATIONSHIP_NOT_FOUND', 404)
+    throw new ContentRuntimeError('NOT_FOUND', 404)
   }
   assertCollectionEditable(row.collection_state)
   assertEtag(row.collection_etag, ifMatch)
@@ -574,7 +607,7 @@ export async function reorderCollectionMember(
 
   const members = rows.results
   const currentIndex = members.findIndex(item => item.source_id === contentId)
-  if (currentIndex < 0) throw new ContentRuntimeError('RELATIONSHIP_NOT_FOUND', 404)
+  if (currentIndex < 0) throw new ContentRuntimeError('NOT_FOUND', 404)
   if (position >= members.length) throw new ContentRuntimeError('VALIDATION_FAILED', 400)
   if (position === currentIndex) {
     const member = {

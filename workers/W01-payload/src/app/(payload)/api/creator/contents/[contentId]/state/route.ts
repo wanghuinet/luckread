@@ -14,19 +14,17 @@ import {
 
 const errorResponse = (status: number, code: string, message: string) =>
   Response.json(
-    { error: { code, message, details: {} }, requestId: crypto.randomUUID() },
+    { error: { code, message, details: {} }, requestId: `req_${crypto.randomUUID()}` },
     { status, headers: { 'cache-control': 'no-store' } },
   )
 
 const requireStatePreconditions = (request: Request): Response | null => {
   const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
   const ifMatch = request.headers.get('If-Match')?.trim() ?? ''
-  if (!idempotencyKey || idempotencyKey.length > 256) {
-    return errorResponse(428, 'PRECONDITION_REQUIRED', 'Idempotency-Key required')
-  }
-  if (!ifMatch || ifMatch.length > 256) {
-    return errorResponse(428, 'PRECONDITION_REQUIRED', 'If-Match required')
-  }
+  if (!idempotencyKey) return errorResponse(428, 'PRECONDITION_REQUIRED', 'Idempotency-Key required')
+  if (idempotencyKey.length > 256) return errorResponse(422, 'VALIDATION_FAILED', 'Invalid Idempotency-Key header')
+  if (!ifMatch) return errorResponse(428, 'PRECONDITION_REQUIRED', 'If-Match required')
+  if (ifMatch.length > 256) return errorResponse(422, 'VALIDATION_FAILED', 'Invalid If-Match header')
   if (ifMatch === '*') {
     return errorResponse(412, 'PRECONDITION_FAILED', 'If-Match precondition failed')
   }
@@ -49,7 +47,7 @@ export async function POST(
     try {
       body = await request.json()
     } catch {
-      return errorResponse(400, 'VALIDATION_FAILED', 'Invalid content state request')
+      return errorResponse(422, 'VALIDATION_FAILED', 'Invalid content state request')
     }
 
     const response = await callW03Content({

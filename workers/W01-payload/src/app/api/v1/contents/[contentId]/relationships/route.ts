@@ -12,7 +12,7 @@ import {
 
 const errorResponse = (status: number, code: string, message: string) =>
   Response.json(
-    { error: { code, message, details: {} }, requestId: crypto.randomUUID() },
+    { error: { code, message, details: {} }, requestId: `req_${crypto.randomUUID()}` },
     { status, headers: { 'cache-control': 'no-store' } },
   )
 
@@ -21,9 +21,8 @@ const relationshipPath = (contentId: string) =>
 
 const requireIdempotency = (request: Request): Response | null => {
   const value = request.headers.get('Idempotency-Key')?.trim() ?? ''
-  if (!value || value.length > 256) {
-    return errorResponse(428, 'PRECONDITION_REQUIRED', 'Idempotency-Key required')
-  }
+  if (!value) return errorResponse(428, 'PRECONDITION_REQUIRED', 'Idempotency-Key required')
+  if (value.length > 256) return errorResponse(422, 'VALIDATION_FAILED', 'Invalid Idempotency-Key header')
   return null
 }
 
@@ -37,12 +36,12 @@ export async function GET(
     if (url.searchParams.has('direction')) {
       const direction = url.searchParams.get('direction')?.trim() ?? ''
       if (!['out', 'in', 'both'].includes(direction)) {
-        return errorResponse(400, 'VALIDATION_FAILED', 'Invalid relationship direction')
+        return errorResponse(422, 'VALIDATION_FAILED', 'Invalid relationship direction')
       }
     }
     const cursor = url.searchParams.get('cursor')
     if (cursor && cursor.length > 2048) {
-      return errorResponse(400, 'VALIDATION_FAILED', 'Invalid cursor')
+      return errorResponse(400, 'INVALID_CURSOR', 'Invalid cursor')
     }
 
     await enforcePublicReadRateLimit(request)
@@ -94,7 +93,7 @@ export async function POST(
     }
     return response
   } catch (error) {
-    if (error instanceof SyntaxError) return errorResponse(400, 'VALIDATION_FAILED', 'Invalid relationship request')
+    if (error instanceof SyntaxError) return errorResponse(422, 'VALIDATION_FAILED', 'Invalid relationship request')
     if (error instanceof W03ContentClientError) return errorResponse(error.status, error.code, 'Content service unavailable')
     return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Content service unavailable')
   }
