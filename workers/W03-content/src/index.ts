@@ -283,7 +283,7 @@ const worker = {
       if (path && path.collectionMembers && path.id && request.method === 'GET') {
         const principal = requiredCreatorPrincipal(request)
         const cursor = url.searchParams.get('cursor')
-        if (cursor && cursor.length > 2048) throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+        if (cursor && cursor.length > 2048) throw new ContentRuntimeError('INVALID_CURSOR', 400)
         const page = await listCollectionMembers(
           env.D1_02,
           principal.userId,
@@ -359,7 +359,7 @@ const worker = {
       if (path && path.collections && request.method === 'GET' && path.id === undefined) {
         const principal = requiredCreatorPrincipal(request)
         const cursor = url.searchParams.get('cursor')
-        if (cursor && cursor.length > 2048) throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+        if (cursor && cursor.length > 2048) throw new ContentRuntimeError('INVALID_CURSOR', 400)
         const page = await listCreatorCollections(
           env.D1_02,
           principal.userId,
@@ -416,7 +416,7 @@ const worker = {
       if (path && path.seriesMembers && path.id && request.method === 'GET') {
         const principal = requiredCreatorPrincipal(request)
         const cursor = url.searchParams.get('cursor')
-        if (cursor && cursor.length > 2048) throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+        if (cursor && cursor.length > 2048) throw new ContentRuntimeError('INVALID_CURSOR', 400)
         const page = await listSeriesMembers(
           env.D1_02,
           principal.userId,
@@ -483,7 +483,7 @@ const worker = {
       if (path && path.series && request.method === 'GET' && path.id === undefined) {
         const principal = requiredCreatorPrincipal(request)
         const cursor = url.searchParams.get('cursor')
-        if (cursor && cursor.length > 2048) throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+        if (cursor && cursor.length > 2048) throw new ContentRuntimeError('INVALID_CURSOR', 400)
         const page = await listCreatorSeries(
           env.D1_02,
           principal.userId,
@@ -532,7 +532,7 @@ const worker = {
           throw new ContentRuntimeError('VALIDATION_FAILED', 400)
         }
         const cursor = url.searchParams.get('cursor')
-        if (cursor && cursor.length > 2048) throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+        if (cursor && cursor.length > 2048) throw new ContentRuntimeError('INVALID_CURSOR', 400)
         const page = await listContentRelationships(
           env.D1_02,
           path.id,
@@ -580,7 +580,7 @@ const worker = {
         const principal = requiredCreatorPrincipal(request)
         const cursor = url.searchParams.get('cursor')
         const limit = parseRevisionListLimit(url.searchParams.get('limit'))
-        if (cursor && cursor.length > 2048) throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+        if (cursor && cursor.length > 2048) throw new ContentRuntimeError('INVALID_CURSOR', 400)
         const page = await listContentRevisions(env.D1_02, principal.userId, path.id, cursor, limit)
         return json({
           data: {
@@ -624,7 +624,7 @@ const worker = {
         const cursor = url.searchParams.get('cursor')
         const limitParam = url.searchParams.get('limit')
         const limit = parseListLimit(limitParam)
-        if (cursor && cursor.length > 2048) throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+        if (cursor && cursor.length > 2048) throw new ContentRuntimeError('INVALID_CURSOR', 400)
         const filters = validateListFilters(url.searchParams.get('status'), url.searchParams.get('type'))
         const page = await listCreatorContents(env.D1_02, principal.userId, cursor, limit, filters)
         return json({
@@ -657,7 +657,7 @@ const worker = {
         const creatorId = url.searchParams.get('creatorId')?.trim() || null
         const contentType = url.searchParams.get('type')?.trim() || null
         const limit = parseListLimit(limitParam)
-        if (cursor && cursor.length > 2048) throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+        if (cursor && cursor.length > 2048) throw new ContentRuntimeError('INVALID_CURSOR', 400)
         if (creatorId && !/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(creatorId)) {
           throw new ContentRuntimeError('VALIDATION_FAILED', 400)
         }
