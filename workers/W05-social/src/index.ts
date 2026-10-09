@@ -154,17 +154,17 @@ export default {
 
       if (url.pathname.startsWith('/internal/social/shares/')) {
         const parts = url.pathname.split('/').filter(Boolean)
-        if (parts.length !== 4 || parts[2] !== 'shares') return new Response(null, { status: 404 })
+        if (parts.length !== 4 || parts[2] !== 'shares') throw new ShareRuntimeError('NOT_FOUND', 404)
         if (request.method !== 'GET') return new Response(null, { status: 405, headers: { Allow: 'GET' } })
         requireTransport(request)
         const shareId = decodePathPart(parts[3])
-        if (shareId === null) return new Response(null, { status: 400 })
+        if (shareId === null) throw new ShareRuntimeError('VALIDATION_FAILED', 400)
         return json({ data: await resolveShare(env.DB, shareId), requestId: createRequestId() })
       }
 
       if (url.pathname.startsWith('/internal/social/content/')) {
         const parts = url.pathname.split('/').filter(Boolean)
-        if (parts.length !== 5 || parts[2] !== 'content' || parts[4] !== 'shares') return new Response(null, { status: 404 })
+        if (parts.length !== 5 || parts[2] !== 'content' || parts[4] !== 'shares') throw new ShareRuntimeError('NOT_FOUND', 404)
         if (request.method !== 'POST') return new Response(null, { status: 405, headers: { Allow: 'POST' } })
         const actorUserId = requirePrincipal(request)
         requireInteractionLayer(request)
@@ -411,7 +411,7 @@ export default {
       }
 
       const path = parseFollowPath(url.pathname)
-      if (!path) return new Response(null, { status: 404 })
+      if (!path) throw new FollowRuntimeError('NOT_FOUND', 404)
 
       if (path.kind === 'follow') {
         const viewerUserId = requirePrincipal(request)
