@@ -21,9 +21,8 @@ const relationshipPath = (contentId: string) =>
 
 const requireIdempotency = (request: Request): Response | null => {
   const value = request.headers.get('Idempotency-Key')?.trim() ?? ''
-  if (!value || value.length > 256) {
-    return errorResponse(428, 'PRECONDITION_REQUIRED', 'Idempotency-Key required')
-  }
+  if (!value) return errorResponse(428, 'PRECONDITION_REQUIRED', 'Idempotency-Key required')
+  if (value.length > 256) return errorResponse(422, 'VALIDATION_FAILED', 'Invalid Idempotency-Key header')
   return null
 }
 
