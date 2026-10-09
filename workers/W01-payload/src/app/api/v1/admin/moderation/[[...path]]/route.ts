@@ -36,7 +36,7 @@ const run = async (request: Request, context: { params: Promise<{ path?: string[
     try {
       body = await request.json()
     } catch {
-      return jsonError(400, 'VALIDATION_FAILED', 'Invalid moderation request')
+      return jsonError(422, 'VALIDATION_FAILED', 'Invalid moderation request')
     }
   }
 
