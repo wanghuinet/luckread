@@ -1,3 +1,4 @@
+import { activateEmailVerifiedAccount } from '../account/account-state-transition.js'
 import { createLuckReadAuth } from './better-auth.js'
 import { resolveGlobalLayer, type LayerResolution } from '../authz/role-assignment.js'
 
@@ -5,6 +6,7 @@ type AuthSession = {
   user: {
     id: string
     email: string
+    emailVerified?: boolean
     accountState?: string | null
     accountStateVersion?: number | null
   }
@@ -45,13 +47,22 @@ export async function resolveBetterAuthPrincipal(
     return null
   }
 
-  const accountState = typeof result.user.accountState === 'string'
+  let accountState = typeof result.user.accountState === 'string'
     ? result.user.accountState
     : 'PENDING_VERIFICATION'
 
-  const accountStateVersion = typeof result.user.accountStateVersion === 'number'
+  let accountStateVersion = typeof result.user.accountStateVersion === 'number'
     ? result.user.accountStateVersion
     : 1
+
+  // Better Auth is the proof authority: only its verified-email claim can
+  // trigger this idempotent W02 repair/activation path. The role is committed
+  // with the ACTIVE transition before global layer resolution runs.
+  if (result.user.emailVerified === true) {
+    const activation = await activateEmailVerifiedAccount(db, String(result.user.id), now)
+    accountState = activation.accountState
+    accountStateVersion = activation.accountStateVersion
+  }
 
   const layerResolution: LayerResolution = await resolveGlobalLayer(
     db,
