@@ -1,7 +1,7 @@
 import {
   ContentRuntimeError,
-  decodeCursor,
-  encodeCursor,
+  decodeScopedCursor,
+  encodeScopedCursor,
   type ContentD1,
 } from './content-runtime.js'
 
@@ -329,7 +329,8 @@ export async function listContentRelationships(
   }
 
   const pageSize = relationLimit(limit)
-  const decoded = cursor ? decodeCursor(cursor) : null
+  const cursorScope = JSON.stringify({ type: 'content-relationships', contentId, direction })
+  const decoded = cursor ? decodeScopedCursor(cursor, cursorScope) : null
   const cursorClause = decoded
     ? 'AND (r.created_at < ? OR (r.created_at = ? AND r.relationship_id < ?))'
     : ''
@@ -393,7 +394,7 @@ export async function listContentRelationships(
     })),
     hasMore: rows.results.length > pageSize,
     nextCursor: rows.results.length > pageSize && last
-      ? encodeCursor(last.created_at, last.relationship_id)
+      ? encodeScopedCursor(last.created_at, last.relationship_id, cursorScope)
       : null,
   }
 }
