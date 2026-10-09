@@ -64,10 +64,16 @@ export async function POST(request: Request): Promise<Response> {
     if (principal instanceof Response) return principal
 
     const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
-    if (!idempotencyKey || idempotencyKey.length > 256) {
+    if (!idempotencyKey) {
       return Response.json(
         { error: { code: 'PRECONDITION_REQUIRED', message: 'Idempotency-Key required', details: {} }, requestId: `req_${crypto.randomUUID()}` },
         { status: 428 },
+      )
+    }
+    if (idempotencyKey.length > 256) {
+      return Response.json(
+        { error: { code: 'VALIDATION_FAILED', message: 'Invalid Idempotency-Key header', details: {} }, requestId: `req_${crypto.randomUUID()}` },
+        { status: 422 },
       )
     }
 
