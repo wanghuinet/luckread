@@ -52,7 +52,8 @@ const schema = { results: all('PRAGMA table_info(users)') }
 if (!schema.results.some((column) => column.name === 'identity_id')) throw new Error('Better Auth profile projection column identity_id is missing')
 for (const required of ['users', 'auth_registration_envelopes', 'consents']) { if (!all('SELECT name FROM sqlite_master WHERE type = \'table\' AND name = ?', required).length) throw new Error('Required local D1 table missing: ' + required) }
 
-const suffix = randomUUID().replaceAll('-', '').slice(0, 16)
+const suffix = process.env.AUTH001_SUFFIX?.trim() || randomUUID().replaceAll('-', '').slice(0, 16)
+if (!/^[a-zA-Z0-9_-]{1,32}$/.test(suffix)) throw new Error('Invalid AUTH001_SUFFIX')
 const email = 'auth001-runtime-' + suffix + '@luckread.local'
 const username = 'auth001rt' + suffix
 const password = 'Evd-AUTH001-Batch-' + suffix + '-9x!'
@@ -68,7 +69,7 @@ const rollbackEmail = 'auth001-rollback-' + suffix + '@luckread.local'
 const rollbackUsername = 'auth001rb' + suffix
 const sameKeyEmail = 'auth001-same-key-' + suffix + '@luckread.local'
 const sameKeyUsername = 'auth001sk' + suffix
-let triggerName = null
+let triggerName = 'auth001_evidence_fail_' + suffix
 
 const cleanup = async () => {
   if (triggerName) { runSql('DROP TRIGGER IF EXISTS ' + triggerName); triggerName = null }
@@ -86,15 +87,6 @@ try {
   if (firstResponse.status !== 201) throw new Error('Registration failed: HTTP ' + firstResponse.status)
   if (!first.userId || first.accountState !== 'PENDING_VERIFICATION') throw new Error('Registration response is not the canonical Better Auth registration response')
 
-  const projection = await profileForEmail(email, username)
-  if (Number(projection?.c || 0) !== 1 || String(projection.identity_id) !== String(first.userId)) throw new Error('W01 profile projection is not bound to the Better Auth user')
-  if (projection.hash || projection.salt) throw new Error('Legacy Payload password hash/salt was persisted into the profile projection')
-  if (Number(projection.account_state_version || 0) !== 1) throw new Error('W01 profile lifecycle projection version is not canonical')
-  if (all('SELECT name FROM sqlite_master WHERE type = \'table\' AND name = ?', 'users_sessions').length) {
-    const legacySession = await scalar('SELECT COUNT(*) AS c FROM users_sessions WHERE _parent_id = ?', projection.id)
-    if (Number(legacySession?.c || 0) !== 0) throw new Error('Legacy Payload session row was created for Better Auth registration')
-  }
-
   const loginResponse = await request('/auth/login', null, { identity: email, credential: password })
   const login = await responseJson(loginResponse)
   if (loginResponse.status !== 200 || String(login?.user?.id || '') !== String(first.userId)) throw new Error('Better Auth account could not authenticate through the W01 boundary')
@@ -110,35 +102,21 @@ try {
   const postLogoutResponse = await request('/auth/refresh', null, {}, cookie)
   if (postLogoutResponse.status !== 401) throw new Error('Better Auth session remained valid after logout')
 
-  const envelope = await envelopeForKey(keySuccess)
-  if (!envelope || envelope.state !== 'COMPLETED') throw new Error('Completed registration envelope missing')
-  const committedResponse = JSON.parse(String(envelope.committed_response))
-  if (committedResponse.userId !== first.userId || committedResponse.accountState !== first.accountState) throw new Error('committed_response is not the returned canonical response')
-  const expectedResponseDigest = await sha256Hex(JSON.stringify(canonicalize({ schema: 'AUTH-001.response-digest.v1', operationId: 'authRegister', endpoint: '/auth/register', idempotencyKey: keySuccess, payloadHash: envelope.payload_hash, status: 201, accountState: 'PENDING_VERIFICATION' })))
-  if (envelope.response_digest !== expectedResponseDigest) throw new Error('response_digest does not match the committed Better Auth registration response')
-
   const replay = await responseJson(await request('/auth/register', keySuccess, body))
   if (JSON.stringify(replay) !== JSON.stringify(first)) throw new Error('Idempotent replay did not return the original Better Auth registration response')
   const reuse = await responseJson(await request('/auth/register', keySuccess, { ...body, credential: password + '-changed' }))
   if (reuse?.error?.code !== 'IDEMPOTENCY_KEY_REUSE_CONFLICT') throw new Error('Idempotency key reuse conflict was not canonical')
 
-  triggerName = 'auth001_evidence_fail_' + suffix
-  runSql('CREATE TRIGGER ' + triggerName + " BEFORE UPDATE ON auth_registration_envelopes BEGIN SELECT RAISE(ABORT, 'AUTH001_FORCED_ROLLBACK'); END")
+  // The workflow creates this conditional trigger before either Worker starts.
   const rollbackResponse = await request('/auth/register', keyRollback, { ...body, identity: rollbackEmail, username: rollbackUsername })
   if (rollbackResponse.status !== 503) throw new Error('Forced downstream rollback should fail closed with 503, got ' + rollbackResponse.status)
-  const rollbackProjection = await profileForEmail(rollbackEmail, rollbackUsername)
-  if (Number(rollbackProjection?.c || 0) !== 0) throw new Error('W01 rollback left a partial profile projection')
   const rollbackLogin = await request('/auth/login', null, { identity: rollbackEmail, credential: password })
   if (rollbackLogin.status !== 422 && rollbackLogin.status !== 401) throw new Error('W02 rollback did not remove the Better Auth identity')
-  runSql('DROP TRIGGER IF EXISTS ' + triggerName); triggerName = null
 
   const concurrentBody = { ...body, identity: concurrentEmail, username: concurrentUsername, credential: password + '-concurrent' }
   const pair = await Promise.all([request('/auth/register', keyConcurrentA, concurrentBody), request('/auth/register', keyConcurrentB, concurrentBody)])
   const statuses = pair.map((response) => response.status).sort((a, b) => a - b)
   if (statuses[0] !== 201 || statuses[1] !== 422) throw new Error('Concurrent duplicate identity did not produce exactly one success and one Better Auth conflict: ' + statuses.join(','))
-  const concurrentProjection = await profileForEmail(concurrentEmail, concurrentUsername)
-  if (Number(concurrentProjection?.c || 0) !== 1) throw new Error('Concurrent duplicate identity produced more than one W01 profile projection')
-
   const sameKeyBody = { ...body, identity: sameKeyEmail, username: sameKeyUsername, credential: password + '-same-key' }
   const sameKeyPair = await Promise.all([request('/auth/register', keySameKey, sameKeyBody), request('/auth/register', keySameKey, sameKeyBody)])
   const sameKeyPayloads = await Promise.all(sameKeyPair.map(responseJson))
@@ -146,6 +124,31 @@ try {
   const sameKeyValid = sameKeyStatuses[0] === 201 && sameKeyStatuses[1] === 422
   const sameKeyReplay = sameKeyStatuses[0] === 201 && sameKeyStatuses[1] === 201 && JSON.stringify(sameKeyPayloads[0]) === JSON.stringify(sameKeyPayloads[1])
   if (!sameKeyValid && !sameKeyReplay) throw new Error('Concurrent same Idempotency-Key did not resolve to a single Better Auth identity: ' + sameKeyStatuses.join(','))
+  // Run direct local D1 inspection only after all browser-style requests have
+  // finished. Calling Wrangler's local D1 CLI during the HTTP sequence can
+  // interfere with the short-lived local Worker runtime.
+  const projection = await profileForEmail(email, username)
+  if (Number(projection?.c || 0) !== 1 || String(projection.identity_id) !== String(first.userId)) throw new Error('W01 profile projection is not bound to the Better Auth user')
+  if (projection.hash || projection.salt) throw new Error('Legacy Payload password hash/salt was persisted into the profile projection')
+  if (Number(projection.account_state_version || 0) !== 1) throw new Error('W01 profile lifecycle projection version is not canonical')
+  if (all('SELECT name FROM sqlite_master WHERE type = \'table\' AND name = ?', 'users_sessions').length) {
+    const legacySession = await scalar('SELECT COUNT(*) AS c FROM users_sessions WHERE _parent_id = ?', projection.id)
+    if (Number(legacySession?.c || 0) !== 0) throw new Error('Legacy Payload session row was created for Better Auth registration')
+  }
+
+  const envelope = await envelopeForKey(keySuccess)
+  if (!envelope || envelope.state !== 'COMPLETED') throw new Error('Completed registration envelope missing')
+  const committedResponse = JSON.parse(String(envelope.committed_response))
+  if (committedResponse.userId !== first.userId || committedResponse.accountState !== first.accountState) throw new Error('committed_response is not the returned canonical response')
+  const expectedResponseDigest = await sha256Hex(JSON.stringify(canonicalize({ schema: 'AUTH-001.response-digest.v1', operationId: 'authRegister', endpoint: '/auth/register', idempotencyKey: keySuccess, payloadHash: envelope.payload_hash, status: 201, accountState: 'PENDING_VERIFICATION' })))
+  if (envelope.response_digest !== expectedResponseDigest) throw new Error('response_digest does not match the committed Better Auth registration response')
+
+  const rollbackProjection = await profileForEmail(rollbackEmail, rollbackUsername)
+  if (Number(rollbackProjection?.c || 0) !== 0) throw new Error('W01 rollback left a partial profile projection')
+
+  const concurrentProjection = await profileForEmail(concurrentEmail, concurrentUsername)
+  if (Number(concurrentProjection?.c || 0) !== 1) throw new Error('Concurrent duplicate identity produced more than one W01 profile projection')
+
   const sameKeyProjection = await profileForEmail(sameKeyEmail, sameKeyUsername)
   if (Number(sameKeyProjection?.c || 0) !== 1) throw new Error('Concurrent same Idempotency-Key produced more than one W01 profile projection')
 
