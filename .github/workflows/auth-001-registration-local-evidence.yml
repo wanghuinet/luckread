@@ -185,6 +185,8 @@ jobs:
           tail -n 500 auth-001-open-next-build.log || true
           echo "===== W01 local preview log ====="
           tail -n 500 auth-001-preview.log || true
+          echo "===== W02 local preview log ====="
+          tail -n 500 ../W02-identity/auth-001-w02-preview.log || true
 
       - name: Upload same-SHA runtime evidence
         if: ${{ always() }}
