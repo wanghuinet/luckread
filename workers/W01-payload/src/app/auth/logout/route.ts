@@ -13,7 +13,7 @@ export async function POST(request: Request): Promise<Response> {
   } catch {
     return Response.json({
       error: { code: 'SERVICE_UNAVAILABLE', message: 'Authentication service unavailable' },
-      requestId: crypto.randomUUID(),
+      requestId: `req_${crypto.randomUUID()}`,
     }, {
       status: 503,
       headers: { 'cache-control': 'no-store' },
