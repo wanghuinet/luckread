@@ -23,9 +23,8 @@ const resolveOperation = (method: string, segments: string[] | undefined): { pat
 
 const requireHeader = (request: Request, name: 'Idempotency-Key' | 'If-Match'): Response | null => {
   const value = request.headers.get(name)?.trim() ?? ''
-  if (!value || value.length > 256) {
-    return errorResponse(428, 'PRECONDITION_REQUIRED', name + ' required')
-  }
+  if (!value) return errorResponse(428, 'PRECONDITION_REQUIRED', name + ' required')
+  if (value.length > 256) return errorResponse(422, 'VALIDATION_FAILED', 'Invalid ' + name + ' header')
   if (name === 'If-Match' && value === '*') {
     return errorResponse(412, 'PRECONDITION_FAILED', 'If-Match precondition failed')
   }
