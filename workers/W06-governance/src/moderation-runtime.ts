@@ -96,24 +96,29 @@ const normalizeEtag = (value: string): string => {
   return match[1]
 }
 
-const opaqueCursor = (priority: number, createdAt: string, caseId: string): string => {
-  const raw = JSON.stringify({ priority, createdAt, caseId })
+const opaqueCursor = (priority: number, createdAt: string, caseId: string, reviewerId: string): string => {
+  const raw = JSON.stringify({ version: 1, reviewerId, priority, createdAt, caseId })
   let binary = ''
   for (const byte of new TextEncoder().encode(raw)) binary += String.fromCharCode(byte)
   return btoa(binary).replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '')
 }
 
-const decodeCursor = (value: string): { priority: number; createdAt: string; caseId: string } => {
+const decodeCursor = (value: string, reviewerId: string): { priority: number; createdAt: string; caseId: string } => {
   try {
+    if (!value || value.length > 2048 || !/^[A-Za-z0-9_-]+$/.test(value)) throw new Error('INVALID')
     const normalized = value.replaceAll('-', '+').replaceAll('_', '/')
     const padded = normalized + '='.repeat((4 - normalized.length % 4) % 4)
     const bytes = Uint8Array.from(atob(padded), (char) => char.charCodeAt(0))
     const parsed = JSON.parse(new TextDecoder().decode(bytes)) as {
+      version?: unknown
+      reviewerId?: unknown
       priority?: unknown
       createdAt?: unknown
       caseId?: unknown
     }
     if (
+      parsed.version !== 1 ||
+      parsed.reviewerId !== reviewerId ||
       !Number.isInteger(parsed.priority) ||
       typeof parsed.createdAt !== 'string' ||
       !Number.isFinite(Date.parse(parsed.createdAt)) ||
@@ -125,7 +130,7 @@ const decodeCursor = (value: string): { priority: number; createdAt: string; cas
     const priority = parsed.priority as number
     return { priority, createdAt: parsed.createdAt, caseId: parsed.caseId }
   } catch {
-    throw new ModerationRuntimeError('VALIDATION_FAILED', 400)
+    throw new ModerationRuntimeError('INVALID_CURSOR', 400)
   }
 }
 
@@ -204,7 +209,7 @@ export async function listModerationQueue(
 ): Promise<{ items: ReturnType<typeof responseForCase>[]; nextCursor: string | null; hasMore: boolean }> {
   requireResource('reviewer_id', reviewerId)
   const pageSize = Math.min(Math.max(Number.isInteger(requestedLimit) ? Number(requestedLimit) : 20, 1), 50)
-  const decoded = cursor ? decodeCursor(cursor) : null
+  const decoded = cursor ? decodeCursor(cursor, reviewerId) : null
   const statePlaceholders = OPEN_QUEUE_STATES.map(() => '?').join(',')
   const params: unknown[] = [...OPEN_QUEUE_STATES, reviewerId]
   let tail = ''
@@ -263,7 +268,7 @@ export async function listModerationQueue(
       created_at: row.decision_created_at ?? row.updated_at,
     } satisfies ModerationDecisionRow) : null)),
     hasMore,
-    nextCursor: hasMore && last ? opaqueCursor(last.priority, last.created_at, last.case_id) : null,
+    nextCursor: hasMore && last ? opaqueCursor(last.priority, last.created_at, last.case_id, reviewerId) : null,
   }
 }
 
