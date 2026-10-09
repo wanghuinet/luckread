@@ -38,7 +38,7 @@ const parseBody = async (request: Request): Promise<unknown | Response> => {
     if (!body || typeof body !== 'object' || Array.isArray(body)) throw new Error('invalid')
     return body
   } catch {
-    return errorResponse(400, 'VALIDATION_FAILED', 'Invalid subscription request')
+    return errorResponse(422, 'VALIDATION_FAILED', 'Invalid subscription request')
   }
 }
 
