@@ -6,12 +6,20 @@ import { etagForUserProfile, normalizeEtag, pickUserProfileSnapshot, PROFILE_MUT
 import { invalidatePublicUserProfile, invalidatePublicUserProfileByUsername } from '@/lib/public-response-cache'
 import { getBetterAuthPrincipal, W02AuthClientError } from '@/auth/w02-session-client'
 
-const unauthorized = () => Response.json({ errors: [{ message: 'Authentication failed' }] }, { status: 401, headers: { 'cache-control': 'no-store' } })
-const errorResponse = (status: number, code: string, message: string) => Response.json({ error: { code, message, details: {} }, requestId: `req_${crypto.randomUUID()}` }, { status, headers: { 'cache-control': 'no-store' } })
+const errorResponse = (status: number, code: string, message: string) => Response.json(
+  { error: { code, message, details: {} }, requestId: `req_${crypto.randomUUID()}` },
+  { status: code === 'VALIDATION_FAILED' && status === 400 ? 422 : status, headers: { 'cache-control': 'no-store' } },
+)
+const unauthorized = () => errorResponse(401, 'UNAUTHENTICATED', 'Authentication required')
 
 const profileResponse = async (user: Record<string, unknown>, status = 200) => {
   const etag = await etagForUserProfile(user)
-  return new Response(JSON.stringify({ id: String(user.id ?? ''), email: typeof user.email === 'string' ? user.email : '', ...pickUserProfileSnapshot(user) }), {
+  return new Response(JSON.stringify({
+    id: String(user.id ?? ''),
+    email: typeof user.email === 'string' ? user.email : '',
+    ...pickUserProfileSnapshot(user),
+    requestId: `req_${crypto.randomUUID()}`,
+  }), {
     status, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', ETag: etag },
   })
 }
@@ -54,10 +62,10 @@ export async function PATCH(request: Request): Promise<Response> {
   const ifMatch = request.headers.get('If-Match')?.trim() ?? ''
   if (!ifMatch) return errorResponse(428, 'PRECONDITION_REQUIRED', 'If-Match is required')
   let body: unknown
-  try { body = await request.json() } catch { return errorResponse(400, 'VALIDATION_FAILED', 'Invalid request body') }
-  if (!body || typeof body !== 'object' || Array.isArray(body)) return errorResponse(400, 'VALIDATION_FAILED', 'Invalid request body')
+  try { body = await request.json() } catch { return errorResponse(422, 'VALIDATION_FAILED', 'Invalid request body') }
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return errorResponse(422, 'VALIDATION_FAILED', 'Invalid request body')
   const input = body as Record<string, unknown>
-  if (Object.keys(input).some(key => !PROFILE_MUTABLE_FIELDS.includes(key as typeof PROFILE_MUTABLE_FIELDS[number]))) return errorResponse(400, 'VALIDATION_FAILED', 'Unsupported profile field')
+  if (Object.keys(input).some(key => !PROFILE_MUTABLE_FIELDS.includes(key as typeof PROFILE_MUTABLE_FIELDS[number]))) return errorResponse(422, 'VALIDATION_FAILED', 'Unsupported profile field')
 
   const current = authenticated.user
   const currentEtag = await etagForUserProfile(current)
@@ -68,14 +76,14 @@ export async function PATCH(request: Request): Promise<Response> {
     if (!(field in input)) continue
     const value = input[field]
     if (field === 'username') {
-      if (typeof value !== 'string' || value.trim().length === 0 || value.length > 128) return errorResponse(400, 'VALIDATION_FAILED', 'Invalid username')
+      if (typeof value !== 'string' || value.trim().length === 0 || value.length > 128) return errorResponse(422, 'VALIDATION_FAILED', 'Invalid username')
       data[field] = value.trim()
     } else {
-      if (value !== null && typeof value !== 'string') return errorResponse(400, 'VALIDATION_FAILED', 'Invalid profile field')
+      if (value !== null && typeof value !== 'string') return errorResponse(422, 'VALIDATION_FAILED', 'Invalid profile field')
       data[field] = typeof value === 'string' ? value : null
     }
   }
-  if (Object.keys(data).length === 0) return errorResponse(400, 'VALIDATION_FAILED', 'No profile fields to update')
+  if (Object.keys(data).length === 0) return errorResponse(422, 'VALIDATION_FAILED', 'No profile fields to update')
 
   let updated: unknown
   try {
@@ -85,7 +93,7 @@ export async function PATCH(request: Request): Promise<Response> {
       data, overrideAccess: true, depth: 0,
     })
   } catch (error) {
-    if (error instanceof Error && /unique constraint|duplicate|username/i.test(error.message)) return errorResponse(400, 'VALIDATION_FAILED', 'Profile update could not be completed')
+    if (error instanceof Error && /unique constraint|duplicate/i.test(error.message)) return errorResponse(409, 'CONFLICT', 'Username is already in use')
     return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Profile service unavailable')
   }
   if (!updated || typeof updated !== 'object') return errorResponse(412, 'PRECONDITION_FAILED', 'Profile changed before update')
