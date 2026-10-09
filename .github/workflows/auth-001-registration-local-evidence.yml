@@ -121,7 +121,7 @@ jobs:
           NODE_ENV: development
         run: |
           set -euo pipefail
-          npx --yes wrangler@4.116.0 dev --local --persist-to /tmp/luckread-auth001-state --port 8788 --var "CLOUDFLARE_ENV:development" --var "RESEND_API_KEY:auth001-local-evidence-no-send" --var "AUTH_EMAIL_FROM:LuckRead Local <noreply@luckread.local>" > auth-001-w02-preview.log 2>&1 &
+          npx --yes wrangler@4.116.0 dev --local --persist-to /tmp/luckread-auth001-state --port 8788 --var "CLOUDFLARE_ENV:development" --var "AUTH_PUBLIC_BASE_URL:http://luckread.com" --var "RESEND_API_KEY:auth001-local-evidence-no-send" --var "AUTH_EMAIL_FROM:LuckRead Local <noreply@luckread.local>" > auth-001-w02-preview.log 2>&1 &
           echo $! > auth-001-w02-preview.pid
           ready=0
           for _ in $(seq 1 120); do
