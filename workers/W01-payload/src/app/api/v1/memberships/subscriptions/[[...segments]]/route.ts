@@ -5,7 +5,7 @@ import {
 } from '../../../../../../subscription/w07-subscription-client.js'
 
 const errorResponse = (status: number, code: string, message: string) =>
-  Response.json({ error: { code, message, details: {} }, requestId: crypto.randomUUID() }, { status, headers: { 'cache-control': 'no-store' } })
+  Response.json({ error: { code, message, details: {} }, requestId: `req_${crypto.randomUUID()}` }, { status, headers: { 'cache-control': 'no-store' } })
 
 type RouteContext = { params: Promise<{ segments?: string[] }> }
 
