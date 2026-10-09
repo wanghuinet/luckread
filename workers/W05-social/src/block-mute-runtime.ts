@@ -37,7 +37,7 @@ const validateTarget = (actorUserId: string, targetUserId: string): [string, str
   const actor = validateActor(actorUserId)
   const target = validateId(targetUserId)
   if (actor === target) {
-    throw new BlockMuteRuntimeError('INVALID_RELATIONSHIP', 409)
+    throw new BlockMuteRuntimeError('INVALID_STATE', 409)
   }
   return [actor, target]
 }
@@ -105,7 +105,7 @@ export async function setRelation(
     updated_at: string
   }>()
 
-  if (!row) throw new BlockMuteRuntimeError('RELATION_WRITE_FAILED', 500)
+  if (!row) throw new BlockMuteRuntimeError('INTERNAL_ERROR', 500)
 
   return {
     relationshipId: row.relationship_id,
