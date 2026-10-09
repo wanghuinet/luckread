@@ -105,16 +105,13 @@ export async function DELETE(
   if (idempotencyKey.length > 256) return apiErrorResponse(422, 'VALIDATION_FAILED', 'Invalid Idempotency-Key header')
 
   const { mediaId } = await context.params
-  if (!mediaId?.trim()) return new Response(null, { status: 404 })
+  if (!mediaId?.trim()) return apiErrorResponse(404, 'NOT_FOUND', 'Media not found')
 
   try {
     await enforceW01WriteRateLimit(request)
   } catch (error) {
     if (error instanceof TrafficLimitError) return rateLimitResponse(request)
-    return new Response(JSON.stringify({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Media service unavailable' } }), {
-      status: 503,
-      headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
-    })
+    return apiErrorResponse(503, 'SERVICE_UNAVAILABLE', 'Media service unavailable')
   }
 
   const target = new URL('/api/media/' + encodeURIComponent(mediaId), request.url)
@@ -134,16 +131,13 @@ export async function PATCH(
   context: { params: Promise<{ mediaId: string }> },
 ): Promise<Response> {
   const { mediaId } = await context.params
-  if (!mediaId?.trim()) return new Response(null, { status: 404 })
+  if (!mediaId?.trim()) return apiErrorResponse(404, 'NOT_FOUND', 'Media not found')
 
   try {
     await enforceW01WriteRateLimit(request)
   } catch (error) {
     if (error instanceof TrafficLimitError) return rateLimitResponse(request)
-    return new Response(JSON.stringify({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Media service unavailable' } }), {
-      status: 503,
-      headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
-    })
+    return apiErrorResponse(503, 'SERVICE_UNAVAILABLE', 'Media service unavailable')
   }
 
   const target = new URL('/api/media/' + encodeURIComponent(mediaId), request.url)
