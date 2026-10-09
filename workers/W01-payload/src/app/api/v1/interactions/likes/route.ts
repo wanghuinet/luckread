@@ -15,7 +15,7 @@ const parseQueryTarget = (request: Request): { targetType: string; targetId: str
   const targetType = url.searchParams.get('targetType')
   const targetId = url.searchParams.get('targetId')
   if (!targetType || !targetId) {
-    return errorResponse(400, 'VALIDATION_FAILED', 'Invalid like target')
+    return errorResponse(422, 'VALIDATION_FAILED', 'Invalid like target')
   }
   return { targetType, targetId }
 }
@@ -29,7 +29,7 @@ const parseTarget = async (request: Request): Promise<{ targetType: string; targ
     if (typeof targetType !== 'string' || typeof targetId !== 'string') throw new Error('invalid')
     return { targetType, targetId }
   } catch {
-    return errorResponse(400, 'VALIDATION_FAILED', 'Invalid like target')
+    return errorResponse(422, 'VALIDATION_FAILED', 'Invalid like target')
   }
 }
 
