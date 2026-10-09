@@ -22,7 +22,7 @@ function input(overrides: Partial<AccountStateTransitionInput> = {}): AccountSta
 
 function fakeDb(
   initial: { state: string; version: number },
-  options: { failBatch?: boolean; missingUser?: boolean; forceJournalConflict?: boolean } = {},
+  options: { failBatch?: boolean; missingUser?: boolean; forceJournalConflict?: boolean; roleAssignmentChanges?: number } = {},
 ) {
   const row = { ...initial }
   let batchCalls = 0
@@ -104,7 +104,7 @@ function fakeDb(
           changes: statement.sql === 'DELETE FROM "session" WHERE user_id = ?'
             ? 0
             : statement.sql.includes('INSERT INTO role_assignments')
-              ? 1
+              ? (options.roleAssignmentChanges ?? 1)
               : index < 2 ? 1 : 1,
         },
       }))
@@ -630,6 +630,33 @@ describe('AUTH-013 verified-email account activation', () => {
         '2026-10-06T20:00:00.000Z',
         '2026-10-06T20:00:00.000Z',
       ],
+    })
+    expect(fake.journal()).toMatchObject({
+      eventType: 'identity.account_state_changed',
+      resourceId: '42',
+      sourceVersion: 2,
+      status: 'PENDING',
+    })
+  })
+
+  it('accepts trigger-inflated D1 change metadata for verified-role materialization', async () => {
+    const fake = fakeDb(
+      { state: 'PENDING_VERIFICATION', version: 1 },
+      { roleAssignmentChanges: 2 },
+    )
+
+    await expect(activateEmailVerifiedAccount(fake.db, '42', '2026-10-06T20:00:00.000Z'))
+      .resolves.toEqual({
+        activated: true,
+        accountState: 'ACTIVE',
+        accountStateVersion: 2,
+      })
+
+    expect(fake.row).toEqual({ state: 'ACTIVE', version: 2 })
+    expect(fake.batchCalls()).toBe(1)
+    expect(fake.grantedRole()).toMatchObject({
+      sql: expect.stringContaining('INSERT INTO role_assignments'),
+      args: ['verified-user-42', '42', '2026-10-06T20:00:00.000Z', '2026-10-06T20:00:00.000Z', '2026-10-06T20:00:00.000Z'],
     })
     expect(fake.journal()).toMatchObject({
       eventType: 'identity.account_state_changed',
