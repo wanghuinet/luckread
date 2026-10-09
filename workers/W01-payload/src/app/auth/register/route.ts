@@ -387,7 +387,10 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
   // response as proof that W02 persisted a real identity.
   let persistedIdentity: { id: string; email: string; username: string | null } | null = null
   try {
-    persistedIdentity = await env.D1
+    // Start the read-after-write verification at D1 primary. This remains
+    // correct even if read replication is enabled for this database.
+    const identityReadSession = env.D1.withSession('first-primary')
+    persistedIdentity = await identityReadSession
       .prepare('SELECT id, email, username FROM "user" WHERE id = ? LIMIT 1')
       .bind(userId)
       .first<{ id: string; email: string; username: string | null }>()
