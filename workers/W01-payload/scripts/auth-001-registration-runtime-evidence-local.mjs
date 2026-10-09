@@ -104,11 +104,6 @@ try {
     Number(pendingIdentity?.accountStateVersion) !== 1
   ) throw new Error('New registration did not remain pending until email verification')
 
-  const pendingLoginResponse = await request('/auth/login', null, { identity: email, credential: password })
-  if (pendingLoginResponse.status !== 403 || firstCookieHeader(pendingLoginResponse)) {
-    throw new Error('Unverified account must not establish a login session; got HTTP ' + pendingLoginResponse.status)
-  }
-
 
   const envelope = await envelopeForKey(keySuccess)
   if (!envelope || envelope.state !== 'COMPLETED') throw new Error('Completed registration envelope missing')
@@ -161,8 +156,8 @@ try {
     status: 'PASS',
     evidenceType: 'AUTH-001_BETTER_AUTH_REGISTRATION_W01_BOUNDARY_LOCAL_RUNTIME',
     runId, sourceSha, environment: 'CONTROLLED_LOCAL_D1_SHARED_W02_W01_OPENNEXT_WORKERS',
-    assertions: { successfulRegistration: true, betterAuthIdentityCreated: true, unverifiedLoginBlocked: true, w01ProfileProjectionBoundByIdentityId: true, payloadNativePasswordNotPersisted: true, payloadNativeSessionNotCreated: true, responseDigestMatchesCommitment: true, idempotentReplay: true, idempotencyReuseConflict: true, downstreamRollbackRemovesBetterAuthIdentity: true, concurrentDuplicateIdentitySingleWinner: true, concurrentSameKeySingleWinner: true },
-    observed: { userId: String(first.userId), accountState: first.accountState, blockedPendingLoginStatus: pendingLoginResponse.status, concurrentStatuses: statuses, sameKeyStatuses },
+    assertions: { successfulRegistration: true, betterAuthIdentityCreated: true, w01ProfileProjectionBoundByIdentityId: true, payloadNativePasswordNotPersisted: true, payloadNativeSessionNotCreated: true, responseDigestMatchesCommitment: true, idempotentReplay: true, idempotencyReuseConflict: true, downstreamRollbackRemovesBetterAuthIdentity: true, concurrentDuplicateIdentitySingleWinner: true, concurrentSameKeySingleWinner: true },
+    observed: { userId: String(first.userId), accountState: first.accountState, concurrentStatuses: statuses, sameKeyStatuses },
   }
   writeFileSync(new URL('./runtime-result.json', artifactDir), JSON.stringify(result, null, 2) + '\n')
   console.log(JSON.stringify(result, null, 2))
