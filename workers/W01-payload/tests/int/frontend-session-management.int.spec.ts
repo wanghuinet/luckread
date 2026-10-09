@@ -15,7 +15,7 @@ describe('frontend session management', () => {
     expect(page).toContain("cache: 'no-store'")
     expect(route).toContain("'/get-session'")
     expect(route).toContain('const currentSessionId =')
-    expect(route).toContain('currentSessionId,')
+    expect(route).toContain('currentSessionId })')
     expect(route).toContain("return json({ items, nextCursor: null, currentSessionId })")
     expect(route).toContain("normalizeApiErrorResponse(currentResponse, 'Session service unavailable')")
     expect(route).toContain("apiErrorResponse(503, 'SERVICE_UNAVAILABLE', 'Current session information is unavailable')")
