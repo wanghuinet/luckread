@@ -70,7 +70,20 @@ describe('public response cache', () => {
 
     expect(loader).not.toHaveBeenCalled()
     expect(response.headers.get('X-LuckRead-Cache')).toBe('HIT')
-    await expect(response.json()).resolves.toEqual({ data: 'cached' })
+    const firstPayload = await response.json() as { data: string; requestId: string }
+    expect(firstPayload).toMatchObject({
+      data: 'cached',
+      requestId: expect.stringMatching(/^req_[A-Za-z0-9_-]+$/),
+    })
+    const secondResponse = await cachedPublicGet(
+      new Request('https://luckread.com/api/v1/contents'),
+      'content-list',
+      loader,
+      30,
+    )
+    const secondPayload = await secondResponse.json() as { requestId: string }
+    expect(secondPayload.requestId).toMatch(/^req_[A-Za-z0-9_-]+$/)
+    expect(secondPayload.requestId).not.toBe(firstPayload.requestId)
   })
 
   it('coalesces concurrent misses into one origin request', async () => {
@@ -118,7 +131,10 @@ describe('public response cache', () => {
 
     expect(loader).toHaveBeenCalledTimes(1)
     expect(response.status).toBe(200)
-    await expect(response.json()).resolves.toEqual({ data: 'origin' })
+    await expect(response.json()).resolves.toMatchObject({
+      data: 'origin',
+      requestId: expect.stringMatching(/^req_[A-Za-z0-9_-]+$/),
+    })
     expect(response.headers.get('X-LuckRead-Cache')).toBe('MISS')
   })
 
@@ -141,7 +157,10 @@ describe('public response cache', () => {
     const second = await cachedPublicGet(request.clone(), 'content-list', loader, 30)
     expect(loader).toHaveBeenCalledTimes(1)
     expect(second.headers.get('X-LuckRead-Cache')).toBe('HIT')
-    await expect(second.json()).resolves.toEqual({ data: 'origin' })
+    await expect(second.json()).resolves.toMatchObject({
+      data: 'origin',
+      requestId: expect.stringMatching(/^req_[A-Za-z0-9_-]+$/),
+    })
   })
 
   it('uses the memory fallback when Cache API reads fail', async () => {
@@ -163,7 +182,10 @@ describe('public response cache', () => {
 
     expect(loader).toHaveBeenCalledTimes(1)
     expect(response.headers.get('X-LuckRead-Cache')).toBe('HIT')
-    await expect(response.json()).resolves.toEqual({ data: 'origin' })
+    await expect(response.json()).resolves.toMatchObject({
+      data: 'origin',
+      requestId: expect.stringMatching(/^req_[A-Za-z0-9_-]+$/),
+    })
   })
 
   it('bounds concurrent cache-miss origin work', async () => {
