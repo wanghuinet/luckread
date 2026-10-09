@@ -137,9 +137,19 @@ try {
   if (verifiedIdentity.account_state !== 'ACTIVE' || Number(verifiedIdentity.account_state_version || 0) < 2) {
     throw new Error('Better Auth did not activate the verified account')
   }
-  const activeProjection = await profileForEmail(email, username)
-  if (activeProjection?.account_state !== 'ACTIVE' || Number(activeProjection?.account_state_version || 0) < 2) {
-    throw new Error('W01 profile lifecycle projection was not activated after email verification')
+  const activationEvent = await scalar(
+    "SELECT status, source_version FROM auth_013_publication_journal WHERE resource_id = ? AND event_type = 'identity.account_state_changed' ORDER BY created_at DESC LIMIT 1",
+    String(first.userId),
+  )
+  if (activationEvent?.status !== 'PENDING' || Number(activationEvent?.source_version || 0) !== Number(verifiedIdentity.account_state_version)) {
+    throw new Error('Verified account state was not durably journaled for asynchronous projection')
+  }
+  // W01 is an eventual profile projection: this workflow does not run queue
+  // consumers, so its pre-verification state must not be mistaken for a
+  // synchronous consistency failure or silently overwritten in the test.
+  const pendingProjection = await profileForEmail(email, username)
+  if (pendingProjection?.account_state !== 'PENDING_VERIFICATION' || Number(pendingProjection?.account_state_version || 0) !== 1) {
+    throw new Error('W01 profile projection changed without consuming the durable activation event')
   }
   if (all('SELECT name FROM sqlite_master WHERE type = \'table\' AND name = ?', 'users_sessions').length) {
     const legacySession = await scalar('SELECT COUNT(*) AS c FROM users_sessions WHERE _parent_id = ?', projection.id)
@@ -204,8 +214,8 @@ try {
     status: 'PASS',
     evidenceType: 'AUTH-001_BETTER_AUTH_REGISTRATION_W01_BOUNDARY_LOCAL_RUNTIME',
     runId, sourceSha, environment: 'CONTROLLED_LOCAL_D1_SHARED_W02_W01_OPENNEXT_WORKERS',
-    assertions: { successfulRegistration: true, betterAuthIdentityCreated: true, emailVerificationSucceeded: true, canonicalL2AfterVerification: true, betterAuthSessionCreatedAndRevoked: true, w01ProfileProjectionBoundByIdentityId: true, payloadNativePasswordNotPersisted: true, payloadNativeSessionNotCreated: true, responseDigestMatchesCommitment: true, idempotentReplay: true, idempotencyReuseConflict: true, downstreamRollbackRemovesBetterAuthIdentity: true, concurrentDuplicateIdentitySingleWinner: true, concurrentSameKeySingleWinner: true },
-    observed: { userId: String(first.userId), accountState: first.accountState, refreshSessionId: String(refresh.session.id), concurrentStatuses: statuses, sameKeyStatuses },
+    assertions: { successfulRegistration: true, betterAuthIdentityCreated: true, emailVerificationSucceeded: true, canonicalL2AfterVerification: true, durableActivationEventPending: true, w01ProfileProjectionBoundByIdentityId: true, w01ProjectionRemainsEventuallyConsistent: true, payloadNativePasswordNotPersisted: true, payloadNativeSessionNotCreated: true, responseDigestMatchesCommitment: true, idempotentReplay: true, idempotencyReuseConflict: true, downstreamRollbackRemovesBetterAuthIdentity: true, concurrentDuplicateIdentitySingleWinner: true, concurrentSameKeySingleWinner: true },
+    observed: { userId: String(first.userId), accountState: first.accountState, verifiedAccountState: verifiedIdentity.account_state, verifiedAccountStateVersion: Number(verifiedIdentity.account_state_version), activationEventStatus: activationEvent.status, projectionAccountState: pendingProjection.account_state, refreshSessionId: String(refresh.session.id), concurrentStatuses: statuses, sameKeyStatuses },
   }
   writeFileSync(new URL('./runtime-result.json', artifactDir), JSON.stringify(result, null, 2) + '\n')
   console.log(JSON.stringify(result, null, 2))
