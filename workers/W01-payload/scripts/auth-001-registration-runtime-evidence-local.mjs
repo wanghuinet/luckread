@@ -3,6 +3,7 @@ import { mkdirSync, writeFileSync, readFileSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 
 const baseUrl = process.env.AUTH001_BASE_URL || 'http://127.0.0.1:8787'
+const baseOrigin = new URL(baseUrl).origin
 const artifactDir = new URL('../../../artifacts/mapping-0/auth-001-runtime-local/', import.meta.url)
 mkdirSync(artifactDir, { recursive: true })
 const runId = process.env.GITHUB_RUN_ID || 'local'
@@ -40,7 +41,7 @@ const responseJson = async (response) => {
   const text = await response.text()
   try { return JSON.parse(text) } catch { throw new Error('Expected JSON response, HTTP ' + response.status + ': ' + text.slice(0, 500)) }
 }
-const request = (path, idempotencyKey, body, cookie) => fetch(baseUrl + path, { method: 'POST', headers: { 'content-type': 'application/json', ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}), ...(cookie ? { cookie } : {}) }, body: body === undefined ? undefined : JSON.stringify(body) })
+const request = (path, idempotencyKey, body, cookie) => fetch(baseUrl + path, { method: 'POST', headers: { 'content-type': 'application/json', origin: baseOrigin, ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}), ...(cookie ? { cookie } : {}) }, body: body === undefined ? undefined : JSON.stringify(body) })
 const getSetCookie = (response) => typeof response.headers.getSetCookie === 'function' ? response.headers.getSetCookie() : [response.headers.get('set-cookie')].filter(Boolean)
 const firstCookieHeader = (response) => getSetCookie(response).map((value) => value.split(';', 1)[0]).join('; ')
 
