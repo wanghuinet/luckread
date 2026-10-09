@@ -6,12 +6,14 @@ import { bearer } from 'better-auth/plugins'
 
 export interface BetterAuthEnv extends AuthEmailEnvironment {
   D1_01: D1Database
+  BETTER_AUTH_SECRET?: string
   AUTH_PUBLIC_BASE_URL?: string
 }
 
 export const createLuckReadAuth = (env: BetterAuthEnv) => {
   const publicBaseURL = (env.AUTH_PUBLIC_BASE_URL?.trim() || 'https://luckread.com').replace(/\/+$/, '')
   return betterAuth({
+    secret: env.BETTER_AUTH_SECRET,
     baseURL: publicBaseURL,
     // W02 is the platform identity authority. Better Auth uses native D1
     // persistence here; Payload is not an authentication/database adapter.
