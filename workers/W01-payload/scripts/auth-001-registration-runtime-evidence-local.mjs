@@ -143,9 +143,17 @@ try {
   const sameKeyPair = await Promise.all([request('/auth/register', keySameKey, sameKeyBody), request('/auth/register', keySameKey, sameKeyBody)])
   const sameKeyPayloads = await Promise.all(sameKeyPair.map(responseJson))
   const sameKeyStatuses = sameKeyPair.map((response) => response.status).sort((a, b) => a - b)
-  const sameKeyValid = sameKeyStatuses[0] === 201 && sameKeyStatuses[1] === 422
+  const hasInProgressConflict = sameKeyPair.some((response, index) =>
+    response.status === 409 && sameKeyPayloads[index]?.error?.code === 'IDEMPOTENCY_IN_PROGRESS',
+  )
+  const sameKeyConflict = sameKeyStatuses[0] === 201 && sameKeyStatuses[1] === 409 && hasInProgressConflict
   const sameKeyReplay = sameKeyStatuses[0] === 201 && sameKeyStatuses[1] === 201 && JSON.stringify(sameKeyPayloads[0]) === JSON.stringify(sameKeyPayloads[1])
-  if (!sameKeyValid && !sameKeyReplay) throw new Error('Concurrent same Idempotency-Key did not resolve to a single Better Auth identity: ' + sameKeyStatuses.join(','))
+  if (!sameKeyConflict && !sameKeyReplay) throw new Error('Concurrent same Idempotency-Key did not resolve to a single Better Auth identity: ' + sameKeyStatuses.join(','))
+  const settledSameKeyResponse = await request('/auth/register', keySameKey, sameKeyBody)
+  const settledSameKeyReplay = await responseJson(settledSameKeyResponse)
+  if (settledSameKeyResponse.status !== 201 || !settledSameKeyReplay.userId || settledSameKeyReplay.userId !== sameKeyPayloads.find(payload => payload?.userId)?.userId) {
+    throw new Error('Settled same-key replay did not return the original registration')
+  }
   const sameKeyProjection = await profileForEmail(sameKeyEmail, sameKeyUsername)
   if (Number(sameKeyProjection?.c || 0) !== 1) throw new Error('Concurrent same Idempotency-Key produced more than one W01 profile projection')
 
