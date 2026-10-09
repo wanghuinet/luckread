@@ -1,8 +1,8 @@
 'use client'
 
-import { FormEvent, useEffect, useState } from 'react'
+import { FormEvent, useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { fetchJson, getApiErrorMessage, jsonHeaders } from '../../../lib/client-api.js'
 
 type ApiError = {
@@ -14,20 +14,15 @@ type ApiError = {
 
 export default function LoginForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const verifiedNotice = searchParams.get('verified') === '1' ? '邮箱验证成功，请登录。' : ''
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
-  const [verifiedNotice, setVerifiedNotice] = useState('')
   const [needsVerification, setNeedsVerification] = useState(false)
   const [verificationBusy, setVerificationBusy] = useState(false)
   const [verificationMessage, setVerificationMessage] = useState('')
-
-  useEffect(() => {
-    if (new URLSearchParams(window.location.search).get('verified') === '1') {
-      setVerifiedNotice('邮箱验证成功，请登录。')
-    }
-  }, [])
 
   async function resendVerification() {
     const normalizedEmail = email.trim().toLowerCase()
