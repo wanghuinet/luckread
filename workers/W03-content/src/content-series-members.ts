@@ -372,6 +372,42 @@ export async function attachSeriesMember(
   return response
 }
 
+type SeriesMemberCursor = {
+  version: 1
+  ownerUserId: string
+  seriesId: string
+  position: number
+  id: string
+}
+
+const encodeSeriesMemberCursor = (cursor: SeriesMemberCursor): string =>
+  btoa(JSON.stringify(cursor)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '')
+
+const decodeSeriesMemberCursor = (
+  value: string,
+  ownerUserId: string,
+  seriesId: string,
+): { position: number; id: string } => {
+  try {
+    if (!value || value.length > 2048 || !/^[A-Za-z0-9_-]+$/.test(value)) throw new Error('invalid cursor')
+    const normalized = value.replace(/-/g, '+').replace(/_/g, '/')
+    const padded = normalized + '='.repeat((4 - normalized.length % 4) % 4)
+    const parsed = JSON.parse(atob(padded)) as Partial<SeriesMemberCursor>
+    if (
+      parsed.version !== 1 ||
+      parsed.ownerUserId !== ownerUserId ||
+      parsed.seriesId !== seriesId ||
+      !Number.isSafeInteger(parsed.position) ||
+      Number(parsed.position) < 0 ||
+      typeof parsed.id !== 'string' ||
+      !/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(parsed.id)
+    ) throw new Error('invalid cursor')
+    return { position: Number(parsed.position), id: parsed.id }
+  } catch {
+    throw new ContentRuntimeError('INVALID_CURSOR', 400)
+  }
+}
+
 export async function listSeriesMembers(
   db: ContentD1,
   ownerUserId: string,
@@ -389,16 +425,7 @@ export async function listSeriesMembers(
   assertResourceId(seriesId)
   const pageSize = Math.min(Math.max(Number.isSafeInteger(limit) ? limit : 20, 1), 100)
 
-  let decoded: { position: number; id: string } | null = null
-  if (cursor) {
-    try {
-      const value = JSON.parse(atob(cursor)) as { position?: unknown; id?: unknown }
-      if (!Number.isSafeInteger(value.position) || typeof value.id !== 'string') throw new Error('invalid cursor')
-      decoded = { position: Number(value.position), id: value.id }
-    } catch {
-      throw new ContentRuntimeError('VALIDATION_FAILED', 400)
-    }
-  }
+  const decoded = cursor ? decodeSeriesMemberCursor(cursor, ownerUserId, seriesId) : null
 
   const series = await db.prepare(
     'SELECT id, version, etag FROM content_series WHERE id = ? AND owner_user_id = ?',
@@ -442,7 +469,13 @@ export async function listSeriesMembers(
     items: page,
     hasMore,
     nextCursor: hasMore && last
-      ? btoa(JSON.stringify({ position: last.position, id: last.relationshipId }))
+      ? encodeSeriesMemberCursor({
+          version: 1,
+          ownerUserId,
+          seriesId,
+          position: last.position,
+          id: last.relationshipId,
+        })
       : null,
     seriesVersion: series.version,
     seriesEtag: series.etag,
