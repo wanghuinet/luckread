@@ -118,7 +118,7 @@ try {
   const sameKeyPair = await Promise.all([request('/auth/register', keySameKey, sameKeyBody), request('/auth/register', keySameKey, sameKeyBody)])
   const sameKeyPayloads = await Promise.all(sameKeyPair.map(responseJson))
   const sameKeyStatuses = sameKeyPair.map((response) => response.status).sort((a, b) => a - b)
-  const sameKeyValid = sameKeyStatuses[0] === 201 && sameKeyStatuses[1] === 422
+  const sameKeyValid = sameKeyStatuses[0] === 201 && sameKeyStatuses[1] === 409
   const sameKeyReplay = sameKeyStatuses[0] === 201 && sameKeyStatuses[1] === 201 && JSON.stringify(sameKeyPayloads[0]) === JSON.stringify(sameKeyPayloads[1])
   if (!sameKeyValid && !sameKeyReplay) throw new Error('Concurrent same Idempotency-Key did not resolve to a single Better Auth identity: ' + sameKeyStatuses.join(','))
   // Run direct local D1 inspection only after all browser-style requests have
