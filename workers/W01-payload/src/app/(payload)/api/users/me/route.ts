@@ -7,7 +7,7 @@ import { invalidatePublicUserProfile, invalidatePublicUserProfileByUsername } fr
 import { getBetterAuthPrincipal, W02AuthClientError } from '@/auth/w02-session-client'
 
 const unauthorized = () => Response.json({ errors: [{ message: 'Authentication failed' }] }, { status: 401, headers: { 'cache-control': 'no-store' } })
-const errorResponse = (status: number, code: string, message: string) => Response.json({ error: { code, message, details: {} }, requestId: crypto.randomUUID() }, { status, headers: { 'cache-control': 'no-store' } })
+const errorResponse = (status: number, code: string, message: string) => Response.json({ error: { code, message, details: {} }, requestId: `req_${crypto.randomUUID()}` }, { status, headers: { 'cache-control': 'no-store' } })
 
 const profileResponse = async (user: Record<string, unknown>, status = 200) => {
   const etag = await etagForUserProfile(user)
