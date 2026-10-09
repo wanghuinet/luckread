@@ -17,7 +17,7 @@ export async function POST(
   try {
     const { contentId } = await context.params
     if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(contentId)) {
-      return errorResponse(400, 'VALIDATION_FAILED', 'Invalid content id')
+      return errorResponse(422, 'VALIDATION_FAILED', 'Invalid content id')
     }
 
     const principal = await resolveCookieContentPrincipal(request)
@@ -27,7 +27,7 @@ export async function POST(
     try {
       body = await request.json()
     } catch {
-      return errorResponse(400, 'VALIDATION_FAILED', 'Invalid content preflight request')
+      return errorResponse(422, 'VALIDATION_FAILED', 'Invalid content preflight request')
     }
 
     return await callW03Content({
