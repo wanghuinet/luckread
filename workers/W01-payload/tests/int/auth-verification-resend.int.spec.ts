@@ -68,8 +68,8 @@ describe('public email verification resend API', () => {
 
   it('rejects malformed requests before invoking Better Auth', async () => {
     const response = await POST(request({ identity: 'not-an-email' }))
-    expect(response.status).toBe(202)
-    expect(mocks.proxyBetterAuth).toHaveBeenCalledTimes(1)
+    expect(response.status).toBe(422)
+    expect(mocks.proxyBetterAuth).not.toHaveBeenCalled()
   })
 
   it('fails closed when the identity service is unavailable', async () => {
