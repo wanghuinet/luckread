@@ -11,6 +11,8 @@ import { resolveBetterAuthPrincipal } from './auth/principal.js'
 
 interface Env {
   D1_01: D1Database
+  RESEND_API_KEY?: string
+  AUTH_EMAIL_FROM?: string
   AUTH013_QUEUE: Queue
   AUTH013_PROJECTION_QUEUE: Queue
 }
@@ -43,7 +45,7 @@ export default {
     const url = new URL(request.url)
 
     if (url.pathname === '/api/auth' || url.pathname.startsWith('/api/auth/')) {
-      return createLuckReadAuth({ D1_01: env.D1_01 }).handler(request)
+      return createLuckReadAuth(env).handler(request)
     }
 
     if (request.method === 'POST' && url.pathname === '/internal/account/transition') {

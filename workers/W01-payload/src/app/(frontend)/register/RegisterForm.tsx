@@ -30,6 +30,32 @@ export default function RegisterForm({ policyVersion }: RegisterFormProps) {
   const [status, setStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle')
   const [message, setMessage] = useState('')
   const [result, setResult] = useState<RegistrationResponse | null>(null)
+  const [registeredEmail, setRegisteredEmail] = useState('')
+  const [verificationStatus, setVerificationStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle')
+  const [verificationMessage, setVerificationMessage] = useState('')
+
+  async function sendVerificationEmail(identity: string) {
+    setVerificationStatus('sending')
+    setVerificationMessage('')
+
+    try {
+      const { response, data: payload } = await fetchJson<ApiError | null>('/api/v1/auth/verification/send', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ identity }),
+      })
+
+      if (!response.ok) {
+        throw new Error(getApiErrorMessage(payload, '验证邮件暂时无法发送，请点击重试。'))
+      }
+
+      setVerificationStatus('sent')
+      setVerificationMessage('验证邮件已发送至 ' + identity + '。请打开邮件中的链接完成验证。')
+    } catch (error) {
+      setVerificationStatus('error')
+      setVerificationMessage(error instanceof Error ? error.message : '验证邮件暂时无法发送，请点击重试。')
+    }
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -91,12 +117,14 @@ export default function RegisterForm({ policyVersion }: RegisterFormProps) {
       }
 
       setResult(payload)
+      setRegisteredEmail(normalizedEmail)
       setStatus('success')
       setEmail('')
       setUsername('')
       setPassword('')
       setConfirmPassword('')
       setConsent(false)
+      await sendVerificationEmail(normalizedEmail)
     } catch (error) {
       setStatus('error')
       setMessage(error instanceof Error ? error.message : '注册暂时无法完成，请稍后重试。')
@@ -131,6 +159,27 @@ export default function RegisterForm({ policyVersion }: RegisterFormProps) {
                 <br />
                 用户 ID：{result.userId}
               </p>
+              {verificationMessage ? (
+                <p
+                  className={verificationStatus === 'error' ? 'registerError' : 'registerVerificationStatus'}
+                  role={verificationStatus === 'error' ? 'alert' : 'status'}
+                  aria-live="polite"
+                >
+                  {verificationMessage}
+                </p>
+              ) : null}
+              <button
+                className="registerPrimaryButton"
+                type="button"
+                disabled={verificationStatus === 'sending' || !registeredEmail}
+                onClick={() => void sendVerificationEmail(registeredEmail)}
+              >
+                {verificationStatus === 'sending'
+                  ? '正在发送验证邮件…'
+                  : verificationStatus === 'sent'
+                    ? '重新发送验证邮件'
+                    : '发送/重试验证邮件'}
+              </button>
               <Link className="registerPrimaryButton" href="/">
                 返回 LuckRead
               </Link>
