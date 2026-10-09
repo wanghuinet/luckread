@@ -401,9 +401,31 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
     return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Registration identity is unavailable')
   }
 
+  let payloadProfileId: string | number | null = null
+  const removePayloadProfileProjection = async (): Promise<void> => {
+    if (payloadProfileId === null) return
+    try {
+      const payload = await getPayload({ config })
+      await payload.delete({
+        collection: 'users',
+        id: payloadProfileId,
+        overrideAccess: true,
+        disableTransaction: true,
+        req: request,
+      })
+      payloadProfileId = null
+    } catch (cleanupError) {
+      console.error(JSON.stringify({
+        event: 'auth.register.profile_projection_rollback_failure',
+        diagnosticCode: 'AUTH001_PROFILE_PROJECTION_ROLLBACK_FAILURE',
+        errorName: cleanupError instanceof Error ? cleanupError.name : typeof cleanupError,
+      }))
+    }
+  }
+
   try {
     const payload = await getPayload({ config })
-    await payload.create({
+    const createdProfile = await payload.create({
       collection: 'users',
       data: {
         identityId: userId,
@@ -414,6 +436,7 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
       disableTransaction: true,
       req: request,
     })
+    payloadProfileId = createdProfile.id
   } catch (error) {
     // Concurrent sign-ups can both receive a successful Better Auth response
     // before W01's unique email/username projection rejects one request. If
@@ -570,6 +593,7 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     if (isUniqueConstraintError(error)) {
+      await removePayloadProfileProjection()
       const failureCategory =
         /auth_registration_envelopes|active_key/i.test(message)
           ? 'IDEMPOTENCY_CONFLICT'
@@ -611,6 +635,7 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
       )
     }
 
+    await removePayloadProfileProjection()
     try {
       await rollbackRegistrationUser(request, {
         userId,
