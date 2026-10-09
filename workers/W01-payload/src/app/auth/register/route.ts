@@ -331,25 +331,14 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
 
   let authResponse: Response
   try {
-    const signUpOptions = {
+    authResponse = await proxyBetterAuth(request, '/sign-up/email', {
       body: {
         email: normalized.identity,
         name: normalized.username,
         username: normalized.username,
         password: normalized.credential,
       },
-    }
-
-    // Local/shared D1 runtimes can briefly return SQLITE_BUSY when two new
-    // identities are created concurrently. Retry only explicit D1 busy errors;
-    // do not retry ordinary validation or authentication failures.
-    authResponse = await proxyBetterAuth(request, '/sign-up/email', signUpOptions)
-    for (let attempt = 0; attempt < 2 && authResponse.status >= 500; attempt += 1) {
-      const upstreamText = await authResponse.clone().text().catch(() => '')
-      if (!/D1_ERROR|SQLITE_BUSY|database is locked/i.test(upstreamText)) break
-      await new Promise((resolve) => setTimeout(resolve, 40 * (attempt + 1)))
-      authResponse = await proxyBetterAuth(request, '/sign-up/email', signUpOptions)
-    }
+    })
   } catch {
     await releaseReservation()
     return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Registration service unavailable')
