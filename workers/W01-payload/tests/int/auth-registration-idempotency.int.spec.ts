@@ -27,4 +27,25 @@ describe('AUTH-001 registration idempotency ordering', () => {
     expect(source).toContain("event: 'auth.register.profile_projection_failure'")
     expect(source).toContain("return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Registration service unavailable')")
   })
+
+  it('records sanitized signals for upstream and registration-commit failures', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), 'src/app/auth/register/route.ts'),
+      'utf8',
+    )
+
+    const rejectionEvent = source.indexOf("event: 'auth.register.better_auth_rejected'")
+    const rejectionRelease = source.indexOf('await releaseReservation()', rejectionEvent)
+    expect(rejectionEvent).toBeGreaterThanOrEqual(0)
+    expect(rejectionRelease).toBeGreaterThan(rejectionEvent)
+
+    const rejectionDiagnostic = source.slice(rejectionEvent, rejectionRelease)
+    expect(rejectionDiagnostic).toContain('upstreamStatus: authResponse.status')
+    expect(rejectionDiagnostic).toContain('upstreamErrorCode')
+    expect(rejectionDiagnostic).toContain('failureCategory')
+    expect(rejectionDiagnostic).not.toContain('authPayload')
+    expect(rejectionDiagnostic).not.toContain('normalized.credential')
+    expect(source).toContain("event: 'auth.register.commit_conflict'")
+    expect(source).toContain("'CONSENT_CONSTRAINT'")
+  })
 })
