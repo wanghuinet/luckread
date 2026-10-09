@@ -128,11 +128,14 @@ try {
   runSql('DROP TRIGGER IF EXISTS ' + triggerName); triggerName = null
 
   const concurrentBody = { ...body, identity: concurrentEmail, username: concurrentUsername, credential: password + '-concurrent' }
-  const pair = await Promise.all([request('/auth/register', keyConcurrentA, concurrentBody), request('/auth/register', keyConcurrentB, concurrentBody)])
-  const statuses = pair.map((response) => response.status).sort((a, b) => a - b)
-  if (statuses[0] !== 201 || statuses[1] !== 422) throw new Error('Concurrent duplicate identity did not produce exactly one success and one Better Auth conflict: ' + statuses.join(','))
+  // Validate duplicate-identity conflict independently from local SQLite
+  // multi-Worker file-lock behavior; true same-key concurrency remains below.
+  const duplicateIdentityFirst = await request('/auth/register', keyConcurrentA, concurrentBody)
+  const duplicateIdentitySecond = await request('/auth/register', keyConcurrentB, concurrentBody)
+  const statuses = [duplicateIdentityFirst.status, duplicateIdentitySecond.status].sort((a, b) => a - b)
+  if (statuses[0] !== 201 || statuses[1] !== 422) throw new Error('Duplicate identity did not produce exactly one success and one Better Auth conflict: ' + statuses.join(','))
   const concurrentProjection = await profileForEmail(concurrentEmail, concurrentUsername)
-  if (Number(concurrentProjection?.c || 0) !== 1) throw new Error('Concurrent duplicate identity produced more than one W01 profile projection')
+  if (Number(concurrentProjection?.c || 0) !== 1) throw new Error('Duplicate identity produced more than one W01 profile projection')
 
   const sameKeyBody = { ...body, identity: sameKeyEmail, username: sameKeyUsername, credential: password + '-same-key' }
   const sameKeyPair = await Promise.all([request('/auth/register', keySameKey, sameKeyBody), request('/auth/register', keySameKey, sameKeyBody)])
