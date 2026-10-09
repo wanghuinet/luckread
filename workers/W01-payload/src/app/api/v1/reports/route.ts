@@ -56,9 +56,8 @@ export async function POST(request: Request): Promise<Response> {
     }
 
     const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
-    if (!idempotencyKey || idempotencyKey.length > 256) {
-      return errorResponse(428, 'PRECONDITION_REQUIRED', 'Idempotency-Key is required')
-    }
+    if (!idempotencyKey) return errorResponse(428, 'PRECONDITION_REQUIRED', 'Idempotency-Key is required')
+    if (idempotencyKey.length > 256) return errorResponse(422, 'VALIDATION_FAILED', 'Invalid Idempotency-Key header')
 
     if (targetType === 'creator' || targetType === 'profile') {
       try {
