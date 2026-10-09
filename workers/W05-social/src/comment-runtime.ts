@@ -58,6 +58,7 @@ export const parseCommentLimit = (value: string | null): number => {
 type Cursor = {
   version: 1
   contentId: string
+  viewerUserId: string | null
   createdAt: string
   id: string
 }
@@ -68,7 +69,7 @@ const encodeCursor = (cursor: Cursor): string =>
     .replace(/\//g, '_')
     .replace(/=+$/g, '')
 
-const decodeCursor = (value: string | null, contentId: string): Cursor | null => {
+const decodeCursor = (value: string | null, contentId: string, viewerUserId: string | null): Cursor | null => {
   if (!value) return null
   const normalized = value.trim()
   if (!normalized || normalized.length > MAX_CURSOR) {
@@ -82,6 +83,7 @@ const decodeCursor = (value: string | null, contentId: string): Cursor | null =>
     if (
       parsed.version !== 1 ||
       parsed.contentId !== contentId ||
+      parsed.viewerUserId !== viewerUserId ||
       typeof parsed.createdAt !== 'string' ||
       typeof parsed.id !== 'string' ||
       !parsed.createdAt ||
@@ -89,7 +91,10 @@ const decodeCursor = (value: string | null, contentId: string): Cursor | null =>
     ) {
       throw new Error('invalid cursor')
     }
-    return { version: 1, contentId, createdAt: parsed.createdAt, id: parsed.id }
+    if (!Number.isFinite(Date.parse(parsed.createdAt)) || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(parsed.id)) {
+      throw new Error('invalid cursor')
+    }
+    return { version: 1, contentId, viewerUserId, createdAt: parsed.createdAt, id: parsed.id }
   } catch {
     throw new CommentRuntimeError('INVALID_CURSOR', 400)
   }
@@ -532,8 +537,8 @@ export async function listComments(
   viewerUserIdValue: string | null = null,
 ): Promise<CommentPage> {
   const contentId = validateId(contentIdValue)
-  const cursor = decodeCursor(cursorValue, contentId)
   const viewerUserId = viewerUserIdValue ? validateId(viewerUserIdValue, 'UNAUTHENTICATED') : null
+  const cursor = decodeCursor(cursorValue, contentId, viewerUserId)
 
   const whereCursor = cursor
     ? 'AND (c.created_at > ? OR (c.created_at = ? AND c.id > ?))'
@@ -660,7 +665,7 @@ export async function listComments(
     hasMore,
     nextCursor:
       hasMore && last
-        ? encodeCursor({ version: 1, contentId, createdAt: last.created_at, id: last.id })
+        ? encodeCursor({ version: 1, contentId, viewerUserId, createdAt: last.created_at, id: last.id })
         : null,
   }
 }
