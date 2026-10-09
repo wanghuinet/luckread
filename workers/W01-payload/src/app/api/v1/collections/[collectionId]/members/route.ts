@@ -1,7 +1,7 @@
 import { callW03Content, resolveContentPrincipal, W03ContentClientError } from '../../../../../../content/w03-content-client.js'
 
 const errorResponse = (status: number, code: string, message: string) =>
-  Response.json({ error: { code, message, details: {} }, requestId: crypto.randomUUID() }, {
+  Response.json({ error: { code, message, details: {} }, requestId: `req_${crypto.randomUUID()}` }, {
     status,
     headers: { 'cache-control': 'no-store' },
   })
