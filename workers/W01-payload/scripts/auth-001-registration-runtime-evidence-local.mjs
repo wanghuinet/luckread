@@ -94,9 +94,45 @@ try {
     if (Number(legacySession?.c || 0) !== 0) throw new Error('Legacy Payload session row was created for Better Auth registration')
   }
 
+  const pendingIdentity = await scalar(
+    'SELECT email_verified AS emailVerified, account_state AS accountState, account_state_version AS accountStateVersion FROM "user" WHERE id = ? LIMIT 1',
+    first.userId,
+  )
+  if (
+    Number(pendingIdentity?.emailVerified) !== 0 ||
+    pendingIdentity?.accountState !== 'PENDING_VERIFICATION' ||
+    Number(pendingIdentity?.accountStateVersion) !== 1
+  ) throw new Error('New registration did not remain pending until email verification')
+
+  const pendingLoginResponse = await request('/auth/login', null, { identity: email, credential: password })
+  if (pendingLoginResponse.status !== 403 || firstCookieHeader(pendingLoginResponse)) {
+    throw new Error('Unverified account must not establish a login session; got HTTP ' + pendingLoginResponse.status)
+  }
+
+  // Session lifecycle assertions below use an explicit local-only verified
+  // state fixture. The actual verification transition is covered separately
+  // by W02 account-state tests; this fixture isolates sign-in/refresh/logout
+  // behavior from external Resend delivery, which is not configured in CI.
+  runSql(
+    'UPDATE "user" SET email_verified = 1, account_state = ?, account_state_version = account_state_version + 1, updated_at = ? WHERE id = ? AND account_state = ? AND email_verified = 0',
+    'ACTIVE',
+    new Date().toISOString(),
+    first.userId,
+    'PENDING_VERIFICATION',
+  )
+  const verifiedFixture = await scalar(
+    'SELECT email_verified AS emailVerified, account_state AS accountState, account_state_version AS accountStateVersion FROM "user" WHERE id = ? LIMIT 1',
+    first.userId,
+  )
+  if (
+    Number(verifiedFixture?.emailVerified) !== 1 ||
+    verifiedFixture?.accountState !== 'ACTIVE' ||
+    Number(verifiedFixture?.accountStateVersion) !== 2
+  ) throw new Error('Local verified-state fixture was not persisted')
+
   const loginResponse = await request('/auth/login', null, { identity: email, credential: password })
   const login = await responseJson(loginResponse)
-  if (loginResponse.status !== 200 || String(login?.user?.id || '') !== String(first.userId)) throw new Error('Better Auth account could not authenticate through the W01 boundary')
+  if (loginResponse.status !== 200 || String(login?.user?.id || '') !== String(first.userId)) throw new Error('Verified Better Auth account could not authenticate through the W01 boundary')
   const cookie = firstCookieHeader(loginResponse)
   if (!cookie) throw new Error('Better Auth login did not establish a session cookie')
 
@@ -152,8 +188,8 @@ try {
     status: 'PASS',
     evidenceType: 'AUTH-001_BETTER_AUTH_REGISTRATION_W01_BOUNDARY_LOCAL_RUNTIME',
     runId, sourceSha, environment: 'CONTROLLED_LOCAL_D1_SHARED_W02_W01_OPENNEXT_WORKERS',
-    assertions: { successfulRegistration: true, betterAuthIdentityCreated: true, betterAuthSessionCreatedAndRevoked: true, w01ProfileProjectionBoundByIdentityId: true, payloadNativePasswordNotPersisted: true, payloadNativeSessionNotCreated: true, responseDigestMatchesCommitment: true, idempotentReplay: true, idempotencyReuseConflict: true, downstreamRollbackRemovesBetterAuthIdentity: true, concurrentDuplicateIdentitySingleWinner: true, concurrentSameKeySingleWinner: true },
-    observed: { userId: String(first.userId), accountState: first.accountState, refreshSessionId: String(refresh.session.id), concurrentStatuses: statuses, sameKeyStatuses },
+    assertions: { successfulRegistration: true, betterAuthIdentityCreated: true, unverifiedLoginBlocked: true, sessionCreatedAndRevokedAfterLocalVerifiedStateFixture: true, w01ProfileProjectionBoundByIdentityId: true, payloadNativePasswordNotPersisted: true, payloadNativeSessionNotCreated: true, responseDigestMatchesCommitment: true, idempotentReplay: true, idempotencyReuseConflict: true, downstreamRollbackRemovesBetterAuthIdentity: true, concurrentDuplicateIdentitySingleWinner: true, concurrentSameKeySingleWinner: true },
+    observed: { userId: String(first.userId), accountState: first.accountState, blockedPendingLoginStatus: pendingLoginResponse.status, refreshSessionId: String(refresh.session.id), concurrentStatuses: statuses, sameKeyStatuses },
   }
   writeFileSync(new URL('./runtime-result.json', artifactDir), JSON.stringify(result, null, 2) + '\n')
   console.log(JSON.stringify(result, null, 2))
