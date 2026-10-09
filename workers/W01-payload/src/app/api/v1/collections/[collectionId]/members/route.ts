@@ -12,9 +12,9 @@ const requireMutationHeaders = (request: Request): Response | null => {
   if (!idempotencyKey || idempotencyKey.length > 256) {
     return errorResponse(428, 'PRECONDITION_REQUIRED', 'Idempotency-Key required')
   }
-  if (!ifMatch || ifMatch.length > 256 || ifMatch === '*') {
-    return errorResponse(428, 'PRECONDITION_REQUIRED', 'If-Match required')
-  }
+  if (!ifMatch) return errorResponse(428, 'PRECONDITION_REQUIRED', 'If-Match required')
+  if (ifMatch === '*') return errorResponse(412, 'PRECONDITION_FAILED', 'If-Match precondition failed')
+  if (ifMatch.length > 256) return errorResponse(422, 'VALIDATION_FAILED', 'Invalid If-Match header')
   return null
 }
 
@@ -29,7 +29,7 @@ export async function GET(
     const url = new URL(request.url)
     const cursor = url.searchParams.get('cursor')
     if (cursor && cursor.length > 2048) {
-      return errorResponse(400, 'VALIDATION_FAILED', 'Invalid cursor')
+      return errorResponse(400, 'INVALID_CURSOR', 'Invalid cursor')
     }
     return await callW03Content({
       request,
@@ -61,7 +61,7 @@ export async function POST(
       principal,
     })
   } catch (error) {
-    if (error instanceof SyntaxError) return errorResponse(400, 'VALIDATION_FAILED', 'Invalid collection member request')
+    if (error instanceof SyntaxError) return errorResponse(422, 'VALIDATION_FAILED', 'Invalid collection member request')
     if (error instanceof W03ContentClientError) return errorResponse(error.status, error.code, 'Content service unavailable')
     return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Content service unavailable')
   }
