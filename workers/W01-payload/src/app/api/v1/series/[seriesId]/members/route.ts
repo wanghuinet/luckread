@@ -29,7 +29,7 @@ export async function GET(
     const url = new URL(request.url)
     const cursor = url.searchParams.get('cursor')
     if (cursor && cursor.length > 2048) {
-      return errorResponse(400, 'VALIDATION_FAILED', 'Invalid cursor')
+      return errorResponse(400, 'INVALID_CURSOR', 'Invalid cursor')
     }
     return await callW03Content({
       request,
@@ -61,7 +61,7 @@ export async function POST(
       principal,
     })
   } catch (error) {
-    if (error instanceof SyntaxError) return errorResponse(400, 'VALIDATION_FAILED', 'Invalid series member request')
+    if (error instanceof SyntaxError) return errorResponse(422, 'VALIDATION_FAILED', 'Invalid series member request')
     if (error instanceof W03ContentClientError) return errorResponse(error.status, error.code, 'Content service unavailable')
     return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Content service unavailable')
   }
