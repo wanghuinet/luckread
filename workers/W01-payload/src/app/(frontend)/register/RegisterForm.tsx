@@ -65,9 +65,27 @@ export default function RegisterForm({ policyVersion }: RegisterFormProps) {
     const normalizedEmail = email.trim().toLowerCase()
     const normalizedUsername = username.trim()
 
-    if (!normalizedEmail || !normalizedUsername || !password) {
+    if (!normalizedEmail || !normalizedUsername || !password || !confirmPassword) {
       setStatus('error')
       setMessage('请完整填写邮箱、用户名和密码。')
+      return
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      setStatus('error')
+      setMessage('请输入有效的邮箱地址。')
+      return
+    }
+
+    if (password.length < 15) {
+      setStatus('error')
+      setMessage('密码至少需要 15 个字符。')
+      return
+    }
+
+    if (password.length > 128) {
+      setStatus('error')
+      setMessage('密码不能超过 128 个字符。')
       return
     }
 
@@ -226,6 +244,7 @@ export default function RegisterForm({ policyVersion }: RegisterFormProps) {
                     name="email"
                     onChange={(event) => setEmail(event.target.value)}
                     placeholder="name@example.com"
+                    required
                     type="email"
                     value={email}
                     aria-label="邮箱地址"
@@ -255,11 +274,15 @@ export default function RegisterForm({ policyVersion }: RegisterFormProps) {
                     autoComplete="new-password"
                     name="password"
                     onChange={(event) => setPassword(event.target.value)}
-                    placeholder="请输入登录密码"
+                    placeholder="至少 15 个字符"
                     type="password"
+                    minLength={15}
+                    maxLength={128}
+                    required
                     value={password}
                     aria-label="设置密码"
                   />
+                  <small>密码长度为 15–128 个字符，建议使用密码管理器生成并保存。</small>
                 </label>
 
                 <label className="registerField">
@@ -270,6 +293,7 @@ export default function RegisterForm({ policyVersion }: RegisterFormProps) {
                     onChange={(event) => setConfirmPassword(event.target.value)}
                     placeholder="再次输入密码"
                     type="password"
+                    required
                     value={confirmPassword}
                     aria-label="确认密码"
                   />
