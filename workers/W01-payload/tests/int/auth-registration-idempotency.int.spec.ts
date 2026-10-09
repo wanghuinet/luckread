@@ -41,8 +41,9 @@ describe('AUTH-001 registration idempotency ordering', () => {
 
     const rejectionDiagnostic = source.slice(rejectionEvent, rejectionRelease)
     expect(rejectionDiagnostic).toContain('upstreamStatus: authResponse.status')
-    expect(rejectionDiagnostic).toContain('upstreamErrorCode')
-    expect(rejectionDiagnostic).toContain('failureCategory')
+    expect(rejectionDiagnostic).toContain('...diagnostic')
+    expect(source).toContain('const upstreamErrorCode =')
+    expect(source).toContain('const failureCategory =')
     expect(rejectionDiagnostic).not.toContain('authPayload')
     expect(rejectionDiagnostic).not.toContain('normalized.credential')
     expect(source).toContain("event: 'auth.register.commit_conflict'")
