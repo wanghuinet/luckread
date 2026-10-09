@@ -9,9 +9,8 @@ const errorResponse = (status: number, code: string, message: string) =>
 const requireMutationHeaders = (request: Request): Response | null => {
   const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
   const ifMatch = request.headers.get('If-Match')?.trim() ?? ''
-  if (!idempotencyKey || idempotencyKey.length > 256) {
-    return errorResponse(428, 'PRECONDITION_REQUIRED', 'Idempotency-Key required')
-  }
+  if (!idempotencyKey) return errorResponse(428, 'PRECONDITION_REQUIRED', 'Idempotency-Key required')
+  if (idempotencyKey.length > 256) return errorResponse(422, 'VALIDATION_FAILED', 'Invalid Idempotency-Key header')
   if (!ifMatch) return errorResponse(428, 'PRECONDITION_REQUIRED', 'If-Match required')
   if (ifMatch === '*') return errorResponse(412, 'PRECONDITION_FAILED', 'If-Match precondition failed')
   if (ifMatch.length > 256) return errorResponse(422, 'VALIDATION_FAILED', 'Invalid If-Match header')
