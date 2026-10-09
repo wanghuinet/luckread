@@ -9,8 +9,8 @@ import {
 
 const errorResponse = (status: number, code: string, message: string) =>
   Response.json(
-    { error: { code, message, details: {} }, requestId: crypto.randomUUID() },
-    { status },
+    { error: { code, message, details: {} }, requestId: `req_${crypto.randomUUID()}` },
+    { status: code === 'VALIDATION_FAILED' && status === 400 ? 422 : status },
   )
 
 export async function GET(
