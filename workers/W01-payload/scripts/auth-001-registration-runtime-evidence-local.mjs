@@ -100,7 +100,13 @@ if (process.argv.includes('--seed-in-progress')) {
     createdAt,
     createdAt,
   )
-  console.log(JSON.stringify({ status: 'SEEDED', scenario: 'IDEMPOTENCY_IN_PROGRESS', suffix }))
+  runSql(
+    'INSERT INTO users (identity_id, email, username) VALUES (?, ?, ?)',
+    'auth001-existing-profile-' + suffix,
+    concurrentEmail,
+    concurrentUsername,
+  )
+  console.log(JSON.stringify({ status: 'SEEDED', scenario: 'IDEMPOTENCY_IN_PROGRESS_AND_PROFILE_CONFLICT', suffix }))
   process.exit(0)
 }
 
@@ -144,9 +150,16 @@ try {
   if (rollbackLogin.status !== 422 && rollbackLogin.status !== 401) throw new Error('W02 rollback did not remove the Better Auth identity')
 
   const concurrentBody = { ...body, identity: concurrentEmail, username: concurrentUsername, credential: password + '-concurrent' }
-  const pair = await Promise.all([request('/auth/register', keyConcurrentA, concurrentBody), request('/auth/register', keyConcurrentB, concurrentBody)])
-  const statuses = pair.map((response) => response.status).sort((a, b) => a - b)
-  if (statuses[0] !== 201 || statuses[1] !== 422) throw new Error('Concurrent duplicate identity did not produce exactly one success and one Better Auth conflict: ' + statuses.join(','))
+  const projectionConflictResponse = await request('/auth/register', keyConcurrentA, concurrentBody)
+  const projectionConflictPayload = await responseJson(projectionConflictResponse)
+  const statuses = [projectionConflictResponse.status]
+  if (projectionConflictResponse.status !== 422 || projectionConflictPayload?.error?.code !== 'VALIDATION_FAILED') {
+    throw new Error('An email/username already owned by a different W01 profile must return 422 VALIDATION_FAILED; HTTP ' + projectionConflictResponse.status + ', code ' + String(projectionConflictPayload?.error?.code || projectionConflictPayload?.code || 'MISSING'))
+  }
+  const projectionConflictLogin = await request('/auth/login', null, { identity: concurrentEmail, credential: concurrentBody.credential })
+  if (projectionConflictLogin.status !== 401 && projectionConflictLogin.status !== 422) {
+    throw new Error('W02 identity created for a conflicting W01 profile was not rolled back; login HTTP ' + projectionConflictLogin.status)
+  }
   const sameKeyResponse = await request('/auth/register', keySameKey, sameKeyBody)
   const sameKeyPayload = await responseJson(sameKeyResponse)
   const sameKeyStatuses = [sameKeyResponse.status]
@@ -176,7 +189,12 @@ try {
   if (Number(rollbackProjection?.c || 0) !== 0) throw new Error('W01 rollback left a partial profile projection')
 
   const concurrentProjection = await profileForEmail(concurrentEmail, concurrentUsername)
-  if (Number(concurrentProjection?.c || 0) !== 1) throw new Error('Concurrent duplicate identity produced more than one W01 profile projection')
+  if (
+    Number(concurrentProjection?.c || 0) !== 1 ||
+    String(concurrentProjection.identity_id) !== 'auth001-existing-profile-' + suffix
+  ) {
+    throw new Error('Profile conflict handling changed the pre-existing W01 profile or left an additional projection')
+  }
 
   const sameKeyProjection = await profileForEmail(sameKeyEmail, sameKeyUsername)
   if (Number(sameKeyProjection?.c || 0) !== 0) throw new Error('An in-progress idempotency reservation unexpectedly created a profile projection')
@@ -185,8 +203,8 @@ try {
     status: 'PASS',
     evidenceType: 'AUTH-001_BETTER_AUTH_REGISTRATION_W01_BOUNDARY_LOCAL_RUNTIME',
     runId, sourceSha, environment: 'CONTROLLED_LOCAL_D1_SHARED_W02_W01_OPENNEXT_WORKERS',
-    assertions: { successfulRegistration: true, betterAuthIdentityCreated: true, unverifiedLoginDenied: true, noSessionIssuedBeforeVerification: true, w01ProfileProjectionBoundByIdentityId: true, payloadNativePasswordNotPersisted: true, payloadNativeSessionNotCreated: true, responseDigestMatchesCommitment: true, idempotentReplay: true, idempotencyReuseConflict: true, downstreamRollbackRemovesBetterAuthIdentity: true, concurrentDuplicateIdentitySingleWinner: true, inProgressIdempotencyConflict: true },
-    observed: { userId: String(first.userId), accountState: first.accountState, loginDeniedCode: loginErrorCode, concurrentStatuses: statuses, sameKeyStatuses },
+    assertions: { successfulRegistration: true, betterAuthIdentityCreated: true, unverifiedLoginDenied: true, noSessionIssuedBeforeVerification: true, w01ProfileProjectionBoundByIdentityId: true, payloadNativePasswordNotPersisted: true, payloadNativeSessionNotCreated: true, responseDigestMatchesCommitment: true, idempotentReplay: true, idempotencyReuseConflict: true, downstreamRollbackRemovesBetterAuthIdentity: true, profileProjectionConflictRollsBackIdentity: true, inProgressIdempotencyConflict: true },
+    observed: { userId: String(first.userId), accountState: first.accountState, loginDeniedCode: loginErrorCode, projectionConflictStatuses: statuses, sameKeyStatuses },
   }
   writeFileSync(new URL('./runtime-result.json', artifactDir), JSON.stringify(result, null, 2) + '\n')
   console.log(JSON.stringify(result, null, 2))
