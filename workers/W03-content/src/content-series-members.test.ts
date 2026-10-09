@@ -70,6 +70,38 @@ describe('W03 series membership / ordering', () => {
     expect(queries[1]).toContain('LIMIT ?')
   })
 
+  it('binds member cursors to the owning user and series', async () => {
+    let prepareCalls = 0
+    const db = {
+      prepare(query: string) {
+        prepareCalls += 1
+        if (query.includes('FROM content_series')) {
+          return { bind: () => ({ first: async () => ({ id: 'series_1', version: 4, etag: 'W/"4"' }) }) }
+        }
+        return {
+          bind: () => ({
+            all: async () => ({ results: [
+              { relationship_id: 'rel_2', position: 1, created_at: '2026-10-07T00:00:00.000Z', updated_at: '2026-10-07T00:00:00.000Z', series_id: 'series_1', content_id: 'content_2', content_slug: 'episode-2', content_type: 'article', content_state: 'PUBLISHED', title: 'Episode 2' },
+              { relationship_id: 'rel_3', position: 2, created_at: '2026-10-07T00:01:00.000Z', updated_at: '2026-10-07T00:01:00.000Z', series_id: 'series_1', content_id: 'content_3', content_slug: 'episode-3', content_type: 'article', content_state: 'PUBLISHED', title: 'Episode 3' },
+            ] }),
+          }),
+        }
+      },
+    } as never
+    const first = await listSeriesMembers(db, 'user_1', 'series_1', null, 1)
+    expect(first.nextCursor).toEqual(expect.any(String))
+    expect(first.nextCursor).toMatch(/^[A-Za-z0-9_-]+$/)
+    await expect(listSeriesMembers(db, 'user_1', 'series_2', first.nextCursor, 1)).rejects.toMatchObject({
+      code: 'INVALID_CURSOR',
+      status: 400,
+    })
+    await expect(listSeriesMembers(db, 'user_2', 'series_1', first.nextCursor, 1)).rejects.toMatchObject({
+      code: 'INVALID_CURSOR',
+      status: 400,
+    })
+    expect(prepareCalls).toBe(2)
+  })
+
   it('keeps mutation runtime behind idempotency, optimistic concurrency and series scope', () => {
     const runtime = readFileSync(
       resolve(process.cwd(), 'workers/W03-content/src/content-series-members.ts'),
