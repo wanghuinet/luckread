@@ -355,11 +355,15 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
     console.warn(JSON.stringify({
       event: 'auth.register.upstream_rejection',
       diagnosticCode: 'AUTH001_UPSTREAM_REJECTION',
+      cfRay: request.headers.get('cf-ray') ?? null,
       upstreamStatus: authResponse.status,
       upstreamCode,
     }))
     if (upstreamCode === 'PASSWORD_TOO_SHORT') {
       return errorResponse(422, 'PASSWORD_TOO_SHORT', '密码长度必须为 15–128 位')
+    }
+    if (authResponse.status === 403 || upstreamCode === 'INVALID_ORIGIN') {
+      return errorResponse(403, 'INVALID_ORIGIN', '当前访问来源未获授权')
     }
     return errorResponse(
       authResponse.status >= 500 ? 503 : 422,
@@ -392,6 +396,7 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
     console.error(JSON.stringify({
       event: 'auth.register.identity_confirmation_failure',
       diagnosticCode: 'AUTH001_IDENTITY_CONFIRMATION_FAILURE',
+      cfRay: request.headers.get('cf-ray') ?? null,
       errorName: error instanceof Error ? error.name : typeof error,
     }))
     return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Registration service unavailable')
@@ -406,6 +411,7 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
     console.warn(JSON.stringify({
       event: 'auth.register.identity_not_persisted',
       diagnosticCode: 'AUTH001_IDENTITY_NOT_PERSISTED',
+      cfRay: request.headers.get('cf-ray') ?? null,
     }))
     return errorResponse(422, 'VALIDATION_FAILED', 'Registration could not be completed')
   }
