@@ -73,6 +73,38 @@ const sha256Hex = async (value: string): Promise<string> => {
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === 'object' && !Array.isArray(value)
 
+const betterAuthFailureDiagnostic = (value: unknown) => {
+  const root = isRecord(value) ? value : {}
+  const error = isRecord(root.error) ? root.error : root
+  const rawCode = typeof error.code === 'string' ? error.code : null
+  const upstreamErrorCode =
+    rawCode && /^[A-Z0-9_.-]{1,80}$/i.test(rawCode) ? rawCode : null
+  const message =
+    typeof error.message === 'string'
+      ? error.message
+      : typeof root.message === 'string'
+        ? root.message
+        : ''
+  const signal = `${upstreamErrorCode ?? ''} ${message}`.toLowerCase()
+
+  const failureCategory =
+    /password/.test(signal) && /(short|long|length|minimum|maximum|weak|policy|required)/.test(signal)
+      ? 'PASSWORD_POLICY'
+      : /(already exists|already registered|user exists|email exists|username.*taken|duplicate|user_already_exists|username_taken|email_taken)/.test(signal)
+        ? 'IDENTITY_CONFLICT'
+        : /(origin|csrf|cross.?site|trusted.?origin)/.test(signal)
+          ? 'ORIGIN_OR_CSRF_REJECTION'
+          : /username/.test(signal)
+            ? 'USERNAME_VALIDATION'
+            : /email/.test(signal)
+              ? 'EMAIL_VALIDATION'
+              : /(invalid|required|validation|missing)/.test(signal)
+                ? 'INPUT_VALIDATION'
+                : 'UNCLASSIFIED'
+
+  return { upstreamErrorCode, failureCategory }
+}
+
 type D1Binding = Awaited<ReturnType<typeof getCloudflareContext>>['env']['D1']
 
 const isExpired = (expiresAt: string, now: Date) => {
@@ -344,6 +376,13 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
   let authPayload: unknown = null
   try { authPayload = await authResponse.json() } catch {}
   if (!authResponse.ok) {
+    const diagnostic = betterAuthFailureDiagnostic(authPayload)
+    console.error(JSON.stringify({
+      event: 'auth.register.better_auth_rejected',
+      diagnosticCode: 'AUTH001_BETTER_AUTH_REJECTED',
+      upstreamStatus: authResponse.status,
+      ...diagnostic,
+    }))
     await releaseReservation()
     return errorResponse(
       authResponse.status >= 500 ? 503 : 422,
@@ -486,6 +525,19 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     if (isUniqueConstraintError(error)) {
+      const failureCategory =
+        /auth_registration_envelopes|active_key/i.test(message)
+          ? 'IDEMPOTENCY_CONFLICT'
+          : /consents/i.test(message)
+            ? 'CONSENT_CONSTRAINT'
+            : /users/i.test(message)
+              ? 'PAYLOAD_USER_CONSTRAINT'
+              : 'UNCLASSIFIED_UNIQUE_CONSTRAINT'
+      console.error(JSON.stringify({
+        event: 'auth.register.commit_conflict',
+        diagnosticCode: 'AUTH001_COMMIT_CONFLICT',
+        failureCategory,
+      }))
       await rollbackRegistrationUser(request, {
         userId,
         email: normalized.identity,
