@@ -534,6 +534,21 @@ describe('comment runtime', () => {
     expect(page.nextCursor).toEqual(expect.any(String))
   })
 
+  it('rejects comment cursors reused against another content ID', async () => {
+    const d = db([], [
+      { id: 'c1', content_id: 'content-1', author_user_id: 'user-1', parent_id: null, body: 'one', state: 'PUBLISHED', depth: 0, created_at: '2026-10-02T00:00:00.000Z', updated_at: '2026-10-02T00:00:00.000Z' },
+      { id: 'c2', content_id: 'content-1', author_user_id: 'user-2', parent_id: null, body: 'two', state: 'PUBLISHED', depth: 0, created_at: '2026-10-02T00:01:00.000Z', updated_at: '2026-10-02T00:01:00.000Z' },
+    ])
+    const first = await listComments(d, 'content-1', null, 1)
+    expect(first.nextCursor).toEqual(expect.any(String))
+    const before = (d.prepare as unknown as ReturnType<typeof vi.fn>).mock.calls.length
+    await expect(listComments(d, 'content-2', first.nextCursor, 20)).rejects.toMatchObject({
+      code: 'INVALID_CURSOR',
+      status: 400,
+    })
+    expect((d.prepare as unknown as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(before)
+  })
+
   it('applies the viewer Block and Mute policy to comment roots and replies', async () => {
     const d = db([], [{
       results: [{
