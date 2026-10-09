@@ -89,7 +89,7 @@ try {
 
   const firstResponse = await request('/auth/register', keySuccess, body)
   const first = await responseJson(firstResponse)
-  if (firstResponse.status !== 201) throw new Error('Registration failed: HTTP ' + firstResponse.status)
+  if (firstResponse.status !== 201) throw new Error('Registration failed: HTTP ' + firstResponse.status + ' envelope=' + JSON.stringify(first))
   if (!first.userId || first.accountState !== 'PENDING_VERIFICATION') throw new Error('Registration response is not the canonical Better Auth registration response')
 
   const projection = await profileForEmail(email, username)
