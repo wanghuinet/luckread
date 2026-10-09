@@ -135,18 +135,15 @@ export const createLuckReadAuth = (env: BetterAuthEnv) =>
       sendVerificationEmail: async ({ user, url }) => {
         await sendVerificationEmail(env, { user, url })
       },
+      afterEmailVerification: async (user) => {
+        await activateVerifiedAccount(env.D1_01, String(user.id))
+      },
     },
     databaseHooks: {
       user: {
         create: {
           after: async (user) => {
             await ensureBaseUserRole(env.D1_01, String(user.id), new Date().toISOString())
-          },
-        },
-        update: {
-          after: async (user) => {
-            if (user.emailVerified !== true) return
-            await activateVerifiedAccount(env.D1_01, String(user.id))
           },
         },
       },
