@@ -376,6 +376,38 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
     return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Registration identity is unavailable')
   }
 
+  // Better Auth intentionally returns a synthetic user for duplicate-email
+  // sign-up when email verification is required. Never treat an ID in that
+  // response as proof that W02 persisted a real identity.
+  let persistedIdentity: { id: string; email: string; username: string | null } | null = null
+  try {
+    persistedIdentity = await env.D1
+      .prepare('SELECT id, email, username FROM "user" WHERE id = ? LIMIT 1')
+      .bind(userId)
+      .first<{ id: string; email: string; username: string | null }>()
+  } catch (error) {
+    await releaseReservation()
+    console.error(JSON.stringify({
+      event: 'auth.register.identity_confirmation_failure',
+      diagnosticCode: 'AUTH001_IDENTITY_CONFIRMATION_FAILURE',
+      errorName: error instanceof Error ? error.name : typeof error,
+    }))
+    return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Registration service unavailable')
+  }
+
+  if (
+    !persistedIdentity ||
+    persistedIdentity.email.trim().toLowerCase() !== normalized.identity ||
+    String(persistedIdentity.username ?? '').trim() !== normalized.username
+  ) {
+    await releaseReservation()
+    console.warn(JSON.stringify({
+      event: 'auth.register.identity_not_persisted',
+      diagnosticCode: 'AUTH001_IDENTITY_NOT_PERSISTED',
+    }))
+    return errorResponse(422, 'VALIDATION_FAILED', 'Registration could not be completed')
+  }
+
   try {
     const payload = await getPayload({ config })
     await payload.create({
