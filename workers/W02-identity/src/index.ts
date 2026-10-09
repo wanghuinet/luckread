@@ -1,4 +1,5 @@
 import { createLuckReadAuth } from './auth/better-auth.js'
+import { hasAuthEmailConfig } from './auth/email-delivery.js'
 import { publishPendingAccountStateEvents } from './account/publication-journal-publisher.js'
 import { resolveGlobalLayer } from './authz/role-assignment.js'
 import {
@@ -13,6 +14,9 @@ interface Env {
   D1_01: D1Database
   AUTH013_QUEUE: Queue
   AUTH013_PROJECTION_QUEUE: Queue
+  RESEND_API_KEY?: string
+  AUTH_EMAIL_FROM?: string
+  AUTH_PUBLIC_BASE_URL?: string
 }
 
 type ResolveLayerRequest = {
@@ -39,11 +43,31 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
 })
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url)
 
     if (url.pathname === '/api/auth' || url.pathname.startsWith('/api/auth/')) {
-      return createLuckReadAuth({ D1_01: env.D1_01 }).handler(request)
+      const emailDependentEndpoints = new Set([
+        '/api/auth/sign-up/email',
+        '/api/auth/send-verification-email',
+        '/api/auth/request-password-reset',
+      ])
+      if (emailDependentEndpoints.has(url.pathname) && !hasAuthEmailConfig(env)) {
+        return json({
+          error: {
+            code: 'SERVICE_UNAVAILABLE',
+            message: 'Authentication email delivery is not configured',
+          },
+        }, 503)
+      }
+
+      return createLuckReadAuth({
+        D1_01: env.D1_01,
+        RESEND_API_KEY: env.RESEND_API_KEY,
+        AUTH_EMAIL_FROM: env.AUTH_EMAIL_FROM,
+        AUTH_PUBLIC_BASE_URL: env.AUTH_PUBLIC_BASE_URL,
+        waitUntil: (promise) => ctx.waitUntil(promise),
+      }).handler(request)
     }
 
     if (request.method === 'POST' && url.pathname === '/internal/account/transition') {
