@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-import { canTransitionContentState, ContentRuntimeError, createContent, createRequestId, decodeContentListCursor, decodeCursor, decodeScopedCursor, encodeContentListCursor, encodeCursor, encodeScopedCursor, isState, listContents, listCreatorContents, publishDueScheduledContent, toErrorResponse, transitionContentState, updateContent, validateInput, validateListFilters } from './content-runtime.js'
+import { canTransitionContentState, ContentRuntimeError, createContent, createRequestId, decodeContentListCursor, decodeCursor, decodeScopedCursor, encodeContentListCursor, encodeCursor, encodeScopedCursor, isState, listContents, listContentRevisions, listCreatorContents, publishDueScheduledContent, toErrorResponse, transitionContentState, updateContent, validateInput, validateListFilters } from './content-runtime.js'
 import w03Worker, { hasCreatorContentPermission, parseListLimit } from './index.js'
 
 describe('W03 content contract core', () => {
@@ -121,6 +121,47 @@ describe('W03 content contract core', () => {
     expect(() => decodeScopedCursor(direct, 'scope-b')).toThrow(
       expect.objectContaining({ code: 'INVALID_CURSOR' }),
     )
+  })
+
+  it('binds revision cursors to the owning user and content', async () => {
+    const row = {
+      id: 'revision_2',
+      content_id: 'content_123',
+      revision: 2,
+      content_version: 2,
+      actor_user_id: 'user_123',
+      source_revision: 1,
+      operation: 'UPDATE',
+      state: 'DRAFT',
+      slug: 'article-123',
+      title: 'Revision title',
+      body_ref: 'https://cdn.example.com/body.txt',
+      media_refs_json: '[]',
+      cover_ref: null,
+      etag: 'W/"2"',
+      reason: null,
+      correlation_id: 'test-correlation',
+      created_at: '2026-10-02T12:01:00.000Z',
+    }
+    let prepareCalls = 0
+    const db = {
+      prepare() {
+        prepareCalls += 1
+        return { bind: () => ({ all: async () => ({ results: [row, { ...row, id: 'revision_1' }] }) }) }
+      },
+    } as never
+    const first = await listContentRevisions(db, 'user_123', 'content_123', null, 1)
+    expect(first.hasMore).toBe(true)
+    expect(first.nextCursor).toEqual(expect.any(String))
+    await expect(listContentRevisions(db, 'user_123', 'content_999', first.nextCursor, 1)).rejects.toMatchObject({
+      code: 'INVALID_CURSOR',
+      status: 400,
+    })
+    await expect(listContentRevisions(db, 'user_999', 'content_123', first.nextCursor, 1)).rejects.toMatchObject({
+      code: 'INVALID_CURSOR',
+      status: 400,
+    })
+    expect(prepareCalls).toBe(1)
   })
 
   it('rejects update requests that change the immutable content type', async () => {
