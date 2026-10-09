@@ -9,7 +9,7 @@ import { assertSocialTargetUserExists } from '../../../../social/w05-social-clie
 const errorResponse = (status: number, code: string, message: string) =>
   Response.json(
     { error: { code, message, details: {} }, requestId: `req_${crypto.randomUUID()}` },
-    { status, headers: { 'cache-control': 'no-store' } },
+    { status: code === 'VALIDATION_FAILED' && status === 400 ? 422 : status, headers: { 'cache-control': 'no-store' } },
   )
 
 const validateBody = async (request: Request): Promise<Record<string, unknown> | Response> => {
