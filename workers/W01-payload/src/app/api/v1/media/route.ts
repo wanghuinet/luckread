@@ -5,13 +5,11 @@ import { POST as payloadMediaPost } from '../../../(payload)/api/[...slug]/route
 
 import { getBetterAuthPrincipal, W02AuthClientError } from '@/auth/w02-session-client'
 import { TrafficLimitError, enforcePublicReadRateLimit, enforceW01WriteRateLimit, rateLimitResponse } from '@/auth/traffic-limit'
+import { apiErrorResponse, appendRequestIdToJsonResponse, normalizeApiErrorResponse } from '@/lib/api-response'
 
 type PayloadRouteContext = Parameters<typeof payloadMediaPost>[1]
 
-const unauthorized = () => new Response(JSON.stringify({ error: { code: 'UNAUTHENTICATED', message: 'Authentication required' } }), {
-  status: 401,
-  headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
-})
+const unauthorized = () => apiErrorResponse(401, 'UNAUTHENTICATED', 'Authentication required')
 
 async function authenticate(request: Request) {
   const principal = await getBetterAuthPrincipal(request)
@@ -21,20 +19,14 @@ async function authenticate(request: Request) {
 
 const authenticateErrorResponse = (error: unknown): Response => {
   if (error instanceof W02AuthClientError && error.status === 401) return unauthorized()
-  return new Response(JSON.stringify({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Media authentication service unavailable' } }), {
-    status: 503,
-    headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
-  })
+  return apiErrorResponse(503, 'SERVICE_UNAVAILABLE', 'Media authentication service unavailable')
 }
 export async function GET(request: Request): Promise<Response> {
   try {
     await enforcePublicReadRateLimit(request)
   } catch (error) {
     if (error instanceof TrafficLimitError) return rateLimitResponse(request)
-    return new Response(JSON.stringify({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Media service unavailable' } }), {
-      status: 503,
-      headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
-    })
+    return apiErrorResponse(503, 'SERVICE_UNAVAILABLE', 'Media service unavailable')
   }
 
   let authenticated: Awaited<ReturnType<typeof authenticate>>
@@ -61,18 +53,15 @@ export async function GET(request: Request): Promise<Response> {
       overrideAccess: true,
     })
 
-    return new Response(JSON.stringify(result), {
+    return await appendRequestIdToJsonResponse(new Response(JSON.stringify(result), {
       status: 200,
       headers: {
         'content-type': 'application/json; charset=utf-8',
         'cache-control': 'no-store',
       },
-    })
+    }))
   } catch {
-    return new Response(JSON.stringify({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Media service unavailable' } }), {
-      status: 503,
-      headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
-    })
+    return apiErrorResponse(503, 'SERVICE_UNAVAILABLE', 'Media service unavailable')
   }
 }
 
@@ -85,26 +74,22 @@ export async function GET(request: Request): Promise<Response> {
  */
 export async function POST(request: Request): Promise<Response> {
   const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
-  if (!idempotencyKey || idempotencyKey.length > 256) {
-    return new Response(
-      JSON.stringify({ error: { code: 'PRECONDITION_REQUIRED', message: 'Idempotency-Key required' } }),
-      { status: 428, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' } },
-    )
-  }
+  if (!idempotencyKey) return apiErrorResponse(428, 'PRECONDITION_REQUIRED', 'Idempotency-Key required')
+  if (idempotencyKey.length > 256) return apiErrorResponse(422, 'VALIDATION_FAILED', 'Invalid Idempotency-Key header')
 
   try {
     await enforceW01WriteRateLimit(request)
   } catch (error) {
     if (error instanceof TrafficLimitError) return rateLimitResponse(request)
-    return new Response(JSON.stringify({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Media service unavailable' } }), {
-      status: 503,
-      headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
-    })
+    return apiErrorResponse(503, 'SERVICE_UNAVAILABLE', 'Media service unavailable')
   }
 
   const target = new URL('/api/media', request.url)
   const context: PayloadRouteContext = {
     params: Promise.resolve({ slug: ['media'] }),
   }
-  return payloadMediaPost(new Request(target, request.clone()), context)
+  const response = await payloadMediaPost(new Request(target, request.clone()), context)
+  return response.ok
+    ? appendRequestIdToJsonResponse(response)
+    : normalizeApiErrorResponse(response, 'Media service unavailable')
 }
