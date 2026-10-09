@@ -575,15 +575,15 @@ export async function listCreatorContents(
     bindings.push(filters.contentType)
   }
   if (decoded) {
-    conditions.push('(created_at < ? OR (created_at = ? AND id < ?))')
-    bindings.push(decoded.createdAt, decoded.createdAt, decoded.id)
+    conditions.push('(updated_at < ? OR (updated_at = ? AND id < ?))')
+    bindings.push(decoded.updatedAt, decoded.updatedAt, decoded.id)
   }
   const rows = await db.prepare(
     `SELECT id, content_type, owner_user_id, creator_id, ip_id, state, scheduled_at, version, revision,
             slug, title, body_ref, media_refs_json, cover_ref, etag, created_at, updated_at
        FROM contents
       WHERE ${conditions.join(' AND ')}
-      ORDER BY created_at DESC, id DESC
+      ORDER BY updated_at DESC, id DESC
       LIMIT ?`,
   ).bind(...bindings, pageSize + 1).all<ContentRow>()
   const hasMore = rows.results.length > pageSize
@@ -593,7 +593,7 @@ export async function listCreatorContents(
     items: page,
     hasMore,
     nextCursor: hasMore && last
-      ? encodeContentListCursor(last.createdAt, last.id, creatorId, contentType)
+      ? encodeCursor(last.updatedAt, last.id)
       : null,
   }
 }
@@ -625,8 +625,8 @@ export async function listContents(
   }
 
   if (decoded) {
-    conditions.push('(updated_at < ? OR (updated_at = ? AND id < ?))')
-    bindings.push(decoded.updatedAt, decoded.updatedAt, decoded.id)
+    conditions.push('(created_at < ? OR (created_at = ? AND id < ?))')
+    bindings.push(decoded.createdAt, decoded.createdAt, decoded.id)
   }
 
   const rows = await db.prepare(
@@ -634,7 +634,7 @@ export async function listContents(
             slug, title, body_ref, media_refs_json, cover_ref, etag, created_at, updated_at
        FROM contents
       WHERE ${conditions.join(' AND ')}
-      ORDER BY updated_at DESC, id DESC
+      ORDER BY created_at DESC, id DESC
       LIMIT ?`,
   ).bind(...bindings, pageSize + 1).all<ContentRow>()
 
@@ -644,7 +644,7 @@ export async function listContents(
   return {
     items: page,
     hasMore,
-    nextCursor: hasMore && last ? encodeCursor(last.updatedAt, last.id) : null,
+    nextCursor: hasMore && last ? encodeContentListCursor(last.createdAt, last.id, creatorId, contentType) : null,
   }
 }
 
