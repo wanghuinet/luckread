@@ -49,7 +49,7 @@ export async function POST(
     try {
       body = await request.json()
     } catch {
-      return errorResponse(400, 'VALIDATION_FAILED', 'Invalid content state request')
+      return errorResponse(422, 'VALIDATION_FAILED', 'Invalid content state request')
     }
 
     const response = await callW03Content({
