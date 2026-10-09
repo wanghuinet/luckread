@@ -47,6 +47,18 @@ const json = (body: unknown, status = 200) =>
     },
   })
 
+const canonicalRequestId = (value?: string): string =>
+  value && /^req_[A-Za-z0-9_-]{1,123}$/.test(value)
+    ? value
+    : 'req_' + crypto.randomUUID().replaceAll('-', '')
+
+const canonicalErrorCode = (code: string): string => {
+  if (code === 'REPORT_WRITE_FAILED' || code.endsWith('_WRITE_FAILED')) return 'INTERNAL_ERROR'
+  if (code.startsWith('INVALID_')) return 'VALIDATION_FAILED'
+  if (code === 'RELATIONSHIP_BLOCKED' || code === 'SELF_FOLLOW_NOT_ALLOWED') return 'CONFLICT'
+  return code
+}
+
 const actorTypes = new Set(['user', 'service', 'admin', 'system', 'job'])
 const resourceIdPattern = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/
 const requestIdPattern = /^req_[A-Za-z0-9_-]{1,123}$/
@@ -194,34 +206,39 @@ const parseDecision = (value: unknown): {
 
 const errorResponse = (error: unknown, requestId?: string): Response => {
   if (error instanceof ReportRuntimeError) {
+    const code = canonicalErrorCode(error.code)
     const message =
       error.code === 'UNAUTHENTICATED' ? 'Authentication required' :
       error.code === 'PERMISSION_DENIED' ? 'Permission denied' :
       error.code === 'NOT_FOUND' ? 'Reported resource not found' :
       error.code === 'PRECONDITION_REQUIRED' ? 'Idempotency-Key is required' :
-      error.code === 'CONFLICT' ? 'Conflicting report request' :
+      code === 'CONFLICT' ? 'Conflicting report request' :
       error.code === 'RATE_LIMITED' ? 'Too many reports' :
       error.code === 'REPORT_WRITE_FAILED' ? 'Report could not be created' :
+      code === 'INTERNAL_ERROR' ? 'Report could not be created' :
       'Invalid report request'
-    return json({ error: { code: error.code, message, details: {} }, requestId: requestId ?? crypto.randomUUID() }, error.status)
+    const status = code === 'VALIDATION_FAILED' && error.status === 400 ? 422 : code === 'INTERNAL_ERROR' && error.status < 500 ? 500 : error.status
+    return json({ error: { code, message, details: {} }, requestId: canonicalRequestId(requestId) }, status)
   }
   if (error instanceof ModerationRuntimeError) {
-    const code = error.code
+    const code = canonicalErrorCode(error.code)
     const message =
-      code === 'UNAUTHENTICATED' ? 'Authentication required' :
-      code === 'PERMISSION_DENIED' ? 'Permission denied' :
-      code === 'NOT_FOUND' ? 'Moderation case not found' :
-      code === 'PRECONDITION_REQUIRED' ? 'If-Match and Idempotency-Key are required' :
-      code === 'PRECONDITION_FAILED' ? 'Moderation case has changed' :
-      code === 'INVALID_STATE' ? 'Invalid moderation case state' :
-      code === 'IDEMPOTENCY_KEY_REUSE_CONFLICT' ? 'Idempotency-Key cannot be reused with different input' :
-      code === 'REPORT_WRITE_FAILED' ? 'Report could not be created' :
-      code === 'CONFLICT' ? 'Conflicting report request' :
-      code === 'SERVICE_UNAVAILABLE' ? 'Moderation service unavailable' :
+      error.code === 'UNAUTHENTICATED' ? 'Authentication required' :
+      error.code === 'PERMISSION_DENIED' ? 'Permission denied' :
+      error.code === 'NOT_FOUND' ? 'Moderation case not found' :
+      error.code === 'PRECONDITION_REQUIRED' ? 'If-Match and Idempotency-Key are required' :
+      error.code === 'PRECONDITION_FAILED' ? 'Moderation case has changed' :
+      error.code === 'INVALID_STATE' ? 'Invalid moderation case state' :
+      error.code === 'IDEMPOTENCY_KEY_REUSE_CONFLICT' ? 'Idempotency-Key cannot be reused with different input' :
+      error.code === 'REPORT_WRITE_FAILED' ? 'Report could not be created' :
+      code === 'CONFLICT' ? 'Conflicting moderation request' :
+      code === 'INTERNAL_ERROR' ? 'Moderation service unavailable' :
+      error.code === 'SERVICE_UNAVAILABLE' ? 'Moderation service unavailable' :
       'Invalid moderation request'
-    return json({ error: { code, message, details: {} }, requestId: requestId ?? crypto.randomUUID() }, error.status)
+    const status = code === 'VALIDATION_FAILED' && error.status === 400 ? 422 : code === 'INTERNAL_ERROR' && error.status < 500 ? 500 : error.status
+    return json({ error: { code, message, details: {} }, requestId: canonicalRequestId(requestId) }, status)
   }
-  return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Moderation service unavailable', details: {} }, requestId: requestId ?? crypto.randomUUID() }, 503)
+  return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Moderation service unavailable', details: {} }, requestId: canonicalRequestId(requestId) }, 503)
 }
 
 export default {
@@ -230,7 +247,7 @@ export default {
       await enforceRateLimit(request, env)
     } catch (error) {
       if (error instanceof ModerationRuntimeError && error.code === 'RATE_LIMITED') {
-        return json({ error: { code: 'RATE_LIMITED', message: 'Too many requests', details: { retryAfter: 60 } }, requestId: crypto.randomUUID() }, 429)
+        return json({ error: { code: 'RATE_LIMITED', message: 'Too many requests', details: { retryAfter: 60 } }, requestId: canonicalRequestId() }, 429)
       }
       throw error
     }
