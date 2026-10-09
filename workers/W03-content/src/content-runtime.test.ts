@@ -87,10 +87,13 @@ describe('W03 content contract core', () => {
       created_at: '2026-10-02T12:00:00.000Z',
       updated_at: '2026-10-02T12:01:00.000Z',
     }
-    const prepare = vi.fn(() => ({
-      bind: () => ({ all: async () => ({ results: [row, { ...row, id: 'content_video_124' }] }) }),
-    }))
-    const db = { prepare } as never
+    let prepareCalls = 0
+    const db = {
+      prepare() {
+        prepareCalls += 1
+        return { bind: () => ({ all: async () => ({ results: [row, { ...row, id: 'content_video_124' }] }) }) }
+      },
+    } as never
     const first = await listCreatorContents(db, 'user_123', null, 1, {
       status: 'DRAFT',
       contentType: 'video',
@@ -109,7 +112,7 @@ describe('W03 content contract core', () => {
       status: 'DRAFT',
       contentType: 'video',
     })).rejects.toMatchObject({ code: 'INVALID_CURSOR', status: 400 })
-    expect(prepare).toHaveBeenCalledTimes(1)
+    expect(prepareCalls).toBe(1)
     const direct = encodeScopedCursor('2026-10-02T12:00:00.000Z', 'content_123', 'scope-a')
     expect(decodeScopedCursor(direct, 'scope-a')).toEqual({
       updatedAt: '2026-10-02T12:00:00.000Z',
