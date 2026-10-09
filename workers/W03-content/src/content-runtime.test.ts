@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-import { canTransitionContentState, createContent, decodeCursor, encodeCursor, isState, listContents, publishDueScheduledContent, transitionContentState, updateContent, validateInput, validateListFilters } from './content-runtime.js'
+import { canTransitionContentState, ContentRuntimeError, createContent, createRequestId, decodeContentListCursor, decodeCursor, encodeContentListCursor, encodeCursor, isState, listContents, publishDueScheduledContent, toErrorResponse, transitionContentState, updateContent, validateInput, validateListFilters } from './content-runtime.js'
 import w03Worker, { hasCreatorContentPermission, parseListLimit } from './index.js'
 
 describe('W03 content contract core', () => {
@@ -17,6 +17,42 @@ describe('W03 content contract core', () => {
       updatedAt: '2026-09-29T12:00:00.000Z',
       id: 'content_123',
     })
+  })
+
+  it('emits contract-compliant error envelopes and request identifiers', async () => {
+    const response = toErrorResponse(new ContentRuntimeError('VALIDATION_FAILED', 400))
+    expect(response.status).toBe(422)
+    const payload = await response.json() as {
+      error: { code: string; message: string; details: Record<string, unknown> }
+      requestId: string
+    }
+    expect(payload).toMatchObject({
+      error: { code: 'VALIDATION_FAILED', message: expect.any(String), details: {} },
+      requestId: expect.stringMatching(/^req_[A-Za-z0-9_-]+$/),
+    })
+    expect(createRequestId()).toMatch(/^req_[A-Za-z0-9_-]+$/)
+  })
+
+  it('binds public content cursors to filters and rejects cross-filter reuse', () => {
+    const cursor = encodeContentListCursor(
+      '2026-10-02T12:00:00.000Z',
+      'content_123',
+      'user_123',
+      'video',
+    )
+    expect(decodeContentListCursor(cursor, 'user_123', 'video')).toMatchObject({
+      createdAt: '2026-10-02T12:00:00.000Z',
+      id: 'content_123',
+      creatorId: 'user_123',
+      contentType: 'video',
+      version: 1,
+    })
+    expect(() => decodeContentListCursor(cursor, null, 'video')).toThrow(
+      expect.objectContaining({ code: 'INVALID_CURSOR' }),
+    )
+    expect(() => decodeContentListCursor(cursor, 'user_123', 'article')).toThrow(
+      expect.objectContaining({ code: 'INVALID_CURSOR' }),
+    )
   })
 
   it('rejects update requests that change the immutable content type', async () => {
@@ -205,9 +241,10 @@ describe('W03 content contract core', () => {
         { D1_02: db },
       )
 
-      expect(response.status).toBe(400)
+      expect(response.status).toBe(422)
       await expect(response.json()).resolves.toMatchObject({
         error: { code: 'VALIDATION_FAILED' },
+        requestId: expect.stringMatching(/^req_[A-Za-z0-9_-]+$/),
       })
     }
   })
