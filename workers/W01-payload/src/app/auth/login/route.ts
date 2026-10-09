@@ -18,7 +18,7 @@ export async function POST(request: Request): Promise<Response> {
 
   let body: { identity?: unknown; credential?: unknown }
   try { body = await request.json() as typeof body } catch {
-    return errorResponse(400, 'VALIDATION_FAILED', 'Invalid request body')
+    return errorResponse(422, 'VALIDATION_FAILED', 'Invalid request body')
   }
 
   if (
@@ -27,7 +27,7 @@ export async function POST(request: Request): Promise<Response> {
     typeof body.credential !== 'string' ||
     body.credential.length === 0
   ) {
-    return errorResponse(400, 'VALIDATION_FAILED', 'Invalid authentication request')
+    return errorResponse(422, 'VALIDATION_FAILED', 'Invalid authentication request')
   }
 
   try {
