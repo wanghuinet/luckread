@@ -3,6 +3,7 @@
 import {
   ContentRuntimeError,
   createContent,
+  createRequestId,
   deleteContent,
   getContent,
   listContents,
@@ -290,7 +291,7 @@ const worker = {
           cursor,
           parseListLimit(url.searchParams.get('limit')),
         )
-        return json({ data: page, schemaVersion: '1.0', requestId: crypto.randomUUID() })
+        return json({ data: page, schemaVersion: '1.0', requestId: createRequestId() })
       }
 
       if (path && path.collectionMembers && path.id && request.method === 'POST' && !path.collectionMemberContentId) {
@@ -305,7 +306,7 @@ const worker = {
             requireIdempotency(request),
           ),
           schemaVersion: '1.0',
-          requestId: crypto.randomUUID(),
+          requestId: createRequestId(),
         }, 201)
       }
 
@@ -321,7 +322,7 @@ const worker = {
             requireIdempotency(request),
           ),
           schemaVersion: '1.0',
-          requestId: crypto.randomUUID(),
+          requestId: createRequestId(),
         })
       }
 
@@ -340,7 +341,7 @@ const worker = {
             requireIdempotency(request),
           ),
           schemaVersion: '1.0',
-          requestId: crypto.randomUUID(),
+          requestId: createRequestId(),
         })
       }
 
@@ -352,7 +353,7 @@ const worker = {
           await parseBody(request),
           requireIdempotency(request),
         )
-        return json({ data: collection, schemaVersion: '1.0', requestId: crypto.randomUUID() }, 201)
+        return json({ data: collection, schemaVersion: '1.0', requestId: createRequestId() }, 201)
       }
 
       if (path && path.collections && request.method === 'GET' && path.id === undefined) {
@@ -365,12 +366,12 @@ const worker = {
           cursor,
           parseListLimit(url.searchParams.get('limit')),
         )
-        return json({ data: page, schemaVersion: '1.0', requestId: crypto.randomUUID() })
+        return json({ data: page, schemaVersion: '1.0', requestId: createRequestId() })
       }
 
       if (path && path.collections && path.id && request.method === 'GET') {
         const principal = requiredCreatorPrincipal(request)
-        return json({ data: await getCollection(env.D1_02, principal.userId, path.id), schemaVersion: '1.0', requestId: crypto.randomUUID() })
+        return json({ data: await getCollection(env.D1_02, principal.userId, path.id), schemaVersion: '1.0', requestId: createRequestId() })
       }
 
       if (path && path.collections && path.id && request.method === 'PATCH') {
@@ -385,7 +386,7 @@ const worker = {
             requireIdempotency(request),
           ),
           schemaVersion: '1.0',
-          requestId: crypto.randomUUID(),
+          requestId: createRequestId(),
         })
       }
 
@@ -409,7 +410,7 @@ const worker = {
           await parseBody(request),
           requireIdempotency(request),
         )
-        return json({ data: series, schemaVersion: '1.0', requestId: crypto.randomUUID() }, 201)
+        return json({ data: series, schemaVersion: '1.0', requestId: createRequestId() }, 201)
       }
 
       if (path && path.seriesMembers && path.id && request.method === 'GET') {
@@ -423,7 +424,7 @@ const worker = {
           cursor,
           parseListLimit(url.searchParams.get('limit')),
         )
-        return json({ data: page, schemaVersion: '1.0', requestId: crypto.randomUUID() })
+        return json({ data: page, schemaVersion: '1.0', requestId: createRequestId() })
       }
 
       if (path && path.seriesMembers && path.id && request.method === 'POST' && !path.seriesMemberContentId) {
@@ -438,7 +439,7 @@ const worker = {
             requireIdempotency(request),
           ),
           schemaVersion: '1.0',
-          requestId: crypto.randomUUID(),
+          requestId: createRequestId(),
         }, 201)
       }
 
@@ -454,7 +455,7 @@ const worker = {
             requireIdempotency(request),
           ),
           schemaVersion: '1.0',
-          requestId: crypto.randomUUID(),
+          requestId: createRequestId(),
         })
       }
 
@@ -475,7 +476,7 @@ const worker = {
             requireIdempotency(request),
           ),
           schemaVersion: '1.0',
-          requestId: crypto.randomUUID(),
+          requestId: createRequestId(),
         })
       }
 
@@ -489,12 +490,12 @@ const worker = {
           cursor,
           parseListLimit(url.searchParams.get('limit')),
         )
-        return json({ data: page, schemaVersion: '1.0', requestId: crypto.randomUUID() })
+        return json({ data: page, schemaVersion: '1.0', requestId: createRequestId() })
       }
 
       if (path && path.series && path.id && request.method === 'GET') {
         const principal = requiredCreatorPrincipal(request)
-        return json({ data: await getSeries(env.D1_02, principal.userId, path.id), schemaVersion: '1.0', requestId: crypto.randomUUID() })
+        return json({ data: await getSeries(env.D1_02, principal.userId, path.id), schemaVersion: '1.0', requestId: createRequestId() })
       }
 
       if (path && path.series && path.id && request.method === 'PATCH') {
@@ -509,7 +510,7 @@ const worker = {
             requireIdempotency(request),
           ),
           schemaVersion: '1.0',
-          requestId: crypto.randomUUID(),
+          requestId: createRequestId(),
         })
       }
 
@@ -545,7 +546,7 @@ const worker = {
             nextCursor: page.nextCursor,
             hasMore: page.hasMore,
           },
-          requestId: crypto.randomUUID(),
+          requestId: createRequestId(),
         })
       }
 
@@ -559,7 +560,7 @@ const worker = {
           body,
           requireIdempotency(request),
         )
-        return json({ data: relationship, requestId: crypto.randomUUID() }, 201)
+        return json({ data: relationship, requestId: createRequestId() }, 201)
       }
 
       if (path && path.relationships && path.id && path.relationshipId && request.method === 'DELETE') {
@@ -572,7 +573,7 @@ const worker = {
           relationshipId,
           requireIdempotency(request),
         )
-        return json({ data: relationship, requestId: crypto.randomUUID() })
+        return json({ data: relationship, requestId: createRequestId() })
       }
 
       if (path && path.revisions && path.id && request.method === 'GET' && !path.revisionId) {
@@ -587,7 +588,7 @@ const worker = {
             nextCursor: page.nextCursor,
             hasMore: page.hasMore,
           },
-          requestId: crypto.randomUUID(),
+          requestId: createRequestId(),
         })
       }
 
@@ -595,7 +596,7 @@ const worker = {
         const principal = requiredCreatorPrincipal(request)
         return json({
           data: await getContentRevision(env.D1_02, principal.userId, path.id, path.revisionId),
-          requestId: crypto.randomUUID(),
+          requestId: createRequestId(),
         })
       }
 
@@ -614,7 +615,7 @@ const worker = {
         )
         return json({
           ...result,
-          requestId: crypto.randomUUID(),
+          requestId: createRequestId(),
         })
       }
 
@@ -646,7 +647,7 @@ const worker = {
             nextCursor: page.nextCursor,
             hasMore: page.hasMore,
           },
-          requestId: crypto.randomUUID(),
+          requestId: createRequestId(),
         })
       }
 
@@ -688,7 +689,7 @@ const worker = {
             nextCursor: page.nextCursor,
             hasMore: page.hasMore,
           },
-          requestId: crypto.randomUUID(),
+          requestId: createRequestId(),
         })
       }
 
@@ -719,7 +720,7 @@ const worker = {
           } catch {
             throw new ContentRuntimeError('VALIDATION_FAILED', 400)
           }
-          if (report.verdict === 'RED') throw new ContentRuntimeError('PREFLIGHT_BLOCKED', 422)
+          if (report.verdict === 'RED') throw new ContentRuntimeError('VALIDATION_FAILED', 422)
         }
         const reason = typeof body.reason === 'string' ? body.reason : undefined
         const requestedScheduledAt =
