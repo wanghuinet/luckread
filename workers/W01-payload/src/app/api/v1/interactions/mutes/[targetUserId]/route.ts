@@ -19,9 +19,8 @@ export async function DELETE(
     if (principal instanceof Response) return principal
     const { targetUserId } = await context.params
     const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
-    if (!idempotencyKey || idempotencyKey.length > 256) {
-      return errorResponse(428, 'PRECONDITION_REQUIRED', 'Idempotency-Key is required')
-    }
+    if (!idempotencyKey) return errorResponse(428, 'PRECONDITION_REQUIRED', 'Idempotency-Key is required')
+    if (idempotencyKey.length > 256) return errorResponse(422, 'VALIDATION_FAILED', 'Invalid Idempotency-Key header')
     return await callW05Social({
       request,
       pathname: '/internal/social/interactions/mutes/' + encodeURIComponent(targetUserId),
