@@ -61,13 +61,33 @@ export default {
         }, 503)
       }
 
-      return createLuckReadAuth({
+      const authResponse = await createLuckReadAuth({
         D1_01: env.D1_01,
         RESEND_API_KEY: env.RESEND_API_KEY,
         AUTH_EMAIL_FROM: env.AUTH_EMAIL_FROM,
         AUTH_PUBLIC_BASE_URL: env.AUTH_PUBLIC_BASE_URL,
         waitUntil: (promise) => ctx.waitUntil(promise),
       }).handler(request)
+
+      if (authResponse.status === 403) {
+        const diagnosticPayload = await authResponse.clone().json().catch(() => null) as { code?: unknown } | null
+        if (diagnosticPayload?.code === 'INVALID_ORIGIN') {
+          const originHeader = request.headers.get('origin')
+          const refererHeader = request.headers.get('referer')
+          const safeOrigin = (value: string | null): string => {
+            if (!value) return 'ABSENT'
+            try { return new URL(value).origin } catch { return 'INVALID' }
+          }
+          console.warn(JSON.stringify({
+            event: 'auth.origin.validation_failed',
+            requestOrigin: safeOrigin(originHeader),
+            refererOrigin: safeOrigin(refererHeader),
+            requestUrlOrigin: new URL(request.url).origin,
+          }))
+        }
+      }
+
+      return authResponse
     }
 
     if (request.method === 'POST' && url.pathname === '/internal/account/transition') {
