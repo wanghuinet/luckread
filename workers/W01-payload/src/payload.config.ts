@@ -113,11 +113,12 @@ function getCloudflareContextFromWrangler(): Promise<CloudflareContext> {
         // During next build the page-data phase forks parallel workers, each
         // of which loads its own workerd against the same local D1 persistence
         // file, so production non-CLI evaluation stays in-memory and offline.
-        // Local integration tests/migrations may intentionally share one D1
-        // persistence directory across W01 and W02. This override only affects
-        // the Wrangler platform proxy used outside the Worker runtime.
+        // Wrangler CLI's --persist-to appends /v3, but getPlatformProxy's
+        // persist.path does not. Point both at the same storage root so W01
+        // Payload migrations and W02 Wrangler migrations share the local D1.
+        // This override only applies outside the Worker runtime when explicitly set.
         persist: process.env.CLOUDFLARE_PERSIST_TO
-          ? { path: process.env.CLOUDFLARE_PERSIST_TO }
+          ? { path: path.join(process.env.CLOUDFLARE_PERSIST_TO, 'v3') }
           : isProduction
             ? false
             : undefined,
