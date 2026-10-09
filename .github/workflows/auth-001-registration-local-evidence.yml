@@ -99,6 +99,14 @@ jobs:
 
       # The AUTH-013 migration updates the W01 `users` profile projection,
       # so create the Payload-owned base tables before applying W02 migrations.
+      # This evidence run must use local D1 only. The checked-in W01
+      # dev config marks D1 remote:true, which otherwise makes Payload CLI's
+      # local migration state diverge from Wrangler's --local state.
+      - name: Force W01 D1 binding local for registration evidence
+        run: |
+          set -euo pipefail
+          node --input-type=module -e "import fs from 'node:fs'; const p='workers/W01-payload/wrangler.jsonc'; const s=fs.readFileSync(p,'utf8'); const matches=s.match(/\\"remote\\": true/g) || []; if(matches.length !== 1) throw new Error('Expected exactly one W01 remote D1 flag, found '+matches.length); fs.writeFileSync(p,s.replace('\\\"remote\\": true','\\\"remote\\": false'))"
+
       - name: Apply exact W01 local migrations
         working-directory: workers/W01-payload
         env:
