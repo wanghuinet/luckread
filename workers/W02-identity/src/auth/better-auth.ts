@@ -149,6 +149,13 @@ export const createLuckReadAuth = (env: BetterAuthEnv) =>
       },
     },
     user: {
+      // The checked-in D1 schema deliberately uses snake_case columns.
+      // Map Better Auth's camelCase core fields to those exact column names.
+      fields: {
+        emailVerified: 'email_verified',
+        createdAt: 'created_at',
+        updatedAt: 'updated_at',
+      },
       additionalFields: {
         username: {
           type: 'string',
@@ -190,7 +197,36 @@ export const createLuckReadAuth = (env: BetterAuthEnv) =>
         },
       },
     },
+    account: {
+      fields: {
+        accountId: 'account_id',
+        providerId: 'provider_id',
+        userId: 'user_id',
+        accessToken: 'access_token',
+        refreshToken: 'refresh_token',
+        idToken: 'id_token',
+        accessTokenExpiresAt: 'access_token_expires_at',
+        refreshTokenExpiresAt: 'refresh_token_expires_at',
+        createdAt: 'created_at',
+        updatedAt: 'updated_at',
+      },
+    },
+    verification: {
+      fields: {
+        expiresAt: 'expires_at',
+        createdAt: 'created_at',
+        updatedAt: 'updated_at',
+      },
+    },
     session: {
+      fields: {
+        expiresAt: 'expires_at',
+        createdAt: 'created_at',
+        updatedAt: 'updated_at',
+        ipAddress: 'ip_address',
+        userAgent: 'user_agent',
+        userId: 'user_id',
+      },
       expiresIn: 60 * 60 * 24 * 7,
       updateAge: 60 * 60 * 24,
       modelName: 'session',
