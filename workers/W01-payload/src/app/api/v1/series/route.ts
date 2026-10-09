@@ -21,11 +21,11 @@ export async function GET(request: Request): Promise<Response> {
     const url = new URL(request.url)
     const cursor = url.searchParams.get('cursor')
     if (cursor && cursor.length > 2048) {
-      return errorResponse(400, 'VALIDATION_FAILED', 'Invalid cursor')
+      return errorResponse(400, 'INVALID_CURSOR', 'Invalid cursor')
     }
     const limit = url.searchParams.get('limit')
     if (limit && !/^(?:[1-9]|[1-4][0-9]|50)$/.test(limit.trim())) {
-      return errorResponse(400, 'VALIDATION_FAILED', 'Invalid limit')
+      return errorResponse(422, 'VALIDATION_FAILED', 'Invalid limit')
     }
     return await callW03Content({
       request,
@@ -53,7 +53,7 @@ export async function POST(request: Request): Promise<Response> {
       principal,
     })
   } catch (error) {
-    if (error instanceof SyntaxError) return errorResponse(400, 'VALIDATION_FAILED', 'Invalid series request')
+    if (error instanceof SyntaxError) return errorResponse(422, 'VALIDATION_FAILED', 'Invalid series request')
     if (error instanceof W03ContentClientError) return errorResponse(error.status, error.code, 'Content service unavailable')
     return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Content service unavailable')
   }
