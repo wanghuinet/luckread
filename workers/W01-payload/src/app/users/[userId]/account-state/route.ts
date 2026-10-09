@@ -4,7 +4,7 @@ const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' } })
 
 const errorResponse = (status: number, code: string, message: string) =>
-  json({ error: { code, message, details: {} }, requestId: crypto.randomUUID() }, status)
+  json({ error: { code, message, details: {} }, requestId: `req_${crypto.randomUUID()}` }, status)
 
 type AccountStateBody = { to?: unknown; reason?: unknown }
 
