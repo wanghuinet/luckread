@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-import { canTransitionContentState, ContentRuntimeError, createContent, createRequestId, decodeContentListCursor, decodeCursor, encodeContentListCursor, encodeCursor, isState, listContents, publishDueScheduledContent, toErrorResponse, transitionContentState, updateContent, validateInput, validateListFilters } from './content-runtime.js'
+import { canTransitionContentState, ContentRuntimeError, createContent, createRequestId, decodeContentListCursor, decodeCursor, decodeScopedCursor, encodeContentListCursor, encodeCursor, encodeScopedCursor, isState, listContents, listCreatorContents, publishDueScheduledContent, toErrorResponse, transitionContentState, updateContent, validateInput, validateListFilters } from './content-runtime.js'
 import w03Worker, { hasCreatorContentPermission, parseListLimit } from './index.js'
 
 describe('W03 content contract core', () => {
@@ -65,6 +65,59 @@ describe('W03 content contract core', () => {
     })()
     expect(mismatchedCreator).toMatchObject({ code: 'INVALID_CURSOR' })
     expect(mismatchedType).toMatchObject({ code: 'INVALID_CURSOR' })
+  })
+
+  it('binds creator content pagination to owner and active filters', async () => {
+    const row = {
+      id: 'content_video_123',
+      content_type: 'video',
+      owner_user_id: 'user_123',
+      creator_id: 'user_123',
+      ip_id: null,
+      state: 'DRAFT',
+      scheduled_at: null,
+      version: 1,
+      revision: 1,
+      slug: 'video-123',
+      title: 'Draft video',
+      body_ref: 'https://cdn.example.com/body.txt',
+      media_refs_json: '[]',
+      cover_ref: null,
+      etag: 'W/"1"',
+      created_at: '2026-10-02T12:00:00.000Z',
+      updated_at: '2026-10-02T12:01:00.000Z',
+    }
+    const prepare = vi.fn(() => ({
+      bind: () => ({ all: async () => ({ results: [row, { ...row, id: 'content_video_124' }] }) }),
+    }))
+    const db = { prepare } as never
+    const first = await listCreatorContents(db, 'user_123', null, 1, {
+      status: 'DRAFT',
+      contentType: 'video',
+    })
+    expect(first.hasMore).toBe(true)
+    expect(first.nextCursor).toEqual(expect.any(String))
+    expect(() => decodeScopedCursor(
+      first.nextCursor!,
+      JSON.stringify({ type: 'creator-contents', ownerUserId: 'user_123', status: 'DRAFT', contentType: 'article' }),
+    )).toThrow(expect.objectContaining({ code: 'INVALID_CURSOR' }))
+    await expect(listCreatorContents(db, 'user_123', first.nextCursor, 1, {
+      status: 'DRAFT',
+      contentType: 'article',
+    })).rejects.toMatchObject({ code: 'INVALID_CURSOR', status: 400 })
+    await expect(listCreatorContents(db, 'user_999', first.nextCursor, 1, {
+      status: 'DRAFT',
+      contentType: 'video',
+    })).rejects.toMatchObject({ code: 'INVALID_CURSOR', status: 400 })
+    expect(prepare).toHaveBeenCalledTimes(1)
+    const direct = encodeScopedCursor('2026-10-02T12:00:00.000Z', 'content_123', 'scope-a')
+    expect(decodeScopedCursor(direct, 'scope-a')).toEqual({
+      updatedAt: '2026-10-02T12:00:00.000Z',
+      id: 'content_123',
+    })
+    expect(() => decodeScopedCursor(direct, 'scope-b')).toThrow(
+      expect.objectContaining({ code: 'INVALID_CURSOR' }),
+    )
   })
 
   it('rejects update requests that change the immutable content type', async () => {
