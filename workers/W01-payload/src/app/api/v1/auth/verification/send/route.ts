@@ -2,8 +2,8 @@ import {
   enforceAuthRateLimit,
   TrafficLimitError,
   rateLimitResponse,
-} from '../../../../auth/traffic-limit.js'
-import { proxyBetterAuth } from '../../../../auth/w02-session-client.js'
+} from '../../../../../../auth/traffic-limit.js'
+import { proxyBetterAuth } from '../../../../../../auth/w02-session-client.js'
 
 const errorResponse = (status: number, code: string, message: string) =>
   Response.json({
