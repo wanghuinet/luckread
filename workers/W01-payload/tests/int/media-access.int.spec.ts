@@ -171,7 +171,7 @@ describe('Media upload access', () => {
     expect(route).toContain("sort: '-createdAt'")
     expect(route).toContain('Math.min(Math.max(requestedLimit, 1), 50)')
     expect(route).toContain('overrideAccess: true')
-    expect(route).toContain("status: 401")
+    expect(route).toContain("apiErrorResponse(401, 'UNAUTHENTICATED'")
     expect(route).toContain("status: 503")
     expect(route).not.toContain('D1Database')
     expect(route).not.toContain('R2Bucket')
@@ -227,8 +227,8 @@ it('guards media creation before the Payload upload handler', () => {
 it('guards media update and delete before the Payload handlers', () => {
   const route = read('src/app/api/v1/media/[mediaId]/route.ts')
   expect(route).toContain('await enforceW01WriteRateLimit(request)')
-  expect(route).toContain('return payloadMediaDelete')
-  expect(route).toContain('return payloadMediaPatch')
+  expect(route).toContain('await payloadMediaDelete(')
+  expect(route).toContain('await payloadMediaPatch(')
   const guards = [...route.matchAll(/await enforceW01WriteRateLimit\(request\)/g)]
   expect(guards.length).toBe(2)
 })
