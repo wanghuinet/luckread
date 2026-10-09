@@ -187,6 +187,8 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
   if (
     identityType !== 'email' ||
     typeof identity !== 'string' || identity.trim().length === 0 ||
+    identity.trim().length > 254 ||
+    !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(identity.trim()) ||
     typeof credential !== 'string' || credential.length === 0 ||
     typeof username !== 'string' || username.trim().length === 0 || username.length > 128 ||
     consent.purpose !== SCOPE ||
@@ -345,6 +347,24 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
   try { authPayload = await authResponse.json() } catch {}
   if (!authResponse.ok) {
     await releaseReservation()
+    const upstreamError = isRecord(authPayload) && isRecord(authPayload.error)
+      ? authPayload.error
+      : isRecord(authPayload) ? authPayload : {}
+    const rawCode = typeof upstreamError.code === 'string' ? upstreamError.code : ''
+    const upstreamCode = /^[A-Z0-9_]{1,80}$/.test(rawCode) ? rawCode : 'UNKNOWN'
+    console.warn(JSON.stringify({
+      event: 'auth.register.upstream_rejection',
+      diagnosticCode: 'AUTH001_UPSTREAM_REJECTION',
+      cfRay: request.headers.get('cf-ray') ?? null,
+      upstreamStatus: authResponse.status,
+      upstreamCode,
+    }))
+    if (upstreamCode === 'PASSWORD_TOO_SHORT') {
+      return errorResponse(422, 'PASSWORD_TOO_SHORT', '密码长度必须为 15–128 位')
+    }
+    if (authResponse.status === 403 || upstreamCode === 'INVALID_ORIGIN') {
+      return errorResponse(403, 'INVALID_ORIGIN', '当前访问来源未获授权')
+    }
     return errorResponse(
       authResponse.status >= 500 ? 503 : 422,
       authResponse.status >= 500 ? 'SERVICE_UNAVAILABLE' : 'VALIDATION_FAILED',
@@ -360,6 +380,43 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
   if (!userId) {
     await releaseReservation()
     return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Registration identity is unavailable')
+  }
+
+  // Better Auth intentionally returns a synthetic user for duplicate-email
+  // sign-up when email verification is required. Never treat an ID in that
+  // response as proof that W02 persisted a real identity.
+  let persistedIdentity: { id: string; email: string; username: string | null } | null = null
+  try {
+    // Start the read-after-write verification at D1 primary. This remains
+    // correct even if read replication is enabled for this database.
+    const identityReadSession = env.D1.withSession('first-primary')
+    persistedIdentity = await identityReadSession
+      .prepare('SELECT id, email, username FROM "user" WHERE id = ? LIMIT 1')
+      .bind(userId)
+      .first<{ id: string; email: string; username: string | null }>()
+  } catch (error) {
+    await releaseReservation()
+    console.error(JSON.stringify({
+      event: 'auth.register.identity_confirmation_failure',
+      diagnosticCode: 'AUTH001_IDENTITY_CONFIRMATION_FAILURE',
+      cfRay: request.headers.get('cf-ray') ?? null,
+      errorName: error instanceof Error ? error.name : typeof error,
+    }))
+    return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Registration service unavailable')
+  }
+
+  if (
+    !persistedIdentity ||
+    persistedIdentity.email.trim().toLowerCase() !== normalized.identity ||
+    String(persistedIdentity.username ?? '').trim() !== normalized.username
+  ) {
+    await releaseReservation()
+    console.warn(JSON.stringify({
+      event: 'auth.register.identity_not_persisted',
+      diagnosticCode: 'AUTH001_IDENTITY_NOT_PERSISTED',
+      cfRay: request.headers.get('cf-ray') ?? null,
+    }))
+    return errorResponse(422, 'VALIDATION_FAILED', 'Registration could not be completed')
   }
 
   try {

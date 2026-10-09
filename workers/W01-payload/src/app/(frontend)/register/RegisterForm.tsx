@@ -71,6 +71,18 @@ export default function RegisterForm({ policyVersion }: RegisterFormProps) {
       return
     }
 
+    if (normalizedEmail.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      setStatus('error')
+      setMessage('请输入有效的邮箱地址。')
+      return
+    }
+
+    if (password.length < 15 || password.length > 128) {
+      setStatus('error')
+      setMessage('密码长度必须为 15–128 位。')
+      return
+    }
+
     if (password !== confirmPassword) {
       setStatus('error')
       setMessage('两次输入的密码不一致。')
@@ -254,12 +266,17 @@ export default function RegisterForm({ policyVersion }: RegisterFormProps) {
                   <input
                     autoComplete="new-password"
                     name="password"
+                    minLength={15}
+                    maxLength={128}
+                    required
                     onChange={(event) => setPassword(event.target.value)}
-                    placeholder="请输入登录密码"
+                    placeholder="请输入 15–128 位密码"
                     type="password"
                     value={password}
                     aria-label="设置密码"
+                    aria-describedby="register-password-hint"
                   />
+                  <small id="register-password-hint">密码长度为 15–128 位。</small>
                 </label>
 
                 <label className="registerField">
