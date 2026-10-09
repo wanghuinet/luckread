@@ -56,6 +56,37 @@ describe('W01 Better Auth boundary', () => {
     expect(denyIndex).toBeLessThan(upstreamIndex)
   })
 
+  it('connects email verification delivery and activation in canonical W02', () => {
+    const authConfig = readFileSync(
+      resolve(process.cwd(), '../W02-identity/src/auth/better-auth.ts'),
+      'utf8',
+    )
+    expect(authConfig).toContain("baseURL: 'https://luckread.com'")
+    expect(authConfig).toContain('requireEmailVerification: true')
+    expect(authConfig).toContain('sendVerificationEmail: async ({ user, url })')
+    expect(authConfig).toContain("applyAccountStateTransition(db, {")
+    expect(authConfig).toContain("if (user.emailVerified !== true) return")
+    expect(authConfig).toContain("to: 'ACTIVE'")
+    expect(authConfig).toContain("reason: 'email verification completed'")
+  })
+
+  it('keeps registration email verification on the post-commit W01 path', () => {
+    const registerForm = readFileSync(
+      resolve(process.cwd(), 'src/app/(frontend)/register/RegisterForm.tsx'),
+      'utf8',
+    )
+    const verificationRoute = readFileSync(
+      resolve(process.cwd(), 'src/app/api/v1/auth/verification/send/route.ts'),
+      'utf8',
+    )
+    expect(registerForm).toContain("'/api/v1/auth/verification/send'")
+    expect(registerForm).toContain('await sendVerificationEmail(normalizedEmail)')
+    expect(registerForm).toContain('发送/重试验证邮件')
+    expect(verificationRoute).toContain("'/send-verification-email'")
+    expect(verificationRoute).toContain("callbackURL: 'https://luckread.com/login?verified=1'")
+    expect(verificationRoute).toContain("!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(identity.trim())")
+  })
+
   it('proxies login credentials to W02 and does not require legacy device/session material', async () => {
     const upstream = new Response(JSON.stringify({ user: { id: 'u1' } }), {
       status: 200,
