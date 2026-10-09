@@ -8,7 +8,7 @@ import { invalidatePublicFollowListsForUsers } from '../../../../../../lib/publi
 const errorResponse = (status: number, code: string, message: string) =>
   Response.json(
     { error: { code, message, details: {} }, requestId: `req_${crypto.randomUUID()}` },
-    { status, headers: { 'cache-control': 'no-store' } },
+    { status: code === 'VALIDATION_FAILED' && status === 400 ? 422 : status, headers: { 'cache-control': 'no-store' } },
   )
 
 export async function DELETE(
