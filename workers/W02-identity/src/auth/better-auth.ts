@@ -73,6 +73,14 @@ export const createLuckReadAuth = (env: BetterAuthEnv) => {
       },
     },
     user: {
+      // The authoritative D1-01 identity schema uses snake_case physical
+      // columns. Keep Better Auth's logical API fields while mapping storage
+      // explicitly to the admitted migration.
+      fields: {
+        emailVerified: 'email_verified',
+        createdAt: 'created_at',
+        updatedAt: 'updated_at',
+      },
       additionalFields: {
         username: {
           type: 'string',
@@ -114,7 +122,36 @@ export const createLuckReadAuth = (env: BetterAuthEnv) => {
         },
       },
     },
+    account: {
+      fields: {
+        accountId: 'account_id',
+        providerId: 'provider_id',
+        userId: 'user_id',
+        accessToken: 'access_token',
+        refreshToken: 'refresh_token',
+        idToken: 'id_token',
+        accessTokenExpiresAt: 'access_token_expires_at',
+        refreshTokenExpiresAt: 'refresh_token_expires_at',
+        createdAt: 'created_at',
+        updatedAt: 'updated_at',
+      },
+    },
+    verification: {
+      fields: {
+        expiresAt: 'expires_at',
+        createdAt: 'created_at',
+        updatedAt: 'updated_at',
+      },
+    },
     session: {
+      fields: {
+        userId: 'user_id',
+        expiresAt: 'expires_at',
+        ipAddress: 'ip_address',
+        userAgent: 'user_agent',
+        createdAt: 'created_at',
+        updatedAt: 'updated_at',
+      },
       expiresIn: 60 * 60 * 24 * 7,
       updateAge: 60 * 60 * 24,
       modelName: 'session',
