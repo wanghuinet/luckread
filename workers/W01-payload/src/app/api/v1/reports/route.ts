@@ -56,7 +56,7 @@ export async function POST(request: Request): Promise<Response> {
     }
 
     const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
-    if (!idempotencyKey) {
+    if (!idempotencyKey || idempotencyKey.length > 256) {
       return errorResponse(428, 'PRECONDITION_REQUIRED', 'Idempotency-Key is required')
     }
 
@@ -69,7 +69,7 @@ export async function POST(request: Request): Promise<Response> {
           const clientError = error as { status: number; code: string; message: string }
           return errorResponse(
             clientError.status,
-            clientError.code === 'NOT_FOUND' ? 'RESOURCE_NOT_FOUND' : clientError.code,
+            clientError.code === 'NOT_FOUND' ? 'NOT_FOUND' : clientError.code,
             clientError.message,
           )
         }
@@ -85,11 +85,11 @@ export async function POST(request: Request): Promise<Response> {
         principal,
       })
       if (!targetResponse.ok) {
-        return errorResponse(targetResponse.status === 404 ? 404 : 503, targetResponse.status === 404 ? 'RESOURCE_NOT_FOUND' : 'SERVICE_UNAVAILABLE', targetResponse.status === 404 ? 'Reported content not found' : 'Content service unavailable')
+        return errorResponse(targetResponse.status === 404 ? 404 : 503, targetResponse.status === 404 ? 'NOT_FOUND' : 'SERVICE_UNAVAILABLE', targetResponse.status === 404 ? 'Reported content not found' : 'Content service unavailable')
       }
       const targetData = await targetResponse.json().catch((): null => null) as { id?: string; state?: string } | null
       if (targetData?.id !== targetId || targetData.state !== 'PUBLISHED') {
-        return errorResponse(404, 'RESOURCE_NOT_FOUND', 'Reported content not found')
+        return errorResponse(404, 'NOT_FOUND', 'Reported content not found')
       }
     }
 
