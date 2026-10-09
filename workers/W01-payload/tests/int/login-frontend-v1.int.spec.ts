@@ -9,7 +9,10 @@ describe('login frontend', () => {
       'utf8',
     )
 
-    expect(page).toContain("fetchJson<{ error?: { message?: string } }>('/api/v1/auth/login'")
+    expect(page).toContain("fetchJson<ApiError | null>('/api/v1/auth/login'")
+    expect(page).toContain("errorCode === 'EMAIL_NOT_VERIFIED'")
+    expect(page).toContain("'/api/v1/auth/verification/send'")
+    expect(page).toContain("get('verified') === '1'")
     expect(page).not.toContain("fetch('/auth/login'")
     expect(page).not.toContain('deviceId')
     expect(page).toContain("credentials: 'include'")
