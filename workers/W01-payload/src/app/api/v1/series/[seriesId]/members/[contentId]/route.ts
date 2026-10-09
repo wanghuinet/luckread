@@ -36,7 +36,7 @@ export async function PATCH(
       principal,
     })
   } catch (error) {
-    if (error instanceof SyntaxError) return errorResponse(400, 'VALIDATION_FAILED', 'Invalid series ordering request')
+    if (error instanceof SyntaxError) return errorResponse(422, 'VALIDATION_FAILED', 'Invalid series ordering request')
     if (error instanceof W03ContentClientError) return errorResponse(error.status, error.code, 'Content service unavailable')
     return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Content service unavailable')
   }
