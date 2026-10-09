@@ -500,7 +500,8 @@ export async function listContentRevisions(
   assertResourceId(principalUserId)
   assertResourceId(contentId)
   const pageSize = revisionPageSize(limit)
-  const decoded = cursor ? decodeCursor(cursor) : null
+  const cursorScope = JSON.stringify({ type: 'content-revisions', principalUserId, contentId })
+  const decoded = cursor ? decodeScopedCursor(cursor, cursorScope) : null
   const cursorClause = decoded ? 'AND (r.created_at < ? OR (r.created_at = ? AND r.id < ?))' : ''
   const cursorBindings = decoded ? [decoded.updatedAt, decoded.updatedAt, decoded.id] : []
   const rows = await db.prepare(`
@@ -515,7 +516,7 @@ export async function listContentRevisions(
   const hasMore = rows.results.length > pageSize
   const page = rows.results.slice(0, pageSize).map(toRevision)
   const last = page.at(-1)
-  return { items: page, hasMore, nextCursor: hasMore && last ? encodeCursor(last.createdAt, last.id) : null }
+  return { items: page, hasMore, nextCursor: hasMore && last ? encodeScopedCursor(last.createdAt, last.id, cursorScope) : null }
 }
 
 export async function getContentRevision(
@@ -563,7 +564,13 @@ export async function listCreatorContents(
 ): Promise<{ items: ContentRecord[]; nextCursor: string | null; hasMore: boolean }> {
   assertResourceId(ownerUserId)
   const pageSize = Math.min(Math.max(Number.isSafeInteger(limit) ? limit : 20, 1), 50)
-  const decoded = cursor ? decodeCursor(cursor) : null
+  const cursorScope = JSON.stringify({
+    type: 'creator-contents',
+    ownerUserId,
+    status: filters.status ?? null,
+    contentType: filters.contentType ?? null,
+  })
+  const decoded = cursor ? decodeScopedCursor(cursor, cursorScope) : null
   const conditions = ['owner_user_id = ?']
   const bindings: unknown[] = [ownerUserId]
   if (filters.status) {
@@ -593,7 +600,7 @@ export async function listCreatorContents(
     items: page,
     hasMore,
     nextCursor: hasMore && last
-      ? encodeCursor(last.updatedAt, last.id)
+      ? encodeScopedCursor(last.updatedAt, last.id, cursorScope)
       : null,
   }
 }
@@ -1156,6 +1163,43 @@ export function decodeCursor(value: string): { updatedAt: string; id: string } {
     if (typeof decoded.updatedAt !== 'string' || typeof decoded.id !== 'string') throw new Error('INVALID')
     assertResourceId(decoded.id)
     if (!Number.isFinite(Date.parse(decoded.updatedAt))) throw new Error('INVALID')
+    return { updatedAt: decoded.updatedAt, id: decoded.id }
+  } catch {
+    throw new ContentRuntimeError('INVALID_CURSOR', 400)
+  }
+}
+
+export function encodeScopedCursor(updatedAt: string, id: string, scope: string): string {
+  const raw = JSON.stringify({ version: 1, scope, updatedAt, id })
+  const bytes = new TextEncoder().encode(raw)
+  let binary = ''
+  for (const byte of bytes) binary += String.fromCharCode(byte)
+  return btoa(binary).replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '')
+}
+
+export function decodeScopedCursor(
+  value: string,
+  scope: string,
+): { updatedAt: string; id: string } {
+  try {
+    if (!value || value.length > 2048 || !/^[A-Za-z0-9_-]+$/.test(value)) throw new Error('INVALID')
+    const normalized = value.replaceAll('-', '+').replaceAll('_', '/')
+    const padded = normalized + '='.repeat((4 - normalized.length % 4) % 4)
+    const bytes = Uint8Array.from(atob(padded), char => char.charCodeAt(0))
+    const decoded = JSON.parse(new TextDecoder().decode(bytes)) as {
+      version?: unknown
+      scope?: unknown
+      updatedAt?: unknown
+      id?: unknown
+    }
+    if (
+      decoded.version !== 1 ||
+      decoded.scope !== scope ||
+      typeof decoded.updatedAt !== 'string' ||
+      !Number.isFinite(Date.parse(decoded.updatedAt)) ||
+      typeof decoded.id !== 'string' ||
+      !/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(decoded.id)
+    ) throw new Error('INVALID')
     return { updatedAt: decoded.updatedAt, id: decoded.id }
   } catch {
     throw new ContentRuntimeError('INVALID_CURSOR', 400)
