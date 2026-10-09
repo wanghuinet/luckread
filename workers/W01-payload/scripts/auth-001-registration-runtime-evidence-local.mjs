@@ -13,7 +13,13 @@ if (policy.policyVersion !== 'DEV-2026-09-28.1') throw new Error('Unexpected dev
 const escapeSql = (value) => "'" + String(value).replaceAll("'", "''") + "'"
 const renderSql = (sql, args) => { let index = 0; return sql.replaceAll('?', () => escapeSql(args[index++])) }
 const d1Json = (command) => {
-  const output = execFileSync('pnpm', ['exec', 'wrangler', 'd1', 'execute', 'luckread', '--local', '--json', '--config', 'wrangler.jsonc', '--command', command], { encoding: 'utf8', cwd: process.cwd(), env: process.env, maxBuffer: 8 * 1024 * 1024 })
+  const persistPath = process.env.AUTH001_LOCAL_D1_STATE?.trim()
+  const args = [
+    'exec', 'wrangler', 'd1', 'execute', 'luckread', '--local',
+    ...(persistPath ? ['--persist-to', persistPath] : []),
+    '--json', '--config', 'wrangler.jsonc', '--command', command,
+  ]
+  const output = execFileSync('pnpm', args, { encoding: 'utf8', cwd: process.cwd(), env: process.env, maxBuffer: 8 * 1024 * 1024 })
   return JSON.parse(output)
 }
 const d1Rows = (command) => {
