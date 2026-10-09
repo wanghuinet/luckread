@@ -172,7 +172,7 @@ describe('Media upload access', () => {
     expect(route).toContain('Math.min(Math.max(requestedLimit, 1), 50)')
     expect(route).toContain('overrideAccess: true')
     expect(route).toContain("apiErrorResponse(401, 'UNAUTHENTICATED'")
-    expect(route).toContain("status: 503")
+    expect(route).toContain("apiErrorResponse(503, 'SERVICE_UNAVAILABLE', 'Media service unavailable')")
     expect(route).not.toContain('D1Database')
     expect(route).not.toContain('R2Bucket')
   })
