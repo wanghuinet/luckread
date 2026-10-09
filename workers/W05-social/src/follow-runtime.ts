@@ -258,7 +258,7 @@ async function listFollowRelations(
 export async function follow(db: D1Database, followerUserId: string, targetUserId: string): Promise<FollowRow> {
   const follower = userId(followerUserId)
   const target = userId(targetUserId)
-  if (follower === target) throw new FollowRuntimeError('SELF_FOLLOW_NOT_ALLOWED', 409)
+  if (follower === target) throw new FollowRuntimeError('CONFLICT', 409)
 
   const state = await db.prepare(
     `SELECT
@@ -289,7 +289,7 @@ export async function follow(db: D1Database, followerUserId: string, targetUserI
   }>()
 
   if (Number(state?.blocked ?? 0) === 1) {
-    throw new FollowRuntimeError('RELATIONSHIP_BLOCKED', 409)
+    throw new FollowRuntimeError('CONFLICT', 409)
   }
 
   if (
@@ -336,14 +336,14 @@ export async function follow(db: D1Database, followerUserId: string, targetUserI
     follower,
   ).first<FollowRow>()
 
-  if (!row) throw new FollowRuntimeError('RELATIONSHIP_BLOCKED', 409)
+  if (!row) throw new FollowRuntimeError('CONFLICT', 409)
   await invalidateFollowListCountCache(follower, target)
   return row
 }
 
 export async function unfollow(db: D1Database, followerUserId: string, targetUserId: string): Promise<void> {
   const follower=userId(followerUserId), target=userId(targetUserId)
-  if (follower===target) throw new FollowRuntimeError('SELF_FOLLOW_NOT_ALLOWED',409)
+  if (follower===target) throw new FollowRuntimeError('CONFLICT',409)
   await db.prepare('DELETE FROM social_follow_relationships WHERE follower_user_id = ? AND target_user_id = ?').bind(follower,target).run()
   await invalidateFollowListCountCache(follower, target)
 }
