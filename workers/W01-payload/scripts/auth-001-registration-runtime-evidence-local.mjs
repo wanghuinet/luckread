@@ -82,7 +82,7 @@ let triggerName = 'auth001_evidence_fail_' + suffix
 
 if (process.argv.includes('--seed-in-progress')) {
   const createdAt = new Date().toISOString()
-  const expiresAt = new Date(Date.now() + IDEMPOTENCY_TTL_MS).toISOString()
+  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
   runSql(
     `INSERT INTO auth_registration_envelopes (
       id, idempotency_key, active_key, scope, endpoint, payload_hash, state,
