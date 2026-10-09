@@ -27,4 +27,19 @@ describe('AUTH-001 registration idempotency ordering', () => {
     expect(source).toContain("event: 'auth.register.profile_projection_failure'")
     expect(source).toContain("return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Registration service unavailable')")
   })
+
+  it('confirms that W02 returned a persisted identity before creating the Payload profile', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), 'src/app/auth/register/route.ts'),
+      'utf8',
+    )
+
+    const identityLookup = source.indexOf('SELECT id, email, username FROM "user" WHERE id = ? LIMIT 1')
+    const projectionWrite = source.indexOf('await payload.create({')
+    expect(identityLookup).toBeGreaterThanOrEqual(0)
+    expect(projectionWrite).toBeGreaterThanOrEqual(0)
+    expect(identityLookup).toBeLessThan(projectionWrite)
+    expect(source).toContain("event: 'auth.register.identity_not_persisted'")
+    expect(source).toContain("return errorResponse(422, 'VALIDATION_FAILED', 'Registration could not be completed')")
+  })
 })
