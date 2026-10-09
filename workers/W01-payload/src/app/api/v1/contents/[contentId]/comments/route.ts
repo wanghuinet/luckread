@@ -13,8 +13,8 @@ import { invalidatePublicContentComments } from '../../../../../../lib/public-re
 
 const errorResponse = (status: number, code: string, message: string) =>
   Response.json(
-    { error: { code, message, details: {} }, requestId: crypto.randomUUID() },
-    { status, headers: { 'cache-control': 'no-store' } },
+    { error: { code, message, details: {} }, requestId: `req_${crypto.randomUUID()}` },
+    { status: code === 'VALIDATION_FAILED' && status === 400 ? 422 : status, headers: { 'cache-control': 'no-store' } },
   )
 
 const resolveContentId = async (
