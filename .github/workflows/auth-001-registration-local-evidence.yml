@@ -105,7 +105,7 @@ jobs:
       - name: Force W01 D1 binding local for registration evidence
         run: |
           set -euo pipefail
-          node --input-type=module -e "import fs from 'node:fs'; const p='workers/W01-payload/wrangler.jsonc'; const s=fs.readFileSync(p,'utf8'); const matches=s.match(/\\"remote\\": true/g) || []; if(matches.length !== 1) throw new Error('Expected exactly one W01 remote D1 flag, found '+matches.length); fs.writeFileSync(p,s.replace('\\\"remote\\": true','\\\"remote\\": false'))"
+          node --input-type=module -e 'import fs from "node:fs"; const p="workers/W01-payload/wrangler.jsonc"; const s=fs.readFileSync(p,"utf8"); const marker="\\\"remote\\": true"; const count=s.split(marker).length-1; if(count!==1) throw new Error("Expected exactly one W01 remote D1 flag, found "+count); fs.writeFileSync(p,s.replace(marker,"\\\"remote\\": false"));'
 
       - name: Apply exact W01 local migrations
         working-directory: workers/W01-payload
