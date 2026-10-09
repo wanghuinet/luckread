@@ -345,6 +345,20 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
   try { authPayload = await authResponse.json() } catch {}
   if (!authResponse.ok) {
     await releaseReservation()
+    const upstreamError = isRecord(authPayload) && isRecord(authPayload.error)
+      ? authPayload.error
+      : isRecord(authPayload) ? authPayload : {}
+    const rawCode = typeof upstreamError.code === 'string' ? upstreamError.code : ''
+    const upstreamCode = /^[A-Z0-9_]{1,80}$/.test(rawCode) ? rawCode : 'UNKNOWN'
+    console.warn(JSON.stringify({
+      event: 'auth.register.upstream_rejection',
+      diagnosticCode: 'AUTH001_UPSTREAM_REJECTION',
+      upstreamStatus: authResponse.status,
+      upstreamCode,
+    }))
+    if (upstreamCode === 'PASSWORD_TOO_SHORT') {
+      return errorResponse(422, 'PASSWORD_TOO_SHORT', '密码长度必须为 15–128 位')
+    }
     return errorResponse(
       authResponse.status >= 500 ? 503 : 422,
       authResponse.status >= 500 ? 'SERVICE_UNAVAILABLE' : 'VALIDATION_FAILED',
