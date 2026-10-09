@@ -161,6 +161,28 @@ export default function CreatorContentList({ loginPath = '/admin/login' }: { log
     return data as { version?: unknown }
   }
 
+  async function syncPublishedSocialMetadata(itemId: string): Promise<void> {
+    const { response, data } = await fetchJson<{ error?: { message?: string } }>(
+      '/api/v1/contents/' + encodeURIComponent(itemId) + '/social',
+      {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          accept: 'application/json',
+          'content-type': 'application/json',
+          'Idempotency-Key': 'content-social-sync:' + itemId + ':' + crypto.randomUUID(),
+        },
+        body: '{}',
+      },
+    )
+    if (response.status === 401) {
+      const returnTo = window.location.pathname + window.location.search + window.location.hash
+      window.location.assign(loginPath + '?returnTo=' + encodeURIComponent(returnTo))
+      throw new Error('AUTH_REQUIRED')
+    }
+    if (!response.ok) throw new Error(getApiErrorMessage(data, '内容社交元数据同步失败'))
+  }
+
   function defaultScheduleInputValue(): string {
     const next = new Date(Date.now() + 60 * 60 * 1000)
     next.setSeconds(0, 0)
@@ -213,7 +235,17 @@ export default function CreatorContentList({ loginPath = '/admin/login' }: { log
     setError('')
     try {
       await requestTransition(item.id, to, item.version)
+      let socialSyncFailed = false
+      if (to === 'PUBLISHED') {
+        try {
+          await syncPublishedSocialMetadata(item.id)
+        } catch (cause) {
+          if (cause instanceof Error && cause.message === 'AUTH_REQUIRED') throw cause
+          socialSyncFailed = true
+        }
+      }
       await load()
+      if (socialSyncFailed) setError('内容已发布，但社交元数据同步失败；再次发布或打开内容后可重试。')
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : `${verb}失败`)
     } finally {

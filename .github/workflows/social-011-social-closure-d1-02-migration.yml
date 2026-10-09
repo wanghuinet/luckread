@@ -1,0 +1,108 @@
+name: SOCIAL-011 Social Closure D1-02 Migration
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Exact 40-character source SHA containing the SOCIAL-011 migration
+        required: true
+        type: string
+      confirm:
+        description: Type APPLY_SOCIAL_011_MIGRATION to permit remote D1 mutation
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  WRANGLER_VERSION: 4.116.0
+  EXPECTED_DB_ID: 6c342634-97f6-4248-9f4a-85772af4f22c
+  EXPECTED_DB_NAME: luckreadpro
+  EXPECTED_WORKER: luckread-w05
+  EXPECTED_BINDING: DB
+
+jobs:
+  migrate:
+    if: ${{ inputs.confirm == 'APPLY_SOCIAL_011_MIGRATION' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Validate source SHA
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: printf '%s' "$SOURCE_SHA" | grep -Eq '^[0-9a-f]{40}$'
+
+      - name: Checkout exact source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha }}
+          fetch-depth: 1
+
+      - name: Verify exact source SHA
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Verify W05 binding and migration source
+        run: |
+          python - <<'PY'
+          import json
+          import sqlite3
+          from pathlib import Path
+          config = json.loads(Path('workers/W05-social/wrangler.jsonc').read_text())
+          assert config['name'] == 'luckread-w05'
+          bindings = config.get('d1_databases', [])
+          assert len(bindings) == 1
+          assert bindings[0]['binding'] == 'DB'
+          assert bindings[0]['database_id'] == '6c342634-97f6-4248-9f4a-85772af4f22c'
+          assert bindings[0]['database_name'] == 'luckreadpro'
+          migration = Path('workers/W05-social/migrations/20261008_011_social_closure_v1.sql')
+          assert migration.is_file()
+          db = sqlite3.connect(':memory:')
+          db.executescript(Path('workers/W05-social/migrations/20261002_002_social_003_like_v1.sql').read_text())
+          db.executescript(Path('workers/W05-social/migrations/20261002_005_social_005_comment_likes_v1.sql').read_text())
+          db.executescript(migration.read_text())
+          like_sql = db.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='interaction_likes'").fetchone()[0]
+          assert "target_type IN ('content','comment')" in like_sql
+          for table in ['social_topics','social_target_topics','social_mentions','social_notifications','social_notification_preferences']:
+              assert db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (table,)).fetchone()
+          print('SOCIAL_011_SOURCE_AND_STATIC=PASS')
+          PY
+
+      - name: Install W01 test dependencies from committed lockfile
+        working-directory: workers/W01-payload
+        run: |
+          corepack enable
+          pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Run social closure tests
+        working-directory: workers/W01-payload
+        run: pnpm exec vitest run --config ./vitest.config.mts ../../workers/W05-social/src/social-closure-runtime.test.ts tests/int/social-closure-v1-adapter.int.spec.ts
+
+      - name: Apply SOCIAL-011 Social Closure migration remotely
+        working-directory: workers/W05-social
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx --yes "wrangler@$WRANGLER_VERSION" d1 migrations apply "$EXPECTED_DB_NAME" --remote --config wrangler.jsonc
+
+      - name: Verify remote social closure schema
+        working-directory: workers/W05-social
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$EXPECTED_DB_NAME" --remote --json --config wrangler.jsonc --command 'SELECT name, sql FROM sqlite_master WHERE type = "table" AND name IN ("interaction_likes","social_topics","social_mentions","social_notifications","social_notification_preferences") ORDER BY name;' > /tmp/social-011-schema.json
+          python - <<'PY'
+          import json
+          data = json.load(open('/tmp/social-011-schema.json'))
+          rows = [row for item in data for row in item.get('results', [])] if isinstance(data, list) else data.get('results', [])
+          print('SOCIAL_011_REMOTE_SCHEMA_RESULT_ROWS=' + str(len(rows)))
+          PY

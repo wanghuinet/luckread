@@ -7,6 +7,7 @@ import {
   resolveCookieContentPrincipal,
   type ContentPrincipal,
 } from '../content/w03-content-client.js'
+import { extractSocialTokens } from './social-token-parser.js'
 
 type W05SocialService = {
   fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response>
@@ -39,6 +40,36 @@ export async function resolveOptionalCookieSocialPrincipal(
   const principal = await resolveCookieSocialPrincipal(request)
   if (principal instanceof Response && principal.status === 401) return null
   return principal
+}
+
+
+export type ResolvedSocialMention = { userId: string; handle: string }
+
+export async function resolveSocialMentionTargets(body: string): Promise<ResolvedSocialMention[]> {
+  const unique = Array.from(new Set(
+    extractSocialTokens(body)
+      .filter((token) => token.kind === 'mention')
+      .map((token) => token.normalized),
+  )).slice(0, 20)
+  if (!unique.length) return []
+
+  const payload = await getPayload({ config })
+  const result = await payload.find({
+    collection: 'users',
+    where: { username: { in: unique } },
+    depth: 0,
+    limit: unique.length,
+    overrideAccess: true,
+    select: { id: true, username: true } as any,
+  })
+
+  return result.docs
+    .map((user) => {
+      const username = typeof user.username === 'string' ? user.username.trim() : ''
+      if (!username) return null
+      return { userId: String(user.id), handle: username }
+    })
+    .filter((value): value is ResolvedSocialMention => Boolean(value))
 }
 
 export async function assertSocialTargetUserExists(targetUserId: string): Promise<void> {
