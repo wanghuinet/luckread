@@ -91,7 +91,7 @@ jobs:
 
       - name: Install W02 dependencies
         working-directory: workers/W02-identity
-        run: pnpm install --frozen-lockfile
+        run: npm install --ignore-scripts --no-audit --no-fund
 
       - name: Apply exact W02 Better Auth migrations
         working-directory: workers/W02-identity
