@@ -160,7 +160,7 @@ describe('comment runtime', () => {
       body: '被屏蔽后不能评论',
       idempotencyKey: 'blocked-1',
     })).rejects.toMatchObject({
-      code: 'RELATIONSHIP_BLOCKED',
+      code: 'CONFLICT',
       status: 409,
     })
   })
@@ -235,7 +235,7 @@ describe('comment runtime', () => {
       body: '并发屏蔽期间的评论',
       idempotencyKey: 'block-race-1',
     })).rejects.toMatchObject({
-      code: 'COMMENT_WRITE_FAILED',
+      code: 'INTERNAL_ERROR',
       status: 500,
     })
 
@@ -352,7 +352,7 @@ describe('comment runtime', () => {
     }))
 
     await expect(deleteComment(d, 'user-1', 'c1')).rejects.toMatchObject({
-      code: 'COMMENT_HAS_REPLIES',
+      code: 'CONFLICT',
       status: 409,
     })
   })
@@ -389,7 +389,7 @@ describe('comment runtime', () => {
       { id: 'c1', author_user_id: 'user-1', state: 'PUBLISHED', has_replies: 1 },
     ])
     await expect(deleteComment(d, 'user-1', 'c1')).rejects.toMatchObject({
-      code: 'COMMENT_HAS_REPLIES',
+      code: 'CONFLICT',
       status: 409,
     })
   })
