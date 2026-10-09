@@ -19,7 +19,7 @@ export async function GET(
 ): Promise<Response> {
   try {
     const { shareId } = await context.params
-    if (!shareId?.trim()) return errorResponse(400, 'VALIDATION_FAILED', 'Invalid share id')
+    if (!shareId?.trim()) return errorResponse(422, 'VALIDATION_FAILED', 'Invalid share id')
     await enforcePublicReadRateLimit(request)
     if (hasAuthenticatedSessionCredential(request)) {
       return await callW05SocialPublic({
