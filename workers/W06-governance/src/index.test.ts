@@ -31,6 +31,17 @@ function createDb(success = true) {
   }
 }
 
+describe('W06 canonical API error mapping', () => {
+  it('preserves canonical codes before normalizing internal aliases', async () => {
+    const runtime = await import('./index')
+    expect(runtime.canonicalErrorCode('INVALID_STATE')).toBe('INVALID_STATE')
+    expect(runtime.canonicalErrorCode('INVALID_CURSOR')).toBe('INVALID_CURSOR')
+    expect(runtime.canonicalErrorCode('CURSOR_EXPIRED')).toBe('CURSOR_EXPIRED')
+    expect(runtime.canonicalErrorCode('REPORT_WRITE_FAILED')).toBe('INTERNAL_ERROR')
+    expect(runtime.canonicalErrorCode('INVALID_AUDIT_EVENT')).toBe('VALIDATION_FAILED')
+  })
+})
+
 describe('W06 runtime', () => {
   it('persists a canonical AUTH-013 account-state AuditEvent', async () => {
     const { db, prepare, bind, run } = createDb(true)
