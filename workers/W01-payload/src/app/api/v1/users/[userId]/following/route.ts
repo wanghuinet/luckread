@@ -19,7 +19,7 @@ export async function GET(
 ): Promise<Response> {
   try {
     const { userId } = await context.params
-    if (!userId.trim()) return errorResponse(400, 'VALIDATION_FAILED', 'Invalid user id')
+    if (!userId.trim()) return errorResponse(422, 'VALIDATION_FAILED', 'Invalid user id')
 
     const url = new URL(request.url)
     const query = new URLSearchParams()
