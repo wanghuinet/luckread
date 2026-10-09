@@ -22,9 +22,8 @@ const resolveCommentId = async (
 
 const requireIdempotencyKey = (request: Request): string | Response => {
   const key = request.headers.get('Idempotency-Key')?.trim() ?? ''
-  if (!key || key.length > 256) {
-    return errorResponse(428, 'PRECONDITION_REQUIRED', 'Idempotency-Key required')
-  }
+  if (!key) return errorResponse(428, 'PRECONDITION_REQUIRED', 'Idempotency-Key required')
+  if (key.length > 256) return errorResponse(422, 'VALIDATION_FAILED', 'Invalid Idempotency-Key header')
   return key
 }
 
