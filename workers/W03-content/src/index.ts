@@ -125,12 +125,15 @@ const requiredCreatorPrincipal = (request: Request): { userId: string; layer: st
 const requireIfMatch = (request: Request): string => {
   const value = request.headers.get('If-Match')?.trim() ?? ''
   if (!value) throw new ContentRuntimeError('PRECONDITION_REQUIRED', 428)
+  if (value.length > 256) throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+  if (value === '*') throw new ContentRuntimeError('PRECONDITION_FAILED', 412)
   return value
 }
 
 const requireIdempotency = (request: Request): string => {
   const value = request.headers.get('Idempotency-Key')?.trim() ?? ''
-  if (!value || value.length > 256) throw new ContentRuntimeError('PRECONDITION_REQUIRED', 428)
+  if (!value) throw new ContentRuntimeError('PRECONDITION_REQUIRED', 428)
+  if (value.length > 256) throw new ContentRuntimeError('VALIDATION_FAILED', 400)
   return value
 }
 
