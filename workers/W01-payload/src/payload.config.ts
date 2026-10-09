@@ -21,6 +21,7 @@ const isPayloadCLI = process.argv.some((value) => {
   return resolved !== undefined && resolved.endsWith(path.join('payload', 'bin.js'))
 })
 const isProduction = process.env.NODE_ENV === 'production'
+const localPersistPath = process.env.AUTH001_LOCAL_D1_STATE?.trim()
 // The migration workflow sets this only for the explicitly admitted baseline
 // migration. This makes the remote-D1 decision independent of package-manager
 // CLI argv/symlink shape while keeping next build/dev offline.
@@ -113,7 +114,11 @@ function getCloudflareContextFromWrangler(): Promise<CloudflareContext> {
         // During next build the page-data phase forks parallel workers, each
         // of which loads its own workerd against the same local D1 persistence
         // file, so production non-CLI evaluation stays in-memory and offline.
-        persist: isProduction ? false : undefined,
+        persist: isProduction
+          ? false
+          : localPersistPath
+            ? { path: path.join(localPersistPath, 'v3') }
+            : undefined,
       } satisfies GetPlatformProxyOptions),
   )
 }
