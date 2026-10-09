@@ -1,4 +1,5 @@
 import { TrafficLimitError, enforcePublicReadRateLimit, enforceW01WriteRateLimit, rateLimitResponse } from '@/auth/traffic-limit'
+import { apiErrorResponse, appendRequestIdToJsonResponse, normalizeApiErrorResponse } from '@/lib/api-response'
 import { DELETE as payloadMediaDelete, GET as payloadMediaGet, PATCH as payloadMediaPatch } from '../../../../(payload)/api/[...slug]/route'
 
 type PayloadRouteContext = Parameters<typeof payloadMediaGet>[1]
@@ -62,14 +63,11 @@ export async function GET(
     await enforcePublicReadRateLimit(request)
   } catch (error) {
     if (error instanceof TrafficLimitError) return rateLimitResponse(request)
-    return new Response(JSON.stringify({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Media service unavailable' } }), {
-      status: 503,
-      headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
-    })
+    return apiErrorResponse(503, 'SERVICE_UNAVAILABLE', 'Media service unavailable')
   }
 
   const { mediaId } = await context.params
-  if (!mediaId?.trim()) return new Response(null, { status: 404 })
+  if (!mediaId?.trim()) return apiErrorResponse(404, 'NOT_FOUND', 'Media not found')
 
   const target = new URL('/api/media/' + encodeURIComponent(mediaId), request.url)
   const payloadContext: PayloadRouteContext = {
@@ -77,7 +75,7 @@ export async function GET(
   }
 
   const response = await payloadMediaGet(new Request(target, request.clone()), payloadContext)
-  if (!response.ok) return response
+  if (!response.ok) return normalizeApiErrorResponse(response, 'Media service unavailable')
 
   let body: unknown
   try {
@@ -86,14 +84,14 @@ export async function GET(
     return response
   }
 
-  return new Response(JSON.stringify(withDeliveryStatus(body)), {
+  return appendRequestIdToJsonResponse(new Response(JSON.stringify(withDeliveryStatus(body)), {
     status: response.status,
     headers: {
       'content-type': response.headers.get('content-type') ?? 'application/json; charset=utf-8',
       'cache-control': 'private, no-store',
       ...(response.headers.get('etag') ? { etag: response.headers.get('etag')! } : {}),
     },
-  })
+  }))
 }
 
 type PayloadDeleteRouteContext = Parameters<typeof payloadMediaDelete>[1]
@@ -103,12 +101,8 @@ export async function DELETE(
   context: { params: Promise<{ mediaId: string }> },
 ): Promise<Response> {
   const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
-  if (!idempotencyKey || idempotencyKey.length > 256) {
-    return new Response(
-      JSON.stringify({ error: { code: 'PRECONDITION_REQUIRED', message: 'Idempotency-Key required' } }),
-      { status: 428, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' } },
-    )
-  }
+  if (!idempotencyKey) return apiErrorResponse(428, 'PRECONDITION_REQUIRED', 'Idempotency-Key required')
+  if (idempotencyKey.length > 256) return apiErrorResponse(422, 'VALIDATION_FAILED', 'Invalid Idempotency-Key header')
 
   const { mediaId } = await context.params
   if (!mediaId?.trim()) return new Response(null, { status: 404 })
@@ -128,7 +122,10 @@ export async function DELETE(
     params: Promise.resolve({ slug: ['media', mediaId] }),
   }
 
-  return payloadMediaDelete(new Request(target, request.clone()), payloadContext)
+  const response = await payloadMediaDelete(new Request(target, request.clone()), payloadContext)
+  return response.ok
+    ? appendRequestIdToJsonResponse(response)
+    : normalizeApiErrorResponse(response, 'Media service unavailable')
 }
 
 
@@ -154,5 +151,8 @@ export async function PATCH(
     params: Promise.resolve({ slug: ['media', mediaId] }),
   }
 
-  return payloadMediaPatch(new Request(target, request.clone()), payloadContext)
+  const response = await payloadMediaPatch(new Request(target, request.clone()), payloadContext)
+  return response.ok
+    ? appendRequestIdToJsonResponse(response)
+    : normalizeApiErrorResponse(response, 'Media service unavailable')
 }
