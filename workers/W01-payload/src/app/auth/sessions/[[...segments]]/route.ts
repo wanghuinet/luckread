@@ -63,7 +63,23 @@ export async function GET(
       }
     })
 
-    return json({ items, nextCursor: null })
+    const currentResponse = await proxyBetterAuth(request, '/get-session', { method: 'GET' })
+    if (!currentResponse.ok) {
+      return normalizeApiErrorResponse(currentResponse, 'Session service unavailable')
+    }
+    const currentPayload: unknown = await currentResponse.json()
+    const currentSessionId =
+      currentPayload && typeof currentPayload === 'object' && !Array.isArray(currentPayload) &&
+      'session' in currentPayload &&
+      (currentPayload as { session?: { id?: unknown } | null }).session &&
+      typeof (currentPayload as { session: { id?: unknown } }).session.id === 'string'
+        ? (currentPayload as { session: { id: string } }).session.id
+        : ''
+    if (!currentSessionId || currentSessionId.length > 128) {
+      return apiErrorResponse(503, 'SERVICE_UNAVAILABLE', 'Current session information is unavailable')
+    }
+
+    return json({ items, nextCursor: null, currentSessionId })
   } catch (error) {
     return mapError(error)
   }
