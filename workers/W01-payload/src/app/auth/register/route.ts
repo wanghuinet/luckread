@@ -334,6 +334,7 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
         name: normalized.username,
         username: normalized.username,
         password: normalized.credential,
+        callbackURL: 'https://luckread.com/login?verified=1',
       },
     })
   } catch {
