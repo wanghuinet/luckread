@@ -47,12 +47,24 @@ describe('W03 content contract core', () => {
       contentType: 'video',
       version: 1,
     })
-    expect(() => decodeContentListCursor(cursor, null, 'video')).toThrow(
-      expect.objectContaining({ code: 'INVALID_CURSOR' }),
-    )
-    expect(() => decodeContentListCursor(cursor, 'user_123', 'article')).toThrow(
-      expect.objectContaining({ code: 'INVALID_CURSOR' }),
-    )
+    const mismatchedCreator = (() => {
+      try {
+        decodeContentListCursor(cursor, null, 'video')
+        return null
+      } catch (error) {
+        return error
+      }
+    })()
+    const mismatchedType = (() => {
+      try {
+        decodeContentListCursor(cursor, 'user_123', 'article')
+        return null
+      } catch (error) {
+        return error
+      }
+    })()
+    expect(mismatchedCreator).toMatchObject({ code: 'INVALID_CURSOR' })
+    expect(mismatchedType).toMatchObject({ code: 'INVALID_CURSOR' })
   })
 
   it('rejects update requests that change the immutable content type', async () => {
