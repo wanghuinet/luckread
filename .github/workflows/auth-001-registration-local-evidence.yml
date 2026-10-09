@@ -105,6 +105,16 @@ jobs:
         working-directory: workers/W02-identity
         run: npx --yes wrangler@4.116.0 d1 migrations apply luckread --local --persist-to "$GITHUB_WORKSPACE/workers/W01-payload/.wrangler/state" --config wrangler.jsonc
 
+      - name: Prepare conditional rollback trigger before Workers start
+        working-directory: workers/W01-payload
+        env:
+          AUTH001_SUFFIX: run${{ github.run_id }}a${{ github.run_attempt }}
+        run: |
+          set -euo pipefail
+          trigger_name="auth001_evidence_fail_${AUTH001_SUFFIX}"
+          rollback_key="auth001-local-rollback-${AUTH001_SUFFIX}"
+          pnpm exec wrangler d1 execute luckread --local --config wrangler.jsonc --command "CREATE TRIGGER ${trigger_name} BEFORE UPDATE ON auth_registration_envelopes WHEN OLD.idempotency_key = '${rollback_key}' BEGIN SELECT RAISE(ABORT, 'AUTH001_FORCED_ROLLBACK'); END"
+
       - name: Build exact W01 OpenNext worker
         working-directory: workers/W01-payload
         env:
@@ -159,6 +169,7 @@ jobs:
         working-directory: workers/W01-payload
         env:
           AUTH001_BASE_URL: http://127.0.0.1:8787
+          AUTH001_SUFFIX: run${{ github.run_id }}a${{ github.run_attempt }}
         run: |
           set -euo pipefail
           node --import=tsx/esm scripts/auth-001-registration-runtime-evidence-local.mjs
