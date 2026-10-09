@@ -17,7 +17,7 @@ export async function GET(
 
     if (!username || !usernamePattern.test(username)) {
       return Response.json(
-        { error: { code: 'VALIDATION_FAILED', message: 'Invalid username', details: {} }, requestId: crypto.randomUUID() },
+        { error: { code: 'VALIDATION_FAILED', message: 'Invalid username', details: {} }, requestId: `req_${crypto.randomUUID()}` },
         { status: 400, headers: { 'cache-control': 'no-store' } },
       )
     }
@@ -38,7 +38,7 @@ export async function GET(
         const user = result.docs[0]
         if (!user) {
           return Response.json(
-            { error: { code: 'RESOURCE_NOT_FOUND', message: 'User not found', details: {} }, requestId: crypto.randomUUID() },
+            { error: { code: 'RESOURCE_NOT_FOUND', message: 'User not found', details: {} }, requestId: `req_${crypto.randomUUID()}` },
             { status: 404, headers: { 'cache-control': 'no-store' } },
           )
         }
@@ -61,7 +61,7 @@ export async function GET(
   } catch (error) {
     if (error instanceof TrafficLimitError) return rateLimitResponse(request)
     return Response.json(
-      { error: { code: 'SERVICE_UNAVAILABLE', message: 'Profile service unavailable', details: {} }, requestId: crypto.randomUUID() },
+      { error: { code: 'SERVICE_UNAVAILABLE', message: 'Profile service unavailable', details: {} }, requestId: `req_${crypto.randomUUID()}` },
       { status: 503, headers: { 'cache-control': 'no-store' } },
     )
   }
