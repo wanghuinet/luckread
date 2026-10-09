@@ -420,8 +420,40 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
     return errorResponse(422, 'VALIDATION_FAILED', 'Registration could not be completed')
   }
 
+  let payload: Awaited<ReturnType<typeof getPayload>> | null = null
+  let profileProjectionId: string | number | null = null
+
+  // The Payload profile is a projection of the W02 identity. Any failure
+  // after this insert must remove this projection as well as the W02 identity.
+  const rollbackPayloadProfile = async (): Promise<void> => {
+    const payloadClient = payload ?? await getPayload({ config })
+    let targetId = profileProjectionId
+    if (targetId === null) {
+      const existingProfile = await payloadClient.find({
+        collection: 'users',
+        where: { identityId: { equals: userId } },
+        limit: 1,
+        depth: 0,
+        overrideAccess: true,
+        req: request,
+      })
+      targetId = existingProfile.docs[0]?.id ?? null
+    }
+
+    if (targetId !== null) {
+      await payloadClient.delete({
+        collection: 'users',
+        id: targetId,
+        overrideAccess: true,
+        disableTransaction: true,
+        req: request,
+      })
+      profileProjectionId = null
+    }
+  }
+
   try {
-    const payload = await getPayload({ config })
+    payload = await getPayload({ config })
     // Import the generated collection type directly so Next's isolated route
     // type-checker includes Payload's module augmentation for auth fields.
     const profileData: Pick<PayloadUser, 'identityId' | 'username'> & { email: string } = {
@@ -429,14 +461,24 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
       email: normalized.identity,
       username: normalized.username,
     }
-    await payload.create({
+    const createdProfile = await payload.create({
       collection: 'users',
       data: profileData,
       overrideAccess: true,
       disableTransaction: true,
       req: request,
     })
+    profileProjectionId = createdProfile.id
   } catch (error) {
+    try {
+      await rollbackPayloadProfile()
+    } catch (projectionRollbackError) {
+      console.error(JSON.stringify({
+        event: 'auth.register.profile_projection_rollback_failure',
+        diagnosticCode: 'AUTH001_PROFILE_PROJECTION_ROLLBACK_FAILURE',
+        errorName: projectionRollbackError instanceof Error ? projectionRollbackError.name : typeof projectionRollbackError,
+      }))
+    }
     try {
       await rollbackRegistrationUser(request, {
         userId,
@@ -553,6 +595,15 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     if (isUniqueConstraintError(error)) {
+      try {
+        await rollbackPayloadProfile()
+      } catch (projectionRollbackError) {
+        console.error(JSON.stringify({
+          event: 'auth.register.profile_projection_rollback_failure',
+          diagnosticCode: 'AUTH001_PROFILE_PROJECTION_ROLLBACK_FAILURE',
+          errorName: projectionRollbackError instanceof Error ? projectionRollbackError.name : typeof projectionRollbackError,
+        }))
+      }
       await rollbackRegistrationUser(request, {
         userId,
         email: normalized.identity,
@@ -581,6 +632,15 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
       )
     }
 
+    try {
+      await rollbackPayloadProfile()
+    } catch (projectionRollbackError) {
+      console.error(JSON.stringify({
+        event: 'auth.register.profile_projection_rollback_failure',
+        diagnosticCode: 'AUTH001_PROFILE_PROJECTION_ROLLBACK_FAILURE',
+        errorName: projectionRollbackError instanceof Error ? projectionRollbackError.name : typeof projectionRollbackError,
+      }))
+    }
     try {
       await rollbackRegistrationUser(request, {
         userId,
