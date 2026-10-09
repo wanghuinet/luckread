@@ -57,6 +57,7 @@ export const parseCommentLimit = (value: string | null): number => {
 
 type Cursor = {
   version: 1
+  contentId: string
   createdAt: string
   id: string
 }
@@ -67,7 +68,7 @@ const encodeCursor = (cursor: Cursor): string =>
     .replace(/\//g, '_')
     .replace(/=+$/g, '')
 
-const decodeCursor = (value: string | null): Cursor | null => {
+const decodeCursor = (value: string | null, contentId: string): Cursor | null => {
   if (!value) return null
   const normalized = value.trim()
   if (!normalized || normalized.length > MAX_CURSOR) {
@@ -80,6 +81,7 @@ const decodeCursor = (value: string | null): Cursor | null => {
     const parsed = JSON.parse(atob(padded)) as Partial<Cursor>
     if (
       parsed.version !== 1 ||
+      parsed.contentId !== contentId ||
       typeof parsed.createdAt !== 'string' ||
       typeof parsed.id !== 'string' ||
       !parsed.createdAt ||
@@ -87,7 +89,7 @@ const decodeCursor = (value: string | null): Cursor | null => {
     ) {
       throw new Error('invalid cursor')
     }
-    return { version: 1, createdAt: parsed.createdAt, id: parsed.id }
+    return { version: 1, contentId, createdAt: parsed.createdAt, id: parsed.id }
   } catch {
     throw new CommentRuntimeError('INVALID_CURSOR', 400)
   }
@@ -530,7 +532,7 @@ export async function listComments(
   viewerUserIdValue: string | null = null,
 ): Promise<CommentPage> {
   const contentId = validateId(contentIdValue)
-  const cursor = decodeCursor(cursorValue)
+  const cursor = decodeCursor(cursorValue, contentId)
   const viewerUserId = viewerUserIdValue ? validateId(viewerUserIdValue, 'UNAUTHENTICATED') : null
 
   const whereCursor = cursor
@@ -658,7 +660,7 @@ export async function listComments(
     hasMore,
     nextCursor:
       hasMore && last
-        ? encodeCursor({ version: 1, createdAt: last.created_at, id: last.id })
+        ? encodeCursor({ version: 1, contentId, createdAt: last.created_at, id: last.id })
         : null,
   }
 }
