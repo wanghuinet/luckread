@@ -42,6 +42,24 @@ const sha256Hex = async (value) => {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value))
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('')
 }
+
+const createLocalVerificationToken = async (email) => {
+  const secret = process.env.AUTH001_BETTER_AUTH_SECRET
+  if (!secret || secret.length < 32) throw new Error('Local Better Auth test secret is not configured')
+  const now = Math.floor(Date.now() / 1000)
+  const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url')
+  const payload = Buffer.from(JSON.stringify({ email: email.trim().toLowerCase(), iat: now, exp: now + 3600 })).toString('base64url')
+  const signed = header + '.' + payload
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  )
+  const signature = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(signed))
+  return signed + '.' + Buffer.from(signature).toString('base64url')
+}
 const responseJson = async (response) => {
   const text = await response.text()
   try { return JSON.parse(text) } catch { throw new Error('Expected JSON response, HTTP ' + response.status + ': ' + text.slice(0, 500)) }
@@ -97,16 +115,12 @@ try {
   if (projection.hash || projection.salt) throw new Error('Legacy Payload password hash/salt was persisted into the profile projection')
   if (Number(projection.account_state_version || 0) !== 1) throw new Error('W01 profile lifecycle projection version is not canonical')
 
-  const verification = await scalar(
-    'SELECT identifier, value, expires_at FROM verification WHERE identifier = ? OR identifier = ? OR identifier LIKE ? OR identifier LIKE ? ORDER BY created_at DESC LIMIT 1',
-    email, String(first.userId), '%' + email + '%', '%' + String(first.userId) + '%',
-  )
-  if (!verification || typeof verification.value !== 'string' || !verification.value) {
-    throw new Error('Better Auth email verification token is missing')
-  }
-
+  // Better Auth email-verification tokens are signed JWTs, not durable
+  // rows in the verification table. Mint the same token shape using the
+  // test-only secret passed explicitly to the local W02 Worker.
+  const verificationToken = await createLocalVerificationToken(email)
   const verifyURL = new URL('/api/auth/verify-email', baseUrl)
-  verifyURL.searchParams.set('token', verification.value)
+  verifyURL.searchParams.set('token', verificationToken)
   verifyURL.searchParams.set('callbackURL', baseUrl + '/login?verified=1')
   const verifyResponse = await requestGet(verifyURL.pathname + verifyURL.search)
   if (verifyResponse.status < 200 || verifyResponse.status >= 400) {
