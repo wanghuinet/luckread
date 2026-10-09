@@ -12,9 +12,9 @@ const requireMutationHeaders = (request: Request): Response | null => {
   if (!idempotencyKey || idempotencyKey.length > 256) {
     return errorResponse(428, 'PRECONDITION_REQUIRED', 'Idempotency-Key required')
   }
-  if (!ifMatch || ifMatch.length > 256 || ifMatch === '*') {
-    return errorResponse(428, 'PRECONDITION_REQUIRED', 'If-Match required')
-  }
+  if (!ifMatch) return errorResponse(428, 'PRECONDITION_REQUIRED', 'If-Match required')
+  if (ifMatch === '*') return errorResponse(412, 'PRECONDITION_FAILED', 'If-Match precondition failed')
+  if (ifMatch.length > 256) return errorResponse(422, 'VALIDATION_FAILED', 'Invalid If-Match header')
   return null
 }
 
@@ -56,7 +56,7 @@ export async function PATCH(
       principal,
     })
   } catch (error) {
-    if (error instanceof SyntaxError) return errorResponse(400, 'VALIDATION_FAILED', 'Invalid series request')
+    if (error instanceof SyntaxError) return errorResponse(422, 'VALIDATION_FAILED', 'Invalid series request')
     if (error instanceof W03ContentClientError) return errorResponse(error.status, error.code, 'Content service unavailable')
     return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Content service unavailable')
   }
