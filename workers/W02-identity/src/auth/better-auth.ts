@@ -1,18 +1,24 @@
+import { activateEmailVerifiedAccount } from '../account/account-state-transition.js'
 import { ensureBaseUserRole } from '../authz/role-assignment.js'
+import { dispatchAuthEmail, escapeAuthEmailHtml, type AuthEmailEnvironment } from './email-delivery.js'
 import { betterAuth } from 'better-auth'
 import { bearer } from 'better-auth/plugins'
 
-export interface BetterAuthEnv {
+export interface BetterAuthEnv extends AuthEmailEnvironment {
   D1_01: D1Database
+  AUTH_PUBLIC_BASE_URL?: string
 }
 
-export const createLuckReadAuth = (env: BetterAuthEnv) =>
-  betterAuth({
+export const createLuckReadAuth = (env: BetterAuthEnv) => {
+  const publicBaseURL = (env.AUTH_PUBLIC_BASE_URL?.trim() || 'https://luckread.com').replace(/\\/+$/, '')
+  return betterAuth({
+    baseURL: publicBaseURL,
     // W02 is the platform identity authority. Better Auth uses native D1
     // persistence here; Payload is not an authentication/database adapter.
     database: env.D1_01,
     basePath: '/api/auth',
     trustedOrigins: [
+      publicBaseURL,
       'https://luckread-w02.internal',
       'https://luckread.com',
       'https://www.luckread.com',
@@ -24,13 +30,37 @@ export const createLuckReadAuth = (env: BetterAuthEnv) =>
     emailAndPassword: {
       enabled: true,
       disableSignUp: false,
-      requireEmailVerification: false,
+      requireEmailVerification: true,
       autoSignIn: false,
       minPasswordLength: 15,
       maxPasswordLength: 128,
       revokeSessionsOnPasswordReset: true,
-      sendResetPassword: async () => {
-        throw new Error('PASSWORD_RESET_DELIVERY_UNCONFIGURED')
+      sendResetPassword: async ({ user, url }) => {
+        const safeURL = escapeAuthEmailHtml(url)
+        await dispatchAuthEmail(env, {
+          to: user.email,
+          subject: 'Reset your LuckRead password',
+          text: 'Use this link to reset your LuckRead password: ' + url,
+          html: '<p>Use the link below to reset your LuckRead password.</p><p><a href="' + safeURL + '">Reset password</a></p>',
+        })
+      },
+    },
+    emailVerification: {
+      sendOnSignUp: true,
+      sendOnSignIn: false,
+      autoSignInAfterVerification: false,
+      expiresIn: 60 * 60,
+      sendVerificationEmail: async ({ user, url }) => {
+        const safeURL = escapeAuthEmailHtml(url)
+        await dispatchAuthEmail(env, {
+          to: user.email,
+          subject: 'Verify your LuckRead email',
+          text: 'Verify your LuckRead email address: ' + url,
+          html: '<p>Welcome to LuckRead.</p><p>Confirm your email address to activate your account and enable social interactions.</p><p><a href="' + safeURL + '">Verify email address</a></p><p>This link expires in 60 minutes.</p>',
+        })
+      },
+      afterEmailVerification: async (user) => {
+        await activateEmailVerifiedAccount(env.D1_01, String(user.id))
       },
     },
     databaseHooks: {
@@ -97,3 +127,4 @@ export const createLuckReadAuth = (env: BetterAuthEnv) =>
       },
     },
   })
+}
