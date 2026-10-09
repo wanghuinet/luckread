@@ -404,7 +404,9 @@ async function applyAccountStateTransitionInternal(
     batchResult.length !== statements.length ||
     batchResult[0]?.meta?.changes !== 1 ||
     batchResult[1]?.meta?.changes !== 1 ||
-    batchResult.slice(additionalStartIndex).some((result) => result?.meta?.changes !== 1)
+    batchResult.slice(additionalStartIndex).some((result) =>
+      typeof result?.meta?.changes !== 'number' || result.meta.changes < 1
+    )
   ) {
     throw new AccountStateTransitionError(
       'CONFLICT',
