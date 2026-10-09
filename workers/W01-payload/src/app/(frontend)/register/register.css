@@ -1,7 +1,7 @@
 .registerPage {
   --register-ink: #122544;
   --register-muted: #71809a;
-  --register-blue: #2864e8;
+  --register-blue: #2563eb;
   --register-line: #e1e8f2;
   min-height: 100vh;
   padding: 0;
@@ -54,7 +54,7 @@
   place-items: center;
   border: 1px solid rgba(255, 255, 255, 0.28);
   border-radius: 13px;
-  background: linear-gradient(145deg, #5d91ff, #2864e8);
+  background: linear-gradient(145deg, #5d91ff, #2563eb);
   box-shadow: 0 8px 22px rgba(22, 91, 230, 0.3);
   color: #fff;
   font-size: 21px;
@@ -311,7 +311,7 @@
 .registerField input:focus {
   border-color: #5b8df0;
   background: #fff;
-  box-shadow: 0 0 0 4px rgba(40, 100, 232, 0.1);
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
 }
 
 .registerField small {
@@ -382,14 +382,14 @@
 }
 
 .registerPrimaryButton {
-  background: #2864e8;
+  background: #2563eb;
   color: #fff;
   box-shadow: 0 7px 16px rgba(40, 100, 232, 0.19);
 }
 
 .registerPrimaryButton:hover {
   transform: translateY(-1px);
-  background: #1e55ce;
+  background: #1d4ed8;
   box-shadow: 0 10px 22px rgba(40, 100, 232, 0.24);
 }
 
@@ -488,7 +488,7 @@
   place-items: center;
   border-radius: 11px;
   background: #edf3ff;
-  color: #2864e8;
+  color: #2563eb;
   font-size: 17px;
 }
 
