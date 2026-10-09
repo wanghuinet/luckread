@@ -91,11 +91,11 @@ jobs:
 
       - name: Install W02 dependencies
         working-directory: workers/W02-identity
-        run: pnpm install --frozen-lockfile
+        run: npm install --ignore-scripts --no-audit --no-fund
 
       - name: Apply exact W02 Better Auth migrations
         working-directory: workers/W02-identity
-        run: pnpm exec wrangler d1 migrations apply luckread --local --config wrangler.jsonc
+        run: npx --yes wrangler@4.116.0 d1 migrations apply luckread --local --config wrangler.jsonc
 
       - name: Install W01 dependencies
         working-directory: workers/W01-payload
@@ -126,7 +126,7 @@ jobs:
           NODE_ENV: development
         run: |
           set -euo pipefail
-          pnpm exec wrangler dev --local --persist-to /tmp/luckread-auth001-state --port 8788 --var "CLOUDFLARE_ENV:development" > auth-001-w02-preview.log 2>&1 &
+          npx --yes wrangler@4.116.0 dev --local --persist-to /tmp/luckread-auth001-state --port 8788 --var "CLOUDFLARE_ENV:development" > auth-001-w02-preview.log 2>&1 &
           echo $! > auth-001-w02-preview.pid
           ready=0
           for _ in $(seq 1 120); do
