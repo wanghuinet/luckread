@@ -547,7 +547,9 @@ const enforceCacheMissOriginFuse = (keyString: string): boolean => {
 
 const withCacheHeader = async (response: Response, value: 'HIT' | 'MISS'): Promise<Response> => {
   const headers = new Headers(response.headers)
-  headers.set('X-LuckRead-Cache', value)
+  if (headers.get('X-LuckRead-Cache') !== 'OVERLOADED') {
+    headers.set('X-LuckRead-Cache', value)
+  }
   const contentType = headers.get('content-type') ?? ''
   if (contentType.includes('application/json')) {
     try {
