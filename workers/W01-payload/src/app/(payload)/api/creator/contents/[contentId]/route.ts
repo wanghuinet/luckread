@@ -83,7 +83,7 @@ export async function PATCH(
     try {
       body = await request.json()
     } catch {
-      return errorResponse(400, 'VALIDATION_FAILED', 'Invalid content request')
+      return errorResponse(422, 'VALIDATION_FAILED', 'Invalid content request')
     }
 
     return await callW03Content({
