@@ -25,6 +25,7 @@ describe('W01 Users collection contract', () => {
 
     expect(fields).toEqual(
       expect.arrayContaining([
+        expect.objectContaining({ name: 'identityId', type: 'text', required: false, unique: true, index: true }),
         expect.objectContaining({
           name: 'username',
           type: 'text',
