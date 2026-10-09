@@ -419,16 +419,17 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
     // before W01's unique email/username projection rejects one request. If
     // this identity is already projected, never roll back the shared identity
     // created by the winning request.
-    let identityAlreadyProjected = false
+    let projectedProfile: { id: string; identityId: string | null } | null
     try {
-      const projected = await env.D1
-        .prepare('SELECT id FROM users WHERE identity_id = ? LIMIT 1')
-        .bind(userId)
-        .first<{ id: string }>()
-      identityAlreadyProjected = !!projected
+      projectedProfile = await env.D1
+        .prepare(
+          'SELECT id, identity_id AS identityId FROM users WHERE identity_id = ? OR email = ? OR username = ? LIMIT 1',
+        )
+        .bind(userId, normalized.identity, normalized.username)
+        .first<{ id: string; identityId: string | null }>()
     } catch {
-      // If we cannot determine whether the identity belongs to the winner,
-      // fail closed without deleting a possibly shared Better Auth identity.
+      // If we cannot determine whether the profile belongs to this or another
+      // request, fail closed without deleting a possibly shared identity.
       await releaseReservation()
       console.error(JSON.stringify({
         event: 'auth.register.profile_projection_failure',
@@ -438,7 +439,11 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
       return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Registration service unavailable')
     }
 
+    const identityAlreadyProjected = projectedProfile?.identityId === userId
+    const identityOwnedByAnotherProfile = !!projectedProfile && !identityAlreadyProjected
     if (identityAlreadyProjected) {
+      // The concurrent winner already owns this identity and profile. Do not
+      // invoke W02 rollback, because that would remove the winner's account.
       await releaseReservation()
       console.error(JSON.stringify({
         event: 'auth.register.profile_projection_conflict',
@@ -449,6 +454,7 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
     }
 
     const identityConflict =
+      identityOwnedByAnotherProfile ||
       isUniqueConstraintError(error) ||
       (error instanceof Error && /(unique|duplicate|already exists)/i.test(error.message))
     try {
