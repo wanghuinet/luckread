@@ -69,7 +69,40 @@ const rollbackEmail = 'auth001-rollback-' + suffix + '@luckread.local'
 const rollbackUsername = 'auth001rb' + suffix
 const sameKeyEmail = 'auth001-same-key-' + suffix + '@luckread.local'
 const sameKeyUsername = 'auth001sk' + suffix
+const sameKeyBody = { ...body, identity: sameKeyEmail, username: sameKeyUsername, credential: password + '-same-key' }
+const sameKeyNormalized = {
+  identityType: 'email',
+  identity: sameKeyEmail.trim().toLowerCase(),
+  credential: password + '-same-key',
+  username: sameKeyUsername.trim(),
+  consent: { purpose: 'ACCOUNT_REGISTRATION', policyVersion: policy.policyVersion },
+}
+const sameKeyPayloadHash = await sha256Hex(JSON.stringify(canonicalize(sameKeyNormalized)))
 let triggerName = 'auth001_evidence_fail_' + suffix
+
+if (process.argv.includes('--seed-in-progress')) {
+  const createdAt = new Date().toISOString()
+  const expiresAt = new Date(Date.now() + IDEMPOTENCY_TTL_MS).toISOString()
+  runSql(
+    `INSERT INTO auth_registration_envelopes (
+      id, idempotency_key, active_key, scope, endpoint, payload_hash, state,
+      response_digest, committed_response, expires_at, consent_record_id,
+      updated_at, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, 'IN_PROGRESS', ?, NULL, ?, NULL, ?, ?)`,
+    'auth001-seed-' + suffix,
+    keySameKey,
+    keySameKey,
+    'ACCOUNT_REGISTRATION',
+    'authRegister',
+    sameKeyPayloadHash,
+    'seed-only-response-digest',
+    expiresAt,
+    createdAt,
+    createdAt,
+  )
+  console.log(JSON.stringify({ status: 'SEEDED', scenario: 'IDEMPOTENCY_IN_PROGRESS', suffix }))
+  process.exit(0)
+}
 
 const cleanup = async () => {
   if (triggerName) { runSql('DROP TRIGGER IF EXISTS ' + triggerName); triggerName = null }
@@ -114,13 +147,12 @@ try {
   const pair = await Promise.all([request('/auth/register', keyConcurrentA, concurrentBody), request('/auth/register', keyConcurrentB, concurrentBody)])
   const statuses = pair.map((response) => response.status).sort((a, b) => a - b)
   if (statuses[0] !== 201 || statuses[1] !== 422) throw new Error('Concurrent duplicate identity did not produce exactly one success and one Better Auth conflict: ' + statuses.join(','))
-  const sameKeyBody = { ...body, identity: sameKeyEmail, username: sameKeyUsername, credential: password + '-same-key' }
-  const sameKeyPair = await Promise.all([request('/auth/register', keySameKey, sameKeyBody), request('/auth/register', keySameKey, sameKeyBody)])
-  const sameKeyPayloads = await Promise.all(sameKeyPair.map(responseJson))
-  const sameKeyStatuses = sameKeyPair.map((response) => response.status).sort((a, b) => a - b)
-  const sameKeyValid = sameKeyStatuses[0] === 201 && sameKeyStatuses[1] === 409
-  const sameKeyReplay = sameKeyStatuses[0] === 201 && sameKeyStatuses[1] === 201 && JSON.stringify(sameKeyPayloads[0]) === JSON.stringify(sameKeyPayloads[1])
-  if (!sameKeyValid && !sameKeyReplay) throw new Error('Concurrent same Idempotency-Key did not resolve to a single Better Auth identity: ' + sameKeyStatuses.join(','))
+  const sameKeyResponse = await request('/auth/register', keySameKey, sameKeyBody)
+  const sameKeyPayload = await responseJson(sameKeyResponse)
+  const sameKeyStatuses = [sameKeyResponse.status]
+  if (sameKeyResponse.status !== 409 || sameKeyPayload?.error?.code !== 'IDEMPOTENCY_IN_PROGRESS') {
+    throw new Error('An in-progress idempotency reservation must return 409 IDEMPOTENCY_IN_PROGRESS; HTTP ' + sameKeyResponse.status + ', code ' + String(sameKeyPayload?.error?.code || sameKeyPayload?.code || 'MISSING'))
+  }
   // Run direct local D1 inspection only after all browser-style requests have
   // finished. Calling Wrangler's local D1 CLI during the HTTP sequence can
   // interfere with the short-lived local Worker runtime.
@@ -147,13 +179,13 @@ try {
   if (Number(concurrentProjection?.c || 0) !== 1) throw new Error('Concurrent duplicate identity produced more than one W01 profile projection')
 
   const sameKeyProjection = await profileForEmail(sameKeyEmail, sameKeyUsername)
-  if (Number(sameKeyProjection?.c || 0) !== 1) throw new Error('Concurrent same Idempotency-Key produced more than one W01 profile projection')
+  if (Number(sameKeyProjection?.c || 0) !== 0) throw new Error('An in-progress idempotency reservation unexpectedly created a profile projection')
 
   const result = {
     status: 'PASS',
     evidenceType: 'AUTH-001_BETTER_AUTH_REGISTRATION_W01_BOUNDARY_LOCAL_RUNTIME',
     runId, sourceSha, environment: 'CONTROLLED_LOCAL_D1_SHARED_W02_W01_OPENNEXT_WORKERS',
-    assertions: { successfulRegistration: true, betterAuthIdentityCreated: true, unverifiedLoginDenied: true, noSessionIssuedBeforeVerification: true, w01ProfileProjectionBoundByIdentityId: true, payloadNativePasswordNotPersisted: true, payloadNativeSessionNotCreated: true, responseDigestMatchesCommitment: true, idempotentReplay: true, idempotencyReuseConflict: true, downstreamRollbackRemovesBetterAuthIdentity: true, concurrentDuplicateIdentitySingleWinner: true, concurrentSameKeySingleWinner: true },
+    assertions: { successfulRegistration: true, betterAuthIdentityCreated: true, unverifiedLoginDenied: true, noSessionIssuedBeforeVerification: true, w01ProfileProjectionBoundByIdentityId: true, payloadNativePasswordNotPersisted: true, payloadNativeSessionNotCreated: true, responseDigestMatchesCommitment: true, idempotentReplay: true, idempotencyReuseConflict: true, downstreamRollbackRemovesBetterAuthIdentity: true, concurrentDuplicateIdentitySingleWinner: true, inProgressIdempotencyConflict: true },
     observed: { userId: String(first.userId), accountState: first.accountState, loginDeniedCode: loginErrorCode, concurrentStatuses: statuses, sameKeyStatuses },
   }
   writeFileSync(new URL('./runtime-result.json', artifactDir), JSON.stringify(result, null, 2) + '\n')
