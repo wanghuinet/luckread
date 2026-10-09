@@ -424,7 +424,7 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
     const payload = await getPayload({ config })
     // Import the generated collection type directly so Next's isolated route
     // type-checker includes Payload's module augmentation for auth fields.
-    const profileData: Pick<PayloadUser, 'identityId' | 'email' | 'username'> = {
+    const profileData: Pick<PayloadUser, 'identityId' | 'username'> & { email: string } = {
       identityId: userId,
       email: normalized.identity,
       username: normalized.username,
