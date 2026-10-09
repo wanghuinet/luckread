@@ -39,14 +39,13 @@ export async function PATCH(
     if (principal instanceof Response) return principal
 
     const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
-    if (!idempotencyKey || idempotencyKey.length > 256) {
-      return errorResponse(428, 'PRECONDITION_REQUIRED', 'Idempotency-Key required')
-    }
+    if (!idempotencyKey) return errorResponse(428, 'PRECONDITION_REQUIRED', 'Idempotency-Key required')
+    if (idempotencyKey.length > 256) return errorResponse(422, 'VALIDATION_FAILED', 'Invalid Idempotency-Key header')
 
     const ifMatch = request.headers.get('If-Match')?.trim() ?? ''
-    if (!ifMatch || ifMatch.length > 256) {
-      return errorResponse(428, 'PRECONDITION_REQUIRED', 'If-Match required')
-    }
+    if (!ifMatch) return errorResponse(428, 'PRECONDITION_REQUIRED', 'If-Match required')
+    if (ifMatch === '*') return errorResponse(412, 'PRECONDITION_FAILED', 'If-Match precondition failed')
+    if (ifMatch.length > 256) return errorResponse(422, 'VALIDATION_FAILED', 'Invalid If-Match header')
 
     let body: unknown
     try {
@@ -91,9 +90,8 @@ export async function DELETE(
     if (principal instanceof Response) return principal
 
     const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
-    if (!idempotencyKey || idempotencyKey.length > 256) {
-      return errorResponse(428, 'PRECONDITION_REQUIRED', 'Idempotency-Key required')
-    }
+    if (!idempotencyKey) return errorResponse(428, 'PRECONDITION_REQUIRED', 'Idempotency-Key required')
+    if (idempotencyKey.length > 256) return errorResponse(422, 'VALIDATION_FAILED', 'Invalid Idempotency-Key header')
 
     return await finalizeCommentMutationResponse(await callW05Social({
       request,
