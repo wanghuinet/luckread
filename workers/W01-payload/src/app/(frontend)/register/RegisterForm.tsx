@@ -71,7 +71,7 @@ export default function RegisterForm({ policyVersion }: RegisterFormProps) {
       return
     }
 
-    if (normalizedEmail.length > 254 || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(normalizedEmail)) {
+    if (normalizedEmail.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
       setStatus('error')
       setMessage('请输入有效的邮箱地址。')
       return
