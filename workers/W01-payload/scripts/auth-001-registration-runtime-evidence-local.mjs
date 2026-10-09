@@ -13,7 +13,13 @@ if (policy.policyVersion !== 'DEV-2026-09-28.1') throw new Error('Unexpected dev
 const escapeSql = (value) => "'" + String(value).replaceAll("'", "''") + "'"
 const renderSql = (sql, args) => { let index = 0; return sql.replaceAll('?', () => escapeSql(args[index++])) }
 const d1Json = (command) => {
-  const output = execFileSync('pnpm', ['exec', 'wrangler', 'd1', 'execute', 'luckread', '--local', '--json', '--config', 'wrangler.jsonc', '--command', command], { encoding: 'utf8', cwd: process.cwd(), env: process.env, maxBuffer: 8 * 1024 * 1024 })
+  const persistPath = process.env.AUTH001_LOCAL_D1_STATE?.trim()
+  const args = [
+    'exec', 'wrangler', 'd1', 'execute', 'luckread', '--local',
+    ...(persistPath ? ['--persist-to', persistPath] : []),
+    '--json', '--config', 'wrangler.jsonc', '--command', command,
+  ]
+  const output = execFileSync('pnpm', args, { encoding: 'utf8', cwd: process.cwd(), env: process.env, maxBuffer: 8 * 1024 * 1024 })
   return JSON.parse(output)
 }
 const d1Rows = (command) => {
@@ -36,11 +42,30 @@ const sha256Hex = async (value) => {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value))
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('')
 }
+
+const createLocalVerificationToken = async (email) => {
+  const secret = process.env.AUTH001_BETTER_AUTH_SECRET
+  if (!secret || secret.length < 32) throw new Error('Local Better Auth test secret is not configured')
+  const now = Math.floor(Date.now() / 1000)
+  const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url')
+  const payload = Buffer.from(JSON.stringify({ email: email.trim().toLowerCase(), iat: now, exp: now + 3600 })).toString('base64url')
+  const signed = header + '.' + payload
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  )
+  const signature = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(signed))
+  return signed + '.' + Buffer.from(signature).toString('base64url')
+}
 const responseJson = async (response) => {
   const text = await response.text()
   try { return JSON.parse(text) } catch { throw new Error('Expected JSON response, HTTP ' + response.status + ': ' + text.slice(0, 500)) }
 }
-const request = (path, idempotencyKey, body, cookie) => fetch(baseUrl + path, { method: 'POST', headers: { 'content-type': 'application/json', ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}), ...(cookie ? { cookie } : {}) }, body: body === undefined ? undefined : JSON.stringify(body) })
+const request = (path, idempotencyKey, body, cookie) => fetch(baseUrl + path, { method: 'POST', headers: { 'content-type': 'application/json', origin: baseUrl, ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}), ...(cookie ? { cookie } : {}) }, body: body === undefined ? undefined : JSON.stringify(body) })
+const requestGet = (path) => fetch(baseUrl + path, { method: 'GET', headers: { origin: baseUrl }, redirect: 'manual' })
 const getSetCookie = (response) => typeof response.headers.getSetCookie === 'function' ? response.headers.getSetCookie() : [response.headers.get('set-cookie')].filter(Boolean)
 const firstCookieHeader = (response) => getSetCookie(response).map((value) => value.split(';', 1)[0]).join('; ')
 
@@ -82,13 +107,50 @@ try {
 
   const firstResponse = await request('/auth/register', keySuccess, body)
   const first = await responseJson(firstResponse)
-  if (firstResponse.status !== 201) throw new Error('Registration failed: HTTP ' + firstResponse.status)
+  if (firstResponse.status !== 201) throw new Error('Registration failed: HTTP ' + firstResponse.status + ' envelope=' + JSON.stringify(first))
   if (!first.userId || first.accountState !== 'PENDING_VERIFICATION') throw new Error('Registration response is not the canonical Better Auth registration response')
 
   const projection = await profileForEmail(email, username)
   if (Number(projection?.c || 0) !== 1 || String(projection.identity_id) !== String(first.userId)) throw new Error('W01 profile projection is not bound to the Better Auth user')
   if (projection.hash || projection.salt) throw new Error('Legacy Payload password hash/salt was persisted into the profile projection')
   if (Number(projection.account_state_version || 0) !== 1) throw new Error('W01 profile lifecycle projection version is not canonical')
+
+  // Better Auth email-verification tokens are signed JWTs, not durable
+  // rows in the verification table. Mint the same token shape using the
+  // test-only secret passed explicitly to the local W02 Worker.
+  const verificationToken = await createLocalVerificationToken(email)
+  const verifyURL = new URL('/api/auth/verify-email', baseUrl)
+  verifyURL.searchParams.set('token', verificationToken)
+  verifyURL.searchParams.set('callbackURL', baseUrl + '/login?verified=1')
+  const verifyResponse = await requestGet(verifyURL.pathname + verifyURL.search)
+  if (verifyResponse.status < 200 || verifyResponse.status >= 400) {
+    throw new Error('Better Auth email verification failed: HTTP ' + verifyResponse.status)
+  }
+
+  const verifiedIdentity = await scalar(
+    'SELECT email_verified, account_state, account_state_version FROM "user" WHERE id = ?',
+    String(first.userId),
+  )
+  if (Number(verifiedIdentity?.email_verified || 0) !== 1) {
+    throw new Error('Better Auth did not persist the verified-email state')
+  }
+  if (verifiedIdentity.account_state !== 'ACTIVE' || Number(verifiedIdentity.account_state_version || 0) < 2) {
+    throw new Error('Better Auth did not activate the verified account')
+  }
+  const activationEvent = await scalar(
+    "SELECT status, source_version FROM auth_013_publication_journal WHERE resource_id = ? AND event_type = 'identity.account_state_changed' ORDER BY created_at DESC LIMIT 1",
+    String(first.userId),
+  )
+  if (activationEvent?.status !== 'PENDING' || Number(activationEvent?.source_version || 0) !== Number(verifiedIdentity.account_state_version)) {
+    throw new Error('Verified account state was not durably journaled for asynchronous projection')
+  }
+  // W01 is an eventual profile projection: this workflow does not run queue
+  // consumers, so its pre-verification state must not be mistaken for a
+  // synchronous consistency failure or silently overwritten in the test.
+  const pendingProjection = await profileForEmail(email, username)
+  if (pendingProjection?.account_state !== 'PENDING_VERIFICATION' || Number(pendingProjection?.account_state_version || 0) !== 1) {
+    throw new Error('W01 profile projection changed without consuming the durable activation event')
+  }
   if (all('SELECT name FROM sqlite_master WHERE type = \'table\' AND name = ?', 'users_sessions').length) {
     const legacySession = await scalar('SELECT COUNT(*) AS c FROM users_sessions WHERE _parent_id = ?', projection.id)
     if (Number(legacySession?.c || 0) !== 0) throw new Error('Legacy Payload session row was created for Better Auth registration')
@@ -152,8 +214,8 @@ try {
     status: 'PASS',
     evidenceType: 'AUTH-001_BETTER_AUTH_REGISTRATION_W01_BOUNDARY_LOCAL_RUNTIME',
     runId, sourceSha, environment: 'CONTROLLED_LOCAL_D1_SHARED_W02_W01_OPENNEXT_WORKERS',
-    assertions: { successfulRegistration: true, betterAuthIdentityCreated: true, betterAuthSessionCreatedAndRevoked: true, w01ProfileProjectionBoundByIdentityId: true, payloadNativePasswordNotPersisted: true, payloadNativeSessionNotCreated: true, responseDigestMatchesCommitment: true, idempotentReplay: true, idempotencyReuseConflict: true, downstreamRollbackRemovesBetterAuthIdentity: true, concurrentDuplicateIdentitySingleWinner: true, concurrentSameKeySingleWinner: true },
-    observed: { userId: String(first.userId), accountState: first.accountState, refreshSessionId: String(refresh.session.id), concurrentStatuses: statuses, sameKeyStatuses },
+    assertions: { successfulRegistration: true, betterAuthIdentityCreated: true, emailVerificationSucceeded: true, canonicalL2AfterVerification: true, durableActivationEventPending: true, w01ProfileProjectionBoundByIdentityId: true, w01ProjectionRemainsEventuallyConsistent: true, payloadNativePasswordNotPersisted: true, payloadNativeSessionNotCreated: true, responseDigestMatchesCommitment: true, idempotentReplay: true, idempotencyReuseConflict: true, downstreamRollbackRemovesBetterAuthIdentity: true, concurrentDuplicateIdentitySingleWinner: true, concurrentSameKeySingleWinner: true },
+    observed: { userId: String(first.userId), accountState: first.accountState, verifiedAccountState: verifiedIdentity.account_state, verifiedAccountStateVersion: Number(verifiedIdentity.account_state_version), activationEventStatus: activationEvent.status, projectionAccountState: pendingProjection.account_state, refreshSessionId: String(refresh.session.id), concurrentStatuses: statuses, sameKeyStatuses },
   }
   writeFileSync(new URL('./runtime-result.json', artifactDir), JSON.stringify(result, null, 2) + '\n')
   console.log(JSON.stringify(result, null, 2))

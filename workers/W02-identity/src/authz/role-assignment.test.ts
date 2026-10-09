@@ -59,6 +59,12 @@ describe('RoleAssignment global layer resolution', () => {
       .resolves.toEqual({ decision: 'ALLOW', layer: 'L7' })
   })
 
+  it('resolves verified_user to the canonical L2 layer', async () => {
+    const { db } = fakeD1([assignment({ roleId: 'verified_user' })])
+    await expect(resolveGlobalLayer(db, 'user-1', 'ACTIVE', NOW))
+      .resolves.toEqual({ decision: 'ALLOW', layer: 'L2' })
+  })
+
   it('treats equal-layer global assignments as equivalent', async () => {
     const { db } = fakeD1([
       assignment({ id: 'ra-ip', roleId: 'ip_principal' }),
@@ -151,14 +157,29 @@ describe('RoleAssignment global layer resolution', () => {
 
 
 describe('Base user role materialization', () => {
-  it('creates one deterministic global L1 role assignment', async () => {
+  it('creates one deterministic global L1 role assignment and verifies the stored row', async () => {
     const calls: Array<{ sql: string; args: unknown[] }> = []
+    const reads: Array<{ sql: string; args: unknown[] }> = []
+    let persisted: Record<string, unknown> | null = null
     const db = {
       prepare: (sql: string) => ({
         bind: (...args: unknown[]) => ({
           run: async () => {
             calls.push({ sql, args })
+            persisted = {
+              id: args[0],
+              subjectId: args[1],
+              roleId: 'user',
+              scopeType: 'global',
+              scopeId: null,
+              status: 'ACTIVE',
+              validUntil: null,
+            }
             return { meta: { changes: 1 } }
+          },
+          first: async <T>() => {
+            reads.push({ sql, args })
+            return persisted as T | null
           },
         }),
       }),
@@ -169,6 +190,53 @@ describe('Base user role materialization', () => {
     expect(calls[0].sql).toContain('INSERT OR IGNORE INTO role_assignments')
     expect(calls[0].sql).toContain("'user', 'global'")
     expect(calls[0].args).toEqual(['base-user-user-1', 'user-1', NOW, NOW, NOW])
+    expect(reads).toHaveLength(1)
+    expect(reads[0].sql).toContain('WHERE id = ?')
+    expect(reads[0].args).toEqual(['base-user-user-1'])
+  })
+
+  it('does not treat D1 change metadata from trigger effects as ambiguous', async () => {
+    const stored = {
+      id: 'base-user-user-1',
+      subjectId: 'user-1',
+      roleId: 'user',
+      scopeType: 'global',
+      scopeId: null,
+      status: 'ACTIVE',
+      validUntil: null,
+    }
+    const db = {
+      prepare: () => ({
+        bind: () => ({
+          run: async () => ({ meta: { changes: 2 } }),
+          first: async <T>() => stored as T,
+        }),
+      }),
+    } as unknown as D1Database
+
+    await expect(ensureBaseUserRole(db, 'user-1', NOW)).resolves.toBeUndefined()
+  })
+
+  it('fails closed when the deterministic assignment id belongs to a different subject', async () => {
+    const db = {
+      prepare: () => ({
+        bind: () => ({
+          run: async () => ({ meta: { changes: 0 } }),
+          first: async <T>() => ({
+            id: 'base-user-user-1',
+            subjectId: 'user-2',
+            roleId: 'user',
+            scopeType: 'global',
+            scopeId: null,
+            status: 'ACTIVE',
+            validUntil: null,
+          }) as T,
+        }),
+      }),
+    } as unknown as D1Database
+
+    await expect(ensureBaseUserRole(db, 'user-1', NOW))
+      .rejects.toThrow('base role materialization postcondition failed')
   })
 
   it('rejects invalid subjects before persistence', async () => {

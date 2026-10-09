@@ -1,18 +1,26 @@
+import { activateEmailVerifiedAccount } from '../account/account-state-transition.js'
 import { ensureBaseUserRole } from '../authz/role-assignment.js'
+import { dispatchAuthEmail, escapeAuthEmailHtml, type AuthEmailEnvironment } from './email-delivery.js'
 import { betterAuth } from 'better-auth'
 import { bearer } from 'better-auth/plugins'
 
-export interface BetterAuthEnv {
+export interface BetterAuthEnv extends AuthEmailEnvironment {
   D1_01: D1Database
+  BETTER_AUTH_SECRET?: string
+  AUTH_PUBLIC_BASE_URL?: string
 }
 
-export const createLuckReadAuth = (env: BetterAuthEnv) =>
-  betterAuth({
+export const createLuckReadAuth = (env: BetterAuthEnv) => {
+  const publicBaseURL = (env.AUTH_PUBLIC_BASE_URL?.trim() || 'https://luckread.com').replace(/\/+$/, '')
+  return betterAuth({
+    secret: env.BETTER_AUTH_SECRET,
+    baseURL: publicBaseURL,
     // W02 is the platform identity authority. Better Auth uses native D1
     // persistence here; Payload is not an authentication/database adapter.
     database: env.D1_01,
     basePath: '/api/auth',
     trustedOrigins: [
+      publicBaseURL,
       'https://luckread-w02.internal',
       'https://luckread.com',
       'https://www.luckread.com',
@@ -24,13 +32,37 @@ export const createLuckReadAuth = (env: BetterAuthEnv) =>
     emailAndPassword: {
       enabled: true,
       disableSignUp: false,
-      requireEmailVerification: false,
+      requireEmailVerification: true,
       autoSignIn: false,
       minPasswordLength: 15,
       maxPasswordLength: 128,
       revokeSessionsOnPasswordReset: true,
-      sendResetPassword: async () => {
-        throw new Error('PASSWORD_RESET_DELIVERY_UNCONFIGURED')
+      sendResetPassword: async ({ user, url }) => {
+        const safeURL = escapeAuthEmailHtml(url)
+        await dispatchAuthEmail(env, {
+          to: user.email,
+          subject: 'Reset your LuckRead password',
+          text: 'Use this link to reset your LuckRead password: ' + url,
+          html: '<p>Use the link below to reset your LuckRead password.</p><p><a href="' + safeURL + '">Reset password</a></p>',
+        })
+      },
+    },
+    emailVerification: {
+      sendOnSignUp: true,
+      sendOnSignIn: false,
+      autoSignInAfterVerification: false,
+      expiresIn: 60 * 60,
+      sendVerificationEmail: async ({ user, url }) => {
+        const safeURL = escapeAuthEmailHtml(url)
+        await dispatchAuthEmail(env, {
+          to: user.email,
+          subject: 'Verify your LuckRead email',
+          text: 'Verify your LuckRead email address: ' + url,
+          html: '<p>Welcome to LuckRead.</p><p>Confirm your email address to activate your account and enable social interactions.</p><p><a href="' + safeURL + '">Verify email address</a></p><p>This link expires in 60 minutes.</p>',
+        })
+      },
+      afterEmailVerification: async (user) => {
+        await activateEmailVerifiedAccount(env.D1_01, String(user.id))
       },
     },
     databaseHooks: {
@@ -43,6 +75,14 @@ export const createLuckReadAuth = (env: BetterAuthEnv) =>
       },
     },
     user: {
+      // The authoritative D1-01 identity schema uses snake_case physical
+      // columns. Keep Better Auth's logical API fields while mapping storage
+      // explicitly to the admitted migration.
+      fields: {
+        emailVerified: 'email_verified',
+        createdAt: 'created_at',
+        updatedAt: 'updated_at',
+      },
       additionalFields: {
         username: {
           type: 'string',
@@ -84,7 +124,36 @@ export const createLuckReadAuth = (env: BetterAuthEnv) =>
         },
       },
     },
+    account: {
+      fields: {
+        accountId: 'account_id',
+        providerId: 'provider_id',
+        userId: 'user_id',
+        accessToken: 'access_token',
+        refreshToken: 'refresh_token',
+        idToken: 'id_token',
+        accessTokenExpiresAt: 'access_token_expires_at',
+        refreshTokenExpiresAt: 'refresh_token_expires_at',
+        createdAt: 'created_at',
+        updatedAt: 'updated_at',
+      },
+    },
+    verification: {
+      fields: {
+        expiresAt: 'expires_at',
+        createdAt: 'created_at',
+        updatedAt: 'updated_at',
+      },
+    },
     session: {
+      fields: {
+        userId: 'user_id',
+        expiresAt: 'expires_at',
+        ipAddress: 'ip_address',
+        userAgent: 'user_agent',
+        createdAt: 'created_at',
+        updatedAt: 'updated_at',
+      },
       expiresIn: 60 * 60 * 24 * 7,
       updateAge: 60 * 60 * 24,
       modelName: 'session',
@@ -97,3 +166,4 @@ export const createLuckReadAuth = (env: BetterAuthEnv) =>
       },
     },
   })
+}

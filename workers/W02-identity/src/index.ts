@@ -1,4 +1,5 @@
 import { createLuckReadAuth } from './auth/better-auth.js'
+import { hasAuthEmailConfig } from './auth/email-delivery.js'
 import { publishPendingAccountStateEvents } from './account/publication-journal-publisher.js'
 import { resolveGlobalLayer } from './authz/role-assignment.js'
 import {
@@ -11,8 +12,12 @@ import { resolveBetterAuthPrincipal } from './auth/principal.js'
 
 interface Env {
   D1_01: D1Database
+  BETTER_AUTH_SECRET?: string
   AUTH013_QUEUE: Queue
   AUTH013_PROJECTION_QUEUE: Queue
+  RESEND_API_KEY?: string
+  AUTH_EMAIL_FROM?: string
+  AUTH_PUBLIC_BASE_URL?: string
 }
 
 type ResolveLayerRequest = {
@@ -39,11 +44,52 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
 })
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url)
 
     if (url.pathname === '/api/auth' || url.pathname.startsWith('/api/auth/')) {
-      return createLuckReadAuth({ D1_01: env.D1_01 }).handler(request)
+      const emailDependentEndpoints = new Set([
+        '/api/auth/sign-up/email',
+        '/api/auth/send-verification-email',
+        '/api/auth/request-password-reset',
+      ])
+      if (emailDependentEndpoints.has(url.pathname) && !hasAuthEmailConfig(env)) {
+        return json({
+          error: {
+            code: 'SERVICE_UNAVAILABLE',
+            message: 'Authentication email delivery is not configured',
+          },
+        }, 503)
+      }
+
+      const authResponse = await createLuckReadAuth({
+        D1_01: env.D1_01,
+        BETTER_AUTH_SECRET: env.BETTER_AUTH_SECRET,
+        RESEND_API_KEY: env.RESEND_API_KEY,
+        AUTH_EMAIL_FROM: env.AUTH_EMAIL_FROM,
+        AUTH_PUBLIC_BASE_URL: env.AUTH_PUBLIC_BASE_URL,
+        waitUntil: (promise) => ctx.waitUntil(promise),
+      }).handler(request)
+
+      if (authResponse.status === 403) {
+        const diagnosticPayload = await authResponse.clone().json().catch(() => null) as { code?: unknown } | null
+        if (diagnosticPayload?.code === 'INVALID_ORIGIN') {
+          const originHeader = request.headers.get('origin')
+          const refererHeader = request.headers.get('referer')
+          const safeOrigin = (value: string | null): string => {
+            if (!value) return 'ABSENT'
+            try { return new URL(value).origin } catch { return 'INVALID' }
+          }
+          console.warn(JSON.stringify({
+            event: 'auth.origin.validation_failed',
+            requestOrigin: safeOrigin(originHeader),
+            refererOrigin: safeOrigin(refererHeader),
+            requestUrlOrigin: new URL(request.url).origin,
+          }))
+        }
+      }
+
+      return authResponse
     }
 
     if (request.method === 'POST' && url.pathname === '/internal/account/transition') {
@@ -189,7 +235,10 @@ export default {
       }
 
       try {
-        const auth = createLuckReadAuth({ D1_01: env.D1_01 })
+        const auth = createLuckReadAuth({
+          D1_01: env.D1_01,
+          BETTER_AUTH_SECRET: env.BETTER_AUTH_SECRET,
+        })
         const current = await auth.api.getSession({ headers: request.headers, query: {} })
         if (!current?.user?.id) {
           return json({ error: { code: 'UNAUTHENTICATED', message: 'authentication required' } }, 401)

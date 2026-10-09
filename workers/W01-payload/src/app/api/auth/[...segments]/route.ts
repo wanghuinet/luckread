@@ -44,6 +44,7 @@ const handler = async (
   // the required W01 profile projection.
   const canonicalW01AuthEndpoints = new Set([
     'sign-up/email',
+    'send-verification-email',
     'change-password',
     'request-password-reset',
     'reset-password',

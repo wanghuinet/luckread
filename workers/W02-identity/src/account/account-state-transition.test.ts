@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import {
+  activateEmailVerifiedAccount,
   applyAccountStateTransition,
   authorizeAccountStateTransition,
   type AccountStateTransitionInput,
@@ -21,12 +22,13 @@ function input(overrides: Partial<AccountStateTransitionInput> = {}): AccountSta
 
 function fakeDb(
   initial: { state: string; version: number },
-  options: { failBatch?: boolean; missingUser?: boolean; forceJournalConflict?: boolean } = {},
+  options: { failBatch?: boolean; missingUser?: boolean; forceJournalConflict?: boolean; roleAssignmentChanges?: number } = {},
 ) {
   const row = { ...initial }
   let batchCalls = 0
   let lastJournal: Record<string, unknown> | null = null
   let sessionRevocation: unknown[] | null = null
+  let grantedRole: { sql: string; args: unknown[] } | null = null
 
   const db = {
     prepare(sql: string) {
@@ -71,10 +73,12 @@ function fakeDb(
       row.state = nextState
       row.version += 1
 
-      if (statements.length === 3) {
-        sessionRevocation = statements[2].args
-        if (statements[2].sql !== 'DELETE FROM "session" WHERE user_id = ?') {
-          throw new Error('account-state session invalidation must target Better Auth session table')
+      for (const statement of statements) {
+        if (statement.sql === 'DELETE FROM "session" WHERE user_id = ?') {
+          sessionRevocation = statement.args
+        }
+        if (statement.sql.includes('INSERT INTO role_assignments')) {
+          grantedRole = { sql: statement.sql, args: statement.args }
         }
       }
 
@@ -95,7 +99,15 @@ function fakeDb(
         lastErrorCode: journalArgs[12],
       }
 
-      return statements.map((_, index) => ({ meta: { changes: index < 2 ? 1 : 2 } }))
+      return statements.map((statement, index) => ({
+        meta: {
+          changes: statement.sql === 'DELETE FROM "session" WHERE user_id = ?'
+            ? 0
+            : statement.sql.includes('INSERT INTO role_assignments')
+              ? (options.roleAssignmentChanges ?? 1)
+              : index < 2 ? 1 : 1,
+        },
+      }))
     },
   }
 
@@ -105,6 +117,7 @@ function fakeDb(
     batchCalls: () => batchCalls,
     journal: () => lastJournal,
     sessionRevocation: () => sessionRevocation,
+    grantedRole: () => grantedRole,
   }
 }
 
@@ -591,5 +604,93 @@ describe('AUTH-013 canonical state-machine coverage', () => {
       expect(fake.batchCalls()).toBe(0)
       expect(fake.row).toEqual({ state: transition.from, version: 7 })
     }
+  })
+})
+
+
+describe('AUTH-013 verified-email account activation', () => {
+  it('atomically activates a pending account and grants the canonical L2 role', async () => {
+    const fake = fakeDb({ state: 'PENDING_VERIFICATION', version: 1 })
+
+    await expect(activateEmailVerifiedAccount(fake.db, '42', '2026-10-06T20:00:00.000Z'))
+      .resolves.toEqual({
+        activated: true,
+        accountState: 'ACTIVE',
+        accountStateVersion: 2,
+      })
+
+    expect(fake.row).toEqual({ state: 'ACTIVE', version: 2 })
+    expect(fake.batchCalls()).toBe(1)
+    expect(fake.grantedRole()).toMatchObject({
+      sql: expect.stringContaining('INSERT INTO role_assignments'),
+      args: [
+        'verified-user-42',
+        '42',
+        '2026-10-06T20:00:00.000Z',
+        '2026-10-06T20:00:00.000Z',
+        '2026-10-06T20:00:00.000Z',
+      ],
+    })
+    expect(fake.journal()).toMatchObject({
+      eventType: 'identity.account_state_changed',
+      resourceId: '42',
+      sourceVersion: 2,
+      status: 'PENDING',
+    })
+  })
+
+  it('accepts trigger-inflated D1 change metadata for verified-role materialization', async () => {
+    const fake = fakeDb(
+      { state: 'PENDING_VERIFICATION', version: 1 },
+      { roleAssignmentChanges: 2 },
+    )
+
+    await expect(activateEmailVerifiedAccount(fake.db, '42', '2026-10-06T20:00:00.000Z'))
+      .resolves.toEqual({
+        activated: true,
+        accountState: 'ACTIVE',
+        accountStateVersion: 2,
+      })
+
+    expect(fake.row).toEqual({ state: 'ACTIVE', version: 2 })
+    expect(fake.batchCalls()).toBe(1)
+    expect(fake.grantedRole()).toMatchObject({
+      sql: expect.stringContaining('INSERT INTO role_assignments'),
+      args: ['verified-user-42', '42', '2026-10-06T20:00:00.000Z', '2026-10-06T20:00:00.000Z', '2026-10-06T20:00:00.000Z'],
+    })
+    expect(fake.journal()).toMatchObject({
+      eventType: 'identity.account_state_changed',
+      resourceId: '42',
+      sourceVersion: 2,
+      status: 'PENDING',
+    })
+  })
+
+  it('does not repeat state or role writes for an already-active account', async () => {
+    const fake = fakeDb({ state: 'ACTIVE', version: 2 })
+
+    await expect(activateEmailVerifiedAccount(fake.db, '42', '2026-10-06T20:00:00.000Z'))
+      .resolves.toEqual({
+        activated: false,
+        accountState: 'ACTIVE',
+        accountStateVersion: 2,
+      })
+
+    expect(fake.batchCalls()).toBe(0)
+    expect(fake.grantedRole()).toBeNull()
+  })
+
+  it('does not activate a blocked account from an email-verification callback', async () => {
+    const fake = fakeDb({ state: 'BANNED', version: 4 })
+
+    await expect(activateEmailVerifiedAccount(fake.db, '42', '2026-10-06T20:00:00.000Z'))
+      .resolves.toEqual({
+        activated: false,
+        accountState: 'BANNED',
+        accountStateVersion: 4,
+      })
+
+    expect(fake.batchCalls()).toBe(0)
+    expect(fake.grantedRole()).toBeNull()
   })
 })

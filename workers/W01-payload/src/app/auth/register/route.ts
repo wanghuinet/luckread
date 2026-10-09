@@ -334,6 +334,7 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
         name: normalized.username,
         username: normalized.username,
         password: normalized.credential,
+        callbackURL: 'https://luckread.com/login?verified=1',
       },
     })
   } catch {
@@ -344,6 +345,22 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
   let authPayload: unknown = null
   try { authPayload = await authResponse.json() } catch {}
   if (!authResponse.ok) {
+    const authEnvelope = isRecord(authPayload) ? authPayload : null
+    const nestedAuthError = authEnvelope && isRecord(authEnvelope.error) ? authEnvelope.error : null
+    const rawAuthErrorCode =
+      typeof authEnvelope?.code === 'string'
+        ? authEnvelope.code
+        : typeof nestedAuthError?.code === 'string'
+          ? nestedAuthError.code
+          : 'UNCLASSIFIED'
+    const diagnosticCode = /^[A-Z0-9_:-]{1,80}$/.test(rawAuthErrorCode)
+      ? rawAuthErrorCode
+      : 'UNCLASSIFIED'
+    console.warn(JSON.stringify({
+      event: 'auth.register.better_auth_rejected',
+      upstreamStatus: authResponse.status,
+      diagnosticCode,
+    }))
     await releaseReservation()
     return errorResponse(
       authResponse.status >= 500 ? 503 : 422,

@@ -28,15 +28,42 @@ export async function ensureBaseUserRole(
   }
 
   const roleId = 'base-user-' + subjectId
-  const result = await db
+  // D1 change metadata can include effects caused by role-version triggers.
+  // Do not use meta.changes as an insert cardinality signal; verify the
+  // deterministic assignment that must exist after INSERT OR IGNORE instead.
+  await db
     .prepare(
       "INSERT OR IGNORE INTO role_assignments\n        (id, subject_id, role_id, scope_type, scope_id, status, valid_from, valid_until, created_at, updated_at)\n       VALUES (?, ?, 'user', 'global', NULL, 'ACTIVE', ?, NULL, ?, ?)",
     )
     .bind(roleId, subjectId, now, now, now)
     .run()
 
-  if (result.meta?.changes !== undefined && result.meta.changes > 1) {
-    throw new Error('base role materialization was ambiguous')
+  const persisted = await db
+    .prepare(
+      'SELECT id, subject_id AS subjectId, role_id AS roleId, scope_type AS scopeType, scope_id AS scopeId, status, valid_until AS validUntil FROM role_assignments WHERE id = ? LIMIT 1',
+    )
+    .bind(roleId)
+    .first<{
+      id: string
+      subjectId: string
+      roleId: string
+      scopeType: string
+      scopeId: string | null
+      status: string
+      validUntil: string | null
+    }>()
+
+  if (
+    !persisted ||
+    persisted.id !== roleId ||
+    persisted.subjectId !== subjectId ||
+    persisted.roleId !== 'user' ||
+    persisted.scopeType !== 'global' ||
+    persisted.scopeId !== null ||
+    persisted.status !== 'ACTIVE' ||
+    persisted.validUntil !== null
+  ) {
+    throw new Error('base role materialization postcondition failed')
   }
 }
 const roleToLayer = new Map<string, string>()
