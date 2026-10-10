@@ -25,6 +25,13 @@ const result = {
   status: 'PENDING',
 }
 
+const hasCredentialField = (value) => {
+  if (!value || typeof value !== 'object') return false
+  if (Array.isArray(value)) return value.some(hasCredentialField)
+  return Object.entries(value).some(([key, nested]) =>
+    /^(?:token|accessToken|refreshToken|sessionToken)$/i.test(key) || hasCredentialField(nested))
+}
+
 const safeErrorCode = (value) => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null
   if (typeof value.code === 'string' && /^[A-Za-z0-9_-]{1,80}$/.test(value.code)) return value.code
@@ -167,6 +174,7 @@ if (!email || !password) {
     loginCheck.pass = login.facts.status === 200 &&
       login.json?.data?.user && typeof login.json.data.user.id === 'string' &&
       typeof login.json.data.user.email === 'string' &&
+      login.json.data.user.email.trim().toLowerCase() === email.trim().toLowerCase() &&
       login.json.data.user.emailVerified === true &&
       login.response?.headers.get('cache-control') === 'no-store'
     console.log(`${loginCheck.pass ? 'PASS' : 'FAIL'} login_success HTTP ${login.facts.status}`)
@@ -184,15 +192,16 @@ if (!email || !password) {
       loginCheck.userIdComparedInMemory = true
       loginCheck.cookieNames = jar.names()
       loginCheck.nativeSessionHeaderPresent = Boolean(sessionToken)
-      loginCheck.jsonContainsCredential = JSON.stringify(login.json).includes(sessionToken) && Boolean(sessionToken)
-      loginCheck.jsonContainsCredential = loginCheck.jsonContainsCredential || Object.prototype.hasOwnProperty.call(login.json, 'token')
+      loginCheck.jsonContainsCredential = Boolean(sessionToken) && (
+        JSON.stringify(login.json).includes(sessionToken) || hasCredentialField(login.json)
+      )
 
       check('login_returns_native_session_header', Boolean(sessionToken), {
         headerName: 'X-LuckRead-Session-Token',
         status: login.facts.status,
       })
-      check('login_json_does_not_contain_session_credential', Boolean(sessionToken) && !JSON.stringify(login.json).includes(sessionToken) &&
-        !Object.prototype.hasOwnProperty.call(login.json, 'token'), { status: login.facts.status })
+      check('login_json_does_not_contain_session_credential', Boolean(sessionToken) &&
+        !JSON.stringify(login.json).includes(sessionToken) && !hasCredentialField(login.json), { status: login.facts.status })
       check('login_sets_browser_cookie', Boolean(staleCookieHeader) && login.cookies.some(x => /better-auth\.session_token=|__Secure-better-auth\.session_token=|__Host-better-auth\.session_token=/.test(x)), {
         setCookieCount: login.cookies.length,
         cookieNames: jar.names(),
@@ -213,6 +222,9 @@ if (!email || !password) {
         cacheControl: cookieSession.facts.cacheControl,
       })
 
+      const cookieUpdatedToken = cookieSession.response?.headers.get('x-luckread-session-token')
+      if (cookieUpdatedToken) sessionToken = cookieUpdatedToken
+
       const bearerSession = await request('session_read_by_bearer', 'GET', '/api/v1/auth/session', {
         headers: { authorization: `Bearer ${sessionToken}` },
       })
@@ -232,7 +244,7 @@ if (!email || !password) {
         headers: { cookie: jar.header() || staleCookieHeader },
       })
       check('protected_profile_by_cookie', profileCookie.facts.status === 200 &&
-        profileCookie.json?.id === userId, {
+        typeof profileCookie.json?.email === 'string' && profileCookie.json.email.trim().toLowerCase() === email.trim().toLowerCase(), {
         status: profileCookie.facts.status,
         cfRay: profileCookie.facts.cfRay,
       })
@@ -241,24 +253,32 @@ if (!email || !password) {
         headers: { authorization: `Bearer ${sessionToken}` },
       })
       check('protected_profile_by_bearer', profileBearer.facts.status === 200 &&
-        profileBearer.json?.id === userId, {
+        typeof profileBearer.json?.email === 'string' && profileBearer.json.email.trim().toLowerCase() === email.trim().toLowerCase(), {
         status: profileBearer.facts.status,
         cfRay: profileBearer.facts.cfRay,
       })
 
+      const revocationCookieHeader = jar.header() || staleCookieHeader
+      const revokedBearerToken = sessionToken
       const logout = await request('logout_revokes_current_session', 'POST', '/api/v1/auth/logout', {
-        headers: { cookie: jar.header() || staleCookieHeader },
+        headers: { cookie: revocationCookieHeader },
       })
       jar.update(logout.cookies)
-      check('logout_revokes_current_session', logout.facts.status === 204 && logout.raw.length === 0, {
+      check('logout_revokes_current_session', logout.facts.status === 204 && logout.raw.length === 0 &&
+        !logout.response?.headers.get('x-luckread-session-token'), {
         status: logout.facts.status,
         cfRay: logout.facts.cfRay,
         bodyEmpty: logout.raw.length === 0,
         clearsCookie: logout.cookies.some(x => /better-auth\.session_token=|__Secure-better-auth\.session_token=|__Host-better-auth\.session_token=/.test(x) && /max-age=0|expires=/i.test(x)),
       })
 
+      check('logout_clears_browser_cookie', logout.cookies.some(x => /better-auth\\.session_token=|__Secure-better-auth\\.session_token=|__Host-better-auth\\.session_token=/.test(x) && /max-age=0|expires=/i.test(x)), {
+        status: logout.facts.status,
+        setCookieCount: logout.cookies.length,
+      })
+
       const staleCookieSession = await request('revoked_cookie_session_denied', 'GET', '/api/v1/auth/session', {
-        headers: { cookie: staleCookieHeader },
+        headers: { cookie: revocationCookieHeader },
       })
       check('revoked_cookie_session_denied', staleCookieSession.facts.status === 401, {
         status: staleCookieSession.facts.status,
@@ -267,7 +287,7 @@ if (!email || !password) {
       })
 
       const staleBearerSession = await request('revoked_bearer_session_denied', 'GET', '/api/v1/auth/session', {
-        headers: { authorization: `Bearer ${sessionToken}` },
+        headers: { authorization: `Bearer ${revokedBearerToken}` },
       })
       check('revoked_bearer_session_denied', staleBearerSession.facts.status === 401, {
         status: staleBearerSession.facts.status,
