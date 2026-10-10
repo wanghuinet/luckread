@@ -126,9 +126,11 @@ True refresh-token rotation, expiry/reuse detection, and rotation lineage remain
 
 ## 6. Real runtime acceptance
 
-Manual workflow: [APP Auth Session Live E2E](../../.github/workflows/app-auth-session-live-e2e.yml)
+The existing [W01/W02 binding deployment workflow](../../.github/workflows/w01-w02-binding-deploy.yml) now enforces the live session acceptance **after both Workers deploy**. It checks that the two QA repository secrets exist before making any production deployment, then runs the session test against `https://luckread.com`, bound to the exact `source_sha` being deployed. A deployment run cannot report overall success unless the session E2E passes.
 
-It uses an existing, registered, email-verified QA account to test the following sequence against `https://luckread.com`:
+For an explicit rerun after deployment, use the [APP Auth Session Live E2E workflow](../../.github/workflows/app-auth-session-live-e2e.yml).
+
+Both workflows use an existing, registered, email-verified QA account to test the following sequence:
 
 1. successful login returns HTTP 200, the stable user DTO, `Set-Cookie`, and `X-LuckRead-Session-Token`;
 2. the session credential is absent from JSON;
