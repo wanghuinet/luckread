@@ -1,4 +1,4 @@
-import { createLuckReadAuth } from './better-auth.js'
+import { createLuckReadAuth, type BetterAuthEnv } from './better-auth.js'
 import { resolveGlobalLayer, type LayerResolution } from '../authz/role-assignment.js'
 
 type AuthSession = {
@@ -27,11 +27,12 @@ const toIso = (value: Date | string): string =>
   value instanceof Date ? value.toISOString() : new Date(value).toISOString()
 
 export async function resolveBetterAuthPrincipal(
-  db: D1Database,
+  env: BetterAuthEnv,
   request: Request,
   now = new Date().toISOString(),
 ): Promise<AuthenticatedPrincipal | null> {
-  const auth = createLuckReadAuth({ D1_01: db })
+  const db = env.D1_01
+  const auth = createLuckReadAuth(env)
 
   const result = await auth.api.getSession({
     headers: request.headers,
