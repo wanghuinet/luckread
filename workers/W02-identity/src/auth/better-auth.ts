@@ -62,6 +62,47 @@ async function sendVerificationEmail(
   }
 }
 
+
+async function sendPasswordResetEmail(
+  env: BetterAuthEnv,
+  input: { user: { email: string }; url: string },
+): Promise<void> {
+  const apiKey = env.RESEND_API_KEY?.trim()
+  const from = env.AUTH_EMAIL_FROM?.trim()
+  if (!apiKey || !from) {
+    console.error(JSON.stringify({
+      event: 'auth.password_reset.delivery_unconfigured',
+      diagnosticCode: 'AUTH_PASSWORD_RESET_DELIVERY_UNCONFIGURED',
+    }))
+    throw new Error('PASSWORD_RESET_DELIVERY_UNCONFIGURED')
+  }
+
+  const safeUrl = escapeHtml(input.url)
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      authorization: 'Bearer ' + apiKey,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      from,
+      to: [input.user.email],
+      subject: 'Reset your LuckRead password',
+      text: 'Reset your LuckRead password by opening this link: ' + input.url,
+      html: '<p>We received a request to reset your LuckRead password.</p><p>If you requested this, use the link below to choose a new password:</p><p><a href="' + safeUrl + '">Reset password</a></p><p>If you did not request this, you can ignore this email.</p>',
+    }),
+  })
+
+  if (!response.ok) {
+    console.error(JSON.stringify({
+      event: 'auth.password_reset.delivery_failure',
+      diagnosticCode: 'AUTH_PASSWORD_RESET_DELIVERY_FAILED',
+      status: response.status,
+    }))
+    throw new Error('PASSWORD_RESET_DELIVERY_FAILED')
+  }
+}
+
 async function activateVerifiedAccount(db: D1Database, userId: string): Promise<void> {
   const readCurrent = () => db
     .prepare(
@@ -120,8 +161,8 @@ export const createLuckReadAuth = (env: BetterAuthEnv) =>
       minPasswordLength: 15,
       maxPasswordLength: 128,
       revokeSessionsOnPasswordReset: true,
-      sendResetPassword: async () => {
-        throw new Error('PASSWORD_RESET_DELIVERY_UNCONFIGURED')
+      sendResetPassword: async ({ user, url }) => {
+        await sendPasswordResetEmail(env, { user, url })
       },
     },
     emailVerification: {
