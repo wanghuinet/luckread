@@ -138,9 +138,9 @@ async function activateVerifiedAccount(db: D1Database, userId: string): Promise<
 }
 
 const sanitizeAuthDiagnostic = (value: string): string => value
-  .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}/gi, '[redacted-email]')
-  .replace(/https?:\\/\\/[^\\s"'<>]+/gi, '[redacted-url]')
-  .replace(/(token|secret|password|authorization|api[_-]?key)\\s*[:=]\\s*[^\\s,;]+/gi, '$1=[redacted]')
+  .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '[redacted-email]')
+  .replace(/https?:\/\/[^\s"'<>]+/gi, '[redacted-url]')
+  .replace(/(token|secret|password|authorization|api[_-]?key)\s*[:=]\s*[^\s,;]+/gi, '$1=[redacted]')
   .slice(0, 240)
 
 export const createLuckReadAuth = (env: BetterAuthEnv) =>
