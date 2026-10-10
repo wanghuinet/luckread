@@ -52,7 +52,7 @@ function ResetPasswordForm() {
 
     setBusy(true)
     try {
-      const { response, data } = await fetchJson<{ error?: { message?: string } }>('/api/v1/auth/password/reset/confirm', {
+      const { response, data } = await fetchJson<{ error?: { code?: string; message?: string } }>('/api/v1/auth/password/reset/confirm', {
         method: 'POST',
         credentials: 'include',
         cache: 'no-store',
