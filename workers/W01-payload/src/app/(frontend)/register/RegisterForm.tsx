@@ -46,7 +46,14 @@ export default function RegisterForm({ policyVersion }: RegisterFormProps) {
       })
 
       if (!response.ok) {
-        throw new Error(getApiErrorMessage(payload, '验证邮件暂时无法发送，请点击重试。'))
+        if (response.status === 429) {
+          throw new Error('验证邮件请求过于频繁，请稍后再试。')
+        }
+        if (response.status >= 500) {
+          throw new Error('账号已创建，但验证邮件服务暂时不可用。请稍后点击重试。')
+        }
+        const apiMessage = getApiErrorMessage(payload, '')
+        throw new Error(/[\u3400-\u9fff]/.test(apiMessage) ? apiMessage : '验证邮件请求未能处理，请检查邮箱后重试。')
       }
 
       setVerificationStatus('sent')
