@@ -70,11 +70,14 @@ function ResetPasswordForm() {
         if (response.status >= 500) {
           throw new Error('密码重置服务暂时不可用，请稍后重试。')
         }
+        const apiMessage = getApiErrorMessage(data, '')
+        if (/[\u3400-\u9fff]/.test(apiMessage) && data?.error?.code?.toUpperCase() !== 'RESET_TOKEN_INVALID_OR_EXPIRED') {
+          throw new Error(apiMessage)
+        }
         if (response.status === 400 || response.status === 401 || response.status === 422) {
           throw new Error('重置链接无效、已过期或已使用。请重新申请密码找回邮件。')
         }
-        const apiMessage = getApiErrorMessage(data, '')
-        throw new Error(/[\u3400-\u9fff]/.test(apiMessage) ? apiMessage : '密码重置未能完成，请稍后重试。')
+        throw new Error('密码重置未能完成，请稍后重试。')
       }
 
       setRecoveryToken('')
