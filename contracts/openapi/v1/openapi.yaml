@@ -1708,6 +1708,9 @@ paths:
         cookie or Authorization Bearer session credential instead.
       deprecated: true
       operationId: authRefresh
+      security:
+        - sessionCookieAuth: []
+        - bearerAuth: []
       x-luckread-contract-status: DEPRECATED_COMPATIBILITY_ALIAS
       responses:
         '200':
