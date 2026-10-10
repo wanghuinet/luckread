@@ -8,6 +8,7 @@ on:
       - 'workers/W02-identity/src/authz/**'
       - 'workers/W02-identity/src/account/**'
       - 'workers/W02-identity/src/index.ts'
+      - 'workers/W02-identity/wrangler.jsonc'
       - '.github/workflows/w02-session-runtime-ci.yml'
   pull_request:
     paths:
@@ -15,6 +16,7 @@ on:
       - 'workers/W02-identity/src/authz/**'
       - 'workers/W02-identity/src/account/**'
       - 'workers/W02-identity/src/index.ts'
+      - 'workers/W02-identity/wrangler.jsonc'
       - '.github/workflows/w02-session-runtime-ci.yml'
   workflow_dispatch:
 
@@ -36,8 +38,27 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
-      - name: Run W02 principal and Resend delivery tests
-        run: npx vitest@3.2.4 run workers/W02-identity/src/auth/principal.test.ts workers/W02-identity/src/auth/resend-email.test.ts workers/W02-identity/src/auth/session-list.test.ts
+      - name: Verify session rate-limit bindings reuse established namespaces
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs'
+          const config = JSON.parse(fs.readFileSync('workers/W02-identity/wrangler.jsonc', 'utf8'))
+          const actual = new Map((config.ratelimits ?? []).map(binding => [binding.name, binding]))
+          const expected = [
+            ['AUTH_SESSION_READ_LIMITER', '2026100312', 300],
+            ['AUTH_SESSION_WRITE_LIMITER', '2026100320', 60],
+          ]
+          for (const [name, namespaceId, limit] of expected) {
+            const binding = actual.get(name)
+            if (!binding || binding.namespace_id !== namespaceId ||
+                binding.simple?.limit !== limit || binding.simple?.period !== 60) {
+              throw new Error('invalid session rate-limit binding: ' + name)
+            }
+          }
+          console.log(JSON.stringify({ sessionRateLimitBindings: expected.map(([name]) => name) }))
+          NODE
+      - name: Run W02 principal, Resend, session-list and session-revoke tests
+        run: npx vitest@3.2.4 run workers/W02-identity/src/auth/principal.test.ts workers/W02-identity/src/auth/resend-email.test.ts workers/W02-identity/src/auth/session-list.test.ts workers/W02-identity/src/auth/session-rate-limit.test.ts workers/W02-identity/src/auth/session-revoke.test.ts
 
   account-state-boundary:
     name: W02 Account State Boundary Tests
