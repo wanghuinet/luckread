@@ -1,0 +1,186 @@
+name: W02 Better Auth Production Schema Readonly
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Exact LuckRead source commit to use for schema expectations
+        required: true
+        default: af6e55c79494bf705390d26e84279d951e60a250
+        type: string
+      database_name:
+        description: Cloudflare display name for D1-01
+        required: true
+        default: luckread
+        type: string
+      confirm:
+        description: Type READONLY to permit remote read-only inspection
+        required: true
+        default: READONLY
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    if: \${{ inputs.confirm == 'READONLY' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact source commit
+        uses: actions/checkout@v4
+        with:
+          ref: \${{ inputs.source_sha }}
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Validate the exact D1-01 target
+        working-directory: workers/W02-identity
+        env:
+          DATABASE_NAME: \${{ inputs.database_name }}
+          EXPECTED_D1_01_ID: "2f80471e-3756-49f9-8db1-7707a433ad64"
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs'
+          const config = JSON.parse(fs.readFileSync('wrangler.jsonc', 'utf8'))
+          const target = config.d1_databases?.find((item) => item.binding === 'D1_01')
+          if (!target) throw new Error('D1_01 binding is missing')
+          if (target.database_name !== process.env.DATABASE_NAME) throw new Error('database_name mismatch; remote query stopped')
+          if (target.database_id !== process.env.EXPECTED_D1_01_ID) throw new Error('database_id mismatch; remote query stopped')
+          console.log(JSON.stringify({
+            binding: target.binding,
+            database_name: target.database_name,
+            database_id: target.database_id,
+            migrations_dir: target.migrations_dir,
+            mode: 'READONLY',
+          }, null, 2))
+          NODE
+
+      - name: Capture remote Better Auth schema without changing data
+        working-directory: workers/W02-identity
+        env:
+          CLOUDFLARE_ACCOUNT_ID: \${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: \${{ secrets.CLOUDFLARE_API_TOKEN }}
+          DATABASE_NAME: \${{ inputs.database_name }}
+        run: |
+          set -euo pipefail
+          out="../../artifacts/w02-better-auth-production-schema"
+          mkdir -p "$out"
+
+          npx --yes wrangler@4.116.0 d1 execute "$DATABASE_NAME" --remote \
+            --config wrangler.jsonc \
+            --command "SELECT name, type, tbl_name, sql FROM sqlite_master WHERE type IN ('table','index','trigger') ORDER BY type, name;" \
+            > "$out/sqlite_master.txt"
+
+          npx --yes wrangler@4.116.0 d1 execute "$DATABASE_NAME" --remote \
+            --config wrangler.jsonc --command "PRAGMA table_list;" > "$out/table_list.txt"
+
+          for table in user session account verification; do
+            npx --yes wrangler@4.116.0 d1 execute "$DATABASE_NAME" --remote \
+              --config wrangler.jsonc --command "PRAGMA table_info('$table');" \
+              > "$out/\${table}_table_info.txt"
+            npx --yes wrangler@4.116.0 d1 execute "$DATABASE_NAME" --remote \
+              --config wrangler.jsonc --command "PRAGMA index_list('$table');" \
+              > "$out/\${table}_index_list.txt"
+            npx --yes wrangler@4.116.0 d1 execute "$DATABASE_NAME" --remote \
+              --config wrangler.jsonc --command "PRAGMA foreign_key_list('$table');" \
+              > "$out/\${table}_foreign_keys.txt"
+          done
+
+          npx --yes wrangler@4.116.0 d1 execute "$DATABASE_NAME" --remote \
+            --config wrangler.jsonc --command "PRAGMA foreign_key_check;" \
+            > "$out/foreign_key_check.txt"
+
+          npx --yes wrangler@4.116.0 d1 execute "$DATABASE_NAME" --remote \
+            --config wrangler.jsonc \
+            --command "SELECT name FROM sqlite_master WHERE type='table' AND name='d1_migrations';" \
+            > "$out/d1_migrations_presence.txt"
+
+          if grep -Fq '"name": "d1_migrations"' "$out/d1_migrations_presence.txt"; then
+            npx --yes wrangler@4.116.0 d1 execute "$DATABASE_NAME" --remote \
+              --config wrangler.jsonc --command "SELECT * FROM d1_migrations ORDER BY id;" \
+              > "$out/d1_migrations.txt"
+          else
+            printf '%s\n' 'TABLE_MISSING: d1_migrations' > "$out/d1_migrations.txt"
+          fi
+
+          cat > "$out/provenance.txt" <<EOF
+          workflow=W02 Better Auth Production Schema Readonly
+          source_sha=\${{ inputs.source_sha }}
+          database_name=\${{ inputs.database_name }}
+          database_id=2f80471e-3756-49f9-8db1-7707a433ad64
+          binding=D1_01
+          mode=READONLY
+          remote_ddl=false
+          remote_dml=false
+          checked_tables=user,session,account,verification
+          EOF
+
+      - name: Report schema and migration findings
+        if: always()
+        working-directory: workers/W02-identity
+        run: |
+          set -uo pipefail
+          out="../../artifacts/w02-better-auth-production-schema"
+          mkdir -p "$out"
+          report="$out/findings.txt"
+          {
+            echo "W02 Better Auth production D1 schema findings"
+            echo "Expected core tables: user, session, account, verification"
+            echo "Expected core migration: 0005_better_auth_identity_core.sql"
+            echo
+            for table in user session account verification; do
+              if grep -Fq "\"name\": \"$table\"" "$out/sqlite_master.txt" 2>/dev/null; then
+                echo "TABLE_PRESENT: $table"
+              else
+                echo "TABLE_MISSING_OR_NOT_CAPTURED: $table"
+              fi
+            done
+            echo
+            if grep -Fq "0005_better_auth_identity_core.sql" "$out/d1_migrations.txt" 2>/dev/null; then
+              echo "MIGRATION_0005_RECORDED: yes"
+            else
+              echo "MIGRATION_0005_RECORDED: no evidence found"
+            fi
+            echo
+            echo "Column checks"
+            check_column() {
+              table="$1"
+              column="$2"
+              file="$out/\${table}_table_info.txt"
+              if grep -Fq "\"name\": \"$column\"" "$file" 2>/dev/null; then
+                echo "COLUMN_PRESENT: $table.$column"
+              else
+                echo "COLUMN_MISSING_OR_NOT_CAPTURED: $table.$column"
+              fi
+            }
+            for column in id name email email_verified account_state account_state_version created_at updated_at; do
+              check_column user "$column"
+            done
+            for column in id expires_at token created_at updated_at ip_address user_agent user_id; do
+              check_column session "$column"
+            done
+            for column in id account_id provider_id user_id access_token refresh_token id_token access_token_expires_at refresh_token_expires_at scope password created_at updated_at; do
+              check_column account "$column"
+            done
+            for column in id identifier value expires_at created_at updated_at; do
+              check_column verification "$column"
+            done
+            echo
+            echo "Foreign-key check (empty result set is expected)"
+            cat "$out/foreign_key_check.txt" 2>/dev/null || true
+          } | tee "$report"
+
+      - name: Upload read-only schema evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: w02-better-auth-production-schema-\${{ inputs.source_sha }}
+          path: artifacts/w02-better-auth-production-schema/
+          if-no-files-found: error
+          retention-days: 14
