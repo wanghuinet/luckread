@@ -96,7 +96,7 @@ export default function RegisterForm({ policyVersion }: RegisterFormProps) {
       return
     }
 
-    const passwordLength = Array.from(password).length
+    const passwordLength = password.length
     if (!password) {
       setStatus('error')
       setMessage('请输入登录密码。')
