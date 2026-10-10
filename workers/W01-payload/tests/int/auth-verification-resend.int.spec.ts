@@ -66,6 +66,33 @@ describe('public email verification resend API', () => {
     expect(await response.text()).toBe('')
   })
 
+  it('does not report unexpected upstream 4xx responses as accepted mail requests', async () => {
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    mocks.proxyBetterAuth.mockResolvedValue(new Response(JSON.stringify({
+      error: { code: 'INVALID_ORIGIN' },
+    }), { status: 400 }))
+
+    const response = await POST(request({ identity: 'reader@example.com' }))
+    expect(response.status).toBe(503)
+    const serializedLogs = warning.mock.calls.flat().join(' ')
+    expect(serializedLogs).toContain('AUTH_EMAIL_VERIFICATION_UPSTREAM_REJECTION')
+    expect(serializedLogs).toContain('INVALID_ORIGIN')
+    expect(serializedLogs).not.toContain('reader@example.com')
+    warning.mockRestore()
+  })
+
+  it('keeps expected no-op outcomes private while reporting server failures', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    mocks.proxyBetterAuth.mockResolvedValue(new Response(JSON.stringify({
+      error: { code: 'EMAIL_PROVIDER_UNAVAILABLE' },
+    }), { status: 500 }))
+
+    const response = await POST(request({ identity: 'reader@example.com' }))
+    expect(response.status).toBe(503)
+    expect(error.mock.calls.flat().join(' ')).toContain('AUTH_EMAIL_VERIFICATION_UPSTREAM_FAILURE')
+    error.mockRestore()
+  })
+
   it('rejects malformed requests before invoking Better Auth', async () => {
     const response = await POST(request({ identity: 'not-an-email' }))
     expect(response.status).toBe(422)
