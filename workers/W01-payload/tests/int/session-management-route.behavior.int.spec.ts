@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
-  proxyBetterAuth: vi.fn(),
+  listSessions: vi.fn(),
   revokeSessionById: vi.fn(),
   enforcePublicReadRateLimit: vi.fn(),
   enforceW01WriteRateLimit: vi.fn(),
@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => ({
 }))
 
 vi.mock('../../src/auth/w02-session-client.js', () => ({
-  proxyBetterAuth: mocks.proxyBetterAuth,
+  listSessions: mocks.listSessions,
   revokeSessionById: mocks.revokeSessionById,
   W02AuthClientError: class extends Error {
     status: number
@@ -30,40 +30,25 @@ vi.mock('../../src/auth/traffic-limit.js', () => ({
 import { DELETE, GET } from '../../src/app/auth/sessions/[[...segments]]/route.js'
 
 const context = (segments: string[] = []) => ({ params: Promise.resolve({ segments }) })
-const session = (id: string, createdAt: string) => ({
-  id,
-  createdAt,
-  expiresAt: '2026-12-01T00:00:00.000Z',
-  userId: 'owner-user',
-  token: 'must-not-be-returned',
-})
-
-const jsonResponse = (value: unknown, status = 200) =>
-  new Response(JSON.stringify(value), { status, headers: { 'content-type': 'application/json' } })
-
-const cursorId = (value: string): string => {
-  const encoded = value.slice(3).replace(/-/g, '+').replace(/_/g, '/')
-  return atob(encoded + '='.repeat((4 - encoded.length % 4) % 4))
-}
 
 describe('session management route behavior', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mocks.proxyBetterAuth.mockReset()
+    mocks.listSessions.mockReset()
     mocks.revokeSessionById.mockReset()
     mocks.enforcePublicReadRateLimit.mockResolvedValue(undefined)
     mocks.enforceW01WriteRateLimit.mockResolvedValue(undefined)
     mocks.revokeSessionById.mockResolvedValue(undefined)
   })
 
-  it('returns the current session at the envelope and excludes secrets from session items', async () => {
-    mocks.proxyBetterAuth
-      .mockResolvedValueOnce(jsonResponse([
-        session('session-3', '2026-10-03T00:00:00.000Z'),
-        session('session-2', '2026-10-02T00:00:00.000Z'),
-        session('session-1', '2026-10-01T00:00:00.000Z'),
-      ]))
-      .mockResolvedValueOnce(jsonResponse({ session: { id: 'session-2' } }))
+  it('returns the W02 session-list envelope without allowing shared caching', async () => {
+    mocks.listSessions.mockResolvedValue({
+      items: [
+        { sessionId: 'session-2', createdAt: '2026-10-02T00:00:00.000Z', expiresAt: '2026-12-01T00:00:00.000Z', lastSeenAt: null },
+      ],
+      currentSessionId: 'session-2',
+      nextCursor: null,
+    })
 
     const response = await GET(
       new Request('https://luckread.test/api/v1/auth/sessions?limit=2', {
@@ -71,70 +56,42 @@ describe('session management route behavior', () => {
       }),
       context(),
     )
-    const payload = await response.json() as {
-      items: Array<Record<string, unknown>>
-      currentSessionId: string
-      nextCursor: string | null
-    }
+    const payload = await response.json() as { items: Array<{ sessionId: string }>; currentSessionId: string; nextCursor: string | null }
 
     expect(response.status).toBe(200)
     expect(response.headers.get('cache-control')).toBe('no-store')
     expect(payload.currentSessionId).toBe('session-2')
-    expect(payload.items.map((item) => item.sessionId)).toEqual(['session-3', 'session-2'])
-    expect(payload.items.every((item) => !('token' in item) && !('userId' in item))).toBe(true)
-    expect(payload.nextCursor).toMatch(/^s1\.[A-Za-z0-9_-]+$/)
-    expect(cursorId(payload.nextCursor as string)).toBe('session-2')
+    expect(payload.items.map((item) => item.sessionId)).toEqual(['session-2'])
+    expect(mocks.listSessions).toHaveBeenCalledWith(expect.any(Request), { limit: 2 })
     expect(mocks.enforcePublicReadRateLimit).toHaveBeenCalledTimes(1)
   })
 
-  it('continues from the opaque cursor without repeating previous items', async () => {
-    const cursor = 's1.' + btoa('session-2').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '')
-    mocks.proxyBetterAuth
-      .mockResolvedValueOnce(jsonResponse([
-        session('session-3', '2026-10-03T00:00:00.000Z'),
-        session('session-2', '2026-10-02T00:00:00.000Z'),
-        session('session-1', '2026-10-01T00:00:00.000Z'),
-      ]))
-      .mockResolvedValueOnce(jsonResponse({ session: { id: 'session-3' } }))
+  it('caps public results at 50 even when the client requests 100 and forwards the cursor', async () => {
+    mocks.listSessions.mockResolvedValue({ items: [], currentSessionId: 'session-1', nextCursor: null })
 
     const response = await GET(
-      new Request('https://luckread.test/api/v1/auth/sessions?limit=2&cursor=' + encodeURIComponent(cursor)),
+      new Request('https://luckread.test/api/v1/auth/sessions?limit=100&cursor=s1.example'),
       context(),
     )
-    const payload = await response.json() as { items: Array<{ sessionId: string }>; nextCursor: string | null }
 
     expect(response.status).toBe(200)
-    expect(payload.items.map((item) => item.sessionId)).toEqual(['session-1'])
-    expect(payload.nextCursor).toBeNull()
+    expect(mocks.listSessions).toHaveBeenCalledWith(expect.any(Request), { limit: 50, cursor: 's1.example' })
   })
 
-  it('rejects invalid limit and malformed cursor before calling Better Auth', async () => {
+  it('rejects an invalid limit or empty cursor before calling W02', async () => {
     const invalidLimit = await GET(
       new Request('https://luckread.test/api/v1/auth/sessions?limit=101'),
       context(),
     )
     expect(invalidLimit.status).toBe(400)
-    expect(mocks.proxyBetterAuth).not.toHaveBeenCalled()
+    expect(mocks.listSessions).not.toHaveBeenCalled()
 
     const invalidCursor = await GET(
-      new Request('https://luckread.test/api/v1/auth/sessions?cursor=not-a-cursor'),
+      new Request('https://luckread.test/api/v1/auth/sessions?cursor='),
       context(),
     )
     expect(invalidCursor.status).toBe(400)
-    expect(mocks.proxyBetterAuth).not.toHaveBeenCalled()
-  })
-
-  it('fails closed if the active session cannot be identified', async () => {
-    mocks.proxyBetterAuth
-      .mockResolvedValueOnce(jsonResponse([session('session-1', '2026-10-01T00:00:00.000Z')]))
-      .mockResolvedValueOnce(jsonResponse({ session: {} }))
-
-    const response = await GET(
-      new Request('https://luckread.test/api/v1/auth/sessions'),
-      context(),
-    )
-    expect(response.status).toBe(503)
-    expect((await response.json()).error.code).toBe('SERVICE_UNAVAILABLE')
+    expect(mocks.listSessions).not.toHaveBeenCalled()
   })
 
   it('revokes an addressed session through W02 and returns no content', async () => {
