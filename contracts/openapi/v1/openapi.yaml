@@ -226,7 +226,6 @@ paths:
               schema: { type: string }
             Cache-Control:
               schema: { type: string, const: no-store }
-        '401': { $ref: '#/components/responses/Unauthenticated' }
         '503':
           description: Authentication service unavailable.
           content:
