@@ -140,6 +140,7 @@ describe('W02 bounded session list', () => {
     const response = await handleCurrentUserSessionList(env, request({ limit: 10 }))
 
     expect(response.status).toBe(503)
-    expect((await response.json()).error.code).toBe('SERVICE_UNAVAILABLE')
+    const payload = await response.json() as { error?: { code?: string } }
+    expect(payload.error?.code).toBe('SERVICE_UNAVAILABLE')
   })
 })
