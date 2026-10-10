@@ -17,6 +17,14 @@ describe('frontend session management', () => {
     expect(route).toContain('currentSessionId,\n      nextCursor:')
     expect(route).not.toContain('currentSessionId,\n        deviceId:')
   })
+
+  it('applies existing W01 traffic guards to session reads and revocation writes', () => {
+    const route = read('src/app/auth/sessions/[[...segments]]/route.ts')
+    expect(route).toContain('enforcePublicReadRateLimit(request)')
+    expect(route).toContain('enforceW01WriteRateLimit(request)')
+    expect(route).toContain('rateLimitResponse(request)')
+    expect(route).toContain("error: { code: 'SERVICE_UNAVAILABLE', message: 'Session service unavailable' }")
+  })
   it('reads the canonical session list and exposes the current session marker', () => {
     const page = read('src/app/(frontend)/me/sessions/page.tsx')
     const route = read('src/app/auth/sessions/[[...segments]]/route.ts')
