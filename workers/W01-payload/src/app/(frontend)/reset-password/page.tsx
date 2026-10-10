@@ -9,7 +9,7 @@ const MIN_PASSWORD_LENGTH = 15
 const MAX_PASSWORD_LENGTH = 128
 
 function validLength(value: string): boolean {
-  const length = Array.from(value).length
+  const length = value.length
   return length >= MIN_PASSWORD_LENGTH && length <= MAX_PASSWORD_LENGTH
 }
 
