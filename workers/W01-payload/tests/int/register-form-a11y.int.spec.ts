@@ -14,7 +14,7 @@ describe('Register form status accessibility', () => {
 
   it('aligns password validation with the W02 Better Auth policy', () => {
     const source = readFileSync(resolve(process.cwd(), 'src/app/(frontend)/register/RegisterForm.tsx'), 'utf8')
-    expect(source).toContain('const passwordLength = Array.from(password).length')
+    expect(source).toContain('const passwordLength = password.length')
     expect(source).toContain('passwordLength < 15 || passwordLength > 128')
     expect(source).toContain('minLength={15}')
     expect(source).toContain('maxLength={128}')
@@ -25,5 +25,7 @@ describe('Register form status accessibility', () => {
     const source = readFileSync(resolve(process.cwd(), 'src/app/(frontend)/register/RegisterForm.tsx'), 'utf8')
     expect(source).toContain('normalizedEmail.length > 254')
     expect(source).toContain('邮箱格式不正确，请检查后重试。')
+    expect(source).toContain('!/^[A-Za-z0-9]{6,32}$/.test(normalizedUsername)')
+    expect(source).toContain('用户名需为 6–32 位英文字母或数字')
   })
 })
