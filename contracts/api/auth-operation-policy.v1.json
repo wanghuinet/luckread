@@ -303,11 +303,11 @@
       "evidence": {
         "openapi": "PASS",
         "inventory": "PENDING_VALIDATION",
-        "permission": "PENDING_VALIDATION",
-        "state": "PENDING_RUNTIME_EVIDENCE",
+        "permission": "MISSING",
+        "state": "MISSING",
         "resource": "PASS",
         "cache": "PASS",
-        "antiAbuse": "PENDING_RUNTIME_EVIDENCE",
+        "antiAbuse": "MISSING",
         "integration": "MISSING",
         "securityE2E": "MISSING"
       }
