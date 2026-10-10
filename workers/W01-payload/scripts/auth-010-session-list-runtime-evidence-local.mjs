@@ -131,9 +131,11 @@ const listSessions = async (cookie, { limit = 100, cursor } = {}) => {
     // Preserve only a stable, non-secret transport classification. Never log
     // the request URL, cookie, headers, or the raw exception text.
     const cause = error && typeof error === 'object' && 'cause' in error
-      ? (error as { cause?: { code?: unknown } }).cause
+      ? error.cause
       : undefined
-    const causeCode = typeof cause?.code === 'string' ? cause.code : ''
+    const causeCode = cause && typeof cause === 'object' && 'code' in cause && typeof cause.code === 'string'
+      ? cause.code
+      : ''
     const knownCodes = new Set([
       'ECONNREFUSED',
       'ECONNRESET',
