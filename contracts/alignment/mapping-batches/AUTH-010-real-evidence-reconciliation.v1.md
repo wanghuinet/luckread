@@ -98,10 +98,10 @@ A separate device contract is required before AUTH-010 can claim a fully reconci
 
 PR #991 implements the bounded W01 session-list/revoke surface through the existing W02 Service Binding. The canonical native Better Auth session remains authoritative for session identity and lifecycle; this change does not add Worker/D1/Queue/Service Binding topology, alter the schema, modify Better Auth, or change Payload core.
 
-The exact tested source `eb0b1643732b0d0124eeb380f008015eadbe665c` passed the controlled local W01 + W02 runtime evidence workflow:
+The exact tested source `51ec6ed8ae8e2bedd0b18fb208135515b801ba5b` passed the controlled local W01 + W02 runtime evidence workflow:
 
-- Workflow run: https://github.com/wanghuinet/luckread/actions/runs/38046895324
-- Uploaded evidence artifact: https://github.com/wanghuinet/luckread/actions/runs/38046895324/artifacts/11668550109
+- Workflow run: https://github.com/wanghuinet/luckread/actions/runs/38048910613
+- Uploaded evidence artifact: https://github.com/wanghuinet/luckread/actions/runs/38048910613/artifacts/11668427770
 - Evidence type: `AUTH-010_SESSION_LIST_REVOKE_W01_W02_LOCAL_RUNTIME`
 - Environment: `CONTROLLED_LOCAL_D1`; this is not evidence that the same commit is deployed remotely or in production.
 - Verified: signed W02 login cookie authenticates the W01 route; list is capped at 50; cursor continuation works (50 + 6 rows in the fixture); current-session marker is stable; secret fields are absent; list responses are `no-store`; malformed cursor is rejected; a second real W02 identity cannot list the first user's sessions or alter them by revoke; the owner can revoke; repeat revoke is an idempotent 204; the revoked session is absent from a subsequent list; synthetic test identities/sessions are cleaned up; no secrets were captured.
@@ -111,7 +111,7 @@ The W01 route invokes the existing read/write limiter helpers. Route behavior te
 ## 8. Remaining blockers
 
 1. Reconcile the anti-abuse scope mismatch before changing policy evidence: current W01 bindings enforce global-origin and IP keys, but the declared list/revoke policy requires account, endpoint, and (for revoke) session scope. The new 429 route tests cover response wiring only; `antiAbuse` must remain `MISSING` until the required scopes are implemented and tested or the canonical policy is deliberately reconciled.
-2. Register the exact-SHA runtime evidence in the appropriate feature/evidence trace without promoting the repository-wide Mapping 0 registry from its current `NOT_GREEN` state or invalidating its tested-commit anchor.
+2. The new record `EVD-AUTH010-B11-SESSION-LIST-REVOKE-LOCAL-001` is registered as `CREATED` with the exact workflow/artifact reference. Promote it to `VERIFIED` only through the normal evidence-acceptance process; the repository-wide Mapping 0 registry remains `NOT_GREEN` and its tested-commit anchor is unchanged.
 3. Run a new exact-SHA remote/deployed verification before claiming that this PR's session behavior is live in production. The current green run uses controlled local D1 only.
 4. Keep the AUTH-002 native-session authority intact. This PR proves the list/revoke runtime path; it does not, by itself, prove every extension-table/device field in the full `ENT-SESSION` contract.
 5. `ENT-DEVICE-RECORD` remains proposed. Do not describe this session API closeout as a complete device registry until a separate canonical device contract is established.
@@ -133,6 +133,6 @@ Required final chain:
 Proceed in this order, one item at a time:
 
 1. close the declared-versus-implemented anti-abuse scope gap for list/revoke and test account/endpoint/session enforcement; do not promote `antiAbuse` solely because the route maps a limiter error to 429;
-2. register the passing run `38046895324` / tested commit `eb0b1643732b0d0124eeb380f008015eadbe665c` in the feature-level evidence trace; do not mark repository-wide Mapping 0 GREEN;
+2. accept `EVD-AUTH010-B11-SESSION-LIST-REVOKE-LOCAL-001` through the feature-level evidence process after applicable mapping gates; its current state is `CREATED`, not active/verified, and repository-wide Mapping 0 must remain `NOT_GREEN`;
 3. perform a fresh remote/deployed exact-SHA session lifecycle verification when the code is deployed;
 4. revisit AUTH-010's full feature status only after device authority and remaining canonical mapping requirements are genuinely closed.
