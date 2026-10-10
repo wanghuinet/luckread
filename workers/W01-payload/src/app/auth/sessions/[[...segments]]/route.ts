@@ -9,6 +9,22 @@ const mapError = (error: unknown): Response => {
     if (error.status === 401) return json({ error: { code: 'UNAUTHENTICATED', message: 'Authentication required' } }, 401)
     if (error.status === 403) return json({ error: { code: 'PERMISSION_DENIED', message: 'Permission denied' } }, 403)
     if (error.status === 400) return json({ error: { code: 'VALIDATION_FAILED', message: 'Invalid session request' } }, 400)
+    if (error.status === 429) {
+      return new Response(JSON.stringify({
+        error: {
+          code: 'RATE_LIMITED',
+          message: 'Too many requests',
+          details: { retryAfter: 60 },
+        },
+      }), {
+        status: 429,
+        headers: {
+          'content-type': 'application/json; charset=utf-8',
+          'cache-control': 'no-store',
+          'retry-after': '60',
+        },
+      })
+    }
   }
   return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Session service unavailable' } }, 503)
 }
