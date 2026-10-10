@@ -2,11 +2,13 @@ import { applyAccountStateTransition } from '../account/account-state-transition
 import { ensureBaseUserRole } from '../authz/role-assignment.js'
 import { betterAuth } from 'better-auth'
 import { bearer } from 'better-auth/plugins'
+import { sendResendEmail } from './resend-email.js'
 
 export interface BetterAuthEnv {
   D1_01: D1Database
   RESEND_API_KEY?: string
   AUTH_EMAIL_FROM?: string
+  CLOUDFLARE_ENV?: string
 }
 
 type AccountStateRow = {
@@ -26,81 +28,28 @@ async function sendVerificationEmail(
   env: BetterAuthEnv,
   input: { user: { email: string }; url: string },
 ): Promise<void> {
-  const apiKey = env.RESEND_API_KEY?.trim()
-  const from = env.AUTH_EMAIL_FROM?.trim()
-  if (!apiKey || !from) {
-    console.error(JSON.stringify({
-      event: 'auth.email_verification.delivery_unconfigured',
-      diagnosticCode: 'AUTH_EMAIL_DELIVERY_UNCONFIGURED',
-    }))
-    throw new Error('EMAIL_DELIVERY_UNCONFIGURED')
-  }
-
   const safeUrl = escapeHtml(input.url)
-  const response = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      authorization: 'Bearer ' + apiKey,
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify({
-      from,
-      to: [input.user.email],
-      subject: 'Verify your LuckRead email',
-      text: 'Verify your LuckRead email by opening this link: ' + input.url,
-      html: '<p>Welcome to LuckRead.</p><p>Verify your email address to activate your account:</p><p><a href="' + safeUrl + '">Verify email address</a></p>',
-    }),
+  await sendResendEmail(env, {
+    purpose: 'email_verification',
+    to: input.user.email,
+    subject: 'Verify your LuckRead email',
+    text: 'Verify your LuckRead email by opening this link: ' + input.url,
+    html: '<p>Welcome to LuckRead.</p><p>Verify your email address to activate your account:</p><p><a href="' + safeUrl + '">Verify email address</a></p>',
   })
-
-  if (!response.ok) {
-    console.error(JSON.stringify({
-      event: 'auth.email_verification.delivery_failure',
-      diagnosticCode: 'AUTH_EMAIL_DELIVERY_FAILED',
-      status: response.status,
-    }))
-    throw new Error('EMAIL_DELIVERY_FAILED')
-  }
 }
-
 
 async function sendPasswordResetEmail(
   env: BetterAuthEnv,
   input: { user: { email: string }; url: string },
 ): Promise<void> {
-  const apiKey = env.RESEND_API_KEY?.trim()
-  const from = env.AUTH_EMAIL_FROM?.trim()
-  if (!apiKey || !from) {
-    console.error(JSON.stringify({
-      event: 'auth.password_reset.delivery_unconfigured',
-      diagnosticCode: 'AUTH_PASSWORD_RESET_DELIVERY_UNCONFIGURED',
-    }))
-    throw new Error('PASSWORD_RESET_DELIVERY_UNCONFIGURED')
-  }
-
   const safeUrl = escapeHtml(input.url)
-  const response = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      authorization: 'Bearer ' + apiKey,
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify({
-      from,
-      to: [input.user.email],
-      subject: 'Reset your LuckRead password',
-      text: 'Reset your LuckRead password by opening this link: ' + input.url,
-      html: '<p>We received a request to reset your LuckRead password.</p><p>If you requested this, use the link below to choose a new password:</p><p><a href="' + safeUrl + '">Reset password</a></p><p>If you did not request this, you can ignore this email.</p>',
-    }),
+  await sendResendEmail(env, {
+    purpose: 'password_reset',
+    to: input.user.email,
+    subject: 'Reset your LuckRead password',
+    text: 'Reset your LuckRead password by opening this link: ' + input.url,
+    html: '<p>We received a request to reset your LuckRead password.</p><p>If you requested this, use the link below to choose a new password:</p><p><a href="' + safeUrl + '">Reset password</a></p><p>If you did not request this, you can ignore this email.</p>',
   })
-
-  if (!response.ok) {
-    console.error(JSON.stringify({
-      event: 'auth.password_reset.delivery_failure',
-      diagnosticCode: 'AUTH_PASSWORD_RESET_DELIVERY_FAILED',
-      status: response.status,
-    }))
-    throw new Error('PASSWORD_RESET_DELIVERY_FAILED')
-  }
 }
 
 async function activateVerifiedAccount(db: D1Database, userId: string): Promise<void> {
@@ -137,22 +86,27 @@ async function activateVerifiedAccount(db: D1Database, userId: string): Promise<
   }
 }
 
-export const createLuckReadAuth = (env: BetterAuthEnv) =>
-  betterAuth({
+const buildLuckReadAuth = (env: BetterAuthEnv) => {
+  // Keep local origins available only to the local evidence/runtime profile.
+  // Production must never inherit localhost trust from a shared config.
+  const trustedOrigins = [
+    'https://luckread-w02.internal',
+    'https://luckread.com',
+    'https://www.luckread.com',
+    'https://mp.luckread.com',
+    'https://sso.luckread.com',
+    ...(env.CLOUDFLARE_ENV?.trim().toLowerCase() === 'development'
+      ? ['http://127.0.0.1:8787', 'http://localhost:8787']
+      : []),
+  ]
+
+  return betterAuth({
     // W02 is the platform identity authority. Better Auth uses native D1
     // persistence here; Payload is not an authentication/database adapter.
     database: env.D1_01,
     baseURL: 'https://luckread.com',
     basePath: '/api/auth',
-    trustedOrigins: [
-      'https://luckread-w02.internal',
-      'https://luckread.com',
-      'https://www.luckread.com',
-      'https://mp.luckread.com',
-      'https://sso.luckread.com',
-      'http://127.0.0.1:8787',
-      'http://localhost:8787',
-    ],
+    trustedOrigins,
     emailAndPassword: {
       enabled: true,
       disableSignUp: false,
@@ -275,8 +229,25 @@ export const createLuckReadAuth = (env: BetterAuthEnv) =>
     plugins: [bearer()],
     advanced: {
       database: {
-        validateSchema: false,
+        // Fail closed and log actionable schema drift before it degrades
+        // a registration/login request into an opaque database error.
+        validateSchema: true,
         generateId: () => crypto.randomUUID(),
       },
     },
   })
+}
+
+const authInstances = new WeakMap<D1Database, ReturnType<typeof buildLuckReadAuth>>()
+
+// W02 routes share one initialized Better Auth instance per D1 binding/isolate.
+// This preserves Better Auth's cached schema validation and avoids rebuilding
+// its router and database adapter for every authentication request.
+export const createLuckReadAuth = (env: BetterAuthEnv) => {
+  const cached = authInstances.get(env.D1_01)
+  if (cached) return cached
+
+  const auth = buildLuckReadAuth(env)
+  authInstances.set(env.D1_01, auth)
+  return auth
+}

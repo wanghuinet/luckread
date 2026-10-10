@@ -25,7 +25,7 @@ describe('W02 Better Auth principal authority', () => {
 
     await expect(
       resolveBetterAuthPrincipal(
-        {} as D1Database,
+        { D1_01: {} as D1Database },
         new Request('https://luckread.test'),
         '2026-10-06T20:00:00.000Z',
       ),
@@ -33,8 +33,8 @@ describe('W02 Better Auth principal authority', () => {
   })
 
   it('derives identity and session from Better Auth without a secondary session store', async () => {
-    const db = {} as D1Database
-    const result = await resolveBetterAuthPrincipal(db, new Request('https://luckread.test', {
+    const env = { D1_01: {} as D1Database }
+    const result = await resolveBetterAuthPrincipal(env, new Request('https://luckread.test', {
       headers: { cookie: 'better-auth.session_token=test' },
     }), '2026-10-06T20:00:00.000Z')
     expect(result).toEqual({
