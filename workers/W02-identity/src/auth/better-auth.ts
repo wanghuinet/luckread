@@ -2,6 +2,7 @@ import { applyAccountStateTransition } from '../account/account-state-transition
 import { ensureBaseUserRole } from '../authz/role-assignment.js'
 import { betterAuth } from 'better-auth'
 import { bearer } from 'better-auth/plugins'
+import { sendResendEmail } from './resend-email.js'
 
 export interface BetterAuthEnv {
   D1_01: D1Database
@@ -22,8 +23,6 @@ const escapeHtml = (value: string): string =>
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;')
-
-import { sendResendEmail } from './resend-email.js'
 
 async function sendVerificationEmail(
   env: BetterAuthEnv,
