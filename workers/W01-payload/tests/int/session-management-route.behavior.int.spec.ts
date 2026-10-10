@@ -28,6 +28,7 @@ vi.mock('../../src/auth/traffic-limit.js', () => ({
 }))
 
 import { DELETE, GET } from '../../src/app/auth/sessions/[[...segments]]/route.js'
+import { TrafficLimitError } from '../../src/auth/traffic-limit.js'
 
 const context = (segments: string[] = []) => ({ params: Promise.resolve({ segments }) })
 
@@ -106,6 +107,31 @@ describe('session management route behavior', () => {
     expect(await response.text()).toBe('')
     expect(mocks.revokeSessionById).toHaveBeenCalledWith(request, 'session-other')
     expect(mocks.enforceW01WriteRateLimit).toHaveBeenCalledTimes(1)
+  })
+
+  it('returns 429 and skips W02 when the public-read limiter is exhausted', async () => {
+    const request = new Request('https://luckread.test/api/v1/auth/sessions?limit=2')
+    mocks.enforcePublicReadRateLimit.mockRejectedValueOnce(new TrafficLimitError())
+
+    const response = await GET(request, context())
+
+    expect(response.status).toBe(429)
+    expect(mocks.rateLimitResponse).toHaveBeenCalledWith(request)
+    expect(mocks.listSessions).not.toHaveBeenCalled()
+  })
+
+  it('returns 429 and skips revocation when the write limiter is exhausted', async () => {
+    const request = new Request('https://luckread.test/api/v1/auth/sessions/session-other', {
+      method: 'DELETE',
+      headers: { 'Idempotency-Key': 'session-revoke-rate-limit-test' },
+    })
+    mocks.enforceW01WriteRateLimit.mockRejectedValueOnce(new TrafficLimitError())
+
+    const response = await DELETE(request, context(['session-other']))
+
+    expect(response.status).toBe(429)
+    expect(mocks.rateLimitResponse).toHaveBeenCalledWith(request)
+    expect(mocks.revokeSessionById).not.toHaveBeenCalled()
   })
 
   it('requires an idempotency key before calling W02', async () => {
