@@ -57,7 +57,7 @@ describe('W02 policy-scoped session revoke', () => {
     mocks.revokeSession.mockResolvedValue({ success: true })
   })
 
-  it('enforces account, target-session, and endpoint limits before reading D1', async () => {
+  it('enforces account, authenticated-caller-session, and endpoint limits before reading D1', async () => {
     const db = makeEnv({ id: 'target-session', token: 'private-native-session-token', userId: 'user-1' })
     const response = await handleCurrentUserSessionRevoke(db.env, request('target-session'))
     const payload = await response.json() as { revoked?: boolean }
@@ -65,11 +65,11 @@ describe('W02 policy-scoped session revoke', () => {
     expect(response.status).toBe(200)
     expect(payload.revoked).toBe(true)
     expect(db.limiter.limit).toHaveBeenNthCalledWith(1, { key: 'auth010:session-revoke:account:user-1' })
-    expect(db.limiter.limit).toHaveBeenNthCalledWith(2, { key: 'auth010:session-revoke:session:target-session' })
+    expect(db.limiter.limit).toHaveBeenNthCalledWith(2, { key: 'auth010:session-revoke:session:current-session' })
     expect(db.limiter.limit).toHaveBeenNthCalledWith(3, { key: 'auth010:session-revoke:endpoint' })
     expect(db.sequence.slice(0, 4)).toEqual([
       'auth010:session-revoke:account:user-1',
-      'auth010:session-revoke:session:target-session',
+      'auth010:session-revoke:session:current-session',
       'auth010:session-revoke:endpoint',
       'd1:target-session',
     ])
