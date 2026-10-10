@@ -143,6 +143,6 @@ Required final chain:
 
 Proceed in this order, one item at a time:
 
-1. assess canonical evidence admission for `EVD-AUTH010-B13-SESSION-LIST-REVOKE-LOCAL-003` under the registry's tested-source/freshness rules; keep its status `CREATED` unless admission requirements are independently satisfied, preserve Mapping 0 `NOT_GREEN`, and do not rewrite the tested-commit anchor;
+1. assess formal admission of `EVD-AUTH010-B14-SESSION-LIST-REVOKE-LOCAL-004` under the registry's tested-source/freshness rules; keep its status `CREATED` unless admission requirements are independently satisfied, preserve Mapping 0 `NOT_GREEN`, and do not rewrite the tested-commit anchor;
 2. perform a fresh remote/deployed exact-SHA session lifecycle verification when the candidate code is deployed; controlled local-D1 evidence alone does not prove deployed behavior;
 3. revisit AUTH-010's full feature status only after device authority and remaining canonical mapping requirements are genuinely closed.
