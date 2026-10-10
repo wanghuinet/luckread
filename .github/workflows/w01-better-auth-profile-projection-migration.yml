@@ -75,12 +75,15 @@ jobs:
         with:
           node-version: 24
 
-      - name: Enable pinned pnpm 10
-        run: corepack enable && corepack prepare pnpm@10.34.5 --activate
+      - name: Setup pnpm 11
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11
+          run_install: false
 
       - name: Install locked W01 dependencies
         working-directory: workers/W01-payload
-        run: pnpm install --frozen-lockfile --ignore-workspace
+        run: pnpm install --frozen-lockfile
 
       - name: Validate Cloudflare access
         env:
