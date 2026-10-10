@@ -116,47 +116,64 @@ const login = async (email, password) => {
   return cookie
 }
 
+const classifyTransportError = (error) => {
+  const cause = error && typeof error === 'object' && 'cause' in error ? error.cause : undefined
+  const causeCode = cause && typeof cause === 'object' && 'code' in cause && typeof cause.code === 'string'
+    ? cause.code
+    : ''
+  const knownCodes = new Set([
+    'ECONNREFUSED',
+    'ECONNRESET',
+    'ETIMEDOUT',
+    'EPIPE',
+    'ERR_INVALID_CHAR',
+    'ERR_INVALID_URL',
+    'UND_ERR_CONNECT_TIMEOUT',
+    'UND_ERR_INVALID_ARG',
+    'UND_ERR_INVALID_CHAR',
+    'UND_ERR_SOCKET',
+  ])
+  return knownCodes.has(causeCode)
+    ? causeCode
+    : error instanceof TypeError
+      ? 'TYPE_ERROR'
+      : 'UNKNOWN_ERROR'
+}
+
 const listSessions = async (cookie, { limit = 100, cursor } = {}) => {
   const params = new URLSearchParams({ limit: String(limit) })
   if (cursor !== undefined) params.set('cursor', cursor)
+  const url = baseUrl + '/api/v1/auth/sessions?' + params.toString()
 
-  let response
-  try {
-    response = await fetch(baseUrl + '/api/v1/auth/sessions?' + params.toString(), {
-      method: 'GET',
-      headers: requestHeaders({ cookie }),
-      cache: 'no-store',
-    })
-  } catch (error) {
-    // Preserve only a stable, non-secret transport classification. Never log
-    // the request URL, cookie, headers, or the raw exception text.
-    const cause = error && typeof error === 'object' && 'cause' in error
-      ? error.cause
-      : undefined
-    const causeCode = cause && typeof cause === 'object' && 'code' in cause && typeof cause.code === 'string'
-      ? cause.code
-      : ''
-    const knownCodes = new Set([
-      'ECONNREFUSED',
-      'ECONNRESET',
-      'ETIMEDOUT',
-      'EPIPE',
-      'ERR_INVALID_CHAR',
-      'ERR_INVALID_URL',
-      'UND_ERR_CONNECT_TIMEOUT',
-      'UND_ERR_INVALID_ARG',
-      'UND_ERR_INVALID_CHAR',
-      'UND_ERR_SOCKET',
-    ])
-    const classification = knownCodes.has(causeCode)
-      ? causeCode
-      : error instanceof TypeError
-        ? 'TYPE_ERROR'
-        : 'UNKNOWN_ERROR'
-    throw new Error('AUTH010_SESSION_LIST_FETCH_' + classification)
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: requestHeaders({ cookie, connection: 'close' }),
+        cache: 'no-store',
+      })
+      return { response, payload: await parseJson(response, 'AUTH010_SESSION_LIST') }
+    } catch (error) {
+      const classification = classifyTransportError(error)
+      if (attempt === 0 && ['UND_ERR_SOCKET', 'ECONNRESET', 'EPIPE'].includes(classification)) {
+        // This is a read-only local probe. Retry once only for a transport
+        // reset, after confirming that the local W01 listener is still alive.
+        let healthy = false
+        try {
+          const health = await fetch(baseUrl + '/', { headers: { connection: 'close' }, cache: 'no-store' })
+          healthy = health.status < 500
+        } catch {}
+        if (healthy) {
+          await new Promise((resolve) => setTimeout(resolve, 100))
+          continue
+        }
+        throw new Error('AUTH010_SESSION_LIST_FETCH_' + classification + '_W01_UNHEALTHY')
+      }
+      throw new Error('AUTH010_SESSION_LIST_FETCH_' + classification)
+    }
   }
 
-  return { response, payload: await parseJson(response, 'AUTH010_SESSION_LIST') }
+  throw new Error('AUTH010_SESSION_LIST_FETCH_RETRY_EXHAUSTED')
 }
 
 const revokeSession = async (cookie, sessionId, idempotencyKey) => {
