@@ -26,7 +26,7 @@ export default function VerifyEmailForm() {
     if (
       normalizedEmail.length === 0 ||
       normalizedEmail.length > 254 ||
-      !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(normalizedEmail)
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)
     ) {
       setStatus('error')
       setMessage('请输入有效的注册邮箱地址。')
