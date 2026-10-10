@@ -80,7 +80,7 @@ export async function handleCurrentUserSessionList(
     if (!cursor) return json({ error: { code: 'INVALID_CURSOR', message: 'Invalid session list cursor' } }, 400)
   }
 
-  let current: Awaited<ReturnType<ReturnType<typeof createLuckReadAuth>['api']['getSession']>>
+  let current: { user?: { id?: string }; session?: { id?: string } } | null
   try {
     const auth = createLuckReadAuth(env)
     current = await auth.api.getSession({ headers: request.headers, query: {} })
