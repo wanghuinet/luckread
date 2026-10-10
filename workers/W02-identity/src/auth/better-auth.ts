@@ -4,11 +4,17 @@ import { betterAuth } from 'better-auth'
 import { bearer } from 'better-auth/plugins'
 import { sendResendEmail } from './resend-email.js'
 
+export interface RateLimitBinding {
+  limit(input: { key: string }): Promise<{ success: boolean }>
+}
+
 export interface BetterAuthEnv {
   D1_01: D1Database
   RESEND_API_KEY?: string
   AUTH_EMAIL_FROM?: string
   CLOUDFLARE_ENV?: string
+  AUTH_SESSION_READ_LIMITER?: RateLimitBinding
+  AUTH_SESSION_WRITE_LIMITER?: RateLimitBinding
 }
 
 type AccountStateRow = {

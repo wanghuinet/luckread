@@ -1,4 +1,4 @@
-import { createLuckReadAuth } from './auth/better-auth.js'
+import { createLuckReadAuth, type RateLimitBinding } from './auth/better-auth.js'
 import { publishPendingAccountStateEvents } from './account/publication-journal-publisher.js'
 import { resolveGlobalLayer } from './authz/role-assignment.js'
 import {
@@ -8,9 +8,13 @@ import {
   type AccountState,
 } from './account/account-state-transition.js'
 import { resolveBetterAuthPrincipal } from './auth/principal.js'
+import { handleCurrentUserSessionList } from './auth/session-list.js'
+import { handleCurrentUserSessionRevoke } from './auth/session-revoke.js'
 
 interface Env {
   D1_01: D1Database
+  AUTH_SESSION_READ_LIMITER: RateLimitBinding
+  AUTH_SESSION_WRITE_LIMITER: RateLimitBinding
   RESEND_API_KEY?: string
   AUTH_EMAIL_FROM?: string
   AUTH013_QUEUE: Queue
@@ -184,37 +188,12 @@ export default {
         return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'registration rollback unavailable' } }, 503)
       }
     }
+    if (request.method === 'POST' && url.pathname === '/internal/auth/session/list') {
+      return handleCurrentUserSessionList(env, request)
+    }
+
     if (request.method === 'POST' && url.pathname === '/internal/auth/session/revoke-by-id') {
-      const body = await readJsonBody<{ sessionId?: unknown }>(request)
-      if (!body || typeof body.sessionId !== 'string' || body.sessionId.length === 0 || body.sessionId.length > 128) {
-        return json({ error: { code: 'VALIDATION_FAILED', message: 'invalid session revocation request' } }, 400)
-      }
-
-      try {
-        const auth = createLuckReadAuth(env)
-        const current = await auth.api.getSession({ headers: request.headers, query: {} })
-        if (!current?.user?.id) {
-          return json({ error: { code: 'UNAUTHENTICATED', message: 'authentication required' } }, 401)
-        }
-
-        const target = await env.D1_01
-          .prepare('SELECT id, token, user_id AS userId FROM "session" WHERE id = ? LIMIT 1')
-          .bind(body.sessionId)
-          .first<{ id: string; token: string; userId: string }>()
-
-        if (!target || String(target.userId) !== String(current.user.id)) {
-          return json({ revoked: true })
-        }
-
-        await auth.api.revokeSession({
-          headers: request.headers,
-          body: { token: target.token },
-        })
-
-        return json({ revoked: true })
-      } catch {
-        return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'session service unavailable' } }, 503)
-      }
+      return handleCurrentUserSessionRevoke(env, request)
     }
 
     if (request.method === 'POST' && url.pathname === '/internal/authz/resolve-layer') {

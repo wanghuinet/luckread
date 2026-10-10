@@ -5,17 +5,41 @@ import { resolve } from 'node:path'
 const read = (relativePath: string) => readFileSync(resolve(process.cwd(), relativePath), 'utf8')
 
 describe('frontend session management', () => {
-  it('reads the canonical session list and exposes the current session marker', () => {
+  it('exposes the session handlers through the versioned API path used by the client', () => {
+    const route = read('src/app/api/v1/auth/sessions/[[...segments]]/route.ts')
+    expect(route).toContain("export { GET, DELETE } from '../../../../../auth/sessions/[[...segments]]/route'")
+  })
+
+  it('delegates session pagination to a bounded W02 query', () => {
+    const route = read('src/app/auth/sessions/[[...segments]]/route.ts')
+    const w02 = read('../W02-identity/src/auth/session-list.ts')
+    expect(route).toContain('listSessions(request,')
+    expect(route).toContain('Math.min(50, requestedLimit)')
+    expect(w02).toContain('WHERE user_id = ?')
+    expect(w02).toContain('ORDER BY created_at DESC, id DESC LIMIT ?')
+    expect(w02).toContain('currentSessionId')
+    expect(w02).toContain('nextCursor')
+    expect(w02).toContain('limit + 1')
+  })
+
+  it('applies existing W01 traffic guards to session reads and revocation writes', () => {
+    const route = read('src/app/auth/sessions/[[...segments]]/route.ts')
+    expect(route).toContain('enforcePublicReadRateLimit(request)')
+    expect(route).toContain('enforceW01WriteRateLimit(request)')
+    expect(route).toContain('rateLimitResponse(request)')
+    expect(route).toContain("error: { code: 'SERVICE_UNAVAILABLE', message: 'Session service unavailable' }")
+  })
+  it('loads the current session marker through the W02 bounded session-list boundary', () => {
     const page = read('src/app/(frontend)/me/sessions/page.tsx')
     const route = read('src/app/auth/sessions/[[...segments]]/route.ts')
+    const client = read('src/auth/w02-session-client.ts')
 
     expect(page).toContain("fetchJson<SessionResponse | { error?: { message?: string } }>('/api/v1/auth/sessions?' + params.toString()")
     expect(page).toContain('currentSessionId')
     expect(page).toContain("credentials: 'include'")
     expect(page).toContain("cache: 'no-store'")
-    expect(route).toContain("'/get-session'")
-    expect(route).toContain('const currentSessionId =')
-    expect(route).toContain('currentSessionId,')
+    expect(route).toContain('listSessions(request,')
+    expect(client).toContain("'/internal/auth/session/list'")
   })
 
   it('revokes only non-current sessions through the existing DELETE API with idempotency', () => {

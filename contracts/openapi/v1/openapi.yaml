@@ -353,7 +353,7 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [items]
+                required: [items, currentSessionId]
                 properties:
                   items:
                     type: array
@@ -376,6 +376,8 @@ paths:
                           type: string
                           format: date-time
                           nullable: true
+                  currentSessionId:
+                    $ref: '#/components/schemas/ResourceId'
                   nextCursor:
                     type: string
                     nullable: true
