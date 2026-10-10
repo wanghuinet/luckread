@@ -8,6 +8,18 @@
   "vars": {
     "AUTH_EMAIL_FROM": "noreply@good.luckread.com"
   },
+  "ratelimits": [
+    {
+      "name": "AUTH_SESSION_READ_LIMITER",
+      "namespace_id": "2026100312",
+      "simple": { "limit": 300, "period": 60 }
+    },
+    {
+      "name": "AUTH_SESSION_WRITE_LIMITER",
+      "namespace_id": "2026100320",
+      "simple": { "limit": 60, "period": 60 }
+    }
+  ],
   "observability": {
     "enabled": true,
     "logs": {
