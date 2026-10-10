@@ -13,12 +13,41 @@ const mapError = (error: unknown): Response => {
   return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Session service unavailable' } }, 503)
 }
 
+const encodeCursor = (sessionId: string): string =>
+  's1.' + btoa(sessionId).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '')
+
+const decodeCursor = (cursor: string): string | null => {
+  if (!cursor.startsWith('s1.')) return null
+  const encoded = cursor.slice(3)
+  if (!encoded || !/^[A-Za-z0-9_-]+$/.test(encoded)) return null
+  const base64 = encoded.replace(/-/g, '+').replace(/_/g, '/')
+  const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4)
+  try {
+    const sessionId = atob(padded)
+    return sessionId.length > 0 && sessionId.length <= 128 ? sessionId : null
+  } catch {
+    return null
+  }
+}
+
 export async function GET(
   request: Request,
   context: { params: Promise<{ segments?: string[] }> },
 ): Promise<Response> {
   const { segments = [] } = await context.params
   if (segments.length !== 0) return new Response(null, { status: 404 })
+
+  const url = new URL(request.url)
+  const rawLimit = url.searchParams.get('limit')
+  const requestedLimit = rawLimit === null ? 20 : Number(rawLimit)
+  if (!Number.isInteger(requestedLimit) || requestedLimit < 1 || requestedLimit > 100) {
+    return json({ error: { code: 'VALIDATION_FAILED', message: 'Invalid session list limit' } }, 400)
+  }
+  const cursor = url.searchParams.get('cursor')
+  const cursorId = cursor === null ? null : decodeCursor(cursor)
+  if (cursor !== null && (!cursorId || cursor.length > 128)) {
+    return json({ error: { code: 'INVALID_CURSOR', message: 'Invalid session list cursor' } }, 400)
+  }
 
   try {
     await enforcePublicReadRateLimit(request)
@@ -48,17 +77,6 @@ export async function GET(
       return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Current session could not be resolved' } }, 503)
     }
 
-    const url = new URL(request.url)
-    const rawLimit = url.searchParams.get('limit')
-    const requestedLimit = rawLimit === null ? 20 : Number(rawLimit)
-    if (!Number.isInteger(requestedLimit) || requestedLimit < 1 || requestedLimit > 100) {
-      return json({ error: { code: 'VALIDATION_FAILED', message: 'Invalid session list limit' } }, 400)
-    }
-    const cursor = url.searchParams.get('cursor')
-    if (cursor !== null && (cursor.length === 0 || cursor.length > 128)) {
-      return json({ error: { code: 'INVALID_CURSOR', message: 'Invalid session list cursor' } }, 400)
-    }
-
     const sessions = (rawSessions as Array<Record<string, unknown>>)
       .filter((session) => typeof session.id === 'string' && session.id.length > 0)
       .sort((left, right) => {
@@ -68,11 +86,11 @@ export async function GET(
         return timeOrder || String(right.id).localeCompare(String(left.id))
       })
 
-    const cursorIndex = cursor === null ? -1 : sessions.findIndex((session) => session.id === cursor)
-    if (cursor !== null && cursorIndex < 0) {
+    const cursorIndex = cursorId === null ? -1 : sessions.findIndex((session) => session.id === cursorId)
+    if (cursorId !== null && cursorIndex < 0) {
       return json({ error: { code: 'INVALID_CURSOR', message: 'Session list cursor is no longer valid' } }, 400)
     }
-    const startIndex = cursor === null ? 0 : cursorIndex + 1
+    const startIndex = cursorId === null ? 0 : cursorIndex + 1
     const pageLimit = Math.min(50, requestedLimit)
     const page = sessions.slice(startIndex, startIndex + pageLimit)
     const hasMore = startIndex + page.length < sessions.length
@@ -86,7 +104,7 @@ export async function GET(
         lastSeenAt: typeof session.lastSeenAt === 'string' ? session.lastSeenAt : null,
       })),
       currentSessionId,
-      nextCursor: hasMore && page.length > 0 ? String(page[page.length - 1].id) : null,
+      nextCursor: hasMore && page.length > 0 ? encodeCursor(String(page[page.length - 1].id)) : null,
     })
   } catch (error) {
     return mapError(error)
