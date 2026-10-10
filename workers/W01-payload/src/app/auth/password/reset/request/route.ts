@@ -9,15 +9,20 @@ const jsonError = (status: number, code: string, message: string) =>
   })
 
 export async function POST(request: Request): Promise<Response> {
-  let body: PasswordResetRequest
-  try { body = await request.json() as PasswordResetRequest } catch {
+  let body: unknown
+  try { body = await request.json() } catch {
     return jsonError(422, 'VALIDATION_FAILED', '请求数据格式无效，请刷新页面后重试。')
   }
 
-  if (typeof body.identifier !== 'string' || body.identifier.trim().length === 0) {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return jsonError(422, 'VALIDATION_FAILED', '请求数据格式无效，请刷新页面后重试。')
+  }
+
+  const rawIdentifier = (body as PasswordResetRequest).identifier
+  if (typeof rawIdentifier !== 'string' || rawIdentifier.trim().length === 0) {
     return jsonError(422, 'EMAIL_REQUIRED', '请输入注册邮箱。')
   }
-  const identifier = body.identifier.trim().toLowerCase()
+  const identifier = rawIdentifier.trim().toLowerCase()
   if (identifier.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(identifier)) {
     return jsonError(422, 'EMAIL_INVALID', '邮箱格式不正确，请检查后重试。')
   }

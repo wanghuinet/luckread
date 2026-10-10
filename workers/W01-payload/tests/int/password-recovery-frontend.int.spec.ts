@@ -10,7 +10,7 @@ describe('password recovery frontend', () => {
     const page = read('src/app/(frontend)/forgot-password/page.tsx')
 
     expect(login).toContain('href="/forgot-password"')
-    expect(page).toContain("fetchJson<{ error?: { message?: string } }>('/api/v1/auth/password/reset/request'")
+    expect(page).toContain("fetchJson<{ error?: { code?: string; message?: string } }>('/api/v1/auth/password/reset/request'")
     expect(page).toContain("method: 'POST'")
     expect(page).toContain('identifier')
     expect(page).toContain('如果该邮箱对应 LuckRead 账号')
@@ -33,5 +33,18 @@ describe('password recovery frontend', () => {
     expect(page).toContain("const searchParams = useSearchParams()")
     expect(page).toContain("useState(searchParams.get('token') || '')")
     expect(page).toContain("window.history.replaceState(null, '', '/reset-password')")
+  })
+
+  it('rejects malformed JSON bodies safely at auth route boundaries', () => {
+    const loginRoute = read('src/app/auth/login/route.ts')
+    const requestRoute = read('src/app/auth/password/reset/request/route.ts')
+    const confirmRoute = read('src/app/auth/password/reset/confirm/route.ts')
+
+    for (const source of [loginRoute, requestRoute, confirmRoute]) {
+      expect(source).toContain("if (!body || typeof body !== 'object' || Array.isArray(body))")
+    }
+    expect(loginRoute).toContain("'EMAIL_REQUIRED'")
+    expect(loginRoute).toContain("'EMAIL_INVALID'")
+    expect(loginRoute).toContain("'PASSWORD_REQUIRED'")
   })
 })

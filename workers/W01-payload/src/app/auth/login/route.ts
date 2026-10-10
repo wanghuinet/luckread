@@ -16,25 +16,34 @@ export async function POST(request: Request): Promise<Response> {
     return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Authentication service unavailable')
   }
 
-  let body: { identity?: unknown; credential?: unknown }
-  try { body = await request.json() as typeof body } catch {
-    return errorResponse(400, 'VALIDATION_FAILED', 'Invalid request body')
+  let body: unknown
+  try { body = await request.json() } catch {
+    return errorResponse(400, 'VALIDATION_FAILED', '请求数据格式无效，请重试。')
   }
 
-  if (
-    typeof body.identity !== 'string' ||
-    body.identity.trim().length === 0 ||
-    typeof body.credential !== 'string' ||
-    body.credential.length === 0
-  ) {
-    return errorResponse(400, 'VALIDATION_FAILED', 'Invalid authentication request')
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return errorResponse(400, 'VALIDATION_FAILED', '请求数据格式无效，请重试。')
+  }
+
+  const loginRequest = body as { identity?: unknown; credential?: unknown }
+  const identity = loginRequest.identity
+  const credential = loginRequest.credential
+  if (typeof identity !== 'string' || identity.trim().length === 0) {
+    return errorResponse(400, 'EMAIL_REQUIRED', '请输入邮箱地址。')
+  }
+  const normalizedIdentity = identity.trim().toLowerCase()
+  if (normalizedIdentity.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedIdentity)) {
+    return errorResponse(400, 'EMAIL_INVALID', '邮箱格式不正确，请检查后重试。')
+  }
+  if (typeof credential !== 'string' || credential.length === 0) {
+    return errorResponse(400, 'PASSWORD_REQUIRED', '请输入登录密码。')
   }
 
   try {
     return await proxyBetterAuth(request, '/sign-in/email', {
       body: {
-        email: body.identity.trim().toLowerCase(),
-        password: body.credential,
+        email: normalizedIdentity,
+        password: credential,
         rememberMe: true,
       },
     })

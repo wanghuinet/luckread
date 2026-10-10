@@ -57,7 +57,7 @@ export default function RegisterForm({ policyVersion }: RegisterFormProps) {
       }
 
       setVerificationStatus('sent')
-      setVerificationMessage('验证邮件已发送至 ' + identity + '。请打开邮件中的链接完成验证。')
+      setVerificationMessage('已受理发往 ' + identity + ' 的验证邮件请求。邮件可能需要几分钟到达；若未收到，请检查垃圾邮件或稍后重试。')
     } catch (error) {
       setVerificationStatus('error')
       setVerificationMessage(error instanceof Error ? error.message : '验证邮件暂时无法发送，请点击重试。')
