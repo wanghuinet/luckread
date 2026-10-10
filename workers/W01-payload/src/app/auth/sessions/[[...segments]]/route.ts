@@ -72,7 +72,7 @@ export async function GET(
     return json({
       items: page.map((session) => ({
         sessionId: String(session.id),
-        deviceId: typeof session.deviceId === 'string' ? session.deviceId : null,
+        ...(typeof session.deviceId === 'string' ? { deviceId: session.deviceId } : {}),
         createdAt: String(session.createdAt ?? ''),
         expiresAt: String(session.expiresAt ?? ''),
         lastSeenAt: typeof session.lastSeenAt === 'string' ? session.lastSeenAt : null,
