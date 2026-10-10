@@ -139,6 +139,45 @@ export async function transitionAccountState(
   throw new W02AuthClientError(status, 'account-state transition failed')
 }
 
+export type SessionListResponse = {
+  items: Array<{
+    sessionId: string
+    deviceId?: string
+    createdAt: string
+    expiresAt: string
+    lastSeenAt: string | null
+  }>
+  currentSessionId: string
+  nextCursor: string | null
+}
+
+export async function listSessions(
+  request: Request,
+  input: { limit: number; cursor?: string },
+): Promise<SessionListResponse> {
+  const response = await callW02('/internal/auth/session/list', {
+    request,
+    body: input,
+  })
+
+  let payload: unknown = null
+  try { payload = await response.json() } catch {}
+
+  if (
+    response.ok &&
+    payload &&
+    typeof payload === 'object' &&
+    Array.isArray((payload as SessionListResponse).items) &&
+    typeof (payload as SessionListResponse).currentSessionId === 'string' &&
+    ((payload as SessionListResponse).nextCursor === null ||
+      typeof (payload as SessionListResponse).nextCursor === 'string')
+  ) {
+    return payload as SessionListResponse
+  }
+
+  throw new W02AuthClientError(response.status || 503, 'session list failed')
+}
+
 export async function revokeSessionById(request: Request, sessionId: string): Promise<void> {
   const response = await callW02('/internal/auth/session/revoke-by-id', {
     request,
