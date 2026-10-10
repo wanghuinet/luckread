@@ -302,7 +302,7 @@
       ],
       "evidence": {
         "openapi": "PASS",
-        "inventory": "PENDING_VALIDATION",
+        "inventory": "PASS",
         "permission": "MISSING",
         "state": "MISSING",
         "resource": "PASS",
