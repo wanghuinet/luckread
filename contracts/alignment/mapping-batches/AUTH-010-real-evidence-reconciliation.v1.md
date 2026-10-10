@@ -94,24 +94,29 @@ For the current closure pass, `deviceId` is treated only as the canonical `ENT-S
 
 A separate device contract is required before AUTH-010 can claim a fully reconciled device registry surface.
 
-## 7. Important runtime boundary
+## 7. Current session API implementation and runtime evidence (2026-10-10)
 
-The discovered `auth_session_state` code is evidence of a persistence/schema implementation, but it is **not** evidence that AUTH-010 list/revoke endpoints are implemented.
+PR #991 implements the bounded W01 session-list/revoke surface through the existing W02 Service Binding. The canonical native Better Auth session remains authoritative for session identity and lifecycle; this change does not add Worker/D1/Queue/Service Binding topology, alter the schema, modify Better Auth, or change Payload core.
 
-The source file comments identify this table as the minimal extension state for AUTH-002. Therefore AUTH-010 must consume that authority through an explicit runtime binding rather than claim ownership from name/field similarity. fileciteturn43file0
+The exact tested source `eb0b1643732b0d0124eeb380f008015eadbe665c` passed the controlled local W01 + W02 runtime evidence workflow:
 
-Repository search still found no concrete handler implementing both `authSessionList` and `authSessionRevoke`, and no authoritative handler → DTO → authorization → persistence → lifecycle → response chain for AUTH-010.
+- Workflow run: https://github.com/wanghuinet/luckread/actions/runs/38046895324
+- Uploaded evidence artifact: https://github.com/wanghuinet/luckread/actions/runs/38046895324/artifacts/11668550109
+- Evidence type: `AUTH-010_SESSION_LIST_REVOKE_W01_W02_LOCAL_RUNTIME`
+- Environment: `CONTROLLED_LOCAL_D1`; this is not evidence that the same commit is deployed remotely or in production.
+- Verified: signed W02 login cookie authenticates the W01 route; list is capped at 50; cursor continuation works (50 + 6 rows in the fixture); current-session marker is stable; secret fields are absent; list responses are `no-store`; malformed cursor is rejected; a second real W02 identity cannot list the first user's sessions or alter them by revoke; the owner can revoke; repeat revoke is an idempotent 204; the revoked session is absent from a subsequent list; synthetic test identities/sessions are cleaned up; no secrets were captured.
+
+The W01 route still invokes the existing read/write traffic limiters, and behavioral tests assert those hooks are called. The AUTH-010 runtime probe did **not** exercise actual rate-limit exhaustion/429 behavior, so `antiAbuse` remains unverified. This evidence closes the current list/revoke runtime chain only; it does not complete the proposed independent device-record feature or promote the full AUTH-010 feature to GREEN.
 
 ## 8. Remaining blockers
 
-1. Bind `authSessionList` and `authSessionRevoke` to the canonical `ENT-SESSION` entity/field IDs without duplicating or overriding AUTH-002 authority.
-2. Accept real Gate-1 schema evidence proving the native `createdAt` / `expiresAt` representation and extension schema against the tested commit; no duplicate extension columns should be introduced.
-3. Establish canonical DTO/OpenAPI request/response definitions for list/revoke.
-4. Establish concrete runtime handlers and self-scope authorization evidence.
-5. Establish authoritative lifecycle/event semantics for list/revoke, including revocation dominance over stale cache.
-6. Prove executable migration/application state for the extension schema and its relationship to native session persistence.
-7. Define and validate `ENT-DEVICE-RECORD` separately before claiming complete device-registry mapping.
-8. Add positive/negative integration/security tests and actual Evidence Registry execution references.
+1. Prove real anti-abuse enforcement for these routes with an executable rate-limit/429 test; the current runtime evidence does not exercise limiter exhaustion, so the policy field remains `MISSING`.
+2. Register the exact-SHA runtime evidence in the appropriate feature/evidence trace without promoting the repository-wide Mapping 0 registry from its current `NOT_GREEN` state or invalidating its tested-commit anchor.
+3. Run a new exact-SHA remote/deployed verification before claiming that this PR's session behavior is live in production. The current green run uses controlled local D1 only.
+4. Keep the AUTH-002 native-session authority intact. This PR proves the list/revoke runtime path; it does not, by itself, prove every extension-table/device field in the full `ENT-SESSION` contract.
+5. `ENT-DEVICE-RECORD` remains proposed. Do not describe this session API closeout as a complete device registry until a separate canonical device contract is established.
+
+The previously listed handler/OpenAPI/self-scope/pagination/revocation test blockers are no longer accurate for the session list/revoke path: canonical OpenAPI, W01/W02 handlers, the controlled runtime evidence, cross-account isolation, revocation persistence, and post-revoke visibility are now present in the tested PR.
 
 ## 9. GREEN decision
 
@@ -125,11 +130,9 @@ Required final chain:
 
 ## 10. Next closure action
 
-Proceed in this order:
+Proceed in this order, one item at a time:
 
-1. execute/accept AUTH-002 Gate-1 schema evidence for the native + extension boundary;
-2. bind canonical AUTH-010 DTO/OpenAPI definitions;
-3. locate or implement the actual list/revoke runtime surface;
-4. bind self-scope authorization and revocation lifecycle;
-5. execute integration/security tests and register non-empty Evidence Registry records;
-6. only then re-evaluate AUTH-010 for GREEN.
+1. add deterministic rate-limit behavior evidence for `GET /auth/sessions` and `DELETE /auth/sessions/{sessionId}`, then promote only the supported `antiAbuse` fields;
+2. register the passing run `38046895324` / tested commit `eb0b1643732b0d0124eeb380f008015eadbe665c` in the feature-level evidence trace; do not mark repository-wide Mapping 0 GREEN;
+3. perform a fresh remote/deployed exact-SHA session lifecycle verification when the code is deployed;
+4. revisit AUTH-010's full feature status only after device authority and remaining canonical mapping requirements are genuinely closed.
