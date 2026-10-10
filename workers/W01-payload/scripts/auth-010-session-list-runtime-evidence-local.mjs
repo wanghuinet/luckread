@@ -147,10 +147,12 @@ const loginDirectW02 = async (email, password) => {
   const w02BaseUrl = w02ConfiguredUrl.endsWith('/') ? w02ConfiguredUrl.slice(0, -1) : w02ConfiguredUrl
   const response = await fetch(w02BaseUrl + '/api/auth/sign-in/email', {
     method: 'POST',
-    headers: requestHeaders({ 'content-type': 'application/json' }),
+    headers: requestHeaders({ 'content-type': 'application/json', connection: 'close' }),
     body: JSON.stringify({ email, password }),
+    cache: 'no-store',
   })
-  await parseJson(response, 'AUTH010_SECOND_IDENTITY_LOGIN')
+  // The evidence only needs the signed cookie. Avoid consuming a successful
+  // auth response body when the local workerd connection is already closing.
   const cookie = firstCookieHeader(response)
   if (!response.ok || !cookie) {
     throw new Error('AUTH010_SECOND_IDENTITY_LOGIN_FAILED_HTTP_' + response.status)
