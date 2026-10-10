@@ -17,6 +17,7 @@ const sessionIds = { a1: null, a2: null, b1: null }
 let failureCode = null
 let sourceSha = null
 let probeSha256 = null
+let workflowSha256 = null
 
 function assertCheck(name, condition, code) {
   checks[name] = condition === true
@@ -156,7 +157,9 @@ async function runAssertions() {
   assertCheck('DistinctTestAccounts', emailA.toLowerCase() !== emailB.toLowerCase(), 'TEST_ACCOUNTS_MUST_BE_DISTINCT')
 
   const probeSource = readFileSync(new URL(import.meta.url))
+  const workflowSource = readFileSync(resolve('.github/workflows/auth-010-remote-e2e.yml'))
   probeSha256 = createHash('sha256').update(probeSource).digest('hex')
+  workflowSha256 = createHash('sha256').update(workflowSource).digest('hex')
 
   const unauthenticated = await listSessions(null, 'AUTH010_UNAUTHENTICATED_LIST')
   assertCheck('UnauthenticatedDenied401', unauthenticated.response.status === 401, 'UNAUTHENTICATED_LIST_HTTP_' + unauthenticated.response.status)
@@ -251,7 +254,10 @@ async function main() {
     environmentClass: 'REMOTE_DEPLOYED_HTTP',
     startedAt,
     finishedAt: new Date().toISOString(),
-    probeSha256,
+    fileSha256: {
+      probe: probeSha256,
+      workflow: workflowSha256,
+    },
     assertions: checks,
     cleanup: cleanupResults,
     secretMaterialRecorded: false,
