@@ -10,12 +10,16 @@ describe('frontend session management', () => {
     expect(route).toContain("export { GET, DELETE } from '../../../../../auth/sessions/[[...segments]]/route'")
   })
 
-  it('returns a bounded, paginated list with currentSessionId at the response envelope', () => {
+  it('delegates session pagination to a bounded W02 query', () => {
     const route = read('src/app/auth/sessions/[[...segments]]/route.ts')
-    expect(route).toContain('const pageLimit = Math.min(50, requestedLimit)')
-    expect(route).toContain("const cursor = url.searchParams.get('cursor')")
-    expect(route).toContain('currentSessionId,\n      nextCursor:')
-    expect(route).not.toContain('currentSessionId,\n        deviceId:')
+    const w02 = read('src/auth/session-list.ts')
+    expect(route).toContain('listSessions(request,')
+    expect(route).toContain('Math.min(50, requestedLimit)')
+    expect(w02).toContain('WHERE user_id = ?')
+    expect(w02).toContain('ORDER BY created_at DESC, id DESC LIMIT ?')
+    expect(w02).toContain('currentSessionId')
+    expect(w02).toContain('nextCursor')
+    expect(w02).toContain('limit + 1')
   })
 
   it('applies existing W01 traffic guards to session reads and revocation writes', () => {
