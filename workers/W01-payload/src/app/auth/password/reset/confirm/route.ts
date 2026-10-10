@@ -13,7 +13,7 @@ const jsonError = (status: number, code: string, message: string) =>
 
 const assertPasswordPolicy = (value: unknown): value is string => {
   if (typeof value !== 'string') return false
-  const length = Array.from(value).length
+  const length = value.length
   return length >= 15 && length <= 128
 }
 
