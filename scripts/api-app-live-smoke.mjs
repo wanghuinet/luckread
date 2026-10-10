@@ -12,7 +12,7 @@ const evidencePath = resolve(evidenceDir, `api-app-live-smoke-${runId}-${runAtte
 
 const summarizeBody = (value) => {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) {
-    return { json: value !== undefined, topLevelKeys: [] }
+    return { json: false, topLevelKeys: [] }
   }
 
   const summary = {
