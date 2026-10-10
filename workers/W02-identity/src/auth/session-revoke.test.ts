@@ -32,7 +32,7 @@ const makeEnv = (target: unknown) => {
     bind: vi.fn().mockReturnThis(),
     first: vi.fn().mockResolvedValue(target),
   }
-  const prepare = vi.fn((sql: string) => {
+  const prepare = vi.fn((_sql: string) => {
     sequence.push('d1:target-session')
     return statement
   })
