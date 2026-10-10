@@ -6,7 +6,7 @@ const email = process.env.LUCKREAD_APP_AUTH_SMOKE_EMAIL || ''
 const password = process.env.LUCKREAD_APP_AUTH_SMOKE_PASSWORD || ''
 const runId = process.env.GITHUB_RUN_ID || 'local'
 const runAttempt = process.env.GITHUB_RUN_ATTEMPT || '1'
-const sourceSha = process.env.GITHUB_SHA || 'unknown'
+const sourceSha = process.env.LUCKREAD_SOURCE_SHA || process.env.GITHUB_SHA || 'unknown'
 const evidenceDir = resolve('artifacts/api-auth-session-live-e2e')
 const evidencePath = resolve(evidenceDir, `auth-session-live-e2e-${runId}-${runAttempt}.json`)
 
