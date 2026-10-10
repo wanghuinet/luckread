@@ -439,7 +439,7 @@
         "state": "PASS",
         "resource": "PASS",
         "cache": "PASS",
-        "antiAbuse": "MISSING",
+        "antiAbuse": "PASS",
         "integration": "PASS",
         "securityE2E": "PASS"
       }
@@ -516,7 +516,7 @@
         "state": "PASS",
         "resource": "PASS",
         "cache": "PASS",
-        "antiAbuse": "MISSING",
+        "antiAbuse": "PASS",
         "integration": "PASS",
         "securityE2E": "PASS"
       }
