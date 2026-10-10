@@ -2,6 +2,12 @@ name: APP API live HTTP smoke evidence
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - 'audit/1.1-app-api-acceptance-*'
+    paths:
+      - '.github/workflows/api-app-live-smoke.yml'
+      - 'scripts/api-app-live-smoke.mjs'
 
 permissions:
   contents: read
