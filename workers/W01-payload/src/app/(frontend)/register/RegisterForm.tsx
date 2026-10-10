@@ -65,21 +65,46 @@ export default function RegisterForm({ policyVersion }: RegisterFormProps) {
     const normalizedEmail = email.trim().toLowerCase()
     const normalizedUsername = username.trim()
 
-    if (!normalizedEmail || !normalizedUsername || !password) {
+    if (!normalizedEmail) {
       setStatus('error')
-      setMessage('请完整填写邮箱、用户名和密码。')
+      setMessage('请输入邮箱地址。')
       return
     }
 
     if (normalizedEmail.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
       setStatus('error')
-      setMessage('请输入有效的邮箱地址。')
+      setMessage('邮箱格式不正确，请检查后重试。')
       return
     }
 
-    if (password.length < 15 || password.length > 128) {
+    if (!normalizedUsername) {
       setStatus('error')
-      setMessage('密码长度必须为 15–128 位。')
+      setMessage('请输入用户名。')
+      return
+    }
+
+    if (!/^[A-Za-z0-9]{6,32}$/.test(normalizedUsername)) {
+      setStatus('error')
+      setMessage('用户名需为 6–32 位英文字母或数字，不能包含空格或特殊字符。')
+      return
+    }
+
+    const passwordLength = Array.from(password).length
+    if (!password) {
+      setStatus('error')
+      setMessage('请输入登录密码。')
+      return
+    }
+
+    if (passwordLength < 15 || passwordLength > 128) {
+      setStatus('error')
+      setMessage('密码长度必须为 15–128 个字符。建议使用较长且独一无二的密码。')
+      return
+    }
+
+    if (!confirmPassword) {
+      setStatus('error')
+      setMessage('请再次输入密码以完成确认。')
       return
     }
 
@@ -117,7 +142,24 @@ export default function RegisterForm({ policyVersion }: RegisterFormProps) {
       })
 
       if (!response.ok) {
-        throw new Error(getApiErrorMessage(payload, '注册暂时无法完成，请稍后重试。'))
+        const apiError = payload && 'error' in payload ? payload.error : undefined
+        const code = typeof apiError?.code === 'string' ? apiError.code.toUpperCase() : ''
+        if (code === 'EMAIL_ALREADY_REGISTERED') {
+          throw new Error('该邮箱可能已注册，请尝试登录或使用“忘记密码”找回账号。')
+        }
+        if (code === 'USERNAME_TAKEN' || code === 'USERNAME_ALREADY_EXISTS') {
+          throw new Error('该用户名已被使用，请换一个用户名。')
+        }
+        if (response.status === 429) {
+          throw new Error('注册请求过于频繁，请稍等片刻后重试。')
+        }
+        if (response.status >= 500) {
+          throw new Error('注册服务暂时不可用，账号可能尚未创建成功，请稍后重试。')
+        }
+        const apiMessage = getApiErrorMessage(payload, '')
+        throw new Error(/[\u3400-\u9fff]/.test(apiMessage)
+          ? apiMessage
+          : '注册信息未通过校验，请检查邮箱、用户名和密码格式后重试。')
       }
 
       if (
@@ -139,7 +181,9 @@ export default function RegisterForm({ policyVersion }: RegisterFormProps) {
       await sendVerificationEmail(normalizedEmail)
     } catch (error) {
       setStatus('error')
-      setMessage(error instanceof Error ? error.message : '注册暂时无法完成，请稍后重试。')
+      setMessage(error instanceof TypeError
+        ? '网络连接异常，注册请求未完成。请检查网络后重试。'
+        : error instanceof Error ? error.message : '注册暂时无法完成，请稍后重试。')
     }
   }
 
@@ -248,7 +292,8 @@ export default function RegisterForm({ policyVersion }: RegisterFormProps) {
                   <span>用户名</span>
                   <input
                     autoComplete="username"
-                    maxLength={128}
+                    minLength={6}
+                    maxLength={32}
                     name="username"
                     onChange={(event) => setUsername(event.target.value)}
                     placeholder="设置你的公开用户名"
@@ -258,7 +303,7 @@ export default function RegisterForm({ policyVersion }: RegisterFormProps) {
                     value={username}
                     aria-label="用户名"
                   />
-                  <small>将用于你的公开主页：luckread.com/你的用户名</small>
+                  <small>用于你的公开主页：luckread.com/你的用户名。用户名需为 6–32 位英文字母或数字。</small>
                 </label>
 
                 <label className="registerField">
@@ -270,13 +315,13 @@ export default function RegisterForm({ policyVersion }: RegisterFormProps) {
                     maxLength={128}
                     required
                     onChange={(event) => setPassword(event.target.value)}
-                    placeholder="请输入 15–128 位密码"
+                    placeholder="请设置 15–128 位密码"
                     type="password"
                     value={password}
                     aria-label="设置密码"
                     aria-describedby="register-password-hint"
                   />
-                  <small id="register-password-hint">密码长度为 15–128 位。</small>
+                  <small id="register-password-hint">密码需为 15–128 个字符；可使用长句，不要使用其他网站的旧密码。</small>
                 </label>
 
                 <label className="registerField">
