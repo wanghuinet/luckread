@@ -498,6 +498,18 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
     payload = await getPayload({ config })
     // Import the generated collection type directly so Next's isolated route
     // type-checker includes Payload's module augmentation for auth fields.
+    const existingUsername = await payload.find({
+      collection: 'users',
+      where: { username: { equals: normalized.username } },
+      limit: 1,
+      depth: 0,
+      overrideAccess: true,
+      req: request,
+    })
+    if (existingUsername.docs.length > 0) {
+      throw new Error('AUTH001_USERNAME_TAKEN')
+    }
+
     const profileData: Pick<PayloadUser, 'identityId' | 'username'> & { email: string } = {
       identityId: userId,
       email: normalized.identity,
@@ -546,6 +558,9 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
       errorName: error instanceof Error ? error.name : typeof error,
       errorMessage: safeProjectionErrorMessage,
     }))
+    if (error instanceof Error && error.message === 'AUTH001_USERNAME_TAKEN') {
+      return errorResponse(409, 'USERNAME_TAKEN', '该用户名已被使用，请换一个用户名。')
+    }
     return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Registration service unavailable')
   }
 
