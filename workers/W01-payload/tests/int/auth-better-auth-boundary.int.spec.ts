@@ -263,10 +263,15 @@ describe('W01 Better Auth boundary', () => {
     expect(response.headers.get('cache-control')).toBe('no-store')
   })
 
-  it('uses Better Auth session retrieval instead of minting a legacy refresh token', async () => {
-    mocks.proxyBetterAuth.mockResolvedValue(new Response(JSON.stringify({ user: { id: 'u1' }, session: { id: 's1' } }), { status: 200 }))
+  it('keeps the legacy refresh path as a deprecated alias for the canonical session response', async () => {
+    mocks.proxyBetterAuth.mockResolvedValue(new Response(JSON.stringify({
+      user: { id: 'u1', email: 'user@example.com', name: null, emailVerified: true, image: null },
+      session: { id: 's1', expiresAt: '2026-10-18T12:00:00.000Z' },
+    }), { status: 200 }))
     const response = await refresh(request('https://luckread.test/api/v1/auth/refresh', 'POST', {}))
+    const data = await response.json() as { data: { session: { id: string } } }
     expect(response.status).toBe(200)
+    expect(data.data.session.id).toBe('s1')
     expect(mocks.proxyBetterAuth).toHaveBeenCalledWith(expect.any(Request), '/get-session', { method: 'GET' })
   })
 
