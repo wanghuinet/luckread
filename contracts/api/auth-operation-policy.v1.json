@@ -198,6 +198,7 @@
       "security": [
         "no_account_enumeration",
         "credential_never_logged",
+        "credential_never_returned",
         "constant_failure_semantics",
         "risk_challenge_before_expensive_work",
         "session_credential_never_in_json_body",
