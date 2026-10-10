@@ -5,6 +5,16 @@
   "compatibility_date": "2025-08-15",
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": false,
+  "vars": {
+    "AUTH_EMAIL_FROM": "noreply@good.luckread.com"
+  },
+  "observability": {
+    "enabled": true,
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 1
+    }
+  },
   "triggers": {
     "crons": [
       "* * * * *"
