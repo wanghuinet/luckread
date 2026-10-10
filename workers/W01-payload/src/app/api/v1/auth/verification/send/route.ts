@@ -25,18 +25,18 @@ export async function POST(request: Request): Promise<Response> {
     await enforceAuthRateLimit(request, 'AUTH_REGISTER_LIMITER', ['ip:' + clientIp])
   } catch (error) {
     if (error instanceof TrafficLimitError) return rateLimitResponse(request)
-    return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Verification service unavailable')
+    return errorResponse(503, 'SERVICE_UNAVAILABLE', '验证邮件服务暂时不可用，请稍后重试。')
   }
 
   let body: unknown
   try {
     body = await request.json()
   } catch {
-    return errorResponse(422, 'VALIDATION_FAILED', 'Invalid verification request')
+    return errorResponse(422, 'VALIDATION_FAILED', '验证邮件请求格式无效，请检查邮箱地址。')
   }
 
   if (!body || typeof body !== 'object' || Array.isArray(body)) {
-    return errorResponse(422, 'VALIDATION_FAILED', 'Invalid verification request')
+    return errorResponse(422, 'VALIDATION_FAILED', '验证邮件请求格式无效，请检查邮箱地址。')
   }
 
   const identity = (body as { identity?: unknown }).identity
@@ -46,7 +46,7 @@ export async function POST(request: Request): Promise<Response> {
     identity.trim().length > 254 ||
     !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(identity.trim())
   ) {
-    return errorResponse(422, 'VALIDATION_FAILED', 'Invalid verification request')
+    return errorResponse(422, 'VALIDATION_FAILED', '验证邮件请求格式无效，请检查邮箱地址。')
   }
 
   try {
@@ -58,10 +58,10 @@ export async function POST(request: Request): Promise<Response> {
     })
 
     if (upstream.status === 429) {
-      return errorResponse(429, 'RATE_LIMITED', 'Too many verification requests')
+      return errorResponse(429, 'RATE_LIMITED', '验证邮件请求过于频繁，请稍后再试。')
     }
     if (upstream.status >= 500) {
-      return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Verification service unavailable')
+      return errorResponse(503, 'SERVICE_UNAVAILABLE', '验证邮件服务暂时不可用，请稍后重试。')
     }
 
     // Do not reveal whether an email address has an account or is already
@@ -72,6 +72,6 @@ export async function POST(request: Request): Promise<Response> {
       headers: { 'cache-control': 'no-store' },
     })
   } catch {
-    return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Verification service unavailable')
+    return errorResponse(503, 'SERVICE_UNAVAILABLE', '验证邮件服务暂时不可用，请稍后重试。')
   }
 }
