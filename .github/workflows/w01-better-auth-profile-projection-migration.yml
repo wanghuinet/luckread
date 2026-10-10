@@ -1,0 +1,281 @@
+name: W01 Better Auth Profile Projection Migration
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Exact main commit containing the admitted migration change
+        required: true
+        type: string
+      database_name:
+        description: Controlled D1 database name
+        required: true
+        default: luckread
+        type: string
+      confirm:
+        description: Type APPLY_BETTER_AUTH_PROFILE_PROJECTION_MIGRATION to permit the controlled remote migration
+        required: true
+        default: APPLY_BETTER_AUTH_PROFILE_PROJECTION_MIGRATION
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  WRANGLER_VERSION: "4.116.0"
+  W01_WRANGLER_CONFIG: workers/W01-payload/wrangler.jsonc
+  DATABASE_NAME: luckread
+  PROFILE_PROJECTION_MIGRATION: 20261006_202000_MIG_BETTER_AUTH_PROFILE_PROJECTION_V1
+  EXPECTED_DATABASE_ID: 2f80471e-3756-49f9-8db1-7707a433ad64
+
+jobs:
+  apply-profile-projection-migration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Validate dispatch inputs
+        env:
+          REQUESTED_DATABASE_NAME: ${{ inputs.database_name }}
+          CONFIRM: ${{ inputs.confirm }}
+        run: |
+          set -euo pipefail
+          test "$REQUESTED_DATABASE_NAME" = "luckread"
+          test "$CONFIRM" = "APPLY_BETTER_AUTH_PROFILE_PROJECTION_MIGRATION"
+
+      - name: Checkout exact source commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha }}
+          fetch-depth: 0
+
+      - name: Validate exact source and admitted migration source
+        env:
+          REQUESTED_SHA: ${{ inputs.source_sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$REQUESTED_SHA"
+          git merge-base --is-ancestor "$REQUESTED_SHA" origin/main
+          test "$(git rev-parse HEAD:workers/W01-payload/src/migrations/20261006_202000_MIG_BETTER_AUTH_PROFILE_PROJECTION_V1.ts)" = "5a6da5828534eca31a2e9e800692badc4096fecc"
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs'
+          const source = readFileSync('workers/W01-payload/src/migrations/index.ts', 'utf8')
+          const name = '20261006_202000_MIG_BETTER_AUTH_PROFILE_PROJECTION_V1'
+          const registrations = source.match(new RegExp("name:\\s*'" + name + "'", 'g')) ?? []
+          if (registrations.length !== 1) throw new Error('Expected exactly one registration for ' + name)
+          const wrangler = JSON.parse(readFileSync(process.env.W01_WRANGLER_CONFIG, 'utf8'))
+          const binding = (wrangler.d1_databases ?? []).find((item) => item.binding === 'D1')
+          if (!binding || binding.database_name !== 'luckread' || binding.database_id !== process.env.EXPECTED_DATABASE_ID) {
+            throw new Error('W01 D1 binding is not the admitted luckread database')
+          }
+          console.log(JSON.stringify({ migration: name, registrationCount: registrations.length, databaseName: binding.database_name, databaseId: binding.database_id }))
+          NODE
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Setup pnpm 11
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.0.0
+          run_install: false
+
+      - name: Install locked W01 dependencies
+        working-directory: workers/W01-payload
+        run: pnpm install --frozen-lockfile --ignore-workspace
+
+      - name: Validate Cloudflare access
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          mkdir -p artifacts/evidence/w01-profile-projection
+
+      - name: Capture pre-migration state without mutation
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        working-directory: workers/W01-payload
+        run: |
+          set -euo pipefail
+          EVIDENCE_DIR=../../artifacts/evidence/w01-profile-projection
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 info "$DATABASE_NAME" --json --config wrangler.jsonc > "$EVIDENCE_DIR/d1-info.json"
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc --command 'PRAGMA table_info("users");' > "$EVIDENCE_DIR/pre-users-schema.json"
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc --command 'PRAGMA index_list("users");' > "$EVIDENCE_DIR/pre-users-indexes.json"
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc --command 'SELECT COUNT(*) AS users_count FROM users;' > "$EVIDENCE_DIR/pre-users-count.json"
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc --command 'SELECT id,name,batch FROM payload_migrations ORDER BY id;' > "$EVIDENCE_DIR/pre-payload-migrations.json"
+
+      - name: Fail closed unless only the admitted migration is pending
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import { readFileSync, writeFileSync } from 'node:fs'
+          const dir = 'artifacts/evidence/w01-profile-projection'
+          const expectedDatabaseId = process.env.EXPECTED_DATABASE_ID
+          const migration = process.env.PROFILE_PROJECTION_MIGRATION
+          const expectedHistory = [
+            '20250929_111647',
+            '20260921_003203_MIG_AUTH_002_SESSION_V1',
+            '20260925_111503_MIG_ENT_USER_PROFILE_V1',
+            '20260928_020000_MIG_AUTH_001_REGISTRATION_BATCH_V1',
+            '20260928_104842_MIG_PAYLOAD_3902_NATIVE_SCHEMA_V1',
+            '20261002_120000_media_owner',
+          ]
+          const parse = (name) => JSON.parse(readFileSync(dir + '/' + name, 'utf8'))
+          const rowsFrom = (value) => {
+            const rows = []
+            const walk = (item) => {
+              if (Array.isArray(item)) { for (const child of item) walk(child); return }
+              if (!item || typeof item !== 'object') return
+              if (Array.isArray(item.results)) rows.push(...item.results)
+              for (const child of Object.values(item)) walk(child)
+            }
+            walk(value)
+            return [...new Map(rows.filter((row) => row && typeof row === 'object').map((row) => [JSON.stringify(row), row])).values()]
+          }
+          const info = parse('d1-info.json')
+          const schema = rowsFrom(parse('pre-users-schema.json'))
+          const indexes = rowsFrom(parse('pre-users-indexes.json'))
+          const countRows = rowsFrom(parse('pre-users-count.json'))
+          const history = rowsFrom(parse('pre-payload-migrations.json')).map((row) => String(row.name ?? ''))
+          const columnNames = schema.map((row) => String(row.name))
+          const indexNames = indexes.map((row) => String(row.name))
+          const usersCount = Number(countRows[0]?.users_count ?? NaN)
+          const errors = []
+          if (!JSON.stringify(info).includes(expectedDatabaseId)) errors.push('D1 info does not prove the expected database ID')
+          if (!columnNames.includes('username') || !columnNames.includes('email')) errors.push('required baseline users columns are missing')
+          if (columnNames.includes('identity_id')) errors.push('identity_id already exists; do not replay the migration')
+          if (indexNames.includes('users_identity_id_idx')) errors.push('identity_id index already exists; reconcile schema before execution')
+          if (!Number.isSafeInteger(usersCount) || usersCount < 0) errors.push('users row count could not be verified')
+          if (history.includes(migration)) errors.push('target migration is already recorded in payload_migrations')
+          if (history.length !== expectedHistory.length || [...history].sort().join('|') !== [...expectedHistory].sort().join('|')) {
+            errors.push('Payload migration history differs from the admitted baseline; no migration will run')
+          }
+          const summary = {
+            mode: 'READ_ONLY_PREFLIGHT',
+            sourceSha: process.env.SOURCE_SHA,
+            databaseName: process.env.DATABASE_NAME,
+            expectedDatabaseId,
+            usersCount,
+            usersColumns: columnNames,
+            usersIndexes: indexes.map((row) => ({ name: row.name, unique: row.unique })),
+            payloadMigrationHistory: history,
+            pendingMigration: migration,
+            errors,
+          }
+          writeFileSync(dir + '/preflight-summary.json', JSON.stringify(summary, null, 2) + '\n')
+          console.log(JSON.stringify(summary, null, 2))
+          if (errors.length) throw new Error('W01_PROFILE_PROJECTION_PREFLIGHT_BLOCKED: ' + errors.join('; '))
+          NODE
+
+      - name: Apply the single admitted Payload migration
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_ENV: production
+          NODE_ENV: production
+          PAYLOAD_MIGRATION_REMOTE: "true"
+          PAYLOAD_SECRET: ignore
+        working-directory: workers/W01-payload
+        run: pnpm exec payload migrate
+
+      - name: Capture and validate post-migration state
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        working-directory: workers/W01-payload
+        run: |
+          set -euo pipefail
+          EVIDENCE_DIR=../../artifacts/evidence/w01-profile-projection
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc --command 'PRAGMA table_info("users");' > "$EVIDENCE_DIR/post-users-schema.json"
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc --command 'PRAGMA index_list("users");' > "$EVIDENCE_DIR/post-users-indexes.json"
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc --command 'SELECT COUNT(*) AS users_count FROM users;' > "$EVIDENCE_DIR/post-users-count.json"
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc --command 'SELECT id,name,batch FROM payload_migrations ORDER BY id;' > "$EVIDENCE_DIR/post-payload-migrations.json"
+          cd ../..
+          node --input-type=module <<'NODE'
+          import { readFileSync, writeFileSync } from 'node:fs'
+          const dir = 'artifacts/evidence/w01-profile-projection'
+          const read = (name) => JSON.parse(readFileSync(dir + '/' + name, 'utf8'))
+          const rowsFrom = (value) => {
+            const rows = []
+            const walk = (item) => {
+              if (Array.isArray(item)) { for (const child of item) walk(child); return }
+              if (!item || typeof item !== 'object') return
+              if (Array.isArray(item.results)) rows.push(...item.results)
+              for (const child of Object.values(item)) walk(child)
+            }
+            walk(value)
+            return [...new Map(rows.filter((row) => row && typeof row === 'object').map((row) => [JSON.stringify(row), row])).values()]
+          }
+          const pre = read('preflight-summary.json')
+          const schema = rowsFrom(read('post-users-schema.json'))
+          const indexes = rowsFrom(read('post-users-indexes.json'))
+          const countRows = rowsFrom(read('post-users-count.json'))
+          const history = rowsFrom(read('post-payload-migrations.json')).map((row) => String(row.name ?? ''))
+          const identity = schema.find((row) => String(row.name) === 'identity_id')
+          const identityIndex = indexes.find((row) => String(row.name) === 'users_identity_id_idx')
+          const usersCount = Number(countRows[0]?.users_count ?? NaN)
+          const targetCount = history.filter((name) => name === process.env.PROFILE_PROJECTION_MIGRATION).length
+          const errors = []
+          if (!identity) errors.push('users.identity_id column is missing after migration')
+          if (identity && (String(identity.type).toLowerCase() !== 'text' || Number(identity.notnull) !== 0)) errors.push('identity_id does not match the admitted nullable text schema')
+          if (!identityIndex || Number(identityIndex.unique) !== 1) errors.push('users_identity_id_idx is missing or not unique')
+          if (targetCount !== 1) errors.push('target migration must appear exactly once in payload_migrations')
+          if (!Number.isSafeInteger(usersCount) || usersCount !== Number(pre.usersCount)) errors.push('users row count changed during the additive schema migration')
+          const summary = {
+            mode: 'REMOTE_POSTCHECK',
+            sourceSha: process.env.SOURCE_SHA,
+            databaseName: process.env.DATABASE_NAME,
+            migration: process.env.PROFILE_PROJECTION_MIGRATION,
+            identityColumn: identity ?? null,
+            identityIndex: identityIndex ?? null,
+            usersCountBefore: pre.usersCount,
+            usersCountAfter: usersCount,
+            targetMigrationOccurrences: targetCount,
+            payloadMigrationHistory: history,
+            errors,
+          }
+          writeFileSync(dir + '/postflight-summary.json', JSON.stringify(summary, null, 2) + '\n')
+          console.log(JSON.stringify(summary, null, 2))
+          if (errors.length) throw new Error('W01_PROFILE_PROJECTION_POSTCHECK_FAILED: ' + errors.join('; '))
+          NODE
+
+      - name: Write controlled execution provenance
+        if: always()
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          REQUESTED_DATABASE_NAME: ${{ inputs.database_name }}
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/evidence/w01-profile-projection
+          cat > artifacts/evidence/w01-profile-projection/provenance.json <<EOF
+          {
+            "repository": "$GITHUB_REPOSITORY",
+            "workflow": "$GITHUB_WORKFLOW",
+            "runId": $GITHUB_RUN_ID,
+            "sourceSha": "$SOURCE_SHA",
+            "databaseName": "$REQUESTED_DATABASE_NAME",
+            "databaseId": "$EXPECTED_DATABASE_ID",
+            "environmentClass": "CONTROLLED_REMOTE_D1",
+            "migration": "$PROFILE_PROJECTION_MIGRATION",
+            "mode": "MANUAL_TYPED_CONFIRMATION",
+            "identityIdBackfill": false
+          }
+          EOF
+          cat artifacts/evidence/w01-profile-projection/provenance.json
+
+      - name: Upload migration evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: w01-better-auth-profile-projection-migration-${{ github.run_id }}
+          path: artifacts/evidence/w01-profile-projection/
+          if-no-files-found: warn
+          retention-days: 90
