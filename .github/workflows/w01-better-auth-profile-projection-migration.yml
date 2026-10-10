@@ -75,11 +75,8 @@ jobs:
         with:
           node-version: 24
 
-      - name: Setup pnpm 11
-        uses: pnpm/action-setup@v4
-        with:
-          version: 11.0.0
-          run_install: false
+      - name: Enable pinned pnpm 10
+        run: corepack enable && corepack prepare pnpm@10.34.5 --activate
 
       - name: Install locked W01 dependencies
         working-directory: workers/W01-payload
