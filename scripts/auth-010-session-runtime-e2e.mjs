@@ -122,11 +122,13 @@ async function cleanupOne(label, cookie, sessionId, fallbackCookie = null) {
   if (!cookie && !fallbackCookie) return
   let id = sessionId
   let authCookie = cookie
-  if (!id && authCookie) id = await discoverCurrentSession(authCookie, 'AUTH010_CLEANUP_DISCOVER_' + label)
   if (!id && fallbackCookie) {
-    authCookie = fallbackCookie
+    id = await discoverCurrentSession(fallbackCookie, 'AUTH010_CLEANUP_DISCOVER_' + label)
+  }
+  if (!id && authCookie) {
     id = await discoverCurrentSession(authCookie, 'AUTH010_CLEANUP_DISCOVER_' + label)
   }
+  if (!authCookie) authCookie = fallbackCookie
   if (!id || !authCookie) {
     cleanupResults.push({ label, status: 'NOT_DISCOVERED' })
     return
