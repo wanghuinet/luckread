@@ -558,7 +558,13 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
       errorName: error instanceof Error ? error.name : typeof error,
       errorMessage: safeProjectionErrorMessage,
     }))
-    if (error instanceof Error && error.message === 'AUTH001_USERNAME_TAKEN') {
+    // The read-before-write check improves the common path; the database's
+    // unique constraint remains authoritative under concurrent registrations.
+    const usernameConflict = error instanceof Error && (
+      error.message === 'AUTH001_USERNAME_TAKEN' ||
+      (isUniqueConstraintError(error) && /username/i.test(error.message))
+    )
+    if (usernameConflict) {
       return errorResponse(409, 'USERNAME_TAKEN', '该用户名已被使用，请换一个用户名。')
     }
     return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Registration service unavailable')

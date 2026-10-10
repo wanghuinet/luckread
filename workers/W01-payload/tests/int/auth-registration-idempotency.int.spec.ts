@@ -54,6 +54,7 @@ describe('AUTH-001 registration idempotency ordering', () => {
     expect(source).toContain("'USERNAME_INVALID'")
     expect(source).toContain("'PASSWORD_LENGTH_INVALID'")
     expect(source).toContain("'USERNAME_TAKEN'")
+    expect(source).toContain('isUniqueConstraintError(error) && /username/i.test(error.message)')
     expect(source).toContain('/^[A-Za-z0-9]{6,32}$/.test(username.trim())')
     expect(source).toContain('credentialLength < 15 || credentialLength > 128')
   })
