@@ -267,10 +267,29 @@ try {
   const invalidCursor = await listSessions(cookieA, { cursor: 'not-an-opaque-cursor' })
   if (invalidCursor.response.status !== 400) throw new Error('AUTH010_INVALID_CURSOR_WAS_NOT_REJECTED')
 
-  currentStage = 'register-user-b'
-  const userBId = await registerAccount({ email: emailB, username: usernameB, password: basePassword, idempotencyKey: registerKeyB })
-  currentStage = 'login-user-b'
-  const cookieB = await login(emailB, basePassword)
+  currentStage = 'seed-cross-account-session'
+  // Avoid spending the shared local registration limiter a second time.
+  // This isolated synthetic identity/session exists only in local D1; the
+  // W02 Better Auth session reader still validates its cookie and ownership.
+  const userBId = 'auth010-fixture-user-' + suffix
+  const sessionBId = 'auth010-fixture-session-' + suffix
+  const tokenB = 'auth010-fixture-token-' + suffix
+  const nowB = new Date().toISOString()
+  userIds.push(userBId)
+  runSql(
+    'INSERT INTO "user" (id, name, email, email_verified, image, username, bio, locale, timezone, account_state, account_state_version, created_at, updated_at) VALUES (' +
+      [userBId, usernameB, emailB, 1, null, usernameB, null, 'en-US', 'UTC', 'ACTIVE', 2, nowB, nowB]
+        .map((value) => value === null ? 'NULL' : escapeSql(value)).join(',') +
+      ')',
+  )
+  runSql(
+    'INSERT INTO "session" (id, expires_at, token, created_at, updated_at, ip_address, user_agent, user_id) VALUES (' +
+      [sessionBId, new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), tokenB, nowB, nowB, null, null, userBId]
+        .map((value) => value === null ? 'NULL' : escapeSql(value)).join(',') +
+      ')',
+  )
+  const cookieB = 'better-auth.session_token=' + tokenB
+  console.log('::add-mask::' + cookieB)
   currentStage = 'cross-account-list'
   const userBList = await listSessions(cookieB, { limit: 100 })
   if (userBList.response.status !== 200) throw new Error('AUTH010_SECOND_USER_LIST_FAILED')
