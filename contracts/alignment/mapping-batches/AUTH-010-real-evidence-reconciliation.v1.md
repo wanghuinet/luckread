@@ -144,5 +144,5 @@ Required final chain:
 Proceed in this order, one item at a time:
 
 1. assess formal admission of `EVD-AUTH010-B14-SESSION-LIST-REVOKE-LOCAL-004` under the registry's tested-source/freshness rules; keep its status `CREATED` unless admission requirements are independently satisfied, preserve Mapping 0 `NOT_GREEN`, and do not rewrite the tested-commit anchor;
-2. restore a harness compatible with the native Better Auth session model; after merge and exact-SHA deployment, execute the remote lifecycle verification with explicit authorization. Controlled local-D1 evidence alone does not prove deployed behavior;
+2. the guarded native-session remote harness is now present on the candidate branch; after merge, exact-SHA W01/W02 deployment, and configuration of the two dedicated test accounts, execute it with explicit `RUN_AUTH010_REMOTE_E2E` confirmation. Controlled local-D1 evidence alone does not prove deployed behavior;
 3. revisit AUTH-010's full feature status only after device authority and remaining canonical mapping requirements are genuinely closed.
