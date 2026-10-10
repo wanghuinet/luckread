@@ -7,6 +7,7 @@ export interface BetterAuthEnv {
   D1_01: D1Database
   RESEND_API_KEY?: string
   AUTH_EMAIL_FROM?: string
+  CLOUDFLARE_ENV?: string
 }
 
 type AccountStateRow = {
@@ -137,22 +138,27 @@ async function activateVerifiedAccount(db: D1Database, userId: string): Promise<
   }
 }
 
-export const createLuckReadAuth = (env: BetterAuthEnv) =>
-  betterAuth({
+const buildLuckReadAuth = (env: BetterAuthEnv) => {
+  // Keep local origins available only to the local evidence/runtime profile.
+  // Production must never inherit localhost trust from a shared config.
+  const trustedOrigins = [
+    'https://luckread-w02.internal',
+    'https://luckread.com',
+    'https://www.luckread.com',
+    'https://mp.luckread.com',
+    'https://sso.luckread.com',
+    ...(env.CLOUDFLARE_ENV?.trim().toLowerCase() === 'development'
+      ? ['http://127.0.0.1:8787', 'http://localhost:8787']
+      : []),
+  ]
+
+  return betterAuth({
     // W02 is the platform identity authority. Better Auth uses native D1
     // persistence here; Payload is not an authentication/database adapter.
     database: env.D1_01,
     baseURL: 'https://luckread.com',
     basePath: '/api/auth',
-    trustedOrigins: [
-      'https://luckread-w02.internal',
-      'https://luckread.com',
-      'https://www.luckread.com',
-      'https://mp.luckread.com',
-      'https://sso.luckread.com',
-      'http://127.0.0.1:8787',
-      'http://localhost:8787',
-    ],
+    trustedOrigins,
     emailAndPassword: {
       enabled: true,
       disableSignUp: false,
@@ -275,8 +281,25 @@ export const createLuckReadAuth = (env: BetterAuthEnv) =>
     plugins: [bearer()],
     advanced: {
       database: {
-        validateSchema: false,
+        // Fail closed and log actionable schema drift before it degrades
+        // a registration/login request into an opaque database error.
+        validateSchema: true,
         generateId: () => crypto.randomUUID(),
       },
     },
   })
+}
+
+const authInstances = new WeakMap<D1Database, ReturnType<typeof buildLuckReadAuth>>()
+
+// W02 routes share one initialized Better Auth instance per D1 binding/isolate.
+// This preserves Better Auth's cached schema validation and avoids rebuilding
+// its router and database adapter for every authentication request.
+export const createLuckReadAuth = (env: BetterAuthEnv) => {
+  const cached = authInstances.get(env.D1_01)
+  if (cached) return cached
+
+  const auth = buildLuckReadAuth(env)
+  authInstances.set(env.D1_01, auth)
+  return auth
+}
