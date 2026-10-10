@@ -24,12 +24,12 @@ on:
   pull_request:
     paths:
       - ".github/workflows/auth-001-registration-local-evidence.yml"
-      kers/W01-payload/src/auth/w02-session-client.ts"
-      kers/W02-identity/src/auth/**"
-      kers/W02-identity/src/authz/**"
-      kers/W02-identity/src/index.ts"
-      kers/W02-identity/migrations/0005_better_auth_identity_core.sql"
       - "workers/W01-payload/src/app/auth/register/**"
+      - "workers/W01-payload/src/auth/w02-session-client.ts"
+      - "workers/W02-identity/src/auth/**"
+      - "workers/W02-identity/src/authz/**"
+      - "workers/W02-identity/src/index.ts"
+      - "workers/W02-identity/migrations/0005_better_auth_identity_core.sql"
       - "workers/W01-payload/src/collections/Users.ts"
       - "workers/W01-payload/src/migrations/**"
       - "workers/W01-payload/src/payload.config.ts"
@@ -91,25 +91,31 @@ jobs:
 
       - name: Install W02 dependencies
         working-directory: workers/W02-identity
-        run: pnpm install --frozen-lockfile
-
-      - name: Apply exact W02 Better Auth migrations
-        working-directory: workers/W02-identity
-        run: pnpm exec wrangler d1 migrations apply luckread --local --config wrangler.jsonc
+        run: npm install --ignore-scripts --no-audit --no-fund
 
       - name: Install W01 dependencies
         working-directory: workers/W01-payload
         run: pnpm install --frozen-lockfile
 
-      - name: Apply exact W01 local migrations
-        working-directory: workers/W01-payload
-        run: pnpm payload migrate
-
-      - name: Apply already-admitted AUTH-013 D1-01 schema locally
-        working-directory: workers/W01-payload
+      # The AUTH-013 migration updates the W01 `users` profile projection,
+      # so create the Payload-owned base tables before applying W02 migrations.
+      # This evidence run must use local D1 only. The checked-in W01
+      # dev config marks D1 remote:true, which otherwise makes Payload CLI's
+      # local migration state diverge from Wrangler's --local state.
+      - name: Force W01 D1 binding local for registration evidence
         run: |
           set -euo pipefail
-          pnpm exec wrangler d1 execute luckread --local --config wrangler.jsonc --file ../W02-identity/migrations/0002_auth_013_account_state.sql
+          node --input-type=module -e 'import fs from "node:fs"; const p="workers/W01-payload/wrangler.jsonc"; const s=fs.readFileSync(p,"utf8"); const marker="\"remote\": true"; const count=s.split(marker).length-1; if(count!==1) throw new Error("Expected exactly one W01 remote D1 flag, found "+count); fs.writeFileSync(p,s.replace(marker,"\"remote\": false"));'
+
+      - name: Apply exact W01 local migrations
+        working-directory: workers/W01-payload
+        env:
+          CLOUDFLARE_PERSIST_TO: /tmp/luckread-auth001-state
+        run: pnpm payload migrate
+
+      - name: Apply exact W02 Better Auth migrations
+        working-directory: workers/W01-payload
+        run: pnpm exec wrangler d1 migrations apply luckread --local --persist-to /tmp/luckread-auth001-state --config ../W02-identity/wrangler.jsonc
 
       - name: Build exact W01 OpenNext worker
         working-directory: workers/W01-payload
@@ -126,7 +132,7 @@ jobs:
           NODE_ENV: development
         run: |
           set -euo pipefail
-          pnpm exec wrangler dev --local --persist-to /tmp/luckread-auth001-state --port 8788 --var "CLOUDFLARE_ENV:development" > auth-001-w02-preview.log 2>&1 &
+          pnpm --dir ../W01-payload exec wrangler dev --local --persist-to /tmp/luckread-auth001-state --config ../W02-identity/wrangler.jsonc --port 8788 --var "CLOUDFLARE_ENV:development" > auth-001-w02-preview.log 2>&1 &
           echo $! > auth-001-w02-preview.pid
           ready=0
           for _ in $(seq 1 120); do
@@ -165,6 +171,7 @@ jobs:
         working-directory: workers/W01-payload
         env:
           AUTH001_BASE_URL: http://127.0.0.1:8787
+          CLOUDFLARE_PERSIST_TO: /tmp/luckread-auth001-state
         run: |
           set -euo pipefail
           node --import=tsx/esm scripts/auth-001-registration-runtime-evidence-local.mjs
@@ -178,6 +185,8 @@ jobs:
           tail -n 500 auth-001-open-next-build.log || true
           echo "===== W01 local preview log ====="
           tail -n 500 auth-001-preview.log || true
+          echo "===== W02 local preview log ====="
+          tail -n 500 ../W02-identity/auth-001-w02-preview.log || true
 
       - name: Upload same-SHA runtime evidence
         if: ${{ always() }}

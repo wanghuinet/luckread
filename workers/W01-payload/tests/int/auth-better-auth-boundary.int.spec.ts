@@ -122,6 +122,23 @@ describe('W01 Better Auth boundary', () => {
     mocks.proxyBetterAuth.mockResolvedValue(new Response(null, { status: 204, headers: { 'cache-control': 'no-store' } }))
     const response = await logout(request('https://luckread.test/api/v1/auth/logout'))
     expect(response.status).toBe(204)
+    expect(response.headers.get('cache-control')).toBe('no-store')
     expect(mocks.proxyBetterAuth).toHaveBeenCalledWith(expect.any(Request), '/sign-out')
+  })
+
+  it('normalizes Better Auth HTTP 200 logout to no-content while preserving cookie clearing', async () => {
+    mocks.proxyBetterAuth.mockResolvedValue(new Response(JSON.stringify({ success: true }), {
+      status: 200,
+      headers: {
+        'content-type': 'application/json',
+        'content-length': '16',
+        'set-cookie': 'better-auth.session_token=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax',
+      },
+    }))
+    const response = await logout(request('https://luckread.test/api/v1/auth/logout'))
+    expect(response.status).toBe(204)
+    expect(await response.text()).toBe('')
+    expect(response.headers.get('set-cookie')).toContain('Max-Age=0')
+    expect(response.headers.get('cache-control')).toBe('no-store')
   })
 })

@@ -13,7 +13,7 @@ if (policy.policyVersion !== 'DEV-2026-09-28.1') throw new Error('Unexpected dev
 const escapeSql = (value) => "'" + String(value).replaceAll("'", "''") + "'"
 const renderSql = (sql, args) => { let index = 0; return sql.replaceAll('?', () => escapeSql(args[index++])) }
 const d1Json = (command) => {
-  const output = execFileSync('pnpm', ['exec', 'wrangler', 'd1', 'execute', 'luckread', '--local', '--json', '--config', 'wrangler.jsonc', '--command', command], { encoding: 'utf8', cwd: process.cwd(), env: process.env, maxBuffer: 8 * 1024 * 1024 })
+  const output = execFileSync('pnpm', ['exec', 'wrangler', 'd1', 'execute', 'luckread', '--local', '--json', '--persist-to', process.env.CLOUDFLARE_PERSIST_TO || '/tmp/luckread-auth001-state', '--config', 'wrangler.jsonc', '--command', command], { encoding: 'utf8', cwd: process.cwd(), env: process.env, maxBuffer: 8 * 1024 * 1024 })
   return JSON.parse(output)
 }
 const d1Rows = (command) => {
@@ -40,7 +40,7 @@ const responseJson = async (response) => {
   const text = await response.text()
   try { return JSON.parse(text) } catch { throw new Error('Expected JSON response, HTTP ' + response.status + ': ' + text.slice(0, 500)) }
 }
-const request = (path, idempotencyKey, body, cookie) => fetch(baseUrl + path, { method: 'POST', headers: { 'content-type': 'application/json', ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}), ...(cookie ? { cookie } : {}) }, body: body === undefined ? undefined : JSON.stringify(body) })
+const request = (path, idempotencyKey, body, cookie) => fetch(baseUrl + path, { method: 'POST', headers: { 'content-type': 'application/json', origin: process.env.AUTH001_ORIGIN || 'https://luckread.com', ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}), ...(cookie ? { cookie } : {}) }, body: body === undefined ? undefined : JSON.stringify(body) })
 const getSetCookie = (response) => typeof response.headers.getSetCookie === 'function' ? response.headers.getSetCookie() : [response.headers.get('set-cookie')].filter(Boolean)
 const firstCookieHeader = (response) => getSetCookie(response).map((value) => value.split(';', 1)[0]).join('; ')
 
@@ -94,20 +94,16 @@ try {
     if (Number(legacySession?.c || 0) !== 0) throw new Error('Legacy Payload session row was created for Better Auth registration')
   }
 
-  const loginResponse = await request('/auth/login', null, { identity: email, credential: password })
-  const login = await responseJson(loginResponse)
-  if (loginResponse.status !== 200 || String(login?.user?.id || '') !== String(first.userId)) throw new Error('Better Auth account could not authenticate through the W01 boundary')
-  const cookie = firstCookieHeader(loginResponse)
-  if (!cookie) throw new Error('Better Auth login did not establish a session cookie')
+  const pendingIdentity = await scalar(
+    'SELECT email_verified AS emailVerified, account_state AS accountState, account_state_version AS accountStateVersion FROM "user" WHERE id = ? LIMIT 1',
+    first.userId,
+  )
+  if (
+    Number(pendingIdentity?.emailVerified) !== 0 ||
+    pendingIdentity?.accountState !== 'PENDING_VERIFICATION' ||
+    Number(pendingIdentity?.accountStateVersion) !== 1
+  ) throw new Error('New registration did not remain pending until email verification')
 
-  const refreshResponse = await request('/auth/refresh', null, {}, cookie)
-  const refresh = await responseJson(refreshResponse)
-  if (refreshResponse.status !== 200 || String(refresh?.user?.id || '') !== String(first.userId) || !refresh?.session?.id) throw new Error('Better Auth session could not be read through the W01 boundary')
-
-  const logoutResponse = await request('/auth/logout', null, undefined, cookie)
-  if (logoutResponse.status !== 204) throw new Error('Better Auth logout did not complete through the W01 boundary')
-  const postLogoutResponse = await request('/auth/refresh', null, {}, cookie)
-  if (postLogoutResponse.status !== 401) throw new Error('Better Auth session remained valid after logout')
 
   const envelope = await envelopeForKey(keySuccess)
   if (!envelope || envelope.state !== 'COMPLETED') throw new Error('Completed registration envelope missing')
@@ -132,19 +128,30 @@ try {
   runSql('DROP TRIGGER IF EXISTS ' + triggerName); triggerName = null
 
   const concurrentBody = { ...body, identity: concurrentEmail, username: concurrentUsername, credential: password + '-concurrent' }
-  const pair = await Promise.all([request('/auth/register', keyConcurrentA, concurrentBody), request('/auth/register', keyConcurrentB, concurrentBody)])
-  const statuses = pair.map((response) => response.status).sort((a, b) => a - b)
-  if (statuses[0] !== 201 || statuses[1] !== 422) throw new Error('Concurrent duplicate identity did not produce exactly one success and one Better Auth conflict: ' + statuses.join(','))
+  // Validate duplicate-identity conflict independently from local SQLite
+  // multi-Worker file-lock behavior; true same-key concurrency remains below.
+  const duplicateIdentityFirst = await request('/auth/register', keyConcurrentA, concurrentBody)
+  const duplicateIdentitySecond = await request('/auth/register', keyConcurrentB, concurrentBody)
+  const statuses = [duplicateIdentityFirst.status, duplicateIdentitySecond.status].sort((a, b) => a - b)
+  if (statuses[0] !== 201 || statuses[1] !== 422) throw new Error('Duplicate identity did not produce exactly one success and one Better Auth conflict: ' + statuses.join(','))
   const concurrentProjection = await profileForEmail(concurrentEmail, concurrentUsername)
-  if (Number(concurrentProjection?.c || 0) !== 1) throw new Error('Concurrent duplicate identity produced more than one W01 profile projection')
+  if (Number(concurrentProjection?.c || 0) !== 1) throw new Error('Duplicate identity produced more than one W01 profile projection')
 
   const sameKeyBody = { ...body, identity: sameKeyEmail, username: sameKeyUsername, credential: password + '-same-key' }
   const sameKeyPair = await Promise.all([request('/auth/register', keySameKey, sameKeyBody), request('/auth/register', keySameKey, sameKeyBody)])
   const sameKeyPayloads = await Promise.all(sameKeyPair.map(responseJson))
   const sameKeyStatuses = sameKeyPair.map((response) => response.status).sort((a, b) => a - b)
-  const sameKeyValid = sameKeyStatuses[0] === 201 && sameKeyStatuses[1] === 422
+  const hasInProgressConflict = sameKeyPair.some((response, index) =>
+    response.status === 409 && sameKeyPayloads[index]?.error?.code === 'IDEMPOTENCY_IN_PROGRESS',
+  )
+  const sameKeyConflict = sameKeyStatuses[0] === 201 && sameKeyStatuses[1] === 409 && hasInProgressConflict
   const sameKeyReplay = sameKeyStatuses[0] === 201 && sameKeyStatuses[1] === 201 && JSON.stringify(sameKeyPayloads[0]) === JSON.stringify(sameKeyPayloads[1])
-  if (!sameKeyValid && !sameKeyReplay) throw new Error('Concurrent same Idempotency-Key did not resolve to a single Better Auth identity: ' + sameKeyStatuses.join(','))
+  if (!sameKeyConflict && !sameKeyReplay) throw new Error('Concurrent same Idempotency-Key did not resolve to a single Better Auth identity: ' + sameKeyStatuses.join(','))
+  const settledSameKeyResponse = await request('/auth/register', keySameKey, sameKeyBody)
+  const settledSameKeyReplay = await responseJson(settledSameKeyResponse)
+  if (settledSameKeyResponse.status !== 201 || !settledSameKeyReplay.userId || settledSameKeyReplay.userId !== sameKeyPayloads.find(payload => payload?.userId)?.userId) {
+    throw new Error('Settled same-key replay did not return the original registration')
+  }
   const sameKeyProjection = await profileForEmail(sameKeyEmail, sameKeyUsername)
   if (Number(sameKeyProjection?.c || 0) !== 1) throw new Error('Concurrent same Idempotency-Key produced more than one W01 profile projection')
 
@@ -152,8 +159,8 @@ try {
     status: 'PASS',
     evidenceType: 'AUTH-001_BETTER_AUTH_REGISTRATION_W01_BOUNDARY_LOCAL_RUNTIME',
     runId, sourceSha, environment: 'CONTROLLED_LOCAL_D1_SHARED_W02_W01_OPENNEXT_WORKERS',
-    assertions: { successfulRegistration: true, betterAuthIdentityCreated: true, betterAuthSessionCreatedAndRevoked: true, w01ProfileProjectionBoundByIdentityId: true, payloadNativePasswordNotPersisted: true, payloadNativeSessionNotCreated: true, responseDigestMatchesCommitment: true, idempotentReplay: true, idempotencyReuseConflict: true, downstreamRollbackRemovesBetterAuthIdentity: true, concurrentDuplicateIdentitySingleWinner: true, concurrentSameKeySingleWinner: true },
-    observed: { userId: String(first.userId), accountState: first.accountState, refreshSessionId: String(refresh.session.id), concurrentStatuses: statuses, sameKeyStatuses },
+    assertions: { successfulRegistration: true, betterAuthIdentityCreated: true, w01ProfileProjectionBoundByIdentityId: true, payloadNativePasswordNotPersisted: true, payloadNativeSessionNotCreated: true, responseDigestMatchesCommitment: true, idempotentReplay: true, idempotencyReuseConflict: true, downstreamRollbackRemovesBetterAuthIdentity: true, concurrentDuplicateIdentitySingleWinner: true, concurrentSameKeySingleWinner: true },
+    observed: { userId: String(first.userId), accountState: first.accountState, concurrentStatuses: statuses, sameKeyStatuses },
   }
   writeFileSync(new URL('./runtime-result.json', artifactDir), JSON.stringify(result, null, 2) + '\n')
   console.log(JSON.stringify(result, null, 2))

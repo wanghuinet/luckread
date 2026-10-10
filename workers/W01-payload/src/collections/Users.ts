@@ -7,7 +7,13 @@ export const Users: CollectionConfig = {
   slug: 'users',
   admin: { useAsTitle: 'email' },
   auth: {
-    disableLocalStrategy: true,
+    // Keep Payload's auth-owned identity columns in the profile projection
+    // schema while disabling Payload's local email/password auth strategy.
+    // W02 / Better Auth remains the only account authentication authority.
+    disableLocalStrategy: {
+      enableFields: true,
+      optionalPassword: true,
+    },
     strategies: [betterAuthPayloadStrategy],
   },
   // Account creation is Better Auth/W02-owned. W01 only stores the

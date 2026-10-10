@@ -151,24 +151,53 @@ describe('RoleAssignment global layer resolution', () => {
 
 
 describe('Base user role materialization', () => {
-  it('creates one deterministic global L1 role assignment', async () => {
+  it('verifies the deterministic role row instead of relying on D1 change metadata', async () => {
     const calls: Array<{ sql: string; args: unknown[] }> = []
     const db = {
       prepare: (sql: string) => ({
         bind: (...args: unknown[]) => ({
           run: async () => {
             calls.push({ sql, args })
-            return { meta: { changes: 1 } }
+            return { meta: { changes: 2 } }
+          },
+          first: async () => {
+            calls.push({ sql, args })
+            return {
+              id: 'base-user-user-1',
+              subjectId: 'user-1',
+              roleId: 'user',
+              scopeType: 'global',
+              scopeId: null,
+              status: 'ACTIVE',
+              validFrom: NOW,
+              validUntil: null,
+            }
           },
         }),
       }),
     } as unknown as D1Database
 
     await expect(ensureBaseUserRole(db, 'user-1', NOW)).resolves.toBeUndefined()
-    expect(calls).toHaveLength(1)
+    expect(calls).toHaveLength(2)
     expect(calls[0].sql).toContain('INSERT OR IGNORE INTO role_assignments')
     expect(calls[0].sql).toContain("'user', 'global'")
     expect(calls[0].args).toEqual(['base-user-user-1', 'user-1', NOW, NOW, NOW])
+    expect(calls[1].sql).toContain('SELECT id, subject_id AS subjectId')
+    expect(calls[1].args).toEqual(['base-user-user-1'])
+  })
+
+  it('rejects a missing persisted base role', async () => {
+    const db = {
+      prepare: () => ({
+        bind: () => ({
+          run: async () => ({ meta: { changes: 1 } }),
+          first: async () => null,
+        }),
+      }),
+    } as unknown as D1Database
+
+    await expect(ensureBaseUserRole(db, 'user-1', NOW))
+      .rejects.toThrow('base role materialization failed validation')
   })
 
   it('rejects invalid subjects before persistence', async () => {

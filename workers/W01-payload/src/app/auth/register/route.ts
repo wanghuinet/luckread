@@ -6,6 +6,7 @@ import priv004DevPolicy from '../../../../../../artifacts/mapping-0/priv004-appr
 import priv004ProdPolicy from '../../../../../../artifacts/mapping-0/priv004-production-policy-instance-2026-09-27.json'
 import { enforceAuthRateLimit, TrafficLimitError, rateLimitResponse } from '../../../auth/traffic-limit.js'
 import { proxyBetterAuth, rollbackRegistrationUser } from '../../../auth/w02-session-client.js'
+import type { User as PayloadUser } from '../../../payload-types'
 
 const SCOPE = 'ACCOUNT_REGISTRATION'
 const ENDPOINT = 'authRegister'
@@ -419,20 +420,65 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
     return errorResponse(422, 'VALIDATION_FAILED', 'Registration could not be completed')
   }
 
+  let payload: Awaited<ReturnType<typeof getPayload>> | null = null
+  let profileProjectionId: string | number | null = null
+
+  // The Payload profile is a projection of the W02 identity. Any failure
+  // after this insert must remove this projection as well as the W02 identity.
+  const rollbackPayloadProfile = async (): Promise<void> => {
+    const payloadClient = payload ?? await getPayload({ config })
+    let targetId = profileProjectionId
+    if (targetId === null) {
+      const existingProfile = await payloadClient.find({
+        collection: 'users',
+        where: { identityId: { equals: userId } },
+        limit: 1,
+        depth: 0,
+        overrideAccess: true,
+        req: request,
+      })
+      targetId = existingProfile.docs[0]?.id ?? null
+    }
+
+    if (targetId !== null) {
+      await payloadClient.delete({
+        collection: 'users',
+        id: targetId,
+        overrideAccess: true,
+        disableTransaction: true,
+        req: request,
+      })
+      profileProjectionId = null
+    }
+  }
+
   try {
-    const payload = await getPayload({ config })
-    await payload.create({
+    payload = await getPayload({ config })
+    // Import the generated collection type directly so Next's isolated route
+    // type-checker includes Payload's module augmentation for auth fields.
+    const profileData: Pick<PayloadUser, 'identityId' | 'username'> & { email: string } = {
+      identityId: userId,
+      email: normalized.identity,
+      username: normalized.username,
+    }
+    const createdProfile = await payload.create({
       collection: 'users',
-      data: {
-        identityId: userId,
-        email: normalized.identity,
-        username: normalized.username,
-      },
+      data: profileData,
       overrideAccess: true,
       disableTransaction: true,
       req: request,
     })
+    profileProjectionId = createdProfile.id
   } catch (error) {
+    try {
+      await rollbackPayloadProfile()
+    } catch (projectionRollbackError) {
+      console.error(JSON.stringify({
+        event: 'auth.register.profile_projection_rollback_failure',
+        diagnosticCode: 'AUTH001_PROFILE_PROJECTION_ROLLBACK_FAILURE',
+        errorName: projectionRollbackError instanceof Error ? projectionRollbackError.name : typeof projectionRollbackError,
+      }))
+    }
     try {
       await rollbackRegistrationUser(request, {
         userId,
@@ -447,10 +493,16 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
       }))
     }
     await releaseReservation()
+    const rawProjectionErrorMessage = error instanceof Error ? error.message : 'non-error throwable'
+    const safeProjectionErrorMessage = rawProjectionErrorMessage
+      .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '[redacted-email]')
+      .replace(/\b(password|credential|token)\s*[:=]\s*\S+/gi, '$1=[redacted]')
+      .slice(0, 200)
     console.error(JSON.stringify({
       event: 'auth.register.profile_projection_failure',
       diagnosticCode: 'AUTH001_PROFILE_PROJECTION_FAILURE',
       errorName: error instanceof Error ? error.name : typeof error,
+      errorMessage: safeProjectionErrorMessage,
     }))
     return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Registration service unavailable')
   }
@@ -543,6 +595,15 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     if (isUniqueConstraintError(error)) {
+      try {
+        await rollbackPayloadProfile()
+      } catch (projectionRollbackError) {
+        console.error(JSON.stringify({
+          event: 'auth.register.profile_projection_rollback_failure',
+          diagnosticCode: 'AUTH001_PROFILE_PROJECTION_ROLLBACK_FAILURE',
+          errorName: projectionRollbackError instanceof Error ? projectionRollbackError.name : typeof projectionRollbackError,
+        }))
+      }
       await rollbackRegistrationUser(request, {
         userId,
         email: normalized.identity,
@@ -571,6 +632,15 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
       )
     }
 
+    try {
+      await rollbackPayloadProfile()
+    } catch (projectionRollbackError) {
+      console.error(JSON.stringify({
+        event: 'auth.register.profile_projection_rollback_failure',
+        diagnosticCode: 'AUTH001_PROFILE_PROJECTION_ROLLBACK_FAILURE',
+        errorName: projectionRollbackError instanceof Error ? projectionRollbackError.name : typeof projectionRollbackError,
+      }))
+    }
     try {
       await rollbackRegistrationUser(request, {
         userId,
