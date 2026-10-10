@@ -32,6 +32,9 @@ jobs:
         with:
           node-version: 24
 
+      - name: Validate post-deploy session E2E harness before production changes
+        run: node --check scripts/auth-session-live-e2e.mjs
+
       - name: Require verified QA credentials before production deployment
         env:
           LUCKREAD_APP_AUTH_SMOKE_EMAIL: ${{ secrets.LUCKREAD_APP_AUTH_SMOKE_EMAIL }}
