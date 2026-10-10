@@ -91,7 +91,8 @@ jobs:
 
       - name: Verify Better Auth runtime dependency
         working-directory: workers/W02-identity
-        run: node --input-type=module -e "import('better-auth').then(() => console.log('better-auth runtime import: OK'))"
+        run: |
+          node --input-type=module -e "import('better-auth').then(() => console.log('better-auth runtime import: OK'))"
 
       - name: Verify W02 migration artifacts are committed
         run: |
