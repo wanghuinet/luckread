@@ -22,12 +22,12 @@ describe('AUTH-010 session anti-abuse scopes', () => {
     expect(limiter.limit).toHaveBeenNthCalledWith(2, { key: 'auth010:session-list:endpoint' })
   })
 
-  it('applies account, target-session, and endpoint keys for revoke', async () => {
+  it('applies account, authenticated-caller-session, and endpoint keys for revoke', async () => {
     const env = makeEnv()
     const limiter = env.AUTH_SESSION_WRITE_LIMITER!
-    await enforceSessionRevokeRateLimits(env, 'user-17', 'session-29')
+    await enforceSessionRevokeRateLimits(env, 'user-17', 'caller-session-29')
     expect(limiter.limit).toHaveBeenNthCalledWith(1, { key: 'auth010:session-revoke:account:user-17' })
-    expect(limiter.limit).toHaveBeenNthCalledWith(2, { key: 'auth010:session-revoke:session:session-29' })
+    expect(limiter.limit).toHaveBeenNthCalledWith(2, { key: 'auth010:session-revoke:session:caller-session-29' })
     expect(limiter.limit).toHaveBeenNthCalledWith(3, { key: 'auth010:session-revoke:endpoint' })
   })
 
