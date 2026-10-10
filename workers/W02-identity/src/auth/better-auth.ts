@@ -137,6 +137,12 @@ async function activateVerifiedAccount(db: D1Database, userId: string): Promise<
   }
 }
 
+const sanitizeAuthDiagnostic = (value: string): string => value
+  .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '[redacted-email]')
+  .replace(/https?:\/\/[^\s"'<>]+/gi, '[redacted-url]')
+  .replace(/(token|secret|password|authorization|api[_-]?key)\s*[:=]\s*[^\s,;]+/gi, '$1=[redacted]')
+  .slice(0, 240)
+
 export const createLuckReadAuth = (env: BetterAuthEnv) =>
   betterAuth({
     // W02 is the platform identity authority. Better Auth uses native D1
@@ -271,6 +277,23 @@ export const createLuckReadAuth = (env: BetterAuthEnv) =>
       expiresIn: 60 * 60 * 24 * 7,
       updateAge: 60 * 60 * 24,
       modelName: 'session',
+    },
+    logger: {
+      level: 'error',
+      log: (level, message, ...args) => {
+        const errors = args
+          .filter((value): value is Error => value instanceof Error)
+          .map((error) => ({
+            name: error.name,
+            message: sanitizeAuthDiagnostic(error.message),
+          }))
+        console.error(JSON.stringify({
+          event: 'auth.better_auth.internal_error',
+          level,
+          message: sanitizeAuthDiagnostic(String(message)),
+          errors,
+        }))
+      },
     },
     plugins: [bearer()],
     advanced: {
