@@ -131,7 +131,7 @@ export default {
 
     if (request.method === 'POST' && url.pathname === '/internal/auth/principal') {
       try {
-        const principal = await resolveBetterAuthPrincipal(env.D1_01, request)
+        const principal = await resolveBetterAuthPrincipal(env, request)
         if (!principal) return json({ active: false }, 401)
 
         return json({
@@ -191,7 +191,7 @@ export default {
       }
 
       try {
-        const auth = createLuckReadAuth({ D1_01: env.D1_01 })
+        const auth = createLuckReadAuth(env)
         const current = await auth.api.getSession({ headers: request.headers, query: {} })
         if (!current?.user?.id) {
           return json({ error: { code: 'UNAUTHENTICATED', message: 'authentication required' } }, 401)
