@@ -30,6 +30,46 @@ const request = (url: string, method = 'POST', body?: unknown) =>
   })
 
 describe('W01 Better Auth boundary', () => {
+  it('binds the app-owned login/session DTO to the canonical OpenAPI contract', () => {
+    const openapi = readFileSync(
+      resolve(process.cwd(), '../../contracts/openapi/v1/openapi.yaml'),
+      'utf8',
+    )
+    const loginRoute = readFileSync(
+      resolve(process.cwd(), 'src/app/auth/login/route.ts'),
+      'utf8',
+    )
+    const sessionRoute = readFileSync(
+      resolve(process.cwd(), 'src/app/auth/session/route.ts'),
+      'utf8',
+    )
+    const legacyRefreshRoute = readFileSync(
+      resolve(process.cwd(), 'src/app/auth/refresh/route.ts'),
+      'utf8',
+    )
+
+    const loginContractStart = openapi.indexOf('  /auth/login:')
+    const sessionContractStart = openapi.indexOf('  /auth/session:', loginContractStart)
+    const logoutContractStart = openapi.indexOf('  /auth/logout:', sessionContractStart)
+    const loginAndSessionContract = openapi.slice(loginContractStart, logoutContractStart)
+
+    expect(loginContractStart).toBeGreaterThanOrEqual(0)
+    expect(sessionContractStart).toBeGreaterThan(loginContractStart)
+    expect(loginAndSessionContract).toContain('required: [identity, credential]')
+    expect(loginAndSessionContract).not.toContain('required: [identity, credential, deviceId]')
+    expect(loginAndSessionContract).toContain('X-LuckRead-Session-Token')
+    expect(loginAndSessionContract).toContain('/auth/session')
+    expect(loginAndSessionContract).not.toContain('accessToken:')
+    expect(loginAndSessionContract).not.toContain('refreshToken:')
+    expect(loginRoute).toContain("'X-LuckRead-Session-Token'")
+    expect(loginRoute).toContain("headers.delete('set-auth-token')")
+    expect(loginRoute).toContain('data: { user }')
+    expect(sessionRoute).toContain("'/get-session'")
+    expect(sessionRoute).toContain("errorResponse(401, 'UNAUTHENTICATED'")
+    expect(legacyRefreshRoute).toContain('GET as POST')
+    expect(legacyRefreshRoute).toContain('does not rotate')
+  })
+
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.enforceAuthRateLimit.mockResolvedValue(undefined)
