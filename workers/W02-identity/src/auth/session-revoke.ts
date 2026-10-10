@@ -44,7 +44,7 @@ export async function handleCurrentUserSessionRevoke(
   }
 
   try {
-    await enforceSessionRevokeRateLimits(env, userId, sessionId)
+    await enforceSessionRevokeRateLimits(env, userId, currentSessionId)
   } catch (error) {
     return sessionRateLimitErrorResponse(error)
   }
