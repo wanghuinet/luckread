@@ -46,7 +46,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: \${{ inputs.source_sha }}
-          fetch-depth: 1
+          fetch-depth: 0
 
       - name: Validate exact source and admitted migration source
         env:
@@ -54,6 +54,7 @@ jobs:
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$REQUESTED_SHA"
+          git merge-base --is-ancestor "$REQUESTED_SHA" origin/main
           test "$(git rev-parse HEAD:workers/W01-payload/src/migrations/20261006_202000_MIG_BETTER_AUTH_PROFILE_PROJECTION_V1.ts)" = "5a6da5828534eca31a2e9e800692badc4096fecc"
           node --input-type=module <<'NODE'
           import { readFileSync } from 'node:fs'
@@ -102,11 +103,11 @@ jobs:
         run: |
           set -euo pipefail
           EVIDENCE_DIR=../../artifacts/evidence/w01-profile-projection
-          npx --yes "wrangler@$WRANGLER_VERSION" d1 info "$DATABASE_NAME" --json --config "$W01_WRANGLER_CONFIG" > "$EVIDENCE_DIR/d1-info.json"
-          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --json --config "$W01_WRANGLER_CONFIG" --command 'PRAGMA table_info("users");' > "$EVIDENCE_DIR/pre-users-schema.json"
-          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --json --config "$W01_WRANGLER_CONFIG" --command 'PRAGMA index_list("users");' > "$EVIDENCE_DIR/pre-users-indexes.json"
-          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --json --config "$W01_WRANGLER_CONFIG" --command 'SELECT COUNT(*) AS users_count FROM users;' > "$EVIDENCE_DIR/pre-users-count.json"
-          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --json --config "$W01_WRANGLER_CONFIG" --command 'SELECT id,name,batch FROM payload_migrations ORDER BY id;' > "$EVIDENCE_DIR/pre-payload-migrations.json"
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 info "$DATABASE_NAME" --json --config wrangler.jsonc > "$EVIDENCE_DIR/d1-info.json"
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc --command 'PRAGMA table_info("users");' > "$EVIDENCE_DIR/pre-users-schema.json"
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc --command 'PRAGMA index_list("users");' > "$EVIDENCE_DIR/pre-users-indexes.json"
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc --command 'SELECT COUNT(*) AS users_count FROM users;' > "$EVIDENCE_DIR/pre-users-count.json"
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc --command 'SELECT id,name,batch FROM payload_migrations ORDER BY id;' > "$EVIDENCE_DIR/pre-payload-migrations.json"
 
       - name: Fail closed unless only the admitted migration is pending
         env:
@@ -193,10 +194,10 @@ jobs:
         run: |
           set -euo pipefail
           EVIDENCE_DIR=../../artifacts/evidence/w01-profile-projection
-          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --json --config "$W01_WRANGLER_CONFIG" --command 'PRAGMA table_info("users");' > "$EVIDENCE_DIR/post-users-schema.json"
-          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --json --config "$W01_WRANGLER_CONFIG" --command 'PRAGMA index_list("users");' > "$EVIDENCE_DIR/post-users-indexes.json"
-          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --json --config "$W01_WRANGLER_CONFIG" --command 'SELECT COUNT(*) AS users_count FROM users;' > "$EVIDENCE_DIR/post-users-count.json"
-          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --json --config "$W01_WRANGLER_CONFIG" --command 'SELECT id,name,batch FROM payload_migrations ORDER BY id;' > "$EVIDENCE_DIR/post-payload-migrations.json"
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc --command 'PRAGMA table_info("users");' > "$EVIDENCE_DIR/post-users-schema.json"
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc --command 'PRAGMA index_list("users");' > "$EVIDENCE_DIR/post-users-indexes.json"
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc --command 'SELECT COUNT(*) AS users_count FROM users;' > "$EVIDENCE_DIR/post-users-count.json"
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc --command 'SELECT id,name,batch FROM payload_migrations ORDER BY id;' > "$EVIDENCE_DIR/post-payload-migrations.json"
           cd ../..
           node --input-type=module <<'NODE'
           import { readFileSync, writeFileSync } from 'node:fs'
