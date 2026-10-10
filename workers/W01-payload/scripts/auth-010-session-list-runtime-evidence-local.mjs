@@ -102,6 +102,61 @@ const registerAccount = async ({ email, username, password, idempotencyKey }) =>
   return String(payload.userId)
 }
 
+const createSecondIsolatedIdentity = async () => {
+  // B is created through the real local W02 Better Auth HTTP API. This avoids
+  // spending the public W01 registration limiter already exercised by AUTH-001,
+  // while still obtaining a genuine Better Auth identity and signed session cookie.
+  const w02BaseUrl = (process.env.AUTH010_W02_BASE_URL || 'http://127.0.0.1:8788').replace(/\\/$/, '')
+  const signupResponse = await fetch(w02BaseUrl + '/api/auth/sign-up/email', {
+    method: 'POST',
+    headers: requestHeaders({ 'content-type': 'application/json' }),
+    body: JSON.stringify({
+      email: emailB,
+      name: usernameB,
+      username: usernameB,
+      password: basePassword,
+    }),
+  })
+  await parseJson(signupResponse, 'AUTH010_SECOND_IDENTITY_SIGNUP')
+  if (!signupResponse.ok) {
+    throw new Error('AUTH010_SECOND_IDENTITY_SIGNUP_FAILED_HTTP_' + signupResponse.status)
+  }
+
+  const identity = scalar('SELECT id FROM "user" WHERE email = ? LIMIT 1', emailB)
+  const userId = typeof identity?.id === 'string' ? identity.id : ''
+  if (!userId) throw new Error('AUTH010_SECOND_IDENTITY_NOT_PERSISTED')
+  userIds.push(userId)
+
+  runSql(
+    'UPDATE "user" SET email_verified = 1, account_state = \'ACTIVE\', account_state_version = account_state_version + 1 WHERE id = ?',
+    userId,
+  )
+  const activated = scalar(
+    'SELECT id, email_verified AS emailVerified, account_state AS accountState FROM "user" WHERE id = ? LIMIT 1',
+    userId,
+  )
+  if (!activated || Number(activated.emailVerified) !== 1 || activated.accountState !== 'ACTIVE') {
+    throw new Error('AUTH010_SECOND_IDENTITY_ACTIVATION_FAILED')
+  }
+  return userId
+}
+
+const loginDirectW02 = async (email, password) => {
+  const w02BaseUrl = (process.env.AUTH010_W02_BASE_URL || 'http://127.0.0.1:8788').replace(/\\/$/, '')
+  const response = await fetch(w02BaseUrl + '/api/auth/sign-in/email', {
+    method: 'POST',
+    headers: requestHeaders({ 'content-type': 'application/json' }),
+    body: JSON.stringify({ email, password }),
+  })
+  await parseJson(response, 'AUTH010_SECOND_IDENTITY_LOGIN')
+  const cookie = firstCookieHeader(response)
+  if (!response.ok || !cookie) {
+    throw new Error('AUTH010_SECOND_IDENTITY_LOGIN_FAILED_HTTP_' + response.status)
+  }
+  console.log('::add-mask::' + cookie)
+  return cookie
+}
+
 const login = async (email, password) => {
   const response = await postJson('/api/v1/auth/login', {
     identity: email,
@@ -284,29 +339,10 @@ try {
   const invalidCursor = await listSessions(cookieA, { cursor: 'not-an-opaque-cursor' })
   if (invalidCursor.response.status !== 400) throw new Error('AUTH010_INVALID_CURSOR_WAS_NOT_REJECTED')
 
-  currentStage = 'seed-cross-account-session'
-  // Avoid spending the shared local registration limiter a second time.
-  // This isolated synthetic identity/session exists only in local D1; the
-  // W02 Better Auth session reader still validates its cookie and ownership.
-  const userBId = 'auth010-fixture-user-' + suffix
-  const sessionBId = 'auth010-fixture-session-' + suffix
-  const tokenB = 'auth010-fixture-token-' + suffix
-  const nowB = new Date().toISOString()
-  userIds.push(userBId)
-  runSql(
-    'INSERT INTO "user" (id, name, email, email_verified, image, username, bio, locale, timezone, account_state, account_state_version, created_at, updated_at) VALUES (' +
-      [userBId, usernameB, emailB, 1, null, usernameB, null, 'en-US', 'UTC', 'ACTIVE', 2, nowB, nowB]
-        .map((value) => value === null ? 'NULL' : escapeSql(value)).join(',') +
-      ')',
-  )
-  runSql(
-    'INSERT INTO "session" (id, expires_at, token, created_at, updated_at, ip_address, user_agent, user_id) VALUES (' +
-      [sessionBId, new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), tokenB, nowB, nowB, null, null, userBId]
-        .map((value) => value === null ? 'NULL' : escapeSql(value)).join(',') +
-      ')',
-  )
-  const cookieB = 'better-auth.session_token=' + tokenB
-  console.log('::add-mask::' + cookieB)
+  currentStage = 'create-second-real-w02-identity'
+  const userBId = await createSecondIsolatedIdentity()
+  currentStage = 'login-second-real-w02-identity'
+  const cookieB = await loginDirectW02(emailB, basePassword)
   currentStage = 'cross-account-list'
   const userBList = await listSessions(cookieB, { limit: 100 })
   if (userBList.response.status !== 200) throw new Error('AUTH010_SECOND_USER_LIST_FAILED')
