@@ -24,14 +24,14 @@ permissions:
 
 jobs:
   audit:
-    if: \${{ inputs.confirm == 'READONLY' }}
+    if: ${{ inputs.confirm == 'READONLY' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - name: Checkout exact source commit
         uses: actions/checkout@v4
         with:
-          ref: \${{ inputs.source_sha }}
+          ref: ${{ inputs.source_sha }}
 
       - name: Setup Node 24
         uses: actions/setup-node@v4
@@ -41,7 +41,7 @@ jobs:
       - name: Validate the exact D1-01 target
         working-directory: workers/W02-identity
         env:
-          DATABASE_NAME: \${{ inputs.database_name }}
+          DATABASE_NAME: ${{ inputs.database_name }}
           EXPECTED_D1_01_ID: "2f80471e-3756-49f9-8db1-7707a433ad64"
         run: |
           set -euo pipefail
@@ -64,9 +64,9 @@ jobs:
       - name: Capture remote Better Auth schema without changing data
         working-directory: workers/W02-identity
         env:
-          CLOUDFLARE_ACCOUNT_ID: \${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          CLOUDFLARE_API_TOKEN: \${{ secrets.CLOUDFLARE_API_TOKEN }}
-          DATABASE_NAME: \${{ inputs.database_name }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          DATABASE_NAME: ${{ inputs.database_name }}
         run: |
           set -euo pipefail
           out="../../artifacts/w02-better-auth-production-schema"
@@ -83,13 +83,13 @@ jobs:
           for table in user session account verification; do
             npx --yes wrangler@4.116.0 d1 execute "$DATABASE_NAME" --remote \
               --config wrangler.jsonc --command "PRAGMA table_info('$table');" \
-              > "$out/\${table}_table_info.txt"
+              > "$out/${table}_table_info.txt"
             npx --yes wrangler@4.116.0 d1 execute "$DATABASE_NAME" --remote \
               --config wrangler.jsonc --command "PRAGMA index_list('$table');" \
-              > "$out/\${table}_index_list.txt"
+              > "$out/${table}_index_list.txt"
             npx --yes wrangler@4.116.0 d1 execute "$DATABASE_NAME" --remote \
               --config wrangler.jsonc --command "PRAGMA foreign_key_list('$table');" \
-              > "$out/\${table}_foreign_keys.txt"
+              > "$out/${table}_foreign_keys.txt"
           done
 
           npx --yes wrangler@4.116.0 d1 execute "$DATABASE_NAME" --remote \
@@ -111,8 +111,8 @@ jobs:
 
           cat > "$out/provenance.txt" <<EOF
           workflow=W02 Better Auth Production Schema Readonly
-          source_sha=\${{ inputs.source_sha }}
-          database_name=\${{ inputs.database_name }}
+          source_sha=${{ inputs.source_sha }}
+          database_name=${{ inputs.database_name }}
           database_id=2f80471e-3756-49f9-8db1-7707a433ad64
           binding=D1_01
           mode=READONLY
@@ -152,7 +152,7 @@ jobs:
             check_column() {
               table="$1"
               column="$2"
-              file="$out/\${table}_table_info.txt"
+              file="$out/${table}_table_info.txt"
               if grep -Fq "\"name\": \"$column\"" "$file" 2>/dev/null; then
                 echo "COLUMN_PRESENT: $table.$column"
               else
@@ -180,7 +180,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: w02-better-auth-production-schema-\${{ inputs.source_sha }}
+          name: w02-better-auth-production-schema-${{ inputs.source_sha }}
           path: artifacts/w02-better-auth-production-schema/
           if-no-files-found: error
           retention-days: 14
