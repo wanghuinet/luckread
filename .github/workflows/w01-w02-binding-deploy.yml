@@ -4,12 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       source_sha:
-        description: Exact W01 source commit to deploy
+        description: Exact source commit containing both W01 and W02 implementations
         required: true
         type: string
-        default: 5def70a5edd2d64bd585fe4251f5ba97f2f792aa
       confirm:
-        description: Type DEPLOY_BINDING to permit W01 application deployment
+        description: Type DEPLOY_BINDING to permit W02 and W01 application deployment
         required: true
         type: string
         default: DEPLOY_BINDING
@@ -21,7 +20,7 @@ jobs:
   deploy:
     if: ${{ inputs.confirm == 'DEPLOY_BINDING' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - name: Checkout exact source commit
         uses: actions/checkout@v4
@@ -39,7 +38,7 @@ jobs:
           version: 11.0.0
           run_install: false
 
-      - name: Install locked dependencies
+      - name: Install locked W01 dependencies
         working-directory: workers/W01-payload
         run: pnpm install --frozen-lockfile
 
@@ -86,6 +85,31 @@ jobs:
         working-directory: workers/W01-payload
         run: pnpm exec opennextjs-cloudflare build
 
+      - name: Install W02 runtime dependencies
+        working-directory: workers/W02-identity
+        run: npm install --ignore-scripts --no-audit --no-fund
+
+      - name: Verify Better Auth runtime dependency
+        working-directory: workers/W02-identity
+        run: node --input-type=module -e "import('better-auth').then(() => console.log('better-auth runtime import: OK'))"
+
+      - name: Verify W02 migration artifacts are committed
+        run: |
+          node scripts/generate-role-assignment-migration.mjs
+          node scripts/generate-role-version-migration.mjs
+          git diff --exit-code -- workers/W02-identity/migrations/0001_role_assignments.sql
+          git diff --exit-code -- workers/W02-identity/migrations/0003_role_authorization_versions.sql
+
+      - name: Deploy W02 first with pinned Wrangler
+        working-directory: workers/W02-identity
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          mkdir -p ../../artifacts/mapping-0
+          set -o pipefail
+          npx --yes wrangler@4.116.0 deploy --config wrangler.jsonc 2>&1 | tee ../../artifacts/mapping-0/w02-email-auth-deploy.log
+
       - name: Deploy W01 application with Service Binding
         working-directory: workers/W01-payload
         env:
@@ -102,16 +126,19 @@ jobs:
           workflow=W01 W02 Auth Binding Deploy
           source_sha=${{ inputs.source_sha }}
           confirmation=DEPLOY_BINDING
-          worker=luckread-w01-payload
+          workers=luckread-w02,luckread-w01-payload
+          deployment_order=W02 then W01
           binding=W02_AUTH
           target=luckread-w02
           database_mutation=false
           EOF
+          cat artifacts/mapping-0/w01-w02-binding-deploy-provenance.txt
 
       - name: Upload deployment evidence
         uses: actions/upload-artifact@v4
         with:
           name: w01-w02-binding-deployment-${{ inputs.source_sha }}
           path: |
+            artifacts/mapping-0/w02-email-auth-deploy.log
             artifacts/mapping-0/w01-w02-binding-deploy.log
             artifacts/mapping-0/w01-w02-binding-deploy-provenance.txt
