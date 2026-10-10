@@ -32,6 +32,18 @@ jobs:
         with:
           node-version: 24
 
+      - name: Require verified QA credentials before production deployment
+        env:
+          LUCKREAD_APP_AUTH_SMOKE_EMAIL: ${{ secrets.LUCKREAD_APP_AUTH_SMOKE_EMAIL }}
+          LUCKREAD_APP_AUTH_SMOKE_PASSWORD: ${{ secrets.LUCKREAD_APP_AUTH_SMOKE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "$LUCKREAD_APP_AUTH_SMOKE_EMAIL" ] || [ -z "$LUCKREAD_APP_AUTH_SMOKE_PASSWORD" ]; then
+            echo "Configure LUCKREAD_APP_AUTH_SMOKE_EMAIL and LUCKREAD_APP_AUTH_SMOKE_PASSWORD repository Actions secrets before deploying; the post-deploy login/session acceptance is mandatory."
+            exit 1
+          fi
+          echo "Verified QA credential secret names are present; values were not printed."
+
       - name: Setup pnpm 11
         uses: pnpm/action-setup@v4
         with:
@@ -143,3 +155,20 @@ jobs:
             artifacts/mapping-0/w02-email-auth-deploy.log
             artifacts/mapping-0/w01-w02-binding-deploy.log
             artifacts/mapping-0/w01-w02-binding-deploy-provenance.txt
+
+      - name: Verify real APP login and session behavior after deployment
+        env:
+          LUCKREAD_API_BASE_URL: https://luckread.com
+          LUCKREAD_SOURCE_SHA: ${{ inputs.source_sha }}
+          LUCKREAD_APP_AUTH_SMOKE_EMAIL: ${{ secrets.LUCKREAD_APP_AUTH_SMOKE_EMAIL }}
+          LUCKREAD_APP_AUTH_SMOKE_PASSWORD: ${{ secrets.LUCKREAD_APP_AUTH_SMOKE_PASSWORD }}
+        run: node scripts/auth-session-live-e2e.mjs
+
+      - name: Upload sanitized APP session acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-auth-session-live-e2e-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/api-auth-session-live-e2e/*.json
+          if-no-files-found: error
+          retention-days: 30
