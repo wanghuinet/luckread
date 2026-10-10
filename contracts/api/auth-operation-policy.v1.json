@@ -404,35 +404,35 @@
       "operationId": "authRefresh",
       "method": "POST",
       "path": "/auth/refresh",
-      "visibility": "public_authenticated",
-      "capability": "token_refresh",
-      "contractStatus": "CONTRACTED_PARTIAL",
+      "visibility": "public_authenticated_legacy",
+      "capability": "legacy_session_read",
+      "contractStatus": "DEPRECATED_COMPATIBILITY_ALIAS",
       "auth": {
-        "mode": "refresh_credential",
-        "subject": "session"
+        "mode": "session_cookie_or_bearer",
+        "subject": "current_session"
       },
       "authorization": {
         "required": true,
-        "permission": "user.session.refresh",
+        "permission": "user.session.read",
         "scope": "self"
       },
       "resource": {
-        "class": "SINGLE_AUTHORITATIVE_WRITE",
-        "d1ReadMax": 1,
+        "class": "BOUNDED_COMPOSITION",
+        "d1ReadMax": 2,
         "d1WriteMax": 1,
         "d1ReadRowsMax": 4,
-        "d1WriteRowsMax": 2,
+        "d1WriteRowsMax": 1,
         "rpcMax": 0,
         "outboundMax": 0
       },
       "cache": {
         "mode": "NO_STORE",
         "shared": false,
-        "authorizationBoundary": false
+        "authorizationBoundary": true
       },
       "retry": {
         "maxAttempts": 1,
-        "clientRetrySafe": false,
+        "clientRetrySafe": true,
         "requiresIdempotency": false
       },
       "event": {
@@ -448,7 +448,6 @@
         "scopes": [
           "session",
           "account",
-          "device",
           "endpoint"
         ],
         "actions": [
@@ -458,24 +457,33 @@
         ]
       },
       "idempotency": {
-        "required": false
+        "required": false,
+        "semantic": "read-only legacy session lookup alias"
       },
       "security": [
-        "refresh_token_rotation",
-        "reuse_detection",
-        "revoked_session_denied",
-        "old_refresh_token_invalidated"
+        "deprecated_alias",
+        "does_not_issue_or_rotate_refresh_tokens",
+        "same_session_contract_as_authSessionGet",
+        "no_store"
       ],
       "evidence": {
-        "openapi": "MISSING",
+        "openapi": "PASS",
         "inventory": "PASS",
-        "permission": "MISSING",
-        "state": "MISSING",
+        "permission": "PASS",
+        "state": "N/A",
         "resource": "PASS",
         "cache": "PASS",
-        "antiAbuse": "MISSING",
+        "antiAbuse": "PENDING_RUNTIME_EVIDENCE",
         "integration": "MISSING",
         "securityE2E": "MISSING"
+      },
+      "wire": {
+        "requiredFields": [],
+        "requestBody": "IGNORED_LEGACY_COMPATIBILITY_ONLY",
+        "canonicalReplacement": "GET /auth/session",
+        "responseDtoId": "DTO-AUTH-SESSION-RESPONSE",
+        "rotatesRefreshToken": false,
+        "cacheControl": "no-store"
       }
     },
     {
