@@ -1,0 +1,41 @@
+name: APP Auth Session Live E2E
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: app-auth-session-live-e2e
+  cancel-in-progress: false
+
+jobs:
+  live-session-e2e:
+    name: Verify one real login session via cookie and Bearer
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      LUCKREAD_API_BASE_URL: https://luckread.com
+      LUCKREAD_APP_AUTH_SMOKE_EMAIL: ${{ secrets.LUCKREAD_APP_AUTH_SMOKE_EMAIL }}
+      LUCKREAD_APP_AUTH_SMOKE_PASSWORD: ${{ secrets.LUCKREAD_APP_AUTH_SMOKE_PASSWORD }}
+    steps:
+      - name: Checkout exact tested revision
+        uses: actions/checkout@v4
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Test real login, cookie/Bearer session, protected API, and logout
+        run: node scripts/auth-session-live-e2e.mjs
+
+      - name: Upload sanitized session evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-auth-session-live-e2e-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/api-auth-session-live-e2e/*.json
+          if-no-files-found: error
+          retention-days: 30
