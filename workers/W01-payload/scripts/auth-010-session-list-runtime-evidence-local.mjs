@@ -145,14 +145,14 @@ const createSecondIsolatedIdentity = async () => {
 const loginDirectW02 = async (email, password) => {
   const w02ConfiguredUrl = process.env.AUTH010_W02_BASE_URL || 'http://127.0.0.1:8788'
   const w02BaseUrl = w02ConfiguredUrl.endsWith('/') ? w02ConfiguredUrl.slice(0, -1) : w02ConfiguredUrl
+  // Do not force a hop-by-hop Connection header on Node's local Worker fetch.
+  // The prior "connection: close" request failed before W02 observed sign-in.
   const response = await fetch(w02BaseUrl + '/api/auth/sign-in/email', {
     method: 'POST',
-    headers: requestHeaders({ 'content-type': 'application/json', connection: 'close' }),
+    headers: requestHeaders({ 'content-type': 'application/json' }),
     body: JSON.stringify({ email, password }),
     cache: 'no-store',
   })
-  // The evidence only needs the signed cookie. Avoid consuming a successful
-  // auth response body when the local workerd connection is already closing.
   const cookie = firstCookieHeader(response)
   if (!response.ok || !cookie) {
     throw new Error('AUTH010_SECOND_IDENTITY_LOGIN_FAILED_HTTP_' + response.status)
@@ -421,7 +421,11 @@ try {
     environmentClass: 'CONTROLLED_LOCAL_D1',
     errorName: name,
     failureStage: currentStage,
-    failureCode: error instanceof Error && /^AUTH010_[A-Z0-9_]+$/.test(error.message) ? error.message : 'AUTH010_UNCLASSIFIED_ERROR',
+    failureCode: error instanceof Error && /^AUTH010_[A-Z0-9_]+$/.test(error.message)
+      ? error.message
+      : error instanceof TypeError
+        ? 'AUTH010_TRANSPORT_' + classifyTransportError(error)
+        : 'AUTH010_UNCLASSIFIED_' + name.toUpperCase(),
     secretMaterialIncluded: false,
   }
   try { writeFileSync(new URL('runtime-result.json', artifactDir), JSON.stringify(result, null, 2) + '\n') } catch {}
