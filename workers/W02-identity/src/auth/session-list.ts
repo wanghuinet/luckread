@@ -1,4 +1,8 @@
 import { createLuckReadAuth, type BetterAuthEnv } from './better-auth.js'
+import {
+  enforceSessionListRateLimits,
+  sessionRateLimitErrorResponse,
+} from './session-rate-limit.js'
 
 type SessionCursor = {
   createdAt: string
@@ -92,6 +96,12 @@ export async function handleCurrentUserSessionList(
   const currentSessionId = typeof current?.session?.id === 'string' ? String(current.session.id) : ''
   if (!userId || !currentSessionId) {
     return json({ error: { code: 'UNAUTHENTICATED', message: 'Authentication required' } }, 401)
+  }
+
+  try {
+    await enforceSessionListRateLimits(env, userId)
+  } catch (error) {
+    return sessionRateLimitErrorResponse(error)
   }
 
   const now = new Date().toISOString()
