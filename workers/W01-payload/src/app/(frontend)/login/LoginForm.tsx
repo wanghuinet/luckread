@@ -30,6 +30,10 @@ export default function LoginForm() {
       setVerificationMessage('请先填写注册邮箱。')
       return
     }
+    if (normalizedEmail.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      setVerificationMessage('邮箱格式不正确，请检查后重试。')
+      return
+    }
 
     setVerificationBusy(true)
     setVerificationMessage('')
@@ -41,13 +45,20 @@ export default function LoginForm() {
       })
 
       if (!response.ok) {
-        setVerificationMessage(getApiErrorMessage(data, '验证邮件暂时无法发送，请稍后重试。'))
+        if (response.status === 429) {
+          setVerificationMessage('请求过于频繁，请稍后再试。')
+        } else if (response.status >= 500) {
+          setVerificationMessage('验证邮件服务暂时不可用，请稍后重试。')
+        } else {
+          const apiMessage = getApiErrorMessage(data, '')
+          setVerificationMessage(/[\u3400-\u9fff]/.test(apiMessage) ? apiMessage : '无法处理验证邮件请求，请检查邮箱格式后重试。')
+        }
         return
       }
 
       setVerificationMessage('如果该邮箱尚未验证，系统已受理验证邮件发送请求。请检查收件箱和垃圾邮件。')
     } catch {
-      setVerificationMessage('网络异常，验证邮件请求未能完成。请稍后重试。')
+      setVerificationMessage('网络连接异常，验证邮件请求未能完成。请检查网络后重试。')
     } finally {
       setVerificationBusy(false)
     }
@@ -58,21 +69,43 @@ export default function LoginForm() {
     setError('')
     setNeedsVerification(false)
     setVerificationMessage('')
+
+    const normalizedEmail = email.trim().toLowerCase()
+    if (!normalizedEmail) {
+      setError('请输入邮箱地址。')
+      return
+    }
+    if (normalizedEmail.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      setError('邮箱格式不正确，请检查后重试。')
+      return
+    }
+    if (!password) {
+      setError('请输入登录密码。')
+      return
+    }
+
     setBusy(true)
     try {
       const { response, data } = await fetchJson<ApiError | null>('/api/v1/auth/login', {
         method: 'POST',
         headers: jsonHeaders(),
         credentials: 'include',
-        body: JSON.stringify({ identity: email.trim(), credential: password }),
+        body: JSON.stringify({ identity: normalizedEmail, credential: password }),
       })
       if (!response.ok) {
         const errorCode = data?.error?.code?.toUpperCase()
         if (response.status === 403 && errorCode === 'EMAIL_NOT_VERIFIED') {
           setNeedsVerification(true)
           setError('该邮箱尚未验证。请先完成邮箱验证，或重新发送验证邮件。')
+        } else if (response.status === 429) {
+          setError('登录尝试过于频繁，请稍后再试。')
+        } else if (response.status >= 500) {
+          setError('登录服务暂时不可用，请稍后重试。')
+        } else if (response.status === 400 || response.status === 401 || response.status === 422) {
+          setError('邮箱或密码不正确，请检查后重试。')
         } else {
-          setError(getApiErrorMessage(data, '登录失败，请检查账号和密码。'))
+          const apiMessage = getApiErrorMessage(data, '')
+          setError(/[\u3400-\u9fff]/.test(apiMessage) ? apiMessage : '登录失败，请稍后重试。')
         }
         return
       }
@@ -82,14 +115,14 @@ export default function LoginForm() {
         : '/publish'
       router.push(returnTo)
     } catch {
-      setError('网络异常，请稍后重试。')
+      setError('网络连接异常，登录请求未能完成。请检查网络后重试。')
     } finally {
       setBusy(false)
     }
   }
 
   return (
-    <form className="lr-auth-form" onSubmit={submit} aria-busy={busy}>
+    <form className="lr-auth-form" onSubmit={submit} aria-busy={busy} noValidate>
       {verifiedNotice ? <div className="lr-muted" role="status" aria-live="polite">{verifiedNotice}</div> : null}
       <label>
         邮箱
