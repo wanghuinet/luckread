@@ -1,4 +1,5 @@
 import { proxyBetterAuth, revokeSessionById, W02AuthClientError } from '../../../../auth/w02-session-client.js'
+import { enforcePublicReadRateLimit, enforceW01WriteRateLimit, rateLimitResponse, TrafficLimitError } from '../../../../auth/traffic-limit.js'
 
 const json = (body: unknown, status = 200) =>
   Response.json(body, { status, headers: { 'cache-control': 'no-store' } })
@@ -18,6 +19,13 @@ export async function GET(
 ): Promise<Response> {
   const { segments = [] } = await context.params
   if (segments.length !== 0) return new Response(null, { status: 404 })
+
+  try {
+    await enforcePublicReadRateLimit(request)
+  } catch (error) {
+    if (error instanceof TrafficLimitError) return rateLimitResponse(request)
+    return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Session service unavailable' } }, 503)
+  }
 
   try {
     const response = await proxyBetterAuth(request, '/list-sessions', { method: 'GET' })
@@ -91,6 +99,13 @@ export async function DELETE(
 ): Promise<Response> {
   const { segments = [] } = await context.params
   if (segments.length !== 1 || !segments[0]) return new Response(null, { status: 404 })
+
+  try {
+    await enforceW01WriteRateLimit(request)
+  } catch (error) {
+    if (error instanceof TrafficLimitError) return rateLimitResponse(request)
+    return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Session service unavailable' } }, 503)
+  }
 
   const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
   if (!idempotencyKey || idempotencyKey.length > 256) {
