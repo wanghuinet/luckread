@@ -12,7 +12,7 @@ describe('frontend session management', () => {
 
   it('delegates session pagination to a bounded W02 query', () => {
     const route = read('src/app/auth/sessions/[[...segments]]/route.ts')
-    const w02 = read('src/auth/session-list.ts')
+    const w02 = read('../W02-identity/src/auth/session-list.ts')
     expect(route).toContain('listSessions(request,')
     expect(route).toContain('Math.min(50, requestedLimit)')
     expect(w02).toContain('WHERE user_id = ?')
@@ -29,17 +29,17 @@ describe('frontend session management', () => {
     expect(route).toContain('rateLimitResponse(request)')
     expect(route).toContain("error: { code: 'SERVICE_UNAVAILABLE', message: 'Session service unavailable' }")
   })
-  it('reads the canonical session list and exposes the current session marker', () => {
+  it('loads the current session marker through the W02 bounded session-list boundary', () => {
     const page = read('src/app/(frontend)/me/sessions/page.tsx')
     const route = read('src/app/auth/sessions/[[...segments]]/route.ts')
+    const client = read('src/auth/w02-session-client.ts')
 
     expect(page).toContain("fetchJson<SessionResponse | { error?: { message?: string } }>('/api/v1/auth/sessions?' + params.toString()")
     expect(page).toContain('currentSessionId')
     expect(page).toContain("credentials: 'include'")
     expect(page).toContain("cache: 'no-store'")
-    expect(route).toContain("'/get-session'")
-    expect(route).toContain('const currentSessionId =')
-    expect(route).toContain('currentSessionId,')
+    expect(route).toContain('listSessions(request,')
+    expect(client).toContain("'/internal/auth/session/list'")
   })
 
   it('revokes only non-current sessions through the existing DELETE API with idempotency', () => {
