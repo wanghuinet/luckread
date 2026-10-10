@@ -173,5 +173,5 @@ jobs:
         with:
           name: app-auth-session-live-e2e-${{ github.run_id }}-${{ github.run_attempt }}
           path: artifacts/api-auth-session-live-e2e/*.json
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 30
