@@ -1,0 +1,38 @@
+name: APP API live HTTP smoke evidence
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: app-api-live-smoke
+  cancel-in-progress: false
+
+jobs:
+  smoke:
+    name: Safe public and unauthenticated API probes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout selected revision
+        uses: actions/checkout@v4
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Probe public HTTP API contracts
+        id: smoke
+        run: node scripts/api-app-live-smoke.mjs
+
+      - name: Upload sanitized HTTP evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-api-live-http-smoke-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/api-app-live-smoke/*.json
+          if-no-files-found: error
+          retention-days: 30
