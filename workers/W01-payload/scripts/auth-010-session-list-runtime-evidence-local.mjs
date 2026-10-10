@@ -106,7 +106,8 @@ const createSecondIsolatedIdentity = async () => {
   // B is created through the real local W02 Better Auth HTTP API. This avoids
   // spending the public W01 registration limiter already exercised by AUTH-001,
   // while still obtaining a genuine Better Auth identity and signed session cookie.
-  const w02BaseUrl = (process.env.AUTH010_W02_BASE_URL || 'http://127.0.0.1:8788').replace(/\\/$/, '')
+  const w02ConfiguredUrl = process.env.AUTH010_W02_BASE_URL || 'http://127.0.0.1:8788'
+  const w02BaseUrl = w02ConfiguredUrl.endsWith('/') ? w02ConfiguredUrl.slice(0, -1) : w02ConfiguredUrl
   const signupResponse = await fetch(w02BaseUrl + '/api/auth/sign-up/email', {
     method: 'POST',
     headers: requestHeaders({ 'content-type': 'application/json' }),
@@ -142,7 +143,8 @@ const createSecondIsolatedIdentity = async () => {
 }
 
 const loginDirectW02 = async (email, password) => {
-  const w02BaseUrl = (process.env.AUTH010_W02_BASE_URL || 'http://127.0.0.1:8788').replace(/\\/$/, '')
+  const w02ConfiguredUrl = process.env.AUTH010_W02_BASE_URL || 'http://127.0.0.1:8788'
+  const w02BaseUrl = w02ConfiguredUrl.endsWith('/') ? w02ConfiguredUrl.slice(0, -1) : w02ConfiguredUrl
   const response = await fetch(w02BaseUrl + '/api/auth/sign-in/email', {
     method: 'POST',
     headers: requestHeaders({ 'content-type': 'application/json' }),
