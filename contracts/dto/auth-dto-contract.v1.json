@@ -157,15 +157,21 @@
     {
       "featureId": "AUTH-011",
       "operationId": "authRefresh",
-      "requestDtoId": "DTO-AUTH-REFRESH-REQUEST",
-      "responseDtoId": "DTO-AUTH-REFRESH-RESPONSE",
-      "requestSchemaRef": "#/paths/~1auth~1refresh/post/requestBody/content/application~1json/schema",
+      "requestDtoId": null,
+      "responseDtoId": "DTO-AUTH-SESSION-RESPONSE",
+      "requestSchemaRef": null,
       "responseSchemaRef": "#/paths/~1auth~1refresh/post/responses/200/content/application~1json/schema",
       "errorSchemaRef": "#/components/schemas/ErrorResponse",
       "entityIds": [
         "ENT-SESSION"
       ],
-      "status": "CONTRACT_BOUND"
+      "status": "DEPRECATED_COMPATIBILITY_ALIAS",
+      "wireSemantics": {
+        "requestBody": "IGNORED_LEGACY_COMPATIBILITY_ONLY",
+        "canonicalReplacement": "GET /auth/session",
+        "rotatesRefreshToken": false,
+        "responseDtoId": "DTO-AUTH-SESSION-RESPONSE"
+      }
     },
     {
       "featureId": "AUTH-013",
