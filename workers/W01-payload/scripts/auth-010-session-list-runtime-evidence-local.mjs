@@ -156,13 +156,18 @@ const cleanup = async () => {
 }
 
 let cleaned = false
+let currentStage = 'startup'
 try {
+  currentStage = 'health-check'
   const health = await fetch(baseUrl + '/')
   if (health.status >= 500) throw new Error('AUTH010_LOCAL_W01_NOT_READY')
 
+  currentStage = 'register-user-a'
   const userAId = await registerAccount({ email: emailA, username: usernameA, password: basePassword, idempotencyKey: registerKeyA })
+  currentStage = 'login-user-a'
   const cookieA = await login(emailA, basePassword)
 
+  currentStage = 'profile-read'
   const profileResponse = await fetch(baseUrl + '/api/v1/users/me', {
     method: 'GET',
     headers: requestHeaders({ cookie: cookieA }),
@@ -173,11 +178,13 @@ try {
     throw new Error('AUTH010_PROFILE_READ_FAILED_HTTP_' + profileResponse.status)
   }
 
+  currentStage = 'native-session-check'
   const currentRow = scalar('SELECT id, user_id AS userId FROM "session" WHERE user_id = ? ORDER BY created_at DESC LIMIT 1', userAId)
   if (!currentRow?.id || String(currentRow.userId) !== userAId) {
     throw new Error('AUTH010_NATIVE_LOGIN_SESSION_NOT_FOUND')
   }
 
+  currentStage = 'seed-session-fixtures'
   const seedNow = Date.now()
   const sessionValues = Array.from({ length: 55 }, (_, index) => {
     const sessionId = 'auth010-seed-' + suffix + '-' + String(index).padStart(2, '0')
@@ -195,6 +202,7 @@ try {
   const seededCount = scalar('SELECT COUNT(*) AS count FROM "session" WHERE user_id = ?', userAId)
   if (Number(seededCount?.count) < 56) throw new Error('AUTH010_SESSION_FIXTURE_SEED_FAILED')
 
+  currentStage = 'list-page-one'
   const first = await listSessions(cookieA, { limit: 100 })
   if (first.response.status !== 200) throw new Error('AUTH010_FIRST_PAGE_FAILED_HTTP_' + first.response.status)
   const firstItems = first.payload?.items
@@ -213,6 +221,7 @@ try {
   }
 
   const firstIds = new Set(firstItems.map((item) => item.sessionId))
+  currentStage = 'list-page-two'
   const second = await listSessions(cookieA, { limit: 100, cursor: first.payload.nextCursor })
   if (second.response.status !== 200) throw new Error('AUTH010_SECOND_PAGE_FAILED_HTTP_' + second.response.status)
   const secondItems = second.payload?.items
@@ -222,11 +231,15 @@ try {
   if (secondItems.some((item) => firstIds.has(item.sessionId))) throw new Error('AUTH010_PAGINATION_REPEATED_SESSION')
   if (second.payload.currentSessionId !== currentRow.id) throw new Error('AUTH010_CURRENT_SESSION_CHANGED_ACROSS_PAGES')
 
+  currentStage = 'invalid-cursor'
   const invalidCursor = await listSessions(cookieA, { cursor: 'not-an-opaque-cursor' })
   if (invalidCursor.response.status !== 400) throw new Error('AUTH010_INVALID_CURSOR_WAS_NOT_REJECTED')
 
+  currentStage = 'register-user-b'
   const userBId = await registerAccount({ email: emailB, username: usernameB, password: basePassword, idempotencyKey: registerKeyB })
+  currentStage = 'login-user-b'
   const cookieB = await login(emailB, basePassword)
+  currentStage = 'cross-account-list'
   const userBList = await listSessions(cookieB, { limit: 100 })
   if (userBList.response.status !== 200) throw new Error('AUTH010_SECOND_USER_LIST_FAILED')
   if (userBList.payload.items.some((item) => firstIds.has(item.sessionId))) throw new Error('AUTH010_CROSS_ACCOUNT_SESSION_LEAK')
@@ -234,11 +247,13 @@ try {
   const targetSessionId = firstItems.find((item) => item.sessionId !== currentRow.id)?.sessionId
   if (typeof targetSessionId !== 'string') throw new Error('AUTH010_OWNED_REVOKE_TARGET_MISSING')
 
+  currentStage = 'cross-account-revoke'
   const crossAccountRevoke = await revokeSession(cookieB, targetSessionId, 'AUTH010-' + suffix + '-CROSS')
   if (crossAccountRevoke.status !== 204) throw new Error('AUTH010_CROSS_ACCOUNT_REVOKE_STATUS_UNEXPECTED')
   const targetAfterCross = scalar('SELECT id FROM "session" WHERE id = ? AND user_id = ? LIMIT 1', targetSessionId, userAId)
   if (!targetAfterCross) throw new Error('AUTH010_CROSS_ACCOUNT_REVOKE_CHANGED_OWNER_SESSION')
 
+  currentStage = 'owned-revoke'
   const ownRevoke = await revokeSession(cookieA, targetSessionId, 'AUTH010-' + suffix + '-OWN')
   if (ownRevoke.status !== 204) throw new Error('AUTH010_OWNED_REVOKE_STATUS_UNEXPECTED')
   const repeatedRevoke = await revokeSession(cookieA, targetSessionId, 'AUTH010-' + suffix + '-OWN-REPLAY')
@@ -246,11 +261,13 @@ try {
   const targetAfterOwn = scalar('SELECT id FROM "session" WHERE id = ? AND user_id = ? LIMIT 1', targetSessionId, userAId)
   if (targetAfterOwn) throw new Error('AUTH010_OWNED_REVOKE_DID_NOT_REMOVE_NATIVE_SESSION')
 
+  currentStage = 'verify-after-revoke'
   const afterRevoke = await listSessions(cookieA, { limit: 100 })
   if (afterRevoke.response.status !== 200 || afterRevoke.payload.items.some((item) => item.sessionId === targetSessionId)) {
     throw new Error('AUTH010_REVOKED_SESSION_REMAINED_VISIBLE')
   }
 
+  currentStage = 'cleanup-success-fixtures'
   await cleanup()
   cleaned = true
 
@@ -295,6 +312,8 @@ try {
     testedCommitSha: sourceSha,
     environmentClass: 'CONTROLLED_LOCAL_D1',
     errorName: name,
+    failureStage: currentStage,
+    failureCode: error instanceof Error && /^AUTH010_[A-Z0-9_]+$/.test(error.message) ? error.message : 'AUTH010_UNCLASSIFIED_ERROR',
     secretMaterialIncluded: false,
   }
   try { writeFileSync(new URL('runtime-result.json', artifactDir), JSON.stringify(result, null, 2) + '\n') } catch {}
