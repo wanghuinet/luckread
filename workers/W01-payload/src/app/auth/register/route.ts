@@ -185,17 +185,36 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
   const credential = body.credential
   const username = body.username
   const consent = body.consent
+  if (identityType !== 'email') {
+    return errorResponse(422, 'IDENTITY_TYPE_UNSUPPORTED', '目前仅支持使用邮箱注册。')
+  }
+  if (typeof identity !== 'string' || identity.trim().length === 0) {
+    return errorResponse(422, 'EMAIL_REQUIRED', '请输入邮箱地址。')
+  }
   if (
-    identityType !== 'email' ||
-    typeof identity !== 'string' || identity.trim().length === 0 ||
     identity.trim().length > 254 ||
-    !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(identity.trim()) ||
-    typeof credential !== 'string' || credential.length === 0 ||
-    typeof username !== 'string' || username.trim().length === 0 || username.length > 128 ||
+    !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(identity.trim())
+  ) {
+    return errorResponse(422, 'EMAIL_INVALID', '邮箱格式不正确，请检查后重试。')
+  }
+  if (typeof credential !== 'string' || credential.length === 0) {
+    return errorResponse(422, 'PASSWORD_REQUIRED', '请输入登录密码。')
+  }
+  const credentialLength = credential.length
+  if (credentialLength < 15 || credentialLength > 128) {
+    return errorResponse(422, 'PASSWORD_LENGTH_INVALID', '密码长度必须为 15–128 个字符。')
+  }
+  if (typeof username !== 'string' || username.trim().length === 0) {
+    return errorResponse(422, 'USERNAME_REQUIRED', '请输入用户名。')
+  }
+  if (!/^[A-Za-z0-9]{6,32}$/.test(username.trim())) {
+    return errorResponse(422, 'USERNAME_INVALID', '用户名需为 6–32 位英文字母或数字，不能包含空格或特殊字符。')
+  }
+  if (
     consent.purpose !== SCOPE ||
     typeof consent.policyVersion !== 'string' || consent.policyVersion.length === 0 ||
     Object.keys(consent).some((key) => !['purpose', 'policyVersion'].includes(key))
-  ) return errorResponse(422, 'VALIDATION_FAILED', 'Invalid registration request')
+  ) return errorResponse(422, 'CONSENT_INVALID', '请确认已同意当前用户协议和隐私政策后再注册。')
 
   const now = new Date()
   let policy: ReturnType<typeof validatePolicy>
@@ -411,6 +430,29 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
     persistedIdentity.email.trim().toLowerCase() !== normalized.identity ||
     String(persistedIdentity.username ?? '').trim() !== normalized.username
   ) {
+    // Better Auth can return a synthetic identity for an email that is already
+    // registered while verification is required. Check by normalized email so
+    // the UI can guide the user without treating the synthetic ID as persisted.
+    try {
+      const identityByEmail = await env.D1
+        .withSession('first-primary')
+        .prepare('SELECT id FROM "user" WHERE email = ? LIMIT 1')
+        .bind(normalized.identity)
+        .first<{ id: string }>()
+      if (identityByEmail && identityByEmail.id !== userId) {
+        await releaseReservation()
+        return errorResponse(409, 'EMAIL_ALREADY_REGISTERED', '该邮箱可能已注册，请尝试登录或使用“忘记密码”找回账号。')
+      }
+    } catch (error) {
+      await releaseReservation()
+      console.error(JSON.stringify({
+        event: 'auth.register.duplicate_identity_check_failure',
+        diagnosticCode: 'AUTH001_DUPLICATE_IDENTITY_CHECK_FAILURE',
+        cfRay: request.headers.get('cf-ray') ?? null,
+        errorName: error instanceof Error ? error.name : typeof error,
+      }))
+      return errorResponse(503, 'SERVICE_UNAVAILABLE', '注册服务暂时不可用，请稍后重试。')
+    }
     await releaseReservation()
     console.warn(JSON.stringify({
       event: 'auth.register.identity_not_persisted',
@@ -456,6 +498,18 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
     payload = await getPayload({ config })
     // Import the generated collection type directly so Next's isolated route
     // type-checker includes Payload's module augmentation for auth fields.
+    const existingUsername = await payload.find({
+      collection: 'users',
+      where: { username: { equals: normalized.username } },
+      limit: 1,
+      depth: 0,
+      overrideAccess: true,
+      req: request,
+    })
+    if (existingUsername.docs.length > 0) {
+      throw new Error('AUTH001_USERNAME_TAKEN')
+    }
+
     const profileData: Pick<PayloadUser, 'identityId' | 'username'> & { email: string } = {
       identityId: userId,
       email: normalized.identity,
@@ -504,6 +558,15 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
       errorName: error instanceof Error ? error.name : typeof error,
       errorMessage: safeProjectionErrorMessage,
     }))
+    // The read-before-write check improves the common path; the database's
+    // unique constraint remains authoritative under concurrent registrations.
+    const usernameConflict = error instanceof Error && (
+      error.message === 'AUTH001_USERNAME_TAKEN' ||
+      (isUniqueConstraintError(error) && /username/i.test(error.message))
+    )
+    if (usernameConflict) {
+      return errorResponse(409, 'USERNAME_TAKEN', '该用户名已被使用，请换一个用户名。')
+    }
     return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Registration service unavailable')
   }
 

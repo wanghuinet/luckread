@@ -14,17 +14,21 @@ export default function ForgotPasswordPage() {
     event.preventDefault()
     if (busy) return
 
-    const value = identifier.trim()
+    const value = identifier.trim().toLowerCase()
     setError('')
     setMessage('')
     if (!value) {
       setError('请输入注册邮箱。')
       return
     }
+    if (value.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+      setError('邮箱格式不正确，请检查拼写后重试。')
+      return
+    }
 
     setBusy(true)
     try {
-      const { response, data } = await fetchJson<{ error?: { message?: string } }>('/api/v1/auth/password/reset/request', {
+      const { response, data } = await fetchJson<{ error?: { code?: string; message?: string } }>('/api/v1/auth/password/reset/request', {
         method: 'POST',
         credentials: 'include',
         cache: 'no-store',
@@ -36,12 +40,21 @@ export default function ForgotPasswordPage() {
       })
 
       if (!response.ok) {
-        throw new Error(getApiErrorMessage(data, '暂时无法发送找回邮件，请稍后重试。'))
+        if (response.status === 429) {
+          throw new Error('请求过于频繁，请稍等片刻后再试。')
+        }
+        if (response.status >= 500) {
+          throw new Error('密码找回邮件服务暂时不可用，请稍后重试。')
+        }
+        const apiMessage = getApiErrorMessage(data, '')
+        throw new Error(/[\u3400-\u9fff]/.test(apiMessage) ? apiMessage : '找回请求未能处理，请检查邮箱格式后重试。')
       }
 
       setMessage('如果该邮箱对应 LuckRead 账号，系统会发送密码找回邮件。请检查收件箱和垃圾邮件。')
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : '暂时无法发送找回邮件，请稍后重试。')
+      setError(cause instanceof TypeError
+        ? '网络连接异常，找回请求未能完成。请检查网络后重试。'
+        : cause instanceof Error ? cause.message : '密码找回服务暂时不可用，请稍后重试。')
     } finally {
       setBusy(false)
     }
@@ -54,7 +67,7 @@ export default function ForgotPasswordPage() {
         <h1>找回密码</h1>
         <p className="lr-muted">输入注册邮箱，我们会发送密码重置说明。</p>
 
-        <form className="lr-auth-form" onSubmit={submit} aria-busy={busy}>
+        <form className="lr-auth-form" onSubmit={submit} aria-busy={busy} noValidate>
           <label>
             注册邮箱
             <input

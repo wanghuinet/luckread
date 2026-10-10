@@ -132,8 +132,17 @@ try {
   // multi-Worker file-lock behavior; true same-key concurrency remains below.
   const duplicateIdentityFirst = await request('/auth/register', keyConcurrentA, concurrentBody)
   const duplicateIdentitySecond = await request('/auth/register', keyConcurrentB, concurrentBody)
+  const duplicateIdentityPayloads = await Promise.all([
+    responseJson(duplicateIdentityFirst),
+    responseJson(duplicateIdentitySecond),
+  ])
   const statuses = [duplicateIdentityFirst.status, duplicateIdentitySecond.status].sort((a, b) => a - b)
-  if (statuses[0] !== 201 || statuses[1] !== 422) throw new Error('Duplicate identity did not produce exactly one success and one Better Auth conflict: ' + statuses.join(','))
+  const hasDuplicateIdentityConflict = duplicateIdentityFirst.status === 409
+    ? duplicateIdentityPayloads[0]?.error?.code === 'EMAIL_ALREADY_REGISTERED'
+    : duplicateIdentityPayloads[1]?.error?.code === 'EMAIL_ALREADY_REGISTERED'
+  if (statuses[0] !== 201 || statuses[1] !== 409 || !hasDuplicateIdentityConflict) {
+    throw new Error('Duplicate identity must produce exactly one success and one EMAIL_ALREADY_REGISTERED conflict: ' + statuses.join(','))
+  }
   const concurrentProjection = await profileForEmail(concurrentEmail, concurrentUsername)
   if (Number(concurrentProjection?.c || 0) !== 1) throw new Error('Duplicate identity produced more than one W01 profile projection')
 

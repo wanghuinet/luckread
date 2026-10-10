@@ -2,14 +2,14 @@
 
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { FormEvent, Suspense, useState } from 'react'
+import { FormEvent, Suspense, useEffect, useState } from 'react'
 import { fetchJson, getApiErrorMessage } from '../../../lib/client-api.js'
 
 const MIN_PASSWORD_LENGTH = 15
 const MAX_PASSWORD_LENGTH = 128
 
 function validLength(value: string): boolean {
-  const length = Array.from(value).length
+  const length = value.length
   return length >= MIN_PASSWORD_LENGTH && length <= MAX_PASSWORD_LENGTH
 }
 
@@ -22,6 +22,16 @@ function ResetPasswordForm() {
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
 
+  // A recovery token is a short-lived secret. Preserve it in component state
+  // but remove it from the address bar and browser history as soon as the page
+  // mounts, rather than leaving it in copied URLs or later navigations.
+  useEffect(() => {
+    const url = new URL(window.location.href)
+    if (!url.searchParams.has('token')) return
+    url.searchParams.delete('token')
+    window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash)
+  }, [])
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (busy) return
@@ -33,8 +43,16 @@ function ResetPasswordForm() {
       setError('缺少密码重置令牌，请使用邮件中的重置链接打开此页面。')
       return
     }
+    if (!newPassword) {
+      setError('请输入新密码。')
+      return
+    }
     if (!validLength(newPassword)) {
-      setError('新密码长度必须为 15–128 个 Unicode 字符。')
+      setError('新密码长度必须为 15–128 个字符。建议使用长句，不要复用其他网站的密码。')
+      return
+    }
+    if (!confirmPassword) {
+      setError('请再次输入新密码以完成确认。')
       return
     }
     if (newPassword !== confirmPassword) {
@@ -44,7 +62,7 @@ function ResetPasswordForm() {
 
     setBusy(true)
     try {
-      const { response, data } = await fetchJson<{ error?: { message?: string } }>('/api/v1/auth/password/reset/confirm', {
+      const { response, data } = await fetchJson<{ error?: { code?: string; message?: string } }>('/api/v1/auth/password/reset/confirm', {
         method: 'POST',
         credentials: 'include',
         cache: 'no-store',
@@ -56,7 +74,20 @@ function ResetPasswordForm() {
       })
 
       if (!response.ok) {
-        throw new Error(getApiErrorMessage(data, '密码重置失败，请重新申请找回邮件。'))
+        if (response.status === 429) {
+          throw new Error('操作过于频繁，请稍后再试。')
+        }
+        if (response.status >= 500) {
+          throw new Error('密码重置服务暂时不可用，请稍后重试。')
+        }
+        const apiMessage = getApiErrorMessage(data, '')
+        if (/[\u3400-\u9fff]/.test(apiMessage) && data?.error?.code?.toUpperCase() !== 'RESET_TOKEN_INVALID_OR_EXPIRED') {
+          throw new Error(apiMessage)
+        }
+        if (response.status === 400 || response.status === 401 || response.status === 422) {
+          throw new Error('重置链接无效、已过期或已使用。请重新申请密码找回邮件。')
+        }
+        throw new Error('密码重置未能完成，请稍后重试。')
       }
 
       setRecoveryToken('')
@@ -65,7 +96,9 @@ function ResetPasswordForm() {
       setMessage('密码已重置。现在可以使用新密码登录。')
       window.history.replaceState(null, '', '/reset-password')
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : '密码重置失败，请重新申请找回邮件。')
+      setError(cause instanceof TypeError
+        ? '网络连接异常，密码重置请求未能完成。请检查网络后重试。'
+        : cause instanceof Error ? cause.message : '密码重置暂时失败，请重新申请找回邮件。')
     } finally {
       setBusy(false)
     }
@@ -78,7 +111,7 @@ function ResetPasswordForm() {
         <h1>重置密码</h1>
         <p className="lr-muted">使用邮件中的一次性重置令牌设置新的登录密码。</p>
 
-        <form className="lr-auth-form" onSubmit={submit} aria-busy={busy}>
+        <form className="lr-auth-form" onSubmit={submit} aria-busy={busy} noValidate>
           <label>
             重置令牌
             <input
@@ -118,7 +151,7 @@ function ResetPasswordForm() {
             />
           </label>
 
-          <p className="lr-muted">密码长度要求：15–128 个 Unicode 字符。</p>
+          <p className="lr-muted">密码长度要求：15–128 个字符。请使用较长且独一无二的密码。</p>
 
           {error ? <div className="lr-error" role="alert" aria-live="assertive">{error}</div> : null}
           {message ? <div role="status" aria-live="polite">{message}</div> : null}

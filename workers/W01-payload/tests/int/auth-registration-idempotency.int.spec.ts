@@ -42,6 +42,23 @@ describe('AUTH-001 registration idempotency ordering', () => {
     expect(source).toContain("event: 'auth.register.identity_not_persisted'")
     expect(source).toContain("return errorResponse(422, 'VALIDATION_FAILED', 'Registration could not be completed')")
     expect(source).toContain("env.D1.withSession('first-primary')")
+    expect(source).toContain('SELECT id FROM "user" WHERE email = ? LIMIT 1')
+    expect(source).not.toContain('lower(email) = ?')
+  })
+
+  it('validates email, username and password policy at the registration API boundary', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), 'src/app/auth/register/route.ts'),
+      'utf8',
+    )
+
+    expect(source).toContain("'EMAIL_INVALID'")
+    expect(source).toContain("'USERNAME_INVALID'")
+    expect(source).toContain("'PASSWORD_LENGTH_INVALID'")
+    expect(source).toContain("'USERNAME_TAKEN'")
+    expect(source).toContain('isUniqueConstraintError(error) && /username/i.test(error.message)')
+    expect(source).toContain('/^[A-Za-z0-9]{6,32}$/.test(username.trim())')
+    expect(source).toContain('credentialLength < 15 || credentialLength > 128')
   })
 
   it('preserves origin rejection semantics and logs a correlation identifier', () => {
