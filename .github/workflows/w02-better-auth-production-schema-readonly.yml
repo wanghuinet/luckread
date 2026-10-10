@@ -132,7 +132,7 @@ jobs:
           {
             echo "W02 Better Auth production D1 schema findings"
             echo "Expected core tables: user, session, account, verification"
-            echo "Expected core migration: 0005_better_auth_identity_core.sql"
+            echo "Expected core migration: 0005_better_auth_identity_core"
             echo
             for table in user session account verification; do
               if grep -Fq "\"name\": \"$table\"" "$out/sqlite_master.txt" 2>/dev/null; then
@@ -142,7 +142,7 @@ jobs:
               fi
             done
             echo
-            if grep -Fq "0005_better_auth_identity_core.sql" "$out/d1_migrations.txt" 2>/dev/null; then
+            if grep -Fq "0005_better_auth_identity_core" "$out/d1_migrations.txt" 2>/dev/null; then
               echo "MIGRATION_0005_RECORDED: yes"
             else
               echo "MIGRATION_0005_RECORDED: no evidence found"
