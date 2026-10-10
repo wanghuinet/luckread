@@ -4,6 +4,7 @@ import * as migration_20260925_111503_MIG_ENT_USER_PROFILE_V1 from './20260925_1
 import * as migration_20260928_020000_MIG_AUTH_001_REGISTRATION_BATCH_V1 from './20260928_020000_MIG_AUTH_001_REGISTRATION_BATCH_V1';
 import * as migration_20260928_104842_MIG_PAYLOAD_3902_NATIVE_SCHEMA_V1 from './20260928_104842_MIG_PAYLOAD_3902_NATIVE_SCHEMA_V1';
 import * as migration_20261002_120000_media_owner from './20261002_120000_media_owner';
+import * as migration_20261006_202000_MIG_BETTER_AUTH_PROFILE_PROJECTION_V1 from './20261006_202000_MIG_BETTER_AUTH_PROFILE_PROJECTION_V1';
 
 export const migrations = [
   {
@@ -35,5 +36,10 @@ export const migrations = [
     up: migration_20261002_120000_media_owner.up,
     down: migration_20261002_120000_media_owner.down,
     name: '20261002_120000_media_owner'
+  },
+  {
+    up: migration_20261006_202000_MIG_BETTER_AUTH_PROFILE_PROJECTION_V1.up,
+    down: migration_20261006_202000_MIG_BETTER_AUTH_PROFILE_PROJECTION_V1.down,
+    name: '20261006_202000_MIG_BETTER_AUTH_PROFILE_PROJECTION_V1',
   },
 ];
