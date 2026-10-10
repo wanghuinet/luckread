@@ -9,6 +9,8 @@ on:
       - 'workers/W02-identity/src/account/**'
       - 'workers/W02-identity/src/index.ts'
       - 'workers/W02-identity/wrangler.jsonc'
+      - 'scripts/auth-010-session-runtime-e2e.mjs'
+      - '.github/workflows/auth-010-remote-e2e.yml'
       - '.github/workflows/w02-session-runtime-ci.yml'
   pull_request:
     paths:
@@ -17,6 +19,8 @@ on:
       - 'workers/W02-identity/src/account/**'
       - 'workers/W02-identity/src/index.ts'
       - 'workers/W02-identity/wrangler.jsonc'
+      - 'scripts/auth-010-session-runtime-e2e.mjs'
+      - '.github/workflows/auth-010-remote-e2e.yml'
       - '.github/workflows/w02-session-runtime-ci.yml'
   workflow_dispatch:
 
@@ -57,6 +61,8 @@ jobs:
           }
           console.log(JSON.stringify({ sessionRateLimitBindings: expected.map(([name]) => name) }))
           NODE
+      - name: Validate AUTH-010 remote evidence probe syntax
+        run: node --check scripts/auth-010-session-runtime-e2e.mjs
       - name: Run W02 principal, Resend, session-list and session-revoke tests
         run: npx vitest@3.2.4 run workers/W02-identity/src/auth/principal.test.ts workers/W02-identity/src/auth/resend-email.test.ts workers/W02-identity/src/auth/session-list.test.ts workers/W02-identity/src/auth/session-rate-limit.test.ts workers/W02-identity/src/auth/session-revoke.test.ts
 
