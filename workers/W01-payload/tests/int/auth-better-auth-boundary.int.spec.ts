@@ -227,6 +227,38 @@ describe('W01 Better Auth boundary', () => {
     )
   })
 
+  it('accepts the Bearer plugin header as the canonical credential when JSON has no token field', async () => {
+    const upstream = new Response(JSON.stringify({
+      redirect: false,
+      user: {
+        id: 'u-header-only',
+        email: 'user@example.com',
+        name: null,
+        emailVerified: true,
+        image: null,
+      },
+    }), {
+      status: 200,
+      headers: {
+        'set-cookie': 'better-auth.session_token=header-only-session; Path=/; HttpOnly; Secure; SameSite=Lax',
+        'set-auth-token': 'header-only-session',
+      },
+    })
+    mocks.proxyBetterAuth.mockResolvedValue(upstream)
+
+    const response = await login(request('https://luckread.test/api/v1/auth/login', 'POST', {
+      identity: 'user@example.com',
+      credential: 'correct-password',
+    }))
+    const data = await response.json() as { data: { user: Record<string, unknown> }; requestId: string }
+
+    expect(response.status).toBe(200)
+    expect(data.data.user.id).toBe('u-header-only')
+    expect(response.headers.get('x-luckread-session-token')).toBe('header-only-session')
+    expect(JSON.stringify(data)).not.toContain('header-only-session')
+    expect(response.headers.get('set-auth-token')).toBeNull()
+  })
+
   it('normalizes unverified-account login failure to the public error envelope', async () => {
     mocks.proxyBetterAuth.mockResolvedValue(new Response(JSON.stringify({
       code: 'EMAIL_NOT_VERIFIED',
