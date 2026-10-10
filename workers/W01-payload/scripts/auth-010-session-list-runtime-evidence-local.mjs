@@ -119,11 +119,41 @@ const login = async (email, password) => {
 const listSessions = async (cookie, { limit = 100, cursor } = {}) => {
   const params = new URLSearchParams({ limit: String(limit) })
   if (cursor !== undefined) params.set('cursor', cursor)
-  const response = await fetch(baseUrl + '/api/v1/auth/sessions?' + params.toString(), {
-    method: 'GET',
-    headers: requestHeaders({ cookie }),
-    cache: 'no-store',
-  })
+
+  let response
+  try {
+    response = await fetch(baseUrl + '/api/v1/auth/sessions?' + params.toString(), {
+      method: 'GET',
+      headers: requestHeaders({ cookie }),
+      cache: 'no-store',
+    })
+  } catch (error) {
+    // Preserve only a stable, non-secret transport classification. Never log
+    // the request URL, cookie, headers, or the raw exception text.
+    const cause = error && typeof error === 'object' && 'cause' in error
+      ? (error as { cause?: { code?: unknown } }).cause
+      : undefined
+    const causeCode = typeof cause?.code === 'string' ? cause.code : ''
+    const knownCodes = new Set([
+      'ECONNREFUSED',
+      'ECONNRESET',
+      'ETIMEDOUT',
+      'EPIPE',
+      'ERR_INVALID_CHAR',
+      'ERR_INVALID_URL',
+      'UND_ERR_CONNECT_TIMEOUT',
+      'UND_ERR_INVALID_ARG',
+      'UND_ERR_INVALID_CHAR',
+      'UND_ERR_SOCKET',
+    ])
+    const classification = knownCodes.has(causeCode)
+      ? causeCode
+      : error instanceof TypeError
+        ? 'TYPE_ERROR'
+        : 'UNKNOWN_ERROR'
+    throw new Error('AUTH010_SESSION_LIST_FETCH_' + classification)
+  }
+
   return { response, payload: await parseJson(response, 'AUTH010_SESSION_LIST') }
 }
 
