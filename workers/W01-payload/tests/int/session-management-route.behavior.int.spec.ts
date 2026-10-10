@@ -28,6 +28,7 @@ vi.mock('../../src/auth/traffic-limit.js', () => ({
 }))
 
 import { DELETE, GET } from '../../src/app/auth/sessions/[[...segments]]/route.js'
+import { W02AuthClientError } from '../../src/auth/w02-session-client.js'
 import { TrafficLimitError } from '../../src/auth/traffic-limit.js'
 
 const context = (segments: string[] = []) => ({ params: Promise.resolve({ segments }) })
@@ -132,6 +133,29 @@ describe('session management route behavior', () => {
     expect(response.status).toBe(429)
     expect(mocks.rateLimitResponse).toHaveBeenCalledWith(request)
     expect(mocks.revokeSessionById).not.toHaveBeenCalled()
+  })
+
+  it('preserves W02 policy-scoped rate limiting as HTTP 429 for list and revoke', async () => {
+    mocks.listSessions.mockRejectedValueOnce(new W02AuthClientError(429, 'session list rate limited'))
+    const readRequest = new Request('https://luckread.test/api/v1/auth/sessions?limit=2')
+    const readResponse = await GET(readRequest, context())
+    const readPayload = await readResponse.json() as { error?: { code?: string } }
+
+    expect(readResponse.status).toBe(429)
+    expect(readResponse.headers.get('retry-after')).toBe('60')
+    expect(readPayload.error?.code).toBe('RATE_LIMITED')
+
+    mocks.revokeSessionById.mockRejectedValueOnce(new W02AuthClientError(429, 'session revoke rate limited'))
+    const writeRequest = new Request('https://luckread.test/api/v1/auth/sessions/session-other', {
+      method: 'DELETE',
+      headers: { 'Idempotency-Key': 'session-revoke-w02-rate-limit-test' },
+    })
+    const writeResponse = await DELETE(writeRequest, context(['session-other']))
+    const writePayload = await writeResponse.json() as { error?: { code?: string } }
+
+    expect(writeResponse.status).toBe(429)
+    expect(writeResponse.headers.get('retry-after')).toBe('60')
+    expect(writePayload.error?.code).toBe('RATE_LIMITED')
   })
 
   it('requires an idempotency key before calling W02', async () => {
