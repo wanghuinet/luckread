@@ -23,85 +23,133 @@ const escapeHtml = (value: string): string =>
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;')
 
+type ResendEmailPurpose = 'email_verification' | 'password_reset'
+
+type ResendEmailInput = {
+  purpose: ResendEmailPurpose
+  to: string
+  subject: string
+  text: string
+  html: string
+}
+
+const safeProviderField = (value: unknown): string | undefined => {
+  if (typeof value === 'number' && Number.isSafeInteger(value)) return String(value)
+  if (typeof value !== 'string' || !/^[A-Za-z0-9_.-]{1,80}$/.test(value)) return undefined
+  return value
+}
+
+/**
+ * Shared Resend delivery path for Better Auth verification and password reset.
+ * Logs only safe provider diagnostics; never log recipient addresses, message
+ * content, verification URLs, or credentials. A 2xx response means the provider
+ * accepted the message, not that it reached the recipient's inbox.
+ */
+async function sendResendEmail(env: BetterAuthEnv, input: ResendEmailInput): Promise<void> {
+  const apiKey = env.RESEND_API_KEY?.trim()
+  const from = env.AUTH_EMAIL_FROM?.trim()
+  const deliveryAttemptId = crypto.randomUUID()
+  const diagnosticPrefix = input.purpose === 'email_verification'
+    ? 'AUTH_EMAIL_DELIVERY'
+    : 'AUTH_PASSWORD_RESET_DELIVERY'
+  const eventPrefix = 'auth.' + input.purpose
+
+  if (!apiKey || !from) {
+    console.error(JSON.stringify({
+      event: eventPrefix + '.delivery_unconfigured',
+      diagnosticCode: diagnosticPrefix + '_UNCONFIGURED',
+      deliveryAttemptId,
+    }))
+    throw new Error(diagnosticPrefix + '_UNCONFIGURED')
+  }
+
+  let response: Response
+  try {
+    response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        authorization: 'Bearer ' + apiKey,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        from,
+        to: [input.to],
+        subject: input.subject,
+        text: input.text,
+        html: input.html,
+      }),
+      signal: AbortSignal.timeout(10_000),
+    })
+  } catch (error) {
+    const timedOut = error instanceof Error && error.name === 'TimeoutError'
+    console.error(JSON.stringify({
+      event: eventPrefix + '.delivery_failure',
+      diagnosticCode: diagnosticPrefix + (timedOut ? '_TIMEOUT' : '_NETWORK_FAILURE'),
+      deliveryAttemptId,
+      errorName: error instanceof Error ? error.name : typeof error,
+    }))
+    throw new Error(diagnosticPrefix + (timedOut ? '_TIMEOUT' : '_NETWORK_FAILURE'))
+  }
+
+  let providerPayload: unknown = null
+  try {
+    providerPayload = await response.json()
+  } catch {
+    // Some upstream/proxy failures return non-JSON bodies; status remains useful.
+  }
+  const providerRecord = providerPayload && typeof providerPayload === 'object'
+    ? providerPayload as Record<string, unknown>
+    : {}
+
+  if (!response.ok) {
+    console.error(JSON.stringify({
+      event: eventPrefix + '.delivery_failure',
+      diagnosticCode: diagnosticPrefix + '_REJECTED',
+      deliveryAttemptId,
+      status: response.status,
+      providerErrorName: safeProviderField(providerRecord.name) ?? null,
+      providerErrorCode: safeProviderField(providerRecord.statusCode)
+        ?? safeProviderField(providerRecord.code)
+        ?? null,
+    }))
+    throw new Error(diagnosticPrefix + '_REJECTED')
+  }
+
+  console.info(JSON.stringify({
+    event: eventPrefix + '.delivery_accepted',
+    diagnosticCode: diagnosticPrefix + '_ACCEPTED',
+    deliveryAttemptId,
+    status: response.status,
+    providerMessageId: safeProviderField(providerRecord.id) ?? null,
+  }))
+}
+
 async function sendVerificationEmail(
   env: BetterAuthEnv,
   input: { user: { email: string }; url: string },
 ): Promise<void> {
-  const apiKey = env.RESEND_API_KEY?.trim()
-  const from = env.AUTH_EMAIL_FROM?.trim()
-  if (!apiKey || !from) {
-    console.error(JSON.stringify({
-      event: 'auth.email_verification.delivery_unconfigured',
-      diagnosticCode: 'AUTH_EMAIL_DELIVERY_UNCONFIGURED',
-    }))
-    throw new Error('EMAIL_DELIVERY_UNCONFIGURED')
-  }
-
   const safeUrl = escapeHtml(input.url)
-  const response = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      authorization: 'Bearer ' + apiKey,
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify({
-      from,
-      to: [input.user.email],
-      subject: 'Verify your LuckRead email',
-      text: 'Verify your LuckRead email by opening this link: ' + input.url,
-      html: '<p>Welcome to LuckRead.</p><p>Verify your email address to activate your account:</p><p><a href="' + safeUrl + '">Verify email address</a></p>',
-    }),
+  await sendResendEmail(env, {
+    purpose: 'email_verification',
+    to: input.user.email,
+    subject: 'Verify your LuckRead email',
+    text: 'Verify your LuckRead email by opening this link: ' + input.url,
+    html: '<p>Welcome to LuckRead.</p><p>Verify your email address to activate your account:</p><p><a href="' + safeUrl + '">Verify email address</a></p>',
   })
-
-  if (!response.ok) {
-    console.error(JSON.stringify({
-      event: 'auth.email_verification.delivery_failure',
-      diagnosticCode: 'AUTH_EMAIL_DELIVERY_FAILED',
-      status: response.status,
-    }))
-    throw new Error('EMAIL_DELIVERY_FAILED')
-  }
 }
-
 
 async function sendPasswordResetEmail(
   env: BetterAuthEnv,
   input: { user: { email: string }; url: string },
 ): Promise<void> {
-  const apiKey = env.RESEND_API_KEY?.trim()
-  const from = env.AUTH_EMAIL_FROM?.trim()
-  if (!apiKey || !from) {
-    console.error(JSON.stringify({
-      event: 'auth.password_reset.delivery_unconfigured',
-      diagnosticCode: 'AUTH_PASSWORD_RESET_DELIVERY_UNCONFIGURED',
-    }))
-    throw new Error('PASSWORD_RESET_DELIVERY_UNCONFIGURED')
-  }
-
   const safeUrl = escapeHtml(input.url)
-  const response = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      authorization: 'Bearer ' + apiKey,
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify({
-      from,
-      to: [input.user.email],
-      subject: 'Reset your LuckRead password',
-      text: 'Reset your LuckRead password by opening this link: ' + input.url,
-      html: '<p>We received a request to reset your LuckRead password.</p><p>If you requested this, use the link below to choose a new password:</p><p><a href="' + safeUrl + '">Reset password</a></p><p>If you did not request this, you can ignore this email.</p>',
-    }),
+  await sendResendEmail(env, {
+    purpose: 'password_reset',
+    to: input.user.email,
+    subject: 'Reset your LuckRead password',
+    text: 'Reset your LuckRead password by opening this link: ' + input.url,
+    html: '<p>We received a request to reset your LuckRead password.</p><p>If you requested this, use the link below to choose a new password:</p><p><a href="' + safeUrl + '">Reset password</a></p><p>If you did not request this, you can ignore this email.</p>',
   })
-
-  if (!response.ok) {
-    console.error(JSON.stringify({
-      event: 'auth.password_reset.delivery_failure',
-      diagnosticCode: 'AUTH_PASSWORD_RESET_DELIVERY_FAILED',
-      status: response.status,
-    }))
-    throw new Error('PASSWORD_RESET_DELIVERY_FAILED')
-  }
 }
 
 async function activateVerifiedAccount(db: D1Database, userId: string): Promise<void> {
