@@ -44,6 +44,19 @@ describe('AUTH-001 registration idempotency ordering', () => {
     expect(source).toContain("env.D1.withSession('first-primary')")
   })
 
+  it('validates email, username and password policy at the registration API boundary', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), 'src/app/auth/register/route.ts'),
+      'utf8',
+    )
+
+    expect(source).toContain("'EMAIL_INVALID'")
+    expect(source).toContain("'USERNAME_INVALID'")
+    expect(source).toContain("'PASSWORD_LENGTH_INVALID'")
+    expect(source).toContain('/^[A-Za-z0-9]{6,32}$/.test(username.trim())')
+    expect(source).toContain('credentialLength < 15 || credentialLength > 128')
+  })
+
   it('preserves origin rejection semantics and logs a correlation identifier', () => {
     const source = readFileSync(
       resolve(process.cwd(), 'src/app/auth/register/route.ts'),
