@@ -142,25 +142,6 @@ const createSecondIsolatedIdentity = async () => {
   return userId
 }
 
-const loginDirectW02 = async (email, password) => {
-  const w02ConfiguredUrl = process.env.AUTH010_W02_BASE_URL || 'http://127.0.0.1:8788'
-  const w02BaseUrl = w02ConfiguredUrl.endsWith('/') ? w02ConfiguredUrl.slice(0, -1) : w02ConfiguredUrl
-  // Do not force a hop-by-hop Connection header on Node's local Worker fetch.
-  // The prior "connection: close" request failed before W02 observed sign-in.
-  const response = await fetch(w02BaseUrl + '/api/auth/sign-in/email', {
-    method: 'POST',
-    headers: requestHeaders({ 'content-type': 'application/json' }),
-    body: JSON.stringify({ email, password }),
-    cache: 'no-store',
-  })
-  const cookie = firstCookieHeader(response)
-  if (!response.ok || !cookie) {
-    throw new Error('AUTH010_SECOND_IDENTITY_LOGIN_FAILED_HTTP_' + response.status)
-  }
-  console.log('::add-mask::' + cookie)
-  return cookie
-}
-
 const login = async (email, password) => {
   const response = await postJson('/api/v1/auth/login', {
     identity: email,
@@ -345,8 +326,8 @@ try {
 
   currentStage = 'create-second-real-w02-identity'
   const userBId = await createSecondIsolatedIdentity()
-  currentStage = 'login-second-real-w02-identity'
-  const cookieB = await loginDirectW02(emailB, basePassword)
+  currentStage = 'login-second-identity-through-w01'
+  const cookieB = await login(emailB, basePassword)
   currentStage = 'cross-account-list'
   const userBList = await listSessions(cookieB, { limit: 100 })
   if (userBList.response.status !== 200) throw new Error('AUTH010_SECOND_USER_LIST_FAILED')
