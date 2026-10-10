@@ -1469,9 +1469,26 @@
       "timestamp": "2026-10-10T13:49:34Z",
       "producer": "AUTH-001 Registration Local Runtime Evidence / run 38057216280 / job 114228042055",
       "result": "PASS",
-      "status": "CREATED",
+      "status": "SUPERSEDED",
       "checkId": "114228042055",
       "workflowRef": "https://github.com/wanghuinet/luckread/actions/runs/38057216280",
+      "freshnessMode": "EXECUTED_AT_TESTED_COMMIT"
+    },
+    {
+      "evidenceId": "EVD-AUTH010-B14-SESSION-LIST-REVOKE-LOCAL-004",
+      "type": "INTEGRATION_TEST",
+      "claimId": "AUTH-010::SESSION-LIST-REVOKE-LOCAL-RUNTIME",
+      "subjectType": "FEATURE",
+      "subjectId": "AUTH-010",
+      "source": "GitHub Actions AUTH-001 Registration Local Runtime Evidence — exact-SHA AUTH-010 session list/revoke runtime probe",
+      "sourceRef": "https://github.com/wanghuinet/luckread/actions/runs/38058806887/artifacts/11672366415",
+      "commitSha": "fc70945471ee1630d65ac64cfe730527370ca3e5",
+      "timestamp": "2026-10-10T14:17:25Z",
+      "producer": "AUTH-001 Registration Local Runtime Evidence / run 38058806887 / job 114232662574",
+      "result": "PASS",
+      "status": "CREATED",
+      "checkId": "114232662574",
+      "workflowRef": "https://github.com/wanghuinet/luckread/actions/runs/38058806887",
       "freshnessMode": "EXECUTED_AT_TESTED_COMMIT"
     }
   ],
