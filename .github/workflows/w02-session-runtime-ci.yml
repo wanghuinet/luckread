@@ -37,7 +37,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
       - name: Run W02 principal and Resend delivery tests
-        run: npx vitest@3.2.4 run workers/W02-identity/src/auth/principal.test.ts workers/W02-identity/src/auth/resend-email.test.ts
+        run: npx vitest@3.2.4 run workers/W02-identity/src/auth/principal.test.ts workers/W02-identity/src/auth/resend-email.test.ts workers/W02-identity/src/auth/session-list.test.ts
 
   account-state-boundary:
     name: W02 Account State Boundary Tests
