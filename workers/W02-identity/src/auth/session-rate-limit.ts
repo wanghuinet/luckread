@@ -28,14 +28,14 @@ export async function enforceSessionListRateLimits(env: BetterAuthEnv, userId: s
   await checkLimit(env.AUTH_SESSION_READ_LIMITER, 'auth010:session-list:endpoint')
 }
 
-/** Apply account, target-session, and endpoint limits before reading a target row. */
+/** Apply account, authenticated-caller-session, and endpoint limits before reading a target row. */
 export async function enforceSessionRevokeRateLimits(
   env: BetterAuthEnv,
   userId: string,
-  targetSessionId: string,
+  currentSessionId: string,
 ): Promise<void> {
   await checkLimit(env.AUTH_SESSION_WRITE_LIMITER, 'auth010:session-revoke:account:' + userId)
-  await checkLimit(env.AUTH_SESSION_WRITE_LIMITER, 'auth010:session-revoke:session:' + targetSessionId)
+  await checkLimit(env.AUTH_SESSION_WRITE_LIMITER, 'auth010:session-revoke:session:' + currentSessionId)
   await checkLimit(env.AUTH_SESSION_WRITE_LIMITER, 'auth010:session-revoke:endpoint')
 }
 
