@@ -32,6 +32,8 @@ describe('password recovery frontend', () => {
     expect(page).toContain('新密码长度必须为 15–128 个字符。')
     expect(page).toContain("const searchParams = useSearchParams()")
     expect(page).toContain("useState(searchParams.get('token') || '')")
+    expect(page).toContain("url.searchParams.delete('token')")
+    expect(page).toContain("window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash)")
     expect(page).toContain("window.history.replaceState(null, '', '/reset-password')")
   })
 

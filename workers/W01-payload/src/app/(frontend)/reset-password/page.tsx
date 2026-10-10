@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { FormEvent, Suspense, useState } from 'react'
+import { FormEvent, Suspense, useEffect, useState } from 'react'
 import { fetchJson, getApiErrorMessage } from '../../../lib/client-api.js'
 
 const MIN_PASSWORD_LENGTH = 15
@@ -21,6 +21,16 @@ function ResetPasswordForm() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
+
+  // A recovery token is a short-lived secret. Preserve it in component state
+  // but remove it from the address bar and browser history as soon as the page
+  // mounts, rather than leaving it in copied URLs or later navigations.
+  useEffect(() => {
+    const url = new URL(window.location.href)
+    if (!url.searchParams.has('token')) return
+    url.searchParams.delete('token')
+    window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash)
+  }, [])
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
