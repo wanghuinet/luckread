@@ -200,7 +200,7 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
   if (typeof credential !== 'string' || credential.length === 0) {
     return errorResponse(422, 'PASSWORD_REQUIRED', '请输入登录密码。')
   }
-  const credentialLength = Array.from(credential).length
+  const credentialLength = credential.length
   if (credentialLength < 15 || credentialLength > 128) {
     return errorResponse(422, 'PASSWORD_LENGTH_INVALID', '密码长度必须为 15–128 个字符。')
   }
