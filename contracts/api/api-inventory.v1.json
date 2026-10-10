@@ -41,6 +41,7 @@
         "DELETE /v1/auth/sessions/{sessionId}",
         "GET /v1/account/sessions",
         "GET /v1/auth/credentials",
+        "GET /v1/auth/session",
         "GET /v1/auth/sessions",
         "GET /v1/users/me",
         "PATCH /v1/users/me",

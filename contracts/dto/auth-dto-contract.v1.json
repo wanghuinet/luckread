@@ -26,7 +26,41 @@
       "responseDtoId": "DTO-AUTH-LOGIN-RESPONSE",
       "requestSchemaRef": "#/paths/~1auth~1login/post/requestBody/content/application~1json/schema",
       "responseSchemaRef": "#/paths/~1auth~1login/post/responses/200/content/application~1json/schema",
-      "status": "CONTRACT_BOUND"
+      "status": "CONTRACT_BOUND",
+      "wireSemantics": {
+        "requestFields": [
+          "identity",
+          "credential"
+        ],
+        "deviceIdAccepted": false,
+        "successJsonContainsSessionCredential": false,
+        "sessionCredentialHeader": "X-LuckRead-Session-Token",
+        "browserCarrier": "Set-Cookie",
+        "nativeRequestCarrier": "Authorization: Bearer",
+        "refreshTokenIssued": false
+      }
+    },
+    {
+      "featureId": "AUTH-002",
+      "operationId": "authSessionGet",
+      "requestDtoId": null,
+      "responseDtoId": "DTO-AUTH-SESSION-RESPONSE",
+      "requestSchemaRef": null,
+      "responseSchemaRef": "#/paths/~1auth~1session/get/responses/200/content/application~1json/schema",
+      "status": "CONTRACT_BOUND",
+      "wireSemantics": {
+        "credentials": [
+          "HttpOnly session cookie",
+          "Authorization: Bearer"
+        ],
+        "responseFields": [
+          "data.session.id",
+          "data.session.expiresAt",
+          "data.user"
+        ],
+        "invalidSessionStatus": 401,
+        "cacheControl": "no-store"
+      }
     },
     {
       "featureId": "AUTH-002",
@@ -123,15 +157,21 @@
     {
       "featureId": "AUTH-011",
       "operationId": "authRefresh",
-      "requestDtoId": "DTO-AUTH-REFRESH-REQUEST",
-      "responseDtoId": "DTO-AUTH-REFRESH-RESPONSE",
-      "requestSchemaRef": "#/paths/~1auth~1refresh/post/requestBody/content/application~1json/schema",
+      "requestDtoId": null,
+      "responseDtoId": "DTO-AUTH-SESSION-RESPONSE",
+      "requestSchemaRef": null,
       "responseSchemaRef": "#/paths/~1auth~1refresh/post/responses/200/content/application~1json/schema",
       "errorSchemaRef": "#/components/schemas/ErrorResponse",
       "entityIds": [
         "ENT-SESSION"
       ],
-      "status": "CONTRACT_BOUND"
+      "status": "DEPRECATED_COMPATIBILITY_ALIAS",
+      "wireSemantics": {
+        "requestBody": "IGNORED_LEGACY_COMPATIBILITY_ONLY",
+        "canonicalReplacement": "GET /auth/session",
+        "rotatesRefreshToken": false,
+        "responseDtoId": "DTO-AUTH-SESSION-RESPONSE"
+      }
     },
     {
       "featureId": "AUTH-013",

@@ -81,7 +81,13 @@ paths:
   /auth/login:
     post:
       tags: [Auth]
-      summary: Authenticate and issue tokens
+      summary: Authenticate and establish the canonical LuckRead session
+      description: >-
+        Browser clients retain the HttpOnly session cookie from Set-Cookie.
+        Native clients read X-LuckRead-Session-Token and send it as
+        Authorization: Bearer <token>. Both carriers address the same
+        Better Auth server-side session. The opaque credential is never
+        included in the JSON body; this operation does not issue refresh tokens.
       security: []
       operationId: authLogin
       requestBody:
@@ -90,38 +96,141 @@ paths:
           application/json:
             schema:
               type: object
-              required: [identity, credential, deviceId]
+              required: [identity, credential]
               additionalProperties: false
               properties:
-                identity: { type: string }
-                credential: { type: string, format: password }
-                deviceId:
+                identity:
                   type: string
+                  format: email
+                  maxLength: 254
+                credential:
+                  type: string
+                  format: password
                   minLength: 1
-                  maxLength: 128
-                  description: Opaque client-generated privacy-safe device reference; never derive from IP, User-Agent, fingerprinting, cookies, geolocation or hardware identifiers.
+                  writeOnly: true
       responses:
         '200':
-          description: Authenticated.
+          description: Authenticated; a single native session is established.
+          headers:
+            X-LuckRead-Session-Token:
+              required: true
+              description: Opaque session credential for native clients. Send as Authorization Bearer; store only in platform secure storage.
+              schema: { type: string, minLength: 1 }
+            Set-Cookie:
+              description: HttpOnly browser session cookie; clients should use a cookie jar and must not parse or construct the cookie manually.
+              schema: { type: string }
+            Cache-Control:
+              schema: { type: string, const: no-store }
           content:
             application/json:
               schema:
                 type: object
+                required: [data, requestId]
+                additionalProperties: false
                 properties:
-                  accessToken: { type: string }
-                  refreshToken: { type: string }
-                  expiresIn: { type: integer }
-                  layer: { type: string, pattern: '^L[0-8]$' }
+                  data:
+                    type: object
+                    required: [user]
+                    additionalProperties: false
+                    properties:
+                      user:
+                        $ref: '#/components/schemas/AuthSessionUser'
+                  requestId: { type: string }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403':
+          description: Email verification is required before sign-in.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503':
+          description: Authentication service unavailable.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /auth/session:
+    get:
+      tags: [Auth]
+      summary: Read and validate the current session
+      description: >-
+        Use either the browser session cookie or the opaque token returned in
+        X-LuckRead-Session-Token as Authorization: Bearer <token>. Returns the
+        same session and user for either carrier. No valid session returns 401.
+        Successful responses are never cached.
+      operationId: authSessionGet
+      security:
+        - sessionCookieAuth: []
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Current session is valid.
+          headers:
+            X-LuckRead-Session-Token:
+              description: Updated opaque session credential when the auth authority returns one.
+              schema: { type: string, minLength: 1 }
+            Set-Cookie:
+              description: Session cookie update, if emitted by the auth authority.
+              schema: { type: string }
+            Cache-Control:
+              schema: { type: string, const: no-store }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, requestId]
+                additionalProperties: false
+                properties:
+                  data:
+                    type: object
+                    required: [session, user]
+                    additionalProperties: false
+                    properties:
+                      session:
+                        type: object
+                        required: [id, expiresAt]
+                        additionalProperties: false
+                        properties:
+                          id: { $ref: '#/components/schemas/ResourceId' }
+                          expiresAt: { type: string, format: date-time }
+                      user:
+                        $ref: '#/components/schemas/AuthSessionUser'
+                  requestId: { type: string }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503':
+          description: Authentication service unavailable.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
 
   /auth/logout:
     post:
       tags: [Auth]
-      summary: Revoke current session and increment token version
+      summary: Revoke the current session
+      description: >-
+        Accepts the same browser cookie or native Bearer session credential
+        used by protected APIs. Returns no body and clears the browser cookie
+        when present. The revoked credential must not be reused.
       operationId: authLogout
+      security:
+        - sessionCookieAuth: []
+        - bearerAuth: []
       responses:
         '204':
-          description: Logged out; token version incremented.
-        '4XX': { $ref: '#/components/responses/ClientError' }
+          description: Logged out; no response body.
+          headers:
+            Set-Cookie:
+              description: Expired session cookie, when cookie authentication was used.
+              schema: { type: string }
+            Cache-Control:
+              schema: { type: string, const: no-store }
+        '503':
+          description: Authentication service unavailable.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
 
   /auth/password/change:
     post:
@@ -1592,42 +1701,50 @@ paths:
   /auth/refresh:
     post:
       tags: [Auth]
-      summary: Refresh session tokens with rotation and reuse detection
+      summary: Deprecated compatibility alias for reading the current session
+      description: >-
+        Deprecated. This route does not rotate refresh tokens and must not be
+        used as a token refresh API. Use GET /auth/session with the current
+        cookie or Authorization Bearer session credential instead.
+      deprecated: true
       operationId: authRefresh
-      x-luckread-contract-status: CONTRACTED_PARTIAL
-      x-luckread-source: contracts/api/auth-operation-policy.v1.json
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [refreshToken, deviceId]
-              additionalProperties: false
-              properties:
-                refreshToken:
-                  type: string
-                  minLength: 1
-                  description: Refresh credential presented for the current session; never log or persist in raw form.
-                deviceId:
-                  type: string
-                  minLength: 1
-                  maxLength: 128
-                  description: Opaque client-generated privacy-safe device reference bound to the native session id.
+      security:
+        - sessionCookieAuth: []
+        - bearerAuth: []
+      x-luckread-contract-status: DEPRECATED_COMPATIBILITY_ALIAS
       responses:
         '200':
-          description: Refresh succeeded and the predecessor refresh credential is invalidated.
+          description: Current session is valid; response shape matches GET /auth/session.
           content:
             application/json:
               schema:
                 type: object
-                required: [accessToken, refreshToken, expiresIn, layer]
+                required: [data, requestId]
                 additionalProperties: false
                 properties:
-                  accessToken: { type: string }
-                  refreshToken: { type: string }
-                  expiresIn: { type: integer }
-                  layer: { type: string, pattern: '^L[0-8]$' }
+                  data:
+                    type: object
+                    required: [session, user]
+                    additionalProperties: false
+                    properties:
+                      session:
+                        type: object
+                        required: [id, expiresAt]
+                        additionalProperties: false
+                        properties:
+                          id: { $ref: '#/components/schemas/ResourceId' }
+                          expiresAt: { type: string, format: date-time }
+                      user:
+                        $ref: '#/components/schemas/AuthSessionUser'
+                  requestId: { type: string }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503':
+          description: Authentication service unavailable.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
   /auth/revoke:
     post:
       tags: [Auth]
@@ -2582,6 +2699,11 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
+    sessionCookieAuth:
+      type: apiKey
+      in: cookie
+      name: better-auth.session_token
+      description: Browser cookie carrier for the same current session used by bearerAuth.
   parameters:
     UserId:
       name: userId
@@ -2695,6 +2817,16 @@ components:
         application/json:
           schema: { $ref: '#/components/schemas/ErrorResponse' }
   schemas:
+    AuthSessionUser:
+      type: object
+      required: [id, email, emailVerified]
+      additionalProperties: false
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        email: { type: string, format: email }
+        name: { type: [string, 'null'] }
+        emailVerified: { type: boolean }
+        image: { type: [string, 'null'], format: uri }
     ResourceId:
       type: string
       minLength: 1

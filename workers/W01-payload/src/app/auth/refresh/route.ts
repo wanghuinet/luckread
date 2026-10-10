@@ -1,24 +1,3 @@
-import { proxyBetterAuth } from '../../../auth/w02-session-client.js'
-import { enforceAuthRateLimit, TrafficLimitError, rateLimitResponse } from '../../../auth/traffic-limit.js'
-
-export async function POST(request: Request): Promise<Response> {
-  try {
-    const clientIp = request.headers.get('cf-connecting-ip')?.trim() || 'unknown'
-    await enforceAuthRateLimit(request, 'AUTH_REFRESH_LIMITER', ['ip:' + clientIp])
-  } catch (error) {
-    if (error instanceof TrafficLimitError) return rateLimitResponse(request)
-    return Response.json({
-      error: { code: 'SERVICE_UNAVAILABLE', message: 'Authentication service unavailable' },
-      requestId: crypto.randomUUID(),
-    }, { status: 503, headers: { 'cache-control': 'no-store' } })
-  }
-
-  try {
-    return await proxyBetterAuth(request, '/get-session', { method: 'GET' })
-  } catch {
-    return Response.json({
-      error: { code: 'SERVICE_UNAVAILABLE', message: 'Authentication service unavailable' },
-      requestId: crypto.randomUUID(),
-    }, { status: 503, headers: { 'cache-control': 'no-store' } })
-  }
-}
+// Legacy compatibility alias. This endpoint does not rotate access/refresh
+// tokens; new clients must use GET /api/v1/auth/session.
+export { GET as POST } from '../session/route.js'
