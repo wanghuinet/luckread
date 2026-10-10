@@ -8,6 +8,7 @@ import {
   type AccountState,
 } from './account/account-state-transition.js'
 import { resolveBetterAuthPrincipal } from './auth/principal.js'
+import { handleCurrentUserSessionList } from './auth/session-list.js'
 
 interface Env {
   D1_01: D1Database
@@ -184,6 +185,10 @@ export default {
         return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'registration rollback unavailable' } }, 503)
       }
     }
+    if (request.method === 'POST' && url.pathname === '/internal/auth/session/list') {
+      return handleCurrentUserSessionList(env, request)
+    }
+
     if (request.method === 'POST' && url.pathname === '/internal/auth/session/revoke-by-id') {
       const body = await readJsonBody<{ sessionId?: unknown }>(request)
       if (!body || typeof body.sessionId !== 'string' || body.sessionId.length === 0 || body.sessionId.length > 128) {
