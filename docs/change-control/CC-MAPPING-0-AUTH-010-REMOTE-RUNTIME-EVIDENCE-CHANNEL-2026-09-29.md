@@ -36,7 +36,7 @@ Remote/deployed exact-SHA verification remains **NOT EXECUTED**. The harness mus
 9. Repeating the same revoke with the same idempotency key is an idempotent no-op (204).
 10. The revoked session disappears from a subsequent list while account A's primary test session remains current.
 11. Cleanup attempts revoke only the three current-run login sessions (A1, A2 and B1); no accounts are created and no direct D1 writes occur.
-12. The evidence JSON includes the exact tested source SHA, deployment run/artifact IDs, the probe SHA-256, assertion outcomes, and no secret values.
+12. The evidence JSON includes the exact tested source SHA, deployment run/artifact IDs, SHA-256 hashes for both the probe and workflow, assertion outcomes, and no secret values.
 
 ## Non-goals
 
