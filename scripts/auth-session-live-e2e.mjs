@@ -272,7 +272,7 @@ if (!email || !password) {
         clearsCookie: logout.cookies.some(x => /better-auth\.session_token=|__Secure-better-auth\.session_token=|__Host-better-auth\.session_token=/.test(x) && /max-age=0|expires=/i.test(x)),
       })
 
-      check('logout_clears_browser_cookie', logout.cookies.some(x => /better-auth\\.session_token=|__Secure-better-auth\\.session_token=|__Host-better-auth\\.session_token=/.test(x) && /max-age=0|expires=/i.test(x)), {
+      check('logout_clears_browser_cookie', logout.cookies.some(x => /better-auth\.session_token=|__Secure-better-auth\\.session_token=|__Host-better-auth\\.session_token=/.test(x) && /max-age=0|expires=/i.test(x)), {
         status: logout.facts.status,
         setCookieCount: logout.cookies.length,
       })
