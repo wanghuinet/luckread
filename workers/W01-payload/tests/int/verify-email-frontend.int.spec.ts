@@ -11,7 +11,8 @@ describe('standalone email verification page', () => {
 
     expect(form).toContain("'/api/v1/auth/verification/send'")
     expect(form).toContain('body: JSON.stringify({ identity: normalizedEmail })')
-    expect(form).toContain("!/^\\\\s@")
+    expect(form).toContain('normalizedEmail.length > 254')
+    expect(form).toContain('.toLowerCase()')
     expect(form).toContain('系统已受理验证邮件请求')
     expect(form).toContain("status === 'sending'")
   })
