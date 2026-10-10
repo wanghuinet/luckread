@@ -123,7 +123,7 @@ W01 continues to enforce origin/IP guardrails. This PR adds policy-matched scope
 
 1. Policy-matched account + endpoint limits for listing and account + caller-session + endpoint limits for revocation execute before D1 session-row access. Same-SHA W02 session/principal/rate-limit tests and W01 Foundation CI passed at `fc70945471ee1630d65ac64cfe730527370ca3e5`; the operation-policy `antiAbuse` evidence fields are `PASS`. The local runtime record is `EVD-AUTH010-B14-SESSION-LIST-REVOKE-LOCAL-004` (`CREATED`); formal registry admission and remote/deployed verification remain open.
 2. Latest exact-SHA local runtime evidence is recorded as `EVD-AUTH010-B14-SESSION-LIST-REVOKE-LOCAL-004` (`CREATED`); B13, B12 and B11 are `SUPERSEDED`. Do not mark B14 `VERIFIED` or alter the global tested-commit anchor without canonical evidence-admission authorization. Mapping 0 remains `NOT_GREEN`.
-3. Run a remote/deployed exact-SHA verification before claiming that this PR's session behavior is live in production. The current runtime run uses controlled local D1 only.
+3. Remote/deployed exact-SHA verification remains blocked: PR #991 is open and its candidate head is not deployed; the documented remote E2E workflow and probe are absent on the active candidate. The older backup-branch probe is incompatible with the native Better Auth session schema and versioned route. Restore/adapt the harness, merge and deploy the exact tested source using the controlled W01/W02 workflow, then execute remote verification with explicit authorization. Until that succeeds, remote runtime remains unverified.
 4. Keep the AUTH-002 native-session authority intact. This PR proves the list/revoke runtime path; it does not, by itself, prove every extension-table/device field in the full `ENT-SESSION` contract.
 5. `ENT-DEVICE-RECORD` remains proposed. Do not describe this session API closeout as a complete device registry until a separate canonical device contract is established.
 
@@ -144,5 +144,5 @@ Required final chain:
 Proceed in this order, one item at a time:
 
 1. assess formal admission of `EVD-AUTH010-B14-SESSION-LIST-REVOKE-LOCAL-004` under the registry's tested-source/freshness rules; keep its status `CREATED` unless admission requirements are independently satisfied, preserve Mapping 0 `NOT_GREEN`, and do not rewrite the tested-commit anchor;
-2. perform a fresh remote/deployed exact-SHA session lifecycle verification when the candidate code is deployed; controlled local-D1 evidence alone does not prove deployed behavior;
+2. restore a harness compatible with the native Better Auth session model; after merge and exact-SHA deployment, execute the remote lifecycle verification with explicit authorization. Controlled local-D1 evidence alone does not prove deployed behavior;
 3. revisit AUTH-010's full feature status only after device authority and remaining canonical mapping requirements are genuinely closed.
