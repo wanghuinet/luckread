@@ -76,6 +76,10 @@ describe('W01 Better Auth boundary', () => {
       resolve(process.cwd(), '../W02-identity/src/auth/better-auth.ts'),
       'utf8',
     )
+    const emailDelivery = readFileSync(
+      resolve(process.cwd(), '../W02-identity/src/auth/resend-email.ts'),
+      'utf8',
+    )
     const principal = readFileSync(
       resolve(process.cwd(), '../W02-identity/src/auth/principal.ts'),
       'utf8',
@@ -96,10 +100,10 @@ describe('W01 Better Auth boundary', () => {
     // Schema drift must be detected by Better Auth rather than hidden.
     expect(authConfig).toContain('validateSchema: true')
     expect(authConfig).not.toContain('validateSchema: false')
-    expect(authConfig).toContain('AbortSignal.timeout(10_000)')
-    expect(authConfig).toContain("diagnosticPrefix + '_ACCEPTED'")
-    expect(authConfig).toContain("diagnosticPrefix + '_REJECTED'")
-    expect(authConfig).toContain('providerMessageId')
+    expect(emailDelivery).toContain('AbortSignal.timeout(10_000)')
+    expect(emailDelivery).toContain("diagnosticPrefix + '_ACCEPTED'")
+    expect(emailDelivery).toContain("diagnosticPrefix + '_REJECTED'")
+    expect(emailDelivery).toContain('providerMessageId')
 
     // Browser localhost origins are trusted only in local development.
     expect(authConfig).toContain(
