@@ -436,7 +436,7 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
     try {
       const identityByEmail = await env.D1
         .withSession('first-primary')
-        .prepare('SELECT id FROM "user" WHERE lower(email) = ? LIMIT 1')
+        .prepare('SELECT id FROM "user" WHERE email = ? LIMIT 1')
         .bind(normalized.identity)
         .first<{ id: string }>()
       if (identityByEmail && identityByEmail.id !== userId) {

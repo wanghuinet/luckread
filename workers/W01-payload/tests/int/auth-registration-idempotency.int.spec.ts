@@ -42,6 +42,8 @@ describe('AUTH-001 registration idempotency ordering', () => {
     expect(source).toContain("event: 'auth.register.identity_not_persisted'")
     expect(source).toContain("return errorResponse(422, 'VALIDATION_FAILED', 'Registration could not be completed')")
     expect(source).toContain("env.D1.withSession('first-primary')")
+    expect(source).toContain('SELECT id FROM "user" WHERE email = ? LIMIT 1')
+    expect(source).not.toContain('lower(email) = ?')
   })
 
   it('validates email, username and password policy at the registration API boundary', () => {
