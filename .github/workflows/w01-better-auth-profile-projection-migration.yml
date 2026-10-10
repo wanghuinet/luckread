@@ -35,8 +35,8 @@ jobs:
     steps:
       - name: Validate dispatch inputs
         env:
-          REQUESTED_DATABASE_NAME: \${{ inputs.database_name }}
-          CONFIRM: \${{ inputs.confirm }}
+          REQUESTED_DATABASE_NAME: ${{ inputs.database_name }}
+          CONFIRM: ${{ inputs.confirm }}
         run: |
           set -euo pipefail
           test "$REQUESTED_DATABASE_NAME" = "luckread"
@@ -45,12 +45,12 @@ jobs:
       - name: Checkout exact source commit
         uses: actions/checkout@v4
         with:
-          ref: \${{ inputs.source_sha }}
+          ref: ${{ inputs.source_sha }}
           fetch-depth: 0
 
       - name: Validate exact source and admitted migration source
         env:
-          REQUESTED_SHA: \${{ inputs.source_sha }}
+          REQUESTED_SHA: ${{ inputs.source_sha }}
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$REQUESTED_SHA"
@@ -87,8 +87,8 @@ jobs:
 
       - name: Validate Cloudflare access
         env:
-          CLOUDFLARE_API_TOKEN: \${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: \${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -euo pipefail
           test -n "$CLOUDFLARE_API_TOKEN"
@@ -97,8 +97,8 @@ jobs:
 
       - name: Capture pre-migration state without mutation
         env:
-          CLOUDFLARE_API_TOKEN: \${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: \${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         working-directory: workers/W01-payload
         run: |
           set -euo pipefail
@@ -111,7 +111,7 @@ jobs:
 
       - name: Fail closed unless only the admitted migration is pending
         env:
-          SOURCE_SHA: \${{ inputs.source_sha }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
         run: |
           set -euo pipefail
           node --input-type=module <<'NODE'
@@ -176,8 +176,8 @@ jobs:
 
       - name: Apply the single admitted Payload migration
         env:
-          CLOUDFLARE_API_TOKEN: \${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: \${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_ENV: production
           NODE_ENV: production
           PAYLOAD_MIGRATION_REMOTE: "true"
@@ -187,9 +187,9 @@ jobs:
 
       - name: Capture and validate post-migration state
         env:
-          CLOUDFLARE_API_TOKEN: \${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: \${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          SOURCE_SHA: \${{ inputs.source_sha }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
         working-directory: workers/W01-payload
         run: |
           set -euo pipefail
@@ -250,8 +250,8 @@ jobs:
       - name: Write controlled execution provenance
         if: always()
         env:
-          SOURCE_SHA: \${{ inputs.source_sha }}
-          REQUESTED_DATABASE_NAME: \${{ inputs.database_name }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          REQUESTED_DATABASE_NAME: ${{ inputs.database_name }}
         run: |
           set -euo pipefail
           mkdir -p artifacts/evidence/w01-profile-projection
@@ -275,7 +275,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: w01-better-auth-profile-projection-migration-\${{ github.run_id }}
+          name: w01-better-auth-profile-projection-migration-${{ github.run_id }}
           path: artifacts/evidence/w01-profile-projection/
           if-no-files-found: warn
           retention-days: 90
