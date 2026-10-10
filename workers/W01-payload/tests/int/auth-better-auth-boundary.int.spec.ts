@@ -71,6 +71,40 @@ describe('W01 Better Auth boundary', () => {
     expect(authConfig).toContain("reason: 'email verification completed'")
   })
 
+  it('hardens W02 schema validation, auth initialization and production trusted origins', () => {
+    const authConfig = readFileSync(
+      resolve(process.cwd(), '../W02-identity/src/auth/better-auth.ts'),
+      'utf8',
+    )
+    const principal = readFileSync(
+      resolve(process.cwd(), '../W02-identity/src/auth/principal.ts'),
+      'utf8',
+    )
+    const w02Index = readFileSync(
+      resolve(process.cwd(), '../W02-identity/src/index.ts'),
+      'utf8',
+    )
+
+    // Borrow the plugin's initialize-once model while retaining W02-native D1.
+    expect(authConfig).toContain('const authInstances = new WeakMap')
+    expect(authConfig).toContain('authInstances.get(env.D1_01)')
+    expect(authConfig).toContain('authInstances.set(env.D1_01, auth)')
+    expect(principal).toContain('createLuckReadAuth(env)')
+    expect(w02Index).toContain('resolveBetterAuthPrincipal(env, request)')
+    expect(w02Index).toContain('createLuckReadAuth(env)')
+
+    // Schema drift must be detected by Better Auth rather than hidden.
+    expect(authConfig).toContain('validateSchema: true')
+    expect(authConfig).not.toContain('validateSchema: false')
+
+    // Browser localhost origins are trusted only in local development.
+    expect(authConfig).toContain(
+      `...(env.CLOUDFLARE_ENV?.trim().toLowerCase() === 'development'
+      ? ['http://127.0.0.1:8787', 'http://localhost:8787']
+      : []),`,
+    )
+  })
+
   it('keeps registration email verification on the post-commit W01 path', () => {
     const registerForm = readFileSync(
       resolve(process.cwd(), 'src/app/(frontend)/register/RegisterForm.tsx'),
