@@ -198,10 +198,11 @@
       "security": [
         "no_account_enumeration",
         "credential_never_logged",
-        "credential_never_returned",
         "constant_failure_semantics",
         "risk_challenge_before_expensive_work",
-        "refresh_rotation_required"
+        "session_credential_never_in_json_body",
+        "one_authoritative_session_for_cookie_and_bearer",
+        "session_credential_never_logged"
       ],
       "evidence": {
         "openapi": "PASS",
@@ -211,6 +212,102 @@
         "resource": "PASS",
         "cache": "PASS",
         "antiAbuse": "MISSING",
+        "integration": "MISSING",
+        "securityE2E": "MISSING"
+      },
+      "wire": {
+        "requiredFields": [
+          "identity",
+          "credential"
+        ],
+        "forbiddenFields": [
+          "deviceId",
+          "accessToken",
+          "refreshToken"
+        ],
+        "successDto": "DTO-AUTH-LOGIN-RESPONSE",
+        "sessionAuthority": "W02_BETTER_AUTH",
+        "browserSessionCarrier": "Set-Cookie (HttpOnly)",
+        "nativeSessionCarrier": "X-LuckRead-Session-Token response header, then Authorization: Bearer",
+        "sessionCredentialInJsonBody": false,
+        "refreshTokenIssued": false,
+        "cacheControl": "no-store"
+      }
+    },
+    {
+      "operationId": "authSessionGet",
+      "method": "GET",
+      "path": "/auth/session",
+      "visibility": "public_authenticated",
+      "capability": "session_read_current",
+      "contractStatus": "CONTRACTED_PARTIAL",
+      "auth": {
+        "mode": "session_cookie_or_bearer",
+        "subject": "current_session"
+      },
+      "authorization": {
+        "required": true,
+        "permission": "user.session.read",
+        "scope": "self"
+      },
+      "resource": {
+        "class": "BOUNDED_COMPOSITION",
+        "d1ReadMax": 2,
+        "d1WriteMax": 1,
+        "d1ReadRowsMax": 4,
+        "d1WriteRowsMax": 1,
+        "rpcMax": 0,
+        "outboundMax": 0
+      },
+      "cache": {
+        "mode": "NO_STORE",
+        "shared": false,
+        "authorizationBoundary": true
+      },
+      "retry": {
+        "maxAttempts": 1,
+        "clientRetrySafe": true,
+        "requiresIdempotency": false
+      },
+      "event": {
+        "syncConsumersMax": 0,
+        "asyncEventsMax": 0,
+        "fanoutMax": 0
+      },
+      "queue": {
+        "enqueueMax": 0
+      },
+      "antiAbuse": {
+        "required": true,
+        "scopes": [
+          "session",
+          "account",
+          "endpoint"
+        ],
+        "actions": [
+          "ALLOW",
+          "THROTTLE",
+          "BLOCK"
+        ]
+      },
+      "idempotency": {
+        "required": false,
+        "semantic": "read-only session validation"
+      },
+      "security": [
+        "session_cookie_or_bearer_only",
+        "session_credential_never_in_json_body",
+        "revoked_session_must_be_rejected",
+        "no_store"
+      ],
+      "evidence": {
+        "openapi": "PASS",
+        "inventory": "PENDING_VALIDATION",
+        "permission": "PENDING_VALIDATION",
+        "state": "PENDING_RUNTIME_EVIDENCE",
+        "resource": "PASS",
+        "cache": "PASS",
+        "antiAbuse": "PENDING_RUNTIME_EVIDENCE",
         "integration": "MISSING",
         "securityE2E": "MISSING"
       }
@@ -223,8 +320,8 @@
       "capability": "session_revoke_current",
       "contractStatus": "CONTRACTED_PARTIAL",
       "auth": {
-        "mode": "authenticated",
-        "subject": "current_user"
+        "mode": "session_cookie_or_bearer",
+        "subject": "current_session"
       },
       "authorization": {
         "required": true,
@@ -290,6 +387,17 @@
         "antiAbuse": "MISSING",
         "integration": "MISSING",
         "securityE2E": "MISSING"
+      },
+      "wire": {
+        "requestBody": "NONE",
+        "acceptedCredentials": [
+          "HttpOnly session cookie",
+          "Authorization: Bearer <session-token>"
+        ],
+        "successStatus": 204,
+        "successBody": "NONE",
+        "cookieClearing": "Set-Cookie when cookie carrier used",
+        "revokedCredentialEchoed": false
       }
     },
     {
