@@ -26,6 +26,13 @@ const makeDatabase = (rows: unknown[] = []) => {
   return { database: database as unknown as D1Database, statement, prepare: database.prepare }
 }
 
+const makeEnv = (database: D1Database): BetterAuthEnv => ({
+  D1_01: database,
+  AUTH_SESSION_READ_LIMITER: {
+    limit: vi.fn().mockResolvedValue({ success: true }),
+  },
+})
+
 const encodeCursor = (value: { createdAt: string; sessionId: string }) =>
   's1.' + btoa(JSON.stringify(value)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '')
 
@@ -60,7 +67,7 @@ describe('W02 bounded session list', () => {
       row('session-2', '2026-10-02T00:00:00.000Z'),
       row('session-1', '2026-10-01T00:00:00.000Z'),
     ])
-    const env = { D1_01: db.database } as BetterAuthEnv
+    const env = makeEnv(db.database)
 
     const response = await handleCurrentUserSessionList(env, request({ limit: 2 }))
     const payload = await response.json() as {
@@ -84,12 +91,18 @@ describe('W02 bounded session list', () => {
     expect(db.prepare).toHaveBeenCalledWith(expect.stringContaining('ORDER BY created_at DESC, id DESC LIMIT ?'))
     expect(db.statement.bind).toHaveBeenCalledWith('user-1', expect.any(String), 3)
     expect(db.statement.all).toHaveBeenCalledTimes(1)
+    expect(env.AUTH_SESSION_READ_LIMITER?.limit).toHaveBeenNthCalledWith(1, {
+      key: 'auth010:session-list:account:user-1',
+    })
+    expect(env.AUTH_SESSION_READ_LIMITER?.limit).toHaveBeenNthCalledWith(2, {
+      key: 'auth010:session-list:endpoint',
+    })
   })
 
   it('uses the decoded cursor in the keyset predicate and bounds the look-ahead query', async () => {
     const db = makeDatabase([row('session-1', '2026-10-01T00:00:00.000Z')])
     const cursor = encodeCursor({ createdAt: '2026-10-02T00:00:00.000Z', sessionId: 'session-2' })
-    const env = { D1_01: db.database } as BetterAuthEnv
+    const env = makeEnv(db.database)
 
     const response = await handleCurrentUserSessionList(env, request({ limit: 10, cursor }))
     const payload = await response.json() as { items: Array<{ sessionId: string }>; nextCursor: string | null }
@@ -110,7 +123,7 @@ describe('W02 bounded session list', () => {
 
   it('rejects invalid limits and cursors before authenticating or querying D1', async () => {
     const db = makeDatabase()
-    const env = { D1_01: db.database } as BetterAuthEnv
+    const env = makeEnv(db.database)
 
     const limitResponse = await handleCurrentUserSessionList(env, request({ limit: 51 }))
     const cursorResponse = await handleCurrentUserSessionList(env, request({ limit: 10, cursor: 'not-valid' }))
@@ -124,18 +137,37 @@ describe('W02 bounded session list', () => {
   it('rejects anonymous requests without querying session rows', async () => {
     mocks.getSession.mockResolvedValueOnce(null)
     const db = makeDatabase()
-    const env = { D1_01: db.database } as BetterAuthEnv
+    const env = makeEnv(db.database)
 
     const response = await handleCurrentUserSessionList(env, request({ limit: 10 }))
 
     expect(response.status).toBe(401)
+    expect(db.prepare).not.toHaveBeenCalled()
+    expect(env.AUTH_SESSION_READ_LIMITER?.limit).not.toHaveBeenCalled()
+  })
+
+  it('returns 429 before D1 when a required account or endpoint scope is exhausted', async () => {
+    const db = makeDatabase()
+    const env = makeEnv(db.database)
+    const limiter = env.AUTH_SESSION_READ_LIMITER!
+    vi.mocked(limiter.limit)
+      .mockResolvedValueOnce({ success: true })
+      .mockResolvedValueOnce({ success: false })
+
+    const response = await handleCurrentUserSessionList(env, request({ limit: 10 }))
+    const payload = await response.json() as { error?: { code?: string } }
+
+    expect(response.status).toBe(429)
+    expect(response.headers.get('retry-after')).toBe('60')
+    expect(payload.error?.code).toBe('RATE_LIMITED')
+    expect(limiter.limit).toHaveBeenCalledTimes(2)
     expect(db.prepare).not.toHaveBeenCalled()
   })
 
   it('fails closed when D1 cannot serve the session query', async () => {
     const db = makeDatabase()
     db.statement.all.mockRejectedValueOnce(new Error('D1 unavailable'))
-    const env = { D1_01: db.database } as BetterAuthEnv
+    const env = makeEnv(db.database)
 
     const response = await handleCurrentUserSessionList(env, request({ limit: 10 }))
 
