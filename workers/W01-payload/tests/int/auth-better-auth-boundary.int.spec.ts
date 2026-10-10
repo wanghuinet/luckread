@@ -96,6 +96,10 @@ describe('W01 Better Auth boundary', () => {
     // Schema drift must be detected by Better Auth rather than hidden.
     expect(authConfig).toContain('validateSchema: true')
     expect(authConfig).not.toContain('validateSchema: false')
+    expect(authConfig).toContain('AbortSignal.timeout(10_000)')
+    expect(authConfig).toContain("diagnosticPrefix + '_ACCEPTED'")
+    expect(authConfig).toContain("diagnosticPrefix + '_REJECTED'")
+    expect(authConfig).toContain('providerMessageId')
 
     // Browser localhost origins are trusted only in local development.
     expect(authConfig).toContain(
@@ -120,6 +124,9 @@ describe('W01 Better Auth boundary', () => {
     expect(verificationRoute).toContain("'/send-verification-email'")
     expect(verificationRoute).toContain("callbackURL: 'https://luckread.com/login?verified=1'")
     expect(verificationRoute).toContain("!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(identity.trim())")
+    expect(verificationRoute).toContain('UPSTREAM_PRIVACY_NOOP_CODES')
+    expect(verificationRoute).toContain('AUTH_EMAIL_VERIFICATION_UPSTREAM_REJECTION')
+    expect(verificationRoute).toContain('readUpstreamDiagnosticCode')
   })
 
   it('proxies login credentials to W02 and does not require legacy device/session material', async () => {
