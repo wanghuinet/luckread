@@ -20,6 +20,7 @@ on:
       - "workers/W01-payload/src/migrations/**"
       - "workers/W01-payload/src/payload.config.ts"
       - "workers/W01-payload/scripts/auth-001-registration-runtime-evidence-local.mjs"
+      - "workers/W01-payload/scripts/auth-010-session-list-runtime-evidence-local.mjs"
       - "artifacts/mapping-0/priv004-approved-policy-instance-2026-09-27.json"
   pull_request:
     paths:
@@ -177,6 +178,16 @@ jobs:
           node --import=tsx/esm scripts/auth-001-registration-runtime-evidence-local.mjs
           test -s ../../artifacts/mapping-0/auth-001-runtime-local/runtime-result.json
 
+      - name: Run AUTH-010 session list and revoke runtime evidence
+        working-directory: workers/W01-payload
+        env:
+          AUTH001_BASE_URL: http://127.0.0.1:8787
+          CLOUDFLARE_PERSIST_TO: /tmp/luckread-auth001-state
+        run: |
+          set -euo pipefail
+          node --import=tsx/esm scripts/auth-010-session-list-runtime-evidence-local.mjs
+          test -s ../../artifacts/mapping-0/auth-010-session-list-runtime-local/runtime-result.json
+
       - name: Dump W01 runtime log on evidence failure
         if: ${{ failure() }}
         working-directory: workers/W01-payload
@@ -195,6 +206,7 @@ jobs:
           name: auth-001-registration-runtime-local-${{ steps.source.outputs.sha }}
           path: |
             artifacts/mapping-0/auth-001-runtime-local/
+            artifacts/mapping-0/auth-010-session-list-runtime-local/
             workers/W01-payload/auth-001-open-next-build.log
             workers/W01-payload/auth-001-preview.log
             workers/W02-identity/auth-001-w02-preview.log
