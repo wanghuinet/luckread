@@ -259,6 +259,20 @@ describe('W01 Better Auth boundary', () => {
     expect(response.headers.get('set-auth-token')).toBeNull()
   })
 
+  it('rejects legacy or unknown login fields rather than silently ignoring them', async () => {
+    const response = await login(request('https://luckread.test/api/v1/auth/login', 'POST', {
+      identity: 'user@example.com',
+      credential: 'correct-password',
+      deviceId: 'legacy-device-field',
+    }))
+    const data = await response.json() as { error: { code: string }; requestId: string }
+
+    expect(response.status).toBe(400)
+    expect(data.error.code).toBe('VALIDATION_FAILED')
+    expect(data.requestId).toBeTruthy()
+    expect(mocks.proxyBetterAuth).not.toHaveBeenCalled()
+  })
+
   it('normalizes unverified-account login failure to the public error envelope', async () => {
     mocks.proxyBetterAuth.mockResolvedValue(new Response(JSON.stringify({
       code: 'EMAIL_NOT_VERIFIED',
