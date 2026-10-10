@@ -5,6 +5,18 @@ import { resolve } from 'node:path'
 const read = (relativePath: string) => readFileSync(resolve(process.cwd(), relativePath), 'utf8')
 
 describe('frontend session management', () => {
+  it('exposes the session handlers through the versioned API path used by the client', () => {
+    const route = read('src/app/api/v1/auth/sessions/[[...segments]]/route.ts')
+    expect(route).toContain("export { GET, DELETE } from '../../../../../auth/sessions/[[...segments]]/route'")
+  })
+
+  it('returns a bounded, paginated list with currentSessionId at the response envelope', () => {
+    const route = read('src/app/auth/sessions/[[...segments]]/route.ts')
+    expect(route).toContain('const pageLimit = Math.min(50, requestedLimit)')
+    expect(route).toContain("const cursor = url.searchParams.get('cursor')")
+    expect(route).toContain('currentSessionId,\n      nextCursor:')
+    expect(route).not.toContain('currentSessionId,\n        deviceId:')
+  })
   it('reads the canonical session list and exposes the current session marker', () => {
     const page = read('src/app/(frontend)/me/sessions/page.tsx')
     const route = read('src/app/auth/sessions/[[...segments]]/route.ts')
