@@ -113,6 +113,7 @@ export default function LoginForm() {
         <Link className="lr-link" href="/forgot-password">忘记密码？</Link>
         <Link className="lr-link" href="/register">还没有账号？立即注册</Link>
       </div>
+      <Link className="lr-link" href="/verify-email">收不到验证邮件？点此重发</Link>
     </form>
   )
 }
