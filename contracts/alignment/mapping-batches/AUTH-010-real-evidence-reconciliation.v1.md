@@ -106,11 +106,11 @@ The exact tested source `eb0b1643732b0d0124eeb380f008015eadbe665c` passed the co
 - Environment: `CONTROLLED_LOCAL_D1`; this is not evidence that the same commit is deployed remotely or in production.
 - Verified: signed W02 login cookie authenticates the W01 route; list is capped at 50; cursor continuation works (50 + 6 rows in the fixture); current-session marker is stable; secret fields are absent; list responses are `no-store`; malformed cursor is rejected; a second real W02 identity cannot list the first user's sessions or alter them by revoke; the owner can revoke; repeat revoke is an idempotent 204; the revoked session is absent from a subsequent list; synthetic test identities/sessions are cleaned up; no secrets were captured.
 
-The W01 route still invokes the existing read/write traffic limiters, and behavioral tests assert those hooks are called. The AUTH-010 runtime probe did **not** exercise actual rate-limit exhaustion/429 behavior, so `antiAbuse` remains unverified. This evidence closes the current list/revoke runtime chain only; it does not complete the proposed independent device-record feature or promote the full AUTH-010 feature to GREEN.
+The W01 route invokes the existing read/write limiter helpers. Route behavior tests now verify that read- or write-limiter exhaustion maps to HTTP 429 and prevents the downstream W02 list/revoke call; the tests passed in [Payload Foundation CI run 38048910635](https://github.com/wanghuinet/luckread/actions/runs/38048910635). However, the limiter keys currently enforce global-origin and client-IP scopes (`public-read:origin` / `public-read:ip:*`, `w01-write:origin` / `w01-write:ip:*`), while the canonical operation policy requires account + endpoint scopes for list and account + session + endpoint scopes for revoke. The tests prove 429 handling, not that required scope granularity. Therefore `antiAbuse` correctly remains `MISSING`. This evidence closes the current list/revoke runtime chain only; it does not complete the proposed independent device-record feature or promote the full AUTH-010 feature to GREEN.
 
 ## 8. Remaining blockers
 
-1. Prove real anti-abuse enforcement for these routes with an executable rate-limit/429 test; the current runtime evidence does not exercise limiter exhaustion, so the policy field remains `MISSING`.
+1. Reconcile the anti-abuse scope mismatch before changing policy evidence: current W01 bindings enforce global-origin and IP keys, but the declared list/revoke policy requires account, endpoint, and (for revoke) session scope. The new 429 route tests cover response wiring only; `antiAbuse` must remain `MISSING` until the required scopes are implemented and tested or the canonical policy is deliberately reconciled.
 2. Register the exact-SHA runtime evidence in the appropriate feature/evidence trace without promoting the repository-wide Mapping 0 registry from its current `NOT_GREEN` state or invalidating its tested-commit anchor.
 3. Run a new exact-SHA remote/deployed verification before claiming that this PR's session behavior is live in production. The current green run uses controlled local D1 only.
 4. Keep the AUTH-002 native-session authority intact. This PR proves the list/revoke runtime path; it does not, by itself, prove every extension-table/device field in the full `ENT-SESSION` contract.
@@ -132,7 +132,7 @@ Required final chain:
 
 Proceed in this order, one item at a time:
 
-1. add deterministic rate-limit behavior evidence for `GET /auth/sessions` and `DELETE /auth/sessions/{sessionId}`, then promote only the supported `antiAbuse` fields;
+1. close the declared-versus-implemented anti-abuse scope gap for list/revoke and test account/endpoint/session enforcement; do not promote `antiAbuse` solely because the route maps a limiter error to 429;
 2. register the passing run `38046895324` / tested commit `eb0b1643732b0d0124eeb380f008015eadbe665c` in the feature-level evidence trace; do not mark repository-wide Mapping 0 GREEN;
 3. perform a fresh remote/deployed exact-SHA session lifecycle verification when the code is deployed;
 4. revisit AUTH-010's full feature status only after device authority and remaining canonical mapping requirements are genuinely closed.
