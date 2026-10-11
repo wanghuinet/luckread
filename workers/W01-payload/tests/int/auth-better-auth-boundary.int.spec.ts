@@ -110,6 +110,7 @@ describe('W01 Better Auth boundary', () => {
     expect(authConfig).toContain("applyAccountStateTransition(db, {")
     expect(authConfig).toContain("to: 'ACTIVE'")
     expect(authConfig).toContain("reason: 'email verification completed'")
+    expect(authConfig).toContain('await ensureVerifiedUserRole(env.D1_01, userId, new Date().toISOString())')
   })
 
   it('hardens W02 schema validation, auth initialization and production trusted origins', () => {

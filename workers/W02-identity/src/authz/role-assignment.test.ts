@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ensureBaseUserRole, resolveGlobalLayer, type RoleAssignmentRecord } from './role-assignment.js'
+import { ensureBaseUserRole, ensureVerifiedUserRole, resolveGlobalLayer, type RoleAssignmentRecord } from './role-assignment.js'
 
 const NOW = '2026-09-22T12:00:00.000Z'
 
@@ -207,5 +207,121 @@ describe('Base user role materialization', () => {
       },
     } as unknown as D1Database
     await expect(ensureBaseUserRole(db, '', NOW)).rejects.toThrow('invalid subject id')
+  })
+})
+
+
+function verifiedUserRoleFixture(
+  user: { accountState: string; emailVerified: number | boolean } | null = {
+    accountState: 'ACTIVE',
+    emailVerified: 1,
+  },
+  initial: RoleAssignmentRecord | null = null,
+) {
+  let stored = initial
+  let insertCount = 0
+  const db = {
+    prepare: (sql: string) => ({
+      bind: (...args: unknown[]) => ({
+        first: async <T>() => {
+          if (sql.includes('FROM "user"')) return user as T | null
+          if (sql.includes('FROM role_assignments WHERE id = ?')) {
+            return (stored && stored.id === String(args[0]) ? stored : null) as T | null
+          }
+          throw new Error('unexpected first query: ' + sql)
+        },
+        run: async () => {
+          if (!sql.startsWith('INSERT OR IGNORE INTO role_assignments')) {
+            throw new Error('unexpected write query: ' + sql)
+          }
+          const [id, subjectId, now] = args as [string, string, string, string, string]
+          if (
+            stored &&
+            stored.subjectId === subjectId &&
+            stored.roleId === 'verified_user' &&
+            stored.scopeType === 'global' &&
+            stored.scopeId === null &&
+            stored.status === 'ACTIVE'
+          ) {
+            throw new Error('role assignment effective interval overlaps existing assignment')
+          }
+          stored = {
+            id,
+            subjectId,
+            roleId: 'verified_user',
+            scopeType: 'global',
+            scopeId: null,
+            status: 'ACTIVE',
+            validFrom: now,
+            validUntil: null,
+            createdAt: now,
+            updatedAt: now,
+          }
+          insertCount += 1
+          return { meta: { changes: 1 } }
+        },
+      }),
+    }),
+  }
+  return {
+    db: db as unknown as D1Database,
+    getStored: () => stored,
+    getInsertCount: () => insertCount,
+  }
+}
+
+describe('Verified user role materialization', () => {
+  it('grants only the canonical global L2 role after account activation and email verification', async () => {
+    const fixture = verifiedUserRoleFixture()
+    await expect(ensureVerifiedUserRole(fixture.db, 'user-1', NOW)).resolves.toBeUndefined()
+    expect(fixture.getStored()).toMatchObject({
+      id: 'verified-user-user-1',
+      subjectId: 'user-1',
+      roleId: 'verified_user',
+      scopeType: 'global',
+      scopeId: null,
+      status: 'ACTIVE',
+      validFrom: NOW,
+      validUntil: null,
+    })
+    await expect(resolveGlobalLayer(
+      fakeD1([assignment(), fixture.getStored()!]).db,
+      'user-1',
+      'ACTIVE',
+      NOW,
+    )).resolves.toEqual({ decision: 'ALLOW', layer: 'L2' })
+  })
+
+  it('is idempotent for repeated verification callbacks', async () => {
+    const fixture = verifiedUserRoleFixture()
+    await ensureVerifiedUserRole(fixture.db, 'user-1', NOW)
+    await ensureVerifiedUserRole(fixture.db, 'user-1', NOW)
+    expect(fixture.getInsertCount()).toBe(1)
+  })
+
+  it('refuses a pending or unverified account and fails closed', async () => {
+    const pending = verifiedUserRoleFixture({ accountState: 'PENDING_VERIFICATION', emailVerified: 1 })
+    await expect(ensureVerifiedUserRole(pending.db, 'user-1', NOW))
+      .rejects.toThrow('verified-user role grant requires an ACTIVE email-verified account')
+    expect(pending.getInsertCount()).toBe(0)
+
+    const unverified = verifiedUserRoleFixture({ accountState: 'ACTIVE', emailVerified: 0 })
+    await expect(ensureVerifiedUserRole(unverified.db, 'user-1', NOW))
+      .rejects.toThrow('verified-user role grant requires an ACTIVE email-verified account')
+    expect(unverified.getInsertCount()).toBe(0)
+  })
+
+  it('does not silently restore a previously revoked verification role', async () => {
+    const fixture = verifiedUserRoleFixture(
+      { accountState: 'ACTIVE', emailVerified: 1 },
+      assignment({
+        id: 'verified-user-user-1',
+        roleId: 'verified_user',
+        status: 'REVOKED',
+      }),
+    )
+    await expect(ensureVerifiedUserRole(fixture.db, 'user-1', NOW))
+      .rejects.toThrow('verified-user role assignment is not currently valid')
+    expect(fixture.getInsertCount()).toBe(0)
   })
 })
