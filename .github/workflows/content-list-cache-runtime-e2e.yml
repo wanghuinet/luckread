@@ -353,30 +353,48 @@ jobs:
         if: always()
         run: |
           mkdir -p artifacts/mapping-0/content-list-cache-runtime-e2e
-          cat > artifacts/mapping-0/content-list-cache-runtime-e2e/provenance.json <<EOF
-          {
-            "workflow": "Content List Cache Runtime E2E",
-            "testedSourceSha": "$TESTED_COMMIT",
-            "deploymentRunId": "$DEPLOYMENT_RUN_ID",
-            "worker": "luckread-w01-payload",
-            "publicPath": "/api/v1/contents",
-            "cacheNamespace": "content-list",
-            "filteredVariant": "creatorId,type,limit",
-            "anonymousMiss": true,
-            "anonymousHit": true,
-            "authenticatedSharedCacheBypass": true,
-            "mutationBoundary": "PUBLISHED->UNPUBLISHED",
-            "postMutationFilteredListMiss": true,
-            "postMutationFixtureHidden": true,
-            "newWorker": 0,
-            "newD1": 0,
-            "syntheticFixtureOnly": true
+          node --input-type=module <<'NODE'
+          import { copyFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs'
+          const outputDir = 'artifacts/mapping-0/content-list-cache-runtime-e2e'
+          const definitions = [
+            { file: 'cache-list-miss.json', key: 'anonymousMiss', pass: (value) => value?.status === 'PASS' && value?.cache === 'miss' },
+            { file: 'cache-list-hit.json', key: 'anonymousHit', pass: (value) => value?.status === 'PASS' && value?.cache === 'hit' },
+            { file: 'cache-list-auth-bypass.json', key: 'authenticatedSharedCacheBypass', pass: (value) => value?.status === 'PASS' && value?.sharedCacheHeader === null },
+            { file: 'cache-list-after-mutation.json', key: 'postMutationFilteredListMiss', pass: (value) => value?.status === 'PASS' && value?.cache === 'miss' && value?.fixtureVisible === false },
+          ]
+          const checks = {}
+          for (const definition of definitions) {
+            let evidence = null
+            if (existsSync(definition.file)) {
+              try { evidence = JSON.parse(readFileSync(definition.file, 'utf8')) } catch {}
+              copyFileSync(definition.file, `${outputDir}/${definition.file}`)
+            }
+            checks[definition.key] = { pass: definition.pass(evidence), file: existsSync(definition.file) ? definition.file : null }
           }
-          EOF
-          for file in cache-list-miss.json cache-list-hit.json cache-list-auth-bypass.json cache-list-after-mutation.json; do
-            test -f "$file"
-            cp "$file" "artifacts/mapping-0/content-list-cache-runtime-e2e/$file"
-          done
+          const allPassed = definitions.every(({ key }) => checks[key].pass)
+          const provenance = {
+            workflow: 'Content List Cache Runtime E2E',
+            status: allPassed ? 'PASS' : 'INCOMPLETE_OR_FAILED',
+            testedSourceSha: process.env.TESTED_COMMIT || null,
+            deploymentRunId: process.env.DEPLOYMENT_RUN_ID || null,
+            worker: 'luckread-w01-payload',
+            publicPath: '/api/v1/contents',
+            cacheNamespace: 'content-list',
+            filteredVariant: 'creatorId,type,limit',
+            anonymousMiss: checks.anonymousMiss.pass,
+            anonymousHit: checks.anonymousHit.pass,
+            authenticatedSharedCacheBypass: checks.authenticatedSharedCacheBypass.pass,
+            mutationBoundary: 'PUBLISHED->UNPUBLISHED',
+            postMutationFilteredListMiss: checks.postMutationFilteredListMiss.pass,
+            postMutationFixtureHidden: checks.postMutationFilteredListMiss.pass,
+            checks,
+            newWorker: 0,
+            newD1: 0,
+            syntheticFixtureOnly: true
+          }
+          writeFileSync(`${outputDir}/provenance.json`, JSON.stringify(provenance, null, 2) + '\n')
+          console.log(JSON.stringify({ evidenceStatus: provenance.status, checks }))
+          NODE
 
       - name: Upload runtime evidence
         if: always()
