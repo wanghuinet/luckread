@@ -107,7 +107,7 @@ jobs:
           const runId = String(process.env.GITHUB_RUN_ID);
           const suffix = 'CRL3-' + runId + '-' + randomBytes(5).toString('hex');
           const email = 'content-e2e-' + suffix + '@example.com';
-          const username = 'content_e2e_' + suffix.replaceAll('-', '').slice(-24);
+          const username = 'contente2e' + runId + randomBytes(5).toString('hex');
           const password = 'Evd-CNT-' + randomBytes(24).toString('base64url') + '-Z9!';
           const roleId = 'CONTENT-E2E-ROLE-' + runId + '-' + randomBytes(5).toString('hex');
           const registerKey = 'CONTENT-E2E-' + runId + '-register';
@@ -121,7 +121,7 @@ jobs:
             const raw = await response.text();
             let data = null;
             try { data = raw ? JSON.parse(raw) : null; } catch {}
-            return { status: response.status, data };
+            return { status: response.status, data, headers: response.headers };
           }
 
           const register = await post('/auth/register', {
@@ -145,7 +145,7 @@ jobs:
             '--config', 'workers/W01-payload/wrangler.jsonc', '--command', command,
           ], { encoding: 'utf8', env: process.env, maxBuffer: 8 * 1024 * 1024 });
 
-           d1('UPDATE "user" SET account_state=\'ACTIVE\', account_state_version=account_state_version+1 WHERE id=' + sql(userId));
+           d1('UPDATE "user" SET email_verified=1, account_state=\'ACTIVE\', account_state_version=account_state_version+1 WHERE id=' + sql(userId));
           d1('INSERT INTO role_assignments (id,subject_id,role_id,scope_type,scope_id,status,valid_from,valid_until,created_at,updated_at) VALUES (' + sql(roleId) + ',' + sql(userId) + ',\'creator\',\'global\',NULL,\'ACTIVE\',' + sql(now) + ',NULL,' + sql(now) + ',' + sql(now) + ')');
 
           appendFileSync(process.env.GITHUB_ENV, 'CREATOR_AUTH_USER_ID=' + userId + '\n');
@@ -153,21 +153,27 @@ jobs:
           appendFileSync(process.env.GITHUB_ENV, 'CREATOR_ROLE_ID=' + roleId + '\n');
           appendFileSync(process.env.GITHUB_ENV, 'CREATOR_REGISTRATION_KEY=' + registerKey + '\n');
 
-          const login = await post('/auth/login', {
+          const login = await post('/api/v1/auth/login', {
             identity: email,
             credential: password,
-            deviceId: 'content-e2e-' + runId,
           });
-          const token = login.data?.accessToken;
-          if (login.status !== 200 || typeof token !== 'string') {
-            throw new Error('creator login failed: HTTP ' + login.status + ' body=' + JSON.stringify(login.data));
-          }
-          if (login.data?.layer !== 'L3') {
-            throw new Error('creator layer mismatch: expected L3, got ' + String(login.data?.layer));
+          const user = login.data?.data?.user;
+          const token = login.headers.get('x-luckread-session-token');
+          if (
+            login.status !== 200 ||
+            !token ||
+            String(user?.id) !== userId ||
+            user?.emailVerified !== true
+          ) {
+            throw new Error(
+              'creator login failed against APP-AUTH-01: HTTP ' + login.status +
+              ' body=' + JSON.stringify(login.data) +
+              ' nativeSessionHeader=' + Boolean(token),
+            );
           }
           console.log('::add-mask::' + token);
           appendFileSync(process.env.GITHUB_ENV, 'CREATOR_TOKEN=' + token + '\n');
-          console.log(JSON.stringify({ creatorUserId: userId, creatorLayer: login.data.layer }));
+          console.log(JSON.stringify({ creatorUserId: userId, emailVerified: user.emailVerified, nativeSessionHeaderPresent: true }));
           NODE
 
       - name: Create article through public API
