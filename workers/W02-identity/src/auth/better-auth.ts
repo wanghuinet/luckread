@@ -1,5 +1,5 @@
 import { applyAccountStateTransition } from '../account/account-state-transition.js'
-import { ensureBaseUserRole } from '../authz/role-assignment.js'
+import { ensureBaseUserRole, ensureVerifiedUserRole } from '../authz/role-assignment.js'
 import { betterAuth } from 'better-auth'
 import { bearer } from 'better-auth/plugins'
 import { sendResendEmail } from './resend-email.js'
@@ -131,7 +131,9 @@ const buildLuckReadAuth = (env: BetterAuthEnv) => {
         await sendVerificationEmail(env, { user, url })
       },
       afterEmailVerification: async (user) => {
-        await activateVerifiedAccount(env.D1_01, String(user.id))
+        const userId = String(user.id)
+        await activateVerifiedAccount(env.D1_01, userId)
+        await ensureVerifiedUserRole(env.D1_01, userId, new Date().toISOString())
       },
     },
     databaseHooks: {
