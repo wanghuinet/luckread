@@ -2,6 +2,14 @@ name: APP API live HTTP smoke evidence
 
 on:
   workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/api-app-live-smoke.yml'
+      - 'scripts/api-app-live-smoke.mjs'
+      - 'workers/W01-payload/src/lib/public-response-cache.ts'
+      - 'workers/W01-payload/src/app/api/v1/contents/route.ts'
   push:
     branches:
       - main
@@ -20,7 +28,22 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  validate:
+    if: ${{ github.event_name == 'pull_request' }}
+    name: Validate public smoke harness
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout selected revision
+        uses: actions/checkout@v4
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Syntax-check live smoke script
+        run: node --check scripts/api-app-live-smoke.mjs
+
   smoke:
+    if: ${{ github.event_name != 'pull_request' }}
     name: Safe public and unauthenticated API probes
     runs-on: ubuntu-latest
     timeout-minutes: 5
