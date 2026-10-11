@@ -170,7 +170,7 @@ jobs:
             'INSERT INTO role_assignments (id,subject_id,role_id,scope_type,scope_id,status,valid_from,valid_until,created_at,updated_at) VALUES (' +
             [roleId,userId,'creator','global',null,'ACTIVE',now,null,now,now].map((v,i)=>i === 4 ? 'NULL' : q(v)).join(',') + ')')
 
-          const login = await post('/auth/login', {
+          const login = await post('/api/v1/auth/login', {
             identity: email,
             credential: password,
           })
