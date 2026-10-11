@@ -296,6 +296,8 @@ jobs:
             -H "Idempotency-Key: $idempotency_key" \
             --data '{"targetType":"content","targetId":"'"$LIKE_CACHE_TEST_CONTENT_ID"'"}' \
             "$SOCIAL_API_BASE_URL/api/v1/interactions/likes" > /tmp/like-post-replay.json
+          # Let the 5-second shared aggregate TTL expire before asserting its authoritative count.
+          sleep 6
           curl --silent --show-error --fail-with-body -H "Authorization: Bearer $LIKE_CACHE_TEST_TOKEN" "$url" > /tmp/like-replay-status.json
           node --input-type=module <<'NODE'
           import { readFileSync, writeFileSync } from 'node:fs'
@@ -305,23 +307,33 @@ jobs:
           const status = JSON.parse(readFileSync('/tmp/like-replay-status.json','utf8'))
           const firstId = posted?.data?.relationshipId
           const replayId = replay?.data?.relationshipId
+          const initialPostCount = Number(viewer?.data?.likeCount)
+          const settledCount = Number(status?.data?.likeCount)
           if (typeof firstId !== 'string' || viewer?.data?.liked !== true) {
             throw new Error('initial like write or viewer-state invalidation failed')
           }
           if (typeof replayId !== 'string' || replayId !== firstId) {
             throw new Error('same-key replay did not preserve relationshipId')
           }
-          if (status?.data?.liked !== true || Number(status?.data?.likeCount) !== Number(viewer?.data?.likeCount)) {
-            throw new Error('same-key replay changed effective like state/count')
+          // Exactly two relations should exist: the synthetic seed actor and the QA viewer.
+          // Do not compare against the immediate response because its shared aggregate may be stale.
+          if (status?.data?.liked !== true || settledCount !== 2) {
+            throw new Error('same-key replay did not settle to exactly two effective likes: ' + JSON.stringify({
+              viewerLiked: status?.data?.liked,
+              initialPostCount,
+              settledCount,
+            }))
           }
           writeFileSync('like-viewer-invalidation.json', JSON.stringify({
             status:'PASS',
             viewerLiked:true,
             sameKeyReplay:true,
             relationshipIdStable:true,
-            effectiveLikeCount:Number(status?.data?.likeCount),
+            initialPostAggregateCount:initialPostCount,
+            settledAggregateLikeCount:settledCount,
+            expectedAuthoritativeCount:2,
             duplicateEffectiveLike:false
-          },null,2)+'\n')
+          },null,2)+'\\n')
           NODE
 
       - name: Prime shared aggregate before non-invalidation check
@@ -422,6 +434,17 @@ jobs:
         if: always()
         run: |
           mkdir -p artifacts/mapping-0/w05-like-cache-runtime-e2e
+          evidence_flag() { if test -f "$1"; then printf true; else printf false; fi; }
+          fresh_stale="$(evidence_flag like-aggregate-fresh-stale.json)"
+          refreshed="$(evidence_flag like-aggregate-refresh.json)"
+          viewer_replay="$(evidence_flag like-viewer-invalidation.json)"
+          shared_prime="$(evidence_flag like-shared-prime.json)"
+          shared_stale="$(evidence_flag like-shared-no-sync-invalidation.json)"
+          shared_refresh="$(evidence_flag like-shared-refresh-2.json)"
+          complete=true
+          for file in like-initial.json like-aggregate-fresh-stale.json like-aggregate-refresh.json like-viewer-invalidation.json like-shared-prime.json like-shared-no-sync-invalidation.json like-shared-refresh-2.json; do
+            if ! test -f "$file"; then complete=false; fi
+          done
           cat > artifacts/mapping-0/w05-like-cache-runtime-e2e/provenance.json <<EOF
           {
             "workflow": "W05 Like Aggregate Cache Runtime E2E",
@@ -432,18 +455,24 @@ jobs:
             "publicPath": "/api/v1/interactions/likes",
             "cacheModel": "private viewer state + shared aggregate",
             "aggregateTtlSecondsMax": 5,
-            "freshAggregateStalenessObserved": true,
-            "aggregateRefreshAfterTtl": true,
-            "viewerStateInvalidationImmediate": true,
-            "sharedAggregateNotSynchronouslyInvalidated": true,
+            "freshAggregateStalenessObserved": $fresh_stale,
+            "aggregateRefreshAfterTtl": $refreshed,
+            "viewerStateInvalidationAndSameKeyReplayVerified": $viewer_replay,
+            "sharedAggregatePrimed": $shared_prime,
+            "sharedAggregateNotSynchronouslyInvalidated": $shared_stale,
+            "sharedAggregateRefreshesAfterSecondTtl": $shared_refresh,
+            "runtimeChecksComplete": $complete,
             "noNewWorker": 0,
             "newD1": 0,
             "syntheticFixtureOnly": true
           }
           EOF
           for file in like-initial.json like-aggregate-fresh-stale.json like-aggregate-refresh.json like-viewer-invalidation.json like-shared-prime.json like-shared-no-sync-invalidation.json like-shared-refresh-2.json; do
-            test -f "$file"
-            cp "$file" "artifacts/mapping-0/w05-like-cache-runtime-e2e/$file"
+            if test -f "$file"; then
+              cp "$file" "artifacts/mapping-0/w05-like-cache-runtime-e2e/$file"
+            else
+              printf '{"status":"NOT_REACHED","reason":"an earlier runtime assertion stopped this run"}\\n' > "artifacts/mapping-0/w05-like-cache-runtime-e2e/$file"
+            fi
           done
 
       - name: Upload runtime evidence
