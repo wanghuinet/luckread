@@ -18,11 +18,12 @@ vi.mock('../../src/auth/traffic-limit.js', () => ({
 
 import { POST } from '../../src/app/api/v1/auth/verification/send/route.js'
 
-const request = (body: unknown) => new Request('https://luckread.test/api/v1/auth/verification/send', {
+const request = (body: unknown, extraHeaders: HeadersInit = {}) => new Request('https://luckread.test/api/v1/auth/verification/send', {
   method: 'POST',
   headers: {
     'content-type': 'application/json',
     'cf-connecting-ip': '203.0.113.10',
+    ...Object.fromEntries(new Headers(extraHeaders).entries()),
   },
   body: JSON.stringify(body),
 })
@@ -54,6 +55,23 @@ describe('public email verification resend API', () => {
         },
       },
     )
+  })
+
+  it('does not forward a stale browser session cookie but preserves the origin', async () => {
+    const response = await POST(request(
+      { identity: 'reader@example.com' },
+      {
+        cookie: 'better-auth.session_token=stale-session',
+        origin: 'https://luckread.com',
+      },
+    ))
+
+    expect(response.status).toBe(202)
+    const proxiedRequest = mocks.proxyBetterAuth.mock.calls[0]?.[0] as Request | undefined
+    expect(proxiedRequest).toBeInstanceOf(Request)
+    expect(proxiedRequest?.headers.has('cookie')).toBe(false)
+    expect(proxiedRequest?.headers.get('origin')).toBe('https://luckread.com')
+    expect(proxiedRequest?.headers.get('cf-connecting-ip')).toBe('203.0.113.10')
   })
 
   it('does not reveal account existence for Better Auth validation outcomes', async () => {
