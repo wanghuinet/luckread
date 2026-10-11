@@ -98,7 +98,7 @@ const readAuthorizationState = (userId) => {
     '  AND r.valid_from <= ' + sqlQuote(now) + ' AND (r.valid_until IS NULL OR ' + sqlQuote(now) + ' < r.valid_until)) AS hasL2Role,',
     'COALESCE((SELECT v.role_version FROM role_authorization_versions v WHERE v.subject_id = u.id LIMIT 1), 0) AS roleVersion,',
     '(SELECT COUNT(*) FROM "user" u2 WHERE ' + postDeployRegistrationFilter + ') AS postDeployRegisteredAccounts,',
-    '(SELECT COUNT(*) FROM "user" u2 WHERE ' + postDeployRegistrationFilter + " AND u2.account_state = 'PENDING_VERIFICATION') AS postDeployPendingVerificationAccounts,',
+    `(SELECT COUNT(*) FROM "user" u2 WHERE ${postDeployRegistrationFilter} AND u2.account_state = 'PENDING_VERIFICATION') AS postDeployPendingVerificationAccounts,`,
     '(SELECT COUNT(*) FROM "user" u2 WHERE ' + postDeployAccountFilter + ') AS postDeployVerifiedActiveAccounts,',
     '(SELECT COUNT(*) FROM "user" u2 WHERE ' + postDeployAccountFilter + ' AND EXISTS (' + hasActiveL2Assignment + ')) AS postDeployL2GrantedAccounts,',
     '(SELECT COUNT(*) FROM "user" u2 WHERE ' + postDeployAccountFilter + ' AND NOT EXISTS (' + hasActiveL2Assignment + ')) AS postDeployL2MissingAccounts',
