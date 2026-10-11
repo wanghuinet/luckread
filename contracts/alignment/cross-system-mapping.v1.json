@@ -4492,8 +4492,8 @@
       "evidence": [
         "contracts/alignment/mapping-batches/B13-B15-creator-membership-commerce.v1.json",
         "contracts/alignment/mapping-batches/MON-001-011-PAY-001-013-real-evidence-reconciliation.v1.md",
-        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
         "contracts/entity/SUBSCRIPTION-ENTITY-CONTRACT.v1.json",
+        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
         "docs/change-control/CC-MON-SUBSCRIPTION-DATA-MODEL-ADMISSION-2026-10-02.md"
       ],
       "blockers": [
@@ -4517,14 +4517,14 @@
       "evidence": [
         "contracts/alignment/mapping-batches/B13-B15-creator-membership-commerce.v1.json",
         "contracts/alignment/mapping-batches/MON-001-011-PAY-001-013-real-evidence-reconciliation.v1.md",
-        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
-        "contracts/entity/SUBSCRIPTION-ENTITY-CONTRACT.v1.json",
-        "docs/change-control/CC-MON-SUBSCRIPTION-DATA-MODEL-ADMISSION-2026-10-02.md",
         "contracts/api/rc-04-06-share-subscription-entitlement.v1.json",
+        "contracts/authz/permissions.json",
+        "contracts/entity/SUBSCRIPTION-ENTITY-CONTRACT.v1.json",
         "contracts/openapi/v1/openapi.yaml",
         "contracts/openapi/v1/operation-policy.json",
-        "contracts/authz/permissions.json",
         "contracts/state-machines/subscription.json",
+        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
+        "docs/change-control/CC-MON-SUBSCRIPTION-DATA-MODEL-ADMISSION-2026-10-02.md",
         "docs/change-control/CC-SUBSCRIPTION-STATE-API-RECONCILIATION-2026-10-02.md"
       ],
       "blockers": [
@@ -6747,10 +6747,10 @@
         "contracts/entity/SOCIAL-001-follow-relationship-contract.v1.json",
         "contracts/openapi/v1/openapi.yaml#/social/follows",
         "contracts/persistence/SOCIAL-001-follow-relationship-persistence-contract.v1.json",
-        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
-        "docs/change-control/CC-MAPPING-0-SOCIAL-001-FOLLOW-ENTITY-CONTRACT-2026-09-30.md",
+        "contracts/transport/SOCIAL-001-follow-trusted-authority-binding.v1.json",
         "contracts/transport/W01-W05-social-follow-http-binding.v1.json",
-        "contracts/transport/SOCIAL-001-follow-trusted-authority-binding.v1.json"
+        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
+        "docs/change-control/CC-MAPPING-0-SOCIAL-001-FOLLOW-ENTITY-CONTRACT-2026-09-30.md"
       ],
       "blockers": [
         "API and Entity/Field/Persistence contracts are bound.",
@@ -6758,7 +6758,8 @@
         "Actor principal, actor account state, follow permission, target identity, block policy, anti-abuse admission and caller provenance are bound to existing authoritative contracts.",
         "Target followability and privacy/audience operational authority remain unresolved.",
         "Runtime, tests and Evidence Registry provenance remain unverified."
-      ]    },
+      ]
+    },
     {
       "featureId": "SOCIAL-002",
       "status": "UNRESOLVED",
