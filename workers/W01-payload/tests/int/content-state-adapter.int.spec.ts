@@ -80,6 +80,35 @@ describe('public content-list cache invalidation scope', () => {
   })
 })
 
+describe('scheduled publication cache window', () => {
+  it('pins scheduled publish wiring and the public content-list TTL', () => {
+    const publicListRoute = read('src/app/api/v1/contents/route.ts')
+    const listHandler = publicListRoute.slice(
+      publicListRoute.indexOf('export async function GET'),
+      publicListRoute.indexOf('export async function POST'),
+    )
+    const cache = read('src/lib/public-response-cache.ts')
+    const w03Index = readFileSync(
+      resolve(process.cwd(), '../W03-content/src/index.ts'),
+      'utf8',
+    )
+    const w03Runtime = readFileSync(
+      resolve(process.cwd(), '../W03-content/src/content-runtime.ts'),
+      'utf8',
+    )
+    const scheduledHandler = w03Index.slice(w03Index.indexOf('async scheduled('))
+
+    expect(scheduledHandler).toContain("controller.cron !== '* * * * *'")
+    expect(scheduledHandler).toContain('publishDueScheduledContent(env.D1_02')
+    expect(w03Runtime).toContain("SET state = 'PUBLISHED', scheduled_at = NULL")
+    expect(listHandler).toContain("'content-list'")
+    expect(listHandler).toContain("      30,\n    )")
+    expect(cache).toContain('Cache-Control')
+    expect(cache).toContain('s-maxage=${effectiveTtl}')
+    expect(cache).toContain('Math.max(1, Math.floor(ttlSeconds))')
+  })
+})
+
 describe('1.1 content lifecycle closeout', () => {
   it('wires the complete creator lifecycle from draft creation through review and public delivery', () => {
     const publisher = read('src/app/(frontend)/publish/PublishComposer.tsx')
