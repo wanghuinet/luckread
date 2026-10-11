@@ -193,52 +193,76 @@ if (!email || !password || !accountId || !apiToken) {
       try { dbState = readAuthorizationState(userId) } catch (error) {
         dbReadError = error instanceof Error ? error.message : 'D1_READ_FAILED'
       }
-      const dbPass = !!dbState &&
-        dbState.accountActive &&
-        dbState.emailVerified &&
-        dbState.baseRoleActive &&
-        dbState.verifiedUserRoleActive &&
-        Number.isSafeInteger(dbState.roleVersion) &&
-        dbState.roleVersion >= 1
-      check('d1_authoritative_l1_l2_assignments_and_version', dbPass, {
-        accountCreatedAt: dbState?.accountCreatedAt ?? null,
-        accountCreatedBeforeL2Deploy: dbState?.accountCreatedBeforeL2Deploy === true,
-        accountActive: dbState?.accountActive === true,
-        emailVerified: dbState?.emailVerified === true,
-        baseRoleActive: dbState?.baseRoleActive === true,
-        verifiedUserRoleActive: dbState?.verifiedUserRoleActive === true,
-        roleVersionPresent: Number.isSafeInteger(dbState?.roleVersion) && dbState.roleVersion >= 1,
-        roleVersion: Number.isSafeInteger(dbState?.roleVersion) ? dbState.roleVersion : null,
-        readOutcome: dbState ? 'READ_OK' : dbReadError || 'READ_FAILED',
-      })
+      if (!dbState) {
+        check('d1_authoritative_l1_l2_assignments_and_version', false, {
+          readOutcome: dbReadError || 'READ_FAILED',
+        })
+        result.status = 'FAIL'
+        await finish()
+      } else if (dbState.accountCreatedBeforeL2Deploy) {
+        // A pre-deploy identity cannot prove whether the post-deploy email
+        // verification hook grants L2. Do not misreport its expected legacy
+        // L1 state as a new-user lifecycle regression.
+        check('qa_account_created_after_l2_role_deployment', false, {
+          accountCreatedAt: dbState.accountCreatedAt,
+          l2RoleDeployTimestamp: process.env.LUCKREAD_L2_ROLE_DEPLOYED_AT || null,
+          observedLegacyBaseRoleOnly: dbState.baseRoleActive && !dbState.verifiedUserRoleActive,
+          nextAction: 'Register a new QA account after the deployed L2 hook, verify its email, then update the two QA Actions secrets.',
+        })
+        result.status = 'BLOCKED_STALE_QA_ACCOUNT'
+        await finish()
+      } else {
+        check('qa_account_created_after_l2_role_deployment', true, {
+          accountCreatedAt: dbState.accountCreatedAt,
+          l2RoleDeployTimestamp: process.env.LUCKREAD_L2_ROLE_DEPLOYED_AT || null,
+        })
+        const dbPass =
+          dbState.accountActive &&
+          dbState.emailVerified &&
+          dbState.baseRoleActive &&
+          dbState.verifiedUserRoleActive &&
+          Number.isSafeInteger(dbState.roleVersion) &&
+          dbState.roleVersion >= 1
+        check('d1_authoritative_l1_l2_assignments_and_version', dbPass, {
+          accountCreatedAt: dbState.accountCreatedAt,
+          accountCreatedBeforeL2Deploy: dbState.accountCreatedBeforeL2Deploy,
+          accountActive: dbState.accountActive,
+          emailVerified: dbState.emailVerified,
+          baseRoleActive: dbState.baseRoleActive,
+          verifiedUserRoleActive: dbState.verifiedUserRoleActive,
+          roleVersionPresent: Number.isSafeInteger(dbState.roleVersion) && dbState.roleVersion >= 1,
+          roleVersion: Number.isSafeInteger(dbState.roleVersion) ? dbState.roleVersion : null,
+          readOutcome: 'READ_OK',
+        })
 
-      const targetId = 'authz-l12-probe-' + runId + '-' + randomUUID()
-      const probeResponse = await fetch(baseUrl + '/api/v1/interactions/likes', {
-        method: 'POST',
-        headers: {
-          accept: 'application/json',
-          'content-type': 'application/json',
-          origin: new URL(baseUrl).origin,
-          cookie: cookieHeader,
-          'Idempotency-Key': 'authz-l12-live-' + runId + '-' + randomUUID(),
-        },
-        body: JSON.stringify({ targetType: 'content', targetId }),
-        redirect: 'manual',
-        signal: AbortSignal.timeout(15000),
-      })
-      const probe = await parseJson(probeResponse)
-      const probeCode = codeOf(probe)
-      const gatePass = probeResponse.status === 404 && probeCode === 'NOT_FOUND'
-      check('verified_user_passes_l2_gate_without_writing_business_data', gatePass, {
-        httpStatus: probeResponse.status,
-        errorCode: probeCode,
-        cfRayPresent: Boolean(probeResponse.headers.get('cf-ray')),
-        probeUsesGuaranteedMissingTarget: true,
-      })
+        const targetId = 'authz-l12-probe-' + runId + '-' + randomUUID()
+        const probeResponse = await fetch(baseUrl + '/api/v1/interactions/likes', {
+          method: 'POST',
+          headers: {
+            accept: 'application/json',
+            'content-type': 'application/json',
+            origin: new URL(baseUrl).origin,
+            cookie: cookieHeader,
+            'Idempotency-Key': 'authz-l12-live-' + runId + '-' + randomUUID(),
+          },
+          body: JSON.stringify({ targetType: 'content', targetId }),
+          redirect: 'manual',
+          signal: AbortSignal.timeout(15000),
+        })
+        const probe = await parseJson(probeResponse)
+        const probeCode = codeOf(probe)
+        const gatePass = probeResponse.status === 404 && probeCode === 'NOT_FOUND'
+        check('verified_user_passes_l2_gate_without_writing_business_data', gatePass, {
+          httpStatus: probeResponse.status,
+          errorCode: probeCode,
+          cfRayPresent: Boolean(probeResponse.headers.get('cf-ray')),
+          probeUsesGuaranteedMissingTarget: true,
+        })
 
-      result.status = result.checks.every((entry) => entry.pass) ? 'PASS' : 'FAIL'
-      result.liveVerifiedUserRoleAndGateConfirmed = dbPass && gatePass
-      await finish()
+        result.status = result.checks.every((entry) => entry.pass) ? 'PASS' : 'FAIL'
+        result.liveVerifiedUserRoleAndGateConfirmed = dbPass && gatePass
+        await finish()
+      }
     }
   } catch (error) {
     result.status = 'FAIL'
