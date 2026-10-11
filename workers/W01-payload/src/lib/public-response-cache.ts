@@ -548,18 +548,18 @@ const enforceCacheMissOriginFuse = (keyString: string): boolean => {
 const generatePublicRequestId = (): string =>
   `req_${crypto.randomUUID().replaceAll('-', '')}`
 
-const withCacheHeader = async (response: Response, value: 'HIT' | 'MISS'): Promise<Response> => {
+const withCacheHeader = async (response: Response, cacheStatus: 'HIT' | 'MISS'): Promise<Response> => {
   const headers = new Headers(response.headers)
-  headers.set('X-LuckRead-Cache', value)
+  headers.set('X-LuckRead-Cache', cacheStatus)
 
   // The cached body is shared across requests, so request-scoped metadata must
   // be refreshed after lookup. Keep the stored response untouched for future hits.
   if ((headers.get('content-type') ?? '').includes('application/json')) {
     try {
-      const value = await response.clone().json() as unknown
-      if (value && typeof value === 'object' && !Array.isArray(value) && 'requestId' in value) {
+      const bodyValue = await response.clone().json() as unknown
+      if (bodyValue && typeof bodyValue === 'object' && !Array.isArray(bodyValue) && 'requestId' in bodyValue) {
         const requestId = generatePublicRequestId()
-        const body = { ...(value as Record<string, unknown>), requestId }
+        const body = { ...(bodyValue as Record<string, unknown>), requestId }
         headers.set('x-request-id', requestId)
         headers.set('cache-control', 'private, no-store')
         headers.delete('content-length')
