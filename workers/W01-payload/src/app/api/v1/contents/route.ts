@@ -1,4 +1,4 @@
-import { cachedPublicGet, invalidatePublicContentList } from '../../../../lib/public-response-cache.js'
+import { cachedPublicGet } from '../../../../lib/public-response-cache.js'
 import {
   ContentListQueryError,
   hasAuthenticatedSessionCredential,
@@ -88,7 +88,6 @@ export async function POST(request: Request): Promise<Response> {
       body,
       principal,
     })
-    if (response.ok) await invalidatePublicContentList(request)
     return response
   } catch (error) {
     if (error instanceof W03ContentClientError) return unavailable(error)
