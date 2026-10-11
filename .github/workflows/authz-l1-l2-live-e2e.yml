@@ -1,0 +1,51 @@
+name: AUTHZ L1-L2 Verified User Live E2E
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/authz-l1-l2-live-e2e.mjs'
+      - '.github/workflows/authz-l1-l2-live-e2e.yml'
+      - 'workers/W02-identity/src/authz/role-assignment.ts'
+      - 'workers/W02-identity/src/auth/better-auth.ts'
+      - 'workers/W02-identity/migrations/0001_role_assignments.sql'
+      - 'workers/W02-identity/migrations/0003_role_authorization_versions.sql'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: authz-l1-l2-verified-user-live-e2e
+  cancel-in-progress: false
+
+jobs:
+  verified-user-live-e2e:
+    name: Verify live L1/L2 authorization facts and W01-W02-W05 gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      LUCKREAD_API_BASE_URL: https://luckread.com
+      LUCKREAD_APP_AUTH_SMOKE_EMAIL: ${{ secrets.LUCKREAD_APP_AUTH_SMOKE_EMAIL }}
+      LUCKREAD_APP_AUTH_SMOKE_PASSWORD: ${{ secrets.LUCKREAD_APP_AUTH_SMOKE_PASSWORD }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Validate smoke harness
+        run: node --check scripts/authz-l1-l2-live-e2e.mjs
+      - name: Verify production RoleAssignment and L2 authorization gate
+        run: node scripts/authz-l1-l2-live-e2e.mjs
+      - name: Upload sanitized authorization evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: authz-l1-l2-live-e2e-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/authz-l1-l2-live-e2e/*.json
+          if-no-files-found: warn
+          retention-days: 30
