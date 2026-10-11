@@ -312,7 +312,7 @@ jobs:
           if (typeof replayId !== 'string' || replayId !== firstId) {
             throw new Error('same-key replay did not preserve relationshipId')
           }
-          if (status?.data?.liked !== true || Number(status?.data?.likeCount) !== 2) {
+          if (status?.data?.liked !== true || Number(status?.data?.likeCount) !== Number(viewer?.data?.likeCount)) {
             throw new Error('same-key replay changed effective like state/count')
           }
           writeFileSync('like-viewer-invalidation.json', JSON.stringify({
@@ -320,9 +320,9 @@ jobs:
             viewerLiked:true,
             sameKeyReplay:true,
             relationshipIdStable:true,
-            effectiveLikeCount:2,
+            effectiveLikeCount:Number(status?.data?.likeCount),
             duplicateEffectiveLike:false
-          },null,2)+'\\n')
+          },null,2)+'\n')
           NODE
 
       - name: Prime shared aggregate before non-invalidation check
