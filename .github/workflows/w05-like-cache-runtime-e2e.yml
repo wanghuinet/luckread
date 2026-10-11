@@ -125,86 +125,55 @@ jobs:
         with:
           node-version: 24
 
-      - name: Create authenticated viewer fixture
+      - name: Create authenticated QA viewer fixture
         env:
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          LUCKREAD_APP_AUTH_SMOKE_EMAIL: ${{ secrets.LUCKREAD_APP_AUTH_SMOKE_EMAIL }}
+          LUCKREAD_APP_AUTH_SMOKE_PASSWORD: ${{ secrets.LUCKREAD_APP_AUTH_SMOKE_PASSWORD }}
         run: |
           set -euo pipefail
           node --input-type=module <<'NODE'
-          import { randomBytes } from 'node:crypto'
           import { appendFileSync } from 'node:fs'
-          import { execFileSync } from 'node:child_process'
 
           const base = process.env.SOCIAL_API_BASE_URL.replace(/\/$/, '')
-          const runId = process.env.GITHUB_RUN_ID
-          const runAttempt = process.env.GITHUB_RUN_ATTEMPT || '1'
-          const fixtureId = runId + '-a' + runAttempt
-          const nonce = randomBytes(8).toString('hex')
-          const email = 'like-cache-e2e-' + fixtureId + '-' + nonce + '@example.com'
-          const username = 'like_cache_e2e_' + fixtureId + '_' + nonce.slice(0, 8)
-          const password = 'Evd-LikeCache-' + randomBytes(24).toString('base64url') + '-Z9!'
-          const roleId = 'LIKE-CACHE-E2E-ROLE-' + fixtureId + '-' + nonce
-          const registerKey = 'LIKE-CACHE-E2E-' + fixtureId + '-REGISTER'
+          const email = process.env.LUCKREAD_APP_AUTH_SMOKE_EMAIL || ''
+          const password = process.env.LUCKREAD_APP_AUTH_SMOKE_PASSWORD || ''
+          if (!email || !password) {
+            throw new Error('Missing LUCKREAD_APP_AUTH_SMOKE_EMAIL or LUCKREAD_APP_AUTH_SMOKE_PASSWORD repository secrets')
+          }
 
-          async function post(path, body, headers = {}) {
-            const r = await fetch(base + path, {
+          async function post(path, body) {
+            const response = await fetch(base + path, {
               method: 'POST',
-              headers: { accept: 'application/json', 'content-type': 'application/json', ...headers },
+              headers: { accept: 'application/json', 'content-type': 'application/json' },
               body: JSON.stringify(body),
             })
-            const raw = await r.text()
+            const raw = await response.text()
             let data = null
             try { data = raw ? JSON.parse(raw) : null } catch {}
-            return { status: r.status, data }
+            return { status: response.status, data, headers: response.headers }
           }
 
-          const reg = await post('/auth/register', {
-            identityType: 'email',
-            identity: email,
-            credential: password,
-            username,
-            consent: { purpose: 'ACCOUNT_REGISTRATION', policyVersion: 'PROD-2026-09-28.1' },
-          }, { 'Idempotency-Key': registerKey })
-
-          if (reg.status !== 201 || typeof reg.data?.userId !== 'string') {
-            throw new Error('viewer registration failed: HTTP ' + reg.status + ' body=' + JSON.stringify(reg.data))
-          }
-
-          const userId = String(reg.data.userId)
-          const now = new Date().toISOString()
-          const q = (value) => "'" + String(value).replaceAll("'", "''") + "'"
-          const d1 = (databaseName, config, command) => execFileSync(
-            'npx',
-            ['--yes', 'wrangler@' + process.env.WRANGLER_VERSION, 'd1', 'execute', databaseName, '--remote', '--yes', '--config', config, '--command', command],
-            { encoding: 'utf8', env: process.env, maxBuffer: 8 * 1024 * 1024 },
-          )
-
-          d1(process.env.DATABASE_NAME_W01, 'deployed-source/workers/W01-payload/wrangler.jsonc',
-            'UPDATE users SET account_state=\'ACTIVE\', account_state_version=COALESCE(account_state_version,0)+1 WHERE CAST(id AS TEXT)=' + q(userId))
-          d1(process.env.DATABASE_NAME_W01, 'deployed-source/workers/W01-payload/wrangler.jsonc',
-            'INSERT INTO role_assignments (id,subject_id,role_id,scope_type,scope_id,status,valid_from,valid_until,created_at,updated_at) VALUES (' +
-            [roleId,userId,'creator','global',null,'ACTIVE',now,null,now,now].map((v,i)=>i === 4 ? 'NULL' : q(v)).join(',') + ')')
-
-          const login = await post('/auth/login', {
-            identity: email,
-            credential: password,
-            deviceId: 'like-cache-e2e-' + fixtureId,
-          })
-          const token = login.data?.accessToken
-          if (login.status !== 200 || typeof token !== 'string' || login.data?.layer !== 'L3') {
-            throw new Error('viewer login failed: HTTP ' + login.status + ' body=' + JSON.stringify(login.data))
+          const login = await post('/api/v1/auth/login', { identity: email, credential: password })
+          const user = login.data?.data?.user
+          const token = login.headers.get('x-luckread-session-token')
+          if (
+            login.status !== 200 ||
+            typeof user?.id !== 'string' ||
+            user.email.trim().toLowerCase() !== email.trim().toLowerCase() ||
+            user.emailVerified !== true ||
+            !token
+          ) {
+            throw new Error(
+              'QA viewer login failed against APP-AUTH-01: HTTP ' + login.status +
+              ' body=' + JSON.stringify(login.data) +
+              ' nativeSessionHeader=' + Boolean(token),
+            )
           }
 
           console.log('::add-mask::' + token)
-          for (const line of [
-            'LIKE_CACHE_TEST_USER_ID=' + userId,
-            'LIKE_CACHE_TEST_ROLE_ID=' + roleId,
-            'LIKE_CACHE_TEST_REGISTER_KEY=' + registerKey,
-            'LIKE_CACHE_TEST_TOKEN=' + token,
-          ]) appendFileSync(process.env.GITHUB_ENV, line + '\n')
-
-          console.log(JSON.stringify({ userId, layer: login.data.layer }))
+          appendFileSync(process.env.GITHUB_ENV, 'LIKE_CACHE_TEST_USER_ID=' + user.id + '\n')
+          appendFileSync(process.env.GITHUB_ENV, 'LIKE_CACHE_TEST_TOKEN=' + token + '\n')
+          console.log(JSON.stringify({ userId: user.id, emailVerified: true, nativeSessionHeaderPresent: true }))
           NODE
 
       - name: Seed published content fixture
@@ -394,14 +363,20 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
           set -euo pipefail
+          if [ -n "${LIKE_CACHE_TEST_TOKEN:-}" ]; then
+            status="$(curl --silent --show-error -o /tmp/like-cache-logout.out -w '%{http_code}' \
+              -X POST \
+              -H "Authorization: Bearer $LIKE_CACHE_TEST_TOKEN" \
+              "$SOCIAL_API_BASE_URL/api/v1/auth/logout")"
+            if [ "$status" != "204" ]; then
+              echo "QA viewer logout failed: HTTP $status"
+              exit 1
+            fi
+          fi
           node --input-type=module <<'NODE'
           import { execFileSync } from 'node:child_process'
           const q = (value) => "'" + String(value).replaceAll("'", "''") + "'"
           const contentId = process.env.LIKE_CACHE_TEST_CONTENT_ID || '__none__'
-          const userId = process.env.LIKE_CACHE_TEST_USER_ID || '__none__'
-          const roleId = process.env.LIKE_CACHE_TEST_ROLE_ID || '__none__'
-          const registerKey = process.env.LIKE_CACHE_TEST_REGISTER_KEY || '__none__'
-
           const run = (databaseName, config, sql) => execFileSync(
             'npx',
             ['--yes','wrangler@'+process.env.WRANGLER_VERSION,'d1','execute',databaseName,'--remote','--yes','--config',config,'--command',sql],
@@ -410,14 +385,7 @@ jobs:
 
           run(process.env.DATABASE_NAME_W05,'w05-source/workers/W05-social/wrangler.jsonc',
             'DELETE FROM interaction_likes WHERE target_id=' + q(contentId) + '; DELETE FROM contents WHERE id=' + q(contentId) + ';')
-          run(process.env.DATABASE_NAME_W01,'deployed-source/workers/W01-payload/wrangler.jsonc',
-            'DELETE FROM role_assignments WHERE id=' + q(roleId) + ' OR subject_id=' + q(userId) + ';' +
-            'DELETE FROM auth_session_state WHERE user_id=' + q(userId) + ';' +
-            'DELETE FROM users_sessions WHERE CAST(_parent_id AS TEXT)=' + q(userId) + ';' +
-            'DELETE FROM consents WHERE CAST(actor_subject_id AS TEXT)=' + q(userId) + ' OR CAST(owner_subject_id AS TEXT)=' + q(userId) + ';' +
-            'DELETE FROM auth_registration_envelopes WHERE idempotency_key=' + q(registerKey) + ';' +
-            'DELETE FROM users WHERE CAST(id AS TEXT)=' + q(userId) + ';')
-          console.log(JSON.stringify({contentId,userId,cleanup:'COMPLETE'}))
+          console.log(JSON.stringify({contentId,cleanup:'SYNTHETIC_SOCIAL_FIXTURES_ONLY'}))
           NODE
 
       - name: Write runtime evidence
