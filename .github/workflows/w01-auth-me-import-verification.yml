@@ -6,12 +6,28 @@ on:
       - main
     paths:
       - 'workers/W01-payload/src/app/(payload)/api/users/me/route.ts'
+      - 'workers/W01-payload/src/app/auth/**'
+      - 'workers/W01-payload/src/app/api/v1/auth/**'
       - 'workers/W01-payload/tests/int/users-me-route-import.int.spec.ts'
+      - 'workers/W01-payload/tests/int/auth-better-auth-boundary.int.spec.ts'
+      - 'workers/W01-payload/tests/int/login-frontend-v1.int.spec.ts'
+      - 'contracts/openapi/v1/openapi.yaml'
+      - 'contracts/api/auth-operation-policy.v1.json'
+      - 'contracts/dto/auth-dto-contract.v1.json'
+      - 'contracts/api/api-inventory.v1.json'
       - '.github/workflows/w01-auth-me-import-verification.yml'
   pull_request:
     paths:
       - 'workers/W01-payload/src/app/(payload)/api/users/me/route.ts'
+      - 'workers/W01-payload/src/app/auth/**'
+      - 'workers/W01-payload/src/app/api/v1/auth/**'
       - 'workers/W01-payload/tests/int/users-me-route-import.int.spec.ts'
+      - 'workers/W01-payload/tests/int/auth-better-auth-boundary.int.spec.ts'
+      - 'workers/W01-payload/tests/int/login-frontend-v1.int.spec.ts'
+      - 'contracts/openapi/v1/openapi.yaml'
+      - 'contracts/api/auth-operation-policy.v1.json'
+      - 'contracts/dto/auth-dto-contract.v1.json'
+      - 'contracts/api/api-inventory.v1.json'
       - '.github/workflows/w01-auth-me-import-verification.yml'
   workflow_dispatch:
 
@@ -38,7 +54,7 @@ jobs:
         run: pnpm exec tsc --noEmit
       - name: Verify W02 Better Auth boundary
         working-directory: workers/W01-payload
-        run: pnpm exec vitest run tests/int/users-me-route-import.int.spec.ts --config ./vitest.config.mts
+        run: pnpm exec vitest run tests/int/users-me-route-import.int.spec.ts tests/int/auth-better-auth-boundary.int.spec.ts tests/int/login-frontend-v1.int.spec.ts --config ./vitest.config.mts
       - name: Production build
         working-directory: workers/W01-payload
         env:
