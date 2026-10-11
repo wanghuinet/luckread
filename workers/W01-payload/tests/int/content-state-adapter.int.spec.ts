@@ -102,8 +102,9 @@ describe('scheduled publication cache window', () => {
     expect(scheduledHandler).toContain('publishDueScheduledContent(env.D1_02')
     expect(w03Runtime).toContain("SET state = 'PUBLISHED', scheduled_at = NULL")
     expect(listHandler).toContain("'content-list'")
-    expect(listHandler).toMatch(/'content-list',[\\s\\S]*?\\n\\s*30,\\n\\s*\\)/)
-    expect(cache).toContain('Cache-Control', 's-maxage=') // preserve edge-cache TTL contract
+    expect(listHandler).toContain("      30,\n    )")
+    expect(cache).toContain('Cache-Control')
+    expect(cache).toContain('s-maxage=${effectiveTtl}')
     expect(cache).toContain('Math.max(1, Math.floor(ttlSeconds))')
   })
 })
