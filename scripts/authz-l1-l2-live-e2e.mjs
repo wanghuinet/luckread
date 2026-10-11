@@ -307,6 +307,58 @@ if (!email || !password || !accountId || !apiToken) {
           probeUsesGuaranteedMissingTarget: true,
         })
 
+        // Read-only social negative probes: neither request can create a follow relation.
+        // Missing Idempotency-Key must be rejected before target lookup or mutation.
+        const followUrl = baseUrl + '/api/v1/social/follows/' + encodeURIComponent(userId)
+        const missingKeyResponse = await fetch(followUrl, {
+          method: 'POST',
+          headers: {
+            accept: 'application/json',
+            'content-type': 'application/json',
+            origin: new URL(baseUrl).origin,
+            cookie: cookieHeader,
+          },
+          body: JSON.stringify({}),
+          redirect: 'manual',
+          signal: AbortSignal.timeout(15000),
+        })
+        const missingKeyBody = await parseJson(missingKeyResponse)
+        const missingKeyPass = missingKeyResponse.status === 428 &&
+          codeOf(missingKeyBody) === 'PRECONDITION_REQUIRED'
+        check('follow_mutation_requires_idempotency_key', missingKeyPass, {
+          httpStatus: missingKeyResponse.status,
+          errorCode: codeOf(missingKeyBody),
+          cfRayPresent: Boolean(missingKeyResponse.headers.get('cf-ray')),
+          responseBodyStored: false,
+        })
+
+        // The authenticated principal is also the target. W05 must reject self-follow
+        // before any relationship write, returning the stable conflict code.
+        const selfFollowResponse = await fetch(followUrl, {
+          method: 'POST',
+          headers: {
+            accept: 'application/json',
+            'content-type': 'application/json',
+            origin: new URL(baseUrl).origin,
+            cookie: cookieHeader,
+            'Idempotency-Key': 'authz-follow-self-' + runId + '-' + randomUUID(),
+          },
+          body: JSON.stringify({}),
+          redirect: 'manual',
+          signal: AbortSignal.timeout(15000),
+        })
+        const selfFollowBody = await parseJson(selfFollowResponse)
+        const selfFollowPass = selfFollowResponse.status === 409 &&
+          codeOf(selfFollowBody) === 'SELF_FOLLOW_NOT_ALLOWED'
+        check('self_follow_rejected_without_relationship_write', selfFollowPass, {
+          httpStatus: selfFollowResponse.status,
+          errorCode: codeOf(selfFollowBody),
+          cfRayPresent: Boolean(selfFollowResponse.headers.get('cf-ray')),
+          requestIdPresent: typeof selfFollowBody?.requestId === 'string',
+          selfTargetProbe: true,
+          responseBodyStored: false,
+        })
+
         result.status = result.checks.every((entry) => entry.pass) ? 'PASS' : 'FAIL'
         result.liveVerifiedUserRoleAndGateConfirmed = dbPass && gatePass
         await finish()
