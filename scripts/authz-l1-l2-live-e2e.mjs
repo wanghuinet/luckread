@@ -307,9 +307,10 @@ if (!email || !password || !accountId || !apiToken) {
           probeUsesGuaranteedMissingTarget: true,
         })
 
-        // Read-only social negative probes: neither request can create a follow relation.
-        // Missing Idempotency-Key must be rejected before target lookup or mutation.
-        const followUrl = baseUrl + '/api/v1/social/follows/' + encodeURIComponent(userId)
+        // Read-only social negative probes: both requests use a guaranteed-random
+        // missing target, so neither can create a follow relation.
+        const missingTargetId = 'authz-follow-missing-' + runId + '-' + randomUUID()
+        const followUrl = baseUrl + '/api/v1/social/follows/' + encodeURIComponent(missingTargetId)
         const missingKeyResponse = await fetch(followUrl, {
           method: 'POST',
           headers: {
@@ -332,30 +333,30 @@ if (!email || !password || !accountId || !apiToken) {
           responseBodyStored: false,
         })
 
-        // The authenticated principal is also the target. W05 must reject self-follow
-        // before any relationship write, returning the stable conflict code.
-        const selfFollowResponse = await fetch(followUrl, {
+        // With the required precondition present, a nonexistent target must be
+        // reported as NOT_FOUND rather than SERVICE_UNAVAILABLE, without writing.
+        const missingTargetResponse = await fetch(followUrl, {
           method: 'POST',
           headers: {
             accept: 'application/json',
             'content-type': 'application/json',
             origin: new URL(baseUrl).origin,
             cookie: cookieHeader,
-            'Idempotency-Key': 'authz-follow-self-' + runId + '-' + randomUUID(),
+            'Idempotency-Key': 'authz-follow-missing-' + runId + '-' + randomUUID(),
           },
           body: JSON.stringify({}),
           redirect: 'manual',
           signal: AbortSignal.timeout(15000),
         })
-        const selfFollowBody = await parseJson(selfFollowResponse)
-        const selfFollowPass = selfFollowResponse.status === 409 &&
-          codeOf(selfFollowBody) === 'SELF_FOLLOW_NOT_ALLOWED'
-        check('self_follow_rejected_without_relationship_write', selfFollowPass, {
-          httpStatus: selfFollowResponse.status,
-          errorCode: codeOf(selfFollowBody),
-          cfRayPresent: Boolean(selfFollowResponse.headers.get('cf-ray')),
-          requestIdPresent: typeof selfFollowBody?.requestId === 'string',
-          selfTargetProbe: true,
+        const missingTargetBody = await parseJson(missingTargetResponse)
+        const missingTargetPass = missingTargetResponse.status === 404 &&
+          codeOf(missingTargetBody) === 'NOT_FOUND'
+        check('follow_missing_target_returns_not_found_without_write', missingTargetPass, {
+          httpStatus: missingTargetResponse.status,
+          errorCode: codeOf(missingTargetBody),
+          cfRayPresent: Boolean(missingTargetResponse.headers.get('cf-ray')),
+          requestIdPresent: typeof missingTargetBody?.requestId === 'string',
+          targetIsRandomAndGuaranteedMissing: true,
           responseBodyStored: false,
         })
 
