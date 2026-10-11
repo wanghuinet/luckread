@@ -333,7 +333,7 @@ jobs:
             settledAggregateLikeCount:settledCount,
             expectedAuthoritativeCount:2,
             duplicateEffectiveLike:false
-          },null,2)+'\\n')
+          },null,2)+'\n')
           NODE
 
       - name: Prime shared aggregate before non-invalidation check
@@ -471,7 +471,7 @@ jobs:
             if test -f "$file"; then
               cp "$file" "artifacts/mapping-0/w05-like-cache-runtime-e2e/$file"
             else
-              printf '{"status":"NOT_REACHED","reason":"an earlier runtime assertion stopped this run"}\\n' > "artifacts/mapping-0/w05-like-cache-runtime-e2e/$file"
+              printf '{"status":"NOT_REACHED","reason":"an earlier runtime assertion stopped this run"}\n' > "artifacts/mapping-0/w05-like-cache-runtime-e2e/$file"
             fi
           done
 
