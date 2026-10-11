@@ -126,7 +126,7 @@ jobs:
           const runId = process.env.GITHUB_RUN_ID
           const nonce = randomBytes(8).toString('hex')
           const email = 'content-cache-e2e-' + runId + '-' + nonce + '@example.com'
-          const username = 'content_cache_e2e_' + runId + '_' + nonce.slice(0, 8)
+          const username = 'ccachee2e' + runId + nonce.slice(0, 8)
           const password = 'Evd-Cache-' + randomBytes(24).toString('base64url') + '-Z9!'
           const roleId = 'CONTENT-CACHE-E2E-ROLE-' + runId + '-' + nonce
           const registerKey = 'CONTENT-CACHE-E2E-' + runId + '-REGISTER'
@@ -140,7 +140,7 @@ jobs:
             const raw = await r.text()
             let data = null
             try { data = raw ? JSON.parse(raw) : null } catch {}
-            return { status: r.status, data }
+            return { status: r.status, data, headers: r.headers }
           }
 
           const reg = await post('/auth/register', {
@@ -165,7 +165,7 @@ jobs:
           )
 
           d1(process.env.DATABASE_NAME_W01, 'deployed-source/workers/W01-payload/wrangler.jsonc',
-            'UPDATE "user" SET account_state=\'ACTIVE\', account_state_version=account_state_version+1 WHERE id=' + q(userId))
+            'UPDATE "user" SET email_verified=1, account_state=\'ACTIVE\', account_state_version=account_state_version+1 WHERE id=' + q(userId))
           d1(process.env.DATABASE_NAME_W01, 'deployed-source/workers/W01-payload/wrangler.jsonc',
             'INSERT INTO role_assignments (id,subject_id,role_id,scope_type,scope_id,status,valid_from,valid_until,created_at,updated_at) VALUES (' +
             [roleId,userId,'creator','global',null,'ACTIVE',now,null,now,now].map((v,i)=>i === 4 ? 'NULL' : q(v)).join(',') + ')')
@@ -173,11 +173,11 @@ jobs:
           const login = await post('/auth/login', {
             identity: email,
             credential: password,
-            deviceId: 'content-cache-e2e-' + runId,
           })
-          const token = login.data?.accessToken
-          if (login.status !== 200 || typeof token !== 'string' || login.data?.layer !== 'L3') {
-            throw new Error('creator login failed: HTTP ' + login.status + ' body=' + JSON.stringify(login.data))
+          const user = login.data?.data?.user
+          const token = login.headers.get('x-luckread-session-token')
+          if (login.status !== 200 || !token || String(user?.id) !== userId || user?.emailVerified !== true) {
+            throw new Error('creator login failed against APP-AUTH-01: HTTP ' + login.status + ' body=' + JSON.stringify(login.data) + ' nativeSessionHeader=' + Boolean(token))
           }
 
           console.log('::add-mask::' + token)
@@ -188,7 +188,7 @@ jobs:
             'CACHE_TEST_TOKEN=' + token,
           ]) appendFileSync(process.env.GITHUB_ENV, line + '\n')
 
-          console.log(JSON.stringify({userId, layer: login.data.layer}))
+          console.log(JSON.stringify({userId, emailVerified: user.emailVerified, nativeSessionHeaderPresent: Boolean(token)}))
           NODE
 
       - name: Seed published content fixture
