@@ -53,7 +53,14 @@ const request = async (name, method, path, { headers = {}, body } = {}) => {
   try {
     const response = await fetch(baseUrl + path, {
       method,
-      headers: { accept: 'application/json', ...headers },
+      headers: {
+        accept: 'application/json',
+        // Match browser same-origin mutation requests; Better Auth enforces trusted origins.
+        ...(['GET', 'HEAD', 'OPTIONS'].includes(method.toUpperCase())
+          ? {}
+          : { origin: new URL(baseUrl).origin }),
+        ...headers,
+      },
       ...(body === undefined ? {} : { body }),
       redirect: 'manual',
       signal: AbortSignal.timeout(15_000),
