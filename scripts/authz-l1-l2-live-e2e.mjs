@@ -81,7 +81,8 @@ const readAuthorizationState = (userId) => {
   const deployedAt = process.env.LUCKREAD_L2_ROLE_DEPLOYED_AT || ''
   if (!Number.isFinite(Date.parse(deployedAt))) throw new Error('L2_DEPLOY_TIMESTAMP_INVALID')
   const deployedAtSql = sqlQuote(deployedAt)
-  const postDeployAccountFilter = 'u2.account_state = \'ACTIVE\' AND u2.email_verified = 1 AND datetime(u2.created_at) >= datetime(' + deployedAtSql + ')'
+  const postDeployRegistrationFilter = 'datetime(u2.created_at) >= datetime(' + deployedAtSql + ')'
+  const postDeployAccountFilter = postDeployRegistrationFilter + ' AND u2.account_state = \'ACTIVE\' AND u2.email_verified = 1'
   const hasActiveL2Assignment = [
     "SELECT 1 FROM role_assignments r2 WHERE r2.subject_id = u2.id AND r2.role_id = 'verified_user'",
     "AND r2.scope_type = 'global' AND r2.scope_id IS NULL AND r2.status = 'ACTIVE'",
@@ -96,6 +97,8 @@ const readAuthorizationState = (userId) => {
     "  AND r.scope_type = 'global' AND r.scope_id IS NULL AND r.status = 'ACTIVE'",
     '  AND r.valid_from <= ' + sqlQuote(now) + ' AND (r.valid_until IS NULL OR ' + sqlQuote(now) + ' < r.valid_until)) AS hasL2Role,',
     'COALESCE((SELECT v.role_version FROM role_authorization_versions v WHERE v.subject_id = u.id LIMIT 1), 0) AS roleVersion,',
+    '(SELECT COUNT(*) FROM "user" u2 WHERE ' + postDeployRegistrationFilter + ') AS postDeployRegisteredAccounts,',
+    '(SELECT COUNT(*) FROM "user" u2 WHERE ' + postDeployRegistrationFilter + " AND u2.account_state = 'PENDING_VERIFICATION') AS postDeployPendingVerificationAccounts,',
     '(SELECT COUNT(*) FROM "user" u2 WHERE ' + postDeployAccountFilter + ') AS postDeployVerifiedActiveAccounts,',
     '(SELECT COUNT(*) FROM "user" u2 WHERE ' + postDeployAccountFilter + ' AND EXISTS (' + hasActiveL2Assignment + ')) AS postDeployL2GrantedAccounts,',
     '(SELECT COUNT(*) FROM "user" u2 WHERE ' + postDeployAccountFilter + ' AND NOT EXISTS (' + hasActiveL2Assignment + ')) AS postDeployL2MissingAccounts',
@@ -140,6 +143,8 @@ const readAuthorizationState = (userId) => {
     baseRoleActive: row.hasBaseRole === true || Number(row.hasBaseRole) === 1,
     verifiedUserRoleActive: row.hasL2Role === true || Number(row.hasL2Role) === 1,
     roleVersion: Number(row.roleVersion || 0),
+    postDeployRegisteredAccounts: Number(row.postDeployRegisteredAccounts || 0),
+    postDeployPendingVerificationAccounts: Number(row.postDeployPendingVerificationAccounts || 0),
     postDeployVerifiedActiveAccounts: Number(row.postDeployVerifiedActiveAccounts || 0),
     postDeployL2GrantedAccounts: Number(row.postDeployL2GrantedAccounts || 0),
     postDeployL2MissingAccounts: Number(row.postDeployL2MissingAccounts || 0),
@@ -213,13 +218,20 @@ if (!email || !password || !accountId || !apiToken) {
         const aggregateConsistent = aggregateHasSample &&
           dbState.postDeployL2GrantedAccounts === dbState.postDeployVerifiedActiveAccounts &&
           dbState.postDeployL2MissingAccounts === 0
+        const aggregateOutcome = dbState.postDeployRegisteredAccounts === 0
+          ? 'NO_POST_DEPLOY_REGISTRATIONS'
+          : dbState.postDeployVerifiedActiveAccounts === 0 && dbState.postDeployPendingVerificationAccounts > 0
+            ? 'POST_DEPLOY_REGISTRATIONS_PENDING_VERIFICATION'
+            : dbState.postDeployVerifiedActiveAccounts === 0
+              ? 'NO_POST_DEPLOY_VERIFIED_ACTIVE_ACCOUNTS'
+              : aggregateConsistent ? 'ALL_SAMPLED_ACCOUNTS_HAVE_L2' : 'POST_DEPLOY_L2_GAP_DETECTED'
         check('post_deploy_verified_account_l2_aggregate', aggregateConsistent, {
+          accountsRegisteredAfterDeploy: dbState.postDeployRegisteredAccounts,
+          accountsPendingVerification: dbState.postDeployPendingVerificationAccounts,
           verifiedActiveAccountsCreatedAfterDeploy: dbState.postDeployVerifiedActiveAccounts,
           accountsWithEffectiveL2: dbState.postDeployL2GrantedAccounts,
           accountsMissingEffectiveL2: dbState.postDeployL2MissingAccounts,
-          outcome: !aggregateHasSample
-            ? 'NO_POST_DEPLOY_VERIFIED_ACTIVE_ACCOUNTS'
-            : aggregateConsistent ? 'ALL_SAMPLED_ACCOUNTS_HAVE_L2' : 'POST_DEPLOY_L2_GAP_DETECTED',
+          outcome: aggregateOutcome,
           identityDetailsStored: false,
         })
       }
@@ -238,6 +250,8 @@ if (!email || !password || !accountId || !apiToken) {
           accountCreatedAt: dbState.accountCreatedAt,
           l2RoleDeployTimestamp: process.env.LUCKREAD_L2_ROLE_DEPLOYED_AT || null,
           observedLegacyBaseRoleOnly: dbState.baseRoleActive && !dbState.verifiedUserRoleActive,
+          postDeployRegisteredAccounts: dbState.postDeployRegisteredAccounts,
+          postDeployPendingVerificationAccounts: dbState.postDeployPendingVerificationAccounts,
           postDeployVerifiedActiveAccounts: dbState.postDeployVerifiedActiveAccounts,
           postDeployL2GrantedAccounts: dbState.postDeployL2GrantedAccounts,
           postDeployL2MissingAccounts: dbState.postDeployL2MissingAccounts,
