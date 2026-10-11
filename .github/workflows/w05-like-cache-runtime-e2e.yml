@@ -7,12 +7,12 @@ on:
         description: Exact W01 source commit used by the controlled binding deployment
         required: true
         type: string
-        default: 3793f7c7b9c2d964a870d9d9cdc39605639efc2a
+        default: d364a89f7992390d210b31ae60a8167e5c2c2354
       w01_deployment_run_id:
         description: Successful W01 W02 Auth Binding Deploy run ID for that exact source
         required: true
         type: string
-        default: "37191968881"
+        default: "38133300215"
       tested_w05_commit:
         description: Exact W05 source commit used by the controlled D1-02 deployment
         required: true
@@ -26,7 +26,7 @@ on:
       social_api_base_url:
         description: Controlled public W01 social API URL
         required: true
-        default: https://api.luckread.com
+        default: https://luckread.com
         type: string
       database_name_w01:
         description: Controlled W01 D1 database name
