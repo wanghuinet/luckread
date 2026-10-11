@@ -136,11 +136,11 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   const user = publicUser(payload.user)
-  const bodyToken = typeof payload.token === 'string' && payload.token.length > 0 ? payload.token : null
   const headerToken = upstream.headers.get('set-auth-token')?.trim() ?? ''
-  // Better Auth's Bearer plugin publishes the session credential in the
-  // response header. Do not require a duplicate credential in the JSON body.
-  if (!user || !headerToken || (bodyToken !== null && headerToken !== bodyToken)) {
+  // Better Auth returns the raw session.token in JSON but the Bearer plugin
+  // returns the signed session-cookie credential in set-auth-token. They are
+  // intentionally different formats; the header is authoritative for clients.
+  if (!user || !headerToken) {
     return errorResponse(502, 'AUTH_UPSTREAM_RESPONSE_INVALID', 'Authentication service returned an invalid response')
   }
 
