@@ -153,7 +153,7 @@ jobs:
             return { status: response.status, data, headers: response.headers }
           }
 
-          const login = await post('/auth/login', { identity: email, credential: password })
+          const login = await post('/api/v1/auth/login', { identity: email, credential: password })
           const user = login.data?.data?.user
           const token = login.headers.get('x-luckread-session-token')
           if (
