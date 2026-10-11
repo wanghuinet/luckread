@@ -93,7 +93,6 @@ export async function PATCH(
     })
     if (response.ok) {
       await invalidatePublicContentDetail(request, contentId)
-      await invalidatePublicContentList(request)
     }
     return response
   } catch (error) {

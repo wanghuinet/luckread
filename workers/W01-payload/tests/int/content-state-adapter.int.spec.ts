@@ -59,6 +59,27 @@ describe('creator content lifecycle cache adapters', () => {
   })
 })
 
+describe('public content-list cache invalidation scope', () => {
+  it('keeps the global public list cache during draft creation and draft-only edits', () => {
+    const createRoute = read('src/app/api/v1/contents/route.ts')
+    const createMutation = createRoute.slice(createRoute.indexOf('export async function POST'))
+    const contentRoute = read('src/app/api/v1/contents/[contentId]/route.ts')
+    const patchStart = contentRoute.indexOf('export async function PATCH')
+    const deleteStart = contentRoute.indexOf('export async function DELETE')
+    const patchMutation = contentRoute.slice(patchStart, deleteStart)
+    const runtime = readFileSync(
+      resolve(process.cwd(), '../W03-content/src/content-runtime.ts'),
+      'utf8',
+    )
+
+    expect(runtime).toContain("state: 'DRAFT'")
+    expect(runtime).toContain("const EDITABLE_STATES = new Set<ContentState>(['DRAFT', 'REJECTED', 'RESTORED'])")
+    expect(createMutation).not.toContain('invalidatePublicContentList')
+    expect(patchMutation).toContain('invalidatePublicContentDetail(request, contentId)')
+    expect(patchMutation).not.toContain('invalidatePublicContentList')
+  })
+})
+
 describe('1.1 content lifecycle closeout', () => {
   it('wires the complete creator lifecycle from draft creation through review and public delivery', () => {
     const publisher = read('src/app/(frontend)/publish/PublishComposer.tsx')
