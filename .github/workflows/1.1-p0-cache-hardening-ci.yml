@@ -9,6 +9,8 @@ on:
       - 'workers/W01-payload/src/lib/content-list-cache-guard.ts'
       - 'workers/W01-payload/src/lib/content-list-cache-guard.test.ts'
       - 'workers/W01-payload/src/app/api/v1/contents/**'
+      - 'workers/W01-payload/tests/int/content-state-adapter.int.spec.ts'
+      - 'workers/W03-content/src/content-runtime.ts'
       - 'workers/W01-payload/src/app/api/v1/comments/**'
       - 'workers/W01-payload/src/app/api/v1/content/[contentId]/shares/route.ts'
       - 'workers/W01-payload/src/app/api/v1/shares/[shareId]/route.ts'
@@ -24,6 +26,8 @@ on:
       - 'workers/W01-payload/src/lib/content-list-cache-guard.ts'
       - 'workers/W01-payload/src/lib/content-list-cache-guard.test.ts'
       - 'workers/W01-payload/src/app/api/v1/contents/**'
+      - 'workers/W01-payload/tests/int/content-state-adapter.int.spec.ts'
+      - 'workers/W03-content/src/content-runtime.ts'
       - 'workers/W01-payload/src/app/api/v1/comments/**'
       - 'workers/W01-payload/src/app/api/v1/content/[contentId]/shares/route.ts'
       - 'workers/W01-payload/src/app/api/v1/shares/[shareId]/route.ts'
@@ -55,6 +59,9 @@ jobs:
       - name: Cache hardening unit tests
         working-directory: workers/W01-payload
         run: pnpm exec vitest run --config ./vitest.cache.config.mts
+      - name: Content-list mutation invalidation regression
+        working-directory: workers/W01-payload
+        run: pnpm exec vitest run --config ./vitest.config.mts tests/int/content-state-adapter.int.spec.ts
       - name: W01 typecheck
         working-directory: workers/W01-payload
         run: pnpm exec tsc --noEmit
@@ -75,9 +82,17 @@ jobs:
           assert route.index('validateContentListQuery(url)') < route.index('return await cachedPublicGet')
           assert route.index('if (hasAuthenticatedSessionCredential(request))') < route.index('return await cachedPublicGet')
           assert 'resolveCookieContentPrincipal' in route
-          assert 'invalidatePublicContentList' in route
+          create_mutation = route.split('export async function POST', 1)[1]
+          content_patch = detail.split('export async function PATCH', 1)[1].split('export async function DELETE', 1)[0]
+          assert 'invalidatePublicContentList' not in create_mutation
+          assert 'invalidatePublicContentList' not in content_patch
           assert 'invalidatePublicContentList' in detail
           assert 'invalidatePublicContentList' in state
+          creator_state = Path('workers/W01-payload/src/app/(payload)/api/creator/contents/[contentId]/state/route.ts').read_text()
+          assert 'invalidatePublicContentList' in creator_state
+          content_runtime = Path('workers/W03-content/src/content-runtime.ts').read_text()
+          assert "state: 'DRAFT'" in content_runtime
+          assert "const EDITABLE_STATES = new Set<ContentState>(['DRAFT', 'REJECTED', 'RESTORED'])" in content_runtime
           assert 'invalidatePublicContentComments' in state
           assert 'invalidatePublicContentComments' in detail
           assert 'invalidatePublicContentComments' in cache
