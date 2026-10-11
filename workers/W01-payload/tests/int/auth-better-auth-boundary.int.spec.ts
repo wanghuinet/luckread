@@ -260,6 +260,41 @@ describe('W01 Better Auth boundary', () => {
     expect(response.headers.get('set-auth-token')).toBeNull()
   })
 
+  it('uses the signed Bearer header even when the JSON token has a different representation', async () => {
+    const upstream = new Response(JSON.stringify({
+      redirect: false,
+      // Better Auth 1.7.7 returns the raw session.token in the JSON body.
+      token: 'raw-session-token',
+      user: {
+        id: 'u-signed-token',
+        email: 'user@example.com',
+        name: null,
+        emailVerified: true,
+        image: null,
+      },
+    }), {
+      status: 200,
+      headers: {
+        'set-cookie': 'better-auth.session_token=signed-cookie-credential; Path=/; HttpOnly; Secure; SameSite=Lax',
+        'set-auth-token': 'signed-cookie-credential',
+      },
+    })
+    mocks.proxyBetterAuth.mockResolvedValue(upstream)
+
+    const response = await login(request('https://luckread.test/api/v1/auth/login', 'POST', {
+      identity: 'user@example.com',
+      credential: 'correct-password',
+    }))
+    const data = await response.json() as { data: { user: Record<string, unknown> }; requestId: string }
+
+    expect(response.status).toBe(200)
+    expect(data.data.user.id).toBe('u-signed-token')
+    expect(response.headers.get('x-luckread-session-token')).toBe('signed-cookie-credential')
+    expect(response.headers.get('set-cookie')).toContain('better-auth.session_token=signed-cookie-credential')
+    expect(JSON.stringify(data)).not.toContain('raw-session-token')
+    expect(JSON.stringify(data)).not.toContain('signed-cookie-credential')
+  })
+
   it('rejects legacy or unknown login fields rather than silently ignoring them', async () => {
     const response = await login(request('https://luckread.test/api/v1/auth/login', 'POST', {
       identity: 'user@example.com',
