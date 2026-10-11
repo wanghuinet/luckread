@@ -11,14 +11,13 @@ const UPSTREAM_PRIVACY_NOOP_CODES = new Set([
   'USER_ALREADY_VERIFIED',
 ])
 
-const errorResponse = (status: number, code: string, message: string) =>
-  Response.json({
-    error: { code, message, details: {} },
-    requestId: crypto.randomUUID(),
-  }, {
-    status,
-    headers: { 'cache-control': 'no-store' },
-  })
+const errorResponse = (status: number, code: string, message: string) => Response.json({
+  error: { code, message, details: {} },
+  requestId: crypto.randomUUID(),
+}, {
+  status,
+  headers: { 'cache-control': 'no-store' },
+})
 
 async function readUpstreamDiagnosticCode(response: Response): Promise<string | null> {
   try {
@@ -79,7 +78,17 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   try {
-    const upstream = await proxyBetterAuth(request, '/send-verification-email', {
+    // This is a public, rate-limited resend flow keyed by the supplied email.
+    // Do not forward a browser session: Better Auth otherwise treats the call
+    // as authenticated and rejects it when the session email differs from the
+    // requested recipient (EMAIL_MISMATCH). Keep all other request headers.
+    const upstreamHeaders = new Headers(request.headers)
+    upstreamHeaders.delete('cookie')
+    const upstreamRequest = new Request(request.url, {
+      method: request.method,
+      headers: upstreamHeaders,
+    })
+    const upstream = await proxyBetterAuth(upstreamRequest, '/send-verification-email', {
       body: {
         email: identity.trim().toLowerCase(),
         callbackURL: 'https://luckread.com/login?verified=1',
