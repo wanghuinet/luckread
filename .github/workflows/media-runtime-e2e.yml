@@ -223,7 +223,7 @@ jobs:
           : "${MEDIA_OWNER_REGISTER_KEY:=__none__}"
           : "${MEDIA_OTHER_REGISTER_KEY:=__none__}"
           if [ -n "${MEDIA_ID:-}" ] && [ -n "${MEDIA_OWNER_TOKEN:-}" ]; then
-            status="$(curl --silent --show-error -o /tmp/media-delete.json -w '%{http_code}' -X DELETE -H "Authorization: Bearer $MEDIA_OWNER_TOKEN" -H "Idempotency-Key: MEDIA-E2E-$GITHUB_RUN_ID-DELETE" "$W01_BASE_URL/api/v1/media/$MEDIA_ID")"
+            status="$(curl --silent --show-error -o /tmp/media-delete.json -w '%{http_code}' -X DELETE -H "Authorization: Bearer $MEDIA_OWNER_TOKEN" -H "Idempotency-Key: MEDIA-E2E-$GITHUB_RUN_ID-DELETE" "$W01_BASE_URL/api/v1/media/$MEDIA_ID" || true)"
             case "$status" in 2*|404) ;; *) echo "WARNING: media API delete returned HTTP $status; continuing with D1 cleanup";; esac
           fi
           for token in "${MEDIA_OWNER_TOKEN:-}" "${MEDIA_OTHER_TOKEN:-}"; do
@@ -245,11 +245,11 @@ jobs:
           import {execFileSync} from 'node:child_process'
           const ids=[process.env.MEDIA_OWNER_USER_ID||'__none__',process.env.MEDIA_OTHER_USER_ID||'__none__']
           const q=v=>"'" + String(v).replaceAll("'","''") + "'"
-          const sql="SELECT (SELECT COUNT(*) FROM users WHERE CAST(id AS TEXT) IN ("+ids.map(q).join(',')+")) AS payload_users_remaining, (SELECT COUNT(*) FROM \"user\" WHERE id IN ("+ids.map(q).join(',')+")) AS better_auth_users_remaining, (SELECT COUNT(*) FROM \"session\" WHERE user_id IN ("+ids.map(q).join(',')+")) AS sessions_remaining, (SELECT COUNT(*) FROM media WHERE owner_user_id IN ("+ids.map(q).join(',')+")) AS media_remaining;"
+          const sql="SELECT (SELECT COUNT(*) FROM users WHERE CAST(id AS TEXT) IN ("+ids.map(q).join(',')+")) AS payload_users_remaining, (SELECT COUNT(*) FROM \"user\" WHERE id IN ("+ids.map(q).join(',')+")) AS better_auth_users_remaining, (SELECT COUNT(*) FROM \"session\" WHERE user_id IN ("+ids.map(q).join(',')+")) AS sessions_remaining, (SELECT COUNT(*) FROM role_assignments WHERE subject_id IN ("+ids.map(q).join(',')+")) AS role_assignments_remaining, (SELECT COUNT(*) FROM media WHERE owner_user_id IN ("+ids.map(q).join(',')+")) AS media_remaining;"
           const raw=execFileSync('npx',['--yes','wrangler@'+process.env.WRANGLER_VERSION,'d1','execute',process.env.DATABASE_NAME,'--remote','--json','--yes','--config','deployed-source/workers/W01-payload/wrangler.jsonc','--command',sql],{encoding:'utf8',env:process.env})
           const value=JSON.parse(raw)
           const row=value?.[0]?.results?.[0]??value?.result?.results?.[0]??{}
-          const counts={payloadUsers:Number(row.payload_users_remaining),betterAuthUsers:Number(row.better_auth_users_remaining),sessions:Number(row.sessions_remaining),media:Number(row.media_remaining)}
+          const counts={payloadUsers:Number(row.payload_users_remaining),betterAuthUsers:Number(row.better_auth_users_remaining),sessions:Number(row.sessions_remaining),roleAssignments:Number(row.role_assignments_remaining),media:Number(row.media_remaining)}
           if(Object.values(counts).some(n=>n!==0))throw new Error('fixture cleanup incomplete: '+JSON.stringify(counts))
           console.log('Media fixture cleanup PASS')
           NODE
