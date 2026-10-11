@@ -48,12 +48,29 @@ export async function assertSocialTargetUserExists(targetUserId: string): Promis
   }
 
   const payload = await getPayload({ config })
-  const user = await payload.findByID({
-    collection: 'users',
-    id: normalized,
-    depth: 0,
-    overrideAccess: true,
-  })
+  let user: unknown
+  try {
+    user = await payload.findByID({
+      collection: 'users',
+      id: normalized,
+      depth: 0,
+      overrideAccess: true,
+    })
+  } catch (error) {
+    // Payload throws for missing IDs rather than returning null. Translate only
+    // explicit not-found errors; infrastructure/configuration failures remain 503.
+    const details = error && typeof error === 'object'
+      ? error as { status?: unknown; statusCode?: unknown; code?: unknown }
+      : null
+    if (
+      details?.status === 404 ||
+      details?.statusCode === 404 ||
+      details?.code === 'NOT_FOUND'
+    ) {
+      throw new W05SocialClientError(404, 'NOT_FOUND', 'Target user not found')
+    }
+    throw error
+  }
   if (!user) throw new W05SocialClientError(404, 'NOT_FOUND', 'Target user not found')
 }
 
