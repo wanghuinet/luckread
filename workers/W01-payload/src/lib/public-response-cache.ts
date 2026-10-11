@@ -545,10 +545,39 @@ const enforceCacheMissOriginFuse = (keyString: string): boolean => {
 }
 
 
-const withCacheHeader = (response: Response, value: 'HIT' | 'MISS'): Response => {
+const generatePublicRequestId = (): string =>
+  `req_${crypto.randomUUID().replaceAll('-', '')}`
+
+const withCacheHeader = async (response: Response, value: 'HIT' | 'MISS'): Promise<Response> => {
   const headers = new Headers(response.headers)
   headers.set('X-LuckRead-Cache', value)
-  return new Response(response.body, { status: response.status, headers })
+
+  // The cached body is shared across requests, so request-scoped metadata must
+  // be refreshed after lookup. Keep the stored response untouched for future hits.
+  if ((headers.get('content-type') ?? '').includes('application/json')) {
+    try {
+      const value = await response.clone().json() as unknown
+      if (value && typeof value === 'object' && !Array.isArray(value) && 'requestId' in value) {
+        const requestId = generatePublicRequestId()
+        const body = { ...(value as Record<string, unknown>), requestId }
+        headers.set('x-request-id', requestId)
+        headers.set('cache-control', 'private, no-store')
+        headers.delete('content-length')
+        headers.delete('content-encoding')
+        headers.delete('content-md5')
+        headers.delete('etag')
+        return new Response(JSON.stringify(body), {
+          status: response.status,
+          statusText: response.statusText,
+          headers,
+        })
+      }
+    } catch {
+      // Preserve non-JSON or malformed JSON origin bodies as-is.
+    }
+  }
+
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers })
 }
 
 export const cachedPublicGet = async (
@@ -586,10 +615,10 @@ export const cachedPublicGet = async (
 
   try {
     const hit = await cache.match(key)
-    if (hit) return withCacheHeader(hit, 'HIT')
+    if (hit) return await withCacheHeader(hit, 'HIT')
   } catch {
     const memoryHit = readMemoryFallback(keyString)
-    if (memoryHit) return withCacheHeader(memoryHit, 'HIT')
+    if (memoryHit) return await withCacheHeader(memoryHit, 'HIT')
   }
 
   const memoryHit = readMemoryFallback(keyString)
@@ -636,7 +665,7 @@ export const cachedPublicGet = async (
   if (response.status === 503 && response.headers.get('x-luckread-cache') === 'OVERLOADED') {
     return response
   }
-  return withCacheHeader(response.clone(), 'MISS')
+  return await withCacheHeader(response.clone(), 'MISS')
 }
 
 export const invalidatePublicRoute = async (request: Request, namespace: string, pathname: string): Promise<void> => {
