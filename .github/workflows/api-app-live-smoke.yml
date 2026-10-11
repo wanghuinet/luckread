@@ -4,10 +4,13 @@ on:
   workflow_dispatch:
   push:
     branches:
+      - main
       - 'audit/1.1-app-api-acceptance-*'
     paths:
       - '.github/workflows/api-app-live-smoke.yml'
       - 'scripts/api-app-live-smoke.mjs'
+      - 'workers/W01-payload/src/lib/public-response-cache.ts'
+      - 'workers/W01-payload/src/app/api/v1/contents/route.ts'
 
 permissions:
   contents: read
