@@ -143,7 +143,7 @@ jobs:
             return { status: r.status, data, headers: r.headers }
           }
 
-          const reg = await post('/auth/register', {
+          const reg = await post('/api/v1/auth/register', {
             identityType: 'email',
             identity: email,
             credential: password,
@@ -156,6 +156,13 @@ jobs:
           }
 
           const userId = String(reg.data.userId)
+          // Save cleanup identifiers before any later D1 mutation or login can fail.
+          for (const line of [
+            'CACHE_TEST_USER_ID=' + userId,
+            'CACHE_TEST_ROLE_ID=' + roleId,
+            'CACHE_TEST_REGISTER_KEY=' + registerKey,
+          ]) appendFileSync(process.env.GITHUB_ENV, line + '\n')
+
           const now = new Date().toISOString()
           const q = (value) => "'" + String(value).replaceAll("'", "''") + "'"
           const d1 = (databaseName, config, command) => execFileSync(
@@ -181,12 +188,7 @@ jobs:
           }
 
           console.log('::add-mask::' + token)
-          for (const line of [
-            'CACHE_TEST_USER_ID=' + userId,
-            'CACHE_TEST_ROLE_ID=' + roleId,
-            'CACHE_TEST_REGISTER_KEY=' + registerKey,
-            'CACHE_TEST_TOKEN=' + token,
-          ]) appendFileSync(process.env.GITHUB_ENV, line + '\n')
+          appendFileSync(process.env.GITHUB_ENV, 'CACHE_TEST_TOKEN=' + token + '\n')
 
           console.log(JSON.stringify({userId, emailVerified: user.emailVerified, nativeSessionHeaderPresent: Boolean(token)}))
           NODE
@@ -202,6 +204,8 @@ jobs:
           import { execFileSync } from 'node:child_process'
           const q = (value) => "'" + String(value).replaceAll("'", "''") + "'"
           const contentId = 'cachee2e-' + process.env.GITHUB_RUN_ID
+          // Set this before the remote insert so always() cleanup knows the intended ID.
+          appendFileSync(process.env.GITHUB_ENV, 'CACHE_TEST_CONTENT_ID=' + contentId + '\n')
           const now = new Date().toISOString()
           const sql =
             'INSERT INTO contents ' +
@@ -217,7 +221,6 @@ jobs:
             ['--yes','wrangler@'+process.env.WRANGLER_VERSION,'d1','execute',process.env.DATABASE_NAME_W03,'--remote','--yes','--config','deployed-source/workers/W03-content/wrangler.jsonc','--command',sql],
             { encoding:'utf8', env:process.env, maxBuffer:8*1024*1024 },
           )
-          appendFileSync(process.env.GITHUB_ENV, 'CACHE_TEST_CONTENT_ID=' + contentId + '\n')
           console.log('seeded contentId=' + contentId)
           NODE
 
