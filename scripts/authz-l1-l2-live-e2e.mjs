@@ -78,6 +78,15 @@ const extractRows = (value) => {
 
 const readAuthorizationState = (userId) => {
   const now = new Date().toISOString()
+  const deployedAt = process.env.LUCKREAD_L2_ROLE_DEPLOYED_AT || ''
+  if (!Number.isFinite(Date.parse(deployedAt))) throw new Error('L2_DEPLOY_TIMESTAMP_INVALID')
+  const deployedAtSql = sqlQuote(deployedAt)
+  const postDeployAccountFilter = 'u2.account_state = \'ACTIVE\' AND u2.email_verified = 1 AND datetime(u2.created_at) >= datetime(' + deployedAtSql + ')'
+  const hasActiveL2Assignment = [
+    "SELECT 1 FROM role_assignments r2 WHERE r2.subject_id = u2.id AND r2.role_id = 'verified_user'",
+    "AND r2.scope_type = 'global' AND r2.scope_id IS NULL AND r2.status = 'ACTIVE'",
+    'AND r2.valid_from <= ' + sqlQuote(now) + ' AND (r2.valid_until IS NULL OR ' + sqlQuote(now) + ' < r2.valid_until)',
+  ].join(' ')
   const sql = [
     'SELECT u.id AS userId, u.created_at AS accountCreatedAt, u.account_state AS accountState, u.email_verified AS emailVerified,',
     "EXISTS (SELECT 1 FROM role_assignments r WHERE r.subject_id = u.id AND r.role_id = 'user'",
@@ -86,7 +95,10 @@ const readAuthorizationState = (userId) => {
     "EXISTS (SELECT 1 FROM role_assignments r WHERE r.subject_id = u.id AND r.role_id = 'verified_user'",
     "  AND r.scope_type = 'global' AND r.scope_id IS NULL AND r.status = 'ACTIVE'",
     '  AND r.valid_from <= ' + sqlQuote(now) + ' AND (r.valid_until IS NULL OR ' + sqlQuote(now) + ' < r.valid_until)) AS hasL2Role,',
-    'COALESCE((SELECT v.role_version FROM role_authorization_versions v WHERE v.subject_id = u.id LIMIT 1), 0) AS roleVersion',
+    'COALESCE((SELECT v.role_version FROM role_authorization_versions v WHERE v.subject_id = u.id LIMIT 1), 0) AS roleVersion,',
+    '(SELECT COUNT(*) FROM "user" u2 WHERE ' + postDeployAccountFilter + ') AS postDeployVerifiedActiveAccounts,',
+    '(SELECT COUNT(*) FROM "user" u2 WHERE ' + postDeployAccountFilter + ' AND EXISTS (' + hasActiveL2Assignment + ')) AS postDeployL2GrantedAccounts,',
+    '(SELECT COUNT(*) FROM "user" u2 WHERE ' + postDeployAccountFilter + ' AND NOT EXISTS (' + hasActiveL2Assignment + ')) AS postDeployL2MissingAccounts',
     'FROM "user" u WHERE u.id = ' + sqlQuote(userId) + ' LIMIT 1',
   ].join(' ')
   const env = { ...process.env, CLOUDFLARE_ACCOUNT_ID: accountId, CLOUDFLARE_API_TOKEN: apiToken }
@@ -128,6 +140,9 @@ const readAuthorizationState = (userId) => {
     baseRoleActive: row.hasBaseRole === true || Number(row.hasBaseRole) === 1,
     verifiedUserRoleActive: row.hasL2Role === true || Number(row.hasL2Role) === 1,
     roleVersion: Number(row.roleVersion || 0),
+    postDeployVerifiedActiveAccounts: Number(row.postDeployVerifiedActiveAccounts || 0),
+    postDeployL2GrantedAccounts: Number(row.postDeployL2GrantedAccounts || 0),
+    postDeployL2MissingAccounts: Number(row.postDeployL2MissingAccounts || 0),
   }
 }
 
@@ -193,6 +208,22 @@ if (!email || !password || !accountId || !apiToken) {
       try { dbState = readAuthorizationState(userId) } catch (error) {
         dbReadError = error instanceof Error ? error.message : 'D1_READ_FAILED'
       }
+      if (dbState) {
+        const aggregateHasSample = dbState.postDeployVerifiedActiveAccounts > 0
+        const aggregateConsistent = aggregateHasSample &&
+          dbState.postDeployL2GrantedAccounts === dbState.postDeployVerifiedActiveAccounts &&
+          dbState.postDeployL2MissingAccounts === 0
+        check('post_deploy_verified_account_l2_aggregate', aggregateConsistent, {
+          verifiedActiveAccountsCreatedAfterDeploy: dbState.postDeployVerifiedActiveAccounts,
+          accountsWithEffectiveL2: dbState.postDeployL2GrantedAccounts,
+          accountsMissingEffectiveL2: dbState.postDeployL2MissingAccounts,
+          outcome: !aggregateHasSample
+            ? 'NO_POST_DEPLOY_VERIFIED_ACTIVE_ACCOUNTS'
+            : aggregateConsistent ? 'ALL_SAMPLED_ACCOUNTS_HAVE_L2' : 'POST_DEPLOY_L2_GAP_DETECTED',
+          identityDetailsStored: false,
+        })
+      }
+
       if (!dbState) {
         check('d1_authoritative_l1_l2_assignments_and_version', false, {
           readOutcome: dbReadError || 'READ_FAILED',
@@ -207,6 +238,9 @@ if (!email || !password || !accountId || !apiToken) {
           accountCreatedAt: dbState.accountCreatedAt,
           l2RoleDeployTimestamp: process.env.LUCKREAD_L2_ROLE_DEPLOYED_AT || null,
           observedLegacyBaseRoleOnly: dbState.baseRoleActive && !dbState.verifiedUserRoleActive,
+          postDeployVerifiedActiveAccounts: dbState.postDeployVerifiedActiveAccounts,
+          postDeployL2GrantedAccounts: dbState.postDeployL2GrantedAccounts,
+          postDeployL2MissingAccounts: dbState.postDeployL2MissingAccounts,
           nextAction: 'Register a new QA account after the deployed L2 hook, verify its email, then update the two QA Actions secrets.',
         })
         result.status = 'BLOCKED_STALE_QA_ACCOUNT'
