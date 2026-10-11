@@ -28,7 +28,7 @@ const summarizeBody = (value) => {
   return summary
 }
 
-const probe = async ({ name, method, path, headers = {}, body, accepts, expectedErrorCode }) => {
+const probe = async ({ name, method, path, headers = {}, body, accepts, expectedErrorCode, inspectPublicCache = false }) => {
   const started = Date.now()
   let result
 
@@ -50,9 +50,21 @@ const probe = async ({ name, method, path, headers = {}, body, accepts, expected
     }
     const bodySummary = summarizeBody(parsed)
     const contentType = response.headers.get('content-type')
+    const cacheControl = response.headers.get('cache-control')
+    const requestIdHeader = response.headers.get('x-request-id')
+    const luckReadCache = response.headers.get('x-luckread-cache')
     const statusAccepted = accepts.includes(response.status)
     const errorAccepted = !expectedErrorCode || bodySummary.errorCode === expectedErrorCode
     const isJsonExpected = response.status === 204 || bodySummary.json === true
+    const normalizedCacheControl = (cacheControl ?? '').toLowerCase()
+    const cacheContractPass = !inspectPublicCache || (
+      (luckReadCache === 'HIT' || luckReadCache === 'MISS') &&
+      typeof requestIdHeader === 'string' &&
+      requestIdHeader.length > 0 &&
+      bodySummary.requestId === requestIdHeader &&
+      normalizedCacheControl.includes('private') &&
+      normalizedCacheControl.includes('no-store')
+    )
 
     result = {
       name,
@@ -61,10 +73,13 @@ const probe = async ({ name, method, path, headers = {}, body, accepts, expected
       status: response.status,
       acceptedStatuses: accepts,
       expectedErrorCode: expectedErrorCode || null,
-      pass: statusAccepted && errorAccepted && isJsonExpected,
+      pass: statusAccepted && errorAccepted && isJsonExpected && cacheContractPass,
+      cacheContractPass: inspectPublicCache ? cacheContractPass : null,
       durationMs: Date.now() - started,
       contentType,
-      cacheControl: response.headers.get('cache-control'),
+      cacheControl,
+      xRequestId: requestIdHeader,
+      luckReadCache,
       cfRay: response.headers.get('cf-ray'),
       body: bodySummary,
     }
@@ -77,6 +92,7 @@ const probe = async ({ name, method, path, headers = {}, body, accepts, expected
       acceptedStatuses: accepts,
       expectedErrorCode: expectedErrorCode || null,
       pass: false,
+      cacheContractPass: inspectPublicCache ? false : null,
       durationMs: Date.now() - started,
       transportError: error instanceof Error ? error.name : typeof error,
     }
@@ -92,12 +108,40 @@ const headers = (extra = {}) => ({
 })
 
 const results = []
-results.push(await probe({
-  name: 'public_content_list',
+const publicCacheFirst = await probe({
+  name: 'public_content_list_cache_contract_first_request',
   method: 'GET',
   path: '/api/v1/contents?limit=1',
   accepts: [200],
-}))
+  inspectPublicCache: true,
+})
+results.push(publicCacheFirst)
+
+const publicCacheSecond = await probe({
+  name: 'public_content_list_cache_contract_repeat_request',
+  method: 'GET',
+  path: '/api/v1/contents?limit=1',
+  accepts: [200],
+  inspectPublicCache: true,
+})
+results.push(publicCacheSecond)
+
+const requestIdsAreFresh = (
+  typeof publicCacheFirst.body?.requestId === 'string' &&
+  typeof publicCacheSecond.body?.requestId === 'string' &&
+  publicCacheFirst.body.requestId !== publicCacheSecond.body.requestId
+)
+results.push({
+  name: 'public_content_list_request_id_refresh',
+  method: 'ASSERT',
+  path: '/api/v1/contents?limit=1 (two requests)',
+  status: requestIdsAreFresh ? 200 : 500,
+  acceptedStatuses: [200],
+  expectedErrorCode: null,
+  pass: requestIdsAreFresh,
+  requestIdsAreDistinct: requestIdsAreFresh,
+  durationMs: 0,
+})
 
 results.push(await probe({
   name: 'anonymous_current_profile_denied',
