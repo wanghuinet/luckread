@@ -26,6 +26,8 @@ jobs:
     timeout-minutes: 10
     env:
       LUCKREAD_API_BASE_URL: https://luckread.com
+      # W02/W01 binding deploy that shipped the L1→L2 afterEmailVerification callback.
+      LUCKREAD_L2_ROLE_DEPLOYED_AT: '2026-10-11T10:49:02Z'
       LUCKREAD_APP_AUTH_SMOKE_EMAIL: ${{ secrets.LUCKREAD_APP_AUTH_SMOKE_EMAIL }}
       LUCKREAD_APP_AUTH_SMOKE_PASSWORD: ${{ secrets.LUCKREAD_APP_AUTH_SMOKE_PASSWORD }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

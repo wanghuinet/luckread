@@ -79,7 +79,7 @@ const extractRows = (value) => {
 const readAuthorizationState = (userId) => {
   const now = new Date().toISOString()
   const sql = [
-    'SELECT u.id AS userId, u.account_state AS accountState, u.email_verified AS emailVerified,',
+    'SELECT u.id AS userId, u.created_at AS accountCreatedAt, u.account_state AS accountState, u.email_verified AS emailVerified,',
     "EXISTS (SELECT 1 FROM role_assignments r WHERE r.subject_id = u.id AND r.role_id = 'user'",
     "  AND r.scope_type = 'global' AND r.scope_id IS NULL AND r.status = 'ACTIVE'",
     '  AND r.valid_from <= ' + sqlQuote(now) + ' AND (r.valid_until IS NULL OR ' + sqlQuote(now) + ' < r.valid_until)) AS hasBaseRole,',
@@ -121,6 +121,8 @@ const readAuthorizationState = (userId) => {
   const row = rows[0]
   if (String(row.userId) !== String(userId)) throw new Error('D1_SUBJECT_MISMATCH')
   return {
+    accountCreatedAt: typeof row.accountCreatedAt === 'string' ? row.accountCreatedAt : null,
+    accountCreatedBeforeL2Deploy: typeof row.accountCreatedAt === 'string' && Number.isFinite(Date.parse(process.env.LUCKREAD_L2_ROLE_DEPLOYED_AT || '')) && Date.parse(row.accountCreatedAt) < Date.parse(process.env.LUCKREAD_L2_ROLE_DEPLOYED_AT),
     accountActive: row.accountState === 'ACTIVE',
     emailVerified: row.emailVerified === true || Number(row.emailVerified) === 1,
     baseRoleActive: row.hasBaseRole === true || Number(row.hasBaseRole) === 1,
@@ -199,6 +201,8 @@ if (!email || !password || !accountId || !apiToken) {
         Number.isSafeInteger(dbState.roleVersion) &&
         dbState.roleVersion >= 1
       check('d1_authoritative_l1_l2_assignments_and_version', dbPass, {
+        accountCreatedAt: dbState?.accountCreatedAt ?? null,
+        accountCreatedBeforeL2Deploy: dbState?.accountCreatedBeforeL2Deploy === true,
         accountActive: dbState?.accountActive === true,
         emailVerified: dbState?.emailVerified === true,
         baseRoleActive: dbState?.baseRoleActive === true,
