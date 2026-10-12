@@ -11,6 +11,7 @@ const requireText = (name, source, pattern) => { if (!pattern.test(source)) fail
 const w01Config = parse('workers/W01-payload/wrangler.jsonc')
 const w08Config = parse('workers/W08-creator/wrangler.jsonc')
 const layers = parse('contracts/authz/layers.json')
+const authzPermissions = parse('contracts/authz/permissions.json')
 const publicBinding = parse('contracts/transport/W01-W08-creator-http-binding.v1.json')
 const grantBinding = parse('contracts/transport/W08-W02-role-assignment-http-binding.v1.json')
 const routeContract = parse('contracts/transport/public-worker-terminal-routing.v1.json')
@@ -63,6 +64,10 @@ requireText('applicant status reads must use own-scope CASL authorization', w08R
 requireText('reviewer endpoints must use CASL L7/L8 authorization', w08Runtime, /evaluateCreatorApplicationPermission\(principal, 'creator\.application\.review'/)
 requireText('W08 must serve the private CASL permission endpoint', w08Runtime, /internal\/authz\/check-permission/)
 requireText('CASL policy must model creator applications', w08Casl, /'CreatorApplication'/)
+const canonicalPermissionNames = new Set((authzPermissions['x-permissions'] ?? []).map((permission) => permission.name))
+for (const match of w08Casl.matchAll(/\bgrant\('([^']+)'/g)) {
+  if (!canonicalPermissionNames.has(match[1])) failures.push('CASL action missing from canonical permission catalog: '+match[1])
+}
 requireText('shared authorization context must resolve persisted D1 role assignments', w08RoleLayer, /FROM role_assignments/)
 requireText('internal CASL endpoint must reject caller-supplied layer or state', w08AuthzHandler, /CALLER_SUPPLIED_AUTHORIZATION_CONTEXT/)
 if (!w08AuthzHandler.includes('/internal/auth/principal')) failures.push('internal CASL endpoint must resolve actor identity through W02 session binding')
