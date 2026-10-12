@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react'
 import { fetchJson, getApiErrorMessage } from '../../../../lib/client-api.js'
 import styles from './creator-application.module.css'
 
@@ -100,7 +100,7 @@ export default function CreatorApplicationClient({
 
   useEffect(() => { void loadApplication() }, [loadApplication])
 
-  async function submitApplication(event: React.FormEvent<HTMLFormElement>) {
+  async function submitApplication(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (layer !== 'L2' || saving) return
     const normalizedStatement = statement.trim()
