@@ -97,6 +97,47 @@ async function principalFor(env: Env, request: Request): Promise<Principal | Res
 
 const actorLayer = (principal: Principal) => principal.layer ?? null
 
+function auditStatement(
+  env: Env,
+  input: {
+    eventKey: string
+    actorId: string
+    subjectId: string
+    eventType: 'CREATOR_APPLICATION_SUBMITTED' | 'CREATOR_APPLICATION_APPROVED' | 'CREATOR_APPLICATION_REJECTED' | 'CREATOR_ROLE_GRANTED' | 'CREATOR_SCOPE_CREATED' | 'SCOPED_ROLE_GRANTED'
+    resourceType: 'creator_application' | 'creator' | 'creator_scope' | 'role_assignment'
+    resourceId: string
+    fromState: string | null
+    toState: string | null
+    idempotencyKey?: string | null
+    request: Request
+    details?: Record<string, unknown>
+    occurredAt?: string
+  },
+): D1PreparedStatement {
+  const occurredAt = input.occurredAt ?? new Date().toISOString()
+  const correlationId = input.request.headers.get('X-LuckRead-Correlation-Id')?.trim().slice(0, 128) ||
+    input.request.headers.get('cf-ray')?.trim().slice(0, 128) || null
+  return env.D1_01.prepare(
+    'INSERT OR IGNORE INTO creator_authorization_audit ' +
+    '(audit_id,event_key,actor_id,subject_id,event_type,resource_type,resource_id,from_state,to_state,idempotency_key,correlation_id,occurred_at,details_json) ' +
+    'VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)',
+  ).bind(
+    crypto.randomUUID(),
+    input.eventKey,
+    input.actorId,
+    input.subjectId,
+    input.eventType,
+    input.resourceType,
+    input.resourceId,
+    input.fromState,
+    input.toState,
+    input.idempotencyKey ?? null,
+    correlationId,
+    occurredAt,
+    JSON.stringify(input.details ?? {}),
+  )
+}
+
 async function callRoleGrant(
   env: Env,
   originalRequest: Request,
@@ -184,6 +225,20 @@ async function retryCreatorGrant(
       "UPDATE creators SET status = 'ACTIVE', version = version + 1, updated_at = ? " +
       "WHERE application_id = ? AND status = 'PENDING_ROLE_GRANT'",
     ).bind(now, application.application_id),
+    auditStatement(env, {
+      eventKey: 'creator-role-granted:' + application.application_id,
+      actorId: application.decided_by ?? 'system',
+      subjectId: application.user_id,
+      eventType: 'CREATOR_ROLE_GRANTED',
+      resourceType: 'creator',
+      resourceId: creator.creatorId,
+      fromState: 'PENDING_ROLE_GRANT',
+      toState: 'ACTIVE',
+      idempotencyKey: application.decision_idempotency_key,
+      request,
+      details: { roleId: 'creator', approvalRef: 'creator-application-' + application.application_id },
+      occurredAt: now,
+    }),
   ])
   const latest = await readApplication(env, application.application_id)
   return json({
@@ -236,11 +291,27 @@ async function handleApplicationCreate(env: Env, request: Request): Promise<Resp
 
   const applicationId = crypto.randomUUID()
   try {
-    await env.D1_01.prepare(
-      "INSERT INTO creator_applications " +
-      "(application_id,user_id,creator_type,statement,status,grant_state,version,application_idempotency_key,created_at,updated_at) " +
-      "VALUES (?,?,?,?,'PENDING','NOT_REQUESTED',1,?,?,?)",
-    ).bind(applicationId, principal.userId, creatorType, statement, key, now, now).run()
+    await env.D1_01.batch([
+      env.D1_01.prepare(
+        "INSERT INTO creator_applications " +
+        "(application_id,user_id,creator_type,statement,status,grant_state,version,application_idempotency_key,created_at,updated_at) " +
+        "VALUES (?,?,?,?,'PENDING','NOT_REQUESTED',1,?,?,?)",
+      ).bind(applicationId, principal.userId, creatorType, statement, key, now, now),
+      auditStatement(env, {
+        eventKey: 'creator-application-submitted:' + applicationId,
+        actorId: principal.userId,
+        subjectId: principal.userId,
+        eventType: 'CREATOR_APPLICATION_SUBMITTED',
+        resourceType: 'creator_application',
+        resourceId: applicationId,
+        fromState: null,
+        toState: 'PENDING',
+        idempotencyKey: key,
+        request,
+        details: { creatorType },
+        occurredAt: now,
+      }),
+    ])
   } catch {
     return errorResponse(409, 'APPLICATION_CONFLICT', 'Creator application could not be created; refresh and retry')
   }
@@ -320,7 +391,7 @@ async function handleAdminApplicationDecision(env: Env, request: Request): Promi
     }
     const now = new Date().toISOString()
     try {
-      await env.D1_01.batch([
+      const results = await env.D1_01.batch([
         env.D1_01.prepare(
           "UPDATE creator_applications SET status = 'APPROVED', grant_state = 'PENDING', version = version + 1, " +
           'decision_idempotency_key = ?, decided_by = ?, decision_reason = ?, decided_at = ?, updated_at = ? ' +
@@ -328,9 +399,30 @@ async function handleAdminApplicationDecision(env: Env, request: Request): Promi
         ).bind(idempotencyKey, principal.userId, reason, now, now, application.application_id, expectedVersion),
         env.D1_01.prepare(
           "INSERT INTO creators (creator_id,user_id,application_id,creator_type,status,version,created_at,updated_at) " +
-          "VALUES (?,?,?,?,'PENDING_ROLE_GRANT',1,?,?) ON CONFLICT(application_id) DO NOTHING",
-        ).bind('creator-' + application.application_id, application.user_id, application.application_id, application.creator_type, now, now),
+          "SELECT ?, user_id, application_id, creator_type, 'PENDING_ROLE_GRANT', 1, ?, ? " +
+          "FROM creator_applications WHERE application_id = ? AND status = 'APPROVED' " +
+          "AND decision_idempotency_key = ? AND decided_by = ? " +
+          "ON CONFLICT(application_id) DO NOTHING",
+        ).bind('creator-' + application.application_id, now, now, application.application_id, idempotencyKey, principal.userId),
+        env.D1_01.prepare(
+          "INSERT OR IGNORE INTO creator_authorization_audit " +
+          "(audit_id,event_key,actor_id,subject_id,event_type,resource_type,resource_id,from_state,to_state,idempotency_key,correlation_id,occurred_at,details_json) " +
+          "SELECT ?, ?, ?, user_id, 'CREATOR_APPLICATION_APPROVED', 'creator_application', application_id, 'PENDING', 'APPROVED', ?, ?, ?, ? " +
+          "FROM creator_applications WHERE application_id = ? AND status = 'APPROVED' " +
+          "AND decision_idempotency_key = ? AND decided_by = ?",
+        ).bind(
+          crypto.randomUUID(), 'creator-application-decision:' + application.application_id + ':' + idempotencyKey,
+          principal.userId, idempotencyKey,
+          request.headers.get('X-LuckRead-Correlation-Id')?.trim().slice(0, 128) || request.headers.get('cf-ray')?.trim().slice(0, 128) || null,
+          now, JSON.stringify({ reason }), application.application_id, idempotencyKey, principal.userId,
+        ),
       ])
+      if ((results[0]?.meta?.changes ?? 0) !== 1) {
+        const current = await readApplication(env, application.application_id)
+        if (!current || current.status !== 'APPROVED' || current.decided_by !== principal.userId || current.decision_idempotency_key !== idempotencyKey) {
+          return errorResponse(412, 'PRECONDITION_FAILED', 'Creator application changed; refresh before deciding')
+        }
+      }
     } catch {
       return errorResponse(409, 'CREATOR_IDENTITY_CONFLICT', 'Creator identity could not be established')
     }
@@ -339,12 +431,26 @@ async function handleAdminApplicationDecision(env: Env, request: Request): Promi
   }
 
   const now = new Date().toISOString()
-  const result = await env.D1_01.prepare(
-    "UPDATE creator_applications SET status = 'REJECTED', grant_state = 'NOT_REQUESTED', version = version + 1, " +
-    'decision_idempotency_key = ?, decided_by = ?, decision_reason = ?, decided_at = ?, updated_at = ? ' +
-    "WHERE application_id = ? AND status = 'PENDING' AND version = ?",
-  ).bind(idempotencyKey, principal.userId, reason, now, now, application.application_id, expectedVersion).run()
-  if ((result.meta?.changes ?? 0) !== 1) return errorResponse(412, 'PRECONDITION_FAILED', 'Creator application changed; refresh before deciding')
+  const results = await env.D1_01.batch([
+    env.D1_01.prepare(
+      "UPDATE creator_applications SET status = 'REJECTED', grant_state = 'NOT_REQUESTED', version = version + 1, " +
+      'decision_idempotency_key = ?, decided_by = ?, decision_reason = ?, decided_at = ?, updated_at = ? ' +
+      "WHERE application_id = ? AND status = 'PENDING' AND version = ?",
+    ).bind(idempotencyKey, principal.userId, reason, now, now, application.application_id, expectedVersion),
+    env.D1_01.prepare(
+      "INSERT OR IGNORE INTO creator_authorization_audit " +
+      "(audit_id,event_key,actor_id,subject_id,event_type,resource_type,resource_id,from_state,to_state,idempotency_key,correlation_id,occurred_at,details_json) " +
+      "SELECT ?, ?, ?, user_id, 'CREATOR_APPLICATION_REJECTED', 'creator_application', application_id, 'PENDING', 'REJECTED', ?, ?, ?, ? " +
+      "FROM creator_applications WHERE application_id = ? AND status = 'REJECTED' " +
+      "AND decision_idempotency_key = ? AND decided_by = ?",
+    ).bind(
+      crypto.randomUUID(), 'creator-application-decision:' + application.application_id + ':' + idempotencyKey,
+      principal.userId, idempotencyKey,
+      request.headers.get('X-LuckRead-Correlation-Id')?.trim().slice(0, 128) || request.headers.get('cf-ray')?.trim().slice(0, 128) || null,
+      now, JSON.stringify({ reason }), application.application_id, idempotencyKey, principal.userId,
+    ),
+  ])
+  if ((results[0]?.meta?.changes ?? 0) !== 1) return errorResponse(412, 'PRECONDITION_FAILED', 'Creator application changed; refresh before deciding')
   application = (await readApplication(env, application.application_id)) ?? application
   return json({ applicationId: application.application_id, status: application.status, grantState: application.grant_state, version: application.version })
 }
@@ -392,9 +498,25 @@ async function retryScopeGrant(env: Env, request: Request, appointment: ScopeApp
   })
   if (!grant.ok) return errorResponse(503, 'ROLE_GRANT_PENDING', 'Appointment was saved but scoped authorization is pending; repeat the same request to retry')
   const now = new Date().toISOString()
-  await env.D1_01.prepare(
-    "UPDATE creator_scope_appointments SET status = 'ACTIVE', updated_at = ? WHERE appointment_id = ? AND status = 'PENDING_ROLE_GRANT'",
-  ).bind(now, appointment.appointment_id).run()
+  await env.D1_01.batch([
+    env.D1_01.prepare(
+      "UPDATE creator_scope_appointments SET status = 'ACTIVE', updated_at = ? WHERE appointment_id = ? AND status = 'PENDING_ROLE_GRANT'",
+    ).bind(now, appointment.appointment_id),
+    auditStatement(env, {
+      eventKey: 'scoped-role-granted:' + appointment.appointment_id,
+      actorId: appointment.appointed_by,
+      subjectId: appointment.user_id,
+      eventType: 'SCOPED_ROLE_GRANTED',
+      resourceType: 'creator_scope',
+      resourceId: appointment.scope_id,
+      fromState: 'PENDING_ROLE_GRANT',
+      toState: 'ACTIVE',
+      idempotencyKey: appointment.idempotency_key,
+      request,
+      details: { roleId: appointment.role_id, scopeType: appointment.scope_type, scopeRole: appointment.scope_role },
+      occurredAt: now,
+    }),
+  ])
   return json({
     appointmentId: appointment.appointment_id,
     scopeId: appointment.scope_id,
@@ -477,6 +599,20 @@ async function handleScopeAppointment(env: Env, request: Request): Promise<Respo
       "INSERT INTO creator_scopes (scope_id,scope_type,name,status,verification_state,created_by,idempotency_key,request_fingerprint,created_at,updated_at) " +
       "VALUES (?,'organization',?,'ACTIVE','VERIFIED',?,?,?,?,?)",
     ).bind(scopeId, name, principal.userId, key, requestFingerprint, now, now))
+    statements.push(auditStatement(env, {
+      eventKey: 'creator-scope-created:' + scopeId,
+      actorId: principal.userId,
+      subjectId: targetUserId,
+      eventType: 'CREATOR_SCOPE_CREATED',
+      resourceType: 'creator_scope',
+      resourceId: scopeId,
+      fromState: null,
+      toState: 'ACTIVE',
+      idempotencyKey: key,
+      request,
+      details: { scopeType: 'organization', initialAppointmentRole: 'ORG_LEAD' },
+      occurredAt: now,
+    }))
   }
   statements.push(env.D1_01.prepare(
     "INSERT INTO creator_scope_appointments (appointment_id,scope_id,user_id,scope_role,role_id,status,grant_ref,appointed_by,idempotency_key,request_fingerprint,created_at,updated_at) " +
