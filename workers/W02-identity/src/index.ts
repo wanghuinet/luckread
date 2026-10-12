@@ -268,32 +268,18 @@ export default {
         return json({ error: { code: 'VALIDATION_FAILED', message: 'invalid role assignment command' } }, 400)
       }
 
-      const globalApprover = actor.layer === 'L7' || actor.layer === 'L8'
-      let scopedOrganizationAdmin = false
-      if (
-        !globalApprover &&
-        body.roleId === 'mcn_editor' &&
-        body.scopeType === 'organization' &&
-        typeof body.scopeId === 'string' &&
-        body.scopeId.length > 0
-      ) {
-        const now = new Date().toISOString()
-        const assignment = await env.D1_01.prepare(
-          "SELECT id FROM role_assignments WHERE subject_id = ? AND role_id = 'mcn_admin' " +
-          "AND scope_type = 'organization' AND scope_id = ? AND status = 'ACTIVE' " +
-          "AND valid_from <= ? AND (valid_until IS NULL OR ? < valid_until) LIMIT 1",
-        ).bind(actor.userId, body.scopeId, now, now).first<{ id: string }>()
-        scopedOrganizationAdmin = !!assignment
+      if (body.roleId !== 'creator' || body.scopeType !== 'global' || body.scopeId !== null) {
+        return json({ error: { code: 'VALIDATION_FAILED', message: 'only global L3 creator grants are admitted by this endpoint' } }, 400)
       }
-      if (!mayApproveRoleGrant(actor.layer, body.roleId, body.scopeType, scopedOrganizationAdmin)) {
-        return json({ error: { code: 'PERMISSION_DENIED', message: 'L7/L8 approval or a matching scoped mcn_admin assignment is required' } }, 403)
+      if (!mayApproveRoleGrant(actor.layer)) {
+        return json({ error: { code: 'PERMISSION_DENIED', message: 'L7/L8 approval is required' } }, 403)
       }
 
       try {
         const result = await grantCreatorBusinessRole(env.D1_01, {
           subjectId: body.subjectId,
-          roleId: body.roleId as 'creator' | 'ip_principal' | 'mcn_admin' | 'mcn_editor',
-          scopeType: body.scopeType as 'global' | 'organization' | 'ip',
+          roleId: body.roleId as 'creator',
+          scopeType: body.scopeType as 'global',
           scopeId: body.scopeId,
           approvalRef: body.approvalRef,
         })
