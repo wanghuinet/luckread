@@ -179,6 +179,7 @@ export default function ProfilePage() {
           <Link href="/me/subscriptions">我的订阅</Link>
           <Link href="/me/sessions">登录设备</Link>
           <Link href="/me/password">修改密码</Link>
+          <Link href="/creator-application">创作者资格</Link>
           <Link href="/creator-center">创作者中心</Link>
         </div>
       </div>
