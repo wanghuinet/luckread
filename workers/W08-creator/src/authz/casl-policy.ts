@@ -163,7 +163,8 @@ function validResourceAttributes(value: unknown): value is Record<string, unknow
 }
 
 function selfOwnerCondition(subjectId: string): Record<string, unknown> {
-  return { $or: [{ ownerId: subjectId }, { owner_id: subjectId }] }
+  // Resource ownership fields are normalized before constructing the CASL subject.
+  return { ownerId: subjectId }
 }
 
 function addPublicAndSelfRules(
@@ -418,10 +419,23 @@ export function evaluateCaslPermission(input: CaslPermissionInput): CaslPermissi
       }
     }
 
+    const resourceAttributes = { ...(input.resourceAttributes ?? {}) }
+
+    // Some owning Workers expose the database field as owner_id while other
+    // DTOs use ownerId. Normalize this alias before CASL evaluates ownership.
+    if (
+      resourceAttributes.ownerId !== undefined &&
+      resourceAttributes.owner_id !== undefined &&
+      resourceAttributes.ownerId !== resourceAttributes.owner_id
+    ) {
+      return decision(input, 'DENY', 'AMBIGUOUS_RESOURCE_OWNERSHIP')
+    }
+    if (resourceAttributes.ownerId === undefined && typeof resourceAttributes.owner_id === 'string') {
+      resourceAttributes.ownerId = resourceAttributes.owner_id
+    }
+
     const ability = buildLayerAbility(input)
-    const taggedResource = caslSubject(input.resourceType, {
-      ...(input.resourceAttributes ?? {}),
-    })
+    const taggedResource = caslSubject(input.resourceType, resourceAttributes)
     if (!ability.can(input.action, taggedResource)) {
       return decision(input, 'DENY', 'PERMISSION_DENIED')
     }
