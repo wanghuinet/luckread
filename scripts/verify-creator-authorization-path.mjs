@@ -46,6 +46,17 @@ if (creatorRoute?.publicPaths.some((x) => x.includes('creator-scopes'))) failure
 if (inventory.domains.creator_ip_mcn.endpoint_groups.some((x) => x.includes('creator-scopes'))) failures.push('out-of-stage creator-scope routes remain in API inventory')
 
 requireText('fixed W08 service proxy missing', w01Client, /service\.fetch\(new Request\('https:\/\/luckread-w08-creator\.internal' \+ path/)
+const expectedCreatorProxyPaths = [
+  '/api/v1/creator-applications',
+  '/api/v1/creator-applications/me',
+  '/api/v1/admin/creator-applications',
+  '/api/v1/admin/creator-applications/decision',
+]
+for (const path of expectedCreatorProxyPaths) {
+  if (!w01Client.includes("'"+path+"'")) failures.push('W01 W08 proxy path missing: '+path)
+}
+if (w01Client.includes('creator-scopes')) failures.push('W01 W08 proxy must not expose out-of-stage creator-scope paths')
+if (!w01Client.includes('const pathname = path.split(/[?#]/, 1)[0]')) failures.push('W01 W08 proxy must match exact pathnames while preserving query strings')
 requireText('W01 bearer authorization header must be stripped', w01Client, /headers\.delete\('authorization'\)/i)
 requireText('new creator applications must use CASL L2-only authorization', w08Runtime, /evaluateCreatorApplicationPermission\(principal, 'creator\.application\.apply'/)
 requireText('applicant status reads must use own-scope CASL authorization', w08Runtime, /evaluateCreatorApplicationPermission\(principal, 'creator\.application\.read\.own'/)
