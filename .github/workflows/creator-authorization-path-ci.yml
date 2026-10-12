@@ -14,6 +14,8 @@ on:
       - 'workers/W08-creator/**'
       - 'contracts/transport/W01-W08-creator-http-binding.v1.json'
       - 'contracts/transport/W08-W02-role-assignment-http-binding.v1.json'
+      - 'scripts/verify-creator-authorization-path.mjs'
+      - 'scripts/verify-worker-terminal-routing.mjs'
       - '.github/workflows/creator-authorization-path-ci.yml'
   workflow_dispatch:
 
@@ -79,3 +81,4 @@ jobs:
           if (l42.operation.allowedRoleScopePairs.length !== 4) throw new Error('expected narrow L3/L4 role allow-list')
           console.log('CREATOR_AUTHORIZATION_BINDING=PASS')
           NODE
+          node scripts/verify-worker-terminal-routing.mjs
