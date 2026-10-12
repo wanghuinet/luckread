@@ -79,7 +79,7 @@ const command = (overrides: Partial<{
   scopeId: null,
   approvalRef: 'creator-application-00000000-0000-4000-8000-000000000001',
   ...overrides,
-}) as Parameters<typeof grantCreatorBusinessRole>[1]
+}) as Parameters<typeof grantCreatorBusinessRole>[1] as Parameters<typeof grantCreatorBusinessRole>[1]
 
 const fixedNow = '2026-10-12T09:30:00.000Z'
 
