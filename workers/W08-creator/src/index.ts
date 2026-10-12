@@ -256,7 +256,6 @@ async function retryCreatorGrant(
 async function handleApplicationCreate(env: Env, request: Request): Promise<Response> {
   const principal = await principalFor(env, request)
   if (principal instanceof Response) return principal
-  if (!mayApplyForCreator(actorLayer(principal))) return errorResponse(403, 'VERIFIED_USER_REQUIRED', 'Email verification and L2 access are required')
   const key = request.headers.get('Idempotency-Key')
   if (!validIdempotencyKey(key)) return errorResponse(428, 'PRECONDITION_REQUIRED', 'A valid Idempotency-Key is required')
 
@@ -281,6 +280,7 @@ async function handleApplicationCreate(env: Env, request: Request): Promise<Resp
     if (replay.creator_type !== creatorType || replay.statement !== statement) return errorResponse(409, 'IDEMPOTENCY_CONFLICT', 'Idempotency key was used with different application data')
     return json({ applicationId: replay.application_id, status: replay.status, grantState: replay.grant_state, version: replay.version, replayed: true })
   }
+  if (!mayApplyForCreator(actorLayer(principal))) return errorResponse(403, 'VERIFIED_USER_REQUIRED', 'Email verification and L2 access are required')
 
   const existingCreator = await env.D1_01.prepare(
     'SELECT creator_id FROM creators WHERE user_id = ? LIMIT 1',
@@ -476,6 +476,14 @@ async function readAppointmentByKey(env: Env, actorId: string, key: string): Pro
 
 async function retryScopeGrant(env: Env, request: Request, appointment: ScopeAppointmentRow): Promise<Response> {
   if (appointment.status === 'ACTIVE') {
+    const now = new Date().toISOString()
+    const effectiveRole = await env.D1_01.prepare(
+      "SELECT id FROM role_assignments WHERE subject_id = ? AND role_id = ? AND scope_type = ? " +
+      "AND scope_id = ? AND status = 'ACTIVE' AND valid_from <= ? " +
+      "AND (valid_until IS NULL OR ? < valid_until) LIMIT 1",
+    ).bind(appointment.user_id, appointment.role_id, appointment.scope_type, appointment.scope_id, now, now)
+      .first<{ id: string }>()
+    if (!effectiveRole) return errorResponse(409, 'ROLE_ASSIGNMENT_NOT_ACTIVE', 'The scoped role assignment is no longer effective')
     return json({
       appointmentId: appointment.appointment_id,
       scopeId: appointment.scope_id,
@@ -657,13 +665,17 @@ async function handleScopeAppointment(env: Env, request: Request): Promise<Respo
 async function handleMyScopes(env: Env, request: Request): Promise<Response> {
   const principal = await principalFor(env, request)
   if (principal instanceof Response) return principal
+  const now = new Date().toISOString()
   const result = await env.D1_01.prepare(
     "SELECT a.appointment_id AS appointmentId, a.scope_id AS scopeId, s.scope_type AS scopeType, " +
     "s.name AS scopeName, a.scope_role AS scopeRole, a.role_id AS roleId, a.status, a.created_at AS appointedAt " +
     "FROM creator_scope_appointments a JOIN creator_scopes s ON s.scope_id = a.scope_id " +
+    "JOIN role_assignments r ON r.subject_id = a.user_id AND r.role_id = a.role_id " +
+    "AND r.scope_type = s.scope_type AND r.scope_id = s.scope_id AND r.status = 'ACTIVE' " +
+    "AND r.valid_from <= ? AND (r.valid_until IS NULL OR ? < r.valid_until) " +
     "WHERE a.user_id = ? AND a.status = 'ACTIVE' AND s.status = 'ACTIVE' " +
     "AND (s.scope_type <> 'ip' OR s.verification_state = 'VERIFIED') ORDER BY a.created_at DESC LIMIT 100",
-  ).bind(principal.userId).all()
+  ).bind(now, now, principal.userId).all()
   return json({ data: result.results ?? [] })
 }
 
