@@ -46,6 +46,7 @@ type ScopeAppointmentRow = {
   scope_type: 'organization' | 'ip'
   name: string
   scope_status: 'ACTIVE' | 'INACTIVE'
+  verification_state: 'PENDING' | 'VERIFIED' | 'REJECTED'
 }
 
 const json = (body: unknown, status = 200, extraHeaders?: HeadersInit) => Response.json(body, {
@@ -213,15 +214,20 @@ async function handleApplicationCreate(env: Env, request: Request): Promise<Resp
   // allow-listed application fields above are persisted.
   const now = new Date().toISOString()
   const replay = await env.D1_01.prepare(
-    'SELECT application_id, user_id, creator_type, status, grant_state, version, created_at ' +
+    'SELECT application_id, user_id, creator_type, statement, status, grant_state, version, created_at ' +
     'FROM creator_applications WHERE user_id = ? AND application_idempotency_key = ? LIMIT 1',
   ).bind(principal.userId, key).first<{
-    application_id: string; user_id: string; creator_type: string; status: string; grant_state: string; version: number; created_at: string
+    application_id: string; user_id: string; creator_type: string; statement: string; status: string; grant_state: string; version: number; created_at: string
   }>()
   if (replay) {
-    if (replay.creator_type !== creatorType) return errorResponse(409, 'IDEMPOTENCY_CONFLICT', 'Idempotency key was used with different application data')
+    if (replay.creator_type !== creatorType || replay.statement !== statement) return errorResponse(409, 'IDEMPOTENCY_CONFLICT', 'Idempotency key was used with different application data')
     return json({ applicationId: replay.application_id, status: replay.status, grantState: replay.grant_state, version: replay.version, replayed: true })
   }
+
+  const existingCreator = await env.D1_01.prepare(
+    'SELECT creator_id FROM creators WHERE user_id = ? LIMIT 1',
+  ).bind(principal.userId).first<{ creator_id: string }>()
+  if (existingCreator) return errorResponse(409, 'CREATOR_ALREADY_EXISTS', 'This account already has a creator identity')
 
   const existingPending = await env.D1_01.prepare(
     "SELECT application_id FROM creator_applications WHERE user_id = ? AND status = 'PENDING' LIMIT 1",
@@ -353,7 +359,7 @@ async function readAppointmentByKey(env: Env, actorId: string, key: string): Pro
   return env.D1_01.prepare(
     'SELECT a.appointment_id, a.scope_id, a.user_id, a.scope_role, a.role_id, a.status, a.grant_ref, ' +
     'a.appointed_by, a.idempotency_key, a.request_fingerprint, a.created_at, a.updated_at, ' +
-    's.scope_type, s.name, s.status AS scope_status ' +
+    's.scope_type, s.name, s.status AS scope_status, s.verification_state ' +
     'FROM creator_scope_appointments a JOIN creator_scopes s ON s.scope_id = a.scope_id ' +
     'WHERE a.appointed_by = ? AND a.idempotency_key = ? LIMIT 1',
   ).bind(actorId, key).first<ScopeAppointmentRow>()
@@ -374,6 +380,9 @@ async function retryScopeGrant(env: Env, request: Request, appointment: ScopeApp
     })
   }
   if (appointment.scope_status !== 'ACTIVE') return errorResponse(409, 'SCOPE_INACTIVE', 'Cannot grant a role in an inactive scope')
+  if (appointment.scope_type === 'ip' && appointment.verification_state !== 'VERIFIED') {
+    return errorResponse(403, 'IP_SCOPE_NOT_VERIFIED', 'An IP-principal appointment requires a verified IP scope')
+  }
   const grant = await callRoleGrant(env, request, {
     subjectId: appointment.user_id,
     roleId: appointment.role_id,
@@ -410,12 +419,24 @@ async function handleScopeAppointment(env: Env, request: Request): Promise<Respo
 
   const appointmentRole = deriveRoleAppointment(body.scopeType, body.scopeRole)
   const targetUserId = typeof body.targetUserId === 'string' ? body.targetUserId.trim() : ''
+  const requestedScopeId = typeof body.scopeId === 'string' ? body.scopeId.trim() : ''
   const name = typeof body.name === 'string' ? body.name.trim() : ''
-  if (!appointmentRole || targetUserId.length < 1 || targetUserId.length > 128 || name.length < 1 || name.length > 200) {
-    return errorResponse(400, 'VALIDATION_FAILED', 'Invalid scope appointment; use an allowed scope type, role, target user, and name')
+  if (!appointmentRole || targetUserId.length < 1 || targetUserId.length > 128) {
+    return errorResponse(400, 'VALIDATION_FAILED', 'Invalid scope appointment; use an allowed scope type, role, and target user')
   }
   if (targetUserId === principal.userId) return errorResponse(400, 'VALIDATION_FAILED', 'Self-appointment is not allowed')
-  const requestFingerprint = await fingerprint([appointmentRole.scopeType, appointmentRole.scopeRole, targetUserId, name])
+  // Admins may create an organization only while appointing its lead. An IP
+  // scope is never created by this public operation; it must already exist
+  // and be marked VERIFIED by the rights-verification authority.
+  const createsOrganization = !requestedScopeId && appointmentRole.scopeType === 'organization' &&
+    appointmentRole.scopeRole === 'ORG_LEAD' && name.length >= 1 && name.length <= 200
+  if (!requestedScopeId && !createsOrganization) {
+    return errorResponse(400, 'VERIFIED_SCOPE_REQUIRED', 'An existing active scope is required for this appointment')
+  }
+  if (requestedScopeId && name.length > 0) {
+    return errorResponse(400, 'VALIDATION_FAILED', 'Do not send a new scope name when appointing into an existing scope')
+  }
+  const requestFingerprint = await fingerprint([appointmentRole.scopeType, appointmentRole.scopeRole, targetUserId, requestedScopeId || null, name])
   const existing = await readAppointmentByKey(env, principal.userId, key)
   if (existing) {
     if (existing.request_fingerprint !== requestFingerprint) return errorResponse(409, 'IDEMPOTENCY_CONFLICT', 'Idempotency key was used with different appointment data')
@@ -423,23 +444,50 @@ async function handleScopeAppointment(env: Env, request: Request): Promise<Respo
   }
 
   const now = new Date().toISOString()
-  const scopeId = crypto.randomUUID()
+  const target = await env.D1_01.prepare(
+    'SELECT account_state AS accountState, email_verified AS emailVerified FROM "user" WHERE id = ? LIMIT 1',
+  ).bind(targetUserId).first<{ accountState: string; emailVerified: number | boolean }>()
+  const verifiedRole = await env.D1_01.prepare(
+    "SELECT id FROM role_assignments WHERE subject_id = ? AND role_id = 'verified_user' AND scope_type = 'global' " +
+    "AND scope_id IS NULL AND status = 'ACTIVE' AND valid_from <= ? AND (valid_until IS NULL OR ? < valid_until) LIMIT 1",
+  ).bind(targetUserId, now, now).first<{ id: string }>()
+  if (!target || target.accountState !== 'ACTIVE' || !(target.emailVerified === true || target.emailVerified === 1) || !verifiedRole) {
+    return errorResponse(403, 'TARGET_NOT_ELIGIBLE', 'The appointed user must be an ACTIVE email-verified L2 account')
+  }
+
+  let scopeId = requestedScopeId
+  if (requestedScopeId) {
+    const scope = await env.D1_01.prepare(
+      'SELECT scope_id, scope_type AS scopeType, status, verification_state AS verificationState FROM creator_scopes WHERE scope_id = ? LIMIT 1',
+    ).bind(requestedScopeId).first<{ scope_id: string; scopeType: string; status: string; verificationState: string }>()
+    if (!scope || scope.scopeType !== appointmentRole.scopeType || scope.status !== 'ACTIVE') {
+      return errorResponse(404, 'SCOPE_NOT_FOUND', 'An active scope of the requested type was not found')
+    }
+    if (scope.scopeType === 'ip' && scope.verificationState !== 'VERIFIED') {
+      return errorResponse(403, 'IP_SCOPE_NOT_VERIFIED', 'An IP-principal appointment requires a verified IP scope')
+    }
+  } else {
+    scopeId = crypto.randomUUID()
+  }
+
   const appointmentId = crypto.randomUUID()
   const grantRef = 'creator-scope-appointment-' + appointmentId
+  const statements: D1PreparedStatement[] = []
+  if (createsOrganization) {
+    statements.push(env.D1_01.prepare(
+      "INSERT INTO creator_scopes (scope_id,scope_type,name,status,verification_state,created_by,idempotency_key,request_fingerprint,created_at,updated_at) " +
+      "VALUES (?,'organization',?,'ACTIVE','VERIFIED',?,?,?,?,?)",
+    ).bind(scopeId, name, principal.userId, key, requestFingerprint, now, now))
+  }
+  statements.push(env.D1_01.prepare(
+    "INSERT INTO creator_scope_appointments (appointment_id,scope_id,user_id,scope_role,role_id,status,grant_ref,appointed_by,idempotency_key,request_fingerprint,created_at,updated_at) " +
+    "VALUES (?,?,?,?,?,'PENDING_ROLE_GRANT',?,?,?,?,?,?)",
+  ).bind(
+    appointmentId, scopeId, targetUserId, appointmentRole.scopeRole, appointmentRole.roleId, grantRef,
+    principal.userId, key, requestFingerprint, now, now,
+  ))
   try {
-    await env.D1_01.batch([
-      env.D1_01.prepare(
-        "INSERT INTO creator_scopes (scope_id,scope_type,name,status,created_by,idempotency_key,request_fingerprint,created_at,updated_at) " +
-        "VALUES (?,?,?,'ACTIVE',?,?,?,?,?)",
-      ).bind(scopeId, appointmentRole.scopeType, name, principal.userId, key, requestFingerprint, now, now),
-      env.D1_01.prepare(
-        "INSERT INTO creator_scope_appointments (appointment_id,scope_id,user_id,scope_role,role_id,status,grant_ref,appointed_by,idempotency_key,request_fingerprint,created_at,updated_at) " +
-        "VALUES (?,?,?,?,?,'PENDING_ROLE_GRANT',?,?,?,?,?,?)",
-      ).bind(
-        appointmentId, scopeId, targetUserId, appointmentRole.scopeRole, appointmentRole.roleId, grantRef,
-        principal.userId, key, requestFingerprint, now, now,
-      ),
-    ])
+    await env.D1_01.batch(statements)
   } catch {
     const raced = await readAppointmentByKey(env, principal.userId, key)
     if (raced && raced.request_fingerprint === requestFingerprint) return retryScopeGrant(env, request, raced)
@@ -458,7 +506,8 @@ async function handleMyScopes(env: Env, request: Request): Promise<Response> {
     "SELECT a.appointment_id AS appointmentId, a.scope_id AS scopeId, s.scope_type AS scopeType, " +
     "s.name AS scopeName, a.scope_role AS scopeRole, a.role_id AS roleId, a.status, a.created_at AS appointedAt " +
     "FROM creator_scope_appointments a JOIN creator_scopes s ON s.scope_id = a.scope_id " +
-    "WHERE a.user_id = ? AND a.status = 'ACTIVE' AND s.status = 'ACTIVE' ORDER BY a.created_at DESC LIMIT 100",
+    "WHERE a.user_id = ? AND a.status = 'ACTIVE' AND s.status = 'ACTIVE' " +
+    "AND (s.scope_type <> 'ip' OR s.verification_state = 'VERIFIED') ORDER BY a.created_at DESC LIMIT 100",
   ).bind(principal.userId).all()
   return json({ data: result.results ?? [] })
 }
