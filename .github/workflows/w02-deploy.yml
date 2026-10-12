@@ -35,6 +35,9 @@ jobs:
       - name: Verify Better Auth package
         working-directory: workers/W02-identity
         run: node --input-type=module -e "import('better-auth').then(() => console.log('better-auth 1.7.7 import: OK'))"
+      - name: Verify CASL authorization package
+        working-directory: workers/W02-identity
+        run: node --input-type=module -e "import('@casl/ability').then(() => console.log('@casl/ability 7.0.1 import: OK'))"
       - name: Verify RoleAssignment migration artifacts
         run: |
           node scripts/generate-role-assignment-migration.mjs
