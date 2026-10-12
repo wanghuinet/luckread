@@ -22,6 +22,8 @@ const w08Migration = read('workers/W08-creator/migrations/0001_creator_authoriza
 const w02Runtime = read('workers/W02-identity/src/index.ts')
 const w02Grant = read('workers/W02-identity/src/authz/role-assignment-command.ts')
 const applicationUi = read('workers/W01-payload/src/app/(frontend)/creator-application/CreatorApplicationClient.tsx')
+const reviewPage = read('workers/W01-payload/src/app/(frontend)/creator-review/page.tsx')
+const reviewUi = read('workers/W01-payload/src/app/(frontend)/creator-review/CreatorReviewClient.tsx')
 const creatorPage = read('workers/W01-payload/src/app/(frontend)/creator-center/page.tsx')
 
 const roleMap = Object.fromEntries(layers['x-layers'].flatMap((item) => (item.roles ?? []).map((role) => [role, item.id])))
@@ -57,6 +59,9 @@ requireText('W02 must require effective L2 role', w02Grant, /VERIFIED_ROLE_REQUI
 requireText('H5 page must submit through authoritative API', applicationUi, /fetchJson[\s\S]*\/api\/v1\/creator-applications/)
 requireText('H5 retries must preserve idempotency key', applicationUi, /Idempotency-Key/)
 requireText('creator center requires L3', creatorPage, /principal\.layer !== 'L3'/)
+requireText('review page must restrict entry to L7/L8', reviewPage, /principal\.layer !== 'L7' && principal\.layer !== 'L8'/)
+requireText('review UI must use existing admin API and optimistic locking', reviewUi, /\/api\/v1\/admin\/creator-applications[\s\S]*If-Match[\s\S]*Idempotency-Key/)
+requireText('approved grant retries must remain explicit', reviewUi, /重试授权/)
 
 if (failures.length) {
   console.error('CREATOR_AUTHORIZATION_PATH=FAIL')
