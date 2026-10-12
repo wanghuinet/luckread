@@ -200,7 +200,7 @@ Historical candidate/change-control documents found in the repository are not pr
 | 25 Tasks | 100% |
 | 43 Feature Domains | 100% |
 | 12 Worker Master | 100% |
-| 4 D1 Master | 100% |
+| 5 D1 Master | 100% |
 | Worker × D1 Binding | 100% |
 | Feature → Task | 100% |
 | Feature → Task → Worker | 43/43 = 100% |
