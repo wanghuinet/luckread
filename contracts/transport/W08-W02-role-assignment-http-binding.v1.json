@@ -27,7 +27,7 @@
     "callerHeader": "X-LuckRead-Caller: W08",
     "transportVersion": "X-LuckRead-Transport-Version: 1.0",
     "principalSource": "W02 independently resolves the current session and global L0-L8 layer from Better Auth and D1-01",
-    "approverMinimumLayer": "L7",
+    "approverAdmission": "L7/L8 for global creator/IP/organization-lead grants; a valid mcn_admin assignment may appoint only mcn_editor inside the exact same organization scope",
     "targetGate": [
       "target user exists",
       "account_state is ACTIVE",
@@ -50,6 +50,7 @@
     "globalRoleFromScopedAssignment": "forbidden",
     "revokedAssignmentReactivationByReplay": "forbidden",
     "approverIdentityFromRequestBody": "forbidden",
+    "scopedAdminGrantLimit": "mcn_admin can grant mcn_editor only within the exact active organization scope; cannot grant creator, ip_principal, mcn_admin, or a global role",
     "approverSessionForwarding": "restricted to the private W08-to-W02 call for independent session revalidation; never logged",
     "crossD1Transaction": false
   },
