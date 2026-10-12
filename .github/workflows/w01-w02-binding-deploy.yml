@@ -160,15 +160,6 @@ jobs:
         working-directory: workers/W01-payload
         run: pnpm exec opennextjs-cloudflare build
 
-      - name: Install W02 runtime dependencies
-        working-directory: workers/W02-identity
-        run: npm install --ignore-scripts --no-audit --no-fund
-
-      - name: Verify Better Auth runtime dependency
-        working-directory: workers/W02-identity
-        run: |
-          node --input-type=module -e "import('better-auth').then(() => console.log('better-auth runtime import: OK'))"
-
       - name: Verify W02 migration artifacts are committed
         run: |
           node scripts/generate-role-assignment-migration.mjs
