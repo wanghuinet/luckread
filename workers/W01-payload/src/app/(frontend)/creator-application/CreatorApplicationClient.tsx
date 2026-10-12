@@ -206,7 +206,14 @@ export default function CreatorApplicationClient({
           </div>
         ) : null}
 
-        {!loading && layer !== 'L2' && layer !== 'L3' ? (
+        {!loading && (layer === 'L7' || layer === 'L8') ? (
+          <div className={styles.eligibleNotice}>
+            <span className={styles.checkIcon} aria-hidden="true">✓</span>
+            <div><h3>管理员审核入口</h3><p>你的权限允许审核创作者资格申请。</p><Link href="/creator-review">打开创作者审核队列 →</Link></div>
+          </div>
+        ) : null}
+
+        {!loading && layer !== 'L2' && layer !== 'L3' && layer !== 'L7' && layer !== 'L8' ? (
           <div className={styles.lockedNotice}>
             <h3>暂不能提交创作者申请</h3>
             <p>请先完成邮箱验证并获得 L2 普通用户权限。账号权限由系统依据验证和授权结果确定，页面不会自行提升权限。</p>
