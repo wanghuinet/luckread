@@ -1,26 +1,24 @@
-# W02 — Identity / Account / Authorization
+# W02 — Identity / Account
 
-Canonical Worker role: Identity / Account / Authorization.
+Canonical Worker role: **Identity / Account**.
 
 Project authority has selected this repository path as the physical source location for canonical W02:
 `workers/W02-identity`
 
-The directory name `W02-identity` is the canonical physical path for W02; Worker authority remains defined by the Worker Master. Canonical W02 owns T01/T02/T03 and D1-01 under the ACTIVE/CANONICAL Worker Master.
+The directory name `W02-identity` is the canonical physical path for W02; Worker authority remains defined by the Worker Master. Canonical W02 owns T01/T02 and D1-01 identity/account state under the amended Worker Master.
 
 Deployment and inter-Worker transport are governed by:
 `docs/change-control/CC-MAPPING-0-E6-W02-DEPLOYMENT-TRANSPORT-DECISION-2026-09-22.md`
 
-Implementation admission is now GREEN at source-implementation scope after the explicit D1-01/D1-02 physical allocation decision. W02 contains the contracted RoleAssignment resolver and Contract-driven D1-01 migration source. Remote D1 mutation and Worker deployment remain controlled evidence steps; Payload remains the platform base in W01.
+W02 remains the sole account-system core:
+- Better Auth owns authentication, sessions and email-verification flow.
+- W02 owns account creation/lifecycle and authoritative account state.
+- Payload Core and Better Auth implementation are not replaced or modified by the W08 CASL change.
+- W02 continues to host the existing RoleAssignment materialization and layer-projection code during this incremental closeout because account lifecycle and authentication response paths currently depend on it. That compatibility code does not make W02 the shared business-permission policy engine; CASL policy evaluation belongs to W08.
+- Existing internal session endpoints remain Service-Binding transports only. No public W02 auth endpoint is introduced by the W08 authorization change.
+- D1-01 schema/migration files remain in the established W02 migration runner in this slice; this is physical schema deployment location, not a second permission-decision authority.
 
-## Current implementation boundary
+W08 authorization contract:
+`workers/W08-creator/src/authz/casl-policy.ts` and `POST /internal/authz/check-permission`.
 
-- W02 Worker name: `luckread-w02`.
-- D1 binding: `D1_01` → D1-01 primary UUID `2f80471e-3756-49f9-8db1-7707a433ad64`.
-- RoleAssignment migration source: `workers/W02-identity/migrations/0001_role_assignments.sql`.
-- Migration generation guard: `scripts/generate-role-assignment-migration.mjs`.
-- Resolver: `workers/W02-identity/src/authz/role-assignment.ts`.
-- Internal resolution endpoint: `POST /internal/authz/resolve-layer`.
-- Internal session endpoints: `POST /internal/auth/session/establish`, `/refresh`, `/revoke`, `/validate`.
-- These are Service Binding internal transports only; no public W02 auth endpoint is introduced.
-- W01 transport binding: `W02_AUTH` → `luckread-w02`; deployment evidence remains pending.
-
+No Worker deployment is implied by source changes. Remote D1 mutation and controlled Worker deployment still require their own evidence and authorization.
