@@ -1,5 +1,6 @@
 import { AbilityBuilder, createMongoAbility, subject as caslSubject } from '@casl/ability'
 import layers from '../../../../contracts/authz/layers.json'
+import permissions from '../../../../contracts/authz/permissions.json'
 
 export type LayerId = 'L0' | 'L1' | 'L2' | 'L3' | 'L4' | 'L5' | 'L6' | 'L7' | 'L8'
 export type ScopedRoleAssignment = {
@@ -31,6 +32,9 @@ export type CaslPermissionDecision = {
 export const AUTHZ_POLICY_VERSION = 'casl-l0-l8-v1'
 
 const CONTRACT_LAYERS = new Set<string>(layers['x-layers'].map((layer) => layer.id))
+const CONTRACT_PERMISSION_NAMES = new Set<string>(
+  (permissions as unknown as { 'x-permissions': Array<{ name: string }> })['x-permissions'].map((permission) => permission.name),
+)
 export const SUPPORTED_AUTHZ_SUBJECTS = [
   'Content',
   'Search',
@@ -386,6 +390,9 @@ export function evaluateCaslPermission(input: CaslPermissionInput): CaslPermissi
     }
     if (typeof input.action !== 'string' || input.action.trim().length === 0 || input.action.length > 128) {
       return decision(input, 'DENY', 'INVALID_ACTION')
+    }
+    if (!CONTRACT_PERMISSION_NAMES.has(input.action)) {
+      return decision(input, 'DENY', 'UNKNOWN_PERMISSION')
     }
     if (!(SUPPORTED_AUTHZ_SUBJECTS as readonly string[]).includes(input.resourceType)) {
       return decision(input, 'DENY', 'UNSUPPORTED_RESOURCE')
