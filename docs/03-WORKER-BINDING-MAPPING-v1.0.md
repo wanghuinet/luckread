@@ -40,7 +40,7 @@ Exactly five D1 domains are authoritative. D1-01..D1-04 retain existing business
 | W08 | Creator / Organization | D1-01 | RW scoped | No | No | No | No |
 | W09 | Platform / Storage / Reliability | D1-03 | No | No | RW scoped platform/runtime authority | No | No |
 | W10 | Async / Queue / Job Execution | D1-03 scoped execution | No | No | RW scoped execution records only | No | No |
-| W11 | Growth / Campaign / Analytics / Operations | D1-03 | No | Read/reference only where explicitly contracted | RW scoped operational/analytics state | No |
+| W11 | Growth / Campaign / Analytics / Operations | D1-03 + D1-05 | No | Read/reference only where explicitly contracted | RW scoped campaign/operations state | No | RW scoped analytics-only derived data |
 | W12 | External Developer / Integration Execution | No default business D1 | No direct authority | No direct authority | No direct authority | No direct authority | No |
 
 ### Permission notation
