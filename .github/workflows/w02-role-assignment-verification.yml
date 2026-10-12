@@ -51,7 +51,8 @@ jobs:
         run: npm install --ignore-scripts --no-audit --no-fund --package-lock=false
       - name: Verify pinned CASL runtime dependency
         working-directory: workers/W08-creator
-        run: node --input-type=module -e "import('@casl/ability').then(() => console.log('@casl/ability 7.0.1 import: OK'))"
+        run: |
+          node --input-type=module -e 'import("@casl/ability").then(() => console.log("@casl/ability 7.0.1 import: OK"))'
       - name: Typecheck W08
         run: npx tsc -p workers/W08-creator/tsconfig.json --noEmit
       - name: Test CASL L0-L8 policy
