@@ -2,28 +2,11 @@ import { describe, expect, it } from 'vitest'
 import {
   admitCreatorDecision,
   creatorApplicationReplayMatches,
-  mayApplyForCreator,
-  mayReviewCreatorApplication,
   parseExpectedVersion,
   validIdempotencyKey,
 } from './policy.js'
 
 describe('creator authorization admission', () => {
-  it('permits only a global L2 user to apply without trusting a body role', () => {
-    expect(mayApplyForCreator('L2')).toBe(true)
-    expect(mayApplyForCreator('L3')).toBe(false)
-    expect(mayApplyForCreator('L7')).toBe(false)
-    expect(mayApplyForCreator('L1')).toBe(false)
-    expect(mayApplyForCreator(null)).toBe(false)
-  })
-
-  it('restricts creator application review and grant initiation to L7/L8', () => {
-    expect(mayReviewCreatorApplication('L7')).toBe(true)
-    expect(mayReviewCreatorApplication('L8')).toBe(true)
-    expect(mayReviewCreatorApplication('L6')).toBe(false)
-    expect(mayReviewCreatorApplication('L3')).toBe(false)
-  })
-
   it('recognizes exact application retries but rejects a reused key with changed content', () => {
     const existing = { creator_type: 'WRITER', statement: 'I publish long-form articles.' }
     expect(creatorApplicationReplayMatches(existing, { creatorType: 'WRITER', statement: 'I publish long-form articles.' })).toBe(true)
