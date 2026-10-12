@@ -42,6 +42,19 @@
       "terminalWorker": "W06",
       "transportBinding": "W01-W06-moderation-http-binding.v1",
       "authorityNote": "W06 is the Rights/Trust & Safety/Governance authority and D1-03 moderation owner."
+    },
+    {
+      "operationIdFamily": "creator",
+      "publicPaths": [
+        "/api/v1/creator-applications",
+        "/api/v1/admin/creator-applications",
+        "/api/v1/admin/creator-scopes",
+        "/api/v1/creator-scopes"
+      ],
+      "ingressWorker": "W01",
+      "terminalWorker": "W08",
+      "transportBinding": "W01-W08-creator-http-binding.v1",
+      "authorityNote": "W08 owns creator qualification and organization/IP scope facts in D1-01; W02 alone assigns the associated L3/L4 roles."
     }
   ],
   "workerToWorkerInvariant": {
