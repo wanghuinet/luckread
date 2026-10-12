@@ -18,7 +18,7 @@ The project owner has directed the following responsibility boundary:
 2. Add the internal `POST /internal/authz/check-permission` endpoint to the already-provisioned `luckread-w08-creator` Worker source.
 3. Resolve actor identity from the W02 session through the existing private Service Binding; derive account state and layer/scoped-role context from persisted D1-01 facts. The request body cannot supply subjectId, layer, account state, or scope grants. Resource attributes must be loaded server-side from the owning domain.
 4. Keep the endpoint internal-only, with `workers_dev=false`, no public route, no new caller Service Binding, and `Cache-Control: no-store`.
-5. Do not deploy, mutate remote D1, or switch runtime callers in this source slice.
+5. Do not deploy, mutate remote D1, or move non-W08 callers to the generic permission endpoint in this source slice. The existing W08 creator-qualification routes are intentionally changed from duplicate layer-only guards to the local shared CASL policy; W02 session/principal resolution and W02-owned RoleAssignment grant transport remain authoritative and unchanged.
 6. Existing W02 role-materialization and session-layer-projection code remains a documented compatibility dependency while the T03 runtime closeout is staged. It must not be used as a substitute for W08's CASL business-permission decision.
 7. A positive CASL result remains only one authorization facet. Authentication/session validity, MFA, governance, ownership/resource facts, entitlement, approvals, and business-state checks remain mandatory where applicable.
 
