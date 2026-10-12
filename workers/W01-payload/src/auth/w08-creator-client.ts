@@ -29,6 +29,7 @@ export async function callW08Creator(request: Request, path: string, method: 'GE
   const headers = new Headers(request.headers)
   headers.delete('host')
   headers.delete('content-length')
+  headers.delete('authorization')
   let body: BodyInit | undefined
   if (method === 'POST') {
     body = await request.arrayBuffer()
