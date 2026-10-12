@@ -77,7 +77,7 @@ export default {
     // Context facts are derived here from D1-01, never accepted from the caller.
     // Refuse unknown fields so layer/account state/scope grants cannot be forged.
     const allowedKeys = new Set(['subjectId', 'action', 'resourceType', 'resourceAttributes'])
-    if (Object.keys(body as Record<string, unknown>).some((key) => !allowedKeys.has(key))) {
+    if (Object.keys(body).some((key) => !allowedKeys.has(key))) {
       return deny('CALLER_SUPPLIED_AUTHORIZATION_CONTEXT', 400)
     }
 
