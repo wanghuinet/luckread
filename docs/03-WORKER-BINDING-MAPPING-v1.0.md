@@ -4,7 +4,7 @@
 >
 > Authority: `docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md` → `docs/00-PROJECT-BLUEPRINT-v1.4.md` → `docs/02-FINAL-MAPPING-v1.0.md` → `docs/04-WORKER-MASTER-v1.0.md` → `docs/09-D1-DOMAIN-MASTER-v1.0.md`.
 >
-> Frozen topology: **12 Workers / 4 D1 domains / 25 Contract Tasks**.
+> Frozen topology: **12 Workers / 5 D1 domains / 25 Contract Tasks**.
 
 ## 1. Purpose
 
@@ -23,7 +23,7 @@ No Worker/D1 ownership may be inferred from code, routes, Payload Collections, d
 | D1-03 | Platform Operations / Governance / Runtime |
 | D1-04 | Commerce / Financial Authority |
 
-Exactly four D1 domains are authoritative. No implicit fifth D1 exists.
+Exactly five D1 domains are authoritative. D1-01..D1-04 retain existing business authority; D1-05 is analytics-only and W11-exclusive.
 
 ## 3. Canonical Worker × D1 matrix
 
@@ -117,7 +117,7 @@ Exactly four D1 domains are authoritative. No implicit fifth D1 exists.
 
 ### W11
 
-- Primary Worker for T22/T23 and D1-03 operational/analytics/campaign state assigned by contract.
+- Primary Worker for T22 campaign/growth operations in D1-03 and T23 analytics-derived state in D1-05. W11 is the sole analytics persistence owner; D1-05 cannot override any business authority.
 - Analytics and operational projections cannot replace D1-01, D1-02, or D1-04 authoritative state.
 
 ### W12
