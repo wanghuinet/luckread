@@ -18,9 +18,36 @@ Implementation admission is now GREEN at source-implementation scope after the e
 - D1 binding: `D1_01` → D1-01 primary UUID `2f80471e-3756-49f9-8db1-7707a433ad64`.
 - RoleAssignment migration source: `workers/W02-identity/migrations/0001_role_assignments.sql`.
 - Migration generation guard: `scripts/generate-role-assignment-migration.mjs`.
-- Resolver: `workers/W02-identity/src/authz/role-assignment.ts`.
-- Internal resolution endpoint: `POST /internal/authz/resolve-layer`.
+- Layer resolver: `workers/W02-identity/src/authz/role-assignment.ts`.
+- CASL policy engine: `workers/W02-identity/src/authz/casl-policy.ts` (`@casl/ability` pinned to `7.0.1`).
+- Internal layer endpoint: `POST /internal/authz/resolve-layer`.
+- Internal permission endpoint: `POST /internal/authz/check-permission`.
 - Internal session endpoints: `POST /internal/auth/session/establish`, `/refresh`, `/revoke`, `/validate`.
 - These are Service Binding internal transports only; no public W02 auth endpoint is introduced.
 - W01 transport binding: `W02_AUTH` → `luckread-w02`; deployment evidence remains pending.
 
+
+
+## CASL authorization core
+
+W02 owns the shared L0-L8 permission evaluation entry point. The internal
+\`POST /internal/authz/check-permission\` endpoint reads account state and
+global role-layer facts from D1-01, and derives IP/organization scope grants
+from currently active, time-valid \`RoleAssignment\` records. Callers cannot
+supply their own layer, account state, or scope IDs. The request supplies only
+the permission action and resource facts that the owning business domain has
+already loaded.
+
+The CASL engine denies unregistered actions and unsupported resource types by
+default, checks user/resource ownership, limits scoped IP/organization roles
+to their recorded scope, blocks L7 assignment of L8, and forbids audit-log
+mutation at every layer. The endpoint is internal Service-Binding transport
+and sends \`Cache-Control: no-store\`; authorization decisions are not cached.
+
+**Permission checks are one required authorization facet, not a replacement
+for the canonical decision contract.** Callers must still enforce authenticated
+principal/session validity, account-state and ownership facts from their
+authoritative domains, entitlement/subscription, MFA/credential assurance,
+workflow approvals and business-state checks where applicable. A positive
+CASL result alone must not authorize a sensitive administrative or commercial
+operation. Payload Access Control remains in place for CMS enforcement.
