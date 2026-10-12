@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://luckread.com/contracts/v1/transport/W01-W08-creator-http-binding.v1.json",
-  "title": "W01 to W08 Creator API Internal HTTP Binding",
+  "title": "W01 to W08 Creator Qualification API Internal HTTP Binding",
   "version": "1.0.0",
   "status": "CONTRACTED_PARTIAL",
   "caller": {
@@ -11,8 +11,8 @@
   },
   "callee": {
     "logicalWorker": "W08",
-    "role": "Creator / Organization / Creator Qualification",
-    "authority": "Creator and scope relationship facts on D1-01"
+    "role": "Creator Qualification",
+    "authority": "Creator applications and creator identity facts on D1-01"
   },
   "transport": {
     "kind": "Cloudflare Worker Service Binding HTTP",
@@ -61,31 +61,12 @@
       "precondition": "If-Match",
       "idempotency": "Idempotency-Key",
       "audit": "decision actor, reason, timestamp and application version are persisted by W08"
-    },
-    {
-      "operationId": "appointScopedCreatorRole",
-      "method": "POST",
-      "publicPath": "/api/v1/admin/creator-scopes",
-      "internalPath": "/api/v1/admin/creator-scopes",
-      "principalRequired": true,
-      "authorizationRule": "L7/L8 for creating organization scope or appointing organization leads/IP principals; a matching scoped L4 mcn_admin may appoint only mcn_editor inside the same active organization",
-      "idempotency": "Idempotency-Key",
-      "bodyAuthority": "scope type and membership intent only; W08 derives roleId and scopeId"
-    },
-    {
-      "operationId": "listMyScopedCreatorRoles",
-      "method": "GET",
-      "publicPath": "/api/v1/creator-scopes",
-      "internalPath": "/api/v1/creator-scopes/me",
-      "principalRequired": true,
-      "cache": "NO_STORE"
     }
   ],
   "trustBoundary": {
     "authentication": "W08 calls W02_AUTH /internal/auth/principal using the request session; W08 never trusts a body userId as the actor",
     "creatorQualification": "W08 owns application/review state and creator identity",
-    "roleAssignment": "W02 alone writes role_assignments after authenticating the approver independently",
-    "scope": "W08 validates and owns organization/IP scope and appointment facts; roleId is derived from a narrow server-side mapping"
+    "roleAssignment": "W02 alone writes role_assignments after authenticating the approver independently"
   },
   "failurePolicy": {
     "timeoutMs": 2000,
@@ -118,7 +99,6 @@
   "implementationStatus": {
     "source": "IMPLEMENTED_ON_FEATURE_BRANCH",
     "productionDeployment": "PENDING",
-    "realUserL2L3E2E": "PENDING",
-    "realUserScopedL4E2E": "PENDING"
+    "realUserL2L3E2E": "PENDING"
   }
 }
