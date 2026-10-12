@@ -8,7 +8,7 @@ on:
         required: true
         type: string
       confirm:
-        description: Type DEPLOY_BINDING to permit W02 and W01 application deployment
+        description: Type DEPLOY_BINDING for W02/W01 only, or DEPLOY_BINDING_AND_W08_CREATOR to explicitly include W08 Creator
         required: true
         type: string
         default: DEPLOY_BINDING
@@ -23,7 +23,7 @@ permissions:
 
 jobs:
   deploy:
-    if: ${{ inputs.confirm == 'DEPLOY_BINDING' }}
+    if: ${{ inputs.confirm == 'DEPLOY_BINDING' || inputs.confirm == 'DEPLOY_BINDING_AND_W08_CREATOR' }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -35,8 +35,12 @@ jobs:
       - name: Gate optional W08 Creator deployment before any production mutation
         env:
           CONFIRM_CREATOR: ${{ inputs.confirm_creator }}
+          CONFIRM: ${{ inputs.confirm }}
         run: |
           set -euo pipefail
+          if [ "$CONFIRM" = "DEPLOY_BINDING_AND_W08_CREATOR" ]; then
+            CONFIRM_CREATOR="DEPLOY_W08_CREATOR"
+          fi
           if [ -f workers/W08-creator/wrangler.jsonc ]; then
             if [ "$CONFIRM_CREATOR" != "DEPLOY_W08_CREATOR" ]; then
               echo "This source includes W08 Creator. Set confirm_creator=DEPLOY_W08_CREATOR to enable the W08 migration/deploy; no production changes have run."
@@ -56,19 +60,19 @@ jobs:
           node-version: 24
 
       - name: Install root toolchain for creator preflight
-        if: ${{ inputs.confirm_creator == 'DEPLOY_W08_CREATOR' }}
+        if: ${{ inputs.confirm_creator == 'DEPLOY_W08_CREATOR' || inputs.confirm == 'DEPLOY_BINDING_AND_W08_CREATOR' }}
         run: npm ci
 
       - name: Run creator authorization runtime and UI contract tests before production changes
-        if: ${{ inputs.confirm_creator == 'DEPLOY_W08_CREATOR' }}
+        if: ${{ inputs.confirm_creator == 'DEPLOY_W08_CREATOR' || inputs.confirm == 'DEPLOY_BINDING_AND_W08_CREATOR' }}
         run: npx --no-install vitest run workers/W02-identity/src/authz/role-assignment-command.test.ts workers/W08-creator/src/policy.test.ts workers/W08-creator/src/index.runtime.test.ts workers/W01-payload/tests/int/creator-application-page.int.spec.ts
 
       - name: Typecheck W08 Creator Worker before production changes
-        if: ${{ inputs.confirm_creator == 'DEPLOY_W08_CREATOR' }}
+        if: ${{ inputs.confirm_creator == 'DEPLOY_W08_CREATOR' || inputs.confirm == 'DEPLOY_BINDING_AND_W08_CREATOR' }}
         run: npx --no-install tsc --noEmit -p workers/W08-creator/tsconfig.json
 
       - name: Install and typecheck W02 creator grant path before production changes
-        if: ${{ inputs.confirm_creator == 'DEPLOY_W08_CREATOR' }}
+        if: ${{ inputs.confirm_creator == 'DEPLOY_W08_CREATOR' || inputs.confirm == 'DEPLOY_BINDING_AND_W08_CREATOR' }}
         working-directory: workers/W02-identity
         run: |
           npm install --ignore-scripts --no-audit --no-fund
@@ -101,7 +105,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Typecheck W01 API and creator routes before production changes
-        if: ${{ inputs.confirm_creator == 'DEPLOY_W08_CREATOR' }}
+        if: ${{ inputs.confirm_creator == 'DEPLOY_W08_CREATOR' || inputs.confirm == 'DEPLOY_BINDING_AND_W08_CREATOR' }}
         working-directory: workers/W01-payload
         run: pnpm exec tsc --noEmit
 
@@ -148,7 +152,7 @@ jobs:
           git diff --exit-code -- workers/W02-identity/migrations/0003_role_authorization_versions.sql
 
       - name: Apply W08 additive migration on existing D1-01
-        if: ${{ inputs.confirm_creator == 'DEPLOY_W08_CREATOR' }}
+        if: ${{ inputs.confirm_creator == 'DEPLOY_W08_CREATOR' || inputs.confirm == 'DEPLOY_BINDING_AND_W08_CREATOR' }}
         working-directory: workers/W08-creator
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -166,7 +170,7 @@ jobs:
           npx --yes wrangler@4.116.0 deploy --config wrangler.jsonc 2>&1 | tee ../../artifacts/mapping-0/w02-email-auth-deploy.log
 
       - name: Deploy W08 Creator Worker
-        if: ${{ inputs.confirm_creator == 'DEPLOY_W08_CREATOR' }}
+        if: ${{ inputs.confirm_creator == 'DEPLOY_W08_CREATOR' || inputs.confirm == 'DEPLOY_BINDING_AND_W08_CREATOR' }}
         working-directory: workers/W08-creator
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -189,8 +193,13 @@ jobs:
       - name: Write deployment provenance
         env:
           CONFIRM_CREATOR: ${{ inputs.confirm_creator }}
+          CONFIRM: ${{ inputs.confirm }}
           SOURCE_SHA: ${{ inputs.source_sha }}
         run: |
+          if [ "$CONFIRM" = "DEPLOY_BINDING_AND_W08_CREATOR" ]; then
+            CONFIRM_CREATOR="DEPLOY_W08_CREATOR"
+            export CONFIRM_CREATOR
+          fi
           workers="luckread-w02,luckread-w01-payload"
           deployment_order="W02 then W01"
           database_mutation=false
