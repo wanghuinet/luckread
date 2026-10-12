@@ -32,8 +32,7 @@
     {
       "binding": "W07_SUBSCRIPTION",
       "service": "luckread-w07"
-    }
-,
+    },
     {
       "binding": "W08_CREATOR",
       "service": "luckread-w08-creator"
