@@ -17,7 +17,7 @@ Boundary:
 ## Shared CASL authorization
 
 - Policy source: `src/authz/casl-policy.ts`; L0-L8 policy tests live beside it.
-- Internal `POST /internal/authz/check-permission` derives current account/role/scope facts from D1-01. Client-supplied layer/account state is rejected.
+- Internal `POST /internal/authz/check-permission` resolves actor identity from the W02 session over `W02_AUTH`, derives current account/role/scope facts from D1-01, and rejects request-body `subjectId`, layer, or account state.
 - Creator application creation, own-status reads, and review endpoints use the same CASL policy. Workflow controls such as self-review prevention, optimistic concurrency, idempotency, and retriable W02 grants remain separate mandatory checks.
 - W02 remains the sole writer of `role_assignments`. W08 owns Creator application/identity facts and calls W02 for the L3 grant after approval.
 - Keep the existing provisioned Worker name `luckread-w08-creator`, D1-01, and W01 `W08_CREATOR` binding. No new Worker, D1, Queue, or Service Binding is introduced.
