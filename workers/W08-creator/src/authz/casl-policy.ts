@@ -367,7 +367,7 @@ function buildLayerAbility(input: CaslPermissionInput) {
   // These restrictions are deliberately added last; CASL evaluates the last
   // matching rule first, so they cannot be overridden by a grant.
   cannot(['audit.update', 'audit.delete', 'audit.mutate', 'audit.update.any', 'audit.delete.any'], 'AuditLog')
-  cannot(['role.assign', 'role.assign.any'], 'RoleAssignment', { roleId: 'super_admin' })
+  cannot('role.assign', 'RoleAssignment', { roleId: 'super_admin' })
   cannot('user.restrict.limited', 'User', { layer: { $in: ['L7', 'L8'] } })
   cannot('user.restrict.any', 'User', { layer: { $in: ['L7', 'L8'] } })
   cannot('user.suspend', 'User', { layer: { $in: ['L7', 'L8'] } })
