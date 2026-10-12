@@ -204,21 +204,6 @@
       "auditRequired": true
     },
     {
-      "name": "creator.scope.manage",
-      "resource": "creator_scope",
-      "action": "manage",
-      "minLayer": "L4",
-      "scope": "organization",
-      "auditRequired": true
-    },
-    {
-      "name": "creator.scope.read.own",
-      "resource": "creator_scope",
-      "action": "read",
-      "minLayer": "L2",
-      "scope": "own"
-    },
-    {
       "name": "entitlement.check",
       "resource": "entitlement",
       "action": "check",
