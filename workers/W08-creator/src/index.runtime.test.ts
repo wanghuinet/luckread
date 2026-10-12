@@ -275,6 +275,23 @@ function existingApplication(overrides: Partial<TestApplication> = {}): TestAppl
 }
 
 describe('W08 creator qualification runtime guards', () => {
+  it('routes the internal CASL endpoint and rejects a forged subject before any D1 access', async () => {
+    const setup = harness(principal('regular-user-0001', 'L2'))
+    const response = await worker.fetch(request('/internal/authz/check-permission', 'POST', {
+      subjectId: 'admin-user-0001',
+      action: 'creator.application.review',
+      resourceType: 'CreatorApplication',
+    }), setup.env)
+
+    expect(response.status).toBe(400)
+    expect(await response.json()).toMatchObject({
+      decision: 'DENY',
+      reasonCode: 'CALLER_SUPPLIED_AUTHORIZATION_CONTEXT',
+    })
+    expect(setup.db.queries).toHaveLength(0)
+    expect(setup.db.batches).toBe(0)
+  })
+
   let db: FakeD1
   let env: Parameters<typeof worker.fetch>[1]
 
