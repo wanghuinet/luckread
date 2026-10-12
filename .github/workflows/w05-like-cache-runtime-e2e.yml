@@ -7,12 +7,12 @@ on:
         description: Exact W01 source commit used by the controlled binding deployment
         required: true
         type: string
-        default: d364a89f7992390d210b31ae60a8167e5c2c2354
+        default: 8c972b725f94513023e2b1bd2dd5073f53e9dd7d
       w01_deployment_run_id:
         description: Successful W01 W02 Auth Binding Deploy run ID for that exact source
         required: true
         type: string
-        default: "38133300215"
+        default: "38190504671"
       tested_w05_commit:
         description: Exact W05 source commit used by the controlled D1-02 deployment
         required: true
@@ -398,6 +398,63 @@ jobs:
           writeFileSync('like-shared-refresh-2.json', JSON.stringify({status:'PASS',viewerLiked:true,aggregateLikeCount:3,expectedAuthoritativeCount:3},null,2)+'\n')
           NODE
 
+      - name: Verify unlike write, same-key replay, viewer invalidation, and aggregate convergence
+        run: |
+          set -euo pipefail
+          url="$SOCIAL_API_BASE_URL/api/v1/interactions/likes?targetType=content&targetId=$LIKE_CACHE_TEST_CONTENT_ID"
+          idempotency_key="LIKE-CACHE-E2E-$GITHUB_RUN_ID-A$GITHUB_RUN_ATTEMPT-UNLIKE"
+          first_status="$(curl --silent --show-error --output /tmp/like-unlike-first.out --write-out '%{http_code}' \
+            -X DELETE \
+            -H "Authorization: Bearer $LIKE_CACHE_TEST_TOKEN" \
+            -H "Content-Type: application/json" \
+            -H "Idempotency-Key: $idempotency_key" \
+            --data '{"targetType":"content","targetId":"'"$LIKE_CACHE_TEST_CONTENT_ID"'"}' \
+            "$SOCIAL_API_BASE_URL/api/v1/interactions/likes")"
+          replay_status="$(curl --silent --show-error --output /tmp/like-unlike-replay.out --write-out '%{http_code}' \
+            -X DELETE \
+            -H "Authorization: Bearer $LIKE_CACHE_TEST_TOKEN" \
+            -H "Content-Type: application/json" \
+            -H "Idempotency-Key: $idempotency_key" \
+            --data '{"targetType":"content","targetId":"'"$LIKE_CACHE_TEST_CONTENT_ID"'"}' \
+            "$SOCIAL_API_BASE_URL/api/v1/interactions/likes")"
+          if [ "$first_status" != "204" ] || [ "$replay_status" != "204" ]; then
+            echo "Unlike and same-key replay must both return 204; got first=$first_status replay=$replay_status"
+            exit 1
+          fi
+          curl --silent --show-error --fail-with-body -H "Authorization: Bearer $LIKE_CACHE_TEST_TOKEN" "$url" > /tmp/like-unlike-immediate.json
+          # Viewer-specific state must be fresh immediately; the shared aggregate may
+          # remain cached briefly, so authoritative count is asserted after its TTL.
+          sleep 6
+          curl --silent --show-error --fail-with-body -H "Authorization: Bearer $LIKE_CACHE_TEST_TOKEN" "$url" > /tmp/like-unlike-settled.json
+          LIKE_UNLIKE_FIRST_STATUS="$first_status" LIKE_UNLIKE_REPLAY_STATUS="$replay_status" node --input-type=module <<'NODE'
+          import { readFileSync, writeFileSync } from 'node:fs'
+          const immediate = JSON.parse(readFileSync('/tmp/like-unlike-immediate.json','utf8'))
+          const settled = JSON.parse(readFileSync('/tmp/like-unlike-settled.json','utf8'))
+          const immediateCount = Number(immediate?.data?.likeCount)
+          const settledCount = Number(settled?.data?.likeCount)
+          if (immediate?.data?.liked !== false) {
+            throw new Error('viewer state stayed liked after unlike; cache invalidation failed')
+          }
+          if (settled?.data?.liked !== false || settledCount !== 2) {
+            throw new Error('unlike replay did not converge to two remaining fixture likes: ' + JSON.stringify({
+              viewerLiked: settled?.data?.liked,
+              immediateAggregateCount: immediateCount,
+              settledAggregateCount: settledCount,
+            }))
+          }
+          writeFileSync('like-unlike-replay.json', JSON.stringify({
+            status: 'PASS',
+            firstDeleteHttpStatus: Number(process.env.LIKE_UNLIKE_FIRST_STATUS),
+            sameKeyReplayHttpStatus: Number(process.env.LIKE_UNLIKE_REPLAY_STATUS),
+            viewerStateInvalidatedImmediately: true,
+            immediateAggregateLikeCount: Number.isSafeInteger(immediateCount) ? immediateCount : null,
+            settledViewerLiked: false,
+            settledAggregateLikeCount: settledCount,
+            expectedAuthoritativeCount: 2,
+            aggregateConvergedAfterTtl: true,
+          }, null, 2) + '\n')
+          NODE
+
       - name: Verify cleanup
         if: always()
         env:
@@ -441,8 +498,9 @@ jobs:
           shared_prime="$(evidence_flag like-shared-prime.json)"
           shared_stale="$(evidence_flag like-shared-no-sync-invalidation.json)"
           shared_refresh="$(evidence_flag like-shared-refresh-2.json)"
+          unlike_replay="$(evidence_flag like-unlike-replay.json)"
           complete=true
-          for file in like-initial.json like-aggregate-fresh-stale.json like-aggregate-refresh.json like-viewer-invalidation.json like-shared-prime.json like-shared-no-sync-invalidation.json like-shared-refresh-2.json; do
+          for file in like-initial.json like-aggregate-fresh-stale.json like-aggregate-refresh.json like-viewer-invalidation.json like-shared-prime.json like-shared-no-sync-invalidation.json like-shared-refresh-2.json like-unlike-replay.json; do
             if ! test -f "$file"; then complete=false; fi
           done
           cat > artifacts/mapping-0/w05-like-cache-runtime-e2e/provenance.json <<EOF
@@ -461,13 +519,14 @@ jobs:
             "sharedAggregatePrimed": $shared_prime,
             "sharedAggregateNotSynchronouslyInvalidated": $shared_stale,
             "sharedAggregateRefreshesAfterSecondTtl": $shared_refresh,
+            "unlikeMutationReplayAndAggregateConvergenceVerified": $unlike_replay,
             "runtimeChecksComplete": $complete,
             "noNewWorker": 0,
             "newD1": 0,
             "syntheticFixtureOnly": true
           }
           EOF
-          for file in like-initial.json like-aggregate-fresh-stale.json like-aggregate-refresh.json like-viewer-invalidation.json like-shared-prime.json like-shared-no-sync-invalidation.json like-shared-refresh-2.json; do
+          for file in like-initial.json like-aggregate-fresh-stale.json like-aggregate-refresh.json like-viewer-invalidation.json like-shared-prime.json like-shared-no-sync-invalidation.json like-shared-refresh-2.json like-unlike-replay.json; do
             if test -f "$file"; then
               cp "$file" "artifacts/mapping-0/w05-like-cache-runtime-e2e/$file"
             else
