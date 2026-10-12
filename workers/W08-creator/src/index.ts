@@ -1,4 +1,6 @@
-import { admitCreatorDecision, creatorApplicationReplayMatches, mayApplyForCreator, mayReviewCreatorApplication, parseExpectedVersion, validIdempotencyKey } from './policy.js'
+import { admitCreatorDecision, creatorApplicationReplayMatches, parseExpectedVersion, validIdempotencyKey } from './policy.js'
+import { evaluateCreatorApplicationPermission } from './authz/creator-application-permission.js'
+import { handlePermissionCheck } from './authz/handler.js'
 
 interface Env {
   D1_01: D1Database
@@ -77,8 +79,6 @@ async function principalFor(env: Env, request: Request): Promise<Principal | Res
     return errorResponse(503, 'IDENTITY_SERVICE_UNAVAILABLE', 'Identity service unavailable')
   }
 }
-
-const actorLayer = (principal: Principal) => principal.layer ?? null
 
 function auditStatement(
   env: Env,
@@ -261,7 +261,7 @@ async function handleApplicationCreate(env: Env, request: Request): Promise<Resp
     if (!creatorApplicationReplayMatches(replay, { creatorType, statement })) return errorResponse(409, 'IDEMPOTENCY_CONFLICT', 'Idempotency key was used with different application data')
     return json({ applicationId: replay.application_id, status: replay.status, grantState: replay.grant_state, version: replay.version, replayed: true })
   }
-  if (!mayApplyForCreator(actorLayer(principal))) return errorResponse(403, 'VERIFIED_USER_REQUIRED', 'Email verification and L2 access are required')
+  if (evaluateCreatorApplicationPermission(principal, 'creator.application.apply', { ownerId: principal.userId }).decision !== 'ALLOW') return errorResponse(403, 'VERIFIED_USER_REQUIRED', 'Email verification and L2 access are required')
 
   const existingCreator = await env.D1_01.prepare(
     'SELECT creator_id FROM creators WHERE user_id = ? LIMIT 1',
@@ -305,6 +305,9 @@ async function handleApplicationCreate(env: Env, request: Request): Promise<Resp
 async function handleApplicationRead(env: Env, request: Request): Promise<Response> {
   const principal = await principalFor(env, request)
   if (principal instanceof Response) return principal
+  if (evaluateCreatorApplicationPermission(principal, 'creator.application.read.own', { ownerId: principal.userId }).decision !== 'ALLOW') {
+    return errorResponse(403, 'PERMISSION_DENIED', 'You may only read your own creator application')
+  }
   const row = await env.D1_01.prepare(
     'SELECT application_id, creator_type, statement, status, grant_state, version, created_at, updated_at, decided_at, decision_reason ' +
     'FROM creator_applications WHERE user_id = ? ORDER BY created_at DESC LIMIT 1',
@@ -318,7 +321,7 @@ async function handleApplicationRead(env: Env, request: Request): Promise<Respon
 async function handleAdminApplicationList(env: Env, request: Request): Promise<Response> {
   const principal = await principalFor(env, request)
   if (principal instanceof Response) return principal
-  if (!mayReviewCreatorApplication(actorLayer(principal))) return errorResponse(403, 'PERMISSION_DENIED', 'L7 or L8 authorization is required')
+  if (evaluateCreatorApplicationPermission(principal, 'creator.application.review', {}).decision !== 'ALLOW') return errorResponse(403, 'PERMISSION_DENIED', 'L7 or L8 authorization is required')
   const url = new URL(request.url)
   const limitValue = Number(url.searchParams.get('limit') ?? '25')
   const limit = Number.isSafeInteger(limitValue) ? Math.max(1, Math.min(50, limitValue)) : 25
@@ -332,7 +335,7 @@ async function handleAdminApplicationList(env: Env, request: Request): Promise<R
 async function handleAdminApplicationDecision(env: Env, request: Request): Promise<Response> {
   const principal = await principalFor(env, request)
   if (principal instanceof Response) return principal
-  if (!mayReviewCreatorApplication(actorLayer(principal))) return errorResponse(403, 'PERMISSION_DENIED', 'L7 or L8 authorization is required')
+  if (evaluateCreatorApplicationPermission(principal, 'creator.application.review', {}).decision !== 'ALLOW') return errorResponse(403, 'PERMISSION_DENIED', 'L7 or L8 authorization is required')
   const idempotencyKey = request.headers.get('Idempotency-Key')
   if (!validIdempotencyKey(idempotencyKey)) return errorResponse(428, 'PRECONDITION_REQUIRED', 'A valid Idempotency-Key is required')
   const body = await readBody(request)
@@ -446,6 +449,16 @@ async function handleAdminApplicationDecision(env: Env, request: Request): Promi
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url)
+    if (request.method === 'POST' && url.pathname === '/internal/authz/check-permission') {
+      try {
+        return await handlePermissionCheck(request, env)
+      } catch {
+        return Response.json(
+          { decision: 'DENY', reasonCode: 'AUTHORIZATION_INPUT_UNAVAILABLE', policyVersion: 'casl-l0-l8-v1' },
+          { status: 503, headers: { 'cache-control': 'no-store' } },
+        )
+      }
+    }
     if (url.pathname === '/api/v1/creator-applications' && request.method === 'POST') {
       try { return await handleApplicationCreate(env, request) } catch { return errorResponse(503, 'CREATOR_SERVICE_UNAVAILABLE', 'Creator application service unavailable') }
     }
