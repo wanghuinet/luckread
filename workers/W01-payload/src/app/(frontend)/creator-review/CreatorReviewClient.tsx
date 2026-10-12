@@ -70,8 +70,7 @@ export default function CreatorReviewClient({ displayName }: { displayName: stri
 
   useEffect(() => { void loadQueue() }, [loadQueue])
 
-  async function decide(event: FormEvent<HTMLFormElement>, application: CreatorApplication, decision: Decision) {
-    event.preventDefault()
+  async function decide(application: CreatorApplication, decision: Decision) {
     if (workingId) return
     const reason = (reasons[application.application_id] ?? '').trim()
     if (decision === 'REJECTED' && !reason) {
@@ -158,21 +157,18 @@ export default function CreatorReviewClient({ displayName }: { displayName: stri
                 </div>
                 <p className={styles.statement}>{application.statement || '申请人未填写说明。'}</p>
                 <div className={styles.meta}><span>提交于 {dateLabel(application.created_at)}</span><span>版本 v{application.version}</span></div>
-                <form onSubmit={(event) => void decide(event, application, retryingGrant ? 'APPROVED' : 'REJECTED')} className={styles.decisionForm}>
+                <form onSubmit={(event) => event.preventDefault()} className={styles.decisionForm}>
                   <label>
                     <span>{retryingGrant ? '授权重试说明（选填）' : '审核意见'}</span>
                     <textarea value={reasons[application.application_id] ?? ''} onChange={(event) => setReasons((current) => ({ ...current, [application.application_id]: event.target.value }))} maxLength={500} rows={3} placeholder={retryingGrant ? '可以补充处理说明。重试会复用原审核幂等键。' : '拒绝时请说明原因；通过时可以填写建议。'} disabled={workingId !== null} />
                   </label>
                   <div className={styles.actions}>
                     {retryingGrant ? (
-                      <button className={styles.approve} type="submit" disabled={workingId !== null}>{workingId === application.application_id ? '正在重试…' : '重试授权'}</button>
+                      <button className={styles.approve} type="button" disabled={workingId !== null} onClick={() => void decide(application, 'APPROVED')}>{workingId === application.application_id ? '正在重试…' : '重试授权'}</button>
                     ) : (
                       <>
-                        <button className={styles.reject} type="submit" disabled={workingId !== null} onClick={(event) => { event.preventDefault(); void decide(event as unknown as FormEvent<HTMLFormElement>, application, 'REJECTED') }}>{workingId === application.application_id ? '处理中…' : '拒绝申请'}</button>
-                        <button className={styles.approve} type="button" disabled={workingId !== null} onClick={() => {
-                          const form = document.getElementById('creator-review-' + application.application_id) as HTMLFormElement | null
-                          if (form) void decide({ preventDefault() {} } as FormEvent<HTMLFormElement>, application, 'APPROVED')
-                        }}>{workingId === application.application_id ? '处理中…' : '通过并授予 L3'}</button>
+                        <button className={styles.reject} type="button" disabled={workingId !== null} onClick={() => void decide(application, 'REJECTED')}>{workingId === application.application_id ? '处理中…' : '拒绝申请'}</button>
+                        <button className={styles.approve} type="button" disabled={workingId !== null} onClick={() => void decide(application, 'APPROVED')}>{workingId === application.application_id ? '处理中…' : '通过并授予 L3'}</button>
                       </>
                     )}
                   </div>
