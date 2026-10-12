@@ -1,8 +1,8 @@
-# W08 — Creator / Organization
+# W08 — Authorization / Creator / Organization
 
 Canonical Worker identity: **W08**
-Canonical responsibility: **Creator / Organization**
-Primary Task: **T04**
+Canonical responsibility: **Authorization / Creator / Organization**
+Primary Tasks: **T03, T04**
 Primary D1 authority: **D1-01**
 
 Canonical repository path: `workers/W08-creator`.
