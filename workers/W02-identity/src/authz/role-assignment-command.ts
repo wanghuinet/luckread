@@ -29,12 +29,12 @@ const roleScopeMatches = (command: RoleGrantCommand): boolean => {
     return command.scopeType === 'global' && command.scopeId === null
   }
   if (command.roleId === 'ip_principal') {
-    return command.scopeType === 'ip' && typeof command.scopeId === 'string' && command.scopeId.length > 0
+    return command.scopeType === 'ip' && typeof command.scopeId === 'string' && command.scopeId.length > 0 && command.scopeId.length <= 128
   }
   return (command.roleId === 'mcn_admin' || command.roleId === 'mcn_editor') &&
     command.scopeType === 'organization' &&
     typeof command.scopeId === 'string' &&
-    command.scopeId.length > 0
+    command.scopeId.length > 0 && command.scopeId.length <= 128
 }
 
 const sameScope = (row: PersistedAssignment, command: RoleGrantCommand): boolean =>
