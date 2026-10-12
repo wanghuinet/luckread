@@ -12,6 +12,11 @@ on:
         required: true
         type: string
         default: DEPLOY_BINDING
+      confirm_creator:
+        description: Type DEPLOY_W08_CREATOR only when source_sha includes W08 Creator qualification
+        required: false
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -26,6 +31,36 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ inputs.source_sha }}
+
+      - name: Gate optional W08 Creator deployment before any production mutation
+        env:
+          CONFIRM_CREATOR: ${{ inputs.confirm_creator }}
+        run: |
+          set -euo pipefail
+          if [ -f workers/W08-creator/wrangler.jsonc ]; then
+            if [ "$CONFIRM_CREATOR" != "DEPLOY_W08_CREATOR" ]; then
+              echo "This source includes W08 Creator. Set confirm_creator=DEPLOY_W08_CREATOR to enable the W08 migration/deploy; no production changes have run."
+              exit 1
+            fi
+            node --input-type=module - <<'NODE'
+            import fs from 'node:fs'
+            const w01 = JSON.parse(fs.readFileSync('workers/W01-payload/wrangler.jsonc', 'utf8'))
+            const w08 = JSON.parse(fs.readFileSync('workers/W08-creator/wrangler.jsonc', 'utf8'))
+            const binding = (w08.d1_databases || []).find((x) => x.binding === 'D1_01')
+            const ingress = (w01.services || []).find((x) => x.binding === 'W08_CREATOR')
+            if (w08.name !== 'luckread-w08-creator') throw new Error('W08 worker identity mismatch')
+            if (!binding || binding.database_name !== 'luckread' || binding.database_id !== '2f80471e-3756-49f9-8db1-7707a433ad64') throw new Error('W08 must reuse existing D1-01')
+            if (!ingress || ingress.service !== 'luckread-w08-creator') throw new Error('W01 W08_CREATOR binding mismatch')
+            if (!fs.existsSync('workers/W08-creator/migrations/0001_creator_authorization.sql')) throw new Error('W08 migration missing')
+            console.log('W08_D1_01_REUSE=PASS')
+            console.log('W01_W08_BINDING=PASS')
+            NODE
+          elif [ -n "$CONFIRM_CREATOR" ]; then
+            echo "confirm_creator was supplied, but source_sha does not contain W08 Creator files."
+            exit 1
+          else
+            echo "Source SHA has no W08 Creator Worker; creator migration/deploy skipped."
+          fi
 
       - name: Setup Node 24
         uses: actions/setup-node@v4
@@ -116,6 +151,14 @@ jobs:
           git diff --exit-code -- workers/W02-identity/migrations/0001_role_assignments.sql
           git diff --exit-code -- workers/W02-identity/migrations/0003_role_authorization_versions.sql
 
+      - name: Apply W08 additive migration on existing D1-01
+        if: ${{ inputs.confirm_creator == 'DEPLOY_W08_CREATOR' }}
+        working-directory: workers/W08-creator
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: npx --yes wrangler@4.116.0 d1 migrations apply "luckread" --remote --config wrangler.jsonc
+
       - name: Deploy W02 first with pinned Wrangler
         working-directory: workers/W02-identity
         env:
@@ -125,6 +168,17 @@ jobs:
           mkdir -p ../../artifacts/mapping-0
           set -o pipefail
           npx --yes wrangler@4.116.0 deploy --config wrangler.jsonc 2>&1 | tee ../../artifacts/mapping-0/w02-email-auth-deploy.log
+
+      - name: Deploy W08 Creator Worker
+        if: ${{ inputs.confirm_creator == 'DEPLOY_W08_CREATOR' }}
+        working-directory: workers/W08-creator
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          mkdir -p ../../artifacts/mapping-0
+          set -o pipefail
+          npx --yes wrangler@4.116.0 deploy --config wrangler.jsonc 2>&1 | tee ../../artifacts/mapping-0/w08-creator-deploy.log
 
       - name: Deploy W01 application with Service Binding
         working-directory: workers/W01-payload
@@ -137,16 +191,33 @@ jobs:
           npx --yes wrangler@4.116.0 deploy --config wrangler.jsonc 2>&1 | tee ../../artifacts/mapping-0/w01-w02-binding-deploy.log
 
       - name: Write deployment provenance
+        env:
+          CONFIRM_CREATOR: ${{ inputs.confirm_creator }}
         run: |
+          workers="luckread-w02,luckread-w01-payload"
+          deployment_order="W02 then W01"
+          database_mutation=false
+          creator_migration="not_applied"
+          if [ "$CONFIRM_CREATOR" = "DEPLOY_W08_CREATOR" ]; then
+            workers="luckread-w02,luckread-w08-creator,luckread-w01-payload"
+            deployment_order="W08 additive migration, W02 then W08 then W01"
+            database_mutation=true
+            creator_migration="workers/W08-creator/migrations/0001_creator_authorization.sql"
+          fi
           cat > artifacts/mapping-0/w01-w02-binding-deploy-provenance.txt <<EOF
           workflow=W01 W02 Auth Binding Deploy
           source_sha=${{ inputs.source_sha }}
           confirmation=DEPLOY_BINDING
-          workers=luckread-w02,luckread-w01-payload
-          deployment_order=W02 then W01
+          creator_confirmation=${CONFIRM_CREATOR:-not_requested}
+          workers=$workers
+          deployment_order=$deployment_order
           binding=W02_AUTH
+          creator_binding=W08_CREATOR
           target=luckread-w02
-          database_mutation=false
+          database_mutation=$database_mutation
+          creator_migration=$creator_migration
+          new_worker=false
+          new_database=false
           EOF
           cat artifacts/mapping-0/w01-w02-binding-deploy-provenance.txt
 
@@ -156,6 +227,7 @@ jobs:
           name: w01-w02-binding-deployment-${{ inputs.source_sha }}
           path: |
             artifacts/mapping-0/w02-email-auth-deploy.log
+            artifacts/mapping-0/w08-creator-deploy.log
             artifacts/mapping-0/w01-w02-binding-deploy.log
             artifacts/mapping-0/w01-w02-binding-deploy-provenance.txt
 
