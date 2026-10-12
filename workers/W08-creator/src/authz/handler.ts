@@ -8,13 +8,13 @@ import {
 } from './casl-policy.js'
 import { resolvePermissionContext } from './role-layer.js'
 
-type Env = { D1_01: D1Database }
+type Env = { D1_01: D1Database; W02_AUTH: Fetcher }
 type PermissionRequest = {
-  subjectId?: unknown
   action?: unknown
   resourceType?: unknown
   resourceAttributes?: unknown
 }
+type W02Principal = { active: true; userId: string; accountState?: string }
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
   status,
@@ -50,10 +50,43 @@ function deny(reasonCode: string, status = 200) {
   return json({ decision: 'DENY', reasonCode, policyVersion: AUTHZ_POLICY_VERSION }, status)
 }
 
+async function resolveSubjectFromW02Session(
+  request: Request,
+  env: Env,
+): Promise<{ userId: string } | null | Response> {
+  // No session cookie means the request is anonymous. Identity is never read
+  // from the request body; authenticated subject identity is resolved by W02.
+  if (!request.headers.has('cookie')) return null
+  try {
+    const headers = new Headers(request.headers)
+    headers.delete('host')
+    headers.delete('content-length')
+    headers.delete('authorization')
+    const response = await env.W02_AUTH.fetch(new Request(
+      'https://luckread-w02.internal/internal/auth/principal',
+      { method: 'POST', headers },
+    ))
+    const value: unknown = await response.json().catch(() => null)
+    if (
+      response.ok && value && typeof value === 'object' &&
+      (value as W02Principal).active === true &&
+      typeof (value as W02Principal).userId === 'string' &&
+      (value as W02Principal).userId.length > 0
+    ) {
+      return { userId: (value as W02Principal).userId }
+    }
+    if (response.status === 401 || (value as { active?: unknown } | null)?.active === false) return null
+    return deny('IDENTITY_SERVICE_UNAVAILABLE', 503)
+  } catch {
+    return deny('IDENTITY_SERVICE_UNAVAILABLE', 503)
+  }
+}
+
 /**
- * Internal-only permission endpoint. It derives current account state and
- * time-valid role/scope facts from D1-01; callers cannot submit those facts.
- * Domain callers remain responsible for loading authoritative resource fields.
+ * Internal-only permission endpoint. Actor identity comes from a W02 session,
+ * and current account/role/scope facts come from D1-01. Callers cannot submit
+ * subjectId, layer, account state, or scoped-role facts. Resource attributes
+ * must be loaded server-side by the owning domain before this endpoint is used.
  */
 export async function handlePermissionCheck(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url)
@@ -64,15 +97,11 @@ export async function handlePermissionCheck(request: Request, env: Env): Promise
   const body = await readJsonBody(request)
   if (!body) return deny('INVALID_AUTHORIZATION_REQUEST', 400)
 
-  const allowedKeys = new Set(['subjectId', 'action', 'resourceType', 'resourceAttributes'])
+  const allowedKeys = new Set(['action', 'resourceType', 'resourceAttributes'])
   if (Object.keys(body).some((key) => !allowedKeys.has(key))) {
     return deny('CALLER_SUPPLIED_AUTHORIZATION_CONTEXT', 400)
   }
-
-  const subjectId = body.subjectId
-  const isAnonymous = subjectId === undefined || subjectId === null
   if (
-    (!isAnonymous && (typeof subjectId !== 'string' || subjectId.length === 0 || subjectId.length > 128)) ||
     typeof body.action !== 'string' || body.action.trim().length === 0 || body.action.length > 128 ||
     typeof body.resourceType !== 'string' ||
     !(SUPPORTED_AUTHZ_SUBJECTS as readonly string[]).includes(body.resourceType) ||
@@ -84,12 +113,15 @@ export async function handlePermissionCheck(request: Request, env: Env): Promise
   const action = body.action
   const resourceType = body.resourceType
   const resourceAttributes = (body.resourceAttributes ?? {}) as Record<string, unknown>
+  const actor = await resolveSubjectFromW02Session(request, env)
+  if (actor instanceof Response) return actor
+  const subjectId = actor?.userId ?? null
 
   try {
     let context: { layer: LayerId; scopedRoleAssignments: ScopedRoleAssignment[] }
     let accountState: string | null
 
-    if (isAnonymous) {
+    if (subjectId === null) {
       context = { layer: 'L0', scopedRoleAssignments: [] }
       accountState = null
     } else {
@@ -113,7 +145,7 @@ export async function handlePermissionCheck(request: Request, env: Env): Promise
 
     const input: CaslPermissionInput = {
       ...context,
-      subjectId: isAnonymous ? null : subjectId as string,
+      subjectId,
       accountState,
       action,
       resourceType,
