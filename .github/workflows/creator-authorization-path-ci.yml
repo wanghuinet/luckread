@@ -37,7 +37,7 @@ jobs:
         run: npm ci
 
       - name: Verify creator authorization policy tests
-        run: npx --yes vitest@3.2.4 run workers/W08-creator/src/policy.test.ts
+        run: npx --yes vitest@3.2.4 run workers/W02-identity/src/authz/role-assignment-command.test.ts workers/W08-creator/src/policy.test.ts
 
       - name: Typecheck W08 Creator Worker
         run: npx --no-install tsc --noEmit -p workers/W08-creator/tsconfig.json
@@ -64,8 +64,9 @@ jobs:
         working-directory: workers/W01-payload
         run: pnpm exec tsc --noEmit
 
-      - name: Verify W01/W08 binding and transport authorities
+      - name: Verify creator authorization path and transport authorities
         run: |
+          node scripts/verify-creator-authorization-path.mjs
           node --input-type=module - <<'NODE'
           import fs from 'node:fs'
           const w01 = JSON.parse(fs.readFileSync('workers/W01-payload/wrangler.jsonc', 'utf8'))
