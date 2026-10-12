@@ -68,7 +68,12 @@ class FakeStatement {
     }
 
     if (this.sql.includes('FROM creators WHERE user_id = ?')) {
-      return (this.db.creators.get(String(a)) ?? null) as T | null
+      const row = this.db.creators.get(String(a))
+      if (!row) return null
+      if (this.sql.includes('AS creatorId')) {
+        return { creatorId: row.creator_id, applicationId: row.application_id } as T
+      }
+      return { creator_id: row.creator_id, application_id: row.application_id } as T
     }
 
     return null
@@ -92,7 +97,7 @@ class FakeStatement {
 
 class FakeD1 {
   applications = new Map<string, TestApplication>()
-  creators = new Map<string, { creator_id: string; application_id: string }>()
+  creators = new Map<string, { creator_id: string; application_id: string; status?: string; version?: number; updated_at?: string }>()
   queries: Array<{ sql: string; values: unknown[] }> = []
   batches = 0
 
@@ -104,8 +109,10 @@ class FakeD1 {
     this.batches++
     const results = statements.map((item) => {
       const statement = item as FakeStatement
+      const values = statement.values
+
       if (statement.sql.includes('INSERT INTO creator_applications')) {
-        const [applicationId, userId, creatorType, statementText, idempotencyKey, now, updatedAt] = statement.values
+        const [applicationId, userId, creatorType, statementText, idempotencyKey, now, updatedAt] = values
         this.applications.set(String(applicationId), {
           application_id: String(applicationId),
           user_id: String(userId),
@@ -124,6 +131,62 @@ class FakeD1 {
         })
         return { meta: { changes: 1 } }
       }
+
+      if (statement.sql.includes("UPDATE creator_applications SET status = 'APPROVED'")) {
+        const [key, actorId, reason, decidedAt, updatedAt, applicationId, expectedVersion] = values
+        const row = this.applications.get(String(applicationId))
+        if (!row || row.status !== 'PENDING' || row.version !== Number(expectedVersion)) {
+          return { meta: { changes: 0 } }
+        }
+        Object.assign(row, {
+          status: 'APPROVED',
+          grant_state: 'PENDING',
+          version: row.version + 1,
+          decision_idempotency_key: String(key),
+          decided_by: String(actorId),
+          decision_reason: String(reason),
+          decided_at: String(decidedAt),
+          updated_at: String(updatedAt),
+        })
+        return { meta: { changes: 1 } }
+      }
+
+      if (statement.sql.includes('INSERT INTO creators')) {
+        const [creatorId, createdAt, updatedAt, applicationId, key, actorId] = values
+        const row = this.applications.get(String(applicationId))
+        if (!row || row.status !== 'APPROVED' || row.decision_idempotency_key !== key || row.decided_by !== actorId) {
+          return { meta: { changes: 0 } }
+        }
+        this.creators.set(row.user_id, {
+          creator_id: String(creatorId),
+          application_id: row.application_id,
+          status: 'PENDING_ROLE_GRANT',
+          version: 1,
+          updated_at: String(updatedAt ?? createdAt),
+        })
+        return { meta: { changes: 1 } }
+      }
+
+      if (statement.sql.includes("UPDATE creator_applications SET grant_state = 'GRANTED'")) {
+        const [updatedAt, applicationId] = values
+        const row = this.applications.get(String(applicationId))
+        if (!row || row.status !== 'APPROVED' || row.grant_state !== 'PENDING') return { meta: { changes: 0 } }
+        row.grant_state = 'GRANTED'
+        row.version++
+        row.updated_at = String(updatedAt)
+        return { meta: { changes: 1 } }
+      }
+
+      if (statement.sql.includes("UPDATE creators SET status = 'ACTIVE'")) {
+        const [updatedAt, applicationId] = values
+        const row = [...this.creators.values()].find((item) => item.application_id === String(applicationId))
+        if (!row || row.status !== 'PENDING_ROLE_GRANT') return { meta: { changes: 0 } }
+        row.status = 'ACTIVE'
+        row.version = (row.version ?? 1) + 1
+        row.updated_at = String(updatedAt)
+        return { meta: { changes: 1 } }
+      }
+
       return { meta: { changes: 1 } }
     })
     return results
@@ -150,8 +213,9 @@ const request = (path: string, method: string, body?: unknown, headers?: Headers
   })
 }
 
-function harness(current: TestPrincipal | null) {
+function harness(current: TestPrincipal | null, allowRoleGrant = false) {
   const db = new FakeD1()
+  const roleGrants: Array<Record<string, unknown>> = []
   const auth = {
     async fetch(incoming: Request): Promise<Response> {
       const path = new URL(incoming.url).pathname
@@ -159,6 +223,10 @@ function harness(current: TestPrincipal | null) {
         return current
           ? Response.json(current)
           : Response.json({ active: false }, { status: 401 })
+      }
+      if (path === '/internal/authz/role-assignment' && allowRoleGrant) {
+        roleGrants.push(await incoming.json() as Record<string, unknown>)
+        return Response.json({ assignmentId: 'role-assignment-test-0001', replayed: false })
       }
       // Tests must not accidentally promote an identity unless a test opts into it.
       throw new Error('Unexpected W02 role-assignment call in guard-path test')
@@ -168,7 +236,7 @@ function harness(current: TestPrincipal | null) {
     D1_01: db as unknown as D1Database,
     W02_AUTH: auth as unknown as Fetcher,
   } as Parameters<typeof worker.fetch>[1]
-  return { db, env }
+  return { db, env, roleGrants }
 }
 
 async function responseBody(response: Response) {
@@ -316,6 +384,73 @@ describe('W08 creator qualification runtime guards', () => {
     expect(staleResponse.status).toBe(412)
     expect((await responseBody(staleResponse)).data?.error?.code).toBe('PRECONDITION_FAILED')
     expect(staleHarness.db.batches).toBe(0)
+  })
+
+  it('grants L3 only after an authorized L7 approval and W02 confirms RoleAssignment', async () => {
+    const setup = harness(principal('reviewer-l7-0001', 'L7'), true)
+    setup.db.applications.set('creator-app-0001', existingApplication())
+
+    const response = await worker.fetch(request('/api/v1/admin/creator-applications/decision', 'POST', {
+      applicationId: 'creator-app-0001',
+      decision: 'APPROVED',
+      reason: 'Creator qualification accepted.',
+    }, { 'Idempotency-Key': 'creator-review-approve-0001', 'If-Match': '"1"' }), setup.env)
+    const result = await responseBody(response)
+
+    expect(response.status).toBe(200)
+    expect(result.data).toMatchObject({ status: 'APPROVED', grantState: 'GRANTED', version: 3 })
+    expect(setup.roleGrants).toEqual([{
+      subjectId: 'applicant-0001',
+      roleId: 'creator',
+      scopeType: 'global',
+      scopeId: null,
+      approvalRef: 'creator-application-creator-app-0001',
+    }])
+    expect(setup.db.creators.get('applicant-0001')).toMatchObject({
+      application_id: 'creator-app-0001',
+      status: 'ACTIVE',
+    })
+    expect(setup.db.applications.get('creator-app-0001')).toMatchObject({
+      status: 'APPROVED',
+      grant_state: 'GRANTED',
+      decided_by: 'reviewer-l7-0001',
+    })
+  })
+
+  it('shows grant-pending retries only to the reviewer who originally approved the application', async () => {
+    const reviewer = harness(principal('reviewer-l7-0001', 'L7'))
+    const otherReviewer = harness(principal('reviewer-l7-0002', 'L7'))
+    reviewer.db.applications.set('creator-app-own-retry', existingApplication({
+      application_id: 'creator-app-own-retry',
+      status: 'APPROVED',
+      grant_state: 'PENDING',
+      version: 2,
+      decided_by: 'reviewer-l7-0001',
+      decision_idempotency_key: 'creator-review-original-own',
+    }))
+    reviewer.db.applications.set('creator-app-other-retry', existingApplication({
+      application_id: 'creator-app-other-retry',
+      user_id: 'applicant-0002',
+      application_id: 'creator-app-other-retry',
+      status: 'APPROVED',
+      grant_state: 'PENDING',
+      version: 2,
+      decided_by: 'reviewer-l7-0002',
+      decision_idempotency_key: 'creator-review-original-other',
+    }))
+    otherReviewer.db.applications = reviewer.db.applications
+    otherReviewer.db.creators = reviewer.db.creators
+
+    const ownResponse = await worker.fetch(request('/api/v1/admin/creator-applications', 'GET'), reviewer.env)
+    const otherResponse = await worker.fetch(request('/api/v1/admin/creator-applications', 'GET'), otherReviewer.env)
+    const own = await responseBody(ownResponse)
+    const other = await responseBody(otherResponse)
+
+    expect(ownResponse.status).toBe(200)
+    expect(own.data?.data?.map((item) => item.application_id)).toContain('creator-app-own-retry')
+    expect(own.data?.data?.map((item) => item.application_id)).not.toContain('creator-app-other-retry')
+    expect(other.data?.data?.map((item) => item.application_id)).toContain('creator-app-other-retry')
+    expect(other.data?.data?.map((item) => item.application_id)).not.toContain('creator-app-own-retry')
   })
 
   it('rejects a conflicting decision after the application has reached a final state', async () => {
