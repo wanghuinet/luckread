@@ -44,8 +44,12 @@ jobs:
       - name: Install root toolchain
         run: npm ci
 
+      - name: Install W08 runtime dependencies
+        working-directory: workers/W08-creator
+        run: npm install --ignore-scripts --no-audit --no-fund --package-lock=false
+
       - name: Verify creator authorization policy tests
-        run: npx --yes vitest@3.2.4 run workers/W02-identity/src/authz/role-assignment-command.test.ts workers/W08-creator/src/policy.test.ts workers/W08-creator/src/index.runtime.test.ts workers/W01-payload/tests/int/creator-application-page.int.spec.ts
+        run: npx --yes vitest@3.2.4 run workers/W02-identity/src/authz/role-assignment-command.test.ts workers/W08-creator/src/policy.test.ts workers/W08-creator/src/authz/casl-policy.test.ts workers/W08-creator/src/authz/handler.test.ts workers/W08-creator/src/index.runtime.test.ts workers/W01-payload/tests/int/creator-application-page.int.spec.ts
 
       - name: Typecheck W08 Creator Worker
         run: npx --no-install tsc --noEmit -p workers/W08-creator/tsconfig.json
