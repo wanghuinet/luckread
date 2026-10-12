@@ -423,7 +423,7 @@
       "auditRequired": true,
       "optimisticLockRequired": false,
       "idempotencyRequired": false,
-      "stateMachine": "creator"
+      "stateMachine": "none"
     },
     {
       "operationId": "listModerationCases",
@@ -654,20 +654,7 @@
       "auditRequired": false,
       "optimisticLockRequired": false,
       "idempotencyRequired": false,
-      "stateMachine": "creator"
-    },
-    {
-      "operationId": "listMyCreatorScopes",
-      "auth": {
-        "mode": "authenticated"
-      },
-      "permissions": [
-        "creator.scope.read.own"
-      ],
-      "auditRequired": false,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": false,
-      "stateMachine": "creator"
+      "stateMachine": "none"
     },
     {
       "operationId": "getCreatorAnalytics",
@@ -1503,20 +1490,7 @@
       "auditRequired": true,
       "optimisticLockRequired": true,
       "idempotencyRequired": true,
-      "stateMachine": "creator"
-    },
-    {
-      "operationId": "appointCreatorScopeRole",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "creator.scope.manage"
-      ],
-      "auditRequired": true,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": true,
-      "stateMachine": "creator"
+      "stateMachine": "none"
     },
     {
       "operationId": "decideModerationCase",
@@ -1865,7 +1839,7 @@
       "auditRequired": true,
       "optimisticLockRequired": false,
       "idempotencyRequired": true,
-      "stateMachine": "creator"
+      "stateMachine": "none"
     },
     {
       "operationId": "postDeveloperApiKeys",
