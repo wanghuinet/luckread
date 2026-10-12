@@ -42,19 +42,7 @@ jobs:
               echo "This source includes W08 Creator. Set confirm_creator=DEPLOY_W08_CREATOR to enable the W08 migration/deploy; no production changes have run."
               exit 1
             fi
-            node --input-type=module - <<'NODE'
-            import fs from 'node:fs'
-            const w01 = JSON.parse(fs.readFileSync('workers/W01-payload/wrangler.jsonc', 'utf8'))
-            const w08 = JSON.parse(fs.readFileSync('workers/W08-creator/wrangler.jsonc', 'utf8'))
-            const binding = (w08.d1_databases || []).find((x) => x.binding === 'D1_01')
-            const ingress = (w01.services || []).find((x) => x.binding === 'W08_CREATOR')
-            if (w08.name !== 'luckread-w08-creator') throw new Error('W08 worker identity mismatch')
-            if (!binding || binding.database_name !== 'luckread' || binding.database_id !== '2f80471e-3756-49f9-8db1-7707a433ad64') throw new Error('W08 must reuse existing D1-01')
-            if (!ingress || ingress.service !== 'luckread-w08-creator') throw new Error('W01 W08_CREATOR binding mismatch')
-            if (!fs.existsSync('workers/W08-creator/migrations/0001_creator_authorization.sql')) throw new Error('W08 migration missing')
-            console.log('W08_D1_01_REUSE=PASS')
-            console.log('W01_W08_BINDING=PASS')
-            NODE
+            node --input-type=module -e 'import fs from "node:fs"; const w01=JSON.parse(fs.readFileSync("workers/W01-payload/wrangler.jsonc","utf8")); const w08=JSON.parse(fs.readFileSync("workers/W08-creator/wrangler.jsonc","utf8")); const binding=(w08.d1_databases||[]).find((x)=>x.binding==="D1_01"); const ingress=(w01.services||[]).find((x)=>x.binding==="W08_CREATOR"); if(w08.name!=="luckread-w08-creator") throw new Error("W08 worker identity mismatch"); if(!binding||binding.database_name!=="luckread"||binding.database_id!=="2f80471e-3756-49f9-8db1-7707a433ad64") throw new Error("W08 must reuse existing D1-01"); if(!ingress||ingress.service!=="luckread-w08-creator") throw new Error("W01 W08_CREATOR binding mismatch"); if(!fs.existsSync("workers/W08-creator/migrations/0001_creator_authorization.sql")) throw new Error("W08 migration missing"); console.log("W08_D1_01_REUSE=PASS"); console.log("W01_W08_BINDING=PASS");'
           elif [ -n "$CONFIRM_CREATOR" ]; then
             echo "confirm_creator was supplied, but source_sha does not contain W08 Creator files."
             exit 1
@@ -125,15 +113,7 @@ jobs:
       - name: Verify W01 traffic guard bindings
         working-directory: workers/W01-payload
         run: |
-          node - <<'NODE'
-          const fs=require('fs')
-          const c=JSON.parse(fs.readFileSync('wrangler.jsonc','utf8'))
-          const required=['PUBLIC_ORIGIN_GLOBAL_LIMITER','PUBLIC_READ_LIMITER','AUTH_ORIGIN_GLOBAL_LIMITER','AUTH_REGISTER_LIMITER','AUTH_LOGIN_LIMITER','AUTH_REFRESH_LIMITER']
-          const names=new Set((c.ratelimits||[]).map(x=>x.name))
-          for(const name of required) if(!names.has(name)) throw new Error('missing rate limiter: '+name)
-          console.log(JSON.stringify({rateLimitBindings:[...names].sort()}))
-          NODE
-
+          node -e 'const fs=require("fs"); const c=JSON.parse(fs.readFileSync("wrangler.jsonc","utf8")); const required=["PUBLIC_ORIGIN_GLOBAL_LIMITER","PUBLIC_READ_LIMITER","AUTH_ORIGIN_GLOBAL_LIMITER","AUTH_REGISTER_LIMITER","AUTH_LOGIN_LIMITER","AUTH_REFRESH_LIMITER"]; const names=new Set((c.ratelimits||[]).map(x=>x.name)); for(const name of required) if(!names.has(name)) throw new Error("missing rate limiter: "+name); console.log(JSON.stringify({rateLimitBindings:[...names].sort()}));'
       - name: Ensure W01 PAYLOAD_SECRET runtime secret
         working-directory: workers/W01-payload
         env:
@@ -209,6 +189,7 @@ jobs:
       - name: Write deployment provenance
         env:
           CONFIRM_CREATOR: ${{ inputs.confirm_creator }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
         run: |
           workers="luckread-w02,luckread-w01-payload"
           deployment_order="W02 then W01"
@@ -220,21 +201,7 @@ jobs:
             database_mutation=true
             creator_migration="workers/W08-creator/migrations/0001_creator_authorization.sql"
           fi
-          cat > artifacts/mapping-0/w01-w02-binding-deploy-provenance.txt <<EOF
-          workflow=W01 W02 Auth Binding Deploy
-          source_sha=${{ inputs.source_sha }}
-          confirmation=DEPLOY_BINDING
-          creator_confirmation=${CONFIRM_CREATOR:-not_requested}
-          workers=$workers
-          deployment_order=$deployment_order
-          binding=W02_AUTH
-          creator_binding=W08_CREATOR
-          target=luckread-w02
-          database_mutation=$database_mutation
-          creator_migration=$creator_migration
-          new_worker=false
-          new_database=false
-          EOF
+          node -e 'const fs=require("node:fs"); const creator=process.env.CONFIRM_CREATOR==="DEPLOY_W08_CREATOR"; const values=["workflow=W01 W02 Auth Binding Deploy","source_sha="+process.env.SOURCE_SHA,"confirmation=DEPLOY_BINDING","creator_confirmation="+(process.env.CONFIRM_CREATOR||"not_requested"),"workers="+(creator?"luckread-w02,luckread-w08-creator,luckread-w01-payload":"luckread-w02,luckread-w01-payload"),"deployment_order="+(creator?"W08 additive migration, W02 then W08 then W01":"W02 then W01"),"binding=W02_AUTH","creator_binding=W08_CREATOR","target=luckread-w02","database_mutation="+creator,"creator_migration="+(creator?"workers/W08-creator/migrations/0001_creator_authorization.sql":"not_applied"),"new_worker=false","new_database=false"]; fs.writeFileSync("artifacts/mapping-0/w01-w02-binding-deploy-provenance.txt",values.join("\\n")+"\\n");'
           cat artifacts/mapping-0/w01-w02-binding-deploy-provenance.txt
 
       - name: Upload deployment evidence
