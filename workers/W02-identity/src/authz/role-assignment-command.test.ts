@@ -174,7 +174,10 @@ describe('W02 creator role assignment authority', () => {
     expect(mayApproveRoleGrant('L2', 'mcn_editor', 'ip', true)).toBe(false)
     expect(mayApproveRoleGrant('L2', 'mcn_admin', 'organization', true)).toBe(false)
     expect(mayApproveRoleGrant('L2', 'creator', 'global', true)).toBe(false)
-    expect(mayApproveRoleGrant('L6', 'mcn_editor', 'organization', true)).toBe(false)
+    // Scope authority is independent from the actor's global layer:
+    // a matching mcn_admin assignment still grants editor-management rights
+    // only for that organization, but never grants global elevation.
+    expect(mayApproveRoleGrant('L6', 'mcn_editor', 'organization', true)).toBe(true)
     expect(mayApproveRoleGrant('L7', 'creator', 'global', false)).toBe(true)
     expect(mayApproveRoleGrant('L8', 'ip_principal', 'ip', false)).toBe(true)
   })
