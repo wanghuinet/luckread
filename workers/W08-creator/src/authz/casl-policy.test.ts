@@ -315,7 +315,7 @@ describe('CASL L0-L8 authorization policy', () => {
   })
 
   it('denies unknown permissions, unsupported subjects, and malformed attributes', () => {
-    expect(evaluate({ action: 'permission.not.registered' }).decision).toBe('DENY')
+    expect(evaluate({ action: 'permission.not.registered' })).toMatchObject({ decision: 'DENY', reasonCode: 'UNKNOWN_PERMISSION' })
     expect(evaluate({
       action: 'security.manage',
       layer: 'L8',
