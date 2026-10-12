@@ -138,15 +138,17 @@ const principal = (userId: string, layer: string): TestPrincipal => ({
   layer,
 })
 
-const request = (path: string, method: string, body?: unknown, headers?: HeadersInit) =>
-  new Request('https://luckread-w08-creator.internal' + path, {
+const request = (path: string, method: string, body?: unknown, headers?: HeadersInit) => {
+  const requestHeaders = new Headers(headers)
+  if (body !== undefined && !requestHeaders.has('content-type')) {
+    requestHeaders.set('content-type', 'application/json')
+  }
+  return new Request('https://luckread-w08-creator.internal' + path, {
     method,
-    headers: new Headers({
-      ...(body === undefined ? {} : { 'content-type': 'application/json' }),
-      ...(headers ?? {}),
-    }),
+    headers: requestHeaders,
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   })
+}
 
 function harness(current: TestPrincipal | null) {
   const db = new FakeD1()
