@@ -8,9 +8,10 @@ import {
 } from './policy.js'
 
 describe('creator authorization admission', () => {
-  it('permits an email-verified L2 user to apply without trusting a body role', () => {
+  it('permits only a global L2 user to apply without trusting a body role', () => {
     expect(mayApplyForCreator('L2')).toBe(true)
-    expect(mayApplyForCreator('L3')).toBe(true)
+    expect(mayApplyForCreator('L3')).toBe(false)
+    expect(mayApplyForCreator('L7')).toBe(false)
     expect(mayApplyForCreator('L1')).toBe(false)
     expect(mayApplyForCreator(null)).toBe(false)
   })
