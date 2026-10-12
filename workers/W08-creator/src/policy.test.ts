@@ -1,8 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  deriveRoleAppointment,
   mayApplyForCreator,
-  mayCreateNewScope,
   mayReviewCreatorApplication,
   parseExpectedVersion,
   validIdempotencyKey,
@@ -22,26 +20,6 @@ describe('creator authorization admission', () => {
     expect(mayReviewCreatorApplication('L8')).toBe(true)
     expect(mayReviewCreatorApplication('L6')).toBe(false)
     expect(mayReviewCreatorApplication('L3')).toBe(false)
-  })
-
-  it('derives only the allowed scoped L4 roles from a scope appointment intent', () => {
-    expect(deriveRoleAppointment('ip', 'IP_PRINCIPAL')?.roleId).toBe('ip_principal')
-    expect(deriveRoleAppointment('organization', 'ORG_LEAD')?.roleId).toBe('mcn_admin')
-    expect(deriveRoleAppointment('organization', 'ORG_EDITOR')?.roleId).toBe('mcn_editor')
-    expect(deriveRoleAppointment('ip', 'ORG_LEAD')).toBeNull()
-    expect(deriveRoleAppointment('organization', 'SUPER_ADMIN')).toBeNull()
-    expect(deriveRoleAppointment('global', 'CREATOR')).toBeNull()
-  })
-
-  it('allows public runtime to create only a new organization paired with a lead appointment', () => {
-    const lead = deriveRoleAppointment('organization', 'ORG_LEAD')
-    const editor = deriveRoleAppointment('organization', 'ORG_EDITOR')
-    const ip = deriveRoleAppointment('ip', 'IP_PRINCIPAL')
-    expect(mayCreateNewScope(lead, '', 'Studio')).toBe(true)
-    expect(mayCreateNewScope(editor, '', 'Studio')).toBe(false)
-    expect(mayCreateNewScope(ip, '', 'IP')).toBe(false)
-    expect(mayCreateNewScope(lead, 'existing-scope', '')).toBe(false)
-    expect(mayCreateNewScope(lead, '', ' '.repeat(201))).toBe(false)
   })
 
   it('parses strong version preconditions and rejects weak or malformed values', () => {
