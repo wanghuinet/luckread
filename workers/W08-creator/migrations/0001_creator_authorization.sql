@@ -69,3 +69,31 @@ CREATE TABLE IF NOT EXISTS creator_scope_appointments (
 );
 CREATE INDEX IF NOT EXISTS creator_scope_appointments_user_idx
   ON creator_scope_appointments(user_id, status);
+
+
+CREATE TABLE IF NOT EXISTS creator_authorization_audit (
+  audit_id TEXT NOT NULL PRIMARY KEY,
+  event_key TEXT NOT NULL UNIQUE,
+  actor_id TEXT NOT NULL,
+  subject_id TEXT NOT NULL,
+  event_type TEXT NOT NULL CHECK (event_type IN (
+    'CREATOR_APPLICATION_SUBMITTED',
+    'CREATOR_APPLICATION_APPROVED',
+    'CREATOR_APPLICATION_REJECTED',
+    'CREATOR_ROLE_GRANTED',
+    'CREATOR_SCOPE_CREATED',
+    'SCOPED_ROLE_GRANTED'
+  )),
+  resource_type TEXT NOT NULL CHECK (resource_type IN ('creator_application','creator','creator_scope','role_assignment')),
+  resource_id TEXT NOT NULL,
+  from_state TEXT,
+  to_state TEXT,
+  idempotency_key TEXT,
+  correlation_id TEXT,
+  occurred_at TEXT NOT NULL,
+  details_json TEXT NOT NULL DEFAULT '{}'
+);
+CREATE INDEX IF NOT EXISTS creator_authorization_audit_subject_time_idx
+  ON creator_authorization_audit(subject_id, occurred_at);
+CREATE INDEX IF NOT EXISTS creator_authorization_audit_resource_time_idx
+  ON creator_authorization_audit(resource_type, resource_id, occurred_at);
