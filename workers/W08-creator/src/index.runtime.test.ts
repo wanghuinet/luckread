@@ -431,7 +431,6 @@ describe('W08 creator qualification runtime guards', () => {
     reviewer.db.applications.set('creator-app-other-retry', existingApplication({
       application_id: 'creator-app-other-retry',
       user_id: 'applicant-0002',
-      application_id: 'creator-app-other-retry',
       status: 'APPROVED',
       grant_state: 'PENDING',
       version: 2,
