@@ -1,14 +1,3 @@
-export type Layer = 'L0' | 'L1' | 'L2' | 'L3' | 'L4' | 'L5' | 'L6' | 'L7' | 'L8'
-
-export function mayApplyForCreator(layer: string | null | undefined): boolean {
-  // Only the verified global L2 user may request first-time L3 creator access.
-  return layer === 'L2'
-}
-
-export function mayReviewCreatorApplication(layer: string | null | undefined): boolean {
-  return layer === 'L7' || layer === 'L8'
-}
-
 export type CreatorDecisionAdmission = 'DECIDE' | 'REPLAY' | 'SELF_APPROVAL_DENIED' | 'DECISION_CONFLICT'
 
 export function creatorApplicationReplayMatches(
