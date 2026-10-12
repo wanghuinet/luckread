@@ -8,6 +8,7 @@ import {
   type AccountState,
 } from './account/account-state-transition.js'
 import { resolveBetterAuthPrincipal } from './auth/principal.js'
+import { grantCreatorBusinessRole, RoleAssignmentCommandError } from './authz/role-assignment-command.js'
 
 interface Env {
   D1_01: D1Database
@@ -228,6 +229,70 @@ export default {
         return json(result)
       } catch {
         return json({ decision: 'DENY' }, 503)
+      }
+    }
+
+    if (request.method === 'POST' && url.pathname === '/internal/authz/role-assignment') {
+      // W08 owns the creator application/scope appointment. W02 independently
+      // authenticates the approving administrator and remains the sole writer
+      // of RoleAssignment. This path is private to the W08 service binding.
+      if (
+        request.headers.get('X-LuckRead-Caller') !== 'W08' ||
+        request.headers.get('X-LuckRead-Transport-Version') !== '1.0'
+      ) {
+        return json({ error: { code: 'FORBIDDEN', message: 'authorized internal caller required' } }, 403)
+      }
+
+      const actor = await resolveBetterAuthPrincipal(env, request).catch(() => null)
+      if (!actor) return json({ error: { code: 'UNAUTHENTICATED', message: 'authenticated approver required' } }, 401)
+      if (actor.accountState !== 'ACTIVE' || (actor.layer !== 'L7' && actor.layer !== 'L8')) {
+        return json({ error: { code: 'PERMISSION_DENIED', message: 'L7 or L8 authorization is required' } }, 403)
+      }
+
+      const body = await readJsonBody<{
+        subjectId?: unknown
+        roleId?: unknown
+        scopeType?: unknown
+        scopeId?: unknown
+        approvalRef?: unknown
+      }>(request)
+      if (
+        !body ||
+        typeof body.subjectId !== 'string' ||
+        typeof body.roleId !== 'string' ||
+        typeof body.scopeType !== 'string' ||
+        !(body.scopeId === null || typeof body.scopeId === 'string') ||
+        typeof body.approvalRef !== 'string'
+      ) {
+        return json({ error: { code: 'VALIDATION_FAILED', message: 'invalid role assignment command' } }, 400)
+      }
+
+      try {
+        const result = await grantCreatorBusinessRole(env.D1_01, {
+          subjectId: body.subjectId,
+          roleId: body.roleId as 'creator' | 'ip_principal' | 'mcn_admin' | 'mcn_editor',
+          scopeType: body.scopeType as 'global' | 'organization' | 'ip',
+          scopeId: body.scopeId,
+          approvalRef: body.approvalRef,
+        })
+        return json({ ...result, approvedBy: actor.userId })
+      } catch (error) {
+        const code = error instanceof RoleAssignmentCommandError ? error.code : 'ROLE_ASSIGNMENT_WRITE_FAILED'
+        const status =
+          code === 'VALIDATION_FAILED' ? 400 :
+          code === 'ROLE_MAPPING_INVALID' ? 409 :
+          code === 'TARGET_NOT_ELIGIBLE' || code === 'VERIFIED_ROLE_REQUIRED' ? 403 :
+          code === 'ROLE_ASSIGNMENT_CONFLICT' || code === 'ROLE_ASSIGNMENT_ALREADY_ACTIVE' ? 409 : 503
+        return json({
+          error: {
+            code,
+            message:
+              status === 400 ? 'invalid role assignment command' :
+              status === 403 ? 'target account is not eligible for this role' :
+              status === 409 ? 'role assignment conflicts with current authorization state' :
+              'role assignment service unavailable',
+          },
+        }, status)
       }
     }
 
