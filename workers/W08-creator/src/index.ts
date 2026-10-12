@@ -52,7 +52,7 @@ type ScopeAppointmentRow = {
 const json = (body: unknown, status = 200, extraHeaders?: HeadersInit) => {
   const headers = new Headers({ 'cache-control': 'no-store' })
   new Headers(extraHeaders).forEach((value, key) => headers.set(key, value))
-  return Response.json(body, { status, headers })
+  return Response.json({ data: body, requestId: crypto.randomUUID() }, { status, headers })
 }
 
 const errorResponse = (status: number, code: string, message: string) =>
