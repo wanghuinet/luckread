@@ -1,5 +1,5 @@
--- W08 / D1-01 owns creator applications, creator identity, organization/IP
--- scope references and scope membership facts. RoleAssignment remains W02-owned.
+-- W08 / D1-01 owns creator applications and creator identity facts.
+-- RoleAssignment remains W02-owned.
 CREATE TABLE IF NOT EXISTS creator_applications (
   application_id TEXT NOT NULL PRIMARY KEY,
   user_id TEXT NOT NULL,
@@ -34,43 +34,6 @@ CREATE TABLE IF NOT EXISTS creators (
 );
 CREATE INDEX IF NOT EXISTS creators_status_idx ON creators(status);
 
-CREATE TABLE IF NOT EXISTS creator_scopes (
-  scope_id TEXT NOT NULL PRIMARY KEY,
-  scope_type TEXT NOT NULL CHECK (scope_type IN ('organization','ip')),
-  name TEXT NOT NULL,
-  status TEXT NOT NULL CHECK (status IN ('ACTIVE','INACTIVE')),
-  verification_state TEXT NOT NULL CHECK (verification_state IN ('PENDING','VERIFIED','REJECTED')),
-  created_by TEXT NOT NULL,
-  idempotency_key TEXT NOT NULL,
-  request_fingerprint TEXT NOT NULL,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL,
-  UNIQUE(created_by, idempotency_key)
-);
-CREATE INDEX IF NOT EXISTS creator_scopes_type_status_idx
-  ON creator_scopes(scope_type, status);
-
-CREATE TABLE IF NOT EXISTS creator_scope_appointments (
-  appointment_id TEXT NOT NULL PRIMARY KEY,
-  scope_id TEXT NOT NULL,
-  user_id TEXT NOT NULL,
-  scope_role TEXT NOT NULL CHECK (scope_role IN ('IP_PRINCIPAL','ORG_LEAD','ORG_EDITOR')),
-  role_id TEXT NOT NULL CHECK (role_id IN ('ip_principal','mcn_admin','mcn_editor')),
-  status TEXT NOT NULL CHECK (status IN ('PENDING_ROLE_GRANT','ACTIVE')),
-  grant_ref TEXT NOT NULL UNIQUE,
-  appointed_by TEXT NOT NULL,
-  idempotency_key TEXT NOT NULL,
-  request_fingerprint TEXT NOT NULL,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL,
-  UNIQUE(scope_id, user_id),
-  UNIQUE(appointed_by, idempotency_key),
-  FOREIGN KEY(scope_id) REFERENCES creator_scopes(scope_id)
-);
-CREATE INDEX IF NOT EXISTS creator_scope_appointments_user_idx
-  ON creator_scope_appointments(user_id, status);
-
-
 CREATE TABLE IF NOT EXISTS creator_authorization_audit (
   audit_id TEXT NOT NULL PRIMARY KEY,
   event_key TEXT NOT NULL UNIQUE,
@@ -80,11 +43,9 @@ CREATE TABLE IF NOT EXISTS creator_authorization_audit (
     'CREATOR_APPLICATION_SUBMITTED',
     'CREATOR_APPLICATION_APPROVED',
     'CREATOR_APPLICATION_REJECTED',
-    'CREATOR_ROLE_GRANTED',
-    'CREATOR_SCOPE_CREATED',
-    'SCOPED_ROLE_GRANTED'
+    'CREATOR_ROLE_GRANTED'
   )),
-  resource_type TEXT NOT NULL CHECK (resource_type IN ('creator_application','creator','creator_scope','role_assignment')),
+  resource_type TEXT NOT NULL CHECK (resource_type IN ('creator_application','creator','role_assignment')),
   resource_id TEXT NOT NULL,
   from_state TEXT,
   to_state TEXT,
