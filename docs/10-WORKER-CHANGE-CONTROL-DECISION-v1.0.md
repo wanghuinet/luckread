@@ -5,6 +5,8 @@
 > Authority: `docs/00-PROJECT-BLUEPRINT-v1.4.md`
 > 
 > Depends on: `docs/09-D1-DOMAIN-MASTER-v1.0.md`
+>
+> Active W02/W08 authorization boundary amended by `docs/change-control/CC-W02-W08-AUTHORIZATION-BOUNDARY-2026-10-12.md`.
 
 ## 1. Purpose
 
@@ -19,13 +21,13 @@ Historical Worker topologies remain historical evidence and are not silently ren
 | Worker | Responsibility | Primary Task | Primary D1 |
 |---|---|---|---|
 | W01 | Public API / Gateway / Developer & Admin API Boundary | T24 | None; API boundary only |
-| W02 | Identity / Account / Authorization | T01,T02,T03 | D1-01 |
+| W02 | Identity / Account | T01,T02 | D1-01 |
 | W03 | Content / Article / Media / Translation | T05,T06,T07,T15 | D1-02 |
 | W04 | Feed / Recommendation / Search | T08,T09,T10 | Derived/projection boundary; no new D1 |
 | W05 | Social / Community / Messaging / Notification | T11,T12,T13,T14 | D1-02; D1-03 only for runtime delivery state |
 | W06 | Rights / Trust & Safety / Governance | T19,T20,T21 | D1-03 |
 | W07 | Subscription / Commerce / Payment / Advertising | T16,T17,T18 | D1-04; scoped D1-01 entitlement transition only |
-| W08 | Creator / Organization | T04 | D1-01 |
+| W08 | Authorization / Creator / Organization | T03,T04 | D1-01 |
 | W09 | Platform / Storage / Reliability | T25 | D1-03 |
 | W10 | Async / Queue / Job Execution | None | D1-03 scoped execution only |
 | W11 | Growth / Campaign / Analytics / Operations | T22,T23 | D1-03 |
@@ -35,7 +37,7 @@ Historical Worker topologies remain historical evidence and are not silently ren
 
 Every Contract Task has exactly one Primary Worker:
 
-T01→W02, T02→W02, T03→W02, T04→W08, T05→W03, T06→W03, T07→W03, T08→W04, T09→W04, T10→W04, T11→W05, T12→W05, T13→W05, T14→W05, T15→W03, T16→W07, T17→W07, T18→W07, T19→W06, T20→W06, T21→W06, T22→W11, T23→W11, T24→W01, T25→W09.
+T01→W02, T02→W02, T03→W08, T04→W08, T05→W03, T06→W03, T07→W03, T08→W04, T09→W04, T10→W04, T11→W05, T12→W05, T13→W05, T14→W05, T15→W03, T16→W07, T17→W07, T18→W07, T19→W06, T20→W06, T21→W06, T22→W11, T23→W11, T24→W01, T25→W09.
 
 W10 and W12 are execution/integration boundaries and therefore do not require an artificial Primary Task.
 
