@@ -21,13 +21,13 @@ No implementation, API contract, database ownership, or deployment decision may 
 | ID | Canonical responsibility | Primary Task(s) | Primary D1 authority |
 |---|---|---|---|
 | W01 | Public API / Gateway / Developer & Admin API Boundary | T24 | None; API boundary only |
-| W02 | Identity / Account / Authorization | T01,T02,T03 | D1-01 |
+| W02 | Identity / Account | T01,T02 | D1-01 |
 | W03 | Content / Article / Media / Translation | T05,T06,T07,T15 | D1-02 |
 | W04 | Feed / Recommendation / Search | T08,T09,T10 | Derived/projection boundary; no new D1 |
 | W05 | Social / Community / Messaging / Notification | T11,T12,T13,T14 | D1-02; D1-03 only for scoped runtime delivery state |
 | W06 | Rights / Trust & Safety / Governance | T19,T20,T21 | D1-03 |
 | W07 | Subscription / Commerce / Payment / Advertising | T16,T17,T18 | D1-04; scoped D1-01 entitlement transition only |
-| W08 | Creator / Organization | T04 | D1-01 |
+| W08 | Authorization / Creator / Organization | T03,T04 | D1-01 |
 | W09 | Platform / Storage / Reliability | T25 | D1-03 |
 | W10 | Async / Queue / Job Execution | None | D1-03 scoped execution only |
 | W11 | Growth / Campaign / Analytics / Operations | T22,T23 | D1-03 |
@@ -39,7 +39,7 @@ Every Contract Task has exactly one authoritative Primary Worker:
 
 - T01 → W02
 - T02 → W02
-- T03 → W02
+- T03 → W08
 - T04 → W08
 - T05 → W03
 - T06 → W03
@@ -66,6 +66,8 @@ Every Contract Task has exactly one authoritative Primary Worker:
 W10 and W12 are execution/integration boundaries and therefore do not receive an artificial Primary Task.
 
 ## 4. Non-negotiable authority boundaries
+
+**Authorization boundary amendment:** W02 owns identity/account authentication and lifecycle; W08 owns the shared L0–L8 permission policy and CASL decision service. This amendment is governed by `docs/change-control/CC-W02-W08-AUTHORIZATION-BOUNDARY-2026-10-12.md`. It does not replace Better Auth, alter Payload Core, or add a Worker/D1/Queue.
 
 1. Public API exposure does not create business-state ownership.
 2. W01 is not a universal database writer.
