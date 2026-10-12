@@ -533,7 +533,6 @@ async function retryScopeGrant(env: Env, request: Request, appointment: ScopeApp
 async function handleScopeAppointment(env: Env, request: Request): Promise<Response> {
   const principal = await principalFor(env, request)
   if (principal instanceof Response) return principal
-  if (!mayReviewCreatorApplication(actorLayer(principal))) return errorResponse(403, 'PERMISSION_DENIED', 'L7 or L8 authorization is required to appoint an organization or IP lead')
   const key = request.headers.get('Idempotency-Key')
   if (!validIdempotencyKey(key)) return errorResponse(428, 'PRECONDITION_REQUIRED', 'A valid Idempotency-Key is required')
   const body = await readBody(request)
@@ -556,6 +555,24 @@ async function handleScopeAppointment(env: Env, request: Request): Promise<Respo
   }
   if (requestedScopeId && name.length > 0) {
     return errorResponse(400, 'VALIDATION_FAILED', 'Do not send a new scope name when appointing into an existing scope')
+  }
+  // New scope creation is a global admin operation. Existing organization
+  // scopes may be managed by an L7/L8 administrator or by the L4 mcn_admin
+  // assigned to that exact organization. Scoped roles never elevate global layer.
+  if (createsOrganization && !mayReviewCreatorApplication(actorLayer(principal))) {
+    return errorResponse(403, 'PERMISSION_DENIED', 'Only L7/L8 administrators may create a new organization scope')
+  }
+  if (requestedScopeId && !mayReviewCreatorApplication(actorLayer(principal))) {
+    if (appointmentRole.scopeType !== 'organization' || appointmentRole.scopeRole !== 'ORG_EDITOR') {
+      return errorResponse(403, 'PERMISSION_DENIED', 'Scoped organization admins may only appoint editors within their own organization')
+    }
+    const nowForScopeGrant = new Date().toISOString()
+    const managesScope = await env.D1_01.prepare(
+      "SELECT id FROM role_assignments WHERE subject_id = ? AND role_id = 'mcn_admin' " +
+      "AND scope_type = 'organization' AND scope_id = ? AND status = 'ACTIVE' " +
+      "AND valid_from <= ? AND (valid_until IS NULL OR ? < valid_until) LIMIT 1",
+    ).bind(principal.userId, requestedScopeId, nowForScopeGrant, nowForScopeGrant).first<{ id: string }>()
+    if (!managesScope) return errorResponse(403, 'PERMISSION_DENIED', 'An active mcn_admin assignment for this organization is required')
   }
   const requestFingerprint = await fingerprint([appointmentRole.scopeType, appointmentRole.scopeRole, targetUserId, requestedScopeId || null, name])
   const existing = await readAppointmentByKey(env, principal.userId, key)
