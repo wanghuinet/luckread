@@ -20,7 +20,17 @@ class MockStatement {
     if (this.sql.includes('FROM "user"')) return this.db.user as T | null
     if (this.sql.includes("role_id = 'verified_user'")) return this.db.verified ? { id: 'verified-user-row' } as T : null
     if (this.sql.includes('FROM role_assignments WHERE id = ?')) {
-      return (this.db.assignments.get(String(this.values[0])) ?? null) as T | null
+      const row = this.db.assignments.get(String(this.values[0]))
+      return row ? {
+        id: row.id,
+        subjectId: row.subject_id,
+        roleId: row.role_id,
+        scopeType: row.scope_type,
+        scopeId: row.scope_id,
+        status: row.status,
+        validFrom: row.valid_from,
+        validUntil: row.valid_until,
+      } as T : null
     }
     if (this.sql.includes('FROM role_assignments WHERE subject_id = ?')) {
       return this.db.duplicateEffective ? { id: 'already-effective' } as T : null
