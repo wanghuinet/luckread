@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { grantCreatorBusinessRole, RoleAssignmentCommandError } from './role-assignment-command.js'
-import { mayApproveRoleGrant } from './role-grant-approval-policy.js'
 
 type Assignment = {
   id: string
