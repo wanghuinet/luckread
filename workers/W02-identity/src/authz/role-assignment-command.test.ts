@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { grantCreatorBusinessRole, RoleAssignmentCommandError } from './role-assignment-command.js'
+import { mayApproveRoleGrant } from './role-grant-approval-policy.js'
 
 type Assignment = {
   id: string
@@ -164,5 +165,17 @@ describe('W02 creator role assignment authority', () => {
   it('refuses timestamps that cannot yield an effective assignment', async () => {
     await expect(grantCreatorBusinessRole(db as unknown as D1Database, command(), 'not-a-date'))
       .rejects.toMatchObject({ code: 'VALIDATION_FAILED' })
+  })
+
+  it('allows L4 mcn_admin to appoint editors only in the matching organization scope', () => {
+    expect(mayApproveRoleGrant('L2', 'mcn_editor', 'organization', true)).toBe(true)
+    expect(mayApproveRoleGrant('L3', 'mcn_editor', 'organization', true)).toBe(true)
+    expect(mayApproveRoleGrant('L2', 'mcn_editor', 'organization', false)).toBe(false)
+    expect(mayApproveRoleGrant('L2', 'mcn_editor', 'ip', true)).toBe(false)
+    expect(mayApproveRoleGrant('L2', 'mcn_admin', 'organization', true)).toBe(false)
+    expect(mayApproveRoleGrant('L2', 'creator', 'global', true)).toBe(false)
+    expect(mayApproveRoleGrant('L6', 'mcn_editor', 'organization', true)).toBe(false)
+    expect(mayApproveRoleGrant('L7', 'creator', 'global', false)).toBe(true)
+    expect(mayApproveRoleGrant('L8', 'ip_principal', 'ip', false)).toBe(true)
   })
 })
