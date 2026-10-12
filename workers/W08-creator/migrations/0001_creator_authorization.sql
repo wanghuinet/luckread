@@ -39,6 +39,7 @@ CREATE TABLE IF NOT EXISTS creator_scopes (
   scope_type TEXT NOT NULL CHECK (scope_type IN ('organization','ip')),
   name TEXT NOT NULL,
   status TEXT NOT NULL CHECK (status IN ('ACTIVE','INACTIVE')),
+  verification_state TEXT NOT NULL CHECK (verification_state IN ('PENDING','VERIFIED','REJECTED')),
   created_by TEXT NOT NULL,
   idempotency_key TEXT NOT NULL,
   request_fingerprint TEXT NOT NULL,
