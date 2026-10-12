@@ -19,10 +19,10 @@ Historical D1 and Worker topology documents remain evidence/reference unless exp
 ## 2. Frozen topology
 
 - Workers: exactly 12
-- D1 domains: exactly 4
+- D1 domains: exactly 5
 - Contract Tasks: exactly 25
 
-No fifth D1 domain may be introduced implicitly.
+D1-05 is explicitly approved as an analytics-only domain; no sixth D1 domain may be introduced implicitly.
 
 ## 3. Canonical D1 domains
 
@@ -32,6 +32,7 @@ No fifth D1 domain may be introduced implicitly.
 | D1-02 | Content / Community Data |
 | D1-03 | Platform Operations / Governance / Runtime |
 | D1-04 | Commerce / Financial Authority |
+| D1-05 | Analytics-only Derived Data (W11-exclusive) |
 
 ## 4. D1-01 — Identity / Account / Access
 
@@ -127,7 +128,6 @@ D1-03 owns platform operational, governance and runtime state.
 | ExecutionInbox / ExecutionOutbox | W10 | Async delivery/execution records only |
 | OperationalIdempotency | W10 | Platform execution idempotency only |
 | Campaign | W11 | Growth/campaign operations only |
-| AnalyticsOperation | W11 | Analytics/operations state only |
 | GrowthOperation | W11 | Growth/operations state only |
 
 Domain-local outbox/inbox/idempotency records remain in their source D1 and are not D1-03 entities. W10 executes asynchronous work but does not become a second owner of business state.
@@ -138,7 +138,7 @@ Domain-local outbox/inbox/idempotency records remain in their source D1 and are 
 - Every authoritative D1-03 entity has exactly one primary Worker owner.
 - Audit records are append-oriented or controlled-state records and cannot be silently rewritten by ordinary business flows.
 - Runtime/job state does not become business authority.
-- Analytics and operational projections do not become identity, content or financial authority.
+- Campaign/growth operational state may remain in D1-03; analytics-derived counters and rollups belong to D1-05. Neither may become identity, content, social, entitlement or financial authority.
 
 ## 7. D1-04 — Commerce / Financial Authority
 
@@ -174,7 +174,32 @@ D1-04 owns durable commercial state and authoritative financial facts.
 - No remote counter mutation may represent a financial effect.
 - Financial effects must be independently auditable.
 
-## 8. Subscription / Entitlement boundary
+## 8. D1-05 — Analytics-only Derived Data (W11-exclusive)
+
+### Authority
+
+D1-05 stores only derived analytics data and analytics processing state. W11 is its sole Worker access owner. It is not a business-authority replacement for D1-01..D1-04.
+
+### Primary data
+
+- Bounded validated analytics events where retention is required
+- Deduplication/idempotency keys with explicit retention
+- Article, dynamic and short-video view/play aggregates
+- Reading duration and video completion aggregates where reliable events exist
+- Like/comment/share/follow projections reconciled to W05 authoritative facts
+- Creator/content daily rollups, metric versions, rollup watermarks and reconciliation status
+- Rebuildable dashboard read models and bounded analytics query materializations
+
+### Invariants
+
+- W11 is the only Worker permitted to read/write D1-05.
+- D1-05 is derived/projection state only; it cannot become authoritative for identity, content publication, social relationships, entitlements, orders, payments, revenue, refunds or ledger facts.
+- W03/W05/W07 remain authoritative for their own facts and provide data only through already admitted event/API contracts.
+- Analytics failure must not fail core content, social or commerce writes.
+- Retention, privacy/consent, deletion, deduplication, batch size, indexes and rebuild/reconciliation are explicit contracts.
+- Neon remains an optional later analytical store and is not required for the 1.1 D1-backed MVP.
+
+## 9. Subscription / Entitlement boundary
 
 Subscription and membership access authority belongs to D1-01.
 
@@ -194,9 +219,9 @@ Access decision
 
 No cross-D1 distributed transaction is assumed.
 
-## 9. Advertising boundary
+## 10. Advertising boundary
 
-Advertising is not a fifth D1 and advertising business state does not automatically belong to D1-04.
+Advertising is not a separate D1 domain, and advertising business state does not automatically belong to D1-04.
 
 Campaign, creative, targeting, delivery and operational advertising state remain with their owning Blueprint domain.
 
@@ -204,7 +229,7 @@ Only authoritative financial effects, including reconciled spend, billing, reven
 
 Every financial posting must retain an auditable reference to its originating advertising source/event.
 
-## 10. Cross-domain transaction rule
+## 11. Cross-domain transaction rule
 
 Same-domain atomicity is allowed only where the contract explicitly defines the invariant.
 
@@ -226,7 +251,7 @@ Reconciliation / evidence
 
 Events are integration mechanisms and never replace the owning domain's source of truth.
 
-## 11. Cross-domain reference rules
+## 12. Cross-domain reference rules
 
 1. Every authoritative entity has exactly one primary D1 owner.
 2. Foreign ownership remains with the authoritative domain.
@@ -236,7 +261,7 @@ Events are integration mechanisms and never replace the owning domain's source o
 6. Event payloads use versioned contract data and correlation/idempotency identifiers.
 7. Deletion and erasure semantics are governed by the owning domain and propagated explicitly.
 
-## 12. Worker / D1 security boundary
+## 13. Worker / D1 security boundary
 
 - Every D1 writer is scoped to its authorized domain and operation.
 - No unrestricted cross-domain database writer exists.
@@ -247,7 +272,7 @@ Events are integration mechanisms and never replace the owning domain's source o
 - W10 asynchronous execution does not become a second D1-03 authority.
 - W12 integration execution does not become a second T24 or universal D1 authority.
 
-## 13. Projection boundaries
+## 14. Projection boundaries
 
 The following are never authoritative replacements for the owning D1:
 
@@ -259,7 +284,7 @@ The following are never authoritative replacements for the owning D1:
 - Operational snapshots
 - Consumer-side replicas of business state
 
-## 14. Provider portability
+## 15. Provider portability
 
 The logical model is provider-neutral.
 
@@ -275,13 +300,13 @@ Cloudflare D1 is the initial relational provider. PostgreSQL/GCP migration must 
 
 Provider-specific SQL/storage behavior must not become part of the business authority contract.
 
-## 15. Payload boundary
+## 16. Payload boundary
 
 Payload Core remains immutable.
 
 Payload may be used only through supported extension points. It must not be forked, patched, copied or treated as a generic business-code container.
 
-## 16. Historical topology disposition
+## 17. Historical topology disposition
 
 The following remain historical evidence and do not override this Master:
 
@@ -293,7 +318,7 @@ The following remain historical evidence and do not override this Master:
 
 Historical records are preserved for auditability and migration analysis.
 
-## 17. Required downstream mapping
+## 18. Required downstream mapping
 
 The following chain is mandatory before Contract GREEN:
 
@@ -328,7 +353,7 @@ requires explicit architecture change control and must not be introduced through
 ## 19. Gate status
 
 ```text
-Blueprint topology target      = 12 Workers / 4 D1 / 25 Tasks
+Blueprint topology target      = 12 Workers / 5 D1 / 25 Tasks
 D1 domain definition           = FROZEN
 D1 entity ownership baseline   = FROZEN
 Cross-D1 transaction rule      = FROZEN
