@@ -1,0 +1,124 @@
+name: W08 Creator Runtime Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Exact source commit containing W01/W02/W08 implementation
+        required: true
+        type: string
+      confirm:
+        description: Type DEPLOY_W08_CREATOR to permit the controlled schema and Worker deployment
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    if: ${{ inputs.confirm == 'DEPLOY_W08_CREATOR' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout exact source commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha }}
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install root toolchain
+        run: npm ci
+
+      - name: Validate immutable topology and new migration
+        run: |
+          node --input-type=module - <<'NODE'
+          import fs from 'node:fs'
+          const w08 = JSON.parse(fs.readFileSync('workers/W08-creator/wrangler.jsonc', 'utf8'))
+          const binding = (w08.d1_databases || []).find((x) => x.binding === 'D1_01')
+          if (w08.name !== 'luckread-w08-creator') throw new Error('W08 worker identity mismatch')
+          if (!binding || binding.database_id !== '2f80471e-3756-49f9-8db1-7707a433ad64') throw new Error('W08 must reuse existing D1-01')
+          if (!fs.existsSync('workers/W08-creator/migrations/0001_creator_authorization.sql')) throw new Error('W08 migration missing')
+          console.log('W08_D1_01_REUSE=PASS')
+          NODE
+
+      - name: Run creator authorization policy tests
+        run: npx --yes vitest@3.2.4 run workers/W08-creator/src/policy.test.ts
+
+      - name: Typecheck W08
+        run: npx --yes tsc@5.9.3 --noEmit -p workers/W08-creator/tsconfig.json
+
+      - name: Install locked W01 dependencies
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.0.0
+          run_install: false
+
+      - name: Install W01 dependencies
+        working-directory: workers/W01-payload
+        run: pnpm install --frozen-lockfile
+
+      - name: Build W01
+        working-directory: workers/W01-payload
+        run: pnpm exec opennextjs-cloudflare build
+
+      - name: Configure Cloudflare access
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          test -n "$CLOUDFLARE_API_TOKEN"
+
+      - name: Apply W08 additive migration on existing D1-01
+        working-directory: workers/W08-creator
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: npx --yes wrangler@4.116.0 d1 migrations apply D1_01 --remote --config wrangler.jsonc
+
+      - name: Deploy W02 with the role-grant command
+        working-directory: workers/W02-identity
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: npx --yes wrangler@4.116.0 deploy --config wrangler.jsonc
+
+      - name: Deploy W08 Creator Worker
+        working-directory: workers/W08-creator
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: npx --yes wrangler@4.116.0 deploy --config wrangler.jsonc
+
+      - name: Deploy W01 public API gateway with W08 binding
+        working-directory: workers/W01-payload
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: npx --yes wrangler@4.116.0 deploy --config wrangler.jsonc
+
+      - name: Write deployment provenance
+        run: |
+          mkdir -p artifacts/mapping-0
+          cat > artifacts/mapping-0/w08-creator-deploy-provenance.txt <<EOF
+          workflow=W08 Creator Runtime Deploy
+          source_sha=${{ inputs.source_sha }}
+          confirmation=DEPLOY_W08_CREATOR
+          workers=luckread-w02,luckread-w08-creator,luckread-w01-payload
+          d1_domain=D1-01
+          new_worker=false
+          new_database=false
+          migration=workers/W08-creator/migrations/0001_creator_authorization.sql
+          EOF
+          cat artifacts/mapping-0/w08-creator-deploy-provenance.txt
+
+      - name: Upload deployment provenance
+        uses: actions/upload-artifact@v4
+        with:
+          name: w08-creator-deployment-${{ inputs.source_sha }}
+          path: artifacts/mapping-0/w08-creator-deploy-provenance.txt
