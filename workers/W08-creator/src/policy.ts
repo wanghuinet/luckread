@@ -9,8 +9,9 @@ export type RoleAppointment = {
 }
 
 export function mayApplyForCreator(layer: string | null | undefined): boolean {
-  if (!layer || !/^L[0-8]$/.test(layer)) return false
-  return Number(layer.slice(1)) >= 2
+  // L2 is the exact onboarding state. A global L3 creator should manage their
+  // existing creator identity instead of opening a duplicate application.
+  return layer === 'L2'
 }
 
 export function mayReviewCreatorApplication(layer: string | null | undefined): boolean {
