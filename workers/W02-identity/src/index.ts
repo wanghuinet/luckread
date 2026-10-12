@@ -9,6 +9,7 @@ import {
 } from './account/account-state-transition.js'
 import { resolveBetterAuthPrincipal } from './auth/principal.js'
 import { grantCreatorBusinessRole, RoleAssignmentCommandError } from './authz/role-assignment-command.js'
+import { mayApproveRoleGrant } from './authz/role-grant-approval-policy.js'
 
 interface Env {
   D1_01: D1Database
@@ -284,7 +285,7 @@ export default {
         ).bind(actor.userId, body.scopeId, now, now).first<{ id: string }>()
         scopedOrganizationAdmin = !!assignment
       }
-      if (!globalApprover && !scopedOrganizationAdmin) {
+      if (!mayApproveRoleGrant(actor.layer, body.roleId, body.scopeType, scopedOrganizationAdmin)) {
         return json({ error: { code: 'PERMISSION_DENIED', message: 'L7/L8 approval or a matching scoped mcn_admin assignment is required' } }, 403)
       }
 
