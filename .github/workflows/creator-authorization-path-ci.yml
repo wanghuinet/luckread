@@ -11,6 +11,8 @@ on:
       - 'workers/W01-payload/wrangler.jsonc'
       - 'workers/W02-identity/src/index.ts'
       - 'workers/W02-identity/src/authz/role-assignment-command.ts'
+      - 'workers/W02-identity/src/authz/role-grant-approval-policy.ts'
+      - 'workers/W02-identity/src/authz/role-assignment-command.test.ts'
       - 'workers/W08-creator/**'
       - 'contracts/transport/W01-W08-creator-http-binding.v1.json'
       - 'contracts/transport/W08-W02-role-assignment-http-binding.v1.json'
