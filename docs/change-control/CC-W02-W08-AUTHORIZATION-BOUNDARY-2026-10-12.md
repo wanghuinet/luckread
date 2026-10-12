@@ -15,8 +15,8 @@ The project owner has directed the following responsibility boundary:
 ## Implementation boundary for this slice
 
 1. Place the CASL policy engine and its L0–L8 tests under `workers/W08-creator`.
-2. Add the internal `POST /internal/authz/check-permission` endpoint to the already-provisioned `luckread-w08` Worker source.
-3. Derive account state and layer/scoped-role context from persisted D1-01 facts. The caller cannot submit its own layer, account state, or scope grants.
+2. Add the internal `POST /internal/authz/check-permission` endpoint to the already-provisioned `luckread-w08-creator` Worker source.
+3. Resolve actor identity from the W02 session through the existing private Service Binding; derive account state and layer/scoped-role context from persisted D1-01 facts. The request body cannot supply subjectId, layer, account state, or scope grants. Resource attributes must be loaded server-side from the owning domain.
 4. Keep the endpoint internal-only, with `workers_dev=false`, no public route, no new caller Service Binding, and `Cache-Control: no-store`.
 5. Do not deploy, mutate remote D1, or switch runtime callers in this source slice.
 6. Existing W02 role-materialization and session-layer-projection code remains a documented compatibility dependency while the T03 runtime closeout is staged. It must not be used as a substitute for W08's CASL business-permission decision.
