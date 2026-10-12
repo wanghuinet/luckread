@@ -142,7 +142,7 @@ The Worker Change-Control decision has promoted the candidate topology to the ca
 
 The next artifact is the **Worker × D1 Binding Mapping**.
 
-It must bind all 12 Workers to the canonical 4-D1 topology while preserving:
+It must bind all 12 Workers to the canonical 5-D1 topology while preserving:
 
 - one authoritative D1 owner per authoritative entity;
 - no implicit fifth D1;
@@ -160,6 +160,6 @@ Only after that binding is audited can the Final Mapping be frozen and Contract 
 
 The canonical sequence remains:
 
-**Blueprint → Architecture Blueprint → 25 Tasks → 12 Worker Master → 4 D1 Master → Mapping → Contracts → Implementation → Tests → CI → Deployment → Evidence**
+**Blueprint → Architecture Blueprint → 25 Tasks → 12 Worker Master → 5 D1 Master → Mapping → Contracts → Implementation → Tests → CI → Deployment → Evidence**
 
 No Contract may authorize a Worker responsibility that is absent from this Master or a subsequent approved Mapping change.
