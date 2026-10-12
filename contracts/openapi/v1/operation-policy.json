@@ -413,6 +413,19 @@
       "x-luckread-source": "contracts/api/api-inventory.v1.json"
     },
     {
+      "operationId": "listCreatorApplicationsForReview",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "creator.application.review"
+      ],
+      "auditRequired": true,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "creator"
+    },
+    {
       "operationId": "listModerationCases",
       "auth": {
         "mode": "permission"
@@ -629,6 +642,32 @@
       "idempotencyRequired": false,
       "stateMachine": "none",
       "x-luckread-source": "contracts/api/revision.v1.json"
+    },
+    {
+      "operationId": "getMyCreatorApplication",
+      "auth": {
+        "mode": "authenticated"
+      },
+      "permissions": [
+        "creator.application.read.own"
+      ],
+      "auditRequired": false,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "creator"
+    },
+    {
+      "operationId": "listMyCreatorScopes",
+      "auth": {
+        "mode": "authenticated"
+      },
+      "permissions": [
+        "creator.scope.read.own"
+      ],
+      "auditRequired": false,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "creator"
     },
     {
       "operationId": "getCreatorAnalytics",
@@ -1454,6 +1493,32 @@
       "x-luckread-source": "contracts/api/api-inventory.v1.json"
     },
     {
+      "operationId": "decideCreatorApplication",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "creator.application.review"
+      ],
+      "auditRequired": true,
+      "optimisticLockRequired": true,
+      "idempotencyRequired": true,
+      "stateMachine": "creator"
+    },
+    {
+      "operationId": "appointCreatorScopeRole",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "creator.scope.manage"
+      ],
+      "auditRequired": true,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": true,
+      "stateMachine": "creator"
+    },
+    {
       "operationId": "decideModerationCase",
       "auth": {
         "mode": "permission"
@@ -1788,6 +1853,19 @@
       "optimisticLockRequired": true,
       "idempotencyRequired": true,
       "stateMachine": "content"
+    },
+    {
+      "operationId": "applyForCreator",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "creator.application.apply"
+      ],
+      "auditRequired": true,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": true,
+      "stateMachine": "creator"
     },
     {
       "operationId": "postDeveloperApiKeys",
@@ -2287,84 +2365,6 @@
       "stateMachine": "none",
       "x-luckread-contract-status": "DISCOVERY_DRAFT",
       "x-luckread-source": "contracts/api/api-inventory.v1.json"
-    },
-    {
-      "operationId": "getMyCreatorApplication",
-      "auth": {
-        "mode": "authenticated"
-      },
-      "permissions": [
-        "creator.application.read.own"
-      ],
-      "auditRequired": false,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": false,
-      "stateMachine": "creator"
-    },
-    {
-      "operationId": "applyForCreator",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "creator.application.apply"
-      ],
-      "auditRequired": true,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": true,
-      "stateMachine": "creator"
-    },
-    {
-      "operationId": "listCreatorApplicationsForReview",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "creator.application.review"
-      ],
-      "auditRequired": true,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": false,
-      "stateMachine": "creator"
-    },
-    {
-      "operationId": "decideCreatorApplication",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "creator.application.review"
-      ],
-      "auditRequired": true,
-      "optimisticLockRequired": true,
-      "idempotencyRequired": true,
-      "stateMachine": "creator"
-    },
-    {
-      "operationId": "appointCreatorScopeRole",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "creator.scope.manage"
-      ],
-      "auditRequired": true,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": true,
-      "stateMachine": "creator"
-    },
-    {
-      "operationId": "listMyCreatorScopes",
-      "auth": {
-        "mode": "authenticated"
-      },
-      "permissions": [
-        "creator.scope.read.own"
-      ],
-      "auditRequired": false,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": false,
-      "stateMachine": "creator"
     }
   ]
 }
