@@ -1,6 +1,8 @@
 # Luckread Final Mapping v1.0
 
-> Status: **FROZEN / CANONICAL MAPPING**
+> Status: **FROZEN / CANONICAL MAPPING, AMENDED BY CHANGE CONTROL**
+>
+> Active amendment: `docs/change-control/CC-W02-W08-AUTHORIZATION-BOUNDARY-2026-10-12.md` assigns Task T03 (Authorization) to W08; the 12-Worker / 4-D1 / 25-Task counts are unchanged.
 >
 > Scope: Luckread Payload self-media platform.
 >
@@ -56,7 +58,7 @@ No additional Worker or D1 domain may be introduced implicitly by Mapping or imp
 |---|---|---|
 | T01 | W02 | D1-01 |
 | T02 | W02 | D1-01 |
-| T03 | W02 | D1-01 |
+| T03 | W08 | D1-01 |
 | T04 | W08 | D1-01 |
 | T05 | W03 | D1-02 |
 | T06 | W03 | D1-02 |
@@ -88,7 +90,7 @@ This table is authoritative only at Task/Worker/D1-boundary level. Entity-level 
 |---|---|---|---|---|
 | A Identity/account | T01 | W02 | D1-01 | MAPPED |
 | B Profile/lifecycle | T02 | W02 | D1-01 | MAPPED |
-| C Authorization | T03 | W02 | D1-01 | MAPPED |
+| C Authorization | T03 | W08 | D1-01 | MAPPED |
 | D Creator/organization | T04 | W08 | D1-01 | MAPPED |
 | E Content lifecycle | T05 | W03 | D1-02 | MAPPED |
 | F Article/text | T06 | W03 | D1-02 | MAPPED |
@@ -135,7 +137,7 @@ This table is authoritative only at Task/Worker/D1-boundary level. Entity-level 
 H, AF and AQ are resolved at Mapping layer without changing the frozen topology.
 
 - **H:** W09/T25 owns extension/platform capability; durable future content remains D1-02/W03.
-- **AF:** W09/T25 owns tenant control-plane concerns; identity, organization, roles and access remain D1-01/W02/W08; platform runtime configuration may use D1-03.
+- **AF:** W09/T25 owns tenant control-plane concerns; identity/account state remains D1-01/W02, while authorization/role decisions and creator/organization remain D1-01/W08; platform runtime configuration may use D1-03.
 - **AQ:** W09/T25 owns generic extension boundary; commerce and financial authority remains W07/D1-04; entitlement remains D1-01.
 
 No fifth D1 and no additional Worker was introduced.
