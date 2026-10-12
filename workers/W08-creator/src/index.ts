@@ -1,4 +1,4 @@
-import { mayApplyForCreator, mayReviewCreatorApplication, parseExpectedVersion, validIdempotencyKey } from './policy.js'
+import { admitCreatorDecision, creatorApplicationReplayMatches, mayApplyForCreator, mayReviewCreatorApplication, parseExpectedVersion, validIdempotencyKey } from './policy.js'
 
 interface Env {
   D1_01: D1Database
@@ -258,7 +258,7 @@ async function handleApplicationCreate(env: Env, request: Request): Promise<Resp
     application_id: string; user_id: string; creator_type: string; statement: string; status: string; grant_state: string; version: number; created_at: string
   }>()
   if (replay) {
-    if (replay.creator_type !== creatorType || replay.statement !== statement) return errorResponse(409, 'IDEMPOTENCY_CONFLICT', 'Idempotency key was used with different application data')
+    if (!creatorApplicationReplayMatches(replay, { creatorType, statement })) return errorResponse(409, 'IDEMPOTENCY_CONFLICT', 'Idempotency key was used with different application data')
     return json({ applicationId: replay.application_id, status: replay.status, grantState: replay.grant_state, version: replay.version, replayed: true })
   }
   if (!mayApplyForCreator(actorLayer(principal))) return errorResponse(403, 'VERIFIED_USER_REQUIRED', 'Email verification and L2 access are required')
@@ -346,21 +346,25 @@ async function handleAdminApplicationDecision(env: Env, request: Request): Promi
 
   let application = await readApplication(env, body.applicationId)
   if (!application) return errorResponse(404, 'NOT_FOUND', 'Creator application not found')
-  if (application.user_id === principal.userId) return errorResponse(403, 'SELF_APPROVAL_DENIED', 'An application cannot be approved by its own applicant')
-
-  if (application.status !== 'PENDING') {
-    const sameReplay = application.status === decision &&
-      application.decided_by === principal.userId &&
-      application.decision_idempotency_key === idempotencyKey
-    if (!sameReplay) return errorResponse(409, 'DECISION_CONFLICT', 'This application already has a different final decision')
-    return decision === 'APPROVED' ? retryCreatorGrant(env, request, application) : json({
-      applicationId: application.application_id,
-      status: application.status,
-      grantState: application.grant_state,
-      version: application.version,
-      replayed: true,
-    })
-  }
+  const admission = admitCreatorDecision({
+    applicationStatus: application.status,
+    requestedDecision: decision,
+    applicantId: application.user_id,
+    actorId: principal.userId,
+    storedDecision: application.status,
+    storedActorId: application.decided_by,
+    storedIdempotencyKey: application.decision_idempotency_key,
+    requestIdempotencyKey: idempotencyKey,
+  })
+  if (admission === 'SELF_APPROVAL_DENIED') return errorResponse(403, 'SELF_APPROVAL_DENIED', 'An application cannot be approved by its own applicant')
+  if (admission === 'DECISION_CONFLICT') return errorResponse(409, 'DECISION_CONFLICT', 'This application already has a different final decision')
+  if (admission === 'REPLAY') return decision === 'APPROVED' ? retryCreatorGrant(env, request, application) : json({
+    applicationId: application.application_id,
+    status: application.status,
+    grantState: application.grant_state,
+    version: application.version,
+    replayed: true,
+  })
 
   const expectedVersion = parseExpectedVersion(request.headers.get('If-Match'))
   if (expectedVersion === null) return errorResponse(428, 'PRECONDITION_REQUIRED', 'If-Match with the current application version is required')
