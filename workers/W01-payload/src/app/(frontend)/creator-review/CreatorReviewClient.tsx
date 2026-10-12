@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { type FormEvent, useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { fetchJson, getApiErrorMessage } from '../../../lib/client-api.js'
 import styles from './creator-review.module.css'
 
