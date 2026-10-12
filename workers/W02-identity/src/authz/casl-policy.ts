@@ -74,19 +74,9 @@ const PUBLIC_READ_ACTIONS = new Set([
   'taxonomy.read',
 ])
 
-const SAFE_READ_ACTIONS = new Set([
+const SAFE_FROZEN_ACTIONS = new Set([
   ...PUBLIC_READ_ACTIONS,
   'user.read.self',
-  'comment.read',
-  'content.read.own',
-  'content.read.any',
-  'creator.read.self',
-  'creator.stats.read.self',
-  'media.read.own',
-  'notification.read.self',
-  'moderation.queue.read',
-  'moderation.case.read',
-  'audit.read.any',
 ])
 
 const RESTRICTED_ACCOUNT_WRITE_DENIES = new Set([
@@ -102,7 +92,6 @@ const RESTRICTED_ACCOUNT_WRITE_DENIES = new Set([
   'media.upload',
   'comment.create',
   'subscription.manage.any',
-  'org.billing.read.scope',
   'org.billing.read.scope',
 ])
 
@@ -178,7 +167,6 @@ function selfOwnerCondition(subjectId: string): Record<string, unknown> {
 }
 
 function addPublicAndSelfRules(
-  can: (action: string, subject: string, conditions?: never) => unknown,
   grant: (action: string, subject: string, conditions?: Record<string, unknown>) => void,
   subjectId: string | null,
 ): void {
@@ -191,7 +179,6 @@ function addPublicAndSelfRules(
     grant('user.read.self', 'User', { id: subjectId })
     grant('user.update.self', 'User', { id: subjectId })
   }
-  void can
 }
 
 function addL2Rules(
@@ -338,9 +325,9 @@ function buildLayerAbility(input: CaslPermissionInput) {
     if (conditions) builder.can(action, target, conditions as never)
     else builder.can(action, target)
   }
-  const { can, cannot, build } = builder
+  const { cannot, build } = builder
 
-  addPublicAndSelfRules(can as never, grant, input.subjectId)
+  addPublicAndSelfRules(grant, input.subjectId)
 
   if (input.layer === 'L2' || input.layer === 'L3' || input.layer === 'L4') {
     if (input.subjectId) addL2Rules(grant, input.subjectId)
@@ -416,11 +403,16 @@ export function evaluateCaslPermission(input: CaslPermissionInput): CaslPermissi
           return decision(input, 'DENY', 'EMAIL_VERIFICATION_REQUIRED')
         }
       } else if (input.accountState === 'RESTRICTED') {
-        if (RESTRICTED_ACCOUNT_WRITE_DENIES.has(input.action) || ADMIN_ONLY_ACTIONS.has(input.action)) {
+        if (
+          RESTRICTED_ACCOUNT_WRITE_DENIES.has(input.action) ||
+          ADMIN_ONLY_ACTIONS.has(input.action) ||
+          input.action.startsWith('ip.') ||
+          input.action.startsWith('org.')
+        ) {
           return decision(input, 'DENY', 'ACCOUNT_RESTRICTED')
         }
       } else if (input.accountState === 'FROZEN') {
-        if (!SAFE_READ_ACTIONS.has(input.action)) return decision(input, 'DENY', 'ACCOUNT_FROZEN_READ_ONLY')
+        if (!SAFE_FROZEN_ACTIONS.has(input.action)) return decision(input, 'DENY', 'ACCOUNT_FROZEN_READ_ONLY')
       } else if (input.accountState !== 'ACTIVE') {
         return decision(input, 'DENY', 'ACCOUNT_STATE_DENY')
       }
