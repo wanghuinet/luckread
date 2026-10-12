@@ -49,10 +49,11 @@ type ScopeAppointmentRow = {
   verification_state: 'PENDING' | 'VERIFIED' | 'REJECTED'
 }
 
-const json = (body: unknown, status = 200, extraHeaders?: HeadersInit) => Response.json(body, {
-  status,
-  headers: { 'cache-control': 'no-store', ...Object.fromEntries(new Headers(extraHeaders).entries()) },
-})
+const json = (body: unknown, status = 200, extraHeaders?: HeadersInit) => {
+  const headers = new Headers({ 'cache-control': 'no-store' })
+  new Headers(extraHeaders).forEach((value, key) => headers.set(key, value))
+  return Response.json(body, { status, headers })
+}
 
 const errorResponse = (status: number, code: string, message: string) =>
   json({ error: { code, message, details: {} }, requestId: crypto.randomUUID() }, status)
