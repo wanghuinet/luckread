@@ -68,7 +68,10 @@ export default function CreatorReviewClient({ displayName }: { displayName: stri
     }
   }, [])
 
-  useEffect(() => { void loadQueue() }, [loadQueue])
+  useEffect(() => {
+    const timer = window.setTimeout(() => { void loadQueue() }, 0)
+    return () => window.clearTimeout(timer)
+  }, [loadQueue])
 
   async function decide(application: CreatorApplication, decision: Decision) {
     if (workingId) return
