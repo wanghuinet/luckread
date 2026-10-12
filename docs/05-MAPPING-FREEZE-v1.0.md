@@ -14,7 +14,7 @@ The frozen implementation topology is exactly:
 
 - **25 Contract Tasks**
 - **12 Workers**
-- **4 D1 Domains**
+- **5 D1 Domains**
 - **43 Blueprint feature domains**
 
 No additional Worker, D1 domain, Task, or feature authority may be introduced implicitly during Contract generation or implementation.
@@ -99,7 +99,7 @@ Contract generation must use the frozen mapping and must not silently expand sco
 After this decision:
 
 - Adding a Worker is a topology change.
-- Adding a D1 domain is a topology change.
+- Adding a D1 domain is a topology change and requires explicit Change Control; this approved amendment sets the target at five D1 domains.
 - Moving Primary Task ownership is a mapping change.
 - Moving authoritative entity ownership is a D1 authority change.
 - Adding an API not traceable to a frozen feature/capability is prohibited.
