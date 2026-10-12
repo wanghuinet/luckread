@@ -8,7 +8,7 @@
 >
 > Architecture source of truth: `docs/00-PROJECT-BLUEPRINT-v1.4.md`.
 >
-> Final implementation target: **25 Contract Tasks / 12 Workers / 4 D1 Domains**.
+> Final implementation target: **25 Contract Tasks / 12 Workers / 5 D1 Domains**.
 >
 > Formal freeze decision: `docs/05-MAPPING-FREEZE-v1.0.md`.
 
@@ -46,7 +46,7 @@ Worker and D1 ownership must never be inferred from implementation code.
 |---|---:|---|
 | Contract Tasks | 25 | CANONICAL |
 | Workers | 12 | CANONICAL |
-| D1 Domains | 4 | CANONICAL |
+| D1 Domains | 5 | CANONICAL |
 
 No additional Worker or D1 domain may be introduced implicitly by Mapping or implementation.
 
@@ -75,8 +75,8 @@ No additional Worker or D1 domain may be introduced implicitly by Mapping or imp
 | T19 | W06 | D1-03 |
 | T20 | W06 | D1-03 |
 | T21 | W06 | D1-03 |
-| T22 | W11 | D1-03 |
-| T23 | W11 | D1-03 |
+| T22 | W11 | D1-03 campaign/growth operations |
+| T23 | W11 | D1-05 analytics-only derived data |
 | T24 | W01 | API boundary / no direct D1 authority |
 | T25 | W09 | D1-03 platform/runtime authority |
 
@@ -108,9 +108,9 @@ This table is authoritative only at Task/Worker/D1-boundary level. Entity-level 
 | T Rights | T19 | W06 | D1-03 governance; content refs remain owning domain | MAPPED |
 | U Trust/safety | T20 | W06 | D1-03 | MAPPED |
 | V Reports/governance | T21 | W06 | D1-03 | MAPPED |
-| W Growth | T22 | W11 | D1-03 | MAPPED |
-| X Operations/campaigns | T22 | W11 | D1-03 | MAPPED |
-| Y Analytics | T23 | W11 | D1-03 projections/operational state | MAPPED |
+| W Growth | T22 | W11 | D1-03 campaign/growth operations | MAPPED |
+| X Operations/campaigns | T22 | W11 | D1-03 campaign/growth operations | MAPPED |
+| Y Analytics | T23 | W11 | D1-05 analytics-only derived data | MAPPED |
 | Z SEO/public discovery | T24 | W01 | API/public boundary; no direct D1 | BOUNDARY |
 | AA Client platform | T24 | W01 | Client/API boundary; no direct D1 | BOUNDARY |
 | AB API platform | T24 | W01 | API boundary; no direct D1 | BOUNDARY |
@@ -124,7 +124,7 @@ This table is authoritative only at Task/Worker/D1-boundary level. Entity-level 
 | AJ Cloudflare deployment | T25 | W09 | Runtime boundary; no business D1 | BOUNDARY |
 | AK PostgreSQL/GCP portability | T25 | W09 | Portability boundary; no new D1 | BOUNDARY |
 | AL Reliability/DR | T25 | W09 | D1-03 | MAPPED |
-| AM Observability | T23 | W11 | D1-03 | MAPPED |
+| AM Observability | T23 | W11 | D1-05 analytics-only derived data | MAPPED |
 | AN Security | T25 | W09 | D1-03 runtime; business authorization remains owning D1 | MAPPED |
 | AO Privacy/compliance | T25 | W09 | D1-03 governance; subject data remains owning D1 | MAPPED |
 | AP Integrations/ecosystem | T25 | W09 | Integration boundary; business state remains owning D1 | MAPPED |
@@ -151,7 +151,7 @@ No fifth D1 and no additional Worker was introduced.
 | 43 Blueprint domains have Primary Task | 43/43 PASS |
 | 25 Tasks have exactly one Primary Worker | 25/25 PASS |
 | 12 Worker identities resolve to Worker Master | 12/12 PASS |
-| 4 D1 domains resolve to D1 Master | 4/4 PASS |
+| 5 D1 domains resolve to D1 Master | 5/5 PASS |
 | Feature → Task → Worker → D1/boundary | 43/43 PASS |
 | H/AF/AQ prior conflicts | 3/3 RESOLVED |
 
