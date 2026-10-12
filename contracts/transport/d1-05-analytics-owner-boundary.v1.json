@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/d1-05-analytics-owner-boundary.v1.json",
+  "title": "LuckRead D1-05 Analytics Owner Boundary",
+  "version": "1.0.0",
+  "status": "CONTRACTED_DESIGN_ONLY",
+  "purpose": "Define W11-exclusive access and derived-data limits for the fifth canonical D1 domain without claiming physical provisioning or runtime readiness.",
+  "domain": "D1-05",
+  "authority": "Analytics-only derived data and analytics processing state; not a business source of truth.",
+  "primaryWorker": "W11",
+  "owners": {
+    "W11": [
+      "ValidatedAnalyticsEvent",
+      "AnalyticsDeduplicationKey",
+      "ContentViewAggregate",
+      "VideoPlayAggregate",
+      "ReadingDurationAggregate",
+      "SocialMetricProjection",
+      "CreatorContentDailyRollup",
+      "MetricVersion",
+      "RollupWatermark",
+      "AnalyticsReconciliationStatus",
+      "AnalyticsDashboardReadModel"
+    ]
+  },
+  "sourceAuthorities": {
+    "W03": ["Content identity", "Publication state", "Media/content metadata"],
+    "W05": ["Likes", "Comments", "Shares", "Bookmarks", "Follow relationships"],
+    "W07": ["Orders", "Payments", "Refunds", "Revenue", "Ledger facts"]
+  },
+  "boundaryRules": [
+    "W11 is the only Worker allowed to read/write D1-05.",
+    "D1-05 contains derived analytics state only and never becomes the source of truth for identity, content publication, social relationships, entitlements, commerce or financial facts.",
+    "W03/W05/W07 authoritative writes must not wait for D1-05 persistence.",
+    "Only already admitted event/API delivery contracts may feed D1-05; this contract creates no Worker, Queue, Service Binding or transport.",
+    "Metrics must be deduplicated, versioned, privacy-filtered and reconcilable to authoritative source facts.",
+    "Retention, deletion, consent/purpose, indexes, batch size, replay and rebuild behavior require explicit implementation contracts.",
+    "A null or absent physical database UUID means the domain is not provisioned; no runtime binding may be inferred from this contract."
+  ],
+  "topology": { "workerCount": 12, "d1Count": 5, "taskCount": 25 },
+  "physicalProvisioning": {
+    "status": "PENDING_ADMISSION",
+    "databaseUuid": null,
+    "workerBinding": "W11-only; not yet admitted",
+    "runtimeEvidence": "NOT_PROVIDED"
+  }
+}
