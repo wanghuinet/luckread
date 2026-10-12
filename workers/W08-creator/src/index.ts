@@ -1,4 +1,4 @@
-import { deriveRoleAppointment, mayApplyForCreator, mayReviewCreatorApplication, parseExpectedVersion, validIdempotencyKey } from './policy.js'
+import { deriveRoleAppointment, mayApplyForCreator, mayCreateNewScope, mayReviewCreatorApplication, parseExpectedVersion, validIdempotencyKey } from './policy.js'
 
 interface Env {
   D1_01: D1Database
@@ -428,8 +428,7 @@ async function handleScopeAppointment(env: Env, request: Request): Promise<Respo
   // Admins may create an organization only while appointing its lead. An IP
   // scope is never created by this public operation; it must already exist
   // and be marked VERIFIED by the rights-verification authority.
-  const createsOrganization = !requestedScopeId && appointmentRole.scopeType === 'organization' &&
-    appointmentRole.scopeRole === 'ORG_LEAD' && name.length >= 1 && name.length <= 200
+  const createsOrganization = mayCreateNewScope(appointmentRole, requestedScopeId, name)
   if (!requestedScopeId && !createsOrganization) {
     return errorResponse(400, 'VERIFIED_SCOPE_REQUIRED', 'An existing active scope is required for this appointment')
   }
