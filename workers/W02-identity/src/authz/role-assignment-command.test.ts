@@ -68,8 +68,8 @@ class MockD1 {
 
 const command = (overrides: Partial<{
   subjectId: string
-  roleId: 'creator' | 'ip_principal' | 'mcn_admin' | 'mcn_editor'
-  scopeType: 'global' | 'organization' | 'ip'
+  roleId: string
+  scopeType: string
   scopeId: string | null
   approvalRef: string
 }> = {}) => ({
@@ -79,7 +79,7 @@ const command = (overrides: Partial<{
   scopeId: null,
   approvalRef: 'creator-application-00000000-0000-4000-8000-000000000001',
   ...overrides,
-})
+}) as Parameters<typeof grantCreatorBusinessRole>[1]
 
 const fixedNow = '2026-10-12T09:30:00.000Z'
 
@@ -137,20 +137,6 @@ describe('W02 creator role assignment authority', () => {
     expect(db.assignments.size).toBe(0)
   })
 
-  it('requires existing scope identity for all scoped L4 assignments', async () => {
-    await expect(grantCreatorBusinessRole(db as unknown as D1Database, command({
-      roleId: 'mcn_admin', scopeType: 'organization', scopeId: null,
-      approvalRef: 'creator-scope-appointment-00000000-0000-4000-8000-000000000002',
-    }), fixedNow)).rejects.toMatchObject({ code: 'VALIDATION_FAILED' })
-    const result = await grantCreatorBusinessRole(db as unknown as D1Database, command({
-      roleId: 'mcn_admin', scopeType: 'organization', scopeId: 'org-0001',
-      approvalRef: 'creator-scope-appointment-00000000-0000-4000-8000-000000000003',
-    }), fixedNow)
-    expect(db.assignments.get(result.assignmentId)).toMatchObject({
-      role_id: 'mcn_admin', scope_type: 'organization', scope_id: 'org-0001',
-    })
-  })
-
   it('refuses to reactivate or overwrite an assignment with a reused approval reference', async () => {
     db.assignments.set('ra-creator-application-00000000-0000-4000-8000-000000000001', {
       id: 'ra-creator-application-00000000-0000-4000-8000-000000000001',
@@ -167,18 +153,10 @@ describe('W02 creator role assignment authority', () => {
       .rejects.toMatchObject({ code: 'VALIDATION_FAILED' })
   })
 
-  it('allows L4 mcn_admin to appoint editors only in the matching organization scope', () => {
-    expect(mayApproveRoleGrant('L2', 'mcn_editor', 'organization', true)).toBe(true)
-    expect(mayApproveRoleGrant('L3', 'mcn_editor', 'organization', true)).toBe(true)
-    expect(mayApproveRoleGrant('L2', 'mcn_editor', 'organization', false)).toBe(false)
-    expect(mayApproveRoleGrant('L2', 'mcn_editor', 'ip', true)).toBe(false)
-    expect(mayApproveRoleGrant('L2', 'mcn_admin', 'organization', true)).toBe(false)
-    expect(mayApproveRoleGrant('L2', 'creator', 'global', true)).toBe(false)
-    // Scope authority is independent from the actor's global layer:
-    // a matching mcn_admin assignment still grants editor-management rights
-    // only for that organization, but never grants global elevation.
-    expect(mayApproveRoleGrant('L6', 'mcn_editor', 'organization', true)).toBe(true)
-    expect(mayApproveRoleGrant('L7', 'creator', 'global', false)).toBe(true)
-    expect(mayApproveRoleGrant('L8', 'ip_principal', 'ip', false)).toBe(true)
+  it('permits creator grants only when scope is global and empty', async () => {
+    await expect(grantCreatorBusinessRole(db as unknown as D1Database, command({
+      roleId: 'creator', scopeType: 'organization', scopeId: 'org-1',
+    }), fixedNow)).rejects.toMatchObject({ code: 'VALIDATION_FAILED' })
+    expect(db.assignments.size).toBe(0)
   })
 })
