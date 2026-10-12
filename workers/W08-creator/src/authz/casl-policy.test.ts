@@ -191,6 +191,17 @@ describe('CASL L0-L8 authorization policy', () => {
     }).decision).toBe('DENY')
   })
 
+  it('denies super_admin grants through both role-assignment action names', () => {
+    for (const action of ['role.assign', 'role.assign.any']) {
+      expect(evaluate({
+        layer: 'L8',
+        action,
+        resourceType: 'RoleAssignment',
+        resourceAttributes: { roleId: 'super_admin', targetLayer: 'L8' },
+      })).toMatchObject({ decision: 'DENY', reasonCode: 'PERMISSION_DENIED' })
+    }
+  })
+
   it('allows L8 security/audit reads but never audit mutation', () => {
     expect(evaluate({
       layer: 'L8',
