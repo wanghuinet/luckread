@@ -67,6 +67,26 @@ jobs:
         with:
           node-version: 24
 
+      - name: Install root toolchain for creator preflight
+        if: ${{ inputs.confirm_creator == 'DEPLOY_W08_CREATOR' }}
+        run: npm ci
+
+      - name: Run creator authorization runtime and UI contract tests before production changes
+        if: ${{ inputs.confirm_creator == 'DEPLOY_W08_CREATOR' }}
+        run: npx --no-install vitest run workers/W02-identity/src/authz/role-assignment-command.test.ts workers/W08-creator/src/policy.test.ts workers/W08-creator/src/index.runtime.test.ts workers/W01-payload/tests/int/creator-application-page.int.spec.ts
+
+      - name: Typecheck W08 Creator Worker before production changes
+        if: ${{ inputs.confirm_creator == 'DEPLOY_W08_CREATOR' }}
+        run: npx --no-install tsc --noEmit -p workers/W08-creator/tsconfig.json
+
+      - name: Install and typecheck W02 creator grant path before production changes
+        if: ${{ inputs.confirm_creator == 'DEPLOY_W08_CREATOR' }}
+        working-directory: workers/W02-identity
+        run: |
+          npm install --ignore-scripts --no-audit --no-fund
+          node --input-type=module -e "import('better-auth').then(() => console.log('better-auth runtime import: OK'))"
+          npx --no-install tsc --noEmit -p tsconfig.json
+
       - name: Validate post-deploy session E2E harness before production changes
         run: node --check scripts/auth-session-live-e2e.mjs
 
@@ -91,6 +111,11 @@ jobs:
       - name: Install locked W01 dependencies
         working-directory: workers/W01-payload
         run: pnpm install --frozen-lockfile
+
+      - name: Typecheck W01 API and creator routes before production changes
+        if: ${{ inputs.confirm_creator == 'DEPLOY_W08_CREATOR' }}
+        working-directory: workers/W01-payload
+        run: pnpm exec tsc --noEmit
 
       - name: Verify W01 W02_AUTH binding
         working-directory: workers/W01-payload
