@@ -98,7 +98,10 @@ export default function CreatorApplicationClient({
     }
   }, [])
 
-  useEffect(() => { void loadApplication() }, [loadApplication])
+  useEffect(() => {
+    const timer = window.setTimeout(() => { void loadApplication() }, 0)
+    return () => window.clearTimeout(timer)
+  }, [loadApplication])
 
   async function submitApplication(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
