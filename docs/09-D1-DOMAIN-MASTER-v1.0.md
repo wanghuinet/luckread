@@ -33,6 +33,7 @@ D1-05 is explicitly approved as an analytics-only domain; no sixth D1 domain may
 | D1-03 | Platform Operations / Governance / Runtime |
 | D1-04 | Commerce / Financial Authority |
 | D1-05 | Analytics-only Derived Data (W11-exclusive) |
+| D1-05 | Analytics-only Derived Data (W11-exclusive) |
 
 ## 4. D1-01 — Identity / Account / Access
 
