@@ -1,9 +1,9 @@
 import layers from '../../../../contracts/authz/layers.json'
 
-type ScopeType = 'global' | 'organization' | 'ip'
+type ScopeType = 'global'
 type RoleGrantCommand = {
   subjectId: string
-  roleId: 'creator' | 'ip_principal' | 'mcn_admin' | 'mcn_editor'
+  roleId: 'creator'
   scopeType: ScopeType
   scopeId: string | null
   approvalRef: string
@@ -24,18 +24,8 @@ for (const layer of layers['x-layers']) {
   for (const role of layer.roles ?? []) roleToLayer.set(role, layer.id)
 }
 
-const roleScopeMatches = (command: RoleGrantCommand): boolean => {
-  if (command.roleId === 'creator') {
-    return command.scopeType === 'global' && command.scopeId === null
-  }
-  if (command.roleId === 'ip_principal') {
-    return command.scopeType === 'ip' && typeof command.scopeId === 'string' && command.scopeId.length > 0 && command.scopeId.length <= 128
-  }
-  return (command.roleId === 'mcn_admin' || command.roleId === 'mcn_editor') &&
-    command.scopeType === 'organization' &&
-    typeof command.scopeId === 'string' &&
-    command.scopeId.length > 0 && command.scopeId.length <= 128
-}
+const roleScopeMatches = (command: RoleGrantCommand): boolean =>
+  command.roleId === 'creator' && command.scopeType === 'global' && command.scopeId === null
 
 const sameScope = (row: PersistedAssignment, command: RoleGrantCommand): boolean =>
   row.subjectId === command.subjectId &&
@@ -52,7 +42,7 @@ export class RoleAssignmentCommandError extends Error {
 /**
  * Called only after W02 has independently authenticated an L7/L8 approver.
  * The caller (W08) remains responsible for proving the creator application
- * or authoritative organization/IP appointment represented by approvalRef.
+ * represented by approvalRef.
  */
 export async function grantCreatorBusinessRole(
   db: D1Database,
@@ -66,12 +56,12 @@ export async function grantCreatorBusinessRole(
     command.subjectId.length > 128 ||
     !/^[A-Za-z0-9_-]{8,120}$/.test(command.approvalRef) ||
     !roleScopeMatches(command) ||
-    !['creator', 'ip_principal', 'mcn_admin', 'mcn_editor'].includes(command.roleId)
+    command.roleId !== 'creator'
   ) {
     throw new RoleAssignmentCommandError('VALIDATION_FAILED', 'invalid role grant command')
   }
 
-  const expectedLayer = command.roleId === 'creator' ? 'L3' : 'L4'
+  const expectedLayer = 'L3'
   if (roleToLayer.get(command.roleId) !== expectedLayer) {
     throw new RoleAssignmentCommandError('ROLE_MAPPING_INVALID', 'role does not map to its contracted layer')
   }
