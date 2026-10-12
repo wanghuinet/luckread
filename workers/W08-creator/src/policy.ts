@@ -38,6 +38,15 @@ export function deriveRoleAppointment(
   return null
 }
 
+export function mayCreateNewScope(appointment: RoleAppointment | null, existingScopeId: string, name: string): boolean {
+  return !!appointment &&
+    !existingScopeId &&
+    appointment.scopeType === 'organization' &&
+    appointment.scopeRole === 'ORG_LEAD' &&
+    name.trim().length >= 1 &&
+    name.trim().length <= 200
+}
+
 export function parseExpectedVersion(value: string | null): number | null {
   if (!value) return null
   const normalized = value.trim().replace(/^W\//, '').replace(/^"|"$/g, '')
