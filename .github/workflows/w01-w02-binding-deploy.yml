@@ -58,6 +58,11 @@ jobs:
         if: ${{ inputs.confirm == 'DEPLOY_BINDING_AND_W08_CREATOR' }}
         run: npm ci
 
+      - name: Install W08 CASL runtime dependency before checks
+        if: ${{ inputs.confirm == 'DEPLOY_BINDING_AND_W08_CREATOR' }}
+        working-directory: workers/W08-creator
+        run: npm install --ignore-scripts --no-audit --no-fund --package-lock=false
+
       - name: Run creator authorization runtime and UI contract tests before production changes
         if: ${{ inputs.confirm == 'DEPLOY_BINDING_AND_W08_CREATOR' }}
         run: npx --no-install vitest run workers/W02-identity/src/authz/role-assignment-command.test.ts workers/W08-creator/src/policy.test.ts workers/W08-creator/src/index.runtime.test.ts workers/W01-payload/tests/int/creator-application-page.int.spec.ts
