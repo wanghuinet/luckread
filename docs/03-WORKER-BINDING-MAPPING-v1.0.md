@@ -8,6 +8,8 @@
 
 ## 1. Purpose
 
+Authorization ownership was amended by `docs/change-control/CC-W02-W08-AUTHORIZATION-BOUNDARY-2026-10-12.md`: W02 owns identity/account, while W08 owns the shared authorization policy and CASL decision service. The 12-Worker / 4-D1 / 25-Task topology is unchanged.
+
 This document freezes the authoritative Worker × D1 binding required before the Feature → Task → Worker → D1 Mapping Freeze.
 
 Worker identity and Primary Task ownership are defined by the canonical Worker Master. D1 authority is defined by the canonical D1 Domain Master. This document binds those two frozen layers without adding capabilities or changing domain ownership.
@@ -30,13 +32,13 @@ Exactly four D1 domains are authoritative. No implicit fifth D1 exists.
 | Worker | Primary responsibility | Primary D1 | D1-01 | D1-02 | D1-03 | D1-04 |
 |---|---|---|---|---|---|---|
 | W01 | Public API / Gateway / Developer & Admin API Boundary | None | No general authority; bounded AUTH-001 Payload-native registration execution only | No direct authority | No direct authority | No direct authority |
-| W02 | Identity / Account / Authorization | D1-01 | RW scoped | No | No | No |
+| W02 | Identity / Account | D1-01 | RW scoped | No | No | No |
 | W03 | Content / Article / Media / Translation | D1-02 | No | RW scoped | No | No |
 | W04 | Feed / Recommendation / Search | Derived/projection boundary | Read/projection only where explicitly contracted | Read/projection only where explicitly contracted | Read/projection only where explicitly contracted | Read/projection only where explicitly contracted |
 | W05 | Social / Community / Messaging / Notification | D1-02 | No direct authority | RW scoped | RW scoped runtime-delivery only | No |
 | W06 | Rights / Trust & Safety / Governance | D1-03 | No | Read/reference only where contracted | RW scoped | No |
 | W07 | Subscription / Commerce / Payment / Advertising | D1-04 | Scoped entitlement transition only | No | Operational event/audit integration only | RW scoped financial/commercial authority |
-| W08 | Creator / Organization | D1-01 | RW scoped | No | No | No |
+| W08 | Authorization / Creator / Organization | D1-01 | RW scoped | No | No | No |
 | W09 | Platform / Storage / Reliability | D1-03 | No | No | RW scoped platform/runtime authority | No |
 | W10 | Async / Queue / Job Execution | D1-03 scoped execution | No | No | RW scoped execution records only | No |
 | W11 | Growth / Campaign / Analytics / Operations | D1-03 | No | Read/reference only where explicitly contracted | RW scoped operational/analytics state | No |
@@ -63,8 +65,9 @@ Exactly four D1 domains are authoritative. No implicit fifth D1 exists.
 
 ### W02
 
-- Sole Worker authority for T01/T02/T03 and D1-01 identity/account/authorization state.
-- Owns authorization decisions for identity/access state under the applicable contracts.
+- Sole Worker authority for T01/T02 and D1-01 identity/account/profile/session state.
+- Better Auth remains the only account-system core. W02 authenticates identities and owns account lifecycle/state; it does not host the shared CASL business-permission engine.
+- The existing layer-projection endpoint may remain as a temporary authentication/session compatibility path; it is not a substitute for W08 business-permission decisions.
 - Must not become owner of payment or financial facts.
 
 ### W03
@@ -100,8 +103,11 @@ Exactly four D1 domains are authoritative. No implicit fifth D1 exists.
 
 ### W08
 
-- Sole Primary Worker for T04 and D1-01 creator/organization identity relationships.
-- Must not become general identity/account authorization authority outside its assigned entities and contracts.
+- Sole Primary Worker for T03/T04 and D1-01 authorization plus creator/organization relationships under the approved scope.
+- Owns CASL-based L0–L8 permission evaluation and the internal `POST /internal/authz/check-permission` endpoint.
+- Reads time-valid RoleAssignment facts and account state from D1-01 to derive its decision context; callers cannot submit their own layer, account state, or scoped grants.
+- The endpoint is internal-only and returns `Cache-Control: no-store`; callers must supply server-derived identity and resource facts loaded from the owning business domain.
+- Must not duplicate Better Auth or become owner of payment or financial facts.
 
 ### W09
 
