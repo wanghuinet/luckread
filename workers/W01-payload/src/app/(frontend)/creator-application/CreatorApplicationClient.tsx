@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react'
-import { fetchJson, getApiErrorMessage } from '../../../../lib/client-api.js'
+import { fetchJson, getApiErrorMessage } from '../../../lib/client-api.js'
 import styles from './creator-application.module.css'
 
 type CreatorType = 'PERSONAL' | 'WRITER' | 'VIDEO_CREATOR' | 'DEVELOPER' | 'ARTIST' | 'OTHER'
