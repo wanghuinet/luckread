@@ -1,0 +1,80 @@
+name: Creator Authorization Path CI
+
+on:
+  pull_request:
+    paths:
+      - 'workers/W01-payload/src/auth/w08-creator-client.ts'
+      - 'workers/W01-payload/src/app/api/v1/creator-applications/**'
+      - 'workers/W01-payload/src/app/api/v1/creator-scopes/**'
+      - 'workers/W01-payload/src/app/api/v1/admin/creator-applications/**'
+      - 'workers/W01-payload/src/app/api/v1/admin/creator-scopes/**'
+      - 'workers/W01-payload/wrangler.jsonc'
+      - 'workers/W02-identity/src/index.ts'
+      - 'workers/W02-identity/src/authz/role-assignment-command.ts'
+      - 'workers/W08-creator/**'
+      - 'contracts/transport/W01-W08-creator-http-binding.v1.json'
+      - 'contracts/transport/W08-W02-role-assignment-http-binding.v1.json'
+      - '.github/workflows/creator-authorization-path-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install root toolchain
+        run: npm ci
+
+      - name: Verify creator authorization policy tests
+        run: npx --yes vitest@3.2.4 run workers/W08-creator/src/policy.test.ts
+
+      - name: Typecheck W08 Creator Worker
+        run: npx --yes tsc@5.9.3 --noEmit -p workers/W08-creator/tsconfig.json
+
+      - name: Install W02 runtime dependencies
+        working-directory: workers/W02-identity
+        run: npm install --ignore-scripts --no-audit --no-fund
+
+      - name: Typecheck W02 Identity Worker
+        working-directory: workers/W02-identity
+        run: npx --yes tsc@5.9.3 --noEmit -p tsconfig.json
+
+      - name: Setup pnpm 11
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.0.0
+          run_install: false
+
+      - name: Install locked W01 dependencies
+        working-directory: workers/W01-payload
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck W01 API gateway
+        working-directory: workers/W01-payload
+        run: pnpm exec tsc --noEmit
+
+      - name: Verify W01/W08 binding and transport authorities
+        run: |
+          node --input-type=module - <<'NODE'
+          import fs from 'node:fs'
+          const w01 = JSON.parse(fs.readFileSync('workers/W01-payload/wrangler.jsonc', 'utf8'))
+          const w08 = JSON.parse(fs.readFileSync('workers/W08-creator/wrangler.jsonc', 'utf8'))
+          const l4 = JSON.parse(fs.readFileSync('contracts/transport/W01-W08-creator-http-binding.v1.json', 'utf8'))
+          const l42 = JSON.parse(fs.readFileSync('contracts/transport/W08-W02-role-assignment-http-binding.v1.json', 'utf8'))
+          if (!(w01.services || []).some((x) => x.binding === 'W08_CREATOR' && x.service === 'luckread-w08-creator')) throw new Error('W01 W08_CREATOR binding mismatch')
+          if (w08.name !== 'luckread-w08-creator' || !(w08.d1_databases || []).some((x) => x.binding === 'D1_01')) throw new Error('W08 identity/D1-01 binding mismatch')
+          if (l4.topologyConstraints.workerCountDelta !== 0 || l4.topologyConstraints.databaseCountDelta !== 0) throw new Error('topology changed')
+          if (l42.operation.allowedRoleScopePairs.length !== 4) throw new Error('expected narrow L3/L4 role allow-list')
+          console.log('CREATOR_AUTHORIZATION_BINDING=PASS')
+          NODE
