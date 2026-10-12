@@ -324,7 +324,7 @@ async function handleAdminApplicationList(env: Env, request: Request): Promise<R
   const limit = Number.isSafeInteger(limitValue) ? Math.max(1, Math.min(50, limitValue)) : 25
   const rows = await env.D1_01.prepare(
     "SELECT application_id, user_id, creator_type, statement, status, grant_state, version, created_at " +
-    "FROM creator_applications WHERE status = 'PENDING' ORDER BY created_at ASC LIMIT ?",
+    "FROM creator_applications WHERE status = 'PENDING' OR (status = 'APPROVED' AND grant_state = 'PENDING') ORDER BY created_at ASC LIMIT ?",
   ).bind(limit).all()
   return json({ data: rows.results ?? [], limit })
 }
