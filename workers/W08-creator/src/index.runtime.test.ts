@@ -306,12 +306,14 @@ describe('W08 creator qualification runtime guards', () => {
     expect((await responseBody(selfResponse)).data?.error?.code).toBe('SELF_APPROVAL_DENIED')
     expect(selfHarness.db.batches).toBe(0)
 
+    const staleHarness = harness(principal('reviewer-l7-0002', 'L7'))
+    staleHarness.db.applications.set('creator-app-0001', existingApplication())
     const staleResponse = await worker.fetch(request('/api/v1/admin/creator-applications/decision', 'POST', {
       applicationId: 'creator-app-0001', decision: 'APPROVED', reason: '',
-    }, { 'Idempotency-Key': 'creator-review-stale-0001', 'If-Match': '"9"' }), env)
+    }, { 'Idempotency-Key': 'creator-review-stale-0001', 'If-Match': '"9"' }), staleHarness.env)
     expect(staleResponse.status).toBe(412)
     expect((await responseBody(staleResponse)).data?.error?.code).toBe('PRECONDITION_FAILED')
-    expect(db.batches).toBe(0)
+    expect(staleHarness.db.batches).toBe(0)
   })
 
   it('rejects a conflicting decision after the application has reached a final state', async () => {
