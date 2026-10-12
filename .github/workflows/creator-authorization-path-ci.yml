@@ -40,7 +40,7 @@ jobs:
         run: npx --yes vitest@3.2.4 run workers/W08-creator/src/policy.test.ts
 
       - name: Typecheck W08 Creator Worker
-        run: npx --yes tsc@5.9.3 --noEmit -p workers/W08-creator/tsconfig.json
+        run: npx --no-install tsc --noEmit -p workers/W08-creator/tsconfig.json
 
       - name: Install W02 runtime dependencies
         working-directory: workers/W02-identity
@@ -48,7 +48,7 @@ jobs:
 
       - name: Typecheck W02 Identity Worker
         working-directory: workers/W02-identity
-        run: npx --yes tsc@5.9.3 --noEmit -p tsconfig.json
+        run: npx --no-install tsc --noEmit -p tsconfig.json
 
       - name: Setup pnpm 11
         uses: pnpm/action-setup@v4
