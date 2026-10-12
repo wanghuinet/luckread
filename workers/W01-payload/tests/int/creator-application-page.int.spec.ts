@@ -51,4 +51,18 @@ describe('creator qualification application page', () => {
     expect(css).toContain('grid-template-columns: repeat(3, minmax(0, 1fr))')
     expect(css).toContain('grid-template-columns: 1fr')
   })
+  it('restricts creator review to L7/L8 and uses authoritative review APIs', () => {
+    const page = read('src/app/(frontend)/creator-review/page.tsx')
+    const client = read('src/app/(frontend)/creator-review/CreatorReviewClient.tsx')
+    expect(page).toContain("principal.layer !== 'L7' && principal.layer !== 'L8'")
+    expect(client).toContain("'/api/v1/admin/creator-applications?limit=50'")
+    expect(client).toContain("'/api/v1/admin/creator-applications'")
+    expect(client).toContain("'If-Match'")
+    expect(client).toContain("'Idempotency-Key'")
+    expect(client).toContain('通过并授予 L3')
+    expect(client).toContain('重试授权')
+    expect(client).toContain("onClick={() => void decide(application, 'APPROVED')}")
+    expect(client).not.toContain('document.getElementById')
+  })
+
 })
