@@ -11,7 +11,7 @@ export function mayReviewCreatorApplication(layer: string | null | undefined): b
 
 export function parseExpectedVersion(value: string | null): number | null {
   if (!value) return null
-  const normalized = value.trim().replace(/^W\\//, '').replace(/^"|"$/g, '')
+  const normalized = value.trim().replace(/^W[/]/, '').replace(/^"|"$/g, '')
   if (!/^[1-9][0-9]*$/.test(normalized)) return null
   const version = Number(normalized)
   return Number.isSafeInteger(version) ? version : null
