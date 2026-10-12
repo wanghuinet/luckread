@@ -5,10 +5,13 @@ on:
     paths:
       - 'workers/W01-payload/src/auth/w08-creator-client.ts'
       - 'workers/W01-payload/src/app/api/v1/creator-applications/**'
-      - 'workers/W01-payload/src/app/api/v1/creator-scopes/**'
       - 'workers/W01-payload/src/app/api/v1/admin/creator-applications/**'
-      - 'workers/W01-payload/src/app/api/v1/admin/creator-scopes/**'
       - 'workers/W01-payload/wrangler.jsonc'
+      - 'workers/W01-payload/src/app/(frontend)/creator-application/**'
+      - 'workers/W01-payload/src/app/(frontend)/creator-center/page.tsx'
+      - 'workers/W01-payload/src/app/(frontend)/creator-center/CreatorStudio.tsx'
+      - 'workers/W01-payload/src/app/(frontend)/me/profile/page.tsx'
+      - 'workers/W01-payload/tests/int/creator-application-page.int.spec.ts'
       - 'workers/W02-identity/src/index.ts'
       - 'workers/W02-identity/src/authz/role-assignment-command.ts'
       - 'workers/W02-identity/src/authz/role-grant-approval-policy.ts'
@@ -41,7 +44,7 @@ jobs:
         run: npm ci
 
       - name: Verify creator authorization policy tests
-        run: npx --yes vitest@3.2.4 run workers/W02-identity/src/authz/role-assignment-command.test.ts workers/W08-creator/src/policy.test.ts
+        run: npx --yes vitest@3.2.4 run workers/W02-identity/src/authz/role-assignment-command.test.ts workers/W08-creator/src/policy.test.ts workers/W01-payload/tests/int/creator-application-page.int.spec.ts
 
       - name: Typecheck W08 Creator Worker
         run: npx --no-install tsc --noEmit -p workers/W08-creator/tsconfig.json
@@ -80,7 +83,7 @@ jobs:
           if (!(w01.services || []).some((x) => x.binding === 'W08_CREATOR' && x.service === 'luckread-w08-creator')) throw new Error('W01 W08_CREATOR binding mismatch')
           if (w08.name !== 'luckread-w08-creator' || !(w08.d1_databases || []).some((x) => x.binding === 'D1_01')) throw new Error('W08 identity/D1-01 binding mismatch')
           if (l4.topologyConstraints.workerCountDelta !== 0 || l4.topologyConstraints.databaseCountDelta !== 0) throw new Error('topology changed')
-          if (l42.operation.allowedRoleScopePairs.length !== 4) throw new Error('expected narrow L3/L4 role allow-list')
+          if (l42.operation.allowedRoleScopePairs.length !== 1) throw new Error('expected only the global L3 creator role allow-list')
           console.log('CREATOR_AUTHORIZATION_BINDING=PASS')
           NODE
           node scripts/verify-worker-terminal-routing.mjs
