@@ -68,7 +68,7 @@
       "publicPath": "/api/v1/admin/creator-scopes",
       "internalPath": "/api/v1/admin/creator-scopes",
       "principalRequired": true,
-      "minimumGlobalLayer": "L7",
+      "authorizationRule": "L7/L8 for creating organization scope or appointing organization leads/IP principals; a matching scoped L4 mcn_admin may appoint only mcn_editor inside the same active organization",
       "idempotency": "Idempotency-Key",
       "bodyAuthority": "scope type and membership intent only; W08 derives roleId and scopeId"
     },
