@@ -10,7 +10,7 @@ const allowed = new Set(['W06', 'W09', 'W10', 'W11'])
 const owners = contract.owners ?? {}
 
 if (contract.domain !== 'D1-03') throw new Error('Expected D1-03 owner contract')
-if (contract.topology?.workerCount !== 12 || contract.topology?.d1Count !== 4 || contract.topology?.taskCount !== 25) {
+if (contract.topology?.workerCount !== 12 || contract.topology?.d1Count !== 5 || contract.topology?.taskCount !== 25) {
   throw new Error('D1-03 owner contract topology drift')
 }
 
