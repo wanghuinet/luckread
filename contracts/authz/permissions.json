@@ -180,6 +180,45 @@
       "scope": "own"
     },
     {
+      "name": "creator.application.apply",
+      "resource": "creator_application",
+      "action": "apply",
+      "minLayer": "L2",
+      "scope": "own",
+      "auditRequired": true
+    },
+    {
+      "name": "creator.application.read.own",
+      "resource": "creator_application",
+      "action": "read",
+      "minLayer": "L2",
+      "scope": "own"
+    },
+    {
+      "name": "creator.application.review",
+      "resource": "creator_application",
+      "action": "review",
+      "minLayer": "L7",
+      "scope": "platform",
+      "sensitive": true,
+      "auditRequired": true
+    },
+    {
+      "name": "creator.scope.manage",
+      "resource": "creator_scope",
+      "action": "manage",
+      "minLayer": "L4",
+      "scope": "organization",
+      "auditRequired": true
+    },
+    {
+      "name": "creator.scope.read.own",
+      "resource": "creator_scope",
+      "action": "read",
+      "minLayer": "L2",
+      "scope": "own"
+    },
+    {
       "name": "entitlement.check",
       "resource": "entitlement",
       "action": "check",
@@ -248,18 +287,18 @@
       "auditRequired": true
     },
     {
-      "name": "media.read.own",
-      "resource": "media",
-      "action": "read",
-      "minLayer": "L3",
-      "scope": "own"
-    },
-    {
       "name": "media.read",
       "resource": "media",
       "action": "read",
       "minLayer": "L0",
       "scope": "public"
+    },
+    {
+      "name": "media.read.own",
+      "resource": "media",
+      "action": "read",
+      "minLayer": "L3",
+      "scope": "own"
     },
     {
       "name": "media.upload",
@@ -398,9 +437,25 @@
       "auditRequired": true
     },
     {
+      "name": "subscription.change_plan",
+      "resource": "subscription",
+      "action": "change_plan",
+      "minLayer": "L2",
+      "scope": "own",
+      "auditRequired": true
+    },
+    {
       "name": "subscription.create",
       "resource": "subscription",
       "action": "create",
+      "minLayer": "L2",
+      "scope": "own",
+      "auditRequired": true
+    },
+    {
+      "name": "subscription.pause",
+      "resource": "subscription",
+      "action": "pause",
       "minLayer": "L2",
       "scope": "own",
       "auditRequired": true
@@ -411,6 +466,14 @@
       "action": "read",
       "minLayer": "L2",
       "scope": "own"
+    },
+    {
+      "name": "subscription.resume",
+      "resource": "subscription",
+      "action": "resume",
+      "minLayer": "L2",
+      "scope": "own",
+      "auditRequired": true
     },
     {
       "name": "system.job",
@@ -532,30 +595,6 @@
       "action": "update",
       "minLayer": "L1",
       "scope": "own"
-    },
-    {
-      "name": "subscription.pause",
-      "resource": "subscription",
-      "action": "pause",
-      "minLayer": "L2",
-      "scope": "own",
-      "auditRequired": true
-    },
-    {
-      "name": "subscription.resume",
-      "resource": "subscription",
-      "action": "resume",
-      "minLayer": "L2",
-      "scope": "own",
-      "auditRequired": true
-    },
-    {
-      "name": "subscription.change_plan",
-      "resource": "subscription",
-      "action": "change_plan",
-      "minLayer": "L2",
-      "scope": "own",
-      "auditRequired": true
     }
   ],
   "x-forbidden-patterns": [
