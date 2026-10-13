@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { subject } from '@casl/ability'
-import { createW08Ability, createW08AbilityForRoles, resolveCatalogPermissionsForRoles, type W08AuthorizationContext, type W08PrivilegedApprovalEvidence, type W08RoleAuthorizationContext } from './index.js'
+import { createW08Ability, createW08AbilityForRoles, resolveCatalogPermissionsForRoles, type W08AuthorizationContext, type W08PrivilegedApprovalEvidence, type W08RoleAssignment, type W08RoleAuthorizationContext } from './index.js'
 import layers from '../../../contracts/authz/layers.json'
 import permissionCatalog from '../../../contracts/authz/permissions.json'
 
@@ -294,7 +294,7 @@ describe('L8 dual-approval and Break-Glass evidence', () => {
       layer: 'L8',
       accountState: 'active',
       mfaVerified: true,
-      effectiveRoles: ['super_admin'],
+      roleAssignments: [{ roleId: 'super_admin', scopeType: 'global', scopeId: null }],
       privilegedApprovals: [],
     }
     const noApproval = createW08AbilityForRoles(base)
@@ -403,14 +403,14 @@ describe('L5 content operations permission catalog slice', () => {
       layer: 'L5',
       accountState: 'active',
       mfaVerified: false,
-      effectiveRoles: ['operator'],
+      roleAssignments: [{ roleId: 'operator', scopeType: 'global', scopeId: null }],
     })
     const withMfa = createW08AbilityForRoles({
       subjectId: 'operator-1',
       layer: 'L5',
       accountState: 'active',
       mfaVerified: true,
-      effectiveRoles: ['operator'],
+      roleAssignments: [{ roleId: 'operator', scopeType: 'global', scopeId: null }],
     })
 
     expect(withoutMfa.can('curate', 'content')).toBe(false)
@@ -475,14 +475,17 @@ describe('public, interaction, notification and creator permission catalog slice
       layer: 'L0',
       accountState: 'anonymous',
       mfaVerified: false,
-      effectiveRoles: [],
+      roleAssignments: [],
     })
     const verifiedAbility = createW08AbilityForRoles({
       subjectId: 'user-1',
       layer: 'L2',
       accountState: 'active',
       mfaVerified: false,
-      effectiveRoles: ['user', 'verified_user'],
+      roleAssignments: [
+        { roleId: 'user', scopeType: 'global', scopeId: null },
+        { roleId: 'verified_user', scopeType: 'global', scopeId: null },
+      ],
     })
 
     expect(publicAbility.can('read', 'feed')).toBe(true)
@@ -501,10 +504,12 @@ describe('CASL ability from trusted role assignments', () => {
     layer: 'L3',
     accountState: 'active',
     mfaVerified: false,
-    effectiveRoles: ['user', 'verified_user', 'creator'],
+    roleAssignments: [
+      { roleId: 'user', scopeType: 'global', scopeId: null },
+      { roleId: 'verified_user', scopeType: 'global', scopeId: null },
+      { roleId: 'creator', scopeType: 'global', scopeId: null },
+    ],
     deniedPermissions: [],
-    organizationIds: [],
-    ipIds: [],
     ...overrides,
   })
 
@@ -518,7 +523,10 @@ describe('CASL ability from trusted role assignments', () => {
 
   it('fails closed if any effective role is not in the canonical role vocabulary', () => {
     const ability = createW08AbilityForRoles(roleContext({
-      effectiveRoles: ['creator', 'founder'],
+      roleAssignments: [
+        { roleId: 'creator', scopeType: 'global', scopeId: null },
+        { roleId: 'founder', scopeType: 'global', scopeId: null },
+      ],
     }))
 
     expect(ability.can('update', resource('content', { ownerId: 'user-1' }))).toBe(false)
@@ -527,22 +535,26 @@ describe('CASL ability from trusted role assignments', () => {
   it('allows a valid scoped L4 role only inside its trusted scope without changing global layer', () => {
     const ability = createW08AbilityForRoles(roleContext({
       layer: 'L2',
-      effectiveRoles: ['mcn_admin'],
-      organizationIds: ['org-1'],
+      roleAssignments: [
+        { roleId: 'user', scopeType: 'global', scopeId: null },
+        { roleId: 'verified_user', scopeType: 'global', scopeId: null },
+        { roleId: 'mcn_admin', scopeType: 'organization', scopeId: 'org-1' },
+        { roleId: 'mcn_editor', scopeType: 'organization', scopeId: 'org-2' },
+      ],
     }))
 
     expect(ability.can('member_manage', resource('organization', { id: 'org-1' }))).toBe(true)
     expect(ability.can('member_manage', resource('organization', { id: 'org-2' }))).toBe(false)
+    expect(ability.can('member_read', resource('organization', { id: 'org-2' }))).toBe(true)
   })
 
   it('still enforces MFA and explicit DENY after resolving role grants', () => {
     const withoutMfa = createW08AbilityForRoles(roleContext({
       layer: 'L5',
-      effectiveRoles: ['operator'],
+      roleAssignments: [{ roleId: 'operator', scopeType: 'global', scopeId: null }],
       mfaVerified: false,
     }))
     const denied = createW08AbilityForRoles(roleContext({
-      effectiveRoles: ['user', 'verified_user', 'creator'],
       deniedPermissions: ['content.update.own'],
     }))
 
