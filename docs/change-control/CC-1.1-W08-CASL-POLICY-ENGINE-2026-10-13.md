@@ -43,10 +43,12 @@ The mapping remains deliberately marked `PARTIAL_IMPLEMENTED_PERMISSION_CATALOG`
 2. Explicit DENY is applied after grants and must override any matching ALLOW.
 3. The resolved layer must meet the permission's catalogued `minLayer`.
 4. L5-L8 protected/operational grants require verified MFA.
-5. Own, organization, and IP grants require matching server-resolved resource/scope context.
-6. Restricted/frozen accounts may receive only explicitly granted public-read permissions. Suspended, pending-deletion, deleted, and banned accounts receive no grants from this evaluator.
-7. Anonymous L0 access is limited to explicitly granted public read/resolve actions; it cannot use own, organization, IP, or platform scopes.
-8. The evaluator is not authentication, role assignment, entitlement, ownership, workflow, or business-state authority.
+5. Every L8 permission additionally requires trusted, target-bound privileged approval evidence: exact permission and resource type, actor match, non-empty reason, two distinct approvers excluding the actor, an active issue/expiry interval no longer than four hours, and a verified audit-event reference. Missing/invalid evidence denies the privileged action.
+6. L8 approvals bind the resulting CASL grant to the approved resource ID; a permission check made with only a resource-type string fails closed whenever a conditional rule applies.
+7. Own, organization, and IP grants require matching server-resolved resource/scope context.
+8. Restricted/frozen accounts may receive only explicitly granted public-read/resolve permissions. Suspended, pending-deletion, deleted, and banned accounts receive no grants from this evaluator.
+9. Anonymous L0 access is limited to explicitly granted public read/resolve actions; it cannot use own, organization, IP, or platform scopes.
+10. The evaluator is not authentication, role assignment, entitlement, ownership, workflow, business-state, or approval-authority truth. A trusted adapter must verify approval and audit evidence before passing it to W08.
 
 ## 4. Boundary and implementation status
 
