@@ -11,6 +11,42 @@ export interface BetterAuthEnv {
   CLOUDFLARE_ENV?: string
 }
 
+const escapeHtml = (value: string): string =>
+  value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+
+async function sendVerificationEmail(
+  env: BetterAuthEnv,
+  input: { user: { email: string }; url: string },
+): Promise<void> {
+  const safeUrl = escapeHtml(input.url)
+  await sendResendEmail(env, {
+    purpose: 'email_verification',
+    to: input.user.email,
+    subject: 'Verify your LuckRead email',
+    text: 'Verify your LuckRead email by opening this link: ' + input.url,
+    html: '<p>Welcome to LuckRead.</p><p>Verify your email address to activate your account:</p><p><a href="' + safeUrl + '">Verify email address</a></p>',
+  })
+}
+
+async function sendPasswordResetEmail(
+  env: BetterAuthEnv,
+  input: { user: { email: string }; url: string },
+): Promise<void> {
+  const safeUrl = escapeHtml(input.url)
+  await sendResendEmail(env, {
+    purpose: 'password_reset',
+    to: input.user.email,
+    subject: 'Reset your LuckRead password',
+    text: 'Reset your LuckRead password by opening this link: ' + input.url,
+    html: '<p>We received a request to reset your password.</p><p>If you requested this, use the link below to choose a new password:</p><p><a href="' + safeUrl + '">Reset password</a></p><p>If you did not request this, you can ignore this email.</p>',
+  })
+}
+
 async function activateVerifiedAccount(db: D1Database, userId: string): Promise<void> {
   const now = new Date().toISOString()
   const activation = await activateEmailVerifiedAccount(db, userId, now)
@@ -76,7 +112,6 @@ const buildLuckReadAuth = (env: BetterAuthEnv) => {
       afterEmailVerification: async (user) => {
         const userId = String(user.id)
         await activateVerifiedAccount(env.D1_01, userId)
-        await ensureVerifiedUserRole(env.D1_01, userId, new Date().toISOString())
       },
     },
     databaseHooks: {
