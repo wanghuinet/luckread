@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import worker from './index.js'
+import worker from './worker.js'
 
 type TestPrincipal = {
   active: boolean
