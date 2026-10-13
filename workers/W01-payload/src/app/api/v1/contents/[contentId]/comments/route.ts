@@ -7,6 +7,7 @@ import {
   callW05SocialPublic,
   resolveCookieSocialPrincipal,
   resolveOptionalCookieSocialPrincipal,
+  resolveSocialMentionTargets,
   W05SocialClientError,
 } from '../../../../../../social/w05-social-client.js'
 import { invalidatePublicContentComments } from '../../../../../../lib/public-response-cache.js'
@@ -105,12 +106,13 @@ export async function POST(
       return errorResponse(400, 'VALIDATION_FAILED', 'Invalid comment request')
     }
 
+    const mentions = await resolveSocialMentionTargets(body)
     const response = await callW05Social({
       request,
       pathname: '/internal/social/contents/' + encodeURIComponent(contentId) + '/comments',
       method: 'POST',
       principal,
-      body: { body, parentId: parentId ?? null },
+      body: { body, parentId: parentId ?? null, mentions },
     })
     if (response.ok) await invalidatePublicContentComments(contentId)
     return response

@@ -27,7 +27,8 @@ describe('v1 comment adapters', () => {
   })
 
   it('keeps parentId and body in the create request only', () => {
-    expect(route).toContain('body: { body, parentId: parentId ?? null }')
+    expect(route).toContain('body: { body, parentId: parentId ?? null, mentions }')
+    expect(route).toContain('resolveSocialMentionTargets(body)')
   })
 
   it('enforces idempotency precondition on comment deletion', () => {
