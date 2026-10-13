@@ -1,0 +1,10 @@
+{
+  "name": "@luckread/w08-authorization",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "engines": { "node": ">=24" },
+  "dependencies": {
+    "@casl/ability": "7.0.1"
+  }
+}
