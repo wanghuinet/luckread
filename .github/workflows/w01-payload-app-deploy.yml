@@ -1,0 +1,78 @@
+name: W01 Payload Application Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Optional exact source commit SHA; blank uses the selected ref head
+        required: false
+        type: string
+      confirm:
+        description: Type DEPLOY to publish W01 to the configured production routes
+        required: true
+        default: NO
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: w01-payload-production-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: ${{ inputs.confirm == 'DEPLOY' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha || github.sha }}
+
+      - name: Record deployment source
+        id: source
+        run: |
+          set -euo pipefail
+          source_sha="$(git rev-parse HEAD)"
+          echo "source_sha=$source_sha" >> "$GITHUB_OUTPUT"
+          {
+            echo "### W01 production application deployment"
+            echo
+            echo "- Source commit: `$source_sha`"
+            echo "- Target Worker: `luckread-w01-payload`"
+            echo "- Production route includes: `mp.luckread.com`"
+            echo "- D1 migrations: not run"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Setup Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install W01 dependencies
+        working-directory: workers/W01-payload
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Typecheck W01
+        working-directory: workers/W01-payload
+        run: pnpm exec tsc --noEmit
+
+      - name: Run W01 unit and security tests
+        working-directory: workers/W01-payload
+        run: pnpm exec vitest run --passWithNoTests --config ./vitest.config.mts
+
+      - name: Lint W01
+        working-directory: workers/W01-payload
+        run: pnpm run lint
+
+      - name: Deploy W01 application only
+        working-directory: workers/W01-payload
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: pnpm run deploy:app

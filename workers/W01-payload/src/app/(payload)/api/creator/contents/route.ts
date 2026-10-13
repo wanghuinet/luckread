@@ -6,7 +6,7 @@ import {
 
 const errorResponse = (status: number, code: string, message: string) =>
   Response.json(
-    { error: { code, message, details: {} }, requestId: crypto.randomUUID() },
+    { error: { code, message, details: {} }, requestId: `req_${crypto.randomUUID()}` },
     { status, headers: { 'cache-control': 'no-store' } },
   )
 
@@ -19,7 +19,7 @@ export async function POST(request: Request): Promise<Response> {
     try {
       body = await request.json()
     } catch {
-      return errorResponse(400, 'VALIDATION_FAILED', 'Invalid content request')
+      return errorResponse(422, 'VALIDATION_FAILED', 'Invalid content request')
     }
 
     return await callW03Content({

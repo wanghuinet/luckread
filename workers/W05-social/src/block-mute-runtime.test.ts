@@ -49,7 +49,7 @@ describe('block/mute runtime', () => {
   it('rejects self relation and malformed ids before D1 access', async () => {
     const d = db()
     await expect(setRelation(d, 'user-1', 'user-1', 'block')).rejects.toMatchObject({
-      code: 'INVALID_RELATIONSHIP',
+      code: 'INVALID_STATE',
       status: 409,
     })
     await expect(setRelation(d, 'bad id', 'target-1', 'block')).rejects.toMatchObject({

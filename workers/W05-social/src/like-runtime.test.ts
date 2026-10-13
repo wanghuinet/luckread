@@ -1,5 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { getLikeStatus, like, unlike } from './like-runtime.js'
 
 const db = (firstResults: unknown[] = []) => {
@@ -73,7 +75,7 @@ describe('like runtime', () => {
   it('hides content like status when either actor or owner is blocked', async () => {
     const d = db([{ liked: 1, like_count: 9, blocked: 1 }])
     await expect(getLikeStatus(d, 'user-1', { targetType: 'content', targetId: 'content-1' })).rejects.toMatchObject({
-      code: 'RELATIONSHIP_BLOCKED',
+      code: 'CONFLICT',
       status: 409,
     })
     expect(d.prepare).toHaveBeenCalledTimes(1)
@@ -82,7 +84,7 @@ describe('like runtime', () => {
   it('hides comment like status when a comment-side relationship is blocked', async () => {
     const d = db([{ liked: 1, like_count: 4, blocked: 1 }])
     await expect(getLikeStatus(d, 'user-1', { targetType: 'comment', targetId: 'comment-1' })).rejects.toMatchObject({
-      code: 'RELATIONSHIP_BLOCKED',
+      code: 'CONFLICT',
       status: 409,
     })
     expect(d.prepare).toHaveBeenCalledTimes(1)
@@ -126,7 +128,7 @@ describe('like runtime', () => {
       { id: 'content-1', state: 'PUBLISHED', owner_user_id: 'user-2', blocked: 1 },
     ])
     await expect(like(d, 'user-1', { targetType: 'content', targetId: 'content-1' })).rejects.toMatchObject({
-      code: 'RELATIONSHIP_BLOCKED',
+      code: 'CONFLICT',
       status: 409,
     })
     expect(d.prepare).toHaveBeenCalledTimes(1)
@@ -211,6 +213,28 @@ describe('like runtime', () => {
       code: 'VALIDATION_FAILED',
       status: 400,
     })
+  })
+
+  it('invalidates viewer and aggregate caches after unlike', async () => {
+    const cache = {
+      match: vi.fn(async () => undefined),
+      put: vi.fn(async () => undefined),
+      delete: vi.fn(async (_request: Request) => true),
+    }
+    Object.defineProperty(globalThis, 'caches', { value: { default: cache }, configurable: true })
+
+    const database = db()
+    await expect(unlike(database, 'user-1', { targetType: 'content', targetId: 'content-1' })).resolves.toBeUndefined()
+
+    expect(database.prepare).toHaveBeenCalledTimes(1)
+    expect(String((database.prepare as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[0]))
+      .toContain('DELETE FROM interaction_likes')
+    expect(cache.delete).toHaveBeenCalledTimes(2)
+    const deletedKeys = cache.delete.mock.calls.map(([request]) => request.url)
+    expect(deletedKeys).toEqual(expect.arrayContaining([
+      expect.stringContaining('__social-like-viewer-state?v=1&actor=user-1&type=content&id=content-1'),
+      expect.stringContaining('__social-like-aggregate?v=1&type=content&id=content-1'),
+    ]))
   })
 
   it('unlikes idempotently without a read', async () => {

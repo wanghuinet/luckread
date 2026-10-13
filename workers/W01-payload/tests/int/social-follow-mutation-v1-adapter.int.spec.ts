@@ -22,6 +22,17 @@ describe('v1 follow mutation adapter', () => {
     expect(route).toContain('idempotencyKey.length > 256')
   })
 
+  it('maps an explicit missing Payload target to NOT_FOUND while preserving dependency failures', () => {
+    const client = readFileSync(
+      resolve(process.cwd(), 'src/social/w05-social-client.ts'),
+      'utf8',
+    )
+    expect(client).toContain('details?.status === 404')
+    expect(client).toContain('details?.statusCode === 404')
+    expect(client).toContain("new W05SocialClientError(404, 'NOT_FOUND', 'Target user not found')")
+    expect(client).toContain('    throw error\n  }\n  if (!user)')
+  })
+
   it('keeps target existence validation on follow creation', () => {
     expect(route).toContain("if(method==='POST') await assertSocialTargetUserExists(targetUserId)")
   })

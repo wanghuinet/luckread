@@ -18,7 +18,7 @@ const content = route('content')
 const moderation = route('moderation')
 const auth = route('auth')
 
-if (contract.topology.workerCount !== 12 || contract.topology.d1Count !== 4 || contract.topology.taskCount !== 25) {
+if (contract.topology.workerCount !== 12 || contract.topology.d1Count !== 5 || contract.topology.taskCount !== 25) {
   throw new Error('Terminal routing contract topology drift')
 }
 if (!content || content.ingressWorker !== 'W01' || content.terminalWorker !== 'W03') {

@@ -15,31 +15,28 @@ describe('public content detail', () => {
   })
 })
 
-  it('hydrates like state from the authenticated status API', () => {
+  it('hydrates like and favorite state from one canonical W05 social summary', () => {
     const page = read('src/app/(frontend)/content/[contentId]/ContentDetailClient.tsx')
-    expect(page).toContain('/api/v1/interactions/likes?targetType=content&targetId=')
-    expect(page).toContain('likeData?.data?.liked')
-    expect(page).toContain('likeData?.data?.likeCount')
+    expect(page).toContain('/api/v1/contents/')
+    expect(page).toContain("encodeURIComponent(resolved.id) + '/social'")
+    expect(page).toContain('summary.counts?.likes')
+    expect(page).toContain('summary.viewer?.liked')
+    expect(page).toContain('summary.viewer?.favorited')
     expect(page).toContain('setLikeCount(')
-    expect(page).toContain('toLocaleString(dateLocale')
-
-  })
-
-  it('hydrates favorite state from the authenticated status API', () => {
-    const page = read('src/app/(frontend)/content/[contentId]/ContentDetailClient.tsx')
-    expect(page).toContain('/api/v1/interactions/bookmarks?targetType=content&targetId=')
-    expect(page).toContain('bookmarkData?.data?.favorited')
-    expect(page).toContain('setBookmarked(bookmarkData.data.favorited)')
     expect(page).toContain("bookmarked ? 'DELETE' : 'POST'")
     expect(page).toContain("'Idempotency-Key': 'social-bookmark:' + crypto.randomUUID()")
-    expect(page).toContain('copy.detail.favorite')
+    expect(page).toContain('toLocaleString(dateLocale')
   })
 
-  it('surfaces normalized mention and hashtag tokens without creating a second taxonomy authority', () => {
+  it('renders persisted W05 mentions and topics instead of maintaining a second content taxonomy', () => {
     const page = read('src/app/(frontend)/content/[contentId]/ContentDetailClient.tsx')
-    expect(page).toContain("extractSocialTokens(socialTokenBody)")
+    expect(page).toContain('socialTopics')
+    expect(page).toContain('socialMentions')
+    expect(page).toContain("href={'/topics/' + encodeURIComponent(topic.name)}")
+    expect(page).toContain("href={'/users/' + encodeURIComponent(mention.userId)}")
     expect(page).toContain('copy.detail.tagAria')
     expect(page).toContain('content-detail-social-token')
+    expect(page).not.toContain('extractSocialTokens(socialTokenBody)')
     expect(page).not.toContain('hashtags/resolve')
     expect(page).not.toContain('classification_edge')
   })
@@ -180,7 +177,6 @@ it('renders versioned structured article bodies instead of flattening them to pa
   const renderer = read('src/components/ArticleStructuredRenderer.tsx')
 
   expect(page).toContain("tryDeserializeArticleDocument(body)")
-  expect(page).toContain('plainTextFromArticleDocument(structuredArticle)')
   expect(page).toContain('ArticleStructuredRenderer')
   expect(page).toContain('<ArticleStructuredRenderer document={structuredArticle} />')
   expect(page).toContain('!structuredArticle')

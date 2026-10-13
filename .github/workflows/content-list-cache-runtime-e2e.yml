@@ -126,7 +126,7 @@ jobs:
           const runId = process.env.GITHUB_RUN_ID
           const nonce = randomBytes(8).toString('hex')
           const email = 'content-cache-e2e-' + runId + '-' + nonce + '@example.com'
-          const username = 'content_cache_e2e_' + runId + '_' + nonce.slice(0, 8)
+          const username = 'ccachee2e' + runId + nonce.slice(0, 8)
           const password = 'Evd-Cache-' + randomBytes(24).toString('base64url') + '-Z9!'
           const roleId = 'CONTENT-CACHE-E2E-ROLE-' + runId + '-' + nonce
           const registerKey = 'CONTENT-CACHE-E2E-' + runId + '-REGISTER'
@@ -140,10 +140,10 @@ jobs:
             const raw = await r.text()
             let data = null
             try { data = raw ? JSON.parse(raw) : null } catch {}
-            return { status: r.status, data }
+            return { status: r.status, data, headers: r.headers }
           }
 
-          const reg = await post('/auth/register', {
+          const reg = await post('/api/v1/auth/register', {
             identityType: 'email',
             identity: email,
             credential: password,
@@ -156,6 +156,13 @@ jobs:
           }
 
           const userId = String(reg.data.userId)
+          // Save cleanup identifiers before any later D1 mutation or login can fail.
+          for (const line of [
+            'CACHE_TEST_USER_ID=' + userId,
+            'CACHE_TEST_ROLE_ID=' + roleId,
+            'CACHE_TEST_REGISTER_KEY=' + registerKey,
+          ]) appendFileSync(process.env.GITHUB_ENV, line + '\n')
+
           const now = new Date().toISOString()
           const q = (value) => "'" + String(value).replaceAll("'", "''") + "'"
           const d1 = (databaseName, config, command) => execFileSync(
@@ -165,30 +172,25 @@ jobs:
           )
 
           d1(process.env.DATABASE_NAME_W01, 'deployed-source/workers/W01-payload/wrangler.jsonc',
-            'UPDATE "user" SET account_state=\'ACTIVE\', account_state_version=account_state_version+1 WHERE id=' + q(userId))
+            'UPDATE "user" SET email_verified=1, account_state=\'ACTIVE\', account_state_version=account_state_version+1 WHERE id=' + q(userId))
           d1(process.env.DATABASE_NAME_W01, 'deployed-source/workers/W01-payload/wrangler.jsonc',
             'INSERT INTO role_assignments (id,subject_id,role_id,scope_type,scope_id,status,valid_from,valid_until,created_at,updated_at) VALUES (' +
             [roleId,userId,'creator','global',null,'ACTIVE',now,null,now,now].map((v,i)=>i === 4 ? 'NULL' : q(v)).join(',') + ')')
 
-          const login = await post('/auth/login', {
+          const login = await post('/api/v1/auth/login', {
             identity: email,
             credential: password,
-            deviceId: 'content-cache-e2e-' + runId,
           })
-          const token = login.data?.accessToken
-          if (login.status !== 200 || typeof token !== 'string' || login.data?.layer !== 'L3') {
-            throw new Error('creator login failed: HTTP ' + login.status + ' body=' + JSON.stringify(login.data))
+          const user = login.data?.data?.user
+          const token = login.headers.get('x-luckread-session-token')
+          if (login.status !== 200 || !token || String(user?.id) !== userId || user?.emailVerified !== true) {
+            throw new Error('creator login failed against APP-AUTH-01: HTTP ' + login.status + ' body=' + JSON.stringify(login.data) + ' nativeSessionHeader=' + Boolean(token))
           }
 
           console.log('::add-mask::' + token)
-          for (const line of [
-            'CACHE_TEST_USER_ID=' + userId,
-            'CACHE_TEST_ROLE_ID=' + roleId,
-            'CACHE_TEST_REGISTER_KEY=' + registerKey,
-            'CACHE_TEST_TOKEN=' + token,
-          ]) appendFileSync(process.env.GITHUB_ENV, line + '\n')
+          appendFileSync(process.env.GITHUB_ENV, 'CACHE_TEST_TOKEN=' + token + '\n')
 
-          console.log(JSON.stringify({userId, layer: login.data.layer}))
+          console.log(JSON.stringify({userId, emailVerified: user.emailVerified, nativeSessionHeaderPresent: Boolean(token)}))
           NODE
 
       - name: Seed published content fixture
@@ -202,6 +204,8 @@ jobs:
           import { execFileSync } from 'node:child_process'
           const q = (value) => "'" + String(value).replaceAll("'", "''") + "'"
           const contentId = 'cachee2e-' + process.env.GITHUB_RUN_ID
+          // Set this before the remote insert so always() cleanup knows the intended ID.
+          appendFileSync(process.env.GITHUB_ENV, 'CACHE_TEST_CONTENT_ID=' + contentId + '\n')
           const now = new Date().toISOString()
           const sql =
             'INSERT INTO contents ' +
@@ -217,7 +221,6 @@ jobs:
             ['--yes','wrangler@'+process.env.WRANGLER_VERSION,'d1','execute',process.env.DATABASE_NAME_W03,'--remote','--yes','--config','deployed-source/workers/W03-content/wrangler.jsonc','--command',sql],
             { encoding:'utf8', env:process.env, maxBuffer:8*1024*1024 },
           )
-          appendFileSync(process.env.GITHUB_ENV, 'CACHE_TEST_CONTENT_ID=' + contentId + '\n')
           console.log('seeded contentId=' + contentId)
           NODE
 
@@ -353,30 +356,48 @@ jobs:
         if: always()
         run: |
           mkdir -p artifacts/mapping-0/content-list-cache-runtime-e2e
-          cat > artifacts/mapping-0/content-list-cache-runtime-e2e/provenance.json <<EOF
-          {
-            "workflow": "Content List Cache Runtime E2E",
-            "testedSourceSha": "$TESTED_COMMIT",
-            "deploymentRunId": "$DEPLOYMENT_RUN_ID",
-            "worker": "luckread-w01-payload",
-            "publicPath": "/api/v1/contents",
-            "cacheNamespace": "content-list",
-            "filteredVariant": "creatorId,type,limit",
-            "anonymousMiss": true,
-            "anonymousHit": true,
-            "authenticatedSharedCacheBypass": true,
-            "mutationBoundary": "PUBLISHED->UNPUBLISHED",
-            "postMutationFilteredListMiss": true,
-            "postMutationFixtureHidden": true,
-            "newWorker": 0,
-            "newD1": 0,
-            "syntheticFixtureOnly": true
+          node --input-type=module <<'NODE'
+          import { copyFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs'
+          const outputDir = 'artifacts/mapping-0/content-list-cache-runtime-e2e'
+          const definitions = [
+            { file: 'cache-list-miss.json', key: 'anonymousMiss', pass: (value) => value?.status === 'PASS' && value?.cache === 'miss' },
+            { file: 'cache-list-hit.json', key: 'anonymousHit', pass: (value) => value?.status === 'PASS' && value?.cache === 'hit' },
+            { file: 'cache-list-auth-bypass.json', key: 'authenticatedSharedCacheBypass', pass: (value) => value?.status === 'PASS' && value?.sharedCacheHeader === null },
+            { file: 'cache-list-after-mutation.json', key: 'postMutationFilteredListMiss', pass: (value) => value?.status === 'PASS' && value?.cache === 'miss' && value?.fixtureVisible === false },
+          ]
+          const checks = {}
+          for (const definition of definitions) {
+            let evidence = null
+            if (existsSync(definition.file)) {
+              try { evidence = JSON.parse(readFileSync(definition.file, 'utf8')) } catch {}
+              copyFileSync(definition.file, `${outputDir}/${definition.file}`)
+            }
+            checks[definition.key] = { pass: definition.pass(evidence), file: existsSync(definition.file) ? definition.file : null }
           }
-          EOF
-          for file in cache-list-miss.json cache-list-hit.json cache-list-auth-bypass.json cache-list-after-mutation.json; do
-            test -f "$file"
-            cp "$file" "artifacts/mapping-0/content-list-cache-runtime-e2e/$file"
-          done
+          const allPassed = definitions.every(({ key }) => checks[key].pass)
+          const provenance = {
+            workflow: 'Content List Cache Runtime E2E',
+            status: allPassed ? 'PASS' : 'INCOMPLETE_OR_FAILED',
+            testedSourceSha: process.env.TESTED_COMMIT || null,
+            deploymentRunId: process.env.DEPLOYMENT_RUN_ID || null,
+            worker: 'luckread-w01-payload',
+            publicPath: '/api/v1/contents',
+            cacheNamespace: 'content-list',
+            filteredVariant: 'creatorId,type,limit',
+            anonymousMiss: checks.anonymousMiss.pass,
+            anonymousHit: checks.anonymousHit.pass,
+            authenticatedSharedCacheBypass: checks.authenticatedSharedCacheBypass.pass,
+            mutationBoundary: 'PUBLISHED->UNPUBLISHED',
+            postMutationFilteredListMiss: checks.postMutationFilteredListMiss.pass,
+            postMutationFixtureHidden: checks.postMutationFilteredListMiss.pass,
+            checks,
+            newWorker: 0,
+            newD1: 0,
+            syntheticFixtureOnly: true
+          }
+          writeFileSync(`${outputDir}/provenance.json`, JSON.stringify(provenance, null, 2) + '\n')
+          console.log(JSON.stringify({ evidenceStatus: provenance.status, checks }))
+          NODE
 
       - name: Upload runtime evidence
         if: always()

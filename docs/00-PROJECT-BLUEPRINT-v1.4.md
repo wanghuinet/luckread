@@ -10,7 +10,7 @@
 >
 > **Functional source of truth:** `docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md`.
 >
-> **Final implementation target:** 12 Workers / 4 D1 domains / 25 Contract Tasks.
+> **Final implementation target:** 12 Workers / 5 D1 domains / 25 Contract Tasks.
 
 ## 1. Source-of-Truth Hierarchy
 
@@ -38,7 +38,7 @@ Rules:
 4. Contracts must reconcile against both the functional Blueprint and this architecture Blueprint.
 5. If authoritative documents conflict, implementation stops until the conflict is formally resolved.
 6. Historical documents are evidence/reference unless explicitly promoted by Change Control.
-7. **12 Workers / 4 D1 domains / 25 Contract Tasks are the final implementation target and must be reflected by the Mapping and contracts.**
+7. **12 Workers / 5 D1 domains / 25 Contract Tasks are the final implementation target and must be reflected by the Mapping and contracts.**
 
 ## 2. P0 Non-Negotiable Architecture Rules
 
@@ -49,7 +49,7 @@ Worker execution and D1 read/write consumption are budgeted resources. Every arc
 Every component must answer:
 
 - Can Worker executions be reduced without violating the 12-Worker target?
-- Can D1 reads be reduced without violating the 4-D1 target?
+- Can D1 reads be reduced without violating the 5-D1 target?
 - Can D1 writes be reduced?
 - Can cache serve repeated reads?
 - Can high-frequency events be aggregated?
@@ -88,17 +88,17 @@ Payload/application-owned persistence is authoritative for low-frequency structu
 
 ### 2.4 Final Topology Is Fixed
 
-The final Luckread implementation target is:
+The final Luckread implementation target is (D1-05 is analytics-only and W11-exclusive):
 
 ```text
 25 Contract Tasks
         ↓
 12 Workers
         ↓
-4 D1 Domains
+5 D1 Domains
 ```
 
-This is the target topology for implementation and deployment. It is not a license to create arbitrary additional Workers or D1 domains.
+This is the target topology for implementation and deployment: D1-01..D1-04 retain their existing business authority, while D1-05 is analytics-only and W11-exclusive. This is not a license to create arbitrary additional Workers or D1 domains.
 
 A split inside the final topology is permitted only when it remains within the frozen target and is justified by ownership, transaction isolation, security isolation, traffic/scaling, lifecycle, capacity, operational or migration requirements.
 
@@ -134,10 +134,10 @@ Web / H5 / Android / iOS / Mini Program
         +-- drafts/versions
                 |
                 v
-          4 D1 Domains + R2 + Cache + Queue + Search
+          5 D1 Domains + R2 + Cache + Queue + Search
 ```
 
-The 12 Workers are execution boundaries. The 25 Contract Tasks define delivery responsibilities. The 4 D1 domains define the final relational storage topology. These three dimensions must be explicitly mapped rather than inferred from code.
+The 12 Workers are execution boundaries. The 25 Contract Tasks define delivery responsibilities. The 5 D1 domains define the final relational storage topology. These three dimensions must be explicitly mapped rather than inferred from code.
 
 ## 4. Runtime Boundary Rules
 
@@ -191,7 +191,7 @@ Primary keys, timestamps, states, relations, indexes, constraints, retention and
 
 ### 5.2 D1
 
-Luckread's final implementation target is **4 D1 domains**. Domain ownership, tables, cross-domain references, transaction boundaries and read/write rules must be frozen in the Data Mapping and Data Contracts.
+Luckread's final implementation target is **5 D1 domains**. Domain ownership, tables, cross-domain references, transaction boundaries and read/write rules must be frozen in the Data Mapping and Data Contracts.
 
 D1-specific behavior must not leak into public business contracts when it creates migration coupling.
 
@@ -265,7 +265,7 @@ Queue
 Idempotent Consumers
 ```
 
-The exact implementation may differ when a simpler path is demonstrably correct and cheaper, but it must remain within the 12-Worker / 4-D1 / 25-Task target.
+The exact implementation may differ when a simpler path is demonstrably correct and cheaper, but it must remain within the 12-Worker / 5-D1 / 25-Task target.
 
 ### 7.1 Cross-Store / Cross-Domain Writes
 
@@ -350,7 +350,7 @@ An API without a canonical capability owner and Data/Security Contract is not co
 
 ## 12. Data Contract Boundary
 
-Every authoritative entity must declare owner, one of the 4 D1 domains where applicable, provider implementation, primary key, references, lifecycle/state machine, indexes, retention/deletion, audit requirements, migration rules, read-model behavior and cache strategy.
+Every authoritative entity must declare owner, one of the 5 D1 domains where applicable, provider implementation, primary key, references, lifecycle/state machine, indexes, retention/deletion, audit requirements, migration rules, read-model behavior and cache strategy.
 
 Schema changes require a traceable Feature/Data Contract change.
 
@@ -401,7 +401,7 @@ Feature
   ↕
 12 Workers
   ↕
-4 D1 Domains
+5 D1 Domains
   ↕
 API / Data / Security / Runtime / Event / Consistency
   ↕
@@ -460,7 +460,7 @@ These interfaces do not require multiple providers to be deployed today.
 
 Migration requirements include provider-neutral logical models, versioned migrations, migration checksum/reconciliation, stable identifiers, backward-compatible API evolution, controlled dual-read/dual-write only when required, and isolation of Cloudflare-specific behavior behind adapters.
 
-The 4-D1 target is the initial/final Cloudflare relational topology for this implementation baseline; migration to PostgreSQL/GCP changes the provider implementation, not the public Feature/API contracts.
+The 5-D1 target is the initial/final Cloudflare relational topology for this implementation baseline; migration to PostgreSQL/GCP changes the provider implementation, not the public Feature/API contracts.
 
 ## 18. Enterprise Compatibility
 
@@ -540,7 +540,7 @@ Blueprint
   ↓
 12-Worker Mapping Freeze
   ↓
-4-D1 Mapping Freeze
+5-D1 Mapping Freeze
   ↓
 Feature Contract
   ↓
@@ -584,7 +584,7 @@ DRAFT → ARCHITECTURE REVIEW → CONTRACT REVIEW → READY → IMPLEMENTING
 
 ## 23. Final Topology Change Gate
 
-The 12-Worker / 4-D1 / 25-Task topology is frozen for this implementation baseline.
+The 12-Worker / 5-D1 / 25-Task topology is frozen for this implementation baseline.
 
 Any request to add, remove, merge or repurpose a Worker, D1 domain or Contract Task requires explicit Blueprint Change Control and must include:
 
@@ -604,14 +604,14 @@ No topology change may be introduced implicitly through implementation.
 
 Historical documents remain evidence/reference only unless explicitly promoted through Change Control.
 
-The previous statements that treated **25 Business Contract Tasks / 12 Runtime Workers / 4 Physical D1 Domains** as historical or superseded are themselves superseded by this Blueprint revision.
+The previous statements that treated **25 Business Contract Tasks / 12 Runtime Workers / 5 Physical D1 Domains** as historical or superseded are themselves superseded by this Blueprint revision.
 
 The final target is now explicitly:
 
 ```text
 25 Contract Tasks
 12 Workers
-4 D1 Domains
+5 D1 Domains
 ```
 
 Their exact ownership and responsibility must be frozen by the Mapping before implementation.
@@ -622,18 +622,18 @@ Their exact ownership and responsibility must be frozen by the Mapping before im
 
 This architecture Blueprint defines the final implementation topology and how those capabilities cross API, data, security, runtime, storage, event, reliability and migration boundaries.
 
-Every new product capability must first be added to the functional Blueprint with a Feature ID. Its implementation must then map to one of the 25 Contract Tasks, one of the 12 Workers where runtime execution is required, and one of the 4 D1 domains where relational persistence is required.
+Every new product capability must first be added to the functional Blueprint with a Feature ID. Its implementation must then map to one of the 25 Contract Tasks, one of the 12 Workers where runtime execution is required, and one of the 5 D1 domains where relational persistence is required.
 
 ## 26. Non-Goals
 
 This Blueprint does not require Payload Core modification, a private Payload fork, one Worker per feature, synchronous persistence for every user action, a queue for every operation, external search before measured need, distributed coordination without measured need, or sacrificing correctness, security, reliability or durability for cost reduction.
 
-It also does **not** permit silently replacing the final 12-Worker / 4-D1 / 25-Task topology with an ad hoc topology during implementation.
+It also does **not** permit silently replacing the final 12-Worker / 5-D1 / 25-Task topology with an ad hoc topology during implementation.
 
 ## 27. Canonical Decision
 
 This v1.4 Blueprint is the canonical architecture baseline for Luckread.
 
-**Final implementation target: 12 Workers / 4 D1 domains / 25 Contract Tasks.**
+**Final implementation target: 12 Workers / 5 D1 domains / 25 Contract Tasks.**
 
 The former `docs/01-PLATFORM-CONTRACT-v1.0.md` remains historical evidence only after its migration is recorded. Domain contracts must reconcile against this Blueprint before implementation.

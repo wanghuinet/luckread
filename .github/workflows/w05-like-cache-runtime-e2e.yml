@@ -7,12 +7,12 @@ on:
         description: Exact W01 source commit used by the controlled binding deployment
         required: true
         type: string
-        default: 3793f7c7b9c2d964a870d9d9cdc39605639efc2a
+        default: 8c972b725f94513023e2b1bd2dd5073f53e9dd7d
       w01_deployment_run_id:
         description: Successful W01 W02 Auth Binding Deploy run ID for that exact source
         required: true
         type: string
-        default: "37191968881"
+        default: "38190504671"
       tested_w05_commit:
         description: Exact W05 source commit used by the controlled D1-02 deployment
         required: true
@@ -26,7 +26,7 @@ on:
       social_api_base_url:
         description: Controlled public W01 social API URL
         required: true
-        default: https://api.luckread.com
+        default: https://luckread.com
         type: string
       database_name_w01:
         description: Controlled W01 D1 database name
@@ -125,86 +125,60 @@ jobs:
         with:
           node-version: 24
 
-      - name: Create authenticated viewer fixture
+      - name: Create authenticated QA viewer fixture
         env:
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          LUCKREAD_APP_AUTH_SMOKE_EMAIL: ${{ secrets.LUCKREAD_APP_AUTH_SMOKE_EMAIL }}
+          LUCKREAD_APP_AUTH_SMOKE_PASSWORD: ${{ secrets.LUCKREAD_APP_AUTH_SMOKE_PASSWORD }}
         run: |
           set -euo pipefail
           node --input-type=module <<'NODE'
-          import { randomBytes } from 'node:crypto'
           import { appendFileSync } from 'node:fs'
-          import { execFileSync } from 'node:child_process'
 
           const base = process.env.SOCIAL_API_BASE_URL.replace(/\/$/, '')
-          const runId = process.env.GITHUB_RUN_ID
-          const runAttempt = process.env.GITHUB_RUN_ATTEMPT || '1'
-          const fixtureId = runId + '-a' + runAttempt
-          const nonce = randomBytes(8).toString('hex')
-          const email = 'like-cache-e2e-' + fixtureId + '-' + nonce + '@example.com'
-          const username = 'like_cache_e2e_' + fixtureId + '_' + nonce.slice(0, 8)
-          const password = 'Evd-LikeCache-' + randomBytes(24).toString('base64url') + '-Z9!'
-          const roleId = 'LIKE-CACHE-E2E-ROLE-' + fixtureId + '-' + nonce
-          const registerKey = 'LIKE-CACHE-E2E-' + fixtureId + '-REGISTER'
+          const email = process.env.LUCKREAD_APP_AUTH_SMOKE_EMAIL || ''
+          const password = process.env.LUCKREAD_APP_AUTH_SMOKE_PASSWORD || ''
+          if (!email || !password) {
+            throw new Error('Missing LUCKREAD_APP_AUTH_SMOKE_EMAIL or LUCKREAD_APP_AUTH_SMOKE_PASSWORD repository secrets')
+          }
 
-          async function post(path, body, headers = {}) {
-            const r = await fetch(base + path, {
+          async function post(path, body) {
+            const response = await fetch(base + path, {
               method: 'POST',
-              headers: { accept: 'application/json', 'content-type': 'application/json', ...headers },
+              headers: {
+                accept: 'application/json',
+                'content-type': 'application/json',
+                // Match browser-origin requests required by the Better Auth trusted-origin check.
+                origin: new URL(base).origin,
+              },
               body: JSON.stringify(body),
             })
-            const raw = await r.text()
+            const raw = await response.text()
             let data = null
             try { data = raw ? JSON.parse(raw) : null } catch {}
-            return { status: r.status, data }
+            return { status: response.status, data, headers: response.headers }
           }
 
-          const reg = await post('/auth/register', {
-            identityType: 'email',
-            identity: email,
-            credential: password,
-            username,
-            consent: { purpose: 'ACCOUNT_REGISTRATION', policyVersion: 'PROD-2026-09-28.1' },
-          }, { 'Idempotency-Key': registerKey })
-
-          if (reg.status !== 201 || typeof reg.data?.userId !== 'string') {
-            throw new Error('viewer registration failed: HTTP ' + reg.status + ' body=' + JSON.stringify(reg.data))
-          }
-
-          const userId = String(reg.data.userId)
-          const now = new Date().toISOString()
-          const q = (value) => "'" + String(value).replaceAll("'", "''") + "'"
-          const d1 = (databaseName, config, command) => execFileSync(
-            'npx',
-            ['--yes', 'wrangler@' + process.env.WRANGLER_VERSION, 'd1', 'execute', databaseName, '--remote', '--yes', '--config', config, '--command', command],
-            { encoding: 'utf8', env: process.env, maxBuffer: 8 * 1024 * 1024 },
-          )
-
-          d1(process.env.DATABASE_NAME_W01, 'deployed-source/workers/W01-payload/wrangler.jsonc',
-            'UPDATE users SET account_state=\'ACTIVE\', account_state_version=COALESCE(account_state_version,0)+1 WHERE CAST(id AS TEXT)=' + q(userId))
-          d1(process.env.DATABASE_NAME_W01, 'deployed-source/workers/W01-payload/wrangler.jsonc',
-            'INSERT INTO role_assignments (id,subject_id,role_id,scope_type,scope_id,status,valid_from,valid_until,created_at,updated_at) VALUES (' +
-            [roleId,userId,'creator','global',null,'ACTIVE',now,null,now,now].map((v,i)=>i === 4 ? 'NULL' : q(v)).join(',') + ')')
-
-          const login = await post('/auth/login', {
-            identity: email,
-            credential: password,
-            deviceId: 'like-cache-e2e-' + fixtureId,
-          })
-          const token = login.data?.accessToken
-          if (login.status !== 200 || typeof token !== 'string' || login.data?.layer !== 'L3') {
-            throw new Error('viewer login failed: HTTP ' + login.status + ' body=' + JSON.stringify(login.data))
+          const login = await post('/api/v1/auth/login', { identity: email, credential: password })
+          const user = login.data?.data?.user
+          const token = login.headers.get('x-luckread-session-token')
+          if (
+            login.status !== 200 ||
+            typeof user?.id !== 'string' ||
+            user.email.trim().toLowerCase() !== email.trim().toLowerCase() ||
+            user.emailVerified !== true ||
+            !token
+          ) {
+            throw new Error(
+              'QA viewer login failed against APP-AUTH-01: HTTP ' + login.status +
+              ' body=' + JSON.stringify(login.data) +
+              ' nativeSessionHeader=' + Boolean(token),
+            )
           }
 
           console.log('::add-mask::' + token)
-          for (const line of [
-            'LIKE_CACHE_TEST_USER_ID=' + userId,
-            'LIKE_CACHE_TEST_ROLE_ID=' + roleId,
-            'LIKE_CACHE_TEST_REGISTER_KEY=' + registerKey,
-            'LIKE_CACHE_TEST_TOKEN=' + token,
-          ]) appendFileSync(process.env.GITHUB_ENV, line + '\n')
-
-          console.log(JSON.stringify({ userId, layer: login.data.layer }))
+          appendFileSync(process.env.GITHUB_ENV, 'LIKE_CACHE_TEST_USER_ID=' + user.id + '\n')
+          appendFileSync(process.env.GITHUB_ENV, 'LIKE_CACHE_TEST_TOKEN=' + token + '\n')
+          console.log(JSON.stringify({ userId: user.id, emailVerified: true, nativeSessionHeaderPresent: true }))
           NODE
 
       - name: Seed published content fixture
@@ -279,7 +253,6 @@ jobs:
         run: |
           set -euo pipefail
           url="$SOCIAL_API_BASE_URL/api/v1/interactions/likes?targetType=content&targetId=$LIKE_CACHE_TEST_CONTENT_ID"
-          sleep 1
           curl --silent --show-error --fail-with-body -H "Authorization: Bearer $LIKE_CACHE_TEST_TOKEN" "$url" > /tmp/like-stale-0.json
           node --input-type=module <<'NODE'
           import { readFileSync, writeFileSync } from 'node:fs'
@@ -305,23 +278,62 @@ jobs:
           writeFileSync('like-aggregate-refresh.json', JSON.stringify({status:'PASS',viewerLiked:false,aggregateLikeCount:1,expectedAuthoritativeCount:1},null,2)+'\n')
           NODE
 
-      - name: Verify viewer-state invalidation is independent
+      - name: Verify viewer-state invalidation and same-key like replay
         run: |
           set -euo pipefail
           url="$SOCIAL_API_BASE_URL/api/v1/interactions/likes?targetType=content&targetId=$LIKE_CACHE_TEST_CONTENT_ID"
-          curl --silent --show-error --fail-with-body             -X POST             -H "Authorization: Bearer $LIKE_CACHE_TEST_TOKEN"             -H "Content-Type: application/json"             -H "Idempotency-Key: LIKE-CACHE-E2E-$GITHUB_RUN_ID-A$GITHUB_RUN_ATTEMPT-LIKE"             --data '{"targetType":"content","targetId":"'"$LIKE_CACHE_TEST_CONTENT_ID"'"}'             "$SOCIAL_API_BASE_URL/api/v1/interactions/likes" > /tmp/like-post.json
+          idempotency_key="LIKE-CACHE-E2E-$GITHUB_RUN_ID-A$GITHUB_RUN_ATTEMPT-LIKE"
+          curl --silent --show-error --fail-with-body -X POST \
+            -H "Authorization: Bearer $LIKE_CACHE_TEST_TOKEN" \
+            -H "Content-Type: application/json" \
+            -H "Idempotency-Key: $idempotency_key" \
+            --data '{"targetType":"content","targetId":"'"$LIKE_CACHE_TEST_CONTENT_ID"'"}' \
+            "$SOCIAL_API_BASE_URL/api/v1/interactions/likes" > /tmp/like-post.json
           curl --silent --show-error --fail-with-body -H "Authorization: Bearer $LIKE_CACHE_TEST_TOKEN" "$url" > /tmp/like-viewer-after-post.json
+          curl --silent --show-error --fail-with-body -X POST \
+            -H "Authorization: Bearer $LIKE_CACHE_TEST_TOKEN" \
+            -H "Content-Type: application/json" \
+            -H "Idempotency-Key: $idempotency_key" \
+            --data '{"targetType":"content","targetId":"'"$LIKE_CACHE_TEST_CONTENT_ID"'"}' \
+            "$SOCIAL_API_BASE_URL/api/v1/interactions/likes" > /tmp/like-post-replay.json
+          # Let the 5-second shared aggregate TTL expire before asserting its authoritative count.
+          sleep 6
+          curl --silent --show-error --fail-with-body -H "Authorization: Bearer $LIKE_CACHE_TEST_TOKEN" "$url" > /tmp/like-replay-status.json
           node --input-type=module <<'NODE'
           import { readFileSync, writeFileSync } from 'node:fs'
           const posted = JSON.parse(readFileSync('/tmp/like-post.json','utf8'))
-          const value = JSON.parse(readFileSync('/tmp/like-viewer-after-post.json','utf8'))
-          if (typeof posted?.data?.relationshipId !== 'string') {
-            throw new Error('like mutation did not return relationshipId: ' + JSON.stringify(posted))
+          const viewer = JSON.parse(readFileSync('/tmp/like-viewer-after-post.json','utf8'))
+          const replay = JSON.parse(readFileSync('/tmp/like-post-replay.json','utf8'))
+          const status = JSON.parse(readFileSync('/tmp/like-replay-status.json','utf8'))
+          const firstId = posted?.data?.relationshipId
+          const replayId = replay?.data?.relationshipId
+          const initialPostCount = Number(viewer?.data?.likeCount)
+          const settledCount = Number(status?.data?.likeCount)
+          if (typeof firstId !== 'string' || viewer?.data?.liked !== true) {
+            throw new Error('initial like write or viewer-state invalidation failed')
           }
-          if (value?.data?.liked !== true) {
-            throw new Error('private viewer state was not invalidated: ' + JSON.stringify(value))
+          if (typeof replayId !== 'string' || replayId !== firstId) {
+            throw new Error('same-key replay did not preserve relationshipId')
           }
-          writeFileSync('like-viewer-invalidation.json', JSON.stringify({status:'PASS',viewerLiked:true,aggregateLikeCount:Number(value?.data?.likeCount)},null,2)+'\n')
+          // Exactly two relations should exist: the synthetic seed actor and the QA viewer.
+          // Do not compare against the immediate response because its shared aggregate may be stale.
+          if (status?.data?.liked !== true || settledCount !== 2) {
+            throw new Error('same-key replay did not settle to exactly two effective likes: ' + JSON.stringify({
+              viewerLiked: status?.data?.liked,
+              initialPostCount,
+              settledCount,
+            }))
+          }
+          writeFileSync('like-viewer-invalidation.json', JSON.stringify({
+            status:'PASS',
+            viewerLiked:true,
+            sameKeyReplay:true,
+            relationshipIdStable:true,
+            initialPostAggregateCount:initialPostCount,
+            settledAggregateLikeCount:settledCount,
+            expectedAuthoritativeCount:2,
+            duplicateEffectiveLike:false
+          },null,2)+'\n')
           NODE
 
       - name: Prime shared aggregate before non-invalidation check
@@ -361,7 +373,6 @@ jobs:
           )
           NODE
           url="$SOCIAL_API_BASE_URL/api/v1/interactions/likes?targetType=content&targetId=$LIKE_CACHE_TEST_CONTENT_ID"
-          sleep 1
           curl --silent --show-error --fail-with-body -H "Authorization: Bearer $LIKE_CACHE_TEST_TOKEN" "$url" > /tmp/like-shared-stale.json
           node --input-type=module <<'NODE'
           import { readFileSync, writeFileSync } from 'node:fs'
@@ -387,6 +398,63 @@ jobs:
           writeFileSync('like-shared-refresh-2.json', JSON.stringify({status:'PASS',viewerLiked:true,aggregateLikeCount:3,expectedAuthoritativeCount:3},null,2)+'\n')
           NODE
 
+      - name: Verify unlike write, same-key replay, viewer invalidation, and aggregate convergence
+        run: |
+          set -euo pipefail
+          url="$SOCIAL_API_BASE_URL/api/v1/interactions/likes?targetType=content&targetId=$LIKE_CACHE_TEST_CONTENT_ID"
+          idempotency_key="LIKE-CACHE-E2E-$GITHUB_RUN_ID-A$GITHUB_RUN_ATTEMPT-UNLIKE"
+          first_status="$(curl --silent --show-error --output /tmp/like-unlike-first.out --write-out '%{http_code}' \
+            -X DELETE \
+            -H "Authorization: Bearer $LIKE_CACHE_TEST_TOKEN" \
+            -H "Content-Type: application/json" \
+            -H "Idempotency-Key: $idempotency_key" \
+            --data '{"targetType":"content","targetId":"'"$LIKE_CACHE_TEST_CONTENT_ID"'"}' \
+            "$SOCIAL_API_BASE_URL/api/v1/interactions/likes")"
+          replay_status="$(curl --silent --show-error --output /tmp/like-unlike-replay.out --write-out '%{http_code}' \
+            -X DELETE \
+            -H "Authorization: Bearer $LIKE_CACHE_TEST_TOKEN" \
+            -H "Content-Type: application/json" \
+            -H "Idempotency-Key: $idempotency_key" \
+            --data '{"targetType":"content","targetId":"'"$LIKE_CACHE_TEST_CONTENT_ID"'"}' \
+            "$SOCIAL_API_BASE_URL/api/v1/interactions/likes")"
+          if [ "$first_status" != "204" ] || [ "$replay_status" != "204" ]; then
+            echo "Unlike and same-key replay must both return 204; got first=$first_status replay=$replay_status"
+            exit 1
+          fi
+          curl --silent --show-error --fail-with-body -H "Authorization: Bearer $LIKE_CACHE_TEST_TOKEN" "$url" > /tmp/like-unlike-immediate.json
+          # Viewer-specific state must be fresh immediately; the shared aggregate may
+          # remain cached briefly, so authoritative count is asserted after its TTL.
+          sleep 6
+          curl --silent --show-error --fail-with-body -H "Authorization: Bearer $LIKE_CACHE_TEST_TOKEN" "$url" > /tmp/like-unlike-settled.json
+          LIKE_UNLIKE_FIRST_STATUS="$first_status" LIKE_UNLIKE_REPLAY_STATUS="$replay_status" node --input-type=module <<'NODE'
+          import { readFileSync, writeFileSync } from 'node:fs'
+          const immediate = JSON.parse(readFileSync('/tmp/like-unlike-immediate.json','utf8'))
+          const settled = JSON.parse(readFileSync('/tmp/like-unlike-settled.json','utf8'))
+          const immediateCount = Number(immediate?.data?.likeCount)
+          const settledCount = Number(settled?.data?.likeCount)
+          if (immediate?.data?.liked !== false) {
+            throw new Error('viewer state stayed liked after unlike; cache invalidation failed')
+          }
+          if (settled?.data?.liked !== false || settledCount !== 2) {
+            throw new Error('unlike replay did not converge to two remaining fixture likes: ' + JSON.stringify({
+              viewerLiked: settled?.data?.liked,
+              immediateAggregateCount: immediateCount,
+              settledAggregateCount: settledCount,
+            }))
+          }
+          writeFileSync('like-unlike-replay.json', JSON.stringify({
+            status: 'PASS',
+            firstDeleteHttpStatus: Number(process.env.LIKE_UNLIKE_FIRST_STATUS),
+            sameKeyReplayHttpStatus: Number(process.env.LIKE_UNLIKE_REPLAY_STATUS),
+            viewerStateInvalidatedImmediately: true,
+            immediateAggregateLikeCount: Number.isSafeInteger(immediateCount) ? immediateCount : null,
+            settledViewerLiked: false,
+            settledAggregateLikeCount: settledCount,
+            expectedAuthoritativeCount: 2,
+            aggregateConvergedAfterTtl: true,
+          }, null, 2) + '\n')
+          NODE
+
       - name: Verify cleanup
         if: always()
         env:
@@ -394,14 +462,20 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
           set -euo pipefail
+          if [ -n "${LIKE_CACHE_TEST_TOKEN:-}" ]; then
+            status="$(curl --silent --show-error -o /tmp/like-cache-logout.out -w '%{http_code}' \
+              -X POST \
+              -H "Authorization: Bearer $LIKE_CACHE_TEST_TOKEN" \
+              "$SOCIAL_API_BASE_URL/api/v1/auth/logout")"
+            if [ "$status" != "204" ]; then
+              echo "QA viewer logout failed: HTTP $status"
+              exit 1
+            fi
+          fi
           node --input-type=module <<'NODE'
           import { execFileSync } from 'node:child_process'
           const q = (value) => "'" + String(value).replaceAll("'", "''") + "'"
           const contentId = process.env.LIKE_CACHE_TEST_CONTENT_ID || '__none__'
-          const userId = process.env.LIKE_CACHE_TEST_USER_ID || '__none__'
-          const roleId = process.env.LIKE_CACHE_TEST_ROLE_ID || '__none__'
-          const registerKey = process.env.LIKE_CACHE_TEST_REGISTER_KEY || '__none__'
-
           const run = (databaseName, config, sql) => execFileSync(
             'npx',
             ['--yes','wrangler@'+process.env.WRANGLER_VERSION,'d1','execute',databaseName,'--remote','--yes','--config',config,'--command',sql],
@@ -410,20 +484,25 @@ jobs:
 
           run(process.env.DATABASE_NAME_W05,'w05-source/workers/W05-social/wrangler.jsonc',
             'DELETE FROM interaction_likes WHERE target_id=' + q(contentId) + '; DELETE FROM contents WHERE id=' + q(contentId) + ';')
-          run(process.env.DATABASE_NAME_W01,'deployed-source/workers/W01-payload/wrangler.jsonc',
-            'DELETE FROM role_assignments WHERE id=' + q(roleId) + ' OR subject_id=' + q(userId) + ';' +
-            'DELETE FROM auth_session_state WHERE user_id=' + q(userId) + ';' +
-            'DELETE FROM users_sessions WHERE CAST(_parent_id AS TEXT)=' + q(userId) + ';' +
-            'DELETE FROM consents WHERE CAST(actor_subject_id AS TEXT)=' + q(userId) + ' OR CAST(owner_subject_id AS TEXT)=' + q(userId) + ';' +
-            'DELETE FROM auth_registration_envelopes WHERE idempotency_key=' + q(registerKey) + ';' +
-            'DELETE FROM users WHERE CAST(id AS TEXT)=' + q(userId) + ';')
-          console.log(JSON.stringify({contentId,userId,cleanup:'COMPLETE'}))
+          console.log(JSON.stringify({contentId,cleanup:'SYNTHETIC_SOCIAL_FIXTURES_ONLY'}))
           NODE
 
       - name: Write runtime evidence
         if: always()
         run: |
           mkdir -p artifacts/mapping-0/w05-like-cache-runtime-e2e
+          evidence_flag() { if test -f "$1"; then printf true; else printf false; fi; }
+          fresh_stale="$(evidence_flag like-aggregate-fresh-stale.json)"
+          refreshed="$(evidence_flag like-aggregate-refresh.json)"
+          viewer_replay="$(evidence_flag like-viewer-invalidation.json)"
+          shared_prime="$(evidence_flag like-shared-prime.json)"
+          shared_stale="$(evidence_flag like-shared-no-sync-invalidation.json)"
+          shared_refresh="$(evidence_flag like-shared-refresh-2.json)"
+          unlike_replay="$(evidence_flag like-unlike-replay.json)"
+          complete=true
+          for file in like-initial.json like-aggregate-fresh-stale.json like-aggregate-refresh.json like-viewer-invalidation.json like-shared-prime.json like-shared-no-sync-invalidation.json like-shared-refresh-2.json like-unlike-replay.json; do
+            if ! test -f "$file"; then complete=false; fi
+          done
           cat > artifacts/mapping-0/w05-like-cache-runtime-e2e/provenance.json <<EOF
           {
             "workflow": "W05 Like Aggregate Cache Runtime E2E",
@@ -434,18 +513,25 @@ jobs:
             "publicPath": "/api/v1/interactions/likes",
             "cacheModel": "private viewer state + shared aggregate",
             "aggregateTtlSecondsMax": 5,
-            "freshAggregateStalenessObserved": true,
-            "aggregateRefreshAfterTtl": true,
-            "viewerStateInvalidationImmediate": true,
-            "sharedAggregateNotSynchronouslyInvalidated": true,
+            "freshAggregateStalenessObserved": $fresh_stale,
+            "aggregateRefreshAfterTtl": $refreshed,
+            "viewerStateInvalidationAndSameKeyReplayVerified": $viewer_replay,
+            "sharedAggregatePrimed": $shared_prime,
+            "sharedAggregateNotSynchronouslyInvalidated": $shared_stale,
+            "sharedAggregateRefreshesAfterSecondTtl": $shared_refresh,
+            "unlikeMutationReplayAndAggregateConvergenceVerified": $unlike_replay,
+            "runtimeChecksComplete": $complete,
             "noNewWorker": 0,
             "newD1": 0,
             "syntheticFixtureOnly": true
           }
           EOF
-          for file in like-initial.json like-aggregate-fresh-stale.json like-aggregate-refresh.json like-viewer-invalidation.json like-shared-prime.json like-shared-no-sync-invalidation.json like-shared-refresh-2.json; do
-            test -f "$file"
-            cp "$file" "artifacts/mapping-0/w05-like-cache-runtime-e2e/$file"
+          for file in like-initial.json like-aggregate-fresh-stale.json like-aggregate-refresh.json like-viewer-invalidation.json like-shared-prime.json like-shared-no-sync-invalidation.json like-shared-refresh-2.json like-unlike-replay.json; do
+            if test -f "$file"; then
+              cp "$file" "artifacts/mapping-0/w05-like-cache-runtime-e2e/$file"
+            else
+              printf '{"status":"NOT_REACHED","reason":"an earlier runtime assertion stopped this run"}\n' > "artifacts/mapping-0/w05-like-cache-runtime-e2e/$file"
+            fi
           done
 
       - name: Upload runtime evidence

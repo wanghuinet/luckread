@@ -34,7 +34,7 @@ export async function callW06Moderation(input: {
 }): Promise<Response> {
   if (!input.principal.userId || !input.principal.layer) {
     return Response.json(
-      { error: { code: 'UNAUTHENTICATED', message: 'Authentication required', details: {} }, requestId: crypto.randomUUID() },
+      { error: { code: 'UNAUTHENTICATED', message: 'Authentication required', details: {} }, requestId: `req_${crypto.randomUUID()}` },
       { status: 401, headers: { 'cache-control': 'no-store' } },
     )
   }

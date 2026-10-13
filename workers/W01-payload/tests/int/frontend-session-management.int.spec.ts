@@ -27,7 +27,8 @@ describe('frontend session management', () => {
     expect(route).toContain('enforcePublicReadRateLimit(request)')
     expect(route).toContain('enforceW01WriteRateLimit(request)')
     expect(route).toContain('rateLimitResponse(request)')
-    expect(route).toContain("error: { code: 'SERVICE_UNAVAILABLE', message: 'Session service unavailable' }")
+    expect(route).toContain("apiErrorResponse(503, 'SERVICE_UNAVAILABLE', 'Session service unavailable')")
+    expect(route).toContain('normalizeApiErrorResponse(')
   })
   it('loads the current session marker through the W02 bounded session-list boundary', () => {
     const page = read('src/app/(frontend)/me/sessions/page.tsx')

@@ -7,6 +7,7 @@ import {
   resolveCookieContentPrincipal,
   type ContentPrincipal,
 } from '../content/w03-content-client.js'
+import { extractSocialTokens } from './social-token-parser.js'
 
 type W05SocialService = {
   fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response>
@@ -41,6 +42,36 @@ export async function resolveOptionalCookieSocialPrincipal(
   return principal
 }
 
+
+export type ResolvedSocialMention = { userId: string; handle: string }
+
+export async function resolveSocialMentionTargets(body: string): Promise<ResolvedSocialMention[]> {
+  const unique = Array.from(new Set(
+    extractSocialTokens(body)
+      .filter((token) => token.kind === 'mention')
+      .map((token) => token.normalized),
+  )).slice(0, 20)
+  if (!unique.length) return []
+
+  const payload = await getPayload({ config })
+  const result = await payload.find({
+    collection: 'users',
+    where: { username: { in: unique } },
+    depth: 0,
+    limit: unique.length,
+    overrideAccess: true,
+    select: { id: true, username: true } as any,
+  })
+
+  return result.docs
+    .map((user) => {
+      const username = typeof user.username === 'string' ? user.username.trim() : ''
+      if (!username) return null
+      return { userId: String(user.id), handle: username }
+    })
+    .filter((value): value is ResolvedSocialMention => Boolean(value))
+}
+
 export async function assertSocialTargetUserExists(targetUserId: string): Promise<void> {
   const normalized = targetUserId.trim()
   if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(normalized)) {
@@ -48,12 +79,29 @@ export async function assertSocialTargetUserExists(targetUserId: string): Promis
   }
 
   const payload = await getPayload({ config })
-  const user = await payload.findByID({
-    collection: 'users',
-    id: normalized,
-    depth: 0,
-    overrideAccess: true,
-  })
+  let user: unknown
+  try {
+    user = await payload.findByID({
+      collection: 'users',
+      id: normalized,
+      depth: 0,
+      overrideAccess: true,
+    })
+  } catch (error) {
+    // Payload throws for missing IDs rather than returning null. Translate only
+    // explicit not-found errors; infrastructure/configuration failures remain 503.
+    const details = error && typeof error === 'object'
+      ? error as { status?: unknown; statusCode?: unknown; code?: unknown }
+      : null
+    if (
+      details?.status === 404 ||
+      details?.statusCode === 404 ||
+      details?.code === 'NOT_FOUND'
+    ) {
+      throw new W05SocialClientError(404, 'NOT_FOUND', 'Target user not found')
+    }
+    throw error
+  }
   if (!user) throw new W05SocialClientError(404, 'NOT_FOUND', 'Target user not found')
 }
 

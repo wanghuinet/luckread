@@ -556,11 +556,459 @@
       "minLayer": "L2",
       "scope": "own",
       "auditRequired": true
+    },
+    {
+      "name": "search.read.public",
+      "resource": "search",
+      "action": "read",
+      "minLayer": "L0",
+      "scope": "public"
+    },
+    {
+      "name": "feed.read.public",
+      "resource": "feed",
+      "action": "read",
+      "minLayer": "L0",
+      "scope": "public"
+    },
+    {
+      "name": "taxonomy.read",
+      "resource": "taxonomy",
+      "action": "read",
+      "minLayer": "L0",
+      "scope": "public"
+    },
+    {
+      "name": "comment.read",
+      "resource": "comment",
+      "action": "read",
+      "minLayer": "L2",
+      "scope": "public"
+    },
+    {
+      "name": "interaction.unlike",
+      "resource": "interaction",
+      "action": "unlike",
+      "minLayer": "L2",
+      "scope": "public",
+      "auditRequired": true
+    },
+    {
+      "name": "interaction.favorite",
+      "resource": "interaction",
+      "action": "favorite",
+      "minLayer": "L2",
+      "scope": "public",
+      "auditRequired": true
+    },
+    {
+      "name": "social.unfollow",
+      "resource": "social",
+      "action": "unfollow",
+      "minLayer": "L2",
+      "scope": "public",
+      "auditRequired": true
+    },
+    {
+      "name": "notification.read.self",
+      "resource": "notification",
+      "action": "read",
+      "minLayer": "L2",
+      "scope": "own"
+    },
+    {
+      "name": "notification.update.self",
+      "resource": "notification",
+      "action": "update",
+      "minLayer": "L2",
+      "scope": "own",
+      "auditRequired": true
+    },
+    {
+      "name": "creator.read.self",
+      "resource": "creator",
+      "action": "read",
+      "minLayer": "L3",
+      "scope": "own"
+    },
+    {
+      "name": "creator.update.self",
+      "resource": "creator",
+      "action": "update",
+      "minLayer": "L3",
+      "scope": "own",
+      "auditRequired": true
+    },
+    {
+      "name": "creator.stats.read.self",
+      "resource": "creator_stats",
+      "action": "read",
+      "minLayer": "L3",
+      "scope": "own"
+    },
+    {
+      "name": "revision.create.own",
+      "resource": "revision",
+      "action": "create",
+      "minLayer": "L3",
+      "scope": "own",
+      "auditRequired": true
+    },
+    {
+      "name": "content.read.any",
+      "resource": "content",
+      "action": "read",
+      "minLayer": "L5",
+      "scope": "platform"
+    },
+    {
+      "name": "content.feature",
+      "resource": "content",
+      "action": "feature",
+      "minLayer": "L5",
+      "scope": "platform",
+      "auditRequired": true
+    },
+    {
+      "name": "content.promote",
+      "resource": "content",
+      "action": "promote",
+      "minLayer": "L5",
+      "scope": "platform",
+      "auditRequired": true
+    },
+    {
+      "name": "topic.manage",
+      "resource": "topic",
+      "action": "manage",
+      "minLayer": "L5",
+      "scope": "platform",
+      "auditRequired": true
+    },
+    {
+      "name": "campaign.manage",
+      "resource": "campaign",
+      "action": "manage",
+      "minLayer": "L5",
+      "scope": "platform",
+      "auditRequired": true
+    },
+    {
+      "name": "analytics.read",
+      "resource": "analytics",
+      "action": "read",
+      "minLayer": "L5",
+      "scope": "platform"
     }
   ],
   "x-forbidden-patterns": [
     "authorize-by-role-name-only",
     "authorize-by-cache",
     "client-supplied-organization-scope"
-  ]
+  ],
+  "x-role-permissions": {
+    "status": "PARTIAL_IMPLEMENTED_PERMISSION_CATALOG",
+    "source": "docs/04-P0-PERMISSION-RBAC-CONTRACT-v1.0.md + docs/301-L0-L8-PERMISSION-LAYER-CONTRACT-v1.0.md",
+    "rule": "Explicit additive role-to-permission grants. A layer alone never grants a permission. Ownership, scope, account-state, entitlement, workflow, MFA, and business-state checks still apply.",
+    "publicDefaults": [
+      "content.read.public",
+      "feed.read.public",
+      "media.read",
+      "search.read.public",
+      "share.resolve",
+      "taxonomy.read"
+    ],
+    "reservedNonUserPermission": [
+      "system.job"
+    ],
+    "roles": [
+      {
+        "role": "user",
+        "permissions": [
+          "user.credential.manage",
+          "user.reactivate",
+          "user.read.self",
+          "user.session.read",
+          "user.session.refresh",
+          "user.session.revoke",
+          "user.update.self"
+        ],
+        "scopeType": "global"
+      },
+      {
+        "role": "verified_user",
+        "permissions": [
+          "appeal.create",
+          "comment.create",
+          "comment.read",
+          "entitlement.check",
+          "entitlement.read",
+          "interaction.block",
+          "interaction.favorite",
+          "interaction.like",
+          "interaction.mute",
+          "interaction.unlike",
+          "notification.read.self",
+          "notification.update.self",
+          "report.create",
+          "share.create",
+          "social.follow",
+          "social.unfollow",
+          "subscription.cancel",
+          "subscription.change_plan",
+          "subscription.create",
+          "subscription.pause",
+          "subscription.read",
+          "subscription.resume"
+        ],
+        "scopeType": "global"
+      },
+      {
+        "role": "creator",
+        "permissions": [
+          "content.archive.own",
+          "content.create",
+          "content.delete.own",
+          "content.publish.own",
+          "content.restore.own",
+          "content.revision.read",
+          "content.revision.rollback",
+          "content.schedule.own",
+          "content.submit_review.own",
+          "content.unpublish.own",
+          "content.update.own",
+          "creator.read.self",
+          "creator.stats.read.self",
+          "creator.update.self",
+          "media.read.own",
+          "media.upload",
+          "revision.create.own"
+        ],
+        "scopeType": "global"
+      },
+      {
+        "role": "ip_principal",
+        "permissions": [
+          "ip.content.read",
+          "ip.create",
+          "ip.member.invite",
+          "ip.member.remove"
+        ],
+        "scopeType": "ip"
+      },
+      {
+        "role": "mcn_admin",
+        "permissions": [
+          "org.create",
+          "org.member.manage.scope",
+          "organization.member.manage",
+          "organization.member.read",
+          "organization.role.manage"
+        ],
+        "scopeType": "organization"
+      },
+      {
+        "role": "mcn_editor",
+        "permissions": [
+          "organization.member.read"
+        ],
+        "scopeType": "organization"
+      },
+      {
+        "role": "editor",
+        "permissions": [
+          "analytics.read",
+          "campaign.manage",
+          "content.curate",
+          "content.feature",
+          "content.promote",
+          "content.read.any",
+          "topic.manage"
+        ],
+        "scopeType": "global"
+      },
+      {
+        "role": "operator",
+        "permissions": [
+          "analytics.read",
+          "campaign.manage",
+          "content.curate",
+          "content.feature",
+          "content.promote",
+          "content.read.any",
+          "topic.manage"
+        ],
+        "scopeType": "global"
+      },
+      {
+        "role": "moderator",
+        "permissions": [
+          "moderation.case.read",
+          "moderation.decide",
+          "moderation.queue.read",
+          "moderation.read",
+          "user.restrict.limited"
+        ],
+        "scopeType": "global"
+      },
+      {
+        "role": "admin",
+        "permissions": [
+          "analytics.read",
+          "appeal.create",
+          "campaign.manage",
+          "comment.create",
+          "comment.read",
+          "content.archive.own",
+          "content.create",
+          "content.curate",
+          "content.delete.own",
+          "content.feature",
+          "content.promote",
+          "content.publish.own",
+          "content.read.any",
+          "content.read.public",
+          "content.restore.own",
+          "content.revision.read",
+          "content.revision.rollback",
+          "content.schedule.own",
+          "content.submit_review.own",
+          "content.unpublish.own",
+          "content.update.own",
+          "creator.read.self",
+          "creator.stats.read.self",
+          "creator.update.self",
+          "entitlement.check",
+          "entitlement.read",
+          "interaction.block",
+          "interaction.favorite",
+          "interaction.like",
+          "interaction.mute",
+          "interaction.unlike",
+          "media.read",
+          "media.read.own",
+          "media.upload",
+          "moderation.case.read",
+          "moderation.decide",
+          "moderation.queue.read",
+          "moderation.read",
+          "notification.read.self",
+          "notification.update.self",
+          "report.create",
+          "revision.create.own",
+          "role.assign",
+          "share.create",
+          "share.resolve",
+          "social.follow",
+          "social.unfollow",
+          "subscription.cancel",
+          "subscription.change_plan",
+          "subscription.create",
+          "subscription.pause",
+          "subscription.read",
+          "subscription.resume",
+          "topic.manage",
+          "user.ban",
+          "user.credential.manage",
+          "user.freeze",
+          "user.reactivate",
+          "user.read.self",
+          "user.reinstate",
+          "user.restore",
+          "user.restrict.limited",
+          "user.session.read",
+          "user.session.refresh",
+          "user.session.revoke",
+          "user.suspend",
+          "user.unfreeze",
+          "user.update.self"
+        ],
+        "scopeType": "global"
+      },
+      {
+        "role": "super_admin",
+        "permissions": [
+          "analytics.read",
+          "appeal.create",
+          "audit.read.any",
+          "campaign.manage",
+          "comment.create",
+          "comment.read",
+          "content.archive.own",
+          "content.create",
+          "content.curate",
+          "content.delete.own",
+          "content.feature",
+          "content.promote",
+          "content.publish.own",
+          "content.read.any",
+          "content.read.public",
+          "content.restore.own",
+          "content.revision.read",
+          "content.revision.rollback",
+          "content.schedule.own",
+          "content.submit_review.own",
+          "content.unpublish.own",
+          "content.update.own",
+          "creator.read.self",
+          "creator.stats.read.self",
+          "creator.update.self",
+          "entitlement.check",
+          "entitlement.read",
+          "interaction.block",
+          "interaction.favorite",
+          "interaction.like",
+          "interaction.mute",
+          "interaction.unlike",
+          "media.read",
+          "media.read.own",
+          "media.upload",
+          "moderation.case.read",
+          "moderation.decide",
+          "moderation.queue.read",
+          "moderation.read",
+          "notification.read.self",
+          "notification.update.self",
+          "report.create",
+          "revision.create.own",
+          "role.assign",
+          "secret.manage",
+          "share.create",
+          "share.resolve",
+          "social.follow",
+          "social.unfollow",
+          "subscription.cancel",
+          "subscription.change_plan",
+          "subscription.create",
+          "subscription.pause",
+          "subscription.read",
+          "subscription.resume",
+          "topic.manage",
+          "user.ban",
+          "user.credential.manage",
+          "user.freeze",
+          "user.reactivate",
+          "user.read.self",
+          "user.reinstate",
+          "user.restore",
+          "user.restrict.limited",
+          "user.session.read",
+          "user.session.refresh",
+          "user.session.revoke",
+          "user.suspend",
+          "user.unfreeze",
+          "user.update.self"
+        ],
+        "scopeType": "global"
+      }
+    ]
+  },
+  "x-role-permissions-gap": {
+    "status": "OPEN",
+    "note": "Open gaps are only permission identifiers still referenced by canonical docs/301 but not yet represented in x-permissions. These permissions remain ungranted until a separate catalog slice defines their resource, action, minimum layer, scope, and role mapping.",
+    "knownCatalogGaps": [
+      "security.manage",
+      "role.assign.any"
+    ]
+  }
 }

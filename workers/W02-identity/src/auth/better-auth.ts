@@ -1,5 +1,5 @@
-import { applyAccountStateTransition } from '../account/account-state-transition.js'
-import { ensureBaseUserRole } from '../authz/role-assignment.js'
+import { activateEmailVerifiedAccount } from '../account/account-state-transition.js'
+import { ensureBaseUserRole, ensureVerifiedUserRole } from '../authz/role-assignment.js'
 import { betterAuth } from 'better-auth'
 import { bearer } from 'better-auth/plugins'
 import { sendResendEmail } from './resend-email.js'
@@ -15,11 +15,6 @@ export interface BetterAuthEnv {
   CLOUDFLARE_ENV?: string
   AUTH_SESSION_READ_LIMITER?: RateLimitBinding
   AUTH_SESSION_WRITE_LIMITER?: RateLimitBinding
-}
-
-type AccountStateRow = {
-  accountState: string
-  accountStateVersion: number
 }
 
 const escapeHtml = (value: string): string =>
@@ -54,43 +49,27 @@ async function sendPasswordResetEmail(
     to: input.user.email,
     subject: 'Reset your LuckRead password',
     text: 'Reset your LuckRead password by opening this link: ' + input.url,
-    html: '<p>We received a request to reset your LuckRead password.</p><p>If you requested this, use the link below to choose a new password:</p><p><a href="' + safeUrl + '">Reset password</a></p><p>If you did not request this, you can ignore this email.</p>',
+    html: '<p>We received a request to reset your password.</p><p>If you requested this, use the link below to choose a new password:</p><p><a href="' + safeUrl + '">Reset password</a></p><p>If you did not request this, you can ignore this email.</p>',
   })
 }
 
 async function activateVerifiedAccount(db: D1Database, userId: string): Promise<void> {
-  const readCurrent = () => db
-    .prepare(
-      'SELECT account_state AS accountState, account_state_version AS accountStateVersion FROM "user" WHERE id = ? LIMIT 1',
-    )
-    .bind(userId)
-    .first<AccountStateRow>()
+  const now = new Date().toISOString()
+  const activation = await activateEmailVerifiedAccount(db, userId, now)
 
-  const current = await readCurrent()
-  if (!current || current.accountState === 'ACTIVE') return
-  if (current.accountState !== 'PENDING_VERIFICATION') return
-  if (!Number.isSafeInteger(current.accountStateVersion) || current.accountStateVersion < 1) {
-    throw new Error('ACCOUNT_STATE_VERSION_INVALID')
-  }
-
-  try {
-    await applyAccountStateTransition(db, {
-      userId,
-      to: 'ACTIVE',
-      reason: 'email verification completed',
-      expectedVersion: current.accountStateVersion,
-      actor: { id: userId, type: 'user' },
-      permission: null,
-      preconditionSatisfied: true,
-    })
-  } catch (error) {
-    // Verification callbacks can race. Treat an already-committed activation
-    // as success, while preserving failures that left the account pending.
-    const latest = await readCurrent()
-    if (latest?.accountState === 'ACTIVE') return
-    throw error
+  // The account transition and canonical L2 assignment are committed in one
+  // D1 batch. This idempotent guard also repairs an already-active account
+  // whose verification callback previously stopped before role materialization.
+  if (activation.accountState === 'ACTIVE') {
+    await ensureVerifiedUserRole(db, userId, now)
   }
 }
+
+const sanitizeAuthDiagnostic = (value: string): string => value
+  .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '[redacted-email]')
+  .replace(/https?:\/\/[^\s"'<>]+/gi, '[redacted-url]')
+  .replace(/(token|secret|password|authorization|api[_-]?key)\s*[:=]\s*[^\s,;]+/gi, '$1=[redacted]')
+  .slice(0, 240)
 
 const buildLuckReadAuth = (env: BetterAuthEnv) => {
   // Keep local origins available only to the local evidence/runtime profile.
@@ -137,7 +116,8 @@ const buildLuckReadAuth = (env: BetterAuthEnv) => {
         await sendVerificationEmail(env, { user, url })
       },
       afterEmailVerification: async (user) => {
-        await activateVerifiedAccount(env.D1_01, String(user.id))
+        const userId = String(user.id)
+        await activateVerifiedAccount(env.D1_01, userId)
       },
     },
     databaseHooks: {
@@ -231,6 +211,23 @@ const buildLuckReadAuth = (env: BetterAuthEnv) => {
       expiresIn: 60 * 60 * 24 * 7,
       updateAge: 60 * 60 * 24,
       modelName: 'session',
+    },
+    logger: {
+      level: 'error',
+      log: (level, message, ...args) => {
+        const errors = args
+          .filter((value): value is Error => value instanceof Error)
+          .map((error) => ({
+            name: error.name,
+            message: sanitizeAuthDiagnostic(error.message),
+          }))
+        console.error(JSON.stringify({
+          event: 'auth.better_auth.internal_error',
+          level,
+          message: sanitizeAuthDiagnostic(String(message)),
+          errors,
+        }))
+      },
     },
     plugins: [bearer()],
     advanced: {

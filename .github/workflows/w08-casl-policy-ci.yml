@@ -1,0 +1,50 @@
+name: W08 CASL Policy CI
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'workers/W08-creator/**'
+      - 'contracts/authz/**'
+      - 'docs/change-control/CC-1.1-W08-CASL-POLICY-ENGINE-2026-10-13.md'
+      - '.github/workflows/w08-casl-policy-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: w08-casl-policy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  casl-policy:
+    name: CASL authorization policy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Install pinned W08 CASL dependency
+        run: npm install --prefix workers/W08-creator --no-save --ignore-scripts --no-package-lock
+
+      - name: Run W08 authorization tests
+        run: npx vitest run workers/W08-creator/src/authorization.test.ts
+
+      - name: Type-check W08 authorization module
+        run: >-
+          npx tsc --noEmit --strict --skipLibCheck
+          --target ES2022 --module ESNext --moduleResolution Bundler
+          --resolveJsonModule --esModuleInterop --lib ES2022,DOM
+          workers/W08-creator/src/authorization.ts
+          workers/W08-creator/src/index.ts
+          workers/W08-creator/src/authorization.test.ts

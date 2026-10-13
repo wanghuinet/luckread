@@ -18,6 +18,7 @@ vi.mock('../../src/auth/traffic-limit.js', () => ({
 }))
 
 import { POST as login } from '../../src/app/auth/login/route.js'
+import { GET as session } from '../../src/app/auth/session/route.js'
 import { POST as refresh } from '../../src/app/auth/refresh/route.js'
 import { POST as logout } from '../../src/app/auth/logout/route.js'
 
@@ -29,6 +30,46 @@ const request = (url: string, method = 'POST', body?: unknown) =>
   })
 
 describe('W01 Better Auth boundary', () => {
+  it('binds the app-owned login/session DTO to the canonical OpenAPI contract', () => {
+    const openapi = readFileSync(
+      resolve(process.cwd(), '../../contracts/openapi/v1/openapi.yaml'),
+      'utf8',
+    )
+    const loginRoute = readFileSync(
+      resolve(process.cwd(), 'src/app/auth/login/route.ts'),
+      'utf8',
+    )
+    const sessionRoute = readFileSync(
+      resolve(process.cwd(), 'src/app/auth/session/route.ts'),
+      'utf8',
+    )
+    const legacyRefreshRoute = readFileSync(
+      resolve(process.cwd(), 'src/app/auth/refresh/route.ts'),
+      'utf8',
+    )
+
+    const loginContractStart = openapi.indexOf('  /auth/login:')
+    const sessionContractStart = openapi.indexOf('  /auth/session:', loginContractStart)
+    const logoutContractStart = openapi.indexOf('  /auth/logout:', sessionContractStart)
+    const loginAndSessionContract = openapi.slice(loginContractStart, logoutContractStart)
+
+    expect(loginContractStart).toBeGreaterThanOrEqual(0)
+    expect(sessionContractStart).toBeGreaterThan(loginContractStart)
+    expect(loginAndSessionContract).toContain('required: [identity, credential]')
+    expect(loginAndSessionContract).not.toContain('required: [identity, credential, deviceId]')
+    expect(loginAndSessionContract).toContain('X-LuckRead-Session-Token')
+    expect(loginAndSessionContract).toContain('/auth/session')
+    expect(loginAndSessionContract).not.toContain('accessToken:')
+    expect(loginAndSessionContract).not.toContain('refreshToken:')
+    expect(loginRoute).toContain("'X-LuckRead-Session-Token'")
+    expect(loginRoute).toContain("headers.delete('set-auth-token')")
+    expect(loginRoute).toContain('data: { user }')
+    expect(sessionRoute).toContain("'/get-session'")
+    expect(sessionRoute).toContain("errorResponse(401, 'UNAUTHENTICATED'")
+    expect(legacyRefreshRoute).toContain('GET as POST')
+    expect(legacyRefreshRoute).toContain('does not rotate')
+  })
+
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.enforceAuthRateLimit.mockResolvedValue(undefined)
@@ -66,9 +107,16 @@ describe('W01 Better Auth boundary', () => {
     expect(authConfig).toContain('requireEmailVerification: true')
     expect(authConfig).toContain('sendVerificationEmail: async ({ user, url })')
     expect(authConfig).toContain('afterEmailVerification: async (user)')
-    expect(authConfig).toContain("applyAccountStateTransition(db, {")
-    expect(authConfig).toContain("to: 'ACTIVE'")
-    expect(authConfig).toContain("reason: 'email verification completed'")
+    expect(authConfig).toContain("activateEmailVerifiedAccount(db, userId, now)")
+    expect(authConfig).toContain("await ensureVerifiedUserRole(db, userId, now)")
+    const activation = readFileSync(
+      resolve(process.cwd(), '../W02-identity/src/account/account-state-transition.ts'),
+      'utf8',
+    )
+    expect(activation).toContain("to: 'ACTIVE'")
+    expect(activation).toContain("reason: 'email_verified'")
+    expect(activation).toContain('additionalStatements')
+    expect(activation).toContain("INSERT INTO role_assignments")
   })
 
   it('hardens W02 schema validation, auth initialization and production trusted origins', () => {
@@ -133,20 +181,50 @@ describe('W01 Better Auth boundary', () => {
     expect(verificationRoute).toContain('readUpstreamDiagnosticCode')
   })
 
-  it('proxies login credentials to W02 and does not require legacy device/session material', async () => {
-    const upstream = new Response(JSON.stringify({ user: { id: 'u1' } }), {
+  it('normalizes successful login to the public session DTO and preserves cookie/Bearer carriers', async () => {
+    const upstream = new Response(JSON.stringify({
+      redirect: false,
+      token: 'opaque-session-token',
+      user: {
+        id: 'u1',
+        email: 'user@example.com',
+        name: 'Example User',
+        emailVerified: true,
+        image: null,
+      },
+    }), {
       status: 200,
-      headers: { 'set-cookie': 'better-auth.session_token=abc; Path=/; HttpOnly' },
+      headers: {
+        'set-cookie': 'better-auth.session_token=opaque-session-token; Path=/; HttpOnly; Secure; SameSite=Lax',
+        'set-auth-token': 'opaque-session-token',
+        'cache-control': 'no-store',
+      },
     })
     mocks.proxyBetterAuth.mockResolvedValue(upstream)
 
     const response = await login(request('https://luckread.test/api/v1/auth/login', 'POST', {
       identity: 'USER@EXAMPLE.COM',
       credential: 'correct-password',
-      deviceId: 'legacy-device-is-ignored',
     }))
+    const data = await response.json() as {
+      data: { user: Record<string, unknown> }
+      requestId: string
+    }
 
     expect(response.status).toBe(200)
+    expect(data.data.user).toEqual({
+      id: 'u1',
+      email: 'user@example.com',
+      name: 'Example User',
+      emailVerified: true,
+      image: null,
+    })
+    expect(data.requestId).toBeTruthy()
+    expect(JSON.stringify(data)).not.toContain('opaque-session-token')
+    expect(response.headers.get('x-luckread-session-token')).toBe('opaque-session-token')
+    expect(response.headers.get('set-auth-token')).toBeNull()
+    expect(response.headers.get('set-cookie')).toContain('HttpOnly')
+    expect(response.headers.get('cache-control')).toBe('no-store')
     expect(mocks.proxyBetterAuth).toHaveBeenCalledWith(
       expect.any(Request),
       '/sign-in/email',
@@ -156,10 +234,172 @@ describe('W01 Better Auth boundary', () => {
     )
   })
 
-  it('uses Better Auth session retrieval instead of minting a legacy refresh token', async () => {
-    mocks.proxyBetterAuth.mockResolvedValue(new Response(JSON.stringify({ user: { id: 'u1' }, session: { id: 's1' } }), { status: 200 }))
-    const response = await refresh(request('https://luckread.test/api/v1/auth/refresh', 'POST', {}))
+  it('accepts the Bearer plugin header as the canonical credential when JSON has no token field', async () => {
+    const upstream = new Response(JSON.stringify({
+      redirect: false,
+      user: {
+        id: 'u-header-only',
+        email: 'user@example.com',
+        name: null,
+        emailVerified: true,
+        image: null,
+      },
+    }), {
+      status: 200,
+      headers: {
+        'set-cookie': 'better-auth.session_token=header-only-session; Path=/; HttpOnly; Secure; SameSite=Lax',
+        'set-auth-token': 'header-only-session',
+      },
+    })
+    mocks.proxyBetterAuth.mockResolvedValue(upstream)
+
+    const response = await login(request('https://luckread.test/api/v1/auth/login', 'POST', {
+      identity: 'user@example.com',
+      credential: 'correct-password',
+    }))
+    const data = await response.json() as { data: { user: Record<string, unknown> }; requestId: string }
+
     expect(response.status).toBe(200)
+    expect(data.data.user.id).toBe('u-header-only')
+    expect(response.headers.get('x-luckread-session-token')).toBe('header-only-session')
+    expect(JSON.stringify(data)).not.toContain('header-only-session')
+    expect(response.headers.get('set-auth-token')).toBeNull()
+  })
+
+  it('uses the signed Bearer header even when the JSON token has a different representation', async () => {
+    const upstream = new Response(JSON.stringify({
+      redirect: false,
+      // Better Auth 1.7.7 returns the raw session.token in the JSON body.
+      token: 'raw-session-token',
+      user: {
+        id: 'u-signed-token',
+        email: 'user@example.com',
+        name: null,
+        emailVerified: true,
+        image: null,
+      },
+    }), {
+      status: 200,
+      headers: {
+        'set-cookie': 'better-auth.session_token=signed-cookie-credential; Path=/; HttpOnly; Secure; SameSite=Lax',
+        'set-auth-token': 'signed-cookie-credential',
+      },
+    })
+    mocks.proxyBetterAuth.mockResolvedValue(upstream)
+
+    const response = await login(request('https://luckread.test/api/v1/auth/login', 'POST', {
+      identity: 'user@example.com',
+      credential: 'correct-password',
+    }))
+    const data = await response.json() as { data: { user: Record<string, unknown> }; requestId: string }
+
+    expect(response.status).toBe(200)
+    expect(data.data.user.id).toBe('u-signed-token')
+    expect(response.headers.get('x-luckread-session-token')).toBe('signed-cookie-credential')
+    expect(response.headers.get('set-cookie')).toContain('better-auth.session_token=signed-cookie-credential')
+    expect(JSON.stringify(data)).not.toContain('raw-session-token')
+    expect(JSON.stringify(data)).not.toContain('signed-cookie-credential')
+  })
+
+  it('rejects legacy or unknown login fields rather than silently ignoring them', async () => {
+    const response = await login(request('https://luckread.test/api/v1/auth/login', 'POST', {
+      identity: 'user@example.com',
+      credential: 'correct-password',
+      deviceId: 'legacy-device-field',
+    }))
+    const data = await response.json() as { error: { code: string }; requestId: string }
+
+    expect(response.status).toBe(400)
+    expect(data.error.code).toBe('VALIDATION_FAILED')
+    expect(data.requestId).toBeTruthy()
+    expect(mocks.proxyBetterAuth).not.toHaveBeenCalled()
+  })
+
+  it('normalizes unverified-account login failure to the public error envelope', async () => {
+    mocks.proxyBetterAuth.mockResolvedValue(new Response(JSON.stringify({
+      code: 'EMAIL_NOT_VERIFIED',
+      message: 'Email not verified',
+    }), { status: 403 }))
+
+    const response = await login(request('https://luckread.test/api/v1/auth/login', 'POST', {
+      identity: 'user@example.com',
+      credential: 'correct-password',
+    }))
+    const data = await response.json() as { error: { code: string }; requestId: string }
+
+    expect(response.status).toBe(403)
+    expect(data.error.code).toBe('EMAIL_NOT_VERIFIED')
+    expect(data.requestId).toBeTruthy()
+    expect(response.headers.get('cache-control')).toBe('no-store')
+    expect(response.headers.get('x-luckread-session-token')).toBeNull()
+  })
+
+  it('exposes current session through one stable public DTO and keeps refreshed credentials out of JSON', async () => {
+    mocks.proxyBetterAuth.mockResolvedValue(new Response(JSON.stringify({
+      session: { id: 's1', expiresAt: '2026-10-18T12:00:00.000Z', token: 'must-not-escape' },
+      user: {
+        id: 'u1',
+        email: 'user@example.com',
+        name: 'Example User',
+        emailVerified: true,
+        image: null,
+      },
+    }), {
+      status: 200,
+      headers: {
+        'set-auth-token': 'opaque-session-token',
+        'set-cookie': 'better-auth.session_token=opaque-session-token; Path=/; HttpOnly; Secure; SameSite=Lax',
+      },
+    }))
+
+    const response = await session(request('https://luckread.test/api/v1/auth/session', 'GET'))
+    const data = await response.json() as {
+      data: { session: Record<string, unknown>; user: Record<string, unknown> }
+      requestId: string
+    }
+
+    expect(response.status).toBe(200)
+    expect(data.data.session).toEqual({
+      id: 's1',
+      expiresAt: '2026-10-18T12:00:00.000Z',
+    })
+    expect(data.data.user.id).toBe('u1')
+    expect(JSON.stringify(data)).not.toContain('must-not-escape')
+    expect(response.headers.get('x-luckread-session-token')).toBe('opaque-session-token')
+    expect(response.headers.get('set-auth-token')).toBeNull()
+    expect(response.headers.get('set-cookie')).toContain('HttpOnly')
+    expect(response.headers.get('cache-control')).toBe('no-store')
+    expect(mocks.proxyBetterAuth).toHaveBeenCalledWith(
+      expect.any(Request),
+      '/get-session',
+      { method: 'GET' },
+    )
+  })
+
+  it('returns 401 rather than a false successful session snapshot when Better Auth returns null', async () => {
+    mocks.proxyBetterAuth.mockResolvedValue(new Response('null', {
+      status: 200,
+      headers: { 'cache-control': 'no-store' },
+    }))
+
+    const response = await session(request('https://luckread.test/api/v1/auth/session', 'GET'))
+    const data = await response.json() as { error: { code: string }; requestId: string }
+
+    expect(response.status).toBe(401)
+    expect(data.error.code).toBe('UNAUTHENTICATED')
+    expect(data.requestId).toBeTruthy()
+    expect(response.headers.get('cache-control')).toBe('no-store')
+  })
+
+  it('keeps the legacy refresh path as a deprecated alias for the canonical session response', async () => {
+    mocks.proxyBetterAuth.mockResolvedValue(new Response(JSON.stringify({
+      user: { id: 'u1', email: 'user@example.com', name: null, emailVerified: true, image: null },
+      session: { id: 's1', expiresAt: '2026-10-18T12:00:00.000Z' },
+    }), { status: 200 }))
+    const response = await refresh(request('https://luckread.test/api/v1/auth/refresh', 'POST', {}))
+    const data = await response.json() as { data: { session: { id: string } } }
+    expect(response.status).toBe(200)
+    expect(data.data.session.id).toBe('s1')
     expect(mocks.proxyBetterAuth).toHaveBeenCalledWith(expect.any(Request), '/get-session', { method: 'GET' })
   })
 

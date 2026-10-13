@@ -4,7 +4,7 @@
 >
 > Authority: `docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md` → `docs/00-PROJECT-BLUEPRINT-v1.4.md` → `docs/02-FINAL-MAPPING-v1.0.md` → `docs/04-WORKER-MASTER-v1.0.md` → `docs/09-D1-DOMAIN-MASTER-v1.0.md`.
 >
-> Frozen topology: **12 Workers / 4 D1 domains / 25 Contract Tasks**.
+> Frozen topology: **12 Workers / 5 D1 domains / 25 Contract Tasks**.
 
 ## 1. Purpose
 
@@ -22,25 +22,26 @@ No Worker/D1 ownership may be inferred from code, routes, Payload Collections, d
 | D1-02 | Content / Community Data |
 | D1-03 | Platform Operations / Governance / Runtime |
 | D1-04 | Commerce / Financial Authority |
+| D1-05 | Analytics-only Derived Data (W11-exclusive) |
 
-Exactly four D1 domains are authoritative. No implicit fifth D1 exists.
+Exactly five D1 domains are authoritative. D1-01..D1-04 retain existing business authority; D1-05 is analytics-only and W11-exclusive.
 
 ## 3. Canonical Worker × D1 matrix
 
-| Worker | Primary responsibility | Primary D1 | D1-01 | D1-02 | D1-03 | D1-04 |
+| Worker | Primary responsibility | Primary D1 | D1-01 | D1-02 | D1-03 | D1-04 | D1-05 |
 |---|---|---|---|---|---|---|
-| W01 | Public API / Gateway / Developer & Admin API Boundary | None | No general authority; bounded AUTH-001 Payload-native registration execution only | No direct authority | No direct authority | No direct authority |
-| W02 | Identity / Account / Authorization | D1-01 | RW scoped | No | No | No |
-| W03 | Content / Article / Media / Translation | D1-02 | No | RW scoped | No | No |
-| W04 | Feed / Recommendation / Search | Derived/projection boundary | Read/projection only where explicitly contracted | Read/projection only where explicitly contracted | Read/projection only where explicitly contracted | Read/projection only where explicitly contracted |
-| W05 | Social / Community / Messaging / Notification | D1-02 | No direct authority | RW scoped | RW scoped runtime-delivery only | No |
-| W06 | Rights / Trust & Safety / Governance | D1-03 | No | Read/reference only where contracted | RW scoped | No |
-| W07 | Subscription / Commerce / Payment / Advertising | D1-04 | Scoped entitlement transition only | No | Operational event/audit integration only | RW scoped financial/commercial authority |
-| W08 | Creator / Organization | D1-01 | RW scoped | No | No | No |
-| W09 | Platform / Storage / Reliability | D1-03 | No | No | RW scoped platform/runtime authority | No |
-| W10 | Async / Queue / Job Execution | D1-03 scoped execution | No | No | RW scoped execution records only | No |
-| W11 | Growth / Campaign / Analytics / Operations | D1-03 | No | Read/reference only where explicitly contracted | RW scoped operational/analytics state | No |
-| W12 | External Developer / Integration Execution | No default business D1 | No direct authority | No direct authority | No direct authority | No direct authority |
+| W01 | Public API / Gateway / Developer & Admin API Boundary | None | No general authority; bounded AUTH-001 Payload-native registration execution only | No direct authority | No direct authority | No direct authority | No |
+| W02 | Identity / Account / Authorization | D1-01 | RW scoped | No | No | No | No |
+| W03 | Content / Article / Media / Translation | D1-02 | No | RW scoped | No | No | No |
+| W04 | Feed / Recommendation / Search | Derived/projection boundary | Read/projection only where explicitly contracted | Read/projection only where explicitly contracted | Read/projection only where explicitly contracted | Read/projection only where explicitly contracted | No |
+| W05 | Social / Community / Messaging / Notification | D1-02 | No direct authority | RW scoped | RW scoped runtime-delivery only | No | No |
+| W06 | Rights / Trust & Safety / Governance | D1-03 | No | Read/reference only where contracted | RW scoped | No | No |
+| W07 | Subscription / Commerce / Payment / Advertising | D1-04 | Scoped entitlement transition only | No | Operational event/audit integration only | RW scoped financial/commercial authority | No |
+| W08 | Creator / Organization | D1-01 | RW scoped | No | No | No | No |
+| W09 | Platform / Storage / Reliability | D1-03 | No | No | RW scoped platform/runtime authority | No | No |
+| W10 | Async / Queue / Job Execution | D1-03 scoped execution | No | No | RW scoped execution records only | No | No |
+| W11 | Growth / Campaign / Analytics / Operations | D1-03 + D1-05 | No | Read/reference only where explicitly contracted | RW scoped campaign/operations state | No | RW scoped analytics-only derived data |
+| W12 | External Developer / Integration Execution | No default business D1 | No direct authority | No direct authority | No direct authority | No direct authority | No |
 
 ### Permission notation
 
@@ -101,7 +102,9 @@ Exactly four D1 domains are authoritative. No implicit fifth D1 exists.
 ### W08
 
 - Sole Primary Worker for T04 and D1-01 creator/organization identity relationships.
-- Must not become general identity/account authorization authority outside its assigned entities and contracts.
+- Under `CC-1.1-W08-CASL-POLICY-ENGINE-2026-10-13.md`, W08 hosts a bounded CASL policy evaluator using the canonical permission catalog and trusted server-side context.
+- W02 remains the authority for identity, account state, role-assignment facts, and L0-L8 resolution. W08 does not persist roles, infer layers, or create a second identity/account authority.
+- The evaluator does not perform direct D1 writes and does not replace the owning Worker's resource ownership, entitlement, workflow, lifecycle, or business-state checks. Runtime use still requires an explicit admitted integration contract.
 
 ### W09
 
@@ -117,7 +120,7 @@ Exactly four D1 domains are authoritative. No implicit fifth D1 exists.
 
 ### W11
 
-- Primary Worker for T22/T23 and D1-03 operational/analytics/campaign state assigned by contract.
+- Primary Worker for T22 campaign/growth operations in D1-03 and T23 analytics-derived state in D1-05. W11 is the sole analytics persistence owner; D1-05 cannot override any business authority.
 - Analytics and operational projections cannot replace D1-01, D1-02, or D1-04 authoritative state.
 
 ### W12

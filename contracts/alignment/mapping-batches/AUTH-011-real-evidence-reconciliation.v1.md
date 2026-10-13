@@ -165,3 +165,19 @@ AUTH-011 may transition to GREEN only after all of the following are evidence-bo
 `Auth operation policy /auth/refresh` = operation-relative representation.
 
 Therefore API path normalization is no longer an AUTH-011 blocker. E6-WIRE-001 remains blocked only by the uncontracted exact Request/Response/Error Wire Schema, DTO binding, credential-carrier semantics, and route admission.
+
+## Superseding APP session wire disposition — 2026-10-11
+
+The sections above preserve the original AUTH-011 token-rotation requirements and the evidence gap that caused this feature to remain blocked. They must not be interpreted as proof that the current public login path issues access/refresh-token pairs.
+
+The current APP-AUTH-01 wire contract is frozen in `docs/api/APP-AUTH-01-session-contract-v1.0.md`:
+
+- `POST /api/v1/auth/login` establishes one W02/Better Auth session.
+- Browser clients retain the `HttpOnly` cookie; native clients receive the same opaque session credential via `X-LuckRead-Session-Token` and send it as a Bearer credential.
+- `GET /api/v1/auth/session` validates and returns a whitelisted current-session snapshot.
+- `POST /api/v1/auth/logout` revokes the current session.
+- `POST /api/v1/auth/refresh` is a deprecated compatibility alias for session lookup only. It does not rotate refresh tokens.
+
+This superseding public wire disposition **does not promote AUTH-011 to GREEN**. Refresh-token rotation, predecessor invalidation/reuse detection, refresh concurrency guarantees, and associated persistence/security evidence remain unimplemented or unverified and must not be consumed by APP clients. If true refresh-token rotation is later admitted, it requires a separately approved public operation contract and matching runtime evidence; this alias is not that contract.
+
+APP-AUTH-01 successful-login/session HTTP E2E remains pending until the manual GitHub Actions workflow runs against the deployed revision with an existing verified QA account. No live-login PASS is inferred from this contract change.

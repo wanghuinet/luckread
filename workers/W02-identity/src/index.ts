@@ -146,6 +146,7 @@ export default {
           accountState: principal.accountState,
           accountStateVersion: principal.accountStateVersion,
           layer: principal.layer,
+          roleAssignments: principal.roleAssignments,
         })
       } catch {
         return json({ active: false }, 503)

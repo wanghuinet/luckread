@@ -111,6 +111,24 @@ describe('W05 social query transport', () => {
     expect(missingKey.status).toBe(428)
   })
 
+  it('returns a canonical conflict error and request ID for self-follow attempts', async () => {
+    const response = await worker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/follows/viewer-1', {
+        method: 'POST',
+        headers: {
+          ...transportHeaders,
+          'Idempotency-Key': 'self-follow-1',
+        },
+      }),
+      { DB: dbFor() },
+    )
+    expect(response.status).toBe(409)
+    await expect(response.json()).resolves.toMatchObject({
+      error: { code: 'CONFLICT', message: 'CONFLICT', details: {} },
+      requestId: expect.stringMatching(/^req_[A-Za-z0-9_-]+$/),
+    })
+  })
+
   it('unblocks and unmutes with idempotent 204 responses', async () => {
     const unblock = await worker.fetch(
       new Request('https://luckread-w05.internal/internal/social/interactions/blocks/target-1', {

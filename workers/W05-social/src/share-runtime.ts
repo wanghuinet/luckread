@@ -107,7 +107,7 @@ export async function createShare(
     created_at: string
   }>()
 
-  if (!row) throw new ShareRuntimeError('SHARE_WRITE_FAILED', 500)
+  if (!row) throw new ShareRuntimeError('INTERNAL_ERROR', 500)
   if (row.content_id !== contentId) throw new ShareRuntimeError('CONFLICT', 409)
 
   return {

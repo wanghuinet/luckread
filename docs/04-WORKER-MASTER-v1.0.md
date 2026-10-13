@@ -6,7 +6,7 @@
 >
 > Promotion basis: `docs/10-WORKER-CHANGE-CONTROL-DECISION-v1.0.md`.
 >
-> Frozen topology: **12 Workers / 4 D1 domains / 25 Contract Tasks**.
+> Frozen topology: **12 Workers / 5 D1 domains / 25 Contract Tasks**.
 
 ## 1. Canonical status
 
@@ -27,10 +27,10 @@ No implementation, API contract, database ownership, or deployment decision may 
 | W05 | Social / Community / Messaging / Notification | T11,T12,T13,T14 | D1-02; D1-03 only for scoped runtime delivery state |
 | W06 | Rights / Trust & Safety / Governance | T19,T20,T21 | D1-03 |
 | W07 | Subscription / Commerce / Payment / Advertising | T16,T17,T18 | D1-04; scoped D1-01 entitlement transition only |
-| W08 | Creator / Organization | T04 | D1-01 |
+| W08 | Creator / Organization + bounded CASL policy evaluation under approved change control | T04 | D1-01 |
 | W09 | Platform / Storage / Reliability | T25 | D1-03 |
 | W10 | Async / Queue / Job Execution | None | D1-03 scoped execution only |
-| W11 | Growth / Campaign / Analytics / Operations | T22,T23 | D1-03 |
+| W11 | Growth / Campaign / Analytics / Operations | T22,T23 | D1-03 campaign/growth + D1-05 analytics-only |
 | W12 | External Developer / Integration Execution | None | No default business D1 authority |
 
 ## 3. Primary Task ownership
@@ -142,7 +142,7 @@ The Worker Change-Control decision has promoted the candidate topology to the ca
 
 The next artifact is the **Worker × D1 Binding Mapping**.
 
-It must bind all 12 Workers to the canonical 4-D1 topology while preserving:
+It must bind all 12 Workers to the canonical 5-D1 topology while preserving:
 
 - one authoritative D1 owner per authoritative entity;
 - no implicit fifth D1;
@@ -160,6 +160,6 @@ Only after that binding is audited can the Final Mapping be frozen and Contract 
 
 The canonical sequence remains:
 
-**Blueprint → Architecture Blueprint → 25 Tasks → 12 Worker Master → 4 D1 Master → Mapping → Contracts → Implementation → Tests → CI → Deployment → Evidence**
+**Blueprint → Architecture Blueprint → 25 Tasks → 12 Worker Master → 5 D1 Master → Mapping → Contracts → Implementation → Tests → CI → Deployment → Evidence**
 
-No Contract may authorize a Worker responsibility that is absent from this Master or a subsequent approved Mapping change.
+No Contract may authorize a Worker responsibility that is absent from this Master or a subsequent approved Mapping/change-control decision. The W08 CASL evaluator is an execution component only; it does not change Primary Task ownership, D1 authority, or the W02 source of truth for role assignments and resolved layers.

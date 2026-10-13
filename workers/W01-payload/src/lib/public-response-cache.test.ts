@@ -70,7 +70,89 @@ describe('public response cache', () => {
 
     expect(loader).not.toHaveBeenCalled()
     expect(response.headers.get('X-LuckRead-Cache')).toBe('HIT')
-    await expect(response.json()).resolves.toEqual({ data: 'cached' })
+    const firstPayload = await response.json() as { data: string; requestId: string }
+    expect(firstPayload).toMatchObject({
+      data: 'cached',
+      requestId: expect.stringMatching(/^req_[A-Za-z0-9_-]+$/),
+    })
+    const secondResponse = await cachedPublicGet(
+      new Request('https://luckread.com/api/v1/contents'),
+      'content-list',
+      loader,
+      30,
+    )
+    const secondPayload = await secondResponse.json() as { requestId: string }
+    expect(secondPayload.requestId).toMatch(/^req_[A-Za-z0-9_-]+$/)
+    expect(secondPayload.requestId).not.toBe(firstPayload.requestId)
+  })
+
+  it('refreshes request IDs on cache hits and prevents downstream caching of request-scoped envelopes', async () => {
+    const cached = new Response(JSON.stringify({ data: 'cached', requestId: 'origin-request-id' }), {
+      status: 200,
+      headers: {
+        'content-type': 'application/json; charset=utf-8',
+        'cache-control': 'public, max-age=0, s-maxage=30',
+      },
+    })
+    cache.match.mockImplementation(async (request: Request) =>
+      request.url.includes('__content-list-generation') ? generationResponse() : cached,
+    )
+    Object.defineProperty(globalThis, 'caches', { value: { default: cache }, configurable: true })
+
+    const loader = vi.fn(async () => new Response(JSON.stringify({ data: 'origin' }), { status: 200 }))
+    const request = new Request('https://luckread.com/api/v1/contents')
+    const first = await cachedPublicGet(request, 'content-list', loader, 30)
+    const second = await cachedPublicGet(request.clone(), 'content-list', loader, 30)
+    const firstBody = await first.json() as { requestId: string }
+    const secondBody = await second.json() as { requestId: string }
+
+    expect(loader).not.toHaveBeenCalled()
+    expect(firstBody.requestId).toMatch(/^req_[A-Za-z0-9_-]{1,123}$/)
+    expect(secondBody.requestId).toMatch(/^req_[A-Za-z0-9_-]{1,123}$/)
+    expect(firstBody.requestId).not.toBe('origin-request-id')
+    expect(secondBody.requestId).not.toBe(firstBody.requestId)
+    expect(first.headers.get('x-request-id')).toBe(firstBody.requestId)
+    expect(first.headers.get('cache-control')).toBe('private, no-store')
+    expect(first.headers.get('x-luckread-cache')).toBe('HIT')
+  })
+
+  it('returns a fresh request ID on misses while storing the origin response unchanged', async () => {
+    cache.match.mockImplementation(async (request: Request) =>
+      request.url.includes('__content-list-generation') ? generationResponse() : undefined,
+    )
+    Object.defineProperty(globalThis, 'caches', { value: { default: cache }, configurable: true })
+
+    const loader = vi.fn(async () => new Response(JSON.stringify({
+      data: 'origin',
+      requestId: 'origin-request-id',
+    }), {
+      status: 200,
+      headers: {
+        'content-type': 'application/json; charset=utf-8',
+        'cache-control': 'no-store',
+      },
+    }))
+
+    const response = await cachedPublicGet(
+      new Request('https://luckread.com/api/v1/contents'),
+      'content-list',
+      loader,
+      30,
+    )
+    const body = await response.json() as { requestId: string }
+
+    expect(body.requestId).toMatch(/^req_[A-Za-z0-9_-]{1,123}$/)
+    expect(body.requestId).not.toBe('origin-request-id')
+    expect(response.headers.get('x-request-id')).toBe(body.requestId)
+    expect(response.headers.get('cache-control')).toBe('private, no-store')
+
+    const putCalls = cache.put.mock.calls as unknown as Array<[Request, Response | undefined]>
+    const stored = putCalls.find(([request]) => request.url.includes('__edge-cache'))
+    expect(stored).toBeDefined()
+    await expect(stored?.[1]?.clone().json()).resolves.toEqual({
+      data: 'origin',
+      requestId: 'origin-request-id',
+    })
   })
 
   it('coalesces concurrent misses into one origin request', async () => {
@@ -118,7 +200,10 @@ describe('public response cache', () => {
 
     expect(loader).toHaveBeenCalledTimes(1)
     expect(response.status).toBe(200)
-    await expect(response.json()).resolves.toEqual({ data: 'origin' })
+    await expect(response.json()).resolves.toMatchObject({
+      data: 'origin',
+      requestId: expect.stringMatching(/^req_[A-Za-z0-9_-]+$/),
+    })
     expect(response.headers.get('X-LuckRead-Cache')).toBe('MISS')
   })
 
@@ -141,7 +226,10 @@ describe('public response cache', () => {
     const second = await cachedPublicGet(request.clone(), 'content-list', loader, 30)
     expect(loader).toHaveBeenCalledTimes(1)
     expect(second.headers.get('X-LuckRead-Cache')).toBe('HIT')
-    await expect(second.json()).resolves.toEqual({ data: 'origin' })
+    await expect(second.json()).resolves.toMatchObject({
+      data: 'origin',
+      requestId: expect.stringMatching(/^req_[A-Za-z0-9_-]+$/),
+    })
   })
 
   it('uses the memory fallback when Cache API reads fail', async () => {
@@ -163,7 +251,10 @@ describe('public response cache', () => {
 
     expect(loader).toHaveBeenCalledTimes(1)
     expect(response.headers.get('X-LuckRead-Cache')).toBe('HIT')
-    await expect(response.json()).resolves.toEqual({ data: 'origin' })
+    await expect(response.json()).resolves.toMatchObject({
+      data: 'origin',
+      requestId: expect.stringMatching(/^req_[A-Za-z0-9_-]+$/),
+    })
   })
 
   it('bounds concurrent cache-miss origin work', async () => {
