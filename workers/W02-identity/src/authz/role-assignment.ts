@@ -13,7 +13,13 @@ export type RoleAssignmentRecord = {
   updatedAt: string
 }
 
-export type LayerResolution = { decision: 'ALLOW' | 'DENY'; layer?: string }
+export type ResolvedRoleAssignment = Pick<RoleAssignmentRecord, 'id' | 'roleId' | 'scopeType' | 'scopeId'>
+
+export type LayerResolution = {
+  decision: 'ALLOW' | 'DENY'
+  layer?: string
+  roleAssignments?: ResolvedRoleAssignment[]
+}
 
 export async function ensureBaseUserRole(
   db: D1Database,
@@ -171,6 +177,7 @@ export async function resolveGlobalLayer(
   subjectId: string,
   accountState: string,
   now = new Date().toISOString(),
+  includeRoleAssignments = false,
 ): Promise<LayerResolution> {
   if (!subjectId || (accountState !== 'PENDING_VERIFICATION' && accountState !== 'ACTIVE')) return { decision: 'DENY' }
 
@@ -187,10 +194,26 @@ export async function resolveGlobalLayer(
 
   const result = await db.prepare(sql).bind(subjectId, 'ACTIVE', now, now).all<RoleAssignmentRecord>()
   const eligible: Array<{ assignment: RoleAssignmentRecord; layer: string }> = []
+  const resolvedAssignments: ResolvedRoleAssignment[] = []
 
   for (const assignment of result.results) {
-    if (assignment.scopeType !== 'global') continue
     const layer = roleToLayer.get(assignment.roleId)
+    if (includeRoleAssignments && !layer) return { decision: 'DENY' }
+    if (includeRoleAssignments && (
+      (assignment.scopeType === 'global' && assignment.scopeId !== null) ||
+      ((assignment.scopeType === 'organization' || assignment.scopeType === 'ip') &&
+        (typeof assignment.scopeId !== 'string' || assignment.scopeId.length === 0)) ||
+      !['global', 'organization', 'ip'].includes(assignment.scopeType)
+    )) return { decision: 'DENY' }
+    if (includeRoleAssignments) {
+      resolvedAssignments.push({
+        id: assignment.id,
+        roleId: assignment.roleId,
+        scopeType: assignment.scopeType,
+        scopeId: assignment.scopeId,
+      })
+    }
+    if (assignment.scopeType !== 'global') continue
     if (!layer) return { decision: 'DENY' }
     eligible.push({ assignment, layer })
   }
@@ -201,5 +224,9 @@ export async function resolveGlobalLayer(
     Number(next.layer.slice(1)) > Number(current.layer.slice(1)) ? next : current,
   )
 
-  return { decision: 'ALLOW', layer: selected.layer }
+  return {
+    decision: 'ALLOW',
+    layer: selected.layer,
+    ...(includeRoleAssignments ? { roleAssignments: resolvedAssignments } : {}),
+  }
 }
