@@ -19,6 +19,18 @@ type InternalW08Ability = MongoAbility<[string, string | ForcedSubject<string>]>
 export type W08Ability = Pick<InternalW08Ability, 'can'>
 
 type PermissionScope = 'platform' | 'organization' | 'ip' | 'own' | 'public'
+type AssignmentScopeType = 'global' | 'organization' | 'ip'
+type ScopedGrant = {
+  permissionName: string
+  scopeType: 'organization' | 'ip'
+  scopeId: string
+  assignmentLayer: PermissionLayer
+}
+type W08RoleAssignment = {
+  roleId: string
+  scopeType: AssignmentScopeType
+  scopeId: string | null
+}
 type PermissionDefinition = {
   name: string
   resource: string
@@ -185,22 +197,34 @@ type RolePermissionContract = {
   roles?: unknown
 }
 
+const ASSIGNMENT_SCOPE_TYPES = new Set<AssignmentScopeType>(['global', 'organization', 'ip'])
+
 const rolePermissionContract = (permissionCatalog as unknown as {
   'x-role-permissions'?: RolePermissionContract
 })['x-role-permissions']
 
 const rolePermissionDefinitions = Array.isArray(rolePermissionContract?.roles)
-  ? rolePermissionContract.roles.filter((value): value is { role: string; permissions: string[] } => {
+  ? rolePermissionContract.roles.filter((value): value is {
+      role: string
+      permissions: string[]
+      scopeType: AssignmentScopeType
+    } => {
       if (value === null || typeof value !== 'object') return false
-      const candidate = value as { role?: unknown; permissions?: unknown }
+      const candidate = value as { role?: unknown; permissions?: unknown; scopeType?: unknown }
       return typeof candidate.role === 'string' &&
         Array.isArray(candidate.permissions) &&
-        candidate.permissions.every((name) => typeof name === 'string')
+        candidate.permissions.every((name) => typeof name === 'string') &&
+        typeof candidate.scopeType === 'string' &&
+        ASSIGNMENT_SCOPE_TYPES.has(candidate.scopeType as AssignmentScopeType)
     })
   : []
 
 const rolePermissionMap = new Map(
   rolePermissionDefinitions.map((definition) => [definition.role, definition.permissions]),
+)
+
+const roleAssignmentScopeMap = new Map(
+  rolePermissionDefinitions.map((definition) => [definition.role, definition.scopeType]),
 )
 
 const canonicalRoleIds = new Set(
@@ -210,10 +234,17 @@ const canonicalRoleIds = new Set(
 const rolePermissionContractIsComplete =
   rolePermissionContract?.status === 'PARTIAL_IMPLEMENTED_PERMISSION_CATALOG' &&
   rolePermissionMap.size === canonicalRoleIds.size &&
-  [...canonicalRoleIds].every((role) => rolePermissionMap.has(role)) &&
+  [...canonicalRoleIds].every((role) => rolePermissionMap.has(role) && roleAssignmentScopeMap.has(role)) &&
   rolePermissionDefinitions.every((definition) =>
     canonicalRoleIds.has(definition.role) &&
-    definition.permissions.every((name) => PERMISSION_BY_NAME.has(name)),
+    definition.permissions.every((name) => {
+      const permission = PERMISSION_BY_NAME.get(name)
+      if (!permission) return false
+      if (definition.scopeType === 'global') {
+        return permission.scope !== 'organization' && permission.scope !== 'ip'
+      }
+      return permission.scope === definition.scopeType
+    }),
   ) &&
   Array.isArray(rolePermissionContract.publicDefaults) &&
   rolePermissionContract.publicDefaults.every((name) =>
@@ -280,6 +311,7 @@ function addGrant(
   permission: PermissionDefinition,
   context: W08AuthorizationContext,
   privilegedApproval?: W08PrivilegedApprovalEvidence,
+  scopedGrant?: ScopedGrant,
 ): void {
   switch (permission.scope) {
     case 'own': {
@@ -290,6 +322,14 @@ function addGrant(
       return
     }
     case 'organization': {
+      if (scopedGrant) {
+        if (scopedGrant.scopeType !== 'organization' || permission.name !== scopedGrant.permissionName) return
+        const conditions = permission.resource === 'organization' || permission.resource === 'org'
+          ? { id: scopedGrant.scopeId }
+          : { organizationId: scopedGrant.scopeId }
+        can(permission.action, permission.resource, conditions)
+        return
+      }
       const organizationIds = cleanScopeIds(context.organizationIds)
       if (organizationIds.length === 0) return
       const conditions = permission.resource === 'organization' || permission.resource === 'org'
@@ -299,6 +339,14 @@ function addGrant(
       return
     }
     case 'ip': {
+      if (scopedGrant) {
+        if (scopedGrant.scopeType !== 'ip' || permission.name !== scopedGrant.permissionName) return
+        const conditions = permission.resource === 'ip'
+          ? { id: scopedGrant.scopeId }
+          : { ipId: scopedGrant.scopeId }
+        can(permission.action, permission.resource, conditions)
+        return
+      }
       const ipIds = cleanScopeIds(context.ipIds)
       if (ipIds.length === 0) return
       const conditions = permission.resource === 'ip'
@@ -412,6 +460,7 @@ function emptyAbility(): W08Ability {
 function buildW08Ability(
   context: W08AuthorizationContext,
   enforceGlobalLayerMinimum: boolean,
+  scopedGrants?: readonly ScopedGrant[],
 ): W08Ability {
   if (!isContext(context)) return emptyAbility()
 
@@ -475,36 +524,142 @@ function buildW08Ability(
   return guardTypeOnlyChecks(build())
 }
 
-export type W08RoleAuthorizationContext = Omit<W08AuthorizationContext, 'effectivePermissions'> & {
-  effectiveRoles: readonly string[]
+export type W08RoleAuthorizationContext = Omit<
+  W08AuthorizationContext,
+  'effectivePermissions' | 'organizationIds' | 'ipIds'
+> & {
+  /**
+   * Complete, server-resolved, currently effective W02 RoleAssignment tuples.
+   * Never populate these from request fields or token claims.
+   */
+  roleAssignments: readonly W08RoleAssignment[]
 }
 
 /**
- * Preferred server-side entrypoint when W02 has resolved active,
- * time-valid RoleAssignment identifiers.
- *
- * The policy catalog turns those trusted roles into explicit grants; CASL
- * still applies account-state, MFA, ownership, resource visibility, and
- * organization/IP scope rules. A scoped role may authorize only within the
- * server-resolved scope and must not rewrite the principal's global layer.
+ * Preferred server-side entrypoint. Each assignment is validated against the
+ * canonical role-to-scope contract. Global assignments determine the global
+ * layer and global grants; organization/IP assignments produce separate rules
+ * bound to their own exact scope ID. Scope IDs are never unioned across roles.
  */
 export function createW08AbilityForRoles(context: W08RoleAuthorizationContext): W08Ability {
   if (
     context === null ||
     typeof context !== 'object' ||
-    !isStringList(context.effectiveRoles)
+    !Array.isArray(context.roleAssignments) ||
+    context.roleAssignments.length > 500
   ) {
     return emptyAbility()
   }
 
-  const effectivePermissions = resolveCatalogPermissionsForRoles(context.effectiveRoles)
+  const roleLayerById = new Map<string, PermissionLayer>()
+  for (const layer of layers['x-layers']) {
+    for (const role of layer.roles ?? []) roleLayerById.set(role, layer.id as PermissionLayer)
+  }
+
+  const normalized: Array<{ assignment: W08RoleAssignment; layer: PermissionLayer }> = []
+  const seen = new Set<string>()
+
+  for (const value of context.roleAssignments as readonly unknown[]) {
+    if (value === null || typeof value !== 'object') return emptyAbility()
+    const assignment = value as Partial<W08RoleAssignment>
+    if (
+      typeof assignment.roleId !== 'string' ||
+      assignment.roleId.length === 0 ||
+      assignment.roleId.length > 128 ||
+      typeof assignment.scopeType !== 'string' ||
+      !ASSIGNMENT_SCOPE_TYPES.has(assignment.scopeType as AssignmentScopeType) ||
+      !(assignment.scopeId === null ||
+        (typeof assignment.scopeId === 'string' &&
+          assignment.scopeId.length > 0 &&
+          assignment.scopeId.length <= 256))
+    ) {
+      return emptyAbility()
+    }
+
+    const roleId = assignment.roleId
+    const scopeType = assignment.scopeType as AssignmentScopeType
+    const scopeId = assignment.scopeId as string | null
+    const expectedScope = roleAssignmentScopeMap.get(roleId)
+    const layer = roleLayerById.get(roleId)
+
+    if (!expectedScope || !layer || expectedScope !== scopeType) return emptyAbility()
+    if ((scopeType === 'global' && scopeId !== null) ||
+        (scopeType !== 'global' && scopeId === null)) return emptyAbility()
+
+    const key = JSON.stringify([roleId, scopeType, scopeId])
+    if (seen.has(key)) continue
+    seen.add(key)
+    normalized.push({ assignment: { roleId, scopeType, scopeId }, layer })
+  }
+
+  const globalAssignments = normalized.filter(({ assignment }) => assignment.scopeType === 'global')
+  const scopedAssignments = normalized.filter(({ assignment }) => assignment.scopeType !== 'global')
+
+  if (context.accountState === 'anonymous') {
+    if (context.subjectId !== null || context.layer !== 'L0' || normalized.length > 0) return emptyAbility()
+    const anonymousPermissions = resolveCatalogPermissionsForRoles([])
+    if (!anonymousPermissions) return emptyAbility()
+    return buildW08Ability({
+      subjectId: null,
+      layer: 'L0',
+      accountState: 'anonymous',
+      mfaVerified: context.mfaVerified,
+      effectivePermissions: anonymousPermissions,
+      deniedPermissions: context.deniedPermissions,
+      privilegedApprovals: context.privilegedApprovals,
+      organizationIds: [],
+      ipIds: [],
+    }, false, [])
+  }
+
+  if (
+    !context.subjectId ||
+    !isLayer(context.layer) ||
+    globalAssignments.length === 0 ||
+    !['active', 'restricted', 'frozen', 'suspended', 'pending_deletion', 'deleted', 'banned'].includes(context.accountState)
+  ) {
+    return emptyAbility()
+  }
+
+  const expectedLayer = globalAssignments.reduce((current, next) =>
+    LAYER_RANK[next.layer] > LAYER_RANK[current] ? next.layer : current,
+    globalAssignments[0].layer,
+  )
+  if (context.layer !== expectedLayer) return emptyAbility()
+
+  const globalRoleIds = globalAssignments.map(({ assignment }) => assignment.roleId)
+  const effectivePermissions = resolveCatalogPermissionsForRoles(globalRoleIds)
   if (!effectivePermissions) return emptyAbility()
 
-  const { effectiveRoles: _effectiveRoles, ...baseContext } = context
+  const scopedGrants: ScopedGrant[] = []
+  for (const { assignment, layer } of scopedAssignments) {
+    const permissionNames = rolePermissionMap.get(assignment.roleId)
+    if (!permissionNames || assignment.scopeId === null) return emptyAbility()
+    for (const permissionName of permissionNames) {
+      const permission = PERMISSION_BY_NAME.get(permissionName)
+      if (!permission) return emptyAbility()
+      if (permission.scope !== assignment.scopeType) return emptyAbility()
+      if (LAYER_RANK[layer] < LAYER_RANK[permission.minLayer]) continue
+      scopedGrants.push({
+        permissionName,
+        scopeType: assignment.scopeType as 'organization' | 'ip',
+        scopeId: assignment.scopeId,
+        assignmentLayer: layer,
+      })
+    }
+  }
+
   return buildW08Ability({
-    ...baseContext,
+    subjectId: context.subjectId,
+    layer: context.layer,
+    accountState: context.accountState,
+    mfaVerified: context.mfaVerified,
     effectivePermissions,
-  }, false)
+    deniedPermissions: context.deniedPermissions,
+    privilegedApprovals: context.privilegedApprovals,
+    organizationIds: [],
+    ipIds: [],
+  }, false, scopedGrants)
 }
 
 /**
