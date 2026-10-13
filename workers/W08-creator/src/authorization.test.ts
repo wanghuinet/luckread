@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { subject } from '@casl/ability'
-import { createW08Ability, type W08AuthorizationContext } from './index.js'
+import { createW08Ability, resolveCatalogPermissionsForRoles, type W08AuthorizationContext } from './index.js'
+import layers from '../../../contracts/authz/layers.json'
+import permissionCatalog from '../../../contracts/authz/permissions.json'
 
 const context = (
   overrides: Partial<W08AuthorizationContext> = {},
@@ -250,5 +252,59 @@ describe('W08 CASL policy evaluator', () => {
     expect(ability.can(action, target as never)).toBe(true)
     expect(ability.can('manage', 'all')).toBe(false)
   })
+
+describe('canonical role-to-permission mapping', () => {
+  it('combines only explicitly mapped grants for multiple effective roles', () => {
+    const permissions = resolveCatalogPermissionsForRoles(['user', 'verified_user', 'creator'])
+
+    expect(permissions).not.toBeNull()
+    expect(permissions).toContain('content.read.public')
+    expect(permissions).toContain('user.read.self')
+    expect(permissions).toContain('social.follow')
+    expect(permissions).toContain('content.update.own')
+    expect(permissions).not.toContain('secret.manage')
+    expect(permissions).not.toContain('role.assign')
+  })
+
+  it('does not grant every permission merely because the role has a high layer', () => {
+    const permissions = resolveCatalogPermissionsForRoles(['editor'])
+
+    expect(permissions).not.toBeNull()
+    expect(permissions).toContain('content.curate')
+    expect(permissions).not.toContain('role.assign')
+    expect(permissions).not.toContain('secret.manage')
+  })
+
+  it('fails closed for an unknown or forbidden role identifier', () => {
+    expect(resolveCatalogPermissionsForRoles(['creator', 'super_power'])).toBeNull()
+    expect(resolveCatalogPermissionsForRoles(['founder'])).toBeNull()
+  })
+
+  it('has a role mapping for every canonical role, with only catalogued permission IDs', () => {
+    const catalogNames = new Set(permissionCatalog['x-permissions'].map((item) => item.name))
+    const roleIds = [...new Set(layers['x-layers'].flatMap((layer) => layer.roles ?? []))]
+
+    for (const roleId of roleIds) {
+      const permissions = resolveCatalogPermissionsForRoles([roleId])
+      expect(permissions).not.toBeNull()
+      for (const permission of permissions ?? []) {
+        expect(catalogNames.has(permission)).toBe(true)
+      }
+    }
+  })
+
+  it('grants anonymous public defaults without introducing user or write permissions', () => {
+    const permissions = resolveCatalogPermissionsForRoles([])
+
+    expect(permissions).toEqual(expect.arrayContaining([
+      'content.read.public',
+      'media.read',
+      'share.resolve',
+    ]))
+    expect(permissions).not.toContain('user.read.self')
+    expect(permissions).not.toContain('social.follow')
+    expect(permissions).not.toContain('content.create')
+  })
+})
 
 })
