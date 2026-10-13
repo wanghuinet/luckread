@@ -61,6 +61,54 @@ describe('creator qualification application page', () => {
     expect(client).toContain('headers,')
   })
 
+
+  it('prepares a production L2-to-L3 browser acceptance without recording credentials', () => {
+    const config = read('playwright.production.config.ts')
+    const liveTest = read('tests/live/creator-qualification.production.spec.ts')
+    expect(config).toContain("baseURL: 'https://mp.luckread.com'")
+    expect(config).toContain('retries: 0')
+    expect(config).toContain("trace: 'off'")
+    expect(config).toContain("screenshot: 'off'")
+    expect(config).toContain("video: 'off'")
+    expect(liveTest).toContain('LUCKREAD_CREATOR_E2E_APPLICANT_EMAIL')
+    expect(liveTest).toContain('LUCKREAD_CREATOR_E2E_REVIEWER_EMAIL')
+    expect(liveTest).toContain("authorization: 'Bearer ' + sessionToken")
+    expect(liveTest).toContain("grant_state === 'GRANTED'")
+    expect(liveTest).toContain("applicantPage.goto('/creator-center'")
+    expect(liveTest).toContain('sessionTokensStored: false')
+    expect(liveTest).toContain('cookieValuesStored: false')
+  })
+
+  it('requires distinct creator QA accounts and validates the browser suite before production mutations', () => {
+    const workflow = readFileSync(
+      resolve(workerRoot, '../../.github/workflows/w01-w02-binding-deploy.yml'),
+      'utf8',
+    )
+    const accountGate = workflow.indexOf('Gate creator lifecycle QA accounts before any production mutation')
+    const payloadSecretMutation = workflow.indexOf('Ensure W01 PAYLOAD_SECRET runtime secret')
+    const browserPreflight = workflow.indexOf('Install Chromium and validate creator lifecycle browser suite before production changes')
+    const creatorMigration = workflow.indexOf('Apply W08 additive migration on existing D1-01')
+    const w01Deploy = workflow.indexOf('Deploy W01 application with Service Binding')
+    const liveRun = workflow.indexOf('Run real L2-to-L3 creator qualification browser acceptance')
+    const evidenceUpload = workflow.indexOf('Upload sanitized creator authorization E2E evidence')
+
+    expect(accountGate).toBeGreaterThanOrEqual(0)
+    expect(payloadSecretMutation).toBeGreaterThan(accountGate)
+    expect(browserPreflight).toBeGreaterThan(accountGate)
+    expect(creatorMigration).toBeGreaterThan(browserPreflight)
+    expect(w01Deploy).toBeGreaterThan(creatorMigration)
+    expect(liveRun).toBeGreaterThan(w01Deploy)
+    expect(evidenceUpload).toBeGreaterThan(liveRun)
+    for (const secretName of [
+      'LUCKREAD_CREATOR_E2E_APPLICANT_EMAIL',
+      'LUCKREAD_CREATOR_E2E_APPLICANT_PASSWORD',
+      'LUCKREAD_CREATOR_E2E_REVIEWER_EMAIL',
+      'LUCKREAD_CREATOR_E2E_REVIEWER_PASSWORD',
+    ]) {
+      expect(workflow).toContain(secretName)
+    }
+  })
+
   it('restricts creator review to L7/L8 and uses authoritative review APIs', () => {
     const page = read('src/app/(frontend)/creator-review/page.tsx')
     const client = read('src/app/(frontend)/creator-review/CreatorReviewClient.tsx')

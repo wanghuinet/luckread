@@ -13,6 +13,9 @@ on:
       - 'workers/W01-payload/src/app/(frontend)/creator-center/CreatorStudio.tsx'
       - 'workers/W01-payload/src/app/(frontend)/me/profile/page.tsx'
       - 'workers/W01-payload/tests/int/creator-application-page.int.spec.ts'
+      - 'workers/W01-payload/playwright.production.config.ts'
+      - 'workers/W01-payload/tests/live/**'
+      - '.github/workflows/w01-w02-binding-deploy.yml'
       - 'workers/W02-identity/src/index.ts'
       - 'workers/W02-identity/src/authz/role-assignment-command.ts'
       - 'workers/W02-identity/src/authz/role-grant-approval-policy.ts'
@@ -71,6 +74,10 @@ jobs:
       - name: Install locked W01 dependencies
         working-directory: workers/W01-payload
         run: pnpm install --frozen-lockfile
+
+      - name: Validate production creator E2E suite without network access
+        working-directory: workers/W01-payload
+        run: pnpm exec playwright test --config playwright.production.config.ts --list
 
       - name: Typecheck W01 API gateway
         working-directory: workers/W01-payload
