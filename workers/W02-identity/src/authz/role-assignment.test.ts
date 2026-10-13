@@ -139,6 +139,35 @@ describe('RoleAssignment global layer resolution', () => {
       .resolves.toEqual({ decision: 'ALLOW', layer: 'L1' })
   })
 
+  it('returns active scoped and global role assignments from the same authoritative read when requested', async () => {
+    const { db, getQueryCount } = fakeD1([
+      assignment({ id: 'ra-user', roleId: 'user' }),
+      assignment({ id: 'ra-org', roleId: 'mcn_admin', scopeType: 'organization', scopeId: 'org-1' }),
+      assignment({ id: 'ra-ip', roleId: 'ip_principal', scopeType: 'ip', scopeId: 'ip-1' }),
+      assignment({ id: 'ra-expired', roleId: 'admin', validUntil: NOW }),
+      assignment({ id: 'ra-revoked', roleId: 'admin', status: 'REVOKED' }),
+    ])
+    await expect(resolveGlobalLayer(db, 'user-1', 'ACTIVE', NOW, true)).resolves.toEqual({
+      decision: 'ALLOW',
+      layer: 'L1',
+      roleAssignments: [
+        { id: 'ra-ip', roleId: 'ip_principal', scopeType: 'ip', scopeId: 'ip-1' },
+        { id: 'ra-org', roleId: 'mcn_admin', scopeType: 'organization', scopeId: 'org-1' },
+        { id: 'ra-user', roleId: 'user', scopeType: 'global', scopeId: null },
+      ],
+    })
+    expect(getQueryCount()).toBe(1)
+  })
+
+  it('fails closed on an unknown scoped role when resolving the trusted authorization context', async () => {
+    const { db } = fakeD1([
+      assignment({ roleId: 'user' }),
+      assignment({ id: 'ra-unknown', roleId: 'unlisted_role', scopeType: 'organization', scopeId: 'org-1' }),
+    ])
+    await expect(resolveGlobalLayer(db, 'user-1', 'ACTIVE', NOW, true))
+      .resolves.toEqual({ decision: 'DENY' })
+  })
+
   it('returns DENY when no eligible global assignment exists', async () => {
     const { db } = fakeD1([
       assignment({ scopeType: 'ip', scopeId: 'ip-9' }),
