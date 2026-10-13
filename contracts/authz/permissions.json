@@ -725,14 +725,15 @@
       {
         "role": "user",
         "permissions": [
-          "user.read.self",
-          "user.update.self",
           "user.credential.manage",
+          "user.reactivate",
+          "user.read.self",
           "user.session.read",
           "user.session.refresh",
           "user.session.revoke",
-          "user.reactivate"
-        ]
+          "user.update.self"
+        ],
+        "scopeType": "global"
       },
       {
         "role": "verified_user",
@@ -759,7 +760,8 @@
           "subscription.pause",
           "subscription.read",
           "subscription.resume"
-        ]
+        ],
+        "scopeType": "global"
       },
       {
         "role": "creator",
@@ -781,7 +783,8 @@
           "media.read.own",
           "media.upload",
           "revision.create.own"
-        ]
+        ],
+        "scopeType": "global"
       },
       {
         "role": "ip_principal",
@@ -790,7 +793,8 @@
           "ip.create",
           "ip.member.invite",
           "ip.member.remove"
-        ]
+        ],
+        "scopeType": "ip"
       },
       {
         "role": "mcn_admin",
@@ -800,14 +804,15 @@
           "organization.member.manage",
           "organization.member.read",
           "organization.role.manage"
-        ]
+        ],
+        "scopeType": "organization"
       },
       {
         "role": "mcn_editor",
         "permissions": [
-          "ip.content.read",
           "organization.member.read"
-        ]
+        ],
+        "scopeType": "organization"
       },
       {
         "role": "editor",
@@ -819,7 +824,8 @@
           "content.promote",
           "content.read.any",
           "topic.manage"
-        ]
+        ],
+        "scopeType": "global"
       },
       {
         "role": "operator",
@@ -831,7 +837,8 @@
           "content.promote",
           "content.read.any",
           "topic.manage"
-        ]
+        ],
+        "scopeType": "global"
       },
       {
         "role": "moderator",
@@ -841,7 +848,8 @@
           "moderation.queue.read",
           "moderation.read",
           "user.restrict.limited"
-        ]
+        ],
+        "scopeType": "global"
       },
       {
         "role": "admin",
@@ -923,7 +931,8 @@
           "user.suspend",
           "user.unfreeze",
           "user.update.self"
-        ]
+        ],
+        "scopeType": "global"
       },
       {
         "role": "super_admin",
@@ -1007,7 +1016,8 @@
           "user.suspend",
           "user.unfreeze",
           "user.update.self"
-        ]
+        ],
+        "scopeType": "global"
       }
     ]
   },
