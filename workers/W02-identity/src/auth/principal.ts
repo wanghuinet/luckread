@@ -1,5 +1,5 @@
 import { createLuckReadAuth, type BetterAuthEnv } from './better-auth.js'
-import { resolveGlobalLayer, type LayerResolution } from '../authz/role-assignment.js'
+import { resolveGlobalLayer, type LayerResolution, type ResolvedRoleAssignment } from '../authz/role-assignment.js'
 
 type AuthSession = {
   user: {
@@ -21,6 +21,7 @@ export type AuthenticatedPrincipal = {
   accountState: string
   accountStateVersion: number
   layer: string
+  roleAssignments: ResolvedRoleAssignment[]
 }
 
 const toIso = (value: Date | string): string =>
@@ -59,6 +60,7 @@ export async function resolveBetterAuthPrincipal(
     String(result.user.id),
     accountState,
     now,
+    true,
   )
 
   if (layerResolution.decision !== 'ALLOW' || !layerResolution.layer) return null
@@ -70,5 +72,6 @@ export async function resolveBetterAuthPrincipal(
     accountState,
     accountStateVersion,
     layer: layerResolution.layer,
+    roleAssignments: layerResolution.roleAssignments ?? [],
   }
 }
