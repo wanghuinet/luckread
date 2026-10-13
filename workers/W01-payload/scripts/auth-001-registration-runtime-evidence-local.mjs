@@ -40,6 +40,11 @@ const responseJson = async (response) => {
   const text = await response.text()
   try { return JSON.parse(text) } catch { throw new Error('Expected JSON response, HTTP ' + response.status + ': ' + text.slice(0, 500)) }
 }
+const isRequestId = (value) => typeof value === 'string' && /^req_[A-Za-z0-9_-]+$/.test(value)
+const sameRegistrationResult = (left, right) => Boolean(
+  left && right && typeof left.userId === 'string' && left.userId === right.userId &&
+  left.accountState === 'PENDING_VERIFICATION' && right.accountState === left.accountState,
+)
 const request = (path, idempotencyKey, body, cookie) => fetch(baseUrl + path, { method: 'POST', headers: { 'content-type': 'application/json', origin: process.env.AUTH001_ORIGIN || 'https://luckread.com', ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}), ...(cookie ? { cookie } : {}) }, body: body === undefined ? undefined : JSON.stringify(body) })
 const getSetCookie = (response) => typeof response.headers.getSetCookie === 'function' ? response.headers.getSetCookie() : [response.headers.get('set-cookie')].filter(Boolean)
 const firstCookieHeader = (response) => getSetCookie(response).map((value) => value.split(';', 1)[0]).join('; ')
@@ -112,8 +117,11 @@ try {
   const expectedResponseDigest = await sha256Hex(JSON.stringify(canonicalize({ schema: 'AUTH-001.response-digest.v1', operationId: 'authRegister', endpoint: '/auth/register', idempotencyKey: keySuccess, payloadHash: envelope.payload_hash, status: 201, accountState: 'PENDING_VERIFICATION' })))
   if (envelope.response_digest !== expectedResponseDigest) throw new Error('response_digest does not match the committed Better Auth registration response')
 
-  const replay = await responseJson(await request('/auth/register', keySuccess, body))
-  if (JSON.stringify(replay) !== JSON.stringify(first)) throw new Error('Idempotent replay did not return the original Better Auth registration response')
+  if (!isRequestId(first.requestId)) throw new Error('Successful registration must return a canonical request ID')
+  const replayResponse = await request('/auth/register', keySuccess, body)
+  const replay = await responseJson(replayResponse)
+  if (replayResponse.status !== 201 || !sameRegistrationResult(replay, first)) throw new Error('Idempotent replay did not return the original Better Auth registration result')
+  if (!isRequestId(replay.requestId) || replay.requestId === first.requestId) throw new Error('Idempotent replay must emit a fresh canonical request ID')
   const reuse = await responseJson(await request('/auth/register', keySuccess, { ...body, credential: password + '-changed' }))
   if (reuse?.error?.code !== 'IDEMPOTENCY_KEY_REUSE_CONFLICT') throw new Error('Idempotency key reuse conflict was not canonical')
 
@@ -154,11 +162,15 @@ try {
     response.status === 409 && sameKeyPayloads[index]?.error?.code === 'IDEMPOTENCY_IN_PROGRESS',
   )
   const sameKeyConflict = sameKeyStatuses[0] === 201 && sameKeyStatuses[1] === 409 && hasInProgressConflict
-  const sameKeyReplay = sameKeyStatuses[0] === 201 && sameKeyStatuses[1] === 201 && JSON.stringify(sameKeyPayloads[0]) === JSON.stringify(sameKeyPayloads[1])
+  const sameKeyReplay = sameKeyStatuses[0] === 201 && sameKeyStatuses[1] === 201 &&
+    sameRegistrationResult(sameKeyPayloads[0], sameKeyPayloads[1]) &&
+    isRequestId(sameKeyPayloads[0]?.requestId) && isRequestId(sameKeyPayloads[1]?.requestId) &&
+    sameKeyPayloads[0].requestId !== sameKeyPayloads[1].requestId
   if (!sameKeyConflict && !sameKeyReplay) throw new Error('Concurrent same Idempotency-Key did not resolve to a single Better Auth identity: ' + sameKeyStatuses.join(','))
   const settledSameKeyResponse = await request('/auth/register', keySameKey, sameKeyBody)
   const settledSameKeyReplay = await responseJson(settledSameKeyResponse)
-  if (settledSameKeyResponse.status !== 201 || !settledSameKeyReplay.userId || settledSameKeyReplay.userId !== sameKeyPayloads.find(payload => payload?.userId)?.userId) {
+  if (settledSameKeyResponse.status !== 201 || !settledSameKeyReplay.userId || settledSameKeyReplay.userId !== sameKeyPayloads.find(payload => payload?.userId)?.userId ||
+      !isRequestId(settledSameKeyReplay.requestId) || sameKeyPayloads.some(payload => payload?.requestId === settledSameKeyReplay.requestId)) {
     throw new Error('Settled same-key replay did not return the original registration')
   }
   const sameKeyProjection = await profileForEmail(sameKeyEmail, sameKeyUsername)
