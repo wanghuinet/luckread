@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   computeAnalyticsBucketKeys,
+  previousAnalyticsRange,
   resolveAnalyticsPeriod,
 } from './analytics-period'
 
@@ -72,6 +73,82 @@ describe('W11 analytics period helpers (adapted from Traks MIT shared module)', 
     ).toThrow(RangeError)
     expect(() =>
       resolveAnalyticsPeriod('today', new Date('2026-10-14T00:00:00.000Z'), 'Mars/Olympus'),
+    ).toThrow(RangeError)
+  })
+})
+
+describe('previous analytics range', () => {
+  it('compares today with the same elapsed local-day window', () => {
+    const current = resolveAnalyticsPeriod(
+      'today',
+      new Date('2026-10-14T19:00:00.000Z'),
+      'America/Los_Angeles',
+    )
+
+    expect(previousAnalyticsRange(current)).toEqual({
+      from: '2026-10-13T07:00:00.000Z',
+      to: '2026-10-13T19:00:00.000Z',
+    })
+  })
+
+  it('shifts comparison windows by calendar days across a DST transition', () => {
+    const current = resolveAnalyticsPeriod(
+      '7d',
+      new Date('2026-03-08T19:00:00.000Z'),
+      'America/Los_Angeles',
+    )
+
+    expect(previousAnalyticsRange(current)).toEqual({
+      from: '2026-02-23T08:00:00.000Z',
+      to: '2026-03-01T20:00:00.000Z',
+    })
+  })
+
+  it('does not double-scan for all-time periods', () => {
+    const current = resolveAnalyticsPeriod(
+      'all',
+      new Date('2026-10-14T19:00:00.000Z'),
+      'America/Los_Angeles',
+    )
+
+    expect(previousAnalyticsRange(current)).toEqual({
+      from: '2000-01-01T00:00:00.000Z',
+      to: '2000-01-01T00:00:00.000Z',
+    })
+  })
+
+  it('rejects invalid window bounds and negative day counts', () => {
+    expect(() =>
+      previousAnalyticsRange({
+        from: 'not-a-date',
+        to: '2026-10-14T19:00:00.000Z',
+        granularity: 'hour',
+        buckets: [],
+        timeZone: 'UTC',
+        days: 1,
+      }),
+    ).toThrow(RangeError)
+
+    expect(() =>
+      previousAnalyticsRange({
+        from: '2026-10-14T19:00:00.000Z',
+        to: '2026-10-14T18:00:00.000Z',
+        granularity: 'hour',
+        buckets: [],
+        timeZone: 'UTC',
+        days: 1,
+      }),
+    ).toThrow(RangeError)
+
+    expect(() =>
+      previousAnalyticsRange({
+        from: '2026-10-14T00:00:00.000Z',
+        to: '2026-10-14T19:00:00.000Z',
+        granularity: 'hour',
+        buckets: [],
+        timeZone: 'UTC',
+        days: -1,
+      }),
     ).toThrow(RangeError)
   })
 })
