@@ -27,6 +27,25 @@ type PermissionDefinition = {
 }
 
 /**
+ * Trusted attestation produced by the approved L8/Break-Glass grant workflow.
+ * It is not a client request object. The server adapter must verify the
+ * approval authority and durable audit record before passing this evidence.
+ */
+export type W08PrivilegedApprovalEvidence = {
+  approvalId: string
+  permissionName: string
+  actorId: string
+  targetResourceType: string
+  targetResourceId: string
+  reason: string
+  approverIds: readonly string[]
+  issuedAt: string
+  expiresAt: string
+  auditEventId: string
+  auditRecorded: true
+}
+
+/**
  * This context is for trusted server-side use only. The caller must resolve the
  * identity, account state, global layer, effective grants and scope IDs from
  * authoritative services before creating an ability. Never build it from a
@@ -41,6 +60,7 @@ export type W08AuthorizationContext = {
   deniedPermissions?: readonly string[]
   organizationIds?: readonly string[]
   ipIds?: readonly string[]
+  privilegedApprovals?: readonly W08PrivilegedApprovalEvidence[]
 }
 
 const LAYER_RANK: Record<PermissionLayer, number> = {
@@ -89,6 +109,29 @@ function isStringList(value: unknown, optional = false): value is readonly strin
     value.every((item) => typeof item === 'string' && item.length > 0 && item.length <= 256)
 }
 
+function isPrivilegedApprovalEvidence(value: unknown): value is W08PrivilegedApprovalEvidence {
+  if (value === null || typeof value !== 'object') return false
+  const candidate = value as Partial<W08PrivilegedApprovalEvidence>
+  return typeof candidate.approvalId === 'string' && candidate.approvalId.length > 0 && candidate.approvalId.length <= 128 &&
+    typeof candidate.permissionName === 'string' && candidate.permissionName.length > 0 && candidate.permissionName.length <= 128 &&
+    typeof candidate.actorId === 'string' && candidate.actorId.length > 0 && candidate.actorId.length <= 128 &&
+    typeof candidate.targetResourceType === 'string' && candidate.targetResourceType.length > 0 && candidate.targetResourceType.length <= 128 &&
+    typeof candidate.targetResourceId === 'string' && candidate.targetResourceId.length > 0 && candidate.targetResourceId.length <= 256 &&
+    typeof candidate.reason === 'string' && candidate.reason.trim().length > 0 && candidate.reason.length <= 1024 &&
+    isStringList(candidate.approverIds) && candidate.approverIds.length <= 10 &&
+    typeof candidate.issuedAt === 'string' && Number.isFinite(Date.parse(candidate.issuedAt)) &&
+    typeof candidate.expiresAt === 'string' && Number.isFinite(Date.parse(candidate.expiresAt)) &&
+    typeof candidate.auditEventId === 'string' && candidate.auditEventId.length > 0 && candidate.auditEventId.length <= 256 &&
+    candidate.auditRecorded === true
+}
+
+function isPrivilegedApprovalList(value: unknown, optional = false): value is readonly W08PrivilegedApprovalEvidence[] | undefined {
+  if (value === undefined && optional) return true
+  return Array.isArray(value) &&
+    value.length <= 20 &&
+    value.every(isPrivilegedApprovalEvidence)
+}
+
 function isContext(value: unknown): value is W08AuthorizationContext {
   if (value === null || typeof value !== 'object') return false
 
@@ -104,7 +147,8 @@ function isContext(value: unknown): value is W08AuthorizationContext {
     !isStringList(candidate.effectivePermissions) ||
     !isStringList(candidate.deniedPermissions, true) ||
     !isStringList(candidate.organizationIds, true) ||
-    !isStringList(candidate.ipIds, true)
+    !isStringList(candidate.ipIds, true) ||
+    !isPrivilegedApprovalList(candidate.privilegedApprovals, true)
   ) {
     return false
   }
@@ -232,6 +276,7 @@ function addGrant(
   can: (action: string, subject: string, conditions?: Record<string, unknown>) => void,
   permission: PermissionDefinition,
   context: W08AuthorizationContext,
+  privilegedApproval?: W08PrivilegedApprovalEvidence,
 ): void {
   switch (permission.scope) {
     case 'own': {
@@ -271,8 +316,59 @@ function addGrant(
       return
     }
     case 'platform':
-      can(permission.action, permission.resource)
+      if (permission.minLayer === 'L8') {
+        if (!privilegedApproval) return
+        // L8/Break-Glass permission is bound to the approved target, never
+        // materialized as an unbounded platform-wide capability.
+        can(permission.action, permission.resource, { id: privilegedApproval.targetResourceId })
+      } else {
+        can(permission.action, permission.resource)
+      }
   }
+}
+
+
+const MAX_L8_APPROVAL_LIFETIME_MS = 4 * 60 * 60 * 1000
+
+function validPrivilegedApprovalFor(
+  context: W08AuthorizationContext,
+  permission: PermissionDefinition,
+  now = Date.now(),
+): W08PrivilegedApprovalEvidence | null {
+  if (permission.minLayer !== 'L8' || !context.subjectId || context.layer !== 'L8' || !context.mfaVerified) {
+    return null
+  }
+
+  for (const evidence of context.privilegedApprovals ?? []) {
+    const issuedAt = Date.parse(evidence.issuedAt)
+    const expiresAt = Date.parse(evidence.expiresAt)
+    const approvers = new Set(evidence.approverIds)
+
+    if (
+      evidence.permissionName !== permission.name ||
+      evidence.actorId !== context.subjectId ||
+      evidence.targetResourceType !== permission.resource ||
+      evidence.targetResourceId.length === 0 ||
+      evidence.reason.trim().length === 0 ||
+      evidence.auditRecorded !== true ||
+      evidence.auditEventId.length === 0 ||
+      evidence.approverIds.length < 2 ||
+      approvers.size < 2 ||
+      approvers.has(context.subjectId) ||
+      !Number.isFinite(issuedAt) ||
+      !Number.isFinite(expiresAt) ||
+      issuedAt > now ||
+      now >= expiresAt ||
+      expiresAt <= issuedAt ||
+      expiresAt - issuedAt > MAX_L8_APPROVAL_LIFETIME_MS
+    ) {
+      continue
+    }
+
+    return evidence
+  }
+
+  return null
 }
 
 function emptyAbility(): W08Ability {
@@ -336,7 +432,12 @@ function buildW08Ability(
       continue
     }
 
-    addGrant(can, permission, context)
+    const privilegedApproval = permission.minLayer === 'L8'
+      ? validPrivilegedApprovalFor(context, permission)
+      : undefined
+    if (permission.minLayer === 'L8' && !privilegedApproval) continue
+
+    addGrant(can, permission, context, privilegedApproval)
   }
 
   // CASL gives the last matching rule precedence. Register all explicit DENY
