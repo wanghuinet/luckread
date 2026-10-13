@@ -97,7 +97,7 @@ export async function POST(request: Request): Promise<Response> {
     return errorResponse(422, 'VALIDATION_FAILED', '请求数据格式无效，请重试。')
   }
   if (Object.keys(body).some((key) => key !== 'identity' && key !== 'credential')) {
-    return errorResponse(422, 'VALIDATION_FAILED', '登录请求包含不支持的字段。')
+    return errorResponse(400, 'VALIDATION_FAILED', '登录请求包含不支持的字段。')
   }
 
   const loginRequest = body as { identity?: unknown; credential?: unknown }

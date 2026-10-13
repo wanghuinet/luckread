@@ -557,7 +557,7 @@ const withCacheHeader = async (response: Response, cacheStatus: 'HIT' | 'MISS'):
   if ((headers.get('content-type') ?? '').includes('application/json')) {
     try {
       const bodyValue = await response.clone().json() as unknown
-      if (bodyValue && typeof bodyValue === 'object' && !Array.isArray(bodyValue) && 'requestId' in bodyValue) {
+      if (bodyValue && typeof bodyValue === 'object' && !Array.isArray(bodyValue)) {
         const bodyValueRecord = bodyValue as Record<string, unknown>
         if (bodyValueRecord.error && typeof bodyValueRecord.error === 'object' && !Array.isArray(bodyValueRecord.error)) {
           const error = bodyValueRecord.error as Record<string, unknown>
