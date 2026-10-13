@@ -267,10 +267,6 @@ export function aggregateAnalyticsBatch(
       case 'favorite_created':
         projection.favorites += 1
         break
-      case 'follow_created':
-      case 'follow_removed':
-        // Follow changes are aggregated into creator projections above.
-        break
       default:
         throw new TypeError('Unsupported analytics event for aggregation')
     }
