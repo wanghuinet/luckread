@@ -319,7 +319,7 @@ function buildW08Ability(
     if (!permission) continue
     if (enforceGlobalLayerMinimum && rank < LAYER_RANK[permission.minLayer]) continue
 
-    const publicRead = permission.scope === 'public' && permission.action === 'read'
+    const publicRead = permission.scope === 'public' && ['read', 'resolve'].includes(permission.action)
     if (canReadPublicOnly && !publicRead) continue
 
     // L5-L8 operational authority requires verified MFA. Without it, the
