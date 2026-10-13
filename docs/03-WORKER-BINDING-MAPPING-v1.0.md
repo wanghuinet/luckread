@@ -101,7 +101,9 @@ Exactly four D1 domains are authoritative. No implicit fifth D1 exists.
 ### W08
 
 - Sole Primary Worker for T04 and D1-01 creator/organization identity relationships.
-- Must not become general identity/account authorization authority outside its assigned entities and contracts.
+- Under `CC-1.1-W08-CASL-POLICY-ENGINE-2026-10-13.md`, W08 hosts a bounded CASL policy evaluator using the canonical permission catalog and trusted server-side context.
+- W02 remains the authority for identity, account state, role-assignment facts, and L0-L8 resolution. W08 does not persist roles, infer layers, or create a second identity/account authority.
+- The evaluator does not perform direct D1 writes and does not replace the owning Worker's resource ownership, entitlement, workflow, lifecycle, or business-state checks. Runtime use still requires an explicit admitted integration contract.
 
 ### W09
 
