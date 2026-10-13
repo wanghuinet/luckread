@@ -254,6 +254,51 @@ describe('W08 CASL policy evaluator', () => {
     expect(ability.can('manage', 'all')).toBe(false)
   })
 
+describe('L5 content operations permission catalog slice', () => {
+  it('grants only explicit L5 curation, topic, campaign and analytics permissions to operator roles', () => {
+    const permissions = resolveCatalogPermissionsForRoles(['operator'])
+
+    expect(permissions).toEqual(expect.arrayContaining([
+      'content.read.any',
+      'content.curate',
+      'content.feature',
+      'content.promote',
+      'topic.manage',
+      'campaign.manage',
+      'analytics.read',
+    ]))
+    expect(permissions).not.toContain('security.manage')
+    expect(permissions).not.toContain('role.assign.any')
+  })
+
+  it('requires MFA before exercising L5 platform operations', () => {
+    const withoutMfa = createW08AbilityForRoles({
+      subjectId: 'operator-1',
+      layer: 'L5',
+      accountState: 'active',
+      mfaVerified: false,
+      effectiveRoles: ['operator'],
+    })
+    const withMfa = createW08AbilityForRoles({
+      subjectId: 'operator-1',
+      layer: 'L5',
+      accountState: 'active',
+      mfaVerified: true,
+      effectiveRoles: ['operator'],
+    })
+
+    expect(withoutMfa.can('curate', 'content')).toBe(false)
+    expect(withoutMfa.can('manage', 'topic')).toBe(false)
+    expect(withMfa.can('curate', 'content')).toBe(true)
+    expect(withMfa.can('feature', 'content')).toBe(true)
+    expect(withMfa.can('promote', 'content')).toBe(true)
+    expect(withMfa.can('manage', 'topic')).toBe(true)
+    expect(withMfa.can('manage', 'campaign')).toBe(true)
+    expect(withMfa.can('read', 'analytics')).toBe(true)
+    expect(withMfa.can('manage', 'secret')).toBe(false)
+  })
+})
+
 describe('public, interaction, notification and creator permission catalog slice', () => {
   it('includes only explicit public discovery defaults', () => {
     const permissions = resolveCatalogPermissionsForRoles([])
