@@ -92,7 +92,7 @@ const record = (
   if (!pass) throw new Error('Creator qualification production E2E failed at ' + name)
 }
 
-async function readJson(response: Response): Promise<unknown> {
+async function readJson(response: { json: () => Promise<unknown> }): Promise<unknown> {
   try {
     return await response.json()
   } catch {
@@ -205,7 +205,7 @@ test('L2 applicant submits, L7/L8 reviewer grants L3, and creator center accepts
       headers: { accept: 'application/json', 'cache-control': 'no-store' },
       timeout: 15_000,
     })
-    const cookiePayload = await cookieBefore.json().catch(() => null) as CreatorApiPayload | null
+    const cookiePayload = await cookieBefore.json().catch((): null => null) as CreatorApiPayload | null
     const cookieHasNoApplication = cookiePayload?.data?.application === null
     record('fresh_l2_applicant_has_no_prior_creator_application', cookieBefore.status() === 200 && cookieHasNoApplication, {
       httpStatus: cookieBefore.status(),
@@ -359,8 +359,8 @@ test('L2 applicant submits, L7/L8 reviewer grants L3, and creator center accepts
     evidence.failureType = error instanceof Error ? error.name : 'UnknownError'
     throw error
   } finally {
-    if (applicantContext) await applicantContext.close().catch(() => undefined)
-    if (reviewerContext) await reviewerContext.close().catch(() => undefined)
+    if (applicantContext) await applicantContext.close().catch((): undefined => undefined)
+    if (reviewerContext) await reviewerContext.close().catch((): undefined => undefined)
     evidence.finishedAt = new Date().toISOString()
     const failedChecks = evidence.checks.filter((item) => !item.pass).length
     evidence.summary = {
