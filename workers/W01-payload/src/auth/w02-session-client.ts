@@ -80,6 +80,12 @@ export type BetterAuthPrincipal = {
   accountStateVersion?: number
   sessionId?: string
   layer?: string
+  roleAssignments?: Array<{
+    id: string
+    roleId: string
+    scopeType: 'global' | 'organization' | 'ip'
+    scopeId: string | null
+  }>
 }
 
 export async function getBetterAuthPrincipal(request: Request): Promise<BetterAuthPrincipal> {
