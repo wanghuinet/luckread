@@ -1,4 +1,4 @@
-import { AbilityBuilder, createMongoAbility, type MongoAbility } from '@casl/ability'
+import { AbilityBuilder, createMongoAbility, type ForcedSubject, type MongoAbility } from '@casl/ability'
 import permissionCatalog from '../../../contracts/authz/permissions.json'
 
 export type PermissionLayer = 'L0' | 'L1' | 'L2' | 'L3' | 'L4' | 'L5' | 'L6' | 'L7' | 'L8'
@@ -12,7 +12,7 @@ export type AccountState =
   | 'banned'
   | 'anonymous'
 
-export type W08Ability = MongoAbility<[string, string]>
+export type W08Ability = MongoAbility<[string, string | ForcedSubject<string>]>
 
 type PermissionScope = 'platform' | 'organization' | 'ip' | 'own' | 'public'
 type PermissionDefinition = {
@@ -79,6 +79,8 @@ function isAccountState(value: unknown): value is AccountState {
   ].includes(value)
 }
 
+function isStringList(value: unknown): value is readonly string[]
+function isStringList(value: unknown, optional: true): value is readonly string[] | undefined
 function isStringList(value: unknown, optional = false): value is readonly string[] | undefined {
   if (value === undefined && optional) return true
   return Array.isArray(value) &&
