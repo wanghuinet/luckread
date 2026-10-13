@@ -254,6 +254,74 @@ describe('W08 CASL policy evaluator', () => {
     expect(ability.can('manage', 'all')).toBe(false)
   })
 
+describe('public, interaction, notification and creator permission catalog slice', () => {
+  it('includes only explicit public discovery defaults', () => {
+    const permissions = resolveCatalogPermissionsForRoles([])
+
+    expect(permissions).toEqual(expect.arrayContaining([
+      'content.read.public',
+      'search.read.public',
+      'feed.read.public',
+      'taxonomy.read',
+    ]))
+    expect(permissions).not.toContain('content.read.any')
+    expect(permissions).not.toContain('secret.manage')
+  })
+
+  it('maps verified-user interaction and notification permissions explicitly', () => {
+    const permissions = resolveCatalogPermissionsForRoles(['verified_user'])
+
+    expect(permissions).toEqual(expect.arrayContaining([
+      'comment.read',
+      'comment.create',
+      'interaction.like',
+      'interaction.unlike',
+      'interaction.favorite',
+      'social.follow',
+      'social.unfollow',
+      'notification.read.self',
+      'notification.update.self',
+    ]))
+    expect(permissions).not.toContain('content.create')
+  })
+
+  it('maps creator self-service and revision-create permissions only to creator and higher explicit admin roles', () => {
+    const verified = resolveCatalogPermissionsForRoles(['verified_user'])
+    const creator = resolveCatalogPermissionsForRoles(['verified_user', 'creator'])
+
+    expect(verified).not.toContain('creator.read.self')
+    expect(creator).toEqual(expect.arrayContaining([
+      'creator.read.self',
+      'creator.update.self',
+      'creator.stats.read.self',
+      'revision.create.own',
+    ]))
+  })
+
+  it('does not let public defaults or verified-user grants perform privileged content curation', () => {
+    const publicAbility = createW08AbilityForRoles({
+      subjectId: null,
+      layer: 'L0',
+      accountState: 'anonymous',
+      mfaVerified: false,
+      effectiveRoles: [],
+    })
+    const verifiedAbility = createW08AbilityForRoles({
+      subjectId: 'user-1',
+      layer: 'L2',
+      accountState: 'active',
+      mfaVerified: false,
+      effectiveRoles: ['user', 'verified_user'],
+    })
+
+    expect(publicAbility.can('read', 'feed')).toBe(true)
+    expect(publicAbility.can('curate', 'content')).toBe(false)
+    expect(verifiedAbility.can('favorite', 'interaction')).toBe(true)
+    expect(verifiedAbility.can('update', resource('notification', { ownerId: 'user-1' }))).toBe(true)
+    expect(verifiedAbility.can('curate', 'content')).toBe(false)
+  })
+})
+
 describe('CASL ability from trusted role assignments', () => {
   const roleContext = (
     overrides: Partial<W08RoleAuthorizationContext> = {},
