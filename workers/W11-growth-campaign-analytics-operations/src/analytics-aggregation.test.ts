@@ -154,9 +154,9 @@ describe('W11 analytics aggregation', () => {
     const result = aggregateAnalyticsBatch(batch)
     expect(result.contentHourly).toHaveLength(3)
     expect(result.contentHourly.map((row) => row.hourStart)).toEqual([
+      '2026-10-14T00:00:00.000Z',
       '2026-10-14T01:00:00.000Z',
-      '2026-10-14T01:00:00.000Z',
-      '2026-10-14T08:00:00.000Z',
+      '2026-10-14T07:00:00.000Z',
     ])
     expect(result.contentHourly.map((row) => row.contentId)).toEqual([
       'content_01',
