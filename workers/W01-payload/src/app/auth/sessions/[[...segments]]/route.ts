@@ -7,6 +7,9 @@ const json = (body: unknown, status = 200) =>
 
 const mapError = (error: unknown): Response => {
   if (error instanceof W02AuthClientError) {
+    if (error.status === 429) {
+      return apiErrorResponse(429, 'RATE_LIMITED', 'Too many requests', { 'retry-after': '60' })
+    }
     return normalizeApiErrorResponse(
       new Response(null, { status: error.status }),
       'Session service unavailable',
