@@ -288,6 +288,28 @@ describe('L8 dual-approval and Break-Glass evidence', () => {
     privilegedApprovals: approvals,
   })
 
+  it('enforces the same target-bound approval through the preferred role-based entrypoint', () => {
+    const base: W08RoleAuthorizationContext = {
+      subjectId: 'root-1',
+      layer: 'L8',
+      accountState: 'active',
+      mfaVerified: true,
+      effectiveRoles: ['super_admin'],
+      privilegedApprovals: [],
+    }
+    const noApproval = createW08AbilityForRoles(base)
+    const approved = createW08AbilityForRoles({
+      ...base,
+      privilegedApprovals: [
+        privilegedApproval('secret.manage', 'secret', 'secret-1', 'root-1'),
+      ],
+    })
+
+    expect(noApproval.can('manage', resource('secret', { id: 'secret-1' }))).toBe(false)
+    expect(approved.can('manage', resource('secret', { id: 'secret-1' }))).toBe(true)
+    expect(approved.can('manage', resource('secret', { id: 'secret-2' }))).toBe(false)
+  })
+
   it('denies L8 sensitive capabilities when approval and audit evidence are absent', () => {
     const ability = createW08Ability(l8Context())
 
