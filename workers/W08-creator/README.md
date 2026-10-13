@@ -14,6 +14,7 @@ W08 remains the creator/organization domain. Under [CC-1.1-W08-CASL-POLICY-ENGIN
 - W08 does not persist or independently resolve role assignments, infer layers, or become a second identity/account source of truth.
 - The policy module does not access D1 directly and does not replace the owning Worker's entitlement, workflow, resource ownership, lifecycle, or business-state gates.
 - Unknown permissions, malformed context, insufficient layer, missing required MFA, and out-of-scope resources fail closed; explicit DENY overrides ALLOW.
+- L8 sensitive grants additionally require server-verified, target-bound dual-approval/audit evidence valid for no more than four hours. The exported ability surface blocks resource-type-only checks whenever a conditional rule is involved.
 
 ## Current implementation status
 
