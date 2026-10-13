@@ -262,3 +262,57 @@ function generateAnalyticsBuckets(
   }
   return keys
 }
+
+export interface AnalyticsComparisonRange {
+  from: string
+  to: string
+}
+
+/**
+ * Resolve a like-for-like comparison window before a current reporting range.
+ *
+ * Adapted from Traks' MIT-licensed `previousRange` helper. Shifting by
+ * calendar days in the configured IANA timezone avoids DST drift and preserves
+ * the current range's local time-of-day. An all-time range compares to empty
+ * rather than scanning an artificial second all-time window.
+ */
+export function previousAnalyticsRange(
+  range: AnalyticsPeriodRange,
+): AnalyticsComparisonRange {
+  const currentFrom = new Date(range.from)
+  const currentTo = new Date(range.to)
+  if (
+    !Number.isFinite(currentFrom.getTime()) ||
+    !Number.isFinite(currentTo.getTime()) ||
+    currentTo.getTime() < currentFrom.getTime()
+  ) {
+    throw new RangeError('range must contain valid ordered from/to instants')
+  }
+  if (!Number.isSafeInteger(range.days) || range.days < 0) {
+    throw new RangeError('range.days must be a non-negative safe integer')
+  }
+
+  if (currentFrom.getTime() <= ALL_TIME_FLOOR_MS || range.days === 0) {
+    const empty = currentFrom.toISOString()
+    return { from: empty, to: empty }
+  }
+
+  const timeZone = range.timeZone || 'UTC'
+  formatterFor(timeZone)
+
+  const previousFrom = startOfDayNDays(currentFrom, timeZone, -range.days)
+  const intoCurrentDay =
+    currentTo.getTime() - startOfDayInTimeZone(currentTo, timeZone).getTime()
+  const previousTo = new Date(
+    startOfDayNDays(currentTo, timeZone, -range.days).getTime() + intoCurrentDay,
+  )
+
+  if (previousTo.getTime() < previousFrom.getTime()) {
+    throw new RangeError('calculated comparison range is not ordered')
+  }
+
+  return {
+    from: previousFrom.toISOString(),
+    to: previousTo.toISOString(),
+  }
+}
