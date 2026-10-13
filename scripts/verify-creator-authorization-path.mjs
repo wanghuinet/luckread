@@ -40,7 +40,7 @@ if ((w08Config.services ?? []).some((x) => x.binding === 'W01' || x.service === 
 if (publicBinding.callee.logicalWorker !== 'W08' || publicBinding.transport.binding !== 'W08_CREATOR') failures.push('W01-W08 contract target mismatch')
 if (grantBinding.caller.logicalWorker !== 'W08' || grantBinding.callee.logicalWorker !== 'W02') failures.push('W08-W02 contract target mismatch')
 if (grantBinding.operation.allowedRoleScopePairs.length !== 1 || grantBinding.operation.allowedRoleScopePairs[0]?.roleId !== 'creator') failures.push('W08-W02 must admit only global L3 creator grants')
-if (routeContract.topology.workerCount !== 12 || routeContract.topology.d1Count !== 4 || routeContract.topology.taskCount !== 25) failures.push('12 Worker / 4 D1 / 25 Task topology drift')
+if (routeContract.topology.workerCount !== 12 || routeContract.topology.d1Count !== 5 || routeContract.topology.taskCount !== 25) failures.push('12 Worker / 4 D1 / 25 Task topology drift')
 const creatorRoute = routeContract.routes.find((x) => x.operationIdFamily === 'creator')
 if (!creatorRoute || creatorRoute.ingressWorker !== 'W01' || creatorRoute.terminalWorker !== 'W08') failures.push('public creator routing contract missing')
 if (creatorRoute?.publicPaths.some((x) => x.includes('creator-scopes'))) failures.push('out-of-stage L4 public routes remain')
