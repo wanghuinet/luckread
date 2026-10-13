@@ -107,10 +107,16 @@ describe('W01 Better Auth boundary', () => {
     expect(authConfig).toContain('requireEmailVerification: true')
     expect(authConfig).toContain('sendVerificationEmail: async ({ user, url })')
     expect(authConfig).toContain('afterEmailVerification: async (user)')
-    expect(authConfig).toContain("applyAccountStateTransition(db, {")
-    expect(authConfig).toContain("to: 'ACTIVE'")
-    expect(authConfig).toContain("reason: 'email verification completed'")
-    expect(authConfig).toContain('await ensureVerifiedUserRole(env.D1_01, userId, new Date().toISOString())')
+    expect(authConfig).toContain("activateEmailVerifiedAccount(db, userId, now)")
+    expect(authConfig).toContain("await ensureVerifiedUserRole(db, userId, now)")
+    const activation = readFileSync(
+      resolve(process.cwd(), '../W02-identity/src/account/account-state-transition.ts'),
+      'utf8',
+    )
+    expect(activation).toContain("to: 'ACTIVE'")
+    expect(activation).toContain("reason: 'email_verified'")
+    expect(activation).toContain('additionalStatements')
+    expect(activation).toContain("INSERT INTO role_assignments")
   })
 
   it('hardens W02 schema validation, auth initialization and production trusted origins', () => {

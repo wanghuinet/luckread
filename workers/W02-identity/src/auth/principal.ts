@@ -1,10 +1,12 @@
+import { activateEmailVerifiedAccount } from '../account/account-state-transition.js'
 import { createLuckReadAuth, type BetterAuthEnv } from './better-auth.js'
-import { resolveGlobalLayer, type LayerResolution, type ResolvedRoleAssignment } from '../authz/role-assignment.js'
+import { ensureVerifiedUserRole, resolveGlobalLayer, type LayerResolution, type ResolvedRoleAssignment } from '../authz/role-assignment.js'
 
 type AuthSession = {
   user: {
     id: string
     email: string
+    emailVerified?: boolean
     accountState?: string | null
     accountStateVersion?: number | null
   }
@@ -47,13 +49,25 @@ export async function resolveBetterAuthPrincipal(
     return null
   }
 
-  const accountState = typeof result.user.accountState === 'string'
+  let accountState = typeof result.user.accountState === 'string'
     ? result.user.accountState
     : 'PENDING_VERIFICATION'
 
-  const accountStateVersion = typeof result.user.accountStateVersion === 'number'
+  let accountStateVersion = typeof result.user.accountStateVersion === 'number'
     ? result.user.accountStateVersion
     : 1
+
+  // Better Auth's verified-email claim is the only proof accepted for this
+  // idempotent recovery path. It repairs a callback interrupted after token
+  // verification without allowing unverified sessions to obtain L2.
+  if (result.user.emailVerified === true) {
+    const activation = await activateEmailVerifiedAccount(db, String(result.user.id), now)
+    accountState = activation.accountState
+    accountStateVersion = activation.accountStateVersion
+    if (accountState === 'ACTIVE') {
+      await ensureVerifiedUserRole(db, String(result.user.id), now)
+    }
+  }
 
   const layerResolution: LayerResolution = await resolveGlobalLayer(
     db,

@@ -310,9 +310,10 @@ function buildEvent(
   }
 }
 
-export async function applyAccountStateTransition(
+async function applyAccountStateTransitionInternal(
   db: D1Database,
   input: AccountStateTransitionInput,
+  additionalStatements: D1PreparedStatement[] = [],
 ): Promise<AccountStateTransitionResult> {
   assertInput(input)
 
@@ -379,6 +380,8 @@ export async function applyAccountStateTransition(
         .bind(input.userId),
     )
   }
+  const additionalStartIndex = statements.length
+  statements.push(...additionalStatements)
 
   let batchResult: D1Result[]
   try {
@@ -400,7 +403,10 @@ export async function applyAccountStateTransition(
   if (
     batchResult.length !== statements.length ||
     batchResult[0]?.meta?.changes !== 1 ||
-    batchResult[1]?.meta?.changes !== 1
+    batchResult[1]?.meta?.changes !== 1 ||
+    batchResult.slice(additionalStartIndex).some((result) =>
+      typeof result?.meta?.changes !== 'number' || result.meta.changes < 1
+    )
   ) {
     throw new AccountStateTransitionError(
       'CONFLICT',
@@ -414,5 +420,112 @@ export async function applyAccountStateTransition(
     accountStateVersion: nextVersion,
     eventId: event.eventId,
     journalId,
+  }
+}
+
+export async function applyAccountStateTransition(
+  db: D1Database,
+  input: AccountStateTransitionInput,
+): Promise<AccountStateTransitionResult> {
+  return applyAccountStateTransitionInternal(db, input)
+}
+
+export type EmailVerifiedActivationResult = {
+  activated: boolean
+  accountState: AccountState
+  accountStateVersion: number
+}
+
+/**
+ * Called only after Better Auth proves the email-verification token or returns
+ * an authenticated session whose emailVerified flag is true. Account activation
+ * and the L2 role grant share the same D1 batch with the account-state journal.
+ */
+export async function activateEmailVerifiedAccount(
+  db: D1Database,
+  userId: string,
+  now = new Date().toISOString(),
+): Promise<EmailVerifiedActivationResult> {
+  if (typeof userId !== 'string' || userId.length === 0 || userId.length > 128) {
+    throw new AccountStateTransitionError('INVALID_INPUT', 'userId is invalid')
+  }
+  if (!Number.isFinite(Date.parse(now))) {
+    throw new AccountStateTransitionError('INVALID_INPUT', 'activation timestamp is invalid')
+  }
+
+  const current = await db
+    .prepare(
+      'SELECT account_state AS accountState, account_state_version AS accountStateVersion FROM "user" WHERE id = ? LIMIT 1',
+    )
+    .bind(userId)
+    .first<{ accountState: AccountState; accountStateVersion: number }>()
+
+  if (!current) {
+    throw new AccountStateTransitionError('NOT_FOUND', 'user account not found')
+  }
+
+  if (current.accountState !== 'PENDING_VERIFICATION') {
+    return {
+      activated: false,
+      accountState: current.accountState,
+      accountStateVersion: current.accountStateVersion,
+    }
+  }
+
+  const roleAssignmentStatement = db
+    .prepare(
+      "INSERT INTO role_assignments (id, subject_id, role_id, scope_type, scope_id, status, valid_from, valid_until, created_at, updated_at) VALUES (?, ?, 'verified_user', 'global', NULL, 'ACTIVE', ?, NULL, ?, ?)",
+    )
+    .bind('verified-user-' + userId, userId, now, now, now)
+
+  try {
+    const result = await applyAccountStateTransitionInternal(
+      db,
+      {
+        userId,
+        to: 'ACTIVE',
+        reason: 'email_verified',
+        expectedVersion: current.accountStateVersion,
+        actor: { id: userId, type: 'user' },
+        permission: null,
+        preconditionSatisfied: true,
+        now,
+      },
+      [roleAssignmentStatement],
+    )
+
+    return {
+      activated: true,
+      accountState: result.to,
+      accountStateVersion: result.accountStateVersion,
+    }
+  } catch (error) {
+    // A concurrent verification may win the optimistic state/version check.
+    // Treat that race as successful only if the winning atomic batch left both
+    // ACTIVE state and an effective verified_user assignment behind.
+    if (error instanceof AccountStateTransitionError && error.code === 'CONFLICT') {
+      const settled = await db
+        .prepare(
+          'SELECT account_state AS accountState, account_state_version AS accountStateVersion FROM "user" WHERE id = ? LIMIT 1',
+        )
+        .bind(userId)
+        .first<{ accountState: AccountState; accountStateVersion: number }>()
+      if (settled?.accountState === 'ACTIVE') {
+        const assignment = await db
+          .prepare(
+            "SELECT 1 AS present FROM role_assignments WHERE subject_id = ? AND role_id = 'verified_user' AND scope_type = 'global' AND status = 'ACTIVE' AND valid_from <= ? AND (valid_until IS NULL OR ? < valid_until) LIMIT 1",
+          )
+          .bind(userId, now, now)
+          .first<{ present: number }>()
+        if (assignment) {
+          return {
+            activated: false,
+            accountState: settled.accountState,
+            accountStateVersion: settled.accountStateVersion,
+          }
+        }
+      }
+    }
+    throw error
   }
 }
