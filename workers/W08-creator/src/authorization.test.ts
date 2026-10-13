@@ -548,6 +548,42 @@ describe('CASL ability from trusted role assignments', () => {
     expect(ability.can('member_read', resource('organization', { id: 'org-2' }))).toBe(true)
   })
 
+  it('fails closed when a role assignment scope type contradicts the canonical role mapping', () => {
+    const ability = createW08AbilityForRoles(roleContext({
+      layer: 'L2',
+      roleAssignments: [
+        { roleId: 'user', scopeType: 'global', scopeId: null },
+        { roleId: 'verified_user', scopeType: 'global', scopeId: null },
+        { roleId: 'mcn_admin', scopeType: 'global', scopeId: null },
+      ],
+    }))
+
+    expect(ability.can('member_manage', resource('organization', { id: 'org-1' }))).toBe(false)
+  })
+
+  it('binds IP permissions to the exact IP assignment and does not let scoped assignments raise global layer', () => {
+    const valid = createW08AbilityForRoles(roleContext({
+      layer: 'L2',
+      roleAssignments: [
+        { roleId: 'user', scopeType: 'global', scopeId: null },
+        { roleId: 'verified_user', scopeType: 'global', scopeId: null },
+        { roleId: 'ip_principal', scopeType: 'ip', scopeId: 'ip-1' },
+      ],
+    }))
+    const forgedHigherGlobalLayer = createW08AbilityForRoles(roleContext({
+      layer: 'L4',
+      roleAssignments: [
+        { roleId: 'user', scopeType: 'global', scopeId: null },
+        { roleId: 'verified_user', scopeType: 'global', scopeId: null },
+        { roleId: 'ip_principal', scopeType: 'ip', scopeId: 'ip-1' },
+      ],
+    }))
+
+    expect(valid.can('create', resource('ip', { id: 'ip-1' }))).toBe(true)
+    expect(valid.can('create', resource('ip', { id: 'ip-2' }))).toBe(false)
+    expect(forgedHigherGlobalLayer.can('create', resource('ip', { id: 'ip-1' }))).toBe(false)
+  })
+
   it('still enforces MFA and explicit DENY after resolving role grants', () => {
     const withoutMfa = createW08AbilityForRoles(roleContext({
       layer: 'L5',
@@ -599,6 +635,23 @@ describe('canonical role-to-permission mapping', () => {
       expect(permissions).not.toBeNull()
       for (const permission of permissions ?? []) {
         expect(catalogNames.has(permission)).toBe(true)
+      }
+    }
+  })
+
+  it('validates each role mapping scope against every permission in that mapping', () => {
+    const roleDefinitions = permissionCatalog['x-role-permissions'].roles
+    const permissionDefinitions = new Map(permissionCatalog['x-permissions'].map(item => [item.name, item]))
+
+    for (const definition of roleDefinitions) {
+      for (const name of definition.permissions) {
+        const permission = permissionDefinitions.get(name)
+        expect(permission).toBeDefined()
+        if (definition.scopeType === 'global') {
+          expect(['organization', 'ip']).not.toContain(permission?.scope)
+        } else {
+          expect(permission?.scope).toBe(definition.scopeType)
+        }
       }
     }
   })
