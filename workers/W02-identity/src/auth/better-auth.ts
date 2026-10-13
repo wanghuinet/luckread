@@ -1,4 +1,4 @@
-import { applyAccountStateTransition } from '../account/account-state-transition.js'
+import { activateEmailVerifiedAccount } from '../account/account-state-transition.js'
 import { ensureBaseUserRole, ensureVerifiedUserRole } from '../authz/role-assignment.js'
 import { betterAuth } from 'better-auth'
 import { bearer } from 'better-auth/plugins'
@@ -11,78 +11,15 @@ export interface BetterAuthEnv {
   CLOUDFLARE_ENV?: string
 }
 
-type AccountStateRow = {
-  accountState: string
-  accountStateVersion: number
-}
-
-const escapeHtml = (value: string): string =>
-  value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;')
-
-async function sendVerificationEmail(
-  env: BetterAuthEnv,
-  input: { user: { email: string }; url: string },
-): Promise<void> {
-  const safeUrl = escapeHtml(input.url)
-  await sendResendEmail(env, {
-    purpose: 'email_verification',
-    to: input.user.email,
-    subject: 'Verify your LuckRead email',
-    text: 'Verify your LuckRead email by opening this link: ' + input.url,
-    html: '<p>Welcome to LuckRead.</p><p>Verify your email address to activate your account:</p><p><a href="' + safeUrl + '">Verify email address</a></p>',
-  })
-}
-
-async function sendPasswordResetEmail(
-  env: BetterAuthEnv,
-  input: { user: { email: string }; url: string },
-): Promise<void> {
-  const safeUrl = escapeHtml(input.url)
-  await sendResendEmail(env, {
-    purpose: 'password_reset',
-    to: input.user.email,
-    subject: 'Reset your LuckRead password',
-    text: 'Reset your LuckRead password by opening this link: ' + input.url,
-    html: '<p>We received a request to reset your LuckRead password.</p><p>If you requested this, use the link below to choose a new password:</p><p><a href="' + safeUrl + '">Reset password</a></p><p>If you did not request this, you can ignore this email.</p>',
-  })
-}
-
 async function activateVerifiedAccount(db: D1Database, userId: string): Promise<void> {
-  const readCurrent = () => db
-    .prepare(
-      'SELECT account_state AS accountState, account_state_version AS accountStateVersion FROM "user" WHERE id = ? LIMIT 1',
-    )
-    .bind(userId)
-    .first<AccountStateRow>()
+  const now = new Date().toISOString()
+  const activation = await activateEmailVerifiedAccount(db, userId, now)
 
-  const current = await readCurrent()
-  if (!current || current.accountState === 'ACTIVE') return
-  if (current.accountState !== 'PENDING_VERIFICATION') return
-  if (!Number.isSafeInteger(current.accountStateVersion) || current.accountStateVersion < 1) {
-    throw new Error('ACCOUNT_STATE_VERSION_INVALID')
-  }
-
-  try {
-    await applyAccountStateTransition(db, {
-      userId,
-      to: 'ACTIVE',
-      reason: 'email verification completed',
-      expectedVersion: current.accountStateVersion,
-      actor: { id: userId, type: 'user' },
-      permission: null,
-      preconditionSatisfied: true,
-    })
-  } catch (error) {
-    // Verification callbacks can race. Treat an already-committed activation
-    // as success, while preserving failures that left the account pending.
-    const latest = await readCurrent()
-    if (latest?.accountState === 'ACTIVE') return
-    throw error
+  // The account transition and canonical L2 assignment are committed in one
+  // D1 batch. This idempotent guard also repairs an already-active account
+  // whose verification callback previously stopped before role materialization.
+  if (activation.accountState === 'ACTIVE') {
+    await ensureVerifiedUserRole(db, userId, now)
   }
 }
 
