@@ -562,5 +562,279 @@
     "authorize-by-role-name-only",
     "authorize-by-cache",
     "client-supplied-organization-scope"
-  ]
+  ],
+  "x-role-permissions": {
+    "status": "PARTIAL_IMPLEMENTED_PERMISSION_CATALOG",
+    "source": "docs/04-P0-PERMISSION-RBAC-CONTRACT-v1.0.md + docs/301-L0-L8-PERMISSION-LAYER-CONTRACT-v1.0.md",
+    "rule": "Explicit additive role-to-permission grants. A layer alone never grants a permission. Ownership, scope, account-state, entitlement, workflow, MFA, and business-state checks still apply.",
+    "publicDefaults": [
+      "content.read.public",
+      "media.read",
+      "share.resolve"
+    ],
+    "reservedNonUserPermission": [
+      "system.job"
+    ],
+    "roles": [
+      {
+        "role": "user",
+        "permissions": [
+          "user.read.self",
+          "user.update.self",
+          "user.credential.manage",
+          "user.session.read",
+          "user.session.refresh",
+          "user.session.revoke",
+          "user.reactivate"
+        ]
+      },
+      {
+        "role": "verified_user",
+        "permissions": [
+          "comment.create",
+          "interaction.like",
+          "interaction.block",
+          "interaction.mute",
+          "report.create",
+          "social.follow",
+          "appeal.create",
+          "entitlement.check",
+          "entitlement.read",
+          "share.create",
+          "subscription.create",
+          "subscription.read",
+          "subscription.cancel",
+          "subscription.pause",
+          "subscription.resume",
+          "subscription.change_plan"
+        ]
+      },
+      {
+        "role": "creator",
+        "permissions": [
+          "content.create",
+          "content.update.own",
+          "content.delete.own",
+          "content.publish.own",
+          "content.unpublish.own",
+          "content.schedule.own",
+          "content.submit_review.own",
+          "content.archive.own",
+          "content.restore.own",
+          "content.revision.read",
+          "content.revision.rollback",
+          "media.read.own",
+          "media.upload"
+        ]
+      },
+      {
+        "role": "ip_principal",
+        "permissions": [
+          "ip.content.read",
+          "ip.create",
+          "ip.member.invite",
+          "ip.member.remove"
+        ]
+      },
+      {
+        "role": "mcn_admin",
+        "permissions": [
+          "org.create",
+          "org.member.manage.scope",
+          "organization.member.manage",
+          "organization.member.read",
+          "organization.role.manage"
+        ]
+      },
+      {
+        "role": "mcn_editor",
+        "permissions": [
+          "ip.content.read",
+          "organization.member.read"
+        ]
+      },
+      {
+        "role": "editor",
+        "permissions": [
+          "content.curate"
+        ]
+      },
+      {
+        "role": "operator",
+        "permissions": [
+          "content.curate"
+        ]
+      },
+      {
+        "role": "moderator",
+        "permissions": [
+          "moderation.case.read",
+          "moderation.decide",
+          "moderation.queue.read",
+          "moderation.read",
+          "user.restrict.limited"
+        ]
+      },
+      {
+        "role": "admin",
+        "permissions": [
+          "appeal.create",
+          "comment.create",
+          "content.archive.own",
+          "content.create",
+          "content.curate",
+          "content.delete.own",
+          "content.publish.own",
+          "content.read.public",
+          "content.restore.own",
+          "content.revision.read",
+          "content.revision.rollback",
+          "content.schedule.own",
+          "content.submit_review.own",
+          "content.unpublish.own",
+          "content.update.own",
+          "entitlement.check",
+          "entitlement.read",
+          "interaction.block",
+          "interaction.like",
+          "interaction.mute",
+          "ip.content.read",
+          "ip.create",
+          "ip.member.invite",
+          "ip.member.remove",
+          "media.read.own",
+          "media.read",
+          "media.upload",
+          "moderation.case.read",
+          "moderation.decide",
+          "moderation.queue.read",
+          "moderation.read",
+          "org.create",
+          "org.member.manage.scope",
+          "organization.member.manage",
+          "organization.member.read",
+          "organization.role.manage",
+          "report.create",
+          "role.assign",
+          "share.create",
+          "share.resolve",
+          "social.follow",
+          "subscription.cancel",
+          "subscription.create",
+          "subscription.read",
+          "user.ban",
+          "user.credential.manage",
+          "user.freeze",
+          "user.reactivate",
+          "user.read.self",
+          "user.reinstate",
+          "user.restore",
+          "user.restrict.limited",
+          "user.session.read",
+          "user.session.refresh",
+          "user.session.revoke",
+          "user.suspend",
+          "user.unfreeze",
+          "user.update.self",
+          "subscription.pause",
+          "subscription.resume",
+          "subscription.change_plan"
+        ]
+      },
+      {
+        "role": "super_admin",
+        "permissions": [
+          "appeal.create",
+          "audit.read.any",
+          "comment.create",
+          "content.archive.own",
+          "content.create",
+          "content.curate",
+          "content.delete.own",
+          "content.publish.own",
+          "content.read.public",
+          "content.restore.own",
+          "content.revision.read",
+          "content.revision.rollback",
+          "content.schedule.own",
+          "content.submit_review.own",
+          "content.unpublish.own",
+          "content.update.own",
+          "entitlement.check",
+          "entitlement.read",
+          "interaction.block",
+          "interaction.like",
+          "interaction.mute",
+          "ip.content.read",
+          "ip.create",
+          "ip.member.invite",
+          "ip.member.remove",
+          "media.read.own",
+          "media.read",
+          "media.upload",
+          "moderation.case.read",
+          "moderation.decide",
+          "moderation.queue.read",
+          "moderation.read",
+          "org.create",
+          "org.member.manage.scope",
+          "organization.member.manage",
+          "organization.member.read",
+          "organization.role.manage",
+          "report.create",
+          "role.assign",
+          "secret.manage",
+          "share.create",
+          "share.resolve",
+          "social.follow",
+          "subscription.cancel",
+          "subscription.create",
+          "subscription.read",
+          "user.ban",
+          "user.credential.manage",
+          "user.freeze",
+          "user.reactivate",
+          "user.read.self",
+          "user.reinstate",
+          "user.restore",
+          "user.restrict.limited",
+          "user.session.read",
+          "user.session.refresh",
+          "user.session.revoke",
+          "user.suspend",
+          "user.unfreeze",
+          "user.update.self",
+          "subscription.pause",
+          "subscription.resume",
+          "subscription.change_plan"
+        ]
+      }
+    ]
+  },
+  "x-role-permissions-gap": {
+    "status": "OPEN",
+    "note": "This mapping deliberately contains only permissions already present in x-permissions. Permission identifiers required by docs/301 but absent from the catalog are not silently invented or granted.",
+    "knownCatalogGaps": [
+      "search.read.public",
+      "feed.read.public",
+      "taxonomy.read",
+      "comment.read",
+      "interaction.unlike",
+      "interaction.favorite",
+      "social.unfollow",
+      "notification.read.self",
+      "notification.update.self",
+      "creator.read.self",
+      "creator.update.self",
+      "creator.stats.read.self",
+      "content.read.any",
+      "content.feature",
+      "content.promote",
+      "topic.manage",
+      "campaign.manage",
+      "analytics.read",
+      "security.manage",
+      "role.assign.any"
+    ]
+  }
 }
