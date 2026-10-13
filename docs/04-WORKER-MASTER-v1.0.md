@@ -27,7 +27,7 @@ No implementation, API contract, database ownership, or deployment decision may 
 | W05 | Social / Community / Messaging / Notification | T11,T12,T13,T14 | D1-02; D1-03 only for scoped runtime delivery state |
 | W06 | Rights / Trust & Safety / Governance | T19,T20,T21 | D1-03 |
 | W07 | Subscription / Commerce / Payment / Advertising | T16,T17,T18 | D1-04; scoped D1-01 entitlement transition only |
-| W08 | Creator / Organization | T04 | D1-01 |
+| W08 | Creator / Organization + bounded CASL policy evaluation under approved change control | T04 | D1-01 |
 | W09 | Platform / Storage / Reliability | T25 | D1-03 |
 | W10 | Async / Queue / Job Execution | None | D1-03 scoped execution only |
 | W11 | Growth / Campaign / Analytics / Operations | T22,T23 | D1-03 |
