@@ -33,7 +33,9 @@ W08 must consume only server-trusted context. Identity ID, account state, layer,
 
 W08 must never accept client-supplied roles, permission lists, layer values, ownership claims, organization/IP memberships, or MFA claims as authorization facts.
 
-The canonical machine-readable permission vocabulary is `contracts/authz/permissions.json`. A permission not present in that catalog is ignored and cannot grant access. The layer is a ceiling and a minimum-layer check; it does not independently grant permission. Effective grants must come from the canonical server-side authorization resolution process.
+The canonical machine-readable permission vocabulary is `contracts/authz/permissions.json`. Its `x-role-permissions` section now defines explicit additive grants for every role in `contracts/authz/layers.json`; `resolveCatalogPermissionsForRoles` exposes this mapping to trusted server code. Public defaults are explicit. Unknown role IDs or an inconsistent role/permission map return `null` so the caller must deny the request. A permission not present in the catalog cannot grant access.
+
+The mapping is deliberately marked `PARTIAL_IMPLEMENTED_PERMISSION_CATALOG`: permissions referenced by docs/301 but not yet present in the catalog remain ungranted and are listed in `x-role-permissions-gap`. This does not silently invent identifiers or make the catalogue appear complete. The layer is a ceiling and a minimum-layer check; it does not independently grant permission. The caller must provide only active, time-valid role assignments resolved from W02 and keep scope assignment context authoritative.
 
 ## 3. Mandatory policy invariants
 
