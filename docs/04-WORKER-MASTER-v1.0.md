@@ -162,4 +162,4 @@ The canonical sequence remains:
 
 **Blueprint → Architecture Blueprint → 25 Tasks → 12 Worker Master → 4 D1 Master → Mapping → Contracts → Implementation → Tests → CI → Deployment → Evidence**
 
-No Contract may authorize a Worker responsibility that is absent from this Master or a subsequent approved Mapping change.
+No Contract may authorize a Worker responsibility that is absent from this Master or a subsequent approved Mapping/change-control decision. The W08 CASL evaluator is an execution component only; it does not change Primary Task ownership, D1 authority, or the W02 source of truth for role assignments and resolved layers.
