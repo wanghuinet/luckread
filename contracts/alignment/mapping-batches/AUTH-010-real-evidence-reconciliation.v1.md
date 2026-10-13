@@ -94,30 +94,46 @@ For the current closure pass, `deviceId` is treated only as the canonical `ENT-S
 
 A separate device contract is required before AUTH-010 can claim a fully reconciled device registry surface.
 
-## 7. Important runtime boundary
+## 7. Current session API implementation and runtime evidence (2026-10-10)
 
-The discovered `auth_session_state` code is evidence of a persistence/schema implementation, but it is **not** evidence that AUTH-010 list/revoke endpoints are implemented.
+PR #991 implements the bounded W01 session-list/revoke surface through the existing W02 Service Binding. The canonical native Better Auth session remains authoritative for session identity and lifecycle; this change does not add Worker/D1/Queue/Service Binding topology, alter the schema, modify Better Auth, or change Payload core.
 
-The source file comments identify this table as the minimal extension state for AUTH-002. Therefore AUTH-010 must consume that authority through an explicit runtime binding rather than claim ownership from name/field similarity. fileciteturn43file0
+The exact tested source `51ec6ed8ae8e2bedd0b18fb208135515b801ba5b` passed the controlled local W01 + W02 runtime evidence workflow:
 
-Repository search still found no concrete handler implementing both `authSessionList` and `authSessionRevoke`, and no authoritative handler → DTO → authorization → persistence → lifecycle → response chain for AUTH-010.
+- Workflow run: https://github.com/wanghuinet/luckread/actions/runs/38048910613
+- Uploaded evidence artifact: https://github.com/wanghuinet/luckread/actions/runs/38048910613/artifacts/11668427770
+- Evidence type: `AUTH-010_SESSION_LIST_REVOKE_W01_W02_LOCAL_RUNTIME`
+- Environment: `CONTROLLED_LOCAL_D1`; this is not evidence that the same commit is deployed remotely or in production.
+- Verified: signed W02 login cookie authenticates the W01 route; list is capped at 50; cursor continuation works (50 + 6 rows in the fixture); current-session marker is stable; secret fields are absent; list responses are `no-store`; malformed cursor is rejected; a second real W02 identity cannot list the first user's sessions or alter them by revoke; the owner can revoke; repeat revoke is an idempotent 204; the revoked session is absent from a subsequent list; synthetic test identities/sessions are cleaned up; no secrets were captured.
+
+A fresh exact-source run covers the current candidate implementation on the PR head:
+
+- Tested source SHA: `fc70945471ee1630d65ac64cfe730527370ca3e5`
+- W01 + W02 local runtime evidence: https://github.com/wanghuinet/luckread/actions/runs/38058806887
+- Artifact: https://github.com/wanghuinet/luckread/actions/runs/38058806887/artifacts/11672366415
+- Same-SHA W02 session/principal/rate-limit tests: https://github.com/wanghuinet/luckread/actions/runs/38058806940
+- Same-SHA W01 Foundation CI (typecheck, security unit tests, lint and production build): https://github.com/wanghuinet/luckread/actions/runs/38058806967
+- Runtime evidence result: `PASS`; environment `CONTROLLED_LOCAL_D1`, database `luckread` — this does not prove the candidate code is deployed remotely.
+- Runtime assertions passed: profile read, login-cookie authentication, bounded pagination (50 + 6), current-session marker, secret-field exclusion, `no-store`, malformed-cursor rejection, cross-account isolation, owned/repeated revoke (204), native-session removal, and fixture cleanup; `secretsCaptured=false`.
+- The latest evidence is recorded as `EVD-AUTH010-B14-SESSION-LIST-REVOKE-LOCAL-004` with status `CREATED` pending formal registry admission. B13, B12 and B11 are superseded. Mapping 0 remains `NOT_GREEN`; the tested-commit anchor is unchanged.
+
+W01 continues to enforce origin/IP guardrails. This PR adds policy-matched scopes inside W02 before any D1 session-row lookup: `authSessionList` consumes account + endpoint keys, and `authSessionRevoke` consumes account + authenticated-caller-session + endpoint keys. The W02 bindings reuse the existing W01 rate-limit namespace IDs (`2026100312` for read at 300 calls/minute and `2026100320` for writes at 60 calls/minute); operation/scope-prefixed keys avoid collisions with W01's existing origin/IP keys. Rate-limit exhaustion returns `429 RATE_LIMITED`; missing or failing bindings fail closed with 503; W01 preserves W02's 429 response instead of converting it to 503. New tests cover the required key scopes, no-D1-on-limit behavior, and W01 status propagation. The canonical operation-policy `evidence.antiAbuse` fields for `authSessionList` and `authSessionRevoke` are now `PASS`, supported by the same-source W02 scoped-limiter tests and W01 429-propagation tests linked above. The independent Evidence Registry record `EVD-AUTH010-B14-SESSION-LIST-REVOKE-LOCAL-004` remains `CREATED` pending canonical registry admission; B13, B12 and B11 are superseded. The registry itself remains `NOT_GREEN` and its tested-commit anchor is unchanged. This closes the operation-level implementation/test-evidence alignment only; it does not complete the proposed independent device-record feature or promote full AUTH-010 to GREEN.
 
 ## 8. Remaining blockers
 
-1. Bind `authSessionList` and `authSessionRevoke` to the canonical `ENT-SESSION` entity/field IDs without duplicating or overriding AUTH-002 authority.
-2. Accept real Gate-1 schema evidence proving the native `createdAt` / `expiresAt` representation and extension schema against the tested commit; no duplicate extension columns should be introduced.
-3. Establish canonical DTO/OpenAPI request/response definitions for list/revoke.
-4. Establish concrete runtime handlers and self-scope authorization evidence.
-5. Establish authoritative lifecycle/event semantics for list/revoke, including revocation dominance over stale cache.
-6. Prove executable migration/application state for the extension schema and its relationship to native session persistence.
-7. Define and validate `ENT-DEVICE-RECORD` separately before claiming complete device-registry mapping.
-8. Add positive/negative integration/security tests and actual Evidence Registry execution references.
+1. Policy-matched account + endpoint limits for listing and account + caller-session + endpoint limits for revocation execute before D1 session-row access. Same-SHA W02 session/principal/rate-limit tests and W01 Foundation CI passed at `fc70945471ee1630d65ac64cfe730527370ca3e5`; the operation-policy `antiAbuse` evidence fields are `PASS`. The local runtime record is `EVD-AUTH010-B14-SESSION-LIST-REVOKE-LOCAL-004` (`CREATED`); formal registry admission and remote/deployed verification remain open.
+2. Latest exact-SHA local runtime evidence is recorded as `EVD-AUTH010-B14-SESSION-LIST-REVOKE-LOCAL-004` (`CREATED`); B13, B12 and B11 are `SUPERSEDED`. Do not mark B14 `VERIFIED` or alter the global tested-commit anchor without canonical evidence-admission authorization. Mapping 0 remains `NOT_GREEN`.
+3. Remote/deployed exact-SHA verification remains blocked and NOT EXECUTED: the native-session-compatible guarded harness has now been added to candidate branch `fix/api-closeout-session-route-v1` (`.github/workflows/auth-010-remote-e2e.yml` and `scripts/auth-010-session-runtime-e2e.mjs`). It checks for a successful deployment artifact whose provenance names the exact source SHA and only exercises sessions created by two dedicated test-account logins through the public W01 HTTP API; it performs no direct D1 writes and creates no synthetic accounts. PR #991 is still open, so the candidate is not yet considered deployed evidence. Merge the candidate, deploy that exact SHA through the controlled W01/W02 workflow, configure the four dedicated test-account secrets, and manually dispatch the remote workflow with `RUN_AUTH010_REMOTE_E2E`. Until the resulting remote probe passes, remote runtime remains unverified.
+4. Keep the AUTH-002 native-session authority intact. This PR proves the list/revoke runtime path; it does not, by itself, prove every extension-table/device field in the full `ENT-SESSION` contract.
+5. `ENT-DEVICE-RECORD` remains proposed. Do not describe this session API closeout as a complete device registry until a separate canonical device contract is established.
+
+The previously listed handler/OpenAPI/self-scope/pagination/revocation test blockers are no longer accurate for the session list/revoke path: canonical OpenAPI, W01/W02 handlers, the controlled runtime evidence, cross-account isolation, revocation persistence, and post-revoke visibility are now present in the tested PR.
 
 ## 9. GREEN decision
 
 `AUTH-010 = BLOCKED_NOT_GREEN`.
 
-No promotion to GREEN is made in this pass. The AUTH-002 ↔ AUTH-010 boundary is now explicitly reconciled at the contract level. The previous false blocker concerning duplicate `createdAt` / `expiresAt` extension columns is removed; the remaining blockers are runtime, DTO/OpenAPI, authorization, lifecycle, migration, device-authority, tests and execution evidence.
+No promotion to GREEN is made in this pass. The W01/W02 session-list and revoke handlers, canonical OpenAPI, self-scope checks, bounded cursor pagination, rate-limit behavior, and same-SHA local runtime/test evidence are now present. However, the current runtime proof is controlled local D1, not remote/deployed proof; the latest Evidence Registry record remains `CREATED`; the canonical Evidence Registry and Mapping 0 remain `NOT_GREEN` with the existing tested-commit anchor unchanged; and the proposed independent `ENT-DEVICE-RECORD` authority remains unadmitted. Therefore AUTH-010 remains blocked from full GREEN admission.
 
 Required final chain:
 
@@ -125,11 +141,8 @@ Required final chain:
 
 ## 10. Next closure action
 
-Proceed in this order:
+Proceed in this order, one item at a time:
 
-1. execute/accept AUTH-002 Gate-1 schema evidence for the native + extension boundary;
-2. bind canonical AUTH-010 DTO/OpenAPI definitions;
-3. locate or implement the actual list/revoke runtime surface;
-4. bind self-scope authorization and revocation lifecycle;
-5. execute integration/security tests and register non-empty Evidence Registry records;
-6. only then re-evaluate AUTH-010 for GREEN.
+1. assess formal admission of `EVD-AUTH010-B14-SESSION-LIST-REVOKE-LOCAL-004` under the registry's tested-source/freshness rules; keep its status `CREATED` unless admission requirements are independently satisfied, preserve Mapping 0 `NOT_GREEN`, and do not rewrite the tested-commit anchor;
+2. the guarded native-session remote harness is now present on the candidate branch; after merge, exact-SHA W01/W02 deployment, and configuration of the two dedicated test accounts, execute it with explicit `RUN_AUTH010_REMOTE_E2E` confirmation. Controlled local-D1 evidence alone does not prove deployed behavior;
+3. revisit AUTH-010's full feature status only after device authority and remaining canonical mapping requirements are genuinely closed.

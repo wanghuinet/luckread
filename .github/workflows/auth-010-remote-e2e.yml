@@ -1,0 +1,124 @@
+name: AUTH-010 Deployed Session Remote E2E
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Exact source SHA already deployed by W01 W02 Auth Binding Deploy
+        required: true
+        type: string
+      confirm:
+        description: Type RUN_AUTH010_REMOTE_E2E to test and clean up sessions for dedicated test accounts
+        required: true
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  remote-session-e2e:
+    if: ${{ inputs.confirm == 'RUN_AUTH010_REMOTE_E2E' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout exact tested source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha }}
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Validate source SHA and probe syntax
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          set -euo pipefail
+          [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::source_sha must be a lowercase 40-character commit SHA"; exit 1; }
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          node --check scripts/auth-010-session-runtime-e2e.mjs
+          sha256sum scripts/auth-010-session-runtime-e2e.mjs
+
+      - name: Require successful exact-source W01 W02 deployment artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          set -euo pipefail
+          ARTIFACT_NAME="w01-w02-binding-deployment-${SOURCE_SHA}"
+          gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts?name=${ARTIFACT_NAME}&per_page=100" > "$RUNNER_TEMP/artifacts.json"
+          read -r ARTIFACT_ID DEPLOYMENT_RUN_ID < <(
+            jq -r --arg name "$ARTIFACT_NAME" '
+              [.artifacts[] | select(.name == $name and .expired == false)]
+              | sort_by(.created_at)
+              | last
+              | [(.id // ""), (.workflow_run.id // "")]
+              | @tsv
+            ' "$RUNNER_TEMP/artifacts.json"
+          )
+          test -n "$ARTIFACT_ID" || { echo "::error::No exact-source W01/W02 deployment artifact found"; exit 1; }
+          test -n "$DEPLOYMENT_RUN_ID" || { echo "::error::Deployment run reference missing"; exit 1; }
+
+          gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${DEPLOYMENT_RUN_ID}" > "$RUNNER_TEMP/deployment-run.json"
+          jq -e --arg path ".github/workflows/w01-w02-binding-deploy.yml" '
+            .status == "completed" and .conclusion == "success" and .path == $path
+          ' "$RUNNER_TEMP/deployment-run.json" > /dev/null
+
+          gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${ARTIFACT_ID}/zip" > "$RUNNER_TEMP/deployment-artifact.zip"
+          mkdir -p "$RUNNER_TEMP/deployment-artifact"
+          unzip -q "$RUNNER_TEMP/deployment-artifact.zip" -d "$RUNNER_TEMP/deployment-artifact"
+          PROVENANCE="$(find "$RUNNER_TEMP/deployment-artifact" -type f -name 'w01-w02-binding-deploy-provenance.txt' -print -quit)"
+          test -n "$PROVENANCE" || { echo "::error::Deployment provenance file missing"; exit 1; }
+          grep -Fx "source_sha=${SOURCE_SHA}" "$PROVENANCE"
+          grep -Fx "confirmation=DEPLOY_BINDING" "$PROVENANCE"
+          grep -Fx "workers=luckread-w02,luckread-w01-payload" "$PROVENANCE"
+          grep -Fx "database_mutation=false" "$PROVENANCE"
+
+          {
+            echo "AUTH010_DEPLOYMENT_RUN_ID=${DEPLOYMENT_RUN_ID}"
+            echo "AUTH010_DEPLOYMENT_ARTIFACT_ID=${ARTIFACT_ID}"
+          } >> "$GITHUB_ENV"
+          echo "Verified successful deployment run ${DEPLOYMENT_RUN_ID} and artifact ${ARTIFACT_ID} for exact source SHA."
+
+      - name: Verify dedicated test-account secrets are configured
+        env:
+          AUTH010_REMOTE_TEST_USER_A_EMAIL: ${{ secrets.AUTH010_REMOTE_TEST_USER_A_EMAIL }}
+          AUTH010_REMOTE_TEST_USER_A_PASSWORD: ${{ secrets.AUTH010_REMOTE_TEST_USER_A_PASSWORD }}
+          AUTH010_REMOTE_TEST_USER_B_EMAIL: ${{ secrets.AUTH010_REMOTE_TEST_USER_B_EMAIL }}
+          AUTH010_REMOTE_TEST_USER_B_PASSWORD: ${{ secrets.AUTH010_REMOTE_TEST_USER_B_PASSWORD }}
+        run: |
+          set -euo pipefail
+          for name in AUTH010_REMOTE_TEST_USER_A_EMAIL AUTH010_REMOTE_TEST_USER_A_PASSWORD AUTH010_REMOTE_TEST_USER_B_EMAIL AUTH010_REMOTE_TEST_USER_B_PASSWORD; do
+            value="${!name}"
+            if [ -z "$value" ]; then
+              echo "::error::Required dedicated test-account secret is missing: $name"
+              exit 1
+            fi
+          done
+          test "$AUTH010_REMOTE_TEST_USER_A_EMAIL" != "$AUTH010_REMOTE_TEST_USER_B_EMAIL" || {
+            echo "::error::AUTH-010 remote test accounts must be distinct"; exit 1;
+          }
+
+      - name: Run controlled remote session lifecycle assertions
+        env:
+          AUTH010_REMOTE_E2E_CONFIRM: ${{ inputs.confirm }}
+          AUTH010_EXPECTED_SOURCE_SHA: ${{ inputs.source_sha }}
+          AUTH010_REMOTE_BASE_URL: https://luckread.com
+          AUTH010_REMOTE_TEST_USER_A_EMAIL: ${{ secrets.AUTH010_REMOTE_TEST_USER_A_EMAIL }}
+          AUTH010_REMOTE_TEST_USER_A_PASSWORD: ${{ secrets.AUTH010_REMOTE_TEST_USER_A_PASSWORD }}
+          AUTH010_REMOTE_TEST_USER_B_EMAIL: ${{ secrets.AUTH010_REMOTE_TEST_USER_B_EMAIL }}
+          AUTH010_REMOTE_TEST_USER_B_PASSWORD: ${{ secrets.AUTH010_REMOTE_TEST_USER_B_PASSWORD }}
+        run: node scripts/auth-010-session-runtime-e2e.mjs
+
+      - name: Upload remote runtime evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: auth-010-remote-session-evidence-${{ inputs.source_sha }}
+          path: artifacts/mapping-0/auth-010-session-runtime-remote/result.json
+          if-no-files-found: ignore
+          retention-days: 30

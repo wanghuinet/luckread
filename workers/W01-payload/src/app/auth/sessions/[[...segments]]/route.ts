@@ -1,4 +1,5 @@
-import { proxyBetterAuth, revokeSessionById, W02AuthClientError } from '../../../../auth/w02-session-client.js'
+import { listSessions, revokeSessionById, W02AuthClientError } from '../../../../auth/w02-session-client.js'
+import { enforcePublicReadRateLimit, enforceW01WriteRateLimit, rateLimitResponse, TrafficLimitError } from '../../../../auth/traffic-limit.js'
 import { apiErrorResponse, normalizeApiErrorResponse } from '../../../../lib/api-response.js'
 
 const json = (body: unknown, status = 200) =>
@@ -6,6 +7,17 @@ const json = (body: unknown, status = 200) =>
 
 const mapError = (error: unknown): Response => {
   if (error instanceof W02AuthClientError) {
+    if (error.status === 429) {
+      return apiErrorResponse(429, 'RATE_LIMITED', 'Too many requests', { 'retry-after': '60' })
+    }
+    if (error.status === 400) {
+      const code = error.code === 'INVALID_CURSOR' ? 'INVALID_CURSOR' : 'VALIDATION_FAILED'
+      return apiErrorResponse(
+        400,
+        code,
+        code === 'INVALID_CURSOR' ? 'Invalid session list cursor' : 'Invalid session request',
+      )
+    }
     return normalizeApiErrorResponse(
       new Response(null, { status: error.status }),
       'Session service unavailable',
@@ -14,72 +26,42 @@ const mapError = (error: unknown): Response => {
   return apiErrorResponse(503, 'SERVICE_UNAVAILABLE', 'Session service unavailable')
 }
 
-const dateTime = (value: unknown): string | null => {
-  if (typeof value !== 'string' || !value.trim()) return null
-  const parsed = new Date(value)
-  return Number.isFinite(parsed.getTime()) ? parsed.toISOString() : null
-}
-
 export async function GET(
   request: Request,
   context: { params: Promise<{ segments?: string[] }> },
 ): Promise<Response> {
   const { segments = [] } = await context.params
-  if (segments.length !== 0) return apiErrorResponse(404, 'NOT_FOUND', 'Session route not found')
+  if (segments.length !== 0) {
+    return apiErrorResponse(404, 'NOT_FOUND', 'Session route not found')
+  }
+
+  const url = new URL(request.url)
+  const rawLimit = url.searchParams.get('limit')
+  const requestedLimit = rawLimit === null ? 20 : Number(rawLimit)
+  if (!Number.isInteger(requestedLimit) || requestedLimit < 1 || requestedLimit > 100) {
+    return apiErrorResponse(400, 'VALIDATION_FAILED', 'Invalid session list limit')
+  }
+
+  const cursor = url.searchParams.get('cursor')
+  if (cursor !== null && (!cursor || cursor.length > 256)) {
+    return apiErrorResponse(400, 'INVALID_CURSOR', 'Invalid session list cursor')
+  }
 
   try {
-    const response = await proxyBetterAuth(request, '/list-sessions', { method: 'GET' })
-    if (!response.ok) return normalizeApiErrorResponse(response, 'Session service unavailable')
+    await enforcePublicReadRateLimit(request)
+  } catch (error) {
+    if (error instanceof TrafficLimitError) return rateLimitResponse(request)
+    return apiErrorResponse(503, 'SERVICE_UNAVAILABLE', 'Session service unavailable')
+  }
 
-    const payload: unknown = await response.json()
-    if (!Array.isArray(payload)) {
-      return apiErrorResponse(503, 'SERVICE_UNAVAILABLE', 'Session service returned an invalid response')
-    }
-
-    const items = payload.map((value: unknown) => {
-      if (!value || typeof value !== 'object' || Array.isArray(value)) {
-        throw new Error('Invalid session response')
-      }
-      const session = value as Record<string, unknown>
-      const sessionId = typeof session.id === 'string' ? session.id.trim() : ''
-      const createdAt = dateTime(session.createdAt)
-      const expiresAt = dateTime(session.expiresAt)
-      if (!sessionId || sessionId.length > 128 || !createdAt || !expiresAt) {
-        throw new Error('Invalid session response')
-      }
-
-      const deviceId = typeof session.deviceId === 'string' &&
-        session.deviceId.trim().length > 0 &&
-        session.deviceId.length <= 128
-        ? session.deviceId
-        : undefined
-
-      return {
-        sessionId,
-        ...(deviceId ? { deviceId } : {}),
-        createdAt,
-        expiresAt,
-        lastSeenAt: dateTime(session.lastSeenAt),
-      }
+  try {
+    // W02 applies authenticated self-scope and a bounded D1 query; W01 caps
+    // the public contract to 50 items even when a client asks for 100.
+    const result = await listSessions(request, {
+      limit: Math.min(50, requestedLimit),
+      ...(cursor === null ? {} : { cursor }),
     })
-
-    const currentResponse = await proxyBetterAuth(request, '/get-session', { method: 'GET' })
-    if (!currentResponse.ok) {
-      return normalizeApiErrorResponse(currentResponse, 'Session service unavailable')
-    }
-    const currentPayload: unknown = await currentResponse.json()
-    const currentSessionId =
-      currentPayload && typeof currentPayload === 'object' && !Array.isArray(currentPayload) &&
-      'session' in currentPayload &&
-      (currentPayload as { session?: { id?: unknown } | null }).session &&
-      typeof (currentPayload as { session: { id?: unknown } }).session.id === 'string'
-        ? (currentPayload as { session: { id: string } }).session.id
-        : ''
-    if (!currentSessionId || currentSessionId.length > 128) {
-      return apiErrorResponse(503, 'SERVICE_UNAVAILABLE', 'Current session information is unavailable')
-    }
-
-    return json({ items, nextCursor: null, currentSessionId })
+    return json(result)
   } catch (error) {
     return mapError(error)
   }
@@ -92,6 +74,13 @@ export async function DELETE(
   const { segments = [] } = await context.params
   if (segments.length !== 1 || !segments[0]) {
     return apiErrorResponse(404, 'NOT_FOUND', 'Session not found')
+  }
+
+  try {
+    await enforceW01WriteRateLimit(request)
+  } catch (error) {
+    if (error instanceof TrafficLimitError) return rateLimitResponse(request)
+    return apiErrorResponse(503, 'SERVICE_UNAVAILABLE', 'Session service unavailable')
   }
 
   const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''

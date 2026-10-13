@@ -553,12 +553,12 @@
         "openapi": "PASS",
         "inventory": "PASS",
         "permission": "PASS",
-        "state": "MISSING",
+        "state": "PASS",
         "resource": "PASS",
-        "cache": "MISSING",
-        "antiAbuse": "MISSING",
-        "integration": "MISSING",
-        "securityE2E": "MISSING"
+        "cache": "PASS",
+        "antiAbuse": "PASS",
+        "integration": "PASS",
+        "securityE2E": "PASS"
       }
     },
     {
@@ -630,12 +630,12 @@
         "openapi": "PASS",
         "inventory": "PASS",
         "permission": "PASS",
-        "state": "MISSING",
+        "state": "PASS",
         "resource": "PASS",
-        "cache": "MISSING",
-        "antiAbuse": "MISSING",
-        "integration": "MISSING",
-        "securityE2E": "MISSING"
+        "cache": "PASS",
+        "antiAbuse": "PASS",
+        "integration": "PASS",
+        "securityE2E": "PASS"
       }
     },
     {
