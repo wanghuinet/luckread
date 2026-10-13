@@ -44,6 +44,16 @@ describe('content list cache guard', () => {
     ).toString()).toBe('cursor=&creatorId=&limit=20&type=article'.replace('cursor=&creatorId=&',''))
   })
 
+  it('maps invalid public list parameters to the canonical validation status', () => {
+    let caught: unknown
+    try {
+      validateContentListQuery(new URL('https://luckread.com/api/v1/contents?limit=51'))
+    } catch (error) {
+      caught = error
+    }
+    expect(caught).toMatchObject({ code: 'VALIDATION_FAILED', status: 422 })
+  })
+
   it('rejects oversized raw query strings', () => {
     expect(() => validateContentListQuery(
       new URL('https://luckread.com/api/v1/contents?unknown=' + 'x'.repeat(4100)),

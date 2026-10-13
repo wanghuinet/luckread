@@ -11,7 +11,7 @@ const MAX_CURSOR_LENGTH = 2048
 
 export const validateContentListQuery = (url: URL): URLSearchParams => {
   if (url.search.length > MAX_QUERY_LENGTH) {
-    throw new ContentListQueryError('VALIDATION_FAILED', 400)
+    throw new ContentListQueryError('VALIDATION_FAILED', 422)
   }
 
   const allowed = ['cursor', 'creatorId', 'limit', 'type'] as const
@@ -20,29 +20,29 @@ export const validateContentListQuery = (url: URL): URLSearchParams => {
   for (const key of allowed) {
     const values = url.searchParams.getAll(key)
     if (values.length > 1) {
-      throw new ContentListQueryError('VALIDATION_FAILED', 400)
+      throw new ContentListQueryError('VALIDATION_FAILED', 422)
     }
     if (values.length === 0) continue
 
     const value = values[0]?.trim() ?? ''
     if (!value) {
-      throw new ContentListQueryError('VALIDATION_FAILED', 400)
+      throw new ContentListQueryError('VALIDATION_FAILED', 422)
     }
 
     if (key === 'cursor') {
       if (value.length > MAX_CURSOR_LENGTH || !/^[A-Za-z0-9_-]+$/.test(value)) {
-        throw new ContentListQueryError('VALIDATION_FAILED', 400)
+        throw new ContentListQueryError('VALIDATION_FAILED', 422)
       }
     } else if (key === 'creatorId') {
       if (!RESOURCE_ID.test(value)) {
-        throw new ContentListQueryError('VALIDATION_FAILED', 400)
+        throw new ContentListQueryError('VALIDATION_FAILED', 422)
       }
     } else if (key === 'limit') {
       if (!/^(?:[1-9]|[1-4][0-9]|50)$/.test(value)) {
-        throw new ContentListQueryError('VALIDATION_FAILED', 400)
+        throw new ContentListQueryError('VALIDATION_FAILED', 422)
       }
     } else if (!CONTENT_TYPES.has(value)) {
-      throw new ContentListQueryError('VALIDATION_FAILED', 400)
+      throw new ContentListQueryError('VALIDATION_FAILED', 422)
     }
 
     query.set(key, value)

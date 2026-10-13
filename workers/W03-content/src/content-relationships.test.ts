@@ -65,6 +65,34 @@ describe('W03 content relationship foundation', () => {
     }])
   })
 
+  it('binds relationship cursors to content ID and direction', async () => {
+    const row = {
+      relationship_id: 'rel_123',
+      relation_type: 'reference',
+      created_at: '2026-10-07T00:00:00.000Z',
+      related_id: 'content_2',
+      related_slug: 'other-content-abcdef',
+      related_type: 'article',
+      related_title: 'Other content',
+      relation_direction: 'out',
+    }
+    const prepare = () => ({
+      bind: () => ({ all: async () => ({ results: [row, { ...row, relationship_id: 'rel_124' }] }) }),
+    })
+    const db = { prepare } as never
+    const first = await listContentRelationships(db, 'content_1', 'out', null, 1)
+    expect(first.hasMore).toBe(true)
+    expect(first.nextCursor).toEqual(expect.any(String))
+    await expect(listContentRelationships(db, 'content_2', 'out', first.nextCursor, 1)).rejects.toMatchObject({
+      code: 'INVALID_CURSOR',
+      status: 400,
+    })
+    await expect(listContentRelationships(db, 'content_1', 'in', first.nextCursor, 1)).rejects.toMatchObject({
+      code: 'INVALID_CURSOR',
+      status: 400,
+    })
+  })
+
   it('bounds and validates direction before the D1 read', async () => {
     const db = {
       prepare() {

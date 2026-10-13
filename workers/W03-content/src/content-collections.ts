@@ -1,4 +1,4 @@
-import { ContentRuntimeError, type ContentD1 } from './content-runtime.js'
+import { ContentRuntimeError, decodeScopedCursor, encodeScopedCursor, type ContentD1 } from './content-runtime.js'
 
 export type CollectionState =
   | 'DRAFT'
@@ -249,19 +249,6 @@ const insertIdempotency = (
 const listPageSize = (limit: number): number =>
   Math.min(Math.max(Number.isSafeInteger(limit) ? limit : 20, 1), 50)
 
-const parseCursor = (cursor: string | null): { updatedAt: string; id: string } | null => {
-  if (!cursor) return null
-  try {
-    const decoded = JSON.parse(atob(cursor)) as { updatedAt?: unknown; id?: unknown }
-    if (typeof decoded.updatedAt !== 'string' || typeof decoded.id !== 'string') {
-      throw new Error('invalid cursor')
-    }
-    return { updatedAt: decoded.updatedAt, id: decoded.id }
-  } catch {
-    throw new ContentRuntimeError('VALIDATION_FAILED', 400)
-  }
-}
-
 const loadCollectionMutation = async (
   db: ContentD1,
   principalUserId: string,
@@ -383,7 +370,8 @@ export async function listCreatorCollections(
 ): Promise<{ items: CollectionRecord[]; nextCursor: string | null; hasMore: boolean }> {
   assertResourceId(ownerUserId)
   const pageSize = listPageSize(limit)
-  const decoded = parseCursor(cursor)
+  const cursorScope = JSON.stringify({ type: 'creator-collections', ownerUserId })
+  const decoded = cursor ? decodeScopedCursor(cursor, cursorScope) : null
   const cursorClause = decoded ? 'AND (updated_at < ? OR (updated_at = ? AND id < ?))' : ''
   const bindings: unknown[] = [ownerUserId]
   if (decoded) bindings.push(decoded.updatedAt, decoded.updatedAt, decoded.id)
@@ -401,7 +389,7 @@ export async function listCreatorCollections(
     items: page,
     hasMore,
     nextCursor: hasMore && last
-      ? btoa(JSON.stringify({ updatedAt: last.updatedAt, id: last.id }))
+      ? encodeScopedCursor(last.updatedAt, last.id, cursorScope)
       : null,
   }
 }

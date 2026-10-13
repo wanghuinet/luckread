@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-import { canTransitionContentState, createContent, decodeCursor, encodeCursor, isState, listContents, publishDueScheduledContent, transitionContentState, updateContent, validateInput, validateListFilters } from './content-runtime.js'
+import { canTransitionContentState, ContentRuntimeError, createContent, createRequestId, decodeContentListCursor, decodeCursor, decodeScopedCursor, encodeContentListCursor, encodeCursor, encodeScopedCursor, isState, listContents, listContentRevisions, listCreatorContents, publishDueScheduledContent, toErrorResponse, transitionContentState, updateContent, validateInput, validateListFilters } from './content-runtime.js'
 import w03Worker, { hasCreatorContentPermission, parseListLimit } from './index.js'
 
 describe('W03 content contract core', () => {
@@ -17,6 +17,151 @@ describe('W03 content contract core', () => {
       updatedAt: '2026-09-29T12:00:00.000Z',
       id: 'content_123',
     })
+  })
+
+  it('emits contract-compliant error envelopes and request identifiers', async () => {
+    const response = toErrorResponse(new ContentRuntimeError('VALIDATION_FAILED', 400))
+    expect(response.status).toBe(422)
+    const payload = await response.json() as {
+      error: { code: string; message: string; details: Record<string, unknown> }
+      requestId: string
+    }
+    expect(payload).toMatchObject({
+      error: { code: 'VALIDATION_FAILED', message: expect.any(String), details: {} },
+      requestId: expect.stringMatching(/^req_[A-Za-z0-9_-]+$/),
+    })
+    expect(createRequestId()).toMatch(/^req_[A-Za-z0-9_-]+$/)
+  })
+
+  it('binds public content cursors to filters and rejects cross-filter reuse', () => {
+    const cursor = encodeContentListCursor(
+      '2026-10-02T12:00:00.000Z',
+      'content_123',
+      'user_123',
+      'video',
+    )
+    expect(decodeContentListCursor(cursor, 'user_123', 'video')).toMatchObject({
+      createdAt: '2026-10-02T12:00:00.000Z',
+      id: 'content_123',
+      creatorId: 'user_123',
+      contentType: 'video',
+      version: 1,
+    })
+    const mismatchedCreator = (() => {
+      try {
+        decodeContentListCursor(cursor, null, 'video')
+        return null
+      } catch (error) {
+        return error
+      }
+    })()
+    const mismatchedType = (() => {
+      try {
+        decodeContentListCursor(cursor, 'user_123', 'article')
+        return null
+      } catch (error) {
+        return error
+      }
+    })()
+    expect(mismatchedCreator).toMatchObject({ code: 'INVALID_CURSOR' })
+    expect(mismatchedType).toMatchObject({ code: 'INVALID_CURSOR' })
+  })
+
+  it('binds creator content pagination to owner and active filters', async () => {
+    const row = {
+      id: 'content_video_123',
+      content_type: 'video',
+      owner_user_id: 'user_123',
+      creator_id: 'user_123',
+      ip_id: null,
+      state: 'DRAFT',
+      scheduled_at: null,
+      version: 1,
+      revision: 1,
+      slug: 'video-123',
+      title: 'Draft video',
+      body_ref: 'https://cdn.example.com/body.txt',
+      media_refs_json: '[]',
+      cover_ref: null,
+      etag: 'W/"1"',
+      created_at: '2026-10-02T12:00:00.000Z',
+      updated_at: '2026-10-02T12:01:00.000Z',
+    }
+    let prepareCalls = 0
+    const db = {
+      prepare() {
+        prepareCalls += 1
+        return { bind: () => ({ all: async () => ({ results: [row, { ...row, id: 'content_video_124' }] }) }) }
+      },
+    } as never
+    const first = await listCreatorContents(db, 'user_123', null, 1, {
+      status: 'DRAFT',
+      contentType: 'video',
+    })
+    expect(first.hasMore).toBe(true)
+    expect(first.nextCursor).toEqual(expect.any(String))
+    expect(() => decodeScopedCursor(
+      first.nextCursor!,
+      JSON.stringify({ type: 'creator-contents', ownerUserId: 'user_123', status: 'DRAFT', contentType: 'article' }),
+    )).toThrow(expect.objectContaining({ code: 'INVALID_CURSOR' }))
+    await expect(listCreatorContents(db, 'user_123', first.nextCursor, 1, {
+      status: 'DRAFT',
+      contentType: 'article',
+    })).rejects.toMatchObject({ code: 'INVALID_CURSOR', status: 400 })
+    await expect(listCreatorContents(db, 'user_999', first.nextCursor, 1, {
+      status: 'DRAFT',
+      contentType: 'video',
+    })).rejects.toMatchObject({ code: 'INVALID_CURSOR', status: 400 })
+    expect(prepareCalls).toBe(1)
+    const direct = encodeScopedCursor('2026-10-02T12:00:00.000Z', 'content_123', 'scope-a')
+    expect(decodeScopedCursor(direct, 'scope-a')).toEqual({
+      updatedAt: '2026-10-02T12:00:00.000Z',
+      id: 'content_123',
+    })
+    expect(() => decodeScopedCursor(direct, 'scope-b')).toThrow(
+      expect.objectContaining({ code: 'INVALID_CURSOR' }),
+    )
+  })
+
+  it('binds revision cursors to the owning user and content', async () => {
+    const row = {
+      id: 'revision_2',
+      content_id: 'content_123',
+      revision: 2,
+      content_version: 2,
+      actor_user_id: 'user_123',
+      source_revision: 1,
+      operation: 'UPDATE',
+      state: 'DRAFT',
+      slug: 'article-123',
+      title: 'Revision title',
+      body_ref: 'https://cdn.example.com/body.txt',
+      media_refs_json: '[]',
+      cover_ref: null,
+      etag: 'W/"2"',
+      reason: null,
+      correlation_id: 'test-correlation',
+      created_at: '2026-10-02T12:01:00.000Z',
+    }
+    let prepareCalls = 0
+    const db = {
+      prepare() {
+        prepareCalls += 1
+        return { bind: () => ({ all: async () => ({ results: [row, { ...row, id: 'revision_1' }] }) }) }
+      },
+    } as never
+    const first = await listContentRevisions(db, 'user_123', 'content_123', null, 1)
+    expect(first.hasMore).toBe(true)
+    expect(first.nextCursor).toEqual(expect.any(String))
+    await expect(listContentRevisions(db, 'user_123', 'content_999', first.nextCursor, 1)).rejects.toMatchObject({
+      code: 'INVALID_CURSOR',
+      status: 400,
+    })
+    await expect(listContentRevisions(db, 'user_999', 'content_123', first.nextCursor, 1)).rejects.toMatchObject({
+      code: 'INVALID_CURSOR',
+      status: 400,
+    })
+    expect(prepareCalls).toBe(1)
   })
 
   it('rejects update requests that change the immutable content type', async () => {
@@ -205,13 +350,37 @@ describe('W03 content contract core', () => {
         { D1_02: db },
       )
 
-      expect(response.status).toBe(400)
+      expect(response.status).toBe(422)
       await expect(response.json()).resolves.toMatchObject({
         error: { code: 'VALIDATION_FAILED' },
+        requestId: expect.stringMatching(/^req_[A-Za-z0-9_-]+$/),
       })
     }
   })
 
+
+  it('returns the canonical error envelope for an unmatched internal route', async () => {
+    const db = {
+      prepare() {
+        throw new Error('database should not be reached for an unmatched route')
+      },
+    } as never
+    const response = await w03Worker.fetch(
+      new Request('https://luckread-w03.internal/internal/content/unmatched-route', {
+        headers: {
+          'X-LuckRead-Caller': 'W01',
+          'X-LuckRead-Transport-Version': '1.0',
+          'X-LuckRead-Correlation-Id': 'test-unmatched-route',
+        },
+      }),
+      { D1_02: db },
+    )
+    expect(response.status).toBe(404)
+    await expect(response.json()).resolves.toMatchObject({
+      error: { code: 'NOT_FOUND', message: expect.any(String), details: {} },
+      requestId: expect.stringMatching(/^req_[A-Za-z0-9_-]+$/),
+    })
+  })
 
   it('filters public content by content type', async () => {
     const preparedQueries: string[] = []

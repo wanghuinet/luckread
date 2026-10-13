@@ -23,8 +23,8 @@ const finalizeCommentMutationResponse = async (response: Response): Promise<Resp
 
 const errorResponse = (status: number, code: string, message: string) =>
   Response.json(
-    { error: { code, message, details: {} }, requestId: crypto.randomUUID() },
-    { status, headers: { 'cache-control': 'no-store' } },
+    { error: { code, message, details: {} }, requestId: `req_${crypto.randomUUID()}` },
+    { status: code === 'VALIDATION_FAILED' && status === 400 ? 422 : status, headers: { 'cache-control': 'no-store' } },
   )
 
 export async function PATCH(
@@ -33,35 +33,34 @@ export async function PATCH(
 ): Promise<Response> {
   try {
     const { commentId } = await context.params
-    if (!commentId?.trim()) return errorResponse(400, 'VALIDATION_FAILED', 'Invalid comment id')
+    if (!commentId?.trim()) return errorResponse(422, 'VALIDATION_FAILED', 'Invalid comment id')
 
     const principal = await resolveCookieSocialPrincipal(request)
     if (principal instanceof Response) return principal
 
     const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
-    if (!idempotencyKey || idempotencyKey.length > 256) {
-      return errorResponse(428, 'PRECONDITION_REQUIRED', 'Idempotency-Key required')
-    }
+    if (!idempotencyKey) return errorResponse(428, 'PRECONDITION_REQUIRED', 'Idempotency-Key required')
+    if (idempotencyKey.length > 256) return errorResponse(422, 'VALIDATION_FAILED', 'Invalid Idempotency-Key header')
 
     const ifMatch = request.headers.get('If-Match')?.trim() ?? ''
-    if (!ifMatch || ifMatch.length > 256) {
-      return errorResponse(428, 'PRECONDITION_REQUIRED', 'If-Match required')
-    }
+    if (!ifMatch) return errorResponse(428, 'PRECONDITION_REQUIRED', 'If-Match required')
+    if (ifMatch === '*') return errorResponse(412, 'PRECONDITION_FAILED', 'If-Match precondition failed')
+    if (ifMatch.length > 256) return errorResponse(422, 'VALIDATION_FAILED', 'Invalid If-Match header')
 
     let body: unknown
     try {
       body = await request.json()
     } catch {
-      return errorResponse(400, 'VALIDATION_FAILED', 'Invalid JSON body')
+      return errorResponse(422, 'VALIDATION_FAILED', 'Invalid JSON body')
     }
 
     if (!body || typeof body !== 'object' || Array.isArray(body)) {
-      return errorResponse(400, 'VALIDATION_FAILED', 'Invalid request body')
+      return errorResponse(422, 'VALIDATION_FAILED', 'Invalid request body')
     }
 
     const bodyValue = (body as { body?: unknown }).body
     if (typeof bodyValue !== 'string') {
-      return errorResponse(400, 'VALIDATION_FAILED', 'Comment body is required')
+      return errorResponse(422, 'VALIDATION_FAILED', 'Comment body is required')
     }
 
     return await finalizeCommentMutationResponse(await callW05Social({
@@ -85,15 +84,14 @@ export async function DELETE(
 ): Promise<Response> {
   try {
     const { commentId } = await context.params
-    if (!commentId?.trim()) return errorResponse(400, 'VALIDATION_FAILED', 'Invalid comment id')
+    if (!commentId?.trim()) return errorResponse(422, 'VALIDATION_FAILED', 'Invalid comment id')
 
     const principal = await resolveCookieSocialPrincipal(request)
     if (principal instanceof Response) return principal
 
     const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
-    if (!idempotencyKey || idempotencyKey.length > 256) {
-      return errorResponse(428, 'PRECONDITION_REQUIRED', 'Idempotency-Key required')
-    }
+    if (!idempotencyKey) return errorResponse(428, 'PRECONDITION_REQUIRED', 'Idempotency-Key required')
+    if (idempotencyKey.length > 256) return errorResponse(422, 'VALIDATION_FAILED', 'Invalid Idempotency-Key header')
 
     return await finalizeCommentMutationResponse(await callW05Social({
       request,

@@ -558,8 +558,13 @@ const withCacheHeader = async (response: Response, cacheStatus: 'HIT' | 'MISS'):
     try {
       const bodyValue = await response.clone().json() as unknown
       if (bodyValue && typeof bodyValue === 'object' && !Array.isArray(bodyValue) && 'requestId' in bodyValue) {
+        const bodyValueRecord = bodyValue as Record<string, unknown>
+        if (bodyValueRecord.error && typeof bodyValueRecord.error === 'object' && !Array.isArray(bodyValueRecord.error)) {
+          const error = bodyValueRecord.error as Record<string, unknown>
+          if (error.details === undefined || error.details === null) error.details = {}
+        }
         const requestId = generatePublicRequestId()
-        const body = { ...(bodyValue as Record<string, unknown>), requestId }
+        const body = { ...bodyValueRecord, requestId }
         headers.set('x-request-id', requestId)
         headers.set('cache-control', 'private, no-store')
         headers.delete('content-length')

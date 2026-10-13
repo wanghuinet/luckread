@@ -141,6 +141,8 @@ const ALL_STATES: readonly ContentState[] = [
   'PUBLISHED','UNPUBLISHED','ARCHIVED','DELETED','RESTORED',
 ]
 
+export const createRequestId = (): string => 'req_' + crypto.randomUUID()
+
 const publicMessage = (code: string): string => {
   switch (code) {
     case 'UNAUTHENTICATED': return 'Authentication required'
@@ -153,12 +155,9 @@ const publicMessage = (code: string): string => {
     case 'IDEMPOTENCY_IN_PROGRESS': return 'A matching content mutation is already in progress'
     case 'IDEMPOTENCY_KEY_REUSE_CONFLICT': return 'Idempotency-Key cannot be reused with different input'
     case 'SERVICE_UNAVAILABLE': return 'Content service unavailable'
-    case 'PREFLIGHT_BLOCKED': return 'Publish preflight blocked submission'
+    case 'INVALID_CURSOR': return 'Invalid pagination cursor'
+    case 'CURSOR_EXPIRED': return 'Pagination cursor expired'
     case 'RATE_LIMITED': return 'Rate limit exceeded'
-    case 'RELATIONSHIP_ALREADY_EXISTS': return 'Content relationship already exists'
-    case 'RELATIONSHIP_CONFLICT': return 'Content relationship conflict'
-    case 'RELATIONSHIP_NOT_FOUND': return 'Content relationship not found'
-    case 'RELATIONSHIP_NOT_ACTIVE': return 'Content relationship is not active'
     default: return 'Content request failed'
   }
 }
@@ -175,8 +174,8 @@ const errorResponse = (error: ContentRuntimeError): Response => {
       message: publicMessage(error.code),
       details: error.code === 'RATE_LIMITED' ? { retryAfter: 60 } : {},
     },
-    requestId: crypto.randomUUID(),
-  }, { status: error.status, headers })
+    requestId: createRequestId(),
+  }, { status: error.code === 'VALIDATION_FAILED' && error.status === 400 ? 422 : error.status, headers })
 }
 
 const toContent = (row: ContentRow): ContentRecord => ({
@@ -501,7 +500,8 @@ export async function listContentRevisions(
   assertResourceId(principalUserId)
   assertResourceId(contentId)
   const pageSize = revisionPageSize(limit)
-  const decoded = cursor ? decodeCursor(cursor) : null
+  const cursorScope = JSON.stringify({ type: 'content-revisions', principalUserId, contentId })
+  const decoded = cursor ? decodeScopedCursor(cursor, cursorScope) : null
   const cursorClause = decoded ? 'AND (r.created_at < ? OR (r.created_at = ? AND r.id < ?))' : ''
   const cursorBindings = decoded ? [decoded.updatedAt, decoded.updatedAt, decoded.id] : []
   const rows = await db.prepare(`
@@ -516,7 +516,7 @@ export async function listContentRevisions(
   const hasMore = rows.results.length > pageSize
   const page = rows.results.slice(0, pageSize).map(toRevision)
   const last = page.at(-1)
-  return { items: page, hasMore, nextCursor: hasMore && last ? encodeCursor(last.createdAt, last.id) : null }
+  return { items: page, hasMore, nextCursor: hasMore && last ? encodeScopedCursor(last.createdAt, last.id, cursorScope) : null }
 }
 
 export async function getContentRevision(
@@ -564,7 +564,13 @@ export async function listCreatorContents(
 ): Promise<{ items: ContentRecord[]; nextCursor: string | null; hasMore: boolean }> {
   assertResourceId(ownerUserId)
   const pageSize = Math.min(Math.max(Number.isSafeInteger(limit) ? limit : 20, 1), 50)
-  const decoded = cursor ? decodeCursor(cursor) : null
+  const cursorScope = JSON.stringify({
+    type: 'creator-contents',
+    ownerUserId,
+    status: filters.status ?? null,
+    contentType: filters.contentType ?? null,
+  })
+  const decoded = cursor ? decodeScopedCursor(cursor, cursorScope) : null
   const conditions = ['owner_user_id = ?']
   const bindings: unknown[] = [ownerUserId]
   if (filters.status) {
@@ -593,7 +599,9 @@ export async function listCreatorContents(
   return {
     items: page,
     hasMore,
-    nextCursor: hasMore && last ? encodeCursor(last.updatedAt, last.id) : null,
+    nextCursor: hasMore && last
+      ? encodeScopedCursor(last.updatedAt, last.id, cursorScope)
+      : null,
   }
 }
 
@@ -610,7 +618,7 @@ export async function listContents(
     throw new ContentRuntimeError('VALIDATION_FAILED', 400)
   }
 
-  const decoded = cursor ? decodeCursor(cursor) : null
+  const decoded = cursor ? decodeContentListCursor(cursor, creatorId, contentType) : null
   const conditions = ["state = 'PUBLISHED'"]
   const bindings: unknown[] = []
 
@@ -624,8 +632,8 @@ export async function listContents(
   }
 
   if (decoded) {
-    conditions.push('(updated_at < ? OR (updated_at = ? AND id < ?))')
-    bindings.push(decoded.updatedAt, decoded.updatedAt, decoded.id)
+    conditions.push('(created_at < ? OR (created_at = ? AND id < ?))')
+    bindings.push(decoded.createdAt, decoded.createdAt, decoded.id)
   }
 
   const rows = await db.prepare(
@@ -633,7 +641,7 @@ export async function listContents(
             slug, title, body_ref, media_refs_json, cover_ref, etag, created_at, updated_at
        FROM contents
       WHERE ${conditions.join(' AND ')}
-      ORDER BY updated_at DESC, id DESC
+      ORDER BY created_at DESC, id DESC
       LIMIT ?`,
   ).bind(...bindings, pageSize + 1).all<ContentRow>()
 
@@ -643,7 +651,7 @@ export async function listContents(
   return {
     items: page,
     hasMore,
-    nextCursor: hasMore && last ? encodeCursor(last.updatedAt, last.id) : null,
+    nextCursor: hasMore && last ? encodeContentListCursor(last.createdAt, last.id, creatorId, contentType) : null,
   }
 }
 
@@ -1157,7 +1165,93 @@ export function decodeCursor(value: string): { updatedAt: string; id: string } {
     if (!Number.isFinite(Date.parse(decoded.updatedAt))) throw new Error('INVALID')
     return { updatedAt: decoded.updatedAt, id: decoded.id }
   } catch {
-    throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+    throw new ContentRuntimeError('INVALID_CURSOR', 400)
+  }
+}
+
+export function encodeScopedCursor(updatedAt: string, id: string, scope: string): string {
+  const raw = JSON.stringify({ version: 1, scope, updatedAt, id })
+  const bytes = new TextEncoder().encode(raw)
+  let binary = ''
+  for (const byte of bytes) binary += String.fromCharCode(byte)
+  return btoa(binary).replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '')
+}
+
+export function decodeScopedCursor(
+  value: string,
+  scope: string,
+): { updatedAt: string; id: string } {
+  try {
+    if (!value || value.length > 2048 || !/^[A-Za-z0-9_-]+$/.test(value)) throw new Error('INVALID')
+    const normalized = value.replaceAll('-', '+').replaceAll('_', '/')
+    const padded = normalized + '='.repeat((4 - normalized.length % 4) % 4)
+    const bytes = Uint8Array.from(atob(padded), char => char.charCodeAt(0))
+    const decoded = JSON.parse(new TextDecoder().decode(bytes)) as {
+      version?: unknown
+      scope?: unknown
+      updatedAt?: unknown
+      id?: unknown
+    }
+    if (
+      decoded.version !== 1 ||
+      decoded.scope !== scope ||
+      typeof decoded.updatedAt !== 'string' ||
+      !Number.isFinite(Date.parse(decoded.updatedAt)) ||
+      typeof decoded.id !== 'string' ||
+      !/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(decoded.id)
+    ) throw new Error('INVALID')
+    return { updatedAt: decoded.updatedAt, id: decoded.id }
+  } catch {
+    throw new ContentRuntimeError('INVALID_CURSOR', 400)
+  }
+}
+
+type ContentListCursor = {
+  version: 1
+  createdAt: string
+  id: string
+  creatorId: string | null
+  contentType: ContentType | null
+}
+
+export function encodeContentListCursor(
+  createdAt: string,
+  id: string,
+  creatorId: string | null,
+  contentType: ContentType | null,
+): string {
+  const raw = JSON.stringify({ version: 1, createdAt, id, creatorId, contentType } satisfies ContentListCursor)
+  const bytes = new TextEncoder().encode(raw)
+  let binary = ''
+  for (const byte of bytes) binary += String.fromCharCode(byte)
+  return btoa(binary).replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '')
+}
+
+export function decodeContentListCursor(
+  value: string,
+  creatorId: string | null,
+  contentType: ContentType | null,
+): ContentListCursor {
+  try {
+    if (!value || value.length > 2048 || !/^[A-Za-z0-9_-]+$/.test(value)) throw new Error('INVALID')
+    const normalized = value.replaceAll('-', '+').replaceAll('_', '/')
+    const padded = normalized + '='.repeat((4 - normalized.length % 4) % 4)
+    const bytes = Uint8Array.from(atob(padded), char => char.charCodeAt(0))
+    const decoded = JSON.parse(new TextDecoder().decode(bytes)) as Partial<ContentListCursor>
+    if (
+      decoded.version !== 1 ||
+      typeof decoded.createdAt !== 'string' ||
+      !Number.isFinite(Date.parse(decoded.createdAt)) ||
+      typeof decoded.id !== 'string' ||
+      !/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(decoded.id) ||
+      (decoded.creatorId !== null && typeof decoded.creatorId !== 'string') ||
+      (decoded.contentType !== null && !['article', 'post', 'video'].includes(decoded.contentType as string)) ||
+      decoded.creatorId !== creatorId ||
+      decoded.contentType !== contentType
+    ) throw new Error('INVALID')
+    return decoded as ContentListCursor
+  } catch {
+    throw new ContentRuntimeError('INVALID_CURSOR', 400)
   }
 }
 
