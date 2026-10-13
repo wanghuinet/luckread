@@ -1,5 +1,6 @@
 import { AbilityBuilder, createMongoAbility, type ForcedSubject, type MongoAbility } from '@casl/ability'
 import permissionCatalog from '../../../contracts/authz/permissions.json'
+import layers from '../../../contracts/authz/layers.json'
 
 export type PermissionLayer = 'L0' | 'L1' | 'L2' | 'L3' | 'L4' | 'L5' | 'L6' | 'L7' | 'L8'
 export type AccountState =
@@ -130,6 +131,83 @@ const PERMISSION_BY_NAME = new Map<string, PermissionDefinition>(
     .filter(isPermissionDefinition)
     .map((permission) => [permission.name, permission]),
 )
+
+type RolePermissionContract = {
+  status?: string
+  publicDefaults?: unknown
+  roles?: unknown
+}
+
+const rolePermissionContract = (permissionCatalog as unknown as {
+  'x-role-permissions'?: RolePermissionContract
+})['x-role-permissions']
+
+const rolePermissionDefinitions = Array.isArray(rolePermissionContract?.roles)
+  ? rolePermissionContract.roles.filter((value): value is { role: string; permissions: string[] } => {
+      if (value === null || typeof value !== 'object') return false
+      const candidate = value as { role?: unknown; permissions?: unknown }
+      return typeof candidate.role === 'string' &&
+        Array.isArray(candidate.permissions) &&
+        candidate.permissions.every((name) => typeof name === 'string')
+    })
+  : []
+
+const rolePermissionMap = new Map(
+  rolePermissionDefinitions.map((definition) => [definition.role, definition.permissions]),
+)
+
+const canonicalRoleIds = new Set(
+  layers['x-layers'].flatMap((layer) => layer.roles ?? []),
+)
+
+const rolePermissionContractIsComplete =
+  rolePermissionContract?.status === 'PARTIAL_IMPLEMENTED_PERMISSION_CATALOG' &&
+  rolePermissionMap.size === canonicalRoleIds.size &&
+  [...canonicalRoleIds].every((role) => rolePermissionMap.has(role)) &&
+  rolePermissionDefinitions.every((definition) =>
+    canonicalRoleIds.has(definition.role) &&
+    definition.permissions.every((name) => PERMISSION_BY_NAME.has(name)),
+  ) &&
+  Array.isArray(rolePermissionContract.publicDefaults) &&
+  rolePermissionContract.publicDefaults.every((name) =>
+    typeof name === 'string' && PERMISSION_BY_NAME.has(name),
+  )
+
+/**
+ * Resolve a set of authoritative, currently effective RoleAssignment role IDs
+ * into the explicit grants recorded in the canonical permission catalog.
+ *
+ * The caller must pass only active/time-valid assignments returned by W02's
+ * authoritative resolver. This function does not read or persist role rows,
+ * resolve identity, or accept client-provided role claims.
+ *
+ * null means the role vocabulary/catalog is inconsistent or includes an
+ * unknown role; callers MUST fail closed rather than partially grant access.
+ */
+export function resolveCatalogPermissionsForRoles(
+  roleIds: readonly string[],
+): readonly string[] | null {
+  if (
+    !rolePermissionContractIsComplete ||
+    !Array.isArray(roleIds) ||
+    roleIds.length > 500 ||
+    roleIds.some((role) => typeof role !== 'string' || role.length === 0 || role.length > 128)
+  ) {
+    return null
+  }
+
+  const permissions = new Set<string>(
+    rolePermissionContract!.publicDefaults as string[],
+  )
+
+  for (const roleId of new Set(roleIds)) {
+    const rolePermissions = rolePermissionMap.get(roleId)
+    if (!rolePermissions) return null
+    for (const permission of rolePermissions) permissions.add(permission)
+  }
+
+  return [...permissions].sort()
+}
 
 function cleanScopeIds(value: readonly string[] | undefined): string[] {
   return [...new Set((value ?? []).filter((id) => id.length > 0 && id.length <= 256))]
