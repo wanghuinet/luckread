@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { subject } from '@casl/ability'
-import { createW08Ability, resolveCatalogPermissionsForRoles, type W08AuthorizationContext } from './index.js'
+import { createW08Ability, createW08AbilityForRoles, resolveCatalogPermissionsForRoles, type W08AuthorizationContext, type W08RoleAuthorizationContext } from './index.js'
 import layers from '../../../contracts/authz/layers.json'
 import permissionCatalog from '../../../contracts/authz/permissions.json'
 
@@ -252,6 +252,64 @@ describe('W08 CASL policy evaluator', () => {
     expect(ability.can(action, target as never)).toBe(true)
     expect(ability.can('manage', 'all')).toBe(false)
   })
+
+describe('CASL ability from trusted role assignments', () => {
+  const roleContext = (
+    overrides: Partial<W08RoleAuthorizationContext> = {},
+  ): W08RoleAuthorizationContext => ({
+    subjectId: 'user-1',
+    layer: 'L3',
+    accountState: 'active',
+    mfaVerified: false,
+    effectiveRoles: ['user', 'verified_user', 'creator'],
+    deniedPermissions: [],
+    organizationIds: [],
+    ipIds: [],
+    ...overrides,
+  })
+
+  it('builds an ability from role mappings rather than trusting client permission names', () => {
+    const ability = createW08AbilityForRoles(roleContext())
+
+    expect(ability.can('update', resource('content', { ownerId: 'user-1' }))).toBe(true)
+    expect(ability.can('follow', 'social')).toBe(true)
+    expect(ability.can('manage', 'secret')).toBe(false)
+  })
+
+  it('fails closed if any effective role is not in the canonical role vocabulary', () => {
+    const ability = createW08AbilityForRoles(roleContext({
+      effectiveRoles: ['creator', 'founder'],
+    }))
+
+    expect(ability.can('update', resource('content', { ownerId: 'user-1' }))).toBe(false)
+  })
+
+  it('allows a valid scoped L4 role only inside its trusted scope without changing global layer', () => {
+    const ability = createW08AbilityForRoles(roleContext({
+      layer: 'L2',
+      effectiveRoles: ['mcn_admin'],
+      organizationIds: ['org-1'],
+    }))
+
+    expect(ability.can('member_manage', resource('organization', { id: 'org-1' }))).toBe(true)
+    expect(ability.can('member_manage', resource('organization', { id: 'org-2' }))).toBe(false)
+  })
+
+  it('still enforces MFA and explicit DENY after resolving role grants', () => {
+    const withoutMfa = createW08AbilityForRoles(roleContext({
+      layer: 'L5',
+      effectiveRoles: ['operator'],
+      mfaVerified: false,
+    }))
+    const denied = createW08AbilityForRoles(roleContext({
+      effectiveRoles: ['user', 'verified_user', 'creator'],
+      deniedPermissions: ['content.update.own'],
+    }))
+
+    expect(withoutMfa.can('curate', 'content')).toBe(false)
+    expect(denied.can('update', resource('content', { ownerId: 'user-1' }))).toBe(false)
+  })
+})
 
 describe('canonical role-to-permission mapping', () => {
   it('combines only explicitly mapped grants for multiple effective roles', () => {
