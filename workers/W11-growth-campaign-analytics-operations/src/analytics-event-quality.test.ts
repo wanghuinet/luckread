@@ -143,6 +143,20 @@ describe('W11 analytics event quality', () => {
     expect(result.reason).toBe('SOCIAL_EVENTS_REQUIRE_AUTHENTICATED_ACTOR')
   })
 
+  it('requires a content type on content-bound social events', () => {
+    const result = validateAnalyticsEvent(
+      event({
+        eventName: 'like_created',
+        sourceWorker: 'W05',
+        contentType: undefined,
+      }),
+      { now },
+    )
+
+    expect(result.quality).toBe('INVALID')
+    expect(result.reason).toBe('CONTENT_SOCIAL_EVENT_REQUIRES_CONTENT_TYPE')
+  })
+
   it('rejects missing duration for dwell/watch events', () => {
     const result = validateAnalyticsEvent(
       event({

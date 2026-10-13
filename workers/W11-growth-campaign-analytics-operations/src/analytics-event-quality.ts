@@ -98,6 +98,12 @@ const SOCIAL_EVENT_NAMES = new Set<AnalyticsEventName>([
 const CONTENT_EVENT_NAMES = new Set<AnalyticsEventName>(
   ANALYTICS_EVENT_NAMES.filter((name) => !SOCIAL_EVENT_NAMES.has(name)),
 )
+const CONTENT_SOCIAL_EVENT_NAMES = new Set<AnalyticsEventName>([
+  'like_created',
+  'comment_created',
+  'share_created',
+  'favorite_created',
+])
 const VIDEO_EVENT_NAMES = new Set<AnalyticsEventName>([
   'video_impression',
   'video_play_request',
@@ -271,6 +277,18 @@ export function validateAnalyticsEvent(
     (typeof value.contentType !== 'string' || !VALID_CONTENT_TYPES.has(value.contentType))
   ) {
     return outcome('INVALID', 'INVALID_CONTENT_TYPE', undefined, candidateEventId)
+  }
+
+  if (
+    CONTENT_SOCIAL_EVENT_NAMES.has(eventName) &&
+    !VALID_CONTENT_TYPES.has(String(value.contentType))
+  ) {
+    return outcome(
+      'INVALID',
+      'CONTENT_SOCIAL_EVENT_REQUIRES_CONTENT_TYPE',
+      undefined,
+      candidateEventId,
+    )
   }
 
   if (CONTENT_EVENT_NAMES.has(eventName)) {
