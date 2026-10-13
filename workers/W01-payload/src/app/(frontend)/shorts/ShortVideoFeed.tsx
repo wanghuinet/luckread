@@ -76,7 +76,6 @@ export default function ShortVideoFeed() {
   const [profileById, setProfileById] = useState<Record<string, Profile>>({})
   const [busyById, setBusyById] = useState<Record<string, string>>({})
   const [message, setMessage] = useState('')
-  const [notInterestedIds, setNotInterestedIds] = useState<string[]>([])
   const [activeProgress, setActiveProgress] = useState(0)
   const [doubleTapHeartId, setDoubleTapHeartId] = useState<string | null>(null)
   const [mediaErrorById, setMediaErrorById] = useState<Record<string, boolean>>({})
@@ -97,8 +96,8 @@ export default function ShortVideoFeed() {
   const interactionCacheRef = useRef<Record<string, InteractionState>>({})
 
   const visibleItems = useMemo(
-    () => (page.items ?? []).filter((item) => item.contentType === 'video' && item.mediaRefs?.[0] && !notInterestedIds.includes(item.id)),
-    [page.items, notInterestedIds],
+    () => (page.items ?? []).filter((item) => item.contentType === 'video' && item.mediaRefs?.[0]),
+    [page.items],
   )
 
   const setActive = useCallback((index: number) => {
@@ -204,7 +203,7 @@ export default function ShortVideoFeed() {
         let bestIndex = activeIndexRef.current
         let bestRatio = 0
         for (const entry of entries) {
-          if (entry.isIntersecting && entry.intersectionRatio >= bestRatio) {
+          if (entry.isIntersecting && entry.intersectionRatio >= 0.75 && entry.intersectionRatio >= bestRatio) {
             const index = Number((entry.target as HTMLElement).dataset.index)
             if (Number.isFinite(index)) {
               bestIndex = index
@@ -224,7 +223,7 @@ export default function ShortVideoFeed() {
           void loadPage(page.nextCursor)
         }
       },
-      { threshold: [0.55, 0.75, 0.9] },
+      { threshold: [0.75] },
     )
 
     visibleItems.forEach((item, index) => {
@@ -591,11 +590,6 @@ export default function ShortVideoFeed() {
     }
   }
 
-  const markNotInterested = (item: ContentItem) => {
-    setNotInterestedIds((current) => [...current, item.id])
-    setMessage(locale === 'en' ? 'Not interested.' : '已减少这类内容。')
-  }
-
   const togglePlay = (item: ContentItem) => {
     const video = videoRefs.current[item.id]
     if (!video) return
@@ -714,7 +708,7 @@ export default function ShortVideoFeed() {
         <Link href="/" className={styles.brand}>LuckRead</Link>
         <div className={styles.feedTabs} aria-label="短视频频道">
           <span className={styles.feedTabActive}>短视频</span>
-          <Link href="/content?type=video" className={styles.feedTab}>视频</Link>
+          <Link href="/content?type=video" className={styles.feedTab}>视频列表</Link>
         </div>
         <div className={styles.topbarActions}>
           <button aria-label={muted ? '打开声音' : '关闭声音'} className={styles.iconButton} onClick={() => setMuted((value) => !value)} type="button">
@@ -888,10 +882,6 @@ export default function ShortVideoFeed() {
                     <i className="fa-solid fa-share" aria-hidden="true" />
                     <span>分享</span>
                   </button>
-                  <button className={styles.action} onClick={() => markNotInterested(item)} type="button">
-                    <i className="fa-solid fa-minus" aria-hidden="true" />
-                    <span>不感兴趣</span>
-                  </button>
                   <button className={styles.action} disabled={busy === 'report'} onClick={() => void report(item)} type="button">
                     <i className="fa-solid fa-ellipsis" aria-hidden="true" />
                     <span>更多</span>
@@ -935,7 +925,7 @@ export default function ShortVideoFeed() {
       <nav className={styles.bottomNav} aria-label="主导航">
         <Link href="/" className={styles.navItem}><i className="fa-solid fa-house" aria-hidden="true" /><span>首页</span></Link>
         <Link href="/content?type=video" className={styles.navItem}><i className="fa-solid fa-compass" aria-hidden="true" /><span>探索</span></Link>
-        <Link href="/publish?type=video" className={styles.navCreate}><i className="fa-solid fa-plus" aria-hidden="true" /></Link>
+        <Link aria-label="发布视频" href="/publish?type=video" className={styles.navCreate}><i className="fa-solid fa-plus" aria-hidden="true" /></Link>
         <Link href="/creator-center" className={styles.navItem}><i className="fa-solid fa-user-pen" aria-hidden="true" /><span>创作</span></Link>
         <Link href="/me/profile" className={styles.navItem}><i className="fa-solid fa-user" aria-hidden="true" /><span>我</span></Link>
       </nav>

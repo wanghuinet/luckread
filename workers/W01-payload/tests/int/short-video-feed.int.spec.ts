@@ -24,7 +24,7 @@ describe('TikTok-style short video feed', () => {
     expect(feed).toContain("target?.closest('button, a, input, textarea, select, [contenteditable=\"true\"]')")
     expect(feed).toContain('<span className={styles.feedTabActive}>短视频</span>')
     expect(feed).not.toContain('<span className={styles.feedTabActive}>为你</span>')
-        expect(feed).toContain('loadMoreSentinelRef')
+    expect(feed).toContain('loadMoreSentinelRef')
     expect(feed).toContain('void loadPage(nextCursor)')
     expect(feed).toContain('root: feedRef.current')
     expect(css).toContain('scroll-snap-type: y mandatory')
@@ -33,6 +33,18 @@ describe('TikTok-style short video feed', () => {
     expect(css).toContain('-webkit-touch-callout: none')
     expect(css).toContain('scroll-snap-stop: always')
     expect(css).toContain('height: 100dvh')
+  })
+
+  it('keeps the MVP feed deterministic without implying recommendation behavior', () => {
+    const feed = read('src/app/(frontend)/shorts/ShortVideoFeed.tsx')
+    expect(feed).not.toContain('notInterestedIds')
+    expect(feed).not.toContain('markNotInterested')
+    expect(feed).not.toContain('不感兴趣')
+    expect(feed).not.toContain('为你推荐')
+    expect(feed).toContain('entry.intersectionRatio >= 0.75')
+    expect(feed).toContain('{ threshold: [0.75] }')
+    expect(feed).toContain('className={styles.feedTab}>视频列表</Link>')
+    expect(feed).toContain('aria-label="发布视频"')
   })
 
   it('reuses canonical like, bookmark, follow, share, report, and comment authorities', () => {
