@@ -399,8 +399,6 @@ function guardTypeOnlyChecks(ability: InternalW08Ability): W08Ability {
 function emptyAbility(): W08Ability {
   return guardTypeOnlyChecks(new AbilityBuilder<InternalW08Ability>(createMongoAbility).build())
 }
-  return new AbilityBuilder<InternalW08Ability>(createMongoAbility).build()
-}
 
 /**
  * Build a CASL ability from the canonical permission catalog and an already
