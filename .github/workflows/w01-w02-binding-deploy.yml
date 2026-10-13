@@ -65,7 +65,7 @@ jobs:
 
       - name: Run creator authorization runtime and UI contract tests before production changes
         if: ${{ inputs.confirm == 'DEPLOY_BINDING_AND_W08_CREATOR' }}
-        run: npx --no-install vitest run workers/W02-identity/src/authz/role-assignment-command.test.ts workers/W08-creator/src/policy.test.ts workers/W08-creator/src/authz/casl-policy.test.ts workers/W08-creator/src/authz/handler.test.ts workers/W08-creator/src/index.runtime.test.ts workers/W01-payload/tests/int/creator-application-page.int.spec.ts
+        run: npx --no-install vitest run workers/W02-identity/src/authz/role-assignment-command.test.ts workers/W08-creator/src/policy.test.ts workers/W08-creator/src/authz/casl-policy.test.ts workers/W08-creator/src/authz/handler.test.ts workers/W08-creator/src/authz/role-layer.test.ts workers/W08-creator/src/index.runtime.test.ts workers/W01-payload/tests/int/creator-application-page.int.spec.ts
 
       - name: Verify creator authorization/catalog and terminal routing gates
         if: ${{ inputs.confirm == 'DEPLOY_BINDING_AND_W08_CREATOR' }}
