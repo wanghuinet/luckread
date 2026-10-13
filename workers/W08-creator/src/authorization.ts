@@ -200,10 +200,25 @@ export function resolveCatalogPermissionsForRoles(
     rolePermissionContract!.publicDefaults as string[],
   )
 
+  const roleLayerById = new Map<string, PermissionLayer>()
+  for (const layer of layers['x-layers']) {
+    for (const role of layer.roles ?? []) roleLayerById.set(role, layer.id as PermissionLayer)
+  }
+
   for (const roleId of new Set(roleIds)) {
     const rolePermissions = rolePermissionMap.get(roleId)
-    if (!rolePermissions) return null
-    for (const permission of rolePermissions) permissions.add(permission)
+    const roleLayer = roleLayerById.get(roleId)
+    if (!rolePermissions || !roleLayer) return null
+    for (const permissionName of rolePermissions) {
+      const permission = PERMISSION_BY_NAME.get(permissionName)
+      if (!permission) return null
+      // The permission must meet the layer of the actual role grant. This is
+      // separate from the principal's global layer, because scoped role
+      // assignments do not change the global authLogin/authRefresh layer.
+      if (LAYER_RANK[roleLayer] >= LAYER_RANK[permission.minLayer]) {
+        permissions.add(permissionName)
+      }
+    }
   }
 
   return [...permissions].sort()
@@ -273,7 +288,10 @@ function emptyAbility(): W08Ability {
  * account-state, entitlement, workflow, ownership, or business-state checks.
  * Unknown permission names are ignored (fail closed).
  */
-export function createW08Ability(context: W08AuthorizationContext): W08Ability {
+function buildW08Ability(
+  context: W08AuthorizationContext,
+  enforceGlobalLayerMinimum: boolean,
+): W08Ability {
   if (!isContext(context)) return emptyAbility()
 
   const rank = LAYER_RANK[context.layer]
@@ -299,7 +317,7 @@ export function createW08Ability(context: W08AuthorizationContext): W08Ability {
   for (const permissionName of new Set(context.effectivePermissions)) {
     const permission = PERMISSION_BY_NAME.get(permissionName)
     if (!permission) continue
-    if (rank < LAYER_RANK[permission.minLayer]) continue
+    if (enforceGlobalLayerMinimum && rank < LAYER_RANK[permission.minLayer]) continue
 
     const publicRead = permission.scope === 'public' && permission.action === 'read'
     if (canReadPublicOnly && !publicRead) continue
@@ -330,3 +348,45 @@ export function createW08Ability(context: W08AuthorizationContext): W08Ability {
 
   return build()
 }
+
+export type W08RoleAuthorizationContext = Omit<W08AuthorizationContext, 'effectivePermissions'> & {
+  effectiveRoles: readonly string[]
+}
+
+/**
+ * Preferred server-side entrypoint when W02 has resolved active,
+ * time-valid RoleAssignment identifiers.
+ *
+ * The policy catalog turns those trusted roles into explicit grants; CASL
+ * still applies account-state, MFA, ownership, resource visibility, and
+ * organization/IP scope rules. A scoped role may authorize only within the
+ * server-resolved scope and must not rewrite the principal's global layer.
+ */
+export function createW08AbilityForRoles(context: W08RoleAuthorizationContext): W08Ability {
+  if (
+    context === null ||
+    typeof context !== 'object' ||
+    !isStringList(context.effectiveRoles)
+  ) {
+    return emptyAbility()
+  }
+
+  const effectivePermissions = resolveCatalogPermissionsForRoles(context.effectiveRoles)
+  if (!effectivePermissions) return emptyAbility()
+
+  const { effectiveRoles: _effectiveRoles, ...baseContext } = context
+  return buildW08Ability({
+    ...baseContext,
+    effectivePermissions,
+  }, false)
+}
+
+/**
+ * Entry point for callers that already possess a trusted, canonical
+ * effective-permission set. Prefer createW08AbilityForRoles when W02 role IDs
+ * are available, so grant composition remains tied to the permission catalog.
+ */
+export function createW08Ability(context: W08AuthorizationContext): W08Ability {
+  return buildW08Ability(context, true)
+}
+
