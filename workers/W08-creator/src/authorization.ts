@@ -26,7 +26,7 @@ type ScopedGrant = {
   scopeId: string
   assignmentLayer: PermissionLayer
 }
-type W08RoleAssignment = {
+export type W08RoleAssignment = {
   roleId: string
   scopeType: AssignmentScopeType
   scopeId: string | null
@@ -484,7 +484,10 @@ function buildW08Ability(
     return guardTypeOnlyChecks(build())
   }
 
-  for (const permissionName of new Set(context.effectivePermissions)) {
+  const evaluatedPermissionNames = new Set(context.effectivePermissions)
+  for (const scopedGrant of scopedGrants ?? []) evaluatedPermissionNames.add(scopedGrant.permissionName)
+
+  for (const permissionName of evaluatedPermissionNames) {
     const permission = PERMISSION_BY_NAME.get(permissionName)
     if (!permission) continue
     if (enforceGlobalLayerMinimum && rank < LAYER_RANK[permission.minLayer]) continue
