@@ -27,27 +27,30 @@ class FakeD1 {
   users = new Map<string, UserFixture>()
   prepare(sql: string) { return new FakeStatement(this, sql) }
 }
-function fakeW02(principal: TestPrincipal | null): Fetcher {
+function fakeW02(principal: TestPrincipal | null, forwardedAuthorizations: Array<string | null> = []): Fetcher {
   return {
     async fetch(request: Request): Promise<Response> {
       if (new URL(request.url).pathname !== '/internal/auth/principal') return new Response(null, { status: 404 })
+      forwardedAuthorizations.push(request.headers.get('authorization'))
       return principal
         ? Response.json({ active: true, ...principal })
         : Response.json({ active: false }, { status: 401 })
     },
   } as unknown as Fetcher
 }
-const post = (body: unknown, withSession = true) => new Request('https://luckread-w08-creator.internal/internal/authz/check-permission', {
-  method: 'POST',
-  headers: {
-    'content-type': 'application/json',
-    ...(withSession ? { cookie: 'better-auth.session_token=test-session' } : {}),
-  },
-  body: JSON.stringify(body),
-})
-const env = (db: FakeD1, principal: TestPrincipal | null) => ({
+const post = (body: unknown, withSession = true, authorization?: string) => {
+  const headers = new Headers({ 'content-type': 'application/json' })
+  if (withSession) headers.set('cookie', 'better-auth.session_token=test-session')
+  if (authorization) headers.set('authorization', authorization)
+  return new Request('https://luckread-w08-creator.internal/internal/authz/check-permission', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(body),
+  })
+}
+const env = (db: FakeD1, principal: TestPrincipal | null, forwardedAuthorizations?: Array<string | null>) => ({
   D1_01: db as unknown as D1Database,
-  W02_AUTH: fakeW02(principal),
+  W02_AUTH: fakeW02(principal, forwardedAuthorizations),
 })
 
 describe('W08 internal CASL permission endpoint', () => {
@@ -64,6 +67,28 @@ describe('W08 internal CASL permission endpoint', () => {
     }), env(db, { userId: 'verified-1', accountState: 'ACTIVE', layer: 'L2' }))
 
     expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject({ decision: 'ALLOW', action: 'creator.application.apply' })
+  })
+
+  it('forwards native Bearer credentials to W02 for canonical session validation', async () => {
+    const db = new FakeD1()
+    db.users.set('verified-bearer', {
+      accountState: 'ACTIVE',
+      roles: [{ roleId: 'verified_user', scopeType: 'global', scopeId: null }],
+    })
+    const forwardedAuthorizations: Array<string | null> = []
+    const response = await handlePermissionCheck(post({
+      action: 'creator.application.apply',
+      resourceType: 'CreatorApplication',
+      resourceAttributes: { ownerId: 'verified-bearer' },
+    }, false, 'Bearer native-session-token'), env(db, {
+      userId: 'verified-bearer',
+      accountState: 'ACTIVE',
+      layer: 'L2',
+    }, forwardedAuthorizations))
+
+    expect(response.status).toBe(200)
+    expect(forwardedAuthorizations).toEqual(['Bearer native-session-token'])
     expect(await response.json()).toMatchObject({ decision: 'ALLOW', action: 'creator.application.apply' })
   })
 

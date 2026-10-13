@@ -55,7 +55,6 @@ async function principalFor(env: Env, request: Request): Promise<Principal | Res
     const headers = new Headers(request.headers)
     headers.delete('host')
     headers.delete('content-length')
-    headers.delete('authorization')
     const response = await env.W02_AUTH.fetch(new Request('https://luckread-w02.internal/internal/auth/principal', {
       method: 'POST',
       headers,
@@ -136,7 +135,6 @@ async function callRoleGrant(
     const headers = new Headers(originalRequest.headers)
     headers.delete('host')
     headers.delete('content-length')
-    headers.delete('authorization')
     headers.set('X-LuckRead-Caller', 'W08')
     headers.set('X-LuckRead-Transport-Version', '1.0')
     headers.set('content-type', 'application/json; charset=utf-8')

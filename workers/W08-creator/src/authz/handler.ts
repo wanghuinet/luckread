@@ -54,14 +54,13 @@ async function resolveSubjectFromW02Session(
   request: Request,
   env: Env,
 ): Promise<{ userId: string } | null | Response> {
-  // No session cookie means the request is anonymous. Identity is never read
-  // from the request body; authenticated subject identity is resolved by W02.
-  if (!request.headers.has('cookie')) return null
+  // Browser cookies and native Bearer tokens are canonical session carriers.
+  // W08 forwards either to W02 and never interprets raw credentials itself.
+  if (!request.headers.has('cookie') && !request.headers.has('authorization')) return null
   try {
     const headers = new Headers(request.headers)
     headers.delete('host')
     headers.delete('content-length')
-    headers.delete('authorization')
     const response = await env.W02_AUTH.fetch(new Request(
       'https://luckread-w02.internal/internal/auth/principal',
       { method: 'POST', headers },

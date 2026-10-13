@@ -216,15 +216,19 @@ const request = (path: string, method: string, body?: unknown, headers?: Headers
 function harness(current: TestPrincipal | null, allowRoleGrant = false, sharedDb?: FakeD1) {
   const db = sharedDb ?? new FakeD1()
   const roleGrants: Array<Record<string, unknown>> = []
+  const principalAuthorizations: Array<string | null> = []
+  const roleGrantAuthorizations: Array<string | null> = []
   const auth = {
     async fetch(incoming: Request): Promise<Response> {
       const path = new URL(incoming.url).pathname
       if (path === '/internal/auth/principal') {
+        principalAuthorizations.push(incoming.headers.get('authorization'))
         return current
           ? Response.json(current)
           : Response.json({ active: false }, { status: 401 })
       }
       if (path === '/internal/authz/role-assignment' && allowRoleGrant) {
+        roleGrantAuthorizations.push(incoming.headers.get('authorization'))
         roleGrants.push(await incoming.json() as Record<string, unknown>)
         return Response.json({ assignmentId: 'role-assignment-test-0001', replayed: false })
       }
@@ -236,7 +240,7 @@ function harness(current: TestPrincipal | null, allowRoleGrant = false, sharedDb
     D1_01: db as unknown as D1Database,
     W02_AUTH: auth as unknown as Fetcher,
   } as Parameters<typeof worker.fetch>[1]
-  return { db, env, roleGrants }
+  return { db, env, roleGrants, principalAuthorizations, roleGrantAuthorizations }
 }
 
 async function responseBody(response: Response) {
@@ -275,6 +279,20 @@ function existingApplication(overrides: Partial<TestApplication> = {}): TestAppl
 }
 
 describe('W08 creator qualification runtime guards', () => {
+  it('forwards native Bearer sessions to W02 when submitting a creator application', async () => {
+    const setup = harness(principal('applicant-bearer-0001', 'L2'))
+    const response = await worker.fetch(request('/api/v1/creator-applications', 'POST', {
+      creatorType: 'WRITER',
+      statement: 'Bearer session application.',
+    }, {
+      'Idempotency-Key': 'creator-apply-bearer-0001',
+      Authorization: 'Bearer native-session-token',
+    }), setup.env)
+
+    expect(response.status).toBe(201)
+    expect(setup.principalAuthorizations).toEqual(['Bearer native-session-token'])
+  })
+
   it('routes the internal CASL endpoint and rejects a forged subject before any D1 access', async () => {
     const setup = harness(principal('regular-user-0001', 'L2'))
     const response = await worker.fetch(request('/internal/authz/check-permission', 'POST', {
@@ -421,11 +439,17 @@ describe('W08 creator qualification runtime guards', () => {
       applicationId,
       decision: 'APPROVED',
       reason: 'Lifecycle acceptance approved.',
-    }, { 'Idempotency-Key': 'creator-lifecycle-review-0001', 'If-Match': '"1"' }), reviewer.env)
+    }, {
+      'Idempotency-Key': 'creator-lifecycle-review-0001',
+      'If-Match': '"1"',
+      Authorization: 'Bearer reviewer-native-session-token',
+    }), reviewer.env)
     const decision = await responseBody(decisionResponse)
 
     expect(decisionResponse.status).toBe(200)
     expect(decision.data).toMatchObject({ status: 'APPROVED', grantState: 'GRANTED', version: 3 })
+    expect(reviewer.principalAuthorizations).toEqual(['Bearer reviewer-native-session-token'])
+    expect(reviewer.roleGrantAuthorizations).toEqual(['Bearer reviewer-native-session-token'])
     expect(reviewer.roleGrants).toEqual([{
       subjectId: 'applicant-lifecycle-0001',
       roleId: 'creator',
