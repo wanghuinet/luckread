@@ -49,6 +49,40 @@ jobs:
             echo "Source SHA has no W08 Creator Worker; creator migration/deploy skipped."
           fi
 
+
+      - name: Gate creator lifecycle QA accounts before any production mutation
+        if: ${{ inputs.confirm == 'DEPLOY_BINDING_AND_W08_CREATOR' }}
+        env:
+          LUCKREAD_CREATOR_E2E_APPLICANT_EMAIL: ${{ secrets.LUCKREAD_CREATOR_E2E_APPLICANT_EMAIL }}
+          LUCKREAD_CREATOR_E2E_APPLICANT_PASSWORD: ${{ secrets.LUCKREAD_CREATOR_E2E_APPLICANT_PASSWORD }}
+          LUCKREAD_CREATOR_E2E_REVIEWER_EMAIL: ${{ secrets.LUCKREAD_CREATOR_E2E_REVIEWER_EMAIL }}
+          LUCKREAD_CREATOR_E2E_REVIEWER_PASSWORD: ${{ secrets.LUCKREAD_CREATOR_E2E_REVIEWER_PASSWORD }}
+          LUCKREAD_APP_AUTH_SMOKE_EMAIL: ${{ secrets.LUCKREAD_APP_AUTH_SMOKE_EMAIL }}
+        run: |
+          set -euo pipefail
+          for name in LUCKREAD_CREATOR_E2E_APPLICANT_EMAIL LUCKREAD_CREATOR_E2E_APPLICANT_PASSWORD LUCKREAD_CREATOR_E2E_REVIEWER_EMAIL LUCKREAD_CREATOR_E2E_REVIEWER_PASSWORD LUCKREAD_APP_AUTH_SMOKE_EMAIL; do
+            if [ -z "${!name:-}" ]; then
+              echo "Missing required creator E2E secret: $name. No production mutation has run."
+              exit 1
+            fi
+          done
+          valid_email() { [[ "$1" =~ ^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$ ]]; }
+          if ! valid_email "$LUCKREAD_CREATOR_E2E_APPLICANT_EMAIL" || ! valid_email "$LUCKREAD_CREATOR_E2E_REVIEWER_EMAIL" || ! valid_email "$LUCKREAD_APP_AUTH_SMOKE_EMAIL"; then
+            echo "Creator E2E and session smoke credentials must use valid email addresses. No production mutation has run."
+            exit 1
+          fi
+          normalize_email() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]'; }
+          applicant="$(normalize_email "$LUCKREAD_CREATOR_E2E_APPLICANT_EMAIL")"
+          reviewer="$(normalize_email "$LUCKREAD_CREATOR_E2E_REVIEWER_EMAIL")"
+          smoke="$(normalize_email "$LUCKREAD_APP_AUTH_SMOKE_EMAIL")"
+          if [ "$applicant" = "$reviewer" ] || [ "$applicant" = "$smoke" ] || [ "$reviewer" = "$smoke" ]; then
+            echo "Applicant, reviewer and APP session-smoke accounts must be three different accounts. No production mutation has run."
+            exit 1
+          fi
+          echo "Creator lifecycle QA secret names and distinct-account preflight: PASS."
+          echo "Applicant account must be a fresh, active, email-verified L2 account with no creator application."
+          echo "Reviewer account must be active, email-verified and L7/L8. A successful test promotes the applicant to L3."
+
       - name: Setup Node 24
         uses: actions/setup-node@v4
         with:
@@ -114,6 +148,13 @@ jobs:
         if: ${{ inputs.confirm == 'DEPLOY_BINDING_AND_W08_CREATOR' }}
         working-directory: workers/W01-payload
         run: pnpm exec tsc --noEmit
+
+      - name: Install Chromium and validate creator lifecycle browser suite before production changes
+        if: ${{ inputs.confirm == 'DEPLOY_BINDING_AND_W08_CREATOR' }}
+        working-directory: workers/W01-payload
+        run: |
+          pnpm exec playwright install --with-deps chromium
+          pnpm exec playwright test --config playwright.production.config.ts --list
 
       - name: Verify W01 W02_AUTH binding
         working-directory: workers/W01-payload
@@ -228,5 +269,25 @@ jobs:
         with:
           name: app-auth-session-live-e2e-${{ github.run_id }}-${{ github.run_attempt }}
           path: artifacts/api-auth-session-live-e2e/*.json
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Run real L2-to-L3 creator qualification browser acceptance
+        if: ${{ inputs.confirm == 'DEPLOY_BINDING_AND_W08_CREATOR' }}
+        working-directory: workers/W01-payload
+        env:
+          LUCKREAD_SOURCE_SHA: ${{ inputs.source_sha }}
+          LUCKREAD_CREATOR_E2E_APPLICANT_EMAIL: ${{ secrets.LUCKREAD_CREATOR_E2E_APPLICANT_EMAIL }}
+          LUCKREAD_CREATOR_E2E_APPLICANT_PASSWORD: ${{ secrets.LUCKREAD_CREATOR_E2E_APPLICANT_PASSWORD }}
+          LUCKREAD_CREATOR_E2E_REVIEWER_EMAIL: ${{ secrets.LUCKREAD_CREATOR_E2E_REVIEWER_EMAIL }}
+          LUCKREAD_CREATOR_E2E_REVIEWER_PASSWORD: ${{ secrets.LUCKREAD_CREATOR_E2E_REVIEWER_PASSWORD }}
+        run: pnpm exec playwright test --config playwright.production.config.ts
+
+      - name: Upload sanitized creator authorization E2E evidence
+        if: ${{ always() && inputs.confirm == 'DEPLOY_BINDING_AND_W08_CREATOR' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: creator-authorization-live-e2e-${{ github.run_id }}-${{ github.run_attempt }}
+          path: workers/W01-payload/artifacts/creator-authorization-live-e2e/*.json
           if-no-files-found: warn
           retention-days: 30
