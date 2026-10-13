@@ -56,6 +56,7 @@ const navigationByLocale: Record<StudioLocale, {
       { label: '创作者成长', href: '#future-growth', icon: 'fa-arrow-up-right-dots', hint: '即将开放' },
     ],
     system: [
+      { label: '创作者资格', href: '/creator-application', icon: 'fa-user-check' },
       { label: '创作工具', href: '#quality', icon: 'fa-wand-magic-sparkles' },
       { label: '账号设置', href: '/me/profile', icon: 'fa-gear' },
     ],
@@ -80,6 +81,7 @@ const navigationByLocale: Record<StudioLocale, {
       { label: 'Creator growth', href: '#future-growth', icon: 'fa-arrow-up-right-dots', hint: 'Coming soon' },
     ],
     system: [
+      { label: 'Creator qualification', href: '/creator-application', icon: 'fa-user-check' },
       { label: 'Creator tools', href: '#quality', icon: 'fa-wand-magic-sparkles' },
       { label: 'Account settings', href: '/me/profile', icon: 'fa-gear' },
     ],

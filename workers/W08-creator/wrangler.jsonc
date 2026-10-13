@@ -1,0 +1,29 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "luckread-w08-creator",
+  "main": "src/worker.ts",
+  "compatibility_date": "2025-08-15",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "observability": {
+    "enabled": true,
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 1
+    }
+  },
+  "services": [
+    {
+      "binding": "W02_AUTH",
+      "service": "luckread-w02"
+    }
+  ],
+  "d1_databases": [
+    {
+      "binding": "D1_01",
+      "database_name": "luckread",
+      "database_id": "2f80471e-3756-49f9-8db1-7707a433ad64",
+      "migrations_dir": "migrations"
+    }
+  ]
+}

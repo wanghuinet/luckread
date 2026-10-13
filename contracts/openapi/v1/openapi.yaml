@@ -2695,6 +2695,204 @@ paths:
         '400':
           $ref: '#/components/responses/InvalidCursor'
 
+  /creator-applications:
+    get:
+      tags: [Creators]
+      summary: Read the current user's creator qualification application
+      operationId: getMyCreatorApplication
+      security:
+        - sessionCookieAuth: []
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Current user's latest creator application, if any.
+          headers:
+            Cache-Control:
+              schema: { type: string, const: no-store }
+            ETag:
+              schema: { type: string }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, requestId]
+                additionalProperties: false
+                properties:
+                  data:
+                    type: object
+                    required: [application]
+                    properties:
+                      application:
+                        anyOf:
+                          - type: object
+                            required: [application_id, creator_type, status, grant_state, version]
+                            properties:
+                              application_id: { $ref: '#/components/schemas/ResourceId' }
+                              creator_type: { type: string, enum: [PERSONAL, WRITER, VIDEO_CREATOR, DEVELOPER, ARTIST, OTHER] }
+                              statement: { type: string, maxLength: 2000 }
+                              status: { type: string, enum: [PENDING, APPROVED, REJECTED] }
+                              grant_state: { type: string, enum: [NOT_REQUESTED, PENDING, GRANTED] }
+                              version: { type: integer, minimum: 1 }
+                              created_at: { type: string, format: date-time }
+                              updated_at: { type: string, format: date-time }
+                              decided_at: { type: [string, 'null'], format: date-time }
+                              decision_reason: { type: [string, 'null'], maxLength: 500 }
+                          - type: 'null'
+                  requestId: { $ref: '#/components/schemas/RequestId' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '503': { $ref: '#/components/responses/ClientError' }
+    post:
+      tags: [Creators]
+      summary: Apply for a creator identity and L3 publishing eligibility
+      description: >-
+        Only an active, email-verified L2 account may apply. The client cannot
+        choose roles, layers, creator identifiers, reviewer, scope or decision.
+        Approval and the L3 RoleAssignment are committed as separate audited
+        steps; a pending grant is not treated as active creator access.
+      operationId: applyForCreator
+      security:
+        - sessionCookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [creatorType]
+              additionalProperties: false
+              properties:
+                creatorType:
+                  type: string
+                  enum: [PERSONAL, WRITER, VIDEO_CREATOR, DEVELOPER, ARTIST, OTHER]
+                statement:
+                  type: string
+                  maxLength: 2000
+      responses:
+        '201':
+          description: Creator application recorded as pending review.
+          headers:
+            Cache-Control:
+              schema: { type: string, const: no-store }
+            ETag:
+              schema: { type: string }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, requestId]
+                properties:
+                  data:
+                    type: object
+                    required: [applicationId, status, grantState, version]
+                    properties:
+                      applicationId: { $ref: '#/components/schemas/ResourceId' }
+                      status: { type: string, const: PENDING }
+                      grantState: { type: string, const: NOT_REQUESTED }
+                      version: { type: integer, const: 1 }
+                  requestId: { $ref: '#/components/schemas/RequestId' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/PermissionDenied' }
+        '409': { $ref: '#/components/responses/InvalidState' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '503': { $ref: '#/components/responses/ClientError' }
+
+  /admin/creator-applications:
+    get:
+      tags: [Creators]
+      summary: List pending creator applications for authorized reviewers
+      operationId: listCreatorApplicationsForReview
+      description: Requires global L7 or L8 authorization.
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 50, default: 25 }
+      security:
+        - sessionCookieAuth: []
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Bounded page of pending applications.
+          headers:
+            Cache-Control:
+              schema: { type: string, const: no-store }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, requestId]
+                properties:
+                  data:
+                    type: object
+                    required: [data, limit]
+                    properties:
+                      data: { type: array, items: { type: object } }
+                      limit: { type: integer, minimum: 1, maximum: 50 }
+                  requestId: { $ref: '#/components/schemas/RequestId' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/PermissionDenied' }
+        '503': { $ref: '#/components/responses/ClientError' }
+    post:
+      tags: [Creators]
+      summary: Approve or reject a creator application
+      operationId: decideCreatorApplication
+      description: >-
+        Requires global L7 or L8 authorization. A reviewer cannot decide their
+        own application. If-Match and Idempotency-Key prevent stale and
+        duplicate decisions. An APPROVED application is not active for L3
+        capabilities until W02 confirms the L3 RoleAssignment.
+      security:
+        - sessionCookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IfMatchRequired'
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [applicationId, decision]
+              additionalProperties: false
+              properties:
+                applicationId: { $ref: '#/components/schemas/ResourceId' }
+                decision: { type: string, enum: [APPROVED, REJECTED] }
+                reason: { type: string, maxLength: 500 }
+      responses:
+        '200':
+          description: Decision persisted; includes grant state.
+          headers:
+            Cache-Control:
+              schema: { type: string, const: no-store }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, requestId]
+                properties:
+                  data:
+                    type: object
+                    required: [applicationId, status, grantState, version]
+                    properties:
+                      applicationId: { $ref: '#/components/schemas/ResourceId' }
+                      status: { type: string, enum: [APPROVED, REJECTED] }
+                      grantState: { type: string, enum: [PENDING, GRANTED, NOT_REQUESTED] }
+                      version: { type: integer, minimum: 1 }
+                  requestId: { $ref: '#/components/schemas/RequestId' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/PermissionDenied' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/InvalidState' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '503': { $ref: '#/components/responses/ClientError' }
+
 components:
   securitySchemes:
     bearerAuth:

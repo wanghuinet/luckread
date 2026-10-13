@@ -22,14 +22,26 @@
   "routes": [
     {
       "operationIdFamily": "auth",
-      "publicPaths": ["/auth/register", "/auth/login", "/auth/logout", "/auth/password/*", "/auth/refresh", "/auth/sessions/*"],
+      "publicPaths": [
+        "/auth/register",
+        "/auth/login",
+        "/auth/logout",
+        "/auth/password/*",
+        "/auth/refresh",
+        "/auth/sessions/*"
+      ],
       "ingressWorker": "W01",
       "terminalWorker": "W01",
       "authorityNote": "W01 owns the public authentication execution boundary only where the admitted Payload-native route is the execution surface; W02 remains the Identity/Account/Authorization authority and receives explicit delegated identity/session mutations."
     },
     {
       "operationIdFamily": "content",
-      "publicPaths": ["/api/v1/contents", "/api/v1/contents/*", "/api/creator/contents", "/api/creator/contents/*"],
+      "publicPaths": [
+        "/api/v1/contents",
+        "/api/v1/contents/*",
+        "/api/creator/contents",
+        "/api/creator/contents/*"
+      ],
       "ingressWorker": "W01",
       "terminalWorker": "W03",
       "transportBinding": "W01-W03-content-http-binding.v1",
@@ -37,11 +49,24 @@
     },
     {
       "operationIdFamily": "moderation",
-      "publicPaths": ["/api/v1/admin/moderation/*"],
+      "publicPaths": [
+        "/api/v1/admin/moderation/*"
+      ],
       "ingressWorker": "W01",
       "terminalWorker": "W06",
       "transportBinding": "W01-W06-moderation-http-binding.v1",
       "authorityNote": "W06 is the Rights/Trust & Safety/Governance authority and D1-03 moderation owner."
+    },
+    {
+      "operationIdFamily": "creator",
+      "publicPaths": [
+        "/api/v1/creator-applications",
+        "/api/v1/admin/creator-applications"
+      ],
+      "ingressWorker": "W01",
+      "terminalWorker": "W08",
+      "transportBinding": "W01-W08-creator-http-binding.v1",
+      "authorityNote": "W08 owns creator qualification applications and creator identity facts in D1-01; W02 alone assigns the L3 role."
     }
   ],
   "workerToWorkerInvariant": {
@@ -53,6 +78,7 @@
     "No new public namespace is introduced by this contract.",
     "No direct public exposure of W03/W06 is required by this contract.",
     "No Worker topology expansion; the five-D1 target is governed by the approved D1 topology amendment.",
-    "No Mapping 0 GREEN promotion."
+    "No Mapping 0 GREEN promotion.",
+    "No direct public exposure of W08 is required by this contract."
   ]
 }

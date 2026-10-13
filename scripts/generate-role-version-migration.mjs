@@ -16,7 +16,8 @@ if (
 
 const sql = `-- GENERATED FILE
 -- Source authority: contracts/entity/AUTHZ-role-assignment-authority.v1.json
--- Physical owner: D1-01 / W02 / T03
+-- Logical authorization authority: D1-01 / W08 / T03
+-- Physical migration runner: workers/W02-identity/migrations (existing D1-01 schema deployment)
 -- Generator: scripts/generate-role-version-migration.mjs
 -- Do not hand-edit. Regenerate from the canonical Contract source.
 
