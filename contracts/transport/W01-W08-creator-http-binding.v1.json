@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/transport/W01-W08-creator-http-binding.v1.json",
+  "title": "W01 to W08 Creator Qualification API Internal HTTP Binding",
+  "version": "1.0.1",
+  "status": "CONTRACTED_PARTIAL",
+  "caller": {
+    "logicalWorker": "W01",
+    "role": "Public API / Gateway",
+    "authority": "Public HTTP ingress only"
+  },
+  "callee": {
+    "logicalWorker": "W08",
+    "role": "Creator Qualification",
+    "authority": "Creator applications and creator identity facts on D1-01"
+  },
+  "transport": {
+    "kind": "Cloudflare Worker Service Binding HTTP",
+    "binding": "W08_CREATOR",
+    "targetWorker": "luckread-w08-creator",
+    "publicExposure": false,
+    "newWorker": false,
+    "newDatabase": false
+  },
+  "operations": [
+    {
+      "operationId": "submitCreatorApplication",
+      "method": "POST",
+      "publicPath": "/api/v1/creator-applications",
+      "internalPath": "/api/v1/creator-applications",
+      "principalRequired": true,
+      "minimumGlobalLayer": "L2",
+      "idempotency": "Idempotency-Key",
+      "bodyAuthority": "creatorType and statement only; caller cannot set role, layer, decision, creator id, status, scope, or approver"
+    },
+    {
+      "operationId": "readMyCreatorApplication",
+      "method": "GET",
+      "publicPath": "/api/v1/creator-applications",
+      "internalPath": "/api/v1/creator-applications/me",
+      "principalRequired": true,
+      "cache": "NO_STORE"
+    },
+    {
+      "operationId": "listCreatorApplicationsForReview",
+      "method": "GET",
+      "publicPath": "/api/v1/admin/creator-applications",
+      "internalPath": "/api/v1/admin/creator-applications",
+      "principalRequired": true,
+      "minimumGlobalLayer": "L7",
+      "maxPageSize": 50,
+      "cache": "NO_STORE"
+    },
+    {
+      "operationId": "decideCreatorApplication",
+      "method": "POST",
+      "publicPath": "/api/v1/admin/creator-applications",
+      "internalPath": "/api/v1/admin/creator-applications/decision",
+      "principalRequired": true,
+      "minimumGlobalLayer": "L7",
+      "precondition": "If-Match",
+      "idempotency": "Idempotency-Key",
+      "audit": "decision actor, reason, timestamp and application version are persisted by W08"
+    }
+  ],
+  "trustBoundary": {
+    "authentication": "W01 forwards the browser session cookie or native Authorization: Bearer session credential to W08; W08 forwards the same carrier to W02_AUTH /internal/auth/principal for validation. W08 never trusts body userId or validates raw credentials locally.",
+    "creatorQualification": "W08 owns application/review state and creator identity",
+    "roleAssignment": "W02 alone writes role_assignments after authenticating the approver independently",
+    "sessionCredentialCarriers": [
+      "HttpOnly Better Auth browser session cookie",
+      "Authorization: Bearer <canonical Better Auth session token>"
+    ]
+  },
+  "failurePolicy": {
+    "timeoutMs": 2000,
+    "automaticRetries": 0,
+    "mutationRetryRule": "Retry with the same Idempotency-Key; approved role grants remain PENDING until the W02 grant is confirmed",
+    "failClosed": [
+      "missing W08_CREATOR binding",
+      "missing valid W02 principal",
+      "applicant below L2",
+      "reviewer below L7",
+      "missing If-Match on an undecided application",
+      "missing or invalid Idempotency-Key",
+      "role grant not confirmed by W02"
+    ]
+  },
+  "security": {
+    "publicWorker": "W08 is not directly public; all public requests enter through W01",
+    "noClientRoleAssignment": true,
+    "noClientApprovalIdentity": true,
+    "noGlobalElevationFromScopedRole": true,
+    "privateResponsesNoStore": true,
+    "noRawIdentitySecretsInDTO": true,
+    "credentialValidationAuthority": "W02 Better Auth only"
+  },
+  "topologyConstraints": {
+    "workerCountDelta": 0,
+    "databaseCountDelta": 0,
+    "d1Authority": "D1-01",
+    "crossD1Transactions": 0
+  },
+  "implementationStatus": {
+    "source": "IMPLEMENTED_ON_FEATURE_BRANCH",
+    "productionDeployment": "PENDING",
+    "realUserL2L3E2E": "PENDING"
+  }
+}

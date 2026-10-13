@@ -70,6 +70,7 @@
             "enum": [
               "account",
               "content",
+              "creator",
               "none"
             ]
           }
@@ -412,6 +413,19 @@
       "x-luckread-source": "contracts/api/api-inventory.v1.json"
     },
     {
+      "operationId": "listCreatorApplicationsForReview",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "creator.application.review"
+      ],
+      "auditRequired": true,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none"
+    },
+    {
       "operationId": "listModerationCases",
       "auth": {
         "mode": "permission"
@@ -628,6 +642,19 @@
       "idempotencyRequired": false,
       "stateMachine": "none",
       "x-luckread-source": "contracts/api/revision.v1.json"
+    },
+    {
+      "operationId": "getMyCreatorApplication",
+      "auth": {
+        "mode": "authenticated"
+      },
+      "permissions": [
+        "creator.application.read.own"
+      ],
+      "auditRequired": false,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none"
     },
     {
       "operationId": "getCreatorAnalytics",
@@ -1453,6 +1480,19 @@
       "x-luckread-source": "contracts/api/api-inventory.v1.json"
     },
     {
+      "operationId": "decideCreatorApplication",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "creator.application.review"
+      ],
+      "auditRequired": true,
+      "optimisticLockRequired": true,
+      "idempotencyRequired": true,
+      "stateMachine": "none"
+    },
+    {
       "operationId": "decideModerationCase",
       "auth": {
         "mode": "permission"
@@ -1787,6 +1827,19 @@
       "optimisticLockRequired": true,
       "idempotencyRequired": true,
       "stateMachine": "content"
+    },
+    {
+      "operationId": "applyForCreator",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "creator.application.apply"
+      ],
+      "auditRequired": true,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": true,
+      "stateMachine": "none"
     },
     {
       "operationId": "postDeveloperApiKeys",

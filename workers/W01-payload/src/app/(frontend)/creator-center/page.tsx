@@ -25,6 +25,7 @@ export default async function CreatorCenterPage() {
   }
 
   if (!principal.active) redirect('/login?returnTo=%2Fcreator-center')
+  if (principal.layer !== 'L3') redirect('/creator-application')
 
   const displayName =
     typeof principal.username === 'string' && principal.username.trim()

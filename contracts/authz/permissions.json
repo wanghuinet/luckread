@@ -699,6 +699,228 @@
       "action": "read",
       "minLayer": "L5",
       "scope": "platform"
+    },
+    {
+      "name": "appeal.decide",
+      "resource": "appeal",
+      "action": "decide",
+      "minLayer": "L6",
+      "scope": "platform",
+      "auditRequired": true
+    },
+    {
+      "name": "appeal.review",
+      "resource": "appeal",
+      "action": "review",
+      "minLayer": "L6",
+      "scope": "platform",
+      "auditRequired": true
+    },
+    {
+      "name": "comment.moderate",
+      "resource": "comment",
+      "action": "moderate",
+      "minLayer": "L6",
+      "scope": "platform",
+      "auditRequired": true
+    },
+    {
+      "name": "config.manage",
+      "resource": "platform_config",
+      "action": "manage",
+      "minLayer": "L7",
+      "scope": "platform",
+      "sensitive": true,
+      "auditRequired": true
+    },
+    {
+      "name": "content.hide",
+      "resource": "content",
+      "action": "hide",
+      "minLayer": "L6",
+      "scope": "platform",
+      "auditRequired": true
+    },
+    {
+      "name": "content.read.own",
+      "resource": "content",
+      "action": "read",
+      "minLayer": "L3",
+      "scope": "own"
+    },
+    {
+      "name": "content.unpublish.any",
+      "resource": "content",
+      "action": "unpublish",
+      "minLayer": "L6",
+      "scope": "platform",
+      "auditRequired": true
+    },
+    {
+      "name": "creator.application.apply",
+      "resource": "creator_application",
+      "action": "apply",
+      "minLayer": "L2",
+      "scope": "own",
+      "auditRequired": true
+    },
+    {
+      "name": "creator.application.read.own",
+      "resource": "creator_application",
+      "action": "read",
+      "minLayer": "L2",
+      "scope": "own"
+    },
+    {
+      "name": "creator.application.review",
+      "resource": "creator_application",
+      "action": "review",
+      "minLayer": "L7",
+      "scope": "platform",
+      "sensitive": true,
+      "auditRequired": true
+    },
+    {
+      "name": "feature_flag.manage",
+      "resource": "feature_flag",
+      "action": "manage",
+      "minLayer": "L7",
+      "scope": "platform",
+      "sensitive": true,
+      "auditRequired": true
+    },
+    {
+      "name": "ip.content.manage.scope",
+      "resource": "ip",
+      "action": "content_manage",
+      "minLayer": "L4",
+      "scope": "ip",
+      "auditRequired": true
+    },
+    {
+      "name": "ip.member.role.update",
+      "resource": "ip",
+      "action": "member_role_update",
+      "minLayer": "L4",
+      "scope": "ip",
+      "auditRequired": true
+    },
+    {
+      "name": "ip.read.scope",
+      "resource": "ip",
+      "action": "read",
+      "minLayer": "L4",
+      "scope": "ip"
+    },
+    {
+      "name": "ip.revenue.read.scope",
+      "resource": "ip",
+      "action": "revenue_read",
+      "minLayer": "L4",
+      "scope": "ip",
+      "sensitive": true,
+      "auditRequired": true
+    },
+    {
+      "name": "ip.update.scope",
+      "resource": "ip",
+      "action": "update",
+      "minLayer": "L4",
+      "scope": "ip",
+      "auditRequired": true
+    },
+    {
+      "name": "org.billing.read.scope",
+      "resource": "org",
+      "action": "billing_read",
+      "minLayer": "L4",
+      "scope": "organization",
+      "sensitive": true,
+      "auditRequired": true
+    },
+    {
+      "name": "org.manage.any",
+      "resource": "org",
+      "action": "manage",
+      "minLayer": "L7",
+      "scope": "platform",
+      "auditRequired": true
+    },
+    {
+      "name": "org.read.scope",
+      "resource": "org",
+      "action": "read",
+      "minLayer": "L4",
+      "scope": "organization"
+    },
+    {
+      "name": "revision.restore.own",
+      "resource": "revision",
+      "action": "restore",
+      "minLayer": "L3",
+      "scope": "own",
+      "auditRequired": true
+    },
+    {
+      "name": "role.assign.any",
+      "resource": "role",
+      "action": "assign",
+      "minLayer": "L8",
+      "scope": "platform",
+      "sensitive": true,
+      "auditRequired": true
+    },
+    {
+      "name": "security.manage",
+      "resource": "security",
+      "action": "manage",
+      "minLayer": "L8",
+      "scope": "platform",
+      "sensitive": true,
+      "auditRequired": true
+    },
+    {
+      "name": "social.block",
+      "resource": "social",
+      "action": "block",
+      "minLayer": "L2",
+      "scope": "own",
+      "auditRequired": true
+    },
+    {
+      "name": "social.mute",
+      "resource": "social",
+      "action": "mute",
+      "minLayer": "L2",
+      "scope": "own",
+      "auditRequired": true
+    },
+    {
+      "name": "subscription.manage.any",
+      "resource": "subscription",
+      "action": "manage",
+      "minLayer": "L7",
+      "scope": "platform",
+      "sensitive": true,
+      "auditRequired": true
+    },
+    {
+      "name": "user.read.any",
+      "resource": "user",
+      "action": "read",
+      "minLayer": "L7",
+      "scope": "platform",
+      "sensitive": true,
+      "auditRequired": true
+    },
+    {
+      "name": "user.restrict.any",
+      "resource": "user",
+      "action": "restrict",
+      "minLayer": "L7",
+      "scope": "platform",
+      "sensitive": true,
+      "auditRequired": true
     }
   ],
   "x-forbidden-patterns": [
@@ -741,6 +963,8 @@
           "appeal.create",
           "comment.create",
           "comment.read",
+          "creator.application.apply",
+          "creator.application.read.own",
           "entitlement.check",
           "entitlement.read",
           "interaction.block",
@@ -875,6 +1099,7 @@
           "content.submit_review.own",
           "content.unpublish.own",
           "content.update.own",
+          "creator.application.review",
           "creator.read.self",
           "creator.stats.read.self",
           "creator.update.self",
@@ -950,6 +1175,7 @@
           "content.submit_review.own",
           "content.unpublish.own",
           "content.update.own",
+          "creator.application.review",
           "creator.read.self",
           "creator.stats.read.self",
           "creator.update.self",
