@@ -51,6 +51,16 @@ describe('creator qualification application page', () => {
     expect(css).toContain('grid-template-columns: repeat(3, minmax(0, 1fr))')
     expect(css).toContain('grid-template-columns: 1fr')
   })
+  it('preserves the canonical cookie or Bearer credential across the W01-to-W08 binding', () => {
+    const client = read('src/auth/w08-creator-client.ts')
+    expect(client).toContain('const headers = new Headers(request.headers)')
+    expect(client).toContain("headers.delete('host')")
+    expect(client).toContain("headers.delete('content-length')")
+    expect(client).not.toContain("headers.delete('authorization')")
+    expect(client).toContain("new Request('https://luckread-w08-creator.internal' + path")
+    expect(client).toContain('headers,')
+  })
+
   it('restricts creator review to L7/L8 and uses authoritative review APIs', () => {
     const page = read('src/app/(frontend)/creator-review/page.tsx')
     const client = read('src/app/(frontend)/creator-review/CreatorReviewClient.tsx')

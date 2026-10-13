@@ -32,10 +32,11 @@ export async function callW08Creator(request: Request, path: string, method: 'GE
     throw new W08CreatorClientError(400, 'invalid creator service path')
   }
   const service = await getW08Service()
+  // Forward canonical browser-cookie or native Bearer session credentials unchanged.
+  // W01 does not interpret credentials; W08 forwards them to W02 for validation.
   const headers = new Headers(request.headers)
   headers.delete('host')
   headers.delete('content-length')
-  headers.delete('authorization')
   let body: BodyInit | undefined
   if (method === 'POST') {
     body = await request.arrayBuffer()
