@@ -289,6 +289,8 @@ export default function RegisterForm({ policyVersion }: RegisterFormProps) {
                     name="email"
                     onChange={(event) => setEmail(event.target.value)}
                     placeholder="name@example.com"
+                    maxLength={254}
+                    required
                     type="email"
                     value={email}
                     aria-label="邮箱地址"
@@ -338,6 +340,9 @@ export default function RegisterForm({ policyVersion }: RegisterFormProps) {
                     name="confirmPassword"
                     onChange={(event) => setConfirmPassword(event.target.value)}
                     placeholder="再次输入密码"
+                    minLength={15}
+                    maxLength={128}
+                    required
                     type="password"
                     value={confirmPassword}
                     aria-label="确认密码"
