@@ -7,13 +7,17 @@
 | Gate | Current state |
 |---|---|
 | Worker topology | 12/12 canonical |
-| D1 topology | 4/4 canonical |
+| D1 topology | 5-domain target approved; D1-05 physical provisioning pending |
 | Contract Tasks | 25/25 canonical |
-| Worker × D1 logical binding | 12/12 bound |
+| Worker × D1 logical binding | 12 Workers mapped; W11/D1-05 physical binding pending |
 | Physical Worker directory alignment | COMPLETE / MERGED |
 | Mapping 0 Freeze | BLOCKED |
 | Contract generation | BLOCKED |
 | Global implementation authorization | BLOCKED |
+
+## D1 topology amendment (2026-10-12)
+
+The approved target is now 12 Workers / 5 D1 domains / 25 Contract Tasks. D1-01..D1-04 retain their existing business authority. D1-05 is analytics-only and W11-exclusive. The D1-05 physical database UUID, schema/migrations, Wrangler binding and runtime evidence are not yet admitted; do not treat this as provisioned or GREEN.
 
 ## Physical directory alignment
 

@@ -27,8 +27,8 @@ const domainById = Object.fromEntries(
 )
 
 // Scan runtime binding syntax only; comments and quoted literals are removed before matching.
-const bindingPattern = /\.\s*(D1(?:_0[1-4])?|DB)\b/g
-const destructuredBindingPattern = /\{\s*(D1(?:_0[1-4])?|DB)\s*(?:,|\})/g
+const bindingPattern = /\.\s*(D1(?:_0[1-5])?|DB)\b/g
+const destructuredBindingPattern = /\{\s*(D1(?:_0[1-5])?|DB)\s*(?:,|\})/g
 const stripCommentsAndStrings = (source) =>
   source
     .replace(/\/\*[\s\S]*?\*\//g, '')

@@ -5,12 +5,13 @@
   "version": "1.0.0",
   "status": "CONTRACTED_PARTIAL",
   "purpose": "Make the existing Worker-to-D1 scoping mechanically checkable without introducing a D1 proxy or rewriting business logic.",
-  "topology": { "workerCount": 12, "d1Count": 4, "taskCount": 25 },
+  "topology": { "workerCount": 12, "d1Count": 5, "taskCount": 25 },
   "physicalD1Registry": {
     "D1-01": "2f80471e-3756-49f9-8db1-7707a433ad64",
     "D1-02": "6c342634-97f6-4248-9f4a-85772af4f22c",
     "D1-03": "bda1d247-a371-4244-91ae-aef96034db7f",
-    "D1-04": null
+    "D1-04": null,
+    "D1-05": null
   },
   "workers": {
     "W01": { "allowedDomains": ["D1-01"], "notes": "Bounded Payload-native execution substrate; not general D1 business authority." },
@@ -23,7 +24,7 @@
     "W08": { "allowedDomains": ["D1-01"] },
     "W09": { "allowedDomains": ["D1-03"] },
     "W10": { "allowedDomains": ["D1-03"] },
-    "W11": { "allowedDomains": ["D1-03"] },
+    "W11": { "allowedDomains": ["D1-03", "D1-05"] },
     "W12": { "allowedDomains": [] }
   },
   "rules": {
@@ -35,7 +36,7 @@
   },
   "nonGoals": [
     "No D1 proxy or database gateway.",
-    "No new D1.",
+    "No implicit D1 beyond the five-domain canonical topology; D1-05 physical provisioning remains separately gated.",
     "No SQL semantic inference.",
     "No Mapping 0 GREEN promotion."
   ]
