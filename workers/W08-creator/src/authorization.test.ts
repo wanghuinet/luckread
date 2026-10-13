@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { subject } from '@casl/ability'
-import { createW08Ability, createW08AbilityForRoles, resolveCatalogPermissionsForRoles, type W08AuthorizationContext, type W08RoleAuthorizationContext } from './index.js'
+import { createW08Ability, createW08AbilityForRoles, resolveCatalogPermissionsForRoles, type W08AuthorizationContext, type W08PrivilegedApprovalEvidence, type W08RoleAuthorizationContext } from './index.js'
 import layers from '../../../contracts/authz/layers.json'
 import permissionCatalog from '../../../contracts/authz/permissions.json'
 
@@ -20,6 +20,30 @@ const context = (
 
 const resource = (type: string, fields: Record<string, unknown>) =>
   subject(type, fields)
+
+const privilegedApproval = (
+  permissionName: string,
+  targetResourceType: string,
+  targetResourceId: string,
+  actorId = 'user-1',
+  overrides: Partial<W08PrivilegedApprovalEvidence> = {},
+): W08PrivilegedApprovalEvidence => {
+  const now = Date.now()
+  return {
+    approvalId: 'approval-1',
+    permissionName,
+    actorId,
+    targetResourceType,
+    targetResourceId,
+    reason: 'Approved high-risk operation for the specified target',
+    approverIds: ['approver-1', 'approver-2'],
+    issuedAt: new Date(now - 60_000).toISOString(),
+    expiresAt: new Date(now + 30 * 60_000).toISOString(),
+    auditEventId: 'audit-event-1',
+    auditRecorded: true,
+    ...overrides,
+  }
+}
 
 describe('W08 CASL policy evaluator', () => {
   it('denies by default when no effective permission is present', () => {
@@ -235,11 +259,12 @@ describe('W08 CASL policy evaluator', () => {
       subjectId: 'user-1',
       permission: 'secret.manage',
       action: 'manage',
-      target: 'secret',
+      target: resource('secret', { id: 'secret-1' }),
       mfaVerified: true,
+      privilegedApprovals: [privilegedApproval('secret.manage', 'secret', 'secret-1')],
     },
   ])('covers an explicit least-privilege grant for $layer', ({
-    layer, accountState, subjectId, permission, action, target, mfaVerified, organizationIds,
+    layer, accountState, subjectId, permission, action, target, mfaVerified, organizationIds, privilegedApprovals,
   }) => {
     const ability = createW08Ability(context({
       layer,
@@ -248,11 +273,90 @@ describe('W08 CASL policy evaluator', () => {
       effectivePermissions: [permission],
       mfaVerified,
       organizationIds: organizationIds ?? [],
+      privilegedApprovals: privilegedApprovals ?? [],
     }))
 
     expect(ability.can(action, target as never)).toBe(true)
     expect(ability.can('manage', 'all')).toBe(false)
   })
+
+describe('L8 dual-approval and Break-Glass evidence', () => {
+  const l8Context = (approvals: readonly W08PrivilegedApprovalEvidence[] = []) => context({
+    layer: 'L8',
+    mfaVerified: true,
+    effectivePermissions: ['audit.read.any', 'secret.manage'],
+    privilegedApprovals: approvals,
+  })
+
+  it('denies L8 sensitive capabilities when approval and audit evidence are absent', () => {
+    const ability = createW08Ability(l8Context())
+
+    expect(ability.can('manage', resource('secret', { id: 'secret-1' }))).toBe(false)
+    expect(ability.can('read', resource('audit', { id: 'audit-target-1' }))).toBe(false)
+  })
+
+  it('grants an approved L8 action only for its declared target', () => {
+    const ability = createW08Ability(l8Context([
+      privilegedApproval('secret.manage', 'secret', 'secret-1'),
+    ]))
+
+    expect(ability.can('manage', resource('secret', { id: 'secret-1' }))).toBe(true)
+    expect(ability.can('manage', resource('secret', { id: 'secret-2' }))).toBe(false)
+    expect(ability.can('manage', 'secret')).toBe(false)
+  })
+
+  it('rejects an approval with fewer than two distinct approvers', () => {
+    const ability = createW08Ability(l8Context([
+      privilegedApproval('secret.manage', 'secret', 'secret-1', 'user-1', {
+        approverIds: ['approver-1'],
+      }),
+    ]))
+
+    expect(ability.can('manage', resource('secret', { id: 'secret-1' }))).toBe(false)
+  })
+
+  it('rejects self-approval by the acting principal', () => {
+    const ability = createW08Ability(l8Context([
+      privilegedApproval('secret.manage', 'secret', 'secret-1', 'user-1', {
+        approverIds: ['user-1', 'approver-2'],
+      }),
+    ]))
+
+    expect(ability.can('manage', resource('secret', { id: 'secret-1' }))).toBe(false)
+  })
+
+  it('rejects expired approvals and approvals with more than four hours lifetime', () => {
+    const now = Date.now()
+    const expired = privilegedApproval('secret.manage', 'secret', 'secret-1', 'user-1', {
+      issuedAt: new Date(now - 2 * 60 * 60_000).toISOString(),
+      expiresAt: new Date(now - 60_000).toISOString(),
+    })
+    const overlong = privilegedApproval('secret.manage', 'secret', 'secret-1', 'user-1', {
+      issuedAt: new Date(now - 60_000).toISOString(),
+      expiresAt: new Date(now + 4 * 60 * 60_000 + 1).toISOString(),
+    })
+
+    expect(createW08Ability(l8Context([expired])).can('manage', resource('secret', { id: 'secret-1' }))).toBe(false)
+    expect(createW08Ability(l8Context([overlong])).can('manage', resource('secret', { id: 'secret-1' }))).toBe(false)
+  })
+
+  it('rejects evidence for another permission or resource type', () => {
+    const wrongPermission = privilegedApproval('audit.read.any', 'secret', 'secret-1')
+    const wrongTargetType = privilegedApproval('secret.manage', 'audit', 'secret-1')
+
+    expect(createW08Ability(l8Context([wrongPermission])).can('manage', resource('secret', { id: 'secret-1' }))).toBe(false)
+    expect(createW08Ability(l8Context([wrongTargetType])).can('manage', resource('secret', { id: 'secret-1' }))).toBe(false)
+  })
+
+  it('grants audit reads only for the audited target under the matching approval', () => {
+    const ability = createW08Ability(l8Context([
+      privilegedApproval('audit.read.any', 'audit', 'audit-target-1'),
+    ]))
+
+    expect(ability.can('read', resource('audit', { id: 'audit-target-1' }))).toBe(true)
+    expect(ability.can('read', resource('audit', { id: 'audit-target-2' }))).toBe(false)
+  })
+})
 
 describe('L5 content operations permission catalog slice', () => {
   it('grants only explicit L5 curation, topic, campaign and analytics permissions to operator roles', () => {
