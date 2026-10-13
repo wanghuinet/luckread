@@ -10,6 +10,14 @@ const mapError = (error: unknown): Response => {
     if (error.status === 429) {
       return apiErrorResponse(429, 'RATE_LIMITED', 'Too many requests', { 'retry-after': '60' })
     }
+    if (error.status === 400) {
+      const code = error.code === 'INVALID_CURSOR' ? 'INVALID_CURSOR' : 'VALIDATION_FAILED'
+      return apiErrorResponse(
+        400,
+        code,
+        code === 'INVALID_CURSOR' ? 'Invalid session list cursor' : 'Invalid session request',
+      )
+    }
     return normalizeApiErrorResponse(
       new Response(null, { status: error.status }),
       'Session service unavailable',
