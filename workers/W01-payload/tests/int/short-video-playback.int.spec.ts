@@ -151,7 +151,7 @@ describe('short video playback polish', () => {
     expect(feed).toContain('toggleComments')
     expect(feed).toContain('toggleBookmark')
     expect(feed).toContain('share(item)')
-    expect(feed).toContain('markNotInterested')
+    expect(feed).not.toContain('markNotInterested')
     expect(feed).toContain('report(item)')
     expect(css).toContain('scroll-snap-type: y mandatory')
   })
