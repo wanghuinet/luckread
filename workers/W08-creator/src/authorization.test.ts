@@ -152,4 +152,103 @@ describe('W08 CASL policy evaluator', () => {
 
     expect(ability.can('read', resource('content', { visibility: 'public' }))).toBe(false)
   })
+  it.each([
+    {
+      layer: 'L0' as const,
+      accountState: 'anonymous' as const,
+      subjectId: null,
+      permission: 'content.read.public',
+      action: 'read',
+      target: resource('content', { visibility: 'public' }),
+      mfaVerified: false,
+    },
+    {
+      layer: 'L1' as const,
+      accountState: 'active' as const,
+      subjectId: 'user-1',
+      permission: 'user.read.self',
+      action: 'read',
+      target: resource('user', { ownerId: 'user-1' }),
+      mfaVerified: false,
+    },
+    {
+      layer: 'L2' as const,
+      accountState: 'active' as const,
+      subjectId: 'user-1',
+      permission: 'social.follow',
+      action: 'follow',
+      target: 'social',
+      mfaVerified: false,
+    },
+    {
+      layer: 'L3' as const,
+      accountState: 'active' as const,
+      subjectId: 'user-1',
+      permission: 'content.update.own',
+      action: 'update',
+      target: resource('content', { ownerId: 'user-1' }),
+      mfaVerified: false,
+    },
+    {
+      layer: 'L4' as const,
+      accountState: 'active' as const,
+      subjectId: 'user-1',
+      permission: 'organization.member.manage',
+      action: 'member_manage',
+      target: resource('organization', { id: 'org-1' }),
+      mfaVerified: false,
+      organizationIds: ['org-1'],
+    },
+    {
+      layer: 'L5' as const,
+      accountState: 'active' as const,
+      subjectId: 'user-1',
+      permission: 'content.curate',
+      action: 'curate',
+      target: 'content',
+      mfaVerified: true,
+    },
+    {
+      layer: 'L6' as const,
+      accountState: 'active' as const,
+      subjectId: 'user-1',
+      permission: 'moderation.queue.read',
+      action: 'queue_read',
+      target: 'moderation',
+      mfaVerified: true,
+    },
+    {
+      layer: 'L7' as const,
+      accountState: 'active' as const,
+      subjectId: 'user-1',
+      permission: 'role.assign',
+      action: 'assign',
+      target: 'role',
+      mfaVerified: true,
+    },
+    {
+      layer: 'L8' as const,
+      accountState: 'active' as const,
+      subjectId: 'user-1',
+      permission: 'secret.manage',
+      action: 'manage',
+      target: 'secret',
+      mfaVerified: true,
+    },
+  ])('covers an explicit least-privilege grant for $layer', ({
+    layer, accountState, subjectId, permission, action, target, mfaVerified, organizationIds,
+  }) => {
+    const ability = createW08Ability(context({
+      layer,
+      accountState,
+      subjectId,
+      effectivePermissions: [permission],
+      mfaVerified,
+      organizationIds: organizationIds ?? [],
+    }))
+
+    expect(ability.can(action, target as never)).toBe(true)
+    expect(ability.can('manage', 'all')).toBe(false)
+  })
+
 })
