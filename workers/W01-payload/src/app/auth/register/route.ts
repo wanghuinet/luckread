@@ -74,6 +74,37 @@ const sha256Hex = async (value: string): Promise<string> => {
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === 'object' && !Array.isArray(value)
 
+const betterAuthFailureDiagnostic = (value: unknown): { failureCategory: string } => {
+  const root = isRecord(value) ? value : {}
+  const error = isRecord(root.error) ? root.error : root
+  const rawCode = typeof error.code === 'string' ? error.code : ''
+  const code = /^[A-Z0-9_.-]{1,80}$/i.test(rawCode) ? rawCode : ''
+  const message =
+    typeof error.message === 'string'
+      ? error.message
+      : typeof root.message === 'string'
+        ? root.message
+        : ''
+  const signal = `${code} ${message}`.toLowerCase()
+
+  const failureCategory =
+    /password/.test(signal) && /(short|long|length|minimum|maximum|weak|policy|required)/.test(signal)
+      ? 'PASSWORD_POLICY'
+      : /(already exists|already registered|user exists|email exists|username.*taken|duplicate|user_already_exists|username_taken|email_taken)/.test(signal)
+        ? 'IDENTITY_CONFLICT'
+        : /(origin|csrf|cross.?site|trusted.?origin)/.test(signal)
+          ? 'ORIGIN_OR_CSRF_REJECTION'
+          : /username/.test(signal)
+            ? 'USERNAME_VALIDATION'
+            : /email/.test(signal)
+              ? 'EMAIL_VALIDATION'
+              : /(invalid|required|validation|missing)/.test(signal)
+                ? 'INPUT_VALIDATION'
+                : 'UNCLASSIFIED'
+
+  return { failureCategory }
+}
+
 type D1Binding = Awaited<ReturnType<typeof getCloudflareContext>>['env']['D1']
 
 const isExpired = (expiresAt: string, now: Date) => {
@@ -372,12 +403,14 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
       : isRecord(authPayload) ? authPayload : {}
     const rawCode = typeof upstreamError.code === 'string' ? upstreamError.code : ''
     const upstreamCode = /^[A-Z0-9_]{1,80}$/.test(rawCode) ? rawCode : 'UNKNOWN'
+    const diagnostic = betterAuthFailureDiagnostic(authPayload)
     console.warn(JSON.stringify({
       event: 'auth.register.upstream_rejection',
       diagnosticCode: 'AUTH001_UPSTREAM_REJECTION',
       cfRay: request.headers.get('cf-ray') ?? null,
       upstreamStatus: authResponse.status,
       upstreamCode,
+      failureCategory: diagnostic.failureCategory,
     }))
     if (upstreamCode === 'PASSWORD_TOO_SHORT') {
       return errorResponse(422, 'PASSWORD_TOO_SHORT', '密码长度必须为 15–128 位')
@@ -658,6 +691,19 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     if (isUniqueConstraintError(error)) {
+      const failureCategory =
+        /auth_registration_envelopes|active_key/i.test(message)
+          ? 'IDEMPOTENCY_CONFLICT'
+          : /consents/i.test(message)
+            ? 'CONSENT_CONSTRAINT'
+            : /users/i.test(message)
+              ? 'PAYLOAD_USER_CONSTRAINT'
+              : 'UNCLASSIFIED_UNIQUE_CONSTRAINT'
+      console.error(JSON.stringify({
+        event: 'auth.register.commit_conflict',
+        diagnosticCode: 'AUTH001_COMMIT_CONFLICT',
+        failureCategory,
+      }))
       try {
         await rollbackPayloadProfile()
       } catch (projectionRollbackError) {

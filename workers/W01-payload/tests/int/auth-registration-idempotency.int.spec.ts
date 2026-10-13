@@ -71,4 +71,33 @@ describe('AUTH-001 registration idempotency ordering', () => {
     expect(source).toContain("errorResponse(403, 'INVALID_ORIGIN'")
     expect(source).toContain("cfRay: request.headers.get('cf-ray') ?? null")
   })
+  it('categorizes upstream registration failures and commit conflicts without logging raw payloads', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), 'src/app/auth/register/route.ts'),
+      'utf8',
+    )
+
+    expect(source).toContain('const betterAuthFailureDiagnostic = (value: unknown)')
+    expect(source).toContain('const diagnostic = betterAuthFailureDiagnostic(authPayload)')
+    expect(source).toContain('failureCategory: diagnostic.failureCategory')
+    expect(source).toContain("'PASSWORD_POLICY'")
+    expect(source).toContain("'IDENTITY_CONFLICT'")
+    expect(source).toContain("'ORIGIN_OR_CSRF_REJECTION'")
+
+    const rejection = source.indexOf("event: 'auth.register.upstream_rejection'")
+    const rejectionBlockEnd = source.indexOf('}))', rejection)
+    expect(rejection).toBeGreaterThanOrEqual(0)
+    const rejectionBlock = source.slice(rejection, rejectionBlockEnd)
+    expect(rejectionBlock).not.toContain('authPayload')
+    expect(rejectionBlock).not.toContain('upstreamError.message')
+
+    const commitConflict = source.indexOf("event: 'auth.register.commit_conflict'")
+    const commitConflictBlockEnd = source.indexOf('}))', commitConflict)
+    expect(commitConflict).toBeGreaterThanOrEqual(0)
+    const commitConflictBlock = source.slice(commitConflict, commitConflictBlockEnd)
+    expect(commitConflictBlock).toContain("'IDEMPOTENCY_CONFLICT'")
+    expect(commitConflictBlock).toContain("'CONSENT_CONSTRAINT'")
+    expect(commitConflictBlock).not.toContain('message,')
+  })
+
 })
