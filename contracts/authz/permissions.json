@@ -653,6 +653,52 @@
       "minLayer": "L3",
       "scope": "own",
       "auditRequired": true
+    },
+    {
+      "name": "content.read.any",
+      "resource": "content",
+      "action": "read",
+      "minLayer": "L5",
+      "scope": "platform"
+    },
+    {
+      "name": "content.feature",
+      "resource": "content",
+      "action": "feature",
+      "minLayer": "L5",
+      "scope": "platform",
+      "auditRequired": true
+    },
+    {
+      "name": "content.promote",
+      "resource": "content",
+      "action": "promote",
+      "minLayer": "L5",
+      "scope": "platform",
+      "auditRequired": true
+    },
+    {
+      "name": "topic.manage",
+      "resource": "topic",
+      "action": "manage",
+      "minLayer": "L5",
+      "scope": "platform",
+      "auditRequired": true
+    },
+    {
+      "name": "campaign.manage",
+      "resource": "campaign",
+      "action": "manage",
+      "minLayer": "L5",
+      "scope": "platform",
+      "auditRequired": true
+    },
+    {
+      "name": "analytics.read",
+      "resource": "analytics",
+      "action": "read",
+      "minLayer": "L5",
+      "scope": "platform"
     }
   ],
   "x-forbidden-patterns": [
@@ -969,12 +1015,6 @@
     "status": "OPEN",
     "note": "Open gaps are only permission identifiers still referenced by canonical docs/301 but not yet represented in x-permissions. These permissions remain ungranted until a separate catalog slice defines their resource, action, minimum layer, scope, and role mapping.",
     "knownCatalogGaps": [
-      "content.read.any",
-      "content.feature",
-      "content.promote",
-      "topic.manage",
-      "campaign.manage",
-      "analytics.read",
       "security.manage",
       "role.assign.any"
     ]
