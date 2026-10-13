@@ -58,7 +58,16 @@ for (const path of expectedCreatorProxyPaths) {
 }
 if (w01Client.includes('creator-scopes')) failures.push('W01 W08 proxy must not expose out-of-stage creator-scope paths')
 if (!w01Client.includes('const pathname = path.split(/[?#]/, 1)[0]')) failures.push('W01 W08 proxy must match exact pathnames while preserving query strings')
-requireText('W01 bearer authorization header must be stripped', w01Client, /headers\.delete\('authorization'\)/i)
+if (/headers\.delete\(['"]authorization['"]\)/i.test(w01Client)) {
+  failures.push('W01 W08 proxy must preserve the canonical browser-cookie or native Bearer credential for W02 validation')
+}
+requireText('W01 W08 proxy must copy the incoming session headers', w01Client, /const headers = new Headers\(request\.headers\)/)
+if (/headers\.delete\(['"]authorization['"]\)/i.test(w08Runtime)) {
+  failures.push('W08 creator routes must forward the session credential to W02 for validation')
+}
+if (/headers\.delete\(['"]authorization['"]\)/i.test(w08AuthzHandler)) {
+  failures.push('W08 CASL endpoint must forward the session credential to W02 for validation')
+}
 requireText('new creator applications must use CASL L2-only authorization', w08Runtime, /evaluateCreatorApplicationPermission\(principal, 'creator\.application\.apply'/)
 requireText('applicant status reads must use own-scope CASL authorization', w08Runtime, /evaluateCreatorApplicationPermission\(principal, 'creator\.application\.read\.own'/)
 requireText('reviewer endpoints must use CASL L7/L8 authorization', w08Runtime, /evaluateCreatorApplicationPermission\(principal, 'creator\.application\.review'/)

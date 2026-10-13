@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://luckread.com/contracts/v1/transport/W01-W08-creator-http-binding.v1.json",
   "title": "W01 to W08 Creator Qualification API Internal HTTP Binding",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "status": "CONTRACTED_PARTIAL",
   "caller": {
     "logicalWorker": "W01",
@@ -64,9 +64,13 @@
     }
   ],
   "trustBoundary": {
-    "authentication": "W08 calls W02_AUTH /internal/auth/principal using the request session; W08 never trusts a body userId as the actor",
+    "authentication": "W01 forwards the browser session cookie or native Authorization: Bearer session credential to W08; W08 forwards the same carrier to W02_AUTH /internal/auth/principal for validation. W08 never trusts body userId or validates raw credentials locally.",
     "creatorQualification": "W08 owns application/review state and creator identity",
-    "roleAssignment": "W02 alone writes role_assignments after authenticating the approver independently"
+    "roleAssignment": "W02 alone writes role_assignments after authenticating the approver independently",
+    "sessionCredentialCarriers": [
+      "HttpOnly Better Auth browser session cookie",
+      "Authorization: Bearer <canonical Better Auth session token>"
+    ]
   },
   "failurePolicy": {
     "timeoutMs": 2000,
@@ -88,7 +92,8 @@
     "noClientApprovalIdentity": true,
     "noGlobalElevationFromScopedRole": true,
     "privateResponsesNoStore": true,
-    "noRawIdentitySecretsInDTO": true
+    "noRawIdentitySecretsInDTO": true,
+    "credentialValidationAuthority": "W02 Better Auth only"
   },
   "topologyConstraints": {
     "workerCountDelta": 0,
