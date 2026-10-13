@@ -9,7 +9,7 @@ type W02ErrorPayload = {
 }
 
 export class W02AuthClientError extends Error {
-  constructor(readonly status: number, message: string) {
+  constructor(readonly status: number, message: string, readonly code?: string) {
     super(message)
   }
 }
@@ -181,7 +181,7 @@ export async function listSessions(
     return payload as SessionListResponse
   }
 
-  throw new W02AuthClientError(response.status || 503, 'session list failed')
+  throw new W02AuthClientError(response.status || 503, 'session list failed', errorCode(payload) ?? undefined)
 }
 
 export async function revokeSessionById(request: Request, sessionId: string): Promise<void> {
