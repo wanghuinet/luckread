@@ -30,9 +30,11 @@ export function admitCreatorDecision(input: {
 
 export function parseExpectedVersion(value: string | null): number | null {
   if (!value) return null
-  const normalized = value.trim().replace(/^W[/]/, '').replace(/^"|"$/g, '')
-  if (!/^[1-9][0-9]*$/.test(normalized)) return null
-  const version = Number(normalized)
+  // If-Match uses strong entity-tags; this endpoint emits a single strong ETag such as "3".
+  // Reject weak tags, wildcards, lists, and bare numbers rather than weakening concurrency checks.
+  const match = /^"([1-9][0-9]*)"$/.exec(value.trim())
+  if (!match) return null
+  const version = Number(match[1])
   return Number.isSafeInteger(version) ? version : null
 }
 

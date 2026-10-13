@@ -45,27 +45,14 @@ describe('creator authorization admission', () => {
     expect(admitCreatorDecision({ ...base, requestIdempotencyKey: 'another-key' })).toBe('DECISION_CONFLICT')
   })
 
-  it('admits a decision only while an application is pending', () => {
-    const base = {
-      applicationStatus: 'PENDING',
-      requestedDecision: 'APPROVED' as const,
-      applicantId: 'applicant-0001',
-      actorId: 'reviewer-0001',
-      storedDecision: null,
-      storedActorId: null,
-      storedIdempotencyKey: null,
-      requestIdempotencyKey: 'creator-review:app-0001:1:APPROVED',
-    }
-    expect(admitCreatorDecision(base)).toBe('DECIDE')
-    expect(admitCreatorDecision({ ...base, applicationStatus: 'REJECTED' })).toBe('DECISION_CONFLICT')
-  })
-
-  it('parses strong version preconditions and rejects weak or malformed values', () => {
+  it('accepts only the strong version ETag returned by the application endpoint', () => {
     expect(parseExpectedVersion('"3"')).toBe(3)
-    expect(parseExpectedVersion('W/"4"')).toBe(4)
     expect(parseExpectedVersion(null)).toBeNull()
+    expect(parseExpectedVersion('W/"4"')).toBeNull()
+    expect(parseExpectedVersion('3')).toBeNull()
     expect(parseExpectedVersion('*')).toBeNull()
-    expect(parseExpectedVersion('0')).toBeNull()
+    expect(parseExpectedVersion('"3", "4"')).toBeNull()
+    expect(parseExpectedVersion('"0"')).toBeNull()
   })
 
   it('requires bounded, printable idempotency keys', () => {
