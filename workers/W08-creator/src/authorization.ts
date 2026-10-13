@@ -13,7 +13,10 @@ export type AccountState =
   | 'banned'
   | 'anonymous'
 
-export type W08Ability = MongoAbility<[string, string | ForcedSubject<string>]>
+type InternalW08Ability = MongoAbility<[string, string | ForcedSubject<string>]>
+
+/** Public surface intentionally exposes only the guarded authorization check. */
+export type W08Ability = Pick<InternalW08Ability, 'can'>
 
 type PermissionScope = 'platform' | 'organization' | 'ip' | 'own' | 'public'
 type PermissionDefinition = {
@@ -371,8 +374,32 @@ function validPrivilegedApprovalFor(
   return null
 }
 
+/**
+ * CASL's type-only checks cannot establish resource-specific conditions. Keep
+ * the consumer API deliberately narrow and fail closed whenever a conditional
+ * rule is being checked with only a subject type string.
+ */
+function guardTypeOnlyChecks(ability: InternalW08Ability): W08Ability {
+  const can = ((
+    action: string,
+    target: string | ForcedSubject<string>,
+    field?: string,
+  ) => {
+    if (typeof target === 'string') {
+      const rules = ability.rulesFor(action, target) as unknown as Array<{ conditions?: unknown }>
+      if (rules.some((rule) => rule.conditions !== undefined)) return false
+    }
+
+    return ability.can(action, target, field)
+  }) as InternalW08Ability['can']
+
+  return { can }
+}
+
 function emptyAbility(): W08Ability {
-  return new AbilityBuilder<W08Ability>(createMongoAbility).build()
+  return guardTypeOnlyChecks(new AbilityBuilder<InternalW08Ability>(createMongoAbility).build())
+}
+  return new AbilityBuilder<InternalW08Ability>(createMongoAbility).build()
 }
 
 /**
@@ -401,13 +428,13 @@ function buildW08Ability(
     return emptyAbility()
   }
 
-  const { can, cannot, build } = new AbilityBuilder<W08Ability>(createMongoAbility)
+  const { can, cannot, build } = new AbilityBuilder<InternalW08Ability>(createMongoAbility)
   const canReadPublicOnly = context.accountState === 'restricted' || context.accountState === 'frozen'
 
   // Non-active states never receive ordinary mutation, private-read, or
   // administration rules. Suspended/deleted/banned accounts receive none.
   if (!['active', 'restricted', 'frozen', 'anonymous'].includes(context.accountState)) {
-    return build()
+    return guardTypeOnlyChecks(build())
   }
 
   for (const permissionName of new Set(context.effectivePermissions)) {
@@ -447,7 +474,7 @@ function buildW08Ability(
     if (permission) cannot(permission.action, permission.resource)
   }
 
-  return build()
+  return guardTypeOnlyChecks(build())
 }
 
 export type W08RoleAuthorizationContext = Omit<W08AuthorizationContext, 'effectivePermissions'> & {
