@@ -212,7 +212,7 @@ export async function like(
   }
 
   if (Number(targetRow.blocked) === 1) {
-    throw new LikeRuntimeError('RELATIONSHIP_BLOCKED', 409)
+    throw new LikeRuntimeError('CONFLICT', 409)
   }
 
   const createdAt = new Date().toISOString()
@@ -383,7 +383,7 @@ export async function getLikeStatus(
     return result
   }
   if (Number(row.blocked) === 1) {
-    throw new LikeRuntimeError('RELATIONSHIP_BLOCKED', 409)
+    throw new LikeRuntimeError('CONFLICT', 409)
   }
 
   const likeCount = cachedCount ?? Math.max(0, Number(row.like_count ?? 0))

@@ -19,6 +19,38 @@ describe('W03 series foundation', () => {
     expect(migration).toContain("'series.deleted'")
   })
 
+  it('binds creator series cursors to the owning user', async () => {
+    const row = {
+      id: 'series_1',
+      owner_user_id: 'user_1',
+      creator_id: 'user_1',
+      ip_id: null,
+      state: 'DRAFT',
+      version: 1,
+      title: 'Series 1',
+      description: 'desc',
+      cover_ref: null,
+      etag: 'W/"1"',
+      created_at: '2026-10-07T00:00:00.000Z',
+      updated_at: '2026-10-07T00:00:00.000Z',
+    }
+    let prepareCalls = 0
+    const db = {
+      prepare() {
+        prepareCalls += 1
+        return { bind: () => ({ all: async () => ({ results: [row, { ...row, id: 'series_2' }] }) }) }
+      },
+    } as never
+    const first = await listCreatorSeries(db, 'user_1', null, 1)
+    expect(first.nextCursor).toEqual(expect.any(String))
+    expect(first.nextCursor).toMatch(/^[A-Za-z0-9_-]+$/)
+    await expect(listCreatorSeries(db, 'user_2', first.nextCursor, 1)).rejects.toMatchObject({
+      code: 'INVALID_CURSOR',
+      status: 400,
+    })
+    expect(prepareCalls).toBe(1)
+  })
+
   it('lists creator-owned series with one bounded D1 read and cursor pagination', async () => {
     const queries: string[] = []
     const db = {

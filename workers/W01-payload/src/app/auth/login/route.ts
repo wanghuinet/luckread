@@ -10,7 +10,7 @@ type PublicUser = {
 }
 
 const errorResponse = (status: number, code: string, message: string) =>
-  Response.json({ error: { code, message, details: {} }, requestId: crypto.randomUUID() }, {
+  Response.json({ error: { code, message, details: {} }, requestId: `req_${crypto.randomUUID().replaceAll('-', '')}` }, {
     status,
     headers: { 'cache-control': 'no-store' },
   })
@@ -75,7 +75,7 @@ const publicLoginResponse = (response: Response, sessionToken: string, user: Pub
 
   return new Response(JSON.stringify({
     data: { user },
-    requestId: crypto.randomUUID(),
+    requestId: `req_${crypto.randomUUID().replaceAll('-', '')}`,
   }), { status: response.status, headers })
 }
 
@@ -90,11 +90,11 @@ export async function POST(request: Request): Promise<Response> {
 
   let body: unknown
   try { body = await request.json() } catch {
-    return errorResponse(400, 'VALIDATION_FAILED', '请求数据格式无效，请重试。')
+    return errorResponse(422, 'VALIDATION_FAILED', '请求数据格式无效，请重试。')
   }
 
   if (!body || typeof body !== 'object' || Array.isArray(body)) {
-    return errorResponse(400, 'VALIDATION_FAILED', '请求数据格式无效，请重试。')
+    return errorResponse(422, 'VALIDATION_FAILED', '请求数据格式无效，请重试。')
   }
   if (Object.keys(body).some((key) => key !== 'identity' && key !== 'credential')) {
     return errorResponse(400, 'VALIDATION_FAILED', '登录请求包含不支持的字段。')
@@ -104,14 +104,14 @@ export async function POST(request: Request): Promise<Response> {
   const identity = loginRequest.identity
   const credential = loginRequest.credential
   if (typeof identity !== 'string' || identity.trim().length === 0) {
-    return errorResponse(400, 'EMAIL_REQUIRED', '请输入邮箱地址。')
+    return errorResponse(422, 'EMAIL_REQUIRED', '请输入邮箱地址。')
   }
   const normalizedIdentity = identity.trim().toLowerCase()
   if (normalizedIdentity.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedIdentity)) {
-    return errorResponse(400, 'EMAIL_INVALID', '邮箱格式不正确，请检查后重试。')
+    return errorResponse(422, 'EMAIL_INVALID', '邮箱格式不正确，请检查后重试。')
   }
   if (typeof credential !== 'string' || credential.length === 0) {
-    return errorResponse(400, 'PASSWORD_REQUIRED', '请输入登录密码。')
+    return errorResponse(422, 'PASSWORD_REQUIRED', '请输入登录密码。')
   }
 
   let upstream: Response

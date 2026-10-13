@@ -63,6 +63,8 @@ const enforceRateLimit = async (request: Request, env: Env, operation: string): 
   }
 }
 
+const createRequestId = (): string => 'req_' + crypto.randomUUID()
+
 const json = (body: unknown, status = 200) => {
   const headers = new Headers({
     'content-type': 'application/json; charset=utf-8',
@@ -186,17 +188,17 @@ export default {
 
       if (url.pathname.startsWith('/internal/social/shares/')) {
         const parts = url.pathname.split('/').filter(Boolean)
-        if (parts.length !== 4 || parts[2] !== 'shares') return new Response(null, { status: 404 })
+        if (parts.length !== 4 || parts[2] !== 'shares') throw new ShareRuntimeError('NOT_FOUND', 404)
         if (request.method !== 'GET') return new Response(null, { status: 405, headers: { Allow: 'GET' } })
         requireTransport(request)
         const shareId = decodePathPart(parts[3])
-        if (shareId === null) return new Response(null, { status: 400 })
-        return json({ data: await resolveShare(env.DB, shareId), requestId: crypto.randomUUID() })
+        if (shareId === null) throw new ShareRuntimeError('VALIDATION_FAILED', 400)
+        return json({ data: await resolveShare(env.DB, shareId), requestId: createRequestId() })
       }
 
       if (url.pathname.startsWith('/internal/social/content/')) {
         const parts = url.pathname.split('/').filter(Boolean)
-        if (parts.length !== 5 || parts[2] !== 'content' || parts[4] !== 'shares') return new Response(null, { status: 404 })
+        if (parts.length !== 5 || parts[2] !== 'content' || parts[4] !== 'shares') throw new ShareRuntimeError('NOT_FOUND', 404)
         if (request.method !== 'POST') return new Response(null, { status: 405, headers: { Allow: 'POST' } })
         const actorUserId = requirePrincipal(request)
         requireInteractionLayer(request)
@@ -205,7 +207,7 @@ export default {
         const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
         return json({
           data: await createShare(env.DB, actorUserId, contentId, idempotencyKey),
-          requestId: crypto.randomUUID(),
+          requestId: createRequestId(),
         }, 201)
       }
 
@@ -218,9 +220,8 @@ export default {
           const actorUserId = requirePrincipal(request)
           requireInteractionLayer(request)
           const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
-          if (!idempotencyKey || idempotencyKey.length > 256) {
-            throw new BlockMuteRuntimeError('PRECONDITION_REQUIRED', 428)
-          }
+          if (!idempotencyKey) throw new BlockMuteRuntimeError('PRECONDITION_REQUIRED', 428)
+          if (idempotencyKey.length > 256) throw new BlockMuteRuntimeError('VALIDATION_FAILED', 400)
           let body: unknown
           try { body = await request.json() } catch { throw new BlockMuteRuntimeError('VALIDATION_FAILED', 400) }
           if (!body || typeof body !== 'object' || Array.isArray(body)) {
@@ -237,7 +238,7 @@ export default {
           }
           return json({
             data: relation,
-            requestId: crypto.randomUUID(),
+            requestId: createRequestId(),
           })
         }
 
@@ -245,9 +246,8 @@ export default {
           const actorUserId = requirePrincipal(request)
           requireInteractionLayer(request)
           const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
-          if (!idempotencyKey || idempotencyKey.length > 256) {
-            throw new BlockMuteRuntimeError('PRECONDITION_REQUIRED', 428)
-          }
+          if (!idempotencyKey) throw new BlockMuteRuntimeError('PRECONDITION_REQUIRED', 428)
+          if (idempotencyKey.length > 256) throw new BlockMuteRuntimeError('VALIDATION_FAILED', 400)
           await removeRelation(env.DB, actorUserId, targetFromPath, relationType)
           await invalidateRelationshipGraph(actorUserId, targetFromPath)
           if (relationType === 'block') {
@@ -269,9 +269,8 @@ export default {
         const actorUserId = requirePrincipal(request)
         requireInteractionLayer(request)
         const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
-        if (!idempotencyKey || idempotencyKey.length > 256) {
-          throw new CommentRuntimeError('PRECONDITION_REQUIRED', 428)
-        }
+        if (!idempotencyKey) throw new CommentRuntimeError('PRECONDITION_REQUIRED', 428)
+          if (idempotencyKey.length > 256) throw new CommentRuntimeError('VALIDATION_FAILED', 400)
         const commentId = decodePathPart(commentIdParts[3])
         if (commentId === null) throw new CommentRuntimeError('VALIDATION_FAILED', 400)
 
@@ -298,7 +297,7 @@ export default {
             ifMatch,
           })
           return Response.json(
-            { data: result.item, requestId: crypto.randomUUID() },
+            { data: result.item, requestId: createRequestId() },
             {
               status: 200,
               headers: {
@@ -442,7 +441,7 @@ export default {
           }
           const viewerUserId = request.headers.get('X-LuckRead-Principal-User-Id')?.trim() || null
           const page = await listComments(env.DB, commentContentId, cursor, limit, viewerUserId)
-          return json({ data: page, requestId: crypto.randomUUID() })
+          return json({ data: page, requestId: createRequestId() })
         }
 
         const viewerUserId = requirePrincipal(request)
@@ -452,9 +451,8 @@ export default {
         }
 
         const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
-        if (!idempotencyKey || idempotencyKey.length > 256) {
-          throw new CommentRuntimeError('PRECONDITION_REQUIRED', 428)
-        }
+        if (!idempotencyKey) throw new CommentRuntimeError('PRECONDITION_REQUIRED', 428)
+          if (idempotencyKey.length > 256) throw new CommentRuntimeError('VALIDATION_FAILED', 400)
 
         let body: unknown
         try { body = await request.json() } catch { throw new CommentRuntimeError('VALIDATION_FAILED', 400) }
@@ -516,7 +514,7 @@ export default {
             targetId: commentContentId,
           })
         }
-        return json({ data: comment }, 201)
+        return json({ data: comment, requestId: createRequestId() }, 201)
       }
 
       if (url.pathname === '/internal/social/interactions/bookmarks') {
@@ -535,22 +533,21 @@ export default {
 
         if (request.method !== 'GET') {
           const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
-          if (!idempotencyKey || idempotencyKey.length > 256) {
-            throw new FavoriteRuntimeError('PRECONDITION_REQUIRED', 428)
-          }
+          if (!idempotencyKey) throw new FavoriteRuntimeError('PRECONDITION_REQUIRED', 428)
+          if (idempotencyKey.length > 256) throw new FavoriteRuntimeError('VALIDATION_FAILED', 400)
         }
 
         if (request.method === 'GET') {
           return json({
             data: await getFavoriteStatus(env.DB, viewerUserId, target),
-            requestId: crypto.randomUUID(),
+            requestId: createRequestId(),
           })
         }
 
         if (request.method === 'POST') {
           return json({
             data: await favorite(env.DB, viewerUserId, target),
-            requestId: crypto.randomUUID(),
+            requestId: createRequestId(),
           })
         }
 
@@ -572,13 +569,12 @@ export default {
           : await parseJsonTarget(request)
         if (request.method === 'GET') {
           const result = await getLikeStatus(env.DB, viewerUserId, target)
-          return json({ data: result, requestId: crypto.randomUUID() }, 200)
+          return json({ data: result, requestId: createRequestId() }, 200)
         }
 
         const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
-        if (!idempotencyKey || idempotencyKey.length > 256) {
-          throw new LikeRuntimeError('PRECONDITION_REQUIRED', 428)
-        }
+        if (!idempotencyKey) throw new LikeRuntimeError('PRECONDITION_REQUIRED', 428)
+          if (idempotencyKey.length > 256) throw new LikeRuntimeError('VALIDATION_FAILED', 400)
 
         if (request.method === 'POST') {
           const result = await like(env.DB, viewerUserId, target)
@@ -592,23 +588,22 @@ export default {
               targetId: target.targetId,
             })
           }
-          return json({ data: result, requestId: crypto.randomUUID() }, 200)
+          return json({ data: result, requestId: createRequestId() }, 200)
         }
         await unlike(env.DB, viewerUserId, target)
         return new Response(null, { status: 204 })
       }
 
       const path = parseFollowPath(url.pathname)
-      if (!path) return new Response(null, { status: 404 })
+      if (!path) throw new FollowRuntimeError('NOT_FOUND', 404)
 
       if (path.kind === 'follow') {
         const viewerUserId = requirePrincipal(request)
         if (request.method === 'POST') {
           requireInteractionLayer(request)
           const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
-          if (!idempotencyKey || idempotencyKey.length > 256) {
-            throw new FollowRuntimeError('PRECONDITION_REQUIRED', 428)
-          }
+          if (!idempotencyKey) throw new FollowRuntimeError('PRECONDITION_REQUIRED', 428)
+          if (idempotencyKey.length > 256) throw new FollowRuntimeError('VALIDATION_FAILED', 400)
           const row = await follow(env.DB, viewerUserId, path.userId)
           await invalidateRelationshipGraph(viewerUserId, path.userId)
           await enqueueNotification(env.DB, {
@@ -625,16 +620,15 @@ export default {
               targetUserId: row.target_user_id,
               createdAt: row.created_at,
             },
-            requestId: crypto.randomUUID(),
+            requestId: createRequestId(),
           }, 201)
         }
 
         if (request.method === 'DELETE') {
           requireInteractionLayer(request)
           const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
-          if (!idempotencyKey || idempotencyKey.length > 256) {
-            throw new FollowRuntimeError('PRECONDITION_REQUIRED', 428)
-          }
+          if (!idempotencyKey) throw new FollowRuntimeError('PRECONDITION_REQUIRED', 428)
+          if (idempotencyKey.length > 256) throw new FollowRuntimeError('VALIDATION_FAILED', 400)
           await unfollow(env.DB, viewerUserId, path.userId)
           await invalidateRelationshipGraph(viewerUserId, path.userId)
           return new Response(null, { status: 204 })
@@ -651,7 +645,7 @@ export default {
               createdAt: relationship.createdAt,
               relationship,
             },
-            requestId: crypto.randomUUID(),
+            requestId: createRequestId(),
           })
         }
 
@@ -682,7 +676,7 @@ export default {
 
       return json({
         data: page,
-        requestId: crypto.randomUUID(),
+        requestId: createRequestId(),
       })
     } catch (error) {
       if (
@@ -701,8 +695,8 @@ export default {
             message: error.code,
             details: {},
           },
-          requestId: crypto.randomUUID(),
-        }, error.status)
+          requestId: createRequestId(),
+        }, error.code === 'VALIDATION_FAILED' && error.status === 400 ? 422 : error.status)
       }
 
       return json({
@@ -711,7 +705,7 @@ export default {
           message: 'Internal error',
           details: {},
         },
-        requestId: crypto.randomUUID(),
+        requestId: createRequestId(),
       }, 500)
     }
   },

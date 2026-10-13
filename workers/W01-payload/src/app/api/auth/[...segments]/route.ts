@@ -18,7 +18,7 @@ const errorResponse = (
   new Response(
     JSON.stringify({
       error: { code, message, details: {} },
-      requestId: crypto.randomUUID(),
+      requestId: `req_${crypto.randomUUID()}`,
     }),
     {
       status,

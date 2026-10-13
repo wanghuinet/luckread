@@ -13,8 +13,8 @@ export async function GET(
     const { userId } = await context.params
     if (!userId || userId.length > 128) {
       return Response.json(
-        { error: { code: 'VALIDATION_FAILED', message: 'Invalid user id', details: {} }, requestId: crypto.randomUUID() },
-        { status: 400, headers: { 'cache-control': 'no-store' } },
+        { error: { code: 'VALIDATION_FAILED', message: 'Invalid user id', details: {} }, requestId: `req_${crypto.randomUUID()}` },
+        { status: 422, headers: { 'cache-control': 'no-store' } },
       )
     }
 
@@ -32,7 +32,7 @@ export async function GET(
 
         if (!user) {
           return Response.json(
-            { error: { code: 'RESOURCE_NOT_FOUND', message: 'User not found', details: {} }, requestId: crypto.randomUUID() },
+            { error: { code: 'NOT_FOUND', message: 'User not found', details: {} }, requestId: `req_${crypto.randomUUID()}` },
             { status: 404, headers: { 'cache-control': 'no-store' } },
           )
         }
@@ -44,6 +44,7 @@ export async function GET(
           displayName: typeof publicUser.displayName === 'string' ? publicUser.displayName : null,
           bio: typeof publicUser.bio === 'string' ? publicUser.bio : null,
           avatar: typeof publicUser.avatar === 'string' ? publicUser.avatar : null,
+          requestId: `req_${crypto.randomUUID()}`,
         }, {
           headers: {
             'cache-control': 'public, max-age=30, stale-while-revalidate=120',
@@ -55,7 +56,7 @@ export async function GET(
   } catch (error) {
     if (error instanceof TrafficLimitError) return rateLimitResponse(_request)
     return Response.json(
-      { error: { code: 'SERVICE_UNAVAILABLE', message: 'Profile service unavailable', details: {} }, requestId: crypto.randomUUID() },
+      { error: { code: 'SERVICE_UNAVAILABLE', message: 'Profile service unavailable', details: {} }, requestId: `req_${crypto.randomUUID()}` },
       { status: 503, headers: { 'cache-control': 'no-store' } },
     )
   }

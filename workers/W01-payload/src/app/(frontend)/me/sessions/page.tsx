@@ -8,7 +8,7 @@ import { fetchJson, getApiErrorMessage } from '../../../../lib/client-api.js'
 
 type SessionItem = {
   sessionId: string
-  deviceId: string | null
+  deviceId?: string
   createdAt: string
   expiresAt: string
   lastSeenAt: string | null

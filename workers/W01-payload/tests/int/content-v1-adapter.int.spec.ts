@@ -19,6 +19,17 @@ describe('v1 content adapter', () => {
     expect(route).not.toContain('UPDATE ')
   })
 
+  it('returns canonical request IDs and precise invalid-query errors', () => {
+    const createRoute = readFileSync(
+      resolve(process.cwd(), 'src/app/api/v1/contents/route.ts'),
+      'utf8',
+    )
+    expect(route).toContain("`req_${crypto.randomUUID()}`")
+    expect(createRoute).toContain("`req_${crypto.randomUUID()}`")
+    expect(createRoute).toContain("'Invalid content query'")
+    expect(createRoute).not.toContain("message: 'Content service unavailable', details: {} }, requestId")
+  })
+
   it('enforces If-Match and Idempotency-Key on content mutations', () => {
     expect(route).toContain('requireMutationHeaders')
     expect(route).toContain("request.headers.get('Idempotency-Key')?.trim() ?? ''")
