@@ -99,11 +99,12 @@ describe('W08 CASL policy evaluator', () => {
   it('allows restricted accounts public reads only', () => {
     const ability = createW08Ability(context({
       accountState: 'restricted',
-      effectivePermissions: ['content.update.own', 'content.read.public'],
+      effectivePermissions: ['content.update.own', 'content.read.public', 'share.resolve'],
     }))
 
     expect(ability.can('read', resource('content', { visibility: 'public' }))).toBe(true)
     expect(ability.can('read', resource('content', { visibility: 'private' }))).toBe(false)
+    expect(ability.can('resolve', 'share')).toBe(true)
     expect(ability.can('update', resource('content', { ownerId: 'user-1' }))).toBe(false)
   })
 
