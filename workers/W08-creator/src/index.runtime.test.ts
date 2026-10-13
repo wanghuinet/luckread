@@ -213,8 +213,8 @@ const request = (path: string, method: string, body?: unknown, headers?: Headers
   })
 }
 
-function harness(current: TestPrincipal | null, allowRoleGrant = false) {
-  const db = new FakeD1()
+function harness(current: TestPrincipal | null, allowRoleGrant = false, sharedDb?: FakeD1) {
+  const db = sharedDb ?? new FakeD1()
   const roleGrants: Array<Record<string, unknown>> = []
   const auth = {
     async fetch(incoming: Request): Promise<Response> {
@@ -401,6 +401,53 @@ describe('W08 creator qualification runtime guards', () => {
     expect(staleResponse.status).toBe(412)
     expect((await responseBody(staleResponse)).data?.error?.code).toBe('PRECONDITION_FAILED')
     expect(staleHarness.db.batches).toBe(0)
+  })
+
+  it('closes the applicant-to-review-to-W02-grant lifecycle against one shared D1 state', async () => {
+    const applicant = harness(principal('applicant-lifecycle-0001', 'L2'))
+    const submittedResponse = await worker.fetch(request('/api/v1/creator-applications', 'POST', {
+      creatorType: 'WRITER',
+      statement: 'Lifecycle acceptance test.',
+    }, { 'Idempotency-Key': 'creator-lifecycle-apply-0001' }), applicant.env)
+    const submitted = await responseBody(submittedResponse)
+    const applicationId = submitted.data?.applicationId
+
+    expect(submittedResponse.status).toBe(201)
+    expect(applicationId).toBeTruthy()
+    expect(submitted.data?.status).toBe('PENDING')
+
+    const reviewer = harness(principal('reviewer-l7-lifecycle-0001', 'L7'), true, applicant.db)
+    const decisionResponse = await worker.fetch(request('/api/v1/admin/creator-applications/decision', 'POST', {
+      applicationId,
+      decision: 'APPROVED',
+      reason: 'Lifecycle acceptance approved.',
+    }, { 'Idempotency-Key': 'creator-lifecycle-review-0001', 'If-Match': '"1"' }), reviewer.env)
+    const decision = await responseBody(decisionResponse)
+
+    expect(decisionResponse.status).toBe(200)
+    expect(decision.data).toMatchObject({ status: 'APPROVED', grantState: 'GRANTED', version: 3 })
+    expect(reviewer.roleGrants).toEqual([{
+      subjectId: 'applicant-lifecycle-0001',
+      roleId: 'creator',
+      scopeType: 'global',
+      scopeId: null,
+      approvalRef: 'creator-application-' + applicationId,
+    }])
+
+    const promotedApplicant = harness(principal('applicant-lifecycle-0001', 'L3'), false, applicant.db)
+    const statusResponse = await worker.fetch(request('/api/v1/creator-applications/me', 'GET'), promotedApplicant.env)
+    const status = await responseBody(statusResponse)
+
+    expect(statusResponse.status).toBe(200)
+    expect(status.data?.application).toMatchObject({
+      application_id: applicationId,
+      status: 'APPROVED',
+      grant_state: 'GRANTED',
+    })
+    expect(applicant.db.creators.get('applicant-lifecycle-0001')).toMatchObject({
+      application_id: applicationId,
+      status: 'ACTIVE',
+    })
   })
 
   it('grants L3 only after an authorized L7 approval and W02 confirms RoleAssignment', async () => {
