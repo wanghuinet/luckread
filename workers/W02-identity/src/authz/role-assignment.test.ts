@@ -33,7 +33,7 @@ function fakeD1(rows: RoleAssignmentRecord[]) {
               row.status === status &&
               row.validFrom <= validFrom &&
               (row.validUntil === null || evaluatedAt < row.validUntil),
-            ) as T[],
+            ).sort((a, b) => a.roleId.localeCompare(b.roleId) || a.id.localeCompare(b.id)) as T[],
           }
         },
       }),
