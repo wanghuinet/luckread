@@ -556,6 +556,103 @@
       "minLayer": "L2",
       "scope": "own",
       "auditRequired": true
+    },
+    {
+      "name": "search.read.public",
+      "resource": "search",
+      "action": "read",
+      "minLayer": "L0",
+      "scope": "public"
+    },
+    {
+      "name": "feed.read.public",
+      "resource": "feed",
+      "action": "read",
+      "minLayer": "L0",
+      "scope": "public"
+    },
+    {
+      "name": "taxonomy.read",
+      "resource": "taxonomy",
+      "action": "read",
+      "minLayer": "L0",
+      "scope": "public"
+    },
+    {
+      "name": "comment.read",
+      "resource": "comment",
+      "action": "read",
+      "minLayer": "L2",
+      "scope": "public"
+    },
+    {
+      "name": "interaction.unlike",
+      "resource": "interaction",
+      "action": "unlike",
+      "minLayer": "L2",
+      "scope": "public",
+      "auditRequired": true
+    },
+    {
+      "name": "interaction.favorite",
+      "resource": "interaction",
+      "action": "favorite",
+      "minLayer": "L2",
+      "scope": "public",
+      "auditRequired": true
+    },
+    {
+      "name": "social.unfollow",
+      "resource": "social",
+      "action": "unfollow",
+      "minLayer": "L2",
+      "scope": "public",
+      "auditRequired": true
+    },
+    {
+      "name": "notification.read.self",
+      "resource": "notification",
+      "action": "read",
+      "minLayer": "L2",
+      "scope": "own"
+    },
+    {
+      "name": "notification.update.self",
+      "resource": "notification",
+      "action": "update",
+      "minLayer": "L2",
+      "scope": "own",
+      "auditRequired": true
+    },
+    {
+      "name": "creator.read.self",
+      "resource": "creator",
+      "action": "read",
+      "minLayer": "L3",
+      "scope": "own"
+    },
+    {
+      "name": "creator.update.self",
+      "resource": "creator",
+      "action": "update",
+      "minLayer": "L3",
+      "scope": "own",
+      "auditRequired": true
+    },
+    {
+      "name": "creator.stats.read.self",
+      "resource": "creator_stats",
+      "action": "read",
+      "minLayer": "L3",
+      "scope": "own"
+    },
+    {
+      "name": "revision.create.own",
+      "resource": "revision",
+      "action": "create",
+      "minLayer": "L3",
+      "scope": "own",
+      "auditRequired": true
     }
   ],
   "x-forbidden-patterns": [
@@ -569,8 +666,11 @@
     "rule": "Explicit additive role-to-permission grants. A layer alone never grants a permission. Ownership, scope, account-state, entitlement, workflow, MFA, and business-state checks still apply.",
     "publicDefaults": [
       "content.read.public",
+      "feed.read.public",
       "media.read",
-      "share.resolve"
+      "search.read.public",
+      "share.resolve",
+      "taxonomy.read"
     ],
     "reservedNonUserPermission": [
       "system.job"
@@ -591,40 +691,50 @@
       {
         "role": "verified_user",
         "permissions": [
-          "comment.create",
-          "interaction.like",
-          "interaction.block",
-          "interaction.mute",
-          "report.create",
-          "social.follow",
           "appeal.create",
+          "comment.create",
+          "comment.read",
           "entitlement.check",
           "entitlement.read",
+          "interaction.block",
+          "interaction.favorite",
+          "interaction.like",
+          "interaction.mute",
+          "interaction.unlike",
+          "notification.read.self",
+          "notification.update.self",
+          "report.create",
           "share.create",
-          "subscription.create",
-          "subscription.read",
+          "social.follow",
+          "social.unfollow",
           "subscription.cancel",
+          "subscription.change_plan",
+          "subscription.create",
           "subscription.pause",
-          "subscription.resume",
-          "subscription.change_plan"
+          "subscription.read",
+          "subscription.resume"
         ]
       },
       {
         "role": "creator",
         "permissions": [
+          "content.archive.own",
           "content.create",
-          "content.update.own",
           "content.delete.own",
           "content.publish.own",
-          "content.unpublish.own",
-          "content.schedule.own",
-          "content.submit_review.own",
-          "content.archive.own",
           "content.restore.own",
           "content.revision.read",
           "content.revision.rollback",
+          "content.schedule.own",
+          "content.submit_review.own",
+          "content.unpublish.own",
+          "content.update.own",
+          "creator.read.self",
+          "creator.stats.read.self",
+          "creator.update.self",
           "media.read.own",
-          "media.upload"
+          "media.upload",
+          "revision.create.own"
         ]
       },
       {
@@ -656,13 +766,25 @@
       {
         "role": "editor",
         "permissions": [
-          "content.curate"
+          "analytics.read",
+          "campaign.manage",
+          "content.curate",
+          "content.feature",
+          "content.promote",
+          "content.read.any",
+          "topic.manage"
         ]
       },
       {
         "role": "operator",
         "permissions": [
-          "content.curate"
+          "analytics.read",
+          "campaign.manage",
+          "content.curate",
+          "content.feature",
+          "content.promote",
+          "content.read.any",
+          "topic.manage"
         ]
       },
       {
@@ -678,13 +800,19 @@
       {
         "role": "admin",
         "permissions": [
+          "analytics.read",
           "appeal.create",
+          "campaign.manage",
           "comment.create",
+          "comment.read",
           "content.archive.own",
           "content.create",
           "content.curate",
           "content.delete.own",
+          "content.feature",
+          "content.promote",
           "content.publish.own",
+          "content.read.any",
           "content.read.public",
           "content.restore.own",
           "content.revision.read",
@@ -693,35 +821,48 @@
           "content.submit_review.own",
           "content.unpublish.own",
           "content.update.own",
+          "creator.read.self",
+          "creator.stats.read.self",
+          "creator.update.self",
           "entitlement.check",
           "entitlement.read",
           "interaction.block",
+          "interaction.favorite",
           "interaction.like",
           "interaction.mute",
+          "interaction.unlike",
           "ip.content.read",
           "ip.create",
           "ip.member.invite",
           "ip.member.remove",
-          "media.read.own",
           "media.read",
+          "media.read.own",
           "media.upload",
           "moderation.case.read",
           "moderation.decide",
           "moderation.queue.read",
           "moderation.read",
+          "notification.read.self",
+          "notification.update.self",
           "org.create",
           "org.member.manage.scope",
           "organization.member.manage",
           "organization.member.read",
           "organization.role.manage",
           "report.create",
+          "revision.create.own",
           "role.assign",
           "share.create",
           "share.resolve",
           "social.follow",
+          "social.unfollow",
           "subscription.cancel",
+          "subscription.change_plan",
           "subscription.create",
+          "subscription.pause",
           "subscription.read",
+          "subscription.resume",
+          "topic.manage",
           "user.ban",
           "user.credential.manage",
           "user.freeze",
@@ -735,23 +876,26 @@
           "user.session.revoke",
           "user.suspend",
           "user.unfreeze",
-          "user.update.self",
-          "subscription.pause",
-          "subscription.resume",
-          "subscription.change_plan"
+          "user.update.self"
         ]
       },
       {
         "role": "super_admin",
         "permissions": [
+          "analytics.read",
           "appeal.create",
           "audit.read.any",
+          "campaign.manage",
           "comment.create",
+          "comment.read",
           "content.archive.own",
           "content.create",
           "content.curate",
           "content.delete.own",
+          "content.feature",
+          "content.promote",
           "content.publish.own",
+          "content.read.any",
           "content.read.public",
           "content.restore.own",
           "content.revision.read",
@@ -760,36 +904,49 @@
           "content.submit_review.own",
           "content.unpublish.own",
           "content.update.own",
+          "creator.read.self",
+          "creator.stats.read.self",
+          "creator.update.self",
           "entitlement.check",
           "entitlement.read",
           "interaction.block",
+          "interaction.favorite",
           "interaction.like",
           "interaction.mute",
+          "interaction.unlike",
           "ip.content.read",
           "ip.create",
           "ip.member.invite",
           "ip.member.remove",
-          "media.read.own",
           "media.read",
+          "media.read.own",
           "media.upload",
           "moderation.case.read",
           "moderation.decide",
           "moderation.queue.read",
           "moderation.read",
+          "notification.read.self",
+          "notification.update.self",
           "org.create",
           "org.member.manage.scope",
           "organization.member.manage",
           "organization.member.read",
           "organization.role.manage",
           "report.create",
+          "revision.create.own",
           "role.assign",
           "secret.manage",
           "share.create",
           "share.resolve",
           "social.follow",
+          "social.unfollow",
           "subscription.cancel",
+          "subscription.change_plan",
           "subscription.create",
+          "subscription.pause",
           "subscription.read",
+          "subscription.resume",
+          "topic.manage",
           "user.ban",
           "user.credential.manage",
           "user.freeze",
@@ -803,30 +960,15 @@
           "user.session.revoke",
           "user.suspend",
           "user.unfreeze",
-          "user.update.self",
-          "subscription.pause",
-          "subscription.resume",
-          "subscription.change_plan"
+          "user.update.self"
         ]
       }
     ]
   },
   "x-role-permissions-gap": {
     "status": "OPEN",
-    "note": "This mapping deliberately contains only permissions already present in x-permissions. Permission identifiers required by docs/301 but absent from the catalog are not silently invented or granted.",
+    "note": "Open gaps are only permission identifiers still referenced by canonical docs/301 but not yet represented in x-permissions. These permissions remain ungranted until a separate catalog slice defines their resource, action, minimum layer, scope, and role mapping.",
     "knownCatalogGaps": [
-      "search.read.public",
-      "feed.read.public",
-      "taxonomy.read",
-      "comment.read",
-      "interaction.unlike",
-      "interaction.favorite",
-      "social.unfollow",
-      "notification.read.self",
-      "notification.update.self",
-      "creator.read.self",
-      "creator.update.self",
-      "creator.stats.read.self",
       "content.read.any",
       "content.feature",
       "content.promote",
