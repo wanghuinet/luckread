@@ -1,14 +1,25 @@
-# W08 — Creator / Organization
+# W08 — Creator / Organization + CASL Policy Evaluation
 
-Canonical Worker identity: **W08**
-Canonical responsibility: **Creator / Organization**
-Primary Task: **T04**
+Canonical Worker identity: **W08**  
+Primary Task: **T04**  
 Primary D1 authority: **D1-01**
 
-Canonical repository path: `workers/W08-creator`.
+## Responsibility
 
-Boundary:
-- Creator and organization capabilities belong to W08 under the approved Task/Contract model.
-- Search is not the canonical logical role of W08.
-- No unrestricted cross-D1 writes.
-- No new business ownership is inferred from unrelated directory naming.
+W08 remains the creator/organization domain. Under [CC-1.1-W08-CASL-POLICY-ENGINE-2026-10-13](../../docs/change-control/CC-1.1-W08-CASL-POLICY-ENGINE-2026-10-13.md), its code also hosts the bounded CASL policy evaluator.
+
+- W02 remains authoritative for identity, account state, credentials, sessions, role assignments, and L0-L8 resolution.
+- W08 evaluates trusted server-side effective permission context against `contracts/authz/permissions.json`.
+- `resolveCatalogPermissionsForRoles` maps catalogued global role IDs to explicit permissions; unknown roles fail closed. The preferred server entrypoint `createW08AbilityForRoles` accepts W02-resolved `{ roleId, scopeType, scopeId }` RoleAssignment tuples, verifies each role's contracted scope type and global-layer consistency, and binds each organization/IP grant to its exact assignment scope ID. It deliberately does not accept a loose role list plus aggregated `organizationIds`/`ipIds`, avoiding scope union across roles. The current catalog includes public discovery, verified-user interactions/notifications, creator self-service/revisions, and L5 curation/topic/campaign/analytics permissions. The only remaining documented identifiers deliberately held open are `security.manage` and `role.assign.any`; those L8 operations need separate high-risk grant/approval semantics.
+- W08 does not persist or independently resolve role assignments, infer layers, or become a second identity/account source of truth.
+- The policy module does not access D1 directly and does not replace the owning Worker's entitlement, workflow, resource ownership, lifecycle, or business-state gates.
+- Unknown permissions, malformed context, insufficient layer, missing required MFA, and out-of-scope resources fail closed; explicit DENY overrides ALLOW.
+- L8 sensitive grants additionally require server-verified, target-bound dual-approval/audit evidence valid for no more than four hours. The exported ability surface blocks resource-type-only checks whenever a conditional rule is involved.
+
+## Current implementation status
+
+`src/authorization.ts` is the local policy evaluator and `src/authorization.test.ts` covers its unit-level security boundaries.
+
+**Not yet production-integrated:** this directory does not yet expose an admitted public route or cross-Worker transport contract for runtime policy decisions. Unit tests must not be interpreted as proof that current public APIs use this evaluator or as Security GREEN.
+
+No additional Worker, D1, Queue, or Payload Core change is introduced.
