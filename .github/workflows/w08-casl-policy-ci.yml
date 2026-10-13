@@ -46,4 +46,5 @@ jobs:
           --target ES2022 --module ESNext --moduleResolution Bundler
           --resolveJsonModule --esModuleInterop --lib ES2022,DOM
           workers/W08-creator/src/authorization.ts
+          workers/W08-creator/src/index.ts
           workers/W08-creator/src/authorization.test.ts
