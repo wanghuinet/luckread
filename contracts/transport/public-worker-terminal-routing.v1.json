@@ -7,7 +7,7 @@
   "purpose": "Separate public HTTP ingress from authoritative business execution so W01 does not become a universal business owner or mandatory worker-to-worker hop.",
   "topology": {
     "workerCount": 12,
-    "d1Count": 5,
+    "d1Count": 4,
     "taskCount": 25,
     "newWorker": false,
     "newD1": false
@@ -77,7 +77,7 @@
   "nonGoals": [
     "No new public namespace is introduced by this contract.",
     "No direct public exposure of W03/W06 is required by this contract.",
-    "No Worker topology expansion; the five-D1 target is governed by the approved D1 topology amendment.",
+    "No Worker or D1 topology expansion; the existing four-D1 topology remains unchanged.",
     "No Mapping 0 GREEN promotion.",
     "No direct public exposure of W08 is required by this contract."
   ]
