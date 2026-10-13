@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { subject } from '@casl/ability'
-import { createW08Ability, type W08AuthorizationContext } from './authorization.js'
+import { createW08Ability, type W08AuthorizationContext } from './index.js'
 
 const context = (
   overrides: Partial<W08AuthorizationContext> = {},
