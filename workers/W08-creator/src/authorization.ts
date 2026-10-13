@@ -495,10 +495,12 @@ function buildW08Ability(
     const publicRead = permission.scope === 'public' && ['read', 'resolve'].includes(permission.action)
     if (canReadPublicOnly && !publicRead) continue
 
-    // L5-L8 operational authority requires verified MFA. Without it, the
-    // principal may still use explicit public-read permissions, but no
-    // protected or administrative permission is materialized.
-    if (rank >= LAYER_RANK.L5 && !context.mfaVerified && !publicRead) continue
+    // In direct/global mode use the resolved global layer. In role-assignment
+    // mode, organization/IP permission checks use their own assignment layer
+    // below, never the unrelated global layer.
+    const isScopedAssignmentPermission = scopedGrants !== undefined &&
+      (permission.scope === 'organization' || permission.scope === 'ip')
+    if (!isScopedAssignmentPermission && rank >= LAYER_RANK.L5 && !context.mfaVerified && !publicRead) continue
 
     // L0 is strictly public/anonymous: a mistakenly supplied grant cannot
     // make an anonymous request perform a write or platform operation.
@@ -513,6 +515,16 @@ function buildW08Ability(
       ? validPrivilegedApprovalFor(context, permission)
       : undefined
     if (permission.minLayer === 'L8' && !privilegedApproval) continue
+
+    if (scopedGrants !== undefined && (permission.scope === 'organization' || permission.scope === 'ip')) {
+      const matchingGrants = scopedGrants.filter((grant) => grant.permissionName === permission.name)
+      for (const scopedGrant of matchingGrants) {
+        if (LAYER_RANK[scopedGrant.assignmentLayer] < LAYER_RANK[permission.minLayer]) continue
+        if (LAYER_RANK[scopedGrant.assignmentLayer] >= LAYER_RANK.L5 && !context.mfaVerified) continue
+        addGrant(can, permission, context, privilegedApproval ?? undefined, scopedGrant)
+      }
+      continue
+    }
 
     addGrant(can, permission, context, privilegedApproval ?? undefined)
   }
