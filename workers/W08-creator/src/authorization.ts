@@ -462,7 +462,7 @@ function buildW08Ability(
       : undefined
     if (permission.minLayer === 'L8' && !privilegedApproval) continue
 
-    addGrant(can, permission, context, privilegedApproval)
+    addGrant(can, permission, context, privilegedApproval ?? undefined)
   }
 
   // CASL gives the last matching rule precedence. Register all explicit DENY
