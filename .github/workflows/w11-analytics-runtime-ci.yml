@@ -42,6 +42,7 @@ jobs:
           npx vitest run
           workers/W11-growth-campaign-analytics-operations/src/analytics-event-quality.test.ts
           workers/W11-growth-campaign-analytics-operations/src/analytics-aggregation.test.ts
+          workers/W11-growth-campaign-analytics-operations/src/analytics-period.test.ts
 
       - name: Type-check W11 analytics runtime
         run: >-
@@ -51,4 +52,5 @@ jobs:
           workers/W11-growth-campaign-analytics-operations/src/analytics-event-quality.ts
           workers/W11-growth-campaign-analytics-operations/src/analytics-event-quality.test.ts
           workers/W11-growth-campaign-analytics-operations/src/analytics-aggregation.ts
+          workers/W11-growth-campaign-analytics-operations/src/analytics-period.ts
           workers/W11-growth-campaign-analytics-operations/src/analytics-aggregation.test.ts
