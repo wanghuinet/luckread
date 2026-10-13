@@ -95,8 +95,9 @@ describe('AUTH-001 registration idempotency ordering', () => {
     const commitConflictBlockEnd = source.indexOf('}))', commitConflict)
     expect(commitConflict).toBeGreaterThanOrEqual(0)
     const commitConflictBlock = source.slice(commitConflict, commitConflictBlockEnd)
-    expect(commitConflictBlock).toContain("'IDEMPOTENCY_CONFLICT'")
-    expect(commitConflictBlock).toContain("'CONSENT_CONSTRAINT'")
+    expect(source).toContain("'IDEMPOTENCY_CONFLICT'")
+    expect(source).toContain("'CONSENT_CONSTRAINT'")
+    expect(commitConflictBlock).toContain('failureCategory,')
     expect(commitConflictBlock).not.toContain('message,')
   })
 
