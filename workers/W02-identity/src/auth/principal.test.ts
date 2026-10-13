@@ -14,7 +14,7 @@ vi.mock('./better-auth.js', () => ({
 }))
 
 vi.mock('../authz/role-assignment.js', () => ({
-  resolveGlobalLayer: vi.fn().mockResolvedValue({ decision: 'ALLOW', layer: 'L3' }),
+  resolveGlobalLayer: vi.fn().mockResolvedValue({ decision: 'ALLOW', layer: 'L3', roleAssignments: [{ id: 'ra-1', roleId: 'creator', scopeType: 'global', scopeId: null }] }),
 }))
 
 import { resolveBetterAuthPrincipal } from './principal.js'
@@ -44,6 +44,7 @@ describe('W02 Better Auth principal authority', () => {
       accountState: 'ACTIVE',
       accountStateVersion: 2,
       layer: 'L3',
+      roleAssignments: [{ id: 'ra-1', roleId: 'creator', scopeType: 'global', scopeId: null }],
     })
   })
 })
