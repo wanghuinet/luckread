@@ -51,9 +51,9 @@ export async function ingestAnalyticsBatch(
         return outcome
       }
       return {
-        ...outcome,
         quality: 'DUPLICATE',
         reason: 'PERSISTED_EVENT_ID_OR_DEDUPE_KEY',
+        eventId,
       }
     }),
     counts: {
