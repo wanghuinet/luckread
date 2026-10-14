@@ -227,7 +227,7 @@
       "auth": {
         "required": true,
         "permission": "subscription.read",
-        "scope": "self-or-organization"
+        "scope": "self"
       },
       "request": {
         "query": {
