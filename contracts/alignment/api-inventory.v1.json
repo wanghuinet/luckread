@@ -2091,6 +2091,51 @@
       ]
     },
     {
+      "operationId": "changeSubscriptionPlan",
+      "method": "POST",
+      "path": "/v1/memberships/subscriptions/{subscriptionId}/change-plan",
+      "openapiPath": "/memberships/subscriptions/{subscriptionId}/change-plan",
+      "domain": "subscription_entitlement_payment",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/memberships/subscriptions/{subscriptionId}/change-plan",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "pauseSubscription",
+      "method": "POST",
+      "path": "/v1/memberships/subscriptions/{subscriptionId}/pause",
+      "openapiPath": "/memberships/subscriptions/{subscriptionId}/pause",
+      "domain": "subscription_entitlement_payment",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/memberships/subscriptions/{subscriptionId}/pause",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "resumeSubscription",
+      "method": "POST",
+      "path": "/v1/memberships/subscriptions/{subscriptionId}/resume",
+      "openapiPath": "/memberships/subscriptions/{subscriptionId}/resume",
+      "domain": "subscription_entitlement_payment",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/memberships/subscriptions/{subscriptionId}/resume",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
       "operationId": "postNotificationsNotificationIdRead",
       "method": "POST",
       "path": "/v1/notifications/{notificationId}/read",
