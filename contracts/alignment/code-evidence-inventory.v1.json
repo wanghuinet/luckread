@@ -5,6 +5,106 @@
   "generatedBy": "scripts/build-code-evidence-inventory.mjs",
   "records": [
     {
+      "evidenceId": "API_OPERATION:applyForCreator",
+      "subjectType": "API_OPERATION",
+      "subjectId": "applyForCreator",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:authCredentialAdd",
+      "subjectType": "API_OPERATION",
+      "subjectId": "authCredentialAdd",
+      "implementationStatus": "IMPLEMENTED",
+      "implementationRefs": [
+        "workers/W02-identity/src/credentials/credential-add.ts",
+        "workers/W02-identity/src/credentials/credential-list.ts",
+        "workers/W02-identity/src/credentials/credential-lifecycle.ts"
+      ],
+      "testRefs": [
+        "workers/W02-identity/src/credentials/credential-add.test.ts"
+      ],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json",
+        "contracts/alignment/cross-system-mapping.v1.json"
+      ],
+      "blockers": []
+    },
+    {
+      "evidenceId": "API_OPERATION:authCredentialList",
+      "subjectType": "API_OPERATION",
+      "subjectId": "authCredentialList",
+      "implementationStatus": "IMPLEMENTED",
+      "implementationRefs": [
+        "workers/W02-identity/src/credentials/credential-add.ts",
+        "workers/W02-identity/src/credentials/credential-list.ts",
+        "workers/W02-identity/src/credentials/credential-lifecycle.ts"
+      ],
+      "testRefs": [
+        "workers/W02-identity/src/credentials/credential-add.test.ts"
+      ],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json",
+        "contracts/alignment/cross-system-mapping.v1.json"
+      ],
+      "blockers": []
+    },
+    {
+      "evidenceId": "API_OPERATION:authCredentialRemove",
+      "subjectType": "API_OPERATION",
+      "subjectId": "authCredentialRemove",
+      "implementationStatus": "IMPLEMENTED",
+      "implementationRefs": [
+        "workers/W02-identity/src/credentials/credential-add.ts",
+        "workers/W02-identity/src/credentials/credential-list.ts",
+        "workers/W02-identity/src/credentials/credential-lifecycle.ts"
+      ],
+      "testRefs": [
+        "workers/W02-identity/src/credentials/credential-add.test.ts"
+      ],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json",
+        "contracts/alignment/cross-system-mapping.v1.json"
+      ],
+      "blockers": []
+    },
+    {
+      "evidenceId": "API_OPERATION:authCredentialReplace",
+      "subjectType": "API_OPERATION",
+      "subjectId": "authCredentialReplace",
+      "implementationStatus": "IMPLEMENTED",
+      "implementationRefs": [
+        "workers/W02-identity/src/credentials/credential-add.ts",
+        "workers/W02-identity/src/credentials/credential-list.ts",
+        "workers/W02-identity/src/credentials/credential-lifecycle.ts"
+      ],
+      "testRefs": [
+        "workers/W02-identity/src/credentials/credential-add.test.ts"
+      ],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json",
+        "contracts/alignment/cross-system-mapping.v1.json"
+      ],
+      "blockers": []
+    },
+    {
       "evidenceId": "API_OPERATION:authLogin",
       "subjectType": "API_OPERATION",
       "subjectId": "authLogin",
@@ -35,6 +135,63 @@
       "blockers": [
         "Runtime API implementation evidence is not yet mechanically discovered"
       ]
+    },
+    {
+      "evidenceId": "API_OPERATION:authPasswordChange",
+      "subjectType": "API_OPERATION",
+      "subjectId": "authPasswordChange",
+      "implementationStatus": "IMPLEMENTED",
+      "implementationRefs": [
+        "workers/W01-payload/src/app/auth/password/change/route.ts",
+        "workers/W01-payload/src/app/auth/password/reset/request/route.ts",
+        "workers/W01-payload/src/app/auth/password/reset/confirm/route.ts"
+      ],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json",
+        "contracts/alignment/cross-system-mapping.v1.json"
+      ],
+      "blockers": []
+    },
+    {
+      "evidenceId": "API_OPERATION:authPasswordResetConfirm",
+      "subjectType": "API_OPERATION",
+      "subjectId": "authPasswordResetConfirm",
+      "implementationStatus": "IMPLEMENTED",
+      "implementationRefs": [
+        "workers/W01-payload/src/app/auth/password/change/route.ts",
+        "workers/W01-payload/src/app/auth/password/reset/request/route.ts",
+        "workers/W01-payload/src/app/auth/password/reset/confirm/route.ts"
+      ],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json",
+        "contracts/alignment/cross-system-mapping.v1.json"
+      ],
+      "blockers": []
+    },
+    {
+      "evidenceId": "API_OPERATION:authPasswordResetRequest",
+      "subjectType": "API_OPERATION",
+      "subjectId": "authPasswordResetRequest",
+      "implementationStatus": "IMPLEMENTED",
+      "implementationRefs": [
+        "workers/W01-payload/src/app/auth/password/change/route.ts",
+        "workers/W01-payload/src/app/auth/password/reset/request/route.ts",
+        "workers/W01-payload/src/app/auth/password/reset/confirm/route.ts"
+      ],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json",
+        "contracts/alignment/cross-system-mapping.v1.json"
+      ],
+      "blockers": []
     },
     {
       "evidenceId": "API_OPERATION:authRefresh",
@@ -73,6 +230,54 @@
         "contracts/alignment/cross-system-mapping.v1.json"
       ],
       "blockers": []
+    },
+    {
+      "evidenceId": "API_OPERATION:authSessionGet",
+      "subjectType": "API_OPERATION",
+      "subjectId": "authSessionGet",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:authSessionList",
+      "subjectType": "API_OPERATION",
+      "subjectId": "authSessionList",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:authSessionRevoke",
+      "subjectType": "API_OPERATION",
+      "subjectId": "authSessionRevoke",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
     },
     {
       "evidenceId": "API_OPERATION:batchUpdateNotifications",
@@ -325,6 +530,38 @@
       "evidenceId": "API_OPERATION:createSubscription",
       "subjectType": "API_OPERATION",
       "subjectId": "createSubscription",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:decideCreatorApplication",
+      "subjectType": "API_OPERATION",
+      "subjectId": "decideCreatorApplication",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:decideModerationCase",
+      "subjectType": "API_OPERATION",
+      "subjectId": "decideModerationCase",
       "implementationStatus": "UNRESOLVED",
       "implementationRefs": [],
       "testRefs": [],
@@ -866,22 +1103,6 @@
       ]
     },
     {
-      "evidenceId": "API_OPERATION:getEntitlements",
-      "subjectType": "API_OPERATION",
-      "subjectId": "getEntitlements",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
-      ],
-      "blockers": [
-        "Runtime API implementation evidence is not yet mechanically discovered"
-      ]
-    },
-    {
       "evidenceId": "API_OPERATION:getFeed",
       "subjectType": "API_OPERATION",
       "subjectId": "getFeed",
@@ -1090,9 +1311,41 @@
       ]
     },
     {
+      "evidenceId": "API_OPERATION:getModerationCase",
+      "subjectType": "API_OPERATION",
+      "subjectId": "getModerationCase",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
       "evidenceId": "API_OPERATION:getMyCreator",
       "subjectType": "API_OPERATION",
       "subjectId": "getMyCreator",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:getMyCreatorApplication",
+      "subjectType": "API_OPERATION",
+      "subjectId": "getMyCreatorApplication",
       "implementationStatus": "UNRESOLVED",
       "implementationRefs": [],
       "testRefs": [],
@@ -1426,6 +1679,38 @@
       ]
     },
     {
+      "evidenceId": "API_OPERATION:listCreatorApplicationsForReview",
+      "subjectType": "API_OPERATION",
+      "subjectId": "listCreatorApplicationsForReview",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:listEntitlements",
+      "subjectType": "API_OPERATION",
+      "subjectId": "listEntitlements",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
       "evidenceId": "API_OPERATION:listIpContents",
       "subjectType": "API_OPERATION",
       "subjectId": "listIpContents",
@@ -1461,6 +1746,22 @@
       "evidenceId": "API_OPERATION:listModerationCases",
       "subjectType": "API_OPERATION",
       "subjectId": "listModerationCases",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:listModerationQueue",
+      "subjectType": "API_OPERATION",
+      "subjectId": "listModerationQueue",
       "implementationStatus": "UNRESOLVED",
       "implementationRefs": [],
       "testRefs": [],
@@ -2352,9 +2653,9 @@
       ]
     },
     {
-      "evidenceId": "API_OPERATION:search",
+      "evidenceId": "API_OPERATION:searchContent",
       "subjectType": "API_OPERATION",
-      "subjectId": "search",
+      "subjectId": "searchContent",
       "implementationStatus": "UNRESOLVED",
       "implementationRefs": [],
       "testRefs": [],
