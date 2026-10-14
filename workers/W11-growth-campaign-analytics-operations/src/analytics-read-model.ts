@@ -64,15 +64,15 @@ export interface HourlyBucketWindow {
 }
 
 export interface ContentAnalyticsDerivedMetrics {
-  /** Ratios are in the 0..1 range when a denominator exists; null means no denominator/sample. */
+  /** Occurrence-count ratios; they may exceed 1 if a producer emits repeated threshold events. Null means denominator is zero. */
   openRate: number | null
   readStartRate: number | null
   readProgress25Rate: number | null
   readProgress50Rate: number | null
   readProgress75Rate: number | null
   readCompletionRate: number | null
-  averageReadDurationMs: number | null
-  averageDwellDurationMs: number | null
+  averageReadDwellEventMs: number | null
+  averageDwellEventMs: number | null
   completedViewRate: number | null
   videoPlaySuccessRate: number | null
   videoProgress25Rate: number | null
@@ -80,7 +80,7 @@ export interface ContentAnalyticsDerivedMetrics {
   videoProgress75Rate: number | null
   videoProgress90Rate: number | null
   videoCompletionRate: number | null
-  averageVideoWatchMs: number | null
+  averageVideoWatchEventMs: number | null
   /** Interaction actions per open; can exceed 1 because actions are not unique-user counts. */
   likesPerOpen: number | null
   commentsPerOpen: number | null
@@ -181,8 +181,8 @@ function deriveContentMetrics(
     readProgress50Rate: ratio(metrics.readProgress50, metrics.readStarts),
     readProgress75Rate: ratio(metrics.readProgress75, metrics.readStarts),
     readCompletionRate: ratio(metrics.readCompletions, metrics.readStarts),
-    averageReadDurationMs: ratio(metrics.readDurationMs, metrics.readDurationEvents),
-    averageDwellDurationMs: ratio(metrics.dwellDurationMs, metrics.dwellEvents),
+    averageReadDwellEventMs: ratio(metrics.readDurationMs, metrics.readDurationEvents),
+    averageDwellEventMs: ratio(metrics.dwellDurationMs, metrics.dwellEvents),
     completedViewRate: ratio(metrics.completedViews, metrics.opens),
     videoPlaySuccessRate: ratio(metrics.videoPlays, metrics.videoPlayRequests),
     videoProgress25Rate: ratio(metrics.videoProgress25, metrics.videoPlays),
@@ -190,7 +190,7 @@ function deriveContentMetrics(
     videoProgress75Rate: ratio(metrics.videoProgress75, metrics.videoPlays),
     videoProgress90Rate: ratio(metrics.videoProgress90, metrics.videoPlays),
     videoCompletionRate: ratio(metrics.videoCompletions, metrics.videoPlays),
-    averageVideoWatchMs: ratio(metrics.videoWatchMs, metrics.videoWatchEvents),
+    averageVideoWatchEventMs: ratio(metrics.videoWatchMs, metrics.videoWatchEvents),
     likesPerOpen: ratio(metrics.likes, metrics.opens),
     commentsPerOpen: ratio(metrics.comments, metrics.opens),
     sharesPerOpen: ratio(metrics.shares, metrics.opens),
