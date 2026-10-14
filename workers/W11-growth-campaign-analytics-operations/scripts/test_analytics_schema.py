@@ -10,6 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 MIGRATION = ROOT / "migrations" / "0001_analytics_projection.sql"
 STORE = ROOT / "src" / "analytics-d1-store.ts"
 READ_MODEL = ROOT / "src" / "analytics-read-model.ts"
+RECONCILIATION = ROOT / "src" / "analytics-reconciliation.ts"
 SQL_COLUMNS = (
     "event_id, dedupe_key, schema_version, event_name, source_worker, occurred_at, "
     "received_at, hour_start, actor_type, content_id, content_type, creator_id, "
@@ -24,7 +25,7 @@ def extract_sql(source: str, constant: str) -> str:
         flags=re.DOTALL,
     )
     if not match:
-        raise AssertionError(f"Unable to extract {constant} from analytics-d1-store.ts")
+        raise AssertionError(f"Unable to extract SQL constant {constant}")
     return match.group(1)
 
 
@@ -138,15 +139,52 @@ def apply_batch(
         raise
 
 
+def select_from_insert(sql: str) -> str:
+    match = re.search(r"\nSELECT\n.*", sql, flags=re.DOTALL)
+    if not match:
+        raise AssertionError("Unable to extract grouped SELECT from rebuild SQL")
+    return match.group(0).lstrip()
+
+
+def reconcile_hour(
+    connection: sqlite3.Connection,
+    hour_start: str,
+    delete_content_sql: str,
+    rebuild_content_sql: str,
+    delete_creator_sql: str,
+    rebuild_creator_sql: str,
+    mark_applied_sql: str,
+) -> None:
+    connection.execute("BEGIN")
+    try:
+        connection.execute(delete_content_sql, (hour_start,))
+        connection.execute(rebuild_content_sql, (hour_start,))
+        connection.execute(delete_creator_sql, (hour_start,))
+        connection.execute(rebuild_creator_sql, (hour_start,))
+        connection.execute(mark_applied_sql, (hour_start,))
+        connection.commit()
+    except Exception:
+        connection.rollback()
+        raise
+
+
 def main() -> None:
     schema = MIGRATION.read_text(encoding="utf-8")
     store_source = STORE.read_text(encoding="utf-8")
     read_model_source = READ_MODEL.read_text(encoding="utf-8")
+    reconciliation_source = RECONCILIATION.read_text(encoding="utf-8")
     content_sql = extract_sql(store_source, "CONTENT_PROJECTION_SQL")
     creator_sql = extract_sql(store_source, "CREATOR_PROJECTION_SQL")
     mark_applied_sql = extract_sql(store_source, "MARK_APPLIED_SQL")
     content_read_sql, content_metrics = extract_content_summary_sql(read_model_source)
     creator_read_sql = extract_template(read_model_source, "CREATOR_FOLLOWER_SUMMARY_SQL")
+    delete_content_rebuild_sql = extract_sql(reconciliation_source, "DELETE_CONTENT_HOUR_SQL")
+    content_rebuild_sql = extract_sql(reconciliation_source, "REBUILD_CONTENT_HOUR_SQL")
+    delete_creator_rebuild_sql = extract_sql(reconciliation_source, "DELETE_CREATOR_HOUR_SQL")
+    creator_rebuild_sql = extract_sql(reconciliation_source, "REBUILD_CREATOR_HOUR_SQL")
+    mark_hour_applied_sql = extract_sql(reconciliation_source, "MARK_HOUR_APPLIED_SQL")
+    content_rebuild_select = select_from_insert(content_rebuild_sql)
+    creator_rebuild_select = select_from_insert(creator_rebuild_sql)
 
     db = sqlite3.connect(":memory:")
     db.executescript(schema)
@@ -155,6 +193,15 @@ def main() -> None:
         row[1] for row in db.execute("PRAGMA table_info(analytics_event_dedupe)")
     }
     assert "event_id" in columns and "dedupe_key" in columns
+    hour_plan = " ".join(
+        row[3] for row in db.execute(
+            "EXPLAIN QUERY PLAN SELECT event_id FROM analytics_event_dedupe WHERE hour_start = ?",
+            ("2026-10-14T00:00:00.000Z",),
+        )
+    )
+    assert "analytics_event_dedupe_hour_start_idx" in hour_plan, (
+        f"hourly reconciliation ledger lookup should use the hour index: {hour_plan}"
+    )
     assert not {"actor_id", "visitor_id", "session_id"}.intersection(columns), (
         "D1-05 event rows must not persist direct identity/session fields"
     )
@@ -297,13 +344,91 @@ def main() -> None:
         "SELECT COUNT(*) FROM analytics_event_dedupe WHERE event_id = 'evt_schema_missing_duration'"
     ).fetchone()[0] == 0
 
+    # Repair an intentionally corrupted rollup, remove a stale bucket, and
+    # consume a valid PENDING ledger row. Re-running the same repair must be
+    # idempotent, because projection rows are rebuilt (not incremented).
+    hour = query_from
+    db.execute(
+        "UPDATE analytics_content_hourly SET opens = 999 WHERE content_id = 'article_01'"
+    )
+    db.execute(
+        "UPDATE analytics_creator_hourly SET followers_gained = 88 WHERE creator_id = 'creator_01'"
+    )
+    db.execute(
+        "INSERT INTO analytics_content_hourly (hour_start, content_id, content_type, metric_version) VALUES (?, ?, ?, ?)",
+        (hour, "stale_content", "article", "1.0"),
+    )
+    pending = event(
+        "evt_rebuild_pending_0001",
+        "dedupe_rebuild_pending_0001",
+        "content_open",
+    )
+    pending_placeholders = "(" + ", ".join("?" for _ in pending) + ")"
+    db.execute(
+        f"INSERT INTO analytics_event_dedupe ({SQL_COLUMNS}) VALUES {pending_placeholders}",
+        pending,
+    )
+    db.commit()
+
+    content_rebuild_plan = " ".join(
+        row[3] for row in db.execute(
+            "EXPLAIN QUERY PLAN " + content_rebuild_select, (hour,)
+        )
+    )
+    creator_rebuild_plan = " ".join(
+        row[3] for row in db.execute(
+            "EXPLAIN QUERY PLAN " + creator_rebuild_select, (hour,)
+        )
+    )
+    assert "analytics_event_dedupe_hour_start_idx" in content_rebuild_plan, (
+        f"content-hour repair should use event hour index: {content_rebuild_plan}"
+    )
+    assert "analytics_event_dedupe_hour_start_idx" in creator_rebuild_plan, (
+        f"creator-hour repair should use event hour index: {creator_rebuild_plan}"
+    )
+
+    reconciliation_args = (
+        db,
+        hour,
+        delete_content_rebuild_sql,
+        content_rebuild_sql,
+        delete_creator_rebuild_sql,
+        creator_rebuild_sql,
+        mark_hour_applied_sql,
+    )
+    reconcile_hour(*reconciliation_args)
+    repaired_article = db.execute(
+        "SELECT opens, read_duration_ms, read_duration_events, likes FROM analytics_content_hourly WHERE content_id = 'article_01'"
+    ).fetchone()
+    assert repaired_article == (3, 1250, 1, 1), (
+        f"reconciliation did not rebuild article metrics from ledger: {repaired_article}"
+    )
+    assert db.execute(
+        "SELECT COUNT(*) FROM analytics_content_hourly WHERE content_id = 'stale_content'"
+    ).fetchone()[0] == 0, "reconciliation should remove stale projection buckets"
+    repaired_creator = db.execute(
+        "SELECT followers_gained, followers_lost FROM analytics_creator_hourly WHERE creator_id = 'creator_01'"
+    ).fetchone()
+    assert repaired_creator == (1, 1), f"creator projection not repaired: {repaired_creator}"
+    assert db.execute(
+        "SELECT COUNT(*) FROM analytics_event_dedupe WHERE projection_status = 'PENDING'"
+    ).fetchone()[0] == 0, "reconciliation must mark bucket ledger rows APPLIED"
+
+    reconcile_hour(*reconciliation_args)
+    assert db.execute(
+        "SELECT opens FROM analytics_content_hourly WHERE content_id = 'article_01'"
+    ).fetchone()[0] == 3, "re-running reconciliation must not double-count"
+    assert db.execute(
+        "SELECT followers_gained FROM analytics_creator_hourly WHERE creator_id = 'creator_01'"
+    ).fetchone()[0] == 1, "re-running reconciliation must preserve creator totals"
+
     # Projections are written once per grouped dimension, not once per input event.
     grouping = content_sql.upper()
     assert "GROUP BY HOUR_START, CONTENT_TYPE, CONTENT_ID, METRIC_VERSION" in grouping
     assert "ON CONFLICT" in grouping
     assert "PROJECTION_STATUS = 'PENDING'" in grouping
 
-    print("W11 D1-05 schema smoke test passed: migration, grouped writes/reads, single-content and content-set indexes, dedupe, privacy, rollback")
+    print("W11 D1-05 schema smoke test passed: migration, grouped writes/reads, indexes, durable dedupe, idempotent hourly reconciliation, privacy, rollback")
 
 
 if __name__ == "__main__":

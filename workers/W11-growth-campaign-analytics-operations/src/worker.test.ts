@@ -11,6 +11,7 @@ const readySchemaRows: SchemaRow[] = [
   { type: 'table', name: 'analytics_reconciliation_status' },
   { type: 'index', name: 'analytics_event_dedupe_ingested_at_idx' },
   { type: 'index', name: 'analytics_event_dedupe_occurred_at_idx' },
+  { type: 'index', name: 'analytics_event_dedupe_hour_start_idx' },
   { type: 'index', name: 'analytics_event_dedupe_pending_idx' },
   { type: 'index', name: 'analytics_content_hourly_content_time_idx' },
   { type: 'index', name: 'analytics_content_hourly_content_id_time_idx' },

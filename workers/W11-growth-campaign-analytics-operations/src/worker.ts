@@ -24,6 +24,7 @@ const REQUIRED_SCHEMA_OBJECTS = [
   { type: 'table', name: 'analytics_reconciliation_status' },
   { type: 'index', name: 'analytics_event_dedupe_ingested_at_idx' },
   { type: 'index', name: 'analytics_event_dedupe_occurred_at_idx' },
+  { type: 'index', name: 'analytics_event_dedupe_hour_start_idx' },
   { type: 'index', name: 'analytics_event_dedupe_pending_idx' },
   { type: 'index', name: 'analytics_content_hourly_content_time_idx' },
   { type: 'index', name: 'analytics_content_hourly_content_id_time_idx' },
@@ -46,6 +47,7 @@ const ANALYTICS_SCHEMA_PROBE = `
     (type = 'index' AND name IN (
       'analytics_event_dedupe_ingested_at_idx',
       'analytics_event_dedupe_occurred_at_idx',
+      'analytics_event_dedupe_hour_start_idx',
       'analytics_event_dedupe_pending_idx',
       'analytics_content_hourly_content_time_idx',
       'analytics_content_hourly_content_id_time_idx',

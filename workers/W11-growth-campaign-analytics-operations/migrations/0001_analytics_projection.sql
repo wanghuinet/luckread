@@ -68,6 +68,11 @@ CREATE INDEX IF NOT EXISTS analytics_event_dedupe_ingested_at_idx
 CREATE INDEX IF NOT EXISTS analytics_event_dedupe_occurred_at_idx
   ON analytics_event_dedupe (occurred_at);
 
+-- Hourly repair reads the full event ledger for exactly one UTC bucket,
+-- including already-applied events; keep that source scan bounded by hour_start.
+CREATE INDEX IF NOT EXISTS analytics_event_dedupe_hour_start_idx
+  ON analytics_event_dedupe (hour_start);
+
 CREATE TABLE IF NOT EXISTS analytics_content_hourly (
   hour_start TEXT NOT NULL,
   content_id TEXT NOT NULL,
