@@ -291,6 +291,54 @@ describe('W11 bounded analytics read models', () => {
     ])
   })
 
+  it('ranks short videos by an allowlisted playback metric when requested', async () => {
+    const fixture = fakeDb({
+      contentId: 'video_001',
+      contentType: 'video',
+      impressions: 50,
+      opens: 0,
+      videoPlays: 42,
+      videoCompletions: 31,
+    })
+    const result = await getTopContentAnalyticsForContentSet(fixture.db, {
+      contentIds: ['video_001', 'video_002'],
+      window: { from, to },
+      rankBy: 'videoPlays',
+      limit: 3,
+    })
+
+    expect(result.items[0]).toMatchObject({
+      rank: 1,
+      contentId: 'video_001',
+      contentType: 'video',
+      opens: 0,
+      videoPlays: 42,
+      videoCompletions: 31,
+    })
+    expect(fixture.getSql()).toContain('ORDER BY videoPlays DESC, opens DESC, impressions DESC')
+    expect(fixture.getSql()).not.toContain('ORDER BY opens DESC, impressions DESC')
+    expect(fixture.getBoundValues()).toEqual([
+      'video_001',
+      'video_002',
+      from,
+      to,
+      '1.0',
+      3,
+    ])
+  })
+
+  it('rejects unrecognized ranking metrics before querying D1', async () => {
+    const fixture = fakeDb(null)
+    await expect(
+      getTopContentAnalyticsForContentSet(fixture.db, {
+        contentIds: ['video_001'],
+        window: { from, to },
+        rankBy: 'attacker_supplied_sql' as never,
+      }),
+    ).rejects.toThrow('rankBy is invalid')
+    expect(fixture.getPrepareCalls()).toBe(0)
+  })
+
   it('returns an empty ranking without querying D1 for an empty authorized content set', async () => {
     const fixture = fakeDb(null)
     const result = await getTopContentAnalyticsForContentSet(fixture.db, {
