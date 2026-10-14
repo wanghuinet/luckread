@@ -193,7 +193,7 @@ describe('W11 bounded analytics read models', () => {
     ).rejects.toThrow('cannot exceed 90 items per query')
     await expect(
       getContentSetAnalyticsSummary(fixture.db, {
-        contentIds: ['invalid\\u0000content'],
+        contentIds: ['invalid '],
         window: { from, to },
       }),
     ).rejects.toThrow('contentId is invalid')
