@@ -497,7 +497,7 @@ def main() -> None:
     assert "ON CONFLICT" in grouping
     assert "PROJECTION_STATUS = 'PENDING'" in grouping
 
-    print("W11 D1-05 schema smoke test passed: migrations, grouped writes/reads, indexes, durable dedupe, idempotent hourly reconciliation, bounded success/failure status, privacy, rollback")
+    print("W11 D1-05 schema smoke test passed: migrations, grouped writes/reads, indexes, durable dedupe, late-event quarantine/replay, idempotent hourly reconciliation, bounded status, privacy, rollback")
 
 
 if __name__ == "__main__":
