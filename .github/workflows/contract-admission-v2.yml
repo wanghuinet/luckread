@@ -3,9 +3,9 @@ name: Contract Admission CI
 on:
   push:
     branches: [main, 'contract/**']
-    paths: ['package.json','package-lock.json','contracts/**','docs/**','scripts/**','.github/workflows/contract-admission-v2.yml']
+    paths: ['package.json','package-lock.json','contracts/**','docs/**','scripts/**','workers/W07-subscription-commerce/**','workers/W01-payload/src/subscription/**','workers/W01-payload/src/app/api/v1/memberships/**','workers/W01-payload/tests/int/subscription-v1-adapter.int.spec.ts','workers/W01-payload/wrangler.jsonc','.github/workflows/contract-admission-v2.yml']
   pull_request:
-    paths: ['package.json','package-lock.json','contracts/**','docs/**','scripts/**','.github/workflows/contract-admission-v2.yml']
+    paths: ['package.json','package-lock.json','contracts/**','docs/**','scripts/**','workers/W07-subscription-commerce/**','workers/W01-payload/src/subscription/**','workers/W01-payload/src/app/api/v1/memberships/**','workers/W01-payload/tests/int/subscription-v1-adapter.int.spec.ts','workers/W01-payload/wrangler.jsonc','.github/workflows/contract-admission-v2.yml']
   workflow_dispatch:
     inputs:
       checkout_ref:
@@ -26,7 +26,7 @@ permissions:
 
 env:
   CHECKOUT_REF: ${{ github.event.inputs.checkout_ref || github.sha }}
-  ADMISSION_MODE: ${{ github.event.inputs.admission_mode || 'DEVELOPMENT' }}
+  ADMISSION_MODE: ${{ github.event.inputs.admission_mode || (startsWith(github.head_ref, 'contract/full-admission/') && 'FULL') || (startsWith(github.ref_name, 'contract/full-admission/') && 'FULL') || 'DEVELOPMENT' }}
 
 jobs:
   upstream-immutability:
@@ -121,7 +121,7 @@ jobs:
 
   capability-graph-strict-downstream:
     name: Strict Downstream R4/Evidence/R5 Gate
-    if: ${{ inputs.admission_mode == 'FULL' }}
+    if: ${{ inputs.admission_mode == 'FULL' || startsWith(github.head_ref, 'contract/full-admission/') || startsWith(github.ref_name, 'contract/full-admission/') }}
     runs-on: ubuntu-latest
     needs: [capability-graph]
     steps:
@@ -150,7 +150,7 @@ jobs:
 
   alignment:
     name: Five-Way Alignment Admission Gate
-    if: ${{ inputs.admission_mode == 'FULL' }}
+    if: ${{ inputs.admission_mode == 'FULL' || startsWith(github.head_ref, 'contract/full-admission/') || startsWith(github.ref_name, 'contract/full-admission/') }}
     runs-on: ubuntu-latest
     needs: [contract, contract-semantic, feature-inventory, payload-reconciliation]
     steps:
@@ -212,7 +212,7 @@ jobs:
       - mapping-zero-final
       - repository-hygiene
       - upstream-immutability
-    if: ${{ always() && needs.contract.result == 'success' && needs['contract-semantic'].result == 'success' && needs.feature-inventory.result == 'success' && needs.payload-reconciliation.result == 'success' && needs['capability-graph'].result == 'success' && needs['mapping-zero-final'].result == 'success' && needs['repository-hygiene'].result == 'success' && needs['upstream-immutability'].result == 'success' && (inputs.admission_mode != 'FULL' || (needs['capability-graph-strict-downstream'].result == 'success' && needs.alignment.result == 'success')) }}
+    if: ${{ always() && needs.contract.result == 'success' && needs['contract-semantic'].result == 'success' && needs.feature-inventory.result == 'success' && needs.payload-reconciliation.result == 'success' && needs['capability-graph'].result == 'success' && needs['mapping-zero-final'].result == 'success' && needs['repository-hygiene'].result == 'success' && needs['upstream-immutability'].result == 'success' && (!(inputs.admission_mode == 'FULL' || startsWith(github.head_ref, 'contract/full-admission/') || startsWith(github.ref_name, 'contract/full-admission/')) || (needs['capability-graph-strict-downstream'].result == 'success' && needs.alignment.result == 'success')) }}
     steps:
       - uses: actions/checkout@v4
         with:
