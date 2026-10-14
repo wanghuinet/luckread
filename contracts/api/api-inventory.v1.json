@@ -213,6 +213,7 @@
         "DELETE /v1/subscriptions/{subscriptionId}",
         "GET /v1/entitlements",
         "GET /v1/entitlements/{subjectId}",
+        "GET /v1/memberships/subscriptions",
         "GET /v1/memberships/subscriptions/{subscriptionId}",
         "GET /v1/payments/{paymentId}",
         "GET /v1/plans",
