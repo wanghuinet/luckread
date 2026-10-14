@@ -192,6 +192,15 @@ describe('W11 analytics event quality', () => {
     expect(result.reason).toBe('CONTENT_SOCIAL_EVENT_REQUIRES_CONTENT_TYPE')
   })
 
+  it('rejects duration fields on events whose contract does not define duration', () => {
+    const result = validateAnalyticsEvent(
+      event({ eventName: 'content_open', durationMs: 150 }),
+      { now },
+    )
+    expect(result.quality).toBe('INVALID')
+    expect(result.reason).toBe('DURATION_NOT_ALLOWED_FOR_EVENT')
+  })
+
   it('rejects missing duration for dwell/watch events', () => {
     const result = validateAnalyticsEvent(
       event({
