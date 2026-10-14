@@ -657,8 +657,9 @@ export async function getCreatorFollowerSummary(
 /**
  * Creator dashboard overview over one bounded reporting window.
  *
- * Content IDs must be fetched and authorized by the caller via W03. W11 reads
- * only the derived hourly metrics; creator identity and relationship ownership
+ * The caller must authorize creatorId and fetch/authorize content IDs via W03
+ * before invoking this function. W11 reads only derived hourly metrics; it does
+ * not enforce identity or relationship permissions, and those source records
  * remain outside this database. Content and follower aggregates share one D1
  * statement, avoiding per-content queries and keeping the maximum at 97 binds.
  */
