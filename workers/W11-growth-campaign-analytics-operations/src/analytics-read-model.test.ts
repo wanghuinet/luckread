@@ -69,12 +69,12 @@ describe('W11 bounded analytics read models', () => {
       readStartRate: 10 / 12,
       readProgress25Rate: 0.8,
       readCompletionRate: 0.4,
-      averageReadDurationMs: 400,
-      averageDwellDurationMs: 200,
+      averageReadDwellEventMs: 400,
+      averageDwellEventMs: 200,
       videoPlaySuccessRate: 0.8,
       videoProgress25Rate: 0.9,
       videoCompletionRate: 0.15,
-      averageVideoWatchMs: 2000,
+      averageVideoWatchEventMs: 2000,
       likesPerOpen: 5 / 12,
     })
     expect(fixture.getSql()).toContain('FROM analytics_content_hourly')
@@ -118,6 +118,24 @@ describe('W11 bounded analytics read models', () => {
     ])
   })
 
+  it('does not claim event-count ratios are bounded probabilities', async () => {
+    const fixture = fakeDb({
+      readStarts: 2,
+      readProgress25: 5,
+      videoPlays: 2,
+      videoProgress25: 4,
+    })
+    const result = await getContentAnalyticsSummary(fixture.db, {
+      contentId: 'article_001',
+      contentType: 'article',
+      window: { from, to },
+    })
+
+    // Until producers coalesce progress per session, these are event ratios.
+    expect(result.readProgress25Rate).toBe(2.5)
+    expect(result.videoProgress25Rate).toBe(2)
+  })
+
   it('returns zero-valued content metrics when no hourly projection exists', async () => {
     const fixture = fakeDb(null)
     const result = await getContentAnalyticsSummary(fixture.db, {
@@ -131,7 +149,7 @@ describe('W11 bounded analytics read models', () => {
     expect(result.favorites).toBe(0)
     expect(result.openRate).toBeNull()
     expect(result.readCompletionRate).toBeNull()
-    expect(result.averageReadDurationMs).toBeNull()
+    expect(result.averageReadDwellEventMs).toBeNull()
     expect(result.videoCompletionRate).toBeNull()
     expect(result.likesPerOpen).toBeNull()
   })
