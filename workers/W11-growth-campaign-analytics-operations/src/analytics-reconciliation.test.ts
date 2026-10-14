@@ -5,6 +5,10 @@ import type {
   AnalyticsD1Result,
 } from './analytics-d1-store'
 import { reconcileAnalyticsHour } from './analytics-reconciliation'
+import {
+  getLatestAnalyticsProjectionRebuildStatus,
+  type AnalyticsRebuildStatusDatabase,
+} from './analytics-reconciliation-status'
 
 interface CapturedStatement {
   sql: string
@@ -132,4 +136,111 @@ describe('W11 analytics hourly reconciliation', () => {
     expect(batches).toHaveLength(3)
     expect(batches[2]?.[0]?.bindings?.[0]).toBe('REBUILD_BATCH_INCOMPLETE')
   })
+
+describe('W11 latest analytics projection rebuild status', () => {
+  const baseRow = {
+    run_id: '1b6f3e20-43a1-4b22-8d20-7f63a6b92d12',
+    hour_start: hourStart,
+    status: 'SUCCEEDED',
+    started_at: '2026-10-14T00:01:00.123Z',
+    completed_at: '2026-10-14T00:02:00.456Z',
+    content_buckets_rebuilt: 8,
+    creator_buckets_rebuilt: 3,
+    error_code: null,
+  }
+
+  function statusDb(row: Record<string, unknown> | null): {
+    db: AnalyticsRebuildStatusDatabase
+    query: string[]
+  } {
+    const queries: string[] = []
+    return {
+      db: {
+        prepare(sql: string) {
+          queries.push(sql)
+          return { first: async () => row }
+        },
+      },
+      query: queries,
+    }
+  }
+
+  it('returns null when no rebuild has been recorded yet', async () => {
+    const { db, query } = statusDb(null)
+    expect(await getLatestAnalyticsProjectionRebuildStatus(db)).toBeNull()
+    expect(query).toHaveLength(1)
+    expect(query[0]).toContain('WHERE singleton_id = 1')
+  })
+
+  it('returns a validated success summary without arbitrary persisted fields', async () => {
+    const { db } = statusDb({
+      ...baseRow,
+      internal_debug: 'must not be returned',
+    })
+    const result = await getLatestAnalyticsProjectionRebuildStatus(db)
+    expect(result).toEqual({
+      runId: baseRow.run_id,
+      hourStart,
+      status: 'SUCCEEDED',
+      startedAt: baseRow.started_at,
+      completedAt: baseRow.completed_at,
+      contentBucketsRebuilt: 8,
+      creatorBucketsRebuilt: 3,
+      errorCode: null,
+    })
+    expect(JSON.stringify(result)).not.toContain('internal_debug')
+  })
+
+  it('returns a RUNNING state when the caller timed out before completion', async () => {
+    const { db } = statusDb({
+      ...baseRow,
+      status: 'RUNNING',
+      completed_at: null,
+      content_buckets_rebuilt: null,
+      creator_buckets_rebuilt: null,
+      error_code: null,
+    })
+    const result = await getLatestAnalyticsProjectionRebuildStatus(db)
+    expect(result).toMatchObject({
+      status: 'RUNNING',
+      completedAt: null,
+      contentBucketsRebuilt: null,
+      creatorBucketsRebuilt: null,
+      errorCode: null,
+    })
+  })
+
+  it('returns only an enumerated sanitized failure code', async () => {
+    const { db } = statusDb({
+      ...baseRow,
+      status: 'FAILED',
+      completed_at: baseRow.completed_at,
+      content_buckets_rebuilt: null,
+      creator_buckets_rebuilt: null,
+      error_code: 'REBUILD_FAILED',
+      provider_error: 'private SQL details',
+    })
+    const result = await getLatestAnalyticsProjectionRebuildStatus(db)
+    expect(result).toMatchObject({
+      status: 'FAILED',
+      errorCode: 'REBUILD_FAILED',
+    })
+    expect(JSON.stringify(result)).not.toContain('private SQL details')
+  })
+
+  it('rejects impossible hours, malformed counts and unrecognized stored errors', async () => {
+    for (const row of [
+      { ...baseRow, hour_start: '2026-02-30T00:00:00.000Z' },
+      { ...baseRow, content_buckets_rebuilt: -1 },
+      { ...baseRow, error_code: 'provider token=secret' },
+      { ...baseRow, started_at: 'not-a-timestamp' },
+    ]) {
+      const { db } = statusDb(row)
+      await expect(getLatestAnalyticsProjectionRebuildStatus(db)).rejects.toThrow(
+        'Stored analytics projection rebuild status is invalid',
+      )
+    }
+  })
+})
+
 })
