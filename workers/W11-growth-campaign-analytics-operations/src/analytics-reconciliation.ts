@@ -135,6 +135,13 @@ export interface ReconcileAnalyticsHourResult {
   contentBucketsRebuilt: number | null
   /** Null only if the D1 driver omits affected-row metadata. */
   creatorBucketsRebuilt: number | null
+  /** Count of quarantined events promoted for this hour; null if D1 omits change metadata. */
+  lateEventsReplayed?: number | null
+}
+
+export interface ReconcileAnalyticsHourOptions {
+  /** Explicitly promote quarantined LATE rows for this UTC hour before rebuilding. */
+  replayLateEvents?: boolean
 }
 
 type ReconciliationFailureCode =
