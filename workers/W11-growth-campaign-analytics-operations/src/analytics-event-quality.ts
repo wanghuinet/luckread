@@ -1,7 +1,11 @@
 export const ANALYTICS_EVENT_SCHEMA_VERSION = '1.0' as const
 
-/** Hard cap keeps a single validation/deduplication pass CPU- and memory-bounded. */
-export const ANALYTICS_MAX_BATCH_SIZE = 500 as const
+/**
+ * Bound one persistence transaction to 90 event INSERTs plus three projection
+ * statements (93 D1 batch statements total). Every INSERT binds only 16 values,
+ * staying below Cloudflare D1's 100-bound-parameter per-query limit.
+ */
+export const ANALYTICS_MAX_BATCH_SIZE = 90 as const
 
 export const ANALYTICS_EVENT_NAMES = [
   'content_impression',
@@ -391,14 +395,12 @@ export function validateAnalyticsEvent(
       return outcome('INVALID', 'INVALID_DURATION_MS', undefined, candidateEventId)
     }
   } else if (value.durationMs !== undefined) {
-    if (
-      typeof value.durationMs !== 'number' ||
-      !Number.isSafeInteger(value.durationMs) ||
-      value.durationMs < 0 ||
-      value.durationMs > MAX_EVENT_DURATION_MS
-    ) {
-      return outcome('INVALID', 'INVALID_DURATION_MS', undefined, candidateEventId)
-    }
+    return outcome(
+      'INVALID',
+      'DURATION_NOT_ALLOWED_FOR_EVENT',
+      undefined,
+      candidateEventId,
+    )
   }
 
   if (
