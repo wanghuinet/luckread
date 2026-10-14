@@ -126,6 +126,7 @@ jobs:
           workers/W11-growth-campaign-analytics-operations/src/analytics-read-model.test.ts
 
   version_upload:
+    name: Apply migrations and upload W11 version
     needs: preflight
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.confirm == 'APPLY_MIGRATIONS_AND_UPLOAD_W11_VERSION' }}
     runs-on: ubuntu-latest
@@ -183,7 +184,7 @@ jobs:
         run: |
           set -euo pipefail
           npx --yes wrangler@4.116.0 deploy --config wrangler.jsonc 2>&1 | tee /tmp/w11-upload.log
-          current_version_id="$(sed -nE 's/.*Current Version ID: ([0-9a-f-]{36}).*/\\1/p' /tmp/w11-upload.log | tail -n 1)"
+          current_version_id="$(sed -nE 's/.*Current Version ID: ([0-9a-f-]{36}).*/\1/p' /tmp/w11-upload.log | tail -n 1)"
           test -n "$current_version_id" || {
             echo "Wrangler did not report a current version ID."
             exit 1
@@ -237,7 +238,7 @@ jobs:
           mkdir -p artifacts/w11-analytics-deploy
           cat > artifacts/w11-analytics-deploy/provenance.json <<EOF
           {
-            "workflow": "W11 Analytics Runtime Deploy",
+            "workflow": "W11 Analytics Migration and Version Upload",
             "runId": "$GITHUB_RUN_ID",
             "runAttempt": "$GITHUB_RUN_ATTEMPT",
             "sourceSha": "$SOURCE_SHA",
