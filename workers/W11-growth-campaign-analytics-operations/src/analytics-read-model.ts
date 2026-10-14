@@ -1,0 +1,217 @@
+import type { AnalyticsContentType } from './analytics-event-quality'
+
+const MAX_QUERY_WINDOW_MS = 366 * 24 * 60 * 60 * 1000
+const CANONICAL_UTC_MILLIS =
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/
+
+const CONTENT_METRICS = [
+  ['impressions', 'impressions'],
+  ['opens', 'opens'],
+  ['readStarts', 'read_starts'],
+  ['readProgress25', 'read_progress_25'],
+  ['readProgress50', 'read_progress_50'],
+  ['readProgress75', 'read_progress_75'],
+  ['readCompletions', 'read_completions'],
+  ['readDurationMs', 'read_duration_ms'],
+  ['readDurationEvents', 'read_duration_events'],
+  ['dwellDurationMs', 'dwell_duration_ms'],
+  ['dwellEvents', 'dwell_events'],
+  ['completedViews', 'completed_views'],
+  ['videoImpressions', 'video_impressions'],
+  ['videoPlayRequests', 'video_play_requests'],
+  ['videoPlays', 'video_plays'],
+  ['videoProgress25', 'video_progress_25'],
+  ['videoProgress50', 'video_progress_50'],
+  ['videoProgress75', 'video_progress_75'],
+  ['videoProgress90', 'video_progress_90'],
+  ['videoCompletions', 'video_completions'],
+  ['videoReplays', 'video_replays'],
+  ['videoWatchMs', 'video_watch_ms'],
+  ['videoWatchEvents', 'video_watch_events'],
+  ['likes', 'likes'],
+  ['comments', 'comments'],
+  ['shares', 'shares'],
+  ['favorites', 'favorites'],
+] as const
+
+export type ContentAnalyticsMetric = (typeof CONTENT_METRICS)[number][0]
+
+export interface AnalyticsReadStatement {
+  bind(...values: (string | number | null)[]): AnalyticsReadStatement
+  first(): Promise<Record<string, unknown> | null>
+}
+
+export interface AnalyticsReadDatabase {
+  prepare(query: string): AnalyticsReadStatement
+}
+
+export interface AnalyticsQueryWindow {
+  /** Canonical UTC ISO timestamps with millisecond precision. The upper edge is exclusive. */
+  from: string
+  to: string
+}
+
+export interface ContentAnalyticsSummary extends Record<ContentAnalyticsMetric, number> {
+  contentId: string
+  contentType: AnalyticsContentType
+  from: string
+  to: string
+}
+
+export interface CreatorFollowerSummary {
+  creatorId: string
+  from: string
+  to: string
+  followersGained: number
+  followersLost: number
+  netFollowers: number
+}
+
+function parseCanonicalInstant(value: string, field: 'from' | 'to'): number {
+  if (!CANONICAL_UTC_MILLIS.test(value)) {
+    throw new TypeError(`${field} must be a canonical UTC ISO timestamp`)
+  }
+  const instant = Date.parse(value)
+  if (!Number.isFinite(instant) || new Date(instant).toISOString() !== value) {
+    throw new TypeError(`${field} must be a real calendar timestamp`)
+  }
+  return instant
+}
+
+function validateWindow(window: AnalyticsQueryWindow): void {
+  if (!window || typeof window.from !== 'string' || typeof window.to !== 'string') {
+    throw new TypeError('analytics query window must include from and to timestamps')
+  }
+  const from = parseCanonicalInstant(window.from, 'from')
+  const to = parseCanonicalInstant(window.to, 'to')
+  if (to <= from) throw new RangeError('analytics query window must be ordered and non-empty')
+  if (to - from > MAX_QUERY_WINDOW_MS) {
+    throw new RangeError('analytics query window cannot exceed 366 days')
+  }
+}
+
+function validateIdentifier(value: string, field: 'contentId' | 'creatorId'): void {
+  if (
+    typeof value !== 'string' ||
+    value.length === 0 ||
+    value.length > 256 ||
+    value !== value.trim() ||
+    /[\u0000-\u001f\u007f]/u.test(value)
+  ) {
+    throw new TypeError(`${field} is invalid`)
+  }
+}
+
+function readCount(row: Record<string, unknown> | null, column: string): number {
+  const value = row?.[column] ?? 0
+  const count =
+    typeof value === 'number'
+      ? value
+      : typeof value === 'string' && /^\d+$/.test(value)
+        ? Number(value)
+        : Number.NaN
+  if (!Number.isSafeInteger(count) || count < 0) {
+    throw new TypeError(`analytics query returned an invalid count for ${column}`)
+  }
+  return count
+}
+
+function buildContentSummarySql(): string {
+  const columns = CONTENT_METRICS.map(
+    ([key, column]) => `COALESCE(SUM(${column}), 0) AS ${key}`,
+  ).join(',\n  ')
+  return `SELECT
+  ${columns}
+FROM analytics_content_hourly
+WHERE content_id = ?
+  AND content_type = ?
+  AND hour_start >= ?
+  AND hour_start < ?
+  AND metric_version = ?`
+}
+
+const CONTENT_SUMMARY_SQL = buildContentSummarySql()
+
+const CREATOR_FOLLOWER_SUMMARY_SQL = `SELECT
+  COALESCE(SUM(followers_gained), 0) AS followersGained,
+  COALESCE(SUM(followers_lost), 0) AS followersLost
+FROM analytics_creator_hourly
+WHERE creator_id = ?
+  AND hour_start >= ?
+  AND hour_start < ?
+  AND metric_version = ?`
+
+/**
+ * Read pre-aggregated content metrics for one content item and bounded period.
+ * The caller must enforce creator/viewer authorization before presenting results.
+ * This query module itself deliberately has no HTTP or identity-provider behavior.
+ */
+export async function getContentAnalyticsSummary(
+  db: AnalyticsReadDatabase,
+  input: {
+    contentId: string
+    contentType: AnalyticsContentType
+    window: AnalyticsQueryWindow
+  },
+): Promise<ContentAnalyticsSummary> {
+  validateIdentifier(input.contentId, 'contentId')
+  if (!['article', 'post', 'video'].includes(input.contentType)) {
+    throw new TypeError('contentType is invalid')
+  }
+  validateWindow(input.window)
+
+  const row = await db
+    .prepare(CONTENT_SUMMARY_SQL)
+    .bind(
+      input.contentId,
+      input.contentType,
+      input.window.from,
+      input.window.to,
+      '1.0',
+    )
+    .first()
+
+  const metrics = Object.fromEntries(
+    CONTENT_METRICS.map(([key]) => [key, readCount(row, key)]),
+  ) as Record<ContentAnalyticsMetric, number>
+
+  return {
+    contentId: input.contentId,
+    contentType: input.contentType,
+    from: input.window.from,
+    to: input.window.to,
+    ...metrics,
+  }
+}
+
+/**
+ * Read creator follower deltas from the derived hourly projection. A net value
+ * is a period delta (gained minus lost), not an authoritative current follower
+ * count; W05 remains the source of truth for the relationship graph.
+ */
+export async function getCreatorFollowerSummary(
+  db: AnalyticsReadDatabase,
+  input: {
+    creatorId: string
+    window: AnalyticsQueryWindow
+  },
+): Promise<CreatorFollowerSummary> {
+  validateIdentifier(input.creatorId, 'creatorId')
+  validateWindow(input.window)
+
+  const row = await db
+    .prepare(CREATOR_FOLLOWER_SUMMARY_SQL)
+    .bind(input.creatorId, input.window.from, input.window.to, '1.0')
+    .first()
+
+  const followersGained = readCount(row, 'followersGained')
+  const followersLost = readCount(row, 'followersLost')
+  return {
+    creatorId: input.creatorId,
+    from: input.window.from,
+    to: input.window.to,
+    followersGained,
+    followersLost,
+    netFollowers: followersGained - followersLost,
+  }
+}
