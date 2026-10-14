@@ -626,6 +626,7 @@ describe('W11 bounded analytics read models', () => {
     expect(fixture.getSql()).toContain('FROM analytics_content_hourly')
     expect(fixture.getSql()).toContain('FROM analytics_creator_hourly')
     expect(fixture.getSql()).toContain('CROSS JOIN follower_metrics')
+    expect(fixture.getSql()).not.toContain('\\n')
     expect(fixture.getSql()).toContain('content_id IN (?, ?)')
     expect(fixture.getSql()).not.toContain('article_001')
     expect(fixture.getPrepareCalls()).toBe(1)
