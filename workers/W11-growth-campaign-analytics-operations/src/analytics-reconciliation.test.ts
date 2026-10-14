@@ -80,12 +80,41 @@ describe('W11 analytics hourly reconciliation', () => {
     expect(statements[1]?.sql).toContain('GROUP BY hour_start, content_type, content_id, metric_version')
     expect(statements[1]?.sql).toContain('WHERE hour_start = ?')
     expect(statements[1]?.sql).not.toContain("projection_status = 'PENDING'")
+    expect(statements[1]?.sql).toContain("projection_status <> 'LATE'")
     expect(statements[2]?.sql).toContain('DELETE FROM analytics_creator_hourly')
     expect(statements[3]?.sql).toContain('GROUP BY hour_start, creator_id, metric_version')
+    expect(statements[3]?.sql).toContain("projection_status <> 'LATE'")
     expect(statements[4]?.sql).toContain("SET projection_status = 'APPLIED'")
     expect(statements[5]?.sql).toContain("status = 'SUCCEEDED'")
     expect(statements[5]?.bindings).toEqual([hourStart, hourStart, result.runId])
     expect(statements.slice(0, 5).every((statement) => statement.bindings[0] === hourStart)).toBe(true)
+  })
+
+  it('replays only late events for the requested hour in the same atomic rebuild transaction', async () => {
+    const replayBatch: AnalyticsD1Result[] = [
+      { success: true, meta: { changes: 2 } },
+      ...repairSuccess,
+    ]
+    const { db, batches } = fakeDb([startSuccess, replayBatch])
+
+    const result = await reconcileAnalyticsHour(db, hourStart, { replayLateEvents: true })
+    const statements = batches[1] ?? []
+
+    expect(result).toMatchObject({
+      hourStart,
+      status: 'SUCCEEDED',
+      contentBucketsRebuilt: 8,
+      creatorBucketsRebuilt: 3,
+      lateEventsReplayed: 2,
+    })
+    expect(statements).toHaveLength(7)
+    expect(statements[0]?.sql).toContain("SET projection_status = 'PENDING'")
+    expect(statements[0]?.sql).toContain("projection_status = 'LATE'")
+    expect(statements[0]?.bindings).toEqual([hourStart])
+    expect(statements[2]?.sql).toContain("projection_status <> 'LATE'")
+    expect(statements[4]?.sql).toContain("projection_status <> 'LATE'")
+    expect(statements[5]?.sql).toContain("SET projection_status = 'APPLIED'")
+    expect(statements[6]?.sql).toContain("status = 'SUCCEEDED'")
   })
 
   it('rejects noncanonical, non-hour-aligned and impossible timestamps before database access', async () => {

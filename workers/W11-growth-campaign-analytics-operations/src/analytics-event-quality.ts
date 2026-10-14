@@ -500,7 +500,13 @@ export function processAnalyticsBatch(
 
   for (const value of values) {
     const result = validateAnalyticsEvent(value, options)
-    if (result.quality !== 'VALID' || !result.event) {
+    // LATE events are normalized and identity-bearing just like VALID events.
+    // Deduplicate them before returning the LATE outcome so an old event cannot
+    // bypass in-batch or caller-supplied durable idempotency keys.
+    if (
+      !result.event ||
+      (result.quality !== 'VALID' && result.quality !== 'LATE')
+    ) {
       outcomes.push(result)
       counts[result.quality] += 1
       continue
@@ -531,6 +537,12 @@ export function processAnalyticsBatch(
 
     seenEventIds.add(result.event.eventId)
     seenDedupeKeys.add(result.event.dedupeKey)
+    if (result.quality === 'LATE') {
+      outcomes.push(result)
+      counts.LATE += 1
+      continue
+    }
+
     accepted.push(result.event)
     outcomes.push(result)
     counts.VALID += 1

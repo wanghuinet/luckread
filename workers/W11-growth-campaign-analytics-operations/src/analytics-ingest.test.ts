@@ -91,6 +91,10 @@ describe('W11 validated analytics ingestion', () => {
       inserted: 1,
       duplicates: 0,
       duplicateEventIds: [],
+      lateAttempted: 0,
+      lateInserted: 0,
+      lateDuplicates: 0,
+      lateDuplicateEventIds: [],
     })
     expect(getBatchSizes()).toEqual([4])
   })
@@ -109,6 +113,10 @@ describe('W11 validated analytics ingestion', () => {
       inserted: 0,
       duplicates: 0,
       duplicateEventIds: [],
+      lateAttempted: 0,
+      lateInserted: 0,
+      lateDuplicates: 0,
+      lateDuplicateEventIds: [],
     })
     expect(getBatchSizes()).toEqual([])
   })
@@ -135,7 +143,101 @@ describe('W11 validated analytics ingestion', () => {
       inserted: 0,
       duplicates: 1,
       duplicateEventIds: ['evt_ingest_0001'],
+      lateAttempted: 0,
+      lateInserted: 0,
+      lateDuplicates: 0,
+      lateDuplicateEventIds: [],
     })
+  })
+
+  it('durably records LATE events without projecting them as live metrics', async () => {
+    const oldTimestamp = '2026-10-12T00:00:00.000Z'
+    const { db, getBatchSizes } = fakeDb(successfulD1Batch)
+    const result = await ingestAnalyticsBatch(
+      db,
+      [event({
+        occurredAt: oldTimestamp,
+        receivedAt: oldTimestamp,
+      })],
+      { now, maxLatenessMs: 60 * 60 * 1000 },
+    )
+
+    expect(result.quality.accepted).toHaveLength(0)
+    expect(result.quality.counts.LATE).toBe(1)
+    expect(result.persistence).toMatchObject({
+      attempted: 0,
+      inserted: 0,
+      lateAttempted: 1,
+      lateInserted: 1,
+      lateDuplicates: 0,
+    })
+    // A late-only transaction writes the ledger row but never runs projection SQL.
+    expect(getBatchSizes()).toEqual([1])
+  })
+
+  it('persists live and LATE events in one transaction without counting LATE events', async () => {
+    const oldTimestamp = '2026-10-12T00:00:00.000Z'
+    const { db, getBatchSizes } = fakeDb((statementCount) =>
+      Array.from({ length: statementCount }, (_, index) => ({
+        success: true,
+        meta: { changes: index < 2 ? 1 : 0 },
+      })),
+    )
+    const result = await ingestAnalyticsBatch(
+      db,
+      [
+        event(),
+        event({
+          eventId: 'evt_ingest_late_01',
+          dedupeKey: 'dedupe_ingest_late_01',
+          occurredAt: oldTimestamp,
+          receivedAt: oldTimestamp,
+        }),
+      ],
+      { now, maxLatenessMs: 60 * 60 * 1000 },
+    )
+
+    expect(result.quality.accepted).toHaveLength(1)
+    expect(result.quality.counts.VALID).toBe(1)
+    expect(result.quality.counts.LATE).toBe(1)
+    expect(result.quality.counts.DUPLICATE).toBe(0)
+    expect(result.persistence).toMatchObject({
+      attempted: 1,
+      inserted: 1,
+      lateAttempted: 1,
+      lateInserted: 1,
+      duplicates: 0,
+      lateDuplicates: 0,
+    })
+    expect(getBatchSizes()).toEqual([5])
+  })
+
+  it('reclassifies an already-persisted LATE event as DUPLICATE', async () => {
+    const oldTimestamp = '2026-10-12T00:00:00.000Z'
+    const { db } = fakeDb((statementCount) =>
+      Array.from({ length: statementCount }, () => ({
+        success: true,
+        meta: { changes: 0 },
+      })),
+    )
+    const result = await ingestAnalyticsBatch(
+      db,
+      [event({
+        occurredAt: oldTimestamp,
+        receivedAt: oldTimestamp,
+      })],
+      { now, maxLatenessMs: 60 * 60 * 1000 },
+    )
+
+    // No live rows were submitted, so the one late-row INSERT is a duplicate.
+    expect(result.quality.counts.LATE).toBe(0)
+    expect(result.quality.counts.DUPLICATE).toBe(1)
+    expect(result.quality.outcomes[0]).toMatchObject({
+      quality: 'DUPLICATE',
+      reason: 'PERSISTED_EVENT_ID_OR_DEDUPE_KEY',
+      eventId: 'evt_ingest_0001',
+    })
+    expect(result.persistence.lateDuplicateEventIds).toEqual(['evt_ingest_0001'])
   })
 
   it('propagates persistence failures so callers cannot claim events were saved', async () => {

@@ -87,7 +87,10 @@ describe('W11 D1-05 analytics persistence adapter', () => {
     const statements = batches[0] ?? []
     const insert = statements[0]
 
-    expect(result).toEqual({ attempted: 1, inserted: 1, duplicates: 0, duplicateEventIds: [] })
+    expect(result).toEqual({
+      attempted: 1, inserted: 1, duplicates: 0, duplicateEventIds: [],
+      lateAttempted: 0, lateInserted: 0, lateDuplicates: 0, lateDuplicateEventIds: [],
+    })
     expect(batches).toHaveLength(1)
     expect(statements).toHaveLength(4)
     expect(insert?.sql).toContain('INSERT INTO analytics_event_dedupe')
@@ -115,7 +118,10 @@ describe('W11 D1-05 analytics persistence adapter', () => {
 
     const result = await persistAnalyticsEvents(db, input.accepted)
     const statements = getBatches()[0] ?? []
-    expect(result).toEqual({ attempted: 2, inserted: 1, duplicates: 1, duplicateEventIds: ['evt_store_0002'] })
+    expect(result).toEqual({
+      attempted: 2, inserted: 1, duplicates: 1, duplicateEventIds: ['evt_store_0002'],
+      lateAttempted: 0, lateInserted: 0, lateDuplicates: 0, lateDuplicateEventIds: [],
+    })
     expect(statements).toHaveLength(5)
     expect(statements.slice(0, 2).every((item) => (item.sql.match(/\?/g) ?? []).length === 16)).toBe(true)
   })
@@ -150,8 +156,42 @@ describe('W11 D1-05 analytics persistence adapter', () => {
       inserted: 0,
       duplicates: 0,
       duplicateEventIds: [],
+      lateAttempted: 0,
+      lateInserted: 0,
+      lateDuplicates: 0,
+      lateDuplicateEventIds: [],
     })
     expect(getBatches()).toHaveLength(0)
+  })
+
+  it('stores late events in the canonical ledger without running live projection SQL', async () => {
+    const { db, getBatches } = fakeDb([{ success: true, meta: { changes: 1 } }])
+    const result = await persistAnalyticsEvents(db, [], [event({ eventId: 'evt_late_0001', dedupeKey: 'dedupe_late_0001' })])
+    const statements = getBatches()[0] ?? []
+
+    expect(result).toEqual({
+      attempted: 0, inserted: 0, duplicates: 0, duplicateEventIds: [],
+      lateAttempted: 1, lateInserted: 1, lateDuplicates: 0, lateDuplicateEventIds: [],
+    })
+    expect(statements).toHaveLength(1)
+    expect(statements[0]?.sql).toContain('INSERT INTO analytics_event_dedupe')
+    expect(statements[0]?.bindings).toContain('LATE')
+    expect(statements[0]?.sql).not.toContain('analytics_content_hourly')
+  })
+
+  it('inserts live and late rows atomically while only live rows trigger projection statements', async () => {
+    const { db, getBatches } = fakeDb(successResults([1, 1]))
+    const live = event()
+    const late = event({ eventId: 'evt_late_0002', dedupeKey: 'dedupe_late_0002' })
+    const result = await persistAnalyticsEvents(db, [live], [late])
+    const statements = getBatches()[0] ?? []
+
+    expect(result.inserted).toBe(1)
+    expect(result.lateInserted).toBe(1)
+    expect(statements).toHaveLength(5)
+    expect(statements[0]?.bindings).toContain('PENDING')
+    expect(statements[1]?.bindings).toContain('LATE')
+    expect(statements[2]?.sql).toContain('analytics_content_hourly')
   })
 
   it('rejects oversized batches before constructing D1 statements', async () => {

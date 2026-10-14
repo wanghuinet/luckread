@@ -47,6 +47,7 @@ SELECT
   SUM(CASE WHEN event_name = 'favorite_created' THEN 1 ELSE 0 END)
 FROM analytics_event_dedupe
 WHERE hour_start = ?
+  AND projection_status <> 'LATE'
   AND event_name NOT IN ('follow_created', 'follow_removed')
 GROUP BY hour_start, content_type, content_id, metric_version
 `
@@ -65,6 +66,7 @@ SELECT
   SUM(CASE WHEN event_name = 'follow_removed' THEN 1 ELSE 0 END)
 FROM analytics_event_dedupe
 WHERE hour_start = ?
+  AND projection_status <> 'LATE'
   AND event_name IN ('follow_created', 'follow_removed')
 GROUP BY hour_start, creator_id, metric_version
 `
@@ -73,6 +75,12 @@ const MARK_HOUR_APPLIED_SQL = String.raw`
 UPDATE analytics_event_dedupe
 SET projection_status = 'APPLIED'
 WHERE hour_start = ? AND projection_status = 'PENDING'
+`
+
+const REPLAY_LATE_FOR_HOUR_SQL = String.raw`
+UPDATE analytics_event_dedupe
+SET projection_status = 'PENDING'
+WHERE hour_start = ? AND projection_status = 'LATE'
 `
 
 const START_RECONCILIATION_SQL = String.raw`
@@ -127,6 +135,13 @@ export interface ReconcileAnalyticsHourResult {
   contentBucketsRebuilt: number | null
   /** Null only if the D1 driver omits affected-row metadata. */
   creatorBucketsRebuilt: number | null
+  /** Count of quarantined events promoted for this hour; null if D1 omits change metadata. */
+  lateEventsReplayed?: number | null
+}
+
+export interface ReconcileAnalyticsHourOptions {
+  /** Explicitly promote quarantined LATE rows for this UTC hour before rebuilding. */
+  replayLateEvents?: boolean
 }
 
 type ReconciliationFailureCode =
@@ -181,8 +196,10 @@ function assertBatchSucceeded(
 export async function reconcileAnalyticsHour(
   db: AnalyticsD1Database,
   hourStart: string,
+  options: ReconcileAnalyticsHourOptions = {},
 ): Promise<ReconcileAnalyticsHourResult> {
   assertCanonicalUtcHour(hourStart)
+  const replayLateEvents = options.replayLateEvents === true
   const runId = crypto.randomUUID()
 
   let started: AnalyticsD1Result[]
@@ -199,6 +216,9 @@ export async function reconcileAnalyticsHour(
   }
 
   const statements = [
+    ...(replayLateEvents
+      ? [db.prepare(REPLAY_LATE_FOR_HOUR_SQL).bind(hourStart)]
+      : []),
     db.prepare(DELETE_CONTENT_HOUR_SQL).bind(hourStart),
     db.prepare(REBUILD_CONTENT_HOUR_SQL).bind(hourStart),
     db.prepare(DELETE_CREATOR_HOUR_SQL).bind(hourStart),
@@ -217,17 +237,22 @@ export async function reconcileAnalyticsHour(
     if (results.some((result) => result.success === false)) {
       throw new Error('reconciliation batch failed')
     }
-    if (results[5]?.meta?.changes === 0) {
+    const finalizeIndex = statements.length - 1
+    if (results[finalizeIndex]?.meta?.changes === 0) {
       failureCode = 'REBUILD_FINALIZE_FAILED'
       throw new Error('reconciliation status finalization did not match the active run')
     }
 
+    const rebuildOffset = replayLateEvents ? 1 : 0
     return {
       runId,
       hourStart,
       status: 'SUCCEEDED',
-      contentBucketsRebuilt: affectedRows(results[1]),
-      creatorBucketsRebuilt: affectedRows(results[3]),
+      contentBucketsRebuilt: affectedRows(results[rebuildOffset + 1]),
+      creatorBucketsRebuilt: affectedRows(results[rebuildOffset + 3]),
+      ...(replayLateEvents
+        ? { lateEventsReplayed: affectedRows(results[0]) }
+        : {}),
     }
   } catch {
     try {

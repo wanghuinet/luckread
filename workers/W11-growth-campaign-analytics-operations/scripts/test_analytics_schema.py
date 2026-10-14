@@ -154,9 +154,15 @@ def reconcile_hour(
     delete_creator_sql: str,
     rebuild_creator_sql: str,
     mark_applied_sql: str,
+    replay_late_sql: str | None = None,
+    replay_late: bool = False,
 ) -> None:
     connection.execute("BEGIN")
     try:
+        if replay_late:
+            if replay_late_sql is None:
+                raise AssertionError("late-event replay SQL is required when replay is enabled")
+            connection.execute(replay_late_sql, (hour_start,))
         connection.execute(delete_content_sql, (hour_start,))
         connection.execute(rebuild_content_sql, (hour_start,))
         connection.execute(delete_creator_sql, (hour_start,))
@@ -174,6 +180,8 @@ def main() -> None:
         raise AssertionError("Base analytics projection migration is missing")
     if not any(path.name == "0002_analytics_projection_rebuild_state.sql" for path in migration_files):
         raise AssertionError("Projection rebuild state migration is missing")
+    if not any(path.name == "0003_analytics_late_event_replay.sql" for path in migration_files):
+        raise AssertionError("Durable late-event replay migration is missing")
     schema = "\n".join(path.read_text(encoding="utf-8") for path in migration_files)
     store_source = STORE.read_text(encoding="utf-8")
     read_model_source = READ_MODEL.read_text(encoding="utf-8")
@@ -188,6 +196,7 @@ def main() -> None:
     delete_creator_rebuild_sql = extract_sql(reconciliation_source, "DELETE_CREATOR_HOUR_SQL")
     creator_rebuild_sql = extract_sql(reconciliation_source, "REBUILD_CREATOR_HOUR_SQL")
     mark_hour_applied_sql = extract_sql(reconciliation_source, "MARK_HOUR_APPLIED_SQL")
+    replay_late_sql = extract_sql(reconciliation_source, "REPLAY_LATE_FOR_HOUR_SQL")
     start_reconciliation_sql = extract_sql(reconciliation_source, "START_RECONCILIATION_SQL")
     finalize_reconciliation_sql = extract_sql(reconciliation_source, "FINALIZE_RECONCILIATION_SQL")
     fail_reconciliation_sql = extract_sql(reconciliation_source, "FAIL_RECONCILIATION_SQL")
@@ -376,6 +385,18 @@ def main() -> None:
         f"INSERT INTO analytics_event_dedupe ({SQL_COLUMNS}) VALUES {pending_placeholders}",
         pending,
     )
+    # Late events are persisted under the canonical event/dedupe ledger with
+    # projection_status=LATE. Ordinary hourly repairs must leave them out.
+    late_row = list(event(
+        "evt_rebuild_late_0001",
+        "dedupe_rebuild_late_0001",
+        "content_open",
+    ))
+    late_row[-1] = "LATE"
+    db.execute(
+        f"INSERT INTO analytics_event_dedupe ({SQL_COLUMNS}) VALUES {pending_placeholders}",
+        tuple(late_row),
+    )
     db.commit()
 
     content_rebuild_plan = " ".join(
@@ -409,8 +430,11 @@ def main() -> None:
         "SELECT opens, read_duration_ms, read_duration_events, likes FROM analytics_content_hourly WHERE content_id = 'article_01'"
     ).fetchone()
     assert repaired_article == (3, 1250, 1, 1), (
-        f"reconciliation did not rebuild article metrics from ledger: {repaired_article}"
+        f"ordinary reconciliation must exclude the late event: {repaired_article}"
     )
+    assert db.execute(
+        "SELECT projection_status FROM analytics_event_dedupe WHERE event_id = 'evt_rebuild_late_0001'"
+    ).fetchone()[0] == "LATE", "ordinary reconciliation must keep late events quarantined"
     assert db.execute(
         "SELECT COUNT(*) FROM analytics_content_hourly WHERE content_id = 'stale_content'"
     ).fetchone()[0] == 0, "reconciliation should remove stale projection buckets"
@@ -422,10 +446,23 @@ def main() -> None:
         "SELECT COUNT(*) FROM analytics_event_dedupe WHERE projection_status = 'PENDING'"
     ).fetchone()[0] == 0, "reconciliation must mark bucket ledger rows APPLIED"
 
-    reconcile_hour(*reconciliation_args)
+    # Explicit replay promotes only this UTC hour's quarantined rows in the same
+    # transaction as replacement, then repeated replay remains idempotent.
+    reconcile_hour(*reconciliation_args, replay_late_sql=replay_late_sql, replay_late=True)
+    replayed_article = db.execute(
+        "SELECT opens, read_duration_ms, read_duration_events, likes FROM analytics_content_hourly WHERE content_id = 'article_01'"
+    ).fetchone()
+    assert replayed_article == (4, 1250, 1, 1), (
+        f"explicit late-event replay did not add exactly one open: {replayed_article}"
+    )
+    assert db.execute(
+        "SELECT projection_status FROM analytics_event_dedupe WHERE event_id = 'evt_rebuild_late_0001'"
+    ).fetchone()[0] == "APPLIED", "replayed late events should be marked APPLIED"
+
+    reconcile_hour(*reconciliation_args, replay_late_sql=replay_late_sql, replay_late=True)
     assert db.execute(
         "SELECT opens FROM analytics_content_hourly WHERE content_id = 'article_01'"
-    ).fetchone()[0] == 3, "re-running reconciliation must not double-count"
+    ).fetchone()[0] == 4, "re-running replay must not double-count"
     assert db.execute(
         "SELECT followers_gained FROM analytics_creator_hourly WHERE creator_id = 'creator_01'"
     ).fetchone()[0] == 1, "re-running reconciliation must preserve creator totals"
@@ -460,7 +497,7 @@ def main() -> None:
     assert "ON CONFLICT" in grouping
     assert "PROJECTION_STATUS = 'PENDING'" in grouping
 
-    print("W11 D1-05 schema smoke test passed: migrations, grouped writes/reads, indexes, durable dedupe, idempotent hourly reconciliation, bounded success/failure status, privacy, rollback")
+    print("W11 D1-05 schema smoke test passed: migrations, grouped writes/reads, indexes, durable dedupe, late-event quarantine/replay, idempotent hourly reconciliation, bounded status, privacy, rollback")
 
 
 if __name__ == "__main__":

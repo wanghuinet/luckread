@@ -24,11 +24,18 @@ export interface AnalyticsD1Database {
 }
 
 export interface PersistAnalyticsBatchResult {
+  /** Live VALID events eligible for immediate projection. */
   attempted: number
   inserted: number
   duplicates: number
-  /** Event IDs ignored by D1 because their event ID or dedupe key already existed. */
+  /** Live event IDs ignored because their event ID or dedupe key already existed. */
   duplicateEventIds: string[]
+  /** LATE events durably recorded but excluded from live projections. */
+  lateAttempted: number
+  lateInserted: number
+  lateDuplicates: number
+  /** Late event IDs already present in the canonical event/dedupe ledger. */
+  lateDuplicateEventIds: string[]
 }
 
 const INSERT_COLUMNS = [
@@ -158,7 +165,10 @@ function hourStartForEvent(event: AnalyticsEvent): string {
   return hour.toISOString()
 }
 
-function bindValues(event: AnalyticsEvent): (string | number | null)[] {
+function bindValues(
+  event: AnalyticsEvent,
+  projectionStatus: 'PENDING' | 'LATE',
+): (string | number | null)[] {
   // Actor IDs, visitor IDs and session IDs are intentionally not persisted in
   // this projection store. D1-05 stores aggregate-ready event facts, not identity.
   return [
@@ -177,49 +187,70 @@ function bindValues(event: AnalyticsEvent): (string | number | null)[] {
     event.durationMs ?? null,
     event.position ?? null,
     ANALYTICS_METRIC_VERSION,
-    'PENDING',
+    projectionStatus,
   ]
 }
 
 /**
- * Persist only events already accepted by processAnalyticsBatch.
+ * Persist VALID events for live projection and LATE events for durable, explicit replay.
  *
- * Four statements execute in one D1 transaction: insert unique events, aggregate
- * all pending rows by hour/content (not one hot-counter UPDATE per event),
- * aggregate creator follow changes, then mark processed rows. A failure rolls
- * all four operations back, so retrying cannot lose or double-apply projections.
+ * With live events, inserts, grouped content/creator projections and finalization
+ * share one D1 transaction. A late-only batch inserts ledger rows without running
+ * projection SQL. Every live projection query only processes PENDING rows, so
+ * LATE records cannot affect metrics until an explicit replay promotes one hour.
  */
 export async function persistAnalyticsEvents(
   db: AnalyticsD1Database,
   events: readonly AnalyticsEvent[],
+  lateEvents: readonly AnalyticsEvent[] = [],
 ): Promise<PersistAnalyticsBatchResult> {
-  if (events.length > ANALYTICS_MAX_BATCH_SIZE) {
+  const totalEvents = events.length + lateEvents.length
+  if (totalEvents > ANALYTICS_MAX_BATCH_SIZE) {
     throw new RangeError(
       `batch exceeds the ${ANALYTICS_MAX_BATCH_SIZE}-event limit`,
     )
   }
 
-  if (events.length === 0) {
-    return { attempted: 0, inserted: 0, duplicates: 0, duplicateEventIds: [] }
+  const emptyResult: PersistAnalyticsBatchResult = {
+    attempted: 0,
+    inserted: 0,
+    duplicates: 0,
+    duplicateEventIds: [],
+    lateAttempted: 0,
+    lateInserted: 0,
+    lateDuplicates: 0,
+    lateDuplicateEventIds: [],
   }
+  if (totalEvents === 0) return emptyResult
 
   const placeholders = INSERT_COLUMNS.map(() => '?').join(', ')
   const insertSql = `INSERT INTO analytics_event_dedupe (${INSERT_COLUMNS.join(', ')}) VALUES (${placeholders}) ON CONFLICT DO NOTHING`
-  const insertStatements = events.map((event) =>
-    db.prepare(insertSql).bind(...bindValues(event)),
+  const liveInsertStatements = events.map((event) =>
+    db.prepare(insertSql).bind(...bindValues(event, 'PENDING')),
+  )
+  const lateInsertStatements = lateEvents.map((event) =>
+    db.prepare(insertSql).bind(...bindValues(event, 'LATE')),
   )
 
   // D1 allows at most 100 bound parameters per query. Keep inserts separate
-  // (16 bound fields each) and cap this transaction at 90 inserts plus the three
-  // grouped projection/finalization statements (93 statements total).
-  const results = await db.batch([
-    ...insertStatements,
-    db.prepare(CONTENT_PROJECTION_SQL),
-    db.prepare(CREATOR_PROJECTION_SQL),
-    db.prepare(MARK_APPLIED_SQL),
-  ])
+  // (16 bound fields each) and cap this transaction at 90 total inserts plus
+  // three grouped projection/finalization statements (93 statements total).
+  // A late-only batch writes only its ledger entries; it never runs projection SQL.
+  const projectionStatements = events.length > 0
+    ? [
+        db.prepare(CONTENT_PROJECTION_SQL),
+        db.prepare(CREATOR_PROJECTION_SQL),
+        db.prepare(MARK_APPLIED_SQL),
+      ]
+    : []
+  const statements = [
+    ...liveInsertStatements,
+    ...lateInsertStatements,
+    ...projectionStatements,
+  ]
+  const results = await db.batch(statements)
 
-  if (results.length !== events.length + 3) {
+  if (results.length !== statements.length) {
     throw new Error('D1 analytics transaction returned an unexpected result count')
   }
   const failed = results.find((result) => result.success === false)
@@ -227,28 +258,41 @@ export async function persistAnalyticsEvents(
     throw new Error(failed.error || 'D1 analytics transaction failed')
   }
 
-  let inserted = 0
-  const duplicateEventIds: string[] = []
-  for (const [index, result] of results.slice(0, events.length).entries()) {
-    const changes = result.meta?.changes
-    if (changes !== 0 && changes !== 1) {
-      throw new Error('D1 analytics insert did not return a valid changes count')
-    }
-    if (changes === 1) {
-      inserted += 1
-    } else {
-      const duplicateId = events[index]?.eventId
-      if (!duplicateId) {
-        throw new Error('D1 analytics duplicate could not be correlated to an event ID')
+  const duplicateIds = (
+    batchEvents: readonly AnalyticsEvent[],
+    offset: number,
+  ): { inserted: number; duplicateEventIds: string[] } => {
+    let inserted = 0
+    const duplicateEventIds: string[] = []
+    for (const [index, result] of results.slice(offset, offset + batchEvents.length).entries()) {
+      const changes = result.meta?.changes
+      if (changes !== 0 && changes !== 1) {
+        throw new Error('D1 analytics insert did not return a valid changes count')
       }
-      duplicateEventIds.push(duplicateId)
+      if (changes === 1) {
+        inserted += 1
+      } else {
+        const duplicateId = batchEvents[index]?.eventId
+        if (!duplicateId) {
+          throw new Error('D1 analytics duplicate could not be correlated to an event ID')
+        }
+        duplicateEventIds.push(duplicateId)
+      }
     }
+    return { inserted, duplicateEventIds }
   }
+
+  const live = duplicateIds(events, 0)
+  const late = duplicateIds(lateEvents, events.length)
 
   return {
     attempted: events.length,
-    inserted,
-    duplicates: duplicateEventIds.length,
-    duplicateEventIds,
+    inserted: live.inserted,
+    duplicates: live.duplicateEventIds.length,
+    duplicateEventIds: live.duplicateEventIds,
+    lateAttempted: lateEvents.length,
+    lateInserted: late.inserted,
+    lateDuplicates: late.duplicateEventIds.length,
+    lateDuplicateEventIds: late.duplicateEventIds,
   }
 }
