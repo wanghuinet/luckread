@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import worker, { type W11Env } from './worker'
 
-function environment(first: () => Promise<unknown>): W11Env {
+function environment(first: () => Promise<{ ok: number } | null>): W11Env {
   return {
     D1_05: {
       prepare: vi.fn((query: string) => {
