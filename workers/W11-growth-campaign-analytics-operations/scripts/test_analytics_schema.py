@@ -182,7 +182,7 @@ def main() -> None:
         raise AssertionError("Projection rebuild state migration is missing")
     if not any(path.name == "0003_analytics_late_event_replay.sql" for path in migration_files):
         raise AssertionError("Durable late-event replay migration is missing")
-    schema = "\n".join(path.read_text(encoding="utf-8") for path in migration_files)
+    migrations_by_name = {path.name: path for path in migration_files}
     store_source = STORE.read_text(encoding="utf-8")
     read_model_source = READ_MODEL.read_text(encoding="utf-8")
     reconciliation_source = RECONCILIATION.read_text(encoding="utf-8")
@@ -204,7 +204,59 @@ def main() -> None:
     creator_rebuild_select = select_from_insert(creator_rebuild_sql)
 
     db = sqlite3.connect(":memory:")
-    db.executescript(schema)
+    # Exercise migrations as an upgrade, not just a fresh concatenated schema.
+    # Seed an existing row so migration 0003 must preserve data and indexes.
+    db.executescript(
+        migrations_by_name["0001_analytics_projection.sql"].read_text(encoding="utf-8")
+    )
+    legacy_row = list(event(
+        "evt_migration_legacy_0001",
+        "dedupe_migration_legacy_0001",
+        "content_open",
+        content_id="migration_legacy_article",
+    ))
+    legacy_row[-1] = "APPLIED"
+    # Keep this preserved fixture outside the hourly bucket rebuilt below.
+    legacy_row[5] = "2026-10-13T23:12:34.000Z"
+    legacy_row[6] = "2026-10-13T23:12:34.000Z"
+    legacy_row[7] = "2026-10-13T23:00:00.000Z"
+    legacy_placeholders = "(" + ", ".join("?" for _ in legacy_row) + ")"
+    db.execute(
+        f"INSERT INTO analytics_event_dedupe ({SQL_COLUMNS}) VALUES {legacy_placeholders}",
+        tuple(legacy_row),
+    )
+    db.commit()
+    db.executescript(
+        migrations_by_name["0002_analytics_projection_rebuild_state.sql"].read_text(encoding="utf-8")
+    )
+    db.executescript(
+        migrations_by_name["0003_analytics_late_event_replay.sql"].read_text(encoding="utf-8")
+    )
+
+    preserved_legacy_row = db.execute(
+        "SELECT event_id, dedupe_key, projection_status FROM analytics_event_dedupe "
+        "WHERE event_id = 'evt_migration_legacy_0001'"
+    ).fetchone()
+    assert preserved_legacy_row == (
+        "evt_migration_legacy_0001",
+        "dedupe_migration_legacy_0001",
+        "APPLIED",
+    ), f"migration 0003 must preserve existing event rows: {preserved_legacy_row}"
+    recreated_indexes = {
+        row[0] for row in db.execute(
+            "SELECT name FROM sqlite_master WHERE type = 'index' "
+            "AND name LIKE 'analytics_event_dedupe_%_idx'"
+        )
+    }
+    assert {
+        "analytics_event_dedupe_ingested_at_idx",
+        "analytics_event_dedupe_occurred_at_idx",
+        "analytics_event_dedupe_hour_start_idx",
+        "analytics_event_dedupe_pending_idx",
+    }.issubset(recreated_indexes), (
+        f"migration 0003 must recreate event ledger indexes: {recreated_indexes}"
+    )
+
 
     columns = {
         row[1] for row in db.execute("PRAGMA table_info(analytics_event_dedupe)")

@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
 import worker, { type W11Env } from './worker'
 
-type SchemaRow = { type: string; name: string }
+type SchemaRow = { type: string; name: string; sql?: string | null }
 
 const readySchemaRows: SchemaRow[] = [
-  { type: 'table', name: 'analytics_event_dedupe' },
+  { type: 'table', name: 'analytics_event_dedupe', sql: "CREATE TABLE analytics_event_dedupe (projection_status TEXT CHECK (projection_status IN ('PENDING', 'APPLIED', 'LATE')))" },
   { type: 'table', name: 'analytics_content_hourly' },
   { type: 'table', name: 'analytics_creator_hourly' },
   { type: 'table', name: 'analytics_rollup_watermark' },
@@ -37,6 +37,7 @@ function environment(
         }
 
         expect(query).toContain('FROM sqlite_master')
+        expect(query).toContain('SELECT type, name, sql')
         return {
           first: vi.fn(async () => null),
           all: vi.fn(all),
@@ -82,6 +83,30 @@ describe('W11 runtime boundary', () => {
     expect(String(vi.mocked(env.D1_05.prepare).mock.calls[0]?.[0])).toContain(
       'sqlite_master',
     )
+  })
+
+  it('does not report ready before the late-event replay migration is installed', async () => {
+    const legacySchemaRows = readySchemaRows.map((row) =>
+      row.type === 'table' && row.name === 'analytics_event_dedupe'
+        ? { ...row, sql: "CREATE TABLE analytics_event_dedupe (projection_status TEXT CHECK (projection_status IN ('PENDING', 'APPLIED')))" }
+        : row,
+    )
+    const env = environment(async () => ({ ok: 1 }), async () => ({
+      results: legacySchemaRows,
+    }))
+
+    const response = await worker.fetch(
+      new Request('https://w11.internal/readyz'),
+      env,
+    )
+
+    expect(response.status).toBe(503)
+    expect(await response.json()).toEqual({
+      worker: 'W11',
+      status: 'not_ready',
+      database: 'reachable',
+      schema: 'incomplete',
+    })
   })
 
   it('returns 503 when the database is reachable but the analytics schema is incomplete', async () => {

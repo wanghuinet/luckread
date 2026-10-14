@@ -1,6 +1,7 @@
 interface AnalyticsSchemaObject {
   type: string
   name: string
+  sql?: string | null
 }
 
 interface AnalyticsD1Statement {
@@ -34,7 +35,7 @@ const REQUIRED_SCHEMA_OBJECTS = [
 ] as const
 
 const ANALYTICS_SCHEMA_PROBE = `
-  SELECT type, name
+  SELECT type, name, sql
   FROM sqlite_master
   WHERE
     (type = 'table' AND name IN (
@@ -97,12 +98,23 @@ const worker = {
 
     try {
       const result = await env.D1_05.prepare(ANALYTICS_SCHEMA_PROBE).all()
+      const schemaRows = result.results ?? []
       const found = new Set(
-        (result.results ?? []).map(({ type, name }) => `${type}:${name}`),
+        schemaRows.map(({ type, name }) => `${type}:${name}`),
       )
-      const schemaReady = REQUIRED_SCHEMA_OBJECTS.every(({ type, name }) =>
-        found.has(`${type}:${name}`),
-      )
+      const eventLedgerDefinition = schemaRows.find(
+        ({ type, name }) => type === 'table' && name === 'analytics_event_dedupe',
+      )?.sql?.toUpperCase() ?? ''
+      // A table/index-only probe can report ready while migration 0003 (which
+      // admits the LATE status needed for durable quarantine/replay) is absent.
+      const lateEventSchemaReady =
+        eventLedgerDefinition.includes('PROJECTION_STATUS') &&
+        eventLedgerDefinition.includes("'LATE'")
+      const schemaReady =
+        lateEventSchemaReady &&
+        REQUIRED_SCHEMA_OBJECTS.every(({ type, name }) =>
+          found.has(`${type}:${name}`),
+        )
 
       if (!schemaReady) {
         return jsonResponse({
