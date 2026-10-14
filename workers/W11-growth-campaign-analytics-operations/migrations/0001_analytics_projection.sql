@@ -106,6 +106,11 @@ CREATE TABLE IF NOT EXISTS analytics_content_hourly (
 CREATE INDEX IF NOT EXISTS analytics_content_hourly_content_time_idx
   ON analytics_content_hourly (content_type, content_id, hour_start);
 
+-- The bounded creator content-set ranking query has no single content_type
+-- filter, so it needs content_id as the leading key to avoid a time-window scan.
+CREATE INDEX IF NOT EXISTS analytics_content_hourly_content_id_time_idx
+  ON analytics_content_hourly (content_id, hour_start);
+
 CREATE INDEX IF NOT EXISTS analytics_content_hourly_time_idx
   ON analytics_content_hourly (hour_start);
 
