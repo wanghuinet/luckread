@@ -201,21 +201,23 @@ export async function persistAnalyticsEvents(
     return { attempted: 0, inserted: 0, duplicates: 0 }
   }
 
-  const valuesPerEvent = INSERT_COLUMNS.length
-  const placeholders = events
-    .map(() => `(${Array.from({ length: valuesPerEvent }, () => '?').join(', ')})`)
-    .join(', ')
-  const sql = `INSERT INTO analytics_event_dedupe (${INSERT_COLUMNS.join(', ')}) VALUES ${placeholders} ON CONFLICT DO NOTHING`
-  const bindings = events.flatMap(bindValues)
+  const placeholders = INSERT_COLUMNS.map(() => '?').join(', ')
+  const insertSql = `INSERT INTO analytics_event_dedupe (${INSERT_COLUMNS.join(', ')}) VALUES (${placeholders}) ON CONFLICT DO NOTHING`
+  const insertStatements = events.map((event) =>
+    db.prepare(insertSql).bind(...bindValues(event)),
+  )
 
+  // D1 allows at most 100 bound parameters per query. Keep the inserts separate
+  // (16 bound fields each) and stay below 100 statements per batch: 90 inserts
+  // plus the three grouped projection/finalization statements = 93 statements.
   const results = await db.batch([
-    db.prepare(sql).bind(...bindings),
+    ...insertStatements,
     db.prepare(CONTENT_PROJECTION_SQL),
     db.prepare(CREATOR_PROJECTION_SQL),
     db.prepare(MARK_APPLIED_SQL),
   ])
 
-  if (results.length !== 4) {
+  if (results.length !== events.length + 3) {
     throw new Error('D1 analytics transaction returned an unexpected result count')
   }
   const failed = results.find((result) => result.success === false)
@@ -223,14 +225,13 @@ export async function persistAnalyticsEvents(
     throw new Error(failed.error || 'D1 analytics transaction failed')
   }
 
-  const inserted = results[0]?.meta?.changes
-  if (
-    typeof inserted !== 'number' ||
-    !Number.isSafeInteger(inserted) ||
-    inserted < 0 ||
-    inserted > events.length
-  ) {
-    throw new Error('D1 analytics insert did not return a valid changes count')
+  let inserted = 0
+  for (const result of results.slice(0, events.length)) {
+    const changes = result.meta?.changes
+    if (changes !== 0 && changes !== 1) {
+      throw new Error('D1 analytics insert did not return a valid changes count')
+    }
+    inserted += changes
   }
 
   return {
