@@ -1,5 +1,5 @@
 interface AnalyticsHealthStatement {
-  first<T = unknown>(): Promise<T | null>
+  first(): Promise<{ ok: number } | null>
 }
 
 interface AnalyticsHealthDatabase {
@@ -31,7 +31,7 @@ const worker = {
     }
 
     try {
-      const probe = await env.D1_05.prepare('SELECT 1 AS ok').first<{ ok: number }>()
+      const probe = await env.D1_05.prepare('SELECT 1 AS ok').first()
       if (probe?.ok !== 1) throw new Error('D1-05 health probe returned no result')
       return jsonResponse({ worker: 'W11', status: 'ok', database: 'reachable' })
     } catch {
