@@ -39,7 +39,16 @@ function fakeDb(row: Record<string, unknown> | null) {
 
 describe('W11 bounded analytics read models', () => {
   it('returns content metrics using a parameterized bounded indexed query', async () => {
-    const fixture = fakeDb({ impressions: '41', opens: 12, likes: 5 })
+    const fixture = fakeDb({
+      impressions: '41', opens: 12, likes: 5, readStarts: 10,
+      readProgress25: 8, readCompletions: 4,
+      readDurationMs: 1200, readDurationEvents: 3,
+      dwellDurationMs: 400, dwellEvents: 2,
+      videoPlayRequests: 25, videoPlays: 20,
+      videoProgress25: 18, videoProgress50: 14, videoProgress75: 10,
+      videoProgress90: 5, videoCompletions: 3,
+      videoWatchMs: 8000, videoWatchEvents: 4,
+    })
     const result = await getContentAnalyticsSummary(fixture.db, {
       contentId: 'article_001',
       contentType: 'article',
@@ -56,6 +65,17 @@ describe('W11 bounded analytics read models', () => {
       likes: 5,
       comments: 0,
       videoPlays: 0,
+      openRate: 12 / 41,
+      readStartRate: 10 / 12,
+      readProgress25Rate: 0.8,
+      readCompletionRate: 0.4,
+      averageReadDurationMs: 400,
+      averageDwellDurationMs: 200,
+      videoPlaySuccessRate: 0.8,
+      videoProgress25Rate: 0.9,
+      videoCompletionRate: 0.15,
+      averageVideoWatchMs: 2000,
+      likesPerOpen: 5 / 12,
     })
     expect(fixture.getSql()).toContain('FROM analytics_content_hourly')
     expect(fixture.getSql()).toContain('content_id = ?')
@@ -109,6 +129,11 @@ describe('W11 bounded analytics read models', () => {
     expect(result.impressions).toBe(0)
     expect(result.videoPlays).toBe(0)
     expect(result.favorites).toBe(0)
+    expect(result.openRate).toBeNull()
+    expect(result.readCompletionRate).toBeNull()
+    expect(result.averageReadDurationMs).toBeNull()
+    expect(result.videoCompletionRate).toBeNull()
+    expect(result.likesPerOpen).toBeNull()
   })
 
   it('aggregates follower changes as a period delta rather than current authority state', async () => {
