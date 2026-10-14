@@ -76,6 +76,26 @@ describe('W11 analytics event quality', () => {
     ).toBe('INVALID_EVENT_TIMESTAMP')
   })
 
+  it('rejects impossible calendar dates and out-of-range clock fields', () => {
+    const invalidTimestamps = [
+      '2026-02-30T00:00:00.000Z',
+      '2025-02-29T00:00:00.000Z',
+      '2026-13-01T00:00:00.000Z',
+      '2026-10-14T24:00:00.000Z',
+      '2026-10-14T00:60:00.000Z',
+      '2026-10-14T00:00:60.000Z',
+      '2026-10-14T00:00:00.000+25:00',
+    ]
+
+    for (const invalidTimestamp of invalidTimestamps) {
+      expect(
+        validateAnalyticsEvent(event({ occurredAt: invalidTimestamp }), {
+          now,
+        }).reason,
+      ).toBe('INVALID_EVENT_TIMESTAMP')
+    }
+  })
+
   it('classifies events outside the live lateness window separately', () => {
     const old = '2026-10-12T00:00:00.000Z'
     const result = validateAnalyticsEvent(
