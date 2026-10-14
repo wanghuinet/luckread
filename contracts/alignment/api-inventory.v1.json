@@ -996,6 +996,21 @@
       ]
     },
     {
+      "operationId": "listMembershipSubscriptions",
+      "method": "GET",
+      "path": "/v1/memberships/subscriptions",
+      "openapiPath": "/memberships/subscriptions",
+      "domain": "subscription_entitlement_payment",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/memberships/subscriptions",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
       "operationId": "getSubscription",
       "method": "GET",
       "path": "/v1/memberships/subscriptions/{subscriptionId}",

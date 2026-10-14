@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
+const openapi = readFileSync(resolve(process.cwd(), '../../contracts/openapi/v1/openapi.yaml'), 'utf8')
+const apiInventory = JSON.parse(readFileSync(resolve(process.cwd(), '../../contracts/api/api-inventory.v1.json'), 'utf8'))
+
 describe('v1 subscription adapter', () => {
   const route = readFileSync(resolve(process.cwd(), 'src/app/api/v1/memberships/subscriptions/[[...segments]]/route.ts'), 'utf8')
   const client = readFileSync(resolve(process.cwd(), 'src/subscription/w07-subscription-client.ts'), 'utf8')
@@ -29,6 +32,13 @@ describe('v1 subscription adapter', () => {
     expect(route).toContain("segments.length === 2")
     expect(route).toContain("PRECONDITION_REQUIRED")
     expect(route).toContain("PRECONDITION_FAILED")
+  })
+
+  it('declares the existing subscription collection list operation', () => {
+    expect(openapi).toContain('operationId: listMembershipSubscriptions')
+    expect(apiInventory.domains.subscription_entitlement_payment.endpoint_groups)
+      .toContain('GET /v1/memberships/subscriptions')
+    expect(route).toContain("parts.length === 0 && method === 'GET'")
   })
 
   it('exposes only the canonical subscription lifecycle paths', () => {

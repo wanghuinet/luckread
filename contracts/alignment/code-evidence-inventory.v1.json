@@ -317,14 +317,14 @@
       "subjectId": "cancelSubscription",
       "implementationStatus": "IMPLEMENTED",
       "implementationRefs": [
-        "workers/W07-subscription-commerce/src/index.ts",
-        "workers/W07-subscription-commerce/src/subscription-runtime.ts",
         "workers/W01-payload/src/app/api/v1/memberships/subscriptions/[[...segments]]/route.ts",
-        "workers/W01-payload/src/subscription/w07-subscription-client.ts"
+        "workers/W01-payload/src/subscription/w07-subscription-client.ts",
+        "workers/W07-subscription-commerce/src/index.ts",
+        "workers/W07-subscription-commerce/src/subscription-runtime.ts"
       ],
       "testRefs": [
-        "workers/W07-subscription-commerce/src/subscription-runtime.test.ts",
-        "workers/W01-payload/tests/int/subscription-v1-adapter.int.spec.ts"
+        "workers/W01-payload/tests/int/subscription-v1-adapter.int.spec.ts",
+        "workers/W07-subscription-commerce/src/subscription-runtime.test.ts"
       ],
       "schemaEvidenceRefs": [],
       "sourceRefs": [
@@ -356,14 +356,14 @@
       "subjectId": "changeSubscriptionPlan",
       "implementationStatus": "IMPLEMENTED",
       "implementationRefs": [
-        "workers/W07-subscription-commerce/src/index.ts",
-        "workers/W07-subscription-commerce/src/subscription-runtime.ts",
         "workers/W01-payload/src/app/api/v1/memberships/subscriptions/[[...segments]]/route.ts",
-        "workers/W01-payload/src/subscription/w07-subscription-client.ts"
+        "workers/W01-payload/src/subscription/w07-subscription-client.ts",
+        "workers/W07-subscription-commerce/src/index.ts",
+        "workers/W07-subscription-commerce/src/subscription-runtime.ts"
       ],
       "testRefs": [
-        "workers/W07-subscription-commerce/src/subscription-runtime.test.ts",
-        "workers/W01-payload/tests/int/subscription-v1-adapter.int.spec.ts"
+        "workers/W01-payload/tests/int/subscription-v1-adapter.int.spec.ts",
+        "workers/W07-subscription-commerce/src/subscription-runtime.test.ts"
       ],
       "schemaEvidenceRefs": [],
       "sourceRefs": [
@@ -539,14 +539,14 @@
       "subjectId": "createSubscription",
       "implementationStatus": "IMPLEMENTED",
       "implementationRefs": [
-        "workers/W07-subscription-commerce/src/index.ts",
-        "workers/W07-subscription-commerce/src/subscription-runtime.ts",
         "workers/W01-payload/src/app/api/v1/memberships/subscriptions/[[...segments]]/route.ts",
-        "workers/W01-payload/src/subscription/w07-subscription-client.ts"
+        "workers/W01-payload/src/subscription/w07-subscription-client.ts",
+        "workers/W07-subscription-commerce/src/index.ts",
+        "workers/W07-subscription-commerce/src/subscription-runtime.ts"
       ],
       "testRefs": [
-        "workers/W07-subscription-commerce/src/subscription-runtime.test.ts",
-        "workers/W01-payload/tests/int/subscription-v1-adapter.int.spec.ts"
+        "workers/W01-payload/tests/int/subscription-v1-adapter.int.spec.ts",
+        "workers/W07-subscription-commerce/src/subscription-runtime.test.ts"
       ],
       "schemaEvidenceRefs": [],
       "sourceRefs": [
@@ -1506,14 +1506,14 @@
       "subjectId": "getSubscription",
       "implementationStatus": "IMPLEMENTED",
       "implementationRefs": [
-        "workers/W07-subscription-commerce/src/index.ts",
-        "workers/W07-subscription-commerce/src/subscription-runtime.ts",
         "workers/W01-payload/src/app/api/v1/memberships/subscriptions/[[...segments]]/route.ts",
-        "workers/W01-payload/src/subscription/w07-subscription-client.ts"
+        "workers/W01-payload/src/subscription/w07-subscription-client.ts",
+        "workers/W07-subscription-commerce/src/index.ts",
+        "workers/W07-subscription-commerce/src/subscription-runtime.ts"
       ],
       "testRefs": [
-        "workers/W07-subscription-commerce/src/subscription-runtime.test.ts",
-        "workers/W01-payload/tests/int/subscription-v1-adapter.int.spec.ts"
+        "workers/W01-payload/tests/int/subscription-v1-adapter.int.spec.ts",
+        "workers/W07-subscription-commerce/src/subscription-runtime.test.ts"
       ],
       "schemaEvidenceRefs": [],
       "sourceRefs": [
@@ -1762,6 +1762,29 @@
       "blockers": [
         "Runtime API implementation evidence is not yet mechanically discovered"
       ]
+    },
+    {
+      "evidenceId": "API_OPERATION:listMembershipSubscriptions",
+      "subjectType": "API_OPERATION",
+      "subjectId": "listMembershipSubscriptions",
+      "implementationStatus": "IMPLEMENTED",
+      "implementationRefs": [
+        "workers/W01-payload/src/app/api/v1/memberships/subscriptions/[[...segments]]/route.ts",
+        "workers/W01-payload/src/subscription/w07-subscription-client.ts",
+        "workers/W07-subscription-commerce/src/index.ts",
+        "workers/W07-subscription-commerce/src/subscription-runtime.ts"
+      ],
+      "testRefs": [
+        "workers/W01-payload/tests/int/subscription-v1-adapter.int.spec.ts",
+        "workers/W07-subscription-commerce/src/subscription-runtime.test.ts"
+      ],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json",
+        "contracts/alignment/cross-system-mapping.v1.json"
+      ],
+      "blockers": []
     },
     {
       "evidenceId": "API_OPERATION:listModerationCases",
@@ -2025,14 +2048,14 @@
       "subjectId": "pauseSubscription",
       "implementationStatus": "IMPLEMENTED",
       "implementationRefs": [
-        "workers/W07-subscription-commerce/src/index.ts",
-        "workers/W07-subscription-commerce/src/subscription-runtime.ts",
         "workers/W01-payload/src/app/api/v1/memberships/subscriptions/[[...segments]]/route.ts",
-        "workers/W01-payload/src/subscription/w07-subscription-client.ts"
+        "workers/W01-payload/src/subscription/w07-subscription-client.ts",
+        "workers/W07-subscription-commerce/src/index.ts",
+        "workers/W07-subscription-commerce/src/subscription-runtime.ts"
       ],
       "testRefs": [
-        "workers/W07-subscription-commerce/src/subscription-runtime.test.ts",
-        "workers/W01-payload/tests/int/subscription-v1-adapter.int.spec.ts"
+        "workers/W01-payload/tests/int/subscription-v1-adapter.int.spec.ts",
+        "workers/W07-subscription-commerce/src/subscription-runtime.test.ts"
       ],
       "schemaEvidenceRefs": [],
       "sourceRefs": [
@@ -2640,14 +2663,14 @@
       "subjectId": "resumeSubscription",
       "implementationStatus": "IMPLEMENTED",
       "implementationRefs": [
-        "workers/W07-subscription-commerce/src/index.ts",
-        "workers/W07-subscription-commerce/src/subscription-runtime.ts",
         "workers/W01-payload/src/app/api/v1/memberships/subscriptions/[[...segments]]/route.ts",
-        "workers/W01-payload/src/subscription/w07-subscription-client.ts"
+        "workers/W01-payload/src/subscription/w07-subscription-client.ts",
+        "workers/W07-subscription-commerce/src/index.ts",
+        "workers/W07-subscription-commerce/src/subscription-runtime.ts"
       ],
       "testRefs": [
-        "workers/W07-subscription-commerce/src/subscription-runtime.test.ts",
-        "workers/W01-payload/tests/int/subscription-v1-adapter.int.spec.ts"
+        "workers/W01-payload/tests/int/subscription-v1-adapter.int.spec.ts",
+        "workers/W07-subscription-commerce/src/subscription-runtime.test.ts"
       ],
       "schemaEvidenceRefs": [],
       "sourceRefs": [
