@@ -2578,16 +2578,27 @@
       "evidenceId": "ENTITY:ENT-SUBSCRIPTION",
       "subjectType": "ENTITY",
       "subjectId": "ENT-SUBSCRIPTION",
-      "implementationStatus": "CONTRACT_ONLY",
-      "implementationRefs": [],
+      "implementationStatus": "BLOCKED",
+      "implementationRefs": [
+        "workers/W07-subscription-commerce/src/index.ts",
+        "workers/W07-subscription-commerce/src/subscription-runtime.ts"
+      ],
       "testRefs": [],
-      "schemaEvidenceRefs": [],
+      "schemaEvidenceRefs": [
+        "contracts/entity/SUBSCRIPTION-ENTITY-CONTRACT.v1.json",
+        "contracts/persistence/SUBSCRIPTION-D1-01-persistence.v1.json",
+        "workers/W07-subscription-commerce/migrations/0001_membership_subscriptions.sql"
+      ],
       "sourceRefs": [
         "contracts/entity/entity-catalog.v1.json",
         "contracts/entity/entity-implementation-evidence.v1.json"
       ],
       "blockers": [
-        "No concrete implementation evidence recorded."
+        "The W07 runtime and W01 Service Binding adapter exist in source, but source presence is not admitted production-runtime evidence.",
+        "Migration 0001 does not contain the contract-required non-null version column; controlled D1-01 schema/application evidence is absent.",
+        "The runtime uses updated_at as the If-Match compare-and-set authority, while the admitted entity/persistence contract requires monotonic version to be authoritative.",
+        "Subscription creation accepts a supplied planId and hardcodes plan_version=1 without validating an active authoritative plan definition.",
+        "Payment-confirmed subscription transitions and entitlement grant/revoke enforcement have no admitted runtime, integration, and Evidence Registry proof."
       ]
     },
     {
