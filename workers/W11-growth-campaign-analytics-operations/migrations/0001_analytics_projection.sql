@@ -44,8 +44,15 @@ CREATE TABLE IF NOT EXISTS analytics_event_dedupe (
       AND content_id IS NOT NULL AND content_type IS NOT NULL)
   ),
   CHECK (
-    (event_name IN ('read_dwell', 'dwell', 'video_watch') AND duration_ms BETWEEN 1 AND 86400000)
-    OR (event_name NOT IN ('read_dwell', 'dwell', 'video_watch') AND duration_ms IS NULL)
+    (
+      event_name IN ('read_dwell', 'dwell', 'video_watch')
+      AND duration_ms IS NOT NULL
+      AND duration_ms BETWEEN 1 AND 86400000
+    )
+    OR (
+      event_name NOT IN ('read_dwell', 'dwell', 'video_watch')
+      AND duration_ms IS NULL
+    )
   ),
   CHECK (
     event_name NOT IN ('like_created', 'comment_created', 'share_created', 'favorite_created',
