@@ -95,6 +95,20 @@ export interface ContentAnalyticsSummary
   contentType: AnalyticsContentType
 }
 
+export interface ContentAnalyticsMetricChange {
+  current: number
+  previous: number
+  absoluteChange: number
+  /** Percentage change; null when the previous period is zero. */
+  percentChange: number | null
+}
+
+export interface ContentAnalyticsPeriodComparison {
+  current: ContentAnalyticsSummary
+  previous: ContentAnalyticsSummary
+  changes: Record<ContentAnalyticsMetric, ContentAnalyticsMetricChange>
+}
+
 export interface CreatorFollowerSummary extends HourlyBucketWindow {
   creatorId: string
   followersGained: number
@@ -268,6 +282,27 @@ WHERE content_id = ?
 
 const CONTENT_SUMMARY_SQL = buildContentSummarySql()
 
+const CONTENT_COMPARISON_COLUMNS = CONTENT_METRICS.flatMap(([key, column]) => [
+  `COALESCE(SUM(CASE WHEN hour_start >= periods.current_from AND hour_start < periods.current_to THEN ${column} ELSE 0 END), 0) AS current_${key}`,
+  `COALESCE(SUM(CASE WHEN hour_start >= periods.previous_from AND hour_start < periods.previous_to THEN ${column} ELSE 0 END), 0) AS previous_${key}`,
+]).join(',\\n  ')
+
+const CONTENT_COMPARISON_SQL = `WITH periods AS (
+  SELECT ? AS current_from, ? AS current_to, ? AS previous_from, ? AS previous_to
+)
+SELECT
+  ${CONTENT_COMPARISON_COLUMNS}
+FROM analytics_content_hourly
+CROSS JOIN periods
+WHERE content_id = ?
+  AND content_type = ?
+  AND metric_version = ?
+  AND (
+    (hour_start >= periods.current_from AND hour_start < periods.current_to)
+    OR
+    (hour_start >= periods.previous_from AND hour_start < periods.previous_to)
+  )`
+
 const CREATOR_FOLLOWER_SUMMARY_SQL = `SELECT
   COALESCE(SUM(followers_gained), 0) AS followersGained,
   COALESCE(SUM(followers_lost), 0) AS followersLost
@@ -317,6 +352,102 @@ export async function getContentAnalyticsSummary(
     ...bucketWindow,
     ...metrics,
     ...deriveContentMetrics(metrics),
+  }
+}
+
+/**
+ * Compare two non-overlapping content analytics periods in one bounded D1 query.
+ *
+ * Metric values are based on whole hourly buckets overlapping each requested
+ * window. Current and previous buckets must not overlap, otherwise a bucket
+ * could be counted twice. A zero previous value yields a null percent change.
+ */
+export async function getContentAnalyticsPeriodComparison(
+  db: AnalyticsReadDatabase,
+  input: {
+    contentId: string
+    contentType: AnalyticsContentType
+    currentWindow: AnalyticsQueryWindow
+    previousWindow: AnalyticsQueryWindow
+  },
+): Promise<ContentAnalyticsPeriodComparison> {
+  validateIdentifier(input.contentId, 'contentId')
+  if (!['article', 'post', 'video'].includes(input.contentType)) {
+    throw new TypeError('contentType is invalid')
+  }
+  validateWindow(input.currentWindow)
+  validateWindow(input.previousWindow)
+
+  const currentBucketWindow = getHourlyBucketWindow(input.currentWindow)
+  const previousBucketWindow = getHourlyBucketWindow(input.previousWindow)
+  if (
+    Date.parse(previousBucketWindow.bucketToExclusive) >
+    Date.parse(currentBucketWindow.bucketFrom)
+  ) {
+    throw new RangeError(
+      'previous period buckets must end before current period buckets begin',
+    )
+  }
+
+  const row = await db
+    .prepare(CONTENT_COMPARISON_SQL)
+    .bind(
+      currentBucketWindow.bucketFrom,
+      currentBucketWindow.bucketToExclusive,
+      previousBucketWindow.bucketFrom,
+      previousBucketWindow.bucketToExclusive,
+      input.contentId,
+      input.contentType,
+      '1.0',
+    )
+    .first()
+
+  const currentMetrics = Object.fromEntries(
+    CONTENT_METRICS.map(([key]) => [
+      key,
+      readCount(row, `current_${key}`),
+    ]),
+  ) as Record<ContentAnalyticsMetric, number>
+  const previousMetrics = Object.fromEntries(
+    CONTENT_METRICS.map(([key]) => [
+      key,
+      readCount(row, `previous_${key}`),
+    ]),
+  ) as Record<ContentAnalyticsMetric, number>
+
+  const changes = Object.fromEntries(
+    CONTENT_METRICS.map(([key]) => {
+      const current = currentMetrics[key]
+      const previous = previousMetrics[key]
+      const absoluteChange = current - previous
+      return [
+        key,
+        {
+          current,
+          previous,
+          absoluteChange,
+          percentChange: previous === 0 ? null : (absoluteChange / previous) * 100,
+        },
+      ]
+    }),
+  ) as Record<ContentAnalyticsMetric, ContentAnalyticsMetricChange>
+
+  return {
+    current: {
+      contentId: input.contentId,
+      contentType: input.contentType,
+      ...currentBucketWindow,
+      ...currentMetrics,
+      ...deriveContentMetrics(currentMetrics),
+    },
+    previous: {
+      contentId: input.contentId,
+      contentType: input.contentType,
+      ...previousBucketWindow,
+      ...previousMetrics,
+      ...deriveContentMetrics(previousMetrics),
+    },
+    changes,
   }
 }
 
