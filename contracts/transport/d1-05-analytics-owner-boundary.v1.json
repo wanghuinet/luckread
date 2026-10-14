@@ -4,6 +4,7 @@
   "title": "LuckRead D1-05 Analytics Owner Boundary",
   "version": "1.0.0",
   "status": "CONTRACTED_DESIGN_ONLY",
+  "physicalResource": { "databaseName": "allluck", "databaseUuid": "77d82be2-d12e-4a17-b410-9aa7d376bc11" },
   "purpose": "Define W11-exclusive access and derived-data limits for the fifth canonical D1 domain without claiming physical provisioning or runtime readiness.",
   "domain": "D1-05",
   "authority": "Analytics-only derived data and analytics processing state; not a business source of truth.",
@@ -40,8 +41,9 @@
   "topology": { "workerCount": 12, "d1Count": 5, "taskCount": 25 },
   "physicalProvisioning": {
     "status": "PENDING_ADMISSION",
-    "databaseUuid": null,
-    "workerBinding": "W11-only; not yet admitted",
-    "runtimeEvidence": "NOT_PROVIDED"
+    "databaseUuid": "77d82be2-d12e-4a17-b410-9aa7d376bc11",
+    "databaseName": "allluck",
+    "workerBinding": "W11-only; D1_05 Wrangler binding committed; production deployment/admission pending",
+    "runtimeEvidence": "Repository CI verifies UUID/name/Worker binding and worker code; remote deployment and live health probe NOT_PERFORMED"
   }
 }
