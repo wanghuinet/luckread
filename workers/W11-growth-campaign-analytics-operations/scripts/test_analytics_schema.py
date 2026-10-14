@@ -155,6 +155,26 @@ def main() -> None:
         "SELECT COUNT(*) FROM analytics_event_dedupe WHERE event_id = 'evt_schema_bad'"
     ).fetchone()[0] == 0
 
+    # A duration-bearing event must have a positive duration at the SQL boundary,
+    # even if a future caller bypasses TypeScript event validation.
+    missing_duration = [
+        event(
+            "evt_schema_missing_duration",
+            "dedupe_schema_missing_duration",
+            "read_dwell",
+            duration_ms=None,
+        )
+    ]
+    try:
+        apply_batch(db, missing_duration, content_sql, creator_sql, mark_applied_sql)
+    except sqlite3.IntegrityError:
+        pass
+    else:
+        raise AssertionError("schema must reject duration events with no duration")
+    assert db.execute(
+        "SELECT COUNT(*) FROM analytics_event_dedupe WHERE event_id = 'evt_schema_missing_duration'"
+    ).fetchone()[0] == 0
+
     # Projections are written once per grouped dimension, not once per input event.
     grouping = content_sql.upper()
     assert "GROUP BY HOUR_START, CONTENT_TYPE, CONTENT_ID, METRIC_VERSION" in grouping
