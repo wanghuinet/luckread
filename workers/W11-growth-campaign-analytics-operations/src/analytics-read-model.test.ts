@@ -64,7 +64,7 @@ describe('W11 bounded analytics read models', () => {
       opens: 12,
       likes: 5,
       comments: 0,
-      videoPlays: 0,
+      videoPlays: 20,
       openRate: 12 / 41,
       readStartRate: 10 / 12,
       readProgress25Rate: 0.8,
