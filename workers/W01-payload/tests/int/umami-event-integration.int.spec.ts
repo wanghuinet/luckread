@@ -32,6 +32,17 @@ describe('Umami content navigation event reuse', () => {
     expect(page).not.toContain('data-umami-event-title')
   })
 
+  it('tracks short-video detail and navigation clicks without sending content identifiers or titles', () => {
+    const shorts = read('src/app/(frontend)/shorts/ShortVideoFeed.tsx')
+    expect(shorts).toContain('data-umami-event="content-open"')
+    expect(shorts).toContain('data-umami-event-content-type="video"')
+    expect(shorts).toContain('data-umami-event="content-discovery-open"')
+    expect(shorts).toContain('data-umami-event="creator-center-open"')
+    expect(shorts).not.toContain('data-umami-event-content-id')
+    expect(shorts).not.toContain('data-umami-event-title')
+    expect(shorts).not.toContain('umami.track(')
+  })
+
   it('loads the tracker once from the shared frontend root layout', () => {
     const layout = read('src/app/(frontend)/layout.tsx')
     const tracker = read('src/app/(frontend)/UmamiAnalytics.tsx')
