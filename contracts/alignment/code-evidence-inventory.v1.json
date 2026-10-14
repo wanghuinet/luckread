@@ -146,6 +146,22 @@
       ]
     },
     {
+      "evidenceId": "API_OPERATION:changeSubscriptionPlan",
+      "subjectType": "API_OPERATION",
+      "subjectId": "changeSubscriptionPlan",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
       "evidenceId": "API_OPERATION:checkEntitlement",
       "subjectType": "API_OPERATION",
       "subjectId": "checkEntitlement",
@@ -1682,6 +1698,29 @@
       ]
     },
     {
+      "evidenceId": "API_OPERATION:pauseSubscription",
+      "subjectType": "API_OPERATION",
+      "subjectId": "pauseSubscription",
+      "implementationStatus": "IMPLEMENTED",
+      "implementationRefs": [
+        "workers/W07-subscription-commerce/src/index.ts",
+        "workers/W07-subscription-commerce/src/subscription-runtime.ts",
+        "workers/W01-payload/src/app/api/v1/memberships/subscriptions/[[...segments]]/route.ts",
+        "workers/W01-payload/src/subscription/w07-subscription-client.ts"
+      ],
+      "testRefs": [
+        "workers/W07-subscription-commerce/src/subscription-runtime.test.ts",
+        "workers/W01-payload/tests/int/subscription-v1-adapter.int.spec.ts"
+      ],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json",
+        "contracts/alignment/cross-system-mapping.v1.json"
+      ],
+      "blockers": []
+    },
+    {
       "evidenceId": "API_OPERATION:postAccountDeletionRequest",
       "subjectType": "API_OPERATION",
       "subjectId": "postAccountDeletionRequest",
@@ -2272,6 +2311,29 @@
       "blockers": [
         "Runtime API implementation evidence is not yet mechanically discovered"
       ]
+    },
+    {
+      "evidenceId": "API_OPERATION:resumeSubscription",
+      "subjectType": "API_OPERATION",
+      "subjectId": "resumeSubscription",
+      "implementationStatus": "IMPLEMENTED",
+      "implementationRefs": [
+        "workers/W07-subscription-commerce/src/index.ts",
+        "workers/W07-subscription-commerce/src/subscription-runtime.ts",
+        "workers/W01-payload/src/app/api/v1/memberships/subscriptions/[[...segments]]/route.ts",
+        "workers/W01-payload/src/subscription/w07-subscription-client.ts"
+      ],
+      "testRefs": [
+        "workers/W07-subscription-commerce/src/subscription-runtime.test.ts",
+        "workers/W01-payload/tests/int/subscription-v1-adapter.int.spec.ts"
+      ],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json",
+        "contracts/alignment/cross-system-mapping.v1.json"
+      ],
+      "blockers": []
     },
     {
       "evidenceId": "API_OPERATION:rollbackContentRevision",
