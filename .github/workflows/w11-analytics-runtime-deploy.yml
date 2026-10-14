@@ -1,4 +1,4 @@
-name: W11 Analytics Runtime Deploy
+name: W11 Analytics Migration and Version Upload
 
 on:
   pull_request:
@@ -13,12 +13,12 @@ on:
         required: true
         type: string
       confirm:
-        description: Explicitly authorize applying pending D1-05 migrations and deploying W11
+        description: Explicitly authorize applying pending D1-05 migrations and uploading the W11 version
         required: true
         type: choice
         options:
           - CANCEL
-          - APPLY_MIGRATIONS_AND_DEPLOY_W11
+          - APPLY_MIGRATIONS_AND_UPLOAD_W11_VERSION
         default: CANCEL
 
 permissions:
@@ -30,7 +30,7 @@ concurrency:
 
 jobs:
   preflight:
-    if: ${{ github.event_name == 'pull_request' || inputs.confirm == 'APPLY_MIGRATIONS_AND_DEPLOY_W11' }}
+    if: ${{ github.event_name == 'pull_request' || inputs.confirm == 'APPLY_MIGRATIONS_AND_UPLOAD_W11_VERSION' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
@@ -125,9 +125,10 @@ jobs:
           workers/W11-growth-campaign-analytics-operations/src/analytics-read-model.ts
           workers/W11-growth-campaign-analytics-operations/src/analytics-read-model.test.ts
 
-  deploy:
+  version_upload:
+    name: Apply migrations and upload W11 version
     needs: preflight
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.confirm == 'APPLY_MIGRATIONS_AND_DEPLOY_W11' }}
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.confirm == 'APPLY_MIGRATIONS_AND_UPLOAD_W11_VERSION' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
@@ -178,11 +179,20 @@ jobs:
           grep -q "'LATE'" /tmp/w11-analytics-event-ledger-schema.json
           echo W11_REMOTE_D1_05_SCHEMA=PASS
 
-      - name: Deploy W11 without adding a route or binding
+      - name: Upload W11 runtime version without enabling traffic routes
         working-directory: workers/W11-growth-campaign-analytics-operations
-        run: npx --yes wrangler@4.116.0 deploy --config wrangler.jsonc
+        run: |
+          set -euo pipefail
+          npx --yes wrangler@4.116.0 deploy --config wrangler.jsonc 2>&1 | tee /tmp/w11-upload.log
+          current_version_id="$(sed -nE 's/.*Current Version ID: ([0-9a-f-]{36}).*/\1/p' /tmp/w11-upload.log | tail -n 1)"
+          test -n "$current_version_id" || {
+            echo "Wrangler did not report a current version ID."
+            exit 1
+          }
+          echo "W11_CURRENT_VERSION_ID=$current_version_id" >> "$GITHUB_ENV"
+          echo "W11_CURRENT_VERSION_UPLOAD=PASS"
 
-      - name: Verify deployed Worker and D1-05 binding
+      - name: Verify exact uploaded version and D1-05 binding
         run: |
           set -euo pipefail
           curl -fsS \
@@ -192,31 +202,52 @@ jobs:
             > /tmp/w11-worker-settings.json
           jq -e --arg db "$EXPECTED_DB_UUID" '.. | objects | select(.id? == $db)' \
             /tmp/w11-worker-settings.json >/dev/null
-          npx --yes wrangler@4.116.0 deployments list --name "$EXPECTED_WORKER" --json \
-            > /tmp/w11-deployments.json
-          node --input-type=module <<'NODE'
-          import fs from 'node:fs';
-          const deployments = JSON.parse(fs.readFileSync('/tmp/w11-deployments.json', 'utf8'));
-          if (!Array.isArray(deployments) || deployments.length === 0) {
-            throw new Error('No deployed W11 deployment record found');
-          }
-          console.log(JSON.stringify({deploymentRecords:deployments.length, latest:deployments[0]}));
-          NODE
-          echo W11_LIVE_BINDING_AND_DEPLOYMENT=PASS
 
-      - name: Capture deployment evidence and unresolved runtime gates
+          curl -fsS \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            -H "Content-Type: application/json" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/$EXPECTED_WORKER/versions?per_page=20" \
+            > /tmp/w11-versions.json
+          jq -e --arg id "$W11_CURRENT_VERSION_ID" \
+            '.success == true and any(.result.items[]?; .id == $id)' \
+            /tmp/w11-versions.json >/dev/null
+
+          curl -fsS \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            -H "Content-Type: application/json" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/$EXPECTED_WORKER/deployments" \
+            > /tmp/w11-active-deployments.json
+          jq -e '.success == true' /tmp/w11-active-deployments.json >/dev/null
+          active_traffic=false
+          if jq -e --arg id "$W11_CURRENT_VERSION_ID" \
+            'any(.result.deployments[0].versions[]?; .version_id == $id and .percentage == 100)' \
+            /tmp/w11-active-deployments.json >/dev/null; then
+            active_traffic=true
+          fi
+          echo "W11_CURRENT_VERSION_ACTIVE=$active_traffic" >> "$GITHUB_ENV"
+          echo "W11_EXACT_VERSION_UPLOAD_AND_BINDING=PASS"
+          if [[ "$active_traffic" != "true" ]]; then
+            echo "::notice::W11 version exists and D1-05 binding is verified, but the latest traffic deployment does not include this version. No public route or Service Binding was created."
+          else
+            echo "W11_CURRENT_VERSION_SERVING_TRAFFIC=PASS"
+          fi
+
+      - name: Capture version upload evidence and unresolved runtime gates
         run: |
           set -euo pipefail
           mkdir -p artifacts/w11-analytics-deploy
           cat > artifacts/w11-analytics-deploy/provenance.json <<EOF
           {
-            "workflow": "W11 Analytics Runtime Deploy",
+            "workflow": "W11 Analytics Migration and Version Upload",
             "runId": "$GITHUB_RUN_ID",
             "runAttempt": "$GITHUB_RUN_ATTEMPT",
             "sourceSha": "$SOURCE_SHA",
             "worker": "$EXPECTED_WORKER",
             "d1DatabaseUuid": "$EXPECTED_DB_UUID",
             "pendingD1MigrationsApplied": true,
+            "currentVersionId": "$W11_CURRENT_VERSION_ID",
+            "exactVersionUploaded": true,
+            "currentVersionServingTraffic": $W11_CURRENT_VERSION_ACTIVE,
             "remoteLateReplaySchemaVerified": true,
             "deployedBindingVerified": true,
             "publicRouteAdded": false,
@@ -226,10 +257,10 @@ jobs:
           }
           EOF
 
-      - name: Upload deployment evidence
+      - name: Upload version upload evidence
         uses: actions/upload-artifact@v4
         with:
-          name: w11-analytics-deploy-${{ inputs.source_sha }}
+          name: w11-analytics-version-upload-${{ inputs.source_sha }}
           path: artifacts/w11-analytics-deploy/provenance.json
           if-no-files-found: error
           retention-days: 30
