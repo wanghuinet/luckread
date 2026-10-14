@@ -354,17 +354,24 @@
       "evidenceId": "API_OPERATION:changeSubscriptionPlan",
       "subjectType": "API_OPERATION",
       "subjectId": "changeSubscriptionPlan",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
+      "implementationStatus": "IMPLEMENTED",
+      "implementationRefs": [
+        "workers/W07-subscription-commerce/src/index.ts",
+        "workers/W07-subscription-commerce/src/subscription-runtime.ts",
+        "workers/W01-payload/src/app/api/v1/memberships/subscriptions/[[...segments]]/route.ts",
+        "workers/W01-payload/src/subscription/w07-subscription-client.ts"
+      ],
+      "testRefs": [
+        "workers/W07-subscription-commerce/src/subscription-runtime.test.ts",
+        "workers/W01-payload/tests/int/subscription-v1-adapter.int.spec.ts"
+      ],
       "schemaEvidenceRefs": [],
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
+        "contracts/api/api-inventory.v1.json",
+        "contracts/alignment/cross-system-mapping.v1.json"
       ],
-      "blockers": [
-        "Runtime API implementation evidence is not yet mechanically discovered"
-      ]
+      "blockers": []
     },
     {
       "evidenceId": "API_OPERATION:checkEntitlement",
@@ -530,17 +537,24 @@
       "evidenceId": "API_OPERATION:createSubscription",
       "subjectType": "API_OPERATION",
       "subjectId": "createSubscription",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
+      "implementationStatus": "IMPLEMENTED",
+      "implementationRefs": [
+        "workers/W07-subscription-commerce/src/index.ts",
+        "workers/W07-subscription-commerce/src/subscription-runtime.ts",
+        "workers/W01-payload/src/app/api/v1/memberships/subscriptions/[[...segments]]/route.ts",
+        "workers/W01-payload/src/subscription/w07-subscription-client.ts"
+      ],
+      "testRefs": [
+        "workers/W07-subscription-commerce/src/subscription-runtime.test.ts",
+        "workers/W01-payload/tests/int/subscription-v1-adapter.int.spec.ts"
+      ],
       "schemaEvidenceRefs": [],
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
+        "contracts/api/api-inventory.v1.json",
+        "contracts/alignment/cross-system-mapping.v1.json"
       ],
-      "blockers": [
-        "Runtime API implementation evidence is not yet mechanically discovered"
-      ]
+      "blockers": []
     },
     {
       "evidenceId": "API_OPERATION:decideCreatorApplication",
@@ -1490,17 +1504,24 @@
       "evidenceId": "API_OPERATION:getSubscription",
       "subjectType": "API_OPERATION",
       "subjectId": "getSubscription",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
+      "implementationStatus": "IMPLEMENTED",
+      "implementationRefs": [
+        "workers/W07-subscription-commerce/src/index.ts",
+        "workers/W07-subscription-commerce/src/subscription-runtime.ts",
+        "workers/W01-payload/src/app/api/v1/memberships/subscriptions/[[...segments]]/route.ts",
+        "workers/W01-payload/src/subscription/w07-subscription-client.ts"
+      ],
+      "testRefs": [
+        "workers/W07-subscription-commerce/src/subscription-runtime.test.ts",
+        "workers/W01-payload/tests/int/subscription-v1-adapter.int.spec.ts"
+      ],
       "schemaEvidenceRefs": [],
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
+        "contracts/api/api-inventory.v1.json",
+        "contracts/alignment/cross-system-mapping.v1.json"
       ],
-      "blockers": [
-        "Runtime API implementation evidence is not yet mechanically discovered"
-      ]
+      "blockers": []
     },
     {
       "evidenceId": "API_OPERATION:getSubscriptions",
