@@ -51,17 +51,25 @@ export interface AnalyticsQueryWindow {
   to: string
 }
 
-export interface ContentAnalyticsSummary extends Record<ContentAnalyticsMetric, number> {
-  contentId: string
-  contentType: AnalyticsContentType
+export interface HourlyBucketWindow {
+  /** Requested instants retained for display. */
   from: string
   to: string
+  /** Values are whole-hour projections, not event-level exact counts. */
+  granularity: 'hour'
+  /** Inclusive first UTC hour bucket overlapping the requested window. */
+  bucketFrom: string
+  /** Exclusive upper UTC hour-bucket boundary. */
+  bucketToExclusive: string
 }
 
-export interface CreatorFollowerSummary {
+export interface ContentAnalyticsSummary extends Record<ContentAnalyticsMetric, number>, HourlyBucketWindow {
+  contentId: string
+  contentType: AnalyticsContentType
+}
+
+export interface CreatorFollowerSummary extends HourlyBucketWindow {
   creatorId: string
-  from: string
-  to: string
   followersGained: number
   followersLost: number
   netFollowers: number
@@ -87,6 +95,23 @@ function validateWindow(window: AnalyticsQueryWindow): void {
   if (to <= from) throw new RangeError('analytics query window must be ordered and non-empty')
   if (to - from > MAX_QUERY_WINDOW_MS) {
     throw new RangeError('analytics query window cannot exceed 366 days')
+  }
+}
+
+function getHourlyBucketWindow(window: AnalyticsQueryWindow): HourlyBucketWindow {
+  const fromMs = Date.parse(window.from)
+  const toMs = Date.parse(window.to)
+  const hourMs = 60 * 60 * 1000
+  const bucketFrom = new Date(Math.floor(fromMs / hourMs) * hourMs).toISOString()
+  const bucketToExclusive = new Date(
+    Math.ceil(toMs / hourMs) * hourMs,
+  ).toISOString()
+  return {
+    from: window.from,
+    to: window.to,
+    granularity: 'hour',
+    bucketFrom,
+    bucketToExclusive,
   }
 }
 
@@ -143,7 +168,8 @@ WHERE creator_id = ?
 
 /**
  * Read pre-aggregated content metrics for one content item and bounded period.
- * The caller must enforce creator/viewer authorization before presenting results.
+ * Results include every UTC hourly bucket overlapping [from, to); they are not
+ * event-level exact counts for partial hours. The caller must enforce authorization.
  * This query module itself deliberately has no HTTP or identity-provider behavior.
  */
 export async function getContentAnalyticsSummary(
@@ -159,14 +185,15 @@ export async function getContentAnalyticsSummary(
     throw new TypeError('contentType is invalid')
   }
   validateWindow(input.window)
+  const bucketWindow = getHourlyBucketWindow(input.window)
 
   const row = await db
     .prepare(CONTENT_SUMMARY_SQL)
     .bind(
       input.contentId,
       input.contentType,
-      input.window.from,
-      input.window.to,
+      bucketWindow.bucketFrom,
+      bucketWindow.bucketToExclusive,
       '1.0',
     )
     .first()
@@ -178,14 +205,14 @@ export async function getContentAnalyticsSummary(
   return {
     contentId: input.contentId,
     contentType: input.contentType,
-    from: input.window.from,
-    to: input.window.to,
+    ...bucketWindow,
     ...metrics,
   }
 }
 
 /**
- * Read creator follower deltas from the derived hourly projection. A net value
+ * Read creator follower deltas from the derived hourly projection. Results
+ * include whole hourly buckets overlapping the requested window. A net value
  * is a period delta (gained minus lost), not an authoritative current follower
  * count; W05 remains the source of truth for the relationship graph.
  */
@@ -198,18 +225,23 @@ export async function getCreatorFollowerSummary(
 ): Promise<CreatorFollowerSummary> {
   validateIdentifier(input.creatorId, 'creatorId')
   validateWindow(input.window)
+  const bucketWindow = getHourlyBucketWindow(input.window)
 
   const row = await db
     .prepare(CREATOR_FOLLOWER_SUMMARY_SQL)
-    .bind(input.creatorId, input.window.from, input.window.to, '1.0')
+    .bind(
+      input.creatorId,
+      bucketWindow.bucketFrom,
+      bucketWindow.bucketToExclusive,
+      '1.0',
+    )
     .first()
 
   const followersGained = readCount(row, 'followersGained')
   const followersLost = readCount(row, 'followersLost')
   return {
     creatorId: input.creatorId,
-    from: input.window.from,
-    to: input.window.to,
+    ...bucketWindow,
     followersGained,
     followersLost,
     netFollowers: followersGained - followersLost,
