@@ -11,7 +11,10 @@
     "D1-02": "6c342634-97f6-4248-9f4a-85772af4f22c",
     "D1-03": "bda1d247-a371-4244-91ae-aef96034db7f",
     "D1-04": null,
-    "D1-05": null
+    "D1-05": "77d82be2-d12e-4a17-b410-9aa7d376bc11"
+  },
+  "physicalD1Names": {
+    "D1-05": "allluck"
   },
   "workers": {
     "W01": { "allowedDomains": ["D1-01"], "notes": "Bounded Payload-native execution substrate; not general D1 business authority." },
@@ -36,7 +39,7 @@
   },
   "nonGoals": [
     "No D1 proxy or database gateway.",
-    "No implicit D1 beyond the five-domain canonical topology; D1-05 physical provisioning remains separately gated.",
+    "No implicit D1 beyond the five-domain canonical topology; D1-05 UUID/name are registered from the supplied resource details, while remote existence and deployment binding still require runtime verification.",
     "No SQL semantic inference.",
     "No Mapping 0 GREEN promotion."
   ]
