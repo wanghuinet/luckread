@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   getContentAnalyticsSummary,
   getCreatorFollowerSummary,
+  getTopContentAnalyticsForContentSet,
   type AnalyticsReadDatabase,
   type AnalyticsReadStatement,
 } from './analytics-read-model'
@@ -19,6 +20,7 @@ function fakeDb(row: Record<string, unknown> | null) {
       return statement
     }),
     first: vi.fn(async () => row),
+    all: vi.fn(async () => ({ results: row ? [row] : [] })),
   }
   const db: AnalyticsReadDatabase = {
     prepare: vi.fn((query: string) => {
@@ -239,6 +241,85 @@ describe('W11 bounded analytics read models', () => {
         window: { from, to },
       }),
     ).rejects.toThrow('invalid count for impressions')
+  })
+
+  it('ranks an explicit deduplicated content set with parameterized filters and a bounded limit', async () => {
+    const fixture = fakeDb({
+      contentId: 'article_001',
+      contentType: 'article',
+      impressions: 100,
+      opens: 70,
+      readStarts: 60,
+      readCompletions: 30,
+    })
+    const result = await getTopContentAnalyticsForContentSet(fixture.db, {
+      contentIds: ['article_001', 'post_001', 'article_001'],
+      window: {
+        from: '2026-10-14T00:30:00.000Z',
+        to: '2026-10-14T02:15:00.000Z',
+      },
+      limit: 5,
+    })
+
+    expect(result).toMatchObject({
+      granularity: 'hour',
+      bucketFrom: '2026-10-14T00:00:00.000Z',
+      bucketToExclusive: '2026-10-14T03:00:00.000Z',
+      items: [{
+        rank: 1,
+        contentId: 'article_001',
+        contentType: 'article',
+        impressions: 100,
+        opens: 70,
+        readStarts: 60,
+        readCompletions: 30,
+        readCompletionRate: 0.5,
+      }],
+    })
+    expect(fixture.getSql()).toContain('content_id IN (?, ?)')
+    expect(fixture.getSql()).toContain('GROUP BY content_id, content_type')
+    expect(fixture.getSql()).toContain('ORDER BY opens DESC, impressions DESC')
+    expect(fixture.getSql()).toContain('LIMIT ?')
+    expect(fixture.getSql()).not.toContain('article_001')
+    expect(fixture.getBoundValues()).toEqual([
+      'article_001',
+      'post_001',
+      '2026-10-14T00:00:00.000Z',
+      '2026-10-14T03:00:00.000Z',
+      '1.0',
+      5,
+    ])
+  })
+
+  it('returns an empty ranking without querying D1 for an empty authorized content set', async () => {
+    const fixture = fakeDb(null)
+    const result = await getTopContentAnalyticsForContentSet(fixture.db, {
+      contentIds: [],
+      window: { from, to },
+    })
+
+    expect(result.items).toEqual([])
+    expect(fixture.getPrepareCalls()).toBe(0)
+  })
+
+  it('rejects oversized content sets and invalid ranking limits before querying D1', async () => {
+    const fixture = fakeDb(null)
+    const contentIds = Array.from({ length: 91 }, (_, index) => `content_${index.toString().padStart(3, '0')}`)
+    await expect(
+      getTopContentAnalyticsForContentSet(fixture.db, {
+        contentIds,
+        window: { from, to },
+      }),
+    ).rejects.toThrow('cannot exceed 90 items')
+
+    await expect(
+      getTopContentAnalyticsForContentSet(fixture.db, {
+        contentIds: ['content_001'],
+        window: { from, to },
+        limit: 21,
+      }),
+    ).rejects.toThrow('between 1 and 20')
+    expect(fixture.getPrepareCalls()).toBe(0)
   })
 
   it('propagates storage read failures without returning fabricated analytics', async () => {
