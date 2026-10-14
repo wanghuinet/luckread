@@ -71,6 +71,33 @@ describe('W11 bounded analytics read models', () => {
     ])
   })
 
+  it('includes every hourly bucket overlapping a partial-hour request and labels the bucket range', async () => {
+    const fixture = fakeDb({ impressions: 3 })
+    const requestedFrom = '2026-10-14T00:30:00.000Z'
+    const requestedTo = '2026-10-14T02:15:00.000Z'
+    const result = await getContentAnalyticsSummary(fixture.db, {
+      contentId: 'article_001',
+      contentType: 'article',
+      window: { from: requestedFrom, to: requestedTo },
+    })
+
+    expect(result).toMatchObject({
+      from: requestedFrom,
+      to: requestedTo,
+      granularity: 'hour',
+      bucketFrom: '2026-10-14T00:00:00.000Z',
+      bucketToExclusive: '2026-10-14T03:00:00.000Z',
+      impressions: 3,
+    })
+    expect(fixture.getBoundValues()).toEqual([
+      'article_001',
+      'article',
+      '2026-10-14T00:00:00.000Z',
+      '2026-10-14T03:00:00.000Z',
+      '1.0',
+    ])
+  })
+
   it('returns zero-valued content metrics when no hourly projection exists', async () => {
     const fixture = fakeDb(null)
     const result = await getContentAnalyticsSummary(fixture.db, {
