@@ -216,6 +216,10 @@ def main() -> None:
         content_id="migration_legacy_article",
     ))
     legacy_row[-1] = "APPLIED"
+    # Keep this preserved fixture outside the hourly bucket rebuilt below.
+    legacy_row[5] = "2026-10-13T23:12:34.000Z"
+    legacy_row[6] = "2026-10-13T23:12:34.000Z"
+    legacy_row[7] = "2026-10-13T23:00:00.000Z"
     legacy_placeholders = "(" + ", ".join("?" for _ in legacy_row) + ")"
     db.execute(
         f"INSERT INTO analytics_event_dedupe ({SQL_COLUMNS}) VALUES {legacy_placeholders}",
