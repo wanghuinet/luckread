@@ -44,6 +44,7 @@ jobs:
           workers/W11-growth-campaign-analytics-operations/src/analytics-aggregation.test.ts
           workers/W11-growth-campaign-analytics-operations/src/analytics-period.test.ts
           workers/W11-growth-campaign-analytics-operations/src/analytics-d1-store.test.ts
+          workers/W11-growth-campaign-analytics-operations/src/analytics-ingest.test.ts
 
       - name: Verify D1-05 migration and transactional aggregate SQL
         run: python3 workers/W11-growth-campaign-analytics-operations/scripts/test_analytics_schema.py
@@ -60,3 +61,5 @@ jobs:
           workers/W11-growth-campaign-analytics-operations/src/analytics-aggregation.test.ts
           workers/W11-growth-campaign-analytics-operations/src/analytics-d1-store.ts
           workers/W11-growth-campaign-analytics-operations/src/analytics-d1-store.test.ts
+          workers/W11-growth-campaign-analytics-operations/src/analytics-ingest.ts
+          workers/W11-growth-campaign-analytics-operations/src/analytics-ingest.test.ts
