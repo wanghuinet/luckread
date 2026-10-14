@@ -1,6 +1,6 @@
 -- W11 / D1-05: derived analytics only.
 -- Apply only to the dedicated D1-05 resource after its physical binding is admitted.
--- Event inserts and hourly projections share one SQLite transaction via triggers;
+-- Event inserts, grouped projections and status updates are applied in one D1 batch transaction;
 -- duplicate event IDs or dedupe keys are ignored and never increment projections.
 
 CREATE TABLE IF NOT EXISTS analytics_event_dedupe (
