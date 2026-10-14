@@ -17,11 +17,12 @@ export interface AnalyticsIngestResult {
 /**
  * Internal W11 ingestion pipeline for already-authorized server event deliveries.
  *
- * Only VALID events enter D1-05. SUSPECT, INVALID, DUPLICATE, LATE and REJECTED
- * outcomes remain visible to the caller for quarantine/metrics decisions and are
- * not projected by this live path. This is intentionally not an HTTP route:
- * caller authentication, producer authorization and transport admission belong
- * to the existing Worker/event delivery contract.
+ * Only VALID events enter live projections. LATE events are durably stored in
+ * the canonical event/dedupe ledger with projection_status=LATE, then excluded
+ * from normal aggregation until an explicit hour-scoped replay is requested.
+ * SUSPECT, INVALID and REJECTED outcomes remain visible but are not persisted.
+ * This intentionally stays an internal function, not an HTTP route: producer
+ * authentication and transport admission remain the caller's responsibility.
  */
 export async function ingestAnalyticsBatch(
   db: AnalyticsD1Database,
