@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   getContentAnalyticsSummary,
+  getContentAnalyticsPeriodComparison,
   getCreatorFollowerSummary,
   getTopContentAnalyticsForContentSet,
   type AnalyticsReadDatabase,
@@ -91,6 +92,101 @@ describe('W11 bounded analytics read models', () => {
       to,
       '1.0',
     ])
+  })
+
+  it('compares current and previous periods in a single bounded D1 query', async () => {
+    const previousFrom = '2026-09-18T00:00:00.000Z'
+    const previousTo = from
+    const fixture = fakeDb({
+      current_impressions: 120,
+      previous_impressions: 100,
+      current_opens: 45,
+      previous_opens: 30,
+      current_videoPlays: 42,
+      previous_videoPlays: 30,
+      current_videoCompletions: 31,
+      previous_videoCompletions: 15,
+      current_likes: 12,
+      previous_likes: 6,
+    })
+
+    const result = await getContentAnalyticsPeriodComparison(fixture.db, {
+      contentId: 'article_001',
+      contentType: 'article',
+      currentWindow: { from, to },
+      previousWindow: { from: previousFrom, to: previousTo },
+    })
+
+    expect(result.current).toMatchObject({
+      contentId: 'article_001',
+      contentType: 'article',
+      from,
+      to,
+      impressions: 120,
+      opens: 45,
+      videoPlays: 42,
+      videoCompletions: 31,
+      likes: 12,
+    })
+    expect(result.previous).toMatchObject({
+      contentId: 'article_001',
+      contentType: 'article',
+      from: previousFrom,
+      to: previousTo,
+      impressions: 100,
+      opens: 30,
+      videoPlays: 30,
+      videoCompletions: 15,
+      likes: 6,
+    })
+    expect(result.changes.impressions).toEqual({
+      current: 120,
+      previous: 100,
+      absoluteChange: 20,
+      percentChange: 20,
+    })
+    expect(result.changes.videoCompletions.absoluteChange).toBe(16)
+    expect(result.changes.videoCompletions.percentChange).toBeCloseTo(106.6667, 4)
+    expect(result.changes.favorites).toEqual({
+      current: 0,
+      previous: 0,
+      absoluteChange: 0,
+      percentChange: null,
+    })
+    expect(fixture.getSql()).toContain('WITH periods AS')
+    expect(fixture.getSql()).toContain('periods.current_from')
+    expect(fixture.getSql()).toContain('periods.previous_from')
+    expect(fixture.getSql()).toContain('FROM analytics_content_hourly')
+    expect(fixture.getSql()).not.toContain('article_001')
+    expect(fixture.getPrepareCalls()).toBe(1)
+    expect(fixture.getBoundValues()).toEqual([
+      from,
+      to,
+      previousFrom,
+      previousTo,
+      'article_001',
+      'article',
+      '1.0',
+    ])
+  })
+
+  it('rejects overlapping hourly buckets before issuing a comparison query', async () => {
+    const fixture = fakeDb(null)
+    await expect(
+      getContentAnalyticsPeriodComparison(fixture.db, {
+        contentId: 'article_001',
+        contentType: 'article',
+        currentWindow: {
+          from: '2026-10-14T00:30:00.000Z',
+          to: '2026-10-14T03:00:00.000Z',
+        },
+        previousWindow: {
+          from: '2026-10-13T23:30:00.000Z',
+          to: '2026-10-14T00:45:00.000Z',
+        },
+      }),
+    ).rejects.toThrow('previous period buckets must end before current period buckets begin')
+    expect(fixture.getPrepareCalls()).toBe(0)
   })
 
   it('includes every hourly bucket overlapping a partial-hour request and labels the bucket range', async () => {
