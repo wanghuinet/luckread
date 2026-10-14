@@ -39,6 +39,7 @@ export type ContentAnalyticsMetric = (typeof CONTENT_METRICS)[number][0]
 export interface AnalyticsReadStatement {
   bind(...values: (string | number | null)[]): AnalyticsReadStatement
   first(): Promise<Record<string, unknown> | null>
+  all(): Promise<{ results?: Record<string, unknown>[] }>
 }
 
 export interface AnalyticsReadDatabase {
@@ -100,6 +101,20 @@ export interface CreatorFollowerSummary extends HourlyBucketWindow {
   followersLost: number
   netFollowers: number
 }
+
+export interface ContentAnalyticsRankingRow
+  extends Record<ContentAnalyticsMetric, number>, ContentAnalyticsDerivedMetrics {
+  rank: number
+  contentId: string
+  contentType: AnalyticsContentType
+}
+
+export interface TopContentAnalyticsResult extends HourlyBucketWindow {
+  items: ContentAnalyticsRankingRow[]
+}
+
+const MAX_CONTENT_IDS_PER_RANKING_QUERY = 90
+const MAX_CONTENT_RANKING_RESULTS = 20
 
 function parseCanonicalInstant(value: string, field: 'from' | 'to'): number {
   if (!CANONICAL_UTC_MILLIS.test(value)) {
@@ -167,6 +182,14 @@ function readCount(row: Record<string, unknown> | null, column: string): number 
   return count
 }
 
+function readContentMetrics(
+  row: Record<string, unknown> | null,
+): Record<ContentAnalyticsMetric, number> {
+  return Object.fromEntries(
+    CONTENT_METRICS.map(([key]) => [key, readCount(row, key)]),
+  ) as Record<ContentAnalyticsMetric, number>
+}
+
 function ratio(numerator: number, denominator: number): number | null {
   return denominator === 0 ? null : numerator / denominator
 }
@@ -196,6 +219,25 @@ function deriveContentMetrics(
     sharesPerOpen: ratio(metrics.shares, metrics.opens),
     favoritesPerOpen: ratio(metrics.favorites, metrics.opens),
   }
+}
+
+function buildTopContentSql(contentIdCount: number): string {
+  const columns = CONTENT_METRICS.map(
+    ([key, column]) => `COALESCE(SUM(${column}), 0) AS ${key}`,
+  ).join(',\n  ')
+  const placeholders = Array.from({ length: contentIdCount }, () => '?').join(', ')
+  return `SELECT
+  content_id AS contentId,
+  content_type AS contentType,
+  ${columns}
+FROM analytics_content_hourly
+WHERE content_id IN (${placeholders})
+  AND hour_start >= ?
+  AND hour_start < ?
+  AND metric_version = ?
+GROUP BY content_id, content_type
+ORDER BY opens DESC, impressions DESC, content_id ASC, content_type ASC
+LIMIT ?`
 }
 
 function buildContentSummarySql(): string {
@@ -255,9 +297,7 @@ export async function getContentAnalyticsSummary(
     )
     .first()
 
-  const metrics = Object.fromEntries(
-    CONTENT_METRICS.map(([key]) => [key, readCount(row, key)]),
-  ) as Record<ContentAnalyticsMetric, number>
+  const metrics = readContentMetrics(row)
 
   return {
     contentId: input.contentId,
@@ -266,6 +306,79 @@ export async function getContentAnalyticsSummary(
     ...metrics,
     ...deriveContentMetrics(metrics),
   }
+}
+
+/**
+ * Rank a caller-supplied, already-authorized set of content IDs using derived
+ * hourly metrics. The caller must obtain/authorize IDs through W03 first.
+ * This function deliberately does not resolve creator ownership or expose HTTP.
+ */
+export async function getTopContentAnalyticsForContentSet(
+  db: AnalyticsReadDatabase,
+  input: {
+    contentIds: readonly string[]
+    window: AnalyticsQueryWindow
+    limit?: number
+  },
+): Promise<TopContentAnalyticsResult> {
+  validateWindow(input.window)
+  if (!Array.isArray(input.contentIds)) {
+    throw new TypeError('contentIds must be an array')
+  }
+  if (input.contentIds.length > MAX_CONTENT_IDS_PER_RANKING_QUERY) {
+    throw new RangeError(
+      `contentIds cannot exceed ${MAX_CONTENT_IDS_PER_RANKING_QUERY} items per query`,
+    )
+  }
+
+  const limit = input.limit ?? 10
+  if (
+    !Number.isSafeInteger(limit) ||
+    limit < 1 ||
+    limit > MAX_CONTENT_RANKING_RESULTS
+  ) {
+    throw new RangeError(
+      `limit must be an integer between 1 and ${MAX_CONTENT_RANKING_RESULTS}`,
+    )
+  }
+
+  const contentIds = [...new Set(input.contentIds)]
+  for (const contentId of contentIds) validateIdentifier(contentId, 'contentId')
+  const bucketWindow = getHourlyBucketWindow(input.window)
+
+  if (contentIds.length === 0) return { ...bucketWindow, items: [] }
+
+  const statement = db
+    .prepare(buildTopContentSql(contentIds.length))
+    .bind(
+      ...contentIds,
+      bucketWindow.bucketFrom,
+      bucketWindow.bucketToExclusive,
+      '1.0',
+      limit,
+    )
+  const result = await statement.all()
+  const items = (result.results ?? []).map((row, index): ContentAnalyticsRankingRow => {
+    const contentId = row.contentId
+    const contentType = row.contentType
+    if (typeof contentId !== 'string') {
+      throw new TypeError('analytics ranking returned an invalid contentId')
+    }
+    validateIdentifier(contentId, 'contentId')
+    if (contentType !== 'article' && contentType !== 'post' && contentType !== 'video') {
+      throw new TypeError('analytics ranking returned an invalid contentType')
+    }
+    const metrics = readContentMetrics(row)
+    return {
+      rank: index + 1,
+      contentId,
+      contentType,
+      ...metrics,
+      ...deriveContentMetrics(metrics),
+    }
+  })
+
+  return { ...bucketWindow, items }
 }
 
 /**
