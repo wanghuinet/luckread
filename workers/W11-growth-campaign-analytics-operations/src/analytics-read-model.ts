@@ -673,7 +673,7 @@ export interface CreatorAnalyticsDashboardSummary extends ContentSetAnalyticsSum
 function buildCreatorAnalyticsDashboardSql(contentIdCount: number): string {
   const columns = CONTENT_METRICS.map(
     ([key, column]) => `COALESCE(SUM(${column}), 0) AS ${key}`,
-  ).join(',\\n  ')
+  ).join(',\n  ')
   const contentMetrics = contentIdCount > 0
     ? `content_metrics AS (
   SELECT COUNT(DISTINCT content_id) AS observedContentCount,
@@ -686,7 +686,7 @@ function buildCreatorAnalyticsDashboardSql(contentIdCount: number): string {
 )`
     : `content_metrics AS (
   SELECT 0 AS observedContentCount,
-    ${CONTENT_METRICS.map(([key]) => `0 AS ${key}`).join(',\\n    ')}
+    ${CONTENT_METRICS.map(([key]) => `0 AS ${key}`).join(',\n    ')}
 )`
   return `WITH
 ${contentMetrics},
