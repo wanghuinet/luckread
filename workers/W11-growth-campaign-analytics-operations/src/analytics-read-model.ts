@@ -653,3 +653,118 @@ export async function getCreatorFollowerSummary(
     netFollowers: followersGained - followersLost,
   }
 }
+
+/**
+ * Creator dashboard overview over one bounded reporting window.
+ *
+ * Content IDs must be fetched and authorized by the caller via W03. W11 reads
+ * only the derived hourly metrics; creator identity and relationship ownership
+ * remain outside this database. Content and follower aggregates share one D1
+ * statement, avoiding per-content queries and keeping the maximum at 97 binds.
+ */
+export interface CreatorAnalyticsDashboardSummary extends ContentSetAnalyticsSummary {
+  creatorId: string
+  followersGained: number
+  followersLost: number
+  netFollowers: number
+}
+
+function buildCreatorAnalyticsDashboardSql(contentIdCount: number): string {
+  const columns = CONTENT_METRICS.map(
+    ([key, column]) => `COALESCE(SUM(${column}), 0) AS ${key}`,
+  ).join(',\\n  ')
+  const contentMetrics = contentIdCount > 0
+    ? `content_metrics AS (
+  SELECT COUNT(DISTINCT content_id) AS observedContentCount,
+    ${columns}
+  FROM analytics_content_hourly
+  WHERE content_id IN (${Array.from({ length: contentIdCount }, () => '?').join(', ')})
+    AND hour_start >= ?
+    AND hour_start < ?
+    AND metric_version = ?
+)`
+    : `content_metrics AS (
+  SELECT 0 AS observedContentCount,
+    ${CONTENT_METRICS.map(([key]) => `0 AS ${key}`).join(',\\n    ')}
+)`
+  return `WITH
+${contentMetrics},
+follower_metrics AS (
+  SELECT
+    COALESCE(SUM(followers_gained), 0) AS followersGained,
+    COALESCE(SUM(followers_lost), 0) AS followersLost
+  FROM analytics_creator_hourly
+  WHERE creator_id = ?
+    AND hour_start >= ?
+    AND hour_start < ?
+    AND metric_version = ?
+)
+SELECT content_metrics.*, follower_metrics.*
+FROM content_metrics
+CROSS JOIN follower_metrics`
+}
+
+/**
+ * Build a creator overview with a single parameterized D1 query.
+ * The input content set is caller-authorized; it is never discovered from W11.
+ * An empty set still returns follower change metrics without scanning content rows.
+ */
+export async function getCreatorAnalyticsDashboardSummary(
+  db: AnalyticsReadDatabase,
+  input: {
+    creatorId: string
+    contentIds: readonly string[]
+    window: AnalyticsQueryWindow
+  },
+): Promise<CreatorAnalyticsDashboardSummary> {
+  validateIdentifier(input.creatorId, 'creatorId')
+  validateWindow(input.window)
+  if (!Array.isArray(input.contentIds)) {
+    throw new TypeError('contentIds must be an array')
+  }
+  if (input.contentIds.length > MAX_CONTENT_IDS_PER_SUMMARY_QUERY) {
+    throw new RangeError(
+      `contentIds cannot exceed ${MAX_CONTENT_IDS_PER_SUMMARY_QUERY} items per query`,
+    )
+  }
+
+  const contentIds = [...new Set(input.contentIds)]
+  for (const contentId of contentIds) validateIdentifier(contentId, 'contentId')
+  const bucketWindow = getHourlyBucketWindow(input.window)
+  const bucketBindings = [
+    bucketWindow.bucketFrom,
+    bucketWindow.bucketToExclusive,
+    '1.0',
+  ] as const
+  const values = [
+    ...contentIds,
+    ...(contentIds.length > 0 ? bucketBindings : []),
+    input.creatorId,
+    ...bucketBindings,
+  ]
+
+  const row = await db
+    .prepare(buildCreatorAnalyticsDashboardSql(contentIds.length))
+    .bind(...values)
+    .first()
+
+  const metrics = readContentMetrics(row)
+  const observedContentCount = readCount(row, 'observedContentCount')
+  if (observedContentCount > contentIds.length) {
+    throw new TypeError('analytics query returned more content rows than requested')
+  }
+  const followersGained = readCount(row, 'followersGained')
+  const followersLost = readCount(row, 'followersLost')
+
+  return {
+    creatorId: input.creatorId,
+    ...bucketWindow,
+    requestedContentCount: contentIds.length,
+    observedContentCount,
+    ...metrics,
+    ...deriveContentMetrics(metrics),
+    followersGained,
+    followersLost,
+    netFollowers: followersGained - followersLost,
+  }
+}
