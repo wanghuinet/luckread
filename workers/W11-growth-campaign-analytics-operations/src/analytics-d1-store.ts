@@ -207,9 +207,9 @@ export async function persistAnalyticsEvents(
     db.prepare(insertSql).bind(...bindValues(event)),
   )
 
-  // D1 allows at most 100 bound parameters per query. Keep the inserts separate
-  // (16 bound fields each) and stay below 100 statements per batch: 90 inserts
-  // plus the three grouped projection/finalization statements = 93 statements.
+  // D1 allows at most 100 bound parameters per query. Keep inserts separate
+  // (16 bound fields each) and cap this transaction at 90 inserts plus the three
+  // grouped projection/finalization statements (93 statements total).
   const results = await db.batch([
     ...insertStatements,
     db.prepare(CONTENT_PROJECTION_SQL),
