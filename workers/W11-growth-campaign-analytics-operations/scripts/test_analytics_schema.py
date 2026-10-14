@@ -57,6 +57,26 @@ def extract_content_summary_sql(source: str) -> tuple[str, list[tuple[str, str]]
     return query, metrics
 
 
+def build_top_content_sql(
+    metrics: list[tuple[str, str]], content_id_count: int
+) -> str:
+    columns = ",\n  ".join(
+        f"COALESCE(SUM({column}), 0) AS {key}" for key, column in metrics
+    )
+    placeholders = ", ".join("?" for _ in range(content_id_count))
+    return (
+        "SELECT\n  content_id AS contentId,\n  content_type AS contentType,\n  "
+        + columns
+        + f"\nFROM analytics_content_hourly\nWHERE content_id IN ({placeholders})\n"
+        + "  AND hour_start >= ?\n"
+        + "  AND hour_start < ?\n"
+        + "  AND metric_version = ?\n"
+        + "GROUP BY content_id, content_type\n"
+        + "ORDER BY opens DESC, impressions DESC, content_id ASC, content_type ASC\n"
+        + "LIMIT ?"
+    )
+
+
 def extract_template(source: str, constant: str) -> str:
     match = re.search(
         rf"const {re.escape(constant)} = `(.*?)`",
@@ -198,6 +218,24 @@ def main() -> None:
         f"content summary query should use the composite content/time index: {plan}"
     )
 
+    # Creator dashboards rank only the caller-authorized ID set; the content_id
+    # leading index keeps this query from scanning every hourly content row.
+    ranking_read_sql = build_top_content_sql(content_metrics, content_id_count=2)
+    ranking_params = ("article_01", "post_01", query_from, query_to, "1.0", 10)
+    ranking_rows = db.execute(ranking_read_sql, ranking_params).fetchall()
+    assert ranking_rows and ranking_rows[0][0:2] == ("article_01", "article"), (
+        f"unexpected top-content ordering: {ranking_rows}"
+    )
+    ranking_plan = " ".join(
+        row[3]
+        for row in db.execute(
+            "EXPLAIN QUERY PLAN " + ranking_read_sql, ranking_params
+        )
+    )
+    assert "analytics_content_hourly_content_id_time_idx" in ranking_plan, (
+        f"content-set ranking query should use the content_id/time index: {ranking_plan}"
+    )
+
     creator_cursor = db.execute(
         creator_read_sql, ("creator_01", query_from, query_to, "1.0")
     )
@@ -265,7 +303,7 @@ def main() -> None:
     assert "ON CONFLICT" in grouping
     assert "PROJECTION_STATUS = 'PENDING'" in grouping
 
-    print("W11 D1-05 schema smoke test passed: migration, grouped writes and reads, index use, dedupe, privacy, rollback")
+    print("W11 D1-05 schema smoke test passed: migration, grouped writes/reads, single-content and content-set indexes, dedupe, privacy, rollback")
 
 
 if __name__ == "__main__":
