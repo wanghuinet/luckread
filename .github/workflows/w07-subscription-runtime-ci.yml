@@ -9,6 +9,20 @@ on:
       - 'workers/W01-payload/tests/int/subscription-v1-adapter.int.spec.ts'
       - 'workers/W01-payload/wrangler.jsonc'
       - '.github/workflows/w07-subscription-runtime-ci.yml'
+      - 'contracts/alignment/cross-system-mapping.v1.json'
+      - 'contracts/alignment/mapping-batches/B13-B15-creator-membership-commerce.v1.json'
+      - 'contracts/alignment/code-evidence-inventory.v1.json'
+      - 'contracts/alignment/five-way-reconciliation.v1.json'
+      - 'contracts/entity/SUBSCRIPTION-ENTITY-CONTRACT.v1.json'
+      - 'contracts/entity/entity-field-contract.v1.json'
+      - 'contracts/entity/entity-implementation-evidence.v1.json'
+      - 'contracts/persistence/SUBSCRIPTION-D1-01-persistence.v1.json'
+      - 'contracts/state-machines/subscription.json'
+      - 'contracts/openapi/v1/openapi.yaml'
+      - 'contracts/api/rc-04-06-share-subscription-entitlement.v1.json'
+      - 'contracts/authz/permissions.json'
+      - 'docs/110-MEMBERSHIP-DATA-CONTRACT-v1.0.md'
+      - 'docs/111-MEMBERSHIP-API-CONTRACT-v1.0.md'
   push:
     branches: [main]
     paths:
@@ -17,6 +31,21 @@ on:
       - 'workers/W01-payload/src/app/api/v1/memberships/**'
       - 'workers/W01-payload/tests/int/subscription-v1-adapter.int.spec.ts'
       - 'workers/W01-payload/wrangler.jsonc'
+      - '.github/workflows/w07-subscription-runtime-ci.yml'
+      - 'contracts/alignment/cross-system-mapping.v1.json'
+      - 'contracts/alignment/mapping-batches/B13-B15-creator-membership-commerce.v1.json'
+      - 'contracts/alignment/code-evidence-inventory.v1.json'
+      - 'contracts/alignment/five-way-reconciliation.v1.json'
+      - 'contracts/entity/SUBSCRIPTION-ENTITY-CONTRACT.v1.json'
+      - 'contracts/entity/entity-field-contract.v1.json'
+      - 'contracts/entity/entity-implementation-evidence.v1.json'
+      - 'contracts/persistence/SUBSCRIPTION-D1-01-persistence.v1.json'
+      - 'contracts/state-machines/subscription.json'
+      - 'contracts/openapi/v1/openapi.yaml'
+      - 'contracts/api/rc-04-06-share-subscription-entitlement.v1.json'
+      - 'contracts/authz/permissions.json'
+      - 'docs/110-MEMBERSHIP-DATA-CONTRACT-v1.0.md'
+      - 'docs/111-MEMBERSHIP-API-CONTRACT-v1.0.md'
 
 permissions:
   contents: read
