@@ -73,13 +73,13 @@ def build_content_comparison_sql(metrics: list[tuple[str, str]]) -> str:
         )
     return (
         "WITH periods AS (SELECT ? AS current_from, ? AS current_to, "
-        "? AS previous_from, ? AS previous_to)\\n"
-        "SELECT\\n  " + ",\\n  ".join(columns)
-        + "\\nFROM analytics_content_hourly\\nCROSS JOIN periods\\n"
-        + "WHERE content_id = ?\\n"
-        + "  AND content_type = ?\\n"
-        + "  AND metric_version = ?\\n"
-        + "  AND ((hour_start >= periods.current_from AND hour_start < periods.current_to)\\n"
+        "? AS previous_from, ? AS previous_to)\n"
+        "SELECT\n  " + ",\n  ".join(columns)
+        + "\nFROM analytics_content_hourly\nCROSS JOIN periods\n"
+        + "WHERE content_id = ?\n"
+        + "  AND content_type = ?\n"
+        + "  AND metric_version = ?\n"
+        + "  AND ((hour_start >= periods.current_from AND hour_start < periods.current_to)\n"
         + "       OR (hour_start >= periods.previous_from AND hour_start < periods.previous_to))"
     )
 
