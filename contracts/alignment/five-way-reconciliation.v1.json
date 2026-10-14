@@ -4451,6 +4451,7 @@
         "workers/W07-subscription-commerce/src/subscription-runtime.ts"
       ],
       "evidence": [
+        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md:L254",
         "contracts/alignment/api-inventory.v1.json",
         "contracts/alignment/code-evidence-inventory.v1.json",
         "contracts/alignment/mapping-batches/B13-B15-creator-membership-commerce.v1.json",
@@ -4465,7 +4466,6 @@
         "contracts/persistence/SUBSCRIPTION-D1-01-persistence.v1.json",
         "contracts/state-machines/subscription.json",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
-        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md:L254",
         "docs/110-MEMBERSHIP-DATA-CONTRACT-v1.0.md",
         "docs/111-MEMBERSHIP-API-CONTRACT-v1.0.md",
         "docs/change-control/CC-MON-SUBSCRIPTION-DATA-MODEL-ADMISSION-2026-10-02.md",
