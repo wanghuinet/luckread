@@ -2,7 +2,7 @@ export const ANALYTICS_EVENT_SCHEMA_VERSION = '1.0' as const
 
 /**
  * Bound one persistence transaction to 90 event INSERTs plus three projection
- * statements (93 D1 batch statements total). Every INSERT binds only 16 values,
+ * statements (93 statements total). Every INSERT binds only 16 values,
  * staying below Cloudflare D1's 100-bound-parameter per-query limit.
  */
 export const ANALYTICS_MAX_BATCH_SIZE = 90 as const
