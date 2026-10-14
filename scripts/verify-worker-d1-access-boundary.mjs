@@ -70,6 +70,12 @@ for (const dir of dirs) {
       if (!domain) {
         throw new Error(`${workerId}: unregistered D1 id ${String(entry.database_id)}`)
       }
+      const expectedDatabaseName = contract.physicalD1Names?.[domain]
+      if (expectedDatabaseName && entry.database_name !== expectedDatabaseName) {
+        throw new Error(
+          `${workerId}: D1 ${domain} database_name mismatch (expected ${expectedDatabaseName}, got ${String(entry.database_name)})`,
+        )
+      }
       if (!workerPolicy.allowedDomains.includes(domain)) {
         throw new Error(`${workerId}: D1 ${domain} is outside its allowed domain set`)
       }
