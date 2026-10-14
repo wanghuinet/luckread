@@ -386,8 +386,8 @@ def main() -> None:
             comparison_params,
         )
     )
-    assert "analytics_content_hourly_content_id_time_idx" in comparison_plan, (
-        f"period comparison should use the content/time index: {comparison_plan}"
+    assert "analytics_content_hourly_content_time_idx" in comparison_plan, (
+        f"period comparison should use the content-type/content/time index: {comparison_plan}"
     )
     plan = " ".join(
         row[3] for row in db.execute(
