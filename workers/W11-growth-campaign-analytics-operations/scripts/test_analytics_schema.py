@@ -18,7 +18,7 @@ SQL_COLUMNS = (
 
 def extract_sql(source: str, constant: str) -> str:
     match = re.search(
-        rf"const {re.escape(constant)} = String\\.raw`(.*?)`",
+        rf"const {re.escape(constant)} = String\.raw`(.*?)`",
         source,
         flags=re.DOTALL,
     )
