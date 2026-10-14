@@ -87,7 +87,7 @@ describe('W11 D1-05 analytics persistence adapter', () => {
     const statements = batches[0] ?? []
     const insert = statements[0]
 
-    expect(result).toEqual({ attempted: 1, inserted: 1, duplicates: 0 })
+    expect(result).toEqual({ attempted: 1, inserted: 1, duplicates: 0, duplicateEventIds: [] })
     expect(batches).toHaveLength(1)
     expect(statements).toHaveLength(4)
     expect(insert?.sql).toContain('INSERT INTO analytics_event_dedupe')
@@ -115,7 +115,7 @@ describe('W11 D1-05 analytics persistence adapter', () => {
 
     const result = await persistAnalyticsEvents(db, input.accepted)
     const statements = getBatches()[0] ?? []
-    expect(result).toEqual({ attempted: 2, inserted: 1, duplicates: 1 })
+    expect(result).toEqual({ attempted: 2, inserted: 1, duplicates: 1, duplicateEventIds: ['evt_store_0002'] })
     expect(statements).toHaveLength(5)
     expect(statements.slice(0, 2).every((item) => (item.sql.match(/\?/g) ?? []).length === 16)).toBe(true)
   })
@@ -149,6 +149,7 @@ describe('W11 D1-05 analytics persistence adapter', () => {
       attempted: 0,
       inserted: 0,
       duplicates: 0,
+      duplicateEventIds: [],
     })
     expect(getBatches()).toHaveLength(0)
   })
