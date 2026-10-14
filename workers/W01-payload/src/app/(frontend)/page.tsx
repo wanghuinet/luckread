@@ -151,7 +151,7 @@ export default async function HomePage() {
         </Link>
         <nav className="site-nav" aria-label={copy.common.home}>
           <a className="nav-link nav-link-active" href="#top">{copy.common.home}</a>
-          <Link className="nav-link" href="/content">{copy.common.discover}</Link>
+          <Link className="nav-link" data-umami-event="content-discovery-open" href="/content">{copy.common.discover}</Link>
           <a className="nav-link" href="#creator">{copy.common.creators}</a>
           <a className="nav-link" href="#about">{copy.common.about}</a>
         </nav>
@@ -160,7 +160,7 @@ export default async function HomePage() {
           <Link className="header-login" href="/me/subscriptions">{copy.common.subscriptions}</Link>
           <Link className="header-login" href="/login">{copy.common.login}</Link>
           <PublicLanguageToggle locale={publicLocale} />
-          <Link className="header-creator" href={CREATOR_CENTER_URL}>{copy.common.creatorCenter}</Link>
+          <Link className="header-creator" data-umami-event="creator-center-open" href={CREATOR_CENTER_URL}>{copy.common.creatorCenter}</Link>
         </div>
       </header>
 
@@ -177,9 +177,9 @@ export default async function HomePage() {
               {copy.home.heroLead.split('\n')[1]}
             </p>
             <div className="hero-actions">
-              <Link className="button button-primary" href={CREATOR_CENTER_URL}>{copy.common.createNow}<span aria-hidden="true">↗</span></Link>
-              <Link className="button button-quiet" href="/content">{copy.common.explore}</Link>
-              <Link className="button button-quiet" href="/shorts">短视频</Link>
+              <Link className="button button-primary" data-umami-event="creator-center-open" href={CREATOR_CENTER_URL}>{copy.common.createNow}<span aria-hidden="true">↗</span></Link>
+              <Link className="button button-quiet" data-umami-event="content-discovery-open" href="/content">{copy.common.explore}</Link>
+              <Link className="button button-quiet" data-umami-event="short-video-discovery-open" href="/shorts">短视频</Link>
             </div>
           </div>
 
@@ -234,7 +234,7 @@ export default async function HomePage() {
           </div>
           <div className="creator-banner-side">
             <p>{copy.home.creatorDescription}</p>
-            <Link className="button button-light" href={CREATOR_CENTER_URL}>{copy.home.creatorCenter}<span aria-hidden="true">↗</span></Link>
+            <Link className="button button-light" data-umami-event="creator-center-open" href={CREATOR_CENTER_URL}>{copy.home.creatorCenter}<span aria-hidden="true">↗</span></Link>
           </div>
         </section>
       </main>
