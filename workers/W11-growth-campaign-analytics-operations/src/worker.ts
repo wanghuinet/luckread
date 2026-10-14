@@ -22,6 +22,7 @@ const REQUIRED_SCHEMA_OBJECTS = [
   { type: 'table', name: 'analytics_creator_hourly' },
   { type: 'table', name: 'analytics_rollup_watermark' },
   { type: 'table', name: 'analytics_reconciliation_status' },
+  { type: 'table', name: 'analytics_projection_rebuild_state' },
   { type: 'index', name: 'analytics_event_dedupe_ingested_at_idx' },
   { type: 'index', name: 'analytics_event_dedupe_occurred_at_idx' },
   { type: 'index', name: 'analytics_event_dedupe_hour_start_idx' },
@@ -41,7 +42,8 @@ const ANALYTICS_SCHEMA_PROBE = `
       'analytics_content_hourly',
       'analytics_creator_hourly',
       'analytics_rollup_watermark',
-      'analytics_reconciliation_status'
+      'analytics_reconciliation_status',
+      'analytics_projection_rebuild_state'
     ))
     OR
     (type = 'index' AND name IN (

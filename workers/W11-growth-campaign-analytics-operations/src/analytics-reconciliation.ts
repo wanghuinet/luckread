@@ -75,13 +75,64 @@ SET projection_status = 'APPLIED'
 WHERE hour_start = ? AND projection_status = 'PENDING'
 `
 
+const START_RECONCILIATION_SQL = String.raw`
+INSERT INTO analytics_projection_rebuild_state (
+  singleton_id, run_id, hour_start, status, started_at, completed_at,
+  content_buckets_rebuilt, creator_buckets_rebuilt, error_code
+)
+VALUES (
+  1, ?, ?, 'RUNNING', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
+  NULL, NULL, NULL, NULL
+)
+ON CONFLICT(singleton_id) DO UPDATE SET
+  run_id = excluded.run_id,
+  hour_start = excluded.hour_start,
+  status = 'RUNNING',
+  started_at = excluded.started_at,
+  completed_at = NULL,
+  content_buckets_rebuilt = NULL,
+  creator_buckets_rebuilt = NULL,
+  error_code = NULL
+`
+
+const FINALIZE_RECONCILIATION_SQL = String.raw`
+UPDATE analytics_projection_rebuild_state
+SET
+  status = 'SUCCEEDED',
+  content_buckets_rebuilt = (
+    SELECT COUNT(*) FROM analytics_content_hourly WHERE hour_start = ?
+  ),
+  creator_buckets_rebuilt = (
+    SELECT COUNT(*) FROM analytics_creator_hourly WHERE hour_start = ?
+  ),
+  completed_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
+  error_code = NULL
+WHERE singleton_id = 1 AND run_id = ? AND status = 'RUNNING'
+`
+
+const FAIL_RECONCILIATION_SQL = String.raw`
+UPDATE analytics_projection_rebuild_state
+SET
+  status = 'FAILED',
+  error_code = ?,
+  completed_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+WHERE singleton_id = 1 AND run_id = ? AND status = 'RUNNING'
+`
+
 export interface ReconcileAnalyticsHourResult {
+  runId: string
   hourStart: string
-  /** Null means the D1 driver omitted affected-row metadata. */
+  status: 'SUCCEEDED'
+  /** Null only if the D1 driver omits affected-row metadata. */
   contentBucketsRebuilt: number | null
-  /** Null means the D1 driver omitted affected-row metadata. */
+  /** Null only if the D1 driver omits affected-row metadata. */
   creatorBucketsRebuilt: number | null
 }
+
+type ReconciliationFailureCode =
+  | 'REBUILD_FAILED'
+  | 'REBUILD_BATCH_INCOMPLETE'
+  | 'REBUILD_FINALIZE_FAILED'
 
 function assertCanonicalUtcHour(value: string): void {
   if (!CANONICAL_UTC_HOUR.test(value)) {
@@ -104,21 +155,48 @@ function affectedRows(result: AnalyticsD1Result | undefined): number | null {
     : null
 }
 
+function assertBatchSucceeded(
+  results: AnalyticsD1Result[],
+  expectedLength: number,
+): void {
+  if (results.length !== expectedLength) {
+    throw new Error('D1 analytics reconciliation returned an unexpected result count')
+  }
+  if (results.some((result) => result.success === false)) {
+    throw new Error('D1 analytics reconciliation batch failed')
+  }
+}
+
 /**
  * Rebuild exactly one UTC hourly bucket from W11's durable, deduplicated event
  * ledger. The ledger is the source for this derived projection; this does not
  * reconcile or replace W03/W05 authoritative business facts.
  *
- * The delete/rebuild/status sequence is one D1 batch transaction. It is safe to
- * retry: old bucket values are replaced by a fresh group-by result rather than
- * incremented. Restricting the target to one indexed hour prevents callers from
- * accidentally triggering an unbounded historical rebuild.
+ * A fixed-size singleton state row exposes only the latest repair's status,
+ * counts and sanitized error code. This avoids growing a job-history table
+ * without an approved retention policy. Projection replacement and its success
+ * marker commit in the same D1 batch transaction; failures are marked FAILED
+ * separately on a best-effort basis. Overlapping runs are guarded by runId.
  */
 export async function reconcileAnalyticsHour(
   db: AnalyticsD1Database,
   hourStart: string,
 ): Promise<ReconcileAnalyticsHourResult> {
   assertCanonicalUtcHour(hourStart)
+  const runId = crypto.randomUUID()
+
+  let started: AnalyticsD1Result[]
+  try {
+    started = await db.batch([
+      db.prepare(START_RECONCILIATION_SQL).bind(runId, hourStart),
+    ])
+    assertBatchSucceeded(started, 1)
+    if (started[0]?.meta?.changes === 0) {
+      throw new Error('D1 analytics reconciliation start did not claim the state row')
+    }
+  } catch {
+    throw new Error('D1 analytics reconciliation could not start')
+  }
 
   const statements = [
     db.prepare(DELETE_CONTENT_HOUR_SQL).bind(hourStart),
@@ -126,20 +204,39 @@ export async function reconcileAnalyticsHour(
     db.prepare(DELETE_CREATOR_HOUR_SQL).bind(hourStart),
     db.prepare(REBUILD_CREATOR_HOUR_SQL).bind(hourStart),
     db.prepare(MARK_HOUR_APPLIED_SQL).bind(hourStart),
+    db.prepare(FINALIZE_RECONCILIATION_SQL).bind(hourStart, hourStart, runId),
   ]
 
-  const results = await db.batch(statements)
-  if (results.length !== statements.length) {
-    throw new Error('D1 analytics reconciliation returned an unexpected result count')
-  }
-  const failed = results.find((result) => result.success === false)
-  if (failed) {
-    throw new Error(failed.error || 'D1 analytics reconciliation failed')
-  }
+  let failureCode: ReconciliationFailureCode = 'REBUILD_FAILED'
+  try {
+    const results = await db.batch(statements)
+    if (results.length !== statements.length) {
+      failureCode = 'REBUILD_BATCH_INCOMPLETE'
+      throw new Error('unexpected reconciliation result count')
+    }
+    if (results.some((result) => result.success === false)) {
+      throw new Error('reconciliation batch failed')
+    }
+    if (results[5]?.meta?.changes === 0) {
+      failureCode = 'REBUILD_FINALIZE_FAILED'
+      throw new Error('reconciliation status finalization did not match the active run')
+    }
 
-  return {
-    hourStart,
-    contentBucketsRebuilt: affectedRows(results[1]),
-    creatorBucketsRebuilt: affectedRows(results[3]),
+    return {
+      runId,
+      hourStart,
+      status: 'SUCCEEDED',
+      contentBucketsRebuilt: affectedRows(results[1]),
+      creatorBucketsRebuilt: affectedRows(results[3]),
+    }
+  } catch {
+    try {
+      await db.batch([
+        db.prepare(FAIL_RECONCILIATION_SQL).bind(failureCode, runId),
+      ])
+    } catch {
+      // A provider outage may leave RUNNING as the last visible state.
+    }
+    throw new Error('D1 analytics reconciliation failed')
   }
 }

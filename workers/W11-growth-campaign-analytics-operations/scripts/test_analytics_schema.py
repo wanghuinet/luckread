@@ -7,7 +7,7 @@ import sqlite3
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-MIGRATION = ROOT / "migrations" / "0001_analytics_projection.sql"
+MIGRATIONS_DIR = ROOT / "migrations"
 STORE = ROOT / "src" / "analytics-d1-store.ts"
 READ_MODEL = ROOT / "src" / "analytics-read-model.ts"
 RECONCILIATION = ROOT / "src" / "analytics-reconciliation.ts"
@@ -169,7 +169,12 @@ def reconcile_hour(
 
 
 def main() -> None:
-    schema = MIGRATION.read_text(encoding="utf-8")
+    migration_files = sorted(MIGRATIONS_DIR.glob("*.sql"))
+    if not any(path.name == "0001_analytics_projection.sql" for path in migration_files):
+        raise AssertionError("Base analytics projection migration is missing")
+    if not any(path.name == "0002_analytics_projection_rebuild_state.sql" for path in migration_files):
+        raise AssertionError("Projection rebuild state migration is missing")
+    schema = "\n".join(path.read_text(encoding="utf-8") for path in migration_files)
     store_source = STORE.read_text(encoding="utf-8")
     read_model_source = READ_MODEL.read_text(encoding="utf-8")
     reconciliation_source = RECONCILIATION.read_text(encoding="utf-8")
@@ -183,6 +188,9 @@ def main() -> None:
     delete_creator_rebuild_sql = extract_sql(reconciliation_source, "DELETE_CREATOR_HOUR_SQL")
     creator_rebuild_sql = extract_sql(reconciliation_source, "REBUILD_CREATOR_HOUR_SQL")
     mark_hour_applied_sql = extract_sql(reconciliation_source, "MARK_HOUR_APPLIED_SQL")
+    start_reconciliation_sql = extract_sql(reconciliation_source, "START_RECONCILIATION_SQL")
+    finalize_reconciliation_sql = extract_sql(reconciliation_source, "FINALIZE_RECONCILIATION_SQL")
+    fail_reconciliation_sql = extract_sql(reconciliation_source, "FAIL_RECONCILIATION_SQL")
     content_rebuild_select = select_from_insert(content_rebuild_sql)
     creator_rebuild_select = select_from_insert(creator_rebuild_sql)
 
@@ -422,13 +430,37 @@ def main() -> None:
         "SELECT followers_gained FROM analytics_creator_hourly WHERE creator_id = 'creator_01'"
     ).fetchone()[0] == 1, "re-running reconciliation must preserve creator totals"
 
+    # Keep only the latest repair state in a singleton row; no unbounded run history.
+    db.execute(start_reconciliation_sql, ("run_success", hour))
+    db.execute(finalize_reconciliation_sql, (hour, hour, "run_success"))
+    success_state = db.execute(
+        "SELECT status, hour_start, content_buckets_rebuilt, creator_buckets_rebuilt, error_code, completed_at "
+        "FROM analytics_projection_rebuild_state WHERE singleton_id = 1"
+    ).fetchone()
+    assert success_state[0:5] == ("SUCCEEDED", hour, 3, 1, None), (
+        f"unexpected successful reconciliation state: {success_state}"
+    )
+    assert success_state[5] is not None, "successful reconciliation needs a completion timestamp"
+    db.commit()
+
+    db.execute(start_reconciliation_sql, ("run_failure", hour))
+    db.execute(fail_reconciliation_sql, ("REBUILD_FAILED", "run_failure"))
+    failure_state = db.execute(
+        "SELECT status, error_code, completed_at FROM analytics_projection_rebuild_state WHERE singleton_id = 1"
+    ).fetchone()
+    assert failure_state[0:2] == ("FAILED", "REBUILD_FAILED"), (
+        f"unexpected failed reconciliation state: {failure_state}"
+    )
+    assert failure_state[2] is not None, "failed reconciliation needs a completion timestamp"
+    db.commit()
+
     # Projections are written once per grouped dimension, not once per input event.
     grouping = content_sql.upper()
     assert "GROUP BY HOUR_START, CONTENT_TYPE, CONTENT_ID, METRIC_VERSION" in grouping
     assert "ON CONFLICT" in grouping
     assert "PROJECTION_STATUS = 'PENDING'" in grouping
 
-    print("W11 D1-05 schema smoke test passed: migration, grouped writes/reads, indexes, durable dedupe, idempotent hourly reconciliation, privacy, rollback")
+    print("W11 D1-05 schema smoke test passed: migrations, grouped writes/reads, indexes, durable dedupe, idempotent hourly reconciliation, bounded success/failure status, privacy, rollback")
 
 
 if __name__ == "__main__":

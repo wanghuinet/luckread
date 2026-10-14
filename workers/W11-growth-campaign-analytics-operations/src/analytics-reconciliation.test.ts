@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import type {
   AnalyticsD1Database,
   AnalyticsD1PreparedStatement,
@@ -11,9 +11,9 @@ interface CapturedStatement {
   bindings: (string | number | null)[]
 }
 
-function fakeDb(results: AnalyticsD1Result[]): {
+function fakeDb(batchResults: AnalyticsD1Result[][]): {
   db: AnalyticsD1Database
-  statements: CapturedStatement[][]
+  batches: CapturedStatement[][]
 } {
   const batches: CapturedStatement[][] = []
   const db: AnalyticsD1Database = {
@@ -29,39 +29,48 @@ function fakeDb(results: AnalyticsD1Result[]): {
       return statement as unknown as AnalyticsD1PreparedStatement
     },
     async batch(statements) {
+      const callIndex = batches.length
       batches.push(
         statements.map((item) =>
           (item as unknown as { getCaptured: () => CapturedStatement }).getCaptured(),
         ),
       )
-      return results
+      return batchResults[callIndex] ?? []
     },
   }
-  return { db, statements: batches }
+  return { db, batches }
 }
 
 const hourStart = '2026-10-14T00:00:00.000Z'
+const startSuccess: AnalyticsD1Result[] = [{ success: true, meta: { changes: 1 } }]
+const repairSuccess: AnalyticsD1Result[] = [
+  { success: true, meta: { changes: 4 } },
+  { success: true, meta: { changes: 8 } },
+  { success: true, meta: { changes: 2 } },
+  { success: true, meta: { changes: 3 } },
+  { success: true, meta: { changes: 5 } },
+  { success: true, meta: { changes: 1 } },
+]
 
 describe('W11 analytics hourly reconciliation', () => {
-  it('rebuilds content and creator buckets atomically from the durable event ledger', async () => {
-    const { db, statements: batches } = fakeDb([
-      { success: true, meta: { changes: 4 } },
-      { success: true, meta: { changes: 8 } },
-      { success: true, meta: { changes: 2 } },
-      { success: true, meta: { changes: 3 } },
-      { success: true, meta: { changes: 5 } },
-    ])
+  it('rebuilds projections atomically and records a bounded successful status', async () => {
+    const { db, batches } = fakeDb([startSuccess, repairSuccess])
 
     const result = await reconcileAnalyticsHour(db, hourStart)
-    const statements = batches[0] ?? []
+    const start = batches[0]?.[0]
+    const statements = batches[1] ?? []
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       hourStart,
+      status: 'SUCCEEDED',
       contentBucketsRebuilt: 8,
       creatorBucketsRebuilt: 3,
     })
-    expect(batches).toHaveLength(1)
-    expect(statements).toHaveLength(5)
+    expect(result.runId).toMatch(/^[0-9a-f-]{36}$/i)
+    expect(batches).toHaveLength(2)
+    expect(start?.sql).toContain('INSERT INTO analytics_projection_rebuild_state')
+    expect(start?.bindings).toEqual([result.runId, hourStart])
+    expect(statements).toHaveLength(6)
     expect(statements[0]?.sql).toContain('DELETE FROM analytics_content_hourly')
     expect(statements[1]?.sql).toContain('FROM analytics_event_dedupe')
     expect(statements[1]?.sql).toContain('GROUP BY hour_start, content_type, content_id, metric_version')
@@ -70,12 +79,13 @@ describe('W11 analytics hourly reconciliation', () => {
     expect(statements[2]?.sql).toContain('DELETE FROM analytics_creator_hourly')
     expect(statements[3]?.sql).toContain('GROUP BY hour_start, creator_id, metric_version')
     expect(statements[4]?.sql).toContain("SET projection_status = 'APPLIED'")
-    expect(statements.every((statement) => statement.bindings.length === 1)).toBe(true)
-    expect(statements.every((statement) => statement.bindings[0] === hourStart)).toBe(true)
+    expect(statements[5]?.sql).toContain("status = 'SUCCEEDED'")
+    expect(statements[5]?.bindings).toEqual([hourStart, hourStart, result.runId])
+    expect(statements.slice(0, 5).every((statement) => statement.bindings[0] === hourStart)).toBe(true)
   })
 
   it('rejects noncanonical, non-hour-aligned and impossible timestamps before database access', async () => {
-    const { db, statements } = fakeDb([])
+    const { db, batches } = fakeDb([])
 
     await expect(reconcileAnalyticsHour(db, '2026-10-14T00:01:00.000Z')).rejects.toThrow(
       'canonical UTC hour boundary',
@@ -86,26 +96,40 @@ describe('W11 analytics hourly reconciliation', () => {
     await expect(reconcileAnalyticsHour(db, '2026-10-14')).rejects.toThrow(
       'canonical UTC hour boundary',
     )
-    expect(statements).toHaveLength(0)
+    expect(batches).toHaveLength(0)
   })
 
-  it('fails closed when any statement in the reconciliation transaction fails', async () => {
-    const { db } = fakeDb([
-      { success: true },
-      { success: true },
-      { success: false, error: 'rebuild failed' },
-      { success: true },
-      { success: true },
+  it('marks repair as failed without exposing provider errors when a batch fails', async () => {
+    const failedRepair = [
+      ...repairSuccess.slice(0, 2),
+      { success: false, error: 'sensitive provider SQL details' },
+      ...repairSuccess.slice(3),
+    ]
+    const { db, batches } = fakeDb([
+      startSuccess,
+      failedRepair,
+      [{ success: true, meta: { changes: 1 } }],
     ])
 
-    await expect(reconcileAnalyticsHour(db, hourStart)).rejects.toThrow('rebuild failed')
+    await expect(reconcileAnalyticsHour(db, hourStart)).rejects.toThrow(
+      'D1 analytics reconciliation failed',
+    )
+    expect(batches).toHaveLength(3)
+    expect(batches[2]?.[0]?.sql).toContain("status = 'FAILED'")
+    expect(batches[2]?.[0]?.bindings).toEqual(['REBUILD_FAILED', expect.any(String)])
   })
 
-  it('rejects incomplete D1 batch results instead of reporting successful reconciliation', async () => {
-    const { db } = fakeDb([{ success: true }])
+  it('records incomplete batch metadata as a sanitized failure', async () => {
+    const { db, batches } = fakeDb([
+      startSuccess,
+      [{ success: true, meta: { changes: 1 } }],
+      [{ success: true, meta: { changes: 1 } }],
+    ])
 
     await expect(reconcileAnalyticsHour(db, hourStart)).rejects.toThrow(
-      'unexpected result count',
+      'D1 analytics reconciliation failed',
     )
+    expect(batches).toHaveLength(3)
+    expect(batches[2]?.[0]?.bindings?.[0]).toBe('REBUILD_BATCH_INCOMPLETE')
   })
 })

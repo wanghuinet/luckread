@@ -9,6 +9,7 @@ const readySchemaRows: SchemaRow[] = [
   { type: 'table', name: 'analytics_creator_hourly' },
   { type: 'table', name: 'analytics_rollup_watermark' },
   { type: 'table', name: 'analytics_reconciliation_status' },
+  { type: 'table', name: 'analytics_projection_rebuild_state' },
   { type: 'index', name: 'analytics_event_dedupe_ingested_at_idx' },
   { type: 'index', name: 'analytics_event_dedupe_occurred_at_idx' },
   { type: 'index', name: 'analytics_event_dedupe_hour_start_idx' },
