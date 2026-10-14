@@ -90,6 +90,7 @@ describe('W11 validated analytics ingestion', () => {
       attempted: 1,
       inserted: 1,
       duplicates: 0,
+      duplicateEventIds: [],
     })
     expect(getBatchSizes()).toEqual([4])
   })
@@ -107,8 +108,34 @@ describe('W11 validated analytics ingestion', () => {
       attempted: 0,
       inserted: 0,
       duplicates: 0,
+      duplicateEventIds: [],
     })
     expect(getBatchSizes()).toEqual([])
+  })
+
+  it('reclassifies an already-persisted event as DUPLICATE instead of VALID', async () => {
+    const { db } = fakeDb((statementCount) =>
+      Array.from({ length: statementCount }, () => ({
+        success: true,
+        meta: { changes: 0 },
+      })),
+    )
+    const result = await ingestAnalyticsBatch(db, [event()], { now })
+
+    expect(result.quality.counts.VALID).toBe(0)
+    expect(result.quality.counts.DUPLICATE).toBe(1)
+    expect(result.quality.accepted).toHaveLength(0)
+    expect(result.quality.outcomes).toMatchObject([{
+      quality: 'DUPLICATE',
+      reason: 'PERSISTED_EVENT_ID_OR_DEDUPE_KEY',
+      eventId: 'evt_ingest_0001',
+    }])
+    expect(result.persistence).toEqual({
+      attempted: 1,
+      inserted: 0,
+      duplicates: 1,
+      duplicateEventIds: ['evt_ingest_0001'],
+    })
   })
 
   it('propagates persistence failures so callers cannot claim events were saved', async () => {
