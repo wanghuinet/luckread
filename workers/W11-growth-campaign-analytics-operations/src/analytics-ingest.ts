@@ -30,5 +30,38 @@ export async function ingestAnalyticsBatch(
 ): Promise<AnalyticsIngestResult> {
   const quality = processAnalyticsBatch(values, options)
   const persistence = await persistAnalyticsEvents(db, quality.accepted)
-  return { quality, persistence }
+  if (persistence.duplicateEventIds.length === 0) return { quality, persistence }
+
+  const duplicateIds = new Set(persistence.duplicateEventIds)
+  const acceptedIds = new Set(quality.accepted.map((event) => event.eventId))
+  if (
+    duplicateIds.size !== persistence.duplicateEventIds.length ||
+    persistence.duplicateEventIds.some((eventId) => !acceptedIds.has(eventId))
+  ) {
+    throw new Error('D1 duplicate results did not match accepted event identities')
+  }
+
+  const duplicateCount = duplicateIds.size
+  const reconciledQuality: AnalyticsBatchResult = {
+    ...quality,
+    accepted: quality.accepted.filter((event) => !duplicateIds.has(event.eventId)),
+    outcomes: quality.outcomes.map((outcome) => {
+      const eventId = outcome.event?.eventId
+      if (outcome.quality !== 'VALID' || !eventId || !duplicateIds.has(eventId)) {
+        return outcome
+      }
+      return {
+        ...outcome,
+        quality: 'DUPLICATE',
+        reason: 'PERSISTED_EVENT_ID_OR_DEDUPE_KEY',
+      }
+    }),
+    counts: {
+      ...quality.counts,
+      VALID: quality.counts.VALID - duplicateCount,
+      DUPLICATE: quality.counts.DUPLICATE + duplicateCount,
+    },
+  }
+
+  return { quality: reconciledQuality, persistence }
 }
