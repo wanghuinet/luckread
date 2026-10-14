@@ -1,0 +1,235 @@
+name: W11 Analytics Runtime Deploy
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'workers/W11-growth-campaign-analytics-operations/**'
+      - '.github/workflows/w11-analytics-runtime-deploy.yml'
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Exact 40-character commit already merged into main
+        required: true
+        type: string
+      confirm:
+        description: Explicitly authorize applying pending D1-05 migrations and deploying W11
+        required: true
+        type: choice
+        options:
+          - CANCEL
+          - APPLY_MIGRATIONS_AND_DEPLOY_W11
+        default: CANCEL
+
+permissions:
+  contents: read
+
+concurrency:
+  group: w11-analytics-deploy
+  cancel-in-progress: false
+
+jobs:
+  preflight:
+    if: ${{ github.event_name == 'pull_request' || inputs.confirm == 'APPLY_MIGRATIONS_AND_DEPLOY_W11' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SOURCE_SHA: ${{ github.event_name == 'pull_request' && github.sha || inputs.source_sha }}
+      EXPECTED_WORKER: luckread-w11
+      EXPECTED_DB_UUID: 77d82be2-d12e-4a17-b410-9aa7d376bc11
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.sha || inputs.source_sha }}
+          fetch-depth: 0
+
+      - name: Validate source and fixed topology
+        run: |
+          set -euo pipefail
+          printf '%s' "$SOURCE_SHA" | grep -Eq '^[0-9a-f]{40}$'
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+            git fetch origin main
+            git merge-base --is-ancestor "$SOURCE_SHA" origin/main || {
+              echo "Refusing to deploy a commit that is not already merged into main."
+              exit 1
+            }
+          fi
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const c = JSON.parse(fs.readFileSync('workers/W11-growth-campaign-analytics-operations/wrangler.jsonc', 'utf8'));
+          if (c.name !== process.env.EXPECTED_WORKER) throw new Error('W11 identity mismatch');
+          if (c.main !== 'src/worker.ts') throw new Error('W11 entrypoint mismatch');
+          if (c.workers_dev !== false) throw new Error('Refusing to enable workers.dev');
+          if ((c.routes || []).length !== 0) throw new Error('This workflow does not admit routes');
+          if ((c.services || []).length !== 0) throw new Error('This workflow does not admit Service Bindings');
+          const dbs = c.d1_databases || [];
+          if (dbs.length !== 1 || dbs[0].binding !== 'D1_05' ||
+              dbs[0].database_name !== 'allluck' ||
+              dbs[0].database_id !== process.env.EXPECTED_DB_UUID) {
+            throw new Error('W11 D1-05 physical binding mismatch');
+          }
+          for (const name of [
+            '0001_analytics_projection.sql',
+            '0002_analytics_projection_rebuild_state.sql',
+            '0003_analytics_late_event_replay.sql',
+          ]) {
+            if (!fs.existsSync(`workers/W11-growth-campaign-analytics-operations/migrations/${name}`)) {
+              throw new Error('Required migration missing: ' + name);
+            }
+          }
+          console.log(JSON.stringify({worker:c.name, databaseUuid:dbs[0].database_id, routeCount:0, serviceBindingCount:0}));
+          NODE
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Run W11 analytics tests
+        run: >-
+          npx vitest run
+          workers/W11-growth-campaign-analytics-operations/src/analytics-event-quality.test.ts
+          workers/W11-growth-campaign-analytics-operations/src/analytics-aggregation.test.ts
+          workers/W11-growth-campaign-analytics-operations/src/analytics-period.test.ts
+          workers/W11-growth-campaign-analytics-operations/src/analytics-d1-store.test.ts
+          workers/W11-growth-campaign-analytics-operations/src/analytics-reconciliation.test.ts
+          workers/W11-growth-campaign-analytics-operations/src/analytics-ingest.test.ts
+          workers/W11-growth-campaign-analytics-operations/src/worker.test.ts
+          workers/W11-growth-campaign-analytics-operations/src/analytics-read-model.test.ts
+
+      - name: Verify migration schema and transactional SQL
+        run: python3 workers/W11-growth-campaign-analytics-operations/scripts/test_analytics_schema.py
+
+      - name: Strict type-check W11
+        run: >-
+          npx tsc --noEmit --strict --skipLibCheck
+          --target ES2022 --module ESNext --moduleResolution Bundler
+          --lib ES2022,DOM
+          workers/W11-growth-campaign-analytics-operations/src/analytics-event-quality.ts
+          workers/W11-growth-campaign-analytics-operations/src/analytics-event-quality.test.ts
+          workers/W11-growth-campaign-analytics-operations/src/analytics-aggregation.ts
+          workers/W11-growth-campaign-analytics-operations/src/analytics-period.ts
+          workers/W11-growth-campaign-analytics-operations/src/analytics-d1-store.ts
+          workers/W11-growth-campaign-analytics-operations/src/analytics-reconciliation.ts
+          workers/W11-growth-campaign-analytics-operations/src/analytics-reconciliation.test.ts
+          workers/W11-growth-campaign-analytics-operations/src/analytics-d1-store.test.ts
+          workers/W11-growth-campaign-analytics-operations/src/analytics-ingest.ts
+          workers/W11-growth-campaign-analytics-operations/src/analytics-ingest.test.ts
+          workers/W11-growth-campaign-analytics-operations/src/worker.ts
+          workers/W11-growth-campaign-analytics-operations/src/worker.test.ts
+          workers/W11-growth-campaign-analytics-operations/src/analytics-read-model.ts
+          workers/W11-growth-campaign-analytics-operations/src/analytics-read-model.test.ts
+
+  deploy:
+    needs: preflight
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.confirm == 'APPLY_MIGRATIONS_AND_DEPLOY_W11' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SOURCE_SHA: ${{ inputs.source_sha }}
+      EXPECTED_WORKER: luckread-w11
+      EXPECTED_DB_UUID: 77d82be2-d12e-4a17-b410-9aa7d376bc11
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+    steps:
+      - name: Checkout exact admitted source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha }}
+          fetch-depth: 0
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Confirm Cloudflare credentials and merged source
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          test -n "$CLOUDFLARE_API_TOKEN"
+          printf '%s' "$SOURCE_SHA" | grep -Eq '^[0-9a-f]{40}$'
+          git fetch origin main
+          git merge-base --is-ancestor "$SOURCE_SHA" origin/main
+          echo W11_DEPLOY_ADMISSION=PASS
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Apply pending W11 D1-05 migrations
+        working-directory: workers/W11-growth-campaign-analytics-operations
+        run: |
+          set -euo pipefail
+          npx --yes wrangler@4.116.0 d1 migrations list allluck --remote --config wrangler.jsonc
+          npx --yes wrangler@4.116.0 d1 migrations apply allluck --remote --config wrangler.jsonc
+
+      - name: Verify remote schema supports late-event replay
+        working-directory: workers/W11-growth-campaign-analytics-operations
+        run: |
+          set -euo pipefail
+          npx --yes wrangler@4.116.0 d1 execute allluck --remote --config wrangler.jsonc \
+            --command "SELECT sql FROM sqlite_master WHERE type='table' AND name='analytics_event_dedupe'" \
+            --json > /tmp/w11-analytics-event-ledger-schema.json
+          grep -q "'LATE'" /tmp/w11-analytics-event-ledger-schema.json
+          echo W11_REMOTE_D1_05_SCHEMA=PASS
+
+      - name: Deploy W11 without adding a route or binding
+        working-directory: workers/W11-growth-campaign-analytics-operations
+        run: npx --yes wrangler@4.116.0 deploy --config wrangler.jsonc
+
+      - name: Verify deployed Worker and D1-05 binding
+        run: |
+          set -euo pipefail
+          curl -fsS \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            -H "Content-Type: application/json" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/$EXPECTED_WORKER/settings" \
+            > /tmp/w11-worker-settings.json
+          jq -e --arg db "$EXPECTED_DB_UUID" '.. | objects | select(.id? == $db)' \
+            /tmp/w11-worker-settings.json >/dev/null
+          npx --yes wrangler@4.116.0 deployments list --name "$EXPECTED_WORKER" --json \
+            > /tmp/w11-deployments.json
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const deployments = JSON.parse(fs.readFileSync('/tmp/w11-deployments.json', 'utf8'));
+          if (!Array.isArray(deployments) || deployments.length === 0) {
+            throw new Error('No deployed W11 deployment record found');
+          }
+          console.log(JSON.stringify({deploymentRecords:deployments.length, latest:deployments[0]}));
+          NODE
+          echo W11_LIVE_BINDING_AND_DEPLOYMENT=PASS
+
+      - name: Capture deployment evidence and unresolved runtime gates
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/w11-analytics-deploy
+          cat > artifacts/w11-analytics-deploy/provenance.json <<EOF
+          {
+            "workflow": "W11 Analytics Runtime Deploy",
+            "runId": "$GITHUB_RUN_ID",
+            "runAttempt": "$GITHUB_RUN_ATTEMPT",
+            "sourceSha": "$SOURCE_SHA",
+            "worker": "$EXPECTED_WORKER",
+            "d1DatabaseUuid": "$EXPECTED_DB_UUID",
+            "pendingD1MigrationsApplied": true,
+            "remoteLateReplaySchemaVerified": true,
+            "deployedBindingVerified": true,
+            "publicRouteAdded": false,
+            "newServiceBindingAdded": false,
+            "eventIngestTransport": "NOT_ADMITTED",
+            "httpHealthProbe": "NOT_PERFORMED_NO_ADMITTED_ROUTE"
+          }
+          EOF
+
+      - name: Upload deployment evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: w11-analytics-deploy-${{ inputs.source_sha }}
+          path: artifacts/w11-analytics-deploy/provenance.json
+          if-no-files-found: error
+          retention-days: 30
