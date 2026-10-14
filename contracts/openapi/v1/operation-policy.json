@@ -970,6 +970,19 @@
       "x-luckread-source": "contracts/api/media-operation-policy.v1.json"
     },
     {
+      "operationId": "listMembershipSubscriptions",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "subscription.read"
+      ],
+      "auditRequired": false,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none"
+    },
+    {
       "operationId": "getSubscription",
       "auth": {
         "mode": "permission"
