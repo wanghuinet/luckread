@@ -117,11 +117,11 @@
         "workers/W07-subscription-commerce/src/subscription-runtime.ts"
       ],
       "blockers": [
-        "The existing list/create/detail/plan-change/cancel/pause/resume contract and source/test paths are now bound; this remains an evidence-only inventory record.",
-        "Renewal has no execution path or verified payment-renewal transition.",
-        "Migration 0001 lacks the required version column; production D1-01 schema/migration evidence is absent.",
-        "Runtime still uses updated_at CAS instead of monotonic version CAS.",
-        "This record remains UNRESOLVED; no production Evidence Registry admission or global FULL GREEN is claimed."
+        "The existing subscription list route is now declared in OpenAPI, the source endpoint registry, operation policy and the canonical membership API contract; the implementation/test are being checked on this PR.",
+        "Renewal is part of MON-005 but has no execution path or verified payment-renewal transition.",
+        "Migration 0001 lacks the required version column; production D1-01 schema/migration evidence remains absent.",
+        "Runtime still uses updated_at CAS rather than the contracted monotonic version CAS.",
+        "This record remains UNRESOLVED; source traceability does not constitute production Evidence Registry admission."
       ]
     },
     {
