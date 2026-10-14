@@ -6,6 +6,14 @@ const read = (relativePath: string) =>
   readFileSync(resolve(process.cwd(), relativePath), 'utf8')
 
 describe('Umami content navigation event reuse', () => {
+  it('uses the native tracker events on the homepage navigation actions', () => {
+    const home = read('src/app/(frontend)/page.tsx')
+    expect(home).toContain('data-umami-event="creator-center-open"')
+    expect(home).toContain('data-umami-event="content-discovery-open"')
+    expect(home).toContain('data-umami-event="short-video-discovery-open"')
+    expect(home).not.toContain('umami.track(')
+  })
+
   it('reuses the upstream data-attribute tracker for homepage content cards', () => {
     const feed = read('src/app/(frontend)/HomeContentFeed.tsx')
     expect(feed).toContain('data-umami-event="content-open"')
