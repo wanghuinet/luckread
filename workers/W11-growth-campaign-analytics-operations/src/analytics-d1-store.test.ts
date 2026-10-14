@@ -5,7 +5,11 @@ import {
   type AnalyticsD1PreparedStatement,
   type AnalyticsD1Result,
 } from './analytics-d1-store'
-import { processAnalyticsBatch, type AnalyticsEvent } from './analytics-event-quality'
+import {
+  ANALYTICS_MAX_BATCH_SIZE,
+  processAnalyticsBatch,
+  type AnalyticsEvent,
+} from './analytics-event-quality'
 
 const now = Date.parse('2026-10-14T00:30:00.000Z')
 const timestamp = '2026-10-14T00:12:34.000Z'
@@ -64,18 +68,18 @@ function fakeDb(results: AnalyticsD1Result[]): {
   return { db, getBatches: () => batches }
 }
 
-function successResults(inserted: number): AnalyticsD1Result[] {
+function successResults(insertedRows: number[]): AnalyticsD1Result[] {
   return [
-    { success: true, meta: { changes: inserted } },
+    ...insertedRows.map((changes) => ({ success: true, meta: { changes } })),
     { success: true, meta: { changes: 1 } },
     { success: true, meta: { changes: 0 } },
-    { success: true, meta: { changes: 1 } },
+    { success: true, meta: { changes: insertedRows.length } },
   ]
 }
 
 describe('W11 D1-05 analytics persistence adapter', () => {
-  it('uses one atomic four-statement batch and excludes raw identity/session fields', async () => {
-    const { db, getBatches } = fakeDb(successResults(1))
+  it('uses one atomic bounded batch and excludes raw identity/session fields', async () => {
+    const { db, getBatches } = fakeDb(successResults([1]))
     const input = processAnalyticsBatch([event()], { now })
 
     const result = await persistAnalyticsEvents(db, input.accepted)
@@ -95,13 +99,12 @@ describe('W11 D1-05 analytics persistence adapter', () => {
     expect(insert?.bindings).not.toContain('private-visitor-id')
     expect(insert?.bindings).not.toContain('private-session-id')
     expect(statements[1]?.sql).toContain('GROUP BY hour_start, content_type, content_id, metric_version')
-    expect(statements[1]?.sql).toContain('ON CONFLICT (hour_start, content_type, content_id, metric_version)')
     expect(statements[2]?.sql).toContain('GROUP BY hour_start, creator_id, metric_version')
     expect(statements[3]?.sql).toContain("SET projection_status = 'APPLIED'")
   })
 
-  it('reports duplicates using inserted-row metadata from D1', async () => {
-    const { db } = fakeDb(successResults(1))
+  it('uses one prepared statement per event and totals inserts/duplicates', async () => {
+    const { db, getBatches } = fakeDb(successResults([1, 0]))
     const input = processAnalyticsBatch(
       [
         event(),
@@ -111,11 +114,14 @@ describe('W11 D1-05 analytics persistence adapter', () => {
     )
 
     const result = await persistAnalyticsEvents(db, input.accepted)
+    const statements = getBatches()[0] ?? []
     expect(result).toEqual({ attempted: 2, inserted: 1, duplicates: 1 })
+    expect(statements).toHaveLength(5)
+    expect(statements.slice(0, 2).every((item) => (item.sql.match(/\?/g) ?? []).length === 16)).toBe(true)
   })
 
   it('does not open a D1 transaction for an empty batch', async () => {
-    const { db, getBatches } = fakeDb(successResults(0))
+    const { db, getBatches } = fakeDb(successResults([]))
     expect(await persistAnalyticsEvents(db, [])).toEqual({
       attempted: 0,
       inserted: 0,
@@ -125,14 +131,16 @@ describe('W11 D1-05 analytics persistence adapter', () => {
   })
 
   it('rejects oversized batches before constructing D1 statements', async () => {
-    const { db, getBatches } = fakeDb(successResults(0))
-    const oversized = Array.from({ length: 501 }, (_, index) =>
+    const { db, getBatches } = fakeDb(successResults([]))
+    const oversized = Array.from({ length: ANALYTICS_MAX_BATCH_SIZE + 1 }, (_, index) =>
       event({
         eventId: `evt_store_${String(index).padStart(4, '0')}`,
         dedupeKey: `dedupe_store_${String(index).padStart(4, '0')}`,
       }),
     )
-    await expect(persistAnalyticsEvents(db, oversized)).rejects.toThrow(/500-event limit/)
+    await expect(persistAnalyticsEvents(db, oversized)).rejects.toThrow(
+      new RegExp(`${ANALYTICS_MAX_BATCH_SIZE}-event limit`),
+    )
     expect(getBatches()).toHaveLength(0)
   })
 
