@@ -28,7 +28,7 @@ Inventory source: `contracts/alignment/mapping-batches/B13-B15-creator-membershi
 | MON-002 | CONTRACT EVIDENCE FOUND | creator membership API and entitlement authority not executable-evidence bound |
 | MON-003 | CONTRACT EVIDENCE FOUND | plan lifecycle/API/data persistence binding incomplete |
 | MON-004 | CONTRACT EVIDENCE FOUND | subscription lifecycle + entitlement persistence/runtime evidence incomplete |
-| MON-005 | CONTRACT EVIDENCE FOUND | subscription management executable API/DTO/persistence/test evidence incomplete |
+| MON-005 | CONTRACT + SOURCE PATHS FOUND | W01/W07 cancel/pause/resume and test sources are now linked; current-SHA executable PASS, D1-01/version-CAS and renewal evidence remain unverified |
 | MON-006 | CONTRACT EVIDENCE FOUND | entitlement authority/security/cache invalidation/runtime evidence incomplete |
 | MON-007 | CONTRACT EVIDENCE FOUND | full paywall delivery and entitlement enforcement executable evidence incomplete |
 | MON-008 | CONTRACT EVIDENCE FOUND | preview/partial-paywall boundary and authorization evidence incomplete |
