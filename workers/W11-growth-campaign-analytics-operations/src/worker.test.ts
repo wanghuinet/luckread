@@ -42,12 +42,13 @@ describe('W11 runtime boundary', () => {
     )
 
     expect(response.status).toBe(503)
-    expect(await response.json()).toEqual({
+    const body = await response.text()
+    expect(JSON.parse(body)).toEqual({
       worker: 'W11',
       status: 'degraded',
       database: 'unavailable',
     })
-    expect(await response.text().catch(() => '')).not.toContain('sensitive')
+    expect(body).not.toContain('sensitive provider configuration')
   })
 
   it('keeps analytics data routes closed until an admitted transport is connected', async () => {
