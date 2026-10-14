@@ -177,7 +177,7 @@ export default function ContentBrowsePage() {
             {page.items.map((item) => {
               const cover = item.coverRef
               return (
-                <Link className="content-feed-card" href={'/content/' + encodeURIComponent(item.slug || item.id)} key={item.id}>
+                <Link className="content-feed-card" data-umami-event="content-open" data-umami-event-content-type={item.contentType} href={'/content/' + encodeURIComponent(item.slug || item.id)} key={item.id}>
                   <div className="content-feed-cover">
                     {cover ? (
                       <img alt={item.title ? item.title + copy.content.cover : copy.content.cover} loading="lazy" src={cover} />
