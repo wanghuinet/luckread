@@ -84,6 +84,23 @@ def build_content_comparison_sql(metrics: list[tuple[str, str]]) -> str:
     )
 
 
+def build_content_set_summary_sql(
+    metrics: list[tuple[str, str]], content_id_count: int
+) -> str:
+    columns = ",\n  ".join(
+        f"COALESCE(SUM({column}), 0) AS {key}" for key, column in metrics
+    )
+    placeholders = ", ".join("?" for _ in range(content_id_count))
+    return (
+        "SELECT\n  COUNT(DISTINCT content_id) AS observedContentCount,\n  "
+        + columns
+        + f"\nFROM analytics_content_hourly\nWHERE content_id IN ({placeholders})\n"
+        + "  AND hour_start >= ?\n"
+        + "  AND hour_start < ?\n"
+        + "  AND metric_version = ?"
+    )
+
+
 def build_top_content_sql(
     metrics: list[tuple[str, str]], content_id_count: int
 ) -> str:
@@ -396,6 +413,38 @@ def main() -> None:
     )
     assert "analytics_content_hourly_content_time_idx" in plan, (
         f"content summary query should use the composite content/time index: {plan}"
+    )
+
+    # Creator dashboards can sum an authorized content set with one query,
+    # instead of scanning each content item separately.
+    summary_ids = ("article_01", "post_01", "video_01")
+    set_summary_sql = build_content_set_summary_sql(
+        content_metrics, content_id_count=len(summary_ids)
+    )
+    set_summary_params = (*summary_ids, query_from, query_to, "1.0")
+    set_summary_cursor = db.execute(set_summary_sql, set_summary_params)
+    set_summary_row = {
+        description[0]: value
+        for description, value in zip(
+            set_summary_cursor.description or (), set_summary_cursor.fetchone() or ()
+        )
+    }
+    assert set_summary_row["observedContentCount"] == 3, (
+        f"unexpected observed content count: {set_summary_row}"
+    )
+    assert set_summary_row["opens"] == 2 and set_summary_row["likes"] == 1, (
+        f"unexpected content-set aggregate: {set_summary_row}"
+    )
+    assert set_summary_row["dwellEvents"] == 1 and set_summary_row["videoWatchEvents"] == 1, (
+        f"content-set aggregate must combine article/post/video metrics: {set_summary_row}"
+    )
+    set_summary_plan = " ".join(
+        row[3] for row in db.execute(
+            "EXPLAIN QUERY PLAN " + set_summary_sql, set_summary_params
+        )
+    )
+    assert "analytics_content_hourly_content_id_time_idx" in set_summary_plan, (
+        f"content-set aggregation should use the content_id/time index: {set_summary_plan}"
     )
 
     # Creator dashboards rank only the caller-authorized ID set; the content_id

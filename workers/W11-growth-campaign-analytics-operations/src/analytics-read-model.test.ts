@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   getContentAnalyticsSummary,
+  getContentSetAnalyticsSummary,
   getContentAnalyticsPeriodComparison,
   getCreatorFollowerSummary,
   getTopContentAnalyticsForContentSet,
@@ -92,6 +93,111 @@ describe('W11 bounded analytics read models', () => {
       to,
       '1.0',
     ])
+  })
+
+  it('aggregates a deduplicated authorized content set in one bounded query', async () => {
+    const fixture = fakeDb({
+      observedContentCount: '2',
+      impressions: 180,
+      opens: 80,
+      readStarts: 65,
+      readCompletions: 31,
+      videoPlays: 42,
+      videoCompletions: 31,
+      likes: 12,
+      comments: 4,
+      shares: 2,
+      favorites: 3,
+    })
+    const result = await getContentSetAnalyticsSummary(fixture.db, {
+      contentIds: ['article_001', 'video_001', 'article_001'],
+      window: { from, to },
+    })
+
+    expect(result).toMatchObject({
+      requestedContentCount: 2,
+      observedContentCount: 2,
+      impressions: 180,
+      opens: 80,
+      readStarts: 65,
+      readCompletions: 31,
+      videoPlays: 42,
+      videoCompletions: 31,
+      likes: 12,
+      comments: 4,
+      shares: 2,
+      favorites: 3,
+      openRate: 80 / 180,
+      readCompletionRate: 31 / 65,
+    })
+    expect(fixture.getSql()).toContain('COUNT(DISTINCT content_id) AS observedContentCount')
+    expect(fixture.getSql()).toContain('FROM analytics_content_hourly')
+    expect(fixture.getSql()).toContain('content_id IN (?, ?)')
+    expect(fixture.getSql()).toContain('hour_start >= ?')
+    expect(fixture.getSql()).toContain('hour_start < ?')
+    expect(fixture.getSql()).not.toContain('article_001')
+    expect(fixture.getPrepareCalls()).toBe(1)
+    expect(fixture.getBoundValues()).toEqual([
+      'article_001',
+      'video_001',
+      from,
+      to,
+      '1.0',
+    ])
+  })
+
+  it('returns zero metrics without reading D1 for an empty content set', async () => {
+    const fixture = fakeDb(null)
+    const result = await getContentSetAnalyticsSummary(fixture.db, {
+      contentIds: [],
+      window: { from, to },
+    })
+
+    expect(result.requestedContentCount).toBe(0)
+    expect(result.observedContentCount).toBe(0)
+    expect(result.impressions).toBe(0)
+    expect(result.videoPlays).toBe(0)
+    expect(result.openRate).toBeNull()
+    expect(fixture.getPrepareCalls()).toBe(0)
+  })
+
+  it('keeps the 90-content summary query within 100 D1 bind parameters', async () => {
+    const fixture = fakeDb({ observedContentCount: 0 })
+    const contentIds = Array.from(
+      { length: 90 },
+      (_, index) => `content_${index.toString().padStart(3, '0')}`,
+    )
+
+    const result = await getContentSetAnalyticsSummary(fixture.db, {
+      contentIds,
+      window: { from, to },
+    })
+
+    expect(result.requestedContentCount).toBe(90)
+    expect(result.observedContentCount).toBe(0)
+    expect(fixture.getBoundValues()).toHaveLength(93)
+    expect(fixture.getBoundValues().slice(0, 90)).toEqual(contentIds)
+  })
+
+  it('rejects oversized and invalid content ID sets before querying D1', async () => {
+    const fixture = fakeDb(null)
+    const tooManyIds = Array.from(
+      { length: 91 },
+      (_, index) => `content_${index.toString().padStart(3, '0')}`,
+    )
+    await expect(
+      getContentSetAnalyticsSummary(fixture.db, {
+        contentIds: tooManyIds,
+        window: { from, to },
+      }),
+    ).rejects.toThrow('cannot exceed 90 items per query')
+    await expect(
+      getContentSetAnalyticsSummary(fixture.db, {
+        contentIds: ['invalid '],
+        window: { from, to },
+      }),
+    ).rejects.toThrow('contentId is invalid')
+    expect(fixture.getPrepareCalls()).toBe(0)
   })
 
   it('compares current and previous periods in a single bounded D1 query', async () => {

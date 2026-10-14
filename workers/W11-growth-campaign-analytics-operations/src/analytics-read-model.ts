@@ -109,6 +109,14 @@ export interface ContentAnalyticsPeriodComparison {
   changes: Record<ContentAnalyticsMetric, ContentAnalyticsMetricChange>
 }
 
+export interface ContentSetAnalyticsSummary
+  extends Record<ContentAnalyticsMetric, number>, HourlyBucketWindow, ContentAnalyticsDerivedMetrics {
+  /** Count of distinct content IDs in the caller-authorized input set. */
+  requestedContentCount: number
+  /** Count of IDs with at least one projection row in the selected period. */
+  observedContentCount: number
+}
+
 export interface CreatorFollowerSummary extends HourlyBucketWindow {
   creatorId: string
   followersGained: number
@@ -127,6 +135,7 @@ export interface TopContentAnalyticsResult extends HourlyBucketWindow {
   items: ContentAnalyticsRankingRow[]
 }
 
+const MAX_CONTENT_IDS_PER_SUMMARY_QUERY = 90
 const MAX_CONTENT_IDS_PER_RANKING_QUERY = 90
 const MAX_CONTENT_RANKING_RESULTS = 20
 
@@ -282,6 +291,21 @@ WHERE content_id = ?
 
 const CONTENT_SUMMARY_SQL = buildContentSummarySql()
 
+function buildContentSetSummarySql(contentIdCount: number): string {
+  const columns = CONTENT_METRICS.map(
+    ([key, column]) => `COALESCE(SUM(${column}), 0) AS ${key}`,
+  ).join(',\n  ')
+  const placeholders = Array.from({ length: contentIdCount }, () => '?').join(', ')
+  return `SELECT
+  COUNT(DISTINCT content_id) AS observedContentCount,
+  ${columns}
+FROM analytics_content_hourly
+WHERE content_id IN (${placeholders})
+  AND hour_start >= ?
+  AND hour_start < ?
+  AND metric_version = ?`
+}
+
 const CONTENT_COMPARISON_COLUMNS = CONTENT_METRICS.flatMap(([key, column]) => [
   `COALESCE(SUM(CASE WHEN hour_start >= periods.current_from AND hour_start < periods.current_to THEN ${column} ELSE 0 END), 0) AS current_${key}`,
   `COALESCE(SUM(CASE WHEN hour_start >= periods.previous_from AND hour_start < periods.previous_to THEN ${column} ELSE 0 END), 0) AS previous_${key}`,
@@ -350,6 +374,68 @@ export async function getContentAnalyticsSummary(
     contentId: input.contentId,
     contentType: input.contentType,
     ...bucketWindow,
+    ...metrics,
+    ...deriveContentMetrics(metrics),
+  }
+}
+
+/**
+ * Aggregate a bounded, caller-authorized content ID set in one D1 query.
+ *
+ * This supports creator dashboards without issuing one query per article/post/video.
+ * The caller must obtain and authorize content IDs from W03 before invoking this
+ * function. It reports both requested IDs and IDs with data in the selected period.
+ */
+export async function getContentSetAnalyticsSummary(
+  db: AnalyticsReadDatabase,
+  input: {
+    contentIds: readonly string[]
+    window: AnalyticsQueryWindow
+  },
+): Promise<ContentSetAnalyticsSummary> {
+  validateWindow(input.window)
+  if (!Array.isArray(input.contentIds)) {
+    throw new TypeError('contentIds must be an array')
+  }
+  if (input.contentIds.length > MAX_CONTENT_IDS_PER_SUMMARY_QUERY) {
+    throw new RangeError(
+      `contentIds cannot exceed ${MAX_CONTENT_IDS_PER_SUMMARY_QUERY} items per query`,
+    )
+  }
+
+  const contentIds = [...new Set(input.contentIds)]
+  for (const contentId of contentIds) validateIdentifier(contentId, 'contentId')
+  const bucketWindow = getHourlyBucketWindow(input.window)
+  if (contentIds.length === 0) {
+    const metrics = readContentMetrics(null)
+    return {
+      ...bucketWindow,
+      requestedContentCount: 0,
+      observedContentCount: 0,
+      ...metrics,
+      ...deriveContentMetrics(metrics),
+    }
+  }
+
+  const row = await db
+    .prepare(buildContentSetSummarySql(contentIds.length))
+    .bind(
+      ...contentIds,
+      bucketWindow.bucketFrom,
+      bucketWindow.bucketToExclusive,
+      '1.0',
+    )
+    .first()
+  const metrics = readContentMetrics(row)
+  const observedContentCount = readCount(row, 'observedContentCount')
+  if (observedContentCount > contentIds.length) {
+    throw new TypeError('analytics query returned more content rows than requested')
+  }
+
+  return {
+    ...bucketWindow,
+    requestedContentCount: contentIds.length,
+    observedContentCount,
     ...metrics,
     ...deriveContentMetrics(metrics),
   }
