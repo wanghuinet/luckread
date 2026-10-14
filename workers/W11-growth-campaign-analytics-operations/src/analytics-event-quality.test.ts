@@ -138,6 +138,33 @@ describe('W11 analytics event quality', () => {
     ])
   })
 
+  it('deduplicates late events against the same batch and persisted idempotency keys', () => {
+    const old = '2026-10-12T00:00:00.000Z'
+    const first = event({ occurredAt: old, receivedAt: old })
+    const duplicateId = event({
+      dedupeKey: 'dedupe_late_duplicate_01',
+      occurredAt: old,
+      receivedAt: old,
+    })
+    const inBatch = processAnalyticsBatch([first, duplicateId], {
+      now,
+      maxLatenessMs: 60 * 60 * 1000,
+    })
+
+    expect(inBatch.counts.LATE).toBe(1)
+    expect(inBatch.counts.DUPLICATE).toBe(1)
+    expect(inBatch.outcomes.map((item) => item.quality)).toEqual(['LATE', 'DUPLICATE'])
+
+    const persisted = processAnalyticsBatch([first], {
+      now,
+      maxLatenessMs: 60 * 60 * 1000,
+      knownEventIds: new Set(['evt_000001']),
+    })
+    expect(persisted.counts.LATE).toBe(0)
+    expect(persisted.counts.DUPLICATE).toBe(1)
+    expect(persisted.outcomes[0]?.reason).toBe('DUPLICATE_EVENT_ID')
+  })
+
   it('uses persisted idempotency keys supplied by the storage adapter', () => {
     const result = processAnalyticsBatch([event()], {
       now,
