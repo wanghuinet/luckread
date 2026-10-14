@@ -1,5 +1,6 @@
 -- W11 / D1-05: derived analytics only.
--- Apply only to the dedicated D1-05 resource after its physical binding is admitted.
+-- Target: D1-05 `allluck` (77d82be2-d12e-4a17-b410-9aa7d376bc11).
+-- Applying this migration to the remote database remains a separate deployment operation.
 -- Event inserts, grouped projections and status updates are applied in one D1 batch transaction;
 -- duplicate event IDs or dedupe keys are ignored and never increment projections.
 
