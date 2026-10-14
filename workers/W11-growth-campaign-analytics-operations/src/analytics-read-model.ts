@@ -285,7 +285,7 @@ const CONTENT_SUMMARY_SQL = buildContentSummarySql()
 const CONTENT_COMPARISON_COLUMNS = CONTENT_METRICS.flatMap(([key, column]) => [
   `COALESCE(SUM(CASE WHEN hour_start >= periods.current_from AND hour_start < periods.current_to THEN ${column} ELSE 0 END), 0) AS current_${key}`,
   `COALESCE(SUM(CASE WHEN hour_start >= periods.previous_from AND hour_start < periods.previous_to THEN ${column} ELSE 0 END), 0) AS previous_${key}`,
-]).join(',\\n  ')
+]).join(',\n  ')
 
 const CONTENT_COMPARISON_SQL = `WITH periods AS (
   SELECT ? AS current_from, ? AS current_to, ? AS previous_from, ? AS previous_to
