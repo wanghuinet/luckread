@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import React from 'react'
 
+import UmamiAnalytics from './UmamiAnalytics'
 import './styles.css'
 
 export const metadata: Metadata = {
@@ -12,7 +13,10 @@ export default function RootLayout(props: { children: React.ReactNode }) {
   const { children } = props
   return (
     <html lang="zh-CN">
-      <body><main>{children}</main></body>
+      <body>
+        <UmamiAnalytics />
+        <main>{children}</main>
+      </body>
     </html>
   )
 }

@@ -860,7 +860,12 @@ export default function ShortVideoFeed() {
                   </div>
                   <h1>{item.title}</h1>
                   <p>{locale === 'en' ? 'Swipe to keep watching.' : '上下滑动继续刷视频。'}</p>
-                  <Link className={styles.detailLink} href={'/content/' + encodeURIComponent(item.slug || item.id)}>
+                  <Link
+                    className={styles.detailLink}
+                    data-umami-event="content-open"
+                    data-umami-event-content-type="video"
+                    href={'/content/' + encodeURIComponent(item.slug || item.id)}
+                  >
                     打开详情
                   </Link>
                 </div>
@@ -924,9 +929,9 @@ export default function ShortVideoFeed() {
 
       <nav className={styles.bottomNav} aria-label="主导航">
         <Link href="/" className={styles.navItem}><i className="fa-solid fa-house" aria-hidden="true" /><span>首页</span></Link>
-        <Link href="/content?type=video" className={styles.navItem}><i className="fa-solid fa-compass" aria-hidden="true" /><span>探索</span></Link>
+        <Link href="/content?type=video" className={styles.navItem} data-umami-event="content-discovery-open"><i className="fa-solid fa-compass" aria-hidden="true" /><span>探索</span></Link>
         <Link aria-label="发布视频" href="/publish?type=video" className={styles.navCreate}><i className="fa-solid fa-plus" aria-hidden="true" /></Link>
-        <Link href="/creator-center" className={styles.navItem}><i className="fa-solid fa-user-pen" aria-hidden="true" /><span>创作</span></Link>
+        <Link href="/creator-center" className={styles.navItem} data-umami-event="creator-center-open"><i className="fa-solid fa-user-pen" aria-hidden="true" /><span>创作</span></Link>
         <Link href="/me/profile" className={styles.navItem}><i className="fa-solid fa-user" aria-hidden="true" /><span>我</span></Link>
       </nav>
 
