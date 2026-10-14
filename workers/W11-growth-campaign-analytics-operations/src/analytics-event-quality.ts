@@ -137,7 +137,7 @@ const VALID_CONTENT_TYPES = new Set<string>(['article', 'post', 'video'])
 const EVENT_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9:_-]{7,159}$/
 const FIELD_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9:_-]{0,127}$/
 const TIMESTAMP_PATTERN =
-  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/
+  /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d{1,3})?(Z|([+-])(\d{2}):(\d{2}))$/
 
 const DEFAULT_MAX_LATENESS_MS = 24 * 60 * 60 * 1000
 const DEFAULT_ALLOWED_FUTURE_SKEW_MS = 5 * 60 * 1000
@@ -152,7 +152,48 @@ function isFieldId(value: unknown): value is string {
 }
 
 function parseTimestamp(value: unknown): number | undefined {
-  if (typeof value !== 'string' || !TIMESTAMP_PATTERN.test(value)) return undefined
+  if (typeof value !== 'string') return undefined
+  const match = TIMESTAMP_PATTERN.exec(value)
+  if (!match) return undefined
+
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  const hour = Number(match[4])
+  const minute = Number(match[5])
+  const second = Number(match[6])
+  const offsetHours = match[8] === undefined ? 0 : Number(match[9])
+  const offsetMinutes = match[8] === undefined ? 0 : Number(match[10])
+
+  if (
+    month < 1 ||
+    month > 12 ||
+    hour > 23 ||
+    minute > 59 ||
+    second > 59 ||
+    offsetHours > 23 ||
+    offsetMinutes > 59
+  ) {
+    return undefined
+  }
+
+  const leapYear = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0)
+  const daysInMonth = [
+    31,
+    leapYear ? 29 : 28,
+    31,
+    30,
+    31,
+    30,
+    31,
+    31,
+    30,
+    31,
+    30,
+    31,
+  ]
+  if (day < 1 || day > (daysInMonth[month - 1] ?? 0)) return undefined
+
   const timestamp = Date.parse(value)
   return Number.isFinite(timestamp) ? timestamp : undefined
 }
