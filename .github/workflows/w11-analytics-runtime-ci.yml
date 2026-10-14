@@ -42,8 +42,6 @@ jobs:
           npx vitest run
           workers/W11-growth-campaign-analytics-operations/src/analytics-event-quality.test.ts
           workers/W11-growth-campaign-analytics-operations/src/analytics-aggregation.test.ts
-          workers/W11-growth-campaign-analytics-operations/src/analytics-d1-store.ts
-          workers/W11-growth-campaign-analytics-operations/src/analytics-d1-store.test.ts
           workers/W11-growth-campaign-analytics-operations/src/analytics-period.test.ts
           workers/W11-growth-campaign-analytics-operations/src/analytics-d1-store.test.ts
 
@@ -60,3 +58,5 @@ jobs:
           workers/W11-growth-campaign-analytics-operations/src/analytics-aggregation.ts
           workers/W11-growth-campaign-analytics-operations/src/analytics-period.ts
           workers/W11-growth-campaign-analytics-operations/src/analytics-aggregation.test.ts
+          workers/W11-growth-campaign-analytics-operations/src/analytics-d1-store.ts
+          workers/W11-growth-campaign-analytics-operations/src/analytics-d1-store.test.ts
