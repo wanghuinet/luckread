@@ -4438,25 +4438,46 @@
         "resumeSubscription"
       ],
       "payloadCollections": [],
-      "codeEvidenceRefs": [],
+      "codeEvidenceRefs": [
+        "workers/W07-subscription-commerce/src/index.ts",
+        "workers/W07-subscription-commerce/src/subscription-runtime.ts",
+        "workers/W07-subscription-commerce/src/subscription-runtime.test.ts",
+        "workers/W01-payload/src/app/api/v1/memberships/subscriptions/[[...segments]]/route.ts",
+        "workers/W01-payload/src/subscription/w07-subscription-client.ts",
+        "workers/W01-payload/tests/int/subscription-v1-adapter.int.spec.ts"
+      ],
       "evidence": [
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md:L254",
         "contracts/alignment/mapping-batches/B13-B15-creator-membership-commerce.v1.json",
         "contracts/alignment/mapping-batches/MON-001-011-PAY-001-013-real-evidence-reconciliation.v1.md",
-        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
-        "contracts/entity/SUBSCRIPTION-ENTITY-CONTRACT.v1.json",
-        "docs/change-control/CC-MON-SUBSCRIPTION-DATA-MODEL-ADMISSION-2026-10-02.md",
         "contracts/api/rc-04-06-share-subscription-entitlement.v1.json",
+        "contracts/authz/permissions.json",
+        "contracts/entity/SUBSCRIPTION-ENTITY-CONTRACT.v1.json",
         "contracts/openapi/v1/openapi.yaml",
         "contracts/openapi/v1/operation-policy.json",
-        "contracts/authz/permissions.json",
         "contracts/state-machines/subscription.json",
-        "docs/change-control/CC-SUBSCRIPTION-STATE-API-RECONCILIATION-2026-10-02.md"
+        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
+        "docs/change-control/CC-MON-SUBSCRIPTION-DATA-MODEL-ADMISSION-2026-10-02.md",
+        "docs/change-control/CC-SUBSCRIPTION-STATE-API-RECONCILIATION-2026-10-02.md",
+        "contracts/alignment/code-evidence-inventory.v1.json",
+        "contracts/entity/entity-implementation-evidence.v1.json",
+        "contracts/persistence/SUBSCRIPTION-D1-01-persistence.v1.json",
+        "workers/W07-subscription-commerce/src/index.ts",
+        "workers/W07-subscription-commerce/src/subscription-runtime.ts",
+        "workers/W07-subscription-commerce/src/subscription-runtime.test.ts",
+        "workers/W07-subscription-commerce/migrations/0001_membership_subscriptions.sql",
+        "workers/W01-payload/src/app/api/v1/memberships/subscriptions/[[...segments]]/route.ts",
+        "workers/W01-payload/src/subscription/w07-subscription-client.ts",
+        "workers/W01-payload/tests/int/subscription-v1-adapter.int.spec.ts",
+        "docs/110-MEMBERSHIP-DATA-CONTRACT-v1.0.md",
+        "docs/111-MEMBERSHIP-API-CONTRACT-v1.0.md"
       ],
       "blockers": [
-        "Entity/Field contract binding is admitted.",
-        "Canonical API/state/permission vocabulary is now reconciled.",
-        "Physical D1-01 persistence, runtime, cross-domain payment transition, tests and Evidence Registry provenance remain unverified."
+        "W07 runtime and W01 adapter source plus unit/adapter test files are now bound, but exact-current-commit executable PASS evidence is not admitted.",
+        "The declared feature includes renewal; no renewal execution path or verified payment-renewal transition is present in the current W07 runtime.",
+        "Migration 0001 lacks the non-null version column required by the Subscription persistence contract, and production D1-01 schema/application evidence is absent.",
+        "The runtime uses updated_at as the If-Match compare-and-set source; the admitted Subscription contract requires monotonic version as the authoritative CAS source.",
+        "Global Mapping 0 / Five-Way reconciliation remains NOT_GREEN; no feature or entity promotion is claimed."
       ]
     },
     {
@@ -6913,7 +6934,8 @@
         "Actor principal, actor account state, follow permission, target identity, block policy, anti-abuse admission and caller provenance are bound to existing authoritative contracts.",
         "Target followability and privacy/audience operational authority remain unresolved.",
         "Runtime, tests and Evidence Registry provenance remain unverified."
-      ]    },
+      ]
+    },
     {
       "featureId": "SOCIAL-002",
       "status": "UNRESOLVED",
