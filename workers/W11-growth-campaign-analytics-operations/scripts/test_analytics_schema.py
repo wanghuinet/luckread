@@ -58,6 +58,32 @@ def extract_content_summary_sql(source: str) -> tuple[str, list[tuple[str, str]]
     return query, metrics
 
 
+def build_content_comparison_sql(metrics: list[tuple[str, str]]) -> str:
+    columns: list[str] = []
+    for key, column in metrics:
+        columns.append(
+            f"COALESCE(SUM(CASE WHEN hour_start >= periods.current_from "
+            f"AND hour_start < periods.current_to THEN {column} ELSE 0 END), 0) "
+            f"AS current_{key}"
+        )
+        columns.append(
+            f"COALESCE(SUM(CASE WHEN hour_start >= periods.previous_from "
+            f"AND hour_start < periods.previous_to THEN {column} ELSE 0 END), 0) "
+            f"AS previous_{key}"
+        )
+    return (
+        "WITH periods AS (SELECT ? AS current_from, ? AS current_to, "
+        "? AS previous_from, ? AS previous_to)\n"
+        "SELECT\n  " + ",\n  ".join(columns)
+        + "\nFROM analytics_content_hourly\nCROSS JOIN periods\n"
+        + "WHERE content_id = ?\n"
+        + "  AND content_type = ?\n"
+        + "  AND metric_version = ?\n"
+        + "  AND ((hour_start >= periods.current_from AND hour_start < periods.current_to)\n"
+        + "       OR (hour_start >= periods.previous_from AND hour_start < periods.previous_to))"
+    )
+
+
 def build_top_content_sql(
     metrics: list[tuple[str, str]], content_id_count: int
 ) -> str:
@@ -324,6 +350,44 @@ def main() -> None:
     assert len(content_metrics) == 27
     assert content_summary["opens"] == 2 and content_summary["likes"] == 1, (
         f"unexpected content read model: {content_summary}"
+    )
+
+    # Execute the one-query current/previous comparison against the migrated DB.
+    comparison_sql = build_content_comparison_sql(content_metrics)
+    comparison_params = (
+        "2026-10-14T00:00:00.000Z",
+        "2026-10-14T01:00:00.000Z",
+        "2026-10-13T00:00:00.000Z",
+        "2026-10-14T00:00:00.000Z",
+        "article_01",
+        "article",
+        "1.0",
+    )
+    comparison_cursor = db.execute(comparison_sql, comparison_params)
+    comparison_row = {
+        description[0]: value
+        for description, value in zip(
+            comparison_cursor.description or (), comparison_cursor.fetchone() or ()
+        )
+    }
+    assert comparison_row["current_opens"] == 2, (
+        f"current period comparison must include its opens: {comparison_row}"
+    )
+    assert comparison_row["previous_opens"] == 0, (
+        f"previous period comparison must exclude current period buckets: {comparison_row}"
+    )
+    assert comparison_row["current_likes"] == 1 and comparison_row["previous_likes"] == 0, (
+        f"comparison must separate social metrics by period: {comparison_row}"
+    )
+    comparison_plan = " ".join(
+        row[3]
+        for row in db.execute(
+            "EXPLAIN QUERY PLAN " + comparison_sql,
+            comparison_params,
+        )
+    )
+    assert "analytics_content_hourly_content_time_idx" in comparison_plan, (
+        f"period comparison should use the content-type/content/time index: {comparison_plan}"
     )
     plan = " ".join(
         row[3] for row in db.execute(
