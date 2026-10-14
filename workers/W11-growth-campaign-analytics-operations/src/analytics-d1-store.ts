@@ -4,10 +4,7 @@ import {
   type AnalyticsEvent,
 } from './analytics-event-quality'
 
-/**
- * Structural subset of Cloudflare D1 used by this adapter. Keeping this
- * interface narrow makes the adapter testable without a live Cloudflare DB.
- */
+/** Narrow structural types keep tests independent of a live Cloudflare account. */
 export interface AnalyticsD1Result {
   success?: boolean
   error?: string
@@ -18,11 +15,12 @@ export interface AnalyticsD1Result {
 
 export interface AnalyticsD1PreparedStatement {
   bind(...values: (string | number | null)[]): AnalyticsD1PreparedStatement
-  run(): Promise<AnalyticsD1Result>
 }
 
 export interface AnalyticsD1Database {
   prepare(query: string): AnalyticsD1PreparedStatement
+  /** D1 batch is one transaction; a failed statement rolls back the whole batch. */
+  batch(statements: AnalyticsD1PreparedStatement[]): Promise<AnalyticsD1Result[]>
 }
 
 export interface PersistAnalyticsBatchResult {
@@ -47,7 +45,105 @@ const INSERT_COLUMNS = [
   'duration_ms',
   'position',
   'metric_version',
+  'projection_status',
 ] as const
+
+const CONTENT_PROJECTION_SQL = String.raw`
+INSERT INTO analytics_content_hourly (
+  hour_start, content_id, content_type, metric_version,
+  impressions, opens, read_starts, read_progress_25, read_progress_50, read_progress_75,
+  read_completions, read_duration_ms, read_duration_events, dwell_duration_ms, dwell_events,
+  completed_views, video_impressions, video_play_requests, video_plays, video_progress_25,
+  video_progress_50, video_progress_75, video_progress_90, video_completions, video_replays,
+  video_watch_ms, video_watch_events, likes, comments, shares, favorites
+)
+SELECT
+  hour_start, content_id, content_type, metric_version,
+  SUM(CASE WHEN event_name = 'content_impression' THEN 1 ELSE 0 END),
+  SUM(CASE WHEN event_name = 'content_open' THEN 1 ELSE 0 END),
+  SUM(CASE WHEN event_name = 'read_start' THEN 1 ELSE 0 END),
+  SUM(CASE WHEN event_name = 'read_progress_25' THEN 1 ELSE 0 END),
+  SUM(CASE WHEN event_name = 'read_progress_50' THEN 1 ELSE 0 END),
+  SUM(CASE WHEN event_name = 'read_progress_75' THEN 1 ELSE 0 END),
+  SUM(CASE WHEN event_name = 'read_complete' THEN 1 ELSE 0 END),
+  SUM(CASE WHEN event_name = 'read_dwell' THEN COALESCE(duration_ms, 0) ELSE 0 END),
+  SUM(CASE WHEN event_name = 'read_dwell' THEN 1 ELSE 0 END),
+  SUM(CASE WHEN event_name = 'dwell' THEN COALESCE(duration_ms, 0) ELSE 0 END),
+  SUM(CASE WHEN event_name = 'dwell' THEN 1 ELSE 0 END),
+  SUM(CASE WHEN event_name = 'complete_view' THEN 1 ELSE 0 END),
+  SUM(CASE WHEN event_name = 'video_impression' THEN 1 ELSE 0 END),
+  SUM(CASE WHEN event_name = 'video_play_request' THEN 1 ELSE 0 END),
+  SUM(CASE WHEN event_name = 'video_play_success' THEN 1 ELSE 0 END),
+  SUM(CASE WHEN event_name = 'video_progress_25' THEN 1 ELSE 0 END),
+  SUM(CASE WHEN event_name = 'video_progress_50' THEN 1 ELSE 0 END),
+  SUM(CASE WHEN event_name = 'video_progress_75' THEN 1 ELSE 0 END),
+  SUM(CASE WHEN event_name = 'video_progress_90' THEN 1 ELSE 0 END),
+  SUM(CASE WHEN event_name = 'video_complete' THEN 1 ELSE 0 END),
+  SUM(CASE WHEN event_name = 'video_replay' THEN 1 ELSE 0 END),
+  SUM(CASE WHEN event_name = 'video_watch' THEN COALESCE(duration_ms, 0) ELSE 0 END),
+  SUM(CASE WHEN event_name = 'video_watch' THEN 1 ELSE 0 END),
+  SUM(CASE WHEN event_name = 'like_created' THEN 1 ELSE 0 END),
+  SUM(CASE WHEN event_name = 'comment_created' THEN 1 ELSE 0 END),
+  SUM(CASE WHEN event_name = 'share_created' THEN 1 ELSE 0 END),
+  SUM(CASE WHEN event_name = 'favorite_created' THEN 1 ELSE 0 END)
+FROM analytics_event_dedupe
+WHERE projection_status = 'PENDING'
+  AND event_name NOT IN ('follow_created', 'follow_removed')
+GROUP BY hour_start, content_type, content_id, metric_version
+ON CONFLICT (hour_start, content_type, content_id, metric_version) DO UPDATE SET
+  impressions = analytics_content_hourly.impressions + excluded.impressions,
+  opens = analytics_content_hourly.opens + excluded.opens,
+  read_starts = analytics_content_hourly.read_starts + excluded.read_starts,
+  read_progress_25 = analytics_content_hourly.read_progress_25 + excluded.read_progress_25,
+  read_progress_50 = analytics_content_hourly.read_progress_50 + excluded.read_progress_50,
+  read_progress_75 = analytics_content_hourly.read_progress_75 + excluded.read_progress_75,
+  read_completions = analytics_content_hourly.read_completions + excluded.read_completions,
+  read_duration_ms = analytics_content_hourly.read_duration_ms + excluded.read_duration_ms,
+  read_duration_events = analytics_content_hourly.read_duration_events + excluded.read_duration_events,
+  dwell_duration_ms = analytics_content_hourly.dwell_duration_ms + excluded.dwell_duration_ms,
+  dwell_events = analytics_content_hourly.dwell_events + excluded.dwell_events,
+  completed_views = analytics_content_hourly.completed_views + excluded.completed_views,
+  video_impressions = analytics_content_hourly.video_impressions + excluded.video_impressions,
+  video_play_requests = analytics_content_hourly.video_play_requests + excluded.video_play_requests,
+  video_plays = analytics_content_hourly.video_plays + excluded.video_plays,
+  video_progress_25 = analytics_content_hourly.video_progress_25 + excluded.video_progress_25,
+  video_progress_50 = analytics_content_hourly.video_progress_50 + excluded.video_progress_50,
+  video_progress_75 = analytics_content_hourly.video_progress_75 + excluded.video_progress_75,
+  video_progress_90 = analytics_content_hourly.video_progress_90 + excluded.video_progress_90,
+  video_completions = analytics_content_hourly.video_completions + excluded.video_completions,
+  video_replays = analytics_content_hourly.video_replays + excluded.video_replays,
+  video_watch_ms = analytics_content_hourly.video_watch_ms + excluded.video_watch_ms,
+  video_watch_events = analytics_content_hourly.video_watch_events + excluded.video_watch_events,
+  likes = analytics_content_hourly.likes + excluded.likes,
+  comments = analytics_content_hourly.comments + excluded.comments,
+  shares = analytics_content_hourly.shares + excluded.shares,
+  favorites = analytics_content_hourly.favorites + excluded.favorites
+`
+
+const CREATOR_PROJECTION_SQL = String.raw`
+INSERT INTO analytics_creator_hourly (
+  hour_start, creator_id, metric_version, followers_gained, followers_lost
+)
+SELECT
+  hour_start,
+  creator_id,
+  metric_version,
+  SUM(CASE WHEN event_name = 'follow_created' THEN 1 ELSE 0 END),
+  SUM(CASE WHEN event_name = 'follow_removed' THEN 1 ELSE 0 END)
+FROM analytics_event_dedupe
+WHERE projection_status = 'PENDING'
+  AND event_name IN ('follow_created', 'follow_removed')
+GROUP BY hour_start, creator_id, metric_version
+ON CONFLICT (hour_start, creator_id, metric_version) DO UPDATE SET
+  followers_gained = analytics_creator_hourly.followers_gained + excluded.followers_gained,
+  followers_lost = analytics_creator_hourly.followers_lost + excluded.followers_lost
+`
+
+const MARK_APPLIED_SQL = String.raw`
+UPDATE analytics_event_dedupe
+SET projection_status = 'APPLIED'
+WHERE projection_status = 'PENDING'
+`
 
 function hourStartForEvent(event: AnalyticsEvent): string {
   const occurredAt = Date.parse(event.occurredAt)
@@ -79,20 +175,17 @@ function bindValues(event: AnalyticsEvent): (string | number | null)[] {
     event.durationMs ?? null,
     event.position ?? null,
     ANALYTICS_METRIC_VERSION,
+    'PENDING',
   ]
 }
 
 /**
- * Store already validated events in D1-05.
+ * Persist only events already accepted by processAnalyticsBatch.
  *
- * The migration's AFTER INSERT trigger updates hourly projections in the same
- * SQLite transaction as the unique event/dedupe insert. Duplicate event IDs or
- * dedupe keys are ignored by SQLite, so their trigger cannot increment metrics
- * a second time. A failed statement leaves neither dedupe rows nor projections
- * partially committed.
- *
- * This function does not accept arbitrary browser input: callers must pass only
- * the accepted events returned by processAnalyticsBatch after source validation.
+ * Four statements execute in one D1 transaction: insert unique events, aggregate
+ * all pending rows by hour/content (not one hot-counter UPDATE per event),
+ * aggregate creator follow changes, then mark processed rows. A failure rolls
+ * all four operations back, so retrying cannot lose or double-apply projections.
  */
 export async function persistAnalyticsEvents(
   db: AnalyticsD1Database,
@@ -112,15 +205,25 @@ export async function persistAnalyticsEvents(
   const placeholders = events
     .map(() => `(${Array.from({ length: valuesPerEvent }, () => '?').join(', ')})`)
     .join(', ')
-  const sql = `INSERT OR IGNORE INTO analytics_event_dedupe (${INSERT_COLUMNS.join(', ')}) VALUES ${placeholders}`
+  const sql = `INSERT INTO analytics_event_dedupe (${INSERT_COLUMNS.join(', ')}) VALUES ${placeholders} ON CONFLICT DO NOTHING`
   const bindings = events.flatMap(bindValues)
-  const result = await db.prepare(sql).bind(...bindings).run()
 
-  if (result.success === false) {
-    throw new Error(result.error || 'D1 analytics batch insert failed')
+  const results = await db.batch([
+    db.prepare(sql).bind(...bindings),
+    db.prepare(CONTENT_PROJECTION_SQL),
+    db.prepare(CREATOR_PROJECTION_SQL),
+    db.prepare(MARK_APPLIED_SQL),
+  ])
+
+  if (results.length !== 4) {
+    throw new Error('D1 analytics transaction returned an unexpected result count')
+  }
+  const failed = results.find((result) => result.success === false)
+  if (failed) {
+    throw new Error(failed.error || 'D1 analytics transaction failed')
   }
 
-  const inserted = result.meta?.changes
+  const inserted = results[0]?.meta?.changes
   if (
     typeof inserted !== 'number' ||
     !Number.isSafeInteger(inserted) ||
