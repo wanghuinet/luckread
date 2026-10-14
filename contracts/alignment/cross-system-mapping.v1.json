@@ -4544,12 +4544,13 @@
         "workers/W07-subscription-commerce/migrations/0001_membership_subscriptions.sql",
         "workers/W07-subscription-commerce/src/index.ts",
         "workers/W07-subscription-commerce/src/subscription-runtime.test.ts",
-        "workers/W07-subscription-commerce/src/subscription-runtime.ts"
+        "workers/W07-subscription-commerce/src/subscription-runtime.ts",
+        "https://github.com/wanghuinet/luckread/actions/runs/38544516790"
       ],
       "blockers": [
-        "W07 runtime and W01 adapter source plus unit/adapter test files are now bound, but exact-current-commit executable PASS evidence is not admitted.",
-        "The declared feature includes renewal; no renewal execution path or verified payment-renewal transition is present in the current W07 runtime.",
-        "Migration 0001 lacks the non-null version column required by the Subscription persistence contract, and production D1-01 schema/application evidence is absent.",
+        "W07 runtime unit tests and W01 adapter integration tests passed at main commit 68611bae3076565e6c394ee7a4bd167b3ce88f34 (Actions run 38544516790); this does not verify production D1 schema/migration or version-CAS parity.",
+        "Renewal is part of MON-005; no renewal execution path or verified payment-renewal transition is present.",
+        "Migration 0001 lacks the non-null version column required by the Subscription persistence contract; production D1-01 schema/application evidence remains absent.",
         "The runtime uses updated_at as the If-Match compare-and-set source; the admitted Subscription contract requires monotonic version as the authoritative CAS source.",
         "Global Mapping 0 / Five-Way reconciliation remains NOT_GREEN; no feature or entity promotion is claimed."
       ]
