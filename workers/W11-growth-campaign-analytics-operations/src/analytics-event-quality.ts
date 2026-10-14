@@ -1,5 +1,8 @@
 export const ANALYTICS_EVENT_SCHEMA_VERSION = '1.0' as const
 
+/** Hard cap keeps a single validation/deduplication pass CPU- and memory-bounded. */
+export const ANALYTICS_MAX_BATCH_SIZE = 500 as const
+
 export const ANALYTICS_EVENT_NAMES = [
   'content_impression',
   'content_open',
@@ -433,6 +436,11 @@ export function processAnalyticsBatch(
   options: AnalyticsBatchOptions,
 ): AnalyticsBatchResult {
   validateOptions(options)
+  if (values.length > ANALYTICS_MAX_BATCH_SIZE) {
+    throw new RangeError(
+      `batch exceeds the ${ANALYTICS_MAX_BATCH_SIZE}-event limit`,
+    )
+  }
 
   const seenEventIds = new Set(options.knownEventIds ?? [])
   const seenDedupeKeys = new Set(options.knownDedupeKeys ?? [])
