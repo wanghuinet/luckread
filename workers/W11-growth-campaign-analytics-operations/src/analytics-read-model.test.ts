@@ -154,7 +154,7 @@ describe('W11 bounded analytics read models', () => {
     await expect(
       getContentAnalyticsSummary(noCalls.db, {
         contentId: 'article_001',
-        contentType: 'other' as 'article',
+        contentType: 'other' as never,
         window: { from, to },
       }),
     ).rejects.toThrow('contentType is invalid')
