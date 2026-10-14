@@ -120,6 +120,29 @@ describe('W11 D1-05 analytics persistence adapter', () => {
     expect(statements.slice(0, 2).every((item) => (item.sql.match(/\?/g) ?? []).length === 16)).toBe(true)
   })
 
+  it('caps one D1 transaction at 93 statements and at most 16 parameters per INSERT', async () => {
+    const { db, getBatches } = fakeDb(
+      successResults(Array.from({ length: ANALYTICS_MAX_BATCH_SIZE }, () => 1)),
+    )
+    const batch = Array.from({ length: ANALYTICS_MAX_BATCH_SIZE }, (_, index) =>
+      event({
+        eventId: `evt_store_${String(index).padStart(4, '0')}`,
+        dedupeKey: `dedupe_store_${String(index).padStart(4, '0')}`,
+      }),
+    )
+
+    const result = await persistAnalyticsEvents(db, batch)
+    const statements = getBatches()[0] ?? []
+    expect(result.inserted).toBe(ANALYTICS_MAX_BATCH_SIZE)
+    expect(statements).toHaveLength(ANALYTICS_MAX_BATCH_SIZE + 3)
+    expect(statements).toHaveLength(93)
+    expect(
+      statements.slice(0, ANALYTICS_MAX_BATCH_SIZE).every(
+        (statement) => (statement.sql.match(/\?/g) ?? []).length === 16,
+      ),
+    ).toBe(true)
+  })
+
   it('does not open a D1 transaction for an empty batch', async () => {
     const { db, getBatches } = fakeDb(successResults([]))
     expect(await persistAnalyticsEvents(db, [])).toEqual({
