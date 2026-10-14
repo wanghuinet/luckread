@@ -273,7 +273,7 @@ export interface AnalyticsComparisonRange {
  *
  * Adapted from Traks' MIT-licensed `previousRange` helper. Shifting by
  * calendar days in the configured IANA timezone avoids DST drift and preserves
- * the current range's local time-of-day. An all-time range compares to empty
+ * the elapsed portion of the current day. An all-time range compares to empty
  * rather than scanning an artificial second all-time window.
  */
 export function previousAnalyticsRange(
