@@ -57,14 +57,16 @@ def apply_batch(
     placeholders = "(" + ", ".join("?" for _ in rows[0]) + ")"
     insert_sql = (
         f"INSERT INTO analytics_event_dedupe ({SQL_COLUMNS}) VALUES "
-        + ", ".join(placeholders for _ in rows)
+        + placeholders
         + " ON CONFLICT DO NOTHING"
     )
     connection.execute("BEGIN")
     try:
-        inserted = connection.execute(
-            insert_sql, [value for row in rows for value in row]
-        ).rowcount
+        # Mirror the D1 adapter: one row per INSERT keeps each query at 16
+        # bound parameters, below Cloudflare D1's per-query limit of 100.
+        inserted = sum(
+            connection.execute(insert_sql, row).rowcount for row in rows
+        )
         connection.execute(content_sql)
         connection.execute(creator_sql)
         connection.execute(mark_applied_sql)
