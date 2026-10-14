@@ -4,6 +4,7 @@ import {
   getContentSetAnalyticsSummary,
   getContentAnalyticsPeriodComparison,
   getCreatorFollowerSummary,
+  getCreatorAnalyticsDashboardSummary,
   getTopContentAnalyticsForContentSet,
   type AnalyticsReadDatabase,
   type AnalyticsReadStatement,
@@ -582,4 +583,129 @@ describe('W11 bounded analytics read models', () => {
       }),
     ).rejects.toThrow('D1 read failed')
   })
+
+  it('returns content and follower metrics from one parameterized creator dashboard query', async () => {
+    const fixture = fakeDb({
+      observedContentCount: '2',
+      impressions: '25',
+      opens: 10,
+      readStarts: 8,
+      readCompletions: 3,
+      likes: 4,
+      comments: 2,
+      videoPlays: 12,
+      videoCompletions: 9,
+      followersGained: '7',
+      followersLost: 2,
+    })
+    const result = await getCreatorAnalyticsDashboardSummary(fixture.db, {
+      creatorId: 'creator_001',
+      contentIds: ['article_001', 'video_001', 'article_001'],
+      window: { from, to },
+    })
+
+    expect(result).toMatchObject({
+      creatorId: 'creator_001',
+      requestedContentCount: 2,
+      observedContentCount: 2,
+      impressions: 25,
+      opens: 10,
+      readStarts: 8,
+      readCompletions: 3,
+      likes: 4,
+      comments: 2,
+      videoPlays: 12,
+      videoCompletions: 9,
+      openRate: 0.4,
+      readCompletionRate: 3 / 8,
+      followersGained: 7,
+      followersLost: 2,
+      netFollowers: 5,
+    })
+    expect(fixture.getSql()).toContain('WITH')
+    expect(fixture.getSql()).toContain('FROM analytics_content_hourly')
+    expect(fixture.getSql()).toContain('FROM analytics_creator_hourly')
+    expect(fixture.getSql()).toContain('CROSS JOIN follower_metrics')
+    expect(fixture.getSql()).toContain('content_id IN (?, ?)')
+    expect(fixture.getSql()).not.toContain('article_001')
+    expect(fixture.getPrepareCalls()).toBe(1)
+    expect(fixture.getBoundValues()).toEqual([
+      'article_001',
+      'video_001',
+      from,
+      to,
+      '1.0',
+      'creator_001',
+      from,
+      to,
+      '1.0',
+    ])
+  })
+
+  it('returns follower changes and zero content metrics for an empty authorized content set', async () => {
+    const fixture = fakeDb({ followersGained: 1, followersLost: 3 })
+    const result = await getCreatorAnalyticsDashboardSummary(fixture.db, {
+      creatorId: 'creator_001',
+      contentIds: [],
+      window: { from, to },
+    })
+
+    expect(result).toMatchObject({
+      creatorId: 'creator_001',
+      requestedContentCount: 0,
+      observedContentCount: 0,
+      impressions: 0,
+      opens: 0,
+      followersGained: 1,
+      followersLost: 3,
+      netFollowers: -2,
+      openRate: null,
+    })
+    expect(fixture.getSql()).not.toContain('FROM analytics_content_hourly')
+    expect(fixture.getSql()).toContain('FROM analytics_creator_hourly')
+    expect(fixture.getPrepareCalls()).toBe(1)
+    expect(fixture.getBoundValues()).toEqual([
+      'creator_001',
+      from,
+      to,
+      '1.0',
+    ])
+  })
+
+  it('keeps the creator dashboard query under the D1 binding limit at 90 content IDs', async () => {
+    const fixture = fakeDb({ observedContentCount: 90 })
+    const contentIds = Array.from(
+      { length: 90 },
+      (_, index) => `content_${index.toString().padStart(3, '0')}`,
+    )
+
+    const result = await getCreatorAnalyticsDashboardSummary(fixture.db, {
+      creatorId: 'creator_001',
+      contentIds,
+      window: { from, to },
+    })
+
+    expect(result.requestedContentCount).toBe(90)
+    expect(fixture.getPrepareCalls()).toBe(1)
+    expect(fixture.getBoundValues()).toHaveLength(97)
+    expect(fixture.getBoundValues()[93]).toBe('creator_001')
+  })
+
+  it('rejects unauthorized-size input sets before issuing a creator dashboard query', async () => {
+    const fixture = fakeDb(null)
+    const contentIds = Array.from(
+      { length: 91 },
+      (_, index) => `content_${index.toString().padStart(3, '0')}`,
+    )
+
+    await expect(
+      getCreatorAnalyticsDashboardSummary(fixture.db, {
+        creatorId: 'creator_001',
+        contentIds,
+        window: { from, to },
+      }),
+    ).rejects.toThrow('cannot exceed 90 items per query')
+    expect(fixture.getPrepareCalls()).toBe(0)
+  })
+
 })
