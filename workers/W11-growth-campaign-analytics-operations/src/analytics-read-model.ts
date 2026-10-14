@@ -221,10 +221,22 @@ function deriveContentMetrics(
   }
 }
 
-function buildTopContentSql(contentIdCount: number): string {
+function buildTopContentSql(
+  contentIdCount: number,
+  rankBy: ContentAnalyticsMetric,
+): string {
   const columns = CONTENT_METRICS.map(
     ([key, column]) => `COALESCE(SUM(${column}), 0) AS ${key}`,
   ).join(',\n  ')
+  const rankAlias = CONTENT_METRICS.find(([key]) => key === rankBy)?.[0]
+  if (!rankAlias) throw new TypeError('rankBy is invalid')
+  const orderBy = [
+    `${rankAlias} DESC`,
+    ...(rankBy === 'opens' ? [] : ['opens DESC']),
+    ...(rankBy === 'impressions' ? [] : ['impressions DESC']),
+    'content_id ASC',
+    'content_type ASC',
+  ].join(', ')
   const placeholders = Array.from({ length: contentIdCount }, () => '?').join(', ')
   return `SELECT
   content_id AS contentId,
@@ -236,7 +248,7 @@ WHERE content_id IN (${placeholders})
   AND hour_start < ?
   AND metric_version = ?
 GROUP BY content_id, content_type
-ORDER BY opens DESC, impressions DESC, content_id ASC, content_type ASC
+ORDER BY ${orderBy}
 LIMIT ?`
 }
 
@@ -319,9 +331,15 @@ export async function getTopContentAnalyticsForContentSet(
     contentIds: readonly string[]
     window: AnalyticsQueryWindow
     limit?: number
+    /** Metric to rank by; defaults to opens for backward compatibility. */
+    rankBy?: ContentAnalyticsMetric
   },
 ): Promise<TopContentAnalyticsResult> {
   validateWindow(input.window)
+  const rankBy = input.rankBy ?? 'opens'
+  if (!CONTENT_METRICS.some(([key]) => key === rankBy)) {
+    throw new TypeError('rankBy is invalid')
+  }
   if (!Array.isArray(input.contentIds)) {
     throw new TypeError('contentIds must be an array')
   }
@@ -349,7 +367,7 @@ export async function getTopContentAnalyticsForContentSet(
   if (contentIds.length === 0) return { ...bucketWindow, items: [] }
 
   const statement = db
-    .prepare(buildTopContentSql(contentIds.length))
+    .prepare(buildTopContentSql(contentIds.length, rankBy))
     .bind(
       ...contentIds,
       bucketWindow.bucketFrom,
