@@ -9,6 +9,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 MIGRATION = ROOT / "migrations" / "0001_analytics_projection.sql"
 STORE = ROOT / "src" / "analytics-d1-store.ts"
+READ_MODEL = ROOT / "src" / "analytics-read-model.ts"
 SQL_COLUMNS = (
     "event_id, dedupe_key, schema_version, event_name, source_worker, occurred_at, "
     "received_at, hour_start, actor_type, content_id, content_type, creator_id, "
@@ -24,6 +25,46 @@ def extract_sql(source: str, constant: str) -> str:
     )
     if not match:
         raise AssertionError(f"Unable to extract {constant} from analytics-d1-store.ts")
+    return match.group(1)
+
+
+def extract_content_summary_sql(source: str) -> tuple[str, list[tuple[str, str]]]:
+    match = re.search(
+        r"const CONTENT_METRICS = \[(.*?)\] as const",
+        source,
+        flags=re.DOTALL,
+    )
+    if not match:
+        raise AssertionError("Unable to extract CONTENT_METRICS from analytics-read-model.ts")
+    metrics = re.findall(
+        r"\['([A-Za-z][A-Za-z0-9]*)', '([a-z][a-z0-9_]*)'\]",
+        match.group(1),
+    )
+    if len(metrics) != 27:
+        raise AssertionError(f"Expected 27 content metrics, found {len(metrics)}")
+    columns = ",\n  ".join(
+        f"COALESCE(SUM({column}), 0) AS {key}" for key, column in metrics
+    )
+    query = (
+        "SELECT\n  " + columns
+        + "\nFROM analytics_content_hourly\n"
+        + "WHERE content_id = ?\n"
+        + "  AND content_type = ?\n"
+        + "  AND hour_start >= ?\n"
+        + "  AND hour_start < ?\n"
+        + "  AND metric_version = ?"
+    )
+    return query, metrics
+
+
+def extract_template(source: str, constant: str) -> str:
+    match = re.search(
+        rf"const {re.escape(constant)} = `(.*?)`",
+        source,
+        flags=re.DOTALL,
+    )
+    if not match:
+        raise AssertionError(f"Unable to extract {constant} from analytics-read-model.ts")
     return match.group(1)
 
 
@@ -80,9 +121,12 @@ def apply_batch(
 def main() -> None:
     schema = MIGRATION.read_text(encoding="utf-8")
     store_source = STORE.read_text(encoding="utf-8")
+    read_model_source = READ_MODEL.read_text(encoding="utf-8")
     content_sql = extract_sql(store_source, "CONTENT_PROJECTION_SQL")
     creator_sql = extract_sql(store_source, "CREATOR_PROJECTION_SQL")
     mark_applied_sql = extract_sql(store_source, "MARK_APPLIED_SQL")
+    content_read_sql, content_metrics = extract_content_summary_sql(read_model_source)
+    creator_read_sql = extract_template(read_model_source, "CREATOR_FOLLOWER_SUMMARY_SQL")
 
     db = sqlite3.connect(":memory:")
     db.executescript(schema)
@@ -128,6 +172,46 @@ def main() -> None:
         "SELECT followers_gained, followers_lost FROM analytics_creator_hourly WHERE creator_id = 'creator_01'"
     ).fetchone()
     assert creator == (1, 1), f"unexpected creator projection: {creator}"
+
+    # Execute the read-model SQL against the same migrated SQLite schema. These
+    # strings are reconstructed from the TypeScript metric map and exact creator
+    # query template so schema/column drift is caught without a mock DB.
+    query_from = "2026-10-14T00:00:00.000Z"
+    query_to = "2026-10-14T01:00:00.000Z"
+    content_params = ("article_01", "article", query_from, query_to, "1.0")
+    content_cursor = db.execute(content_read_sql, content_params)
+    content_row = content_cursor.fetchone()
+    content_summary = {
+        description[0]: value
+        for description, value in zip(content_cursor.description or (), content_row or ())
+    }
+    assert len(content_metrics) == 27
+    assert content_summary["opens"] == 2 and content_summary["likes"] == 1, (
+        f"unexpected content read model: {content_summary}"
+    )
+    plan = " ".join(
+        row[3] for row in db.execute(
+            "EXPLAIN QUERY PLAN " + content_read_sql, content_params
+        )
+    )
+    assert "analytics_content_hourly_content_time_idx" in plan, (
+        f"content summary query should use the composite content/time index: {plan}"
+    )
+
+    creator_cursor = db.execute(
+        creator_read_sql, ("creator_01", query_from, query_to, "1.0")
+    )
+    creator_summary_row = creator_cursor.fetchone()
+    creator_summary = {
+        description[0]: value
+        for description, value in zip(
+            creator_cursor.description or (), creator_summary_row or ()
+        )
+    }
+    assert creator_summary == {"followersGained": 1, "followersLost": 1}, (
+        f"unexpected creator follower read model: {creator_summary}"
+    )
+
     assert db.execute(
         "SELECT COUNT(*) FROM analytics_event_dedupe WHERE projection_status = 'PENDING'"
     ).fetchone()[0] == 0, "all committed events should be marked APPLIED"
@@ -181,7 +265,7 @@ def main() -> None:
     assert "ON CONFLICT" in grouping
     assert "PROJECTION_STATUS = 'PENDING'" in grouping
 
-    print("W11 D1-05 schema smoke test passed: migration, grouped projections, dedupe, privacy, rollback")
+    print("W11 D1-05 schema smoke test passed: migration, grouped writes and reads, index use, dedupe, privacy, rollback")
 
 
 if __name__ == "__main__":
