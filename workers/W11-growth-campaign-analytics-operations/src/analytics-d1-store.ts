@@ -27,6 +27,8 @@ export interface PersistAnalyticsBatchResult {
   attempted: number
   inserted: number
   duplicates: number
+  /** Event IDs ignored by D1 because their event ID or dedupe key already existed. */
+  duplicateEventIds: string[]
 }
 
 const INSERT_COLUMNS = [
@@ -198,7 +200,7 @@ export async function persistAnalyticsEvents(
   }
 
   if (events.length === 0) {
-    return { attempted: 0, inserted: 0, duplicates: 0 }
+    return { attempted: 0, inserted: 0, duplicates: 0, duplicateEventIds: [] }
   }
 
   const placeholders = INSERT_COLUMNS.map(() => '?').join(', ')
@@ -226,17 +228,27 @@ export async function persistAnalyticsEvents(
   }
 
   let inserted = 0
-  for (const result of results.slice(0, events.length)) {
+  const duplicateEventIds: string[] = []
+  for (const [index, result] of results.slice(0, events.length).entries()) {
     const changes = result.meta?.changes
     if (changes !== 0 && changes !== 1) {
       throw new Error('D1 analytics insert did not return a valid changes count')
     }
-    inserted += changes
+    if (changes === 1) {
+      inserted += 1
+    } else {
+      const duplicateId = events[index]?.eventId
+      if (!duplicateId) {
+        throw new Error('D1 analytics duplicate could not be correlated to an event ID')
+      }
+      duplicateEventIds.push(duplicateId)
+    }
   }
 
   return {
     attempted: events.length,
     inserted,
-    duplicates: events.length - inserted,
+    duplicates: duplicateEventIds.length,
+    duplicateEventIds,
   }
 }
