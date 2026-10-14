@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  ANALYTICS_MAX_BATCH_SIZE,
   processAnalyticsBatch,
   validateAnalyticsEvent,
   type AnalyticsEvent,
@@ -125,6 +126,20 @@ describe('W11 analytics event quality', () => {
 
     expect(result.accepted).toHaveLength(0)
     expect(result.outcomes[0]?.reason).toBe('DUPLICATE_EVENT_ID')
+  })
+
+  it('rejects batches above the hard limit before validating each event', () => {
+    const oversized = Array.from(
+      { length: ANALYTICS_MAX_BATCH_SIZE + 1 },
+      (_, index) => event({
+        eventId: `evt_${String(index).padStart(6, '0')}`,
+        dedupeKey: `dedupe_${String(index).padStart(6, '0')}`,
+      }),
+    )
+
+    expect(() => processAnalyticsBatch(oversized, { now })).toThrow(
+      `batch exceeds the ${ANALYTICS_MAX_BATCH_SIZE}-event limit`,
+    )
   })
 
   it('requires authenticated actors for social interaction events', () => {
