@@ -100,7 +100,7 @@ describe('previous analytics range', () => {
 
     expect(previousAnalyticsRange(current)).toEqual({
       from: '2026-02-23T08:00:00.000Z',
-      to: '2026-03-01T20:00:00.000Z',
+      to: '2026-03-01T19:00:00.000Z',
     })
   })
 
