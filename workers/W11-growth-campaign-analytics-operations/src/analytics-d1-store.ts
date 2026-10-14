@@ -194,10 +194,10 @@ function bindValues(
 /**
  * Persist VALID events for live projection and LATE events for durable, explicit replay.
  *
- * Four statements execute in one D1 transaction: insert unique events, aggregate
- * all pending rows by hour/content (not one hot-counter UPDATE per event),
- * aggregate creator follow changes, then mark processed rows. A failure rolls
- * all four operations back, so retrying cannot lose or double-apply projections.
+ * With live events, inserts, grouped content/creator projections and finalization
+ * share one D1 transaction. A late-only batch inserts ledger rows without running
+ * projection SQL. Every live projection query only processes PENDING rows, so
+ * LATE records cannot affect metrics until an explicit replay promotes one hour.
  */
 export async function persistAnalyticsEvents(
   db: AnalyticsD1Database,
