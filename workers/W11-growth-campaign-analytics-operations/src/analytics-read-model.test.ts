@@ -161,6 +161,24 @@ describe('W11 bounded analytics read models', () => {
     expect(fixture.getPrepareCalls()).toBe(0)
   })
 
+  it('keeps the 90-content summary query within 100 D1 bind parameters', async () => {
+    const fixture = fakeDb({ observedContentCount: 0 })
+    const contentIds = Array.from(
+      { length: 90 },
+      (_, index) => `content_${index.toString().padStart(3, '0')}`,
+    )
+
+    const result = await getContentSetAnalyticsSummary(fixture.db, {
+      contentIds,
+      window: { from, to },
+    })
+
+    expect(result.requestedContentCount).toBe(90)
+    expect(result.observedContentCount).toBe(0)
+    expect(fixture.getBoundValues()).toHaveLength(93)
+    expect(fixture.getBoundValues().slice(0, 90)).toEqual(contentIds)
+  })
+
   it('rejects oversized and invalid content ID sets before querying D1', async () => {
     const fixture = fakeDb(null)
     const tooManyIds = Array.from(
