@@ -11,7 +11,7 @@ describe('Twitter Clone UI reuse through LuckRead API adapters', () => {
     const notice = read('src/app/(frontend)/components/reuse/THIRD_PARTY_NOTICES.md')
 
     expect(component).toContain('Tweet, TweetStats and user')
-    expect(component).toContain('/api/v1/interactions/likes?targetType=content&targetId=')
+    expect(component).toContain("'/api/v1/contents/' + encodeURIComponent(contentId) + '/social'")
     expect(component).toContain('/api/v1/interactions/likes')
     expect(component).toContain("'Idempotency-Key': 'twitter-clone-reuse-like:' + crypto.randomUUID()")
     expect(component).toContain("JSON.stringify({ targetType: 'content', targetId: contentId })")
