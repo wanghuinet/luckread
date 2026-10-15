@@ -21,8 +21,8 @@ type ContentDetail = {
 
 type SocialSummary = {
   data?: {
-    counts?: { likes?: number }
-    viewer?: { liked?: boolean } | null
+    counts?: { likes?: number; favorites?: number; comments?: number; shares?: number }
+    viewer?: { liked?: boolean; favorited?: boolean } | null
   }
   error?: { message?: string }
 }
@@ -62,6 +62,9 @@ export default function LuckReadSocialPostCard({
   const [likeCount, setLikeCount] = useState<number | null>(null)
   const [likeStateLoading, setLikeStateLoading] = useState(true)
   const [likeBusy, setLikeBusy] = useState(false)
+  const [bookmarked, setBookmarked] = useState(false)
+  const [bookmarkBusy, setBookmarkBusy] = useState(false)
+  const [shareBusy, setShareBusy] = useState(false)
   const [message, setMessage] = useState('')
 
   const contentHref = '/content/' + encodeURIComponent(slug || contentId)
@@ -84,6 +87,7 @@ export default function LuckReadSocialPostCard({
       setResolvedCreatorId(creatorId ?? null)
       setPostTimestamp(createdAt || updatedAt || '')
       setProfile(null)
+      setBookmarked(false)
       setLikeStateLoading(true)
 
       // The public content-list DTO intentionally omits author metadata. Reuse
@@ -120,6 +124,7 @@ export default function LuckReadSocialPostCard({
         const result = socialResult.value
         const summary = result.data?.data
         setLiked(result.response.ok && summary?.viewer?.liked === true)
+        setBookmarked(result.response.ok && summary?.viewer?.favorited === true)
         setLikeCount(result.response.ok && typeof summary?.counts?.likes === 'number'
           ? Math.max(0, summary.counts.likes)
           : null)
@@ -184,6 +189,88 @@ export default function LuckReadSocialPostCard({
         : locale === 'en' ? 'Like failed.' : '点赞失败，请稍后重试。')
     } finally {
       setLikeBusy(false)
+    }
+  }
+
+  const toggleBookmark = async () => {
+    if (bookmarkBusy || likeStateLoading) return
+    const previousBookmarked = bookmarked
+    setBookmarkBusy(true)
+    setMessage('')
+    try {
+      const { response, data } = await fetchJson<ApiResponse<unknown>>('/api/v1/interactions/bookmarks', {
+        method: previousBookmarked ? 'DELETE' : 'POST',
+        credentials: 'include',
+        headers: {
+          accept: 'application/json',
+          'content-type': 'application/json',
+          'Idempotency-Key': 'twitter-clone-reuse-bookmark:' + crypto.randomUUID(),
+        },
+        body: JSON.stringify({ targetType: 'content', targetId: contentId }),
+      })
+      if (response.status === 401) {
+        requireLogin()
+        return
+      }
+      if (!response.ok) {
+        throw new Error(getApiErrorMessage(data, locale === 'en' ? 'Bookmark failed.' : '收藏失败，请稍后重试。'))
+      }
+      setBookmarked(!previousBookmarked)
+    } catch (cause) {
+      setMessage(cause instanceof Error
+        ? cause.message
+        : locale === 'en' ? 'Bookmark failed.' : '收藏失败，请稍后重试。')
+    } finally {
+      setBookmarkBusy(false)
+    }
+  }
+
+  const shareContent = async () => {
+    if (shareBusy) return
+    setShareBusy(true)
+    setMessage('')
+    try {
+      const { response, data } = await fetchJson<ApiResponse<{ shareId?: string }>>(
+        '/api/v1/content/' + encodeURIComponent(contentId) + '/shares',
+        {
+          method: 'POST',
+          credentials: 'include',
+          cache: 'no-store',
+          headers: {
+            accept: 'application/json',
+            'content-type': 'application/json',
+            'Idempotency-Key': 'twitter-clone-reuse-share:' + crypto.randomUUID(),
+          },
+          body: JSON.stringify({ contentId }),
+        },
+      )
+      if (response.status === 401) {
+        requireLogin()
+        return
+      }
+      const shareId = data?.data?.shareId
+      if (!response.ok || typeof shareId !== 'string' || !shareId) {
+        throw new Error(getApiErrorMessage(data, locale === 'en' ? 'Could not create a share link.' : '暂时无法生成分享链接。'))
+      }
+      const shareUrl = window.location.origin + '/s/' + encodeURIComponent(shareId)
+      if (typeof navigator.share === 'function') {
+        try {
+          await navigator.share({ title, url: shareUrl })
+          setMessage(locale === 'en' ? 'Share opened.' : locale === 'tw' ? '已開啟分享。' : '已打开分享。')
+          return
+        } catch (shareError) {
+          if (shareError instanceof DOMException && shareError.name === 'AbortError') return
+          // Fall back to the clipboard if native sharing is unavailable.
+        }
+      }
+      await navigator.clipboard.writeText(shareUrl)
+      setMessage(locale === 'en' ? 'Share link copied.' : locale === 'tw' ? '已複製分享連結。' : '已复制分享链接。')
+    } catch (cause) {
+      setMessage(cause instanceof Error
+        ? cause.message
+        : locale === 'en' ? 'Could not create a share link.' : '暂时无法生成分享链接。')
+    } finally {
+      setShareBusy(false)
     }
   }
 
@@ -266,6 +353,29 @@ export default function LuckReadSocialPostCard({
               : likeCount === null
                 ? (liked ? (locale === 'en' ? 'Liked' : '已赞') : (locale === 'en' ? 'Like' : '点赞'))
                 : (locale === 'en' ? 'Likes ' : '点赞 ') + likeCount.toLocaleString(dateLocale)}
+          </button>
+          <button
+            className="content-detail-like"
+            type="button"
+            disabled={bookmarkBusy || likeStateLoading}
+            aria-pressed={bookmarked}
+            onClick={() => void toggleBookmark()}
+          >
+            {bookmarkBusy
+              ? (locale === 'en' ? 'Saving…' : locale === 'tw' ? '處理中…' : '处理中…')
+              : bookmarked
+                ? (locale === 'en' ? 'Saved' : locale === 'tw' ? '已收藏' : '已收藏')
+                : (locale === 'en' ? 'Bookmark' : locale === 'tw' ? '收藏' : '收藏')}
+          </button>
+          <button
+            className="content-detail-share"
+            type="button"
+            disabled={shareBusy}
+            onClick={() => void shareContent()}
+          >
+            {shareBusy
+              ? (locale === 'en' ? 'Sharing…' : locale === 'tw' ? '分享中…' : '分享中…')
+              : (locale === 'en' ? 'Share' : locale === 'tw' ? '分享' : '分享')}
           </button>
           {message ? <span className="content-detail-action-status" role="status">{message}</span> : null}
         </footer>
