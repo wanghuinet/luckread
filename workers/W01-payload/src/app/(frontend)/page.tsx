@@ -261,7 +261,7 @@ export default async function HomePage() {
               <p className="eyebrow">FOR CREATORS</p>
               <h2 dangerouslySetInnerHTML={{ __html: copy.home.creatorTitle }} />
               <p>{copy.home.creatorDescription}</p>
-              <Link className="button button-primary home-side-cta" data-umami-event="creator-center-open" href={CREATOR_CENTER_URL}>
+              <Link aria-label={publicLocale === 'en' ? 'Open Creator Studio from the sidebar' : publicLocale === 'tw' ? '從側欄進入創作者中心' : '从侧栏进入创作者中心'} className="button button-primary home-side-cta" data-umami-event="creator-center-open" href={CREATOR_CENTER_URL}>
                 {copy.home.creatorCenter}<span aria-hidden="true">↗</span>
               </Link>
             </section>
