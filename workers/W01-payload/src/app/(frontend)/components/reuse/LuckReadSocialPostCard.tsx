@@ -18,10 +18,17 @@ type PublicProfile = {
   avatar?: string | null
 }
 
-type LikeResponse = {
+type ContentDetail = {
+  id?: string
+  creatorId?: string | null
+  createdAt?: string
+  updatedAt?: string
+}
+
+type SocialSummary = {
   data?: {
-    liked?: boolean
-    likeCount?: number
+    counts?: { likes?: number }
+    viewer?: { liked?: boolean } | null
   }
   error?: { message?: string }
 }
@@ -53,6 +60,8 @@ export default function LuckReadSocialPostCard({
   locale = 'zh',
 }: Props) {
   const [profile, setProfile] = useState<PublicProfile | null>(null)
+  const [resolvedCreatorId, setResolvedCreatorId] = useState<string | null>(creatorId ?? null)
+  const [postTimestamp, setPostTimestamp] = useState(createdAt || updatedAt || '')
   const [liked, setLiked] = useState(false)
   const [likeCount, setLikeCount] = useState<number | null>(null)
   const [likeStateLoading, setLikeStateLoading] = useState(true)
@@ -64,10 +73,9 @@ export default function LuckReadSocialPostCard({
     locale === 'en' ? 'LuckRead creator' : locale === 'tw' ? 'LuckRead 創作者' : 'LuckRead 创作者'
   )
   const username = profile?.username ? '@' + profile.username : ''
-  const timestamp = createdAt || updatedAt
   const dateLocale = locale === 'en' ? 'en-US' : locale === 'tw' ? 'zh-TW' : 'zh-CN'
-  const formattedDate = timestamp && Number.isFinite(Date.parse(timestamp))
-    ? new Date(timestamp).toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' })
+  const formattedDate = postTimestamp && Number.isFinite(Date.parse(postTimestamp))
+    ? new Date(postTimestamp).toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' })
     : ''
 
   useEffect(() => {
@@ -75,15 +83,22 @@ export default function LuckReadSocialPostCard({
     let cancelled = false
 
     const load = async () => {
-      const profileRequest = creatorId
-        ? fetchJson<PublicProfile>('/api/v1/users/' + encodeURIComponent(creatorId), {
+      setResolvedCreatorId(creatorId ?? null)
+      setPostTimestamp(createdAt || updatedAt || '')
+      setProfile(null)
+      setLikeStateLoading(true)
+
+      // The public content-list DTO intentionally omits author metadata. Reuse
+      // the existing detail endpoint only when the caller cannot supply it.
+      const detailRequest = creatorId
+        ? Promise.resolve(null)
+        : fetchJson<ContentDetail>('/api/v1/contents/' + encodeURIComponent(slug || contentId), {
             headers: { accept: 'application/json' },
             cache: 'no-store',
             signal: controller.signal,
           })
-        : Promise.resolve(null)
-      const likeRequest = fetchJson<LikeResponse>(
-        '/api/v1/interactions/likes?targetType=content&targetId=' + encodeURIComponent(contentId),
+      const socialRequest = fetchJson<SocialSummary>(
+        '/api/v1/contents/' + encodeURIComponent(contentId) + '/social',
         {
           credentials: 'include',
           headers: { accept: 'application/json' },
@@ -92,23 +107,42 @@ export default function LuckReadSocialPostCard({
         },
       )
 
-      const [profileResult, likeResult] = await Promise.allSettled([profileRequest, likeRequest])
+      const [detailResult, socialResult] = await Promise.allSettled([detailRequest, socialRequest])
       if (cancelled) return
 
-      if (profileResult.status === 'fulfilled' && profileResult.value?.response.ok) {
-        const nextProfile = profileResult.value.data
-        if (nextProfile && typeof nextProfile.id === 'string') setProfile(nextProfile)
+      let authorId = creatorId ?? null
+      if (detailResult.status === 'fulfilled' && detailResult.value?.response.ok) {
+        const detail = detailResult.value.data
+        authorId = authorId || (typeof detail?.creatorId === 'string' ? detail.creatorId : null)
+        setPostTimestamp(createdAt || updatedAt || detail?.createdAt || detail?.updatedAt || '')
+        setResolvedCreatorId(authorId)
       }
 
-      if (likeResult.status === 'fulfilled') {
-        const result = likeResult.value
-        const data = result.data
-        setLiked(result.response.ok && data?.data?.liked === true)
-        setLikeCount(result.response.ok && typeof data?.data?.likeCount === 'number'
-          ? Math.max(0, data.data.likeCount)
+      if (socialResult.status === 'fulfilled') {
+        const result = socialResult.value
+        const summary = result.data?.data
+        setLiked(result.response.ok && summary?.viewer?.liked === true)
+        setLikeCount(result.response.ok && typeof summary?.counts?.likes === 'number'
+          ? Math.max(0, summary.counts.likes)
           : null)
       }
-      setLikeStateLoading(false)
+
+      if (authorId) {
+        try {
+          const { response, data } = await fetchJson<PublicProfile>(
+            '/api/v1/users/' + encodeURIComponent(authorId),
+            {
+              headers: { accept: 'application/json' },
+              cache: 'no-store',
+              signal: controller.signal,
+            },
+          )
+          if (!cancelled && response.ok && data && typeof data.id === 'string') setProfile(data)
+        } catch {
+          // The social post remains readable if public profile metadata is unavailable.
+        }
+      }
+      if (!cancelled) setLikeStateLoading(false)
     }
 
     void load().catch(() => {
@@ -119,7 +153,7 @@ export default function LuckReadSocialPostCard({
       cancelled = true
       controller.abort()
     }
-  }, [contentId, creatorId])
+  }, [contentId, creatorId, createdAt, updatedAt, slug])
 
   const requireLogin = () => {
     const returnTo = window.location.pathname + window.location.search + window.location.hash
@@ -165,8 +199,8 @@ export default function LuckReadSocialPostCard({
   return (
     <article className={styles.card} data-testid="luckread-social-post-card">
       <header className={styles.header}>
-        {creatorId ? (
-          <Link className={styles.avatarLink} href={'/users/' + encodeURIComponent(creatorId)} aria-label={profileName}>
+        {resolvedCreatorId ? (
+          <Link className={styles.avatarLink} href={'/users/' + encodeURIComponent(resolvedCreatorId)} aria-label={profileName}>
             {profile?.avatar ? (
               <img className={styles.avatar} src={profile.avatar} alt="" loading="lazy" />
             ) : (
@@ -183,8 +217,8 @@ export default function LuckReadSocialPostCard({
             {formattedDate}
           </span>
         </div>
-        {creatorId ? (
-          <Link className={styles.profileLink} href={'/users/' + encodeURIComponent(creatorId)}>
+        {resolvedCreatorId ? (
+          <Link className={styles.profileLink} href={'/users/' + encodeURIComponent(resolvedCreatorId)}>
             {locale === 'en' ? 'Profile' : locale === 'tw' ? '個人頁' : '主页'}
           </Link>
         ) : null}
