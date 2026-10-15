@@ -22,7 +22,6 @@ describe('public frontend i18n', () => {
     const creatorHome = read('src/app/(twitter-clone)/CreatorDomainHome.tsx')
     const browse = read('src/app/(frontend)/content/page.tsx')
     const detail = read('src/app/(frontend)/content/[contentId]/ContentDetailClient.tsx')
-    const detailPage = read('src/app/(frontend)/content/[contentId]/page.tsx')
     const comments = read('src/app/(frontend)/content/[contentId]/ContentComments.tsx')
 
     expect(toggle).toContain('PUBLIC_LOCALES.map')

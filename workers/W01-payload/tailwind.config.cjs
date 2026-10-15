@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports -- Tailwind v3 consumes this CommonJS config. */
 const defaultTheme = require('tailwindcss/defaultTheme')
 
 module.exports = {
