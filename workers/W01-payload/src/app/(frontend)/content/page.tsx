@@ -5,13 +5,16 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { fetchJson, getApiErrorMessage } from '../../../lib/client-api.js'
 import PublicLanguageToggle, { usePublicLocale } from '../i18n/PublicLanguageToggle'
-import { getPublicCopy, type PublicLocale } from '../i18n/public-locale'
+import LuckReadSocialPostCard from '../components/reuse/LuckReadSocialPostCard'
 import ArticleSummaryPreview from '../../../components/ArticleSummaryPreview.js'
+import { getPublicCopy, type PublicLocale } from '../i18n/public-locale'
 
 type ContentType = 'article' | 'post' | 'video'
 type ContentItem = {
   id: string
   slug?: string
+  creatorId?: string | null
+  createdAt?: string
   contentType: ContentType
   title: string
   bodyRef?: string
@@ -177,6 +180,22 @@ export default function ContentBrowsePage() {
         <>
           <section className="content-browse-grid" aria-label={locale === 'en' ? 'Public content list' : locale === 'tw' ? '公開內容列表' : '公开内容列表'}>
             {page.items.map((item) => {
+              if (item.contentType === 'post') {
+                return (
+                  <LuckReadSocialPostCard
+                    key={item.id}
+                    contentId={item.id}
+                    slug={item.slug}
+                    title={item.title}
+                    creatorId={item.creatorId}
+                    coverRef={item.coverRef}
+                    mediaRefs={item.mediaRefs}
+                    createdAt={item.createdAt}
+                    updatedAt={item.updatedAt}
+                    locale={locale}
+                  />
+                )
+              }
               const cover = item.coverRef
               return (
                 <Link className="content-feed-card" data-umami-event="content-open" data-umami-event-content-type={item.contentType} href={'/content/' + encodeURIComponent(item.slug || item.id)} key={item.id}>
