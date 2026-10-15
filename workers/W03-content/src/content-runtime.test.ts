@@ -564,6 +564,80 @@ describe('W03 content contract core', () => {
 
 
 
+  it('queries a bounded Following feed globally by published owner and scopes its cursor to that owner set', async () => {
+    const preparedQueries: string[] = []
+    const boundParams: unknown[][] = []
+    const rows = [
+      {
+        id: 'content_2',
+        content_type: 'post',
+        owner_user_id: 'user_2',
+        creator_id: null,
+        ip_id: null,
+        state: 'PUBLISHED',
+        scheduled_at: null,
+        version: 1,
+        revision: 1,
+        slug: 'content-2',
+        title: 'Newer post',
+        body_ref: 'https://cdn.example.com/body-2.json',
+        media_refs_json: '[]',
+        cover_ref: null,
+        etag: 'W/"1"',
+        created_at: '2026-10-02T12:01:00.000Z',
+        updated_at: '2026-10-02T12:01:00.000Z',
+      },
+      {
+        id: 'content_1',
+        content_type: 'article',
+        owner_user_id: 'user_1',
+        creator_id: 'creator_1',
+        ip_id: null,
+        state: 'PUBLISHED',
+        scheduled_at: null,
+        version: 1,
+        revision: 1,
+        slug: 'content-1',
+        title: 'Older article',
+        body_ref: 'https://cdn.example.com/body-1.json',
+        media_refs_json: '[]',
+        cover_ref: null,
+        etag: 'W/"1"',
+        created_at: '2026-10-02T12:00:00.000Z',
+        updated_at: '2026-10-02T12:00:00.000Z',
+      },
+    ]
+    const db = {
+      prepare(query: string) {
+        preparedQueries.push(query)
+        return {
+          bind(...values: unknown[]) {
+            boundParams.push(values)
+            return { all: async () => ({ results: rows }) }
+          },
+        }
+      },
+    } as never
+
+    const page = await listFollowingFeedContents(db, ['user_2', 'user_1'], null, 1)
+    expect(page.items).toHaveLength(1)
+    expect(page.items[0]?.ownerUserId).toBe('user_2')
+    expect(page.hasMore).toBe(true)
+    expect(page.nextCursor).toEqual(expect.any(String))
+    expect(preparedQueries).toHaveLength(1)
+    expect(preparedQueries[0]).toContain("state = 'PUBLISHED'")
+    expect(preparedQueries[0]).toContain('owner_user_id IN (SELECT value FROM json_each(?))')
+    expect(preparedQueries[0]).toContain('ORDER BY created_at DESC, id DESC')
+    expect(boundParams[0]?.[0]).toBe(JSON.stringify(['user_1', 'user_2']))
+    expect(boundParams[0]?.at(-1)).toBe(2)
+
+    await expect(listFollowingFeedContents(db, ['user_3'], page.nextCursor, 1)).rejects.toMatchObject({
+      code: 'INVALID_CURSOR',
+      status: 400,
+    })
+    expect(preparedQueries).toHaveLength(1)
+  })
+
   it('filters public content by creator while keeping only published rows', async () => {
     const preparedQueries: string[] = []
     const row = {
