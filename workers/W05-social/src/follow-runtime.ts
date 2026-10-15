@@ -259,6 +259,185 @@ async function listFollowRelations(
   }
 }
 
+
+export type FollowingFeedItem = {
+  id: string
+  slug: string | null
+  creatorId: string | null
+  createdAt: string
+  contentType: 'article' | 'post' | 'video'
+  title: string
+  bodyRef: string | null
+  mediaRefs: string[]
+  coverRef: string | null
+  updatedAt: string
+}
+
+export type FollowingFeedPage = {
+  items: FollowingFeedItem[]
+  nextCursor: string | null
+  hasMore: boolean
+}
+
+type FollowingFeedCursor = {
+  version: 1
+  viewerUserId: string
+  createdAt: string
+  contentId: string
+}
+
+type FollowingFeedRow = {
+  id: string
+  slug: string | null
+  owner_user_id: string | null
+  creator_id: string | null
+  created_at: string
+  content_type: 'article' | 'post' | 'video'
+  title: string
+  body_ref: string | null
+  media_refs_json: string | null
+  cover_ref: string | null
+  updated_at: string
+}
+
+const FOLLOWING_FEED_MAX_CURSOR_LENGTH = 2048
+
+const encodeFollowingFeedCursor = (payload: FollowingFeedCursor): string =>
+  btoa(JSON.stringify(payload)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '')
+
+const decodeFollowingFeedCursor = (
+  value: string | null,
+  viewerUserId: string,
+): FollowingFeedCursor | null => {
+  if (!value) return null
+  if (value.length > FOLLOWING_FEED_MAX_CURSOR_LENGTH) {
+    throw new FollowRuntimeError('INVALID_CURSOR', 400)
+  }
+  try {
+    const padded = value.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - value.length % 4) % 4)
+    const parsed = JSON.parse(atob(padded)) as Partial<FollowingFeedCursor>
+    if (
+      parsed.version !== 1 ||
+      parsed.viewerUserId !== viewerUserId ||
+      typeof parsed.createdAt !== 'string' ||
+      !Number.isFinite(Date.parse(parsed.createdAt)) ||
+      typeof parsed.contentId !== 'string' ||
+      !/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(parsed.contentId)
+    ) {
+      throw new Error('invalid cursor')
+    }
+    return {
+      version: 1,
+      viewerUserId,
+      createdAt: parsed.createdAt,
+      contentId: parsed.contentId,
+    }
+  } catch {
+    throw new FollowRuntimeError('INVALID_CURSOR', 400)
+  }
+}
+
+export const parseFollowingFeedLimit = (value: string | null): number => {
+  if (value === null || value.trim() === '') return DEFAULT_LIMIT
+  const normalized = value.trim()
+  if (!/^(?:[1-9]|[1-4][0-9]|50)$/.test(normalized)) {
+    throw new FollowRuntimeError('VALIDATION_FAILED', 400)
+  }
+  return Number(normalized)
+}
+
+const parseMediaRefs = (value: string | null): string[] => {
+  if (!value) return []
+  try {
+    const parsed: unknown = JSON.parse(value)
+    return Array.isArray(parsed) && parsed.every((item) => typeof item === 'string')
+      ? parsed
+      : []
+  } catch {
+    return []
+  }
+}
+
+export async function listFollowingFeed(
+  db: D1Database,
+  viewerUserId: string,
+  cursorValue: string | null,
+  limit: number,
+): Promise<FollowingFeedPage> {
+  const viewerId = userId(viewerUserId)
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > MAX_LIMIT) {
+    throw new FollowRuntimeError('VALIDATION_FAILED', 400)
+  }
+  const cursor = decodeFollowingFeedCursor(cursorValue, viewerId)
+  const cursorClause = cursor
+    ? 'AND (c.created_at < ? OR (c.created_at = ? AND c.id < ?))'
+    : ''
+  const sql = String.raw\`
+    SELECT c.id, c.slug, c.owner_user_id, c.creator_id, c.created_at,
+           c.content_type, c.title, c.body_ref, c.media_refs_json,
+           c.cover_ref, c.updated_at
+      FROM contents c
+     WHERE c.state = 'PUBLISHED'
+       AND EXISTS (
+         SELECT 1
+           FROM social_follow_relationships f
+          WHERE f.follower_user_id = ?
+            AND (f.target_user_id = c.owner_user_id OR f.target_user_id = c.creator_id)
+       )
+       AND NOT EXISTS (
+         SELECT 1
+           FROM social_user_interactions b
+          WHERE b.relation_type = 'block'
+            AND (
+              (b.actor_user_id = ? AND (b.target_user_id = c.owner_user_id OR b.target_user_id = c.creator_id))
+              OR
+              ((b.actor_user_id = c.owner_user_id OR b.actor_user_id = c.creator_id) AND b.target_user_id = ?)
+            )
+       )
+       AND NOT EXISTS (
+         SELECT 1
+           FROM social_user_interactions m
+          WHERE m.relation_type = 'mute'
+            AND m.actor_user_id = ?
+            AND (m.target_user_id = c.owner_user_id OR m.target_user_id = c.creator_id)
+       )
+       \${cursorClause}
+     ORDER BY c.created_at DESC, c.id DESC
+     LIMIT ?\`
+  const bindings: unknown[] = cursor
+    ? [viewerId, viewerId, viewerId, viewerId, cursor.createdAt, cursor.createdAt, cursor.contentId, limit + 1]
+    : [viewerId, viewerId, viewerId, viewerId, limit + 1]
+  const result = await db.prepare(sql).bind(...bindings).all<FollowingFeedRow>()
+  const rows = result.results ?? []
+  const hasMore = rows.length > limit
+  const visibleRows = hasMore ? rows.slice(0, limit) : rows
+  const items = visibleRows.map((row): FollowingFeedItem => ({
+    id: row.id,
+    slug: row.slug,
+    creatorId: row.creator_id ?? row.owner_user_id,
+    createdAt: row.created_at,
+    contentType: row.content_type,
+    title: row.title,
+    bodyRef: row.body_ref,
+    mediaRefs: parseMediaRefs(row.media_refs_json),
+    coverRef: row.cover_ref,
+    updatedAt: row.updated_at,
+  }))
+  const last = visibleRows.at(-1)
+  return {
+    items,
+    hasMore,
+    nextCursor: hasMore && last
+      ? encodeFollowingFeedCursor({
+          version: 1,
+          viewerUserId: viewerId,
+          createdAt: last.created_at,
+          contentId: last.id,
+        })
+      : null,
+  }
+}
+
 export async function follow(db: D1Database, followerUserId: string, targetUserId: string): Promise<FollowRow> {
   const follower = userId(followerUserId)
   const target = userId(targetUserId)
