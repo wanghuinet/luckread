@@ -7,6 +7,7 @@ import {
   deleteContent,
   getContent,
   listContents,
+  listFollowingFeedContents,
   listCreatorContents,
   validateListFilters,
   toErrorResponse,
@@ -279,6 +280,62 @@ const worker = {
             ifMatch,
             idempotencyKey,
           }),
+          requestId: createRequestId(),
+        })
+      }
+
+      if (request.method === 'POST' && url.pathname === '/internal/content/following-feed') {
+        const principalUserId = request.headers.get('X-LuckRead-Principal-User-Id')?.trim() ?? ''
+        if (
+          request.headers.get('X-LuckRead-Caller') !== 'W04' ||
+          request.headers.get('X-LuckRead-Transport-Version') !== '1.0' ||
+          !request.headers.get('X-LuckRead-Correlation-Id')?.trim() ||
+          !/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(principalUserId) ||
+          request.headers.has('Authorization')
+        ) {
+          throw new ContentRuntimeError('PERMISSION_DENIED', 403)
+        }
+        const body = await parseBody(request)
+        if (
+          Object.keys(body).some((key) => !['ownerUserIds', 'cursor', 'limit'].includes(key)) ||
+          !Array.isArray(body.ownerUserIds) ||
+          body.ownerUserIds.length > 500 ||
+          !Number.isSafeInteger(body.limit) ||
+          Number(body.limit) < 1 ||
+          Number(body.limit) > 50 ||
+          !(body.cursor === null || typeof body.cursor === 'string') ||
+          (typeof body.cursor === 'string' && body.cursor.length > 2048) ||
+          body.ownerUserIds.some((id) => typeof id !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(id))
+        ) {
+          throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+        }
+        const page = await listFollowingFeedContents(
+          env.D1_02,
+          body.ownerUserIds as string[],
+          body.cursor as string | null,
+          Number(body.limit),
+        )
+        return json({
+          data: {
+            items: page.items.map((item) => ({
+              id: item.id,
+              slug: item.slug,
+              ownerUserId: item.ownerUserId,
+              creatorId: item.creatorId,
+              createdAt: item.createdAt,
+              updatedAt: item.updatedAt,
+              contentType: item.contentType,
+              state: item.state,
+              version: item.version,
+              etag: item.etag,
+              title: item.title,
+              bodyRef: item.bodyRef,
+              mediaRefs: item.mediaRefs,
+              coverRef: item.coverRef,
+            })),
+            nextCursor: page.nextCursor,
+            hasMore: page.hasMore,
+          },
           requestId: createRequestId(),
         })
       }
