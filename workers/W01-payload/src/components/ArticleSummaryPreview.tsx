@@ -6,7 +6,6 @@ import {
   extractArticleSummary,
   resolvePublicArticleBodyUrl,
 } from '../lib/article-summary-preview.js'
-import styles from './ArticleSummaryPreview.module.css'
 
 type Props = {
   bodyRef?: string | null
@@ -89,12 +88,12 @@ export default function ArticleSummaryPreview({ bodyRef, label }: Props) {
   if (!bodyRef || (!loading && failed)) return null
 
   return (
-    <div ref={rootRef} className={styles.container} aria-label={label}>
-      <span className={styles.label}>{label}</span>
+    <div ref={rootRef} aria-label={label}>
+      <span className="content-feed-meta">{label}</span>
       {summary ? (
-        <p className={styles.summary}>{summary}</p>
+        <p className="content-detail-action-status">{summary}</p>
       ) : (
-        <span className={styles.skeleton} aria-hidden="true" />
+        <span className="content-feed-skeleton-line content-feed-skeleton-line-title" aria-hidden="true" />
       )}
     </div>
   )
