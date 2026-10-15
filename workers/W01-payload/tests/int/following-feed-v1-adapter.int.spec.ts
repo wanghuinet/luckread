@@ -20,7 +20,7 @@ describe('v1 following feed adapter and home timeline', () => {
     const w01Client = read('src/feed/w04-feed-client.ts')
     const w01Bindings = read('wrangler.jsonc')
     const w04Runtime = read('../W04-feed-search/src/index.ts')
-    const w04Bindings = read('../../W04-feed-search/wrangler.jsonc')
+    const w04Bindings = read('../W04-feed-search/wrangler.jsonc')
     expect(w01Client).toContain("W04_FEED?: W04FeedService")
     expect(w01Bindings).toContain('"binding": "W04_FEED"')
     expect(w04Runtime).toContain("'/internal/feed/following'")
