@@ -39,7 +39,7 @@ function ThreadNode<T extends DiscussionCommentRef>({
     >
       <div className={styles.commentContent}>{renderComment(node.comment)}</div>
       {node.children.length > 0 ? (
-        <div className={styles.children} role="group" aria-label="Replies">
+        <div className={styles.children} role="list" aria-label="Replies">
           {node.children.map((child) => (
             <ThreadNode key={child.comment.id} node={child} renderComment={renderComment} />
           ))}
