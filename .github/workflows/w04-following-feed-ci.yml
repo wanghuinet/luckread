@@ -1,0 +1,59 @@
+name: W04 Following Feed CI
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "workers/W04-feed-search/src/**"
+      - "workers/W04-feed-search/wrangler.jsonc"
+      - "workers/W03-content/src/**"
+      - "workers/W05-social/src/**"
+      - "workers/W01-payload/src/app/api/v1/feed/**"
+      - "workers/W01-payload/wrangler.jsonc"
+      - "workers/W01-payload/tests/int/following-feed-v1-adapter.int.spec.ts"
+      - ".github/workflows/w04-following-feed-ci.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  following-feed:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: W04 Following feed tests
+        run: npx --no-install vitest run workers/W04-feed-search/src/index.test.ts workers/W04-feed-search/src/auth-013-projection.test.ts
+      - name: Typecheck W04 Following feed runtime
+        run: >
+          npx --no-install tsc --noEmit --strict --skipLibCheck
+          --target ES2022 --module ESNext --moduleResolution Bundler
+          --lib ES2022,DOM --types @cloudflare/workers-types
+          workers/W04-feed-search/src/index.ts
+          workers/W04-feed-search/src/auth-013-projection.ts
+      - name: Typecheck W03 content feed boundary
+        run: >
+          npx --no-install tsc --noEmit --strict --skipLibCheck
+          --target ES2022 --module ESNext --moduleResolution Bundler
+          --lib ES2022,DOM --types @cloudflare/workers-types
+          workers/W03-content/src/content-runtime.ts
+          workers/W03-content/src/index.ts
+      - name: Validate Worker bindings
+        run: |
+          node --input-type=module - <<'NODE'
+          import fs from 'node:fs'
+          const w01 = fs.readFileSync('workers/W01-payload/wrangler.jsonc', 'utf8')
+          const w04 = fs.readFileSync('workers/W04-feed-search/wrangler.jsonc', 'utf8')
+          for (const token of ['"binding": "W04_FEED"', '"service": "luckread-w04"']) {
+            if (!w01.includes(token)) throw new Error('Missing W01 feed binding: ' + token)
+          }
+          for (const token of ['"binding": "W03_CONTENT"', '"service": "luckread-w03"', '"binding": "W05_SOCIAL"', '"service": "luckread-w05"']) {
+            if (!w04.includes(token)) throw new Error('Missing W04 feed dependency binding: ' + token)
+          }
+          if (w04.includes('"d1_databases"')) throw new Error('W04 must not gain a D1 binding')
+          NODE
