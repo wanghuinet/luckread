@@ -154,3 +154,89 @@
 @media (prefers-reduced-motion: reduce) {
   .card, .action, .actionLiked { transition: none; }
 }
+
+
+.mediaGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-rows: minmax(94px, 1fr);
+  gap: 3px;
+  width: 100%;
+  max-height: 360px;
+  margin: 0 0 12px;
+  overflow: hidden;
+  border: 1px solid #e5e7eb;
+  border-radius: 13px;
+  background: #e5e7eb;
+}
+
+.mediaItem {
+  position: relative;
+  display: block;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: #111827;
+}
+
+.mediaItem img,
+.mediaItem video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  object-fit: cover;
+  background: #111827;
+}
+
+.mediaGrid[data-count='1'] {
+  display: block;
+  aspect-ratio: 1.55;
+}
+
+.mediaGrid[data-count='1'] .mediaItem {
+  width: 100%;
+  height: 100%;
+}
+
+.mediaGrid[data-count='2'] {
+  aspect-ratio: 1.55;
+}
+
+.mediaGrid[data-count='3'] {
+  grid-template-columns: 1.2fr 1fr;
+  grid-template-rows: repeat(2, minmax(86px, 1fr));
+  aspect-ratio: 1.28;
+}
+
+.mediaGrid[data-count='3'] .mediaItem:first-child {
+  grid-row: 1 / span 2;
+}
+
+.mediaGrid[data-count='4'] {
+  grid-template-rows: repeat(2, minmax(86px, 1fr));
+  aspect-ratio: 1.28;
+}
+
+.videoMark {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, .48);
+  border-radius: 50%;
+  color: #fff;
+  background: rgba(0, 0, 0, .55);
+  font-size: 11px;
+  pointer-events: none;
+}
+
+@media (max-width: 560px) {
+  .mediaGrid[data-count='3'],
+  .mediaGrid[data-count='4'] {
+    grid-auto-rows: minmax(76px, 1fr);
+  }
+}
