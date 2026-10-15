@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react'
 
 import { getPublicCopy, type PublicLocale } from './i18n/public-locale'
 import { fetchJson } from '../../lib/client-api.js'
+import LuckReadSocialPostCard from './components/reuse/LuckReadSocialPostCard'
 import ArticleSummaryPreview from '../../components/ArticleSummaryPreview.js'
 
 type ContentType = 'article' | 'post' | 'video'
@@ -12,6 +13,8 @@ type ContentType = 'article' | 'post' | 'video'
 type ContentItem = {
   id: string
   slug?: string
+  creatorId?: string | null
+  createdAt?: string
   contentType: ContentType
   title: string
   bodyRef?: string
@@ -126,6 +129,22 @@ export default function HomeContentFeed({
             </div>
           ))
         ) : items.map((item) => {
+          if (item.contentType === 'post') {
+            return (
+              <LuckReadSocialPostCard
+                key={item.id}
+                contentId={item.id}
+                slug={item.slug}
+                title={item.title}
+                creatorId={item.creatorId}
+                coverRef={item.coverRef}
+                mediaRefs={item.mediaRefs}
+                createdAt={item.createdAt}
+                updatedAt={item.updatedAt}
+                locale={locale}
+              />
+            )
+          }
           const cover = item.coverRef
           return (
             <Link className="content-feed-card" data-umami-event="content-open" data-umami-event-content-type={item.contentType} href={`/content/${encodeURIComponent(item.slug || item.id)}`} key={item.id}>
@@ -137,7 +156,7 @@ export default function HomeContentFeed({
                     <img alt={item.title ? item.title + copy.content.cover : copy.content.cover} loading="lazy" src={cover} />
                   )
                 ) : (
-                  <span>{item.contentType === 'post' ? 'POST' : 'LUCKREAD'}</span>
+                  <span>LUCKREAD</span>
                 )}
               </div>
               <div className="content-feed-body">
