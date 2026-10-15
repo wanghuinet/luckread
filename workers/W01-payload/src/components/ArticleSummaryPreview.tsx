@@ -21,10 +21,12 @@ export default function ArticleSummaryPreview({ bodyRef, label }: Props) {
   const rootRef = useRef<HTMLDivElement | null>(null)
   const [summary, setSummary] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [failed, setFailed] = useState(false)
 
   useEffect(() => {
     setSummary(null)
     setLoading(false)
+    setFailed(false)
     if (!bodyRef) return
 
     const root = rootRef.current
@@ -37,7 +39,10 @@ export default function ArticleSummaryPreview({ bodyRef, label }: Props) {
       if (started) return
       started = true
       const url = resolvePublicArticleBodyUrl(bodyRef, window.location.origin)
-      if (!url) return
+      if (!url) {
+        setFailed(true)
+        return
+      }
 
       setLoading(true)
       try {
@@ -48,11 +53,17 @@ export default function ArticleSummaryPreview({ bodyRef, label }: Props) {
           referrerPolicy: 'no-referrer',
           signal: controller.signal,
         })
-        if (!response.ok) return
+        if (!response.ok) {
+          setFailed(true)
+          return
+        }
         const raw = await response.text()
         if (controller.signal.aborted) return
-        setSummary(extractArticleSummary(raw))
+        const excerpt = extractArticleSummary(raw)
+        if (excerpt) setSummary(excerpt)
+        else setFailed(true)
       } catch {
+        if (!controller.signal.aborted) setFailed(true)
         // A missing or inaccessible preview must not block the canonical content link.
       } finally {
         if (!controller.signal.aborted) setLoading(false)
@@ -78,7 +89,7 @@ export default function ArticleSummaryPreview({ bodyRef, label }: Props) {
     }
   }, [bodyRef])
 
-  if (!bodyRef || (!loading && !summary)) return null
+  if (!bodyRef || (!loading && failed)) return null
 
   return (
     <div ref={rootRef} className={styles.container} aria-label={label}>
