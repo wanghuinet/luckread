@@ -784,4 +784,30 @@ describe('W05 social comment transport', () => {
     )
     expect(response.status).toBe(401)
   })
+  it('serves Following feed candidates only through the trusted W04 transport', async () => {
+    const response = await worker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/users/viewer-1/following-feed-candidates', {
+        headers: {
+          ...transportHeaders,
+          'X-LuckRead-Caller': 'W04',
+        },
+      }),
+      { DB: dbFor([{ user_id: 'author-1' }, { user_id: 'author-2' }]) },
+    )
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({
+      data: { userIds: ['author-1', 'author-2'], hasMore: false },
+    })
+  })
+
+  it('rejects Following feed candidate requests from callers other than W04', async () => {
+    const response = await worker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/users/viewer-1/following-feed-candidates', {
+        headers: { ...transportHeaders, 'X-LuckRead-Caller': 'W01' },
+      }),
+      { DB: dbFor([]) },
+    )
+    expect(response.status).toBe(403)
+  })
+
 })
