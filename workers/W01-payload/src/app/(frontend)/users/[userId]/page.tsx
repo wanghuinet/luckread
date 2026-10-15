@@ -571,12 +571,11 @@ export default function PublicProfilePage({
             </button>
             {mutualFollow ? <span className="creator-profile-badge">互相关注</span> : null}
           </div>
-          </div>
             </>
           }
         />
 
-                <TwitterCloneProfileNav
+        <TwitterCloneProfileNav
           selected={filter}
           labels={filterLabels}
           onSelect={(value) => { void reloadContents(value) }}
