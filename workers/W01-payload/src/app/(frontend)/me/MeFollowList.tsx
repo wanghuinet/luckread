@@ -239,7 +239,7 @@ export default function MeFollowList({ direction }: { direction: Direction }) {
       ) : null}
 
       {items.length > 0 ? (
-        <section aria-label={isFollowers ? '粉丝列表' : '关注列表'} style={{ marginTop: 24, display: 'grid', gap: 10 }}>
+        <section className="twitter-follow-list" aria-label={isFollowers ? '粉丝列表' : '关注列表'}>
           {items.map((item) => (
             <TwitterCloneFollowRow
               key={item.relationshipId}
