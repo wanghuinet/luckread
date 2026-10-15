@@ -93,6 +93,23 @@ const requirePrincipal = (request: Request): string => {
   return id
 }
 
+const requireFollowingFeedPrincipal = (request: Request): string => {
+  if (
+    request.headers.get('X-LuckRead-Caller') !== 'W04' ||
+    request.headers.get('X-LuckRead-Transport-Version') !== '1.0' ||
+    !request.headers.get('X-LuckRead-Correlation-Id')?.trim() ||
+    request.headers.has('Authorization') ||
+    request.headers.has('Cookie')
+  ) {
+    throw new FollowRuntimeError('PERMISSION_DENIED', 403)
+  }
+  const id = request.headers.get('X-LuckRead-Principal-User-Id')?.trim() ?? ''
+  if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(id)) {
+    throw new FollowRuntimeError('UNAUTHENTICATED', 401)
+  }
+  return id
+}
+
 const requireInteractionLayer = (request: Request): void => {
   const layer = request.headers.get('X-LuckRead-Principal-Layer')?.trim() ?? ''
   if (!/^L[0-8]$/.test(layer) || Number(layer.slice(1)) < 2) {
@@ -600,7 +617,7 @@ export default {
         if (request.method !== 'GET') {
           return new Response(null, { status: 405, headers: { Allow: 'GET' } })
         }
-        const viewerUserId = requirePrincipal(request)
+        const viewerUserId = requireFollowingFeedPrincipal(request)
         const limit = parseFollowingFeedLimit(url.searchParams.get('limit'))
         const cursor = url.searchParams.get('cursor')
         const page = await listFollowingFeed(env.DB, viewerUserId, cursor, limit)
