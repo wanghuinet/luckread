@@ -1,0 +1,41 @@
+name: Temporary W01 Tailwind lockfile sync
+
+on:
+  push:
+    branches:
+      - feat/twitter-clone-ui-reuse
+    paths:
+      - workers/W01-payload/package.json
+      - .github/workflows/z-temp-tailwind-lock-sync.yml
+
+permissions:
+  contents: write
+
+jobs:
+  sync-lockfile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/twitter-clone-ui-reuse
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Refresh W01 pnpm lock
+        working-directory: workers/W01-payload
+        run: pnpm install --lockfile-only --no-frozen-lockfile
+      - name: Commit lockfile if changed
+        run: |
+          if git diff --quiet -- workers/W01-payload/pnpm-lock.yaml; then
+            echo "Lockfile already current"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add workers/W01-payload/pnpm-lock.yaml
+          git commit -m "chore(w01): sync Tailwind lockfile"
+          git push origin feat/twitter-clone-ui-reuse
