@@ -112,6 +112,21 @@ describe('public creator profile', () => {
     expect(page).toContain('signal: controller.signal')
   })
 
+  it('reuses the Twitter Clone social post card for dynamic items on public profiles', () => {
+    const page = read('src/app/(frontend)/users/[userId]/page.tsx')
+    const card = read('src/app/(frontend)/components/reuse/LuckReadSocialPostCard.tsx')
+
+    expect(page).toContain("import LuckReadSocialPostCard from '../../components/reuse/LuckReadSocialPostCard'")
+    expect(page).toContain("if (item.contentType === 'post')")
+    expect(page).toContain('<LuckReadSocialPostCard')
+    expect(page).toContain('creatorId={item.creatorId ?? profile?.id}')
+    expect(page).toContain('mediaRefs={item.mediaRefs}')
+    expect(page).toContain('createdAt={item.createdAt}')
+    expect(page).toContain('href={getContentHref(item)}')
+    expect(card).toContain("'/api/v1/contents/' + encodeURIComponent(contentId) + '/social'")
+    expect(card).toContain('/api/v1/interactions/likes')
+  })
+
   it('routes profile works through the canonical content detail route', () => {
     const page = read('src/app/(frontend)/users/[userId]/page.tsx')
     expect(page).toContain("return '/content/' + encodeURIComponent(item.slug || item.id)")
