@@ -44,7 +44,7 @@ const dbForFeed = () => {
 }
 
 const headers = {
-  'X-LuckRead-Caller': 'W01',
+  'X-LuckRead-Caller': 'W04',
   'X-LuckRead-Transport-Version': '1.0',
   'X-LuckRead-Correlation-Id': 'following-feed-test',
   'X-LuckRead-Principal-User-Id': 'viewer-1',
@@ -106,7 +106,7 @@ describe('W05 following feed runtime', () => {
     const noUser = await worker.fetch(
       new Request('https://luckread-w05.internal/internal/social/feed/following', {
         headers: {
-          'X-LuckRead-Caller': 'W01',
+          'X-LuckRead-Caller': 'W04',
           'X-LuckRead-Transport-Version': '1.0',
           'X-LuckRead-Correlation-Id': 'missing-principal',
         },
