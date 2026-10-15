@@ -25,6 +25,7 @@ type InitialHomeContentItem = {
   slug?: string
   contentType: 'article' | 'post' | 'video'
   title: string
+  bodyRef?: string
   mediaRefs?: string[]
   coverRef?: string | null
   updatedAt?: string

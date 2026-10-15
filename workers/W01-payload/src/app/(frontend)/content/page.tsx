@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { fetchJson, getApiErrorMessage } from '../../../lib/client-api.js'
 import PublicLanguageToggle, { usePublicLocale } from '../i18n/PublicLanguageToggle'
 import LuckReadSocialPostCard from '../components/reuse/LuckReadSocialPostCard'
+import ArticleSummaryPreview from '../../../components/ArticleSummaryPreview.js'
 import { getPublicCopy, type PublicLocale } from '../i18n/public-locale'
 
 type ContentType = 'article' | 'post' | 'video'
@@ -16,6 +17,7 @@ type ContentItem = {
   createdAt?: string
   contentType: ContentType
   title: string
+  bodyRef?: string
   mediaRefs?: string[]
   coverRef?: string | null
   updatedAt?: string
@@ -210,6 +212,13 @@ export default function ContentBrowsePage() {
                       <span>{copy.content.published}</span>
                     </div>
                     <h2>{item.title}</h2>
+                    {item.contentType === 'article' ? (
+                      <ArticleSummaryPreview
+                        key={item.bodyRef || item.id}
+                        bodyRef={item.bodyRef}
+                        label={locale === 'en' ? 'Summary' : '文章摘要'}
+                      />
+                    ) : null}
                     {item.updatedAt ? (
                       <time dateTime={item.updatedAt}>
                         {new Date(item.updatedAt).toLocaleDateString('zh-CN')}
