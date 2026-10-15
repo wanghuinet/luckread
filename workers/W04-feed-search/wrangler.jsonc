@@ -4,6 +4,12 @@
   "main": "src/index.ts",
   "compatibility_date": "2025-08-15",
   "workers_dev": false,
+  "services": [
+    {
+      "binding": "W05_SOCIAL",
+      "service": "luckread-w05"
+    }
+  ],
   "kv_namespaces": [
     {
       "binding": "AUTH013_W04_DERIVED_PROJECTION",
