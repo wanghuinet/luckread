@@ -1,0 +1,155 @@
+/* Adapted visual treatment from ccrsxx/twitter-clone Tweet + user components (MIT). */
+.card {
+  min-width: 0;
+  padding: 15px 16px 10px;
+  border-bottom: 1px solid #e5e7eb;
+  color: #172033;
+  background: #fff;
+  transition: background-color 160ms ease;
+}
+.card:hover { background: #fbfcff; }
+.header {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+}
+.avatarLink {
+  display: inline-flex;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 50%;
+  text-decoration: none;
+}
+.avatar, .avatarFallback {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  place-items: center;
+  border-radius: 50%;
+}
+.avatar { object-fit: cover; background: #edf2ff; }
+.avatarFallback {
+  color: #183fa8;
+  background: #eaf0ff;
+  font-size: 17px;
+  font-weight: 800;
+}
+.author {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  line-height: 1.4;
+}
+.author strong {
+  overflow: hidden;
+  color: #172033;
+  font-size: 14px;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.author span {
+  overflow: hidden;
+  color: #6b7789;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.profileLink {
+  flex: 0 0 auto;
+  padding: 5px 10px;
+  border: 1px solid #dfe5ef;
+  border-radius: 999px;
+  color: #334155;
+  font-size: 11px;
+  font-weight: 700;
+  text-decoration: none;
+}
+.profileLink:hover { border-color: #b9c9f7; color: #183fa8; }
+.bodyLink {
+  display: block;
+  margin-left: 55px;
+  color: inherit;
+  text-decoration: none;
+}
+.postText {
+  margin: 8px 0 12px;
+  color: #283447;
+  font-size: 15px;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.cover {
+  display: block;
+  width: 100%;
+  max-height: 360px;
+  margin: 0 0 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 13px;
+  object-fit: cover;
+}
+.readMore {
+  display: inline-block;
+  margin-bottom: 5px;
+  color: #7b8798;
+  font-size: 11px;
+  font-weight: 650;
+}
+.bodyLink:hover .readMore { color: #183fa8; }
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  margin: 7px 0 0 55px;
+  padding: 6px 0 0;
+}
+.action, .actionLiked {
+  display: inline-flex;
+  min-width: 0;
+  min-height: 36px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  margin-right: clamp(20px, 6vw, 54px);
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 999px;
+  color: #718096;
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+.action svg, .actionLiked svg { width: 18px; height: 18px; flex: 0 0 18px; }
+.action:hover { color: #2458e6; background: #eef3ff; }
+.actionLiked { color: #d94683; }
+.actionLiked:hover { color: #c2256c; background: #fff0f6; }
+.action:disabled, .actionLiked:disabled { opacity: .55; cursor: wait; }
+.message {
+  margin: 4px 0 2px 55px;
+  color: #b42318;
+  font-size: 12px;
+  line-height: 1.5;
+}
+@media (max-width: 560px) {
+  .card { padding: 13px 12px 8px; }
+  .header { gap: 9px; }
+  .avatarLink, .avatar, .avatarFallback { width: 40px; height: 40px; flex-basis: 40px; }
+  .bodyLink, .actions, .message { margin-left: 49px; }
+  .postText { margin-top: 7px; font-size: 14px; }
+  .action, .actionLiked { margin-right: clamp(12px, 4vw, 28px); padding-right: 6px; padding-left: 6px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .card, .action, .actionLiked { transition: none; }
+}
