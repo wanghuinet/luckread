@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { fetchJson, getApiErrorMessage } from '../../../lib/client-api.js'
+import TwitterCloneFollowRow from '../users/TwitterCloneFollowRow'
 
 type Direction = 'followers' | 'following'
 
@@ -34,13 +35,6 @@ type FollowListResponse = {
 }
 
 const PAGE_SIZE = 20
-
-function formatDate(value: string): string {
-  const date = new Date(value)
-  return Number.isNaN(date.getTime())
-    ? '—'
-    : date.toLocaleDateString('zh-CN', { year: 'numeric', month: 'short', day: 'numeric' })
-}
 
 export default function MeFollowList({ direction }: { direction: Direction }) {
   const isFollowers = direction === 'followers'
@@ -245,67 +239,25 @@ export default function MeFollowList({ direction }: { direction: Direction }) {
       ) : null}
 
       {items.length > 0 ? (
-        <section aria-label={isFollowers ? '粉丝列表' : '关注列表'} style={{ marginTop: 24, display: 'grid', gap: 10 }}>
+        <section className="content-detail-card" aria-label={isFollowers ? '粉丝列表' : '关注列表'} style={{ marginTop: 24 }}>
           {items.map((item) => (
-            <article
+            <TwitterCloneFollowRow
               key={item.relationshipId}
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                gap: 16,
-                padding: 16,
-                border: '1px solid #e4e7ec',
-                borderRadius: 14,
-                background: '#fff',
-              }}
-            >
-              <div style={{ display: 'flex', gap: 12, alignItems: 'center', minWidth: 0 }}>
-                <span
-                  aria-hidden="true"
-                  style={{
-                    width: 42,
-                    height: 42,
-                    borderRadius: '50%',
-                    display: 'grid',
-                    placeItems: 'center',
-                    flex: '0 0 auto',
-                    background: '#eef4ff',
-                    color: '#2458e6',
-                    fontWeight: 800,
-                  }}
+              userId={item.userId}
+              followedAt={item.followedAt}
+              action={!isFollowers ? (
+                <button
+                  className="content-detail-follow"
+                  disabled={unfollowingId === item.userId}
+                  onClick={() => void unfollow(item.userId)}
+                  type="button"
                 >
-                  {item.userId.slice(0, 1).toUpperCase()}
-                </span>
-                <div style={{ minWidth: 0 }}>
-                  <Link
-                    href={'/users/' + encodeURIComponent(item.userId)}
-                    style={{ fontWeight: 700, color: '#101828', textDecoration: 'none' }}
-                  >
-                    用户 {item.userId}
-                  </Link>
-                  <div style={{ marginTop: 4, color: '#667085', fontSize: 13 }}>
-                    关系建立于 {formatDate(item.followedAt)}
-                  </div>
-                </div>
-              </div>
-              <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                <Link href={'/users/' + encodeURIComponent(item.userId)} style={{ whiteSpace: 'nowrap' }}>
-                  查看主页
-                </Link>
-                {!isFollowers ? (
-                  <button
-                    disabled={unfollowingId === item.userId}
-                    onClick={() => void unfollow(item.userId)}
-                    type="button"
-                  >
-                    {unfollowingId === item.userId ? '处理中…' : '取消关注'}
-                  </button>
-                ) : null}
-              </div>
-            </article>
+                  {unfollowingId === item.userId ? '处理中…' : '取消关注'}
+                </button>
+              ) : undefined}
+            />
           ))}
-
+ 
           {hasMore && nextCursor ? (
             <div style={{ display: 'flex', justifyContent: 'center', marginTop: 8 }}>
               <button disabled={loadingMore} onClick={() => void loadMore()} type="button">
