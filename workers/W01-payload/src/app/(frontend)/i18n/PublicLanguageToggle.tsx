@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useSyncExternalStore } from 'react'
+import { useEffect, useState, useSyncExternalStore } from 'react'
 
 import {
   PUBLIC_LOCALES,
@@ -17,6 +17,10 @@ export const usePublicLocale = (): PublicLocale => useSyncExternalStore(
 )
 export default function PublicLanguageToggle({ locale }: { locale: PublicLocale }) {
   const [pending, setPending] = useState(false)
+
+  useEffect(() => {
+    document.documentElement.lang = locale === 'en' ? 'en' : locale === 'tw' ? 'zh-TW' : 'zh-CN'
+  }, [locale])
 
   function switchLocale(nextLocale: PublicLocale) {
     if (nextLocale === locale || pending) return

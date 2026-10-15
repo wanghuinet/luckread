@@ -1,16 +1,19 @@
 import Link from 'next/link'
-import { headers } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 import { GET as getPublicContents } from '../../api/v1/contents/route'
 import TwitterCloneHomeFeed, { type HomeContentPage } from '../TwitterCloneHomeFeed'
 import { TwitterLogo } from '../TwitterCloneLanding'
+import PublicLanguageToggle from '../../(frontend)/i18n/PublicLanguageToggle'
+import { normalizePublicLocale, type PublicLocale } from '../../(frontend)/i18n/public-locale'
+import { getTwitterCloneCopy } from '../twitter-clone-copy'
 
 export const dynamic = 'force-dynamic'
 
-async function loadInitialContent(requestHeaders: Headers): Promise<HomeContentPage> {
+async function loadInitialContent(requestHeaders: Headers, locale: PublicLocale): Promise<HomeContentPage> {
   const forwarded = new Headers({ accept: 'application/json' })
-  const language = requestHeaders.get('accept-language')
+  const language = locale === 'en' ? 'en-US' : locale === 'tw' ? 'zh-TW' : 'zh-CN'
   const ip = requestHeaders.get('cf-connecting-ip')
-  if (language) forwarded.set('accept-language', language)
+  forwarded.set('accept-language', language)
   if (ip) forwarded.set('cf-connecting-ip', ip)
   const request = new Request('https://luckread.com/api/v1/contents?limit=20', { headers: forwarded })
   try {
@@ -36,37 +39,40 @@ function NavIcon({ name }: { name: 'home' | 'search' | 'users' | 'bookmark' | 'u
 }
 
 export default async function TwitterCloneHomePage() {
-  const initialPage = await loadInitialContent(await headers())
+  const requestHeaders = await headers()
+  const locale = normalizePublicLocale((await cookies()).get('luckread-ui-locale')?.value)
+  const copy = getTwitterCloneCopy(locale)
+  const initialPage = await loadInitialContent(requestHeaders, locale)
   return <div className="min-h-screen bg-main-background text-light-primary dark:text-dark-primary">
     <div className="mx-auto flex min-h-screen w-full max-w-[1265px] justify-center gap-0 lg:gap-4">
       <header id="sidebar" className="flex w-0 shrink-0 transition-opacity duration-200 xs:w-20 md:w-24 lg:max-w-none xl:-mr-4 xl:w-full xl:max-w-xs">
         <div className="fixed bottom-0 z-20 flex w-full flex-col justify-between border-t border-light-border bg-main-background py-0 dark:border-dark-border xs:top-0 xs:h-full xs:w-auto xs:border-0 xs:bg-transparent xs:px-2 xs:py-3 xs:pt-2 md:px-4 xl:w-72">
           <section className="flex flex-col justify-center gap-2 xs:items-center xl:items-stretch">
-            <h1 className="hidden xs:flex"><Link className="custom-button main-tab text-accent-blue dark:text-twitter-icon" href="/home" aria-label="LuckRead home"><TwitterLogo className="h-7 w-7" /></Link></h1>
+            <h1 className="hidden xs:flex"><Link className="custom-button main-tab text-accent-blue dark:text-twitter-icon" href="/home" aria-label={copy.home.home}><TwitterLogo className="h-7 w-7" /></Link></h1>
             <nav className="flex items-center justify-around xs:flex-col xs:justify-center xl:block">
-              <Link className="custom-button main-tab flex items-center gap-5 rounded-full hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 xl:justify-start" href="/home"><NavIcon name="home" /><span className="hidden text-xl xl:inline">Home</span></Link>
-              <Link className="custom-button main-tab flex items-center gap-5 rounded-full hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 xl:justify-start" href="/content"><NavIcon name="search" /><span className="hidden text-xl xl:inline">Explore</span></Link>
-              <Link className="custom-button main-tab flex items-center gap-5 rounded-full hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 xl:justify-start" href="/me/followers"><NavIcon name="users" /><span className="hidden text-xl xl:inline">Connections</span></Link>
-              <Link className="custom-button main-tab flex items-center gap-5 rounded-full hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 xl:justify-start" href="/me/following"><NavIcon name="bookmark" /><span className="hidden text-xl xl:inline">Following</span></Link>
-              <Link className="custom-button main-tab flex items-center gap-5 rounded-full hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 xl:justify-start" href="/shorts"><NavIcon name="video" /><span className="hidden text-xl xl:inline">Videos</span></Link>
-              <Link className="custom-button main-tab flex items-center gap-5 rounded-full hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 xl:justify-start" href="/me/profile"><NavIcon name="user" /><span className="hidden text-xl xl:inline">Profile</span></Link>
+              <Link className="custom-button main-tab flex items-center gap-5 rounded-full hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 xl:justify-start" href="/home"><NavIcon name="home" /><span className="hidden text-xl xl:inline">{copy.home.home}</span></Link>
+              <Link className="custom-button main-tab flex items-center gap-5 rounded-full hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 xl:justify-start" href="/content"><NavIcon name="search" /><span className="hidden text-xl xl:inline">{copy.home.explore}</span></Link>
+              <Link className="custom-button main-tab flex items-center gap-5 rounded-full hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 xl:justify-start" href="/me/followers"><NavIcon name="users" /><span className="hidden text-xl xl:inline">{copy.home.connections}</span></Link>
+              <Link className="custom-button main-tab flex items-center gap-5 rounded-full hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 xl:justify-start" href="/me/following"><NavIcon name="bookmark" /><span className="hidden text-xl xl:inline">{copy.home.following}</span></Link>
+              <Link className="custom-button main-tab flex items-center gap-5 rounded-full hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 xl:justify-start" href="/shorts"><NavIcon name="video" /><span className="hidden text-xl xl:inline">{copy.home.videos}</span></Link>
+              <Link className="custom-button main-tab flex items-center gap-5 rounded-full hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 xl:justify-start" href="/me/profile"><NavIcon name="user" /><span className="hidden text-xl xl:inline">{copy.home.profile}</span></Link>
             </nav>
-            <Link className="accent-tab absolute right-4 -translate-y-[72px] rounded-full bg-main-accent px-4 py-3 text-lg font-bold text-white outline-none transition hover:brightness-90 xs:static xs:translate-y-0 xl:w-11/12" href="/publish"><span className="flex items-center justify-center gap-2"><NavIcon name="write" /><span className="hidden xl:inline">Post</span></span></Link>
+            <Link className="accent-tab absolute right-4 -translate-y-[72px] rounded-full bg-main-accent px-4 py-3 text-lg font-bold text-white outline-none transition hover:brightness-90 xs:static xs:translate-y-0 xl:w-11/12" href="/publish"><span className="flex items-center justify-center gap-2"><NavIcon name="write" /><span className="hidden xl:inline">{copy.home.post}</span></span></Link>
           </section>
-          <Link className="hidden items-center gap-3 rounded-full p-3 transition hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 xl:flex" href="/me/profile"><span className="grid h-10 w-10 place-items-center rounded-full bg-main-sidebar-background font-bold">L</span><span className="grid min-w-0"><strong className="truncate text-sm">LuckRead</strong><small className="text-light-secondary dark:text-dark-secondary">Profile and settings</small></span></Link>
+          <Link className="hidden items-center gap-3 rounded-full p-3 transition hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 xl:flex" href="/me/profile"><span className="grid h-10 w-10 place-items-center rounded-full bg-main-sidebar-background font-bold">L</span><span className="grid min-w-0"><strong className="truncate text-sm">LuckRead</strong><small className="text-light-secondary dark:text-dark-secondary">{copy.home.profileAndSettings}</small></span></Link>
         </div>
       </header>
       <main className="hover-animation flex min-h-screen w-full max-w-xl flex-col border-x border-light-border pb-32 dark:border-dark-border xs:pb-96">
-        <header className="sticky top-0 z-10 flex items-center justify-between gap-6 bg-main-background/60 px-4 py-2 backdrop-blur-md"><h1 className="text-xl font-bold">Home</h1><Link className="text-sm font-bold text-main-accent hover:underline" href="/content">Explore all</Link></header>
-        <nav className="grid grid-cols-2 border-b border-light-border dark:border-dark-border"><Link className="main-tab relative flex min-h-14 items-center justify-center font-bold hover:bg-white/5" href="/home">For you<span className="absolute bottom-0 h-1 w-14 rounded-full bg-main-accent" /></Link><Link className="main-tab flex min-h-14 items-center justify-center text-light-secondary hover:bg-white/5 dark:text-dark-secondary" href="/me/following">Following</Link></nav>
-        <div className="grid grid-cols-[auto,1fr] gap-x-3 gap-y-1 border-b border-light-border px-4 py-3 dark:border-dark-border"><span className="row-span-2 grid h-12 w-12 place-items-center rounded-full bg-main-sidebar-background text-lg font-bold">L</span><Link className="main-tab min-h-12 rounded-xl px-1 py-3 text-left text-xl text-light-secondary hover:bg-white/5 dark:text-dark-secondary" href="/publish">What is happening?!</Link><div className="col-start-2 flex justify-end pt-2"><Link className="rounded-full bg-main-accent px-5 py-2 font-bold text-white transition hover:brightness-90" href="/publish">Post</Link></div></div>
-        <TwitterCloneHomeFeed initialPage={initialPage} />
+        <header className="sticky top-0 z-10 flex items-center justify-between gap-6 bg-main-background/60 px-4 py-2 backdrop-blur-md"><h1 className="text-xl font-bold">{copy.home.home}</h1><div className="flex items-center gap-3"><PublicLanguageToggle locale={locale} /><Link className="text-sm font-bold text-main-accent hover:underline" href="/content">{copy.home.exploreAll}</Link></div></header>
+        <nav className="grid grid-cols-2 border-b border-light-border dark:border-dark-border"><Link className="main-tab relative flex min-h-14 items-center justify-center font-bold hover:bg-white/5" href="/home">{copy.home.forYou}<span className="absolute bottom-0 h-1 w-14 rounded-full bg-main-accent" /></Link><Link className="main-tab flex min-h-14 items-center justify-center text-light-secondary hover:bg-white/5 dark:text-dark-secondary" href="/me/following">{copy.home.followingTab}</Link></nav>
+        <div className="grid grid-cols-[auto,1fr] gap-x-3 gap-y-1 border-b border-light-border px-4 py-3 dark:border-dark-border"><span className="row-span-2 grid h-12 w-12 place-items-center rounded-full bg-main-sidebar-background text-lg font-bold">L</span><Link className="main-tab min-h-12 rounded-xl px-1 py-3 text-left text-xl text-light-secondary hover:bg-white/5 dark:text-dark-secondary" href="/publish">{copy.home.composePlaceholder}</Link><div className="col-start-2 flex justify-end pt-2"><Link className="rounded-full bg-main-accent px-5 py-2 font-bold text-white transition hover:brightness-90" href="/publish">{copy.home.post}</Link></div></div>
+        <TwitterCloneHomeFeed initialPage={initialPage} locale={locale} />
       </main>
       <aside className="hidden w-96 shrink-0 flex-col gap-4 px-4 py-3 pt-1 lg:flex">
-        <Link className="flex items-center gap-3 rounded-full bg-main-search-background px-4 py-3 text-light-secondary hover:ring-1 hover:ring-main-accent dark:text-dark-secondary" href="/content"><NavIcon name="search" /><span>Search LuckRead</span></Link>
-        <section className="rounded-2xl bg-main-sidebar-background p-4"><h2 className="mb-4 text-xl font-bold">What to explore</h2><Link className="flex justify-between border-b border-light-border py-3 text-sm dark:border-dark-border" href="/content">Articles and discussions <span>›</span></Link><Link className="flex justify-between border-b border-light-border py-3 text-sm dark:border-dark-border" href="/shorts">Short videos <span>›</span></Link><Link className="flex justify-between border-b border-light-border py-3 text-sm dark:border-dark-border" href="/me/following">Following and creators <span>›</span></Link><Link className="flex justify-between py-3 text-sm" href="/me/subscriptions">Subscriptions <span>›</span></Link></section>
-        <section className="rounded-2xl bg-main-sidebar-background p-4"><h2 className="mb-3 text-xl font-bold">For creators</h2><p className="mb-4 text-sm leading-relaxed text-light-secondary dark:text-dark-secondary">Publish articles, posts, and videos from the existing LuckRead creator workflow.</p><Link className="inline-flex rounded-full bg-main-accent px-4 py-2 text-sm font-bold text-white" href="/creator-center">Open Creator Studio</Link></section>
-        <p className="px-2 text-xs leading-relaxed text-light-secondary dark:text-dark-secondary">LuckRead account, content, social, and subscription actions stay connected to the existing APIs.</p>
+        <Link className="flex items-center gap-3 rounded-full bg-main-search-background px-4 py-3 text-light-secondary hover:ring-1 hover:ring-main-accent dark:text-dark-secondary" href="/content"><NavIcon name="search" /><span>{copy.home.search}</span></Link>
+        <section className="rounded-2xl bg-main-sidebar-background p-4"><h2 className="mb-4 text-xl font-bold">{copy.home.whatToExplore}</h2><Link className="flex justify-between border-b border-light-border py-3 text-sm dark:border-dark-border" href="/content">{copy.home.articlesAndDiscussions} <span>›</span></Link><Link className="flex justify-between border-b border-light-border py-3 text-sm dark:border-dark-border" href="/shorts">{copy.home.shortVideos} <span>›</span></Link><Link className="flex justify-between border-b border-light-border py-3 text-sm dark:border-dark-border" href="/me/following">{copy.home.followingAndCreators} <span>›</span></Link><Link className="flex justify-between py-3 text-sm" href="/me/subscriptions">{copy.home.subscriptions} <span>›</span></Link></section>
+        <section className="rounded-2xl bg-main-sidebar-background p-4"><h2 className="mb-3 text-xl font-bold">{copy.home.forCreators}</h2><p className="mb-4 text-sm leading-relaxed text-light-secondary dark:text-dark-secondary">{copy.home.creatorDescription}</p><Link className="inline-flex rounded-full bg-main-accent px-4 py-2 text-sm font-bold text-white" href="/creator-center">{copy.home.openCreatorStudio}</Link></section>
+        <p className="px-2 text-xs leading-relaxed text-light-secondary dark:text-dark-secondary">{copy.home.apiProtection}</p>
       </aside>
     </div>
   </div>
