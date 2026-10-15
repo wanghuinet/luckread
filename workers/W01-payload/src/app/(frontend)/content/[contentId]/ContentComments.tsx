@@ -320,11 +320,10 @@ export default function ContentComments({
       ) : comments.length === 0 ? (
         <p className="content-comment-state">{copy.comments.empty}</p>
       ) : (
-        <div className="content-comment-list">
-          <DiscussionThread
-            comments={comments}
-            renderComment={(comment) => (
-              <article className="content-comment-item" key={comment.id}>
+        <DiscussionThread
+          comments={comments}
+          renderComment={(comment) => (
+            <article className="content-comment-item" key={comment.id} style={{ marginInlineStart: Math.min(comment.depth, 3) * 24 }}>
                 <header>
                   <strong>{copy.comments.reader}</strong>
                 <Link href={'/users/' + encodeURIComponent(comment.authorUserId)}>
@@ -422,9 +421,8 @@ export default function ContentComments({
                 </>
               )}
             </article>
-            )}
-          />
-        </div>
+          )}
+        />
       )}
 
       {hasMore ? (

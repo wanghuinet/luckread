@@ -20,6 +20,8 @@ describe('Twitter Clone-inspired discussion tree on LuckRead APIs', () => {
     expect(thread).toContain('className="content-comment-list"')
     expect(thread).toContain('role="list"')
     expect(thread).not.toContain('discussion-thread.module.css')
+    expect(comments).not.toContain('className="content-comment-list"')
+    expect(comments).toContain('style={{ marginInlineStart: Math.min(comment.depth, 3) * 24 }}')
     expect(tree).toContain('parentId')
     expect(tree).toContain('Missing parents can happen at a pagination boundary')
   })
