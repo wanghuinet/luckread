@@ -29,7 +29,9 @@ import {
   invalidateFollowListCountCache,
   listFollowers,
   listFollowing,
+  listFollowingFeed,
   parseFollowListLimit,
+  parseFollowingFeedLimit,
   unfollow,
 } from './follow-runtime.js'
 
@@ -592,6 +594,17 @@ export default {
         }
         await unlike(env.DB, viewerUserId, target)
         return new Response(null, { status: 204 })
+      }
+
+      if (url.pathname === '/internal/social/feed/following') {
+        if (request.method !== 'GET') {
+          return new Response(null, { status: 405, headers: { Allow: 'GET' } })
+        }
+        const viewerUserId = requirePrincipal(request)
+        const limit = parseFollowingFeedLimit(url.searchParams.get('limit'))
+        const cursor = url.searchParams.get('cursor')
+        const page = await listFollowingFeed(env.DB, viewerUserId, cursor, limit)
+        return json({ data: page, requestId: createRequestId() })
       }
 
       const path = parseFollowPath(url.pathname)
