@@ -36,7 +36,8 @@ const json = (body: unknown, status = 200) =>
 export default {
   async fetch(request: Request, env?: Env): Promise<Response> {
     const url = new URL(request.url)
-    if (request.method === 'GET' && url.pathname === '/internal/feed/following') {
+    if (url.pathname === '/internal/feed/following') {
+      if (request.method !== 'GET') return new Response(null, { status: 405, headers: { Allow: 'GET' } })
       if (request.headers.get('X-LuckRead-Caller') !== 'W01' ||
           request.headers.get('X-LuckRead-Transport-Version') !== '1.0' ||
           !request.headers.get('X-LuckRead-Correlation-Id')?.trim() ||
