@@ -65,6 +65,7 @@ export default function LuckReadSocialPostCard({
   const [bookmarked, setBookmarked] = useState(false)
   const [bookmarkBusy, setBookmarkBusy] = useState(false)
   const [shareBusy, setShareBusy] = useState(false)
+  const [reportBusy, setReportBusy] = useState(false)
   const [message, setMessage] = useState('')
 
   const contentHref = '/content/' + encodeURIComponent(slug || contentId)
@@ -225,6 +226,49 @@ export default function LuckReadSocialPostCard({
     }
   }
 
+
+  const reportContent = async () => {
+    if (reportBusy) return
+    const reasonCode = window.prompt(
+      locale === 'en'
+        ? 'Enter a report reason (for example SPAM, ABUSE, or COPYRIGHT).'
+        : '请输入举报原因（例如 SPAM、ABUSE、COPYRIGHT）',
+      'ABUSE',
+    )?.trim()
+    if (!reasonCode) return
+
+    setReportBusy(true)
+    setMessage('')
+    try {
+      const { response, data } = await fetchJson<ApiResponse<{ status?: string }>>('/api/v1/reports', {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          accept: 'application/json',
+          'content-type': 'application/json',
+          'Idempotency-Key': 'twitter-clone-reuse-report:content:' + contentId + ':' + crypto.randomUUID(),
+        },
+        body: JSON.stringify({ targetType: 'content', targetId: contentId, reasonCode }),
+      })
+      if (response.status === 401) {
+        requireLogin()
+        return
+      }
+      if (!response.ok || !data?.data) {
+        throw new Error(getApiErrorMessage(data, locale === 'en' ? 'Report failed.' : '举报提交失败，请稍后重试。'))
+      }
+      setMessage(data.data.status === 'DEDUPLICATED'
+        ? (locale === 'en' ? 'You have already reported this post.' : '你此前已举报过这条动态。')
+        : (locale === 'en' ? 'Report submitted.' : '举报已提交。'))
+    } catch (cause) {
+      setMessage(cause instanceof Error
+        ? cause.message
+        : locale === 'en' ? 'Report failed.' : '举报提交失败，请稍后重试。')
+    } finally {
+      setReportBusy(false)
+    }
+  }
+
   const shareContent = async () => {
     if (shareBusy) return
     setShareBusy(true)
@@ -376,6 +420,16 @@ export default function LuckReadSocialPostCard({
             {shareBusy
               ? (locale === 'en' ? 'Sharing…' : locale === 'tw' ? '分享中…' : '分享中…')
               : (locale === 'en' ? 'Share' : locale === 'tw' ? '分享' : '分享')}
+          </button>
+          <button
+            className="content-detail-like"
+            type="button"
+            disabled={reportBusy}
+            onClick={() => void reportContent()}
+          >
+            {reportBusy
+              ? (locale === 'en' ? 'Reporting…' : locale === 'tw' ? '舉報中…' : '举报中…')
+              : (locale === 'en' ? 'Report' : locale === 'tw' ? '舉報' : '举报')}
           </button>
           {message ? <span className="content-detail-action-status" role="status">{message}</span> : null}
         </footer>
