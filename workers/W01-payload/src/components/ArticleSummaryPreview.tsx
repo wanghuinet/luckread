@@ -24,9 +24,6 @@ export default function ArticleSummaryPreview({ bodyRef, label }: Props) {
   const [failed, setFailed] = useState(false)
 
   useEffect(() => {
-    setSummary(null)
-    setLoading(false)
-    setFailed(false)
     if (!bodyRef) return
 
     const root = rootRef.current
