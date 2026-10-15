@@ -35,18 +35,14 @@ jobs:
           CONFIRM: ${{ inputs.confirm }}
         run: |
           set -euo pipefail
-          if [ -f workers/W08-creator/wrangler.jsonc ]; then
-            if [ "$CONFIRM" != "DEPLOY_BINDING_AND_W08_CREATOR" ]; then
-              echo "This source includes W08 Creator. Select confirm=DEPLOY_BINDING_AND_W08_CREATOR to enable the W08 migration/deploy; no production changes have run."
+          if [ "$CONFIRM" = "DEPLOY_BINDING_AND_W08_CREATOR" ]; then
+            if [ ! -f workers/W08-creator/wrangler.jsonc ]; then
+              echo "W08 Creator deployment was confirmed, but source_sha does not contain W08 Creator files."
               exit 1
             fi
             node --input-type=module -e 'import fs from "node:fs"; const w01=JSON.parse(fs.readFileSync("workers/W01-payload/wrangler.jsonc","utf8")); const w08=JSON.parse(fs.readFileSync("workers/W08-creator/wrangler.jsonc","utf8")); const binding=(w08.d1_databases||[]).find((x)=>x.binding==="D1_01"); const ingress=(w01.services||[]).find((x)=>x.binding==="W08_CREATOR"); if(w08.name!=="luckread-w08-creator") throw new Error("W08 worker identity mismatch"); if(!binding||binding.database_name!=="luckread"||binding.database_id!=="2f80471e-3756-49f9-8db1-7707a433ad64") throw new Error("W08 must reuse existing D1-01"); if(!ingress||ingress.service!=="luckread-w08-creator") throw new Error("W01 W08_CREATOR binding mismatch"); if(!fs.existsSync("workers/W08-creator/migrations/0001_creator_authorization.sql")) throw new Error("W08 migration missing"); console.log("W08_D1_01_REUSE=PASS"); console.log("W01_W08_BINDING=PASS");'
           else
-            if [ "$CONFIRM" = "DEPLOY_BINDING_AND_W08_CREATOR" ]; then
-              echo "W08 Creator deployment was confirmed, but source_sha does not contain W08 Creator files."
-              exit 1
-            fi
-            echo "Source SHA has no W08 Creator Worker; creator migration/deploy skipped."
+            echo "W08 Creator deployment not requested; migration and deployment will be skipped."
           fi
 
 
