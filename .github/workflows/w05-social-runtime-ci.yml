@@ -88,7 +88,7 @@ jobs:
 
       - name: Run W05 Social and W01 adapter tests
         working-directory: workers/W01-payload
-        run: pnpm exec vitest run --config ./vitest.config.mts ../../workers/W05-social/src/follow-runtime.test.ts ../../workers/W05-social/src/like-runtime.test.ts ../../workers/W05-social/src/comment-runtime.test.ts ../../workers/W05-social/src/favorite-runtime.test.ts ../../workers/W05-social/src/share-runtime.test.ts ../../workers/W05-social/src/block-policy.test.ts ../../workers/W05-social/src/relationship-graph-runtime.test.ts ../../workers/W05-social/src/block-mute-runtime.test.ts ../../workers/W05-social/src/index.test.ts ../../workers/W05-social/src/d1-traffic-guard.test.ts tests/int/social-followers-v1-adapter.int.spec.ts tests/int/social-follow-mutation-v1-adapter.int.spec.ts tests/int/social-likes-v1-adapter.int.spec.ts tests/int/social-comments-v1-adapter.int.spec.ts tests/int/social-comment-likes-v1-adapter.int.spec.ts tests/int/social-bookmarks-v1-adapter.int.spec.ts tests/int/social-shares-v1-adapter.int.spec.ts tests/int/social-shares-landing.int.spec.ts tests/int/social-block-mute-v1-adapter.int.spec.ts tests/int/content-detail.int.spec.ts tests/int/content-detail-comments.int.spec.ts
+        run: pnpm exec vitest run --config ./vitest.config.mts ../../workers/W05-social/src/follow-runtime.test.ts ../../workers/W05-social/src/like-runtime.test.ts ../../workers/W05-social/src/comment-runtime.test.ts ../../workers/W05-social/src/favorite-runtime.test.ts ../../workers/W05-social/src/share-runtime.test.ts ../../workers/W05-social/src/repost-runtime.test.ts ../../workers/W05-social/src/block-policy.test.ts ../../workers/W05-social/src/relationship-graph-runtime.test.ts ../../workers/W05-social/src/block-mute-runtime.test.ts ../../workers/W05-social/src/index.test.ts ../../workers/W05-social/src/d1-traffic-guard.test.ts tests/int/social-followers-v1-adapter.int.spec.ts tests/int/social-follow-mutation-v1-adapter.int.spec.ts tests/int/social-likes-v1-adapter.int.spec.ts tests/int/social-comments-v1-adapter.int.spec.ts tests/int/social-comment-likes-v1-adapter.int.spec.ts tests/int/social-bookmarks-v1-adapter.int.spec.ts tests/int/social-shares-v1-adapter.int.spec.ts tests/int/social-shares-landing.int.spec.ts tests/int/social-block-mute-v1-adapter.int.spec.ts tests/int/content-detail.int.spec.ts tests/int/content-detail-comments.int.spec.ts
 
       - name: Verify comment delete tombstone migration
         run: |
@@ -142,6 +142,26 @@ jobs:
           print('SOCIAL_006_SHARE_MIGRATION_STATIC=PASS')
           PY
 
+
+      - name: Verify repost migration shape
+        run: |
+          python - <<'PY'
+          import sqlite3
+          from pathlib import Path
+          db = sqlite3.connect(':memory:')
+          sql = Path('workers/W05-social/migrations/20261015_012_social_006_repost_v1.sql').read_text()
+          db.executescript(sql)
+          cols = db.execute('PRAGMA table_info("social_reposts")').fetchall()
+          expected = ['repost_id','content_id','actor_user_id','created_at']
+          if [r[1] for r in cols] != expected:
+              raise SystemExit('unexpected repost schema')
+          db.execute("INSERT INTO social_reposts (repost_id, content_id, actor_user_id, created_at) VALUES ('r1','c1','u1','t1')")
+          db.execute("INSERT OR IGNORE INTO social_reposts (repost_id, content_id, actor_user_id, created_at) VALUES ('r2','c1','u1','t2')")
+          count = db.execute("SELECT COUNT(*) FROM social_reposts WHERE content_id='c1' AND actor_user_id='u1'").fetchone()[0]
+          if count != 1:
+              raise SystemExit('actor/content repost uniqueness boundary missing')
+          print('SOCIAL_006_REPOST_MIGRATION_STATIC=PASS')
+          PY
 
       - name: Verify favorite migration shape
         run: |
