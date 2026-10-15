@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 import { isVideoMediaRef, resolveSocialPostMedia } from '../../src/lib/social-post-media.js'
+import { createTtlPromiseCache } from '../../src/lib/social-post-profile-cache.js'
 
 describe('Twitter Clone UI reuse through LuckRead API adapters', () => {
   const read = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8')
@@ -17,7 +18,12 @@ describe('Twitter Clone UI reuse through LuckRead API adapters', () => {
     expect(component).toContain('/api/v1/interactions/likes')
     expect(component).toContain("'Idempotency-Key': 'twitter-clone-reuse-like:' + crypto.randomUUID()")
     expect(component).toContain("JSON.stringify({ targetType: 'content', targetId: contentId })")
-    expect(component).toContain('/api/v1/users/')
+    expect(component).toContain('getCachedPublicProfile(authorId)')
+    const profileCache = read('src/lib/social-post-profile-cache.ts')
+    expect(profileCache).toContain("'/api/v1/users/' + encodeURIComponent(normalizedId)")
+    expect(profileCache).toContain("credentials: 'omit'")
+    expect(profileCache).toContain('ttlMs: 30_000')
+    expect(profileCache).toContain('maxEntries: 200')
     expect(component).not.toContain('firebase/firestore')
     expect(component).not.toContain('tweetsCollection')
     expect(styles).toContain('@media (max-width: 560px)')
@@ -85,5 +91,57 @@ describe('Twitter Clone UI reuse through LuckRead API adapters', () => {
     expect(component).toContain("window.location.assign('/login?returnTo=' + encodeURIComponent(returnTo))")
     expect(component).toContain("targetType: 'content'")
     expect(component).toContain("href={contentHref}")
+  })
+
+  it('coalesces concurrent author lookups, caches successful values briefly, and retries failures', async () => {
+    let now = 0
+    const cache = createTtlPromiseCache<string, { id: string }>({
+      ttlMs: 100,
+      maxEntries: 2,
+      now: () => now,
+    })
+    let calls = 0
+    const loader = async () => {
+      calls += 1
+      return { id: 'author-1' }
+    }
+
+    const [first, concurrent] = await Promise.all([
+      cache.get('author-1', loader),
+      cache.get('author-1', loader),
+    ])
+    expect(calls).toBe(1)
+    expect(first).toBe(concurrent)
+
+    now = 99
+    await cache.get('author-1', loader)
+    expect(calls).toBe(1)
+
+    now = 101
+    await cache.get('author-1', loader)
+    expect(calls).toBe(2)
+
+    let failedCalls = 0
+    await expect(cache.get('unavailable', async () => {
+      failedCalls += 1
+      throw new Error('temporary failure')
+    })).rejects.toThrow('temporary failure')
+    await expect(cache.get('unavailable', async () => {
+      failedCalls += 1
+      return { id: 'recovered' }
+    })).resolves.toEqual({ id: 'recovered' })
+    expect(failedCalls).toBe(2)
+    expect(cache.size).toBeGreaterThan(0)
+  })
+
+  it('keeps viewer-specific like summaries outside the shared public profile cache', () => {
+    const component = read('src/app/(frontend)/components/reuse/LuckReadSocialPostCard.tsx')
+    const cache = read('src/lib/social-post-profile-cache.ts')
+
+    expect(component).toContain("'/api/v1/contents/' + encodeURIComponent(contentId) + '/social'")
+    expect(component).toContain("credentials: 'include'")
+    expect(component).toContain('getCachedPublicProfile(authorId)')
+    expect(cache).not.toContain('/api/v1/contents/')
+    expect(cache).not.toContain('/api/v1/interactions/likes')
   })
 })
