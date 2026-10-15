@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useMemo, type ReactNode } from 'react'
 
 import { buildDiscussionTree, type DiscussionCommentRef, type DiscussionTreeNode } from './discussion-tree'
 import styles from './discussion-thread.module.css'
@@ -12,7 +12,7 @@ export default function DiscussionThread<T extends DiscussionCommentRef>({
   comments,
   renderComment,
 }: Props<T>) {
-  const roots = buildDiscussionTree(comments)
+  const roots = useMemo(() => buildDiscussionTree(comments), [comments])
 
   return (
     <div className={styles.thread} role="list" aria-label="Comment discussion thread">
