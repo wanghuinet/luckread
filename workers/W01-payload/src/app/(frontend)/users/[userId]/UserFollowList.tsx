@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { fetchJson, getApiErrorMessage } from '../../../../lib/client-api.js'
+import TwitterCloneFollowRow from '../TwitterCloneFollowRow'
 
 type Direction = 'followers' | 'following'
 
@@ -35,13 +36,6 @@ type ListResponse = {
 }
 
 const PAGE_SIZE = 20
-
-const formatDate = (value: string): string => {
-  const date = new Date(value)
-  return Number.isNaN(date.getTime())
-    ? '—'
-    : date.toLocaleDateString('zh-CN', { year: 'numeric', month: 'short', day: 'numeric' })
-}
 
 export default function UserFollowList({
   userId,
@@ -246,30 +240,11 @@ export default function UserFollowList({
         <section className="content-detail-card" aria-label={isFollowers ? '粉丝列表' : '关注列表'} style={{ marginTop: 20 }}>
           <div style={{ display: 'grid', gap: 10 }}>
             {items.map((item) => (
-              <article
+              <TwitterCloneFollowRow
                 key={item.relationshipId}
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  gap: 16,
-                  padding: 14,
-                  border: '1px solid #e4eaf1',
-                  borderRadius: 12,
-                }}
-              >
-                <div style={{ minWidth: 0 }}>
-                  <Link href={'/users/' + encodeURIComponent(item.userId)} style={{ fontWeight: 700, color: '#101828', textDecoration: 'none' }}>
-                    用户 {item.userId}
-                  </Link>
-                  <div style={{ marginTop: 4, color: '#8a98ab', fontSize: 12 }}>
-                    关系建立于 {formatDate(item.followedAt)}
-                  </div>
-                </div>
-                <Link href={'/users/' + encodeURIComponent(item.userId)} style={{ whiteSpace: 'nowrap' }}>
-                  查看主页
-                </Link>
-              </article>
+                userId={item.userId}
+                followedAt={item.followedAt}
+              />
             ))}
           </div>
 
