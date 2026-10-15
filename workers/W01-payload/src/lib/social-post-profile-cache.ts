@@ -45,22 +45,23 @@ export function createTtlPromiseCache<K, V>(options: TtlPromiseCacheOptions = {}
         entries.delete(oldestKey.value)
       }
 
-      let entry: CacheEntry<V>
-      const promise = Promise.resolve()
-        .then(loader)
-        .then(
-          (value) => {
-            if (entries.get(key) === entry) entry.expiresAt = now() + ttlMs
-            return value
-          },
-          (error: unknown) => {
-            if (entries.get(key) === entry) entries.delete(key)
-            throw error
-          },
-        )
-      entry = { expiresAt: Number.POSITIVE_INFINITY, promise }
+      const entry: CacheEntry<V> = {
+        expiresAt: Number.POSITIVE_INFINITY,
+        promise: Promise.resolve()
+          .then(loader)
+          .then(
+            (value) => {
+              if (entries.get(key) === entry) entry.expiresAt = now() + ttlMs
+              return value
+            },
+            (error: unknown) => {
+              if (entries.get(key) === entry) entries.delete(key)
+              throw error
+            },
+          ),
+      }
       entries.set(key, entry)
-      return promise
+      return entry.promise
     },
     clear(): void {
       entries.clear()
