@@ -5,6 +5,13 @@ const eslintConfig = [
   ...nextCoreWebVitals,
   ...nextTypescript,
   {
+    files: ['tailwind.config.cjs'],
+    // Tailwind's config is intentionally CommonJS, so require() is valid here.
+    rules: {
+      '@typescript-eslint/no-require-imports': 'off',
+    },
+  },
+  {
     rules: {
       '@typescript-eslint/ban-ts-comment': 'warn',
       '@typescript-eslint/no-empty-object-type': 'warn',
