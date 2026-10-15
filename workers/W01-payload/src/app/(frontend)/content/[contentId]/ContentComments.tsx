@@ -325,7 +325,8 @@ export default function ContentComments({
             comments={comments}
             renderComment={(comment) => (
               <article className="content-comment-item" key={comment.id}>
-                <strong>{copy.comments.reader}</strong>
+                <header>
+                  <strong>{copy.comments.reader}</strong>
                 <Link href={'/users/' + encodeURIComponent(comment.authorUserId)}>
                   {copy.comments.profile}
                 </Link>
