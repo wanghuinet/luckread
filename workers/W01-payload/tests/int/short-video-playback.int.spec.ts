@@ -157,7 +157,7 @@ describe('short video playback polish', () => {
   })
 
   it('keeps the short-video route discoverable from the homepage', () => {
-    const page = read('src/app/(frontend)/page.tsx')
+    const page = read('src/app/(twitter-clone)/home/page.tsx')
     expect(page).toContain('href="/shorts"')
   })
 })

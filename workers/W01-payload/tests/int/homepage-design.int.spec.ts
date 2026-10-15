@@ -1,31 +1,35 @@
-import { readFile } from 'node:fs/promises'
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
-describe('LuckRead homepage', () => {
-  it('declares the reader-first homepage, left discussion tree, and creator entry points', async () => {
-    const [page, styles] = await Promise.all([
-      readFile('src/app/(frontend)/page.tsx', 'utf8'),
-      readFile('src/app/(frontend)/styles.css', 'utf8'),
-    ])
+const read = (relativePath: string) =>
+  readFileSync(relativePath, 'utf8')
 
-    expect(page).toContain('copy.home.heroTitle')
-    expect(page).toContain('copy.home.heroLead')
-    expect(page).toContain("const CREATOR_CENTER_URL = 'https://mp.luckread.com/'")
-    expect(page).toContain('copy.common.createNow')
-    expect(styles).toContain('.home-shell')
-    expect(styles).toContain('.hero')
-    expect(styles).toContain('prefers-reduced-motion')
-    expect(page).toContain('className="home-reading-layout"')
-    expect(page).toContain('className="home-rail-link home-rail-tree"')
-    expect(page.indexOf('home-rail-tree')).toBeLessThan(page.indexOf('home-rail-active'))
-    expect(page).toContain("href=\"/content\"")
-    expect(styles).toContain('.home-left-rail')
-    expect(styles).toContain('.home-reading-main .content-feed-grid')
+describe('Twitter Clone-inspired LuckRead homepage', () => {
+  it('uses the upstream-style landing, navigation, feed, and shared styles', () => {
+    const landing = read('src/app/(twitter-clone)/TwitterCloneLanding.tsx')
+    const styles = read('src/styles/twitter-clone-globals.scss')
+    const home = read('src/app/(twitter-clone)/home/page.tsx')
+    const feed = read('src/app/(twitter-clone)/TwitterCloneHomeFeed.tsx')
+
+    expect(landing).toContain('Happening now')
+    expect(landing).toContain('href="/register"')
+    expect(landing).toContain('href="/login"')
+    expect(landing).toContain('src="/twitter-clone/assets/twitter-banner.png"')
+    expect(landing).toContain('font-twitter-chirp-extended')
+    expect(styles).toContain('.custom-button')
+    expect(styles).toContain('.custom-underline')
+    expect(home).toContain('href="/shorts"')
+    expect(home).toContain('href="/me/subscriptions"')
+    expect(home).toContain('href="/creator-center"')
+    expect(feed).toContain('<LuckReadSocialPostCard')
+    expect(feed).toContain('/api/v1/contents?')
+  })
+
+  it('sends signed-in users to the feed and exposes their profile entry there', () => {
+    const page = read('src/app/(twitter-clone)/page.tsx')
+    const home = read('src/app/(twitter-clone)/home/page.tsx')
+
+    expect(page).toContain("if (principal?.active) redirect('/home')")
+    expect(home).toContain('href="/me/profile"')
   })
 })
-
-
-  it('exposes the signed-in profile entry from the public header', async () => {
-    const page = await readFile('src/app/(frontend)/page.tsx', 'utf8')
-    expect(page).toContain('copy.common.profile')
-  })

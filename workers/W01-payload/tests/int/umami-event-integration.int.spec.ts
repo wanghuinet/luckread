@@ -7,7 +7,7 @@ const read = (relativePath: string) =>
 
 describe('Umami content navigation event reuse', () => {
   it('uses the native tracker events on the homepage navigation actions', () => {
-    const home = read('src/app/(frontend)/page.tsx')
+    const home = read('src/app/(twitter-clone)/TwitterCloneLanding.tsx')
     expect(home).toContain('data-umami-event="creator-center-open"')
     expect(home).toContain('data-umami-event="content-discovery-open"')
     expect(home).toContain('data-umami-event="short-video-discovery-open"')
@@ -43,11 +43,14 @@ describe('Umami content navigation event reuse', () => {
     expect(shorts).not.toContain('umami.track(')
   })
 
-  it('loads the tracker once from the shared frontend root layout', () => {
+  it('loads the tracker from each route-group root layout without duplicate insertion', () => {
     const layout = read('src/app/(frontend)/layout.tsx')
+    const twitterLayout = read('src/app/(twitter-clone)/layout.tsx')
     const tracker = read('src/app/(frontend)/UmamiAnalytics.tsx')
     expect(layout).toContain("import UmamiAnalytics from './UmamiAnalytics'")
     expect(layout).toContain('<UmamiAnalytics />')
+    expect(twitterLayout).toContain("import UmamiAnalytics from '../(frontend)/UmamiAnalytics'")
+    expect(twitterLayout).toContain('<UmamiAnalytics />')
     expect(tracker).toContain('data-do-not-track="true"')
     expect(tracker).toContain('data-exclude-search="true"')
     expect(tracker).toContain('data-exclude-hash="true"')
