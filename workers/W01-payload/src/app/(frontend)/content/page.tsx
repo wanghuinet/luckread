@@ -5,17 +5,16 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { fetchJson, getApiErrorMessage } from '../../../lib/client-api.js'
 import PublicLanguageToggle, { usePublicLocale } from '../i18n/PublicLanguageToggle'
-import LuckReadSocialPostCard from '../components/reuse/LuckReadSocialPostCard'
 import { getPublicCopy, type PublicLocale } from '../i18n/public-locale'
+import ArticleSummaryPreview from '../../../components/ArticleSummaryPreview.js'
 
 type ContentType = 'article' | 'post' | 'video'
 type ContentItem = {
   id: string
   slug?: string
-  creatorId?: string | null
-  createdAt?: string
   contentType: ContentType
   title: string
+  bodyRef?: string
   mediaRefs?: string[]
   coverRef?: string | null
   updatedAt?: string
@@ -178,22 +177,6 @@ export default function ContentBrowsePage() {
         <>
           <section className="content-browse-grid" aria-label={locale === 'en' ? 'Public content list' : locale === 'tw' ? '公開內容列表' : '公开内容列表'}>
             {page.items.map((item) => {
-              if (item.contentType === 'post') {
-                return (
-                  <LuckReadSocialPostCard
-                    key={item.id}
-                    contentId={item.id}
-                    slug={item.slug}
-                    title={item.title}
-                    creatorId={item.creatorId}
-                    coverRef={item.coverRef}
-                    mediaRefs={item.mediaRefs}
-                    createdAt={item.createdAt}
-                    updatedAt={item.updatedAt}
-                    locale={locale}
-                  />
-                )
-              }
               const cover = item.coverRef
               return (
                 <Link className="content-feed-card" data-umami-event="content-open" data-umami-event-content-type={item.contentType} href={'/content/' + encodeURIComponent(item.slug || item.id)} key={item.id}>
@@ -210,6 +193,13 @@ export default function ContentBrowsePage() {
                       <span>{copy.content.published}</span>
                     </div>
                     <h2>{item.title}</h2>
+                    {item.contentType === 'article' ? (
+                      <ArticleSummaryPreview
+                        key={item.bodyRef || item.id}
+                        bodyRef={item.bodyRef}
+                        label={locale === 'en' ? 'Summary' : '文章摘要'}
+                      />
+                    ) : null}
                     {item.updatedAt ? (
                       <time dateTime={item.updatedAt}>
                         {new Date(item.updatedAt).toLocaleDateString('zh-CN')}

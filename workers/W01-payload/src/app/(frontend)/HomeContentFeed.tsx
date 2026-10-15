@@ -5,17 +5,16 @@ import { useEffect, useRef, useState } from 'react'
 
 import { getPublicCopy, type PublicLocale } from './i18n/public-locale'
 import { fetchJson } from '../../lib/client-api.js'
-import LuckReadSocialPostCard from './components/reuse/LuckReadSocialPostCard'
+import ArticleSummaryPreview from '../../components/ArticleSummaryPreview.js'
 
 type ContentType = 'article' | 'post' | 'video'
 
 type ContentItem = {
   id: string
   slug?: string
-  creatorId?: string | null
-  createdAt?: string
   contentType: ContentType
   title: string
+  bodyRef?: string
   mediaRefs?: string[]
   coverRef?: string | null
   updatedAt?: string
@@ -127,22 +126,6 @@ export default function HomeContentFeed({
             </div>
           ))
         ) : items.map((item) => {
-          if (item.contentType === 'post') {
-            return (
-              <LuckReadSocialPostCard
-                key={item.id}
-                contentId={item.id}
-                slug={item.slug}
-                title={item.title}
-                creatorId={item.creatorId}
-                coverRef={item.coverRef}
-                mediaRefs={item.mediaRefs}
-                createdAt={item.createdAt}
-                updatedAt={item.updatedAt}
-                locale={locale}
-              />
-            )
-          }
           const cover = item.coverRef
           return (
             <Link className="content-feed-card" data-umami-event="content-open" data-umami-event-content-type={item.contentType} href={`/content/${encodeURIComponent(item.slug || item.id)}`} key={item.id}>
@@ -154,7 +137,7 @@ export default function HomeContentFeed({
                     <img alt={item.title ? item.title + copy.content.cover : copy.content.cover} loading="lazy" src={cover} />
                   )
                 ) : (
-                  <span>LUCKREAD</span>
+                  <span>{item.contentType === 'post' ? 'POST' : 'LUCKREAD'}</span>
                 )}
               </div>
               <div className="content-feed-body">
@@ -163,6 +146,13 @@ export default function HomeContentFeed({
                   <span>{copy.content.published}</span>
                 </div>
                 <h3>{item.title}</h3>
+                {item.contentType === 'article' ? (
+                  <ArticleSummaryPreview
+                    key={item.bodyRef || item.id}
+                    bodyRef={item.bodyRef}
+                    label={locale === 'en' ? 'Summary' : '文章摘要'}
+                  />
+                ) : null}
                 <span className="content-feed-open">{locale === 'en' ? 'Read content ↗' : locale === 'tw' ? '閱讀內容 ↗' : '阅读内容 ↗'}</span>
               </div>
             </Link>
