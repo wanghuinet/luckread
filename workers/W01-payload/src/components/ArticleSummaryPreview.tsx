@@ -1,0 +1,93 @@
+'use client'
+
+import { useEffect, useRef, useState } from 'react'
+
+import {
+  extractArticleSummary,
+  resolvePublicArticleBodyUrl,
+} from '../lib/article-summary-preview.js'
+import styles from './ArticleSummaryPreview.module.css'
+
+type Props = {
+  bodyRef?: string | null
+  label: string
+}
+
+/**
+ * Lazily loads an article's existing public body file only as its summary
+ * preview approaches the viewport. It never mutates content or adds an API.
+ */
+export default function ArticleSummaryPreview({ bodyRef, label }: Props) {
+  const rootRef = useRef<HTMLDivElement | null>(null)
+  const [summary, setSummary] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    setSummary(null)
+    setLoading(false)
+    if (!bodyRef) return
+
+    const root = rootRef.current
+    if (!root) return
+
+    const controller = new AbortController()
+    let started = false
+
+    const load = async () => {
+      if (started) return
+      started = true
+      const url = resolvePublicArticleBodyUrl(bodyRef, window.location.origin)
+      if (!url) return
+
+      setLoading(true)
+      try {
+        const response = await fetch(url, {
+          method: 'GET',
+          credentials: 'omit',
+          cache: 'force-cache',
+          referrerPolicy: 'no-referrer',
+          signal: controller.signal,
+        })
+        if (!response.ok) return
+        const raw = await response.text()
+        if (controller.signal.aborted) return
+        setSummary(extractArticleSummary(raw))
+      } catch {
+        // A missing or inaccessible preview must not block the canonical content link.
+      } finally {
+        if (!controller.signal.aborted) setLoading(false)
+      }
+    }
+
+    if (typeof IntersectionObserver === 'undefined') {
+      void load()
+      return () => controller.abort()
+    }
+
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) {
+        observer.disconnect()
+        void load()
+      }
+    }, { rootMargin: '320px 0px' })
+
+    observer.observe(root)
+    return () => {
+      observer.disconnect()
+      controller.abort()
+    }
+  }, [bodyRef])
+
+  if (!bodyRef || (!loading && !summary)) return null
+
+  return (
+    <div ref={rootRef} className={styles.container} aria-label={label}>
+      <span className={styles.label}>{label}</span>
+      {summary ? (
+        <p className={styles.summary}>{summary}</p>
+      ) : (
+        <span className={styles.skeleton} aria-hidden="true" />
+      )}
+    </div>
+  )
+}
