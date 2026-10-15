@@ -22,6 +22,18 @@ Verified source locations:
 - `contracts/alignment/mapping-batches/FEED-001-013-real-evidence-reconciliation.v1.md`
 - `docs/change-control/CC-MAPPING-0-AUTH-013-FEED-SEARCH-SERVING-GAP-2026-10-04.md`
 
+## Canonical API operation/path reconciliation (unresolved)
+
+The repository already contains several partly overlapping feed API declarations; they must be reconciled before implementation rather than creating a parallel endpoint:
+
+- `contracts/api/feed-operation-policy.v1.json` defines `getFollowingFeed`, logical path `/feed/following`, but its status and evidence remain `MISSING`.
+- `contracts/api/api-inventory.v1.json` inventories `GET /v1/feed/following`.
+- `contracts/openapi/v1/openapi.yaml` uses server prefix `/api/v1`; it declares both `GET /feed` as `getFeed` with a `type=following` option and `GET /feed/following` as `getFollowingFeed` with `DISCOVERY_DRAFT` status.
+- `contracts/api/feed-delivery.v1.json` currently describes the generic `getFeed` operation at `/feed`, while the Feed Recommendation Trust Contract describes `GET /v1/feed/:feedType`.
+- Existing W01 App Router handlers use concrete paths under `/api/v1/...`; the presence of such route conventions does not by itself upgrade the feed operation from discovery draft to admitted.
+
+**Recommendation for review:** retain one dedicated `getFollowingFeed` operation mapped to the OpenAPI route `GET /api/v1/feed/following?cursor=&limit=` (logical path `/feed/following` under the current `/api/v1` server prefix), and do not implement a second Following code path through `getFeed?type=following` unless the contract owner explicitly chooses that unified route instead. Before implementation, reconcile API Inventory, feed-operation-policy, OpenAPI, feed-delivery, permissions, cache policy, and mapping evidence; the recommendation is not itself an admission or contract mutation.
+
 ## Proposed scope
 
 Admit FEED-001 only, with chronological ordering as the initial policy. Do not implement ranking, trends, search, recommendation, repost entries, or any other feed feature in this slice.
@@ -60,7 +72,7 @@ This proposal interprets that prior decision narrowly and consistently:
 
 The current evidence does not yet establish a complete bounded serving path. The following must be resolved in the admitted design before code is treated as ready:
 
-1. Canonical public API path and operation ID, aligned across API inventory, OpenAPI, permission policy, and the existing W01 route tree.
+1. Admit or revise the recommended canonical `getFollowingFeed` route, and reconcile the generic `getFeed?type=following` alternative across API inventory, OpenAPI, feed-delivery, permission policy, mapping and the existing W01 route tree.
 2. Concrete W01→W04 and W04→W03/W05 service-binding contract, including trusted caller/principal provenance and fail-closed behavior.
 3. An authoritative, bounded way to obtain the viewer's followed-user set and the W03 query/transport to retrieve a globally ordered content page for multiple creators without per-author RPC fan-out.
 4. Cursor semantics under concurrent publication and follow/unfollow changes, including stable tie-breaking and tamper/expiry validation.
@@ -104,7 +116,7 @@ These findings are why merely linking the tab to `/api/v1/users/{userId}/followi
 
 Prefer the contract's W04 feed-serving boundary, without adding a Worker or D1:
 
-1. W01 exposes the canonical authenticated public route `GET /api/v1/feed/following?cursor=&limit=`; it resolves the viewer through the existing W02-backed server principal and forwards no end-user bearer/session token to downstream Workers.
+1. Candidate public ingress route: `GET /api/v1/feed/following?cursor=&limit=`, mapped to logical operation `getFollowingFeed` / `GET /feed/following` under the current OpenAPI `/api/v1` server prefix. This route choice is recommended, not yet admitted; the canonical API documents must be reconciled before code is added. W01 resolves the viewer through the existing W02-backed server principal and forwards no end-user bearer/session token to downstream Workers.
 2. W01 calls W04 through a private Service Binding with a transport contract that carries server-derived viewer identity, correlation ID, page size and cursor. W04 must reject direct/public invocation and malformed/untrusted context.
 3. W04 obtains follow candidates from W05 and eligible content candidates from W03 using explicit read-only, bounded, feed-specific internal operations. Admission must define the W04 caller identity and transport contract; do not weaken existing W01-only operations or let W04 impersonate W01.
 4. The W03 operation must provide a single bounded multi-creator query with stable global ordering and owner/state/visibility checks, rather than one RPC per followed creator. W04 must also consult the existing `AUTH013_W04_DERIVED_PROJECTION` at serving time for derived account-state eligibility, fail safely for missing/stale state, and preserve its account-state-only purpose. W05 remains authoritative for the relationship set and block/mute eligibility; W03 remains authoritative for content and publication state; W04 only assembles the derived feed.
@@ -116,7 +128,7 @@ This path requires explicit approval for feed-specific W01→W04 and W04→W03/W
 ## Next implementation admission checklist
 
 A reviewer can admit this slice only after the PR/contract set identifies:
-- canonical route and operation ID;
+- canonical route and operation ID, including an explicit disposition for the overlapping `getFeed?type=following` route;
 - typed request/response DTO and error envelope;
 - W01→W04 and W04→W03/W05 caller identity, trusted principal provenance, timeout and failure mapping;
 - bounded follow-graph retrieval that does not silently omit followed creators;
