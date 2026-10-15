@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useEffect, useState } from 'react'
 
 import { fetchJson, getApiErrorMessage } from '../../../../lib/client-api.js'
+import { getCachedPublicProfile, type PublicProfile } from '../../../../lib/social-post-profile-cache.js'
 import { resolveSocialPostMedia } from '../../../../lib/social-post-media.js'
 import type { PublicLocale } from '../../i18n/public-locale'
 import styles from './LuckReadSocialPostCard.module.css'
@@ -12,13 +13,6 @@ import styles from './LuckReadSocialPostCard.module.css'
  * UI structure adapted from ccrsxx/twitter-clone's Tweet, TweetStats and user
  * components (MIT). All data and mutations here use LuckRead's W01/W05 APIs.
  */
-type PublicProfile = {
-  id: string
-  username?: string
-  displayName?: string | null
-  avatar?: string | null
-}
-
 type ContentDetail = {
   id?: string
   creatorId?: string | null
@@ -133,15 +127,8 @@ export default function LuckReadSocialPostCard({
 
       if (authorId) {
         try {
-          const { response, data } = await fetchJson<PublicProfile>(
-            '/api/v1/users/' + encodeURIComponent(authorId),
-            {
-              headers: { accept: 'application/json' },
-              cache: 'no-store',
-              signal: controller.signal,
-            },
-          )
-          if (!cancelled && response.ok && data && typeof data.id === 'string') setProfile(data)
+          const authorProfile = await getCachedPublicProfile(authorId)
+          if (!cancelled) setProfile(authorProfile)
         } catch {
           // The social post remains readable if public profile metadata is unavailable.
         }
