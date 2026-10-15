@@ -1,7 +1,6 @@
 import { useMemo, type ReactNode } from 'react'
 
 import { buildDiscussionTree, type DiscussionCommentRef, type DiscussionTreeNode } from './discussion-tree'
-import styles from './discussion-thread.module.css'
 
 type Props<T extends DiscussionCommentRef> = {
   comments: readonly T[]
@@ -15,7 +14,7 @@ export default function DiscussionThread<T extends DiscussionCommentRef>({
   const roots = useMemo(() => buildDiscussionTree(comments), [comments])
 
   return (
-    <div className={styles.thread} role="list" aria-label="Comment discussion thread">
+    <div className="content-comment-list" role="list" aria-label="Comment discussion thread">
       {roots.map((node) => (
         <ThreadNode key={node.comment.id} node={node} renderComment={renderComment} />
       ))}
@@ -32,14 +31,13 @@ function ThreadNode<T extends DiscussionCommentRef>({
 }) {
   return (
     <div
-      className={node.level > 0 ? styles.nestedNode : styles.node}
       data-thread-depth={node.level}
       data-orphan-reply={node.orphan ? 'true' : undefined}
       role="listitem"
     >
-      <div className={styles.commentContent}>{renderComment(node.comment)}</div>
+      {renderComment(node.comment)}
       {node.children.length > 0 ? (
-        <div className={styles.children} role="list" aria-label="Replies">
+        <div className="content-comment-list" role="list" aria-label="Replies">
           {node.children.map((child) => (
             <ThreadNode key={child.comment.id} node={child} renderComment={renderComment} />
           ))}
