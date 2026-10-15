@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react'
 
 import { getPublicCopy, type PublicLocale } from './i18n/public-locale'
 import { fetchJson } from '../../lib/client-api.js'
+import ArticleSummaryPreview from '../../components/ArticleSummaryPreview.js'
 
 type ContentType = 'article' | 'post' | 'video'
 
@@ -13,6 +14,7 @@ type ContentItem = {
   slug?: string
   contentType: ContentType
   title: string
+  bodyRef?: string
   mediaRefs?: string[]
   coverRef?: string | null
   updatedAt?: string
@@ -144,6 +146,12 @@ export default function HomeContentFeed({
                   <span>{copy.content.published}</span>
                 </div>
                 <h3>{item.title}</h3>
+                {item.contentType === 'article' ? (
+                  <ArticleSummaryPreview
+                    bodyRef={item.bodyRef}
+                    label={locale === 'en' ? 'Summary' : '文章摘要'}
+                  />
+                ) : null}
                 <span className="content-feed-open">{locale === 'en' ? 'Read content ↗' : locale === 'tw' ? '閱讀內容 ↗' : '阅读内容 ↗'}</span>
               </div>
             </Link>
