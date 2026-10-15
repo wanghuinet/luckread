@@ -127,6 +127,22 @@ describe('public creator profile', () => {
     expect(card).toContain('/api/v1/interactions/likes')
   })
 
+  it('adapts Twitter Clone share/bookmark actions to LuckRead interaction APIs', () => {
+    const card = read('src/app/(frontend)/components/reuse/LuckReadSocialPostCard.tsx')
+    const detail = read('src/app/(frontend)/content/[contentId]/ContentDetailClient.tsx')
+
+    expect(card).toContain("'/api/v1/interactions/bookmarks'")
+    expect(card).toContain("'/api/v1/content/' + encodeURIComponent(contentId) + '/shares'")
+    expect(card).toContain("summary?.viewer?.favorited === true")
+    expect(card).toContain('className="content-detail-like"')
+    expect(card).toContain('className="content-detail-share"')
+    expect(card).toContain("window.location.origin + '/s/' + encodeURIComponent(shareId)")
+    expect(card).toContain("window.location.assign('/login?returnTo=' + encodeURIComponent(returnTo))")
+    expect(card).not.toContain('firebase')
+    expect(detail).toContain("'/api/v1/interactions/bookmarks'")
+    expect(detail).toContain("'/api/v1/content/' + encodeURIComponent(content.id) + '/shares'")
+  })
+
   it('routes profile works through the canonical content detail route', () => {
     const page = read('src/app/(frontend)/users/[userId]/page.tsx')
     expect(page).toContain("return '/content/' + encodeURIComponent(item.slug || item.id)")
