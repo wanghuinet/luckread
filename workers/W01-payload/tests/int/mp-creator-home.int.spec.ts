@@ -5,29 +5,21 @@ import { resolve } from 'node:path'
 const read = (relativePath: string) => readFileSync(resolve(process.cwd(), relativePath), 'utf8')
 
 describe('mp creator entry routing', () => {
-  it('uses the creator studio as the authenticated mp homepage without redirecting unauthenticated visitors', () => {
-    const page = read('src/app/(frontend)/page.tsx')
-    const creator = read('src/app/(frontend)/creator-center/page.tsx')
+  it('uses the creator studio on the mp host for authenticated visitors without redirecting guests', () => {
+    const page = read('src/app/(twitter-clone)/page.tsx')
+    const creator = read('src/app/(twitter-clone)/CreatorDomainHome.tsx')
 
-    expect(page).toContain("const CREATOR_CENTER_URL = 'https://mp.luckread.com/'")
-    expect(page).toContain("const CREATOR_CENTER_HOSTS = new Set(['mp.luckread.com'])")
-    expect(page).toContain('if (CREATOR_CENTER_HOSTS.has(host))')
-    expect(page).toContain('await enforcePublicReadRateLimit(request)')
-    expect(page).toContain('getBetterAuthPrincipal')
-    expect(page).not.toContain('await payload.auth(')
-    expect(page).not.toContain('readVerifiedPayloadTokenVersion(request)')
-    expect(page).not.toContain('validateSession(')
-    expect(page).toContain("if (principal?.active) {")
-    expect(page).toContain('<CreatorStudio displayName={displayName} userId={principal.userId} locale={locale} />')
-    expect(page).toContain('className="mp-entry-shell"')
-    expect(page).not.toContain("redirect('/creator-center')")
-    expect(page).not.toContain("if (host === 'mp.luckread.com') {\n    redirect('/creator-center')")
-    expect(creator).toContain("new Request('https://mp.luckread.com/creator-center'")
+    expect(page).toContain("if (host === 'mp.luckread.com') return <CreatorDomainHome />")
+    expect(creator).toContain("new Request('https://mp.luckread.com/'")
+    expect(creator).toContain('await enforcePublicReadRateLimit(request)')
     expect(creator).toContain('getBetterAuthPrincipal(request)')
-    expect(creator).toContain("import { getBetterAuthPrincipal, W02AuthClientError } from '@/auth/w02-session-client'")
-    expect(creator).toContain('error instanceof W02AuthClientError && error.status === 401')
-    expect(creator).toContain('throw error')
-    expect(creator).toContain("redirect('/login?returnTo=%2Fcreator-center')")
+    expect(creator).toContain('if (principal?.active)')
+    expect(creator).toContain('return <CreatorStudio displayName={displayName} userId={principal.userId} locale={locale} />')
+    expect(creator).toContain('<CreatorLanguageToggle locale={locale} />')
+    expect(creator).toContain('href="/login?returnTo=%2F"')
+    expect(creator).not.toContain('await payload.auth(')
+    expect(creator).not.toContain('readVerifiedPayloadTokenVersion(request)')
+    expect(creator).not.toContain('validateSession(')
   })
 
   it('keeps creator studio outside the Payload Admin registration', () => {

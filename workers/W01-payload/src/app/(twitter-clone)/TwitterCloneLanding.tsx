@@ -31,7 +31,7 @@ export default function TwitterCloneLanding() {
       </div>
     </main>
     <footer className="hidden justify-center px-4 py-5 text-sm text-light-secondary dark:text-dark-secondary lg:flex"><nav className="flex flex-wrap justify-center gap-4 gap-y-2">
-      <Link className="custom-underline" href="/content">Explore</Link><Link className="custom-underline" href="/shorts">Short videos</Link><Link className="custom-underline" href="/creator-center">Creator Studio</Link><Link className="custom-underline" href="/me/subscriptions">Subscriptions</Link><span>© LuckRead</span>
+      <Link className="custom-underline" data-umami-event="content-discovery-open" href="/content">Explore</Link><Link className="custom-underline" data-umami-event="short-video-discovery-open" href="/shorts">Short videos</Link><Link className="custom-underline" data-umami-event="creator-center-open" href="/creator-center">Creator Studio</Link><Link className="custom-underline" href="/me/subscriptions">Subscriptions</Link><span>© LuckRead</span>
     </nav></footer>
   </div>
 }

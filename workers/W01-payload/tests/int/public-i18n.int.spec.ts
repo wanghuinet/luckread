@@ -16,19 +16,20 @@ describe('public frontend i18n', () => {
     expect(locale).toContain("case 'zh-TW':")
   })
 
-  it('uses one language switch without locale-specific page directories', () => {
+  it('keeps one shared language switch on the public reading routes after the clone landing migration', () => {
     const toggle = read('src/app/(frontend)/i18n/PublicLanguageToggle.tsx')
-    const home = read('src/app/(frontend)/page.tsx')
+    const landing = read('src/app/(twitter-clone)/page.tsx')
+    const home = read('src/app/(twitter-clone)/home/page.tsx')
     const browse = read('src/app/(frontend)/content/page.tsx')
     const detail = read('src/app/(frontend)/content/[contentId]/ContentDetailClient.tsx')
     const detailPage = read('src/app/(frontend)/content/[contentId]/page.tsx')
     const comments = read('src/app/(frontend)/content/[contentId]/ContentComments.tsx')
 
     expect(toggle).toContain('PUBLIC_LOCALES.map')
-    expect(home).toContain('<PublicLanguageToggle locale={publicLocale} />')
-    expect(home).toContain('<HomeContentFeed locale={publicLocale} initialItems={initialHomeContent} />')
-    expect(home).toContain('loadInitialHomeContent(requestHeaders)')
-    expect(home).toContain("publicHeaders.set('accept-language', acceptLanguage)")
+    expect(landing).toContain('TwitterCloneLanding')
+    expect(home).toContain('<TwitterCloneHomeFeed initialPage={initialPage} />')
+    expect(home).toContain('loadInitialContent(await headers())')
+    expect(home).toContain("forwarded.set('accept-language', language)")
     expect(browse).toContain('<PublicLanguageToggle locale={locale} />')
     expect(detail).toContain('<PublicLanguageToggle locale={locale} />')
     expect(detail).toContain('locale={locale}')
