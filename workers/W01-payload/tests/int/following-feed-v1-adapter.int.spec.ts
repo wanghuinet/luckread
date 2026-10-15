@@ -6,14 +6,27 @@ const read = (relativePath: string) =>
   readFileSync(resolve(process.cwd(), relativePath), 'utf8')
 
 describe('v1 following feed adapter and home timeline', () => {
-  it('requires the W01 verified session principal and forwards only through W05', () => {
+  it('requires the W01 verified session principal and forwards the feed request through W04', () => {
     const route = read('src/app/api/v1/feed/following/route.ts')
     expect(route).toContain('resolveSocialPrincipal(request)')
-    expect(route).toContain('callW05Social')
-    expect(route).toContain("'/internal/social/feed/following?'")
+    expect(route).toContain('callW04FollowingFeed')
+    expect(route).toContain("'/internal/feed/following?'")
     expect(route).toContain("'cache-control': 'no-store'")
     expect(route).not.toContain('cachedPublicGet')
     expect(route).not.toContain('X-LuckRead-Principal-User-Id')
+  })
+
+  it('keeps feed serving in W04 and only binds W04 to the existing W05 social service', () => {
+    const w01Client = read('src/feed/w04-feed-client.ts')
+    const w01Bindings = read('wrangler.jsonc')
+    const w04Runtime = read('../W04-feed-search/src/index.ts')
+    const w04Bindings = read('../../W04-feed-search/wrangler.jsonc')
+    expect(w01Client).toContain("W04_FEED?: W04FeedService")
+    expect(w01Bindings).toContain('"binding": "W04_FEED"')
+    expect(w04Runtime).toContain("'/internal/feed/following'")
+    expect(w04Runtime).toContain("'X-LuckRead-Caller': 'W04'")
+    expect(w04Bindings).toContain('"binding": "W05_SOCIAL"')
+    expect(w04Bindings).not.toContain('d1_databases')
   })
 
   it('validates the bounded cursor and page-size query before forwarding', () => {
