@@ -638,6 +638,82 @@ describe('W03 content contract core', () => {
     expect(preparedQueries).toHaveLength(1)
   })
 
+  it('serves the Following feed through the trusted W04 content boundary', async () => {
+    const preparedQueries: string[] = []
+    const row = {
+      id: 'content_feed_1',
+      content_type: 'post',
+      owner_user_id: 'author_1',
+      creator_id: null,
+      ip_id: null,
+      state: 'PUBLISHED',
+      scheduled_at: null,
+      version: 1,
+      revision: 1,
+      slug: 'feed-post-1',
+      title: 'Following post',
+      body_ref: 'https://cdn.example.com/post.json',
+      media_refs_json: '[]',
+      cover_ref: null,
+      etag: 'W/"1"',
+      created_at: '2026-10-02T12:00:00.000Z',
+      updated_at: '2026-10-02T12:00:00.000Z',
+    }
+    const db = {
+      prepare(query: string) {
+        preparedQueries.push(query)
+        return { bind: () => ({ all: async () => ({ results: [row] }) }) }
+      },
+    } as never
+    const response = await w03Worker.fetch(
+      new Request('https://luckread-w03.internal/internal/content/following-feed', {
+        method: 'POST',
+        headers: {
+          'X-LuckRead-Caller': 'W04',
+          'X-LuckRead-Transport-Version': '1.0',
+          'X-LuckRead-Correlation-Id': 'feed-correlation',
+          'X-LuckRead-Principal-User-Id': 'viewer_1',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ ownerUserIds: ['author_1'], cursor: null, limit: 20 }),
+      }),
+      { D1_02: db },
+    )
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({
+      data: {
+        items: [{ id: 'content_feed_1', ownerUserId: 'author_1', contentType: 'post', state: 'PUBLISHED' }],
+        hasMore: false,
+        nextCursor: null,
+      },
+    })
+    expect(preparedQueries).toHaveLength(1)
+    expect(preparedQueries[0]).toContain('json_each(?)')
+  })
+
+  it('does not allow W01 to bypass W04 on the Following feed content boundary', async () => {
+    const db = {
+      prepare() {
+        throw new Error('database must not be queried before trusted transport validation')
+      },
+    } as never
+    const response = await w03Worker.fetch(
+      new Request('https://luckread-w03.internal/internal/content/following-feed', {
+        method: 'POST',
+        headers: {
+          'X-LuckRead-Caller': 'W01',
+          'X-LuckRead-Transport-Version': '1.0',
+          'X-LuckRead-Correlation-Id': 'feed-untrusted-correlation',
+          'X-LuckRead-Principal-User-Id': 'viewer_1',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ ownerUserIds: ['author_1'], cursor: null, limit: 20 }),
+      }),
+      { D1_02: db },
+    )
+    expect(response.status).toBe(403)
+  })
+
   it('filters public content by creator while keeping only published rows', async () => {
     const preparedQueries: string[] = []
     const row = {
