@@ -14,7 +14,11 @@ export type RepostRecord = {
 const MAX_ID = 128
 const validateId = (value: string): string => {
   const normalized = value.trim()
-  if (!normalized || normalized.length > MAX_ID) throw new RepostRuntimeError('VALIDATION_FAILED', 400)
+  // Content/user identifiers use the repository's canonical path-safe ID
+  // alphabet. Reject encoded path separators before any database access.
+  if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(normalized) || normalized.length > MAX_ID) {
+    throw new RepostRuntimeError('VALIDATION_FAILED', 400)
+  }
   return normalized
 }
 const validateActor = (value: string): string => {

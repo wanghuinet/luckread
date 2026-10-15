@@ -49,6 +49,13 @@ describe('repost runtime', () => {
     await expect(createRepost(db(), '', 'content-1')).rejects.toMatchObject({ code: 'UNAUTHENTICATED', status: 401 })
     await expect(createRepost(db(), 'viewer-1', ' ')).rejects.toMatchObject({ code: 'VALIDATION_FAILED', status: 400 })
   })
+  it('rejects path separators before querying D1', async () => {
+    const d = db()
+    await expect(createRepost(d, 'viewer-1', 'content/1'))
+      .rejects.toMatchObject({ code: 'VALIDATION_FAILED', status: 400 })
+    expect((d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).not.toHaveBeenCalled()
+  })
+
   it('removes only the caller relation and tolerates a repeated remove', async () => {
     const d = db([], 0)
     await expect(removeRepost(d, 'viewer-1', 'content-1')).resolves.toBeUndefined()
