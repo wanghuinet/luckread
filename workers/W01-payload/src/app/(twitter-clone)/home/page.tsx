@@ -1,6 +1,5 @@
 import Link from 'next/link'
 import { headers } from 'next/headers'
-import { enforcePublicReadRateLimit } from '@/auth/traffic-limit'
 import { GET as getPublicContents } from '../../api/v1/contents/route'
 import TwitterCloneHomeFeed, { type HomeContentPage } from '../TwitterCloneHomeFeed'
 import { TwitterLogo } from '../TwitterCloneLanding'
@@ -15,7 +14,7 @@ async function loadInitialContent(requestHeaders: Headers): Promise<HomeContentP
   if (ip) forwarded.set('cf-connecting-ip', ip)
   const request = new Request('https://luckread.com/api/v1/contents?limit=20', { headers: forwarded })
   try {
-    await enforcePublicReadRateLimit(request)
+    // The contents route owns anonymous read rate limiting; do not count this request twice.
     const response = await getPublicContents(request)
     if (!response.ok) return { items: [], nextCursor: null, hasMore: false }
     const payload = await response.json() as { data?: HomeContentPage }
