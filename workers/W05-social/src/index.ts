@@ -29,6 +29,7 @@ import {
   invalidateFollowListCountCache,
   listFollowers,
   listFollowing,
+  listFollowingFeedCandidates,
   parseFollowListLimit,
   unfollow,
 } from './follow-runtime.js'
@@ -592,6 +593,22 @@ export default {
         }
         await unlike(env.DB, viewerUserId, target)
         return new Response(null, { status: 204 })
+      }
+
+      const followingFeedCandidatesMatch = /^\/internal\/social\/users\/([^/]+)\/following-feed-candidates$/.exec(url.pathname)
+      if (followingFeedCandidatesMatch) {
+        if (request.method !== 'GET') return new Response(null, { status: 405, headers: { Allow: 'GET' } })
+        const caller = request.headers.get('X-LuckRead-Caller')
+        const transportVersion = request.headers.get('X-LuckRead-Transport-Version')
+        const correlationId = request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? ''
+        const viewerUserId = request.headers.get('X-LuckRead-Principal-User-Id')?.trim() ?? ''
+        const targetUserId = decodePathPart(followingFeedCandidatesMatch[1])
+        if (
+          caller !== 'W04' || transportVersion !== '1.0' || !correlationId ||
+          !targetUserId || !viewerUserId || viewerUserId !== targetUserId
+        ) throw new FollowRuntimeError('PERMISSION_DENIED', 403)
+        const candidates = await listFollowingFeedCandidates(env.DB, viewerUserId)
+        return json({ data: candidates, requestId: createRequestId() })
       }
 
       const path = parseFollowPath(url.pathname)
