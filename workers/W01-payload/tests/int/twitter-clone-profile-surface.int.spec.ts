@@ -1,0 +1,52 @@
+import { describe, expect, it } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+
+const read = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8')
+
+describe('Twitter Clone profile UI reuse on LuckRead public profile', () => {
+  it('renders the upstream-inspired profile cover/avatar/details/stats as a reusable surface', () => {
+    const header = read('src/app/(frontend)/users/[userId]/TwitterCloneProfileHeader.tsx')
+    const page = read('src/app/(frontend)/users/[userId]/page.tsx')
+
+    expect(page).toContain("import TwitterCloneProfileHeader from './TwitterCloneProfileHeader'")
+    expect(page).toContain('<TwitterCloneProfileHeader')
+    expect(page).toContain('profile={profile!}')
+    expect(page).toContain('actions={')
+    expect(header).toContain('creator-profile-cover')
+    expect(header).toContain('creator-profile-avatar')
+    expect(header).toContain('creator-profile-identity')
+    expect(header).toContain('creator-profile-stats')
+    expect(header).toContain("profile.bio?.trim() ? profile.bio : '尚无个人简介'")
+    expect(header).not.toContain('/api/v1/')
+    expect(header).not.toContain('firebase/')
+  })
+
+  it('uses a reusable Twitter-style profile channel nav while content loads remain in the page', () => {
+    const nav = read('src/app/(frontend)/users/[userId]/TwitterCloneProfileNav.tsx')
+    const page = read('src/app/(frontend)/users/[userId]/page.tsx')
+
+    expect(page).toContain("import TwitterCloneProfileNav from './TwitterCloneProfileNav'")
+    expect(page).toContain('<TwitterCloneProfileNav')
+    expect(page).toContain('onSelect={(value) => { void reloadContents(value) }}')
+    expect(nav).toContain('role="tablist"')
+    expect(nav).toContain('aria-selected={selected === type}')
+    expect(nav).toContain('onSelect(type)')
+    expect(page).toContain("'/api/v1/contents?'")
+    expect(page).toContain("'/api/v1/social/follows/'")
+  })
+
+  it('keeps profile relation and moderation mutations on LuckRead APIs and retains MIT notice', () => {
+    const page = read('src/app/(frontend)/users/[userId]/page.tsx')
+    const notice = read('src/app/(frontend)/users/[userId]/TWITTER_CLONE_ATTRIBUTION.md')
+
+    expect(page).toContain("method: isFollowing ? 'DELETE' : 'POST'")
+    expect(page).toContain("const relationPath = action === 'block' ? 'blocks' : 'mutes'")
+    expect(page).toContain("targetType: 'profile'")
+    expect(page).toContain('applySafetyAction(\'block\')')
+    expect(page).toContain('applySafetyAction(\'mute\')')
+    expect(notice).toContain('Copyright (c) 2022 ccrsxx')
+    expect(notice).toContain('MIT License')
+    expect(notice).toContain('No Firebase/Auth/Firestore logic is copied.')
+  })
+})

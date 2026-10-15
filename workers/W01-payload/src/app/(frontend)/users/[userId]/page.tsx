@@ -5,6 +5,8 @@ import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 import { fetchJson, getApiErrorMessage } from '../../../../lib/client-api.js'
+import TwitterCloneProfileHeader from './TwitterCloneProfileHeader'
+import TwitterCloneProfileNav from './TwitterCloneProfileNav'
 
 type PublicProfile = {
   id: string
@@ -463,159 +465,121 @@ export default function PublicProfilePage({
           <Link href="/content">← 返回发现</Link>
         </div>
 
-        <section className="creator-profile-hero" aria-labelledby="creator-profile-title">
-          <div className="creator-profile-cover" aria-hidden="true" />
-          <div className="creator-profile-hero-main">
-            <div className="creator-profile-avatar" aria-label={name + ' 头像'}>
-              {profile?.avatar ? (
-                <img
-                  alt=""
-                  height={96}
-                  loading="eager"
-                  src={profile.avatar}
-                  width={96}
-                />
-              ) : initial}
-            </div>
-
-            <div className="creator-profile-identity">
-              <h1 id="creator-profile-title">{name}</h1>
-              <p className="creator-profile-handle">@{profile?.username}</p>
-              {<p className={'creator-profile-bio' + (profile?.bio?.trim() ? '' : ' is-placeholder')}>{profile?.bio?.trim() ? profile.bio : '尚无个人简介'}</p>}
-            </div>
-
-            <div className="creator-profile-circle-actions" aria-label="快捷操作">
-              {viewerUserId !== profile.id ? (
-                <button
-                  className="creator-profile-circle-button"
-                  type="button"
-                  aria-label="私信"
-                  onClick={() => setSafetyMessage('私信功能将在消息中心接通后启用。')}
-                >
-                  <span aria-hidden="true">✉</span>
-                </button>
-              ) : null}
-              <div className="creator-profile-overflow">
-                <button
-                  className="creator-profile-circle-button"
-                  type="button"
-                  aria-label="更多操作"
-                  aria-expanded={actionsOpen}
-                  aria-haspopup="menu"
-                  onClick={() => setActionsOpen((open) => !open)}
-                >
-                  <span aria-hidden="true">•••</span>
-                </button>
-                {actionsOpen ? (
-                  <div className="creator-profile-overflow-menu" role="menu" aria-label="更多操作">
-                    <button
-                      type="button"
-                      role="menuitem"
-                      onClick={() => {
-                        setActionsOpen(false)
-                        void shareProfile()
-                      }}
-                    >
-                      分享
-                    </button>
-                    {viewerUserId !== profile.id ? (
-                      <>
-                        <button
-                          type="button"
-                          role="menuitem"
-                          disabled={muteBusy}
-                          onClick={() => {
-                            setActionsOpen(false)
-                            void applySafetyAction('mute')
-                          }}
-                        >
-                          {muteBusy ? (muted ? '取消中…' : '静音中…') : muted ? '取消静音' : '静音'}
-                        </button>
-                        <button
-                          type="button"
-                          role="menuitem"
-                          disabled={blockBusy}
-                          onClick={() => {
-                            setActionsOpen(false)
-                            void applySafetyAction('block')
-                          }}
-                        >
-                          {blockBusy ? (blocked ? '取消中…' : '屏蔽中…') : blocked ? '取消屏蔽' : '屏蔽'}
-                        </button>
-                        <button
-                          type="button"
-                          role="menuitem"
-                          disabled={reportBusy}
-                          onClick={() => {
-                            setActionsOpen(false)
-                            void reportProfile()
-                          }}
-                        >
-                          {reportBusy ? '举报中…' : '举报'}
-                        </button>
-                      </>
-                    ) : null}
-                  </div>
-                ) : null}
-              </div>
-            </div>
-
-            <div className="creator-profile-actions">
-              {viewerUserId !== profile.id && !blocked && !blockedBy ? (
-                <button
-                  className="creator-profile-button creator-profile-button-primary"
-                  disabled={followBusy}
-                  onClick={() => void toggleFollow()}
-                  type="button"
-                >
-                  {followBusy ? '处理中…' : isFollowing ? '已关注' : '关注'}
-                </button>
-              ) : null}
+        <TwitterCloneProfileHeader
+          profile={profile!}
+          name={name}
+          initial={initial}
+          following={following}
+          followers={followers}
+          workCount={contents.length}
+          statusMessage={viewerUserId !== profile.id ? safetyMessage : undefined}
+          actions={
+            <>
+          <div className="creator-profile-circle-actions" aria-label="快捷操作">
+            {viewerUserId !== profile.id ? (
               <button
-                className="creator-profile-button"
+                className="creator-profile-circle-button"
                 type="button"
-                onClick={() => setSafetyMessage('订阅入口将在会员功能接通后启用。')}
+                aria-label="私信"
+                onClick={() => setSafetyMessage('私信功能将在消息中心接通后启用。')}
               >
-                订阅
+                <span aria-hidden="true">✉</span>
               </button>
-              {mutualFollow ? <span className="creator-profile-badge">互相关注</span> : null}
+            ) : null}
+            <div className="creator-profile-overflow">
+              <button
+                className="creator-profile-circle-button"
+                type="button"
+                aria-label="更多操作"
+                aria-expanded={actionsOpen}
+                aria-haspopup="menu"
+                onClick={() => setActionsOpen((open) => !open)}
+              >
+                <span aria-hidden="true">•••</span>
+              </button>
+              {actionsOpen ? (
+                <div className="creator-profile-overflow-menu" role="menu" aria-label="更多操作">
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setActionsOpen(false)
+                      void shareProfile()
+                    }}
+                  >
+                    分享
+                  </button>
+                  {viewerUserId !== profile.id ? (
+                    <>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        disabled={muteBusy}
+                        onClick={() => {
+                          setActionsOpen(false)
+                          void applySafetyAction('mute')
+                        }}
+                      >
+                        {muteBusy ? (muted ? '取消中…' : '静音中…') : muted ? '取消静音' : '静音'}
+                      </button>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        disabled={blockBusy}
+                        onClick={() => {
+                          setActionsOpen(false)
+                          void applySafetyAction('block')
+                        }}
+                      >
+                        {blockBusy ? (blocked ? '取消中…' : '屏蔽中…') : blocked ? '取消屏蔽' : '屏蔽'}
+                      </button>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        disabled={reportBusy}
+                        onClick={() => {
+                          setActionsOpen(false)
+                          void reportProfile()
+                        }}
+                      >
+                        {reportBusy ? '举报中…' : '举报'}
+                      </button>
+                    </>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
           </div>
 
-          <dl className="creator-profile-stats" aria-label="作者数据">
-            <div>
-              <dt>关注</dt>
-              <dd>{following === null ? '—' : following.toLocaleString('zh-CN')}</dd>
-            </div>
-            <div>
-              <dt>粉丝</dt>
-              <dd>{followers === null ? '—' : followers.toLocaleString('zh-CN')}</dd>
-            </div>
-            <div>
-              <dt>作品</dt>
-              <dd>{contents.length.toLocaleString('zh-CN')}</dd>
-            </div>
-          </dl>
-
-          {viewerUserId !== profile.id && safetyMessage ? (
-            <p className="creator-profile-global-message" role="status">{safetyMessage}</p>
-          ) : null}
-        </section>
-
-        <nav className="creator-profile-tabs" aria-label="作者内容频道" role="tablist">
-          {(Object.keys(filterLabels) as ProfileFilter[]).map((value) => (
+          <div className="creator-profile-actions">
+            {viewerUserId !== profile.id && !blocked && !blockedBy ? (
+              <button
+                className="creator-profile-button creator-profile-button-primary"
+                disabled={followBusy}
+                onClick={() => void toggleFollow()}
+                type="button"
+              >
+                {followBusy ? '处理中…' : isFollowing ? '已关注' : '关注'}
+              </button>
+            ) : null}
             <button
-              className={'creator-profile-tab' + (filter === value ? ' is-active' : '')}
-              key={value}
-              aria-selected={filter === value}
-              role="tab"
+              className="creator-profile-button"
               type="button"
-              onClick={() => void reloadContents(value)}
+              onClick={() => setSafetyMessage('订阅入口将在会员功能接通后启用。')}
             >
-              {filterLabels[value]}
+              订阅
             </button>
-          ))}
-        </nav>
+            {mutualFollow ? <span className="creator-profile-badge">互相关注</span> : null}
+          </div>
+            </>
+          }
+        />
+
+        <TwitterCloneProfileNav
+          selected={filter}
+          labels={filterLabels}
+          onSelect={(value) => { void reloadContents(value) }}
+        />
 
         <section className="creator-profile-works" id="works" aria-label="作者内容">
           <header className="creator-profile-section-heading">
