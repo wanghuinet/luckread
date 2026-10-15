@@ -54,6 +54,16 @@ describe('Twitter Clone UI reuse through LuckRead API adapters', () => {
     }
   })
 
+  it('renders reply and share counts from the LuckRead social summary', () => {
+    const component = read('src/app/(frontend)/components/reuse/LuckReadSocialPostCard.tsx')
+
+    expect(component).toContain("summary?.counts?.comments === 'number'")
+    expect(component).toContain("summary?.counts?.shares === 'number'")
+    expect(component).toContain('{commentCount !== null ? <span className="text-xs">{commentCount.toLocaleString(dateLocale)}</span> : null}')
+    expect(component).toContain('{shareCount !== null ? <span className="text-xs">{shareCount.toLocaleString(dateLocale)}</span> : null}')
+    expect(component).toContain("'/api/v1/contents/' + encodeURIComponent(contentId) + '/social'")
+  })
+
   it('renders bounded, de-duplicated photo and video attachments in the post card', () => {
     const component = read('src/app/(frontend)/components/reuse/LuckReadSocialPostCard.tsx')
     const sharedStyles = read('src/app/(frontend)/styles.css')

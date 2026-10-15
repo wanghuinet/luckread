@@ -66,6 +66,8 @@ export default function LuckReadSocialPostCard({
   const [postTimestamp, setPostTimestamp] = useState(createdAt || updatedAt || '')
   const [liked, setLiked] = useState(false)
   const [likeCount, setLikeCount] = useState<number | null>(null)
+  const [commentCount, setCommentCount] = useState<number | null>(null)
+  const [shareCount, setShareCount] = useState<number | null>(null)
   const [likeStateLoading, setLikeStateLoading] = useState(true)
   const [likeBusy, setLikeBusy] = useState(false)
   const [bookmarked, setBookmarked] = useState(false)
@@ -94,6 +96,8 @@ export default function LuckReadSocialPostCard({
       setPostTimestamp(createdAt || updatedAt || '')
       setProfile(null)
       setBookmarked(false)
+      setCommentCount(null)
+      setShareCount(null)
       setLikeStateLoading(true)
 
       // The public content-list DTO intentionally omits author metadata. Reuse
@@ -133,6 +137,12 @@ export default function LuckReadSocialPostCard({
         setBookmarked(result.response.ok && summary?.viewer?.favorited === true)
         setLikeCount(result.response.ok && typeof summary?.counts?.likes === 'number'
           ? Math.max(0, summary.counts.likes)
+          : null)
+        setCommentCount(result.response.ok && typeof summary?.counts?.comments === 'number'
+          ? Math.max(0, summary.counts.comments)
+          : null)
+        setShareCount(result.response.ok && typeof summary?.counts?.shares === 'number'
+          ? Math.max(0, summary.counts.shares)
           : null)
       }
 
@@ -316,10 +326,11 @@ export default function LuckReadSocialPostCard({
             </Link>
           ) : null}
           <div className="col-start-2 mt-3 flex max-w-md items-center justify-between text-light-secondary dark:text-dark-secondary">
-            <Link href={contentHref} aria-label="Open replies" className="group flex min-w-0 items-center gap-2 rounded-full p-2 outline-none transition hover:text-accent-blue focus-visible:text-accent-blue">
+            <Link href={contentHref} aria-label={commentCount !== null ? 'Open replies, ' + commentCount + ' comments' : 'Open replies'} className="group flex min-w-0 items-center gap-2 rounded-full p-2 outline-none transition hover:text-accent-blue focus-visible:text-accent-blue">
               <span className="grid h-9 w-9 place-items-center rounded-full transition group-hover:bg-accent-blue/10 group-active:bg-accent-blue/20 group-focus-visible:ring-2 group-focus-visible:ring-accent-blue/80">
                 <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M7.5 8.25h9m-9 3.75h6m-9.75 7.5 2.5-3.5A8.25 8.25 0 1 1 20.25 12a8.2 8.2 0 0 1-2.65 6.08H9.5z" /></svg>
               </span>
+              {commentCount !== null ? <span className="text-xs">{commentCount.toLocaleString(dateLocale)}</span> : null}
             </Link>
             <button aria-label={liked ? 'Unlike' : 'Like'} aria-pressed={liked} className={'group flex items-center gap-2 rounded-full p-2 outline-none transition hover:text-accent-pink focus-visible:text-accent-pink disabled:opacity-50 ' + (liked ? 'text-accent-pink' : '')} disabled={likeBusy || likeStateLoading} onClick={() => void toggleLike()} type="button">
               <span className="grid h-9 w-9 place-items-center rounded-full transition group-hover:bg-accent-pink/10 group-active:bg-accent-pink/20 group-focus-visible:ring-2 group-focus-visible:ring-accent-pink/80">
@@ -332,10 +343,11 @@ export default function LuckReadSocialPostCard({
                 <svg className={'h-5 w-5 ' + (bookmarked ? 'fill-main-accent' : 'fill-none')} viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M6 4.5A1.5 1.5 0 0 1 7.5 3h9A1.5 1.5 0 0 1 18 4.5V21l-6-4-6 4z" /></svg>
               </span>
             </button>
-            <button aria-label="Share" className="group flex items-center gap-2 rounded-full p-2 outline-none transition hover:text-accent-blue focus-visible:text-accent-blue disabled:opacity-50" disabled={shareBusy} onClick={() => void shareContent()} type="button">
+            <button aria-label={shareCount !== null ? 'Share, ' + shareCount + ' shares' : 'Share'} className="group flex items-center gap-2 rounded-full p-2 outline-none transition hover:text-accent-blue focus-visible:text-accent-blue disabled:opacity-50" disabled={shareBusy} onClick={() => void shareContent()} type="button">
               <span className="grid h-9 w-9 place-items-center rounded-full transition group-hover:bg-accent-blue/10 group-active:bg-accent-blue/20 group-focus-visible:ring-2 group-focus-visible:ring-accent-blue/80">
                 <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M12 16V3m0 0L7 8m5-5 5 5M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6" /></svg>
               </span>
+              {shareCount !== null ? <span className="text-xs">{shareCount.toLocaleString(dateLocale)}</span> : null}
             </button>
             {message ? <span className="sr-only" role="status">{message}</span> : null}
           </div>
