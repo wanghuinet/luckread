@@ -17,7 +17,9 @@ describe('Twitter Clone-inspired discussion tree on LuckRead APIs', () => {
     expect(comments).toContain('body: JSON.stringify({ body: body.trim(), parentId: replyingTo })')
     expect(thread).toContain('buildDiscussionTree(comments)')
     expect(thread).toContain('node.children.map')
+    expect(thread).toContain('className="content-comment-list"')
     expect(thread).toContain('role="list"')
+    expect(thread).not.toContain('discussion-thread.module.css')
     expect(tree).toContain('parentId')
     expect(tree).toContain('Missing parents can happen at a pagination boundary')
   })
@@ -30,15 +32,15 @@ describe('Twitter Clone-inspired discussion tree on LuckRead APIs', () => {
     expect(comments).toContain('updateComment(comment)')
     expect(comments).toContain('setReplyingTo(comment.id)')
     expect(comments).toContain("'Idempotency-Key': 'social-comment-delete:' + crypto.randomUUID()")
-    expect(comments).toContain(`'If-Match': '"' + comment.updatedAt + '"'`)
+    expect(comments).toContain(`'If-Match': '"'+ comment.updatedAt + '"'`.replace('""+', '"'))
   })
 
-  it('provides responsive thread connectors and preserves reduced-motion preferences', () => {
-    const styles = read('src/app/(frontend)/content/[contentId]/discussion-thread.module.css')
+  it('reuses LuckRead comment classes and does not add a custom thread stylesheet', () => {
+    const styles = read('src/app/(frontend)/styles.css')
+    const thread = read('src/app/(frontend)/content/[contentId]/DiscussionThread.tsx')
 
-    expect(styles).toContain('.children')
-    expect(styles).toContain('border-inline-start')
-    expect(styles).toContain('@media (max-width: 560px)')
-    expect(styles).toContain('prefers-reduced-motion')
+    expect(styles).toContain('.content-comment-item')
+    expect(styles).toContain('.content-comment-reply')
+    expect(thread).not.toContain('module.css')
   })
 })
