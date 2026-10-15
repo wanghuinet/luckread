@@ -179,6 +179,24 @@ describe('Twitter Clone UI reuse through LuckRead API adapters', () => {
     expect(cache.size).toBeGreaterThan(0)
   })
 
+  it('connects the reused Twitter Clone Following tab to the private Following timeline', () => {
+    const home = read('src/app/(twitter-clone)/home/page.tsx')
+    const feed = read('src/app/(twitter-clone)/TwitterCloneHomeFeed.tsx')
+
+    expect(home).toContain("params.feed === 'following' ? 'following' : 'for-you'")
+    expect(home).toContain('href="/home?feed=following"')
+    expect(home).toContain('feedMode={feedMode}')
+    expect(home).toContain('key={feedMode}')
+    expect(home).not.toContain('href="/me/following">{copy.home.followingTab}</Link>')
+    expect(feed).toContain("'/api/v1/feed/following?'")
+    expect(feed).toContain("credentials: 'include'")
+    expect(feed).toContain("feedMode === 'following' ? '/api/v1/feed/following?'")
+    expect(feed).toContain('ownerUserId?:string')
+    expect(feed).toContain('requiresAuth')
+    expect(feed).toContain("'/login?returnTo='")
+    expect(feed).not.toContain('.module.css')
+  })
+
   it('keeps viewer-specific like summaries outside the shared public profile cache', () => {
     const component = read('src/app/(frontend)/components/reuse/LuckReadSocialPostCard.tsx')
     const cache = read('src/lib/social-post-profile-cache.ts')
