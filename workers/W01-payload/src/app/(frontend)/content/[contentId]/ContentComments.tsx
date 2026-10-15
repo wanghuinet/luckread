@@ -5,6 +5,7 @@ import { FormEvent, useCallback, useEffect, useRef, useState } from 'react'
 
 import { fetchJson, getApiErrorMessage } from '../../../../lib/client-api.js'
 import { getPublicCopy, type PublicLocale } from '../../i18n/public-locale'
+import DiscussionThread from './DiscussionThread'
 
 type CommentItem = {
   id: string
@@ -320,13 +321,10 @@ export default function ContentComments({
         <p className="content-comment-state">{copy.comments.empty}</p>
       ) : (
         <div className="content-comment-list">
-          {comments.map((comment) => (
-            <article
-              className="content-comment-item"
-              key={comment.id}
-              style={{ marginInlineStart: Math.min(comment.depth, 3) * 24 }}
-            >
-              <header>
+          <DiscussionThread
+            comments={comments}
+            renderComment={(comment) => (
+              <article className="content-comment-item" key={comment.id}>
                 <strong>{copy.comments.reader}</strong>
                 <Link href={'/users/' + encodeURIComponent(comment.authorUserId)}>
                   {copy.comments.profile}
@@ -423,7 +421,8 @@ export default function ContentComments({
                 </>
               )}
             </article>
-          ))}
+            )}
+          />
         </div>
       )}
 
