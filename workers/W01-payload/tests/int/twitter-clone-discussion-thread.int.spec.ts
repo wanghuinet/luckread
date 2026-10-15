@@ -32,7 +32,7 @@ describe('Twitter Clone-inspired discussion tree on LuckRead APIs', () => {
     expect(comments).toContain('updateComment(comment)')
     expect(comments).toContain('setReplyingTo(comment.id)')
     expect(comments).toContain("'Idempotency-Key': 'social-comment-delete:' + crypto.randomUUID()")
-    expect(comments).toContain(`'If-Match': '"'+ comment.updatedAt + '"'`.replace('""+', '"'))
+    expect(comments).toContain("'If-Match': '\"' + comment.updatedAt + '\"',")
   })
 
   it('reuses LuckRead comment classes and does not add a custom thread stylesheet', () => {
