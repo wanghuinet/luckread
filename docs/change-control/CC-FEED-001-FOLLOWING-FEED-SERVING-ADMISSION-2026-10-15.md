@@ -76,3 +76,42 @@ The implementation PR must not be marked complete until all of the following pas
 ## Non-goals
 
 This proposal does not implement the Following feed, change current production routing, alter any D1 schema, provision new infrastructure, deploy W04/W01, or promote FEED-001 to GREEN.
+
+## Additional verified implementation facts (2026-10-15)
+
+The existing building blocks are real but not sufficient to claim a Following timeline:
+
+- `workers/W05-social/src/follow-runtime.ts` already implements bounded follow-list pages (maximum 50) with deterministic `created_at DESC, relationship_id DESC` ordering, a user/direction-scoped cursor, and direct block filtering. Its cursor is Base64-encoded JSON with structural validation, not a cryptographically signed cursor; the new feed cursor must not inherit that assumption without an integrity design.
+- `workers/W05-social/src/index.ts` accepts the current internal social caller marker only when `X-LuckRead-Caller: W01`; the admitted follow transport also names W01 as its caller.
+- `workers/W03-content/src/index.ts` currently handles `GET /internal/content/contents` with a singular `creatorId` filter, not a canonical multi-creator Following-feed query.
+- `contracts/transport/W01-W03-content-http-binding.v1.json` and `contracts/transport/W01-W05-social-follow-http-binding.v1.json` define current W01 caller provenance. The public W01 Worker config binds W03 and W05, while `workers/W04-feed-search/wrangler.jsonc` currently has only the account-state KV projection and Queue consumer; it has no W03/W05 service bindings.
+- The public follow-list W01 adapter can read one user's following list through W05, but that list API is not itself a global multi-author content timeline.
+
+These findings are why merely linking the tab to `/api/v1/users/{userId}/following`, repeatedly querying `/api/v1/contents?creatorId=...`, or copying W01's caller marker from W04 would be incorrect.
+
+## Recommended architecture for the admission decision (proposal only)
+
+Prefer the contract's W04 feed-serving boundary, without adding a Worker or D1:
+
+1. W01 exposes the canonical authenticated public route `GET /api/v1/feed/following?cursor=&limit=`; it resolves the viewer through the existing W02-backed server principal and forwards no end-user bearer/session token to downstream Workers.
+2. W01 calls W04 through a private Service Binding with a transport contract that carries server-derived viewer identity, correlation ID, page size and cursor. W04 must reject direct/public invocation and malformed/untrusted context.
+3. W04 obtains follow candidates from W05 and eligible content candidates from W03 using explicit read-only, bounded, feed-specific internal operations. Admission must define the W04 caller identity and transport contract; do not weaken existing W01-only operations or let W04 impersonate W01.
+4. The W03 operation must provide a single bounded multi-creator query with stable global ordering and owner/state/visibility checks, rather than one RPC per followed creator. W05 remains authoritative for the relationship set and block/mute eligibility; W03 remains authoritative for content and publication state; W04 only assembles the derived feed.
+5. Before admitting implementation, resolve how complete follow-graph coverage is maintained beyond one 50-item follow-list page and how follow/unfollow changes affect the cursor. A fixed list of only the most recent followed accounts is not acceptable as a complete Following feed.
+6. Use an integrity-protected, versioned feed cursor bound to viewer identity and query dimensions. Private caching must be per-viewer, no-store must be the safe fallback, and the existing AUTH-013 account-state KV namespace remains dedicated to that projection.
+
+This path requires explicit approval for feed-specific W01→W04 and W04→W03/W05 transport operations, plus a bounded W03 multi-creator read model/query. Those are the design items to admit before implementation; they are not existing capabilities.
+
+## Next implementation admission checklist
+
+A reviewer can admit this slice only after the PR/contract set identifies:
+- canonical route and operation ID;
+- typed request/response DTO and error envelope;
+- W01→W04 and W04→W03/W05 caller identity, trusted principal provenance, timeout and failure mapping;
+- bounded follow-graph retrieval that does not silently omit followed creators;
+- one bounded multi-creator content query and stable, integrity-protected pagination;
+- explicit account-state, block/mute, moderation, deleted/unpublished and visibility filtering;
+- per-viewer cache strategy and unfollow/block invalidation/freshness behavior;
+- max response rows, candidate rows, RPC count, D1 read rows, CPU, rate limits and concurrent request behavior.
+
+Until those decisions are admitted, keep this PR Draft and keep FEED-001 `BLOCKED_NOT_GREEN`.
