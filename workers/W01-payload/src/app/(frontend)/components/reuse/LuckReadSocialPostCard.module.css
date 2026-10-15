@@ -1,5 +1,6 @@
 /* Adapted visual treatment from ccrsxx/twitter-clone Tweet + user components (MIT). */
 .card {
+  grid-column: 1 / -1;
   min-width: 0;
   padding: 15px 16px 10px;
   border-bottom: 1px solid #e5e7eb;
