@@ -66,6 +66,7 @@ export default function LuckReadSocialPostCard({
 
   const contentHref = '/content/' + encodeURIComponent(slug || contentId)
   const mediaItems = resolveSocialPostMedia(mediaRefs, coverRef)
+  const singleMedia = mediaItems.length === 1 ? mediaItems[0] : undefined
   const profileName = profile?.displayName?.trim() || profile?.username || (
     locale === 'en' ? 'LuckRead creator' : locale === 'tw' ? 'LuckRead 創作者' : 'LuckRead 创作者'
   )
@@ -203,20 +204,20 @@ export default function LuckReadSocialPostCard({
 
         <h3>{title}</h3>
 
-        {mediaItems.length === 1 ? (
+        {singleMedia ? (
           <div className="content-feed-cover">
-            {mediaItems[0].kind === 'video' ? (
+            {singleMedia.kind === 'video' ? (
               <video
                 aria-label={title}
                 controls
                 muted
                 playsInline
                 preload="metadata"
-                poster={mediaItems[0].poster}
-                src={mediaItems[0].src}
+                poster={singleMedia.poster}
+                src={singleMedia.src}
               />
             ) : (
-              <img alt={title} loading="lazy" src={mediaItems[0].src} />
+              <img alt={title} loading="lazy" src={singleMedia.src} />
             )}
           </div>
         ) : mediaItems.length > 1 ? (
