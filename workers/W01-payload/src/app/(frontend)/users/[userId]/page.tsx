@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation'
 import { fetchJson, getApiErrorMessage } from '../../../../lib/client-api.js'
 import TwitterCloneProfileHeader from './TwitterCloneProfileHeader'
 import TwitterCloneProfileNav from './TwitterCloneProfileNav'
+import LuckReadSocialPostCard from '../../components/reuse/LuckReadSocialPostCard'
 
 type PublicProfile = {
   id: string
@@ -25,8 +26,11 @@ type CountResponse = {
 type PublicContent = {
   id: string
   slug?: string
+  creatorId?: string | null
+  createdAt?: string
   contentType: 'article' | 'post' | 'video'
   title: string
+  mediaRefs?: string[]
   coverRef?: string | null
   updatedAt?: string
 }
@@ -603,26 +607,45 @@ export default function PublicProfilePage({
 
           {visibleContents.length > 0 ? (
             <div className="creator-profile-grid">
-              {visibleContents.map((item) => (
-                <Link className="creator-profile-card" href={getContentHref(item)} key={item.id}>
-                  <div className="creator-profile-card-media">
-                    {item.coverRef ? (
-                      <img alt="" height={360} loading="lazy" src={item.coverRef} width={480} />
-                    ) : (
-                      <span>{item.contentType === 'video' ? '▶' : item.contentType === 'article' ? 'A' : '•'}</span>
-                    )}
-                  </div>
-                  <div className="creator-profile-card-body">
-                    <span>{contentTypeLabels[item.contentType]}</span>
-                    <h3>{item.title}</h3>
-                    {item.updatedAt ? (
-                      <time dateTime={item.updatedAt}>
-                        {new Date(item.updatedAt).toLocaleDateString('zh-CN')}
-                      </time>
-                    ) : null}
-                  </div>
-                </Link>
-              ))}
+              {visibleContents.map((item) => {
+                if (item.contentType === 'post') {
+                  return (
+                    <LuckReadSocialPostCard
+                      key={item.id}
+                      contentId={item.id}
+                      slug={item.slug}
+                      title={item.title}
+                      creatorId={item.creatorId ?? profile?.id}
+                      coverRef={item.coverRef}
+                      mediaRefs={item.mediaRefs}
+                      createdAt={item.createdAt}
+                      updatedAt={item.updatedAt}
+                      locale="zh"
+                    />
+                  )
+                }
+
+                return (
+                  <Link className="creator-profile-card" href={getContentHref(item)} key={item.id}>
+                    <div className="creator-profile-card-media">
+                      {item.coverRef ? (
+                        <img alt="" height={360} loading="lazy" src={item.coverRef} width={480} />
+                      ) : (
+                        <span>{item.contentType === 'video' ? '▶' : 'A'}</span>
+                      )}
+                    </div>
+                    <div className="creator-profile-card-body">
+                      <span>{contentTypeLabels[item.contentType]}</span>
+                      <h3>{item.title}</h3>
+                      {item.updatedAt ? (
+                        <time dateTime={item.updatedAt}>
+                          {new Date(item.updatedAt).toLocaleDateString('zh-CN')}
+                        </time>
+                      ) : null}
+                    </div>
+                  </Link>
+                )
+              })}
             </div>
           ) : null}
         </section>
