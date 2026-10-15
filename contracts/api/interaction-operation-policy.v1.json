@@ -886,7 +886,7 @@
       }
     },
     {
-      "operationId": "repost",
+      "operationId": "createContentRepost",
       "method": "POST",
       "path": "/content/{contentId}/reposts",
       "visibility": "public_authenticated",
@@ -983,7 +983,7 @@
       }
     },
     {
-      "operationId": "undoRepost",
+      "operationId": "deleteContentRepost",
       "method": "DELETE",
       "path": "/content/{contentId}/reposts",
       "visibility": "public_authenticated",
