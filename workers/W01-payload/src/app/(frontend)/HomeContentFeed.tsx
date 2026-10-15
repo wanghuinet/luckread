@@ -136,6 +136,7 @@ export default function HomeContentFeed({
                 title={item.title}
                 creatorId={item.creatorId}
                 coverRef={item.coverRef}
+                mediaRefs={item.mediaRefs}
                 createdAt={item.createdAt}
                 updatedAt={item.updatedAt}
                 locale={locale}
