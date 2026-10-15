@@ -34,7 +34,7 @@ describe('W04 following feed serving route', () => {
 
   it('rejects untrusted callers, missing principals, duplicate parameters, and invalid bounds', async () => {
     const fetch = vi.fn(async () => Response.json({ data: {} }))
-    const env = { AUTH013_W04_DERIVED_PROJECTION: { get: async () => null, put: async () => undefined }, W05_SOCIAL: { fetch } }
+    const env = { AUTH013_W04_DERIVED_PROJECTION: { get: async (_key: string, _type: 'json'): Promise<unknown> => null, put: async (_key: string, _value: string): Promise<void> => undefined }, W05_SOCIAL: { fetch } }
     const noPrincipal = await worker.fetch(
       new Request('https://luckread-w04.internal/internal/feed/following?limit=6', {
         headers: { ...headers, 'X-LuckRead-Principal-User-Id': '' },
