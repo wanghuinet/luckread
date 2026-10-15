@@ -23,7 +23,7 @@ export function extractArticleSummary(
 
   if (!normalized) return null
   if (normalized.length <= maxChars) return normalized
-  return normalized.slice(0, maxChars).trimEnd() + '…'
+  return normalized.slice(0, maxChars - 1).trimEnd() + '…'
 }
 
 /**
