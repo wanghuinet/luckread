@@ -106,8 +106,6 @@ export default function HomeContentFeed({
     }
   }, [activeFeed, hasInitialItems, retryKey])
 
-  if (!loading && items.length === 0 && !error && activeFeed === 'forYou') return null
-
   const switchFeed = (feed: 'forYou' | 'following') => {
     if (feed === activeFeed) return
     setActiveFeed(feed)
