@@ -5,6 +5,7 @@ import {
   invalidateFollowListCountCache,
   listFollowers,
   listFollowing,
+  listFollowingFeedCandidates,
   parseFollowListLimit,
   unfollow,
 } from './follow-runtime.js'
@@ -235,6 +236,22 @@ describe('follow runtime', () => {
       nextCursor: null,
       hasMore: false,
     })
+  })
+
+  it('returns a bounded following-feed candidate window in one relationship query', async () => {
+    const rows = Array.from({ length: 501 }, (_, index) => ({ user_id: 'user-' + (index + 1) }))
+    const d = db([], [{ results: rows }])
+    const result = await listFollowingFeedCandidates(d, 'viewer-1')
+    expect(result.userIds).toHaveLength(500)
+    expect(result.userIds[0]).toBe('user-1')
+    expect(result.userIds[499]).toBe('user-500')
+    expect(result.hasMore).toBe(true)
+    const query = String((d.prepare as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[0])
+    expect(query).toContain("rel.follower_user_id = ?")
+    expect(query).toContain("block.relation_type = 'block'")
+    expect(query).toContain("mute.relation_type = 'mute'")
+    expect(query).toContain("LIMIT ?")
+    expect(d.prepare).toHaveBeenCalledTimes(1)
   })
 
   it('rejects malformed or cross-direction cursors', async () => {
