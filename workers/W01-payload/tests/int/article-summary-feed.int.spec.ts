@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 import {
@@ -66,6 +66,11 @@ describe('article summary card preview', () => {
     expect(component).toContain("credentials: 'omit'")
     expect(component).toContain("referrerPolicy: 'no-referrer'")
     expect(component).toContain('resolvePublicArticleBodyUrl(bodyRef, window.location.origin)')
+    expect(component).toContain('className="content-feed-meta"')
+    expect(component).toContain('className="content-detail-action-status"')
+    expect(component).toContain('content-feed-skeleton-line')
+    expect(component).not.toContain('ArticleSummaryPreview.module.css')
+    expect(existsSync(resolve(process.cwd(), 'src/components/ArticleSummaryPreview.module.css'))).toBe(false)
     expect(component).not.toContain("fetch('/api/v1/contents?'")
     expect(home).toContain('/content/')
     expect(discovery).toContain('/content/')
