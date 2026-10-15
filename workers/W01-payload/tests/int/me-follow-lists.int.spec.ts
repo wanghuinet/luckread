@@ -9,6 +9,7 @@ describe('personal social relationship pages', () => {
     const followers = read('src/app/(frontend)/me/followers/page.tsx')
     const following = read('src/app/(frontend)/me/following/page.tsx')
     const component = read('src/app/(frontend)/me/MeFollowList.tsx')
+    const row = read('src/app/(frontend)/users/TwitterCloneFollowRow.tsx')
 
     expect(followers).toContain('<MeFollowList direction="followers" />')
     expect(following).toContain('<MeFollowList direction="following" />')
@@ -19,7 +20,9 @@ describe('personal social relationship pages', () => {
     expect(component).toContain('加载更多')
     expect(component).toContain("window.location.assign('/login?returnTo='")
     expect(component).toContain("credentials: 'include'")
-    expect(component).toContain("href={'/users/' + encodeURIComponent(item.userId)}")
+    expect(component).toContain('<TwitterCloneFollowRow')
+    expect(row).toContain("const profileHref = '/users/' + encodeURIComponent(userId)")
+    expect(row).toContain('href={profileHref}')
     expect(component).toContain("method: 'DELETE'")
     expect(component).toContain("'Idempotency-Key': 'social-unfollow:' + crypto.randomUUID()")
     expect(component).toContain('if (isFollowers || unfollowingId) return')
