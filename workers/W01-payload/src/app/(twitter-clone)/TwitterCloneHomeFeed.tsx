@@ -7,24 +7,70 @@ import LuckReadSocialPostCard from '../(frontend)/components/reuse/LuckReadSocia
 import type { PublicLocale } from '../(frontend)/i18n/public-locale'
 import { getTwitterCloneCopy } from './twitter-clone-copy'
 
-export type HomeContentItem = { id:string; slug?:string; creatorId?:string|null; createdAt?:string; updatedAt?:string; contentType:'article'|'post'|'video'; title:string; bodyRef?:string; mediaRefs?:string[]; coverRef?:string|null }
+export type HomeContentItem = { id:string; slug?:string; ownerUserId?:string; creatorId?:string|null; createdAt?:string; updatedAt?:string; contentType:'article'|'post'|'video'; title:string; bodyRef?:string; mediaRefs?:string[]; coverRef?:string|null }
 export type HomeContentPage = { items:HomeContentItem[]; nextCursor:string|null; hasMore:boolean }
+export type HomeFeedMode = 'for-you' | 'following'
 
-export default function TwitterCloneHomeFeed({initialPage,locale}:{initialPage:HomeContentPage;locale:PublicLocale}) {
+export default function TwitterCloneHomeFeed({initialPage,locale,feedMode}:{initialPage:HomeContentPage;locale:PublicLocale;feedMode:HomeFeedMode}) {
   const copy = getTwitterCloneCopy(locale)
   const [items,setItems] = useState<HomeContentItem[]>(initialPage.items)
   const [nextCursor,setNextCursor] = useState<string|null>(initialPage.nextCursor)
   const [hasMore,setHasMore] = useState(initialPage.hasMore)
-  const [loading,setLoading] = useState(false)
+  const [loading,setLoading] = useState(feedMode === 'following')
   const [error,setError] = useState('')
+  const [requiresAuth,setRequiresAuth] = useState(false)
   const sentinelRef = useRef<HTMLDivElement|null>(null)
   const loadingRef = useRef(false)
+
+  async function loadInitialFollowing() {
+    if (feedMode !== 'following' || loadingRef.current) return
+    loadingRef.current = true
+    setLoading(true)
+    setError('')
+    try {
+      const params = new URLSearchParams({ limit: '20' })
+      const { response, data } = await fetchJson<{data?:HomeContentPage;error?:{code?:string;message?:string}}>(
+        '/api/v1/feed/following?' + params.toString(),
+        { headers: { accept: 'application/json' }, cache: 'no-store', credentials: 'include' },
+      )
+      if (response.status === 401 || data?.error?.code === 'UNAUTHENTICATED') {
+        setRequiresAuth(true)
+        setItems([])
+        setNextCursor(null)
+        setHasMore(false)
+        return
+      }
+      if (!response.ok || !data?.data) throw new Error(getApiErrorMessage(data, copy.feed.loadMoreError))
+      const page = data.data
+      setRequiresAuth(false)
+      setItems(page.items ?? [])
+      setNextCursor(page.nextCursor ?? null)
+      setHasMore(page.hasMore === true)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : copy.feed.loadMoreError)
+    } finally {
+      loadingRef.current = false
+      setLoading(false)
+    }
+  }
+
   async function loadMore() {
-    if(loadingRef.current||!hasMore||!nextCursor)return
+    if(loadingRef.current||!hasMore||!nextCursor||requiresAuth)return
     loadingRef.current=true;setLoading(true);setError('')
     try {
       const params=new URLSearchParams({limit:'20',cursor:nextCursor})
-      const {response,data}=await fetchJson<{data?:HomeContentPage;error?:{message?:string}}>('/api/v1/contents?'+params.toString(),{headers:{accept:'application/json'},cache:'no-store',credentials:'omit'})
+      const endpoint = feedMode === 'following' ? '/api/v1/feed/following?' : '/api/v1/contents?'
+      const {response,data}=await fetchJson<{data?:HomeContentPage;error?:{code?:string;message?:string}}>(
+        endpoint + params.toString(),
+        {headers:{accept:'application/json'},cache:'no-store',credentials:feedMode==='following'?'include':'omit'},
+      )
+      if (response.status === 401 && feedMode === 'following') {
+        setRequiresAuth(true)
+        setItems([])
+        setNextCursor(null)
+        setHasMore(false)
+        return
+      }
       if(!response.ok||!data?.data)throw new Error(getApiErrorMessage(data,copy.feed.loadMoreError))
       const page=data.data
       setItems(current=>{const seen=new Set(current.map(item=>item.id));return [...current,...(page.items??[]).filter(item=>!seen.has(item.id))]})
@@ -32,15 +78,31 @@ export default function TwitterCloneHomeFeed({initialPage,locale}:{initialPage:H
     } catch(cause) {setError(cause instanceof Error?cause.message:copy.feed.loadMoreError)}
     finally {loadingRef.current=false;setLoading(false)}
   }
+
+  useEffect(() => {
+    if (feedMode === 'following') void loadInitialFollowing()
+  }, [feedMode])
+
   useEffect(()=>{
     const target=sentinelRef.current;if(!target||!hasMore)return
     const observer=new IntersectionObserver(entries=>{if(entries.some(entry=>entry.isIntersecting))void loadMore()},{rootMargin:'500px 0px'})
     observer.observe(target);return()=>observer.disconnect()
-  },[hasMore,nextCursor])
+  },[hasMore,nextCursor,feedMode,requiresAuth])
+
+  const followingEmptyTitle = locale === 'en'
+    ? 'No posts from followed accounts yet'
+    : locale === 'tw' ? '你追蹤的帳號還沒有動態' : '你关注的账号还没有动态'
+  const signInTitle = locale === 'en'
+    ? 'Sign in to see posts from accounts you follow'
+    : locale === 'tw' ? '登入後查看你追蹤帳號的動態' : '登录后查看你关注账号的动态'
+  const signInLabel = locale === 'en' ? 'Sign in' : locale === 'tw' ? '登入' : '登录'
+
   return <section aria-busy={loading} aria-label={copy.feed.timeline}>
-    {items.map(item=><LuckReadSocialPostCard key={item.id} contentId={item.id} slug={item.slug} title={item.title} creatorId={item.creatorId} coverRef={item.coverRef} mediaRefs={item.mediaRefs} createdAt={item.createdAt} updatedAt={item.updatedAt} locale={locale} presentation="twitter-clone" contentType={item.contentType}/>)}
-    {items.length===0?<div className="flex flex-col items-center gap-3 px-6 py-16 text-center"><h2 className="text-xl font-bold">{copy.feed.noPublicContent}</h2><p className="text-sm text-light-secondary dark:text-dark-secondary">{copy.feed.emptyDescription}</p><Link className="rounded-full bg-main-accent px-5 py-2 font-bold text-white" href="/content">{copy.feed.exploreContent}</Link></div>:null}
-    {error?<div className="flex items-center justify-between gap-3 border-b border-light-border px-4 py-4 text-sm dark:border-dark-border" role="status"><p>{error}</p><button className="rounded-full border border-light-line-reply px-4 py-2 font-bold dark:border-dark-border" onClick={()=>void loadMore()} type="button">{copy.feed.retry}</button></div>:null}
+    {requiresAuth ? <div className="flex flex-col items-center gap-3 px-6 py-16 text-center" role="status"><h2 className="text-xl font-bold">{signInTitle}</h2><Link className="rounded-full bg-main-accent px-5 py-2 font-bold text-white" href={'/login?returnTo=' + encodeURIComponent('/home?feed=following')}>{signInLabel}</Link></div> : null}
+    {!requiresAuth ? items.map(item=><LuckReadSocialPostCard key={item.id} contentId={item.id} slug={item.slug} title={item.title} creatorId={item.creatorId ?? (feedMode === 'following' ? item.ownerUserId : undefined)} coverRef={item.coverRef} mediaRefs={item.mediaRefs} createdAt={item.createdAt} updatedAt={item.updatedAt} locale={locale} presentation="twitter-clone" contentType={item.contentType}/>) : null}
+    {!requiresAuth&&items.length===0&&!loading&&!error?<div className="flex flex-col items-center gap-3 px-6 py-16 text-center"><h2 className="text-xl font-bold">{feedMode==='following'?followingEmptyTitle:copy.feed.noPublicContent}</h2><p className="text-sm text-light-secondary dark:text-dark-secondary">{feedMode==='following'?(locale==='en'?'Follow more accounts to build your timeline.':locale==='tw'?'追蹤更多帳號以建立你的動態。':'关注更多账号，开始建立你的动态。'):copy.feed.emptyDescription}</p><Link className="rounded-full bg-main-accent px-5 py-2 font-bold text-white" href="/content">{copy.feed.exploreContent}</Link></div>:null}
+    {loading&&items.length===0?<div className="flex justify-center px-4 py-6 text-sm text-light-secondary dark:text-dark-secondary" role="status">{copy.feed.loading}</div>:null}
+    {error?<div className="flex items-center justify-between gap-3 border-b border-light-border px-4 py-4 text-sm dark:border-dark-border" role="status"><p>{error}</p><button className="rounded-full border border-light-line-reply px-4 py-2 font-bold dark:border-dark-border" onClick={()=>feedMode==='following'&&items.length===0?void loadInitialFollowing():void loadMore()} type="button">{copy.feed.retry}</button></div>:null}
     {hasMore?<div className="flex justify-center px-4 py-6 text-sm text-light-secondary dark:text-dark-secondary" ref={sentinelRef}>{loading?copy.feed.loading:copy.feed.loadingMore}</div>:null}
   </section>
 }
