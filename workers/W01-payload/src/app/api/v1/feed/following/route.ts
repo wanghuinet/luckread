@@ -1,8 +1,5 @@
-import {
-  resolveSocialPrincipal,
-  callW05Social,
-  W05SocialClientError,
-} from '../../../../../social/w05-social-client.js'
+import { callW04FollowingFeed, W04FeedClientError } from '../../../../../feed/w04-feed-client.js'
+import { resolveSocialPrincipal } from '../../../../../social/w05-social-client.js'
 
 const errorResponse = (status: number, code: string, message: string) =>
   Response.json(
@@ -40,16 +37,15 @@ export async function GET(request: Request): Promise<Response> {
 
     const query = new URLSearchParams({ limit })
     if (cursor) query.set('cursor', cursor)
-    return await callW05Social({
+    return await callW04FollowingFeed({
       request,
-      pathname: '/internal/social/feed/following?' + query.toString(),
-      method: 'GET',
+      pathname: '/internal/feed/following?' + query.toString(),
       principal,
     })
   } catch (error) {
-    if (error instanceof W05SocialClientError) {
+    if (error instanceof W04FeedClientError) {
       return errorResponse(error.status, error.code, error.message)
     }
-    return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Social service unavailable')
+    return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Feed service unavailable')
   }
 }
