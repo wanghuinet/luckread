@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { cookies, headers } from 'next/headers'
 import { GET as getPublicContents } from '../../api/v1/contents/route'
 import TwitterCloneHomeFeed, { type HomeContentPage } from '../TwitterCloneHomeFeed'
+import TwitterCloneSidebarProfile from '../TwitterCloneSidebarProfile'
 import { TwitterLogo } from '../TwitterCloneLanding'
 import PublicLanguageToggle from '../../(frontend)/i18n/PublicLanguageToggle'
 import { normalizePublicLocale, type PublicLocale } from '../../(frontend)/i18n/public-locale'
@@ -59,7 +60,7 @@ export default async function TwitterCloneHomePage() {
             </nav>
             <Link className="accent-tab absolute right-4 -translate-y-[72px] rounded-full bg-main-accent px-4 py-3 text-lg font-bold text-white outline-none transition hover:brightness-90 xs:static xs:translate-y-0 xl:w-11/12" href="/publish"><span className="flex items-center justify-center gap-2"><NavIcon name="write" /><span className="hidden xl:inline">{copy.home.post}</span></span></Link>
           </section>
-          <Link className="hidden items-center gap-3 rounded-full p-3 transition hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 xl:flex" href="/me/profile"><span className="grid h-10 w-10 place-items-center rounded-full bg-main-sidebar-background font-bold">L</span><span className="grid min-w-0"><strong className="truncate text-sm">LuckRead</strong><small className="text-light-secondary dark:text-dark-secondary">{copy.home.profileAndSettings}</small></span></Link>
+          <TwitterCloneSidebarProfile locale={locale} />
         </div>
       </header>
       <main className="hover-animation flex min-h-screen w-full max-w-xl flex-col border-x border-light-border pb-32 dark:border-dark-border xs:pb-96">
