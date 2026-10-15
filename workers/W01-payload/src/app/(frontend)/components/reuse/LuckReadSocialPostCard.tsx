@@ -209,7 +209,7 @@ export default function LuckReadSocialPostCard({
           </span>
         </div>
         {resolvedCreatorId ? (
-          <Link className={styles.profileLink} href={'/users/' + encodeURIComponent(resolvedCreatorId)}>
+          <Link className={'content-detail-follow ' + styles.profileLink} href={'/users/' + encodeURIComponent(resolvedCreatorId)}>
             {locale === 'en' ? 'Profile' : locale === 'tw' ? '個人頁' : '主页'}
           </Link>
         ) : null}
@@ -243,15 +243,15 @@ export default function LuckReadSocialPostCard({
         <span className={styles.readMore}>{locale === 'en' ? 'Open discussion' : locale === 'tw' ? '查看討論' : '查看讨论'} ↗</span>
       </Link>
 
-      <footer className={styles.actions}>
-        <Link className={styles.action} href={contentHref} aria-label={locale === 'en' ? 'Open replies' : '打开评论'}>
+      <footer className={'content-detail-actions ' + styles.actions}>
+        <Link className={'content-comment-reply ' + styles.action} href={contentHref} aria-label={locale === 'en' ? 'Open replies' : '打开评论'}>
           <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
             <path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8z" />
           </svg>
           <span>{locale === 'en' ? 'Discuss' : locale === 'tw' ? '討論' : '讨论'}</span>
         </Link>
         <button
-          className={liked ? styles.actionLiked : styles.action}
+          className={'content-detail-like ' + (liked ? styles.actionLiked : styles.action)}
           type="button"
           disabled={likeBusy || likeStateLoading}
           aria-pressed={liked}
