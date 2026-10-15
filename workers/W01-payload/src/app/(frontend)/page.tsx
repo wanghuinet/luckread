@@ -164,79 +164,127 @@ export default async function HomePage() {
         </div>
       </header>
 
-      <main id="top">
-        <section className="hero" aria-labelledby="hero-title">
-          <div className="hero-copy">
-            <p className="eyebrow">{copy.home.heroEyebrow}</p>
-            <h1 id="hero-title">
-              {copy.home.heroTitle.split('<accent>')[0]}<span>{copy.home.heroTitle.split('<accent>')[1]}</span>
-            </h1>
-            <p className="hero-lede">
-              {copy.home.heroLead.split('\n')[0]}
-              <br className="desktop-break" />
-              {copy.home.heroLead.split('\n')[1]}
-            </p>
-            <div className="hero-actions">
-              <Link className="button button-primary" data-umami-event="creator-center-open" href={CREATOR_CENTER_URL}>{copy.common.createNow}<span aria-hidden="true">↗</span></Link>
-              <Link className="button button-quiet" data-umami-event="content-discovery-open" href="/content">{copy.common.explore}</Link>
-              <Link className="button button-quiet" data-umami-event="short-video-discovery-open" href="/shorts">短视频</Link>
-            </div>
+      <main id="top" className="home-main">
+        <div className="home-reading-layout">
+          <nav className="home-left-rail" aria-label={copy.common.home}>
+            <Link
+              className="home-rail-link home-rail-tree"
+              data-umami-event="content-discovery-open"
+              href="/content"
+              aria-label={publicLocale === 'en' ? 'Threaded discussions' : publicLocale === 'tw' ? '樹狀討論' : '树形讨论'}
+              title={publicLocale === 'en' ? 'Threaded discussions' : publicLocale === 'tw' ? '樹狀討論' : '树形讨论'}
+            >
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8">
+                <path d="M12 4v5M12 9H6v4M12 9h6v4" />
+                <circle cx="12" cy="3.5" r="1.7" />
+                <circle cx="6" cy="15.5" r="1.7" />
+                <circle cx="18" cy="15.5" r="1.7" />
+              </svg>
+              <span className="home-sr-only">{publicLocale === 'en' ? 'Threaded discussions' : publicLocale === 'tw' ? '樹狀討論' : '树形讨论'}</span>
+            </Link>
+            <span className="home-rail-divider" aria-hidden="true" />
+            <Link className="home-rail-link home-rail-active" href="/" aria-label={copy.common.home} title={copy.common.home}>
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8">
+                <path d="m3 10 9-7 9 7v9a2 2 0 0 1-2 2h-4v-7H9v7H5a2 2 0 0 1-2-2z" />
+              </svg>
+            </Link>
+            <Link className="home-rail-link" href="/content" aria-label={copy.common.discover} title={copy.common.discover}>
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8">
+                <circle cx="10.8" cy="10.8" r="6.8" />
+                <path d="m16 16 4.2 4.2" />
+              </svg>
+            </Link>
+            <Link className="home-rail-link" data-umami-event="short-video-discovery-open" href="/shorts" aria-label={publicLocale === 'en' ? 'Short videos' : publicLocale === 'tw' ? '短影片' : '短视频'} title={publicLocale === 'en' ? 'Short videos' : publicLocale === 'tw' ? '短影片' : '短视频'}>
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8">
+                <rect x="3.5" y="5" width="17" height="14" rx="3" />
+                <path d="m10 9 5 3-5 3z" />
+              </svg>
+            </Link>
+            <Link className="home-rail-link" data-umami-event="creator-center-open" href={CREATOR_CENTER_URL} aria-label={copy.common.creatorCenter} title={copy.common.creatorCenter}>
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8">
+                <path d="m14 5 5 5M4 20l4.2-.9L19 8.3a2.1 2.1 0 0 0-3-3L5.2 16.1z" />
+                <path d="M4 20h16" />
+              </svg>
+            </Link>
+          </nav>
+
+          <div className="home-reading-main">
+            <section className="hero home-feed-hero" aria-labelledby="hero-title">
+              <div className="hero-copy">
+                <p className="eyebrow">{copy.home.heroEyebrow}</p>
+                <h1 id="hero-title">
+                  {copy.home.heroTitle.split('<accent>')[0]}<span>{copy.home.heroTitle.split('<accent>')[1]}</span>
+                </h1>
+                <p className="hero-lede">
+                  {copy.home.heroLead.split('\n')[0]}
+                  <br className="desktop-break" />
+                  {copy.home.heroLead.split('\n')[1]}
+                </p>
+                <div className="hero-actions">
+                  <Link className="button button-primary" data-umami-event="creator-center-open" href={CREATOR_CENTER_URL}>{copy.common.createNow}<span aria-hidden="true">↗</span></Link>
+                  <Link className="button button-quiet" data-umami-event="content-discovery-open" href="/content">{copy.common.explore}</Link>
+                  <Link className="button button-quiet" data-umami-event="short-video-discovery-open" href="/shorts">{publicLocale === 'en' ? 'Short videos' : publicLocale === 'tw' ? '短影片' : '短视频'}</Link>
+                </div>
+              </div>
+            </section>
+
+            <nav className="home-topic-strip" aria-label={copy.home.categoryAria}>
+              {categoriesByLocale[publicLocale].map((category, index) => (
+                <Link
+                  className="home-topic-link"
+                  data-umami-event="content-discovery-open"
+                  href={index === 1 ? '/shorts' : '/content'}
+                  key={category}
+                >
+                  {category}<span aria-hidden="true">↗</span>
+                </Link>
+              ))}
+            </nav>
+
+            <HomeContentFeed locale={publicLocale} initialItems={initialHomeContent} />
+
+            <section className="highlight-grid home-highlight-grid" aria-label={copy.home.highlightAria}>
+              {copy.home.highlight.map((item, index) => (
+                <article className="highlight-card" key={String(index + 1)}>
+                  <div className="highlight-index">{String(index + 1).padStart(2, '0')}</div>
+                  <p className="card-eyebrow">{item.eyebrow}</p>
+                  <h3>{item.title}</h3>
+                  <p>{item.body}</p>
+                  <span className="card-arrow" aria-hidden="true">↗</span>
+                </article>
+              ))}
+            </section>
           </div>
 
-          <div className="hero-visual" aria-hidden="true">
-            <div className="hero-orbit hero-orbit-one" />
-            <div className="hero-orbit hero-orbit-two" />
-            <div className="hero-panel">
-              <div className="hero-panel-top"><span>LUCKREAD</span><span>01 / 03</span></div>
-              <div className="hero-signal"><span className="signal-dot" /><span>CONTENT / CREATOR / VALUE</span></div>
-              <div className="hero-panel-title">Good ideas deserve a wider world.</div>
-              <div className="hero-panel-line" />
-              <div className="hero-panel-meta"><span>文字</span><span>影像</span><span>观点</span></div>
-            </div>
-          </div>
-        </section>
-
-        <section className="category-strip" aria-label={copy.home.categoryAria}>
-          {categoriesByLocale[publicLocale].map((category, index) => (
-            <span className="category-item" key={category}>
-              <span className="category-index">0{index + 1}</span>{category}
-            </span>
-          ))}
-        </section>
-
-        <section className="intro-section" id="explore">
-          <div className="section-heading">
-            <p className="eyebrow">{copy.home.exploreEyebrow}</p>
-            <h2 dangerouslySetInnerHTML={{ __html: copy.home.exploreTitle }} />
-          </div>
-          <p className="section-description">{copy.home.exploreDescription}</p>
-        </section>
-
-        <HomeContentFeed locale={publicLocale} initialItems={initialHomeContent} />
-
-        <section className="highlight-grid" aria-label={copy.home.highlightAria}>
-          {copy.home.highlight.map((item, index) => (
-
-            <article className="highlight-card" key={String(index + 1)}>
-              <div className="highlight-index">{String(index + 1).padStart(2, '0')}</div>
-              <p className="card-eyebrow">{item.eyebrow}</p>
-              <h3>{item.title}</h3>
-              <p>{item.body}</p>
-              <span className="card-arrow" aria-hidden="true">↗</span>
-            </article>
-          ))}
-        </section>
-
-        <section className="creator-banner" id="creator">
-          <div>
-            <p className="eyebrow">{copy.home.creatorEyebrow}</p>
-            <h2 dangerouslySetInnerHTML={{ __html: copy.home.creatorTitle }} />
-          </div>
-          <div className="creator-banner-side">
-            <p>{copy.home.creatorDescription}</p>
-            <Link className="button button-light" data-umami-event="creator-center-open" href={CREATOR_CENTER_URL}>{copy.home.creatorCenter}<span aria-hidden="true">↗</span></Link>
-          </div>
-        </section>
+          <aside className="home-right-rail" aria-label={publicLocale === 'en' ? 'Creator and discovery' : publicLocale === 'tw' ? '創作與探索' : '创作与发现'}>
+            <section className="home-side-card home-side-creator" id="creator">
+              <p className="eyebrow">FOR CREATORS</p>
+              <h2 dangerouslySetInnerHTML={{ __html: copy.home.creatorTitle }} />
+              <p>{copy.home.creatorDescription}</p>
+              <Link aria-label={publicLocale === 'en' ? 'Open Creator Studio from the sidebar' : publicLocale === 'tw' ? '從側欄進入創作者中心' : '从侧栏进入创作者中心'} className="button button-primary home-side-cta" data-umami-event="creator-center-open" href={CREATOR_CENTER_URL}>
+                {copy.home.creatorCenter}<span aria-hidden="true">↗</span>
+              </Link>
+            </section>
+            <section className="home-side-card">
+              <h2>{publicLocale === 'en' ? 'Explore LuckRead' : publicLocale === 'tw' ? '探索 LuckRead' : '发现 LuckRead'}</h2>
+              <nav className="home-side-links" aria-label={copy.common.discover}>
+                <Link data-umami-event="content-discovery-open" href="/content">{copy.common.discover}<span aria-hidden="true">↗</span></Link>
+                <Link data-umami-event="short-video-discovery-open" href="/shorts">{publicLocale === 'en' ? 'Short videos' : publicLocale === 'tw' ? '短影片' : '短视频'}<span aria-hidden="true">↗</span></Link>
+                <Link href="/me/subscriptions">{copy.common.subscriptions}<span aria-hidden="true">↗</span></Link>
+              </nav>
+              <div className="home-side-tags">
+                {categoriesByLocale[publicLocale].map((category, index) => (
+                  <Link key={category} href={index === 1 ? '/shorts' : '/content'}>{category}</Link>
+                ))}
+              </div>
+            </section>
+            <section className="home-side-note">
+              <h2>{publicLocale === 'en' ? 'Great discussions start with good content.' : publicLocale === 'tw' ? '好的討論，從好內容開始。' : '好的讨论，从好内容开始。'}</h2>
+              <p>{publicLocale === 'en' ? 'Open any work to read replies and join the existing threaded discussion.' : publicLocale === 'tw' ? '打開任一作品，即可閱讀回覆並加入樹狀討論。' : '打开任一作品，即可阅读回复并参与树状讨论。'}</p>
+              <Link data-umami-event="content-discovery-open" href="/content">{publicLocale === 'en' ? 'Enter discussions' : publicLocale === 'tw' ? '进入討論' : '进入讨论'} ↗</Link>
+            </section>
+          </aside>
+        </div>
       </main>
 
       <footer className="site-footer" id="about">
