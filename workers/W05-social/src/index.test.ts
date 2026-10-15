@@ -170,6 +170,46 @@ describe('W05 social query transport', () => {
     expect(response.status).toBe(201)
   })
 
+  it('creates a repost relation using the authenticated W01 principal', async () => {
+    const response = await worker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/content/content-1/reposts', {
+        method: 'POST',
+        headers: { ...transportHeaders, 'Idempotency-Key': 'repost-1' },
+      }),
+      { DB: dbFor([
+        { id: 'content-1', state: 'PUBLISHED', owner_user_id: 'owner-1', blocked: 0 },
+        null,
+        { repost_id: 'repost-1', content_id: 'content-1', actor_user_id: 'viewer-1', created_at: '2026-10-15T00:00:00.000Z' },
+      ]) },
+    )
+    expect(response.status).toBe(201)
+    await expect(response.json()).resolves.toMatchObject({
+      data: { repostId: 'repost-1', contentId: 'content-1', actorUserId: 'viewer-1' },
+    })
+  })
+
+  it('removes the current actor repost with an idempotent 204', async () => {
+    const response = await worker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/content/content-1/reposts', {
+        method: 'DELETE',
+        headers: { ...transportHeaders, 'Idempotency-Key': 'undo-repost-1' },
+      }),
+      { DB: dbFor() },
+    )
+    expect(response.status).toBe(204)
+  })
+
+  it('requires an idempotency key for repost changes', async () => {
+    const response = await worker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/content/content-1/reposts', {
+        method: 'POST',
+        headers: { ...transportHeaders },
+      }),
+      { DB: dbFor([{ id: 'content-1', state: 'PUBLISHED', owner_user_id: 'owner-1', blocked: 0 }]) },
+    )
+    expect(response.status).toBe(428)
+  })
+
   it('resolves a share without a viewer principal', async () => {
     const response = await worker.fetch(
       new Request('https://luckread-w05.internal/internal/social/shares/share-1', {

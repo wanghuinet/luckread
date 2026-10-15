@@ -21,8 +21,8 @@ type ContentDetail = {
 
 type SocialSummary = {
   data?: {
-    counts?: { likes?: number; favorites?: number; comments?: number; shares?: number }
-    viewer?: { liked?: boolean; favorited?: boolean } | null
+    counts?: { likes?: number; favorites?: number; comments?: number; shares?: number; reposts?: number }
+    viewer?: { liked?: boolean; favorited?: boolean; reposted?: boolean } | null
   }
   error?: { message?: string }
 }
@@ -74,6 +74,9 @@ export default function LuckReadSocialPostCard({
   const [favoriteCount, setFavoriteCount] = useState<number | null>(null)
   const [bookmarkBusy, setBookmarkBusy] = useState(false)
   const [shareBusy, setShareBusy] = useState(false)
+  const [reposted, setReposted] = useState(false)
+  const [repostCount, setRepostCount] = useState<number | null>(null)
+  const [repostBusy, setRepostBusy] = useState(false)
   const [message, setMessage] = useState('')
 
   const contentHref = '/content/' + encodeURIComponent(slug || contentId)
@@ -100,6 +103,8 @@ export default function LuckReadSocialPostCard({
       setFavoriteCount(null)
       setCommentCount(null)
       setShareCount(null)
+      setReposted(false)
+      setRepostCount(null)
       setLikeStateLoading(true)
 
       // The public content-list DTO intentionally omits author metadata. Reuse
@@ -142,6 +147,10 @@ export default function LuckReadSocialPostCard({
           : null)
         setLikeCount(result.response.ok && typeof summary?.counts?.likes === 'number'
           ? Math.max(0, summary.counts.likes)
+          : null)
+        setReposted(result.response.ok && summary?.viewer?.reposted === true)
+        setRepostCount(result.response.ok && typeof summary?.counts?.reposts === 'number'
+          ? Math.max(0, summary.counts.reposts)
           : null)
         setCommentCount(result.response.ok && typeof summary?.counts?.comments === 'number'
           ? Math.max(0, summary.counts.comments)
@@ -299,6 +308,50 @@ export default function LuckReadSocialPostCard({
     }
   }
 
+
+  const toggleRepost = async () => {
+    if (repostBusy || likeStateLoading) return
+    const previousReposted = reposted
+    setRepostBusy(true)
+    setMessage('')
+    try {
+      const { response, data } = await fetchJson<ApiResponse<unknown>>(
+        '/api/v1/content/' + encodeURIComponent(contentId) + '/reposts',
+        {
+          method: previousReposted ? 'DELETE' : 'POST',
+          credentials: 'include',
+          cache: 'no-store',
+          headers: {
+            accept: 'application/json',
+            'Idempotency-Key': 'twitter-clone-reuse-repost:' + crypto.randomUUID(),
+          },
+        },
+      )
+      if (response.status === 401) {
+        requireLogin()
+        return
+      }
+      if (!response.ok && response.status !== 204) {
+        throw new Error(getApiErrorMessage(data, locale === 'en' ? 'Repost failed.' : '转推失败，请稍后重试。'))
+      }
+      setReposted(!previousReposted)
+      setRepostCount((current) => current === null
+        ? null
+        : Math.max(0, current + (previousReposted ? -1 : 1)))
+      setMessage(locale === 'en'
+        ? (previousReposted ? 'Repost removed.' : 'Reposted.')
+        : locale === 'tw'
+          ? (previousReposted ? '已取消轉推。' : '已轉推。')
+          : (previousReposted ? '已取消转推。' : '已转推。'))
+    } catch (cause) {
+      setMessage(cause instanceof Error
+        ? cause.message
+        : locale === 'en' ? 'Repost failed.' : '转推失败，请稍后重试。')
+    } finally {
+      setRepostBusy(false)
+    }
+  }
+
   if (presentation === 'twitter-clone') {
     const creatorHref = resolvedCreatorId ? '/users/' + encodeURIComponent(resolvedCreatorId) : '/content'
     const typeLabel = contentType === 'article' ? 'Article' : contentType === 'video' ? 'Video' : 'Post'
@@ -346,6 +399,12 @@ export default function LuckReadSocialPostCard({
                 <svg className={'h-5 w-5 ' + (liked ? 'fill-accent-pink' : 'fill-none')} viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0l-1 1-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z" /></svg>
               </span>
               {likeCount !== null ? <span className="text-xs">{likeCount.toLocaleString(dateLocale)}</span> : null}
+            </button>
+            <button aria-label={repostCount !== null ? (reposted ? 'Undo repost, ' : 'Repost, ') + repostCount + ' reposts' : (reposted ? 'Undo repost' : 'Repost')} aria-pressed={reposted} className={'group flex items-center gap-2 rounded-full p-2 outline-none transition hover:text-accent-blue focus-visible:text-accent-blue disabled:opacity-50 ' + (reposted ? 'text-accent-blue' : '')} disabled={repostBusy || likeStateLoading} onClick={() => void toggleRepost()} type="button">
+              <span className="grid h-9 w-9 place-items-center rounded-full transition group-hover:bg-accent-blue/10 group-active:bg-accent-blue/20 group-focus-visible:ring-2 group-focus-visible:ring-accent-blue/80">
+                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M7.5 7.5h9l-3-3m3 3-3 3M16.5 16.5h-9l3 3m-3-3 3-3" /></svg>
+              </span>
+              {repostCount !== null ? <span className="text-xs">{repostCount.toLocaleString(dateLocale)}</span> : null}
             </button>
             <button aria-label={favoriteCount !== null ? (bookmarked ? 'Remove bookmark, ' : 'Bookmark, ') + favoriteCount + ' favorites' : (bookmarked ? 'Remove bookmark' : 'Bookmark')} aria-pressed={bookmarked} className="group flex items-center gap-2 rounded-full p-2 outline-none transition hover:text-accent-blue focus-visible:text-accent-blue disabled:opacity-50" disabled={bookmarkBusy || likeStateLoading} onClick={() => void toggleBookmark()} type="button">
               <span className="grid h-9 w-9 place-items-center rounded-full transition group-hover:bg-accent-blue/10 group-active:bg-accent-blue/20 group-focus-visible:ring-2 group-focus-visible:ring-accent-blue/80">
@@ -458,6 +517,20 @@ export default function LuckReadSocialPostCard({
               : bookmarked
                 ? (locale === 'en' ? 'Saved' : locale === 'tw' ? '已收藏' : '已收藏')
                 : (locale === 'en' ? 'Bookmark' : locale === 'tw' ? '收藏' : '收藏')}
+          </button>
+          <button
+            className="content-detail-like"
+            type="button"
+            disabled={repostBusy || likeStateLoading}
+            aria-pressed={reposted}
+            onClick={() => void toggleRepost()}
+          >
+            {repostBusy
+              ? (locale === 'en' ? 'Reposting…' : locale === 'tw' ? '轉推中…' : '转推中…')
+              : reposted
+                ? (locale === 'en' ? 'Reposted' : locale === 'tw' ? '已轉推' : '已转推')
+                : (locale === 'en' ? 'Repost' : locale === 'tw' ? '轉推' : '转推')}
+            {repostCount !== null ? ' ' + repostCount.toLocaleString(dateLocale) : ''}
           </button>
           <button
             className="content-detail-share"

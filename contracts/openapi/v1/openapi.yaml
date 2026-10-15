@@ -1233,6 +1233,28 @@ paths:
         '201': { description: Share created. }
         '4XX': { $ref: '#/components/responses/ClientError' }
 
+  /content/{contentId}/reposts:
+    parameters:
+      - $ref: '#/components/parameters/ContentId'
+    post:
+      tags: [Contents]
+      summary: Repost published content without duplicating its body or media
+      operationId: createContentRepost
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      responses:
+        '201': { description: Repost relation created or existing relation returned. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+    delete:
+      tags: [Contents]
+      summary: Remove the current principal's repost relation
+      operationId: deleteContentRepost
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      responses:
+        '204': { description: Repost relation removed or already absent. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
   /shares/{shareId}:
     parameters:
       - name: shareId

@@ -489,19 +489,21 @@ export async function getContentSocialSummary(
        (SELECT COUNT(*) FROM interaction_likes WHERE target_type = 'content' AND target_id = ?) AS likes,
        (SELECT COUNT(*) FROM social_comments WHERE content_id = ? AND state = 'PUBLISHED') AS comments,
        (SELECT COUNT(*) FROM interaction_favorites WHERE target_type = 'content' AND target_id = ?) AS favorites,
-       (SELECT COUNT(*) FROM social_share_links WHERE content_id = ?) AS shares`,
-  ).bind(contentId, contentId, contentId, contentId).first<{ likes: number; comments: number; favorites: number; shares: number }>()
+       (SELECT COUNT(*) FROM social_share_links WHERE content_id = ?) AS shares,
+       (SELECT COUNT(*) FROM social_reposts WHERE content_id = ?) AS reposts`,
+  ).bind(contentId, contentId, contentId, contentId, contentId).first<{ likes: number; comments: number; favorites: number; shares: number; reposts: number }>()
 
   const social = await getSocialTargets(db, 'content', contentId)
-  let viewer: { liked: boolean; favorited: boolean } | null = null
+  let viewer: { liked: boolean; favorited: boolean; reposted: boolean } | null = null
   if (viewerUserIdValue) {
     const viewerUserId = id(viewerUserIdValue, 'UNAUTHENTICATED')
     const state = await db.prepare(
       `SELECT
          EXISTS (SELECT 1 FROM interaction_likes WHERE actor_user_id = ? AND target_type = 'content' AND target_id = ?) AS liked,
-         EXISTS (SELECT 1 FROM interaction_favorites WHERE actor_user_id = ? AND target_type = 'content' AND target_id = ?) AS favorited`,
-    ).bind(viewerUserId, contentId, viewerUserId, contentId).first<{ liked: number; favorited: number }>()
-    viewer = { liked: Boolean(state?.liked), favorited: Boolean(state?.favorited) }
+         EXISTS (SELECT 1 FROM interaction_favorites WHERE actor_user_id = ? AND target_type = 'content' AND target_id = ?) AS favorited,
+         EXISTS (SELECT 1 FROM social_reposts WHERE actor_user_id = ? AND content_id = ?) AS reposted`,
+    ).bind(viewerUserId, contentId, viewerUserId, contentId, viewerUserId, contentId).first<{ liked: number; favorited: number; reposted: number }>()
+    viewer = { liked: Boolean(state?.liked), favorited: Boolean(state?.favorited), reposted: Boolean(state?.reposted) }
   }
 
   return {
@@ -512,6 +514,7 @@ export async function getContentSocialSummary(
       comments: Number(counts?.comments ?? 0),
       favorites: Number(counts?.favorites ?? 0),
       shares: Number(counts?.shares ?? 0),
+      reposts: Number(counts?.reposts ?? 0),
     },
     viewer,
     topics: social.topics,

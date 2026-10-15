@@ -54,6 +54,21 @@ describe('Twitter Clone UI reuse through LuckRead API adapters', () => {
     }
   })
 
+  it('wires repost and undo-repost through the W01 adapter to W05', () => {
+    const component = read('src/app/(frontend)/components/reuse/LuckReadSocialPostCard.tsx')
+    const route = read('src/app/api/v1/content/[contentId]/reposts/route.ts')
+    expect(component).toContain("'/api/v1/content/' + encodeURIComponent(contentId) + '/reposts'")
+    expect(component).toContain("method: previousReposted ? 'DELETE' : 'POST'")
+    expect(component).toContain("summary?.counts?.reposts === 'number'")
+    expect(component).toContain('summary?.viewer?.reposted === true')
+    expect(route).toContain('resolveCookieSocialPrincipal')
+    expect(route).toContain('callW05Social')
+    expect(route).toContain('/internal/social/content/')
+    expect(route).toContain('/reposts')
+    expect(route).toContain('Idempotency-Key')
+    expect(route).not.toContain('social_reposts')
+  })
+
   it('renders reply and share counts from the LuckRead social summary', () => {
     const component = read('src/app/(frontend)/components/reuse/LuckReadSocialPostCard.tsx')
 

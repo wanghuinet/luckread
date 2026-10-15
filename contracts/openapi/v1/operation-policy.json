@@ -2352,6 +2352,36 @@
       "stateMachine": "none",
       "x-luckread-contract-status": "DISCOVERY_DRAFT",
       "x-luckread-source": "contracts/api/api-inventory.v1.json"
+    },
+    {
+      "operationId": "createContentRepost",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "interaction.repost"
+      ],
+      "auditRequired": false,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": true,
+      "stateMachine": "none",
+      "x-luckread-contract-status": "DISCOVERY_DRAFT",
+      "x-luckread-source": "contracts/api/interaction-operation-policy.v1.json"
+    },
+    {
+      "operationId": "deleteContentRepost",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "interaction.repost"
+      ],
+      "auditRequired": false,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": true,
+      "stateMachine": "none",
+      "x-luckread-contract-status": "DISCOVERY_DRAFT",
+      "x-luckread-source": "contracts/api/interaction-operation-policy.v1.json"
     }
   ]
 }
