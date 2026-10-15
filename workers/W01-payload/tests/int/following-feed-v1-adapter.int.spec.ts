@@ -23,7 +23,7 @@ describe('v1 Following feed adapter', () => {
     expect(route).toContain("url.searchParams.getAll('cursor').length > 1")
     expect(route).toContain("url.searchParams.getAll('limit').length > 1")
     expect(route).toContain("cursor.length > 2048")
-    expect(route).toContain("! /^(?:[1-9]|[1-4][0-9]|50)$/".replace('! ', '!'))
+    expect(route).toContain("!/^(?:[1-9]|[1-4][0-9]|50)$/.test(limit)")
   })
 
   it('binds W01 to the existing W04 Worker without adding a database', () => {
