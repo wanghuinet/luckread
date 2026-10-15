@@ -11,7 +11,7 @@ describe('Twitter-clone homepage reuse', () => {
 
     expect(page).toContain("if (host === 'mp.luckread.com') return <CreatorDomainHome />")
     expect(page).toContain("if (principal?.active) redirect('/home')")
-    expect(page).toContain('return <TwitterCloneLanding />')
+    expect(page).toContain('return <TwitterCloneLanding locale={normalizePublicLocale(localeCookie)} />')
     expect(landing).toContain('Happening now')
     expect(landing).toContain('Sign up with email')
     expect(landing).toContain('href="/content"')
@@ -22,7 +22,7 @@ describe('Twitter-clone homepage reuse', () => {
 
   it('keeps the clone feed, compose entry, profile, and discovery routes connected', async () => {
     const home = await readFile('src/app/(twitter-clone)/home/page.tsx', 'utf8')
-    expect(home).toContain('<TwitterCloneHomeFeed initialPage={initialPage} />')
+    expect(home).toContain('<TwitterCloneHomeFeed initialPage={initialPage} locale={locale} />')
     expect(home).toContain('href="/publish"')
     expect(home).toContain('href="/me/profile"')
     expect(home).toContain('href="/me/subscriptions"')
