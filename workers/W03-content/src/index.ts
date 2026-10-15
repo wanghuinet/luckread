@@ -234,7 +234,7 @@ const worker = {
   async fetch(request: Request, env: Env): Promise<Response> {
     try {
       const url = new URL(request.url)
-      const isRead = request.method === 'GET'
+      const isRead = request.method === 'GET' || (request.method === 'POST' && url.pathname === '/internal/content/following-feed')
       await enforceRateLimits(request, env, isRead ? 'read' : 'write')
       const isModerationTransition =
         request.method === 'POST' &&
