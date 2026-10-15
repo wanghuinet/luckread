@@ -182,10 +182,11 @@ export default {
       contentResponse = await env.W03_CONTENT.fetch(
         new Request('https://luckread-w03.internal/internal/content/following-feed', {
           method: 'POST',
-          headers: new Headers({
-            ...Object.fromEntries(transportHeaders.entries()),
-            'content-type': 'application/json; charset=utf-8',
-          }),
+          headers: (() => {
+            const headers = new Headers(transportHeaders)
+            headers.set('content-type', 'application/json; charset=utf-8')
+            return headers
+          })(),
           body: JSON.stringify({ ownerUserIds: eligibleOwners, cursor, limit }),
         }),
       )
