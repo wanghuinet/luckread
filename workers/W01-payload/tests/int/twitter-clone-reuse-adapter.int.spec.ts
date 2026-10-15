@@ -10,7 +10,7 @@ describe('Twitter Clone UI reuse through LuckRead API adapters', () => {
 
   it('ports the Tweet-style post card without importing the upstream Firebase backend', () => {
     const component = read('src/app/(frontend)/components/reuse/LuckReadSocialPostCard.tsx')
-    const styles = read('src/app/(frontend)/components/reuse/LuckReadSocialPostCard.module.css')
+    const sharedStyles = read('src/app/(frontend)/styles.css')
     const notice = read('src/app/(frontend)/components/reuse/THIRD_PARTY_NOTICES.md')
 
     expect(component).toContain('Tweet, TweetStats and user')
@@ -26,14 +26,18 @@ describe('Twitter Clone UI reuse through LuckRead API adapters', () => {
     expect(profileCache).toContain('maxEntries: 200')
     expect(component).not.toContain('firebase/firestore')
     expect(component).not.toContain('tweetsCollection')
-    expect(styles).toContain('@media (max-width: 560px)')
-    expect(styles).toContain('prefers-reduced-motion')
-    expect(component).toContain("className={'content-detail-actions ' + styles.actions}")
-    expect(component).toContain("className={'content-comment-reply ' + styles.action}")
-    expect(component).toContain("className={'content-detail-like ' + (liked ? styles.actionLiked : styles.action)}")
-    expect(component).toContain("className={'content-detail-follow ' + styles.profileLink}")
     expect(notice).toContain('Copyright (c) 2022 ccrsxx')
     expect(notice).toContain('MIT License')
+    expect(component).not.toContain('LuckReadSocialPostCard.module.css')
+    expect(() => read('src/app/(frontend)/components/reuse/LuckReadSocialPostCard.module.css')).toThrow()
+    expect(sharedStyles).toContain('.content-feed-card {')
+    expect(sharedStyles).toContain('.content-feed-cover img,')
+    expect(sharedStyles).toContain('.content-detail-actions {')
+    expect(sharedStyles).toContain('.content-detail-like')
+    expect(component).toContain('className="content-detail-actions"')
+    expect(component).toContain('className="content-comment-reply"')
+    expect(component).toContain('className="content-detail-like"')
+    expect(component).toContain('className="content-detail-follow"')
   })
 
   it('uses the reusable social post card in both homepage and discovery for dynamic content', () => {
@@ -52,7 +56,7 @@ describe('Twitter Clone UI reuse through LuckRead API adapters', () => {
 
   it('renders bounded, de-duplicated photo and video attachments in the post card', () => {
     const component = read('src/app/(frontend)/components/reuse/LuckReadSocialPostCard.tsx')
-    const styles = read('src/app/(frontend)/components/reuse/LuckReadSocialPostCard.module.css')
+    const sharedStyles = read('src/app/(frontend)/styles.css')
 
     const media = resolveSocialPostMedia([
       'https://media.luckread.com/a.jpg',
@@ -81,10 +85,12 @@ describe('Twitter Clone UI reuse through LuckRead API adapters', () => {
     expect(component).toContain('resolveSocialPostMedia(mediaRefs, coverRef)')
     expect(component).toContain('media.kind === \'video\'')
     expect(component).toContain('preload="metadata"')
-    expect(component).toContain('data-count={mediaItems.length}')
-    expect(styles).toContain('.mediaGrid[data-count=\'3\']')
-    expect(styles).toContain('.mediaGrid[data-count=\'4\']')
-    expect(styles).toContain('@media (max-width: 560px)')
+    expect(component).toContain('mediaItems.length === 1')
+    expect(component).toContain('className="content-feed-cover"')
+    expect(component).toContain('className="lr-preview-media"')
+    expect(sharedStyles).toContain('.content-feed-cover img,')
+    expect(sharedStyles).toContain('.lr-preview-media img,')
+    expect(() => read('src/app/(frontend)/components/reuse/LuckReadSocialPostCard.module.css')).toThrow()
   })
 
   it('keeps like mutations on LuckRead W01/W05 authority and redirects unauthenticated users to login', () => {

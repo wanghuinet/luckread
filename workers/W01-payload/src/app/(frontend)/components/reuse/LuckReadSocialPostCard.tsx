@@ -7,7 +7,6 @@ import { fetchJson, getApiErrorMessage } from '../../../../lib/client-api.js'
 import { getCachedPublicProfile, type PublicProfile } from '../../../../lib/social-post-profile-cache.js'
 import { resolveSocialPostMedia } from '../../../../lib/social-post-media.js'
 import type { PublicLocale } from '../../i18n/public-locale'
-import styles from './LuckReadSocialPostCard.module.css'
 
 /**
  * UI structure adapted from ccrsxx/twitter-clone's Tweet, TweetStats and user
@@ -188,82 +187,88 @@ export default function LuckReadSocialPostCard({
   }
 
   return (
-    <article className={styles.card} data-testid="luckread-social-post-card">
-      <header className={styles.header}>
-        {resolvedCreatorId ? (
-          <Link className={styles.avatarLink} href={'/users/' + encodeURIComponent(resolvedCreatorId)} aria-label={profileName}>
-            {profile?.avatar ? (
-              <img className={styles.avatar} src={profile.avatar} alt="" loading="lazy" />
-            ) : (
-              <span className={styles.avatarFallback}>{profileName.slice(0, 1).toUpperCase()}</span>
-            )}
-          </Link>
-        ) : (
-          <span className={styles.avatarFallback} aria-hidden="true">L</span>
-        )}
-        <div className={styles.author}>
-          <strong>{profileName}</strong>
-          <span>
-            {username ? username + (formattedDate ? ' · ' : '') : ''}
-            {formattedDate}
-          </span>
+    <article className="content-feed-card" data-testid="luckread-social-post-card">
+      <div className="content-feed-body">
+        <div className="content-feed-meta">
+          {resolvedCreatorId ? (
+            <Link className="content-detail-follow" href={'/users/' + encodeURIComponent(resolvedCreatorId)}>
+              {profileName}
+            </Link>
+          ) : (
+            <strong>{profileName}</strong>
+          )}
+          {username ? <span>{username}</span> : null}
+          {formattedDate ? <time dateTime={postTimestamp}>{formattedDate}</time> : null}
         </div>
-        {resolvedCreatorId ? (
-          <Link className={'content-detail-follow ' + styles.profileLink} href={'/users/' + encodeURIComponent(resolvedCreatorId)}>
-            {locale === 'en' ? 'Profile' : locale === 'tw' ? '個人頁' : '主页'}
-          </Link>
-        ) : null}
-      </header>
 
-      <Link className={styles.bodyLink} href={contentHref} data-umami-event="content-open" data-umami-event-content-type="post">
-        <p className={styles.postText}>{title}</p>
-        {mediaItems.length > 0 ? (
-          <div className={styles.mediaGrid} data-count={mediaItems.length} role="group" aria-label={locale === 'en' ? 'Post media' : '动态媒体'}>
+        <h3>{title}</h3>
+
+        {mediaItems.length === 1 ? (
+          <div className="content-feed-cover">
+            {mediaItems[0].kind === 'video' ? (
+              <video
+                aria-label={title}
+                controls
+                muted
+                playsInline
+                preload="metadata"
+                poster={mediaItems[0].poster}
+                src={mediaItems[0].src}
+              />
+            ) : (
+              <img alt={title} loading="lazy" src={mediaItems[0].src} />
+            )}
+          </div>
+        ) : mediaItems.length > 1 ? (
+          <div className="lr-preview-media" role="group" aria-label={locale === 'en' ? 'Post media' : '动态媒体'}>
             {mediaItems.map((media) => (
-              <span className={styles.mediaItem} key={media.src}>
-                {media.kind === 'video' ? (
-                  <>
-                    <video
-                      aria-hidden="true"
-                      muted
-                      playsInline
-                      preload="metadata"
-                      poster={media.poster}
-                      src={media.src}
-                    />
-                    <span className={styles.videoMark} aria-hidden="true">▶</span>
-                  </>
-                ) : (
-                  <img alt="" loading="lazy" src={media.src} />
-                )}
-              </span>
+              media.kind === 'video' ? (
+                <video
+                  key={media.src}
+                  aria-label={title}
+                  controls
+                  muted
+                  playsInline
+                  preload="metadata"
+                  poster={media.poster}
+                  src={media.src}
+                />
+              ) : (
+                <img key={media.src} alt="" loading="lazy" src={media.src} />
+              )
             ))}
           </div>
         ) : null}
-        <span className={styles.readMore}>{locale === 'en' ? 'Open discussion' : locale === 'tw' ? '查看討論' : '查看讨论'} ↗</span>
-      </Link>
 
-      <footer className={'content-detail-actions ' + styles.actions}>
-        <Link className={'content-comment-reply ' + styles.action} href={contentHref} aria-label={locale === 'en' ? 'Open replies' : '打开评论'}>
-          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8z" />
-          </svg>
-          <span>{locale === 'en' ? 'Discuss' : locale === 'tw' ? '討論' : '讨论'}</span>
-        </Link>
-        <button
-          className={'content-detail-like ' + (liked ? styles.actionLiked : styles.action)}
-          type="button"
-          disabled={likeBusy || likeStateLoading}
-          aria-pressed={liked}
-          onClick={() => void toggleLike()}
+        <Link
+          className="content-feed-open"
+          href={contentHref}
+          data-umami-event="content-open"
+          data-umami-event-content-type="post"
         >
-          <svg aria-hidden="true" viewBox="0 0 24 24" fill={liked ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8l1.1 1.1L12 21l7.8-7.5 1.1-1.1a5.5 5.5 0 0 0-.1-7.8z" />
-          </svg>
-          <span>{likeStateLoading ? '…' : likeCount === null ? (liked ? (locale === 'en' ? 'Liked' : '已赞') : (locale === 'en' ? 'Like' : '点赞')) : likeCount.toLocaleString(dateLocale)}</span>
-        </button>
-      </footer>
-      {message ? <p className={styles.message} role="status">{message}</p> : null}
+          {locale === 'en' ? 'Open discussion ↗' : locale === 'tw' ? '查看討論 ↗' : '查看讨论 ↗'}
+        </Link>
+
+        <footer className="content-detail-actions">
+          <Link className="content-comment-reply" href={contentHref} aria-label={locale === 'en' ? 'Open replies' : '打开评论'}>
+            {locale === 'en' ? 'Discuss' : locale === 'tw' ? '討論' : '讨论'}
+          </Link>
+          <button
+            className="content-detail-like"
+            type="button"
+            disabled={likeBusy || likeStateLoading}
+            aria-pressed={liked}
+            onClick={() => void toggleLike()}
+          >
+            {likeStateLoading
+              ? '…'
+              : likeCount === null
+                ? (liked ? (locale === 'en' ? 'Liked' : '已赞') : (locale === 'en' ? 'Like' : '点赞'))
+                : (locale === 'en' ? 'Likes ' : '点赞 ') + likeCount.toLocaleString(dateLocale)}
+          </button>
+          {message ? <span className="content-detail-action-status" role="status">{message}</span> : null}
+        </footer>
+      </div>
     </article>
   )
 }
