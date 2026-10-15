@@ -84,6 +84,15 @@ jobs:
         with:
           node-version: 24
 
+      - name: Install W02 runtime dependencies before deployment
+        working-directory: workers/W02-identity
+        run: npm install --ignore-scripts --no-audit --no-fund
+
+      - name: Verify Better Auth package and runtime imports before deployment
+        working-directory: workers/W02-identity
+        run: |
+          node --input-type=module -e "import { readFile } from 'node:fs/promises'; const pkg = JSON.parse(await readFile('./node_modules/better-auth/package.json', 'utf8')); if (pkg.version !== '1.7.8') throw new Error('Expected better-auth 1.7.8, got ' + pkg.version); await import('better-auth'); await import('better-auth/plugins'); console.log('better-auth ' + pkg.version + ' and plugin imports: OK')"
+
       - name: Install root toolchain for creator preflight
         if: ${{ inputs.confirm == 'DEPLOY_BINDING_AND_W08_CREATOR' }}
         run: npm ci
@@ -107,11 +116,10 @@ jobs:
         if: ${{ inputs.confirm == 'DEPLOY_BINDING_AND_W08_CREATOR' }}
         run: npx --no-install tsc --noEmit -p workers/W08-creator/tsconfig.json
 
-      - name: Install and typecheck W02 creator grant path before production changes
+      - name: Typecheck W02 creator grant path before production changes
         if: ${{ inputs.confirm == 'DEPLOY_BINDING_AND_W08_CREATOR' }}
         working-directory: workers/W02-identity
         run: |
-          npm install --ignore-scripts --no-audit --no-fund
           node --input-type=module -e "import('better-auth').then(() => console.log('better-auth runtime import: OK'))"
           npx --no-install tsc --noEmit -p tsconfig.json
 
