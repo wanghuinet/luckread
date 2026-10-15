@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useEffect, useState } from 'react'
 
 import { fetchJson, getApiErrorMessage } from '../../../../lib/client-api.js'
+import { resolveSocialPostMedia } from '../../../../lib/social-post-media.js'
 import type { PublicLocale } from '../../i18n/public-locale'
 import styles from './LuckReadSocialPostCard.module.css'
 
@@ -44,6 +45,7 @@ type Props = {
   title: string
   creatorId?: string | null
   coverRef?: string | null
+  mediaRefs?: string[]
   createdAt?: string
   updatedAt?: string
   locale?: PublicLocale
@@ -55,6 +57,7 @@ export default function LuckReadSocialPostCard({
   title,
   creatorId,
   coverRef,
+  mediaRefs,
   createdAt,
   updatedAt,
   locale = 'zh',
@@ -69,6 +72,7 @@ export default function LuckReadSocialPostCard({
   const [message, setMessage] = useState('')
 
   const contentHref = '/content/' + encodeURIComponent(slug || contentId)
+  const mediaItems = resolveSocialPostMedia(mediaRefs, coverRef)
   const profileName = profile?.displayName?.trim() || profile?.username || (
     locale === 'en' ? 'LuckRead creator' : locale === 'tw' ? 'LuckRead 創作者' : 'LuckRead 创作者'
   )
@@ -226,7 +230,29 @@ export default function LuckReadSocialPostCard({
 
       <Link className={styles.bodyLink} href={contentHref} data-umami-event="content-open" data-umami-event-content-type="post">
         <p className={styles.postText}>{title}</p>
-        {coverRef ? <img className={styles.cover} src={coverRef} alt="" loading="lazy" /> : null}
+        {mediaItems.length > 0 ? (
+          <div className={styles.mediaGrid} data-count={mediaItems.length} aria-label={locale === 'en' ? 'Post media' : '动态媒体'}>
+            {mediaItems.map((media) => (
+              <span className={styles.mediaItem} key={media.src}>
+                {media.kind === 'video' ? (
+                  <>
+                    <video
+                      aria-hidden="true"
+                      muted
+                      playsInline
+                      preload="metadata"
+                      poster={media.poster}
+                      src={media.src}
+                    />
+                    <span className={styles.videoMark} aria-hidden="true">▶</span>
+                  </>
+                ) : (
+                  <img alt="" loading="lazy" src={media.src} />
+                )}
+              </span>
+            ))}
+          </div>
+        ) : null}
         <span className={styles.readMore}>{locale === 'en' ? 'Open discussion' : locale === 'tw' ? '查看討論' : '查看讨论'} ↗</span>
       </Link>
 
