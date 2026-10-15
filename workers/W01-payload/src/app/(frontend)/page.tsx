@@ -257,7 +257,7 @@ export default async function HomePage() {
           </div>
 
           <aside className="home-right-rail" aria-label={publicLocale === 'en' ? 'Creator and discovery' : publicLocale === 'tw' ? '創作與探索' : '创作与发现'}>
-            <section className="home-side-card home-side-creator">
+            <section className="home-side-card home-side-creator" id="creator">
               <p className="eyebrow">FOR CREATORS</p>
               <h2 dangerouslySetInnerHTML={{ __html: copy.home.creatorTitle }} />
               <p>{copy.home.creatorDescription}</p>
