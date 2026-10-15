@@ -372,7 +372,7 @@ export async function listFollowingFeed(
   const cursorClause = cursor
     ? 'AND (c.created_at < ? OR (c.created_at = ? AND c.id < ?))'
     : ''
-  const sql = String.raw\`
+  const sql = String.raw`
     SELECT c.id, c.slug, c.owner_user_id, c.creator_id, c.created_at,
            c.content_type, c.title, c.body_ref, c.media_refs_json,
            c.cover_ref, c.updated_at
@@ -401,9 +401,9 @@ export async function listFollowingFeed(
             AND m.actor_user_id = ?
             AND (m.target_user_id = c.owner_user_id OR m.target_user_id = c.creator_id)
        )
-       \${cursorClause}
+       ${cursorClause}
      ORDER BY c.created_at DESC, c.id DESC
-     LIMIT ?\`
+     LIMIT ?`
   const bindings: unknown[] = cursor
     ? [viewerId, viewerId, viewerId, viewerId, cursor.createdAt, cursor.createdAt, cursor.contentId, limit + 1]
     : [viewerId, viewerId, viewerId, viewerId, limit + 1]
