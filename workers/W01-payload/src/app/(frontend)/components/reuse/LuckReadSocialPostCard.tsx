@@ -71,6 +71,7 @@ export default function LuckReadSocialPostCard({
   const [likeStateLoading, setLikeStateLoading] = useState(true)
   const [likeBusy, setLikeBusy] = useState(false)
   const [bookmarked, setBookmarked] = useState(false)
+  const [favoriteCount, setFavoriteCount] = useState<number | null>(null)
   const [bookmarkBusy, setBookmarkBusy] = useState(false)
   const [shareBusy, setShareBusy] = useState(false)
   const [message, setMessage] = useState('')
@@ -96,6 +97,7 @@ export default function LuckReadSocialPostCard({
       setPostTimestamp(createdAt || updatedAt || '')
       setProfile(null)
       setBookmarked(false)
+      setFavoriteCount(null)
       setCommentCount(null)
       setShareCount(null)
       setLikeStateLoading(true)
@@ -135,6 +137,9 @@ export default function LuckReadSocialPostCard({
         const summary = result.data?.data
         setLiked(result.response.ok && summary?.viewer?.liked === true)
         setBookmarked(result.response.ok && summary?.viewer?.favorited === true)
+        setFavoriteCount(result.response.ok && typeof summary?.counts?.favorites === 'number'
+          ? Math.max(0, summary.counts.favorites)
+          : null)
         setLikeCount(result.response.ok && typeof summary?.counts?.likes === 'number'
           ? Math.max(0, summary.counts.likes)
           : null)
@@ -232,6 +237,9 @@ export default function LuckReadSocialPostCard({
         throw new Error(getApiErrorMessage(data, locale === 'en' ? 'Bookmark failed.' : '收藏失败，请稍后重试。'))
       }
       setBookmarked(!previousBookmarked)
+      setFavoriteCount((current) => current === null
+        ? null
+        : Math.max(0, current + (previousBookmarked ? -1 : 1)))
     } catch (cause) {
       setMessage(cause instanceof Error
         ? cause.message
@@ -268,6 +276,7 @@ export default function LuckReadSocialPostCard({
       if (!response.ok || typeof shareId !== 'string' || !shareId) {
         throw new Error(getApiErrorMessage(data, locale === 'en' ? 'Could not create a share link.' : '暂时无法生成分享链接。'))
       }
+      setShareCount((current) => current === null ? null : current + 1)
       const shareUrl = window.location.origin + '/s/' + encodeURIComponent(shareId)
       if (typeof navigator.share === 'function') {
         try {
@@ -338,10 +347,11 @@ export default function LuckReadSocialPostCard({
               </span>
               {likeCount !== null ? <span className="text-xs">{likeCount.toLocaleString(dateLocale)}</span> : null}
             </button>
-            <button aria-label={bookmarked ? 'Remove bookmark' : 'Bookmark'} aria-pressed={bookmarked} className="group flex items-center gap-2 rounded-full p-2 outline-none transition hover:text-accent-blue focus-visible:text-accent-blue disabled:opacity-50" disabled={bookmarkBusy || likeStateLoading} onClick={() => void toggleBookmark()} type="button">
+            <button aria-label={favoriteCount !== null ? (bookmarked ? 'Remove bookmark, ' : 'Bookmark, ') + favoriteCount + ' favorites' : (bookmarked ? 'Remove bookmark' : 'Bookmark')} aria-pressed={bookmarked} className="group flex items-center gap-2 rounded-full p-2 outline-none transition hover:text-accent-blue focus-visible:text-accent-blue disabled:opacity-50" disabled={bookmarkBusy || likeStateLoading} onClick={() => void toggleBookmark()} type="button">
               <span className="grid h-9 w-9 place-items-center rounded-full transition group-hover:bg-accent-blue/10 group-active:bg-accent-blue/20 group-focus-visible:ring-2 group-focus-visible:ring-accent-blue/80">
                 <svg className={'h-5 w-5 ' + (bookmarked ? 'fill-main-accent' : 'fill-none')} viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M6 4.5A1.5 1.5 0 0 1 7.5 3h9A1.5 1.5 0 0 1 18 4.5V21l-6-4-6 4z" /></svg>
               </span>
+              {favoriteCount !== null ? <span className="text-xs">{favoriteCount.toLocaleString(dateLocale)}</span> : null}
             </button>
             <button aria-label={shareCount !== null ? 'Share, ' + shareCount + ' shares' : 'Share'} className="group flex items-center gap-2 rounded-full p-2 outline-none transition hover:text-accent-blue focus-visible:text-accent-blue disabled:opacity-50" disabled={shareBusy} onClick={() => void shareContent()} type="button">
               <span className="grid h-9 w-9 place-items-center rounded-full transition group-hover:bg-accent-blue/10 group-active:bg-accent-blue/20 group-focus-visible:ring-2 group-focus-visible:ring-accent-blue/80">
