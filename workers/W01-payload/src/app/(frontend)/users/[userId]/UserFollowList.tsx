@@ -237,16 +237,14 @@ export default function UserFollowList({
       ) : null}
 
       {!error && items.length > 0 ? (
-        <section className="content-detail-card" aria-label={isFollowers ? '粉丝列表' : '关注列表'} style={{ marginTop: 20 }}>
-          <div style={{ display: 'grid', gap: 10 }}>
-            {items.map((item) => (
-              <TwitterCloneFollowRow
-                key={item.relationshipId}
-                userId={item.userId}
-                followedAt={item.followedAt}
-              />
-            ))}
-          </div>
+        <section className="content-detail-card twitter-follow-list twitter-follow-list--public" aria-label={isFollowers ? '粉丝列表' : '关注列表'}>
+          {items.map((item) => (
+            <TwitterCloneFollowRow
+              key={item.relationshipId}
+              userId={item.userId}
+              followedAt={item.followedAt}
+            />
+          ))}
 
           {hasMore && nextCursor ? (
             <div style={{ display: 'flex', justifyContent: 'center', marginTop: 18 }}>
