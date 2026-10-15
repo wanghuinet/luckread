@@ -26,6 +26,10 @@
       "service": "luckread-w05"
     },
     {
+      "binding": "W04_FEED",
+      "service": "luckread-w04"
+    },
+    {
       "binding": "W06_MODERATION",
       "service": "luckread-w06"
     },
