@@ -1497,3 +1497,71 @@ main[style*="max-width"] p[style*="#666"] {
 @media (prefers-reduced-motion: reduce) {
   .home-rail-link { transition: none; }
 }
+
+/* Follow-list row composes existing LuckRead profile-card, avatar, and action styles. */
+.twitter-follow-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 24px;
+}
+.content-detail-card.twitter-follow-list--public {
+  margin-top: 20px;
+  padding: 14px;
+}
+.twitter-follow-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+}
+.twitter-follow-row__identity {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+}
+.twitter-follow-row .creator-profile-avatar.twitter-follow-row__avatar {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  margin: 0;
+  border: 0;
+  background: #eef4ff;
+  color: var(--lr-accent);
+  font-size: 16px;
+}
+.twitter-follow-row .creator-profile-card-body.twitter-follow-row__details {
+  min-width: 0;
+  padding: 0;
+}
+.twitter-follow-row .creator-profile-card-body h3 {
+  margin: 0 0 4px;
+  font-size: 14px;
+}
+.twitter-follow-row .creator-profile-card-body time {
+  display: block;
+  color: var(--lr-muted);
+  font-size: 11px;
+}
+.twitter-follow-row__profile-link {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
+@media (max-width: 560px) {
+  .twitter-follow-row {
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px;
+  }
+  .twitter-follow-row__identity { gap: 9px; }
+  .twitter-follow-row .creator-profile-avatar.twitter-follow-row__avatar {
+    width: 38px;
+    height: 38px;
+    flex-basis: 38px;
+  }
+}
