@@ -32,6 +32,8 @@ type ApiResponse<T> = {
   error?: { message?: string }
 }
 
+type ContentType = 'article' | 'post' | 'video'
+
 type Props = {
   contentId: string
   slug?: string
@@ -42,6 +44,8 @@ type Props = {
   createdAt?: string
   updatedAt?: string
   locale?: PublicLocale
+  presentation?: 'luckread' | 'twitter-clone'
+  contentType?: ContentType
 }
 
 export default function LuckReadSocialPostCard({
@@ -54,6 +58,8 @@ export default function LuckReadSocialPostCard({
   createdAt,
   updatedAt,
   locale = 'zh',
+  presentation = 'luckread',
+  contentType = 'post',
 }: Props) {
   const [profile, setProfile] = useState<PublicProfile | null>(null)
   const [resolvedCreatorId, setResolvedCreatorId] = useState<string | null>(creatorId ?? null)
@@ -272,6 +278,70 @@ export default function LuckReadSocialPostCard({
     } finally {
       setShareBusy(false)
     }
+  }
+
+  if (presentation === 'twitter-clone') {
+    const creatorHref = resolvedCreatorId ? '/users/' + encodeURIComponent(resolvedCreatorId) : '/content'
+    const typeLabel = contentType === 'article' ? 'Article' : contentType === 'video' ? 'Video' : 'Post'
+    return (
+      <article className="hover-animation border-b border-light-border dark:border-dark-border" data-testid="luckread-twitter-clone-card">
+        <div className="accent-tab hover-card grid grid-cols-[auto,minmax(0,1fr)] gap-x-3 gap-y-1 px-4 py-3 outline-none duration-200">
+          <Link href={creatorHref} aria-label={profileName} className="main-tab row-span-2 h-12 w-12 rounded-full outline-none">
+            {profile?.avatar
+              ? <img alt={profileName} className="h-12 w-12 rounded-full bg-main-sidebar-background object-cover" loading="lazy" src={profile.avatar} />
+              : <span className="grid h-12 w-12 place-items-center rounded-full bg-main-sidebar-background text-lg font-bold">{profileName.slice(0, 1).toUpperCase()}</span>}
+          </Link>
+          <div className="flex min-w-0 items-center gap-x-1 text-[15px] leading-5">
+            {resolvedCreatorId
+              ? <Link className="main-tab trim-alt font-bold text-light-primary outline-none dark:text-dark-primary" href={creatorHref}>{profileName}</Link>
+              : <strong className="trim-alt">{profileName}</strong>}
+            {username ? <span className="trim-alt text-light-secondary dark:text-dark-secondary">{username}</span> : null}
+            {formattedDate ? <span className="shrink-0 text-light-secondary dark:text-dark-secondary">· {formattedDate}</span> : null}
+            <span className="ml-auto shrink-0 rounded-full bg-main-sidebar-background px-2 py-0.5 text-[11px] text-light-secondary dark:text-dark-secondary">{typeLabel}</span>
+          </div>
+          <Link href={contentHref} className="main-tab min-w-0 whitespace-pre-wrap break-words text-[15px] leading-5 outline-none">{title}</Link>
+          {mediaItems.length > 0 ? (
+            <Link href={contentHref} className="main-tab col-start-2 mt-3 block overflow-hidden rounded-2xl border border-light-line-reply outline-none dark:border-dark-border" aria-label={title}>
+              {singleMedia ? (
+                singleMedia.kind === 'video'
+                  ? <video aria-label={title} className="max-h-[520px] w-full bg-main-sidebar-background object-contain" controls muted playsInline preload="metadata" poster={singleMedia.poster} src={singleMedia.src} />
+                  : <img alt={title} className="max-h-[520px] w-full bg-main-sidebar-background object-cover" loading="lazy" src={singleMedia.src} />
+              ) : (
+                <div className="grid grid-cols-2 gap-px bg-dark-border">
+                  {mediaItems.slice(0, 4).map((media) => media.kind === 'video'
+                    ? <video key={media.src} aria-label={title} className="aspect-square w-full bg-main-sidebar-background object-cover" controls muted playsInline preload="metadata" poster={media.poster} src={media.src} />
+                    : <img key={media.src} alt="" className="aspect-square w-full bg-main-sidebar-background object-cover" loading="lazy" src={media.src} />)}
+                </div>
+              )}
+            </Link>
+          ) : null}
+          <div className="col-start-2 mt-3 flex max-w-md items-center justify-between text-light-secondary dark:text-dark-secondary">
+            <Link href={contentHref} aria-label="Open replies" className="group flex min-w-0 items-center gap-2 rounded-full p-2 outline-none transition hover:text-accent-blue focus-visible:text-accent-blue">
+              <span className="grid h-9 w-9 place-items-center rounded-full transition group-hover:bg-accent-blue/10 group-active:bg-accent-blue/20 group-focus-visible:ring-2 group-focus-visible:ring-accent-blue/80">
+                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M7.5 8.25h9m-9 3.75h6m-9.75 7.5 2.5-3.5A8.25 8.25 0 1 1 20.25 12a8.2 8.2 0 0 1-2.65 6.08H9.5z" /></svg>
+              </span>
+            </Link>
+            <button aria-label={liked ? 'Unlike' : 'Like'} aria-pressed={liked} className={'group flex items-center gap-2 rounded-full p-2 outline-none transition hover:text-accent-pink focus-visible:text-accent-pink disabled:opacity-50 ' + (liked ? 'text-accent-pink' : '')} disabled={likeBusy || likeStateLoading} onClick={() => void toggleLike()} type="button">
+              <span className="grid h-9 w-9 place-items-center rounded-full transition group-hover:bg-accent-pink/10 group-active:bg-accent-pink/20 group-focus-visible:ring-2 group-focus-visible:ring-accent-pink/80">
+                <svg className={'h-5 w-5 ' + (liked ? 'fill-accent-pink' : 'fill-none')} viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0l-1 1-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z" /></svg>
+              </span>
+              {likeCount !== null ? <span className="text-xs">{likeCount.toLocaleString(dateLocale)}</span> : null}
+            </button>
+            <button aria-label={bookmarked ? 'Remove bookmark' : 'Bookmark'} aria-pressed={bookmarked} className="group flex items-center gap-2 rounded-full p-2 outline-none transition hover:text-accent-blue focus-visible:text-accent-blue disabled:opacity-50" disabled={bookmarkBusy || likeStateLoading} onClick={() => void toggleBookmark()} type="button">
+              <span className="grid h-9 w-9 place-items-center rounded-full transition group-hover:bg-accent-blue/10 group-active:bg-accent-blue/20 group-focus-visible:ring-2 group-focus-visible:ring-accent-blue/80">
+                <svg className={'h-5 w-5 ' + (bookmarked ? 'fill-main-accent' : 'fill-none')} viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M6 4.5A1.5 1.5 0 0 1 7.5 3h9A1.5 1.5 0 0 1 18 4.5V21l-6-4-6 4z" /></svg>
+              </span>
+            </button>
+            <button aria-label="Share" className="group flex items-center gap-2 rounded-full p-2 outline-none transition hover:text-accent-blue focus-visible:text-accent-blue disabled:opacity-50" disabled={shareBusy} onClick={() => void shareContent()} type="button">
+              <span className="grid h-9 w-9 place-items-center rounded-full transition group-hover:bg-accent-blue/10 group-active:bg-accent-blue/20 group-focus-visible:ring-2 group-focus-visible:ring-accent-blue/80">
+                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M12 16V3m0 0L7 8m5-5 5 5M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6" /></svg>
+              </span>
+            </button>
+            {message ? <span className="sr-only" role="status">{message}</span> : null}
+          </div>
+        </div>
+      </article>
+    )
   }
 
   return (
