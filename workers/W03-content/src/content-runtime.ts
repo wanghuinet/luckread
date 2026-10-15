@@ -655,6 +655,103 @@ export async function listContents(
   }
 }
 
+
+type FollowingFeedCursor = {
+  version: 1
+  ownersHash: string
+  createdAt: string
+  id: string
+}
+
+const followingFeedOwnersHash = async (ownerUserIds: string[]): Promise<string> => {
+  const digest = await crypto.subtle.digest(
+    'SHA-256',
+    new TextEncoder().encode(JSON.stringify([...ownerUserIds].sort())),
+  )
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('')
+}
+
+const encodeFollowingFeedCursor = (cursor: FollowingFeedCursor): string => {
+  const bytes = new TextEncoder().encode(JSON.stringify(cursor))
+  let binary = ''
+  for (const byte of bytes) binary += String.fromCharCode(byte)
+  return btoa(binary).replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '')
+}
+
+const decodeFollowingFeedCursor = (
+  value: string,
+  ownersHash: string,
+): FollowingFeedCursor => {
+  try {
+    if (!value || value.length > 2048 || !/^[A-Za-z0-9_-]+$/.test(value)) throw new Error('INVALID')
+    const normalized = value.replaceAll('-', '+').replaceAll('_', '/')
+    const padded = normalized + '='.repeat((4 - normalized.length % 4) % 4)
+    const bytes = Uint8Array.from(atob(padded), (char) => char.charCodeAt(0))
+    const decoded = JSON.parse(new TextDecoder().decode(bytes)) as Partial<FollowingFeedCursor>
+    if (
+      decoded.version !== 1 ||
+      decoded.ownersHash !== ownersHash ||
+      typeof decoded.createdAt !== 'string' ||
+      !Number.isFinite(Date.parse(decoded.createdAt)) ||
+      typeof decoded.id !== 'string' ||
+      !/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(decoded.id)
+    ) throw new Error('INVALID')
+    return decoded as FollowingFeedCursor
+  } catch {
+    throw new ContentRuntimeError('INVALID_CURSOR', 400)
+  }
+}
+
+/**
+ * Returns one globally chronological page of published content from a bounded
+ * server-authorized owner set. W03 remains the authority for publication state.
+ * The JSON owner list is a single SQL binding so the query stays within a
+ * predictable bound even for the maximum 500 candidate authors.
+ */
+export async function listFollowingFeedContents(
+  db: ContentD1,
+  ownerUserIdsValue: string[],
+  cursorValue: string | null,
+  limit: number,
+): Promise<{ items: ContentRecord[]; nextCursor: string | null; hasMore: boolean }> {
+  if (!Array.isArray(ownerUserIdsValue) || ownerUserIdsValue.length > 500) {
+    throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+  }
+  const ownerUserIds = [...new Set(ownerUserIdsValue.map((value) => {
+    if (typeof value !== 'string') throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+    const normalized = value.trim()
+    assertResourceId(normalized)
+    return normalized
+  }))].sort()
+  const pageSize = Math.min(Math.max(Number.isSafeInteger(limit) ? limit : 20, 1), 50)
+  if (ownerUserIds.length === 0) return { items: [], nextCursor: null, hasMore: false }
+
+  const ownersHash = await followingFeedOwnersHash(ownerUserIds)
+  const cursor = cursorValue ? decodeFollowingFeedCursor(cursorValue, ownersHash) : null
+  const cursorClause = cursor
+    ? 'AND (created_at < ? OR (created_at = ? AND id < ?))'
+    : ''
+  const cursorBindings = cursor ? [cursor.createdAt, cursor.createdAt, cursor.id] : []
+  const rows = await db.prepare(`SELECT id, content_type, owner_user_id, creator_id, ip_id, state, scheduled_at, version, revision,
+            slug, title, body_ref, media_refs_json, cover_ref, etag, created_at, updated_at
+       FROM contents
+      WHERE state = 'PUBLISHED'
+        AND owner_user_id IN (SELECT value FROM json_each(?))
+        ${cursorClause}
+      ORDER BY created_at DESC, id DESC
+      LIMIT ?`).bind(JSON.stringify(ownerUserIds), ...cursorBindings, pageSize + 1).all<ContentRow>()
+  const hasMore = rows.results.length > pageSize
+  const page = rows.results.slice(0, pageSize).map(toContent)
+  const last = page.at(-1)
+  return {
+    items: page,
+    hasMore,
+    nextCursor: hasMore && last
+      ? encodeFollowingFeedCursor({ version: 1, ownersHash, createdAt: last.createdAt, id: last.id })
+      : null,
+  }
+}
+
 export async function createContent(
   db: ContentD1,
   ownerUserId: string,
