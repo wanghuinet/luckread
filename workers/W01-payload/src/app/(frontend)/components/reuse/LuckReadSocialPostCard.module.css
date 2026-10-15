@@ -66,15 +66,10 @@
 }
 .profileLink {
   flex: 0 0 auto;
-  padding: 5px 10px;
-  border: 1px solid #dfe5ef;
-  border-radius: 999px;
-  color: #334155;
   font-size: 11px;
-  font-weight: 700;
   text-decoration: none;
 }
-.profileLink:hover { border-color: #b9c9f7; color: #183fa8; }
+.profileLink:hover { color: #183fa8; }
 .bodyLink {
   display: block;
   margin-left: 55px;
@@ -107,9 +102,7 @@
 }
 .bodyLink:hover .readMore { color: #183fa8; }
 .actions {
-  display: flex;
-  align-items: center;
-  gap: 0;
+  justify-content: flex-start;
   margin: 7px 0 0 55px;
   padding: 6px 0 0;
 }
@@ -120,13 +113,7 @@
   align-items: center;
   justify-content: center;
   gap: 7px;
-  margin-right: clamp(20px, 6vw, 54px);
   padding: 4px 8px;
-  border: 0;
-  border-radius: 999px;
-  color: #718096;
-  background: transparent;
-  font: inherit;
   font-size: 12px;
   cursor: pointer;
   text-decoration: none;
@@ -149,7 +136,7 @@
   .avatarLink, .avatar, .avatarFallback { width: 40px; height: 40px; flex-basis: 40px; }
   .bodyLink, .actions, .message { margin-left: 49px; }
   .postText { margin-top: 7px; font-size: 14px; }
-  .action, .actionLiked { margin-right: clamp(12px, 4vw, 28px); padding-right: 6px; padding-left: 6px; }
+  .action, .actionLiked { padding-right: 6px; padding-left: 6px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .card, .action, .actionLiked { transition: none; }
