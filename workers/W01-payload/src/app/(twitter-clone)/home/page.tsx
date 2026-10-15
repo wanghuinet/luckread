@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { cookies, headers } from 'next/headers'
 import { GET as getPublicContents } from '../../api/v1/contents/route'
-import TwitterCloneHomeFeed, { type HomeContentPage } from '../TwitterCloneHomeFeed'
+import TwitterCloneHomeFeed, { type HomeContentPage, type HomeFeedMode } from '../TwitterCloneHomeFeed'
 import TwitterCloneSidebarProfile from '../TwitterCloneSidebarProfile'
 import { TwitterLogo } from '../TwitterCloneLanding'
 import PublicLanguageToggle from '../../(frontend)/i18n/PublicLanguageToggle'
@@ -39,11 +39,15 @@ function NavIcon({ name }: { name: 'home' | 'search' | 'users' | 'bookmark' | 'u
   return <svg aria-hidden="true" className="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8"><path d={paths[name]} /></svg>
 }
 
-export default async function TwitterCloneHomePage() {
+export default async function TwitterCloneHomePage({ searchParams }: { searchParams?: Promise<{ feed?: string | string[] }> } = {}) {
+  const params = searchParams ? await searchParams : {}
+  const feedMode: HomeFeedMode = params.feed === 'following' ? 'following' : 'for-you'
   const requestHeaders = await headers()
   const locale = normalizePublicLocale((await cookies()).get('luckread-ui-locale')?.value)
   const copy = getTwitterCloneCopy(locale)
-  const initialPage = await loadInitialContent(requestHeaders, locale)
+  const initialPage: HomeContentPage = feedMode === 'following'
+    ? { items: [], nextCursor: null, hasMore: false }
+    : await loadInitialContent(requestHeaders, locale)
   return <div className="min-h-screen bg-main-background text-light-primary dark:text-dark-primary">
     <div className="mx-auto flex min-h-screen w-full max-w-[1265px] justify-center gap-0 lg:gap-4">
       <header id="sidebar" className="flex w-0 shrink-0 transition-opacity duration-200 xs:w-20 md:w-24 lg:max-w-none xl:-mr-4 xl:w-full xl:max-w-xs">
@@ -65,9 +69,9 @@ export default async function TwitterCloneHomePage() {
       </header>
       <main className="hover-animation flex min-h-screen w-full max-w-xl flex-col border-x border-light-border pb-32 dark:border-dark-border xs:pb-96">
         <header className="sticky top-0 z-10 flex items-center justify-between gap-6 bg-main-background/60 px-4 py-2 backdrop-blur-md"><h1 className="text-xl font-bold">{copy.home.home}</h1><div className="flex items-center gap-3"><PublicLanguageToggle locale={locale} /><Link className="text-sm font-bold text-main-accent hover:underline" href="/content">{copy.home.exploreAll}</Link></div></header>
-        <nav className="grid grid-cols-2 border-b border-light-border dark:border-dark-border"><Link className="main-tab relative flex min-h-14 items-center justify-center font-bold hover:bg-white/5" href="/home">{copy.home.forYou}<span className="absolute bottom-0 h-1 w-14 rounded-full bg-main-accent" /></Link><Link className="main-tab flex min-h-14 items-center justify-center text-light-secondary hover:bg-white/5 dark:text-dark-secondary" href="/me/following">{copy.home.followingTab}</Link></nav>
+        <nav className="grid grid-cols-2 border-b border-light-border dark:border-dark-border"><Link className={feedMode === 'for-you' ? "main-tab relative flex min-h-14 items-center justify-center font-bold hover:bg-white/5" : "main-tab flex min-h-14 items-center justify-center text-light-secondary hover:bg-white/5 dark:text-dark-secondary"} href="/home">{copy.home.forYou}{feedMode === 'for-you' ? <span className="absolute bottom-0 h-1 w-14 rounded-full bg-main-accent" /> : null}</Link><Link className={feedMode === 'following' ? "main-tab relative flex min-h-14 items-center justify-center font-bold hover:bg-white/5" : "main-tab flex min-h-14 items-center justify-center text-light-secondary hover:bg-white/5 dark:text-dark-secondary"} href="/home?feed=following">{copy.home.followingTab}{feedMode === 'following' ? <span className="absolute bottom-0 h-1 w-14 rounded-full bg-main-accent" /> : null}</Link></nav>
         <div className="grid grid-cols-[auto,1fr] gap-x-3 gap-y-1 border-b border-light-border px-4 py-3 dark:border-dark-border"><span className="row-span-2 grid h-12 w-12 place-items-center rounded-full bg-main-sidebar-background text-lg font-bold">L</span><Link className="main-tab min-h-12 rounded-xl px-1 py-3 text-left text-xl text-light-secondary hover:bg-white/5 dark:text-dark-secondary" href="/publish">{copy.home.composePlaceholder}</Link><div className="col-start-2 flex justify-end pt-2"><Link className="rounded-full bg-main-accent px-5 py-2 font-bold text-white transition hover:brightness-90" href="/publish">{copy.home.post}</Link></div></div>
-        <TwitterCloneHomeFeed initialPage={initialPage} locale={locale} />
+        <TwitterCloneHomeFeed key={feedMode} initialPage={initialPage} locale={locale} feedMode={feedMode} />
       </main>
       <aside className="hidden w-96 shrink-0 flex-col gap-4 px-4 py-3 pt-1 lg:flex">
         <Link className="flex items-center gap-3 rounded-full bg-main-search-background px-4 py-3 text-light-secondary hover:ring-1 hover:ring-main-accent dark:text-dark-secondary" href="/content"><NavIcon name="search" /><span>{copy.home.search}</span></Link>

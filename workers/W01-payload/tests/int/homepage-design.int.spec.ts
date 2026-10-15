@@ -22,13 +22,13 @@ describe('Twitter-clone homepage reuse', () => {
 
   it('keeps the clone feed, compose entry, profile, and discovery routes connected', async () => {
     const home = await readFile('src/app/(twitter-clone)/home/page.tsx', 'utf8')
-    expect(home).toContain('<TwitterCloneHomeFeed initialPage={initialPage} locale={locale} />')
+    expect(home).toContain('<TwitterCloneHomeFeed key={feedMode} initialPage={initialPage} locale={locale} feedMode={feedMode} />')
     expect(home).toContain('href="/publish"')
     expect(home).toContain('href="/me/profile"')
     expect(home).toContain('TwitterCloneSidebarProfile locale={locale}')
     const sidebarProfile = await readFile('src/app/(twitter-clone)/TwitterCloneSidebarProfile.tsx', 'utf8')
     expect(sidebarProfile).toContain("'/api/v1/users/me'")
-    expect(sidebarProfile).toContain('credentials: \'include\'')
+    expect(sidebarProfile).toContain("credentials: 'include'")
     expect(sidebarProfile).not.toContain('firebase/')
     expect(home).toContain('href="/me/subscriptions"')
     expect(home).toContain('href="/shorts"')
