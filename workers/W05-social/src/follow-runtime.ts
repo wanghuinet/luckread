@@ -396,6 +396,50 @@ export async function listFollowers(
   return listFollowRelations(db, userIdValue, 'followers', cursor, limit)
 }
 
+export type FollowingFeedCandidates = { userIds: string[]; hasMore: boolean }
+
+const FOLLOWING_FEED_CANDIDATE_LIMIT = 500
+
+/**
+ * Reads a bounded candidate set for the Following timeline in one authoritative
+ * social query. Feed content itself remains owned and filtered by W03.
+ */
+export async function listFollowingFeedCandidates(
+  db: D1Database,
+  userIdValue: string,
+): Promise<FollowingFeedCandidates> {
+  const ownerId = userId(userIdValue)
+  const result = await db.prepare(`SELECT rel.target_user_id AS user_id
+    FROM social_follow_relationships rel
+    WHERE rel.follower_user_id = ?
+      AND NOT EXISTS (
+        SELECT 1
+        FROM social_user_interactions block
+        WHERE block.relation_type = 'block'
+          AND (
+            (block.actor_user_id = ? AND block.target_user_id = rel.target_user_id)
+            OR
+            (block.actor_user_id = rel.target_user_id AND block.target_user_id = ?)
+          )
+      )
+      AND NOT EXISTS (
+        SELECT 1
+        FROM social_user_interactions mute
+        WHERE mute.relation_type = 'mute'
+          AND mute.actor_user_id = ?
+          AND mute.target_user_id = rel.target_user_id
+      )
+    ORDER BY rel.created_at DESC, rel.relationship_id DESC
+    LIMIT ?`).bind(
+      ownerId, ownerId, ownerId, ownerId, FOLLOWING_FEED_CANDIDATE_LIMIT + 1,
+    ).all<{ user_id: string }>()
+  const rows = result.results ?? []
+  return {
+    userIds: rows.slice(0, FOLLOWING_FEED_CANDIDATE_LIMIT).map((row) => row.user_id),
+    hasMore: rows.length > FOLLOWING_FEED_CANDIDATE_LIMIT,
+  }
+}
+
 export async function listFollowing(
   db: D1Database,
   userIdValue: string,
