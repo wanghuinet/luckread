@@ -46,6 +46,12 @@ The user-visible outcome is:
 5. Block/mute, account state, content visibility, deletion/moderation, and published-state rules are enforced server-side before emission.
 6. For You remains on the existing content-list source until a separate admitted slice changes it.
 
+## Existing resource-budget compatibility (unresolved)
+
+The existing `getFollowingFeed` policy records `d1ReadMax: 1`, `rpcMax: 2`, `candidateItemsMax: 500`, and `responseItemsMax: 50`. The proposed path has a W01→W04 hop plus bounded reads from W05 (relationship authority) and W03 (content authority); current W03 and W05 configs both bind the existing `luckreadpro` D1. On a straightforward end-to-end accounting model, two authoritative source queries and three Worker-to-Worker hops cannot yet be shown to fit `D1ReadMax=1` and `rpcMax=2`.
+
+Before admission, the contract owner must explicitly define whether these budgets count the entire user request or only a named terminal segment, then attach a bounded query/read/RPC estimate. If the source reads or service hops exceed the frozen limits, either redesign the serving path without weakening authority/eligibility, or approve a narrowly scoped budget change through Change Control. Do not silently raise the limits, count unmeasured D1 work as zero, or claim the proposed design already satisfies the current budget.
+
 ## Authority and topology constraints
 
 - W01 remains the public API/authentication boundary and must derive viewer identity from the existing verified session, never from client-supplied identity.
@@ -78,7 +84,7 @@ The current evidence does not yet establish a complete bounded serving path. The
 4. Cursor semantics under concurrent publication and follow/unfollow changes, including stable tie-breaking and tamper/expiry validation.
 5. Server-side eligibility and block/mute/account-state enforcement before the final result is emitted, including a serving-time read of the existing W04 AUTH-013 account-state projection with an explicit missing/stale-state policy.
 6. Private-cache key, freshness, invalidation/version behavior, bounded rebuild, and single-flight strategy. The existing W04 account-state KV namespace must not be repurposed for feed entries; absent a separately admitted private cache, `no-store` is the safe fallback.
-7. Resource/RPC/read-row budgets, anti-abuse limits, timeouts, and graceful failure behavior.
+7. Resource/RPC/read-row budgets, anti-abuse limits, timeouts, and graceful failure behavior, including a written compatibility decision for the existing `D1ReadMax=1` and `rpcMax=2` envelope versus the proposed source reads and Worker hops.
 8. Positive and negative integration tests, pagination/concurrency tests, cache-isolation tests, and deployed HTTP evidence.
 
 ## Admission and acceptance gates
@@ -135,6 +141,6 @@ A reviewer can admit this slice only after the PR/contract set identifies:
 - one bounded multi-creator content query and stable, integrity-protected pagination;
 - explicit account-state, block/mute, moderation, deleted/unpublished and visibility filtering;
 - per-viewer cache strategy and unfollow/block invalidation/freshness behavior;
-- max response rows, candidate rows, RPC count, D1 read rows, CPU, rate limits and concurrent request behavior.
+- max response rows, candidate rows, RPC count (including an explicit counting boundary), D1 read count/rows, CPU, rate limits and concurrent request behavior; demonstrate compliance with the current `D1ReadMax=1` / `rpcMax=2` policy or attach an approved budget amendment.
 
 Until those decisions are admitted, keep this PR Draft and keep FEED-001 `BLOCKED_NOT_GREEN`.
