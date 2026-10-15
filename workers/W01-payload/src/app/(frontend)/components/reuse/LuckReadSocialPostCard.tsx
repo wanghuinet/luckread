@@ -231,7 +231,7 @@ export default function LuckReadSocialPostCard({
       <Link className={styles.bodyLink} href={contentHref} data-umami-event="content-open" data-umami-event-content-type="post">
         <p className={styles.postText}>{title}</p>
         {mediaItems.length > 0 ? (
-          <div className={styles.mediaGrid} data-count={mediaItems.length} aria-label={locale === 'en' ? 'Post media' : '动态媒体'}>
+          <div className={styles.mediaGrid} data-count={mediaItems.length} role="group" aria-label={locale === 'en' ? 'Post media' : '动态媒体'}>
             {mediaItems.map((media) => (
               <span className={styles.mediaItem} key={media.src}>
                 {media.kind === 'video' ? (
