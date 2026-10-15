@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-import { canTransitionContentState, ContentRuntimeError, createContent, createRequestId, decodeContentListCursor, decodeCursor, decodeScopedCursor, encodeContentListCursor, encodeCursor, encodeScopedCursor, isState, listContents, listContentRevisions, listCreatorContents, publishDueScheduledContent, toErrorResponse, transitionContentState, updateContent, validateInput, validateListFilters } from './content-runtime.js'
+import { canTransitionContentState, ContentRuntimeError, createContent, createRequestId, decodeContentListCursor, decodeCursor, decodeScopedCursor, encodeContentListCursor, encodeCursor, encodeScopedCursor, isState, listContents, listFollowingFeedContents, listContentRevisions, listCreatorContents, publishDueScheduledContent, toErrorResponse, transitionContentState, updateContent, validateInput, validateListFilters } from './content-runtime.js'
 import w03Worker, { hasCreatorContentPermission, parseListLimit } from './index.js'
 
 describe('W03 content contract core', () => {
