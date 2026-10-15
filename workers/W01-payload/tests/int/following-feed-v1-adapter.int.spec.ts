@@ -89,7 +89,7 @@ describe('W04 Following feed runtime boundary', () => {
   it('denies spoofed callers and rejects duplicate or unbounded query parameters before calling W05', async () => {
     const fetch = vi.fn(async () => Response.json({ data: {} }))
     const env = {
-      AUTH013_W04_DERIVED_PROJECTION: { get: async () => null, put: async () => undefined },
+      AUTH013_W04_DERIVED_PROJECTION: { get: async (_key: string, _type: 'json'): Promise<unknown> => null, put: async (_key: string, _value: string): Promise<void> => undefined },
       W05_SOCIAL: { fetch },
     }
     const spoofed = await w04Worker.fetch(
