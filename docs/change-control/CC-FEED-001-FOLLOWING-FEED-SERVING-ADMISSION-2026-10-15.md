@@ -41,9 +41,20 @@ The user-visible outcome is:
 - W05 remains authoritative for follow/block/mute relationships.
 - W03 remains authoritative for content records and publication state.
 - No new Worker, D1 database, Payload collection, or direct W01-to-D1 business query.
-- Do not reuse `AUTH013_W04_DERIVED_PROJECTION` for feed data; its current purpose is the account-state projection.
+- Do not store feed candidates, assembled timelines, or private feed pages in `AUTH013_W04_DERIVED_PROJECTION`; its existing authority is the non-authoritative account-state projection.
+- Reconcile with the existing AUTH-013 decision below: the admitted serving path must consume that existing projection for serving-time account-state eligibility, without repurposing the namespace as feed storage.
 - Do not make one content RPC per followed account or merge arbitrary client-side creator requests.
-- Private feed cache keys must be viewer-scoped; no private timeline may enter a shared public cache.
+- Private feed cache keys must be viewer-scoped; no private timeline may enter a shared public cache. Any separate feed cache needs its own admitted binding/contract; until then, viewer-private `no-store` is the safe fallback.
+
+## Reconciliation with existing AUTH-013 Change Control
+
+`docs/change-control/CC-MAPPING-0-AUTH-013-FEED-SEARCH-SERVING-GAP-2026-10-04.md` remains `GAP_CONFIRMED / IMPLEMENTATION_NOT_AUTHORIZED`. It explicitly states that the eventual minimum Feed/Search serving slice must use the existing W04 derived projection and prove serving-time account-state eligibility and cache boundaries.
+
+This proposal interprets that prior decision narrowly and consistently:
+- W04 must read `AUTH013_W04_DERIVED_PROJECTION` as the existing derived account-state eligibility input at serving time and document/test behavior for missing, stale, or ineligible state.
+- The projection remains non-authoritative. W03/W05 retain content and relationship authority; the account-state KV is not a feed candidate store, timeline cache, or replacement for authoritative state.
+- Feed-page caching is a separate design decision. Do not write viewer timelines into this AUTH-013 namespace. Until an independently authorized private cache design exists, fail-safe `no-store` is the proposed fallback.
+- Existing W04 projection/deindex evidence alone is not evidence of user-facing feed serving. The new path still needs explicit admission, endpoint-level tests, cache-isolation evidence, and a validating commit SHA.
 
 ## Required design decisions before implementation admission
 
@@ -53,8 +64,8 @@ The current evidence does not yet establish a complete bounded serving path. The
 2. Concrete W01→W04 and W04→W03/W05 service-binding contract, including trusted caller/principal provenance and fail-closed behavior.
 3. An authoritative, bounded way to obtain the viewer's followed-user set and the W03 query/transport to retrieve a globally ordered content page for multiple creators without per-author RPC fan-out.
 4. Cursor semantics under concurrent publication and follow/unfollow changes, including stable tie-breaking and tamper/expiry validation.
-5. Server-side eligibility and block/mute/account-state enforcement before the final result is emitted.
-6. Private-cache key, freshness, invalidation/version behavior, bounded rebuild, and single-flight strategy. The existing W04 account-state KV namespace must not be repurposed.
+5. Server-side eligibility and block/mute/account-state enforcement before the final result is emitted, including a serving-time read of the existing W04 AUTH-013 account-state projection with an explicit missing/stale-state policy.
+6. Private-cache key, freshness, invalidation/version behavior, bounded rebuild, and single-flight strategy. The existing W04 account-state KV namespace must not be repurposed for feed entries; absent a separately admitted private cache, `no-store` is the safe fallback.
 7. Resource/RPC/read-row budgets, anti-abuse limits, timeouts, and graceful failure behavior.
 8. Positive and negative integration tests, pagination/concurrency tests, cache-isolation tests, and deployed HTTP evidence.
 
@@ -96,7 +107,7 @@ Prefer the contract's W04 feed-serving boundary, without adding a Worker or D1:
 1. W01 exposes the canonical authenticated public route `GET /api/v1/feed/following?cursor=&limit=`; it resolves the viewer through the existing W02-backed server principal and forwards no end-user bearer/session token to downstream Workers.
 2. W01 calls W04 through a private Service Binding with a transport contract that carries server-derived viewer identity, correlation ID, page size and cursor. W04 must reject direct/public invocation and malformed/untrusted context.
 3. W04 obtains follow candidates from W05 and eligible content candidates from W03 using explicit read-only, bounded, feed-specific internal operations. Admission must define the W04 caller identity and transport contract; do not weaken existing W01-only operations or let W04 impersonate W01.
-4. The W03 operation must provide a single bounded multi-creator query with stable global ordering and owner/state/visibility checks, rather than one RPC per followed creator. W05 remains authoritative for the relationship set and block/mute eligibility; W03 remains authoritative for content and publication state; W04 only assembles the derived feed.
+4. The W03 operation must provide a single bounded multi-creator query with stable global ordering and owner/state/visibility checks, rather than one RPC per followed creator. W04 must also consult the existing `AUTH013_W04_DERIVED_PROJECTION` at serving time for derived account-state eligibility, fail safely for missing/stale state, and preserve its account-state-only purpose. W05 remains authoritative for the relationship set and block/mute eligibility; W03 remains authoritative for content and publication state; W04 only assembles the derived feed.
 5. Before admitting implementation, resolve how complete follow-graph coverage is maintained beyond one 50-item follow-list page and how follow/unfollow changes affect the cursor. A fixed list of only the most recent followed accounts is not acceptable as a complete Following feed.
 6. Use an integrity-protected, versioned feed cursor bound to viewer identity and query dimensions. Private caching must be per-viewer, no-store must be the safe fallback, and the existing AUTH-013 account-state KV namespace remains dedicated to that projection.
 
