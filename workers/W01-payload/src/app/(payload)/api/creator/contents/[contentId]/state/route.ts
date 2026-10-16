@@ -12,6 +12,8 @@ import {
   W03ContentClientError,
 } from '../../../../../../../content/w03-content-client.js'
 
+import { bindPreflightToStoredPost } from '../../../../../../../content/bind-post-publish-preflight.js'
+
 const errorResponse = (status: number, code: string, message: string) =>
   Response.json(
     { error: { code, message, details: {} }, requestId: `req_${crypto.randomUUID()}` },
@@ -50,11 +52,14 @@ export async function POST(
       return errorResponse(422, 'VALIDATION_FAILED', 'Invalid content state request')
     }
 
+    const boundBody = await bindPreflightToStoredPost(request, contentId, principal, body, errorResponse)
+    if (boundBody instanceof Response) return boundBody
+
     const response = await callW03Content({
       request,
       pathname: `/internal/content/contents/${encodeURIComponent(contentId)}/state`,
       method: 'POST',
-      body,
+      body: boundBody,
       principal,
     })
 
