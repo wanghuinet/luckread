@@ -8,6 +8,7 @@ import {
   getContent,
   listContents,
   listFollowingOwnerContents,
+  listPublishedContentsByIds,
   listCreatorContents,
   validateListFilters,
   toErrorResponse,
@@ -361,7 +362,40 @@ const worker = {
         })
       }
 
+
       requireTransport(request)
+      if (url.pathname === '/internal/content/bookmarked-items') {
+        if (request.method !== 'POST') return new Response(null, { status: 405, headers: { Allow: 'POST' } })
+        requiredPrincipal(request)
+        const body = await parseBody(request)
+        const ids = body.ids
+        if (
+          !Array.isArray(ids) ||
+          ids.length > 50 ||
+          ids.some(id => typeof id !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(id))
+        ) {
+          throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+        }
+        const items = await listPublishedContentsByIds(env.D1_02, ids)
+        return json({
+          data: {
+            items: items.map(item => ({
+              id: item.id,
+              slug: item.slug,
+              ownerUserId: item.ownerUserId,
+              creatorId: item.creatorId,
+              contentType: item.contentType,
+              title: item.title,
+              bodyRef: item.bodyRef,
+              mediaRefs: item.mediaRefs,
+              coverRef: item.coverRef,
+              createdAt: item.createdAt,
+              updatedAt: item.updatedAt,
+            })),
+          },
+          requestId: createRequestId(),
+        })
+      }
       const path = getPath(url.pathname)
 
       if (path && path.collectionMembers && path.id && request.method === 'GET') {

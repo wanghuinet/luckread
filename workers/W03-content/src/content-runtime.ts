@@ -605,6 +605,32 @@ export async function listCreatorContents(
   }
 }
 
+
+export async function listPublishedContentsByIds(
+  db: ContentD1,
+  contentIds: string[],
+): Promise<ContentRecord[]> {
+  if (!Array.isArray(contentIds) || contentIds.length > 50) {
+    throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+  }
+  const ids = [...new Set(contentIds)]
+  for (const id of ids) assertResourceId(id)
+  if (ids.length === 0) return []
+
+  const rows = await db.prepare(
+    `SELECT c.id, c.content_type, c.owner_user_id, c.creator_id, c.ip_id, c.state,
+            c.scheduled_at, c.version, c.revision, c.slug, c.title, c.body_ref,
+            c.media_refs_json, c.cover_ref, c.etag, c.created_at, c.updated_at
+       FROM json_each(?) AS requested
+       INNER JOIN contents AS c ON c.id = requested.value
+      WHERE c.state = 'PUBLISHED'
+      ORDER BY CAST(requested.key AS INTEGER) ASC
+      LIMIT ?`,
+  ).bind(JSON.stringify(ids), ids.length).all<ContentRow>()
+
+  return rows.results.map(toContent)
+}
+
 export async function listContents(
   db: ContentD1,
   cursor: string | null,

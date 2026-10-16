@@ -5,6 +5,7 @@ import {
   FavoriteRuntimeError,
   favorite,
   getFavoriteStatus,
+  listFavorites,
   unfavorite,
 } from './favorite-runtime.js'
 import { ShareRuntimeError, createShare, resolveShare } from './share-runtime.js'
@@ -533,6 +534,32 @@ export default {
           })
         }
         return json({ data: comment, requestId: createRequestId() }, 201)
+      }
+
+
+      if (url.pathname === '/internal/social/interactions/bookmarks/list') {
+        const viewerUserId = requirePrincipal(request)
+        if (request.method !== 'GET') {
+          return new Response(null, { status: 405, headers: { Allow: 'GET' } })
+        }
+        requireInteractionLayer(request)
+        const allowed = new Set(['limit', 'cursor'])
+        let invalidQuery = false
+        url.searchParams.forEach((_value, key) => {
+          if (!allowed.has(key) || url.searchParams.getAll(key).length !== 1) invalidQuery = true
+        })
+        if (invalidQuery) throw new FavoriteRuntimeError('VALIDATION_FAILED', 400)
+        const rawLimit = url.searchParams.get('limit')
+        const limitText = rawLimit?.trim() ?? ''
+        if (limitText && !/^(?:[1-9]|[1-4][0-9]|50)$/.test(limitText)) {
+          throw new FavoriteRuntimeError('VALIDATION_FAILED', 400)
+        }
+        const cursor = url.searchParams.get('cursor')
+        if (cursor && cursor.length > 2048) throw new FavoriteRuntimeError('INVALID_CURSOR', 400)
+        return json({
+          data: await listFavorites(env.DB, viewerUserId, cursor, limitText ? Number(limitText) : 20),
+          requestId: createRequestId(),
+        })
       }
 
       if (url.pathname === '/internal/social/interactions/bookmarks') {

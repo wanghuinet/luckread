@@ -122,6 +122,7 @@ export default function ContentBrowsePage() {
           <Link className="button button-quiet" href="/">{copy.common.backHome}</Link>
           <Link className="button button-primary" href="/publish">{copy.common.startCreating} ↗</Link>
           <Link className="button button-quiet" href="/shorts">短视频</Link>
+          <Link className="button button-quiet" data-umami-event="bookmarks-open" href="/bookmarks">{locale === 'en' ? 'Bookmarks' : locale === 'tw' ? '已收藏' : '我的收藏'}</Link>
           <PublicLanguageToggle locale={locale} />
         </div>
       </header>

@@ -42,6 +42,7 @@ type Props = {
   createdAt?: string
   updatedAt?: string
   locale?: PublicLocale
+  onBookmarkChanged?: (bookmarked: boolean) => void
 }
 
 export default function LuckReadSocialPostCard({
@@ -54,6 +55,7 @@ export default function LuckReadSocialPostCard({
   createdAt,
   updatedAt,
   locale = 'zh',
+  onBookmarkChanged,
 }: Props) {
   const [profile, setProfile] = useState<PublicProfile | null>(null)
   const [resolvedCreatorId, setResolvedCreatorId] = useState<string | null>(creatorId ?? null)
@@ -217,6 +219,7 @@ export default function LuckReadSocialPostCard({
         throw new Error(getApiErrorMessage(data, locale === 'en' ? 'Bookmark failed.' : '收藏失败，请稍后重试。'))
       }
       setBookmarked(!previousBookmarked)
+      onBookmarkChanged?.(!previousBookmarked)
     } catch (cause) {
       setMessage(cause instanceof Error
         ? cause.message

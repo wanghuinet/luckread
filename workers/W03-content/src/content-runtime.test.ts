@@ -2,10 +2,106 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-import { canTransitionContentState, ContentRuntimeError, createContent, createRequestId, decodeContentListCursor, decodeCursor, decodeScopedCursor, encodeContentListCursor, encodeCursor, encodeScopedCursor, isState, listContents, listContentRevisions, listCreatorContents, publishDueScheduledContent, toErrorResponse, transitionContentState, updateContent, validateInput, validateListFilters } from './content-runtime.js'
+import { canTransitionContentState, ContentRuntimeError, createContent, createRequestId, decodeContentListCursor, decodeCursor, decodeScopedCursor, encodeContentListCursor, encodeCursor, encodeScopedCursor, isState, listContents, listPublishedContentsByIds, listContentRevisions, listCreatorContents, publishDueScheduledContent, toErrorResponse, transitionContentState, updateContent, validateInput, validateListFilters } from './content-runtime.js'
 import w03Worker, { hasCreatorContentPermission, parseListLimit } from './index.js'
 
 describe('W03 content contract core', () => {
+
+  it('serves bookmarked contents only through authenticated W01 transport', async () => {
+    const row = {
+      id: 'content_1', content_type: 'post', owner_user_id: 'user_1', creator_id: 'user_1',
+      ip_id: null, state: 'PUBLISHED', scheduled_at: null, version: 1, revision: 1,
+      slug: 'post-1', title: 'Post 1', body_ref: 'body_1', media_refs_json: '[]',
+      cover_ref: null, etag: 'W/"1"', created_at: '2026-10-02T00:00:00.000Z',
+      updated_at: '2026-10-02T00:00:00.000Z',
+    }
+    let query = ''
+    const env = {
+      D1_02: {
+        prepare(value: string) {
+          query = value
+          return { bind: () => ({ all: async () => ({ results: [row] }) }) }
+        },
+      },
+    } as never
+    const response = await w03Worker.fetch(
+      new Request('https://luckread-w03.internal/internal/content/bookmarked-items', {
+        method: 'POST',
+        headers: {
+          'X-LuckRead-Caller': 'W01',
+          'X-LuckRead-Transport-Version': '1.0',
+          'X-LuckRead-Correlation-Id': 'bookmark-list',
+          'X-LuckRead-Principal-User-Id': 'user_1',
+          'X-LuckRead-Principal-Layer': 'L2',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ ids: ['content_1'] }),
+      }),
+      env,
+      {} as never,
+    )
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({
+      data: { items: [{ id: 'content_1', title: 'Post 1' }] },
+    })
+    expect(query).toContain("WHERE c.state = 'PUBLISHED'")
+    const denied = await w03Worker.fetch(
+      new Request('https://luckread-w03.internal/internal/content/bookmarked-items', {
+        method: 'POST',
+        headers: {
+          'X-LuckRead-Caller': 'untrusted',
+          'X-LuckRead-Transport-Version': '1.0',
+          'X-LuckRead-Correlation-Id': 'blocked',
+        },
+        body: JSON.stringify({ ids: ['content_1'] }),
+      }),
+      env,
+      {} as never,
+    )
+    expect(denied.status).toBe(403)
+  })
+
+
+  it('loads a bounded list of published content IDs in bookmark order', async () => {
+    const rows = [
+      {
+        id: 'content_2', content_type: 'post', owner_user_id: 'user_2', creator_id: 'user_2',
+        ip_id: null, state: 'PUBLISHED', scheduled_at: null, version: 1, revision: 1,
+        slug: 'post-2', title: 'Post 2', body_ref: 'body_2', media_refs_json: '[]',
+        cover_ref: null, etag: 'W/"1"', created_at: '2026-10-02T00:00:00.000Z',
+        updated_at: '2026-10-02T00:00:00.000Z',
+      },
+      {
+        id: 'content_1', content_type: 'article', owner_user_id: 'user_1', creator_id: 'user_1',
+        ip_id: null, state: 'PUBLISHED', scheduled_at: null, version: 1, revision: 1,
+        slug: 'article-1', title: 'Article 1', body_ref: 'body_1', media_refs_json: '[]',
+        cover_ref: null, etag: 'W/"1"', created_at: '2026-10-01T00:00:00.000Z',
+        updated_at: '2026-10-01T00:00:00.000Z',
+      },
+    ]
+    let query = ''
+    let bindings: unknown[] = []
+    const db = {
+      prepare(value: string) {
+        query = value
+        return { bind: (...values: unknown[]) => {
+          bindings = values
+          return { all: async () => ({ results: rows }) }
+        } }
+      },
+    } as never
+
+    const items = await listPublishedContentsByIds(db, ['content_2', 'content_1'])
+    expect(items.map(item => item.id)).toEqual(['content_2', 'content_1'])
+    expect(query).toContain('json_each(?)')
+    expect(query).toContain("WHERE c.state = 'PUBLISHED'")
+    expect(query).toContain('ORDER BY CAST(requested.key AS INTEGER) ASC')
+    expect(bindings).toEqual([JSON.stringify(['content_2', 'content_1']), 2])
+    await expect(listPublishedContentsByIds(db, Array.from({ length: 51 }, (_, i) => 'content_' + i)))
+      .rejects.toMatchObject({ code: 'VALIDATION_FAILED', status: 400 })
+  })
+
+
   it('accepts the canonical lifecycle vocabulary and cursor round-trip', () => {
     expect(isState('DRAFT')).toBe(true)
     expect(isState('APPROVED')).toBe(true)
