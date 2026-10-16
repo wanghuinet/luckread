@@ -114,13 +114,16 @@ const resolveCoverRef = (
 type PublishComposerProps = {
   contentBasePath?: string
   initialType?: ContentType
+  presentation?: 'workspace' | 'tweet-modal'
 }
 
 export default function PublishComposer({
   contentBasePath = '/api/v1/contents',
   initialType = 'article',
+  presentation = 'workspace',
 }: PublishComposerProps) {
   const router = useRouter()
+  const isTweetModal = presentation === 'tweet-modal'
   const [type, setType] = useState<ContentType>(initialType)
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
@@ -748,7 +751,12 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
   }
 
   return (
-    <div className="lr-composer-card" aria-busy={busy}>
+    <div
+      className="lr-composer-card"
+      aria-busy={busy}
+      style={isTweetModal ? { width: '100%', marginTop: 0, padding: 0, border: 0, borderRadius: 0, background: 'transparent', boxShadow: 'none' } : undefined}
+    >
+      {!isTweetModal ? (
       <div className="lr-type-tabs" role="tablist" aria-label="内容类型">
         {draft ? <p className="lr-type-lock-note">草稿创建后内容类型不可变更；需要更换类型请新建内容。</p> : null}
         {([
@@ -769,6 +777,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
           </button>
         ))}
       </div>
+      ) : null}
 
       {type !== 'post' ? (
         <label className="lr-field">
@@ -797,8 +806,8 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
           value={articleDocument}
         />
       ) : (
-        <label className="lr-field">
-          <span>{type === 'post' ? '推文正文' : '视频文案'}</span>
+        <label className={isTweetModal ? 'lr-field lr-post-modal-field' : 'lr-field'}>
+          <span className={isTweetModal ? 'sr-only' : undefined}>{type === 'post' ? '推文正文' : '视频文案'}</span>
           <textarea
             aria-label={type === 'post' ? '推文正文' : '视频文案'}
             disabled={busy || reviewLocked}
@@ -806,6 +815,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
             onChange={(event) => { setBody(event.target.value); markDirty(); setPreflightReport(null) }}
             placeholder={type === 'post' ? '有什么新鲜事？' : '写下你的内容…'}
             rows={type === 'post' ? 5 : 14}
+            style={isTweetModal && type === 'post' ? { minHeight: '130px', fontSize: '20px', lineHeight: 1.5 } : undefined}
             value={body}
           />
           {type === 'post' ? <small aria-live="polite">{body.length}/500</small> : null}
@@ -917,12 +927,12 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
 
       <div className="lr-preflight-policy">
         <div className="lr-preflight-policy-heading">
-          <strong>创作者质量与 AI 规范</strong>
+          <strong>{isTweetModal ? '创作声明' : '创作者质量与 AI 规范'}</strong>
           <span>发布前自动检查</span>
         </div>
         <label className="lr-field">
-          <span>AI 使用方式（请据实选择）</span>
-          <select disabled={busy || reviewLocked} onChange={(event) => { setAiMode(event.target.value as AiMode); setPreflightReport(null) }} value={aiMode}>
+          <span>{isTweetModal ? 'AI 使用方式' : 'AI 使用方式（请据实选择）'}</span>
+          <select aria-label="AI 使用方式" disabled={busy || reviewLocked} onChange={(event) => { setAiMode(event.target.value as AiMode); setPreflightReport(null) }} value={aiMode}>
             <option value="none">未使用 AI</option>
             <option value="outline">AI 只做提纲 / 框架</option>
             <option value="assist">AI 辅助整理 / 润色</option>
@@ -935,7 +945,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
             <span>我已补充自己的原创事实、经验、案例、数据或判断，并亲自核验关键事实。</span>
           </label>
         ) : null}
-        <p>原则：AI 可以帮你搭框架，但不能替代创作者完成文章；最终内容必须真正帮助读者。</p>
+        {!isTweetModal ? <p>原则：AI 可以帮你搭框架，但不能替代创作者完成文章；最终内容必须真正帮助读者。</p> : null}
       </div>
 
       {preflightReport ? (
@@ -963,6 +973,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
       ) : null}
 
 
+      {!isTweetModal || type !== 'post' ? (
       <label className="lr-field">
         <span>{type === 'video' ? '短视频封面' : '封面引用'}（可选）</span>
         <input
@@ -972,6 +983,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
           value={coverRef}
         />
       </label>
+      ) : null}
 
       {draft ? (
         <div className="lr-content-status" role="status">
@@ -1054,42 +1066,63 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
       ) : null}
 
       <div className="lr-actions">
-        {draft?.state === 'PENDING_REVIEW' ? (
-          <button className="secondary" disabled={busy} onClick={startNewContent} type="button">
-            新建内容
-          </button>
-        ) : null}
-        <button className="ghost" disabled={busy || reviewLocked} onClick={async () => {
-          setBusy(true); setError(''); setMessage('')
-          try { await runPreflight(); setMessage('发布前检查完成，请查看检查结果。') }
-          catch (caught) { setError(caught instanceof Error ? caught.message : '发布前检查失败，请稍后重试。') }
-          finally { setBusy(false) }
-        }} type="button">
-          发布前自检
-        </button>
-        <button className="ghost" disabled={busy} onClick={() => setPreview((current) => !current)} type="button">
-          {preview ? '关闭预览' : '预览'}
-        </button>
-        {draft?.id && draft.state === 'DRAFT' ? (
-          <button className="ghost" disabled={busy} onClick={copyDraftLink} type="button">
-            {copied ? '已复制' : '复制恢复链接'}
-          </button>
-        ) : null}
-        {draft?.state === 'DRAFT' ? (
-          <button className="danger" disabled={busy} onClick={discardDraft} type="button">
-            放弃草稿
-          </button>
-        ) : null}
-        <button className="secondary" disabled={busy || autoSaveStatus === 'saving'} onClick={saveDraft} type="button">
-          {busy ? '处理中…' : '保存草稿'}
-        </button>
-        <button className="primary" disabled={busy || autoSaveStatus === 'saving' || draft?.state === 'PENDING_REVIEW'} onClick={submitForReview} type="button">
-          {busy ? '处理中…' : draft?.state === 'PENDING_REVIEW' ? '审核中…' : '提交发布'}
-        </button>
+        {isTweetModal ? (
+          <>
+            {draft?.state === 'PENDING_REVIEW' ? (
+              <button className="secondary" disabled={busy} onClick={startNewContent} type="button">新建内容</button>
+            ) : null}
+            {draft?.state === 'DRAFT' ? (
+              <button className="danger" disabled={busy} onClick={discardDraft} type="button">放弃草稿</button>
+            ) : null}
+            <button className="secondary" disabled={busy || autoSaveStatus === 'saving'} onClick={saveDraft} type="button">
+              {busy ? '处理中…' : '保存草稿'}
+            </button>
+            <button className="primary" disabled={busy || autoSaveStatus === 'saving' || draft?.state === 'PENDING_REVIEW'} onClick={submitForReview} type="button">
+              {busy ? '处理中…' : draft?.state === 'PENDING_REVIEW' ? '审核中…' : '提交审核'}
+            </button>
+          </>
+        ) : (
+          <>
+            {draft?.state === 'PENDING_REVIEW' ? (
+              <button className="secondary" disabled={busy} onClick={startNewContent} type="button">
+                新建内容
+              </button>
+            ) : null}
+            <button className="ghost" disabled={busy || reviewLocked} onClick={async () => {
+              setBusy(true); setError(''); setMessage('')
+              try { await runPreflight(); setMessage('发布前检查完成，请查看检查结果。') }
+              catch (caught) { setError(caught instanceof Error ? caught.message : '发布前检查失败，请稍后重试。') }
+              finally { setBusy(false) }
+            }} type="button">
+              发布前自检
+            </button>
+            <button className="ghost" disabled={busy} onClick={() => setPreview((current) => !current)} type="button">
+              {preview ? '关闭预览' : '预览'}
+            </button>
+            {draft?.id && draft.state === 'DRAFT' ? (
+              <button className="ghost" disabled={busy} onClick={copyDraftLink} type="button">
+                {copied ? '已复制' : '复制恢复链接'}
+              </button>
+            ) : null}
+            {draft?.state === 'DRAFT' ? (
+              <button className="danger" disabled={busy} onClick={discardDraft} type="button">
+                放弃草稿
+              </button>
+            ) : null}
+            <button className="secondary" disabled={busy || autoSaveStatus === 'saving'} onClick={saveDraft} type="button">
+              {busy ? '处理中…' : '保存草稿'}
+            </button>
+            <button className="primary" disabled={busy || autoSaveStatus === 'saving' || draft?.state === 'PENDING_REVIEW'} onClick={submitForReview} type="button">
+              {busy ? '处理中…' : draft?.state === 'PENDING_REVIEW' ? '审核中…' : '提交发布'}
+            </button>
+          </>
+        )}
       </div>
 
       <p className="lr-note">
-        提交发布不会绕过审核：创建后先进入草稿；发布前由 W03 做质量、SEO、导流与 AI 创作规范检查，再按内容状态机进入审核和正式发布。
+        {isTweetModal
+          ? '动态提交后会进入审核；审核通过并正式发布后才会出现在公开信息流。'
+          : '提交发布不会绕过审核：创建后先进入草稿；发布前由 W03 做质量、SEO、导流与 AI 创作规范检查，再按内容状态机进入审核和正式发布。'}
       </p>
     </div>
   )
