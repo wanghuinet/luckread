@@ -195,11 +195,11 @@ jobs:
           const fs = require('node:fs');
           const envelope = JSON.parse(fs.readFileSync('/tmp/social-post-body-upload.json', 'utf8'));
           const doc = envelope?.doc ?? envelope;
-          if (doc?.id) fs.appendFileSync(process.env.GITHUB_ENV, 'POST_BODY_MEDIA_ID=' + String(doc.id) + '\\n');
+          if (doc?.id) fs.appendFileSync(process.env.GITHUB_ENV, 'POST_BODY_MEDIA_ID=' + String(doc.id) + '\n');
           if (!doc?.id || typeof doc.url !== 'string' || !doc.url.trim()) {
             throw new Error('social post body upload did not return a delivery-ready media id/url: ' + JSON.stringify(envelope));
           }
-          fs.appendFileSync(process.env.GITHUB_ENV, 'POST_BODY_REF=' + doc.url.trim() + '\\n');
+          fs.appendFileSync(process.env.GITHUB_ENV, 'POST_BODY_REF=' + doc.url.trim() + '\n');
           console.log(JSON.stringify({ bodyAssetUploaded: true, mediaIdPresent: true, publicUrlPresent: true }));
           NODE
 
@@ -258,7 +258,7 @@ jobs:
           if (value.contentType !== 'post' || value.state !== 'DRAFT' || typeof value.id !== 'string' || value.etag !== 'W/"1"' || Number(value.version) !== 1) {
             throw new Error('social post create assertion failed: ' + JSON.stringify(value));
           }
-          fs.appendFileSync(process.env.GITHUB_ENV, 'SOCIAL_POST_ID=' + value.id + '\\nSOCIAL_POST_ETAG=' + value.etag + '\\n');
+          fs.appendFileSync(process.env.GITHUB_ENV, 'SOCIAL_POST_ID=' + value.id + '\nSOCIAL_POST_ETAG=' + value.etag + '\n');
           NODE
 
       - name: Run publish preflight for article, video, and social post
