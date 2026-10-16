@@ -929,8 +929,10 @@ const worker = {
       }
 
       if (request.method === 'PATCH' && path.id) {
-        const principal = requiredCreatorPrincipal(request)
         const body = await parseBody(request)
+        const principal = body.contentType === 'post'
+          ? requiredSocialPostPrincipal(request)
+          : requiredCreatorPrincipal(request)
         const content = await updateContent(
           env.D1_02,
           principal.userId,
@@ -940,6 +942,7 @@ const worker = {
           requireIdempotency(request),
           new Date(),
           request.headers.get('X-LuckRead-Correlation-Id')?.trim() || 'runtime',
+          principal.layer,
         )
         return json({
           id: content.id,
@@ -955,13 +958,15 @@ const worker = {
       }
 
       if (request.method === 'DELETE' && path.id) {
-        const principal = requiredCreatorPrincipal(request)
+        const principal = requiredSocialPostPrincipal(request)
         await deleteContent(
           env.D1_02,
           principal.userId,
           path.id,
           requireIfMatch(request),
           requireIdempotency(request),
+          new Date(),
+          principal.layer,
         )
         return new Response(null, { status: 204 })
       }
