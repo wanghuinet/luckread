@@ -7,6 +7,7 @@ import {
   deleteContent,
   getContent,
   listContents,
+  listFollowingOwnerContents,
   listCreatorContents,
   validateListFilters,
   toErrorResponse,
@@ -233,8 +234,85 @@ const worker = {
   async fetch(request: Request, env: Env): Promise<Response> {
     try {
       const url = new URL(request.url)
-      const isRead = request.method === 'GET'
+      const isRead = request.method === 'GET' || (request.method === 'POST' && url.pathname === '/internal/content/following-feed')
       await enforceRateLimits(request, env, isRead ? 'read' : 'write')
+
+      if (request.method === 'POST' && url.pathname === '/internal/content/following-feed') {
+        if (
+          request.headers.get('X-LuckRead-Caller') !== 'W04' ||
+          request.headers.get('X-LuckRead-Transport-Version') !== '1.0' ||
+          !request.headers.get('X-LuckRead-Correlation-Id')?.trim() ||
+          request.headers.has('Authorization') ||
+          request.headers.has('Cookie')
+        ) {
+          throw new ContentRuntimeError('PERMISSION_DENIED', 403)
+        }
+        if (url.search !== '') {
+          throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+        }
+        const viewerUserId = request.headers.get('X-LuckRead-Principal-User-Id')?.trim() ?? ''
+        if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(viewerUserId)) {
+          throw new ContentRuntimeError('UNAUTHENTICATED', 401)
+        }
+        const rawBody = await request.text()
+        if (rawBody.length > 70000) throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+        let parsedBody: unknown
+        try { parsedBody = JSON.parse(rawBody) } catch {
+          throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+        }
+        if (!parsedBody || typeof parsedBody !== 'object' || Array.isArray(parsedBody)) {
+          throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+        }
+        const body = parsedBody as Record<string, unknown>
+        if (Object.keys(body).some((key) => !['ownerUserIds', 'cursor', 'limit'].includes(key))) {
+          throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+        }
+        const ownerUserIds = body.ownerUserIds
+        if (
+          !Array.isArray(ownerUserIds) ||
+          ownerUserIds.length < 1 ||
+          ownerUserIds.length > 500 ||
+          ownerUserIds.some((id) => typeof id !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(id))
+        ) {
+          throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+        }
+        const cursor = body.cursor === null || body.cursor === undefined
+          ? null
+          : typeof body.cursor === 'string'
+            ? body.cursor.trim() || null
+            : (() => { throw new ContentRuntimeError('VALIDATION_FAILED', 400) })()
+        if (cursor && cursor.length > 2048) throw new ContentRuntimeError('INVALID_CURSOR', 400)
+        if (body.limit !== undefined && typeof body.limit !== 'number' && typeof body.limit !== 'string') {
+          throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+        }
+        const page = await listFollowingOwnerContents(
+          env.D1_02,
+          viewerUserId,
+          ownerUserIds as string[],
+          cursor,
+          parseListLimit(body.limit === undefined ? null : String(body.limit)),
+        )
+        return json({
+          data: {
+            items: page.items.map((item) => ({
+              id: item.id,
+              slug: item.slug,
+              creatorId: item.creatorId ?? item.ownerUserId,
+              createdAt: item.createdAt,
+              contentType: item.contentType,
+              title: item.title,
+              bodyRef: item.bodyRef,
+              mediaRefs: item.mediaRefs,
+              coverRef: item.coverRef,
+              updatedAt: item.updatedAt,
+            })),
+            nextCursor: page.nextCursor,
+            hasMore: page.hasMore,
+          },
+          requestId: createRequestId(),
+        })
+      }
+
       const isModerationTransition =
         request.method === 'POST' &&
         /^\/internal\/content\/contents\/[^/]+\/state$/.test(url.pathname) &&

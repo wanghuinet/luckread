@@ -259,6 +259,62 @@ async function listFollowRelations(
   }
 }
 
+
+export type FollowingAuthorCandidates = {
+  items: Array<{ userId: string }>
+  candidateWindowTruncated: boolean
+}
+
+const MAX_FOLLOWING_FEED_AUTHORS = 500
+
+/**
+ * W05 owns follow/block/mute relationships. It deliberately returns author IDs
+ * only; W03 remains the authority that selects and projects published content.
+ * The candidate window is bounded to keep the W04 fan-out request predictable.
+ */
+export async function listFollowingAuthorIds(
+  db: D1Database,
+  viewerUserId: string,
+): Promise<FollowingAuthorCandidates> {
+  const viewerId = userId(viewerUserId)
+  const result = await db.prepare(`
+    SELECT f.target_user_id AS user_id
+      FROM social_follow_relationships f
+     WHERE f.follower_user_id = ?
+       AND NOT EXISTS (
+         SELECT 1
+           FROM social_user_interactions b
+          WHERE b.relation_type = 'block'
+            AND (
+              (b.actor_user_id = ? AND b.target_user_id = f.target_user_id)
+              OR
+              (b.actor_user_id = f.target_user_id AND b.target_user_id = ?)
+            )
+       )
+       AND NOT EXISTS (
+         SELECT 1
+           FROM social_user_interactions m
+          WHERE m.relation_type = 'mute'
+            AND m.actor_user_id = ?
+            AND m.target_user_id = f.target_user_id
+       )
+     ORDER BY f.created_at DESC, f.target_user_id DESC
+     LIMIT ?`).bind(
+       viewerId,
+       viewerId,
+       viewerId,
+       viewerId,
+       MAX_FOLLOWING_FEED_AUTHORS + 1,
+     ).all<{ user_id: string }>()
+
+  const rows = result.results ?? []
+  return {
+    items: rows.slice(0, MAX_FOLLOWING_FEED_AUTHORS)
+      .map((row) => ({ userId: row.user_id })),
+    candidateWindowTruncated: rows.length > MAX_FOLLOWING_FEED_AUTHORS,
+  }
+}
+
 export async function follow(db: D1Database, followerUserId: string, targetUserId: string): Promise<FollowRow> {
   const follower = userId(followerUserId)
   const target = userId(targetUserId)

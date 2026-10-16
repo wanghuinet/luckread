@@ -1,0 +1,46 @@
+name: W04 Following Feed CI
+
+on:
+  pull_request:
+    paths:
+      - "workers/W04-feed-search/**"
+      - "workers/W01-payload/tests/int/following-feed-v1-adapter.int.spec.ts"
+      - ".github/workflows/w04-following-feed-ci.yml"
+  push:
+    branches: ["main"]
+    paths:
+      - "workers/W04-feed-search/**"
+      - ".github/workflows/w04-following-feed-ci.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  following-feed:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install locked repository dependencies
+        run: npm ci
+
+      - name: Run W04 Following and AUTH-013 tests
+        run: >-
+          npx --no-install vitest run
+          workers/W04-feed-search/src/auth-013-projection.test.ts
+          workers/W04-feed-search/src/following-feed.test.ts
+
+      - name: Typecheck W04 feed runtime
+        run: >-
+          npx --no-install tsc --noEmit --strict --skipLibCheck
+          --target ES2022 --module ESNext --moduleResolution Bundler
+          --lib ES2022,DOM,DOM.Iterable --types @cloudflare/workers-types
+          workers/W04-feed-search/src/auth-013-projection.ts
+          workers/W04-feed-search/src/index.ts

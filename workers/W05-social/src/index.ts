@@ -29,6 +29,7 @@ import {
   invalidateFollowListCountCache,
   listFollowers,
   listFollowing,
+  listFollowingAuthorIds,
   parseFollowListLimit,
   unfollow,
 } from './follow-runtime.js'
@@ -88,6 +89,23 @@ const requirePrincipal = (request: Request): string => {
   requireTransport(request)
   const id = request.headers.get('X-LuckRead-Principal-User-Id')?.trim() ?? ''
   if (!id) throw new FollowRuntimeError('UNAUTHENTICATED', 401)
+  return id
+}
+
+const requireFollowingFeedPrincipal = (request: Request): string => {
+  if (
+    request.headers.get('X-LuckRead-Caller') !== 'W04' ||
+    request.headers.get('X-LuckRead-Transport-Version') !== '1.0' ||
+    !request.headers.get('X-LuckRead-Correlation-Id')?.trim() ||
+    request.headers.has('Authorization') ||
+    request.headers.has('Cookie')
+  ) {
+    throw new FollowRuntimeError('PERMISSION_DENIED', 403)
+  }
+  const id = request.headers.get('X-LuckRead-Principal-User-Id')?.trim() ?? ''
+  if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(id)) {
+    throw new FollowRuntimeError('UNAUTHENTICATED', 401)
+  }
   return id
 }
 
@@ -592,6 +610,18 @@ export default {
         }
         await unlike(env.DB, viewerUserId, target)
         return new Response(null, { status: 204 })
+      }
+
+      if (url.pathname === '/internal/social/feed/following-authors') {
+        if (request.method !== 'GET') {
+          return new Response(null, { status: 405, headers: { Allow: 'GET' } })
+        }
+        if (url.search !== '') {
+          throw new FollowRuntimeError('VALIDATION_FAILED', 400)
+        }
+        const viewerUserId = requireFollowingFeedPrincipal(request)
+        const candidates = await listFollowingAuthorIds(env.DB, viewerUserId)
+        return json({ data: candidates, requestId: createRequestId() })
       }
 
       const path = parseFollowPath(url.pathname)

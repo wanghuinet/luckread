@@ -655,6 +655,118 @@ export async function listContents(
   }
 }
 
+
+type FollowingContentsCursor = {
+  version: 1
+  viewerUserId: string
+  scopeHash: string
+  createdAt: string
+  id: string
+}
+
+const encodeFollowingContentsCursor = (cursor: FollowingContentsCursor): string =>
+  btoa(JSON.stringify(cursor)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '')
+
+const decodeFollowingContentsCursor = (
+  value: string | null,
+  viewerUserId: string,
+  scopeHash: string,
+): FollowingContentsCursor | null => {
+  if (!value) return null
+  if (value.length > 2048 || !/^[A-Za-z0-9_-]+$/.test(value)) {
+    throw new ContentRuntimeError('INVALID_CURSOR', 400)
+  }
+  try {
+    const padded = value.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - value.length % 4) % 4)
+    const parsed = JSON.parse(atob(padded)) as Partial<FollowingContentsCursor>
+    if (
+      parsed.version !== 1 ||
+      parsed.viewerUserId !== viewerUserId ||
+      parsed.scopeHash !== scopeHash ||
+      typeof parsed.createdAt !== 'string' ||
+      !Number.isFinite(Date.parse(parsed.createdAt)) ||
+      typeof parsed.id !== 'string' ||
+      !/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(parsed.id)
+    ) {
+      throw new Error('invalid following cursor')
+    }
+    return {
+      version: 1,
+      viewerUserId,
+      scopeHash,
+      createdAt: parsed.createdAt,
+      id: parsed.id,
+    }
+  } catch {
+    throw new ContentRuntimeError('INVALID_CURSOR', 400)
+  }
+}
+
+export async function listFollowingOwnerContents(
+  db: ContentD1,
+  viewerUserId: string,
+  followedOwnerIdsInput: string[],
+  cursorValue: string | null,
+  limit: number,
+): Promise<{ items: ContentRecord[]; nextCursor: string | null; hasMore: boolean }> {
+  const viewerId = viewerUserId.trim()
+  assertResourceId(viewerId)
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > 50) {
+    throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+  }
+  const ownerIds = [...new Set(followedOwnerIdsInput.map((id) => id.trim()))].sort()
+  if (ownerIds.length < 1 || ownerIds.length > 500) {
+    throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+  }
+  for (const ownerId of ownerIds) assertResourceId(ownerId)
+
+  const scopeHash = await sha256Hex(JSON.stringify({
+    type: 'following-feed',
+    viewerUserId: viewerId,
+    ownerIds,
+  }))
+  const cursor = decodeFollowingContentsCursor(cursorValue, viewerId, scopeHash)
+  const cursorClause = cursor
+    ? 'AND (c.created_at < ? OR (c.created_at = ? AND c.id < ?))'
+    : ''
+  const cursorBindings: unknown[] = cursor
+    ? [cursor.createdAt, cursor.createdAt, cursor.id]
+    : []
+  const ownerIdsJson = JSON.stringify(ownerIds)
+  const rows = await db.prepare(`
+    SELECT c.id, c.content_type, c.owner_user_id, c.creator_id, c.ip_id, c.state,
+           c.scheduled_at, c.version, c.revision, c.slug, c.title, c.body_ref,
+           c.media_refs_json, c.cover_ref, c.etag, c.created_at, c.updated_at
+      FROM contents c
+     WHERE c.state = 'PUBLISHED'
+       AND c.owner_user_id IN (SELECT value FROM json_each(?))
+       ${cursorClause}
+     ORDER BY c.created_at DESC, c.id DESC
+     LIMIT ?`).bind(
+       ownerIdsJson,
+       ...cursorBindings,
+       limit + 1,
+     ).all<ContentRow>()
+
+  const sourceRows = rows.results ?? []
+  const hasMore = sourceRows.length > limit
+  const items = sourceRows.slice(0, limit).map(toContent)
+  const last = items.at(-1)
+  return {
+    items,
+    hasMore,
+    nextCursor: hasMore && last
+      ? encodeFollowingContentsCursor({
+          version: 1,
+          viewerUserId: viewerId,
+          scopeHash,
+          createdAt: last.createdAt,
+          id: last.id,
+        })
+      : null,
+  }
+}
+
 export async function createContent(
   db: ContentD1,
   ownerUserId: string,
