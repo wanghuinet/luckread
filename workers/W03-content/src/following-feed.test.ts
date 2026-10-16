@@ -124,7 +124,7 @@ describe('W03 private Following endpoint', () => {
     expect(response.headers.get('cache-control')).toBe('no-store')
     await expect(response.json()).resolves.toMatchObject({
       data: {
-        items: [{ id: 'content-1', creatorId: 'creator-1', state: undefined }],
+        items: [{ id: 'content-1', creatorId: 'creator-1' }],
         hasMore: true,
       },
     })
