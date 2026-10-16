@@ -112,3 +112,65 @@ describe('W04 Following feed runtime boundary', () => {
     expect(contentFetch).toHaveBeenCalledTimes(1)
   })
 })
+
+describe('W04 Following AUTH-013 eligibility', () => {
+  it('excludes ineligible followed authors and denies a viewer whose account is banned', async () => {
+    const record = (userId: string, accountState: 'ACTIVE' | 'RESTRICTED' | 'BANNED') => ({
+      schemaVersion: 1,
+      resourceType: 'User',
+      resourceId: userId,
+      sourceAuthority: 'D1-01',
+      sourceVersion: 1,
+      eventId: 'evt_' + userId,
+      projectionVersion: 1,
+      accountState,
+      state: accountState === 'BANNED' ? 'PURGED' : 'ACTIVE',
+      deindex: accountState === 'BANNED',
+      createdAt: '2026-10-16T00:00:00.000Z',
+      staleAfter: '2099-10-16T00:00:00.000Z',
+      policyVersion: 'AUTH-013-v1',
+    })
+    const projections = new Map<string, unknown>([
+      ['auth013:projection:User:viewer-1', record('viewer-1', 'ACTIVE')],
+      ['auth013:projection:User:creator-active', record('creator-active', 'ACTIVE')],
+      ['auth013:projection:User:creator-restricted', record('creator-restricted', 'RESTRICTED')],
+    ])
+    const socialFetch = vi.fn(async () => Response.json({
+      data: {
+        items: [{ userId: 'creator-active' }, { userId: 'creator-restricted' }],
+        candidateWindowTruncated: false,
+      },
+    }))
+    const contentFetch = vi.fn(async (input: RequestInfo | URL) => {
+      const request = input instanceof Request ? input : new Request(input)
+      const body = await request.json() as { ownerUserIds?: string[] }
+      expect(body.ownerUserIds).toEqual(['creator-active'])
+      return Response.json({ data: { items: [], nextCursor: null, hasMore: false } })
+    })
+    const env = {
+      AUTH013_W04_DERIVED_PROJECTION: {
+        get: async (key: string): Promise<unknown> => projections.get(key) ?? null,
+        put: async (_key: string, _value: string): Promise<void> => undefined,
+      },
+      W05_SOCIAL: { fetch: socialFetch },
+      W03_CONTENT: { fetch: contentFetch },
+    }
+    const request = () => new Request('https://luckread-w04.internal/internal/feed/following?limit=6', {
+      headers: {
+        'X-LuckRead-Caller': 'W01',
+        'X-LuckRead-Transport-Version': '1.0',
+        'X-LuckRead-Correlation-Id': 'w04-following-auth013-test',
+        'X-LuckRead-Principal-User-Id': 'viewer-1',
+        'X-LuckRead-Principal-Layer': 'L1',
+      },
+    })
+    const allowed = await w04Worker.fetch(request(), env)
+    expect(allowed.status).toBe(200)
+    expect(contentFetch).toHaveBeenCalledTimes(1)
+
+    projections.set('auth013:projection:User:viewer-1', record('viewer-1', 'BANNED'))
+    const denied = await w04Worker.fetch(request(), env)
+    expect(denied.status).toBe(403)
+    expect(socialFetch).toHaveBeenCalledTimes(1)
+  })
+})
