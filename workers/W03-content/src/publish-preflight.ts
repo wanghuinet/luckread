@@ -575,7 +575,7 @@ export const preflightContent = (rawInput: unknown): PublishPreflightResult => {
   if (input.contentType !== 'post' && title.length > 70) {
     addFinding(findings, 'SEO-TITLE-LONG', 'WARN', 'SEO', '标题偏长', '标题较长，搜索结果中的标题链接可能被截断。', '保留真正重要的信息，删除重复修饰词。')
   }
-  if (!/[\p{L}\p{N}]/u.test(title) || /(.)\1{7,}/u.test(title)) {
+  if (input.contentType !== 'post' && (!/[\p{L}\p{N}]/u.test(title) || /(.)\1{7,}/u.test(title))) {
     addFinding(findings, 'SEO-TITLE-NOISE', 'BLOCK', 'SEO', '标题含明显乱码/重复字符', '标题缺少可识别的文字或数字，或存在异常重复字符，影响可读性与可信度。', '重写为自然、明确、可理解的标题。')
   }
 
@@ -670,7 +670,7 @@ export const preflightContent = (rawInput: unknown): PublishPreflightResult => {
     addFinding(findings, 'QUALITY-BOILERPLATE', 'WARN', 'QUALITY', '模板化套话较多', '开头或结尾存在较多泛化套话，容易让文章缺少真实信息密度。', '直接进入事实、经验、数据和结论，减少空泛铺垫。')
   }
 
-  if (title.length >= 2) {
+  if (input.contentType !== 'post' && title.length >= 2) {
     const relevant = titleSignals(title).some(signal => bodyLower.includes(signal.toLowerCase()))
     if (!relevant) {
       addFinding(findings, 'SEO-TOPIC-MISMATCH', 'WARN', 'SEO', '标题主题在正文中缺少对应信息', '标题中的主要词组在正文中几乎没有出现，存在题文相关性风险。', '确保正文真正回答标题所承诺的问题，不要为搜索词单独拼接标题。')
