@@ -72,16 +72,29 @@ export async function bindPreflightToStoredPost(
     return makeErrorResponse(422, 'VALIDATION_FAILED', 'Stored post content is incomplete')
   }
 
-  const bodyUrl = resolvePublicArticleBodyUrl(content.bodyRef, new URL(request.url).origin)
+  const requestUrl = new URL(request.url)
+  const bodyUrl = resolvePublicArticleBodyUrl(content.bodyRef, requestUrl.origin)
   if (!bodyUrl) {
     return makeErrorResponse(422, 'VALIDATION_FAILED', 'Stored post body reference is not a trusted LuckRead asset')
+  }
+
+  const resolvedBodyUrl = new URL(bodyUrl)
+  const assetHeaders = new Headers({ accept: 'text/plain' })
+  // Payload media is private to its owner. The same-origin fetch must carry
+  // the current Better Auth credential so Payload's auth strategy can enforce
+  // that ownership. Never forward credentials to a CDN or other subdomain.
+  if (resolvedBodyUrl.origin === requestUrl.origin) {
+    const authorization = request.headers.get('authorization')
+    const cookie = request.headers.get('cookie')
+    if (authorization) assetHeaders.set('authorization', authorization)
+    if (cookie) assetHeaders.set('cookie', cookie)
   }
 
   let assetResponse: Response
   try {
     assetResponse = await fetch(bodyUrl, {
       method: 'GET',
-      headers: { accept: 'text/plain' },
+      headers: assetHeaders,
       redirect: 'manual',
     })
   } catch {

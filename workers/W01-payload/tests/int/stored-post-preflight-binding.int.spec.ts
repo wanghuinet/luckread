@@ -12,8 +12,8 @@ const callW03ContentMock = vi.mocked(callW03Content)
 const makeErrorResponse = (status: number, code: string, message: string): Response =>
   Response.json({ error: { code, message } }, { status })
 
-const makeRequest = () =>
-  new Request('https://api.luckread.com/api/v1/contents/post-1/state', { method: 'POST' })
+const makeRequest = (headers?: HeadersInit) =>
+  new Request('https://api.luckread.com/api/v1/contents/post-1/state', { method: 'POST', headers })
 
 const principal = { userId: 'author-1', layer: 'L3' }
 
@@ -82,6 +82,60 @@ describe('bind direct social post publishing to the stored body asset', () => {
     expect(result.preflight.mediaRefs).toEqual(['https://cdn.luckread.com/media/photo.png'])
     expect(result.preflight.coverRef).toBeNull()
     expect(result.preflight.body).not.toBe(submitted.preflight.body)
+  })
+
+  it('forwards owner credentials for same-origin private Payload media reads', async () => {
+    callW03ContentMock.mockResolvedValue(new Response(JSON.stringify(storedPost({
+      bodyRef: '/api/media/file/post-body.txt',
+    })), { status: 200 }))
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response('authoritative body stored in private media', { status: 200 }),
+    )
+    const request = makeRequest({
+      authorization: 'Bearer creator-session-token',
+      cookie: 'better-auth.session_token=creator-session-cookie',
+    })
+
+    const result = await bindPreflightToStoredPost(
+      request,
+      'post-1',
+      principal,
+      submitted,
+      makeErrorResponse,
+    )
+    expect(result).not.toBeInstanceOf(Response)
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://api.luckread.com/api/media/file/post-body.txt',
+      expect.objectContaining({ method: 'GET', redirect: 'manual' }),
+    )
+    const init = fetchMock.mock.calls[0]?.[1]
+    const headers = new Headers(init?.headers)
+    expect(headers.get('authorization')).toBe('Bearer creator-session-token')
+    expect(headers.get('cookie')).toBe('better-auth.session_token=creator-session-cookie')
+  })
+
+  it('does not forward owner credentials to another LuckRead subdomain', async () => {
+    callW03ContentMock.mockResolvedValue(new Response(JSON.stringify(storedPost()), { status: 200 }))
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response('public CDN body', { status: 200 }),
+    )
+    const request = makeRequest({
+      authorization: 'Bearer creator-session-token',
+      cookie: 'better-auth.session_token=creator-session-cookie',
+    })
+
+    await bindPreflightToStoredPost(
+      request,
+      'post-1',
+      principal,
+      submitted,
+      makeErrorResponse,
+    )
+
+    const init = fetchMock.mock.calls[0]?.[1]
+    const headers = new Headers(init?.headers)
+    expect(headers.get('authorization')).toBeNull()
+    expect(headers.get('cookie')).toBeNull()
   })
 
   it('fails closed instead of fetching an untrusted bodyRef', async () => {
