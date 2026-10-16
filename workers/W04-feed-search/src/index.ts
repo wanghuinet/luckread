@@ -93,11 +93,19 @@ export default {
         try { followsPayload = JSON.parse(followsText) as typeof followsPayload } catch {
           return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Social service returned an invalid response', details: {} } }, 503)
         }
-        const candidateIds = Array.isArray(followsPayload.data?.items)
-          ? [...new Set(followsPayload.data.items.map((item) => item?.userId).filter((id): id is string =>
-              typeof id === 'string' && /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(id)))].slice(0, 500)
-          : []
-        const candidateWindowTruncated = followsPayload.data?.candidateWindowTruncated === true
+        if (
+          !Array.isArray(followsPayload.data?.items) ||
+          typeof followsPayload.data.candidateWindowTruncated !== 'boolean' ||
+          followsPayload.data.items.length > 500
+        ) {
+          return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Social service returned an invalid response', details: {} } }, 503)
+        }
+        const rawAuthorIds = followsPayload.data.items.map((item) => item?.userId)
+        if (rawAuthorIds.some((id) => typeof id !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(id))) {
+          return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Social service returned an invalid author ID', details: {} } }, 503)
+        }
+        const candidateIds = [...new Set(rawAuthorIds as string[])]
+        const candidateWindowTruncated = followsPayload.data.candidateWindowTruncated
         if (candidateIds.length === 0) {
           return json({ data: { items: [], nextCursor: null, hasMore: false, candidateWindowTruncated }, requestId: 'req_' + crypto.randomUUID() })
         }
@@ -127,9 +135,18 @@ export default {
         try { contentPayload = JSON.parse(contentText) as typeof contentPayload } catch {
           return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Content service returned an invalid response', details: {} } }, 503)
         }
+        const feedData = contentPayload.data
+        if (
+          !feedData ||
+          !Array.isArray(feedData.items) ||
+          typeof feedData.hasMore !== 'boolean' ||
+          (feedData.nextCursor !== null && typeof feedData.nextCursor !== 'string')
+        ) {
+          return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Content service returned an invalid feed page', details: {} } }, 503)
+        }
         return json({
           ...contentPayload,
-          data: { ...(contentPayload.data ?? {}), candidateWindowTruncated },
+          data: { ...feedData, candidateWindowTruncated },
         })
       } catch {
         return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Following feed service unavailable', details: {} } }, 503)
