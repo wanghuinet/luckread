@@ -9,9 +9,9 @@ import { resolveSocialPostMedia } from '../../../../lib/social-post-media.js'
 import type { PublicLocale } from '../../i18n/public-locale'
 
 /**
- * Shared social post adapter. The default presentation preserves the existing LuckRead
- * content-card surface; `x-timeline` reuses the Tweet row hierarchy from the authorized
- * ccrsxx/twitter-clone UI. All reads and mutations remain on LuckRead W01/W05 APIs.
+ * UI structure adapted from ccrsxx/twitter-clone's Tweet, TweetStats and user
+ * components (MIT). The default LuckRead content-card surface remains available; the
+ * X timeline presentation uses LuckRead W01/W05 APIs for all reads and mutations.
  */
 type ContentDetail = {
   id?: string
