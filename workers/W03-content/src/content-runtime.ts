@@ -1248,7 +1248,16 @@ export async function transitionContentState(
     }
     let report
     try {
-      report = preflightContent(normalizePreflightInput(options.preflight))
+      const preflightInput = normalizePreflightInput(options.preflight)
+      const rawPreflight = options.preflight as Record<string, unknown>
+      if (
+        preflightInput.contentType !== content.contentType ||
+        typeof rawPreflight.title !== 'string' ||
+        rawPreflight.title.trim() !== content.title
+      ) {
+        throw new Error('PREFLIGHT_CONTENT_MISMATCH')
+      }
+      report = preflightContent(preflightInput)
     } catch {
       throw new ContentRuntimeError('VALIDATION_FAILED', 400)
     }
