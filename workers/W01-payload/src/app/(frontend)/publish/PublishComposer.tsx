@@ -328,7 +328,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
     markDirty()
   }
 
-  const reviewLocked = draft?.state === 'PENDING_REVIEW'
+  const reviewLocked = draft?.state === 'PENDING_REVIEW' || (type === 'post' && draft?.state === 'PUBLISHED')
 
   const stateLabel = draft?.state === 'DRAFT'
     ? '草稿已保存'
@@ -608,8 +608,11 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
       aiMode,
       humanContribution: humanConfirmed ? 'substantial' : 'light',
     }
+    const preflightBasePath = contentBasePath === '/api/v1/contents'
+      ? '/api/creator/contents'
+      : contentBasePath
     const { response, data: report } = await authorizedFetch<PublishPreflightResult | { error?: { message?: string } }>(
-      contentBasePath + '/' + encodeURIComponent(savedDraft.id) + '/preflight',
+      preflightBasePath + '/' + encodeURIComponent(savedDraft.id) + '/preflight',
       {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -715,7 +718,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
     try {
       const { report, input, draft: savedDraft } = await runPreflight()
       if (report.verdict === 'RED') return
-      if (report.verdict === 'YELLOW') {
+      if (type !== 'post' && report.verdict === 'YELLOW') {
         const warnings = report.findings.filter((item) => item.severity === 'WARN').slice(0, 4).map((item) => '• ' + item.title).join('\\n')
         if (!window.confirm(report.summary + '\\n\\n建议先处理：\\n' + warnings + '\\n\\n确认仍然提交审核吗？')) return
       }
@@ -728,7 +731,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
             'If-Match': savedDraft.etag,
             'Idempotency-Key': crypto.randomUUID(),
           },
-          body: JSON.stringify({ to: 'PENDING_REVIEW', preflight: input }),
+          body: JSON.stringify({ to: type === 'post' ? 'PUBLISHED' : 'PENDING_REVIEW', preflight: input }),
         },
       )
       if (!response.ok) throw new Error(getApiErrorMessage(data, 'SUBMIT_FAILED'))
@@ -741,7 +744,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
       autoSaveDirtyRef.current = false
       window.dispatchEvent(new Event(CONTENT_MUTATED_EVENT))
       setMessage(type === 'post'
-        ? '动态已提交审核；审核通过并正式发布后会出现在公开信息流。'
+        ? '动态已发布，已进入公开信息流。'
         : '发布前检查通过，已提交审核。审核通过后将进入正式发布状态。')
     } catch (caught) {
       const code = caught instanceof Error ? caught.message : ''
@@ -1074,7 +1077,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
       <div className="lr-actions">
         {isTweetModal ? (
           <>
-            {draft?.state === 'PENDING_REVIEW' ? (
+            {draft?.state === 'PENDING_REVIEW' || (type === 'post' && draft?.state === 'PUBLISHED') ? (
               <button className="secondary" disabled={busy} onClick={startNewContent} type="button">新建内容</button>
             ) : null}
             {draft?.state === 'DRAFT' ? (
@@ -1083,13 +1086,13 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
             <button className="secondary" disabled={busy || autoSaveStatus === 'saving'} onClick={saveDraft} type="button">
               {busy ? '处理中…' : '保存草稿'}
             </button>
-            <button className="primary" disabled={busy || autoSaveStatus === 'saving' || draft?.state === 'PENDING_REVIEW'} onClick={submitForReview} type="button">
-              {busy ? '处理中…' : draft?.state === 'PENDING_REVIEW' ? '审核中…' : '提交审核'}
+            <button className="primary" disabled={busy || autoSaveStatus === 'saving' || reviewLocked} onClick={submitForReview} type="button">
+              {busy ? '处理中…' : draft?.state === 'PENDING_REVIEW' ? '审核中…' : type === 'post' && draft?.state === 'PUBLISHED' ? '已发布' : type === 'post' ? '发布动态' : '提交审核'}
             </button>
           </>
         ) : (
           <>
-            {draft?.state === 'PENDING_REVIEW' ? (
+            {draft?.state === 'PENDING_REVIEW' || (type === 'post' && draft?.state === 'PUBLISHED') ? (
               <button className="secondary" disabled={busy} onClick={startNewContent} type="button">
                 新建内容
               </button>
@@ -1118,8 +1121,8 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
             <button className="secondary" disabled={busy || autoSaveStatus === 'saving'} onClick={saveDraft} type="button">
               {busy ? '处理中…' : '保存草稿'}
             </button>
-            <button className="primary" disabled={busy || autoSaveStatus === 'saving' || draft?.state === 'PENDING_REVIEW'} onClick={submitForReview} type="button">
-              {busy ? '处理中…' : draft?.state === 'PENDING_REVIEW' ? '审核中…' : '提交发布'}
+            <button className="primary" disabled={busy || autoSaveStatus === 'saving' || reviewLocked} onClick={submitForReview} type="button">
+              {busy ? '处理中…' : draft?.state === 'PENDING_REVIEW' ? '审核中…' : type === 'post' && draft?.state === 'PUBLISHED' ? '已发布' : type === 'post' ? '发布动态' : '提交发布'}
             </button>
           </>
         )}
@@ -1127,8 +1130,8 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
 
       <p className="lr-note">
         {isTweetModal
-          ? '动态提交后会进入审核；审核通过并正式发布后才会出现在公开信息流。'
-          : '提交发布不会绕过审核：创建后先进入草稿；发布前由 W03 做质量、SEO、导流与 AI 创作规范检查，再按内容状态机进入审核和正式发布。'}
+          ? '普通动态通过 W03 风险检查后直接发布；需要人工处理的内容仍受平台规则约束。'
+          : '普通动态通过 W03 风险检查后直接发布；文章和视频仍按现有创作者审核流程发布。'}
       </p>
     </div>
   )
