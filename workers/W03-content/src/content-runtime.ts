@@ -917,6 +917,7 @@ export async function updateContent(
   idempotencyKey: string,
   now = new Date(),
   correlationId = 'runtime',
+  principalLayer?: string,
 ): Promise<ContentRecord> {
   assertResourceId(principalUserId)
   assertResourceId(contentId)
@@ -926,6 +927,9 @@ export async function updateContent(
   const operationId = 'updateContent'
   const hash = await requestHash(operationId, { contentId, input: normalized, ifMatch: normalizeEtag(ifMatch) })
   const { content, idempotency } = await loadMutationRow(db, contentId, operationId, idempotencyKey, principalUserId)
+  if (principalLayer === 'L2' && content && content.contentType !== 'post') {
+    throw new ContentRuntimeError('PERMISSION_DENIED', 403)
+  }
   const replay = inspectIdempotency(idempotency, principalUserId, hash, now)
   if (replay.replayed) {
     if (!replay.body) throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
@@ -1109,6 +1113,7 @@ export async function deleteContent(
   ifMatch: string,
   idempotencyKey: string,
   now = new Date(),
+  principalLayer?: string,
 ): Promise<void> {
   assertResourceId(principalUserId)
   assertResourceId(contentId)
@@ -1117,6 +1122,9 @@ export async function deleteContent(
   const operationId = 'deleteContent'
   const hash = await requestHash(operationId, { contentId, ifMatch: normalizeEtag(ifMatch) })
   const { content, idempotency } = await loadMutationRow(db, contentId, operationId, idempotencyKey, principalUserId)
+  if (principalLayer === 'L2' && content && content.contentType !== 'post') {
+    throw new ContentRuntimeError('PERMISSION_DENIED', 403)
+  }
   const replay = inspectIdempotency(idempotency, principalUserId, hash, now)
   if (replay.replayed) return
   if (!content) throw new ContentRuntimeError('NOT_FOUND', 404)
