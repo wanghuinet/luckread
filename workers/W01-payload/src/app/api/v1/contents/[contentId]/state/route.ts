@@ -53,7 +53,7 @@ const readBoundedUtf8 = async (response: Response, maxBytes = 16_384): Promise<s
     }
     return new TextDecoder('utf-8', { fatal: true }).decode(bytes)
   } catch {
-    await reader.cancel().catch(() => undefined)
+    await reader.cancel().catch((): undefined => undefined)
     return null
   }
 }
