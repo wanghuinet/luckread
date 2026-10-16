@@ -112,7 +112,7 @@ export default function LoginForm() {
       const requestedReturnTo = new URLSearchParams(window.location.search).get('returnTo')
       const returnTo = requestedReturnTo && requestedReturnTo.startsWith('/') && !requestedReturnTo.startsWith('//')
         ? requestedReturnTo
-        : '/publish'
+        : '/home'
       router.push(returnTo)
     } catch {
       setError('网络连接异常，登录请求未能完成。请检查网络后重试。')
@@ -122,31 +122,31 @@ export default function LoginForm() {
   }
 
   return (
-    <form className="lr-auth-form" onSubmit={submit} aria-busy={busy} noValidate>
-      {verifiedNotice ? <div className="lr-muted" role="status" aria-live="polite">{verifiedNotice}</div> : null}
-      <label>
+    <form className="grid gap-4" onSubmit={submit} aria-busy={busy} noValidate>
+      {verifiedNotice ? <div className="rounded-xl bg-main-sidebar-background p-3 text-sm text-light-secondary dark:text-dark-secondary" role="status" aria-live="polite">{verifiedNotice}</div> : null}
+      <label className="grid gap-2 text-sm font-semibold text-light-primary dark:text-dark-primary">
         邮箱
-        <input autoComplete="email" inputMode="email" onChange={(event) => setEmail(event.target.value)} placeholder="you@example.com" required type="email" value={email} />
+        <input autoComplete="email" inputMode="email" onChange={(event) => setEmail(event.target.value)} placeholder="you@example.com" required type="email" value={email} className="w-full rounded-md border border-light-line-reply bg-main-background px-3 py-3 text-base text-light-primary outline-none transition focus-visible:ring-2 focus-visible:ring-main-accent/80 dark:border-dark-border dark:text-dark-primary" />
       </label>
-      <label>
+      <label className="grid gap-2 text-sm font-semibold text-light-primary dark:text-dark-primary">
         密码
-        <input autoComplete="current-password" onChange={(event) => setPassword(event.target.value)} placeholder="输入密码" required type="password" value={password} />
+        <input autoComplete="current-password" onChange={(event) => setPassword(event.target.value)} placeholder="Enter your password" required type="password" value={password} className="w-full rounded-md border border-light-line-reply bg-main-background px-3 py-3 text-base text-light-primary outline-none transition focus-visible:ring-2 focus-visible:ring-main-accent/80 dark:border-dark-border dark:text-dark-primary" />
       </label>
-      {error ? <div className="lr-error" role="alert" aria-live="assertive">{error}</div> : null}
+      {error ? <div className="rounded-xl border border-accent-red/20 bg-accent-red/10 p-3 text-sm text-accent-red" role="alert" aria-live="assertive">{error}</div> : null}
       {needsVerification ? (
         <div role="group" aria-label="邮箱验证">
-          <button type="button" disabled={verificationBusy} onClick={() => void resendVerification()}>
+          <button className="rounded-full border border-light-line-reply px-4 py-2 text-sm font-bold text-main-accent hover:bg-main-accent/10 disabled:opacity-50 dark:border-dark-border" type="button" disabled={verificationBusy} onClick={() => void resendVerification()}>
             {verificationBusy ? '正在发送…' : '重新发送验证邮件'}
           </button>
-          {verificationMessage ? <div className="lr-muted" role="status" aria-live="polite">{verificationMessage}</div> : null}
+          {verificationMessage ? <div className="rounded-xl bg-main-sidebar-background p-3 text-sm text-light-secondary dark:text-dark-secondary" role="status" aria-live="polite">{verificationMessage}</div> : null}
         </div>
       ) : null}
-      <button aria-busy={busy} disabled={busy} type="submit">{busy ? '登录中…' : '登录'}</button>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
-        <Link className="lr-link" href="/forgot-password">忘记密码？</Link>
-        <Link className="lr-link" href="/register">还没有账号？立即注册</Link>
+      <button className="rounded-full bg-main-accent px-4 py-3 font-bold text-white transition hover:brightness-90 disabled:cursor-wait disabled:opacity-60" aria-busy={busy} disabled={busy} type="submit">{busy ? '登录中…' : '登录'}</button>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Link className="text-center text-sm text-main-accent hover:underline" href="/forgot-password">忘记密码？</Link>
+        <Link className="text-center text-sm text-main-accent hover:underline" href="/register">还没有账号？立即注册</Link>
       </div>
-      <Link className="lr-link" href="/verify-email">收不到验证邮件？点此重发</Link>
+      <Link className="text-center text-sm text-main-accent hover:underline" href="/verify-email">收不到验证邮件？点此重发</Link>
     </form>
   )
 }

@@ -1,11 +1,11 @@
 import { expect, test } from '@playwright/test'
 
-test('renders the LuckRead public homepage experience', async ({ page }) => {
+test('renders the reused Twitter Clone landing experience on LuckRead', async ({ page }) => {
   await page.goto('http://127.0.0.1:3000/')
 
   await expect(page).toHaveTitle(/LuckRead/)
-  await expect(page.locator('h1')).toContainText('让好内容被看见')
-  await expect(page.locator('a.header-creator')).toHaveAttribute('href', 'https://mp.luckread.com/')
-  await expect(page.getByRole('link', { name: /立即创作/ })).toHaveAttribute('href', 'https://mp.luckread.com/')
-  await expect(page.getByText('发现 · 创作 · 连接')).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: '正在发生的事' })).toBeVisible()
+  await expect(page.getByRole('link', { name: '使用邮箱注册' })).toHaveAttribute('href', '/register')
+  await expect(page.getByRole('link', { name: '登录' }).first()).toHaveAttribute('href', '/login')
+  await expect(page.getByRole('link', { name: '发现内容' })).toHaveAttribute('href', '/content')
 })
