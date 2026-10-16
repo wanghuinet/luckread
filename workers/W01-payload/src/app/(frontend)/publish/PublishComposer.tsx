@@ -425,9 +425,11 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
       setSavedBody(body)
       if (nextSavedArticleSerialized !== null) setSavedArticleSerialized(nextSavedArticleSerialized)
       autoSaveLastSavedAtRef.current = Date.now()
-      const nextUrl = new URL(window.location.href)
-      nextUrl.searchParams.set('draft', saved.id)
-      window.history.replaceState(null, '', nextUrl.pathname + nextUrl.search + nextUrl.hash)
+      if (!isTweetModal) {
+        const nextUrl = new URL(window.location.href)
+        nextUrl.searchParams.set('draft', saved.id)
+        window.history.replaceState(null, '', nextUrl.pathname + nextUrl.search + nextUrl.hash)
+      }
       return saved
     } catch (error) {
       if (rollbackBodyAssetId) await cleanupUploadedBodyAsset(rollbackBodyAssetId)
@@ -551,9 +553,11 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
     autoSaveDirtyRef.current = false
     autoSaveLastSavedAtRef.current = null
     setAutoSaveStatus('idle')
-    const nextUrl = new URL(window.location.href)
-    nextUrl.searchParams.delete('draft')
-    window.history.replaceState(null, '', nextUrl.pathname + nextUrl.search + nextUrl.hash)
+    if (!isTweetModal) {
+      const nextUrl = new URL(window.location.href)
+      nextUrl.searchParams.delete('draft')
+      window.history.replaceState(null, '', nextUrl.pathname + nextUrl.search + nextUrl.hash)
+    }
     setMessage('已准备新的内容草稿。')
     setError('')
   }
@@ -685,9 +689,11 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
       setBody('')
       setAssets([])
       setCoverRef('')
-      const nextUrl = new URL(window.location.href)
-      nextUrl.searchParams.delete('draft')
-      window.history.replaceState(null, '', nextUrl.pathname + nextUrl.search + nextUrl.hash)
+      if (!isTweetModal) {
+        const nextUrl = new URL(window.location.href)
+        nextUrl.searchParams.delete('draft')
+        window.history.replaceState(null, '', nextUrl.pathname + nextUrl.search + nextUrl.hash)
+      }
       window.dispatchEvent(new Event(CONTENT_MUTATED_EVENT))
       setMessage('草稿已放弃。')
     } catch (caught) {
