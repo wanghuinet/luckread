@@ -34,8 +34,10 @@ describe('W04 Following feed serving route', () => {
       const request = input instanceof Request ? input : new Request(input)
       const url = new URL(request.url)
       expect(url.pathname).toBe('/internal/content/following-feed')
-      expect(url.searchParams.get('creatorIds')).toBe('creator-1,creator-2')
-      expect(url.searchParams.get('limit')).toBe('6')
+      expect(request.method).toBe('POST')
+      const payload = await request.json() as { creatorIds?: string[]; limit?: number }
+      expect(payload.creatorIds).toEqual(['creator-1', 'creator-2'])
+      expect(payload.limit).toBe(6)
       expect(request.headers.get('X-LuckRead-Caller')).toBe('W04')
       expect(request.headers.get('X-LuckRead-Principal-User-Id')).toBe('viewer-1')
       expect(request.headers.has('Cookie')).toBe(false)
