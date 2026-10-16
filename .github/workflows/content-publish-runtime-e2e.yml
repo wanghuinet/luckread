@@ -100,6 +100,46 @@ jobs:
           }
           EOF
 
+      - name: Verify W03 D1 schema required by content mutations
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          WRANGLER_VERSION: ${{ env.WRANGLER_VERSION }}
+          DATABASE_NAME_W03: ${{ env.DATABASE_NAME_W03 }}
+        run: |
+          set -euo pipefail
+          SQL="SELECT 'contents' AS table_name, name AS column_name FROM pragma_table_info('contents')
+            UNION ALL SELECT 'content_revisions', name FROM pragma_table_info('content_revisions')
+            UNION ALL SELECT 'content_mutation_idempotency', name FROM pragma_table_info('content_mutation_idempotency')
+            UNION ALL SELECT 'content_txn_guard', name FROM pragma_table_info('content_txn_guard')
+            UNION ALL SELECT name, '__TABLE__' FROM sqlite_master
+              WHERE type='table' AND name IN ('contents','content_revisions','content_mutation_idempotency','content_txn_guard');"
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME_W03" --remote --json --config workers/W03-content/wrangler.jsonc --command "$SQL" > /tmp/w03-schema-preflight.json
+          node <<'NODE'
+          const fs = require('node:fs');
+          const parsed = JSON.parse(fs.readFileSync('/tmp/w03-schema-preflight.json', 'utf8'));
+          const rows = Array.isArray(parsed)
+            ? parsed.flatMap((item) => Array.isArray(item?.results) ? item.results : [])
+            : Array.isArray(parsed?.results) ? parsed.results : [];
+          const tables = new Set(rows.filter((row) => row.column_name === '__TABLE__').map((row) => row.table_name));
+          const requiredTables = ['contents', 'content_revisions', 'content_mutation_idempotency', 'content_txn_guard'];
+          const requirements = {
+            contents: ['id', 'content_type', 'owner_user_id', 'state', 'version', 'revision', 'slug', 'title', 'body_ref', 'media_refs_json', 'cover_ref', 'etag', 'created_at', 'updated_at'],
+            content_revisions: ['id', 'content_id', 'revision', 'content_version', 'actor_user_id', 'source_revision', 'operation', 'state', 'slug', 'title', 'body_ref', 'media_refs_json', 'cover_ref', 'etag', 'reason', 'correlation_id', 'created_at'],
+            content_mutation_idempotency: ['id', 'owner_user_id', 'operation_id', 'idempotency_key', 'request_hash', 'status', 'response_status', 'response_json', 'created_at', 'expires_at'],
+            content_txn_guard: ['id', 'successful'],
+          };
+          const missingTables = requiredTables.filter((table) => !tables.has(table));
+          const missingColumns = Object.entries(requirements).flatMap(([table, columns]) => {
+            const present = new Set(rows.filter((row) => row.table_name === table && row.column_name !== '__TABLE__').map((row) => row.column_name));
+            return columns.filter((column) => !present.has(column)).map((column) => table + '.' + column);
+          });
+          if (missingTables.length || missingColumns.length) {
+            throw new Error('W03 D1 schema is behind the deployed content runtime; missing tables=' + JSON.stringify(missingTables) + ', missing columns=' + JSON.stringify(missingColumns) + '. Apply only the admitted W03 migrations through the approved deployment workflow before rerunning E2E.');
+          }
+          console.log('W03_D1_CONTENT_MUTATION_SCHEMA=PASS');
+          NODE
+
       - name: Setup native moderator fixture
         env:
           AUTH_BASE_URL: ${{ inputs.content_api_base_url }}
@@ -195,6 +235,20 @@ jobs:
           console.log(JSON.stringify({ creatorUserId: userId, emailVerified: user.emailVerified, nativeSessionHeaderPresent: true }));
           NODE
 
+      - name: Probe authenticated W01-to-W03 content route
+        run: |
+          set -euo pipefail
+          set +e
+          status="$(curl --silent --show-error --output /tmp/w03-content-probe.json --write-out '%{http_code}' -H "Authorization: Bearer $CREATOR_TOKEN" "$CONTENT_API_BASE_URL/api/v1/contents")"
+          curl_exit=$?
+          set -e
+          if [ "$curl_exit" -ne 0 ] || [ "$status" != "200" ]; then
+            echo "::error::Authenticated W01-to-W03 content route probe failed: HTTP $status (curl exit $curl_exit)"
+            node -e 'const fs=require("node:fs"); const raw=fs.readFileSync("/tmp/w03-content-probe.json","utf8"); let v; try { v=JSON.parse(raw) } catch {} const error=v?.error; console.error(JSON.stringify({errorCode:error?.code??null,errorMessage:error?.message??null,requestId:v?.requestId??null,nonJsonBody:error?undefined:raw.slice(0,240)}))'
+            exit 1
+          fi
+          echo "W01_TO_W03_AUTHENTICATED_CONTENT_READ=PASS"
+
       - name: Upload authoritative social post body asset
         run: |
           set -euo pipefail
@@ -225,7 +279,15 @@ jobs:
       - name: Create article through public API
         run: |
           set -euo pipefail
-          curl --silent --show-error --fail-with-body             -X POST             -H "Authorization: Bearer $CREATOR_TOKEN"             -H "Content-Type: application/json"             -H "Idempotency-Key: CONTENT-E2E-$GITHUB_RUN_ID-ARTICLE-CREATE"             --data '{"contentType":"article","title":"Content E2E Article","bodyRef":"r2://content-e2e/'"$GITHUB_RUN_ID"'/article","mediaRefs":[],"coverRef":null}'             "$CONTENT_API_BASE_URL/api/v1/contents" > /tmp/article-create.json
+          set +e
+          article_status="$(curl --silent --show-error --output /tmp/article-create.json --write-out '%{http_code}'             -X POST             -H "Authorization: Bearer $CREATOR_TOKEN"             -H "Content-Type: application/json"             -H "Idempotency-Key: CONTENT-E2E-$GITHUB_RUN_ID-ARTICLE-CREATE"             --data '{"contentType":"article","title":"Content E2E Article","bodyRef":"r2://content-e2e/'"$GITHUB_RUN_ID"'/article","mediaRefs":[],"coverRef":null}'             "$CONTENT_API_BASE_URL/api/v1/contents")"
+          article_curl_exit=$?
+          set -e
+          if [ "$article_curl_exit" -ne 0 ] || [ "$article_status" != "201" ]; then
+            echo "::error::Article creation failed: HTTP $article_status (curl exit $article_curl_exit)"
+            node -e 'const fs=require("node:fs"); const raw=fs.readFileSync("/tmp/article-create.json","utf8"); let v; try { v=JSON.parse(raw) } catch {} const error=v?.error; console.error(JSON.stringify({errorCode:error?.code??null,errorMessage:error?.message??null,requestId:v?.requestId??null,nonJsonBody:error?undefined:raw.slice(0,240)}))'
+            exit 1
+          fi
 
           node <<'NODE'
           const fs = require('node:fs');
