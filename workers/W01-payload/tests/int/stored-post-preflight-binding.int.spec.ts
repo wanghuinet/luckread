@@ -37,7 +37,7 @@ const storedPost = (overrides: Record<string, unknown> = {}) => ({
   title: 'authoritative stored title',
   bodyRef: 'https://cdn.luckread.com/media/post-body.txt',
   mediaRefs: ['https://cdn.luckread.com/media/photo.png'],
-  coverRef: null,
+  coverRef: null as string | null,
   ...overrides,
 })
 
