@@ -24,7 +24,7 @@ env:
 
 jobs:
   migrate:
-    if: ${{ inputs.confirm == 'APPLY_SOCIAL_013_MIGRATION' }}
+    if: ${{ github.ref == 'refs/heads/main' && inputs.confirm == 'APPLY_SOCIAL_013_MIGRATION' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -111,6 +111,23 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: npx --yes "wrangler@$WRANGLER_VERSION" d1 migrations apply "$EXPECTED_DB_NAME" --remote --config wrangler.jsonc
+
+      - name: Verify applied migration record
+        working-directory: workers/W05-social
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$EXPECTED_DB_NAME" --remote --json --config wrangler.jsonc --command "SELECT name FROM d1_migrations WHERE name = '20261016_013_social_repost_pin_v1.sql';" > /tmp/social-013-applied.json
+          python - <<'PY'
+          import json
+          data = json.load(open('/tmp/social-013-applied.json'))
+          rows = [row for item in data for row in item.get('results', [])] if isinstance(data, list) else data.get('results', [])
+          if not any(row.get('name') == '20261016_013_social_repost_pin_v1.sql' for row in rows):
+              raise SystemExit('SOCIAL-013 migration record missing after apply')
+          print('SOCIAL_013_MIGRATION_APPLIED=PASS')
+          PY
 
       - name: Verify remote repost and pin schema
         working-directory: workers/W05-social
