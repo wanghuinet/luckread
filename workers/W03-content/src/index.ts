@@ -247,7 +247,7 @@ const worker = {
         ) {
           throw new ContentRuntimeError('PERMISSION_DENIED', 403)
         }
-        if ([...url.searchParams.keys()].length > 0) {
+        if (url.search !== '') {
           throw new ContentRuntimeError('VALIDATION_FAILED', 400)
         }
         const viewerUserId = request.headers.get('X-LuckRead-Principal-User-Id')?.trim() ?? ''
