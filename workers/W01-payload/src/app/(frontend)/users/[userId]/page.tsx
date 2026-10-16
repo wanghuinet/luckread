@@ -253,7 +253,6 @@ export default function PublicProfilePage({
               if (
                 pinnedDetail.response.ok &&
                 pinnedItem?.id === nextPinnedContentId &&
-                pinnedItem.creatorId === userId &&
                 pinnedItem.contentType === 'post'
               ) {
                 items = [...items, pinnedItem]
