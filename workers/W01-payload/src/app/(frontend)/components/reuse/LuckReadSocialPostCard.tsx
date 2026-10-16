@@ -15,6 +15,9 @@ import type { PublicLocale } from '../../i18n/public-locale'
 type ContentDetail = {
   id?: string
   creatorId?: string | null
+  state?: string
+  version?: number
+  etag?: string
   createdAt?: string
   updatedAt?: string
 }
@@ -59,6 +62,16 @@ export default function LuckReadSocialPostCard({
 }: Props) {
   const [profile, setProfile] = useState<PublicProfile | null>(null)
   const [resolvedCreatorId, setResolvedCreatorId] = useState<string | null>(creatorId ?? null)
+  const [viewerUserId, setViewerUserId] = useState<string | null>(null)
+  const [contentState, setContentState] = useState<string | null>(null)
+  const [contentVersion, setContentVersion] = useState<number | null>(null)
+  const [contentEtag, setContentEtag] = useState<string | null>(null)
+  const [following, setFollowing] = useState(false)
+  const [followRestricted, setFollowRestricted] = useState(false)
+  const [followBusy, setFollowBusy] = useState(false)
+  const [moreOpen, setMoreOpen] = useState(false)
+  const [ownerActionBusy, setOwnerActionBusy] = useState(false)
+  const [isDeleted, setIsDeleted] = useState(false)
   const [postTimestamp, setPostTimestamp] = useState(createdAt || updatedAt || '')
   const [liked, setLiked] = useState(false)
   const [likeCount, setLikeCount] = useState<number | null>(null)
@@ -78,6 +91,14 @@ export default function LuckReadSocialPostCard({
   )
   const username = profile?.username ? '@' + profile.username : ''
   const dateLocale = locale === 'en' ? 'en-US' : locale === 'tw' ? 'zh-TW' : 'zh-CN'
+  const isOwnPost = Boolean(viewerUserId && resolvedCreatorId && viewerUserId === resolvedCreatorId)
+  const canManagePost = Boolean(
+    isOwnPost &&
+    contentState === 'PUBLISHED' &&
+    typeof contentVersion === 'number' &&
+    contentVersion > 0 &&
+    contentEtag,
+  )
   const formattedDate = postTimestamp && Number.isFinite(Date.parse(postTimestamp))
     ? new Date(postTimestamp).toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' })
     : ''
@@ -88,20 +109,32 @@ export default function LuckReadSocialPostCard({
 
     const load = async () => {
       setResolvedCreatorId(creatorId ?? null)
+      setViewerUserId(null)
+      setContentState(null)
+      setContentVersion(null)
+      setContentEtag(null)
+      setFollowing(false)
+      setFollowRestricted(false)
       setPostTimestamp(createdAt || updatedAt || '')
       setProfile(null)
       setBookmarked(false)
       setLikeStateLoading(true)
 
-      // The public content-list DTO intentionally omits author metadata. Reuse
-      // the existing detail endpoint only when the caller cannot supply it.
-      const detailRequest = creatorId
-        ? Promise.resolve(null)
-        : fetchJson<ContentDetail>('/api/v1/contents/' + encodeURIComponent(slug || contentId), {
-            headers: { accept: 'application/json' },
-            cache: 'no-store',
-            signal: controller.signal,
-          })
+      const detailRequest = fetchJson<ContentDetail>(
+        '/api/v1/contents/' + encodeURIComponent(contentId),
+        {
+          credentials: 'include',
+          headers: { accept: 'application/json' },
+          cache: 'no-store',
+          signal: controller.signal,
+        },
+      )
+      const viewerRequest = fetchJson<{ id?: string }>('/api/v1/users/me', {
+        credentials: 'include',
+        headers: { accept: 'application/json' },
+        cache: 'no-store',
+        signal: controller.signal,
+      })
       const socialRequest = fetchJson<SocialSummary>(
         '/api/v1/contents/' + encodeURIComponent(contentId) + '/social',
         {
@@ -112,15 +145,57 @@ export default function LuckReadSocialPostCard({
         },
       )
 
-      const [detailResult, socialResult] = await Promise.allSettled([detailRequest, socialRequest])
+      const [detailResult, socialResult, viewerResult] = await Promise.allSettled([
+        detailRequest,
+        socialRequest,
+        viewerRequest,
+      ])
       if (cancelled) return
 
       let authorId = creatorId ?? null
-      if (detailResult.status === 'fulfilled' && detailResult.value?.response.ok) {
+      if (detailResult.status === 'fulfilled' && detailResult.value.response.ok) {
         const detail = detailResult.value.data
         authorId = authorId || (typeof detail?.creatorId === 'string' ? detail.creatorId : null)
+        setContentState(typeof detail?.state === 'string' ? detail.state : null)
+        setContentVersion(typeof detail?.version === 'number' ? detail.version : null)
+        setContentEtag(typeof detail?.etag === 'string' ? detail.etag : null)
         setPostTimestamp(createdAt || updatedAt || detail?.createdAt || detail?.updatedAt || '')
         setResolvedCreatorId(authorId)
+      }
+
+      let viewerId: string | null = null
+      if (
+        viewerResult.status === 'fulfilled' &&
+        viewerResult.value.response.ok &&
+        typeof viewerResult.value.data?.id === 'string'
+      ) {
+        viewerId = viewerResult.value.data.id
+        setViewerUserId(viewerId)
+      }
+
+      if (authorId && viewerId && authorId !== viewerId) {
+        try {
+          const followResult = await fetchJson<ApiResponse<{
+            following?: boolean
+            relationship?: { blocked?: boolean; blockedBy?: boolean }
+          }>>('/api/v1/social/follows/' + encodeURIComponent(authorId), {
+            credentials: 'include',
+            headers: { accept: 'application/json' },
+            cache: 'no-store',
+            signal: controller.signal,
+          })
+          if (!cancelled && followResult.response.ok) {
+            const relationship = followResult.data?.data?.relationship
+            setFollowRestricted(relationship?.blocked === true || relationship?.blockedBy === true)
+            setFollowing(
+              relationship?.blocked !== true &&
+              relationship?.blockedBy !== true &&
+              followResult.data?.data?.following === true,
+            )
+          }
+        } catch {
+          // A failed relationship lookup must not prevent viewing or reporting a public post.
+        }
       }
 
       if (socialResult.status === 'fulfilled') {
@@ -230,8 +305,156 @@ export default function LuckReadSocialPostCard({
   }
 
 
+  const toggleFollow = async () => {
+    if (!resolvedCreatorId || followBusy || followRestricted || isOwnPost) return
+    const wasFollowing = following
+    setFollowBusy(true)
+    setMoreOpen(false)
+    setMessage('')
+    try {
+      const { response, data } = await fetchJson<ApiResponse<{ following?: boolean }>>(
+        '/api/v1/social/follows/' + encodeURIComponent(resolvedCreatorId),
+        {
+          method: wasFollowing ? 'DELETE' : 'POST',
+          credentials: 'include',
+          headers: {
+            accept: 'application/json',
+            'Idempotency-Key': 'twitter-clone-reuse-follow:' + contentId + ':' + crypto.randomUUID(),
+          },
+        },
+      )
+      if (response.status === 401) {
+        requireLogin()
+        return
+      }
+      if (!response.ok) {
+        throw new Error(getApiErrorMessage(
+          data,
+          locale === 'en' ? 'Follow action failed.' : locale === 'tw' ? '追蹤操作失敗。' : '关注操作失败，请稍后重试。',
+        ))
+      }
+      const nextFollowing = typeof data?.data?.following === 'boolean'
+        ? data.data.following
+        : !wasFollowing
+      setFollowing(nextFollowing)
+      setMessage(nextFollowing
+        ? (locale === 'en' ? 'Following creator.' : locale === 'tw' ? '已追蹤作者。' : '已关注作者。')
+        : (locale === 'en' ? 'Unfollowed creator.' : locale === 'tw' ? '已取消追蹤。' : '已取消关注。'))
+    } catch (cause) {
+      setMessage(cause instanceof Error
+        ? cause.message
+        : locale === 'en' ? 'Follow action failed.' : '关注操作失败，请稍后重试。')
+    } finally {
+      setFollowBusy(false)
+    }
+  }
+
+  const transitionOwnedContent = async (
+    to: 'UNPUBLISHED' | 'DRAFT',
+    version: number,
+  ): Promise<number> => {
+    const { response, data } = await fetchJson<{ version?: unknown; error?: { message?: string } }>(
+      '/api/creator/contents/' + encodeURIComponent(contentId) + '/state',
+      {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          accept: 'application/json',
+          'content-type': 'application/json',
+          'If-Match': 'W/"' + version + '"',
+          'Idempotency-Key': 'twitter-clone-reuse-post-edit:' + contentId + ':' + to + ':' + crypto.randomUUID(),
+        },
+        body: JSON.stringify({ to }),
+      },
+    )
+    if (response.status === 401) {
+      requireLogin()
+      throw new Error('AUTH_REQUIRED')
+    }
+    if (!response.ok) {
+      throw new Error(getApiErrorMessage(data, locale === 'en' ? 'Post state update failed.' : '动态状态更新失败。'))
+    }
+    return typeof data?.version === 'number' ? data.version : version + 1
+  }
+
+  const editPost = async () => {
+    if (!canManagePost || contentVersion === null || ownerActionBusy) return
+    const confirmed = window.confirm(locale === 'en'
+      ? 'This post will be taken offline and moved to drafts before editing. Continue?'
+      : locale === 'tw'
+        ? '編輯前會先將此動態下線並轉為草稿，是否繼續？'
+        : '编辑前会先将这条动态下线并转为草稿，是否继续？')
+    if (!confirmed) return
+
+    setOwnerActionBusy(true)
+    setMoreOpen(false)
+    setMessage('')
+    let hasBeenUnpublished = false
+    try {
+      const unpublishedVersion = await transitionOwnedContent('UNPUBLISHED', contentVersion)
+      hasBeenUnpublished = true
+      const draftVersion = await transitionOwnedContent('DRAFT', unpublishedVersion)
+      window.location.assign('/publish?draft=' + encodeURIComponent(contentId) + '&version=' + draftVersion)
+    } catch (cause) {
+      if (cause instanceof Error && cause.message === 'AUTH_REQUIRED') return
+      const baseMessage = cause instanceof Error
+        ? cause.message
+        : locale === 'en' ? 'Could not open this post for editing.' : '暂时无法进入动态编辑。'
+      setMessage(hasBeenUnpublished
+        ? baseMessage + (locale === 'en'
+          ? ' The post is already offline. Open Creator Studio → Content to finish moving it to drafts.'
+          : ' 动态已下线；请进入创作者中心的内容管理，将其转为草稿后继续编辑。')
+        : baseMessage)
+    } finally {
+      setOwnerActionBusy(false)
+    }
+  }
+
+  const deletePost = async () => {
+    if (!canManagePost || !contentEtag || ownerActionBusy) return
+    const confirmed = window.confirm(locale === 'en'
+      ? 'Delete this post? It will move to the deleted state.'
+      : locale === 'tw' ? '確定刪除此動態嗎？內容將進入已刪除狀態。' : '确定删除这条动态吗？内容将进入已删除状态。')
+    if (!confirmed) return
+
+    setOwnerActionBusy(true)
+    setMoreOpen(false)
+    setMessage('')
+    try {
+      const { response, data } = await fetchJson<ApiResponse<unknown>>(
+        '/api/v1/contents/' + encodeURIComponent(contentId),
+        {
+          method: 'DELETE',
+          credentials: 'include',
+          headers: {
+            accept: 'application/json',
+            'If-Match': contentEtag,
+            'Idempotency-Key': 'twitter-clone-reuse-post-delete:' + contentId + ':' + crypto.randomUUID(),
+          },
+          cache: 'no-store',
+        },
+      )
+      if (response.status === 401) {
+        requireLogin()
+        return
+      }
+      if (!response.ok) {
+        throw new Error(getApiErrorMessage(data, locale === 'en' ? 'Delete failed.' : '删除失败，请稍后重试。'))
+      }
+      setIsDeleted(true)
+      window.dispatchEvent(new Event('luckread:content-mutated'))
+    } catch (cause) {
+      setMessage(cause instanceof Error
+        ? cause.message
+        : locale === 'en' ? 'Delete failed.' : '删除失败，请稍后重试。')
+    } finally {
+      setOwnerActionBusy(false)
+    }
+  }
+
   const reportContent = async () => {
     if (reportBusy) return
+    setMoreOpen(false)
     const reasonCode = window.prompt(
       locale === 'en'
         ? 'Enter a report reason (for example SPAM, ABUSE, or COPYRIGHT).'
@@ -320,6 +543,8 @@ export default function LuckReadSocialPostCard({
       setShareBusy(false)
     }
   }
+
+  if (isDeleted) return null
 
   return (
     <article className="content-feed-card" data-testid="luckread-social-post-card">
@@ -425,15 +650,67 @@ export default function LuckReadSocialPostCard({
               : (locale === 'en' ? 'Share' : locale === 'tw' ? '分享' : '分享')}
           </button>
           <button
+            aria-controls={'post-more-actions-' + contentId}
+            aria-expanded={moreOpen}
+            aria-haspopup="true"
             className="content-detail-like"
             type="button"
-            disabled={reportBusy}
-            onClick={() => void reportContent()}
+            onClick={() => setMoreOpen((open) => !open)}
           >
-            {reportBusy
-              ? (locale === 'en' ? 'Reporting…' : locale === 'tw' ? '舉報中…' : '举报中…')
-              : (locale === 'en' ? 'Report' : locale === 'tw' ? '舉報' : '举报')}
+            {locale === 'en' ? 'More' : locale === 'tw' ? '更多' : '更多操作'} ⋯
           </button>
+          {moreOpen ? (
+            <div id={'post-more-actions-' + contentId} role="group" aria-label={locale === 'en' ? 'More post actions' : locale === 'tw' ? '更多動態操作' : '更多动态操作'}>
+              {resolvedCreatorId && !isOwnPost && !followRestricted ? (
+                <button
+                  className="content-detail-like"
+                  type="button"
+                  disabled={followBusy}
+                  onClick={() => void toggleFollow()}
+                >
+                  {followBusy
+                    ? (locale === 'en' ? 'Working…' : locale === 'tw' ? '處理中…' : '处理中…')
+                    : following
+                      ? (locale === 'en' ? 'Unfollow' : locale === 'tw' ? '取消追蹤' : '取消关注')
+                      : (locale === 'en' ? 'Follow creator' : locale === 'tw' ? '追蹤作者' : '关注作者')}
+                </button>
+              ) : null}
+              {canManagePost ? (
+                <>
+                  <button
+                    className="content-detail-like"
+                    type="button"
+                    disabled={ownerActionBusy}
+                    onClick={() => void editPost()}
+                  >
+                    {ownerActionBusy
+                      ? (locale === 'en' ? 'Working…' : locale === 'tw' ? '處理中…' : '处理中…')
+                      : (locale === 'en' ? 'Edit post' : locale === 'tw' ? '編輯動態' : '编辑动态')}
+                  </button>
+                  <button
+                    className="content-detail-like"
+                    type="button"
+                    disabled={ownerActionBusy}
+                    onClick={() => void deletePost()}
+                  >
+                    {ownerActionBusy
+                      ? (locale === 'en' ? 'Deleting…' : locale === 'tw' ? '刪除中…' : '删除中…')
+                      : (locale === 'en' ? 'Delete post' : locale === 'tw' ? '刪除動態' : '删除动态')}
+                  </button>
+                </>
+              ) : null}
+              <button
+                className="content-detail-like"
+                type="button"
+                disabled={reportBusy}
+                onClick={() => void reportContent()}
+              >
+                {reportBusy
+                  ? (locale === 'en' ? 'Reporting…' : locale === 'tw' ? '舉報中…' : '举报中…')
+                  : (locale === 'en' ? 'Report' : locale === 'tw' ? '舉報' : '举报')}
+              </button>
+            </div>
+          ) : null}
           {message ? <span className="content-detail-action-status" role="status">{message}</span> : null}
         </footer>
       </div>
