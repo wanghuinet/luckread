@@ -1,4 +1,4 @@
--- SOCIAL-006 repost and creator profile pin relations
+-- MIG-SOCIAL-013-REPOST-PIN-V1
 -- Authority: W05 / D1-02. Do not copy canonical content body or media.
 CREATE TABLE IF NOT EXISTS social_reposts (
   repost_id TEXT NOT NULL PRIMARY KEY,
