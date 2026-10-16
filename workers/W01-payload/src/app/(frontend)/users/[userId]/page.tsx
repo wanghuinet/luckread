@@ -47,10 +47,20 @@ type ProfilePinResponse = {
   data?: { contentId?: string | null } | null
 }
 
-const sortPinnedFirst = <T extends { id: string }>(items: T[], pinnedContentId: string | null): T[] =>
-  pinnedContentId
-    ? [...items].sort((left, right) => Number(right.id === pinnedContentId) - Number(left.id === pinnedContentId))
-    : items
+const sortPinnedFirst = <T extends { id: string; updatedAt?: string; createdAt?: string }>(
+  items: T[],
+  pinnedContentId: string | null,
+): T[] => {
+  const chronological = [...items].sort((left, right) => {
+    const leftDate = Date.parse(left.updatedAt || left.createdAt || '')
+    const rightDate = Date.parse(right.updatedAt || right.createdAt || '')
+    const dateDelta = (Number.isFinite(rightDate) ? rightDate : 0) - (Number.isFinite(leftDate) ? leftDate : 0)
+    return dateDelta || right.id.localeCompare(left.id)
+  })
+  return pinnedContentId
+    ? chronological.sort((left, right) => Number(right.id === pinnedContentId) - Number(left.id === pinnedContentId))
+    : chronological
+}
 
 type ProfileReply = {
   id: string
@@ -225,9 +235,33 @@ export default function PublicProfilePage({
           setBlocked(followData?.data?.relationship?.blocked === true)
           setBlockedBy(followData?.data?.relationship?.blockedBy === true)
           setMuted(followData?.data?.relationship?.muted === true)
-          const items = Array.isArray(contentData?.data?.items) ? contentData.data.items : []
+          let items = Array.isArray(contentData?.data?.items) ? contentData.data.items : []
           const pinRecord = pinResult.response.ok ? pinResult.data?.data : null
           const nextPinnedContentId = pinRecord && typeof pinRecord.contentId === 'string' ? pinRecord.contentId : null
+          if (nextPinnedContentId && !items.some((item) => item.id === nextPinnedContentId)) {
+            try {
+              const pinnedDetail = await fetchJson<{ data?: PublicContent }>(
+                '/api/v1/contents/' + encodeURIComponent(nextPinnedContentId),
+                {
+                  headers: { accept: 'application/json' },
+                  credentials: 'omit',
+                  cache: 'no-store',
+                  signal: controller.signal,
+                },
+              )
+              const pinnedItem = pinnedDetail.data?.data
+              if (
+                pinnedDetail.response.ok &&
+                pinnedItem?.id === nextPinnedContentId &&
+                pinnedItem.creatorId === userId &&
+                pinnedItem.contentType === 'post'
+              ) {
+                items = [...items, pinnedItem]
+              }
+            } catch (cause) {
+              if (cause instanceof DOMException && cause.name === 'AbortError') throw cause
+            }
+          }
           setPinnedContentId(nextPinnedContentId)
           setContents(sortPinnedFirst(items, nextPinnedContentId))
           setContentCursor(typeof contentData?.data?.nextCursor === 'string' ? contentData.data.nextCursor : null)
