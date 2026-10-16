@@ -7,7 +7,7 @@ import {
   deleteContent,
   getContent,
   listContents,
-  listFollowingCreatorContents,
+  listFollowingOwnerContents,
   listCreatorContents,
   validateListFilters,
   toErrorResponse,
@@ -264,15 +264,15 @@ const worker = {
           throw new ContentRuntimeError('VALIDATION_FAILED', 400)
         }
         const body = parsedBody as Record<string, unknown>
-        if (Object.keys(body).some((key) => !['creatorIds', 'cursor', 'limit'].includes(key))) {
+        if (Object.keys(body).some((key) => !['ownerUserIds', 'cursor', 'limit'].includes(key))) {
           throw new ContentRuntimeError('VALIDATION_FAILED', 400)
         }
-        const creatorIds = body.creatorIds
+        const ownerUserIds = body.ownerUserIds
         if (
-          !Array.isArray(creatorIds) ||
-          creatorIds.length < 1 ||
-          creatorIds.length > 500 ||
-          creatorIds.some((id) => typeof id !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(id))
+          !Array.isArray(ownerUserIds) ||
+          ownerUserIds.length < 1 ||
+          ownerUserIds.length > 500 ||
+          ownerUserIds.some((id) => typeof id !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(id))
         ) {
           throw new ContentRuntimeError('VALIDATION_FAILED', 400)
         }
@@ -285,10 +285,10 @@ const worker = {
         if (body.limit !== undefined && typeof body.limit !== 'number' && typeof body.limit !== 'string') {
           throw new ContentRuntimeError('VALIDATION_FAILED', 400)
         }
-        const page = await listFollowingCreatorContents(
+        const page = await listFollowingOwnerContents(
           env.D1_02,
           viewerUserId,
-          creatorIds as string[],
+          ownerUserIds as string[],
           cursor,
           parseListLimit(body.limit === undefined ? null : String(body.limit)),
         )
