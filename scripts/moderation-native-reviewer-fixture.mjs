@@ -120,18 +120,25 @@ const login = await post('/api/v1/auth/login', {
   credential: password,
 })
 
-const accessToken = login.data?.accessToken
-if (login.status !== 200 || typeof accessToken !== 'string') {
-  throw new Error('native reviewer login failed: HTTP ' + login.status + ' body=' + JSON.stringify(login.data))
-}
-if (login.data?.layer !== 'L6') {
-  throw new Error('native reviewer layer mismatch: expected L6, got ' + String(login.data?.layer))
+const reviewer = login.data?.data?.user
+const sessionToken = login.headers.get('x-luckread-session-token')
+if (
+  login.status !== 200 ||
+  !sessionToken ||
+  String(reviewer?.id) !== userId ||
+  reviewer?.emailVerified !== true
+) {
+  throw new Error(
+    'native reviewer login failed against APP-AUTH-01: HTTP ' + login.status +
+    ' body=' + JSON.stringify(login.data) +
+    ' nativeSessionHeader=' + Boolean(sessionToken),
+  )
 }
 
-console.log('::add-mask::' + accessToken)
+console.log('::add-mask::' + sessionToken)
 console.log('::add-mask::' + password)
 
-appendFileSync(process.env.GITHUB_ENV, 'MODERATION_TOKEN=' + accessToken + '\n')
+appendFileSync(process.env.GITHUB_ENV, 'MODERATION_TOKEN=' + sessionToken + '\n')
 
 const artifactDir = 'artifacts/mapping-0/moderation-runtime-e2e'
 mkdirSync(artifactDir, { recursive: true })
