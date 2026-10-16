@@ -1006,10 +1006,10 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
           </div>
           <article className="lr-preview-card">
             <span className="lr-preview-type">{type === 'article' ? '文章' : type === 'post' ? '动态' : '视频'}</span>
-            <h2>{title.trim() || '未填写标题'}</h2>
+            <h2>{effectiveContentTitle() || '未填写标题'}</h2>
             {type === 'article' ? (
               <ArticleStructuredRenderer document={articleDocument} />
-            ) : (
+            ) : type === 'post' ? null : (
               <p className="lr-preview-body">{body.trim() || '暂无正文'}</p>
             )}
             {resolveCoverRef(
