@@ -1233,6 +1233,7 @@ paths:
         '201': { description: Share created. }
         '4XX': { $ref: '#/components/responses/ClientError' }
 
+
   /shares/{shareId}:
     parameters:
       - name: shareId
@@ -2614,6 +2615,7 @@ paths:
         default:
           description: Discovery-only operation; detailed response contract remains to be closed.
 
+
   /users/{userId}/profile:
     get:
       tags: [Users]
@@ -2909,6 +2911,62 @@ paths:
         '428': { $ref: '#/components/responses/PreconditionRequired' }
         '503': { $ref: '#/components/responses/ClientError' }
 
+  /content/{contentId}/pin:
+    parameters:
+      - $ref: '#/components/parameters/ContentId'
+    post:
+      tags: [Creators]
+      summary: Pin the current creator's published content to their profile.
+      operationId: postContentContentIdPin
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      responses:
+        '200': { description: Profile pin created or confirmed. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+    delete:
+      tags: [Creators]
+      summary: Remove the current creator's profile pin for this content.
+      operationId: deleteContentContentIdPin
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      responses:
+        '204': { description: Profile pin removed or already absent. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+  /content/{contentId}/reposts:
+    parameters:
+      - $ref: '#/components/parameters/ContentId'
+    post:
+      tags: [Interactions]
+      summary: Create a relation to the canonical published content.
+      operationId: postContentContentIdReposts
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      responses:
+        '201': { description: Repost relation created or already present. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+    delete:
+      tags: [Interactions]
+      summary: Remove the current viewer's repost relation.
+      operationId: deleteContentContentIdReposts
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      responses:
+        '204': { description: Repost relation removed or already absent. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+  /users/{userId}/pinned-content:
+    parameters:
+      - name: userId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/ResourceId' }
+    get:
+      tags: [Users]
+      summary: Read a user's public pinned published-content reference.
+      security: []
+      operationId: getUsersUserIdPinnedContent
+      responses:
+        '200': { description: Pinned-content reference, or null when no public pin exists. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
 components:
   securitySchemes:
     bearerAuth:

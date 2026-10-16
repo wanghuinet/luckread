@@ -8,6 +8,7 @@ import {
   type ContentPrincipal,
 } from '../content/w03-content-client.js'
 import { extractSocialTokens } from './social-token-parser.js'
+import { relayW05Response } from './w05-response.js'
 
 type W05SocialService = {
   fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response>
@@ -142,10 +143,7 @@ export async function callW05SocialPublic(input: {
   const etag = response.headers.get('etag')
   if (etag) responseHeaders.set('etag', etag)
 
-  return new Response(await response.arrayBuffer(), {
-    status: response.status,
-    headers: responseHeaders,
-  })
+  return relayW05Response(response, responseHeaders)
 }
 
 export async function callW05Social(input: {
@@ -186,8 +184,5 @@ export async function callW05Social(input: {
   const contentId = response.headers.get('X-LuckRead-Content-Id')
   if (contentId) responseHeaders.set('X-LuckRead-Content-Id', contentId)
 
-  return new Response(await response.arrayBuffer(), {
-    status: response.status,
-    headers: responseHeaders,
-  })
+  return relayW05Response(response, responseHeaders)
 }

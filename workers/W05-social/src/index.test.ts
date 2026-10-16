@@ -18,6 +18,9 @@ const dbFor = (results: unknown[] = []) => {
 const request = (pathname: string, headers: Record<string, string> = {}) =>
   new Request(`https://luckread-w05.internal${pathname}`, { headers })
 
+const requestWithMethod = (pathname: string, method: string, headers: Record<string, string> = {}) =>
+  new Request(`https://luckread-w05.internal${pathname}`, { method, headers })
+
 const transportHeaders = {
   'X-LuckRead-Caller': 'W01',
   'X-LuckRead-Transport-Version': '1.0',
@@ -865,4 +868,120 @@ describe('W05 social comment transport', () => {
     )
     expect(response.status).toBe(401)
   })
+  it('rejects unauthenticated repost and profile pin writes before touching D1', async () => {
+    const unauthenticatedHeaders = {
+      'X-LuckRead-Caller': 'W01',
+      'X-LuckRead-Transport-Version': '1.0',
+      'X-LuckRead-Correlation-Id': 'unauthenticated-write',
+      'X-LuckRead-Principal-Layer': 'L2',
+      'Idempotency-Key': 'unauthenticated-write-1',
+    }
+    const repostDb = dbFor()
+    const repostResponse = await worker.fetch(
+      requestWithMethod('/internal/social/content/content-1/reposts', 'POST', unauthenticatedHeaders),
+      { DB: repostDb },
+    )
+    expect(repostResponse.status).toBe(401)
+    expect((repostDb as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).not.toHaveBeenCalled()
+
+    const pinDb = dbFor()
+    const pinResponse = await worker.fetch(
+      requestWithMethod('/internal/social/content/content-1/pin', 'POST', unauthenticatedHeaders),
+      { DB: pinDb },
+    )
+    expect(pinResponse.status).toBe(401)
+    expect((pinDb as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).not.toHaveBeenCalled()
+  })
+
+  it('creates a repost relation through the authenticated W01 principal', async () => {
+    const response = await worker.fetch(
+      requestWithMethod('/internal/social/content/content-1/reposts', 'POST', {
+        ...transportHeaders,
+        'Idempotency-Key': 'repost-1',
+      }),
+      { DB: dbFor([
+        { id: 'content-1', state: 'PUBLISHED', owner_user_id: 'owner-1', blocked: 0 },
+        null,
+        { repost_id: 'repost-1', content_id: 'content-1', actor_user_id: 'viewer-1', created_at: '2026-10-16T00:00:00.000Z' },
+      ]) },
+    )
+    expect(response.status).toBe(201)
+    await expect(response.json()).resolves.toMatchObject({
+      data: { repostId: 'repost-1', contentId: 'content-1', actorUserId: 'viewer-1' },
+    })
+  })
+
+  it('requires the minimum interaction layer and idempotency key for reposts', async () => {
+    const denied = await worker.fetch(
+      requestWithMethod('/internal/social/content/content-1/reposts', 'POST', {
+        ...transportHeaders,
+        'X-LuckRead-Principal-Layer': 'L1',
+        'Idempotency-Key': 'repost-denied',
+      }),
+      { DB: dbFor() },
+    )
+    expect(denied.status).toBe(403)
+
+    const missingKey = await worker.fetch(
+      requestWithMethod('/internal/social/content/content-1/reposts', 'POST', transportHeaders),
+      { DB: dbFor([{ id: 'content-1', state: 'PUBLISHED', owner_user_id: 'owner-1', blocked: 0 }]) },
+    )
+    expect(missingKey.status).toBe(428)
+  })
+
+  it('pins only the authenticated owner content and unpins idempotently', async () => {
+    const pinResponse = await worker.fetch(
+      requestWithMethod('/internal/social/content/content-1/pin', 'POST', {
+        ...transportHeaders,
+        'X-LuckRead-Principal-Layer': 'L2',
+        'Idempotency-Key': 'pin-1',
+      }),
+      { DB: dbFor([
+        { id: 'content-1', content_type: 'post', state: 'PUBLISHED', owner_user_id: 'viewer-1' },
+        { user_id: 'viewer-1', content_id: 'content-1', pinned_at: '2026-10-16T00:00:00.000Z' },
+      ]) },
+    )
+    expect(pinResponse.status).toBe(200)
+    await expect(pinResponse.json()).resolves.toMatchObject({
+      data: { userId: 'viewer-1', contentId: 'content-1' },
+    })
+
+    const unpinResponse = await worker.fetch(
+      requestWithMethod('/internal/social/content/content-1/pin', 'DELETE', {
+        ...transportHeaders,
+        'X-LuckRead-Principal-Layer': 'L2',
+        'Idempotency-Key': 'unpin-1',
+      }),
+      { DB: dbFor() },
+    )
+    expect(unpinResponse.status).toBe(204)
+  })
+
+  it('rejects profile pin writes from below L2', async () => {
+    const response = await worker.fetch(
+      requestWithMethod('/internal/social/content/content-1/pin', 'POST', {
+        ...transportHeaders,
+        'X-LuckRead-Principal-Layer': 'L1',
+        'Idempotency-Key': 'pin-denied',
+      }),
+      { DB: dbFor() },
+    )
+    expect(response.status).toBe(403)
+  })
+
+  it('returns the public pinned-content reference without requiring a viewer', async () => {
+    const response = await worker.fetch(
+      request('/internal/social/users/owner-1/pinned-content', {
+        'X-LuckRead-Caller': 'W01',
+        'X-LuckRead-Transport-Version': '1.0',
+        'X-LuckRead-Correlation-Id': 'public-pin',
+      }),
+      { DB: dbFor([{ user_id: 'owner-1', content_id: 'content-1', pinned_at: '2026-10-16T00:00:00.000Z' }]) },
+    )
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({
+      data: { userId: 'owner-1', contentId: 'content-1' },
+    })
+  })
+
 })

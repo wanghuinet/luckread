@@ -43,6 +43,25 @@ type ContentListResponse = {
   }
 }
 
+type ProfilePinResponse = {
+  data?: { contentId?: string | null } | null
+}
+
+const sortPinnedFirst = <T extends { id: string; updatedAt?: string; createdAt?: string }>(
+  items: T[],
+  pinnedContentId: string | null,
+): T[] => {
+  const chronological = [...items].sort((left, right) => {
+    const leftDate = Date.parse(left.updatedAt || left.createdAt || '')
+    const rightDate = Date.parse(right.updatedAt || right.createdAt || '')
+    const dateDelta = (Number.isFinite(rightDate) ? rightDate : 0) - (Number.isFinite(leftDate) ? leftDate : 0)
+    return dateDelta || right.id.localeCompare(left.id)
+  })
+  return pinnedContentId
+    ? chronological.sort((left, right) => Number(right.id === pinnedContentId) - Number(left.id === pinnedContentId))
+    : chronological
+}
+
 type ProfileReply = {
   id: string
   contentId: string
@@ -114,6 +133,8 @@ export default function PublicProfilePage({
   const [safetyMessage, setSafetyMessage] = useState('')
   const [filter, setFilter] = useState<ProfileChannel>('posts')
   const [contents, setContents] = useState<PublicContent[]>([])
+  const [pinnedContentId, setPinnedContentId] = useState<string | null>(null)
+  const [pinnedContent, setPinnedContent] = useState<PublicContent | null>(null)
   const [replies, setReplies] = useState<ProfileReply[]>([])
   const [contentCursor, setContentCursor] = useState<string | null>(null)
   const [contentHasMore, setContentHasMore] = useState(false)
@@ -131,7 +152,7 @@ export default function PublicProfilePage({
     void (async () => {
       try {
         const { userId } = await params
-        const [profileResponse, followersResponse, followingResponse, followResponse, contentResponse, viewerResponse] = await Promise.all([
+        const [profileResponse, followersResponse, followingResponse, followResponse, contentResponse, viewerResponse, pinResponse] = await Promise.all([
           fetchJson<PublicProfile | { error?: { message?: string } }>('/api/v1/users/' + encodeURIComponent(userId), {
             headers: { accept: 'application/json' },
             cache: 'no-store',
@@ -177,6 +198,11 @@ export default function PublicProfilePage({
             cache: 'no-store',
             signal: controller.signal,
           }),
+          fetchJson<ProfilePinResponse>('/api/v1/users/' + encodeURIComponent(userId) + '/pinned-content', {
+            headers: { accept: 'application/json' },
+            cache: 'no-store',
+            signal: controller.signal,
+          }),
         ])
 
         const profileResult = profileResponse
@@ -185,6 +211,7 @@ export default function PublicProfilePage({
         const followResult = followResponse
         const contentResult = contentResponse
         const viewerResult = viewerResponse
+        const pinResult = pinResponse
         const data = profileResult.data
         if (profileResult.response.status === 404) throw new Error('USER_NOT_FOUND')
         if (!profileResult.response.ok || !data || !('id' in data)) {
@@ -209,8 +236,39 @@ export default function PublicProfilePage({
           setBlocked(followData?.data?.relationship?.blocked === true)
           setBlockedBy(followData?.data?.relationship?.blockedBy === true)
           setMuted(followData?.data?.relationship?.muted === true)
-          const items = Array.isArray(contentData?.data?.items) ? contentData.data.items : []
-          setContents(items)
+          let items = Array.isArray(contentData?.data?.items) ? contentData.data.items : []
+          const pinRecord = pinResult.response.ok ? pinResult.data?.data : null
+          const nextPinnedContentId = pinRecord && typeof pinRecord.contentId === 'string' ? pinRecord.contentId : null
+          let nextPinnedContent = nextPinnedContentId
+            ? items.find((item) => item.id === nextPinnedContentId) ?? null
+            : null
+          if (nextPinnedContentId && !nextPinnedContent) {
+            try {
+              const pinnedDetail = await fetchJson<{ data?: PublicContent }>(
+                '/api/v1/contents/' + encodeURIComponent(nextPinnedContentId),
+                {
+                  headers: { accept: 'application/json' },
+                  credentials: 'omit',
+                  cache: 'no-store',
+                  signal: controller.signal,
+                },
+              )
+              const pinnedItem = pinnedDetail.data?.data
+              if (
+                pinnedDetail.response.ok &&
+                pinnedItem?.id === nextPinnedContentId &&
+                pinnedItem.contentType === 'post'
+              ) {
+                nextPinnedContent = pinnedItem
+                items = [...items, pinnedItem]
+              }
+            } catch (cause) {
+              if (cause instanceof DOMException && cause.name === 'AbortError') throw cause
+            }
+          }
+          setPinnedContentId(nextPinnedContentId)
+          setPinnedContent(nextPinnedContent)
+          setContents(sortPinnedFirst(items, nextPinnedContentId))
           setContentCursor(typeof contentData?.data?.nextCursor === 'string' ? contentData.data.nextCursor : null)
           setContentHasMore(contentData?.data?.hasMore === true)
           setContentError(contentResult.response.ok ? '' : '暂时无法加载作者作品。')
@@ -269,7 +327,7 @@ export default function PublicProfilePage({
         if (!response.ok || !Array.isArray(data?.data?.items)) throw new Error('PROFILE_LIKES_FAILED')
         const items = await loadLikedContentDetails(data.data.items, controller.signal)
         if (requestId !== contentRequestIdRef.current || controller.signal.aborted) return
-        setContents(items)
+        setContents(sortPinnedFirst(items, pinnedContentId))
         setContentCursor(typeof data.data.nextCursor === 'string' ? data.data.nextCursor : null)
         setContentHasMore(data.data.hasMore === true)
         return
@@ -289,7 +347,11 @@ export default function PublicProfilePage({
       })
       if (!response.ok || !Array.isArray(data?.data?.items)) throw new Error('CONTENT_LIST_FAILED')
       if (requestId !== contentRequestIdRef.current || controller.signal.aborted) return
-      setContents(nextFilter === 'media' ? data.data.items.filter(isMediaContent) : data.data.items)
+      let nextItems = nextFilter === 'media' ? data.data.items.filter(isMediaContent) : data.data.items
+      if (nextFilter === 'posts' && pinnedContent && !nextItems.some((item) => item.id === pinnedContent.id)) {
+        nextItems = [...nextItems, pinnedContent]
+      }
+      setContents(sortPinnedFirst(nextItems, pinnedContentId))
       setContentCursor(typeof data.data.nextCursor === 'string' ? data.data.nextCursor : null)
       setContentHasMore(data.data.hasMore === true)
     } catch (cause) {
@@ -333,7 +395,7 @@ export default function PublicProfilePage({
         if (!response.ok || !Array.isArray(data?.data?.items)) throw new Error('PROFILE_LIKES_FAILED')
         const nextItems = await loadLikedContentDetails(data.data.items, controller.signal)
         if (requestId !== contentRequestIdRef.current || controller.signal.aborted) return
-        setContents((current) => [...current, ...nextItems])
+        setContents((current) => sortPinnedFirst([...current, ...nextItems], pinnedContentId))
         setContentCursor(typeof data.data.nextCursor === 'string' ? data.data.nextCursor : null)
         setContentHasMore(data.data.hasMore === true)
         return
@@ -355,7 +417,7 @@ export default function PublicProfilePage({
       if (!response.ok || !Array.isArray(data?.data?.items)) throw new Error('CONTENT_LIST_FAILED')
       if (requestId !== contentRequestIdRef.current || controller.signal.aborted) return
       const nextItems = filter === 'media' ? data.data.items.filter(isMediaContent) : data.data.items
-      setContents((current) => [...current, ...nextItems])
+      setContents((current) => sortPinnedFirst([...current, ...nextItems], pinnedContentId))
       setContentCursor(typeof data.data.nextCursor === 'string' ? data.data.nextCursor : null)
       setContentHasMore(data.data.hasMore === true)
     } catch (cause) {
@@ -733,6 +795,15 @@ export default function PublicProfilePage({
                       createdAt={item.createdAt}
                       updatedAt={item.updatedAt}
                       locale="zh"
+                      onPinChanged={(changedContentId, isPinned) => {
+                        const nextPinnedContentId = isPinned ? changedContentId : null
+                        const nextPinnedContent = isPinned
+                          ? contents.find((content) => content.id === changedContentId) ?? null
+                          : null
+                        setPinnedContentId(nextPinnedContentId)
+                        setPinnedContent(nextPinnedContent)
+                        setContents((current) => sortPinnedFirst(current, nextPinnedContentId))
+                      }}
                     />
                   )
                 }
