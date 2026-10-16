@@ -28,6 +28,7 @@ export interface ContentInput {
   mediaRefs: string[]
   coverRef: string | null
   poll?: ContentPollInput
+  publishNow?: boolean
 }
 
 export interface ContentRecord {
@@ -262,9 +263,12 @@ export const validateInput = (input: unknown): ContentInput => {
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
     throw new ContentRuntimeError('VALIDATION_FAILED', 400)
   }
-  const candidate = input as { contentType?: unknown; title?: unknown; bodyRef?: unknown; mediaRefs?: unknown; coverRef?: unknown; poll?: unknown }
+  const candidate = input as { contentType?: unknown; title?: unknown; bodyRef?: unknown; mediaRefs?: unknown; coverRef?: unknown; poll?: unknown; publishNow?: unknown }
   const contentType = candidate.contentType === undefined ? 'article' : candidate.contentType
   const mediaRefs = candidate.mediaRefs === undefined ? [] : candidate.mediaRefs
+  if (candidate.publishNow !== undefined && (typeof candidate.publishNow !== 'boolean' || (candidate.publishNow && contentType !== 'post'))) {
+    throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+  }
   let poll: ContentPollInput | undefined
   if (candidate.poll !== undefined) {
     const rawPoll = candidate.poll as { options?: unknown; durationHours?: unknown } | null
@@ -307,6 +311,7 @@ export const validateInput = (input: unknown): ContentInput => {
     mediaRefs: mediaRefs.map(ref => ref.trim()),
     coverRef: candidate.coverRef === undefined || candidate.coverRef === null ? null : candidate.coverRef.trim(),
     ...(poll ? { poll } : {}),
+    ...(candidate.publishNow === true ? { publishNow: true } : {}),
   }
 }
 
@@ -914,7 +919,7 @@ export async function createContent(
   const slug = contentSlugFor(normalized.title, contentId)
   const createdAt = now.toISOString()
   const expiresAt = new Date(now.getTime() + IDEMPOTENCY_TTL_MS).toISOString()
-  const initialState: ContentState = normalized.contentType === 'post' ? 'PUBLISHED' : 'DRAFT'
+  const initialState: ContentState = normalized.contentType === 'post' && normalized.publishNow === true ? 'PUBLISHED' : 'DRAFT'
   const createdContent: ContentRecord = {
     id: contentId,
     contentType: normalized.contentType,
@@ -1348,7 +1353,8 @@ export async function transitionContentState(
   }
 
   const kind = actorKindForLayer(principalLayer)
-  if (!kind) throw new ContentRuntimeError('PERMISSION_DENIED', 403)
+  const socialPostLayer = /^L[2-4]$/.test(principalLayer)
+  if (!kind && !socialPostLayer) throw new ContentRuntimeError('PERMISSION_DENIED', 403)
 
   const operationId = 'transitionContentState'
   const normalizedRequestedScheduledAt = to === 'SCHEDULED' ? normalizeScheduledAt(options.scheduledAt, now) : null
@@ -1373,7 +1379,9 @@ export async function transitionContentState(
   if (kind === 'CREATOR' && !ownsContent) {
     throw new ContentRuntimeError('PERMISSION_DENIED', 403)
   }
-  if (!canTransitionContentState(content.state, to, kind, ownsContent, reason)) {
+  const directSocialPostPublish = socialPostLayer && content.contentType === 'post' && ownsContent && content.state === 'DRAFT' && to === 'PUBLISHED'
+  if (!kind && !directSocialPostPublish) throw new ContentRuntimeError('PERMISSION_DENIED', 403)
+  if (!directSocialPostPublish && (!kind || !canTransitionContentState(content.state, to, kind, ownsContent, reason))) {
     throw new ContentRuntimeError('INVALID_STATE', 409)
   }
 
