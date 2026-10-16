@@ -1,6 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 import { getLikeStatus, like, LikeRuntimeError, unlike } from './like-runtime.js'
 import { CommentRuntimeError, createComment, deleteComment, listComments, parseCommentLimit, updateComment } from './comment-runtime.js'
+import { listProfileLikedContents, listProfileReplies, ProfileChannelRuntimeError } from './profile-channel-runtime.js'
 import {
   FavoriteRuntimeError,
   favorite,
@@ -197,6 +198,20 @@ const parseCommentPath = (pathname: string): string | null => {
     return decodePathPart(parts[3])
   }
   return null
+}
+
+const parseProfileChannelPath = (pathname: string): { userId: string; kind: 'replies' | 'likes' } | null => {
+  const parts = pathname.split('/').filter(Boolean)
+  if (
+    parts.length !== 5 ||
+    parts[0] !== 'internal' ||
+    parts[1] !== 'social' ||
+    parts[2] !== 'users' ||
+    (parts[4] !== 'replies' && parts[4] !== 'likes')
+  ) return null
+  const userId = decodePathPart(parts[3])
+  if (userId === null || !userId.trim()) return null
+  return { userId, kind: parts[4] }
 }
 
 export default {
@@ -651,6 +666,20 @@ export default {
         return json({ data: candidates, requestId: createRequestId() })
       }
 
+      const profileChannel = parseProfileChannelPath(url.pathname)
+      if (profileChannel) {
+        if (request.method !== 'GET') return new Response(null, { status: 405, headers: { Allow: 'GET' } })
+        requireTransport(request)
+        const limit = parseCommentLimit(url.searchParams.get('limit'))
+        const cursor = url.searchParams.get('cursor')
+        if (cursor && cursor.length > 2048) throw new ProfileChannelRuntimeError('INVALID_CURSOR', 400)
+        const viewerUserId = request.headers.get('X-LuckRead-Principal-User-Id')?.trim() || null
+        const data = profileChannel.kind === 'replies'
+          ? await listProfileReplies(env.DB, profileChannel.userId, cursor, limit, viewerUserId)
+          : await listProfileLikedContents(env.DB, profileChannel.userId, cursor, limit, viewerUserId)
+        return json({ data, requestId: createRequestId() })
+      }
+
       const path = parseFollowPath(url.pathname)
       if (!path) throw new FollowRuntimeError('NOT_FOUND', 404)
 
@@ -744,7 +773,8 @@ export default {
         error instanceof ShareRuntimeError ||
         error instanceof BlockMuteRuntimeError ||
         error instanceof RelationshipGraphRuntimeError ||
-        error instanceof SocialClosureRuntimeError
+        error instanceof SocialClosureRuntimeError ||
+        error instanceof ProfileChannelRuntimeError
       ) {
         return json({
           error: {

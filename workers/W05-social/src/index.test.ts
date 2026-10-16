@@ -27,6 +27,55 @@ const transportHeaders = {
 }
 
 describe('W05 social query transport', () => {
+  it('serves profile replies through a bounded public GET route', async () => {
+    const response = await worker.fetch(
+      request('/internal/social/users/user-1/replies?limit=6', {
+        'X-LuckRead-Caller': 'W01',
+        'X-LuckRead-Transport-Version': '1.0',
+        'X-LuckRead-Correlation-Id': 'profile-replies',
+      }),
+      { DB: dbFor([{
+        id: 'reply-1', content_id: 'content-1', author_user_id: 'user-1', parent_id: 'comment-0',
+        body: 'Reply body', state: 'PUBLISHED', depth: 1,
+        created_at: '2026-10-15T10:00:00.000Z', updated_at: '2026-10-15T10:00:00.000Z',
+      }]) },
+    )
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({
+      data: { items: [{ id: 'reply-1', contentId: 'content-1', authorUserId: 'user-1' }], hasMore: false, nextCursor: null },
+      requestId: expect.stringMatching(/^req_/),
+    })
+  })
+
+  it('serves liked content identifiers through a bounded public GET route', async () => {
+    const response = await worker.fetch(
+      request('/internal/social/users/user-1/likes?limit=6', {
+        'X-LuckRead-Caller': 'W01',
+        'X-LuckRead-Transport-Version': '1.0',
+        'X-LuckRead-Correlation-Id': 'profile-likes',
+      }),
+      { DB: dbFor([{ relationship_id: 'like-1', target_id: 'content-1', created_at: '2026-10-15T10:00:00.000Z' }]) },
+    )
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({
+      data: { items: [{ contentId: 'content-1', likedAt: '2026-10-15T10:00:00.000Z' }], hasMore: false, nextCursor: null },
+    })
+  })
+
+  it('requires internal transport and rejects writes to profile channel routes', async () => {
+    const unauthorized = await worker.fetch(request('/internal/social/users/user-1/replies'), { DB: dbFor() })
+    expect(unauthorized.status).toBe(403)
+
+    const unsupported = await worker.fetch(new Request('https://luckread-w05.internal/internal/social/users/user-1/likes', {
+      method: 'POST',
+      headers: {
+        'X-LuckRead-Caller': 'W01',
+        'X-LuckRead-Transport-Version': '1.0',
+        'X-LuckRead-Correlation-Id': 'profile-likes-write',
+      },
+    }), { DB: dbFor() })
+    expect(unsupported.status).toBe(405)
+  })
   it('creates an idempotent block relation for an active actor and existing target', async () => {
     const response = await worker.fetch(
       new Request('https://luckread-w05.internal/internal/social/interactions/blocks', {
