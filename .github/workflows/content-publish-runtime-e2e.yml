@@ -83,6 +83,21 @@ jobs:
       - name: Install repository dependencies
         run: npm ci
 
+      - name: Initialize runtime evidence directory
+        run: |
+          set -euo pipefail
+          evidence_dir="artifacts/mapping-0/content-publish-runtime-e2e"
+          mkdir -p "$evidence_dir"
+          cat > "$evidence_dir/run-start.json" <<EOF
+          {
+            "workflow": "Content Publish Runtime E2E",
+            "runId": "$GITHUB_RUN_ID",
+            "sourceSha": "$W01_SOURCE_SHA",
+            "launchRunId": "$LAUNCH_RUN_ID",
+            "stage": "fixture-setup"
+          }
+          EOF
+
       - name: Setup native moderator fixture
         env:
           AUTH_BASE_URL: ${{ inputs.content_api_base_url }}
