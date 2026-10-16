@@ -665,7 +665,7 @@ type FollowingContentsCursor = {
 }
 
 const encodeFollowingContentsCursor = (cursor: FollowingContentsCursor): string =>
-  btoa(JSON.stringify(cursor)).replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/g, '')
+  btoa(JSON.stringify(cursor)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '')
 
 const decodeFollowingContentsCursor = (
   value: string | null,
