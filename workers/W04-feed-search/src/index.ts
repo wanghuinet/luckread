@@ -11,7 +11,7 @@
 // Runtime log evidence checkpoint.
 // Node runtime evidence script.
 // KV propagation-aware final gate.
-import { applyAccountStateProjection, parseAccountStateChanged } from './auth-013-projection.js'
+import { applyAccountStateProjection, parseAccountStateChanged, type ProjectionRecord } from './auth-013-projection.js'
 
 interface ProjectionKV {
   get(key: string, type: 'json'): Promise<unknown>
@@ -28,6 +28,31 @@ interface Env {
   W05_SOCIAL: SocialFeedService
   W03_CONTENT?: ContentFeedService
 }
+
+const resourceIdPattern = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/
+const activeAccountStates = new Set(['ACTIVE', 'RESTORED', 'REACTIVATED'])
+const projectionKey = (userId: string) => 'auth013:projection:User:' + userId
+
+const projectionIsCurrent = (value: unknown, userId: string, now: number): value is ProjectionRecord => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  const record = value as Partial<ProjectionRecord>
+  return record.schemaVersion === 1 &&
+    record.resourceType === 'User' &&
+    record.resourceId === userId &&
+    record.sourceAuthority === 'D1-01' &&
+    typeof record.sourceVersion === 'number' &&
+    Number.isSafeInteger(record.sourceVersion) &&
+    record.sourceVersion > 0 &&
+    record.policyVersion === 'AUTH-013-v1' &&
+    record.state === 'ACTIVE' &&
+    record.deindex === false &&
+    typeof record.staleAfter === 'string' &&
+    Number.isFinite(Date.parse(record.staleAfter)) &&
+    Date.parse(record.staleAfter) > now
+}
+
+const projectionAllowsFeed = (record: ProjectionRecord): boolean =>
+  record.state === 'ACTIVE' && !record.deindex && activeAccountStates.has(record.accountState)
 
 const json = (body: unknown, status = 200) =>
   Response.json(body, {
@@ -61,6 +86,22 @@ export default {
       if ((cursor && (cursor.length > 2048 || !/^[A-Za-z0-9_-]+$/.test(cursor))) ||
           !/^(?:[1-9]|[1-4][0-9]|50)$/.test(limit)) {
         return json({ error: { code: 'VALIDATION_FAILED', message: 'VALIDATION_FAILED', details: {} } }, 422)
+      }
+      if (!env?.AUTH013_W04_DERIVED_PROJECTION) {
+        return json({ error: { code: 'ACCOUNT_STATE_PROJECTION_UNAVAILABLE', message: 'ACCOUNT_STATE_PROJECTION_UNAVAILABLE', details: {} } }, 503)
+      }
+      const now = Date.now()
+      let viewerProjection: unknown
+      try {
+        viewerProjection = await env.AUTH013_W04_DERIVED_PROJECTION.get(projectionKey(viewerUserId), 'json')
+      } catch {
+        return json({ error: { code: 'ACCOUNT_STATE_PROJECTION_UNAVAILABLE', message: 'ACCOUNT_STATE_PROJECTION_UNAVAILABLE', details: {} } }, 503)
+      }
+      if (!projectionIsCurrent(viewerProjection, viewerUserId, now)) {
+        return json({ error: { code: 'ACCOUNT_STATE_PROJECTION_UNAVAILABLE', message: 'Account state could not be verified', details: {} } }, 503)
+      }
+      if (!projectionAllowsFeed(viewerProjection)) {
+        return json({ error: { code: 'PERMISSION_DENIED', message: 'Account is not eligible to read this feed', details: {} } }, 403)
       }
       if (!env?.W05_SOCIAL || !env?.W03_CONTENT) {
         return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'SERVICE_UNAVAILABLE', details: {} } }, 503)
@@ -108,7 +149,18 @@ export default {
         }
         const candidateIds = [...new Set(rawAuthorIds as string[])]
         const candidateWindowTruncated = followData.candidateWindowTruncated
-        if (candidateIds.length === 0) {
+        let eligibleOwnerIds: string[]
+        try {
+          const eligibility = await Promise.all(candidateIds.map(async (userId) => {
+            const projection = await env.AUTH013_W04_DERIVED_PROJECTION!.get(projectionKey(userId), 'json')
+            if (!projectionIsCurrent(projection, userId, now)) return null
+            return projectionAllowsFeed(projection) ? userId : null
+          }))
+          eligibleOwnerIds = [...new Set(eligibility.filter((userId): userId is string => typeof userId === 'string'))]
+        } catch {
+          return json({ error: { code: 'ACCOUNT_STATE_PROJECTION_UNAVAILABLE', message: 'Following account eligibility could not be verified', details: {} } }, 503)
+        }
+        if (eligibleOwnerIds.length === 0) {
           return json({ data: { items: [], nextCursor: null, hasMore: false, candidateWindowTruncated }, requestId: 'req_' + crypto.randomUUID() })
         }
 
@@ -120,7 +172,7 @@ export default {
             method: 'POST',
             headers: contentHeaders,
             body: JSON.stringify({
-              creatorIds: candidateIds,
+              ownerUserIds: eligibleOwnerIds,
               limit: Number(limit),
               cursor: cursor || null,
             }),
