@@ -69,7 +69,7 @@ async function post(path, body, headers = {}) {
   const raw = await response.text()
   let data = null
   try { data = raw ? JSON.parse(raw) : null } catch {}
-  return { status: response.status, data }
+  return { status: response.status, data, headers: response.headers }
 }
 
 const register = await post('/auth/register', {
