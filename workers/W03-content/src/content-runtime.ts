@@ -1236,7 +1236,7 @@ export async function transitionContentState(
 
   assertEtag(content.etag, ifMatch)
   const ownsContent = content.ownerUserId === principalUserId
-  if (kind !== 'MODERATOR' && !ownsContent) {
+  if (!ownsContent) {
     throw new ContentRuntimeError('PERMISSION_DENIED', 403)
   }
 
