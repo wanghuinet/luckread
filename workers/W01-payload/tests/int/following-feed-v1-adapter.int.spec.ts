@@ -77,7 +77,28 @@ describe('W04 Following feed runtime boundary', () => {
         },
       }),
       {
-        AUTH013_W04_DERIVED_PROJECTION: { get: async (_key: string, _type: 'json'): Promise<unknown> => null, put: async (_key: string, _value: string): Promise<void> => undefined },
+        AUTH013_W04_DERIVED_PROJECTION: {
+          get: async (key: string, _type: 'json'): Promise<unknown> => {
+            const userId = key.split(':').at(-1) ?? ''
+            if (!['viewer-1', 'creator-1'].includes(userId)) return null
+            return {
+              schemaVersion: 1,
+              resourceType: 'User',
+              resourceId: userId,
+              sourceAuthority: 'D1-01',
+              sourceVersion: 1,
+              eventId: 'evt_' + userId,
+              projectionVersion: 1,
+              accountState: 'ACTIVE',
+              state: 'ACTIVE',
+              deindex: false,
+              createdAt: '2026-10-16T00:00:00.000Z',
+              staleAfter: '2099-10-16T00:00:00.000Z',
+              policyVersion: 'AUTH-013-v1',
+            }
+          },
+          put: async (_key: string, _value: string): Promise<void> => undefined,
+        },
         W05_SOCIAL: { fetch: socialFetch },
         W03_CONTENT: { fetch: contentFetch },
       },
