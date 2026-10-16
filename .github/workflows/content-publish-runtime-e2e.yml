@@ -176,6 +176,33 @@ jobs:
           console.log(JSON.stringify({ creatorUserId: userId, emailVerified: user.emailVerified, nativeSessionHeaderPresent: true }));
           NODE
 
+      - name: Upload authoritative social post body asset
+        run: |
+          set -euo pipefail
+          POST_BODY_TEXT='这是一条受控社交动态发布验收，用于验证正文保存、风险预检、直接发布和公开读取；这条测试动态不需要人工审核。'
+          printf '%s' "$POST_BODY_TEXT" > /tmp/social-post-body.txt
+          echo "POST_BODY_TEXT=$POST_BODY_TEXT" >> "$GITHUB_ENV"
+
+          curl --silent --show-error --fail-with-body \
+            -X POST \
+            -H "Authorization: Bearer $CREATOR_TOKEN" \
+            -H "Idempotency-Key: CONTENT-E2E-$GITHUB_RUN_ID-POST-BODY-UPLOAD" \
+            -F "_payload={\"alt\":\"content-e2e-social-post-$GITHUB_RUN_ID.txt\"}" \
+            -F "file=@/tmp/social-post-body.txt;type=text/plain" \
+            "$CONTENT_API_BASE_URL/api/v1/media" > /tmp/social-post-body-upload.json
+
+          node <<'NODE'
+          const fs = require('node:fs');
+          const envelope = JSON.parse(fs.readFileSync('/tmp/social-post-body-upload.json', 'utf8'));
+          const doc = envelope?.doc ?? envelope;
+          if (doc?.id) fs.appendFileSync(process.env.GITHUB_ENV, 'POST_BODY_MEDIA_ID=' + String(doc.id) + '\n');
+          if (!doc?.id || typeof doc.url !== 'string' || !doc.url.trim()) {
+            throw new Error('social post body upload did not return a delivery-ready media id/url: ' + JSON.stringify(envelope));
+          }
+          fs.appendFileSync(process.env.GITHUB_ENV, 'POST_BODY_REF=' + doc.url.trim() + '\n');
+          console.log(JSON.stringify({ bodyAssetUploaded: true, mediaIdPresent: true, publicUrlPresent: true }));
+          NODE
+
       - name: Create article through public API
         run: |
           set -euo pipefail
@@ -200,22 +227,78 @@ jobs:
           fs.appendFileSync(process.env.GITHUB_ENV, 'VIDEO_ID=' + value.id + '\nVIDEO_ETAG=' + value.etag + '\n');
           NODE
 
-      - name: Run publish preflight for article and video
+      - name: Create social post through public API
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require('node:fs');
+          const body = process.env.POST_BODY_TEXT ?? '';
+          const value = {
+            contentType: 'post',
+            title: body.trim().slice(0, 500),
+            bodyRef: process.env.POST_BODY_REF,
+            mediaRefs: [],
+            coverRef: null,
+          };
+          if (!body.trim() || !value.bodyRef) throw new Error('social post authoritative body fixture is missing');
+          fs.writeFileSync('/tmp/social-post-create-request.json', JSON.stringify(value));
+          NODE
+
+          curl --silent --show-error --fail-with-body \
+            -X POST \
+            -H "Authorization: Bearer $CREATOR_TOKEN" \
+            -H "Content-Type: application/json" \
+            -H "Idempotency-Key: CONTENT-E2E-$GITHUB_RUN_ID-POST-CREATE" \
+            --data @/tmp/social-post-create-request.json \
+            "$CONTENT_API_BASE_URL/api/v1/contents" > /tmp/social-post-create.json
+
+          node <<'NODE'
+          const fs = require('node:fs');
+          const value = JSON.parse(fs.readFileSync('/tmp/social-post-create.json', 'utf8'));
+          if (value.contentType !== 'post' || value.state !== 'DRAFT' || typeof value.id !== 'string' || value.etag !== 'W/"1"' || Number(value.version) !== 1) {
+            throw new Error('social post create assertion failed: ' + JSON.stringify(value));
+          }
+          fs.appendFileSync(process.env.GITHUB_ENV, 'SOCIAL_POST_ID=' + value.id + '\nSOCIAL_POST_ETAG=' + value.etag + '\n');
+          NODE
+
+      - name: Run publish preflight for article, video, and social post
         run: |
           set -euo pipefail
           ARTICLE_PREFLIGHT_BODY='{"contentType":"article","title":"Content E2E Article","body":"我实测这条受控文章发布链，记录创建、审核和公开展示结果。这里包含真实测试过程、版本、时间、数据和结论，作为创作者本人完成实质补充与核验的测试正文。结果将由生产 API 和远程 D1 再次确认。","mediaRefs":[],"coverRef":null,"aiMode":"outline","humanContribution":"substantial"}'
           VIDEO_PREFLIGHT_BODY='{"contentType":"video","title":"Content E2E Video","body":"这是一条受控视频发布链测试，记录创建、审核、发布和公开访问结果。","mediaRefs":["r2://content-e2e/'"$GITHUB_RUN_ID"'/video.mp4"],"coverRef":"r2://content-e2e/'"$GITHUB_RUN_ID"'/video-cover.jpg","aiMode":"outline","humanContribution":"substantial"}'
 
+          node <<'NODE'
+          const fs = require('node:fs');
+          const body = process.env.POST_BODY_TEXT ?? '';
+          const value = {
+            contentType: 'post',
+            title: body.trim().slice(0, 500),
+            body,
+            mediaRefs: [],
+            coverRef: null,
+            aiMode: 'outline',
+            humanContribution: 'substantial',
+          };
+          fs.writeFileSync('/tmp/social-post-preflight-request.json', JSON.stringify(value));
+          NODE
+
           curl --silent --show-error --fail-with-body             -X POST             -H "Authorization: Bearer $CREATOR_TOKEN"             -H "Content-Type: application/json"             --data "$ARTICLE_PREFLIGHT_BODY"             "$CONTENT_API_BASE_URL/api/creator/contents/$ARTICLE_ID/preflight" > /tmp/article-preflight.json
 
           curl --silent --show-error --fail-with-body             -X POST             -H "Authorization: Bearer $CREATOR_TOKEN"             -H "Content-Type: application/json"             --data "$VIDEO_PREFLIGHT_BODY"             "$CONTENT_API_BASE_URL/api/creator/contents/$VIDEO_ID/preflight" > /tmp/video-preflight.json
 
+          curl --silent --show-error --fail-with-body \
+            -X POST \
+            -H "Authorization: Bearer $CREATOR_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data @/tmp/social-post-preflight-request.json \
+            "$CONTENT_API_BASE_URL/api/creator/contents/$SOCIAL_POST_ID/preflight" > /tmp/social-post-preflight.json
+
           node <<'NODE'
           const fs=require('node:fs');
-          for(const [kind,file] of [['article','/tmp/article-preflight.json'],['video','/tmp/video-preflight.json']]){
+          for(const [kind,file] of [['article','/tmp/article-preflight.json'],['video','/tmp/video-preflight.json'],['social post','/tmp/social-post-preflight.json']]){
             const v=JSON.parse(fs.readFileSync(file,'utf8'));
             if(!v || !['PASS','YELLOW'].includes(v.verdict)) throw new Error(kind+' preflight blocked: '+JSON.stringify(v));
-            console.log(kind.toUpperCase()+'_PREFLIGHT='+v.verdict);
+            console.log(kind.toUpperCase().replaceAll(' ','_')+'_PREFLIGHT='+v.verdict);
           }
           NODE
 
@@ -232,6 +315,36 @@ jobs:
           node -e "const fs=require('fs'); const runId=process.env.GITHUB_RUN_ID; const p={contentType:'video',title:'Content E2E Video',body:'这是一条受控视频发布链测试，记录创建、审核、发布和公开访问结果。',mediaRefs:['r2://content-e2e/'+runId+'/video.mp4'],coverRef:'r2://content-e2e/'+runId+'/video-cover.jpg',aiMode:'outline',humanContribution:'substantial'}; fs.writeFileSync('/tmp/video-review-request.json', JSON.stringify({to:'PENDING_REVIEW',preflight:p}));"
           curl --silent --show-error --fail-with-body             -X POST             -H "Authorization: Bearer $CREATOR_TOKEN"             -H "Content-Type: application/json"             -H "Idempotency-Key: CONTENT-E2E-$GITHUB_RUN_ID-VIDEO-REVIEW"             -H "If-Match: $VIDEO_ETAG"             --data @/tmp/video-review-request.json             "$CONTENT_API_BASE_URL/api/v1/contents/$VIDEO_ID/state" > /tmp/video-review.json
           node -e "const v=require('/tmp/video-review.json'); if(v.from!=='DRAFT'||v.to!=='PENDING_REVIEW'||Number(v.version)!==2) throw new Error('video review transition failed: '+JSON.stringify(v));"
+
+      - name: Publish social post directly after W03 preflight
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require('node:fs');
+          const preflight = JSON.parse(fs.readFileSync('/tmp/social-post-preflight.json', 'utf8'));
+          fs.writeFileSync('/tmp/social-post-publish-request.json', JSON.stringify({
+            to: 'PUBLISHED',
+            preflight,
+          }));
+          NODE
+
+          curl --silent --show-error --fail-with-body \
+            -X POST \
+            -H "Authorization: Bearer $CREATOR_TOKEN" \
+            -H "Content-Type: application/json" \
+            -H "Idempotency-Key: CONTENT-E2E-$GITHUB_RUN_ID-POST-PUBLISH" \
+            -H "If-Match: $SOCIAL_POST_ETAG" \
+            --data @/tmp/social-post-publish-request.json \
+            "$CONTENT_API_BASE_URL/api/v1/contents/$SOCIAL_POST_ID/state" > /tmp/social-post-publish.json
+
+          node <<'NODE'
+          const fs = require('node:fs');
+          const value = JSON.parse(fs.readFileSync('/tmp/social-post-publish.json', 'utf8'));
+          if (value.from !== 'DRAFT' || value.to !== 'PUBLISHED' || Number(value.version) !== 2 || value.etag !== 'W/"2"') {
+            throw new Error('social post direct publish transition failed: ' + JSON.stringify(value));
+          }
+          console.log('SOCIAL_POST_DIRECT_PUBLISH=PASS');
+          NODE
 
       - name: Seed controlled moderation cases
         env:
@@ -321,8 +434,10 @@ jobs:
           mkdir -p artifacts/mapping-0/content-publish-runtime-e2e
           curl --silent --show-error --fail-with-body "$CONTENT_API_BASE_URL/api/v1/contents/$ARTICLE_ID" > artifacts/mapping-0/content-publish-runtime-e2e/article-public.json
           curl --silent --show-error --fail-with-body "$CONTENT_API_BASE_URL/api/v1/contents/$VIDEO_ID" > artifacts/mapping-0/content-publish-runtime-e2e/video-public.json
-          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME_W03" --remote --json --config workers/W03-content/wrangler.jsonc             --command "SELECT id,content_type,owner_user_id,state,version,revision,title,body_ref,media_refs_json,cover_ref,etag FROM contents WHERE id IN ('$ARTICLE_ID','$VIDEO_ID') ORDER BY id;"             > artifacts/mapping-0/content-publish-runtime-e2e/content-state.json
+          curl --silent --show-error --fail-with-body -H "Authorization: Bearer $CREATOR_TOKEN" "$CONTENT_API_BASE_URL/api/v1/contents/$SOCIAL_POST_ID" > artifacts/mapping-0/content-publish-runtime-e2e/social-post-public.json
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME_W03" --remote --json --config workers/W03-content/wrangler.jsonc             --command "SELECT id,content_type,owner_user_id,state,version,revision,title,body_ref,media_refs_json,cover_ref,etag FROM contents WHERE id IN ('$ARTICLE_ID','$VIDEO_ID','$SOCIAL_POST_ID') ORDER BY id;"             > artifacts/mapping-0/content-publish-runtime-e2e/content-state.json
           npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME_W06" --remote --json --config workers/W06-governance/wrangler.jsonc             --command "SELECT case_id,state,version,current_decision_id FROM moderation_cases WHERE case_id IN ('$CASE_ARTICLE_ID','$CASE_VIDEO_ID') ORDER BY case_id;"             > artifacts/mapping-0/content-publish-runtime-e2e/moderation-cases.json
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME_W06" --remote --json --config workers/W06-governance/wrangler.jsonc             --command "SELECT case_id,state,target_id FROM moderation_cases WHERE target_type='content' AND target_id='$SOCIAL_POST_ID' ORDER BY case_id;"             > artifacts/mapping-0/content-publish-runtime-e2e/social-post-moderation-cases.json
           npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME_W06" --remote --json --config workers/W06-governance/wrangler.jsonc             --command "SELECT decision_id,case_id,case_version,outcome,policy_version,reviewer_id,reviewer_layer FROM moderation_decisions WHERE case_id IN ('$CASE_ARTICLE_ID','$CASE_VIDEO_ID') ORDER BY case_id;"             > artifacts/mapping-0/content-publish-runtime-e2e/moderation-decisions.json
           node <<'NODE'
           const fs=require('node:fs');
@@ -330,11 +445,23 @@ jobs:
             const pub=JSON.parse(fs.readFileSync('artifacts/mapping-0/content-publish-runtime-e2e/'+kind+'-public.json','utf8'));
             if(pub.state!=='PUBLISHED'||Number(pub.version)!==4) throw new Error(kind+' public visibility failed: '+JSON.stringify(pub));
           }
+          const socialPostPublic=JSON.parse(fs.readFileSync('artifacts/mapping-0/content-publish-runtime-e2e/social-post-public.json','utf8'));
+          if(socialPostPublic.contentType!=='post'||socialPostPublic.state!=='PUBLISHED'||Number(socialPostPublic.version)!==2) {
+            throw new Error('social post public visibility failed: '+JSON.stringify(socialPostPublic));
+          }
           const content=JSON.parse(fs.readFileSync('artifacts/mapping-0/content-publish-runtime-e2e/content-state.json'))?.[0]?.results??[];
-          if(content.length!==2||content.some(x=>x.state!=='PUBLISHED'||Number(x.version)!==4)) throw new Error('W03 remote content evidence invalid: '+JSON.stringify(content));
+          if(content.length!==3) throw new Error('W03 remote content evidence missing records: '+JSON.stringify(content));
+          for (const [id,kind,version] of [[process.env.ARTICLE_ID,'article',4],[process.env.VIDEO_ID,'video',4],[process.env.SOCIAL_POST_ID,'post',2]]) {
+            const row=content.find(x=>x.id===id);
+            if(!row||row.content_type!==kind||row.state!=='PUBLISHED'||Number(row.version)!==version) {
+              throw new Error('W03 remote '+kind+' state evidence invalid: '+JSON.stringify(row));
+            }
+          }
           const decisions=JSON.parse(fs.readFileSync('artifacts/mapping-0/content-publish-runtime-e2e/moderation-decisions.json'))?.[0]?.results??[];
           if(decisions.length!==2||decisions.some(x=>x.outcome!=='APPROVED'||x.reviewer_id===null||x.reviewer_layer!=='L6')) throw new Error('W06 decision evidence invalid: '+JSON.stringify(decisions));
-          console.log('CONTENT_PUBLISH_RUNTIME_E2E=PASS');
+          const postCases=JSON.parse(fs.readFileSync('artifacts/mapping-0/content-publish-runtime-e2e/social-post-moderation-cases.json'))?.[0]?.results??[];
+          if(postCases.length!==0) throw new Error('social post unexpectedly entered moderation: '+JSON.stringify(postCases));
+          console.log('CONTENT_PUBLISH_RUNTIME_E2E=PASS; SOCIAL_POST_DIRECT_PUBLISH=PASS; SOCIAL_POST_MODERATION_CASES=0');
           NODE
 
       - name: Capture provenance
@@ -347,6 +474,8 @@ jobs:
           creator_layer=L3
           article_create_review_approve_publish=true
           video_create_review_approve_publish=true
+          social_post_create_preflight_direct_publish=true
+          social_post_no_moderation_handoff=true
           public_visibility_assertion=true
           remote_d1_evidence=true
           new_worker=0
@@ -362,6 +491,17 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
           set -euo pipefail
+          if [ -n "${POST_BODY_MEDIA_ID:-}" ] && [ -n "${CREATOR_TOKEN:-}" ]; then
+            if curl --silent --show-error --fail-with-body \
+              -X DELETE \
+              -H "Authorization: Bearer $CREATOR_TOKEN" \
+              -H "Idempotency-Key: CONTENT-E2E-$GITHUB_RUN_ID-POST-BODY-CLEANUP" \
+              "$CONTENT_API_BASE_URL/api/v1/media/$POST_BODY_MEDIA_ID"; then
+              echo "Social post body asset cleanup: PASS"
+            else
+              echo "::warning::Social post body asset cleanup failed for the controlled E2E fixture"
+            fi
+          fi
           npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME_W06" --remote --yes --config workers/W06-governance/wrangler.jsonc             --command "DELETE FROM moderation_enforcement_outbox WHERE decision_id IN (SELECT decision_id FROM moderation_decisions WHERE case_id LIKE 'content-e2e-%'); DELETE FROM moderation_decision_idempotency WHERE case_id LIKE 'content-e2e-%'; DELETE FROM moderation_decisions WHERE case_id LIKE 'content-e2e-%'; DELETE FROM moderation_cases WHERE case_id LIKE 'content-e2e-%';"
           CREATOR_USER="${CREATOR_AUTH_USER_ID:-__none__}"
           CREATOR_ROLE="${CREATOR_ROLE_ID:-__none__}"
