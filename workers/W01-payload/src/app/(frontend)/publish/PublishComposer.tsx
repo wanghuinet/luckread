@@ -337,6 +337,12 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
           ? '已发布'
           : draft?.state
 
+  const effectiveContentTitle = (): string =>
+    type === 'post' ? body.trim().slice(0, 500) : title.trim()
+
+  const hasPublishableText = (): boolean =>
+    Boolean(effectiveContentTitle() && body.trim())
+
   async function persistDraft(): Promise<ContentResponse> {
     let bodyRef = draft?.bodyRef
     let nextSavedArticleSerialized: string | null = null
@@ -370,7 +376,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
 
       const payload = {
         contentType: type,
-        title: title.trim(),
+        title: effectiveContentTitle(),
         bodyRef,
         mediaRefs: Array.from(new Set([
           ...assets.map((asset) => asset.url),
@@ -466,7 +472,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
       window.clearTimeout(autoSaveTimerRef.current)
       autoSaveTimerRef.current = null
     }
-    if (!restoreCompleteRef.current || !autoSaveDirtyRef.current || reviewLocked || !title.trim() || !body.trim()) {
+    if (!restoreCompleteRef.current || !autoSaveDirtyRef.current || reviewLocked || !hasPublishableText()) {
       setAutoSaveStatus('idle')
       return
     }
@@ -481,8 +487,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
         autoSaveInFlightRef.current ||
         busy ||
         !autoSaveDirtyRef.current ||
-        !title.trim() ||
-        !body.trim() ||
+        !hasPublishableText() ||
         reviewLocked
       ) {
         return
@@ -566,7 +571,9 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
 
   async function runPreflight(): Promise<{ report: PublishPreflightResult; input: Record<string, unknown>; draft: ContentResponse }> {
     if (autoSaveInFlightRef.current) throw new Error('自动保存正在进行，请稍后重试。')
-    if (!title.trim() || !body.trim()) throw new Error('请先填写标题和正文。')
+    if (!hasPublishableText()) {
+      throw new Error(type === 'post' ? '请先填写动态正文。' : '请先填写标题和正文。')
+    }
     if (type === 'video') {
       const videoAssets = assets.filter(isVideoAsset)
       if (videoAssets.length === 0) throw new Error('短视频至少需要添加一个视频素材。')
@@ -579,7 +586,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
     setAutoSaveStatus('saved')
     const input = {
       contentType: type,
-      title: title.trim(),
+      title: effectiveContentTitle(),
       body,
       mediaRefs: Array.from(new Set([
         ...assets.map((asset) => asset.url),
@@ -615,8 +622,8 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
     if (autoSaveInFlightRef.current) return
     setBusy(true); setError(''); setMessage('')
     try {
-      if (!title.trim() || !body.trim()) {
-        setError('请先填写标题和正文。')
+      if (!hasPublishableText()) {
+        setError(type === 'post' ? '请先填写动态正文。' : '请先填写标题和正文。')
         return
       }
       if (type === 'video' && !assets.some(isVideoAsset)) {
@@ -724,7 +731,9 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
       )
       autoSaveDirtyRef.current = false
       window.dispatchEvent(new Event(CONTENT_MUTATED_EVENT))
-      setMessage('发布前检查通过，已提交审核。审核通过后将进入正式发布状态。')
+      setMessage(type === 'post'
+        ? '动态已提交审核；审核通过并正式发布后会出现在公开信息流。'
+        : '发布前检查通过，已提交审核。审核通过后将进入正式发布状态。')
     } catch (caught) {
       const code = caught instanceof Error ? caught.message : ''
       setError(code === 'AUTH_REQUIRED' ? '登录已失效，请重新登录。' : code || '提交失败，请稍后重试。')
@@ -761,16 +770,18 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
         ))}
       </div>
 
-      <label className="lr-field">
-        <span>标题</span>
-        <input
-          maxLength={512}
-          disabled={busy || reviewLocked}
-          onChange={(event) => { setTitle(event.target.value); markDirty() }}
-          placeholder={type === 'post' ? '这一刻想分享什么？' : '输入一个清晰、有吸引力的标题'}
-          value={title}
-        />
-      </label>
+      {type !== 'post' ? (
+        <label className="lr-field">
+          <span>标题</span>
+          <input
+            maxLength={512}
+            disabled={busy || reviewLocked}
+            onChange={(event) => { setTitle(event.target.value); markDirty() }}
+            placeholder="输入一个清晰、有吸引力的标题"
+            value={title}
+          />
+        </label>
+      ) : null}
 
       {type === 'article' ? (
         <ArticleStructuredEditor
@@ -787,14 +798,17 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
         />
       ) : (
         <label className="lr-field">
-          <span>{type === 'post' ? '正文' : '视频文案'}</span>
+          <span>{type === 'post' ? '推文正文' : '视频文案'}</span>
           <textarea
+            aria-label={type === 'post' ? '推文正文' : '视频文案'}
             disabled={busy || reviewLocked}
-            onChange={(event) => { setBody(event.target.value); markDirty() }}
-            placeholder="写下你的内容…"
-            rows={14}
+            maxLength={type === 'post' ? 500 : 160000}
+            onChange={(event) => { setBody(event.target.value); markDirty(); setPreflightReport(null) }}
+            placeholder={type === 'post' ? '有什么新鲜事？' : '写下你的内容…'}
+            rows={type === 'post' ? 5 : 14}
             value={body}
           />
+          {type === 'post' ? <small aria-live="polite">{body.length}/500</small> : null}
         </label>
       )}
 
