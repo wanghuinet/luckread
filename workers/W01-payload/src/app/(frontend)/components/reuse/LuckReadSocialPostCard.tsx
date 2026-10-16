@@ -24,8 +24,9 @@ type ContentDetail = {
 
 type SocialSummary = {
   data?: {
-    counts?: { likes?: number; favorites?: number; comments?: number; shares?: number }
-    viewer?: { liked?: boolean; favorited?: boolean } | null
+    counts?: { likes?: number; favorites?: number; comments?: number; shares?: number; reposts?: number }
+    viewer?: { liked?: boolean; favorited?: boolean; reposted?: boolean } | null
+    pinned?: boolean
   }
   error?: { message?: string }
 }
@@ -46,6 +47,7 @@ type Props = {
   updatedAt?: string
   locale?: PublicLocale
   onBookmarkChanged?: (bookmarked: boolean) => void
+  onPinChanged?: (contentId: string, pinned: boolean) => void
 }
 
 export default function LuckReadSocialPostCard({
@@ -59,6 +61,7 @@ export default function LuckReadSocialPostCard({
   updatedAt,
   locale = 'zh',
   onBookmarkChanged,
+  onPinChanged,
 }: Props) {
   const [profile, setProfile] = useState<PublicProfile | null>(null)
   const [resolvedCreatorId, setResolvedCreatorId] = useState<string | null>(creatorId ?? null)
@@ -79,6 +82,11 @@ export default function LuckReadSocialPostCard({
   const [likeBusy, setLikeBusy] = useState(false)
   const [bookmarked, setBookmarked] = useState(false)
   const [bookmarkBusy, setBookmarkBusy] = useState(false)
+  const [reposted, setReposted] = useState(false)
+  const [repostCount, setRepostCount] = useState<number | null>(null)
+  const [repostBusy, setRepostBusy] = useState(false)
+  const [pinned, setPinned] = useState(false)
+  const [pinBusy, setPinBusy] = useState(false)
   const [shareBusy, setShareBusy] = useState(false)
   const [reportBusy, setReportBusy] = useState(false)
   const [message, setMessage] = useState('')
@@ -118,6 +126,9 @@ export default function LuckReadSocialPostCard({
       setPostTimestamp(createdAt || updatedAt || '')
       setProfile(null)
       setBookmarked(false)
+      setReposted(false)
+      setRepostCount(null)
+      setPinned(false)
       setLikeStateLoading(true)
 
       const detailRequest = fetchJson<ContentDetail>(
@@ -206,6 +217,11 @@ export default function LuckReadSocialPostCard({
         setLikeCount(result.response.ok && typeof summary?.counts?.likes === 'number'
           ? Math.max(0, summary.counts.likes)
           : null)
+        setReposted(result.response.ok && summary?.viewer?.reposted === true)
+        setRepostCount(result.response.ok && typeof summary?.counts?.reposts === 'number'
+          ? Math.max(0, summary.counts.reposts)
+          : null)
+        setPinned(result.response.ok && summary?.pinned === true)
       }
 
       if (authorId) {
@@ -267,6 +283,49 @@ export default function LuckReadSocialPostCard({
         : locale === 'en' ? 'Like failed.' : '点赞失败，请稍后重试。')
     } finally {
       setLikeBusy(false)
+    }
+  }
+
+  const toggleRepost = async () => {
+    if (repostBusy || likeStateLoading) return
+    const previousReposted = reposted
+    setRepostBusy(true)
+    setMessage('')
+    try {
+      const { response, data } = await fetchJson<ApiResponse<unknown>>(
+        '/api/v1/content/' + encodeURIComponent(contentId) + '/reposts',
+        {
+          method: previousReposted ? 'DELETE' : 'POST',
+          credentials: 'include',
+          cache: 'no-store',
+          headers: {
+            accept: 'application/json',
+            'Idempotency-Key': 'twitter-clone-reuse-repost:' + crypto.randomUUID(),
+          },
+        },
+      )
+      if (response.status === 401) {
+        requireLogin()
+        return
+      }
+      if (!response.ok && response.status !== 204) {
+        throw new Error(getApiErrorMessage(data, locale === 'en' ? 'Repost failed.' : '转推失败，请稍后重试。'))
+      }
+      setReposted(!previousReposted)
+      setRepostCount((current) => current === null
+        ? null
+        : Math.max(0, current + (previousReposted ? -1 : 1)))
+      setMessage(locale === 'en'
+        ? (previousReposted ? 'Repost removed.' : 'Reposted.')
+        : locale === 'tw'
+          ? (previousReposted ? '已取消轉推。' : '已轉推。')
+          : (previousReposted ? '已取消转推。' : '已转推。'))
+    } catch (cause) {
+      setMessage(cause instanceof Error
+        ? cause.message
+        : locale === 'en' ? 'Repost failed.' : '转推失败，请稍后重试。')
+    } finally {
+      setRepostBusy(false)
     }
   }
 
@@ -495,6 +554,62 @@ export default function LuckReadSocialPostCard({
     }
   }
 
+  const toggleProfilePin = async () => {
+    if (!canManagePost || pinBusy) return
+    const previousPinned = pinned
+    setPinBusy(true)
+    setMoreOpen(false)
+    setMessage('')
+    try {
+      const { response, data } = await fetchJson<ApiResponse<unknown>>(
+        '/api/v1/content/' + encodeURIComponent(contentId) + '/pin',
+        {
+          method: previousPinned ? 'DELETE' : 'POST',
+          credentials: 'include',
+          cache: 'no-store',
+          headers: {
+            accept: 'application/json',
+            'Idempotency-Key': 'twitter-clone-reuse-pin:' + contentId + ':' + crypto.randomUUID(),
+          },
+        },
+      )
+      if (response.status === 401) {
+        requireLogin()
+        return
+      }
+      if (!response.ok && response.status !== 204) {
+        throw new Error(getApiErrorMessage(data, locale === 'en' ? 'Pin change failed.' : '置顶操作失败，请稍后重试。'))
+      }
+      const nextPinned = !previousPinned
+      setPinned(nextPinned)
+      onPinChanged?.(contentId, nextPinned)
+      window.dispatchEvent(new CustomEvent('luckread:profile-pin-changed', {
+        detail: { contentId, pinned: nextPinned },
+      }))
+      setMessage(locale === 'en'
+        ? (nextPinned ? 'Pinned to profile.' : 'Removed from profile pin.')
+        : locale === 'tw'
+          ? (nextPinned ? '已置頂到個人頁。' : '已取消個人頁置頂。')
+          : (nextPinned ? '已置顶到个人主页。' : '已取消个人主页置顶。'))
+    } catch (cause) {
+      setMessage(cause instanceof Error
+        ? cause.message
+        : locale === 'en' ? 'Pin change failed.' : '置顶操作失败，请稍后重试。')
+    } finally {
+      setPinBusy(false)
+    }
+  }
+
+  useEffect(() => {
+    const handleProfilePinChanged = (event: Event) => {
+      const detail = (event as CustomEvent<{ contentId?: string; pinned?: boolean }>).detail
+      if (!detail?.contentId) return
+      setPinned(detail.contentId === contentId && detail.pinned === true)
+    }
+    window.addEventListener('luckread:profile-pin-changed', handleProfilePinChanged)
+    return () => window.removeEventListener('luckread:profile-pin-changed', handleProfilePinChanged)
+  }, [contentId])
+
   const shareContent = async () => {
     if (shareBusy) return
     setShareBusy(true)
@@ -559,6 +674,7 @@ export default function LuckReadSocialPostCard({
           )}
           {username ? <span>{username}</span> : null}
           {formattedDate ? <time dateTime={postTimestamp}>{formattedDate}</time> : null}
+          {pinned ? <span className="content-detail-action-status">{locale === 'en' ? 'Pinned' : locale === 'tw' ? '已置頂' : '已置顶'}</span> : null}
         </div>
 
         <h3>{title}</h3>
@@ -629,6 +745,18 @@ export default function LuckReadSocialPostCard({
           <button
             className="content-detail-like"
             type="button"
+            disabled={repostBusy || likeStateLoading}
+            aria-pressed={reposted}
+            onClick={() => void toggleRepost()}
+          >
+            {repostBusy
+              ? (locale === 'en' ? 'Reposting…' : locale === 'tw' ? '轉推中…' : '转推中…')
+              : (locale === 'en' ? (reposted ? 'Undo repost' : 'Repost') : locale === 'tw' ? (reposted ? '取消轉推' : '轉推') : (reposted ? '取消转推' : '转推'))}
+            {repostCount !== null ? ' ' + repostCount.toLocaleString(dateLocale) : ''}
+          </button>
+          <button
+            className="content-detail-like"
+            type="button"
             disabled={bookmarkBusy || likeStateLoading}
             aria-pressed={bookmarked}
             onClick={() => void toggleBookmark()}
@@ -677,6 +805,19 @@ export default function LuckReadSocialPostCard({
               ) : null}
               {canManagePost ? (
                 <>
+                  <button
+                    className="content-detail-like"
+                    type="button"
+                    disabled={pinBusy}
+                    aria-pressed={pinned}
+                    onClick={() => void toggleProfilePin()}
+                  >
+                    {pinBusy
+                      ? (locale === 'en' ? 'Working…' : locale === 'tw' ? '處理中…' : '处理中…')
+                      : pinned
+                        ? (locale === 'en' ? 'Unpin from profile' : locale === 'tw' ? '取消個人頁置頂' : '取消个人主页置顶')
+                        : (locale === 'en' ? 'Pin to profile' : locale === 'tw' ? '置頂到個人頁' : '置顶到个人主页')}
+                  </button>
                   <button
                     className="content-detail-like"
                     type="button"
