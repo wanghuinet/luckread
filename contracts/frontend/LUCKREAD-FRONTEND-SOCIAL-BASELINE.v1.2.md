@@ -30,18 +30,20 @@ This file does not claim that any feature is complete. A feature is complete onl
 8. For every migrated component, record source repository and path, destination path, dependencies/styles copied, and the minimum integration changes.
 9. If a feature cannot be achieved through authorized source reuse, stop at an evidenced gap and request a decision; do not treat the no-self-authored-CSS rule as optional.
 
-## 4. Authorized source registry — verification required
+## 4. Authorized source registry
 
-The user has authorized reuse from four repositories. The exact complete four-repository registry must be recovered from the prior approved inventory, PRs, and repository records before source migration begins.
+The user has explicitly confirmed that all four repositories below are authorized reuse sources:
 
-| Source | Current evidence | Phase-1 action |
+| Source | Initial repository evidence | Reuse focus / constraint |
 |---|---|---|
-| ccrsxx/twitter-clone — https://github.com/ccrsxx/twitter-clone | Existing LuckRead third-party notices identify reused tweet, profile, sidebar, feed and style patterns | Inspect upstream paths and current adaptation gaps |
-| Authorized repository 2 | Exact repository/authorization scope not yet verified in this contract pass | Recover from approved prior inventory; do not guess |
-| Authorized repository 3 | Exact repository/authorization scope not yet verified in this contract pass | Recover from approved prior inventory; do not guess |
-| Authorized repository 4 | Exact repository/authorization scope not yet verified in this contract pass | Recover from approved prior inventory; do not guess |
+| [jokerhutt/x-clone](https://github.com/jokerhutt/x-clone) | README describes React + TypeScript + Tailwind; image/video uploads, feed, search, notifications, bookmarks and retweets. Repository metadata does not identify a license; no root LICENSE file was found in this initial check. README says the project is strictly non-commercial. | Inspect UI/media patterns and confirm written permission scope covers intended use and distribution; do not import its JWT/Google OAuth/backend/storage implementation. |
+| [MkdirRaiden/twitter-clone-client](https://github.com/MkdirRaiden/twitter-clone-client) | README describes React + Vite + Tailwind + React Query; auth UI, search, follow system, interactions, notifications and responsive UI. Repository metadata does not identify a license; no root LICENSE file was found in this initial check. | Inspect components/styles for reusable UI patterns; do not use its external backend/auth or assume unlicensed code has blanket reuse rights beyond the user's explicit permission. |
+| [Nash2610/X-Clone](https://github.com/Nash2610/X-Clone) | GitHub metadata identifies MIT; root LICENSE file exists. README describes responsive X-like UI, search and interactions; package manifest indicates a lightweight Vite/Tailwind app. | Inspect static UI/layout patterns; preserve MIT notice and verify source paths and practical integration value before copying. |
+| [ccrsxx/twitter-clone](https://github.com/ccrsxx/twitter-clone) | GitHub metadata identifies MIT; existing LuckRead third-party notices identify reused tweet, profile, sidebar, feed and style patterns. Upstream is archived and uses Firebase/Firestore. | Primary existing reference for X-like layout and interactions; reuse presentation only, not Firebase/Firestore/auth/storage or mutation logic. Preserve MIT attribution. |
 
-No source code outside the confirmed four-repository allowlist may be copied under this contract until the registry is verified.
+The user's authorization establishes the allowed repository list. It does not remove the need to preserve applicable license notices or to distinguish explicit permission from an upstream repository's default license. For the first two repositories, repository metadata currently reports no license and no root LICENSE file was found; record the user's permission and its scope in the project evidence rather than treating the repositories as MIT-licensed.
+
+Before copying from any source, record the exact source file/path, destination path, applicable license/permission evidence, copied styles/dependencies, and minimum adaptation. Do not import upstream backend/auth/data-authority implementations.
 
 ## 5. Social foundation scope
 
