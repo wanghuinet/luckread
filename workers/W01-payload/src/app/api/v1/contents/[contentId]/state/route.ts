@@ -12,11 +12,15 @@ import {
   W03ContentClientError,
 } from '../../../../../../content/w03-content-client.js'
 
+import { bindPreflightToStoredPost } from '../../../../../../content/bind-post-publish-preflight.js'
+
 const errorResponse = (status: number, code: string, message: string) =>
   Response.json(
     { error: { code, message, details: {} }, requestId: `req_${crypto.randomUUID()}` },
     { status: code === 'VALIDATION_FAILED' && status === 400 ? 422 : status, headers: { 'cache-control': 'no-store' } },
   )
+
+
 
 const requireStatePreconditions = (request: Request): Response | null => {
   const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
@@ -41,11 +45,14 @@ export async function POST(
     if (principal instanceof Response) return principal
     const preconditionError = requireStatePreconditions(request)
     if (preconditionError) return preconditionError
+    const submitted = await request.json()
+    const boundSubmission = await bindPreflightToStoredPost(request, contentId, principal, submitted, errorResponse)
+    if (boundSubmission instanceof Response) return boundSubmission
     const response = await callW03Content({
       request,
       pathname: `/internal/content/contents/${encodeURIComponent(contentId)}/state`,
       method: 'POST',
-      body: await request.json(),
+      body: boundSubmission,
       principal,
     })
     if (response.ok) {

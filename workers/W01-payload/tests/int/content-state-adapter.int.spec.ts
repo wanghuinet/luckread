@@ -115,6 +115,7 @@ describe('1.1 content lifecycle closeout', () => {
     const creatorCreate = read('src/app/(payload)/api/creator/contents/route.ts')
     const creatorState = read('src/app/(payload)/api/creator/contents/[contentId]/state/route.ts')
     const publicState = read('src/app/api/v1/contents/[contentId]/state/route.ts')
+    const boundPreflight = read('src/content/bind-post-publish-preflight.ts')
     const creatorList = read('src/app/(payload)/v1beta/CreatorContentList.tsx')
     const publicDetail = read('src/app/(frontend)/content/[contentId]/page.tsx')
     const publicDetailClient = read('src/app/(frontend)/content/[contentId]/ContentDetailClient.tsx')
@@ -126,7 +127,8 @@ describe('1.1 content lifecycle closeout', () => {
 
     expect(publisher).toContain("contentBasePath = '/api/v1/contents'")
     expect(publisher).toContain("contentBasePath + '/' + encodeURIComponent(savedDraft.id) + '/state'")
-    expect(publisher).toContain("JSON.stringify({ to: 'PENDING_REVIEW', preflight: input })")
+    expect(publisher).toContain("to: type === 'post' ? 'PUBLISHED' : 'PENDING_REVIEW'")
+    expect(publisher).toContain('preflight: input')
     expect(publisher).toContain("'If-Match': savedDraft.etag")
     expect(publisher).toContain("'Idempotency-Key': crypto.randomUUID()")
     expect(publisher).toContain("window.dispatchEvent(new Event(CONTENT_MUTATED_EVENT))")
@@ -138,6 +140,7 @@ describe('1.1 content lifecycle closeout', () => {
     expect(creatorState).toContain("/internal/content/contents/")
     expect(creatorState).toContain("/state")
     expect(creatorState).toContain("requireStatePreconditions")
+    expect(creatorState).toContain("bindPreflightToStoredPost")
     expect(creatorState).toContain("invalidatePublicContentDetail(request, contentId)")
     expect(creatorState).toContain("invalidatePublicContentList(request)")
 
@@ -145,6 +148,12 @@ describe('1.1 content lifecycle closeout', () => {
     expect(publicState).toContain("/internal/content/contents/")
     expect(publicState).toContain("/state")
     expect(publicState).toContain("invalidatePublicContentDetail(request, contentId)")
+    expect(publicState).toContain("bindPreflightToStoredPost")
+    expect(boundPreflight).toContain("resolvePublicArticleBodyUrl")
+    expect(boundPreflight).toContain("readBoundedUtf8")
+    expect(boundPreflight).toContain("body: canonicalBody")
+    expect(boundPreflight).toContain("redirect: 'manual'")
+    expect(boundPreflight).toContain("content.state !== 'DRAFT'")
     expect(publicState).toContain("invalidatePublicContentList(request)")
 
     expect(creatorList).toContain("async function requestTransition(itemId: string")
