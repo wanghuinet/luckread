@@ -234,10 +234,10 @@ const worker = {
   async fetch(request: Request, env: Env): Promise<Response> {
     try {
       const url = new URL(request.url)
-      const isRead = request.method === 'GET'
+      const isRead = request.method === 'GET' || (request.method === 'POST' && url.pathname === '/internal/content/following-feed')
       await enforceRateLimits(request, env, isRead ? 'read' : 'write')
 
-      if (request.method === 'GET' && url.pathname === '/internal/content/following-feed') {
+      if (request.method === 'POST' && url.pathname === '/internal/content/following-feed') {
         if (
           request.headers.get('X-LuckRead-Caller') !== 'W04' ||
           request.headers.get('X-LuckRead-Transport-Version') !== '1.0' ||
@@ -247,42 +247,50 @@ const worker = {
         ) {
           throw new ContentRuntimeError('PERMISSION_DENIED', 403)
         }
+        if ([...url.searchParams.keys()].length > 0) {
+          throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+        }
         const viewerUserId = request.headers.get('X-LuckRead-Principal-User-Id')?.trim() ?? ''
         if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(viewerUserId)) {
           throw new ContentRuntimeError('UNAUTHENTICATED', 401)
         }
-        const allowed = new Set(['creatorIds', 'cursor', 'limit'])
-        for (const key of url.searchParams.keys()) {
-          if (!allowed.has(key)) throw new ContentRuntimeError('VALIDATION_FAILED', 400)
-        }
-        const creatorIdsValues = url.searchParams.getAll('creatorIds')
-        const cursorValues = url.searchParams.getAll('cursor')
-        const limitValues = url.searchParams.getAll('limit')
-        if (
-          creatorIdsValues.length !== 1 ||
-          cursorValues.length > 1 ||
-          limitValues.length > 1
-        ) {
+        const rawBody = await request.text()
+        if (rawBody.length > 70000) throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+        let parsedBody: unknown
+        try { parsedBody = JSON.parse(rawBody) } catch {
           throw new ContentRuntimeError('VALIDATION_FAILED', 400)
         }
-        const creatorIdsRaw = creatorIdsValues[0] ?? ''
-        if (creatorIdsRaw.length > 70000) throw new ContentRuntimeError('VALIDATION_FAILED', 400)
-        const creatorIds = creatorIdsRaw.split(',')
+        if (!parsedBody || typeof parsedBody !== 'object' || Array.isArray(parsedBody)) {
+          throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+        }
+        const body = parsedBody as Record<string, unknown>
+        if (Object.keys(body).some((key) => !['creatorIds', 'cursor', 'limit'].includes(key))) {
+          throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+        }
+        const creatorIds = body.creatorIds
         if (
+          !Array.isArray(creatorIds) ||
           creatorIds.length < 1 ||
           creatorIds.length > 500 ||
-          creatorIds.some((id) => !/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(id))
+          creatorIds.some((id) => typeof id !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(id))
         ) {
           throw new ContentRuntimeError('VALIDATION_FAILED', 400)
         }
-        const cursor = cursorValues[0]?.trim() || null
+        const cursor = body.cursor === null || body.cursor === undefined
+          ? null
+          : typeof body.cursor === 'string'
+            ? body.cursor.trim() || null
+            : (() => { throw new ContentRuntimeError('VALIDATION_FAILED', 400) })()
         if (cursor && cursor.length > 2048) throw new ContentRuntimeError('INVALID_CURSOR', 400)
+        if (body.limit !== undefined && typeof body.limit !== 'number' && typeof body.limit !== 'string') {
+          throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+        }
         const page = await listFollowingCreatorContents(
           env.D1_02,
           viewerUserId,
-          creatorIds,
+          creatorIds as string[],
           cursor,
-          parseListLimit(limitValues[0] ?? null),
+          parseListLimit(body.limit === undefined ? null : String(body.limit)),
         )
         return json({
           data: {
@@ -304,6 +312,7 @@ const worker = {
           requestId: createRequestId(),
         })
       }
+
       const isModerationTransition =
         request.method === 'POST' &&
         /^\/internal\/content\/contents\/[^/]+\/state$/.test(url.pathname) &&
