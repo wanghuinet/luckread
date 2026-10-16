@@ -23,10 +23,16 @@ describe('Creator Center admin extension', () => {
     expect(publisher).toContain('mediaRefs: Array.from(new Set([')
   })
 
-  it('opens post publishing from the Twitter-style home composer', () => {
+  it('opens the clone-style tweet composer modal from the Twitter-style home', () => {
     const home = read('src/app/(twitter-clone)/home/page.tsx')
-    expect(home).toContain('href="/publish?type=post"')
-    expect(home).not.toContain('href="/publish"')
+    const modal = read('src/app/(twitter-clone)/TwitterClonePostComposerModal.tsx')
+    const publisher = read('src/app/(frontend)/publish/PublishComposer.tsx')
+    expect(home).toContain('<TwitterClonePostComposerModal')
+    expect(home).not.toContain('href="/publish?type=post"')
+    expect(modal).toContain('role="dialog"')
+    expect(modal).toContain('<PublishComposer initialType="post" presentation="tweet-modal" />')
+    expect(publisher).toContain("presentation?: 'workspace' | 'tweet-modal'")
+    expect(publisher).toContain("const isTweetModal = presentation === 'tweet-modal'")
   })
 
   it('uses a single body field for social posts and derives their feed title', () => {
