@@ -126,7 +126,8 @@ describe('1.1 content lifecycle closeout', () => {
 
     expect(publisher).toContain("contentBasePath = '/api/v1/contents'")
     expect(publisher).toContain("contentBasePath + '/' + encodeURIComponent(savedDraft.id) + '/state'")
-    expect(publisher).toContain("JSON.stringify({ to: 'PENDING_REVIEW', preflight: input })")
+    expect(publisher).toContain("to: type === 'post' ? 'PUBLISHED' : 'PENDING_REVIEW'")
+    expect(publisher).toContain('preflight: input')
     expect(publisher).toContain("'If-Match': savedDraft.etag")
     expect(publisher).toContain("'Idempotency-Key': crypto.randomUUID()")
     expect(publisher).toContain("window.dispatchEvent(new Event(CONTENT_MUTATED_EVENT))")
