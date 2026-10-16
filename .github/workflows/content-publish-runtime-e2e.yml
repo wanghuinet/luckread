@@ -49,10 +49,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
-      - name: Checkout exact source
+      - name: Checkout workflow revision for test harness
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.source_sha }}
+          ref: ${{ github.sha }}
           fetch-depth: 1
 
       - name: Verify exact successful production launch
@@ -60,7 +60,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD)" = "$W01_SOURCE_SHA"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$GITHUB_REF" = "refs/heads/main"
           run_json="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$LAUNCH_RUN_ID")"
           artifacts_json="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$LAUNCH_RUN_ID/artifacts?per_page=100")"
           W01_SOURCE_SHA="$W01_SOURCE_SHA" node --input-type=module -e '
@@ -70,6 +71,7 @@ jobs:
             if (run.name !== "W01 W02 Auth Binding Deploy") throw new Error("launch workflow mismatch: " + run.name);
             if (run.conclusion !== "success") throw new Error("launch run is not SUCCESS");
             if (run.head_branch !== "main") throw new Error("launch run is not on main");
+            if (run.head_sha !== process.env.W01_SOURCE_SHA) throw new Error("launch source commit mismatch");
             const match = (artifacts.artifacts ?? []).find((a) => a?.name === expectedArtifact && a?.expired_at == null);
             if (!match) throw new Error("deployment source artifact mismatch: expected " + expectedArtifact);
             console.log(JSON.stringify({runId:run.id,workflow:run.name,workflowHeadSha:run.head_sha,deployedSourceSha:process.env.W01_SOURCE_SHA,artifact:match.name,conclusion:run.conclusion}));
@@ -82,6 +84,21 @@ jobs:
 
       - name: Install repository dependencies
         run: npm ci
+
+      - name: Initialize runtime evidence directory
+        run: |
+          set -euo pipefail
+          evidence_dir="artifacts/mapping-0/content-publish-runtime-e2e"
+          mkdir -p "$evidence_dir"
+          cat > "$evidence_dir/run-start.json" <<EOF
+          {
+            "workflow": "Content Publish Runtime E2E",
+            "runId": "$GITHUB_RUN_ID",
+            "sourceSha": "$W01_SOURCE_SHA",
+            "launchRunId": "$LAUNCH_RUN_ID",
+            "stage": "fixture-setup"
+          }
+          EOF
 
       - name: Setup native moderator fixture
         env:

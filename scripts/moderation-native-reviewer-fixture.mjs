@@ -14,7 +14,10 @@ if (!accountId || !apiToken) throw new Error('Cloudflare credentials are require
 
 const suffix = 'MODL6-' + runId + '-' + randomBytes(5).toString('hex')
 const email = 'moderation-e2e-' + suffix + '@example.com'
-const username = 'mod_e2e_' + suffix.replaceAll('-', '').slice(-24)
+const username = 'mode2e' + suffix.replaceAll('-', '').slice(-24)
+if (!/^[A-Za-z0-9]{6,32}$/.test(username)) {
+  throw new Error('generated native reviewer username violates the production username policy')
+}
 const password = 'Evd-MOD-' + randomBytes(24).toString('base64url') + '-Z9!'
 const deviceId = 'moderation-e2e-' + runId
 const roleId = 'MODERATION-E2E-ROLE-' + runId + '-' + randomBytes(5).toString('hex')
