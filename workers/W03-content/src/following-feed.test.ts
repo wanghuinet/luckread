@@ -58,7 +58,7 @@ const mockDb = () => {
 describe('W03 Following content projection', () => {
   it('queries only published content for the W04-authorized owner set and returns stable pagination', async () => {
     const { db, prepare } = mockDb()
-    const page = await listFollowingCreatorContents(db, 'viewer-1', ['creator-2', 'creator-1'], null, 1)
+    const page = await listFollowingOwnerContents(db, 'viewer-1', ['creator-2', 'creator-1'], null, 1)
     expect(page.items).toHaveLength(1)
     expect(page.items[0]).toMatchObject({
       id: 'content-1',
@@ -79,20 +79,20 @@ describe('W03 Following content projection', () => {
 
   it('binds cursors to the viewer and followed-author scope', async () => {
     const { db } = mockDb()
-    const page = await listFollowingCreatorContents(db, 'viewer-1', ['creator-1', 'creator-2'], null, 1)
+    const page = await listFollowingOwnerContents(db, 'viewer-1', ['creator-1', 'creator-2'], null, 1)
     await expect(
-      listFollowingCreatorContents(db, 'viewer-2', ['creator-1', 'creator-2'], page.nextCursor, 1),
+      listFollowingOwnerContents(db, 'viewer-2', ['creator-1', 'creator-2'], page.nextCursor, 1),
     ).rejects.toMatchObject({ code: 'INVALID_CURSOR' })
     await expect(
-      listFollowingCreatorContents(db, 'viewer-1', ['creator-1'], page.nextCursor, 1),
+      listFollowingOwnerContents(db, 'viewer-1', ['creator-1'], page.nextCursor, 1),
     ).rejects.toMatchObject({ code: 'INVALID_CURSOR' })
   })
 
   it('rejects an empty or overlarge author set', async () => {
     const { db } = mockDb()
-    await expect(listFollowingCreatorContents(db, 'viewer-1', [], null, 6))
+    await expect(listFollowingOwnerContents(db, 'viewer-1', [], null, 6))
       .rejects.toMatchObject({ code: 'VALIDATION_FAILED' })
-    await expect(listFollowingCreatorContents(db, 'viewer-1', Array.from({ length: 501 }, (_, i) => 'creator-' + i), null, 6))
+    await expect(listFollowingOwnerContents(db, 'viewer-1', Array.from({ length: 501 }, (_, i) => 'creator-' + i), null, 6))
       .rejects.toMatchObject({ code: 'VALIDATION_FAILED' })
   })
 })
