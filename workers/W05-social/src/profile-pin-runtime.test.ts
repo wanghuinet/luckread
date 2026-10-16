@@ -13,7 +13,7 @@ const db = (firstResults: unknown[] = []) => {
   return { prepare } as unknown as D1Database
 }
 
-const published = { id: 'content-1', state: 'PUBLISHED', owner_user_id: 'viewer-1' }
+const published = { id: 'content-1', content_type: 'post', state: 'PUBLISHED', owner_user_id: 'viewer-1' }
 const pin = { user_id: 'viewer-1', content_id: 'content-1', pinned_at: '2026-10-16T00:00:00.000Z' }
 
 describe('profile pin runtime', () => {
@@ -35,7 +35,9 @@ describe('profile pin runtime', () => {
     expect((d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).toHaveBeenCalledTimes(1)
   })
 
-  it('rejects missing or unpublished content', async () => {
+  it('rejects missing, non-post, or unpublished content', async () => {
+    await expect(pinProfileContent(db([{ ...published, content_type: 'article' }]), 'viewer-1', 'content-1'))
+      .rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 })
     await expect(pinProfileContent(db([null]), 'viewer-1', 'content-1'))
       .rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 })
     await expect(pinProfileContent(db([{ ...published, state: 'DRAFT' }]), 'viewer-1', 'content-1'))
@@ -57,7 +59,7 @@ describe('profile pin runtime', () => {
     expect(prepare.mock.calls[0]?.[0]).toContain('content_id')
   })
 
-  it('reads only a published content pin that still belongs to the user', async () => {
+  it('reads only a published post pin that still belongs to the user', async () => {
     await expect(getProfilePin(db([pin]), 'viewer-1')).resolves.toEqual({
       userId: 'viewer-1', contentId: 'content-1', pinnedAt: pin.pinned_at,
     })
