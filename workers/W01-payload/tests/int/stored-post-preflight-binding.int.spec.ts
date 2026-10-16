@@ -138,23 +138,38 @@ describe('bind direct social post publishing to the stored body asset', () => {
     expect((oversized as Response).status).toBe(422)
   })
 
-  it('does not change article submission or a previously published post transition', async () => {
+  it('leaves review submissions alone and does not apply post binding to stored article content', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch')
+    const reviewSubmission = { ...submitted, to: 'PENDING_REVIEW' }
 
-    for (const item of [
-      { ...submitted, to: 'PENDING_REVIEW' },
-      { ...submitted, to: 'PUBLISHED', preflight: { ...submitted.preflight, contentType: 'article' } },
-    ]) {
-      const result = await bindPreflightToStoredPost(
-        makeRequest(),
-        'post-1',
-        principal,
-        item,
-        makeErrorResponse,
-      )
-      expect(result).toBe(item)
-    }
+    const reviewResult = await bindPreflightToStoredPost(
+      makeRequest(),
+      'post-1',
+      principal,
+      reviewSubmission,
+      makeErrorResponse,
+    )
+    expect(reviewResult).toBe(reviewSubmission)
     expect(callW03ContentMock).not.toHaveBeenCalled()
+
+    const articleSubmission = {
+      ...submitted,
+      preflight: { ...submitted.preflight, contentType: 'article' },
+    }
+    callW03ContentMock.mockResolvedValueOnce(new Response(JSON.stringify(storedPost({
+      contentType: 'article',
+      state: 'APPROVED',
+    })), { status: 200 }))
+
+    const articleResult = await bindPreflightToStoredPost(
+      makeRequest(),
+      'post-1',
+      principal,
+      articleSubmission,
+      makeErrorResponse,
+    )
+    expect(articleResult).toBe(articleSubmission)
+    expect(callW03ContentMock).toHaveBeenCalledTimes(1)
     expect(fetchMock).not.toHaveBeenCalled()
   })
 })
