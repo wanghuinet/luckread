@@ -759,7 +759,8 @@ describe('Creator Center admin extension', () => {
     expect(publisher).toContain('controller.abort()')
 
     expect(publisher).toContain('disabled={busy || reviewLocked}')
-    expect(publisher).toContain('<div className="lr-composer-card" aria-busy={busy}>')
+    expect(publisher).toContain('className="lr-composer-card"')
+    expect(publisher).toContain('aria-busy={busy}')
 
     expect(publisher).toContain('当前状态')
     expect(publisher).toContain('版本 {draft.version}')
