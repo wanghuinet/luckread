@@ -22,9 +22,11 @@ interface MessageBatchLike { messages: QueueMessage[] }
 interface SocialFeedService {
   fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response>
 }
+interface ContentFeedService { fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> }
 interface Env {
   AUTH013_W04_DERIVED_PROJECTION: ProjectionKV
   W05_SOCIAL: SocialFeedService
+  W03_CONTENT?: ContentFeedService
 }
 
 const json = (body: unknown, status = 200) =>
@@ -60,34 +62,72 @@ export default {
           !/^(?:[1-9]|[1-4][0-9]|50)$/.test(limit)) {
         return json({ error: { code: 'VALIDATION_FAILED', message: 'VALIDATION_FAILED', details: {} } }, 422)
       }
-      if (!env?.W05_SOCIAL) {
+      if (!env?.W05_SOCIAL || !env?.W03_CONTENT) {
         return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'SERVICE_UNAVAILABLE', details: {} } }, 503)
       }
-      const query = new URLSearchParams({ limit })
-      if (cursor) query.set('cursor', cursor)
+      const correlationId = request.headers.get('X-LuckRead-Correlation-Id')!.trim()
+      const transportHeaders = new Headers({
+        'X-LuckRead-Caller': 'W04',
+        'X-LuckRead-Transport-Version': '1.0',
+        'X-LuckRead-Correlation-Id': correlationId,
+        'X-LuckRead-Principal-User-Id': viewerUserId,
+        'X-LuckRead-Rate-Key': 'user:' + viewerUserId,
+      })
+      const layer = request.headers.get('X-LuckRead-Principal-Layer')?.trim()
+      if (layer && /^L[0-8]$/.test(layer)) transportHeaders.set('X-LuckRead-Principal-Layer', layer)
+
       try {
-        const upstreamHeaders = new Headers({
-          'X-LuckRead-Caller': 'W04',
-          'X-LuckRead-Transport-Version': '1.0',
-          'X-LuckRead-Correlation-Id': request.headers.get('X-LuckRead-Correlation-Id')!.trim(),
-          'X-LuckRead-Principal-User-Id': viewerUserId,
-          'X-LuckRead-Rate-Key': 'user:' + viewerUserId,
-        })
-        const layer = request.headers.get('X-LuckRead-Principal-Layer')?.trim()
-        if (layer && /^L[0-8]$/.test(layer)) upstreamHeaders.set('X-LuckRead-Principal-Layer', layer)
-        const upstream = await env.W05_SOCIAL.fetch(new Request(
-          'https://luckread-w05.internal/internal/social/feed/following?' + query.toString(),
-          { method: 'GET', headers: upstreamHeaders },
+        const followsResponse = await env.W05_SOCIAL.fetch(new Request(
+          'https://luckread-w05.internal/internal/social/feed/following-authors',
+          { method: 'GET', headers: transportHeaders },
         ))
-        return new Response(await upstream.arrayBuffer(), {
-          status: upstream.status,
-          headers: {
-            'content-type': upstream.headers.get('content-type') ?? 'application/json; charset=utf-8',
-            'cache-control': 'no-store',
-          },
+        const followsText = await followsResponse.text()
+        if (!followsResponse.ok) {
+          return new Response(followsText, {
+            status: followsResponse.status,
+            headers: { 'content-type': followsResponse.headers.get('content-type') ?? 'application/json; charset=utf-8', 'cache-control': 'no-store' },
+          })
+        }
+
+        let followsPayload: { data?: { items?: Array<{ userId?: unknown }>; candidateWindowTruncated?: unknown } }
+        try { followsPayload = JSON.parse(followsText) as typeof followsPayload } catch {
+          return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Social service returned an invalid response', details: {} } }, 503)
+        }
+        const candidateIds = Array.isArray(followsPayload.data?.items)
+          ? [...new Set(followsPayload.data.items.map((item) => item?.userId).filter((id): id is string =>
+              typeof id === 'string' && /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(id)))].slice(0, 500)
+          : []
+        const candidateWindowTruncated = followsPayload.data?.candidateWindowTruncated === true
+        if (candidateIds.length === 0) {
+          return json({ data: { items: [], nextCursor: null, hasMore: false, candidateWindowTruncated }, requestId: 'req_' + crypto.randomUUID() })
+        }
+
+        const contentQuery = new URLSearchParams({
+          creatorIds: candidateIds.join(','),
+          limit,
+        })
+        if (cursor) contentQuery.set('cursor', cursor)
+        const contentResponse = await env.W03_CONTENT.fetch(new Request(
+          'https://luckread-w03.internal/internal/content/following-feed?' + contentQuery.toString(),
+          { method: 'GET', headers: transportHeaders },
+        ))
+        const contentText = await contentResponse.text()
+        if (!contentResponse.ok) {
+          return new Response(contentText, {
+            status: contentResponse.status,
+            headers: { 'content-type': contentResponse.headers.get('content-type') ?? 'application/json; charset=utf-8', 'cache-control': 'no-store' },
+          })
+        }
+        let contentPayload: { data?: Record<string, unknown> }
+        try { contentPayload = JSON.parse(contentText) as typeof contentPayload } catch {
+          return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Content service returned an invalid response', details: {} } }, 503)
+        }
+        return json({
+          ...contentPayload,
+          data: { ...(contentPayload.data ?? {}), candidateWindowTruncated },
         })
       } catch {
-        return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'SERVICE_UNAVAILABLE', details: {} } }, 503)
+        return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Following feed service unavailable', details: {} } }, 503)
       }
     }
     if (request.method === 'GET' && url.pathname === '/health') {
