@@ -912,7 +912,7 @@ describe('W05 social comment transport', () => {
         'Idempotency-Key': 'pin-1',
       }),
       { DB: dbFor([
-        { id: 'content-1', state: 'PUBLISHED', owner_user_id: 'viewer-1' },
+        { id: 'content-1', content_type: 'post', state: 'PUBLISHED', owner_user_id: 'viewer-1' },
         { user_id: 'viewer-1', content_id: 'content-1', pinned_at: '2026-10-16T00:00:00.000Z' },
       ]) },
     )
