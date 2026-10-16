@@ -2909,6 +2909,59 @@ paths:
         '428': { $ref: '#/components/responses/PreconditionRequired' }
         '503': { $ref: '#/components/responses/ClientError' }
 
+  /content/{contentId}/pin:
+    delete:
+      tags: [Contents]
+      summary: Discovery draft for DELETE undefined
+      operationId: deleteContentContentIdPin
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+    post:
+      tags: [Contents]
+      summary: Discovery draft for POST undefined
+      operationId: postContentContentIdPin
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /content/{contentId}/reposts:
+    delete:
+      tags: [Interactions]
+      summary: Discovery draft for DELETE undefined
+      operationId: deleteContentContentIdReposts
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+    post:
+      tags: [Interactions]
+      summary: Discovery draft for POST undefined
+      operationId: postContentContentIdReposts
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /users/{userId}/pinned-content:
+    get:
+      tags: [Users]
+      summary: Discovery draft for GET undefined
+      operationId: getUsersUserIdPinnedContent
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
 components:
   securitySchemes:
     bearerAuth:
