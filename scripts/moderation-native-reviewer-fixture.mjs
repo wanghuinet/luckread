@@ -3,6 +3,7 @@ import { execFileSync } from 'node:child_process'
 import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs'
 
 const base = String(process.env.AUTH_BASE_URL || 'https://api.luckread.com').replace(/\/$/, '')
+const authBrowserOrigin = new URL(process.env.AUTH_BROWSER_ORIGIN || 'https://luckread.com').origin
 const accountId = process.env.CLOUDFLARE_ACCOUNT_ID
 const apiToken = process.env.CLOUDFLARE_API_TOKEN
 const runId = String(process.env.GITHUB_RUN_ID || Date.now())
@@ -60,6 +61,7 @@ async function post(path, body, headers = {}) {
     headers: {
       accept: 'application/json',
       'content-type': 'application/json',
+      origin: authBrowserOrigin,
       ...headers,
     },
     body: JSON.stringify(body),
