@@ -705,7 +705,7 @@ describe('Creator Center admin extension', () => {
     expect(publisher).toContain('navigator.clipboard.writeText')
     expect(publisher).toContain("'复制恢复链接'")
     expect(publisher).toContain('const stateLabel = draft?.state')
-    expect(publisher).toContain("const reviewLocked = draft?.state === 'PENDING_REVIEW'")
+    expect(publisher).toContain("const reviewLocked = draft?.state === 'PENDING_REVIEW' || (type === 'post' && draft?.state === 'PUBLISHED')")
     expect(publisher).toContain("const returnTo = window.location.pathname + window.location.search + window.location.hash")
     expect(publisher).toContain("router.replace('/login?returnTo=' + encodeURIComponent(returnTo))")
     expect(contentDetailPage).toContain('generateMetadata')
@@ -1073,6 +1073,19 @@ describe('Creator Center admin extension', () => {
     expect(view).toContain("locale === 'en-US' ? 'Audience' : '粉丝'")
     expect(styles).toContain('.languageSwitch')
     expect(styles).toContain('.languageSwitchButtonActive')
+  })
+
+
+  it('publishes ordinary social posts directly after server preflight while preserving creator review', () => {
+    const publisher = read('src/app/(frontend)/publish/PublishComposer.tsx')
+
+    expect(publisher).toContain("const preflightBasePath = contentBasePath === '/api/v1/contents'")
+    expect(publisher).toContain("? '/api/creator/contents'")
+    expect(publisher).toContain("if (type !== 'post' && report.verdict === 'YELLOW')")
+    expect(publisher).toContain("to: type === 'post' ? 'PUBLISHED' : 'PENDING_REVIEW'")
+    expect(publisher).toContain("'动态已发布，已进入公开信息流。'")
+    expect(publisher).toContain("type === 'post' ? '发布动态' : '提交发布'")
+    expect(publisher).toContain("普通动态通过 W03 风险检查后直接发布")
   })
 
 
