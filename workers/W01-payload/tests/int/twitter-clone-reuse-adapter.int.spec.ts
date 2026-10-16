@@ -196,4 +196,26 @@ describe('Twitter Clone UI reuse through LuckRead API adapters', () => {
     expect(component).toContain("contentState === 'PUBLISHED'")
   })
 
+
+  it('renders the authorized X-style timeline layout on the social homepage while keeping LuckRead API authority', () => {
+    const component = read('src/app/(frontend)/components/reuse/LuckReadSocialPostCard.tsx')
+    const homeFeed = read('src/app/(twitter-clone)/TwitterCloneHomeFeed.tsx')
+
+    expect(homeFeed).toContain('presentation="x-timeline"')
+    expect(component).toContain("presentation?: 'content' | 'x-timeline'")
+    expect(component).toContain("if (presentation === 'x-timeline')")
+    expect(component).toContain('grid grid-cols-[auto,minmax(0,1fr)]')
+    expect(component).toContain('hover:bg-black/[0.025]')
+    expect(component).toContain('dark:hover:bg-white/[0.03]')
+    expect(component).toContain('aria-pressed={reposted}')
+    expect(component).toContain('aria-pressed={liked}')
+    expect(component).toContain('aria-pressed={bookmarked}')
+    expect(component).toContain('role="menu"')
+    expect(component).toContain("'/api/v1/content/' + encodeURIComponent(contentId) + '/reposts'")
+    expect(component).toContain("'/api/v1/content/' + encodeURIComponent(contentId) + '/pin'")
+    expect(component).toContain("'/api/v1/reports'")
+    expect(component).not.toContain('firebase/firestore')
+    expect(component).not.toContain('tweetsCollection')
+  })
+
 })
