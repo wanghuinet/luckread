@@ -44,8 +44,9 @@ const projectionIsCurrent = (value: unknown, userId: string, now: number): value
     Number.isSafeInteger(record.sourceVersion) &&
     record.sourceVersion > 0 &&
     record.policyVersion === 'AUTH-013-v1' &&
-    record.state === 'ACTIVE' &&
-    record.deindex === false &&
+    (record.state === 'ACTIVE' || record.state === 'PURGED') &&
+    typeof record.deindex === 'boolean' &&
+    ((record.state === 'PURGED') === record.deindex) &&
     typeof record.staleAfter === 'string' &&
     Number.isFinite(Date.parse(record.staleAfter)) &&
     Date.parse(record.staleAfter) > now
