@@ -567,10 +567,12 @@ export const preflightContent = (rawInput: unknown): PublishPreflightResult => {
     addFinding(findings, 'SEC-HTML-HIDDEN', 'BLOCK', 'SECURITY', '发现隐藏代码或隐藏文字风险', '正文包含可能影响渲染、导流或搜索引擎识别的 HTML/隐藏样式片段。', '删除 HTML/CSS 注入内容，仅保留真实可读正文。')
   }
 
-  if (title.length < 8) {
+  // A short post's body is its display text, not an SEO headline. Keep
+  // long-form title checks for articles/videos without penalizing normal tweets.
+  if (input.contentType !== 'post' && title.length < 8) {
     addFinding(findings, 'SEO-TITLE-SHORT', 'WARN', 'SEO', '标题信息量偏低', '标题过短，可能无法清楚表达主题。', '把核心主题、对象或结果写进标题，保持自然描述。')
   }
-  if (title.length > 70) {
+  if (input.contentType !== 'post' && title.length > 70) {
     addFinding(findings, 'SEO-TITLE-LONG', 'WARN', 'SEO', '标题偏长', '标题较长，搜索结果中的标题链接可能被截断。', '保留真正重要的信息，删除重复修饰词。')
   }
   if (!/[\p{L}\p{N}]/u.test(title) || /(.)\1{7,}/u.test(title)) {
