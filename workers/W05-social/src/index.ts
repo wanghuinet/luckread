@@ -10,6 +10,8 @@ import {
   unfavorite,
 } from './favorite-runtime.js'
 import { ShareRuntimeError, createShare, resolveShare } from './share-runtime.js'
+import { RepostRuntimeError, createRepost, removeRepost } from './repost-runtime.js'
+import { ProfilePinRuntimeError, getProfilePin, pinProfileContent, unpinProfileContent } from './profile-pin-runtime.js'
 import { BlockMuteRuntimeError, removeRelation, setRelation } from './block-mute-runtime.js'
 import { getRelationshipGraph, invalidateRelationshipGraph, RelationshipGraphRuntimeError } from './relationship-graph-runtime.js'
 import {
@@ -219,6 +221,59 @@ export default {
     try {
       const url = new URL(request.url)
       await enforceRateLimit(request, env, request.method === 'GET' ? 'read:' + url.pathname.split('/').slice(0, 4).join('/') : 'write:' + url.pathname.split('/').slice(0, 4).join('/'))
+
+      const repostMatch = /^\\/internal\\/social\\/content\\/([^/]+)\\/reposts$/.exec(url.pathname)
+      if (repostMatch) {
+        const contentId = decodePathPart(repostMatch[1] ?? '')
+        if (contentId === null) throw new RepostRuntimeError('VALIDATION_FAILED', 400)
+        if (request.method !== 'POST' && request.method !== 'DELETE') {
+          return new Response(null, { status: 405, headers: { Allow: 'POST, DELETE' } })
+        }
+        const actorUserId = requirePrincipal(request)
+        requireInteractionLayer(request)
+        const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
+        if (!idempotencyKey) throw new RepostRuntimeError('PRECONDITION_REQUIRED', 428)
+        if (idempotencyKey.length > 256) throw new RepostRuntimeError('VALIDATION_FAILED', 400)
+        if (request.method === 'POST') {
+          return json({
+            data: await createRepost(env.DB, actorUserId, contentId),
+            requestId: createRequestId(),
+          }, 201)
+        }
+        await removeRepost(env.DB, actorUserId, contentId)
+        return new Response(null, { status: 204 })
+      }
+
+      const pinMatch = /^\\/internal\\/social\\/content\\/([^/]+)\\/pin$/.exec(url.pathname)
+      if (pinMatch) {
+        const contentId = decodePathPart(pinMatch[1] ?? '')
+        if (contentId === null) throw new ProfilePinRuntimeError('VALIDATION_FAILED', 400)
+        if (request.method !== 'POST' && request.method !== 'DELETE') {
+          return new Response(null, { status: 405, headers: { Allow: 'POST, DELETE' } })
+        }
+        const actorUserId = requirePrincipal(request)
+        requireInteractionLayer(request)
+        const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
+        if (!idempotencyKey) throw new ProfilePinRuntimeError('PRECONDITION_REQUIRED', 428)
+        if (idempotencyKey.length > 256) throw new ProfilePinRuntimeError('VALIDATION_FAILED', 400)
+        if (request.method === 'POST') {
+          return json({
+            data: await pinProfileContent(env.DB, actorUserId, contentId),
+            requestId: createRequestId(),
+          })
+        }
+        await unpinProfileContent(env.DB, actorUserId, contentId)
+        return new Response(null, { status: 204 })
+      }
+
+      const pinnedContentMatch = /^\\/internal\\/social\\/users\\/([^/]+)\\/pinned-content$/.exec(url.pathname)
+      if (pinnedContentMatch) {
+        if (request.method !== 'GET') return new Response(null, { status: 405, headers: { Allow: 'GET' } })
+        requireTransport(request)
+        const userId = decodePathPart(pinnedContentMatch[1] ?? '')
+        if (userId === null) throw new ProfilePinRuntimeError('VALIDATION_FAILED', 400)
+        return json({ data: await getProfilePin(env.DB, userId), requestId: createRequestId() })
+      }
 
       if (url.pathname.startsWith('/internal/social/shares/')) {
         const parts = url.pathname.split('/').filter(Boolean)
@@ -771,6 +826,8 @@ export default {
         error instanceof CommentRuntimeError ||
         error instanceof FavoriteRuntimeError ||
         error instanceof ShareRuntimeError ||
+        error instanceof RepostRuntimeError ||
+        error instanceof ProfilePinRuntimeError ||
         error instanceof BlockMuteRuntimeError ||
         error instanceof RelationshipGraphRuntimeError ||
         error instanceof SocialClosureRuntimeError ||
