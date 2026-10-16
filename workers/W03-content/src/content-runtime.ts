@@ -702,10 +702,10 @@ const decodeFollowingContentsCursor = (
   }
 }
 
-export async function listFollowingCreatorContents(
+export async function listFollowingOwnerContents(
   db: ContentD1,
   viewerUserId: string,
-  followedCreatorIdsInput: string[],
+  followedOwnerIdsInput: string[],
   cursorValue: string | null,
   limit: number,
 ): Promise<{ items: ContentRecord[]; nextCursor: string | null; hasMore: boolean }> {
@@ -714,16 +714,16 @@ export async function listFollowingCreatorContents(
   if (!Number.isSafeInteger(limit) || limit < 1 || limit > 50) {
     throw new ContentRuntimeError('VALIDATION_FAILED', 400)
   }
-  const creatorIds = [...new Set(followedCreatorIdsInput.map((id) => id.trim()))].sort()
-  if (creatorIds.length < 1 || creatorIds.length > 500) {
+  const ownerIds = [...new Set(followedOwnerIdsInput.map((id) => id.trim()))].sort()
+  if (ownerIds.length < 1 || ownerIds.length > 500) {
     throw new ContentRuntimeError('VALIDATION_FAILED', 400)
   }
-  for (const creatorId of creatorIds) assertResourceId(creatorId)
+  for (const ownerId of ownerIds) assertResourceId(ownerId)
 
   const scopeHash = await sha256Hex(JSON.stringify({
     type: 'following-feed',
     viewerUserId: viewerId,
-    creatorIds,
+    ownerIds,
   }))
   const cursor = decodeFollowingContentsCursor(cursorValue, viewerId, scopeHash)
   const cursorClause = cursor
@@ -732,22 +732,18 @@ export async function listFollowingCreatorContents(
   const cursorBindings: unknown[] = cursor
     ? [cursor.createdAt, cursor.createdAt, cursor.id]
     : []
-  const creatorIdsJson = JSON.stringify(creatorIds)
+  const ownerIdsJson = JSON.stringify(ownerIds)
   const rows = await db.prepare(`
     SELECT c.id, c.content_type, c.owner_user_id, c.creator_id, c.ip_id, c.state,
            c.scheduled_at, c.version, c.revision, c.slug, c.title, c.body_ref,
            c.media_refs_json, c.cover_ref, c.etag, c.created_at, c.updated_at
       FROM contents c
      WHERE c.state = 'PUBLISHED'
-       AND (
-         c.creator_id IN (SELECT value FROM json_each(?))
-         OR c.owner_user_id IN (SELECT value FROM json_each(?))
-       )
+       AND c.owner_user_id IN (SELECT value FROM json_each(?))
        ${cursorClause}
      ORDER BY c.created_at DESC, c.id DESC
      LIMIT ?`).bind(
-       creatorIdsJson,
-       creatorIdsJson,
+       ownerIdsJson,
        ...cursorBindings,
        limit + 1,
      ).all<ContentRow>()
