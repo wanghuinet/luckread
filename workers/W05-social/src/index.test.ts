@@ -868,6 +868,31 @@ describe('W05 social comment transport', () => {
     )
     expect(response.status).toBe(401)
   })
+  it('rejects unauthenticated repost and profile pin writes before touching D1', async () => {
+    const unauthenticatedHeaders = {
+      'X-LuckRead-Caller': 'W01',
+      'X-LuckRead-Transport-Version': '1.0',
+      'X-LuckRead-Correlation-Id': 'unauthenticated-write',
+      'X-LuckRead-Principal-Layer': 'L2',
+      'Idempotency-Key': 'unauthenticated-write-1',
+    }
+    const repostDb = dbFor()
+    const repostResponse = await worker.fetch(
+      requestWithMethod('/internal/social/content/content-1/reposts', 'POST', unauthenticatedHeaders),
+      { DB: repostDb },
+    )
+    expect(repostResponse.status).toBe(401)
+    expect((repostDb as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).not.toHaveBeenCalled()
+
+    const pinDb = dbFor()
+    const pinResponse = await worker.fetch(
+      requestWithMethod('/internal/social/content/content-1/pin', 'POST', unauthenticatedHeaders),
+      { DB: pinDb },
+    )
+    expect(pinResponse.status).toBe(401)
+    expect((pinDb as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).not.toHaveBeenCalled()
+  })
+
   it('creates a repost relation through the authenticated W01 principal', async () => {
     const response = await worker.fetch(
       requestWithMethod('/internal/social/content/content-1/reposts', 'POST', {
