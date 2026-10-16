@@ -134,6 +134,7 @@ export default function PublicProfilePage({
   const [filter, setFilter] = useState<ProfileChannel>('posts')
   const [contents, setContents] = useState<PublicContent[]>([])
   const [pinnedContentId, setPinnedContentId] = useState<string | null>(null)
+  const [pinnedContent, setPinnedContent] = useState<PublicContent | null>(null)
   const [replies, setReplies] = useState<ProfileReply[]>([])
   const [contentCursor, setContentCursor] = useState<string | null>(null)
   const [contentHasMore, setContentHasMore] = useState(false)
@@ -147,6 +148,8 @@ export default function PublicProfilePage({
   useEffect(() => {
     const controller = new AbortController()
     let cancelled = false
+    setPinnedContentId(null)
+    setPinnedContent(null)
 
     void (async () => {
       try {
@@ -238,7 +241,10 @@ export default function PublicProfilePage({
           let items = Array.isArray(contentData?.data?.items) ? contentData.data.items : []
           const pinRecord = pinResult.response.ok ? pinResult.data?.data : null
           const nextPinnedContentId = pinRecord && typeof pinRecord.contentId === 'string' ? pinRecord.contentId : null
-          if (nextPinnedContentId && !items.some((item) => item.id === nextPinnedContentId)) {
+          let nextPinnedContent = nextPinnedContentId
+            ? items.find((item) => item.id === nextPinnedContentId) ?? null
+            : null
+          if (nextPinnedContentId && !nextPinnedContent) {
             try {
               const pinnedDetail = await fetchJson<{ data?: PublicContent }>(
                 '/api/v1/contents/' + encodeURIComponent(nextPinnedContentId),
@@ -255,6 +261,7 @@ export default function PublicProfilePage({
                 pinnedItem?.id === nextPinnedContentId &&
                 pinnedItem.contentType === 'post'
               ) {
+                nextPinnedContent = pinnedItem
                 items = [...items, pinnedItem]
               }
             } catch (cause) {
@@ -262,6 +269,7 @@ export default function PublicProfilePage({
             }
           }
           setPinnedContentId(nextPinnedContentId)
+          setPinnedContent(nextPinnedContent)
           setContents(sortPinnedFirst(items, nextPinnedContentId))
           setContentCursor(typeof contentData?.data?.nextCursor === 'string' ? contentData.data.nextCursor : null)
           setContentHasMore(contentData?.data?.hasMore === true)
@@ -341,7 +349,11 @@ export default function PublicProfilePage({
       })
       if (!response.ok || !Array.isArray(data?.data?.items)) throw new Error('CONTENT_LIST_FAILED')
       if (requestId !== contentRequestIdRef.current || controller.signal.aborted) return
-      setContents(sortPinnedFirst(nextFilter === 'media' ? data.data.items.filter(isMediaContent) : data.data.items, pinnedContentId))
+      let nextItems = nextFilter === 'media' ? data.data.items.filter(isMediaContent) : data.data.items
+      if (nextFilter === 'posts' && pinnedContent && !nextItems.some((item) => item.id === pinnedContent.id)) {
+        nextItems = [...nextItems, pinnedContent]
+      }
+      setContents(sortPinnedFirst(nextItems, pinnedContentId))
       setContentCursor(typeof data.data.nextCursor === 'string' ? data.data.nextCursor : null)
       setContentHasMore(data.data.hasMore === true)
     } catch (cause) {
@@ -787,7 +799,11 @@ export default function PublicProfilePage({
                       locale="zh"
                       onPinChanged={(changedContentId, isPinned) => {
                         const nextPinnedContentId = isPinned ? changedContentId : null
+                        const nextPinnedContent = isPinned
+                          ? contents.find((content) => content.id === changedContentId) ?? null
+                          : null
                         setPinnedContentId(nextPinnedContentId)
+                        setPinnedContent(nextPinnedContent)
                         setContents((current) => sortPinnedFirst(current, nextPinnedContentId))
                       }}
                     />
