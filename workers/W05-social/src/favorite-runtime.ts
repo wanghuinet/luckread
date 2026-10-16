@@ -155,4 +155,97 @@ export async function unfavorite(
 }
 
 
+
+export type FavoriteListPage = {
+  items: Array<{ targetId: string; createdAt: string }>
+  nextCursor: string | null
+  hasMore: boolean
+}
+
+type FavoriteListCursor = {
+  v: 1
+  actorUserId: string
+  createdAt: string
+  relationshipId: string
+}
+
+const encodeFavoriteListCursor = (value: FavoriteListCursor): string =>
+  btoa(encodeURIComponent(JSON.stringify(value))).replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '')
+
+const decodeFavoriteListCursor = (cursor: string, actorUserId: string): FavoriteListCursor => {
+  try {
+    if (!cursor || cursor.length > 2048 || !/^[A-Za-z0-9_-]+$/.test(cursor)) throw new Error('invalid')
+    const normalized = cursor.replace(/-/g, '+').replace(/_/g, '/')
+    const padded = normalized + '='.repeat((4 - normalized.length % 4) % 4)
+    const value = JSON.parse(decodeURIComponent(atob(padded))) as Partial<FavoriteListCursor>
+    if (
+      value.v !== 1 ||
+      value.actorUserId !== actorUserId ||
+      typeof value.createdAt !== 'string' ||
+      !Number.isFinite(Date.parse(value.createdAt)) ||
+      typeof value.relationshipId !== 'string' ||
+      !value.relationshipId.trim() ||
+      value.relationshipId.length > RESOURCE_ID_MAX
+    ) throw new Error('invalid')
+    return value as FavoriteListCursor
+  } catch {
+    throw new FavoriteRuntimeError('INVALID_CURSOR', 400)
+  }
+}
+
+export async function listFavorites(
+  db: D1Database,
+  actorUserId: string,
+  cursor: string | null,
+  limit: number,
+): Promise<FavoriteListPage> {
+  const actor = validateActor(actorUserId)
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > 50) {
+    throw new FavoriteRuntimeError('VALIDATION_FAILED', 400)
+  }
+  const decoded = cursor ? decodeFavoriteListCursor(cursor, actor) : null
+  const rows = decoded
+    ? await db.prepare(
+        `SELECT relationship_id, target_id, created_at
+           FROM interaction_favorites
+          WHERE actor_user_id = ?
+            AND target_type = 'content'
+            AND (created_at < ? OR (created_at = ? AND relationship_id < ?))
+          ORDER BY created_at DESC, relationship_id DESC
+          LIMIT ?`,
+      ).bind(actor, decoded.createdAt, decoded.createdAt, decoded.relationshipId, limit + 1).all<{
+        relationship_id: string
+        target_id: string
+        created_at: string
+      }>()
+    : await db.prepare(
+        `SELECT relationship_id, target_id, created_at
+           FROM interaction_favorites
+          WHERE actor_user_id = ?
+            AND target_type = 'content'
+          ORDER BY created_at DESC, relationship_id DESC
+          LIMIT ?`,
+      ).bind(actor, limit + 1).all<{
+        relationship_id: string
+        target_id: string
+        created_at: string
+      }>()
+
+  const hasMore = rows.results.length > limit
+  const page = rows.results.slice(0, limit)
+  const last = page.at(-1)
+  return {
+    items: page.map(row => ({ targetId: row.target_id, createdAt: row.created_at })),
+    hasMore,
+    nextCursor: hasMore && last
+      ? encodeFavoriteListCursor({
+          v: 1,
+          actorUserId: actor,
+          createdAt: last.created_at,
+          relationshipId: last.relationship_id,
+        })
+      : null,
+  }
+}
+
 export const clearFavoriteStatusCacheForTests = (): void => favoriteStatusCache.clear()

@@ -201,6 +201,17 @@ export default async function HomePage() {
                 <path d="m10 9 5 3-5 3z" />
               </svg>
             </Link>
+            <Link
+              className="home-rail-link"
+              data-umami-event="bookmarks-open"
+              href="/bookmarks"
+              aria-label={publicLocale === 'en' ? 'Bookmarks' : publicLocale === 'tw' ? '已收藏' : '我的收藏'}
+              title={publicLocale === 'en' ? 'Bookmarks' : publicLocale === 'tw' ? '已收藏' : '我的收藏'}
+            >
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8">
+                <path d="M6 4.75A1.75 1.75 0 0 1 7.75 3h8.5A1.75 1.75 0 0 1 18 4.75V21l-6-4-6 4z" />
+              </svg>
+            </Link>
             <Link className="home-rail-link" data-umami-event="creator-center-open" href={CREATOR_CENTER_URL} aria-label={copy.common.creatorCenter} title={copy.common.creatorCenter}>
               <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8">
                 <path d="m14 5 5 5M4 20l4.2-.9L19 8.3a2.1 2.1 0 0 0-3-3L5.2 16.1z" />
