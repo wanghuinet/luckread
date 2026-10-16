@@ -23,7 +23,7 @@ describe('Twitter-clone homepage reuse', () => {
   it('keeps the clone feed, compose entry, profile, and discovery routes connected', async () => {
     const home = await readFile('src/app/(twitter-clone)/home/page.tsx', 'utf8')
     expect(home).toContain('<TwitterCloneHomeFeed key={feedMode} initialPage={initialPage} locale={locale} feedMode={feedMode} />')
-    expect(home).toContain('href="/publish"')
+    expect(home).toContain('href="/publish?type=post"')
     expect(home).toContain('href="/me/profile"')
     expect(home).toContain('TwitterCloneSidebarProfile locale={locale}')
     const sidebarProfile = await readFile('src/app/(twitter-clone)/TwitterCloneSidebarProfile.tsx', 'utf8')

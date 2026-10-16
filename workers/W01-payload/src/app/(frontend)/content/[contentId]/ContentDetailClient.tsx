@@ -520,17 +520,19 @@ export default function ContentDetailPage({
           </section>
         ) : null}
 
-        <div className="content-detail-body">
-          {structuredArticle ? (
-            <ArticleStructuredRenderer document={structuredArticle} />
-          ) : body ? (
-            splitBodyIntoParagraphs(body).map((paragraph, index) => (
-              <p className="content-detail-paragraph" key={index}>{paragraph}</p>
-            ))
-          ) : (
-            <p className="content-detail-muted">{copy.detail.bodyPreparing}</p>
-          )}
-        </div>
+        {!(content.contentType === 'post' && body.trim() === content.title.trim()) ? (
+          <div className="content-detail-body">
+            {structuredArticle ? (
+              <ArticleStructuredRenderer document={structuredArticle} />
+            ) : body ? (
+              splitBodyIntoParagraphs(body).map((paragraph, index) => (
+                <p className="content-detail-paragraph" key={index}>{paragraph}</p>
+              ))
+            ) : (
+              <p className="content-detail-muted">{copy.detail.bodyPreparing}</p>
+            )}
+          </div>
+        ) : null}
       </article>
       <ContentComments
         contentId={content.id}
