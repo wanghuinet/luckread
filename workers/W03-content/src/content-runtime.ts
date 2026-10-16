@@ -16,12 +16,18 @@ export type ContentState =
 
 export type ContentType = 'article' | 'post' | 'video'
 
+export interface ContentPollInput {
+  options: string[]
+  durationHours: 1 | 24 | 168
+}
+
 export interface ContentInput {
   contentType: ContentType
   title: string
   bodyRef: string
   mediaRefs: string[]
   coverRef: string | null
+  poll?: ContentPollInput
 }
 
 export interface ContentRecord {
@@ -42,6 +48,18 @@ export interface ContentRecord {
   etag: string
   createdAt: string
   updatedAt: string
+  hasPoll?: boolean
+}
+
+export interface ContentPollSummary {
+  contentId: string
+  options: string[]
+  counts: number[]
+  totalVotes: number
+  userVote: number | null
+  durationHours: number
+  expiresAt: string
+  isClosed: boolean
 }
 
 
@@ -158,6 +176,8 @@ const publicMessage = (code: string): string => {
     case 'INVALID_CURSOR': return 'Invalid pagination cursor'
     case 'CURSOR_EXPIRED': return 'Pagination cursor expired'
     case 'RATE_LIMITED': return 'Rate limit exceeded'
+    case 'POLL_ALREADY_VOTED': return 'You have already voted in this poll'
+    case 'POLL_CLOSED': return 'This poll has closed'
     default: return 'Content request failed'
   }
 }
@@ -242,9 +262,29 @@ export const validateInput = (input: unknown): ContentInput => {
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
     throw new ContentRuntimeError('VALIDATION_FAILED', 400)
   }
-  const candidate = input as { contentType?: unknown; title?: unknown; bodyRef?: unknown; mediaRefs?: unknown; coverRef?: unknown }
+  const candidate = input as { contentType?: unknown; title?: unknown; bodyRef?: unknown; mediaRefs?: unknown; coverRef?: unknown; poll?: unknown }
   const contentType = candidate.contentType === undefined ? 'article' : candidate.contentType
   const mediaRefs = candidate.mediaRefs === undefined ? [] : candidate.mediaRefs
+  let poll: ContentPollInput | undefined
+  if (candidate.poll !== undefined) {
+    const rawPoll = candidate.poll as { options?: unknown; durationHours?: unknown } | null
+    if (
+      contentType !== 'post' ||
+      !rawPoll ||
+      !Array.isArray(rawPoll.options) ||
+      rawPoll.options.length < 2 ||
+      rawPoll.options.length > 4 ||
+      rawPoll.options.some((option) => typeof option !== 'string' || !option.trim() || option.trim().length > 25) ||
+      new Set(rawPoll.options.map((option) => typeof option === 'string' ? option.trim().toLocaleLowerCase() : '')).size !== rawPoll.options.length ||
+      ![1, 24, 168].includes(Number(rawPoll.durationHours))
+    ) {
+      throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+    }
+    poll = {
+      options: rawPoll.options.map((option) => (option as string).trim()),
+      durationHours: Number(rawPoll.durationHours) as ContentPollInput['durationHours'],
+    }
+  }
   if (
     !['article', 'post', 'video'].includes(String(contentType)) ||
     !Array.isArray(mediaRefs) || mediaRefs.length > 20 ||
@@ -260,7 +300,14 @@ export const validateInput = (input: unknown): ContentInput => {
   ) {
     throw new ContentRuntimeError('VALIDATION_FAILED', 400)
   }
-  return { contentType: contentType as ContentType, title: candidate.title.trim(), bodyRef: candidate.bodyRef.trim(), mediaRefs: mediaRefs.map(ref => ref.trim()), coverRef: candidate.coverRef === undefined || candidate.coverRef === null ? null : candidate.coverRef.trim() }
+  return {
+    contentType: contentType as ContentType,
+    title: candidate.title.trim(),
+    bodyRef: candidate.bodyRef.trim(),
+    mediaRefs: mediaRefs.map(ref => ref.trim()),
+    coverRef: candidate.coverRef === undefined || candidate.coverRef === null ? null : candidate.coverRef.trim(),
+    ...(poll ? { poll } : {}),
+  }
 }
 
 const canonicalize = (value: unknown): unknown => {
@@ -460,6 +507,9 @@ const isIdempotencyUniqueConstraint = (error: unknown): boolean =>
 const isContentCasGuardFailure = (error: unknown): boolean =>
   /CHECK constraint failed: successful|content_txn_guard.*CHECK constraint/i.test(errorMessage(error))
 
+const isPollAlreadyVoted = (error: unknown): boolean =>
+  /UNIQUE constraint failed: content_poll_votes\.content_id, content_poll_votes\.voter_user_id/i.test(errorMessage(error))
+
 const batchMutation = async (
   db: ContentD1,
   statements: D1PreparedStatement[],
@@ -468,6 +518,7 @@ const batchMutation = async (
     await db.batch(statements)
   } catch (error) {
     if (isIdempotencyUniqueConstraint(error)) throw new ContentRuntimeError('IDEMPOTENCY_IN_PROGRESS', 409)
+    if (isPollAlreadyVoted(error)) throw new ContentRuntimeError('POLL_ALREADY_VOTED', 409)
     if (isContentCasGuardFailure(error)) throw new ContentRuntimeError('PRECONDITION_FAILED', 412)
     throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
   }
@@ -606,6 +657,15 @@ export async function listCreatorContents(
 }
 
 
+async function attachPollFlags(db: ContentD1, items: ContentRecord[]): Promise<ContentRecord[]> {
+  if (!items.length) return items
+  const rows = await db.prepare(
+    'SELECT content_id FROM content_polls WHERE content_id IN (SELECT value FROM json_each(?))',
+  ).bind(JSON.stringify(items.map((item) => item.id))).all<{ content_id: string }>()
+  const pollIds = new Set((rows.results ?? []).map((row) => row.content_id))
+  return items.map((item) => ({ ...item, hasPoll: pollIds.has(item.id) }))
+}
+
 export async function listPublishedContentsByIds(
   db: ContentD1,
   contentIds: string[],
@@ -628,7 +688,7 @@ export async function listPublishedContentsByIds(
       LIMIT ?`,
   ).bind(JSON.stringify(ids), ids.length).all<ContentRow>()
 
-  return rows.results.map(toContent)
+  return attachPollFlags(db, rows.results.map(toContent))
 }
 
 export async function listContents(
@@ -675,7 +735,7 @@ export async function listContents(
   const page = rows.results.slice(0, pageSize).map(toContent)
   const last = page.at(-1)
   return {
-    items: page,
+    items: await attachPollFlags(db, page),
     hasMore,
     nextCursor: hasMore && last ? encodeContentListCursor(last.createdAt, last.id, creatorId, contentType) : null,
   }
@@ -779,7 +839,7 @@ export async function listFollowingOwnerContents(
   const items = sourceRows.slice(0, limit).map(toContent)
   const last = items.at(-1)
   return {
-    items,
+    items: await attachPollFlags(db, items),
     hasMore,
     nextCursor: hasMore && last
       ? encodeFollowingContentsCursor({
@@ -854,13 +914,14 @@ export async function createContent(
   const slug = contentSlugFor(normalized.title, contentId)
   const createdAt = now.toISOString()
   const expiresAt = new Date(now.getTime() + IDEMPOTENCY_TTL_MS).toISOString()
+  const initialState: ContentState = normalized.contentType === 'post' ? 'PUBLISHED' : 'DRAFT'
   const createdContent: ContentRecord = {
     id: contentId,
     contentType: normalized.contentType,
     ownerUserId,
     creatorId: ownerUserId,
     ipId: null,
-    state: 'DRAFT',
+    state: initialState,
     scheduledAt: null,
     version: 1,
     revision: 1,
@@ -872,17 +933,21 @@ export async function createContent(
     etag: etagForVersion(1),
     createdAt,
     updatedAt: createdAt,
+    hasPoll: Boolean(normalized.poll),
   }
 
-  await batchMutation(db, [
+  const mutationStatements: D1PreparedStatement[] = [
     expireMutationRow(db, ownerUserId, operationId, idempotencyKey, createdAt),
     insertCompletedIdempotency(db, ownerUserId, operationId, idempotencyKey, hash, 201, JSON.stringify(createdContent), createdAt, expiresAt),
     db.prepare(
       `INSERT INTO contents
         (id, content_type, owner_user_id, creator_id, ip_id, state, scheduled_at, version, revision, slug, title, body_ref, media_refs_json, cover_ref, etag, created_at, updated_at)
-       VALUES (?, ?, ?, ?, NULL, 'DRAFT', NULL, 1, 1, ?, ?, ?, ?, ?, ?, ?, ?) `,
-    ).bind(contentId, normalized.contentType, ownerUserId, ownerUserId, slug, normalized.title, normalized.bodyRef, JSON.stringify(normalized.mediaRefs), normalized.coverRef, createdContent.etag, createdAt, createdAt),
+       VALUES (?, ?, ?, ?, NULL, ?, NULL, 1, 1, ?, ?, ?, ?, ?, ?, ?, ?) `,
+    ).bind(contentId, normalized.contentType, ownerUserId, ownerUserId, initialState, slug, normalized.title, normalized.bodyRef, JSON.stringify(normalized.mediaRefs), normalized.coverRef, createdContent.etag, createdAt, createdAt),
     atomicGuard(db),
+    ...(normalized.poll ? [db.prepare(
+      `INSERT INTO content_polls (content_id, options_json, duration_hours, expires_at, created_at) VALUES (?, ?, ?, ?, ?)`,
+    ).bind(contentId, JSON.stringify(normalized.poll.options), normalized.poll.durationHours, new Date(now.getTime() + normalized.poll.durationHours * 60 * 60 * 1000).toISOString(), createdAt)] : []),
     insertRevision(db, {
       id: crypto.randomUUID(),
       contentId,
@@ -891,7 +956,7 @@ export async function createContent(
       actorUserId: ownerUserId,
       sourceRevision: null,
       operation: 'CREATE',
-      state: 'DRAFT',
+      state: initialState,
       slug,
       title: normalized.title,
       bodyRef: normalized.bodyRef,
@@ -902,9 +967,97 @@ export async function createContent(
       correlationId: normalizeCorrelationId(correlationId),
       createdAt,
     }),
-  ])
+  ]
+  await batchMutation(db, mutationStatements)
 
   return createdContent
+}
+
+export async function getContentPoll(
+  db: ContentD1,
+  contentId: string,
+  viewerUserId: string | null = null,
+  now = new Date(),
+): Promise<ContentPollSummary> {
+  assertResourceId(contentId)
+  if (viewerUserId) assertResourceId(viewerUserId)
+  const content = await db.prepare('SELECT state FROM contents WHERE id = ?').bind(contentId).first<{ state: ContentState }>()
+  if (!content || content.state !== 'PUBLISHED') throw new ContentRuntimeError('NOT_FOUND', 404)
+  const poll = await db.prepare(
+    'SELECT options_json, duration_hours, expires_at FROM content_polls WHERE content_id = ?',
+  ).bind(contentId).first<{ options_json: string; duration_hours: number; expires_at: string }>()
+  if (!poll) throw new ContentRuntimeError('NOT_FOUND', 404)
+  let options: string[]
+  try {
+    const parsed = JSON.parse(poll.options_json) as unknown
+    if (!Array.isArray(parsed) || parsed.length < 2 || parsed.length > 4 || parsed.some((item) => typeof item !== 'string')) throw new Error('invalid poll options')
+    options = parsed
+  } catch {
+    throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
+  }
+  const voteRows = await db.prepare(
+    'SELECT option_index, COUNT(*) AS vote_count FROM content_poll_votes WHERE content_id = ? GROUP BY option_index',
+  ).bind(contentId).all<{ option_index: number; vote_count: number }>()
+  const counts = Array.from({ length: options.length }, (_, index) => {
+    const row = (voteRows.results ?? []).find((item) => Number(item.option_index) === index)
+    return Number(row?.vote_count ?? 0)
+  })
+  const ownVote = viewerUserId
+    ? await db.prepare('SELECT option_index FROM content_poll_votes WHERE content_id = ? AND voter_user_id = ?').bind(contentId, viewerUserId).first<{ option_index: number }>()
+    : null
+  return {
+    contentId,
+    options,
+    counts,
+    totalVotes: counts.reduce((sum, count) => sum + count, 0),
+    userVote: ownVote ? Number(ownVote.option_index) : null,
+    durationHours: poll.duration_hours,
+    expiresAt: poll.expires_at,
+    isClosed: now.getTime() >= Date.parse(poll.expires_at),
+  }
+}
+
+export async function voteOnContentPoll(
+  db: ContentD1,
+  voterUserId: string,
+  contentId: string,
+  optionIndex: number,
+  idempotencyKey: string,
+  now = new Date(),
+): Promise<ContentPollSummary> {
+  assertResourceId(voterUserId)
+  assertResourceId(contentId)
+  if (!idempotencyKey || idempotencyKey.length > 256) throw new ContentRuntimeError('PRECONDITION_REQUIRED', 428)
+  if (!Number.isSafeInteger(optionIndex) || optionIndex < 0 || optionIndex > 3) throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+  const current = await getContentPoll(db, contentId, voterUserId, now)
+  if (optionIndex >= current.options.length) throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+  if (current.isClosed) throw new ContentRuntimeError('POLL_CLOSED', 409)
+
+  const operationId = 'voteContentPoll'
+  const hash = await requestHash(operationId, { contentId, optionIndex })
+  const existing = await db.prepare(
+    `SELECT id AS idem_id, owner_user_id AS idem_owner_user_id, request_hash AS idem_request_hash,
+            status AS idem_status, response_status AS idem_response_status, response_json AS idem_response_json,
+            expires_at AS idem_expires_at
+       FROM content_mutation_idempotency
+      WHERE owner_user_id = ? AND operation_id = ? AND idempotency_key = ?
+      ORDER BY created_at DESC LIMIT 1`,
+  ).bind(voterUserId, operationId, idempotencyKey).first<IdempotencyRow>()
+  const replay = inspectIdempotency(existing, voterUserId, hash, now)
+  if (replay.replayed) return getContentPoll(db, contentId, voterUserId, now)
+
+  const nowIso = now.toISOString()
+  const expiresAt = new Date(now.getTime() + IDEMPOTENCY_TTL_MS).toISOString()
+  await batchMutation(db, [
+    expireMutationRow(db, voterUserId, operationId, idempotencyKey, nowIso),
+    insertCompletedIdempotency(db, voterUserId, operationId, idempotencyKey, hash, 200,
+      JSON.stringify({ contentId, optionIndex }), nowIso, expiresAt),
+    db.prepare(
+      'INSERT INTO content_poll_votes (content_id, voter_user_id, option_index, idempotency_key, created_at) VALUES (?, ?, ?, ?, ?)',
+    ).bind(contentId, voterUserId, optionIndex, idempotencyKey, nowIso),
+    atomicGuard(db),
+  ])
+  return getContentPoll(db, contentId, voterUserId, now)
 }
 
 export async function updateContent(
