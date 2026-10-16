@@ -350,6 +350,56 @@ describe('W03 content contract core', () => {
   })
 
 
+  it('requires W03 preflight before a draft social post can transition directly to published', async () => {
+    const row = {
+      id: 'content_post_direct_1',
+      content_type: 'post',
+      owner_user_id: 'user_post_direct_1',
+      creator_id: 'user_post_direct_1',
+      ip_id: null,
+      state: 'DRAFT',
+      scheduled_at: null,
+      version: 1,
+      revision: 1,
+      slug: 'post-direct-1',
+      title: 'A short post',
+      body_ref: 'https://cdn.example.com/post-body.txt',
+      media_refs_json: '[]',
+      cover_ref: null,
+      etag: 'W/"1"',
+      created_at: '2026-10-16T00:00:00.000Z',
+      updated_at: '2026-10-16T00:00:00.000Z',
+      idem_id: null,
+      idem_owner_user_id: null,
+      idem_request_hash: null,
+      idem_status: null,
+      idem_response_status: null,
+      idem_response_json: null,
+      idem_expires_at: null,
+    }
+    const db = {
+      prepare() {
+        return { bind: () => ({ first: async () => row }) }
+      },
+      batch: async () => { throw new Error('preflight failures must happen before a state write') },
+    } as never
+
+    await expect(
+      transitionContentState(
+        db,
+        'user_post_direct_1',
+        'L2',
+        'content_post_direct_1',
+        'PUBLISHED',
+        undefined,
+        'W/"1"',
+        'direct-post-idem',
+        new Date('2026-10-16T00:01:00.000Z'),
+      ),
+    ).rejects.toMatchObject({ code: 'VALIDATION_FAILED', status: 400 })
+  })
+
+
   it('requires a future timestamp before scheduling an approved content item', async () => {
     const db = {
       prepare() {
