@@ -148,8 +148,6 @@ export default function PublicProfilePage({
   useEffect(() => {
     const controller = new AbortController()
     let cancelled = false
-    setPinnedContentId(null)
-    setPinnedContent(null)
 
     void (async () => {
       try {
