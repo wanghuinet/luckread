@@ -158,16 +158,18 @@ jobs:
 
           run_d1_query /tmp/w03-migration-history.json "Read d1_migrations ledger" \
             "SELECT name FROM d1_migrations ORDER BY name;"
-          run_d1_query /tmp/w03-schema-before.json "Inspect current W03 schema" \
-            "SELECT 'contents' AS table_name, name AS column_name FROM pragma_table_info('contents')
-              UNION ALL SELECT 'content_revisions', name FROM pragma_table_info('content_revisions')
-              UNION ALL SELECT 'content_relationships', name FROM pragma_table_info('content_relationships')
-              UNION ALL SELECT 'content_series', name FROM pragma_table_info('content_series')
-              UNION ALL SELECT 'content_collections', name FROM pragma_table_info('content_collections')
-              UNION ALL SELECT name, '__TABLE__' FROM sqlite_master
-                WHERE type='table' AND name IN ('contents','content_revisions','content_relationships','content_series','content_collections','content_mutation_idempotency','content_outbox_events','content_txn_guard')
-              UNION ALL SELECT name, '__TRIGGER__' FROM sqlite_master
-                WHERE type='trigger' AND name IN ('contents_after_insert_outbox','contents_after_update_outbox');"
+          # D1 rejects long compound SELECT statements. Read each table's columns
+          # separately and capture object metadata with one non-compound query.
+          for table in contents content_revisions content_relationships content_series content_collections; do
+            run_d1_query "/tmp/w03-schema-before-${table}.json" "Inspect columns for ${table}" \
+              "SELECT '${table}' AS table_name, name AS column_name FROM pragma_table_info('${table}');"
+          done
+          run_d1_query /tmp/w03-schema-before-objects.json "Inspect W03 tables and triggers" \
+            "SELECT name AS table_name,
+                    CASE WHEN type='table' THEN '__TABLE__' ELSE '__TRIGGER__' END AS column_name
+             FROM sqlite_master
+             WHERE (type='table' AND name IN ('contents','content_revisions','content_relationships','content_series','content_collections','content_mutation_idempotency','content_outbox_events','content_txn_guard'))
+                OR (type='trigger' AND name IN ('contents_after_insert_outbox','contents_after_update_outbox'));"
 
       - name: Gate remote drift before any migration
         id: gate_remote_drift
@@ -210,7 +212,10 @@ jobs:
           if (applied.some((name, index) => expected[index] !== name)) {
             throw new Error('Remote migration history is not a prefix of the reviewed chain: ' + JSON.stringify(applied));
           }
-          const schemaRows = rowsFrom('/tmp/w03-schema-before.json');
+          const schemaRows = [
+            'contents', 'content_revisions', 'content_relationships', 'content_series', 'content_collections',
+          ].flatMap((table) => rowsFrom('/tmp/w03-schema-before-' + table + '.json'))
+            .concat(rowsFrom('/tmp/w03-schema-before-objects.json'));
           const tables = new Set(schemaRows.filter((row) => row.column_name === '__TABLE__').map((row) => row.table_name));
           const triggers = new Set(schemaRows.filter((row) => row.column_name === '__TRIGGER__').map((row) => row.table_name));
           const columns = (table) => new Set(schemaRows.filter((row) => row.table_name === table && !String(row.column_name).startsWith('__')).map((row) => row.column_name));
@@ -276,15 +281,17 @@ jobs:
           set -euo pipefail
           npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$EXPECTED_DB_NAME" --remote --json --config wrangler.jsonc \
             --command "SELECT name FROM d1_migrations ORDER BY name;" > /tmp/w03-migration-history-after.json
+          # Read each table's columns independently to stay within D1's
+          # compound-SELECT limits and produce clear per-query failures.
+          for table in contents content_revisions content_relationships content_series content_collections; do
+            npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$EXPECTED_DB_NAME" --remote --json --config wrangler.jsonc \
+              --command "SELECT '${table}' AS table_name, name AS column_name FROM pragma_table_info('${table}');" \
+              > "/tmp/w03-schema-after-${table}.json"
+          done
           npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$EXPECTED_DB_NAME" --remote --json --config wrangler.jsonc \
-            --command "SELECT 'contents' AS table_name, name AS column_name FROM pragma_table_info('contents')
-              UNION ALL SELECT 'content_revisions', name FROM pragma_table_info('content_revisions')
-              UNION ALL SELECT 'content_relationships', name FROM pragma_table_info('content_relationships')
-              UNION ALL SELECT 'content_series', name FROM pragma_table_info('content_series')
-              UNION ALL SELECT 'content_collections', name FROM pragma_table_info('content_collections')
-              UNION ALL SELECT name, '__TABLE__' FROM sqlite_master
-                WHERE type='table' AND name IN ('contents','content_revisions','content_relationships','content_series','content_collections','content_mutation_idempotency','content_outbox_events','content_txn_guard');" \
-            > /tmp/w03-schema-after.json
+            --command "SELECT name AS table_name, '__TABLE__' AS column_name FROM sqlite_master
+              WHERE type='table' AND name IN ('contents','content_revisions','content_relationships','content_series','content_collections','content_mutation_idempotency','content_outbox_events','content_txn_guard');" \
+            > /tmp/w03-schema-after-objects.json
           npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$EXPECTED_DB_NAME" --remote --json --config wrangler.jsonc \
             --command "SELECT
               (SELECT COUNT(*) FROM contents WHERE slug IS NULL OR slug = '') AS contents_without_slug,
@@ -320,7 +327,10 @@ jobs:
           }
           const applied = rowsFrom('/tmp/w03-migration-history-after.json').map((row) => row.name).filter((name) => typeof name === 'string').sort();
           if (JSON.stringify(applied) !== JSON.stringify(expected)) throw new Error('W03 migration ledger is not fully reconciled: ' + JSON.stringify(applied));
-          const rows = rowsFrom('/tmp/w03-schema-after.json');
+          const rows = [
+            'contents', 'content_revisions', 'content_relationships', 'content_series', 'content_collections',
+          ].flatMap((table) => rowsFrom('/tmp/w03-schema-after-' + table + '.json'))
+            .concat(rowsFrom('/tmp/w03-schema-after-objects.json'));
           const tables = new Set(rows.filter((row) => row.column_name === '__TABLE__').map((row) => row.table_name));
           const columns = (table) => new Set(rows.filter((row) => row.table_name === table && !String(row.column_name).startsWith('__')).map((row) => row.column_name));
           const requirements = {
