@@ -33,6 +33,21 @@ describe('W03 publish preflight', () => {
     expect(result.findings.some(item => ['SEO-TITLE-SHORT', 'SEO-TITLE-LONG'].includes(item.id))).toBe(false)
   })
 
+  it('does not treat emoji-only post text as a malformed SEO title', () => {
+    const text = '🎉🎉🎉🎉🎉🎉🎉🎉'
+    const result = preflightContent({
+      ...base,
+      contentType: 'post',
+      title: text,
+      body: text,
+      aiMode: 'none',
+      humanContribution: 'light',
+    })
+
+    expect(result.verdict).toBe('PASS')
+    expect(result.findings.some(item => item.id.startsWith('SEO-TITLE-') || item.id === 'SEO-TOPIC-MISMATCH')).toBe(false)
+  })
+
   it('blocks full-AI article generation under LuckRead creator policy', () => {
     const result = preflightContent({ ...base, aiMode: 'full' })
     expect(result.verdict).toBe('RED')
