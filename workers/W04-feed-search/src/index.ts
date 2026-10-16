@@ -102,14 +102,19 @@ export default {
           return json({ data: { items: [], nextCursor: null, hasMore: false, candidateWindowTruncated }, requestId: 'req_' + crypto.randomUUID() })
         }
 
-        const contentQuery = new URLSearchParams({
-          creatorIds: candidateIds.join(','),
-          limit,
-        })
-        if (cursor) contentQuery.set('cursor', cursor)
+        const contentHeaders = new Headers(transportHeaders)
+        contentHeaders.set('content-type', 'application/json; charset=utf-8')
         const contentResponse = await env.W03_CONTENT.fetch(new Request(
-          'https://luckread-w03.internal/internal/content/following-feed?' + contentQuery.toString(),
-          { method: 'GET', headers: transportHeaders },
+          'https://luckread-w03.internal/internal/content/following-feed',
+          {
+            method: 'POST',
+            headers: contentHeaders,
+            body: JSON.stringify({
+              creatorIds: candidateIds,
+              limit: Number(limit),
+              cursor: cursor || null,
+            }),
+          },
         ))
         const contentText = await contentResponse.text()
         if (!contentResponse.ok) {
