@@ -146,6 +146,11 @@ describe('1.1 content lifecycle closeout', () => {
     expect(publicState).toContain("/internal/content/contents/")
     expect(publicState).toContain("/state")
     expect(publicState).toContain("invalidatePublicContentDetail(request, contentId)")
+    expect(publicState).toContain("bindPreflightToStoredPost")
+    expect(publicState).toContain("resolvePublicArticleBodyUrl")
+    expect(publicState).toContain("readBoundedUtf8")
+    expect(publicState).toContain("body: canonicalBody")
+    expect(publicState).toContain("redirect: 'manual'")
     expect(publicState).toContain("invalidatePublicContentList(request)")
 
     expect(creatorList).toContain("async function requestTransition(itemId: string")
