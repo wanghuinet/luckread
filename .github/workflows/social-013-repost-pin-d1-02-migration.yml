@@ -1,0 +1,153 @@
+name: SOCIAL-013 Repost and Profile Pin D1-02 Migration
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Exact 40-character merged source SHA containing the repost/pin migration
+        required: true
+        type: string
+      confirm:
+        description: Type APPLY_SOCIAL_013_MIGRATION to permit remote D1 mutation
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  WRANGLER_VERSION: 4.116.0
+  EXPECTED_DB_ID: 6c342634-97f6-4248-9f4a-85772af4f22c
+  EXPECTED_DB_NAME: luckreadpro
+  EXPECTED_WORKER: luckread-w05
+  EXPECTED_BINDING: DB
+
+jobs:
+  migrate:
+    if: ${{ inputs.confirm == 'APPLY_SOCIAL_013_MIGRATION' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Validate source SHA
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$SOURCE_SHA" | grep -Eq '^[0-9a-f]{40}$'
+
+      - name: Checkout exact source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha }}
+          fetch-depth: 1
+
+      - name: Verify exact source SHA
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+
+      - name: Verify W05 binding and migration source
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          config = json.loads(Path('workers/W05-social/wrangler.jsonc').read_text())
+          assert config['name'] == 'luckread-w05'
+          bindings = config.get('d1_databases', [])
+          assert len(bindings) == 1
+          assert bindings[0]['binding'] == 'DB'
+          assert bindings[0]['database_id'] == '6c342634-97f6-4248-9f4a-85772af4f22c'
+          assert bindings[0]['database_name'] == 'luckreadpro'
+          migration = Path('workers/W05-social/migrations/20261016_013_social_repost_pin_v1.sql')
+          assert migration.is_file()
+          assert 'MIG-SOCIAL-013-REPOST-PIN-V1' in migration.read_text()
+          print('SOCIAL_013_BINDING_SOURCE=PASS')
+          PY
+
+      - name: Verify repost and pin migration statically
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import sqlite3
+          from pathlib import Path
+          db = sqlite3.connect(':memory:')
+          db.executescript(Path('workers/W05-social/migrations/20261016_013_social_repost_pin_v1.sql').read_text())
+          expected = {
+              'social_reposts': ['repost_id', 'content_id', 'actor_user_id', 'created_at'],
+              'social_profile_pins': ['user_id', 'content_id', 'pinned_at'],
+          }
+          for table, columns in expected.items():
+              actual = [row[1] for row in db.execute(f'PRAGMA table_info("{table}")').fetchall()]
+              if actual != columns:
+                  raise SystemExit(f'unexpected {table} schema: {actual}')
+          repost_unique = False
+          for index in db.execute('PRAGMA index_list("social_reposts")').fetchall():
+              if index[2] != 1:
+                  continue
+              columns = [row[2] for row in db.execute(f'PRAGMA index_info("{index[1]}")').fetchall()]
+              if columns == ['actor_user_id', 'content_id']:
+                  repost_unique = True
+          if not repost_unique:
+              raise SystemExit('repost actor/content uniqueness constraint missing')
+          pin_user = next(row for row in db.execute('PRAGMA table_info("social_profile_pins")').fetchall() if row[1] == 'user_id')
+          if pin_user[5] != 1:
+              raise SystemExit('profile pin user primary key missing')
+          print('SOCIAL_013_MIGRATION_STATIC=PASS')
+          PY
+
+      - name: Apply SOCIAL-013 repost/pin migration remotely
+        working-directory: workers/W05-social
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx --yes "wrangler@$WRANGLER_VERSION" d1 migrations apply "$EXPECTED_DB_NAME" --remote --config wrangler.jsonc
+
+      - name: Verify remote repost and pin schema
+        working-directory: workers/W05-social
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$EXPECTED_DB_NAME" --remote --json --config wrangler.jsonc --command 'PRAGMA table_info("social_reposts");' > /tmp/social-013-reposts-schema.json
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$EXPECTED_DB_NAME" --remote --json --config wrangler.jsonc --command 'PRAGMA index_list("social_reposts");' > /tmp/social-013-reposts-indexes.json
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$EXPECTED_DB_NAME" --remote --json --config wrangler.jsonc --command 'PRAGMA table_info("social_profile_pins");' > /tmp/social-013-pins-schema.json
+          python - <<'PY'
+          import json
+          def rows(path):
+              data = json.load(open(path))
+              if isinstance(data, list):
+                  return [row for item in data for row in item.get('results', [])]
+              return data.get('results', [])
+          repost_cols = rows('/tmp/social-013-reposts-schema.json')
+          repost_indexes = rows('/tmp/social-013-reposts-indexes.json')
+          pin_cols = rows('/tmp/social-013-pins-schema.json')
+          if [row.get('name') for row in repost_cols] != ['repost_id','content_id','actor_user_id','created_at']:
+              raise SystemExit('remote repost schema mismatch')
+          if [row.get('name') for row in pin_cols] != ['user_id','content_id','pinned_at']:
+              raise SystemExit('remote profile pin schema mismatch')
+          if not any(int(row.get('unique', 0)) == 1 and row.get('name') == 'sqlite_autoindex_social_reposts_2' for row in repost_indexes):
+              unique = False
+              # Wrangler/SQLite index naming can differ; inspect columns to validate the business key.
+              for row in repost_indexes:
+                  if int(row.get('unique', 0)) != 1:
+                      continue
+                  index_name = row.get('name')
+                  if not index_name:
+                      continue
+                  import subprocess
+                  result = subprocess.run(
+                      ['npx', '--yes', 'wrangler@4.116.0', 'd1', 'execute', 'luckreadpro', '--remote', '--json', '--config', 'wrangler.jsonc',
+                       '--command', f'PRAGMA index_info("{index_name}");'],
+                      capture_output=True, text=True, check=True
+                  )
+                  parsed = json.loads(result.stdout)
+                  details = [x for item in parsed for x in item.get('results', [])] if isinstance(parsed, list) else parsed.get('results', [])
+                  if [x.get('name') for x in details] == ['actor_user_id','content_id']:
+                      unique = True
+              if not unique:
+                  raise SystemExit('remote repost actor/content uniqueness constraint missing')
+          print('SOCIAL_013_REMOTE_SCHEMA=PASS')
+          PY
