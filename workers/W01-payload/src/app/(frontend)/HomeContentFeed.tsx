@@ -89,7 +89,6 @@ export default function HomeContentFeed({
           setItems(data.data.items ?? [])
           setNextCursor(data.data.nextCursor ?? null)
           setHasMore(data.data.hasMore === true)
-      setCandidateWindowTruncated(data.data.candidateWindowTruncated === true)
           setCandidateWindowTruncated(data.data.candidateWindowTruncated === true)
         } catch (cause) {
           if (requestId !== requestIdRef.current || controller.signal.aborted) return
@@ -163,6 +162,7 @@ export default function HomeContentFeed({
       })
       setNextCursor(data.data.nextCursor ?? null)
       setHasMore(data.data.hasMore === true)
+      setCandidateWindowTruncated(data.data.candidateWindowTruncated === true)
     } catch (cause) {
       if (requestId !== requestIdRef.current || controller.signal.aborted) return
       if (cause instanceof DOMException && cause.name === 'AbortError') return
