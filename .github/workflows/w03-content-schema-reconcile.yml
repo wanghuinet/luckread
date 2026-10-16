@@ -130,10 +130,36 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
           set -euo pipefail
-          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$EXPECTED_DB_NAME" --remote --json --config wrangler.jsonc \
-            --command "SELECT name FROM d1_migrations ORDER BY name;" > /tmp/w03-migration-history.json
-          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$EXPECTED_DB_NAME" --remote --json --config wrangler.jsonc \
-            --command "SELECT 'contents' AS table_name, name AS column_name FROM pragma_table_info('contents')
+          # Keep successful JSON output machine-readable, but print bounded CLI diagnostics
+          # when Wrangler sends an error to stdout (which the original redirect hid).
+          run_d1_query() {
+            local output_file="$1"
+            local label="$2"
+            local sql="$3"
+            local stderr_file
+            local rc
+            stderr_file="$(mktemp)"
+            set +e
+            npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$EXPECTED_DB_NAME" --remote --json --config wrangler.jsonc \
+              --command "$sql" > "$output_file" 2> "$stderr_file"
+            rc=$?
+            set -e
+            if [ "$rc" -ne 0 ]; then
+              echo "::error title=Remote D1 inspection failed::$label exited with code $rc"
+              echo "Wrangler stderr (last 80 lines):"
+              sed -E 's/(Bearer )[[:alnum:]_.-]+/\1[REDACTED]/g; s/(api[_ -]?token[=: ]+)[^[:space:]]+/\1[REDACTED]/Ig' "$stderr_file" | tail -n 80
+              echo "Wrangler stdout (last 80 lines):"
+              sed -E 's/(Bearer )[[:alnum:]_.-]+/\1[REDACTED]/g; s/(api[_ -]?token[=: ]+)[^[:space:]]+/\1[REDACTED]/Ig' "$output_file" | tail -n 80
+              rm -f "$stderr_file"
+              exit "$rc"
+            fi
+            rm -f "$stderr_file"
+          }
+
+          run_d1_query /tmp/w03-migration-history.json "Read d1_migrations ledger" \
+            "SELECT name FROM d1_migrations ORDER BY name;"
+          run_d1_query /tmp/w03-schema-before.json "Inspect current W03 schema" \
+            "SELECT 'contents' AS table_name, name AS column_name FROM pragma_table_info('contents')
               UNION ALL SELECT 'content_revisions', name FROM pragma_table_info('content_revisions')
               UNION ALL SELECT 'content_relationships', name FROM pragma_table_info('content_relationships')
               UNION ALL SELECT 'content_series', name FROM pragma_table_info('content_series')
@@ -141,8 +167,7 @@ jobs:
               UNION ALL SELECT name, '__TABLE__' FROM sqlite_master
                 WHERE type='table' AND name IN ('contents','content_revisions','content_relationships','content_series','content_collections','content_mutation_idempotency','content_outbox_events','content_txn_guard')
               UNION ALL SELECT name, '__TRIGGER__' FROM sqlite_master
-                WHERE type='trigger' AND name IN ('contents_after_insert_outbox','contents_after_update_outbox');" \
-            > /tmp/w03-schema-before.json
+                WHERE type='trigger' AND name IN ('contents_after_insert_outbox','contents_after_update_outbox');"
 
       - name: Gate remote drift before any migration
         id: gate_remote_drift
