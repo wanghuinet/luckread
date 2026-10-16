@@ -222,7 +222,7 @@ export default {
       const url = new URL(request.url)
       await enforceRateLimit(request, env, request.method === 'GET' ? 'read:' + url.pathname.split('/').slice(0, 4).join('/') : 'write:' + url.pathname.split('/').slice(0, 4).join('/'))
 
-      const repostMatch = /^\\/internal\\/social\\/content\\/([^/]+)\\/reposts$/.exec(url.pathname)
+      const repostMatch = /^\/internal\/social\/content\/([^/]+)\/reposts$/.exec(url.pathname)
       if (repostMatch) {
         const contentId = decodePathPart(repostMatch[1] ?? '')
         if (contentId === null) throw new RepostRuntimeError('VALIDATION_FAILED', 400)
@@ -244,7 +244,7 @@ export default {
         return new Response(null, { status: 204 })
       }
 
-      const pinMatch = /^\\/internal\\/social\\/content\\/([^/]+)\\/pin$/.exec(url.pathname)
+      const pinMatch = /^\/internal\/social\/content\/([^/]+)\/pin$/.exec(url.pathname)
       if (pinMatch) {
         const contentId = decodePathPart(pinMatch[1] ?? '')
         if (contentId === null) throw new ProfilePinRuntimeError('VALIDATION_FAILED', 400)
@@ -266,7 +266,7 @@ export default {
         return new Response(null, { status: 204 })
       }
 
-      const pinnedContentMatch = /^\\/internal\\/social\\/users\\/([^/]+)\\/pinned-content$/.exec(url.pathname)
+      const pinnedContentMatch = /^\/internal\/social\/users\/([^/]+)\/pinned-content$/.exec(url.pathname)
       if (pinnedContentMatch) {
         if (request.method !== 'GET') return new Response(null, { status: 405, headers: { Allow: 'GET' } })
         requireTransport(request)
