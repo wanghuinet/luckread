@@ -9,61 +9,101 @@ const headers = {
   'X-LuckRead-Principal-Layer': 'L1',
 }
 
-describe('W04 following feed serving route', () => {
-  it('validates W01 transport and forwards a private bounded request to W05', async () => {
-    const fetch = vi.fn(async (_request: RequestInfo | URL, _init?: RequestInit) =>
-      Response.json({ data: { items: [], nextCursor: null, hasMore: false }, requestId: 'req_feed_1' }),
-    )
+const projection = {
+  get: async (_key: string, _type: 'json'): Promise<unknown> => null,
+  put: async (_key: string, _value: string): Promise<void> => undefined,
+}
+
+describe('W04 Following feed serving route', () => {
+  it('gets relationship candidates from W05 and published content from W03', async () => {
+    const socialFetch = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) => {
+      const request = input instanceof Request ? input : new Request(input)
+      expect(new URL(request.url).pathname).toBe('/internal/social/feed/following-authors')
+      expect(request.headers.get('X-LuckRead-Caller')).toBe('W04')
+      expect(request.headers.get('X-LuckRead-Principal-User-Id')).toBe('viewer-1')
+      expect(request.headers.has('Cookie')).toBe(false)
+      return Response.json({
+        data: {
+          items: [{ userId: 'creator-1' }, { userId: 'creator-2' }],
+          candidateWindowTruncated: true,
+        },
+        requestId: 'req_social_1',
+      })
+    })
+    const contentFetch = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) => {
+      const request = input instanceof Request ? input : new Request(input)
+      const url = new URL(request.url)
+      expect(url.pathname).toBe('/internal/content/following-feed')
+      expect(url.searchParams.get('creatorIds')).toBe('creator-1,creator-2')
+      expect(url.searchParams.get('limit')).toBe('6')
+      expect(request.headers.get('X-LuckRead-Caller')).toBe('W04')
+      expect(request.headers.get('X-LuckRead-Principal-User-Id')).toBe('viewer-1')
+      expect(request.headers.has('Cookie')).toBe(false)
+      return Response.json({
+        data: {
+          items: [{ id: 'content-1', creatorId: 'creator-1', contentType: 'post', title: 'Hello' }],
+          nextCursor: 'cursor_1',
+          hasMore: true,
+        },
+        requestId: 'req_content_1',
+      })
+    })
     const response = await worker.fetch(
       new Request('https://luckread-w04.internal/internal/feed/following?limit=6', { headers }),
-      { AUTH013_W04_DERIVED_PROJECTION: { get: async () => null, put: async () => undefined }, W05_SOCIAL: { fetch } },
+      {
+        AUTH013_W04_DERIVED_PROJECTION: projection,
+        W05_SOCIAL: { fetch: socialFetch },
+        W03_CONTENT: { fetch: contentFetch },
+      },
     )
     expect(response.status).toBe(200)
     expect(response.headers.get('cache-control')).toBe('no-store')
-    await expect(response.json()).resolves.toMatchObject({ data: { items: [], hasMore: false } })
-    expect(fetch).toHaveBeenCalledTimes(1)
-    expect(fetch.mock.calls[0]?.[0]).toBeInstanceOf(Request)
-    const forwarded = fetch.mock.calls[0]?.[0] as Request
-    const upstream = new URL(forwarded.url)
-    expect(upstream.pathname).toBe('/internal/social/feed/following')
-    expect(upstream.searchParams.get('limit')).toBe('6')
-    expect(forwarded.headers.get('X-LuckRead-Caller')).toBe('W04')
-    expect(forwarded.headers.get('X-LuckRead-Principal-User-Id')).toBe('viewer-1')
-    expect(forwarded.headers.has('Cookie')).toBe(false)
+    await expect(response.json()).resolves.toMatchObject({
+      data: {
+        items: [{ id: 'content-1', creatorId: 'creator-1' }],
+        hasMore: true,
+        candidateWindowTruncated: true,
+      },
+    })
+    expect(socialFetch).toHaveBeenCalledTimes(1)
+    expect(contentFetch).toHaveBeenCalledTimes(1)
   })
 
-  it('rejects untrusted callers, missing principals, duplicate parameters, and invalid bounds', async () => {
-    const fetch = vi.fn(async () => Response.json({ data: {} }))
-    const env = { AUTH013_W04_DERIVED_PROJECTION: { get: async (_key: string, _type: 'json'): Promise<unknown> => null, put: async (_key: string, _value: string): Promise<void> => undefined }, W05_SOCIAL: { fetch } }
-    const noPrincipal = await worker.fetch(
-      new Request('https://luckread-w04.internal/internal/feed/following?limit=6', {
-        headers: { ...headers, 'X-LuckRead-Principal-User-Id': '' },
-      }), env,
-    )
-    expect(noPrincipal.status).toBe(401)
-
-    const spoofedCaller = await worker.fetch(
+  it('rejects untrusted transport, duplicate parameters, and out-of-range page sizes before service calls', async () => {
+    const socialFetch = vi.fn(async () => Response.json({ data: { items: [] } }))
+    const contentFetch = vi.fn(async () => Response.json({ data: { items: [] } }))
+    const env = {
+      AUTH013_W04_DERIVED_PROJECTION: projection,
+      W05_SOCIAL: { fetch: socialFetch },
+      W03_CONTENT: { fetch: contentFetch },
+    }
+    const spoofed = await worker.fetch(
       new Request('https://luckread-w04.internal/internal/feed/following?limit=6', {
         headers: { ...headers, 'X-LuckRead-Caller': 'browser' },
-      }), env,
+      }),
+      env,
     )
-    expect(spoofedCaller.status).toBe(403)
+    expect(spoofed.status).toBe(403)
 
     const duplicate = await worker.fetch(
-      new Request('https://luckread-w04.internal/internal/feed/following?limit=6&limit=7', { headers }), env,
+      new Request('https://luckread-w04.internal/internal/feed/following?limit=6&limit=7', { headers }),
+      env,
     )
     expect(duplicate.status).toBe(422)
 
     const oversized = await worker.fetch(
-      new Request('https://luckread-w04.internal/internal/feed/following?limit=51', { headers }), env,
+      new Request('https://luckread-w04.internal/internal/feed/following?limit=51', { headers }),
+      env,
     )
     expect(oversized.status).toBe(422)
-    expect(fetch).not.toHaveBeenCalled()
+    expect(socialFetch).not.toHaveBeenCalled()
+    expect(contentFetch).not.toHaveBeenCalled()
   })
 
-  it('fails closed when the W05 service binding is missing', async () => {
+  it('fails closed if either authoritative service binding is missing', async () => {
     const response = await worker.fetch(
       new Request('https://luckread-w04.internal/internal/feed/following?limit=6', { headers }),
+      { AUTH013_W04_DERIVED_PROJECTION: projection, W05_SOCIAL: { fetch: async () => Response.json({ data: { items: [] } }) } },
     )
     expect(response.status).toBe(503)
     await expect(response.json()).resolves.toMatchObject({ error: { code: 'SERVICE_UNAVAILABLE' } })
