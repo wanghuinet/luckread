@@ -94,7 +94,7 @@ appendFileSync(process.env.GITHUB_ENV, 'MODERATION_ROLE_ID=' + roleId + '\n')
 
 const now = new Date().toISOString()
 d1Json(
-  'UPDATE "user" SET account_state=\'ACTIVE\', account_state_version=account_state_version+1 WHERE id=' + sqlString(userId),
+  'UPDATE "user" SET email_verified=1, account_state=\'ACTIVE\', account_state_version=account_state_version+1 WHERE id=' + sqlString(userId),
 )
 d1Json(
   'INSERT INTO role_assignments (id,subject_id,role_id,scope_type,scope_id,status,valid_from,valid_until,created_at,updated_at) VALUES (' +
