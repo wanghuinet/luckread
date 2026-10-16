@@ -23,6 +23,15 @@ describe('Creator Center admin extension', () => {
     expect(publisher).toContain('mediaRefs: Array.from(new Set([')
   })
 
+  it('uses a single body field for social posts and derives their feed title', () => {
+    const publisher = read('src/app/(frontend)/publish/PublishComposer.tsx')
+    expect(publisher).toContain("type === 'post' ? body.trim().slice(0, 500) : title.trim()")
+    expect(publisher).toContain("{type !== 'post' ? (")
+    expect(publisher).toContain("maxLength={type === 'post' ? 500 : 160000}")
+    expect(publisher).toContain("type === 'post' ? '推文正文' : '视频文案'")
+    expect(publisher).toContain("type === 'post' ? '动态正文' : '请先填写标题和正文。'")
+  })
+
   it('makes the content version explicit inside the publish preview', () => {
     const publisher = read('src/app/(frontend)/publish/PublishComposer.tsx')
     expect(publisher).toContain('<strong>发布预览</strong>')
