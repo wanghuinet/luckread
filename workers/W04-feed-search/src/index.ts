@@ -93,19 +93,21 @@ export default {
         try { followsPayload = JSON.parse(followsText) as typeof followsPayload } catch {
           return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Social service returned an invalid response', details: {} } }, 503)
         }
+        const followData = followsPayload.data
         if (
-          !Array.isArray(followsPayload.data?.items) ||
-          typeof followsPayload.data.candidateWindowTruncated !== 'boolean' ||
-          followsPayload.data.items.length > 500
+          !followData ||
+          !Array.isArray(followData.items) ||
+          typeof followData.candidateWindowTruncated !== 'boolean' ||
+          followData.items.length > 500
         ) {
           return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Social service returned an invalid response', details: {} } }, 503)
         }
-        const rawAuthorIds = followsPayload.data.items.map((item) => item?.userId)
+        const rawAuthorIds = followData.items.map((item) => item?.userId)
         if (rawAuthorIds.some((id) => typeof id !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(id))) {
           return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Social service returned an invalid author ID', details: {} } }, 503)
         }
         const candidateIds = [...new Set(rawAuthorIds as string[])]
-        const candidateWindowTruncated = followsPayload.data.candidateWindowTruncated
+        const candidateWindowTruncated = followData.candidateWindowTruncated
         if (candidateIds.length === 0) {
           return json({ data: { items: [], nextCursor: null, hasMore: false, candidateWindowTruncated }, requestId: 'req_' + crypto.randomUUID() })
         }
