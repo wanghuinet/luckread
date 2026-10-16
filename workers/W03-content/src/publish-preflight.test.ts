@@ -19,6 +19,20 @@ describe('W03 publish preflight', () => {
     expect(result.positiveSignals.some(value => value.includes('第一手'))).toBe(true)
   })
 
+  it('does not apply long-form SEO title-length warnings to short social posts', () => {
+    const result = preflightContent({
+      ...base,
+      contentType: 'post',
+      title: '今天散步',
+      body: '今天散步',
+      aiMode: 'none',
+      humanContribution: 'light',
+    })
+
+    expect(result.verdict).toBe('PASS')
+    expect(result.findings.some(item => ['SEO-TITLE-SHORT', 'SEO-TITLE-LONG'].includes(item.id))).toBe(false)
+  })
+
   it('blocks full-AI article generation under LuckRead creator policy', () => {
     const result = preflightContent({ ...base, aiMode: 'full' })
     expect(result.verdict).toBe('RED')
