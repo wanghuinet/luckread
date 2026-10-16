@@ -116,6 +116,17 @@ const requiredPrincipal = (request: Request): { userId: string; layer: string } 
 export const hasCreatorContentPermission = (layer: string): boolean =>
   /^L[3-4]$/.test(layer)
 
+export const hasSocialPostPermission = (layer: string): boolean =>
+  /^L[2-4]$/.test(layer)
+
+const requiredSocialPostPrincipal = (request: Request): { userId: string; layer: string } => {
+  const principal = requiredPrincipal(request)
+  if (!hasSocialPostPermission(principal.layer)) {
+    throw new ContentRuntimeError('PERMISSION_DENIED', 403)
+  }
+  return principal
+}
+
 const requiredCreatorPrincipal = (request: Request): { userId: string; layer: string } => {
   const principal = requiredPrincipal(request)
   if (!hasCreatorContentPermission(principal.layer)) {
@@ -814,8 +825,9 @@ const worker = {
       if (!path) throw new ContentRuntimeError('NOT_FOUND', 404)
 
       if (request.method === 'POST' && path.id && path.preflight) {
-        requiredCreatorPrincipal(request)
         const body = await parseBody(request)
+        if (body.contentType === 'post') requiredSocialPostPrincipal(request)
+        else requiredCreatorPrincipal(request)
         try {
           return json({ ...preflightContent(normalizePreflightInput(body)), requestId: createRequestId() })
         } catch {
@@ -859,14 +871,16 @@ const worker = {
           requireIfMatch(request),
           requireIdempotency(request),
           new Date(),
-          { scheduledAt: requestedScheduledAt },
+          { scheduledAt: requestedScheduledAt, preflight: body.preflight },
         )
         return json({ ...result, requestId: createRequestId() })
       }
 
       if (request.method === 'POST' && path.id === undefined) {
-        const principal = requiredCreatorPrincipal(request)
         const body = await parseBody(request)
+        const principal = body.contentType === 'post'
+          ? requiredSocialPostPrincipal(request)
+          : requiredCreatorPrincipal(request)
         const content = await createContent(
           env.D1_02,
           principal.userId,
