@@ -213,7 +213,7 @@ jobs:
           // timestamped social migrations for W03 migrations: only compare the
           // exact W03 migration identities and require their own order to be a prefix.
           const appliedSet = new Set(appliedAll);
-          const applied = expected.filter((name) => appliedSet.has(name));
+          const applied = appliedAll.filter((name) => expected.includes(name));
           if (JSON.stringify(applied) !== JSON.stringify(expected.slice(0, applied.length))) {
             throw new Error('W03 migration history is not a prefix of the reviewed chain: ' + JSON.stringify(applied));
           }
