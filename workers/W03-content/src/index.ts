@@ -14,6 +14,8 @@ import {
   toErrorResponse,
   transitionContentState,
   applyModerationContentTransition,
+  getContentPoll,
+  voteOnContentPoll,
   listContentRevisions,
   getContentRevision,
   rollbackContentRevision,
@@ -175,7 +177,7 @@ const decodePathSegment = (value: string): string => {
   }
 }
 
-const getPath = (pathname: string): {id?: string; state?: boolean; preflight?: boolean; revisions?: boolean; relationships?: boolean; relationshipId?: string; revisionId?: string; rollback?: boolean; series?: boolean; seriesMembers?: boolean; seriesMemberContentId?: string; collections?: boolean; collectionMembers?: boolean; collectionMemberContentId?: string} | null => {
+const getPath = (pathname: string): {id?: string; state?: boolean; preflight?: boolean; poll?: boolean; revisions?: boolean; relationships?: boolean; relationshipId?: string; revisionId?: string; rollback?: boolean; series?: boolean; seriesMembers?: boolean; seriesMemberContentId?: string; collections?: boolean; collectionMembers?: boolean; collectionMemberContentId?: string} | null => {
   const parts = pathname.split('/').filter(Boolean)
   if (parts.length === 3 && parts[0] === 'internal' && parts[1] === 'content' && parts[2] === 'contents') {
     return {}
@@ -188,6 +190,9 @@ const getPath = (pathname: string): {id?: string; state?: boolean; preflight?: b
   }
   if (parts.length === 5 && parts[0] === 'internal' && parts[1] === 'content' && parts[2] === 'contents' && parts[4] === 'preflight') {
     return { id: decodePathSegment(parts[3]), preflight: true }
+  }
+  if (parts.length === 5 && parts[0] === 'internal' && parts[1] === 'content' && parts[2] === 'contents' && parts[4] === 'poll') {
+    return { id: decodePathSegment(parts[3]), poll: true }
   }
   if (parts.length === 5 && parts[0] === 'internal' && parts[1] === 'content' && parts[2] === 'contents' && parts[4] === 'revisions') {
     return { id: decodePathSegment(parts[3]), revisions: true }
@@ -306,6 +311,7 @@ const worker = {
               mediaRefs: item.mediaRefs,
               coverRef: item.coverRef,
               updatedAt: item.updatedAt,
+              hasPoll: item.hasPoll === true,
             })),
             nextCursor: page.nextCursor,
             hasMore: page.hasMore,
@@ -803,6 +809,7 @@ const worker = {
               mediaRefs: item.mediaRefs,
               coverRef: item.coverRef,
               scheduledAt: item.scheduledAt,
+              hasPoll: item.hasPoll === true,
             })),
             nextCursor: page.nextCursor,
             hasMore: page.hasMore,
@@ -812,6 +819,19 @@ const worker = {
       }
 
       if (!path) throw new ContentRuntimeError('NOT_FOUND', 404)
+
+      if (path.id && path.poll && request.method === 'GET') {
+        const viewerUserId = request.headers.get('X-LuckRead-Principal-User-Id')?.trim() || null
+        return json({ data: await getContentPoll(env.D1_02, path.id, viewerUserId), requestId: createRequestId() })
+      }
+
+      if (path.id && path.poll && request.method === 'POST') {
+        const principal = requiredPrincipal(request)
+        const body = await parseBody(request)
+        if (typeof body.optionIndex !== 'number') throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+        const result = await voteOnContentPoll(env.D1_02, principal.userId, path.id, body.optionIndex, requireIdempotency(request))
+        return json({ data: result, requestId: createRequestId() })
+      }
 
       if (request.method === 'POST' && path.id && path.preflight) {
         requiredCreatorPrincipal(request)
@@ -865,8 +885,10 @@ const worker = {
       }
 
       if (request.method === 'POST' && path.id === undefined) {
-        const principal = requiredCreatorPrincipal(request)
         const body = await parseBody(request)
+        // Social posts are public-facing user updates and may be created by any authenticated account.
+        // Articles and standalone video content continue to require creator publishing authority.
+        const principal = body.contentType === 'post' ? requiredPrincipal(request) : requiredCreatorPrincipal(request)
         const content = await createContent(
           env.D1_02,
           principal.userId,
@@ -887,6 +909,7 @@ const worker = {
           bodyRef: content.bodyRef,
           mediaRefs: content.mediaRefs,
           coverRef: content.coverRef,
+          hasPoll: content.hasPoll === true,
           requestId: createRequestId(),
         }, 201)
       }
