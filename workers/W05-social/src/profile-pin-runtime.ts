@@ -27,10 +27,10 @@ export async function pinProfileContent(
   const actorUserId = validateId(actorUserIdValue, true)
   const contentId = validateId(contentIdValue)
   const target = await db.prepare(
-    'SELECT id, state, owner_user_id FROM contents WHERE id = ? LIMIT 1',
-  ).bind(contentId).first<{ id: string; state: string; owner_user_id: string | null }>()
+    'SELECT id, content_type, state, owner_user_id FROM contents WHERE id = ? LIMIT 1',
+  ).bind(contentId).first<{ id: string; content_type: string; state: string; owner_user_id: string | null }>()
 
-  if (!target || target.state !== 'PUBLISHED') throw new ProfilePinRuntimeError('NOT_FOUND', 404)
+  if (!target || target.content_type !== 'post' || target.state !== 'PUBLISHED') throw new ProfilePinRuntimeError('NOT_FOUND', 404)
   if (target.owner_user_id !== actorUserId) throw new ProfilePinRuntimeError('PERMISSION_DENIED', 403)
 
   const pinnedAt = new Date().toISOString()
@@ -75,7 +75,7 @@ export async function getProfilePin(
     `SELECT p.user_id, p.content_id, p.pinned_at
        FROM social_profile_pins p
        JOIN contents c ON c.id = p.content_id
-      WHERE p.user_id = ? AND c.owner_user_id = p.user_id AND c.state = 'PUBLISHED'
+      WHERE p.user_id = ? AND c.owner_user_id = p.user_id AND c.content_type = 'post' AND c.state = 'PUBLISHED'
       LIMIT 1`,
   ).bind(userId).first<{ user_id: string; content_id: string; pinned_at: string }>()
   return row ? { userId: row.user_id, contentId: row.content_id, pinnedAt: row.pinned_at } : null
@@ -87,7 +87,7 @@ export async function isContentProfilePinned(db: D1Database, contentIdValue: str
     `SELECT EXISTS (
        SELECT 1 FROM social_profile_pins p
        JOIN contents c ON c.id = p.content_id AND c.owner_user_id = p.user_id
-       WHERE p.content_id = ? AND c.state = 'PUBLISHED'
+       WHERE p.content_id = ? AND c.content_type = 'post' AND c.state = 'PUBLISHED'
      ) AS pinned`,
   ).bind(contentId).first<{ pinned: number }>()
   return Number(row?.pinned ?? 0) === 1
