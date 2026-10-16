@@ -9,8 +9,9 @@ import { resolveSocialPostMedia } from '../../../../lib/social-post-media.js'
 import type { PublicLocale } from '../../i18n/public-locale'
 
 /**
- * UI structure adapted from ccrsxx/twitter-clone's Tweet, TweetStats and user
- * components (MIT). All data and mutations here use LuckRead's W01/W05 APIs.
+ * Shared social post adapter. The default presentation preserves the existing LuckRead
+ * content-card surface; `x-timeline` reuses the Tweet row hierarchy from the authorized
+ * ccrsxx/twitter-clone UI. All reads and mutations remain on LuckRead W01/W05 APIs.
  */
 type ContentDetail = {
   id?: string
@@ -36,6 +37,24 @@ type ApiResponse<T> = {
   error?: { message?: string }
 }
 
+
+type TimelineIconName = 'reply' | 'repost' | 'like' | 'bookmark' | 'share' | 'more' | 'pin'
+
+function TimelineIcon({ name, filled = false }: { name: TimelineIconName; filled?: boolean }) {
+  if (name === 'more') {
+    return <svg aria-hidden="true" className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.7" /><circle cx="12" cy="12" r="1.7" /><circle cx="19" cy="12" r="1.7" /></svg>
+  }
+  const paths: Record<Exclude<TimelineIconName, 'more'>, string> = {
+    reply: 'M21 11.5a8.5 8.5 0 0 1-8.5 8.5H4l-1 2v-6.5A8.5 8.5 0 1 1 21 11.5Z',
+    repost: 'M17 1l4 4-4 4M3 11V9a4 4 0 0 1 4-4h14M7 23l-4-4 4-4m14-1v2a4 4 0 0 1-4 4H3',
+    like: 'M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78Z',
+    bookmark: 'M6 3h12a1 1 0 0 1 1 1v17l-7-4-7 4V4a1 1 0 0 1 1-1Z',
+    share: 'M18 8a3 3 0 1 0-2.83-4L8.7 7.74a3.5 3.5 0 1 0 0 8.52l6.47 3.74A3 3 0 1 0 16.5 18l-6.47-3.74a3.5 3.5 0 0 0 0-4.52L16.5 6A3 3 0 0 0 18 8Z',
+    pin: 'M16 3l5 5-3 1-4 4-1 5-2-2-2-2-2-2-2-2 5-1 4-4 0-2Z',
+  }
+  return <svg aria-hidden="true" className="h-5 w-5" viewBox="0 0 24 24" fill={name === 'like' && filled ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d={paths[name]} /></svg>
+}
+
 type Props = {
   contentId: string
   slug?: string
@@ -45,6 +64,7 @@ type Props = {
   mediaRefs?: string[]
   createdAt?: string
   updatedAt?: string
+  presentation?: 'content' | 'x-timeline'
   locale?: PublicLocale
   onBookmarkChanged?: (bookmarked: boolean) => void
   onPinChanged?: (contentId: string, pinned: boolean) => void
@@ -59,6 +79,7 @@ export default function LuckReadSocialPostCard({
   mediaRefs,
   createdAt,
   updatedAt,
+  presentation = 'content',
   locale = 'zh',
   onBookmarkChanged,
   onPinChanged,
@@ -78,6 +99,7 @@ export default function LuckReadSocialPostCard({
   const [postTimestamp, setPostTimestamp] = useState(createdAt || updatedAt || '')
   const [liked, setLiked] = useState(false)
   const [likeCount, setLikeCount] = useState<number | null>(null)
+  const [commentCount, setCommentCount] = useState<number | null>(null)
   const [likeStateLoading, setLikeStateLoading] = useState(true)
   const [likeBusy, setLikeBusy] = useState(false)
   const [bookmarked, setBookmarked] = useState(false)
@@ -129,6 +151,7 @@ export default function LuckReadSocialPostCard({
       setReposted(false)
       setRepostCount(null)
       setPinned(false)
+      setCommentCount(null)
       setLikeStateLoading(true)
 
       const detailRequest = fetchJson<ContentDetail>(
@@ -222,6 +245,9 @@ export default function LuckReadSocialPostCard({
           ? Math.max(0, summary.counts.reposts)
           : null)
         setPinned(result.response.ok && summary?.pinned === true)
+        setCommentCount(result.response.ok && typeof summary?.counts?.comments === 'number'
+          ? Math.max(0, summary.counts.comments)
+          : null)
       }
 
       if (authorId) {
@@ -660,6 +686,88 @@ export default function LuckReadSocialPostCard({
   }
 
   if (isDeleted) return null
+
+
+  if (presentation === 'x-timeline') {
+    const authorHref = resolvedCreatorId ? '/users/' + encodeURIComponent(resolvedCreatorId) : null
+    const label = (en: string, zh: string, tw = zh) => locale === 'en' ? en : locale === 'tw' ? tw : zh
+    const actionClass = 'group/action inline-flex min-w-0 items-center justify-center gap-1.5 rounded-full p-2 text-light-secondary transition-colors hover:bg-sky-500/10 hover:text-sky-500 disabled:cursor-wait disabled:opacity-50 dark:text-dark-secondary'
+    const actionText = 'min-w-[14px] text-xs tabular-nums'
+    return (
+      <article className="border-b border-light-border px-4 py-3 transition-colors hover:bg-black/[0.025] dark:border-dark-border dark:hover:bg-white/[0.03]" data-testid="luckread-social-post-card">
+        <div className="grid grid-cols-[auto,minmax(0,1fr)] gap-x-3">
+          {authorHref ? (
+            <Link href={authorHref} aria-label={profileName} className="mt-0.5 grid h-10 w-10 place-items-center overflow-hidden rounded-full bg-main-sidebar-background text-sm font-bold text-light-primary dark:text-dark-primary">
+              {profile?.avatar ? <img alt="" className="h-full w-full object-cover" height={40} loading="lazy" src={profile.avatar} width={40} /> : profileName.slice(0, 1).toUpperCase()}
+            </Link>
+          ) : (
+            <div aria-label={profileName} className="mt-0.5 grid h-10 w-10 place-items-center overflow-hidden rounded-full bg-main-sidebar-background text-sm font-bold text-light-primary dark:text-dark-primary">
+              {profile?.avatar ? <img alt="" className="h-full w-full object-cover" height={40} loading="lazy" src={profile.avatar} width={40} /> : profileName.slice(0, 1).toUpperCase()}
+            </div>
+          )}
+          <div className="min-w-0">
+            {pinned ? <div className="mb-1 flex items-center gap-2 pl-1 text-xs font-bold text-light-secondary dark:text-dark-secondary"><TimelineIcon name="pin" /><span>{label('Pinned', '已置顶', '已置頂')}</span></div> : null}
+            <div className="flex min-w-0 items-start justify-between gap-2">
+              <div className="flex min-w-0 flex-wrap items-baseline gap-x-1 text-[15px] leading-5">
+                {authorHref ? <Link className="max-w-full truncate font-bold text-light-primary hover:underline dark:text-dark-primary" href={authorHref}>{profileName}</Link> : <strong className="max-w-full truncate font-bold text-light-primary dark:text-dark-primary">{profileName}</strong>}
+                {username ? <span className="max-w-full truncate text-light-secondary dark:text-dark-secondary">{username}</span> : null}
+                {formattedDate ? <><span aria-hidden="true" className="text-light-secondary dark:text-dark-secondary">·</span><time className="whitespace-nowrap text-light-secondary dark:text-dark-secondary" dateTime={postTimestamp}>{formattedDate}</time></> : null}
+              </div>
+              <div className="relative -mr-2 -mt-2 shrink-0">
+                <button aria-controls={'post-more-actions-' + contentId} aria-expanded={moreOpen} aria-haspopup="true" aria-label={label('Post actions', '动态操作', '動態操作')} className="rounded-full p-2 text-light-secondary transition-colors hover:bg-main-accent/10 hover:text-main-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-main-accent dark:text-dark-secondary" disabled={ownerActionBusy} onClick={() => setMoreOpen((open) => !open)} type="button">
+                  <TimelineIcon name="more" />
+                </button>
+                {moreOpen ? (
+                  <div id={'post-more-actions-' + contentId} className="absolute right-0 top-full z-20 mt-1 w-56 overflow-hidden rounded-xl border border-light-border bg-main-background p-1 text-light-primary shadow-xl dark:border-dark-border dark:text-dark-primary" role="menu" aria-label={label('More post actions', '更多动态操作', '更多動態操作')}>
+                    {resolvedCreatorId && !isOwnPost && !followRestricted ? <button className="block w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-black/5 dark:hover:bg-white/5" disabled={followBusy} onClick={() => void toggleFollow()} role="menuitem" type="button">{followBusy ? label('Working…', '处理中…', '處理中…') : following ? label('Unfollow', '取消关注', '取消追蹤') : label('Follow creator', '关注作者', '追蹤作者')}</button> : null}
+                    {canManagePost ? <>
+                      <button className="block w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-black/5 dark:hover:bg-white/5" aria-pressed={pinned} disabled={pinBusy} onClick={() => void toggleProfilePin()} role="menuitem" type="button">{pinBusy ? label('Working…', '处理中…', '處理中…') : pinned ? label('Unpin from profile', '取消个人主页置顶', '取消個人頁置頂') : label('Pin to profile', '置顶到个人主页', '置頂到個人頁')}</button>
+                      <button className="block w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-black/5 dark:hover:bg-white/5" disabled={ownerActionBusy} onClick={() => void editPost()} role="menuitem" type="button">{ownerActionBusy ? label('Working…', '处理中…', '處理中…') : label('Edit post', '编辑动态', '編輯動態')}</button>
+                      <button className="block w-full rounded-lg px-3 py-2 text-left text-sm text-red-600 hover:bg-red-500/10" disabled={ownerActionBusy} onClick={() => void deletePost()} role="menuitem" type="button">{ownerActionBusy ? label('Deleting…', '删除中…', '刪除中…') : label('Delete post', '删除动态', '刪除動態')}</button>
+                    </> : null}
+                    <button className="block w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-black/5 dark:hover:bg-white/5" disabled={reportBusy} onClick={() => void reportContent()} role="menuitem" type="button">{reportBusy ? label('Reporting…', '举报中…', '檢舉中…') : label('Report post', '举报动态', '檢舉動態')}</button>
+                    <button className="block w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-black/5 dark:hover:bg-white/5" onClick={() => setMoreOpen(false)} role="menuitem" type="button">{label('Close menu', '关闭菜单', '關閉選單')}</button>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+            <Link className="block whitespace-pre-wrap break-words text-[15px] leading-5 text-light-primary dark:text-dark-primary" href={contentHref} data-umami-event="content-open" data-umami-event-content-type="post">
+              {title}
+            </Link>
+            {singleMedia ? (
+              <div className="mt-3 overflow-hidden rounded-2xl border border-light-border dark:border-dark-border">
+                {singleMedia.kind === 'video' ? <video aria-label={title} className="block max-h-[510px] w-full bg-black object-contain" controls muted playsInline preload="metadata" poster={singleMedia.poster} src={singleMedia.src} /> : <img alt={title} className="block max-h-[510px] w-full object-cover" loading="lazy" src={singleMedia.src} />}
+              </div>
+            ) : mediaItems.length > 1 ? (
+              <div className="mt-3 grid grid-cols-2 gap-0.5 overflow-hidden rounded-2xl border border-light-border dark:border-dark-border" role="group" aria-label={label('Post media', '动态媒体', '動態媒體')}>
+                {mediaItems.map((media) => media.kind === 'video' ? (
+                  <video key={media.src} aria-label={title} className="aspect-square max-h-[300px] w-full bg-black object-cover" controls muted playsInline preload="metadata" poster={media.poster} src={media.src} />
+                ) : <img key={media.src} alt="" className="aspect-square max-h-[300px] w-full object-cover" loading="lazy" src={media.src} />)}
+              </div>
+            ) : null}
+            <footer className="mt-2 flex items-center justify-between gap-1 text-light-secondary dark:text-dark-secondary">
+              <Link aria-label={label('Reply or discuss', '回复或讨论', '回覆或討論')} className={actionClass} href={contentHref}>
+                <TimelineIcon name="reply" /><span className={actionText}>{commentCount === null ? label('Reply', '讨论', '討論') : commentCount.toLocaleString(dateLocale)}</span>
+              </Link>
+              <button aria-label={reposted ? label('Undo repost', '取消转推', '取消轉推') : label('Repost', '转推', '轉推')} aria-pressed={reposted} className={actionClass} disabled={repostBusy || likeStateLoading} onClick={() => void toggleRepost()} title={reposted ? label('Undo repost', '取消转推', '取消轉推') : label('Repost', '转推', '轉推')} type="button">
+                <TimelineIcon name="repost" /><span className={actionText}>{repostBusy ? '…' : repostCount === null ? '' : repostCount.toLocaleString(dateLocale)}</span>
+              </button>
+              <button aria-label={liked ? label('Unlike', '取消点赞', '取消按赞') : label('Like', '点赞', '按赞')} aria-pressed={liked} className={actionClass + (liked ? ' text-pink-500 dark:text-pink-400' : '')} disabled={likeBusy || likeStateLoading} onClick={() => void toggleLike()} title={liked ? label('Unlike', '取消点赞', '取消按赞') : label('Like', '点赞', '按赞')} type="button">
+                <TimelineIcon name="like" filled={liked} /><span className={actionText}>{likeStateLoading ? '…' : likeCount === null ? '' : likeCount.toLocaleString(dateLocale)}</span>
+              </button>
+              <button aria-label={bookmarked ? label('Remove bookmark', '取消收藏', '取消收藏') : label('Bookmark', '收藏', '收藏')} aria-pressed={bookmarked} className={actionClass + (bookmarked ? ' text-sky-500 dark:text-sky-400' : '')} disabled={bookmarkBusy || likeStateLoading} onClick={() => void toggleBookmark()} title={bookmarked ? label('Remove bookmark', '取消收藏', '取消收藏') : label('Bookmark', '收藏', '收藏')} type="button">
+                <TimelineIcon name="bookmark" filled={bookmarked} /><span className={actionText}>{bookmarkBusy ? '…' : ''}</span>
+              </button>
+              <button aria-label={label('Share post', '分享动态', '分享動態')} className={actionClass} disabled={shareBusy} onClick={() => void shareContent()} title={label('Share', '分享', '分享')} type="button">
+                <TimelineIcon name="share" /><span className={actionText}>{shareBusy ? '…' : ''}</span>
+              </button>
+            </footer>
+            {message ? <p className="mt-2 rounded-lg bg-main-sidebar-background px-3 py-2 text-xs text-light-secondary dark:text-dark-secondary" role="status">{message}</p> : null}
+          </div>
+        </div>
+      </article>
+    )
+  }
 
   return (
     <article className="content-feed-card" data-testid="luckread-social-post-card">
