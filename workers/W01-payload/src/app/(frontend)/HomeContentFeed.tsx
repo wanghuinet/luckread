@@ -27,6 +27,7 @@ type Page = {
   items: ContentItem[]
   nextCursor?: string | null
   hasMore?: boolean
+  candidateWindowTruncated?: boolean
 }
 
 export default function HomeContentFeed({
@@ -51,6 +52,7 @@ export default function HomeContentFeed({
   const [activeFeed, setActiveFeed] = useState<'forYou' | 'following'>('forYou')
   const [nextCursor, setNextCursor] = useState<string | null>(null)
   const [hasMore, setHasMore] = useState(false)
+  const [candidateWindowTruncated, setCandidateWindowTruncated] = useState(false)
   const [authRequired, setAuthRequired] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
   const requestIdRef = useRef(0)
@@ -87,6 +89,8 @@ export default function HomeContentFeed({
           setItems(data.data.items ?? [])
           setNextCursor(data.data.nextCursor ?? null)
           setHasMore(data.data.hasMore === true)
+      setCandidateWindowTruncated(data.data.candidateWindowTruncated === true)
+          setCandidateWindowTruncated(data.data.candidateWindowTruncated === true)
         } catch (cause) {
           if (requestId !== requestIdRef.current || controller.signal.aborted) return
           if (cause instanceof DOMException && cause.name === 'AbortError') return
@@ -115,6 +119,7 @@ export default function HomeContentFeed({
     setItems([])
     setNextCursor(null)
     setHasMore(false)
+    setCandidateWindowTruncated(false)
     setRetryKey((value) => value + 1)
   }
 
@@ -124,6 +129,7 @@ export default function HomeContentFeed({
     setItems([])
     setNextCursor(null)
     setHasMore(false)
+    setCandidateWindowTruncated(false)
     setAuthRequired(false)
     setRetryKey((value) => value + 1)
   }
@@ -198,6 +204,15 @@ export default function HomeContentFeed({
         <div className="content-feed-error" role="status">
           <p>{emptyFollowing}</p>
           <Link className="button button-quiet" href="/content">{copy.common.discover}</Link>
+        </div>
+      ) : null}
+      {activeFeed === 'following' && candidateWindowTruncated && !loading ? (
+        <div className="content-feed-error" role="status">
+          <p>{locale === 'en'
+            ? 'This feed currently considers up to 500 followed accounts, so some followed creators may be missing.'
+            : locale === 'tw'
+              ? '此動態目前最多納入 500 個追蹤帳戶，部分創作者可能未顯示。'
+              : '当前关注流最多纳入 500 个关注账号，部分创作者可能暂未显示。'}</p>
         </div>
       ) : null}
       <div className="content-feed-grid">
