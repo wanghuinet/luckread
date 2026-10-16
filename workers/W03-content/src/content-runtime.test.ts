@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-import { canTransitionContentState, ContentRuntimeError, createContent, createRequestId, decodeContentListCursor, decodeCursor, decodeScopedCursor, encodeContentListCursor, encodeCursor, encodeScopedCursor, isState, listContents, listPublishedContentsByIds, listContentRevisions, listCreatorContents, publishDueScheduledContent, toErrorResponse, transitionContentState, updateContent, validateInput, validateListFilters } from './content-runtime.js'
+import { canTransitionContentState, ContentRuntimeError, createContent, createRequestId, deleteContent, decodeContentListCursor, decodeCursor, decodeScopedCursor, encodeContentListCursor, encodeCursor, encodeScopedCursor, isState, listContents, listPublishedContentsByIds, listContentRevisions, listCreatorContents, publishDueScheduledContent, toErrorResponse, transitionContentState, updateContent, validateInput, validateListFilters } from './content-runtime.js'
 import w03Worker, { hasCreatorContentPermission, hasSocialPostPermission, parseListLimit } from './index.js'
 
 describe('W03 content contract core', () => {
@@ -347,6 +347,68 @@ describe('W03 content contract core', () => {
     expect(hasCreatorContentPermission('L2')).toBe(false)
     expect(hasCreatorContentPermission('L3')).toBe(true)
     expect(hasCreatorContentPermission('L4')).toBe(true)
+  })
+
+
+  it('does not let an L2 post identity mutate or delete a canonical non-post item', async () => {
+    const row = {
+      id: 'content_article_guard_1',
+      content_type: 'article',
+      owner_user_id: 'user_article_guard_1',
+      creator_id: 'user_article_guard_1',
+      ip_id: null,
+      state: 'DRAFT',
+      scheduled_at: null,
+      version: 1,
+      revision: 1,
+      slug: 'article-guard-1',
+      title: 'Article draft',
+      body_ref: 'https://cdn.example.com/article-body.json',
+      media_refs_json: '[]',
+      cover_ref: null,
+      etag: 'W/"1"',
+      created_at: '2026-10-16T00:00:00.000Z',
+      updated_at: '2026-10-16T00:00:00.000Z',
+      idem_id: null,
+      idem_owner_user_id: null,
+      idem_request_hash: null,
+      idem_status: null,
+      idem_response_status: null,
+      idem_response_json: null,
+      idem_expires_at: null,
+    }
+    const db = {
+      prepare() {
+        return { bind: () => ({ first: async () => row }) }
+      },
+      batch: async () => { throw new Error('a denied mutation must not write') },
+    } as never
+
+    await expect(
+      updateContent(
+        db,
+        'user_article_guard_1',
+        'content_article_guard_1',
+        { contentType: 'post', title: 'Spoofed type', bodyRef: 'https://cdn.example.com/body.txt', mediaRefs: [], coverRef: null },
+        'W/"1"',
+        'spoof-type-key',
+        new Date('2026-10-16T00:01:00.000Z'),
+        'test',
+        'L2',
+      ),
+    ).rejects.toMatchObject({ code: 'PERMISSION_DENIED', status: 403 })
+
+    await expect(
+      deleteContent(
+        db,
+        'user_article_guard_1',
+        'content_article_guard_1',
+        'W/"1"',
+        'delete-article-key',
+        new Date('2026-10-16T00:01:00.000Z'),
+        'L2',
+      ),
+    ).rejects.toMatchObject({ code: 'PERMISSION_DENIED', status: 403 })
   })
 
 
