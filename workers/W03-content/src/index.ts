@@ -7,6 +7,7 @@ import {
   deleteContent,
   getContent,
   listContents,
+  listFollowingCreatorContents,
   listCreatorContents,
   validateListFilters,
   toErrorResponse,
@@ -235,6 +236,74 @@ const worker = {
       const url = new URL(request.url)
       const isRead = request.method === 'GET'
       await enforceRateLimits(request, env, isRead ? 'read' : 'write')
+
+      if (request.method === 'GET' && url.pathname === '/internal/content/following-feed') {
+        if (
+          request.headers.get('X-LuckRead-Caller') !== 'W04' ||
+          request.headers.get('X-LuckRead-Transport-Version') !== '1.0' ||
+          !request.headers.get('X-LuckRead-Correlation-Id')?.trim() ||
+          request.headers.has('Authorization') ||
+          request.headers.has('Cookie')
+        ) {
+          throw new ContentRuntimeError('PERMISSION_DENIED', 403)
+        }
+        const viewerUserId = request.headers.get('X-LuckRead-Principal-User-Id')?.trim() ?? ''
+        if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(viewerUserId)) {
+          throw new ContentRuntimeError('UNAUTHENTICATED', 401)
+        }
+        const allowed = new Set(['creatorIds', 'cursor', 'limit'])
+        for (const key of url.searchParams.keys()) {
+          if (!allowed.has(key)) throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+        }
+        const creatorIdsValues = url.searchParams.getAll('creatorIds')
+        const cursorValues = url.searchParams.getAll('cursor')
+        const limitValues = url.searchParams.getAll('limit')
+        if (
+          creatorIdsValues.length !== 1 ||
+          cursorValues.length > 1 ||
+          limitValues.length > 1
+        ) {
+          throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+        }
+        const creatorIdsRaw = creatorIdsValues[0] ?? ''
+        if (creatorIdsRaw.length > 70000) throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+        const creatorIds = creatorIdsRaw.split(',')
+        if (
+          creatorIds.length < 1 ||
+          creatorIds.length > 500 ||
+          creatorIds.some((id) => !/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(id))
+        ) {
+          throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+        }
+        const cursor = cursorValues[0]?.trim() || null
+        if (cursor && cursor.length > 2048) throw new ContentRuntimeError('INVALID_CURSOR', 400)
+        const page = await listFollowingCreatorContents(
+          env.D1_02,
+          viewerUserId,
+          creatorIds,
+          cursor,
+          parseListLimit(limitValues[0] ?? null),
+        )
+        return json({
+          data: {
+            items: page.items.map((item) => ({
+              id: item.id,
+              slug: item.slug,
+              creatorId: item.creatorId ?? item.ownerUserId,
+              createdAt: item.createdAt,
+              contentType: item.contentType,
+              title: item.title,
+              bodyRef: item.bodyRef,
+              mediaRefs: item.mediaRefs,
+              coverRef: item.coverRef,
+              updatedAt: item.updatedAt,
+            })),
+            nextCursor: page.nextCursor,
+            hasMore: page.hasMore,
+          },
+          requestId: createRequestId(),
+        })
+      }
       const isModerationTransition =
         request.method === 'POST' &&
         /^\/internal\/content\/contents\/[^/]+\/state$/.test(url.pathname) &&
