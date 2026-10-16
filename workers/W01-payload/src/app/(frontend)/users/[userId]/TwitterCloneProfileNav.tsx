@@ -1,6 +1,6 @@
 import type { MouseEvent } from 'react'
 
-type ProfileContentType = 'post' | 'article' | 'video'
+type ProfileContentType = 'posts' | 'replies' | 'media' | 'likes' | 'articles'
 
 type Props = {
   selected: ProfileContentType

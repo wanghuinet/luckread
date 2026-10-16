@@ -43,12 +43,46 @@ type ContentListResponse = {
   }
 }
 
-type ProfileFilter = PublicContent['contentType']
+type ProfileReply = {
+  id: string
+  contentId: string
+  authorUserId: string
+  parentId: string | null
+  body: string
+  depth: number
+  createdAt: string
+  updatedAt: string
+}
 
-const filterLabels: Record<ProfileFilter, string> = {
-  post: '笔记',
-  article: '文章',
-  video: '视频',
+type ProfileReplyListResponse = {
+  data?: {
+    items?: ProfileReply[]
+    nextCursor?: string | null
+    hasMore?: boolean
+  }
+}
+
+type ProfileLikedContentRef = {
+  contentId: string
+  likedAt: string
+}
+
+type ProfileLikedContentListResponse = {
+  data?: {
+    items?: ProfileLikedContentRef[]
+    nextCursor?: string | null
+    hasMore?: boolean
+  }
+}
+
+type ProfileChannel = 'posts' | 'replies' | 'media' | 'likes' | 'articles'
+
+const filterLabels: Record<ProfileChannel, string> = {
+  posts: '帖子',
+  replies: '回复',
+  media: '媒体',
+  likes: '点赞',
+  articles: '文章',
 }
 
 const contentTypeLabels: Record<PublicContent['contentType'], string> = {
@@ -78,8 +112,9 @@ export default function PublicProfilePage({
   const [reportBusy, setReportBusy] = useState(false)
   const [actionsOpen, setActionsOpen] = useState(false)
   const [safetyMessage, setSafetyMessage] = useState('')
-  const [filter, setFilter] = useState<ProfileFilter>('post')
+  const [filter, setFilter] = useState<ProfileChannel>('posts')
   const [contents, setContents] = useState<PublicContent[]>([])
+  const [replies, setReplies] = useState<ProfileReply[]>([])
   const [contentCursor, setContentCursor] = useState<string | null>(null)
   const [contentHasMore, setContentHasMore] = useState(false)
   const [contentLoading, setContentLoading] = useState(true)
@@ -197,7 +232,7 @@ export default function PublicProfilePage({
     }
   }, [params])
 
-  async function reloadContents(nextFilter: ProfileFilter) {
+  async function reloadContents(nextFilter: ProfileChannel) {
     if (!profile) return
     contentRequestRef.current?.abort()
     const controller = new AbortController()
@@ -208,32 +243,59 @@ export default function PublicProfilePage({
     setContentLoading(true)
     setContentError('')
     setContents([])
+    setReplies([])
     setContentCursor(null)
     setContentHasMore(false)
 
     try {
-      const query = [
+      if (nextFilter === 'replies') {
+        const { response, data } = await fetchJson<ProfileReplyListResponse & { error?: { message?: string } }>(
+          '/api/v1/users/' + encodeURIComponent(profile.id) + '/replies?limit=6',
+          { headers: { accept: 'application/json' }, credentials: 'include', cache: 'no-store', signal: controller.signal },
+        )
+        if (!response.ok || !Array.isArray(data?.data?.items)) throw new Error('PROFILE_REPLIES_FAILED')
+        if (requestId !== contentRequestIdRef.current || controller.signal.aborted) return
+        setReplies(data.data.items)
+        setContentCursor(typeof data.data.nextCursor === 'string' ? data.data.nextCursor : null)
+        setContentHasMore(data.data.hasMore === true)
+        return
+      }
+
+      if (nextFilter === 'likes') {
+        const { response, data } = await fetchJson<ProfileLikedContentListResponse & { error?: { message?: string } }>(
+          '/api/v1/users/' + encodeURIComponent(profile.id) + '/likes?limit=6',
+          { headers: { accept: 'application/json' }, credentials: 'include', cache: 'no-store', signal: controller.signal },
+        )
+        if (!response.ok || !Array.isArray(data?.data?.items)) throw new Error('PROFILE_LIKES_FAILED')
+        const items = await loadLikedContentDetails(data.data.items, controller.signal)
+        if (requestId !== contentRequestIdRef.current || controller.signal.aborted) return
+        setContents(items)
+        setContentCursor(typeof data.data.nextCursor === 'string' ? data.data.nextCursor : null)
+        setContentHasMore(data.data.hasMore === true)
+        return
+      }
+
+      const queryParts = [
         'creatorId=' + encodeURIComponent(profile.id),
         'limit=6',
-        'type=' + encodeURIComponent(nextFilter),
-      ].join('&')
-      const { response, data } = await fetchJson<ContentListResponse & { error?: { message?: string } }>('/api/v1/contents?' + query, {
+      ]
+      if (nextFilter === 'posts') queryParts.push('type=post')
+      if (nextFilter === 'articles') queryParts.push('type=article')
+      const { response, data } = await fetchJson<ContentListResponse & { error?: { message?: string } }>('/api/v1/contents?' + queryParts.join('&'), {
         headers: { accept: 'application/json' },
         credentials: 'omit',
         cache: 'no-store',
         signal: controller.signal,
       })
-      if (!response.ok || !Array.isArray(data?.data?.items)) {
-        throw new Error('CONTENT_LIST_FAILED')
-      }
+      if (!response.ok || !Array.isArray(data?.data?.items)) throw new Error('CONTENT_LIST_FAILED')
       if (requestId !== contentRequestIdRef.current || controller.signal.aborted) return
-      setContents(data.data.items)
+      setContents(nextFilter === 'media' ? data.data.items.filter(isMediaContent) : data.data.items)
       setContentCursor(typeof data.data.nextCursor === 'string' ? data.data.nextCursor : null)
       setContentHasMore(data.data.hasMore === true)
     } catch (cause) {
       if (cause instanceof DOMException && cause.name === 'AbortError') return
       if (requestId !== contentRequestIdRef.current) return
-      setContentError('暂时无法加载作品，请稍后重试。')
+      setContentError(nextFilter === 'replies' ? '暂时无法加载回复/讨论，请稍后重试。' : nextFilter === 'likes' ? '暂时无法加载点赞内容，请稍后重试。' : '暂时无法加载作品，请稍后重试。')
     } finally {
       if (requestId === contentRequestIdRef.current) setContentLoading(false)
     }
@@ -248,30 +310,58 @@ export default function PublicProfilePage({
     setContentLoading(true)
 
     try {
-      const params = new URLSearchParams({
+      if (filter === 'replies') {
+        const query = new URLSearchParams({ limit: '6', cursor: contentCursor })
+        const { response, data } = await fetchJson<ProfileReplyListResponse & { error?: { message?: string } }>(
+          '/api/v1/users/' + encodeURIComponent(profile.id) + '/replies?' + query.toString(),
+          { headers: { accept: 'application/json' }, credentials: 'include', cache: 'no-store', signal: controller.signal },
+        )
+        if (!response.ok || !Array.isArray(data?.data?.items)) throw new Error('PROFILE_REPLIES_FAILED')
+        if (requestId !== contentRequestIdRef.current || controller.signal.aborted) return
+        setReplies((current) => [...current, ...data.data.items])
+        setContentCursor(typeof data.data.nextCursor === 'string' ? data.data.nextCursor : null)
+        setContentHasMore(data.data.hasMore === true)
+        return
+      }
+
+      if (filter === 'likes') {
+        const query = new URLSearchParams({ limit: '6', cursor: contentCursor })
+        const { response, data } = await fetchJson<ProfileLikedContentListResponse & { error?: { message?: string } }>(
+          '/api/v1/users/' + encodeURIComponent(profile.id) + '/likes?' + query.toString(),
+          { headers: { accept: 'application/json' }, credentials: 'include', cache: 'no-store', signal: controller.signal },
+        )
+        if (!response.ok || !Array.isArray(data?.data?.items)) throw new Error('PROFILE_LIKES_FAILED')
+        const nextItems = await loadLikedContentDetails(data.data.items, controller.signal)
+        if (requestId !== contentRequestIdRef.current || controller.signal.aborted) return
+        setContents((current) => [...current, ...nextItems])
+        setContentCursor(typeof data.data.nextCursor === 'string' ? data.data.nextCursor : null)
+        setContentHasMore(data.data.hasMore === true)
+        return
+      }
+
+      const query = new URLSearchParams({
         creatorId: profile.id,
         limit: '6',
         cursor: contentCursor,
       })
-      params.set('type', filter)
-
-      const { response, data } = await fetchJson<ContentListResponse & { error?: { message?: string } }>('/api/v1/contents?' + params.toString(), {
+      if (filter === 'posts') query.set('type', 'post')
+      if (filter === 'articles') query.set('type', 'article')
+      const { response, data } = await fetchJson<ContentListResponse & { error?: { message?: string } }>('/api/v1/contents?' + query.toString(), {
         headers: { accept: 'application/json' },
         credentials: 'omit',
         cache: 'no-store',
         signal: controller.signal,
       })
-      if (!response.ok || !Array.isArray(data?.data?.items)) {
-        throw new Error('CONTENT_LIST_FAILED')
-      }
+      if (!response.ok || !Array.isArray(data?.data?.items)) throw new Error('CONTENT_LIST_FAILED')
       if (requestId !== contentRequestIdRef.current || controller.signal.aborted) return
-      setContents((current) => [...current, ...data.data.items])
+      const nextItems = filter === 'media' ? data.data.items.filter(isMediaContent) : data.data.items
+      setContents((current) => [...current, ...nextItems])
       setContentCursor(typeof data.data.nextCursor === 'string' ? data.data.nextCursor : null)
       setContentHasMore(data.data.hasMore === true)
     } catch (cause) {
       if (cause instanceof DOMException && cause.name === 'AbortError') return
       if (requestId !== contentRequestIdRef.current) return
-      setContentError('暂时无法加载更多作品，请稍后重试。')
+      setContentError('暂时无法加载更多内容，请稍后重试。')
     } finally {
       if (requestId === contentRequestIdRef.current) setContentLoading(false)
     }
@@ -440,7 +530,15 @@ export default function PublicProfilePage({
 
   const name = displayName(profile)
   const initial = name.slice(0, 1).toUpperCase()
-  const visibleContents = contents.filter((item) => item.contentType === filter)
+  const visibleContents = filter === 'media'
+    ? contents.filter(isMediaContent)
+    : filter === 'posts'
+      ? contents.filter((item) => item.contentType === 'post')
+      : filter === 'articles'
+        ? contents.filter((item) => item.contentType === 'article')
+        : filter === 'likes'
+          ? contents
+          : []
 
   function getContentHref(item: PublicContent) {
     return '/content/' + encodeURIComponent(item.slug || item.id)
@@ -596,12 +694,26 @@ export default function PublicProfilePage({
           </header>
 
           {contentError ? <p className="creator-profile-message" role="status">{contentError}</p> : null}
-          {contentLoading && contents.length === 0 ? (
-            <div className="creator-profile-empty"><p role="status">暂无作品</p></div>
+          {contentLoading && contents.length === 0 && replies.length === 0 ? (
+            <div className="creator-profile-empty"><p role="status">正在加载{filterLabels[filter]}…</p></div>
           ) : null}
-          {!contentLoading && visibleContents.length === 0 && !contentError ? (
+          {!contentLoading && visibleContents.length === 0 && replies.length === 0 && !contentError ? (
             <div className="creator-profile-empty">
-              <p>暂无{filterLabels[filter]}公开作品</p>
+              <p>{filter === 'replies' ? '暂无回复或讨论' : filter === 'likes' ? '暂无点赞内容' : '暂无' + filterLabels[filter] + '公开作品'}</p>
+            </div>
+          ) : null}
+
+          {filter === 'replies' && replies.length > 0 ? (
+            <div className="creator-profile-grid">
+              {replies.map((reply) => (
+                <Link className="creator-profile-card" href={'/content/' + encodeURIComponent(reply.contentId)} key={reply.id}>
+                  <div className="creator-profile-card-body">
+                    <span>{reply.parentId ? '回复讨论' : '讨论'}</span>
+                    <p>{reply.body}</p>
+                    <time dateTime={reply.createdAt}>{new Date(reply.createdAt).toLocaleDateString('zh-CN')}</time>
+                  </div>
+                </Link>
+              ))}
             </div>
           ) : null}
 
@@ -654,6 +766,31 @@ export default function PublicProfilePage({
       {error ? <p className="creator-profile-global-message" role="status">{error}</p> : null}
     </div>
   )
+}
+
+async function loadLikedContentDetails(
+  refs: ProfileLikedContentRef[],
+  signal: AbortSignal,
+): Promise<PublicContent[]> {
+  const details = await Promise.all(refs.map(async (ref) => {
+    try {
+      const { response, data } = await fetchJson<{ data?: PublicContent }>(
+        '/api/v1/contents/' + encodeURIComponent(ref.contentId),
+        { headers: { accept: 'application/json' }, credentials: 'omit', cache: 'no-store', signal },
+      )
+      if (!response.ok || !data?.data || !data.data.id || !data.data.title) return null
+      if (!['post', 'article', 'video'].includes(data.data.contentType)) return null
+      return data.data
+    } catch (cause) {
+      if (cause instanceof DOMException && cause.name === 'AbortError') throw cause
+      return null
+    }
+  }))
+  return details.filter((item): item is PublicContent => item !== null)
+}
+
+function isMediaContent(item: PublicContent): boolean {
+  return item.contentType === 'video' || Boolean(item.coverRef) || Boolean(item.mediaRefs?.length)
 }
 
 function displayName(profile: PublicProfile | null): string {
