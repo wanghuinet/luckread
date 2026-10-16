@@ -1,6 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
 import { contentSlugFor, isContentSlug } from './content-slug.js'
+import { normalizePreflightInput, preflightContent } from './publish-preflight.js'
 
 export type ContentState =
   | 'DRAFT'
@@ -1141,20 +1142,30 @@ export async function deleteContent(
   ])
 }
 
-const actorKindForLayer = (layer: string): 'CREATOR' | null =>
-  /^L[3-4]$/.test(layer) ? 'CREATOR' : null
+const actorKindForLayer = (layer: string): 'SOCIAL_AUTHOR' | 'CREATOR' | null =>
+  layer === 'L2' ? 'SOCIAL_AUTHOR' : /^L[3-4]$/.test(layer) ? 'CREATOR' : null
 
 export const canTransitionContentState = (
   from: ContentState,
   to: ContentState,
-  kind: 'CREATOR' | 'MODERATOR',
+  kind: 'SOCIAL_AUTHOR' | 'CREATOR' | 'MODERATOR',
   owns: boolean,
   reason?: string,
+  contentType?: ContentType,
 ): boolean => {
   if (kind === 'MODERATOR') {
     return from === 'PENDING_REVIEW' && (to === 'APPROVED' || to === 'REJECTED')
   }
   if (!owns) return false
+
+  // L2 is allowed to create and directly publish only ordinary social posts.
+  // Creator roles retain the existing article/video lifecycle, and may also
+  // publish ordinary posts without routing them through human review.
+  if (kind === 'SOCIAL_AUTHOR') {
+    return contentType === 'post' && from === 'DRAFT' && to === 'PUBLISHED'
+  }
+  if (contentType === 'post' && from === 'DRAFT' && to === 'PUBLISHED') return true
+
   if (from === 'DRAFT' && to === 'PENDING_REVIEW') return true
   if (from === 'REJECTED' && to === 'DRAFT') return true
   if (from === 'APPROVED' && to === 'PUBLISHED') return true
@@ -1186,7 +1197,7 @@ export async function transitionContentState(
   ifMatch: string,
   idempotencyKey: string,
   now = new Date(),
-  options: { scheduledAt?: string | null } = {},
+  options: { scheduledAt?: string | null; preflight?: unknown } = {},
 ): Promise<{ from: ContentState; to: ContentState; version: number; etag: string; scheduledAt?: string | null }> {
   assertResourceId(principalUserId)
   assertResourceId(contentId)
@@ -1217,10 +1228,26 @@ export async function transitionContentState(
 
   assertEtag(content.etag, ifMatch)
   const ownsContent = content.ownerUserId === principalUserId
-  if (kind === 'CREATOR' && !ownsContent) {
+  if (kind !== 'MODERATOR' && !ownsContent) {
     throw new ContentRuntimeError('PERMISSION_DENIED', 403)
   }
-  if (!canTransitionContentState(content.state, to, kind, ownsContent, reason)) {
+
+  // Direct publication is narrowly available for draft social posts only.
+  // Re-run the risk/quality preflight at the content authority before any write.
+  if (content.state === 'DRAFT' && content.contentType === 'post' && to === 'PUBLISHED') {
+    if (!options.preflight || typeof options.preflight !== 'object' || Array.isArray(options.preflight)) {
+      throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+    }
+    let report
+    try {
+      report = preflightContent(normalizePreflightInput(options.preflight))
+    } catch {
+      throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+    }
+    if (report.verdict === 'RED') throw new ContentRuntimeError('VALIDATION_FAILED', 422)
+  }
+
+  if (!canTransitionContentState(content.state, to, kind, ownsContent, reason, content.contentType)) {
     throw new ContentRuntimeError('INVALID_STATE', 409)
   }
 
