@@ -20,7 +20,6 @@ if (!/^[A-Za-z0-9]{6,32}$/.test(username)) {
   throw new Error('generated native reviewer username violates the production username policy')
 }
 const password = 'Evd-MOD-' + randomBytes(24).toString('base64url') + '-Z9!'
-const deviceId = 'moderation-e2e-' + runId
 const roleId = 'MODERATION-E2E-ROLE-' + runId + '-' + randomBytes(5).toString('hex')
 const registerKey = 'MODERATION-E2E-' + runId + '-register'
 
