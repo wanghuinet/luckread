@@ -616,7 +616,7 @@ export default {
         if (request.method !== 'GET') {
           return new Response(null, { status: 405, headers: { Allow: 'GET' } })
         }
-        if ([...url.searchParams.keys()].length > 0) {
+        if (url.search !== '') {
           throw new FollowRuntimeError('VALIDATION_FAILED', 400)
         }
         const viewerUserId = requireFollowingFeedPrincipal(request)
