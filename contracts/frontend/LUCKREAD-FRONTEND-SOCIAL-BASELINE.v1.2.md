@@ -93,7 +93,53 @@ For each feature, the inventory must identify:
 
 Unknown API names, DTO fields, permissions or database behavior must be explicitly marked unverified; do not infer or invent them.
 
-## 7. Staged delivery
+## 7. Initial evidence-based inventory (2026-10-16)
+
+This is a repository/PR evidence snapshot, not a claim of full runtime acceptance. Merge status proves code landed; it does not by itself prove the production user journey works.
+
+### 7.1 Current PR deduplication
+
+| Status | PR | Finding / action |
+|---|---|---|
+| Open | [#1063](https://github.com/wanghuinet/luckread/pull/1063) | This contract and reuse boundaries. |
+| Open | [#1064](https://github.com/wanghuinet/luckread/pull/1064) | Fixes ordinary-post permission, direct publish after W03 preflight, and the composer preflight adapter path. Do not merge until all CI gates pass; latest checks are being rerun after fixing a stale lifecycle assertion and an impossible TypeScript moderator comparison. |
+| Merged | [#1042](https://github.com/wanghuinet/luckread/pull/1042) | Shared social post card adapted from ccrsxx; uses LuckRead W01/W05 APIs and preserves attribution. |
+| Merged | [#1043](https://github.com/wanghuinet/luckread/pull/1043) | Threaded discussion presentation wired to W05 comments. |
+| Merged | [#1044](https://github.com/wanghuinet/luckread/pull/1044) | Reused profile header and navigation. |
+| Merged | [#1046](https://github.com/wanghuinet/luckread/pull/1046) | Follow-list row using W05 data. |
+| Merged | [#1047](https://github.com/wanghuinet/luckread/pull/1047) | Shared post card on public profiles. |
+| Merged | [#1048](https://github.com/wanghuinet/luckread/pull/1048) | Share and bookmark actions. |
+| Merged | [#1053](https://github.com/wanghuinet/luckread/pull/1053), [#1056](https://github.com/wanghuinet/luckread/pull/1056) | Following tab and authenticated Following feed. |
+| Merged | [#1054](https://github.com/wanghuinet/luckread/pull/1054), [#1055](https://github.com/wanghuinet/luckread/pull/1055), [#1057](https://github.com/wanghuinet/luckread/pull/1057) | Report action, paginated bookmarks, post more-actions menu. |
+| Merged | [#1058](https://github.com/wanghuinet/luckread/pull/1058), [#1059](https://github.com/wanghuinet/luckread/pull/1059) | Profile content tabs; repost and pinned-post actions. |
+| Merged | [#1060](https://github.com/wanghuinet/luckread/pull/1060), [#1061](https://github.com/wanghuinet/luckread/pull/1061), [#1062](https://github.com/wanghuinet/luckread/pull/1062) | Home compose routing, clone-style compose modal, and X-like timeline card presentation. Runtime publish permission is handled separately by open PR #1064. |
+| Closed unmerged | [#1051](https://github.com/wanghuinet/luckread/pull/1051), [#1052](https://github.com/wanghuinet/luckread/pull/1052) | Do not revive as duplicate standalone work without new evidence; following-feed implementation was subsequently merged in #1056 and tab wiring in #1053. |
+| Closed unmerged | [#1049](https://github.com/wanghuinet/luckread/pull/1049) | Migration route-check repair was not merged separately; use the merged migration and verify current route behavior rather than reapplying this branch. |
+
+### 7.2 Source-to-destination reuse map (verified paths only)
+
+| Reused presentation | Upstream source evidence | LuckRead destination / current evidence |
+|---|---|---|
+| Social post card, post stats and user-card composition | ccrsxx/twitter-clone Tweet, TweetStats, user-card presentation | workers/W01-payload/src/app/(frontend)/components/reuse/LuckReadSocialPostCard.tsx; merged PR #1042 |
+| Profile header/avatar/details and profile tab navigation | ccrsxx/twitter-clone src/components/layout/user-home-layout.tsx, src/components/user/user-home-avatar.tsx, src/components/user/user-details.tsx, src/components/user/user-nav.tsx | workers/W01-payload/src/app/(frontend)/users/[userId]/TwitterCloneProfileHeader.tsx and TwitterCloneProfileNav.tsx; merged PR #1044 |
+| Composer modal / home timeline presentation | ccrsxx/twitter-clone is the established presentation reference; exact per-component source paths still require final source-level verification | workers/W01-payload/src/app/(frontend)/publish/PublishComposer.tsx and shared home feed/card; PRs #1061/#1062 |
+| Image/video upload presentation | Existing LuckRead composer includes a multi-file media input accepting images and videos (articles accept images); current code has media preview/removal and video metadata UI | Same PublishComposer.tsx; verify deployed upload and publication round trip. This does not yet establish X-style icon placement or complete E2E acceptance. |
+
+The three additional authorized repositories are in the allowlist, but their exact component paths have not yet been selected/copied into LuckRead. Do not fabricate a source-to-destination mapping; finish file-level comparison before choosing any component from them.
+
+### 7.3 Feature/API/permission/test status
+
+| Feature | Current status | Existing authority / evidence | Remaining closeout |
+|---|---|---|---|
+| Ordinary text post publishing | **Broken / pending fix validation** | W03 content authority; W01 composer; open PR #1064 | Pass all CI, verify L2-L4 ownership rules, W03 preflight, public feed appearance and real success/error response. |
+| Human review for ordinary posts | **Pending fix validation** | #1064 narrowly permits owner-only DRAFT -> PUBLISHED for posts; articles/videos retain review | Confirm deployed runtime behavior; no blanket review bypass. |
+| Image and video selection/upload UI | **Partial / code present** | Existing PublishComposer.tsx, LuckRead media API; image/video file input and previews | Confirm upload API/auth, file constraints, upload failure, save/reload and published post rendering on desktop/H5. |
+| Poll creation and voting | **Missing / blocked on API contract evidence** | Current PR #1064 explicitly excludes polls; no dedicated SOCIAL-008 poll/vote contract/API evidence found in the current inventory | Search all four authorized sources for reusable poll UI; separately verify whether LuckRead has canonical poll/vote APIs. Do not implement frontend-only fake polls or create a second data authority. |
+| Like, reply/thread, repost, pin | **Code present; runtime acceptance still required** | #1042, #1043, #1059; W05 is social authority | Verify counts, idempotency, ownership and refreshed state in live journeys. |
+| Following timeline, profile tabs, report, bookmark/share | **Code present; runtime acceptance still required** | #1044, #1048, #1053–#1058; existing W01/W05 adapters | Avoid reimplementation; verify empty/error/auth states and real API behavior. |
+| Notifications, search, block/mute | **Partial / needs surface-by-surface verification** | Existing backend capabilities and prior profile surfaces vary by feature | Map exact route, API, permission, source component and acceptance evidence before declaring complete. |
+
+## 8. Staged delivery
 
 ### Phase 1 — Contract and inventory (current authorized phase)
 - Review current frontend, API contracts, route structure, social adapters and existing implementation evidence.
