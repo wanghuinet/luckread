@@ -1,6 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 import { describe, expect, it, vi } from 'vitest'
-import { listFollowingCreatorContents } from './content-runtime.js'
+import { listFollowingOwnerContents } from './content-runtime.js'
 import worker from './index.js'
 
 const rows = [
@@ -56,7 +56,7 @@ const mockDb = () => {
 }
 
 describe('W03 Following content projection', () => {
-  it('queries only published content for the W05-supplied creator set and returns stable pagination', async () => {
+  it('queries only published content for the W04-authorized owner set and returns stable pagination', async () => {
     const { db, prepare } = mockDb()
     const page = await listFollowingCreatorContents(db, 'viewer-1', ['creator-2', 'creator-1'], null, 1)
     expect(page.items).toHaveLength(1)
@@ -71,7 +71,8 @@ describe('W03 Following content projection', () => {
     expect(page.nextCursor).toBeTruthy()
     const sql = String(prepare.mock.calls[0]?.[0] ?? '')
     expect(sql).toContain("c.state = 'PUBLISHED'")
-    expect(sql).toContain('json_each(?)')
+    expect(sql).toContain('c.owner_user_id IN (SELECT value FROM json_each(?))')
+    expect(sql).not.toContain('c.creator_id IN (SELECT value FROM json_each(?))')
     expect(sql).not.toContain('social_follow_relationships')
     expect(sql).not.toContain('social_user_interactions')
   })
@@ -116,7 +117,7 @@ describe('W03 private Following endpoint', () => {
           'X-LuckRead-Correlation-Id': 'w03-following-test',
           'X-LuckRead-Principal-User-Id': 'viewer-1',
         },
-        body: JSON.stringify({ creatorIds: ['creator-1', 'creator-2'], limit: 1, cursor: null }),
+        body: JSON.stringify({ ownerUserIds: ['creator-1', 'creator-2'], limit: 1, cursor: null }),
       }),
       env,
     )
@@ -144,7 +145,7 @@ describe('W03 private Following endpoint', () => {
           'X-LuckRead-Correlation-Id': 'wrong-caller',
           'X-LuckRead-Principal-User-Id': 'viewer-1',
         },
-        body: JSON.stringify({ creatorIds: ['creator-1'], limit: 6 }),
+        body: JSON.stringify({ ownerUserIds: ['creator-1'], limit: 6 }),
       }),
       env,
     )
@@ -160,7 +161,7 @@ describe('W03 private Following endpoint', () => {
           'X-LuckRead-Correlation-Id': 'bad-authors',
           'X-LuckRead-Principal-User-Id': 'viewer-1',
         },
-        body: JSON.stringify({ creatorIds: [], limit: 6 }),
+        body: JSON.stringify({ ownerUserIds: [], limit: 6 }),
       }),
       env,
     )
