@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 import { canTransitionContentState, ContentRuntimeError, createContent, createRequestId, decodeContentListCursor, decodeCursor, decodeScopedCursor, encodeContentListCursor, encodeCursor, encodeScopedCursor, isState, listContents, listPublishedContentsByIds, listContentRevisions, listCreatorContents, publishDueScheduledContent, toErrorResponse, transitionContentState, updateContent, validateInput, validateListFilters } from './content-runtime.js'
-import w03Worker, { hasCreatorContentPermission, parseListLimit } from './index.js'
+import w03Worker, { hasCreatorContentPermission, hasSocialPostPermission, parseListLimit } from './index.js'
 
 describe('W03 content contract core', () => {
 
@@ -321,6 +321,12 @@ describe('W03 content contract core', () => {
   it('allows only the contracted creator and moderator transitions', () => {
     expect(canTransitionContentState('DRAFT', 'PENDING_REVIEW', 'CREATOR', true)).toBe(true)
     expect(canTransitionContentState('DRAFT', 'PUBLISHED', 'CREATOR', true)).toBe(false)
+    expect(canTransitionContentState('DRAFT', 'PUBLISHED', 'CREATOR', true, undefined, 'article')).toBe(false)
+    expect(canTransitionContentState('DRAFT', 'PUBLISHED', 'CREATOR', true, undefined, 'post')).toBe(true)
+    expect(canTransitionContentState('DRAFT', 'PENDING_REVIEW', 'SOCIAL_AUTHOR', true, undefined, 'post')).toBe(false)
+    expect(canTransitionContentState('DRAFT', 'PUBLISHED', 'SOCIAL_AUTHOR', true, undefined, 'post')).toBe(true)
+    expect(canTransitionContentState('DRAFT', 'PUBLISHED', 'SOCIAL_AUTHOR', false, undefined, 'post')).toBe(false)
+    expect(canTransitionContentState('DRAFT', 'PUBLISHED', 'SOCIAL_AUTHOR', true, undefined, 'video')).toBe(false)
     expect(canTransitionContentState('PENDING_REVIEW', 'APPROVED', 'MODERATOR', false)).toBe(true)
     expect(canTransitionContentState('PENDING_REVIEW', 'REJECTED', 'MODERATOR', false)).toBe(true)
     expect(canTransitionContentState('APPROVED', 'SCHEDULED', 'CREATOR', true)).toBe(true)
@@ -329,6 +335,18 @@ describe('W03 content contract core', () => {
     expect(canTransitionContentState('PENDING_REVIEW', 'APPROVED', 'CREATOR', true)).toBe(false)
     expect(canTransitionContentState('PUBLISHED', 'PENDING_REVIEW', 'CREATOR', true, 'material_edit_requires_review')).toBe(true)
     expect(canTransitionContentState('PUBLISHED', 'PENDING_REVIEW', 'CREATOR', true, 'other')).toBe(false)
+  })
+
+  it('allows ordinary social post creation only at the authenticated L2-L4 layers', () => {
+    expect(hasSocialPostPermission('L2')).toBe(true)
+    expect(hasSocialPostPermission('L3')).toBe(true)
+    expect(hasSocialPostPermission('L4')).toBe(true)
+    expect(hasSocialPostPermission('L1')).toBe(false)
+    expect(hasSocialPostPermission('L5')).toBe(false)
+    expect(hasSocialPostPermission('')).toBe(false)
+    expect(hasCreatorContentPermission('L2')).toBe(false)
+    expect(hasCreatorContentPermission('L3')).toBe(true)
+    expect(hasCreatorContentPermission('L4')).toBe(true)
   })
 
 
