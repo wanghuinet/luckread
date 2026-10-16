@@ -206,11 +206,16 @@ jobs:
             visit(root);
             return rows;
           }
-          const applied = rowsFrom('/tmp/w03-migration-history.json')
+          const appliedAll = rowsFrom('/tmp/w03-migration-history.json')
             .map((row) => row.name).filter((name) => typeof name === 'string').sort();
-          if (new Set(applied).size !== applied.length) throw new Error('Remote d1_migrations has duplicate names');
-          if (applied.some((name, index) => expected[index] !== name)) {
-            throw new Error('Remote migration history is not a prefix of the reviewed chain: ' + JSON.stringify(applied));
+          if (new Set(appliedAll).size !== appliedAll.length) throw new Error('Remote d1_migrations has duplicate names');
+          // D1-02 is shared by several LuckRead subsystems. Do not mistake their
+          // timestamped social migrations for W03 migrations: only compare the
+          // exact W03 migration identities and require their own order to be a prefix.
+          const appliedSet = new Set(appliedAll);
+          const applied = expected.filter((name) => appliedSet.has(name));
+          if (JSON.stringify(applied) !== JSON.stringify(expected.slice(0, applied.length))) {
+            throw new Error('W03 migration history is not a prefix of the reviewed chain: ' + JSON.stringify(applied));
           }
           const schemaRows = [
             'contents', 'content_revisions', 'content_relationships', 'content_series', 'content_collections',
@@ -234,9 +239,11 @@ jobs:
             fs.appendFileSync(process.env.GITHUB_ENV, 'W03_MIGRATION_ACTION=none\n');
             fs.appendFileSync(process.env.GITHUB_OUTPUT, 'action=none\n');
           } else {
-            if (applied.length !== 3 ||
-                JSON.stringify(applied) !== JSON.stringify(expected.slice(0, 3))) {
-              throw new Error('Refusing remote mutation: only the known 0001-0003 applied / 0004-0011 pending state is admitted; current history=' + JSON.stringify(applied));
+            // Admit only the two known pre-0004 states: W03 migrations 0001-0002
+            // (0003 pagination index still pending), or 0001-0003 complete.
+            // Any partial/out-of-order history fails closed.
+            if (![2, 3].includes(applied.length)) {
+              throw new Error('Refusing remote mutation: only W03 migrations 0001-0002 or 0001-0003 with 0004-0011 pending are admitted; current W03 history=' + JSON.stringify(applied));
             }
             const missingTables = ['content_revisions','content_relationships','content_series','content_collections'].filter((table) => tables.has(table));
             const contentCols = columns('contents');
@@ -256,12 +263,14 @@ jobs:
           console.log(JSON.stringify({
             sourceSha: process.env.SOURCE_SHA,
             appliedMigrations: applied,
+            allAppliedMigrationCount: appliedAll.length,
+            appliedW03Migrations: applied,
             pendingMigrations: alreadyFullyMigrated ? [] : expected.slice(applied.length),
             action: alreadyFullyMigrated ? 'NO_OP_SCHEMA_ALREADY_CURRENT' : 'APPLY_REVIEWED_PENDING_MIGRATIONS',
           }));
           NODE
 
-      - name: Apply admitted W03 D1-02 migrations 0004-0011
+      - name: Apply admitted pending W03 D1-02 migrations
         if: steps.gate_remote_drift.outputs.action == 'apply'
         working-directory: workers/W03-content
         env:
