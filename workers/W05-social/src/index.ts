@@ -29,9 +29,8 @@ import {
   invalidateFollowListCountCache,
   listFollowers,
   listFollowing,
-  listFollowingFeed,
+  listFollowingAuthorIds,
   parseFollowListLimit,
-  parseFollowingFeedLimit,
   unfollow,
 } from './follow-runtime.js'
 
@@ -613,15 +612,16 @@ export default {
         return new Response(null, { status: 204 })
       }
 
-      if (url.pathname === '/internal/social/feed/following') {
+      if (url.pathname === '/internal/social/feed/following-authors') {
         if (request.method !== 'GET') {
           return new Response(null, { status: 405, headers: { Allow: 'GET' } })
         }
+        if ([...url.searchParams.keys()].length > 0) {
+          throw new FollowRuntimeError('VALIDATION_FAILED', 400)
+        }
         const viewerUserId = requireFollowingFeedPrincipal(request)
-        const limit = parseFollowingFeedLimit(url.searchParams.get('limit'))
-        const cursor = url.searchParams.get('cursor')
-        const page = await listFollowingFeed(env.DB, viewerUserId, cursor, limit)
-        return json({ data: page, requestId: createRequestId() })
+        const candidates = await listFollowingAuthorIds(env.DB, viewerUserId)
+        return json({ data: candidates, requestId: createRequestId() })
       }
 
       const path = parseFollowPath(url.pathname)
