@@ -1,31 +1,36 @@
 import { readFile } from 'node:fs/promises'
 import { describe, expect, it } from 'vitest'
 
-describe('LuckRead homepage', () => {
-  it('declares the reader-first homepage, left discussion tree, and creator entry points', async () => {
-    const [page, styles] = await Promise.all([
-      readFile('src/app/(frontend)/page.tsx', 'utf8'),
-      readFile('src/app/(frontend)/styles.css', 'utf8'),
+describe('Twitter-clone homepage reuse', () => {
+  it('uses the clone landing for public visitors and preserves the creator-host entry', async () => {
+    const [page, landing, layout] = await Promise.all([
+      readFile('src/app/(twitter-clone)/page.tsx', 'utf8'),
+      readFile('src/app/(twitter-clone)/TwitterCloneLanding.tsx', 'utf8'),
+      readFile('src/app/(twitter-clone)/layout.tsx', 'utf8'),
     ])
 
-    expect(page).toContain('copy.home.heroTitle')
-    expect(page).toContain('copy.home.heroLead')
-    expect(page).toContain("const CREATOR_CENTER_URL = 'https://mp.luckread.com/'")
-    expect(page).toContain('copy.common.createNow')
-    expect(styles).toContain('.home-shell')
-    expect(styles).toContain('.hero')
-    expect(styles).toContain('prefers-reduced-motion')
-    expect(page).toContain('className="home-reading-layout"')
-    expect(page).toContain('className="home-rail-link home-rail-tree"')
-    expect(page.indexOf('home-rail-tree')).toBeLessThan(page.indexOf('home-rail-active'))
-    expect(page).toContain("href=\"/content\"")
-    expect(styles).toContain('.home-left-rail')
-    expect(styles).toContain('.home-reading-main .content-feed-grid')
+    expect(page).toContain("if (host === 'mp.luckread.com') return <CreatorDomainHome />")
+    expect(page).toContain("if (principal?.active) redirect('/home')")
+    expect(page).toContain('return <TwitterCloneLanding locale={normalizePublicLocale(localeCookie)} />')
+    expect(landing).toContain('copy.landing.happeningNow')
+    expect(landing).toContain('copy.landing.signUp')
+    expect(landing).toContain('href="/content"')
+    expect(landing).toContain('href="/shorts"')
+    expect(landing).toContain('href="/creator-center"')
+    expect(layout).toContain("import '../../styles/twitter-clone-globals.scss'")
+  })
+
+  it('keeps the clone feed, compose entry, profile, and discovery routes connected', async () => {
+    const home = await readFile('src/app/(twitter-clone)/home/page.tsx', 'utf8')
+    expect(home).toContain('<TwitterCloneHomeFeed key={feedMode} initialPage={initialPage} locale={locale} feedMode={feedMode} />')
+    expect(home).toContain('href="/publish"')
+    expect(home).toContain('href="/me/profile"')
+    expect(home).toContain('TwitterCloneSidebarProfile locale={locale}')
+    const sidebarProfile = await readFile('src/app/(twitter-clone)/TwitterCloneSidebarProfile.tsx', 'utf8')
+    expect(sidebarProfile).toContain("'/api/v1/users/me'")
+    expect(sidebarProfile).toContain("credentials: 'include'")
+    expect(sidebarProfile).not.toContain('firebase/')
+    expect(home).toContain('href="/me/subscriptions"')
+    expect(home).toContain('href="/shorts"')
   })
 })
-
-
-  it('exposes the signed-in profile entry from the public header', async () => {
-    const page = await readFile('src/app/(frontend)/page.tsx', 'utf8')
-    expect(page).toContain('copy.common.profile')
-  })

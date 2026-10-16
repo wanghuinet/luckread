@@ -36,3 +36,14 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
+
+
+## Reused frontend foundation: ccrsxx/twitter-clone
+
+The Tailwind configuration, PostCSS configuration, base interaction styles, font-face definitions, landing layout, and interaction-feed presentation added for this migration are copied or adapted from the MIT-licensed upstream repository:
+
+- Source: https://github.com/ccrsxx/twitter-clone
+- Reused foundation: upstream `tailwind.config.js`, `postcss.config.js`, `src/styles/globals.scss`, `src/styles/fonts.scss`, `src/components/login/login-main.tsx`, `src/components/sidebar/sidebar.tsx`, `src/components/tweet/tweet.tsx`, and `src/components/tweet/tweet-stats.tsx`
+- Copyright: Copyright (c) 2022 ccrsxx
+- Backend boundary: no upstream Firebase Authentication, Firestore, Cloud Storage, or upstream backend mutation code is used. LuckRead identity stays in W02 Better Auth, content reads stay in W01/W03, and social mutations use LuckRead's existing API path to W05.
+

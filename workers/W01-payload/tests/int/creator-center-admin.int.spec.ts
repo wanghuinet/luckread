@@ -963,14 +963,14 @@ describe('Creator Center admin extension', () => {
     expect(registerForm).toContain('<form aria-busy={status === \'submitting\'} className="registerForm" onSubmit={handleSubmit} noValidate>')
     expect(registerForm).toContain("fetchJson<RegistrationResponse | ApiError>('/api/v1/auth/register'")
     expect(registerForm).not.toContain("fetch('/auth/register'")
-    expect(loginForm).toContain('<form className="lr-auth-form" onSubmit={submit} aria-busy={busy} noValidate>')
-    expect(loginForm).toContain('<div className="lr-error" role="alert" aria-live="assertive">{error}</div>')
-    expect(loginForm).toContain('<button aria-busy={busy} disabled={busy} type="submit">')
+    expect(loginForm).toContain('<form className="grid gap-4" onSubmit={submit} aria-busy={busy} noValidate>')
+    expect(loginForm).toContain('role="alert" aria-live="assertive">{error}</div>')
+    expect(loginForm).toContain('aria-busy={busy} disabled={busy} type="submit">')
   })
 
   it('exposes the user subscription page on the stable subscription API', () => {
     const page = read('src/app/(frontend)/me/subscriptions/page.tsx')
-    const home = read('src/app/(frontend)/page.tsx')
+    const home = read('src/app/(twitter-clone)/home/page.tsx')
     const css = read('src/app/(frontend)/me/subscriptions/subscriptions.css')
 
     expect(page).toContain("'/api/v1/memberships/subscriptions?limit=20&page=' + String(page)")
@@ -1026,7 +1026,7 @@ describe('Creator Center admin extension', () => {
   it('supports a persistent Chinese/English creator studio interface toggle', () => {
     const toggle = read('src/app/(frontend)/creator-center/CreatorLanguageToggle.tsx')
     const page = read('src/app/(frontend)/creator-center/page.tsx')
-    const home = read('src/app/(frontend)/page.tsx')
+    const home = read('src/app/(twitter-clone)/CreatorDomainHome.tsx')
     const view = read('src/app/(frontend)/creator-center/CreatorStudio.tsx')
     const styles = read('src/app/(payload)/v1beta/creator-center.module.css')
 
@@ -1039,7 +1039,7 @@ describe('Creator Center admin extension', () => {
     expect(page).toContain("(await cookies()).get('luckread-ui-locale')?.value")
     expect(page).toContain("localeCookie === 'en-US' ? 'en-US' : 'zh-CN'")
     expect(page).toContain('locale={locale}')
-    expect(home).toContain("import CreatorLanguageToggle from './creator-center/CreatorLanguageToggle'")
+    expect(home).toContain("import CreatorLanguageToggle from '../(frontend)/creator-center/CreatorLanguageToggle'")
     expect(home).toContain("const localeCookie = (await cookies()).get('luckread-ui-locale')?.value")
     expect(home).toContain('<CreatorLanguageToggle locale={locale} />')
     expect(view).toContain("locale?: StudioLocale")
