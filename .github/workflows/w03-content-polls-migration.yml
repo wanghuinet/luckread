@@ -1,0 +1,140 @@
+name: W03 Content Polls Migration
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Exact source SHA containing migration 0012
+        required: true
+        type: string
+      confirm:
+        description: Type APPLY_W03_POLLS to permit remote D1 migration
+        required: true
+        type: string
+        default: APPLY_W03_POLLS
+
+permissions:
+  contents: read
+
+env:
+  WRANGLER_VERSION: 4.116.0
+  EXPECTED_DB_ID: 6c342634-97f6-4248-9f4a-85772af4f22c
+  EXPECTED_DB_NAME: luckreadpro
+  EXPECTED_WORKER: luckread-w03
+  EXPECTED_BINDING: D1_02
+  MIGRATION_FILE: workers/W03-content/migrations/0012_social_content_polls.sql
+
+jobs:
+  migrate:
+    if: ${{ inputs.confirm == 'APPLY_W03_POLLS' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Validate and checkout exact source
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$SOURCE_SHA" | grep -Eq '^[0-9a-f]{40}$'
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha }}
+          fetch-depth: 1
+
+      - name: Verify source and physical D1 binding
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ inputs.source_sha }}"
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          config = json.loads(Path('workers/W03-content/wrangler.jsonc').read_text())
+          assert config['name'] == 'luckread-w03'
+          rows = [x for x in config.get('d1_databases', []) if x.get('binding') == 'D1_02']
+          assert len(rows) == 1 and rows[0]['database_id'] == '6c342634-97f6-4248-9f4a-85772af4f22c'
+          sql = Path('workers/W03-content/migrations/0012_social_content_polls.sql').read_text()
+          assert 'CREATE TABLE content_polls' in sql and 'CREATE TABLE content_poll_votes' in sql
+          print('W03_POLL_MIGRATION_SOURCE=PASS')
+          PY
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install repository dependencies
+        run: npm ci
+
+      - name: Verify migration SQL against the current schema
+        run: |
+          python - <<'PY'
+          import sqlite3
+          from pathlib import Path
+          db = sqlite3.connect(':memory:')
+          for name in ('0001_content_core.sql', '0002_content_2_0_types_media.sql', '0004_content_revision_history.sql'):
+              path = Path('workers/W03-content/migrations') / name
+              if path.exists(): db.executescript(path.read_text())
+          db.executescript(Path('workers/W03-content/migrations/0012_social_content_polls.sql').read_text())
+          names = {row[0] for row in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+          assert {'content_polls','content_poll_votes'} <= names
+          print('W03_POLL_MIGRATION_STATIC=PASS')
+          PY
+
+      - name: Apply admitted W03 D1 migrations remotely
+        working-directory: workers/W03-content
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx --yes "wrangler@$WRANGLER_VERSION" d1 migrations apply "$EXPECTED_DB_NAME" --remote --config wrangler.jsonc
+
+      - name: Verify remote poll tables
+        working-directory: workers/W03-content
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$EXPECTED_DB_NAME" --remote --json --config wrangler.jsonc \
+            --command "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('content_polls','content_poll_votes');" > /tmp/poll-tables.json
+          python - <<'PY'
+          import json
+          data = json.load(open('/tmp/poll-tables.json'))
+          found = set()
+          def walk(value):
+              if isinstance(value, list):
+                  for item in value: walk(item)
+              elif isinstance(value, dict):
+                  if isinstance(value.get('results'), list):
+                      for row in value['results']:
+                          if isinstance(row, dict) and isinstance(row.get('name'), str): found.add(row['name'])
+                  for item in value.values(): walk(item)
+          walk(data)
+          assert {'content_polls','content_poll_votes'} <= found, f'missing poll tables: {found}'
+          print('W03_POLL_MIGRATION_REMOTE=PASS')
+          PY
+
+      - name: Capture migration provenance
+        if: always()
+        run: |
+          mkdir -p artifacts/mapping-0/w03-polls
+          cat > artifacts/mapping-0/w03-polls/provenance.txt <<EOF
+          workflow=W03 Content Polls Migration
+          run_id=$GITHUB_RUN_ID
+          source_sha=${{ inputs.source_sha }}
+          worker=$EXPECTED_WORKER
+          d1_binding=$EXPECTED_BINDING
+          database_id=$EXPECTED_DB_ID
+          database_name=$EXPECTED_DB_NAME
+          migration_file=$MIGRATION_FILE
+          confirmation=APPLY_W03_POLLS
+          EOF
+
+      - name: Upload migration evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: w03-content-polls-migration-${{ github.run_id }}
+          path: artifacts/mapping-0/w03-polls/
+          if-no-files-found: error
+          retention-days: 30
