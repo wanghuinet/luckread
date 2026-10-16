@@ -51,6 +51,8 @@ describe('v1 following feed adapter and home timeline', () => {
     expect(feed).toContain('creator-profile-tabs')
     expect(feed).toContain('nextCursor')
     expect(feed).toContain('loadMore')
+    expect(feed).toContain('candidateWindowTruncated')
+    expect(feed).toContain('up to 500 followed accounts')
   })
 })
 
