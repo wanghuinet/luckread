@@ -922,7 +922,7 @@ describe('W05 social comment transport', () => {
     })
 
     const unpinResponse = await worker.fetch(
-      requestWithMethod('/internal/social/content/content-1/pin', 'POST', {
+      requestWithMethod('/internal/social/content/content-1/pin', 'DELETE', {
         ...transportHeaders,
         'X-LuckRead-Principal-Layer': 'L2',
         'Idempotency-Key': 'unpin-1',
