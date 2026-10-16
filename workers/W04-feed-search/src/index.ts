@@ -77,8 +77,11 @@ export default {
       }
       const cursorValues = url.searchParams.getAll('cursor')
       const limitValues = url.searchParams.getAll('limit')
-      if ([...url.searchParams.keys()].some((key) => key !== 'cursor' && key !== 'limit') ||
-          cursorValues.length > 1 || limitValues.length > 1) {
+      let invalidQueryKey = false
+      url.searchParams.forEach((_value, key) => {
+        if (key !== 'cursor' && key !== 'limit') invalidQueryKey = true
+      })
+      if (invalidQueryKey || cursorValues.length > 1 || limitValues.length > 1) {
         return json({ error: { code: 'VALIDATION_FAILED', message: 'VALIDATION_FAILED', details: {} } }, 422)
       }
       const cursor = cursorValues[0]?.trim() ?? ''
