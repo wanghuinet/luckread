@@ -4,6 +4,13 @@ on:
   pull_request:
     paths:
       - 'workers/W05-social/**'
+      - 'workers/W01-payload/src/app/api/v1/content/[contentId]/reposts/**'
+      - 'workers/W01-payload/src/app/api/v1/content/[contentId]/pin/**'
+      - 'workers/W01-payload/src/app/api/v1/users/[userId]/pinned-content/**'
+      - 'workers/W01-payload/src/app/(frontend)/components/reuse/LuckReadSocialPostCard.tsx'
+      - 'workers/W01-payload/src/app/(frontend)/users/[userId]/page.tsx'
+      - 'workers/W01-payload/tests/int/social-reposts-v1-adapter.int.spec.ts'
+      - 'workers/W01-payload/tests/int/social-profile-pins-v1-adapter.int.spec.ts'
       - 'workers/W01-payload/src/app/api/v1/users/[userId]/followers/**'
       - 'workers/W01-payload/src/app/api/v1/users/[userId]/following/**'
       - 'workers/W01-payload/src/social/**'
@@ -38,6 +45,13 @@ on:
       - main
     paths:
       - 'workers/W05-social/**'
+      - 'workers/W01-payload/src/app/api/v1/content/[contentId]/reposts/**'
+      - 'workers/W01-payload/src/app/api/v1/content/[contentId]/pin/**'
+      - 'workers/W01-payload/src/app/api/v1/users/[userId]/pinned-content/**'
+      - 'workers/W01-payload/src/app/(frontend)/components/reuse/LuckReadSocialPostCard.tsx'
+      - 'workers/W01-payload/src/app/(frontend)/users/[userId]/page.tsx'
+      - 'workers/W01-payload/tests/int/social-reposts-v1-adapter.int.spec.ts'
+      - 'workers/W01-payload/tests/int/social-profile-pins-v1-adapter.int.spec.ts'
       - 'workers/W01-payload/src/app/api/v1/users/[userId]/followers/**'
       - 'workers/W01-payload/src/app/api/v1/users/[userId]/following/**'
       - 'workers/W01-payload/src/app/api/v1/social/follows/**'
@@ -88,7 +102,7 @@ jobs:
 
       - name: Run W05 Social and W01 adapter tests
         working-directory: workers/W01-payload
-        run: pnpm exec vitest run --config ./vitest.config.mts ../../workers/W05-social/src/follow-runtime.test.ts ../../workers/W05-social/src/following-feed.test.ts ../../workers/W05-social/src/like-runtime.test.ts ../../workers/W05-social/src/comment-runtime.test.ts ../../workers/W05-social/src/favorite-runtime.test.ts ../../workers/W05-social/src/share-runtime.test.ts ../../workers/W05-social/src/block-policy.test.ts ../../workers/W05-social/src/relationship-graph-runtime.test.ts ../../workers/W05-social/src/block-mute-runtime.test.ts ../../workers/W05-social/src/index.test.ts ../../workers/W05-social/src/d1-traffic-guard.test.ts tests/int/social-followers-v1-adapter.int.spec.ts tests/int/social-follow-mutation-v1-adapter.int.spec.ts tests/int/social-likes-v1-adapter.int.spec.ts tests/int/social-comments-v1-adapter.int.spec.ts tests/int/social-comment-likes-v1-adapter.int.spec.ts tests/int/social-bookmarks-v1-adapter.int.spec.ts tests/int/social-shares-v1-adapter.int.spec.ts tests/int/social-shares-landing.int.spec.ts tests/int/social-block-mute-v1-adapter.int.spec.ts tests/int/content-detail.int.spec.ts tests/int/content-detail-comments.int.spec.ts
+        run: pnpm exec vitest run --config ./vitest.config.mts ../../workers/W05-social/src/follow-runtime.test.ts ../../workers/W05-social/src/following-feed.test.ts ../../workers/W05-social/src/like-runtime.test.ts ../../workers/W05-social/src/comment-runtime.test.ts ../../workers/W05-social/src/favorite-runtime.test.ts ../../workers/W05-social/src/share-runtime.test.ts ../../workers/W05-social/src/repost-runtime.test.ts ../../workers/W05-social/src/profile-pin-runtime.test.ts ../../workers/W05-social/src/block-policy.test.ts ../../workers/W05-social/src/relationship-graph-runtime.test.ts ../../workers/W05-social/src/block-mute-runtime.test.ts ../../workers/W05-social/src/index.test.ts ../../workers/W05-social/src/d1-traffic-guard.test.ts tests/int/social-followers-v1-adapter.int.spec.ts tests/int/social-follow-mutation-v1-adapter.int.spec.ts tests/int/social-likes-v1-adapter.int.spec.ts tests/int/social-comments-v1-adapter.int.spec.ts tests/int/social-comment-likes-v1-adapter.int.spec.ts tests/int/social-bookmarks-v1-adapter.int.spec.ts tests/int/social-shares-v1-adapter.int.spec.ts tests/int/social-shares-landing.int.spec.ts tests/int/social-block-mute-v1-adapter.int.spec.ts tests/int/social-reposts-v1-adapter.int.spec.ts tests/int/social-profile-pins-v1-adapter.int.spec.ts tests/int/content-detail.int.spec.ts tests/int/content-detail-comments.int.spec.ts
 
       - name: Verify comment delete tombstone migration
         run: |
@@ -142,6 +156,29 @@ jobs:
           print('SOCIAL_006_SHARE_MIGRATION_STATIC=PASS')
           PY
 
+
+      - name: Verify repost and profile pin migration shape
+        run: |
+          python - <<'PY'
+          import sqlite3
+          from pathlib import Path
+          db = sqlite3.connect(':memory:')
+          sql = Path('workers/W05-social/migrations/20261016_013_social_repost_pin_v1.sql').read_text()
+          db.executescript(sql)
+          repost_cols = [row[1] for row in db.execute('PRAGMA table_info("social_reposts")').fetchall()]
+          if repost_cols != ['repost_id', 'content_id', 'actor_user_id', 'created_at']:
+              raise SystemExit(f'unexpected repost schema: {repost_cols}')
+          repost_indexes = {row[1]: row[2] for row in db.execute('PRAGMA index_list("social_reposts")').fetchall()}
+          if repost_indexes.get('sqlite_autoindex_social_reposts_1') != 1:
+              raise SystemExit('repost actor/content uniqueness boundary missing')
+          pin_cols = [row[1] for row in db.execute('PRAGMA table_info("social_profile_pins")').fetchall()]
+          if pin_cols != ['user_id', 'content_id', 'pinned_at']:
+              raise SystemExit(f'unexpected profile pin schema: {pin_cols}')
+          user_key = next((row for row in db.execute('PRAGMA table_info("social_profile_pins")').fetchall() if row[1] == 'user_id'), None)
+          if user_key is None or user_key[5] != 1:
+              raise SystemExit('single-pin-per-profile primary key missing')
+          print('SOCIAL_REPOST_PROFILE_PIN_MIGRATION_STATIC=PASS')
+          PY
 
       - name: Verify favorite migration shape
         run: |
