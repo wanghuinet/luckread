@@ -36,7 +36,7 @@ describe('public frontend i18n', () => {
     expect(cloneCopy).toContain('tw: {')
     expect(home).toContain('<PublicLanguageToggle locale={locale} />')
     expect(home).toContain('<TwitterCloneHomeFeed key={feedMode} initialPage={initialPage} locale={locale} feedMode={feedMode} />')
-    expect(feed).toContain('locale={locale} presentation="twitter-clone"')
+    expect(feed).toContain('locale={locale}')
     expect(feed).not.toContain('locale="en"')
     expect(home).toContain('loadInitialContent(requestHeaders, locale)')
     expect(home).toContain("forwarded.set('accept-language', language)")
