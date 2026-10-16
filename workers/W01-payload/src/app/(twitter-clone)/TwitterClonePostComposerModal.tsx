@@ -34,7 +34,7 @@ export function TwitterClonePostComposerTrigger({
 export default function TwitterClonePostComposerModal() {
   const [open, setOpen] = useState(false)
   const [hasOpened, setHasOpened] = useState(false)
-  const panelRef = useRef<HTMLSectionElement>(null)
+  const panelRef = useRef<HTMLElement | null>(null)
 
   useEffect(() => {
     const showComposer = () => {
