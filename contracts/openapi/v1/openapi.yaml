@@ -1240,7 +1240,7 @@ paths:
     post:
       tags: [Interactions]
       summary: Create a relation to the canonical published content.
-      operationId: createContentRepost
+      operationId: postContentContentIdReposts
       parameters:
         - $ref: '#/components/parameters/IdempotencyKeyRequired'
       responses:
@@ -1249,7 +1249,7 @@ paths:
     delete:
       tags: [Interactions]
       summary: Remove the current viewer's repost relation.
-      operationId: removeContentRepost
+      operationId: deleteContentContentIdReposts
       parameters:
         - $ref: '#/components/parameters/IdempotencyKeyRequired'
       responses:
@@ -1262,7 +1262,7 @@ paths:
     post:
       tags: [Creators]
       summary: Pin the current creator's published content to their profile.
-      operationId: pinContentToProfile
+      operationId: postContentContentIdPin
       parameters:
         - $ref: '#/components/parameters/IdempotencyKeyRequired'
       responses:
@@ -1271,7 +1271,7 @@ paths:
     delete:
       tags: [Creators]
       summary: Remove the current creator's profile pin for this content.
-      operationId: unpinContentFromProfile
+      operationId: deleteContentContentIdPin
       parameters:
         - $ref: '#/components/parameters/IdempotencyKeyRequired'
       responses:
