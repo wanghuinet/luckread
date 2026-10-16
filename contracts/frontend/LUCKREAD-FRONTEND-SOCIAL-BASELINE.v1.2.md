@@ -174,7 +174,7 @@ The three additional authorized repositories are in the allowlist, but their exa
 
 Phase order may be adjusted only where verified dependencies require it. Features already verified complete must not be reimplemented.
 
-## 8. Acceptance gates
+## 9. Acceptance gates
 
 A phase is accepted only when:
 - Source reuse and attribution are traceable.
@@ -187,7 +187,7 @@ A phase is accepted only when:
 
 Build success alone is not end-to-end acceptance. A written plan alone is not feature completion.
 
-## 9. Phase-1 exit report
+## 10. Phase-1 exit report
 
 The Phase-1 PR must include:
 1. Contract path and concise change summary.
