@@ -18,6 +18,9 @@ const dbFor = (results: unknown[] = []) => {
 const request = (pathname: string, headers: Record<string, string> = {}) =>
   new Request(`https://luckread-w05.internal${pathname}`, { headers })
 
+const requestWithMethod = (pathname: string, method: string, headers: Record<string, string> = {}) =>
+  new Request(`https://luckread-w05.internal${pathname}`, { method, headers })
+
 const transportHeaders = {
   'X-LuckRead-Caller': 'W01',
   'X-LuckRead-Transport-Version': '1.0',
@@ -867,7 +870,7 @@ describe('W05 social comment transport', () => {
   })
   it('creates a repost relation through the authenticated W01 principal', async () => {
     const response = await worker.fetch(
-      request('/internal/social/content/content-1/reposts', {
+      requestWithMethod('/internal/social/content/content-1/reposts', 'POST', {
         ...transportHeaders,
         'Idempotency-Key': 'repost-1',
       }),
@@ -885,7 +888,7 @@ describe('W05 social comment transport', () => {
 
   it('requires the minimum interaction layer and idempotency key for reposts', async () => {
     const denied = await worker.fetch(
-      request('/internal/social/content/content-1/reposts', {
+      requestWithMethod('/internal/social/content/content-1/reposts', 'POST', {
         ...transportHeaders,
         'X-LuckRead-Principal-Layer': 'L1',
         'Idempotency-Key': 'repost-denied',
@@ -895,7 +898,7 @@ describe('W05 social comment transport', () => {
     expect(denied.status).toBe(403)
 
     const missingKey = await worker.fetch(
-      request('/internal/social/content/content-1/reposts', transportHeaders),
+      requestWithMethod('/internal/social/content/content-1/reposts', 'POST', transportHeaders),
       { DB: dbFor([{ id: 'content-1', state: 'PUBLISHED', owner_user_id: 'owner-1', blocked: 0 }]) },
     )
     expect(missingKey.status).toBe(428)
@@ -903,7 +906,7 @@ describe('W05 social comment transport', () => {
 
   it('pins only the authenticated owner content and unpins idempotently', async () => {
     const pinResponse = await worker.fetch(
-      request('/internal/social/content/content-1/pin', {
+      requestWithMethod('/internal/social/content/content-1/pin', 'POST', {
         ...transportHeaders,
         'X-LuckRead-Principal-Layer': 'L2',
         'Idempotency-Key': 'pin-1',
@@ -919,7 +922,7 @@ describe('W05 social comment transport', () => {
     })
 
     const unpinResponse = await worker.fetch(
-      request('/internal/social/content/content-1/pin', {
+      requestWithMethod('/internal/social/content/content-1/pin', 'POST', {
         ...transportHeaders,
         'X-LuckRead-Principal-Layer': 'L2',
         'Idempotency-Key': 'unpin-1',
@@ -931,7 +934,7 @@ describe('W05 social comment transport', () => {
 
   it('rejects profile pin writes from below L2', async () => {
     const response = await worker.fetch(
-      request('/internal/social/content/content-1/pin', {
+      requestWithMethod('/internal/social/content/content-1/pin', 'POST', {
         ...transportHeaders,
         'X-LuckRead-Principal-Layer': 'L1',
         'Idempotency-Key': 'pin-denied',
