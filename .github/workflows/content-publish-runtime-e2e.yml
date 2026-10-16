@@ -279,7 +279,7 @@ jobs:
             aiMode: 'outline',
             humanContribution: 'substantial',
           };
-          fs.writeFileSync('/tmp/social-post-preflight.json', JSON.stringify(value));
+          fs.writeFileSync('/tmp/social-post-preflight-request.json', JSON.stringify(value));
           NODE
 
           curl --silent --show-error --fail-with-body             -X POST             -H "Authorization: Bearer $CREATOR_TOKEN"             -H "Content-Type: application/json"             --data "$ARTICLE_PREFLIGHT_BODY"             "$CONTENT_API_BASE_URL/api/creator/contents/$ARTICLE_ID/preflight" > /tmp/article-preflight.json
@@ -290,7 +290,7 @@ jobs:
             -X POST \
             -H "Authorization: Bearer $CREATOR_TOKEN" \
             -H "Content-Type: application/json" \
-            --data @/tmp/social-post-preflight.json \
+            --data @/tmp/social-post-preflight-request.json \
             "$CONTENT_API_BASE_URL/api/creator/contents/$SOCIAL_POST_ID/preflight" > /tmp/social-post-preflight.json
 
           node <<'NODE'
