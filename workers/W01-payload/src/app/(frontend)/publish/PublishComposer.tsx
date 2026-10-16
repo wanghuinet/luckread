@@ -1083,7 +1083,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
             {draft?.state === 'DRAFT' ? (
               <button className="danger" disabled={busy} onClick={discardDraft} type="button">放弃草稿</button>
             ) : null}
-            <button className="secondary" disabled={busy || autoSaveStatus === 'saving'} onClick={saveDraft} type="button">
+            <button className="secondary" disabled={busy || autoSaveStatus === 'saving' || reviewLocked} onClick={saveDraft} type="button">
               {busy ? '处理中…' : '保存草稿'}
             </button>
             <button className="primary" disabled={busy || autoSaveStatus === 'saving' || reviewLocked} onClick={submitForReview} type="button">
@@ -1118,7 +1118,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
                 放弃草稿
               </button>
             ) : null}
-            <button className="secondary" disabled={busy || autoSaveStatus === 'saving'} onClick={saveDraft} type="button">
+            <button className="secondary" disabled={busy || autoSaveStatus === 'saving' || reviewLocked} onClick={saveDraft} type="button">
               {busy ? '处理中…' : '保存草稿'}
             </button>
             <button className="primary" disabled={busy || autoSaveStatus === 'saving' || reviewLocked} onClick={submitForReview} type="button">
