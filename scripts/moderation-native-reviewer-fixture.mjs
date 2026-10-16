@@ -118,7 +118,6 @@ if (
 const login = await post('/auth/login', {
   identity: email,
   credential: password,
-  deviceId,
 })
 
 const accessToken = login.data?.accessToken
