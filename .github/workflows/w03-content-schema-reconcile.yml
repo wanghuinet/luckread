@@ -145,6 +145,7 @@ jobs:
             > /tmp/w03-schema-before.json
 
       - name: Gate remote drift before any migration
+        id: gate_remote_drift
         env:
           SOURCE_SHA: ${{ inputs.source_sha || github.sha }}
         run: |
@@ -201,6 +202,7 @@ jobs:
               !tables.has(table) ? [table + ' table'] : names.filter((name) => !columns(table).has(name)).map((name) => table + '.' + name));
             if (missing.length) throw new Error('All migrations are recorded but the live schema is still inconsistent: ' + JSON.stringify(missing));
             fs.appendFileSync(process.env.GITHUB_ENV, 'W03_MIGRATION_ACTION=none\n');
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, 'action=none\n');
           } else {
             if (applied.length !== 3 ||
                 JSON.stringify(applied) !== JSON.stringify(expected.slice(0, 3))) {
@@ -219,6 +221,7 @@ jobs:
                   unexpectedlyPresentTables:missingTables, unexpectedlyPresentColumns:unexpectedColumns}));
             }
             fs.appendFileSync(process.env.GITHUB_ENV, 'W03_MIGRATION_ACTION=apply\n');
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, 'action=apply\n');
           }
           console.log(JSON.stringify({
             sourceSha: process.env.SOURCE_SHA,
@@ -229,7 +232,7 @@ jobs:
           NODE
 
       - name: Apply admitted W03 D1-02 migrations 0004-0011
-        if: env.W03_MIGRATION_ACTION == 'apply'
+        if: steps.gate_remote_drift.outputs.action == 'apply'
         working-directory: workers/W03-content
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
