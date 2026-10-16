@@ -52,7 +52,7 @@ function TimelineIcon({ name, filled = false }: { name: TimelineIconName; filled
     share: 'M18 8a3 3 0 1 0-2.83-4L8.7 7.74a3.5 3.5 0 1 0 0 8.52l6.47 3.74A3 3 0 1 0 16.5 18l-6.47-3.74a3.5 3.5 0 0 0 0-4.52L16.5 6A3 3 0 0 0 18 8Z',
     pin: 'M16 3l5 5-3 1-4 4-1 5-2-2-2-2-2-2-2-2 5-1 4-4 0-2Z',
   }
-  return <svg aria-hidden="true" className="h-5 w-5" viewBox="0 0 24 24" fill={name === 'like' && filled ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d={paths[name]} /></svg>
+  return <svg aria-hidden="true" className="h-5 w-5" viewBox="0 0 24 24" fill={filled && (name === 'like' || name === 'bookmark') ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d={paths[name]} /></svg>
 }
 
 type Props = {
@@ -747,7 +747,7 @@ export default function LuckReadSocialPostCard({
             ) : null}
             <footer className="mt-2 flex items-center justify-between gap-1 text-light-secondary dark:text-dark-secondary">
               <Link aria-label={label('Reply or discuss', '回复或讨论', '回覆或討論')} className={actionClass} href={contentHref}>
-                <TimelineIcon name="reply" /><span className={actionText}>{commentCount === null ? label('Reply', '讨论', '討論') : commentCount.toLocaleString(dateLocale)}</span>
+                <TimelineIcon name="reply" /><span className={actionText}>{commentCount === null ? '' : commentCount.toLocaleString(dateLocale)}</span>
               </Link>
               <button aria-label={reposted ? label('Undo repost', '取消转推', '取消轉推') : label('Repost', '转推', '轉推')} aria-pressed={reposted} className={actionClass} disabled={repostBusy || likeStateLoading} onClick={() => void toggleRepost()} title={reposted ? label('Undo repost', '取消转推', '取消轉推') : label('Repost', '转推', '轉推')} type="button">
                 <TimelineIcon name="repost" /><span className={actionText}>{repostBusy ? '…' : repostCount === null ? '' : repostCount.toLocaleString(dateLocale)}</span>
