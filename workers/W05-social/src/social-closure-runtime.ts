@@ -494,7 +494,7 @@ export async function getContentSocialSummary(
        EXISTS (
          SELECT 1 FROM social_profile_pins p
          JOIN contents pinned ON pinned.id = p.content_id AND pinned.owner_user_id = p.user_id
-         WHERE p.content_id = ? AND pinned.state = 'PUBLISHED'
+         WHERE p.content_id = ? AND pinned.content_type = 'post' AND pinned.state = 'PUBLISHED'
        ) AS pinned`,
   ).bind(contentId, contentId, contentId, contentId, contentId, contentId).first<{
     likes: number; comments: number; favorites: number; shares: number; reposts: number; pinned: number
