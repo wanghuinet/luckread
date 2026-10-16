@@ -1,0 +1,354 @@
+name: W03 Content Schema Reconciliation
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Exact source commit containing W03 migrations 0001-0011 (leave blank to use this workflow revision)
+        required: false
+        default: ""
+        type: string
+      confirm:
+        description: Explicitly authorize the controlled remote D1-02 migration
+        required: true
+        default: STOP
+        type: choice
+        options:
+          - STOP
+          - APPLY_W03_CONTENT_SCHEMA
+
+permissions:
+  contents: read
+
+env:
+  WRANGLER_VERSION: 4.116.0
+  EXPECTED_DB_ID: 6c342634-97f6-4248-9f4a-85772af4f22c
+  EXPECTED_DB_NAME: luckreadpro
+  EXPECTED_WORKER: luckread-w03
+  EXPECTED_BINDING: D1_02
+
+jobs:
+  reconcile:
+    if: ${{ inputs.confirm == 'APPLY_W03_CONTENT_SCHEMA' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Validate source SHA
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha || github.sha }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$SOURCE_SHA" | grep -Eq '^[0-9a-f]{40}$'
+
+      - name: Checkout exact source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha || github.sha }}
+          fetch-depth: 1
+
+      - name: Verify exact source and target physical binding
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha || github.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          node <<'NODE'
+          const fs = require('node:fs');
+          const config = JSON.parse(fs.readFileSync('workers/W03-content/wrangler.jsonc', 'utf8'));
+          if (config.name !== process.env.EXPECTED_WORKER) throw new Error('Unexpected W03 worker name');
+          if (config.main !== 'src/index.ts') throw new Error('Unexpected W03 entrypoint');
+          const bindings = (config.d1_databases ?? []).filter((x) => x.binding === process.env.EXPECTED_BINDING);
+          if (bindings.length !== 1 || bindings[0].database_name !== process.env.EXPECTED_DB_NAME ||
+              bindings[0].database_id !== process.env.EXPECTED_DB_ID) {
+            throw new Error('W03 D1_02 physical binding does not match the authorized production target');
+          }
+          const expected = [
+            '0001_content_core.sql',
+            '0002_content_2_0_types_media.sql',
+            '0003_creator_list_pagination_index.sql',
+            '0004_content_revision_history.sql',
+            '0005_content_stable_slug.sql',
+            '0006_content_relationships.sql',
+            '0007_content_series.sql',
+            '0008_series_membership_ordering.sql',
+            '0009_content_collections.sql',
+            '0010_collection_membership_ordering.sql',
+            '0011_content_scheduled_publish.sql',
+          ];
+          const actual = fs.readdirSync('workers/W03-content/migrations')
+            .filter((name) => /^\d{4}_.+\.sql$/.test(name))
+            .sort();
+          if (JSON.stringify(actual) !== JSON.stringify(expected)) {
+            throw new Error('W03 migration chain differs from the reviewed 0001-0011 sequence: ' + JSON.stringify(actual));
+          }
+          console.log(JSON.stringify({
+            sourceSha: process.env.SOURCE_SHA,
+            worker: config.name,
+            d1Binding: process.env.EXPECTED_BINDING,
+            databaseName: process.env.EXPECTED_DB_NAME,
+            databaseId: process.env.EXPECTED_DB_ID,
+            migrationCount: actual.length,
+          }));
+          NODE
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Verify static migration chain in SQLite
+        run: |
+          python - <<'PY'
+          import sqlite3
+          from pathlib import Path
+
+          migration_dir = Path('workers/W03-content/migrations')
+          files = sorted(migration_dir.glob('[0-9][0-9][0-9][0-9]_*.sql'))
+          db = sqlite3.connect(':memory:')
+          db.execute('PRAGMA foreign_keys = ON')
+          for path in files:
+              db.executescript(path.read_text())
+          required = {
+              'contents': {'slug', 'scheduled_at', 'media_refs_json'},
+              'content_revisions': {'id', 'content_id', 'revision', 'slug', 'etag'},
+              'content_relationships': {'relationship_id', 'relation_type', 'position'},
+              'content_series': {'id', 'owner_user_id', 'state'},
+              'content_collections': {'id', 'owner_user_id', 'state'},
+          }
+          for table, columns in required.items():
+              present = {row[1] for row in db.execute(f'PRAGMA table_info("{table}")')}
+              missing = columns - present
+              if missing:
+                  raise SystemExit(f'{table} missing columns after full migration chain: {sorted(missing)}')
+          print('W03_MIGRATIONS_0001_0011_STATIC=PASS')
+          PY
+
+      - name: Capture remote migration history and schema
+        working-directory: workers/W03-content
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$EXPECTED_DB_NAME" --remote --json --config wrangler.jsonc \
+            --command "SELECT name FROM d1_migrations ORDER BY name;" > /tmp/w03-migration-history.json
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$EXPECTED_DB_NAME" --remote --json --config wrangler.jsonc \
+            --command "SELECT 'contents' AS table_name, name AS column_name FROM pragma_table_info('contents')
+              UNION ALL SELECT 'content_revisions', name FROM pragma_table_info('content_revisions')
+              UNION ALL SELECT 'content_relationships', name FROM pragma_table_info('content_relationships')
+              UNION ALL SELECT 'content_series', name FROM pragma_table_info('content_series')
+              UNION ALL SELECT 'content_collections', name FROM pragma_table_info('content_collections')
+              UNION ALL SELECT name, '__TABLE__' FROM sqlite_master
+                WHERE type='table' AND name IN ('contents','content_revisions','content_relationships','content_series','content_collections','content_mutation_idempotency','content_outbox_events','content_txn_guard')
+              UNION ALL SELECT name, '__TRIGGER__' FROM sqlite_master
+                WHERE type='trigger' AND name IN ('contents_after_insert_outbox','contents_after_update_outbox');" \
+            > /tmp/w03-schema-before.json
+
+      - name: Gate remote drift before any migration
+        id: gate_remote_drift
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha || github.sha }}
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require('node:fs');
+          const expected = [
+            '0001_content_core.sql',
+            '0002_content_2_0_types_media.sql',
+            '0003_creator_list_pagination_index.sql',
+            '0004_content_revision_history.sql',
+            '0005_content_stable_slug.sql',
+            '0006_content_relationships.sql',
+            '0007_content_series.sql',
+            '0008_series_membership_ordering.sql',
+            '0009_content_collections.sql',
+            '0010_collection_membership_ordering.sql',
+            '0011_content_scheduled_publish.sql',
+          ];
+          function rowsFrom(file) {
+            const root = JSON.parse(fs.readFileSync(file, 'utf8'));
+            const rows = [];
+            function visit(value) {
+              if (Array.isArray(value)) { for (const item of value) visit(item); return; }
+              if (!value || typeof value !== 'object') return;
+              if (Array.isArray(value.results)) {
+                for (const row of value.results) if (row && typeof row === 'object') rows.push(row);
+              }
+              for (const [key, child] of Object.entries(value)) if (key !== 'results') visit(child);
+            }
+            visit(root);
+            return rows;
+          }
+          const applied = rowsFrom('/tmp/w03-migration-history.json')
+            .map((row) => row.name).filter((name) => typeof name === 'string').sort();
+          if (new Set(applied).size !== applied.length) throw new Error('Remote d1_migrations has duplicate names');
+          if (applied.some((name, index) => expected[index] !== name)) {
+            throw new Error('Remote migration history is not a prefix of the reviewed chain: ' + JSON.stringify(applied));
+          }
+          const schemaRows = rowsFrom('/tmp/w03-schema-before.json');
+          const tables = new Set(schemaRows.filter((row) => row.column_name === '__TABLE__').map((row) => row.table_name));
+          const triggers = new Set(schemaRows.filter((row) => row.column_name === '__TRIGGER__').map((row) => row.table_name));
+          const columns = (table) => new Set(schemaRows.filter((row) => row.table_name === table && !String(row.column_name).startsWith('__')).map((row) => row.column_name));
+          const alreadyFullyMigrated = applied.length === expected.length;
+          if (alreadyFullyMigrated) {
+            const needed = {
+              contents: ['slug', 'scheduled_at'],
+              content_revisions: ['id', 'content_id', 'revision', 'slug', 'etag'],
+              content_relationships: ['relationship_id', 'relation_type', 'position'],
+              content_series: ['id', 'owner_user_id'],
+              content_collections: ['id', 'owner_user_id'],
+            };
+            const missing = Object.entries(needed).flatMap(([table, names]) =>
+              !tables.has(table) ? [table + ' table'] : names.filter((name) => !columns(table).has(name)).map((name) => table + '.' + name));
+            if (missing.length) throw new Error('All migrations are recorded but the live schema is still inconsistent: ' + JSON.stringify(missing));
+            fs.appendFileSync(process.env.GITHUB_ENV, 'W03_MIGRATION_ACTION=none\n');
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, 'action=none\n');
+          } else {
+            if (applied.length !== 3 ||
+                JSON.stringify(applied) !== JSON.stringify(expected.slice(0, 3))) {
+              throw new Error('Refusing remote mutation: only the known 0001-0003 applied / 0004-0011 pending state is admitted; current history=' + JSON.stringify(applied));
+            }
+            const missingTables = ['content_revisions','content_relationships','content_series','content_collections'].filter((table) => tables.has(table));
+            const contentCols = columns('contents');
+            const unexpectedColumns = ['slug','scheduled_at'].filter((name) => contentCols.has(name));
+            if (!tables.has('contents') || !tables.has('content_mutation_idempotency') ||
+                !tables.has('content_outbox_events') || !tables.has('content_txn_guard') ||
+                !triggers.has('contents_after_insert_outbox') || !triggers.has('contents_after_update_outbox') ||
+                missingTables.length || unexpectedColumns.length) {
+              throw new Error('Refusing remote mutation because live schema does not match the observed pre-0004 state: ' +
+                JSON.stringify({missingBaselineTables:['contents','content_mutation_idempotency','content_outbox_events','content_txn_guard'].filter((table) => !tables.has(table)),
+                  missingBaselineTriggers:['contents_after_insert_outbox','contents_after_update_outbox'].filter((trigger) => !triggers.has(trigger)),
+                  unexpectedlyPresentTables:missingTables, unexpectedlyPresentColumns:unexpectedColumns}));
+            }
+            fs.appendFileSync(process.env.GITHUB_ENV, 'W03_MIGRATION_ACTION=apply\n');
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, 'action=apply\n');
+          }
+          console.log(JSON.stringify({
+            sourceSha: process.env.SOURCE_SHA,
+            appliedMigrations: applied,
+            pendingMigrations: alreadyFullyMigrated ? [] : expected.slice(applied.length),
+            action: alreadyFullyMigrated ? 'NO_OP_SCHEMA_ALREADY_CURRENT' : 'APPLY_REVIEWED_PENDING_MIGRATIONS',
+          }));
+          NODE
+
+      - name: Apply admitted W03 D1-02 migrations 0004-0011
+        if: steps.gate_remote_drift.outputs.action == 'apply'
+        working-directory: workers/W03-content
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 migrations apply "$EXPECTED_DB_NAME" --remote --config wrangler.jsonc
+
+      - name: Verify remote migration ledger, schema, and revision backfill
+        working-directory: workers/W03-content
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          SOURCE_SHA: ${{ inputs.source_sha || github.sha }}
+        run: |
+          set -euo pipefail
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$EXPECTED_DB_NAME" --remote --json --config wrangler.jsonc \
+            --command "SELECT name FROM d1_migrations ORDER BY name;" > /tmp/w03-migration-history-after.json
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$EXPECTED_DB_NAME" --remote --json --config wrangler.jsonc \
+            --command "SELECT 'contents' AS table_name, name AS column_name FROM pragma_table_info('contents')
+              UNION ALL SELECT 'content_revisions', name FROM pragma_table_info('content_revisions')
+              UNION ALL SELECT 'content_relationships', name FROM pragma_table_info('content_relationships')
+              UNION ALL SELECT 'content_series', name FROM pragma_table_info('content_series')
+              UNION ALL SELECT 'content_collections', name FROM pragma_table_info('content_collections')
+              UNION ALL SELECT name, '__TABLE__' FROM sqlite_master
+                WHERE type='table' AND name IN ('contents','content_revisions','content_relationships','content_series','content_collections','content_mutation_idempotency','content_outbox_events','content_txn_guard');" \
+            > /tmp/w03-schema-after.json
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$EXPECTED_DB_NAME" --remote --json --config wrangler.jsonc \
+            --command "SELECT
+              (SELECT COUNT(*) FROM contents WHERE slug IS NULL OR slug = '') AS contents_without_slug,
+              (SELECT COUNT(*) FROM contents c WHERE NOT EXISTS (
+                SELECT 1 FROM content_revisions r WHERE r.content_id = c.id AND r.revision = c.revision
+              )) AS contents_without_current_revision_snapshot;" > /tmp/w03-schema-integrity.json
+          node <<'NODE'
+          const fs = require('node:fs');
+          const expected = [
+            '0001_content_core.sql',
+            '0002_content_2_0_types_media.sql',
+            '0003_creator_list_pagination_index.sql',
+            '0004_content_revision_history.sql',
+            '0005_content_stable_slug.sql',
+            '0006_content_relationships.sql',
+            '0007_content_series.sql',
+            '0008_series_membership_ordering.sql',
+            '0009_content_collections.sql',
+            '0010_collection_membership_ordering.sql',
+            '0011_content_scheduled_publish.sql',
+          ];
+          function rowsFrom(file) {
+            const root = JSON.parse(fs.readFileSync(file, 'utf8'));
+            const rows = [];
+            function visit(value) {
+              if (Array.isArray(value)) { for (const item of value) visit(item); return; }
+              if (!value || typeof value !== 'object') return;
+              if (Array.isArray(value.results)) for (const row of value.results) if (row && typeof row === 'object') rows.push(row);
+              for (const [key, child] of Object.entries(value)) if (key !== 'results') visit(child);
+            }
+            visit(root);
+            return rows;
+          }
+          const applied = rowsFrom('/tmp/w03-migration-history-after.json').map((row) => row.name).filter((name) => typeof name === 'string').sort();
+          if (JSON.stringify(applied) !== JSON.stringify(expected)) throw new Error('W03 migration ledger is not fully reconciled: ' + JSON.stringify(applied));
+          const rows = rowsFrom('/tmp/w03-schema-after.json');
+          const tables = new Set(rows.filter((row) => row.column_name === '__TABLE__').map((row) => row.table_name));
+          const columns = (table) => new Set(rows.filter((row) => row.table_name === table && !String(row.column_name).startsWith('__')).map((row) => row.column_name));
+          const requirements = {
+            contents: ['slug','scheduled_at','media_refs_json'],
+            content_revisions: ['id','content_id','revision','content_version','actor_user_id','operation','state','slug','title','body_ref','media_refs_json','etag','correlation_id','created_at'],
+            content_relationships: ['relationship_id','source_id','target_id','relation_type','position','status'],
+            content_series: ['id','owner_user_id','creator_id','state'],
+            content_collections: ['id','owner_user_id','creator_id','state'],
+          };
+          const missing = Object.entries(requirements).flatMap(([table, names]) =>
+            !tables.has(table) ? [table + ' table'] : names.filter((name) => !columns(table).has(name)).map((name) => table + '.' + name));
+          if (missing.length) throw new Error('W03 schema still missing expected structures: ' + JSON.stringify(missing));
+          const integrityRows = rowsFrom('/tmp/w03-schema-integrity.json');
+          const integrity = integrityRows.find((row) => row.contents_without_slug !== undefined);
+          if (!integrity || Number(integrity.contents_without_slug) !== 0 || Number(integrity.contents_without_current_revision_snapshot) !== 0) {
+            throw new Error('W03 data backfill verification failed: ' + JSON.stringify(integrity ?? integrityRows));
+          }
+          console.log(JSON.stringify({
+            sourceSha: process.env.SOURCE_SHA,
+            databaseName: process.env.EXPECTED_DB_NAME,
+            databaseId: process.env.EXPECTED_DB_ID,
+            migrationCount: applied.length,
+            migrationLedger: 'PASS',
+            schema: 'PASS',
+            slugBackfill: 'PASS',
+            revisionSnapshotBackfill: 'PASS',
+          }));
+          NODE
+
+      - name: Capture W03 schema reconciliation provenance
+        if: always()
+        run: |
+          mkdir -p artifacts/mapping-0/w03-content-schema-reconcile
+          cat > artifacts/mapping-0/w03-content-schema-reconcile/provenance.txt <<EOF
+          workflow=W03 Content Schema Reconciliation
+          run_id=$GITHUB_RUN_ID
+          run_attempt=$GITHUB_RUN_ATTEMPT
+          source_sha=${{ inputs.source_sha || github.sha }}
+          worker=$EXPECTED_WORKER
+          d1_binding=$EXPECTED_BINDING
+          database_name=$EXPECTED_DB_NAME
+          database_id=$EXPECTED_DB_ID
+          confirmation=${{ inputs.confirm }}
+          migration_action=${W03_MIGRATION_ACTION:-not-reached}
+          migration_execution=confirmed-only
+          deployment_execution=false
+          EOF
+
+      - name: Upload W03 schema reconciliation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: w03-content-schema-reconcile-${{ github.run_id }}
+          path: artifacts/mapping-0/w03-content-schema-reconcile/
+          if-no-files-found: error
+          retention-days: 30
