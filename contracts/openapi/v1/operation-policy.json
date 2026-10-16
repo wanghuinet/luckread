@@ -208,7 +208,7 @@
       "permissions": [],
       "auditRequired": true,
       "optimisticLockRequired": false,
-      "idempotencyRequired": false,
+      "idempotencyRequired": true,
       "stateMachine": "none",
       "x-luckread-contract-status": "DISCOVERY_DRAFT",
       "x-luckread-source": "contracts/api/api-inventory.v1.json"
@@ -221,7 +221,7 @@
       "permissions": [],
       "auditRequired": true,
       "optimisticLockRequired": false,
-      "idempotencyRequired": false,
+      "idempotencyRequired": true,
       "stateMachine": "none",
       "x-luckread-contract-status": "DISCOVERY_DRAFT",
       "x-luckread-source": "contracts/api/api-inventory.v1.json"
@@ -1233,9 +1233,11 @@
     {
       "operationId": "getUsersUserIdPinnedContent",
       "auth": {
-        "mode": "permission"
+        "mode": "public"
       },
-      "permissions": [],
+      "permissions": [
+        "user.read.public"
+      ],
       "auditRequired": false,
       "optimisticLockRequired": false,
       "idempotencyRequired": false,
@@ -1797,7 +1799,7 @@
       "permissions": [],
       "auditRequired": true,
       "optimisticLockRequired": false,
-      "idempotencyRequired": false,
+      "idempotencyRequired": true,
       "stateMachine": "none",
       "x-luckread-contract-status": "DISCOVERY_DRAFT",
       "x-luckread-source": "contracts/api/api-inventory.v1.json"
@@ -1823,7 +1825,7 @@
       "permissions": [],
       "auditRequired": true,
       "optimisticLockRequired": false,
-      "idempotencyRequired": false,
+      "idempotencyRequired": true,
       "stateMachine": "none",
       "x-luckread-contract-status": "DISCOVERY_DRAFT",
       "x-luckread-source": "contracts/api/api-inventory.v1.json"
