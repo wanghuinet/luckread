@@ -168,8 +168,14 @@ jobs:
           repost_cols = [row[1] for row in db.execute('PRAGMA table_info("social_reposts")').fetchall()]
           if repost_cols != ['repost_id', 'content_id', 'actor_user_id', 'created_at']:
               raise SystemExit(f'unexpected repost schema: {repost_cols}')
-          repost_indexes = {row[1]: row[2] for row in db.execute('PRAGMA index_list("social_reposts")').fetchall()}
-          if repost_indexes.get('sqlite_autoindex_social_reposts_1') != 1:
+          unique_actor_content = False
+          for index in db.execute('PRAGMA index_list("social_reposts")').fetchall():
+              if index[2] != 1:
+                  continue
+              columns = [row[2] for row in db.execute(f'PRAGMA index_info("{index[1]}")').fetchall()]
+              if columns == ['actor_user_id', 'content_id']:
+                  unique_actor_content = True
+          if not unique_actor_content:
               raise SystemExit('repost actor/content uniqueness boundary missing')
           pin_cols = [row[1] for row in db.execute('PRAGMA table_info("social_profile_pins")').fetchall()]
           if pin_cols != ['user_id', 'content_id', 'pinned_at']:
