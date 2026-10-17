@@ -146,7 +146,7 @@ export default function CreatorApplicationClient({
   const hasPendingGrant = application?.status === 'APPROVED' && application.grant_state !== 'GRANTED'
 
   return (
-    <TwitterCloneSecondaryPageLayout locale="zh-CN" title="创作者资格" active="editProfile" showLanguageToggle={false}>
+    <TwitterCloneSecondaryPageLayout locale="zh" title="创作者资格" active="editProfile" showLanguageToggle={false}>
       <div className={styles.page + ' text-light-primary dark:text-dark-primary'}>
       <section className={styles.hero}>
         <span className={styles.eyebrow}>CREATOR QUALIFICATION</span>
