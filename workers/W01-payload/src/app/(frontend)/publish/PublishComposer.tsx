@@ -134,6 +134,7 @@ export default function PublishComposer({
   const [articleDocument, setArticleDocument] = useState<ArticleDocument>(() => createArticleDocument())
   const [savedArticleSerialized, setSavedArticleSerialized] = useState('')
   const [assets, setAssets] = useState<UploadedAsset[]>([])
+  const modalMediaInputRef = useRef<HTMLInputElement>(null)
   const [coverRef, setCoverRef] = useState('')
   const [pollEnabled, setPollEnabled] = useState(false)
   const [pollOptions, setPollOptions] = useState<string[]>(['', ''])
@@ -682,8 +683,10 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
         coverRef,
         type === 'article' ? mediaRefsFromArticleDocument(articleDocument) : [],
       ),
-      aiMode,
-      humanContribution: humanConfirmed ? 'substantial' : 'light',
+      ...(type !== 'post' ? {
+        aiMode,
+        humanContribution: humanConfirmed ? 'substantial' : 'light',
+      } : {}),
     }
     if (type === 'post') {
       // Social posts use W03's direct-publish transition, which re-runs the
@@ -858,9 +861,9 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
 
   return (
     <div
-      className="lr-composer-card"
+      className={isTweetModal ? "lr-composer-card lr-post-modal-card" : "lr-composer-card"}
       aria-busy={busy}
-      style={isTweetModal ? { width: '100%', marginTop: 0, padding: 0, border: 0, borderRadius: 0, background: 'transparent', boxShadow: 'none' } : undefined}
+      style={isTweetModal ? { width: '100%', marginTop: 0, padding: 0, border: 0, borderRadius: 0, background: '#000', color: '#e7e9ea', boxShadow: 'none' } : undefined}
     >
       {!isTweetModal ? (
       <div className="lr-type-tabs" role="tablist" aria-label="内容类型">
@@ -924,10 +927,11 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
             style={isTweetModal && type === 'post' ? { minHeight: '130px', fontSize: '20px', lineHeight: 1.5 } : undefined}
             value={body}
           />
-          {type === 'post' ? <small aria-live="polite">{body.length}/500</small> : null}
+          {type === 'post' && !isTweetModal ? <small aria-live="polite">{body.length}/500</small> : null}
         </label>
       )}
 
+{!isTweetModal ? (
       <div className="lr-media-box">
         <div className="lr-media-heading">
           <div>
@@ -1029,9 +1033,46 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
           </p>
         )}
       </div>
+      ) : (
+        <>
+          <input
+            accept="image/*,video/*"
+            hidden
+            multiple
+            disabled={busy || reviewLocked}
+            onChange={handleFiles}
+            ref={modalMediaInputRef}
+            type="file"
+          />
+          {assets.length ? (
+            <div className="lr-post-modal-media-grid" aria-label="已添加媒体">
+              {assets.map((asset) => (
+                <div className="lr-post-modal-media-item" key={asset.id}>
+                  {isVideoAsset(asset) ? (
+                    <video aria-label={asset.filename ?? '已上传视频'} muted playsInline preload="metadata" src={asset.url} />
+                  ) : (
+                    <img alt={asset.filename ?? '已上传图片'} loading="lazy" src={asset.url} />
+                  )}
+                  <button
+                    aria-label={'移除媒体 ' + (asset.filename ?? asset.id)}
+                    className="lr-post-modal-remove-media"
+                    disabled={busy || reviewLocked}
+                    onClick={() => removeAsset(asset.id)}
+                    type="button"
+                  >
+                    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                      <path d="M18 6 6 18M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </>
+      )}
 
 
-      {type === 'post' ? (
+      {!isTweetModal && type === 'post' ? (
         <section className="lr-media-box" aria-label="投票设置">
           <div className="lr-media-heading">
             <div>
@@ -1121,6 +1162,67 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
         </section>
       ) : null}
 
+      {isTweetModal && type === 'post' && pollEnabled ? (
+        <section className="lr-post-modal-poll" aria-label="投票选项">
+          <div className="lr-post-modal-poll-options">
+            {pollOptions.map((option, index) => (
+              <div className="lr-post-modal-poll-option-row" key={index}>
+                <input
+                  aria-label={'投票选项 ' + (index + 1)}
+                  disabled={busy || reviewLocked}
+                  maxLength={50}
+                  onChange={(event) => {
+                    setPollOptions((current) => current.map((value, optionIndex) => optionIndex === index ? event.target.value : value))
+                    markDirty()
+                  }}
+                  placeholder={'选项 ' + (index + 1)}
+                  value={option}
+                />
+                {pollOptions.length > 2 ? (
+                  <button
+                    aria-label={'移除选项 ' + (index + 1)}
+                    className="lr-post-modal-poll-remove"
+                    disabled={busy || reviewLocked}
+                    onClick={() => {
+                      setPollOptions((current) => current.filter((_value, optionIndex) => optionIndex !== index))
+                      markDirty()
+                    }}
+                    type="button"
+                  >×</button>
+                ) : null}
+              </div>
+            ))}
+          </div>
+          <div className="lr-post-modal-poll-footer">
+            {pollOptions.length < 4 ? (
+              <button
+                className="lr-post-modal-poll-add"
+                disabled={busy || reviewLocked}
+                onClick={() => {
+                  setPollOptions((current) => [...current, ''])
+                  markDirty()
+                }}
+                type="button"
+              >+ 添加选项</button>
+            ) : <span />}
+            <select
+              aria-label="投票时长"
+              disabled={busy || reviewLocked}
+              value={pollDurationHours}
+              onChange={(event) => {
+                setPollDurationHours(Number(event.target.value) as 24 | 72 | 168)
+                markDirty()
+              }}
+            >
+              <option value={24}>1 天</option>
+              <option value={72}>3 天</option>
+              <option value={168}>7 天</option>
+            </select>
+          </div>
+        </section>
+      ) : null}
+
+{!isTweetModal ? (
       <div className="lr-preflight-policy">
         <div className="lr-preflight-policy-heading">
           <strong>{isTweetModal ? '创作声明' : '创作者质量与 AI 规范'}</strong>
@@ -1143,8 +1245,9 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
         ) : null}
         {!isTweetModal ? <p>原则：AI 可以帮你搭框架，但不能替代创作者完成文章；最终内容必须真正帮助读者。</p> : null}
       </div>
+      ) : null}
 
-      {preflightReport ? (
+      {!isTweetModal && preflightReport ? (
         <section className={'lr-preflight-report lr-preflight-' + preflightReport.verdict.toLowerCase()} aria-label="发布前检查结果">
           <div className="lr-preflight-report-head">
             <strong>{preflightReport.verdict === 'PASS' ? '检查通过' : preflightReport.verdict === 'YELLOW' ? '建议修改后发布' : '暂不能提交'}</strong>
@@ -1181,14 +1284,14 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
       </label>
       ) : null}
 
-      {draft ? (
+      {!isTweetModal && draft ? (
         <div className="lr-content-status" role="status">
           <span>当前状态</span>
           <strong>{stateLabel}</strong>
           <span>版本 {draft.version}</span>
         </div>
       ) : null}
-      {draft?.state === 'DRAFT' ? (
+      {!isTweetModal && draft?.state === 'DRAFT' ? (
         <div className="lr-content-status" role="status" aria-live="polite">
           <span>自动保存</span>
           <strong>
@@ -1200,8 +1303,8 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
           </strong>
         </div>
       ) : null}
-      {message ? <div className="lr-success" role="status">{message}</div> : null}
-      {error ? <div className="lr-error" role="alert">{error}</div> : null}
+      {(!isTweetModal || message === "正在上传媒体…") && message ? <div className={isTweetModal ? "lr-post-modal-progress" : "lr-success"} role="status">{message}</div> : null}
+      {error ? <div className={isTweetModal ? "lr-post-modal-error" : "lr-error"} role="alert">{error}</div> : null}
 
       {preview ? (
         <section className="lr-preview" aria-label="发布预览">
@@ -1270,21 +1373,54 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
         </section>
       ) : null}
 
-      <div className="lr-actions">
+      <div className={isTweetModal ? "lr-post-modal-toolbar" : "lr-actions"}>
         {isTweetModal ? (
           <>
-            {draft?.state === 'PENDING_REVIEW' || (type === 'post' && draft?.state === 'PUBLISHED') ? (
-              <button className="secondary" disabled={busy} onClick={startNewContent} type="button">新建内容</button>
-            ) : null}
-            {draft?.state === 'DRAFT' ? (
-              <button className="danger" disabled={busy} onClick={discardDraft} type="button">放弃草稿</button>
-            ) : null}
-            <button className="secondary" disabled={busy || autoSaveStatus === 'saving' || reviewLocked} onClick={saveDraft} type="button">
-              {busy ? '处理中…' : '保存草稿'}
-            </button>
-            <button className="primary" disabled={busy || autoSaveStatus === 'saving' || reviewLocked} onClick={submitForReview} type="button">
-              {busy ? '处理中…' : draft?.state === 'PENDING_REVIEW' ? '审核中…' : type === 'post' && draft?.state === 'PUBLISHED' ? '已发布' : type === 'post' ? '发布动态' : '提交审核'}
-            </button>
+            <div className="lr-post-modal-toolbar-actions">
+              <button
+                aria-label="添加图片或视频"
+                className="lr-post-modal-tool-button"
+                disabled={busy || reviewLocked || pollEnabled}
+                onClick={() => modalMediaInputRef.current?.click()}
+                title="图片或视频"
+                type="button"
+              >
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="4" width="18" height="16" rx="3" />
+                  <circle cx="8.5" cy="9" r="1.5" />
+                  <path d="m21 15-5-5L5 20" />
+                </svg>
+              </button>
+              <button
+                aria-label={pollEnabled ? "移除投票" : "添加投票"}
+                aria-pressed={pollEnabled}
+                className={pollEnabled ? "lr-post-modal-tool-button active" : "lr-post-modal-tool-button"}
+                disabled={busy || reviewLocked || assets.length > 0}
+                onClick={() => {
+                  setPollEnabled((enabled) => !enabled)
+                  if (!pollEnabled) setPollOptions(['', ''])
+                  markDirty()
+                }}
+                title="投票"
+                type="button"
+              >
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M4 19V5M4 19H21" />
+                  <path d="M8 16v-5M13 16V7M18 16v-8" />
+                </svg>
+              </button>
+            </div>
+            <div className="lr-post-modal-toolbar-publish">
+              {body.length > 0 ? <span aria-live="polite">{body.length}/500</span> : null}
+              <button
+                className="primary"
+                disabled={busy || autoSaveStatus === 'saving' || reviewLocked || (!body.trim() && assets.length === 0)}
+                onClick={submitForReview}
+                type="button"
+              >
+                {busy ? '发布中…' : type === 'post' && draft?.state === 'PUBLISHED' ? '已发布' : '发布'}
+              </button>
+            </div>
           </>
         ) : (
           <>
@@ -1326,11 +1462,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
         )}
       </div>
 
-      <p className="lr-note">
-        {isTweetModal
-          ? '普通动态通过 W03 风险检查后直接发布；需要人工处理的内容仍受平台规则约束。'
-          : '普通动态通过 W03 风险检查后直接发布；文章和视频仍按现有创作者审核流程发布。'}
-      </p>
+
     </div>
   )
 }
