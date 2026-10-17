@@ -43,6 +43,16 @@ describe('LuckRead H5 blue design system', () => {
     expect(publicFollowList).not.toContain('content-detail-card')
     expect(publicFollowersRoute).toContain('UserFollowList')
     expect(publicFollowingRoute).toContain('UserFollowList')
+    const publicProfileHeader = read('src/app/(frontend)/users/[userId]/TwitterCloneProfileHeader.tsx')
+    const publicProfileNav = read('src/app/(frontend)/users/[userId]/TwitterCloneProfileNav.tsx')
+    const publicProfilePage = read('src/app/(frontend)/users/[userId]/page.tsx')
+    expect(publicProfileHeader).toContain('h-36 bg-light-line-reply xs:h-48 sm:h-52')
+    expect(publicProfileHeader).not.toContain('creator-profile-hero')
+    expect(publicProfileNav).toContain('main-tab dark-bg-tab')
+    expect(publicProfileNav).not.toContain('creator-profile-tabs')
+    expect(publicProfilePage).not.toContain('creator-profile-button')
+    expect(styles).not.toContain('.creator-profile-hero')
+    expect(styles).not.toContain('.creator-profile-tabs')
   })
 
   it('does not introduce another frontend page directory for the blue redesign', () => {

@@ -623,9 +623,9 @@ export default function PublicProfilePage({
 
   return (
     <TwitterCloneSecondaryPageLayout locale={locale} title={name} active="profile">
-      <section className="creator-profile-page">
-        <div className="creator-profile-toolbar">
-          <Link href="/content">← 返回发现</Link>
+      <section className="flex flex-col pb-20">
+        <div className="border-b border-light-border px-4 py-2 dark:border-dark-border">
+          <Link className="main-tab inline-flex rounded-full px-3 py-2 text-sm font-bold hover:bg-light-primary/10 dark:hover:bg-dark-primary/10" href="/content">← 返回发现</Link>
         </div>
 
         <TwitterCloneProfileHeader
@@ -634,14 +634,15 @@ export default function PublicProfilePage({
           initial={initial}
           following={following}
           followers={followers}
+          locale={locale}
           workCount={contents.length}
           statusMessage={viewerUserId !== profile.id ? safetyMessage : undefined}
           actions={
             <>
-          <div className="creator-profile-circle-actions" aria-label="快捷操作">
+          <div className="flex items-center justify-end gap-2" aria-label="快捷操作">
             {viewerUserId !== profile.id ? (
               <button
-                className="creator-profile-circle-button"
+                className="main-tab grid h-10 w-10 place-items-center rounded-full border border-light-border hover:bg-light-primary/10 dark:border-dark-border dark:hover:bg-dark-primary/10"
                 type="button"
                 aria-label="私信"
                 onClick={() => setSafetyMessage('私信功能将在消息中心接通后启用。')}
@@ -649,9 +650,9 @@ export default function PublicProfilePage({
                 <span aria-hidden="true">✉</span>
               </button>
             ) : null}
-            <div className="creator-profile-overflow">
+            <div className="relative">
               <button
-                className="creator-profile-circle-button"
+                className="main-tab grid h-10 w-10 place-items-center rounded-full border border-light-border hover:bg-light-primary/10 dark:border-dark-border dark:hover:bg-dark-primary/10"
                 type="button"
                 aria-label="更多操作"
                 aria-expanded={actionsOpen}
@@ -661,8 +662,9 @@ export default function PublicProfilePage({
                 <span aria-hidden="true">•••</span>
               </button>
               {actionsOpen ? (
-                <div className="creator-profile-overflow-menu" role="menu" aria-label="更多操作">
+                <div className="absolute right-0 top-[calc(100%+0.5rem)] z-50 min-w-36 rounded-2xl border border-light-border bg-main-background p-1 shadow-lg dark:border-dark-border" role="menu" aria-label="更多操作">
                   <button
+                    className="block min-h-10 w-full rounded-lg px-3 text-left text-sm font-medium hover:bg-light-primary/10 disabled:cursor-wait disabled:opacity-50 dark:hover:bg-dark-primary/10"
                     type="button"
                     role="menuitem"
                     onClick={() => {
@@ -675,6 +677,7 @@ export default function PublicProfilePage({
                   {viewerUserId !== profile.id ? (
                     <>
                       <button
+                        className="block min-h-10 w-full rounded-lg px-3 text-left text-sm font-medium hover:bg-light-primary/10 disabled:cursor-wait disabled:opacity-50 dark:hover:bg-dark-primary/10"
                         type="button"
                         role="menuitem"
                         disabled={muteBusy}
@@ -686,6 +689,7 @@ export default function PublicProfilePage({
                         {muteBusy ? (muted ? '取消中…' : '静音中…') : muted ? '取消静音' : '静音'}
                       </button>
                       <button
+                        className="block min-h-10 w-full rounded-lg px-3 text-left text-sm font-medium hover:bg-light-primary/10 disabled:cursor-wait disabled:opacity-50 dark:hover:bg-dark-primary/10"
                         type="button"
                         role="menuitem"
                         disabled={blockBusy}
@@ -697,6 +701,7 @@ export default function PublicProfilePage({
                         {blockBusy ? (blocked ? '取消中…' : '屏蔽中…') : blocked ? '取消屏蔽' : '屏蔽'}
                       </button>
                       <button
+                        className="block min-h-10 w-full rounded-lg px-3 text-left text-sm font-medium hover:bg-light-primary/10 disabled:cursor-wait disabled:opacity-50 dark:hover:bg-dark-primary/10"
                         type="button"
                         role="menuitem"
                         disabled={reportBusy}
@@ -714,14 +719,14 @@ export default function PublicProfilePage({
             </div>
           </div>
 
-          <div className="creator-profile-actions">
+          <div className="flex flex-wrap items-center justify-end gap-2">
             {viewerUserId === profile.id ? (
-              <Link className="creator-profile-button creator-profile-button-primary" href="/me/profile">
+              <Link className="rounded-full bg-main-accent px-4 py-2 text-sm font-bold text-white hover:brightness-90 disabled:opacity-50" href="/me/profile">
                 {locale === 'en' ? 'Edit profile' : locale === 'tw' ? '編輯個人資料' : '编辑资料'}
               </Link>
             ) : !blocked && !blockedBy ? (
               <button
-                className="creator-profile-button creator-profile-button-primary"
+                className="rounded-full bg-main-accent px-4 py-2 text-sm font-bold text-white hover:brightness-90 disabled:opacity-50"
                 disabled={followBusy}
                 onClick={() => void toggleFollow()}
                 type="button"
@@ -731,14 +736,14 @@ export default function PublicProfilePage({
             ) : null}
             {viewerUserId !== profile.id ? (
               <button
-                className="creator-profile-button"
+                className="main-tab rounded-full border border-light-border px-4 py-2 text-sm font-bold hover:bg-light-primary/10 dark:border-dark-border dark:hover:bg-dark-primary/10"
                 type="button"
                 onClick={() => setSafetyMessage('订阅入口将在会员功能接通后启用。')}
               >
                 订阅
               </button>
             ) : null}
-            {mutualFollow ? <span className="creator-profile-badge">互相关注</span> : null}
+            {mutualFollow ? <span className="rounded-full bg-main-sidebar-background px-3 py-2 text-xs font-bold text-light-secondary dark:text-dark-secondary">互相关注</span> : null}
           </div>
             </>
           }
