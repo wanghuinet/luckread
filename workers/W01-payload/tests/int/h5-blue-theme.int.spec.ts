@@ -79,6 +79,13 @@ describe('LuckRead H5 blue design system', () => {
     expect(shareLanding).toContain("'/api/v1/shares/'")
     expect(shareLanding).toContain("router.replace('/content/'")
     expect(shareLanding).not.toContain('style={{')
+    const usernameProfileRoute = read('src/app/(frontend)/[username]/page.tsx')
+    expect(usernameProfileRoute).toContain('TwitterCloneSecondaryPageLayout')
+    expect(usernameProfileRoute).toContain('active="profile"')
+    expect(usernameProfileRoute).toContain("'/api/v1/users/by-username/'")
+    expect(usernameProfileRoute).toContain("return <UserProfilePage params={Promise.resolve({ userId })} />")
+    expect(usernameProfileRoute).toContain('Loading author profile…')
+    expect(usernameProfileRoute).not.toContain('<main className="content-detail"')
   })
 
   it('does not introduce another frontend page directory for the blue redesign', () => {
