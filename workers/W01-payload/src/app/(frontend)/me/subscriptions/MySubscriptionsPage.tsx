@@ -36,7 +36,7 @@ type MutationResponse = {
 const copy = (locale: PublicLocale) => locale === 'en'
   ? {
       eyebrow: 'LUCKREAD · MEMBERSHIP',
-      description: 'Review subscription status and billing periods. Subscription records do not, by themselves, prove payment completion or access entitlement.',
+      description: 'Review subscription status and billing periods. Subscription records do not, by themselves, prove payment completion or access entitlement. Plan changes remain unavailable until the official plan catalog is connected.',
       discover: 'Explore content',
       refresh: 'Refresh',
       refreshing: 'Refreshing…',
@@ -75,7 +75,7 @@ const copy = (locale: PublicLocale) => locale === 'en'
   : locale === 'tw'
     ? {
         eyebrow: 'LUCKREAD · 會員訂閱',
-        description: '查看訂閱狀態與週期。訂閱記錄本身不代表付款完成或已取得內容權益。',
+        description: '查看訂閱狀態與週期。訂閱記錄本身不代表付款完成或已取得內容權益；方案變更將在正式方案目錄接入後開放。',
         discover: '探索內容',
         refresh: '重新整理',
         refreshing: '正在重新整理…',
@@ -113,7 +113,7 @@ const copy = (locale: PublicLocale) => locale === 'en'
       }
     : {
         eyebrow: 'LUCKREAD · 会员订阅',
-        description: '查看订阅状态与周期。订阅记录本身不代表付款完成或已取得内容权益。',
+        description: '查看订阅状态与周期。权益和支付状态仍由各自权威域负责；方案变更将在正式方案目录接入后开放。',
         discover: '发现内容',
         refresh: '刷新',
         refreshing: '刷新中…',
@@ -345,7 +345,7 @@ export default function MySubscriptionsPage() {
 
       <p className="px-4 py-4 text-xs leading-5 text-light-secondary dark:text-dark-secondary">
         {locale === 'en'
-          ? 'This page reflects subscription facts only; it does not treat subscription status as entitlement or proof of payment.'
+          ? 'This page reflects Subscription facts only; it does not treat subscription status as Entitlement or proof of payment.'
           : locale === 'tw'
             ? '此頁面僅呈現訂閱事實，不會把訂閱狀態直接視為內容權益或付款完成。'
             : '当前页面只反映 Subscription 事实，不把订阅状态直接当作 Entitlement 或支付完成。'}
