@@ -773,7 +773,10 @@ describe('Creator Center admin extension', () => {
     expect(publisher).toContain('controller.abort()')
 
     expect(publisher).toContain('disabled={busy || reviewLocked}')
-    expect(publisher).toContain('className="lr-composer-card"')
+    expect(publisher).toContain('className={isTweetModal ? "lr-composer-card lr-post-modal-card" : "lr-composer-card"}')
+    expect(publisher).toContain('lr-post-modal-toolbar')
+    expect(publisher).toContain('lr-post-modal-tool-button')
+    expect(publisher).toContain('lr-post-modal-media-grid')
     expect(publisher).toContain('aria-busy={busy}')
 
     expect(publisher).toContain('当前状态')
@@ -1103,7 +1106,9 @@ describe('Creator Center admin extension', () => {
     expect(publisher).toContain("to: type === 'post' ? 'PUBLISHED' : 'PENDING_REVIEW'")
     expect(publisher).toContain("'动态已发布，已进入公开信息流。'")
     expect(publisher).toContain("type === 'post' ? '发布动态' : '提交发布'")
-    expect(publisher).toContain("普通动态通过 W03 风险检查后直接发布")
+    expect(publisher).toContain("...(type === 'article' ? {")
+    expect(publisher).toContain("{!isTweetModal && type === 'article' ? (")
+    expect(publisher).toContain("if (type === 'post') {")
   })
 
 

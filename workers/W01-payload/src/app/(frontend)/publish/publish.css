@@ -1415,3 +1415,219 @@
   border-color: #93c5fd;
   box-shadow: 0 0 0 3px rgba(37, 99, 235, .08);
 }
+
+
+/* Minimal X-style dark post composer. These rules are scoped to the social modal. */
+.lr-post-modal-shell {
+  color: #e7e9ea;
+}
+.lr-post-modal-shell [role="dialog"] {
+  border: 1px solid #2f3336;
+  background: #000 !important;
+  color: #e7e9ea;
+}
+.lr-post-modal-shell header {
+  border-color: #2f3336 !important;
+  background: #000 !important;
+  color: #e7e9ea;
+}
+.lr-post-modal-card {
+  color: #e7e9ea;
+  background: #000 !important;
+}
+.lr-post-modal-card .lr-post-modal-field {
+  margin: 0;
+}
+.lr-post-modal-card .lr-field textarea {
+  display: block;
+  width: 100%;
+  min-height: 130px;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  padding: 14px 16px;
+  background: #000;
+  color: #e7e9ea;
+  line-height: 1.5;
+  box-shadow: none;
+  resize: vertical;
+}
+.lr-post-modal-card .lr-field textarea::placeholder {
+  color: #71767b;
+}
+.lr-post-modal-card .lr-field textarea:focus {
+  border: 0;
+  box-shadow: none;
+}
+.lr-post-modal-media-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding: 0 14px 12px;
+}
+.lr-post-modal-media-item {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid #2f3336;
+  border-radius: 14px;
+  background: #16181c;
+}
+.lr-post-modal-media-item img,
+.lr-post-modal-media-item video {
+  display: block;
+  width: 100%;
+  max-height: 280px;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+}
+.lr-post-modal-remove-media {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  background: rgb(15 20 25 / 82%);
+  color: #fff;
+  cursor: pointer;
+}
+.lr-post-modal-remove-media svg {
+  width: 16px;
+  height: 16px;
+}
+.lr-post-modal-poll {
+  display: grid;
+  gap: 9px;
+  margin: 0 14px 12px;
+  padding: 12px;
+  border: 1px solid #2f3336;
+  border-radius: 14px;
+  background: #000;
+}
+.lr-post-modal-poll-options {
+  display: grid;
+  gap: 8px;
+}
+.lr-post-modal-poll-option-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.lr-post-modal-poll-option-row input {
+  min-width: 0;
+  width: 100%;
+  border: 1px solid #536471;
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: #000;
+  color: #e7e9ea;
+  outline: none;
+}
+.lr-post-modal-poll-option-row input:focus {
+  border-color: #1d9bf0;
+}
+.lr-post-modal-poll-remove,
+.lr-post-modal-poll-add {
+  flex: none;
+  border: 0;
+  background: transparent;
+  color: #1d9bf0;
+  cursor: pointer;
+  font-size: 12px;
+}
+.lr-post-modal-poll-remove {
+  width: 28px;
+  height: 28px;
+  color: #e7e9ea;
+  font-size: 20px;
+}
+.lr-post-modal-poll-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.lr-post-modal-poll-footer select {
+  border: 1px solid #536471;
+  border-radius: 999px;
+  padding: 5px 10px;
+  background: #000;
+  color: #e7e9ea;
+  font-size: 12px;
+}
+.lr-post-modal-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 52px;
+  padding: 8px 14px 12px;
+  border-top: 1px solid #2f3336;
+  background: #000;
+}
+.lr-post-modal-toolbar-actions,
+.lr-post-modal-toolbar-publish {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.lr-post-modal-tool-button {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #1d9bf0;
+  cursor: pointer;
+}
+.lr-post-modal-tool-button svg {
+  width: 20px;
+  height: 20px;
+}
+.lr-post-modal-tool-button:hover:not(:disabled),
+.lr-post-modal-tool-button.active {
+  background: rgb(29 155 240 / 12%);
+}
+.lr-post-modal-tool-button:disabled {
+  opacity: .4;
+  cursor: not-allowed;
+}
+.lr-post-modal-toolbar-publish > span {
+  color: #71767b;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.lr-post-modal-toolbar .primary {
+  min-height: 36px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 999px;
+  background: #eff3f4;
+  color: #0f1419;
+  font-size: 13px;
+  font-weight: 750;
+  cursor: pointer;
+}
+.lr-post-modal-toolbar .primary:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+}
+.lr-post-modal-progress,
+.lr-post-modal-error {
+  margin: 4px 14px 8px;
+  font-size: 12px;
+}
+.lr-post-modal-progress { color: #71767b; }
+.lr-post-modal-error { color: #f4212e; }
+@media (max-width: 640px) {
+  .lr-post-modal-toolbar {
+    padding-right: 12px;
+    padding-left: 12px;
+  }
+}

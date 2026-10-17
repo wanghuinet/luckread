@@ -66,7 +66,7 @@ export default function TwitterClonePostComposerModal() {
     <div
       aria-hidden={!open}
       className={open
-        ? 'fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-0 dark:bg-[#5B7083]/40 sm:items-center sm:p-4'
+        ? 'lr-post-modal-shell fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/75 p-0 sm:items-center sm:p-4'
         : 'hidden'}
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) setOpen(false)
@@ -75,13 +75,13 @@ export default function TwitterClonePostComposerModal() {
       <section
         aria-label="发推文窗口"
         aria-modal="true"
-        className="mt-0 flex max-h-[100dvh] w-full max-w-xl flex-col overflow-y-auto rounded-none bg-main-background shadow-xl sm:max-h-[calc(100dvh-2rem)] sm:rounded-2xl"
+        className="mt-0 flex max-h-[100dvh] w-full max-w-xl flex-col overflow-y-auto rounded-none border border-[#2f3336] bg-black text-[#e7e9ea] shadow-xl sm:max-h-[calc(100dvh-2rem)] sm:rounded-2xl"
         onMouseDown={(event) => event.stopPropagation()}
         ref={panelRef}
         role="dialog"
         tabIndex={-1}
       >
-        <header className="sticky top-0 z-10 flex items-center gap-5 border-b border-light-border bg-main-background/95 px-4 py-3 backdrop-blur-md dark:border-dark-border">
+        <header className="sticky top-0 z-10 flex items-center gap-5 border-b border-[#2f3336] bg-black px-4 py-3 text-[#e7e9ea]">
           <button
             aria-label="关闭发推文窗口"
             className="custom-button accent-tab grid h-9 w-9 place-items-center rounded-full hover:bg-light-primary/10 dark:hover:bg-dark-primary/10"
@@ -95,8 +95,8 @@ export default function TwitterClonePostComposerModal() {
           <h2 className="text-xl font-bold">发推文</h2>
         </header>
         <div
-          className="lr-publish-shell"
-          style={{ minHeight: 'auto', padding: 0, background: 'transparent' }}
+          className="lr-publish-shell lr-post-modal-shell"
+          style={{ minHeight: 'auto', padding: 0, background: '#000', color: '#e7e9ea' }}
         >
           <PublishComposer initialType="post" presentation="tweet-modal" />
         </div>
