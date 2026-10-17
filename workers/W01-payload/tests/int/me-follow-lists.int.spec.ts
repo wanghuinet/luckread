@@ -6,8 +6,8 @@ const read = (relativePath: string) => readFileSync(resolve(process.cwd(), relat
 
 describe('personal social relationship pages', () => {
   it('provides separate authenticated follower and following pages', () => {
-    const followers = read('src/app/(frontend)/me/followers/page.tsx')
-    const following = read('src/app/(frontend)/me/following/page.tsx')
+    const followers = read('src/app/(twitter-clone)/me/followers/page.tsx')
+    const following = read('src/app/(twitter-clone)/me/following/page.tsx')
     const component = read('src/app/(frontend)/me/MeFollowList.tsx')
     const row = read('src/app/(frontend)/users/TwitterCloneFollowRow.tsx')
 
@@ -21,6 +21,8 @@ describe('personal social relationship pages', () => {
     expect(component).toContain("window.location.assign('/login?returnTo='")
     expect(component).toContain("credentials: 'include'")
     expect(component).toContain('<TwitterCloneFollowRow')
+    expect(component).toContain('<TwitterCloneSecondaryPageLayout locale={locale} title={title} active={isFollowers ? \'connections\' : \'following\'}>')
+    expect(component).toContain('presentation="x-timeline"')
     expect(row).toContain("const profileHref = '/users/' + encodeURIComponent(userId)")
     expect(row).toContain('href={profileHref}')
     expect(component).toContain("method: 'DELETE'")

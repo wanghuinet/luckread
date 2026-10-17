@@ -5,6 +5,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { fetchJson, getApiErrorMessage } from '../../../lib/client-api.js'
 import TwitterCloneFollowRow from '../users/TwitterCloneFollowRow'
+import { usePublicLocale } from '../i18n/PublicLanguageToggle'
+import TwitterCloneSecondaryPageLayout from '../../(twitter-clone)/TwitterCloneSecondaryPageLayout'
 
 type Direction = 'followers' | 'following'
 
@@ -38,6 +40,26 @@ const PAGE_SIZE = 20
 
 export default function MeFollowList({ direction }: { direction: Direction }) {
   const isFollowers = direction === 'followers'
+  const locale = usePublicLocale()
+  const labels = locale === 'en' ? {
+    followers: 'My followers', following: 'Following', account: 'My account', followersOf: "'s followers", follows: 'follows', relationships: 'relationships',
+    loading: 'Loading…', emptyFollowers: 'You do not have followers yet.', emptyFollowing: 'You are not following anyone yet.',
+    emptyFollowersHelp: 'People who follow you will appear here.', emptyFollowingHelp: 'Visit a profile and follow creators to build your list.',
+    discover: 'Discover content', unfollow: 'Unfollow', processing: 'Working…', more: 'Load more', loadingMore: 'Loading…', refresh: 'Refresh list',
+    social: 'LUCKREAD · SOCIAL',
+  } : locale === 'tw' ? {
+    followers: '我的粉絲', following: '追蹤中', account: '我的帳號', followersOf: '的粉絲', follows: '追蹤的用戶', relationships: '個關係',
+    loading: '載入中…', emptyFollowers: '目前還沒有粉絲。', emptyFollowing: '目前還沒有追蹤用戶。',
+    emptyFollowersHelp: '有人追蹤你後，就會顯示在這裡。', emptyFollowingHelp: '前往作者主頁並追蹤感興趣的創作者。',
+    discover: '探索內容', unfollow: '取消追蹤', processing: '處理中…', more: '載入更多', loadingMore: '載入中…', refresh: '重新整理列表',
+    social: 'LUCKREAD · 社交',
+  } : {
+    followers: '我的粉丝', following: '我的关注', account: '我的账号', followersOf: '的粉丝', follows: '关注的用户', relationships: '个关系',
+    loading: '正在加载…', emptyFollowers: '还没有粉丝。', emptyFollowing: '还没有关注用户。',
+    emptyFollowersHelp: '当其他用户关注你后，会在这里看到。', emptyFollowingHelp: '去作者主页关注感兴趣的创作者后，会在这里看到。',
+    discover: '去发现内容', unfollow: '取消关注', processing: '处理中…', more: '加载更多', loadingMore: '加载中…', refresh: '刷新列表',
+    social: 'LUCKREAD · 社交',
+  }
   const [userId, setUserId] = useState<string | null>(null)
   const [displayName, setDisplayName] = useState('')
   const [items, setItems] = useState<FollowListItem[]>([])
@@ -206,73 +228,73 @@ export default function MeFollowList({ direction }: { direction: Direction }) {
     }
   }
 
+  const title = isFollowers ? labels.followers : labels.following
+  const owner = displayName || labels.account
+  const description = owner + (isFollowers ? labels.followersOf : ' ' + labels.follows) +
+    (totalCount === null ? '' : ' · ' + totalCount.toLocaleString(locale === 'en' ? 'en-US' : locale === 'tw' ? 'zh-TW' : 'zh-CN') + ' ' + labels.relationships)
+
   return (
-    <main style={{ maxWidth: 860, margin: '48px auto', padding: '0 20px' }}>
-      <header style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
-        <div>
-          <p style={{ margin: 0, fontSize: 13, letterSpacing: 1.5, color: '#667085' }}>LUCKREAD · SOCIAL</p>
-          <h1 style={{ margin: '8px 0 4px' }}>{isFollowers ? '我的粉丝' : '我的关注'}</h1>
-          <p style={{ margin: 0, color: '#667085' }}>
-            {displayName ? displayName + '的' : '我的'}{isFollowers ? '粉丝列表' : '关注列表'}。
-            {totalCount === null ? '' : ' 共 ' + totalCount.toLocaleString('zh-CN') + ' 个关系。'}
-          </p>
-        </div>
-        <nav aria-label="我的社交关系" style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          <Link href="/me/profile">个人资料</Link>
-          <Link href="/me/followers" aria-current={isFollowers ? 'page' : undefined}>我的粉丝</Link>
-          <Link href="/me/following" aria-current={!isFollowers ? 'page' : undefined}>我的关注</Link>
-          <Link href="/me/subscriptions">我的订阅</Link>
-        </nav>
-      </header>
+    <TwitterCloneSecondaryPageLayout locale={locale} title={title} active={isFollowers ? 'connections' : 'following'}>
+      <section aria-busy={loading || loadingMore} className="flex flex-col">
+        <header className="border-b border-light-border px-4 py-4 dark:border-dark-border">
+          <p className="text-xs font-bold uppercase tracking-widest text-main-accent">{labels.social}</p>
+          <p className="mt-2 text-sm leading-6 text-light-secondary dark:text-dark-secondary">{description}</p>
+        </header>
 
-      {error ? <p role="alert" style={{ marginTop: 24, color: '#b42318' }}>{error}</p> : null}
-      {loading ? <p role="status" style={{ marginTop: 24 }}>正在加载…</p> : null}
+        {error ? <p className="border-b border-light-border px-4 py-3 text-sm text-red-600 dark:border-dark-border" role="alert">{error}</p> : null}
+        {loading ? <p className="border-b border-light-border px-4 py-4 text-sm text-light-secondary dark:border-dark-border" role="status">{labels.loading}</p> : null}
 
-      {!loading && items.length === 0 && !error ? (
-        <section style={{ marginTop: 24, padding: 28, border: '1px solid #e4e7ec', borderRadius: 14 }}>
-          <strong>{isFollowers ? '还没有粉丝。' : '还没有关注用户。'}</strong>
-          <p style={{ margin: '8px 0 0', color: '#667085' }}>
-            {isFollowers ? '当其他用户关注你后，会在这里看到。' : '去作者主页关注感兴趣的创作者后，会在这里看到。'}
-          </p>
-          <Link href="/content" style={{ display: 'inline-block', marginTop: 14 }}>去发现内容</Link>
-        </section>
-      ) : null}
+        {!loading && items.length === 0 && !error ? (
+          <section className="flex flex-col items-center gap-3 px-6 py-16 text-center">
+            <strong className="text-lg">{isFollowers ? labels.emptyFollowers : labels.emptyFollowing}</strong>
+            <p className="max-w-sm text-sm text-light-secondary dark:text-dark-secondary">{isFollowers ? labels.emptyFollowersHelp : labels.emptyFollowingHelp}</p>
+            <Link className="rounded-full bg-main-accent px-5 py-2 text-sm font-bold text-white" href="/content">{labels.discover}</Link>
+          </section>
+        ) : null}
 
-      {items.length > 0 ? (
-        <section className="content-detail-card" aria-label={isFollowers ? '粉丝列表' : '关注列表'} style={{ marginTop: 24 }}>
-          {items.map((item) => (
-            <TwitterCloneFollowRow
-              key={item.relationshipId}
-              userId={item.userId}
-              followedAt={item.followedAt}
-              action={!isFollowers ? (
+        {items.length > 0 ? (
+          <section className="flex flex-col" aria-label={title}>
+            {items.map((item) => (
+              <TwitterCloneFollowRow
+                key={item.relationshipId}
+                userId={item.userId}
+                followedAt={item.followedAt}
+                presentation="x-timeline"
+                locale={locale}
+                action={!isFollowers ? (
+                  <button
+                    className="main-tab rounded-full border border-light-border px-4 py-2 text-sm font-bold hover:bg-light-primary/10 disabled:cursor-not-allowed disabled:opacity-50 dark:border-dark-border dark:hover:bg-dark-primary/10"
+                    disabled={unfollowingId === item.userId}
+                    onClick={() => void unfollow(item.userId)}
+                    type="button"
+                  >
+                    {unfollowingId === item.userId ? labels.processing : labels.unfollow}
+                  </button>
+                ) : undefined}
+              />
+            ))}
+
+            {hasMore && nextCursor ? (
+              <div className="flex justify-center px-4 py-5">
                 <button
-                  className="content-detail-follow"
-                  disabled={unfollowingId === item.userId}
-                  onClick={() => void unfollow(item.userId)}
+                  className="main-tab rounded-full border border-light-border px-5 py-2 text-sm font-bold hover:bg-light-primary/10 disabled:cursor-not-allowed disabled:opacity-50 dark:border-dark-border dark:hover:bg-dark-primary/10"
+                  disabled={loadingMore}
+                  onClick={() => void loadMore()}
                   type="button"
                 >
-                  {unfollowingId === item.userId ? '处理中…' : '取消关注'}
+                  {loadingMore ? labels.loadingMore : labels.more}
                 </button>
-              ) : undefined}
-            />
-          ))}
- 
-          {hasMore && nextCursor ? (
-            <div style={{ display: 'flex', justifyContent: 'center', marginTop: 8 }}>
-              <button disabled={loadingMore} onClick={() => void loadMore()} type="button">
-                {loadingMore ? '加载中…' : '加载更多'}
-              </button>
-            </div>
-          ) : null}
-        </section>
-      ) : null}
+              </div>
+            ) : null}
+          </section>
+        ) : null}
 
-      {!loading && !error ? (
-        <div style={{ display: 'flex', justifyContent: 'flex-start', marginTop: 20 }}>
-          <button onClick={() => void load()} type="button">刷新列表</button>
-        </div>
-      ) : null}
-    </main>
+        {!loading && !error ? (
+          <div className="flex justify-center border-t border-light-border px-4 py-4 dark:border-dark-border">
+            <button className="main-tab rounded-full px-4 py-2 text-sm font-bold text-light-secondary hover:bg-light-primary/10 dark:text-dark-secondary dark:hover:bg-dark-primary/10" onClick={() => void load()} type="button">{labels.refresh}</button>
+          </div>
+        ) : null}
+      </section>
+    </TwitterCloneSecondaryPageLayout>
   )
 }
