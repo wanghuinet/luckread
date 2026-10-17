@@ -5,9 +5,10 @@ import PublicLanguageToggle from '../(frontend)/i18n/PublicLanguageToggle'
 import type { PublicLocale } from '../(frontend)/i18n/public-locale'
 import TwitterClonePostComposerModal, { TwitterClonePostComposerTrigger } from './TwitterClonePostComposerModal'
 import TwitterCloneSidebarProfile from './TwitterCloneSidebarProfile'
+import TwitterCloneSidebarPublicProfileLink from './TwitterCloneSidebarPublicProfileLink'
 import { TwitterLogo } from './TwitterCloneLanding'
 
-type PageNavKey = 'home' | 'explore' | 'trends' | 'notifications' | 'connections' | 'following' | 'bookmarks' | 'videos' | 'profile'
+type PageNavKey = 'home' | 'explore' | 'trends' | 'notifications' | 'connections' | 'following' | 'bookmarks' | 'videos' | 'profile' | 'editProfile'
 
 type Props = {
   locale: PublicLocale
@@ -62,7 +63,6 @@ export default function TwitterCloneSecondaryPageLayout({ locale, title, active,
     { key: 'following', href: '/me/following', icon: 'user' },
     { key: 'bookmarks', href: '/bookmarks', icon: 'bookmark' },
     { key: 'videos', href: '/shorts', icon: 'video' },
-    { key: 'profile', href: '/me/profile', icon: 'user' },
   ]
 
   return (
@@ -79,6 +79,7 @@ export default function TwitterCloneSecondaryPageLayout({ locale, title, active,
                     <SidebarIcon name={item.icon} /><span className="hidden text-xl xl:inline">{copy[item.key]}</span>
                   </Link>
                 ))}
+                <TwitterCloneSidebarPublicProfileLink locale={locale} active={active === 'profile'} />
               </nav>
               <TwitterClonePostComposerTrigger className="accent-tab absolute right-4 -translate-y-[72px] rounded-full bg-main-accent px-4 py-3 text-lg font-bold text-white outline-none transition hover:brightness-90 xs:static xs:translate-y-0 xl:w-11/12" ariaLabel={copy.post}>
                 <span className="flex items-center justify-center gap-2"><SidebarIcon name="write" /><span className="hidden xl:inline">{copy.post}</span></span>
