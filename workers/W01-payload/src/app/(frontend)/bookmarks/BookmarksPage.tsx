@@ -4,7 +4,8 @@ import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { fetchJson, getApiErrorMessage } from '../../../lib/client-api.js'
-import PublicLanguageToggle, { usePublicLocale } from '../i18n/PublicLanguageToggle'
+import { usePublicLocale } from '../i18n/PublicLanguageToggle'
+import TwitterCloneSecondaryPageLayout from '../../(twitter-clone)/TwitterCloneSecondaryPageLayout'
 import LuckReadSocialPostCard from '../components/reuse/LuckReadSocialPostCard'
 import ArticleSummaryPreview from '../../../components/ArticleSummaryPreview.js'
 
@@ -180,69 +181,55 @@ export default function BookmarksPage() {
   }
 
   return (
-    <main className="content-browse">
-      <header className="content-browse-top">
-        <div>
-          <p className="eyebrow">{labels.eyebrow}</p>
-          <h1>{labels.title}</h1>
-          <p>{labels.description}</p>
-        </div>
-        <div className="content-browse-actions">
-          <Link className="button button-quiet" href="/">{locale === 'en' ? 'Home' : locale === 'tw' ? '首頁' : '返回首页'}</Link>
-          <Link className="button button-quiet" href="/content">{labels.discover}</Link>
-          <PublicLanguageToggle locale={locale} />
-        </div>
-      </header>
+    <TwitterCloneSecondaryPageLayout locale={locale} title={labels.title} active="bookmarks">
+      <section aria-busy={loading || loadingMore} className="flex flex-col">
+        <header className="border-b border-light-border px-4 py-4 dark:border-dark-border">
+          <p className="text-xs font-bold uppercase tracking-widest text-main-accent">{labels.eyebrow}</p>
+          <p className="mt-2 text-sm leading-6 text-light-secondary dark:text-dark-secondary">{labels.description}</p>
+        </header>
 
-      {loading ? (
-        <>
-          <div className="content-browse-state" role="status">{labels.loading}</div>
-          <section className="content-browse-grid" aria-label={labels.loading} aria-busy="true">
-            {Array.from({ length: 6 }, (_, index) => (
-              <div className="content-feed-card content-feed-card-skeleton" key={index} aria-hidden="true">
-                <div className="content-feed-cover content-feed-skeleton-block" />
-                <div className="content-feed-body">
-                  <span className="content-feed-skeleton-line content-feed-skeleton-line-short" />
-                  <span className="content-feed-skeleton-line content-feed-skeleton-line-title" />
-                  <span className="content-feed-skeleton-line content-feed-skeleton-line-title" />
-                  <span className="content-feed-skeleton-line content-feed-skeleton-line-meta" />
-                </div>
+        {loading ? (
+          <section aria-label={labels.loading} aria-busy="true">
+            <p className="border-b border-light-border px-4 py-4 text-sm text-light-secondary dark:border-dark-border" role="status">{labels.loading}</p>
+            {Array.from({ length: 5 }, (_, index) => (
+              <div className="animate-pulse border-b border-light-border px-4 py-5 dark:border-dark-border" key={index} aria-hidden="true">
+                <span className="mb-3 block h-3 w-24 rounded-full bg-light-line-reply dark:bg-dark-line-reply" />
+                <span className="mb-2 block h-5 w-4/5 rounded-full bg-light-line-reply dark:bg-dark-line-reply" />
+                <span className="block h-4 w-2/3 rounded-full bg-light-line-reply dark:bg-dark-line-reply" />
               </div>
             ))}
           </section>
-        </>
-      ) : null}
+        ) : null}
 
-      {!loading && error ? (
-        <div className="content-browse-state" role="status">
-          <p>{error}</p>
-          {authRequired ? (
-            <Link className="button button-primary" href={'/login?returnTo=' + encodeURIComponent('/bookmarks')}>{labels.login}</Link>
-          ) : (
-            <button className="button button-quiet" type="button" onClick={() => void load(null)}>{labels.retry}</button>
-          )}
-        </div>
-      ) : null}
+        {!loading && error ? (
+          <div className="flex flex-col items-center gap-3 px-6 py-16 text-center" role="status">
+            <p>{error}</p>
+            {authRequired ? (
+              <Link className="rounded-full bg-main-accent px-5 py-2 text-sm font-bold text-white" href={'/login?returnTo=' + encodeURIComponent('/bookmarks')}>{labels.login}</Link>
+            ) : (
+              <button className="rounded-full border border-light-border px-5 py-2 text-sm font-bold hover:bg-light-primary/10 dark:border-dark-border dark:hover:bg-dark-primary/10" type="button" onClick={() => void load(null)}>{labels.retry}</button>
+            )}
+          </div>
+        ) : null}
 
-      {!loading && !error && page.items.length === 0 && !page.hasMore ? (
-        <div className="content-browse-state">
-          <p>{labels.empty}</p>
-          <Link className="button button-primary" href="/content">{labels.discover}</Link>
-        </div>
-      ) : null}
+        {!loading && !error && page.items.length === 0 && !page.hasMore ? (
+          <div className="flex flex-col items-center gap-3 px-6 py-16 text-center">
+            <p className="text-light-secondary dark:text-dark-secondary">{labels.empty}</p>
+            <Link className="rounded-full bg-main-accent px-5 py-2 text-sm font-bold text-white" href="/content">{labels.discover}</Link>
+          </div>
+        ) : null}
 
-      {!loading && !error && page.items.length === 0 && page.hasMore && page.nextCursor ? (
-        <div className="content-browse-state">
-          <p>{locale === 'en' ? 'Checking more saved items…' : locale === 'tw' ? '正在查看更多收藏…' : '当前页没有可展示的已发布内容，还可以继续查看后续收藏。'}</p>
-          <button className="button button-quiet" type="button" disabled={loadingMore} onClick={() => void load(page.nextCursor)}>
-            {loadingMore ? labels.loadingMore : labels.more}
-          </button>
-        </div>
-      ) : null}
+        {!loading && page.items.length === 0 && page.hasMore && page.nextCursor ? (
+          <div className="flex flex-col items-center gap-3 px-6 py-16 text-center">
+            <p className="text-sm text-light-secondary dark:text-dark-secondary">{locale === 'en' ? 'Checking more saved items…' : locale === 'tw' ? '正在查看更多收藏…' : '当前页没有可展示的已发布内容，还可以继续查看后续收藏。'}</p>
+            <button className="rounded-full border border-light-border px-5 py-2 text-sm font-bold disabled:opacity-50 dark:border-dark-border" type="button" disabled={loadingMore} onClick={() => void load(page.nextCursor)}>
+              {loadingMore ? labels.loadingMore : labels.more}
+            </button>
+          </div>
+        ) : null}
 
-      {!loading && page.items.length > 0 ? (
-        <>
-          <section className="content-browse-grid" aria-label={labels.title}>
+        {!loading && !error && page.items.length > 0 ? (
+          <section className="flex flex-col" aria-label={labels.title}>
             {page.items.map((item) => {
               if (item.contentType === 'post') {
                 return (
@@ -256,6 +243,7 @@ export default function BookmarksPage() {
                     mediaRefs={item.mediaRefs}
                     createdAt={item.createdAt}
                     updatedAt={item.updatedAt}
+                    presentation="x-timeline"
                     locale={locale}
                     onBookmarkChanged={(bookmarked) => {
                       if (!bookmarked) removeFromPage(item.id)
@@ -267,62 +255,56 @@ export default function BookmarksPage() {
               const cover = item.coverRef
               const href = '/content/' + encodeURIComponent(item.slug || item.id)
               return (
-                <article className="content-feed-card" key={item.id}>
-                  <div className="content-feed-cover">
-                    {cover ? (
-                      item.contentType === 'video' ? (
-                        <video aria-label={item.title} controls muted playsInline preload="metadata" src={cover} />
-                      ) : (
-                        <img alt={item.title ? item.title + (locale === 'en' ? ' cover' : '封面') : labels.title} loading="lazy" src={cover} />
-                      )
-                    ) : (
-                      <span>{item.contentType.toUpperCase()}</span>
-                    )}
+                <article className="border-b border-light-border px-4 py-4 dark:border-dark-border" key={item.id}>
+                  <div className="flex items-center gap-2 text-xs text-light-secondary dark:text-dark-secondary">
+                    <span>{item.contentType === 'article' ? (locale === 'en' ? 'Article' : '文章') : (locale === 'en' ? 'Video' : locale === 'tw' ? '影片' : '视频')}</span>
+                    <span aria-hidden="true">·</span>
+                    <time dateTime={item.createdAt || item.updatedAt || undefined}>{item.createdAt ? new Date(item.createdAt).toLocaleDateString(locale === 'en' ? 'en-US' : locale === 'tw' ? 'zh-TW' : 'zh-CN') : ''}</time>
                   </div>
-                  <div className="content-feed-body">
-                    <div className="content-feed-meta">
-                      <span>{item.contentType === 'article' ? (locale === 'en' ? 'Article' : locale === 'tw' ? '文章' : '文章') : (locale === 'en' ? 'Video' : locale === 'tw' ? '影片' : '视频')}</span>
-                      <time dateTime={item.createdAt || item.updatedAt || undefined}>{item.createdAt ? new Date(item.createdAt).toLocaleDateString(locale === 'en' ? 'en-US' : locale === 'tw' ? 'zh-TW' : 'zh-CN') : ''}</time>
-                    </div>
-                    <h2>{item.title}</h2>
-                    {item.contentType === 'article' ? (
-                      <ArticleSummaryPreview
-                        key={item.bodyRef || item.id}
-                        bodyRef={item.bodyRef}
-                        label={labels.summary}
-                      />
-                    ) : null}
-                    <div className="content-browse-actions">
-                      <Link className="content-feed-open" href={href}>{labels.open}</Link>
-                      <button
-                        className="content-detail-like"
-                        type="button"
-                        disabled={removingIds.has(item.id)}
-                        onClick={() => void removeBookmark(item)}
-                      >
-                        {removingIds.has(item.id) ? labels.removing : labels.remove}
-                      </button>
-                    </div>
+                  <Link className="main-tab mt-2 inline-block rounded-lg font-bold hover:underline" href={href}>
+                    <h2 className="text-lg leading-6">{item.title}</h2>
+                  </Link>
+                  {cover ? (
+                    item.contentType === 'video' ? (
+                      <video className="mt-3 max-h-96 w-full rounded-2xl border border-light-border bg-black dark:border-dark-border" aria-label={item.title} controls muted playsInline preload="metadata" src={cover} />
+                    ) : (
+                      <img className="mt-3 max-h-96 w-full rounded-2xl border border-light-border object-cover dark:border-dark-border" alt={item.title ? item.title + (locale === 'en' ? ' cover' : '封面') : labels.title} loading="lazy" src={cover} />
+                    )
+                  ) : null}
+                  {item.contentType === 'article' ? (
+                    <ArticleSummaryPreview key={item.bodyRef || item.id} bodyRef={item.bodyRef} label={labels.summary} />
+                  ) : null}
+                  <div className="mt-3 flex items-center justify-between gap-3">
+                    <Link className="rounded-full px-3 py-2 text-sm font-bold text-main-accent hover:bg-light-primary/10 dark:hover:bg-dark-primary/10" href={href}>{labels.open}</Link>
+                    <button
+                      className="rounded-full border border-light-border px-4 py-2 text-sm font-bold hover:bg-light-primary/10 disabled:opacity-50 dark:border-dark-border dark:hover:bg-dark-primary/10"
+                      type="button"
+                      disabled={removingIds.has(item.id)}
+                      onClick={() => void removeBookmark(item)}
+                    >
+                      {removingIds.has(item.id) ? labels.removing : labels.remove}
+                    </button>
                   </div>
                 </article>
               )
             })}
           </section>
-          {page.hasMore && page.nextCursor && !error ? (
-            <div className="content-browse-more">
-              <button
-                aria-busy={loadingMore}
-                className="button button-quiet"
-                disabled={loadingMore}
-                onClick={() => void load(page.nextCursor)}
-                type="button"
-              >
-                {loadingMore ? labels.loadingMore : labels.more}
-              </button>
-            </div>
-          ) : null}
-        </>
-      ) : null}
-    </main>
+        ) : null}
+
+        {!loading && !error && page.hasMore && page.nextCursor ? (
+          <div className="flex justify-center px-4 py-5">
+            <button
+              aria-busy={loadingMore}
+              className="rounded-full border border-light-border px-5 py-2 text-sm font-bold hover:bg-light-primary/10 disabled:cursor-not-allowed disabled:opacity-50 dark:border-dark-border dark:hover:bg-dark-primary/10"
+              disabled={loadingMore}
+              onClick={() => void load(page.nextCursor)}
+              type="button"
+            >
+              {loadingMore ? labels.loadingMore : labels.more}
+            </button>
+          </div>
+        ) : null}
+      </section>
+    </TwitterCloneSecondaryPageLayout>
   )
 }
