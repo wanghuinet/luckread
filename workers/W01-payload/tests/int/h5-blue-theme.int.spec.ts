@@ -79,7 +79,7 @@ describe('LuckRead H5 blue design system', () => {
     expect(shareLanding).toContain("'/api/v1/shares/'")
     expect(shareLanding).toContain("router.replace('/content/'")
     expect(shareLanding).not.toContain('style={{')
-    const usernameProfileRoute = read('src/app/(frontend)/[username]/page.tsx')
+    const usernameProfileRoute = read('src/app/(twitter-clone)/[username]/page.tsx')
     expect(usernameProfileRoute).toContain('TwitterCloneSecondaryPageLayout')
     expect(usernameProfileRoute).toContain('active="profile"')
     expect(usernameProfileRoute).toContain("'/api/v1/users/by-username/'")
