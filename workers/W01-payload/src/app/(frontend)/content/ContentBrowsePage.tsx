@@ -95,14 +95,14 @@ export default function ContentBrowsePage() {
     } catch (cause) {
       if (requestId !== requestIdRef.current || controller.signal.aborted) return
       if (cause instanceof DOMException && cause.name === 'AbortError') return
-      setError(cause instanceof Error ? cause.message : contentLoadError)
+      setError(cause instanceof Error ? cause.message : fallbackError)
     } finally {
       if (requestId !== requestIdRef.current || controller.signal.aborted) return
       setLoading(false)
       setLoadingMore(false)
       if (abortControllerRef.current === controller) abortControllerRef.current = null
     }
-  }, [contentLoadError])
+  }, [])
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
