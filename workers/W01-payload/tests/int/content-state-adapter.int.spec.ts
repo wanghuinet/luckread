@@ -117,7 +117,7 @@ describe('1.1 content lifecycle closeout', () => {
     const publicState = read('src/app/api/v1/contents/[contentId]/state/route.ts')
     const boundPreflight = read('src/content/bind-post-publish-preflight.ts')
     const creatorList = read('src/app/(payload)/v1beta/CreatorContentList.tsx')
-    const publicDetail = read('src/app/(frontend)/content/[contentId]/page.tsx')
+    const publicDetail = read('src/app/(twitter-clone)/content/[contentId]/page.tsx')
     const publicDetailClient = read('src/app/(frontend)/content/[contentId]/ContentDetailClient.tsx')
     const w03Client = read('src/content/w03-content-client.ts')
     const w03Runtime = readFileSync(
@@ -194,7 +194,7 @@ describe('1.1 content lifecycle closeout', () => {
       resolve(process.cwd(), '../W03-content/src/content-runtime.ts'),
       'utf8',
     )
-    const detailPage = read('src/app/(frontend)/content/[contentId]/page.tsx')
+    const detailPage = read('src/app/(twitter-clone)/content/[contentId]/page.tsx')
     const detailClient = read('src/app/(frontend)/content/[contentId]/ContentDetailClient.tsx')
 
     expect(runtime).toContain(
