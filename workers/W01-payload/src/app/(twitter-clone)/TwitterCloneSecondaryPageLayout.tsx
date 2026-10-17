@@ -24,7 +24,7 @@ const labels = (locale: PublicLocale) => ({
   following: locale === 'en' ? 'Following' : locale === 'tw' ? '追蹤中' : '关注中',
   bookmarks: locale === 'en' ? 'Bookmarks' : locale === 'tw' ? '書籤' : '收藏',
   videos: locale === 'en' ? 'Videos' : locale === 'tw' ? '影片' : '视频',
-  profile: locale === 'en' ? 'Profile' : locale === 'tw' ? '個人主頁' : '个人主页',
+  profile: locale === 'en' ? 'Edit profile' : locale === 'tw' ? '編輯個人資料' : '编辑个人资料',
   post: locale === 'en' ? 'Post' : locale === 'tw' ? '發布' : '发布',
   search: locale === 'en' ? 'Search LuckRead' : locale === 'tw' ? '搜尋 LuckRead' : '搜索 LuckRead',
   exploreContent: locale === 'en' ? 'Articles and discussions' : locale === 'tw' ? '文章與討論' : '文章与讨论',
