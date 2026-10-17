@@ -8,7 +8,7 @@ describe('bookmarks page on the reused LuckRead content UI', () => {
   const page = read('src/app/(frontend)/bookmarks/page.tsx')
   const postCard = read('src/app/(frontend)/components/reuse/LuckReadSocialPostCard.tsx')
   const contentBrowse = read('src/app/(frontend)/content/page.tsx')
-  const home = read('src/app/(twitter-clone)/home/page.tsx')
+  const shell = read('src/app/(twitter-clone)/TwitterCloneSecondaryPageLayout.tsx')
 
   it('loads private, cursor-paginated bookmarks through the canonical W01 endpoint', () => {
     expect(page).toContain("'/api/v1/interactions/bookmarks?'")
@@ -32,7 +32,7 @@ describe('bookmarks page on the reused LuckRead content UI', () => {
     expect(page).not.toContain('bookmarks.module.css')
     expect(page).not.toContain('styles.css')
     expect(contentBrowse).toContain('<Link className="button button-quiet" data-umami-event="bookmarks-open" href="/bookmarks">')
-    expect(home).toContain('data-umami-event="bookmarks-open"')
+    expect(shell).toContain("data-umami-event={item.key === 'bookmarks' ? 'bookmarks-open' : undefined}")
   })
 
   it('removes saved items through the idempotent bookmark API and updates the visible list', () => {
