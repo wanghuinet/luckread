@@ -79,7 +79,7 @@ describe('unified W05 social closure adapters', () => {
     expect(pollCard).toContain('/poll/votes')
     expect(pollCard).toContain('viewerOptionId')
     expect(postCard).toContain('<SocialPoll contentId={contentId} locale={locale} />')
-    expect(worker).toContain('/poll/votes')
+    expect(worker).toContain('pollVoteMatch')
     expect(worker).toContain('castContentPollVote')
     expect(runtime).toContain('UNIQUE (poll_id, user_id)')
     expect(runtime).toContain("c.state !== 'PUBLISHED'")
