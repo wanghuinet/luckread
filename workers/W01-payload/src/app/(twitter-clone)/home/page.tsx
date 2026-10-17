@@ -28,14 +28,15 @@ async function loadInitialContent(requestHeaders: Headers, locale: PublicLocale)
   } catch { return { items: [], nextCursor: null, hasMore: false } }
 }
 
-function NavIcon({ name }: { name: 'home' | 'search' | 'users' | 'bookmark' | 'user' | 'video' | 'write' }) {
+function NavIcon({ name }: { name: 'home' | 'search' | 'users' | 'bookmark' | 'user' | 'video' | 'write' | 'bell' }) {
   const paths: Record<typeof name, string> = {
     home:'M3 10.5 12 3l9 7.5V21h-6v-7H9v7H3z',
     search:'M10.5 3a7.5 7.5 0 1 0 4.7 13.35L21 22l1-1-5.8-5.8A7.5 7.5 0 0 0 10.5 3z',
     users:'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2m7-10a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm7-7.8a4 4 0 0 1 0 7.6m1 4h1a4 4 0 0 1 4 4v1',
     bookmark:'M6 3h12v18l-6-4-6 4z',user:'M20 21a8 8 0 0 0-16 0m8-10a4 4 0 1 0 0-8 4 4 0 0 0 0 8z',
     video:'M4 5h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2zm14 5 5-3v10l-5-3z',
-    write:'M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L8 18l-4 1 1-4z'
+    write:'M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L8 18l-4 1 1-4z',
+    bell:'M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4'
   }
   return <svg aria-hidden="true" className="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8"><path d={paths[name]} /></svg>
 }
@@ -61,6 +62,7 @@ export default async function TwitterCloneHomePage({ searchParams }: { searchPar
               <Link className="custom-button main-tab flex items-center gap-5 rounded-full hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 xl:justify-start" href="/content"><NavIcon name="search" /><span className="hidden text-xl xl:inline">{copy.home.explore}</span></Link>
               <Link className="custom-button main-tab flex items-center gap-5 rounded-full hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 xl:justify-start" href="/me/followers"><NavIcon name="users" /><span className="hidden text-xl xl:inline">{copy.home.connections}</span></Link>
               <Link className="custom-button main-tab flex items-center gap-5 rounded-full hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 xl:justify-start" href="/me/following"><NavIcon name="user" /><span className="hidden text-xl xl:inline">{copy.home.following}</span></Link>
+              <Link className="custom-button main-tab flex items-center gap-5 rounded-full hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 xl:justify-start" href="/notifications"><NavIcon name="bell" /><span className="hidden text-xl xl:inline">{locale === 'en' ? 'Notifications' : '通知'}</span></Link>
               <Link className="custom-button main-tab flex items-center gap-5 rounded-full hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 xl:justify-start" href="/bookmarks" data-umami-event="bookmarks-open"><NavIcon name="bookmark" /><span className="hidden text-xl xl:inline">{copy.home.bookmarks}</span></Link>
               <Link className="custom-button main-tab flex items-center gap-5 rounded-full hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 xl:justify-start" href="/shorts"><NavIcon name="video" /><span className="hidden text-xl xl:inline">{copy.home.videos}</span></Link>
               <Link className="custom-button main-tab flex items-center gap-5 rounded-full hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 xl:justify-start" href="/me/profile"><NavIcon name="user" /><span className="hidden text-xl xl:inline">{copy.home.profile}</span></Link>
