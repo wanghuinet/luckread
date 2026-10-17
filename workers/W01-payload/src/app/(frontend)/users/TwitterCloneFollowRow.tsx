@@ -45,11 +45,11 @@ export default function TwitterCloneFollowRow({ userId, followedAt, profile, act
     return (
       <article className="flex flex-col gap-3 border-b border-light-border px-4 py-4 sm:flex-row sm:items-start sm:gap-4 dark:border-dark-border">
         {profile?.avatar ? (
-          <Link href={profileHref} aria-label={displayName + ' profile'} className="block h-12 w-12 shrink-0 overflow-hidden rounded-full bg-main-sidebar-background">
+          <Link href={profileHref} aria-label={displayName + ' ' + xCopy.profile} className="block h-12 w-12 shrink-0 overflow-hidden rounded-full bg-main-sidebar-background">
             <img alt="" className="h-full w-full object-cover" height={48} loading="lazy" src={profile.avatar} width={48} />
           </Link>
         ) : (
-          <Link href={profileHref} aria-label={displayName + ' profile'} className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-main-sidebar-background text-base font-bold">
+          <Link href={profileHref} aria-label={displayName + ' ' + xCopy.profile} className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-main-sidebar-background text-base font-bold">
             {initial}
           </Link>
         )}
