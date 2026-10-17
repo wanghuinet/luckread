@@ -1,4 +1,4 @@
-import ContentDetailPage from '../../../content/[contentId]/page'
+import { permanentRedirect } from 'next/navigation'
 
 export default async function UsernameArticlePage({
   params,
@@ -6,5 +6,5 @@ export default async function UsernameArticlePage({
   params: Promise<{ username: string; contentId: string }>
 }) {
   const { contentId } = await params
-  return <ContentDetailPage params={Promise.resolve({ contentId })} />
+  permanentRedirect('/content/' + encodeURIComponent(contentId))
 }
