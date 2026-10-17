@@ -994,7 +994,7 @@ describe('Creator Center admin extension', () => {
 
   it('exposes the user subscription page on the stable subscription API', () => {
     const page = read('src/app/(frontend)/me/subscriptions/page.tsx')
-    const home = read('src/app/(twitter-clone)/home/page.tsx')
+    const shell = read('src/app/(twitter-clone)/TwitterCloneSecondaryPageLayout.tsx')
     const css = read('src/app/(frontend)/me/subscriptions/subscriptions.css')
 
     expect(page).toContain("'/api/v1/memberships/subscriptions?limit=20&page=' + String(page)")
@@ -1020,7 +1020,7 @@ describe('Creator Center admin extension', () => {
     expect(page).toContain('加载更多订阅')
     expect(page).toContain("statusLabel")
     expect(page).not.toContain('entitlement')
-    expect(home).toContain('href="/me/subscriptions"')
+    expect(shell).toContain('href="/me/subscriptions"')
     expect(css).toContain('.my-subscriptions')
     expect(css).toContain('.subscription-card')
   })
