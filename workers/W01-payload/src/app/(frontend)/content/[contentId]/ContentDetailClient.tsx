@@ -33,9 +33,11 @@ const splitBodyIntoParagraphs = (value: string): string[] =>
 export default function ContentDetailPage({
   params,
   initialContent,
+  showLanguageToggle = true,
 }: {
   params: Promise<{ contentId: string }>
   initialContent?: Content
+  showLanguageToggle?: boolean
 }) {
   const locale = usePublicLocale()
   const copy = getPublicCopy(locale)
@@ -458,7 +460,7 @@ export default function ContentDetailPage({
       </div>
       <article className="content-detail-card">
         <header className="content-detail-header">
-          <div className="content-detail-language"><PublicLanguageToggle locale={locale} /></div>
+          {showLanguageToggle ? <div className="content-detail-language"><PublicLanguageToggle locale={locale} /></div> : null}
           <p className="eyebrow">LUCKREAD CONTENT</p>
           <h1>{content.title}</h1>
           {content.updatedAt ? (
