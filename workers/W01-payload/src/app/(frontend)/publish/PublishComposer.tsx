@@ -187,6 +187,20 @@ export default function PublishComposer({
           })
           if (bodyResponse.ok) recoveredBody = await bodyResponse.text()
         }
+        let recoveredPoll: DraftPoll | null = null
+        if ((recovered.contentType ?? 'article') === 'post') {
+          const pollResult = await authorizedFetch<PollApiResponse>(
+            '/api/v1/contents/' + encodeURIComponent(recovered.id) + '/poll',
+            { method: 'GET', signal: controller.signal, headers: { accept: 'application/json' } },
+          )
+          const poll = pollResult.response.ok ? pollResult.data?.data?.poll : null
+          if (poll && Array.isArray(poll.options) && [24, 72, 168].includes(Number(poll.durationHours))) {
+            recoveredPoll = {
+              options: poll.options,
+              durationHours: Number(poll.durationHours) as 24 | 72 | 168,
+            }
+          }
+        }
         if (cancelled) return
         setDraft(recovered)
         setType(recovered.contentType ?? 'article')
@@ -205,6 +219,9 @@ export default function PublishComposer({
           setSavedArticleSerialized('')
         }
         setCoverRef(recovered.coverRef ?? '')
+        setPollEnabled(Boolean(recoveredPoll))
+        setPollOptions(recoveredPoll ? recoveredPoll.options.map((option) => option.text) : ['', ''])
+        setPollDurationHours(recoveredPoll?.durationHours ?? 24)
         setAssets((recovered.mediaRefs ?? []).map((url: string) => ({
           id: url,
           url,
@@ -555,7 +572,8 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
       autoSaveInFlightRef.current = true
       setAutoSaveStatus('saving')
       try {
-        await persistDraft()
+        const autoSavedDraft = await persistDraft()
+        await syncDraftPoll(autoSavedDraft.id, false)
         autoSaveLastSavedAtRef.current = Date.now()
         if (changeToken === autoSaveChangeTokenRef.current) {
           autoSaveDirtyRef.current = false
@@ -590,7 +608,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
         autoSaveTimerRef.current = null
       }
     }
-  }, [title, body, type, assets, coverRef, busy, articleDocument])
+  }, [title, body, type, assets, coverRef, busy, articleDocument, pollEnabled, pollOptions, pollDurationHours])
 
   function startNewContent() {
     setDraft(null)
@@ -601,6 +619,9 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
     setBody('')
     setAssets([])
     setCoverRef('')
+    setPollEnabled(false)
+    setPollOptions(['', ''])
+    setPollDurationHours(24)
     setPreview(false)
     setCopied(false)
     cancelPendingAutoSave()
@@ -632,6 +653,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
 
   async function runPreflight(): Promise<{ report: PublishPreflightResult; input: Record<string, unknown>; draft: ContentResponse }> {
     if (autoSaveInFlightRef.current) throw new Error('自动保存正在进行，请稍后重试。')
+    assertPollConfigurationValid()
     if (!hasPublishableText()) {
       throw new Error(type === 'post' ? '请先填写动态正文。' : '请先填写标题和正文。')
     }
@@ -642,6 +664,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
     }
 
     const savedDraft = await persistDraft()
+    await syncDraftPoll(savedDraft.id)
     autoSaveDirtyRef.current = false
     autoSaveLastSavedAtRef.current = Date.now()
     setAutoSaveStatus('saved')
@@ -694,8 +717,10 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
         setError('短视频至少需要添加一个视频素材。')
         return
       }
+      assertPollConfigurationValid()
       const savedChangeToken = autoSaveChangeTokenRef.current
-      await persistDraft()
+      const savedDraft = await persistDraft()
+      await syncDraftPoll(savedDraft.id)
       if (savedChangeToken === autoSaveChangeTokenRef.current) {
         autoSaveDirtyRef.current = false
         autoSaveLastSavedAtRef.current = Date.now()
@@ -725,6 +750,13 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
     setError('')
     setMessage('')
     try {
+      if (type === 'post') {
+        const pollResult = await authorizedFetch<{ error?: { message?: string } }>(
+          '/api/v1/contents/' + encodeURIComponent(draft.id) + '/poll',
+          { method: 'DELETE', headers: { 'Idempotency-Key': 'social-poll-discard:' + draft.id + ':' + crypto.randomUUID() } },
+        )
+        if (!pollResult.response.ok) throw new Error(getApiErrorMessage(pollResult.data, '投票清理失败。'))
+      }
       const { response, data } = await authorizedFetch<{ error?: { message?: string } }>(
         contentBasePath + '/' + encodeURIComponent(draft.id),
         {
