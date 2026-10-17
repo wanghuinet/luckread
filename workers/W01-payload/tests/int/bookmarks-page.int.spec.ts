@@ -5,9 +5,10 @@ import { resolve } from 'node:path'
 const read = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8')
 
 describe('bookmarks page on the reused LuckRead content UI', () => {
-  const page = read('src/app/(frontend)/bookmarks/page.tsx')
+  const page = read('src/app/(frontend)/bookmarks/BookmarksPage.tsx')
   const postCard = read('src/app/(frontend)/components/reuse/LuckReadSocialPostCard.tsx')
   const shell = read('src/app/(twitter-clone)/TwitterCloneSecondaryPageLayout.tsx')
+  const route = read('src/app/(twitter-clone)/bookmarks/page.tsx')
 
   it('loads private, cursor-paginated bookmarks through the canonical W01 endpoint', () => {
     expect(page).toContain("'/api/v1/interactions/bookmarks?'")
@@ -26,10 +27,14 @@ describe('bookmarks page on the reused LuckRead content UI', () => {
     expect(page).toContain('<LuckReadSocialPostCard')
     expect(page).toContain('<ArticleSummaryPreview')
     expect(page).toContain('<video')
-    expect(page).toContain('content-feed-card-skeleton')
-    expect(page).toContain('content-browse-grid')
+    expect(page).toContain('animate-pulse')
+    expect(page).toContain('<TwitterCloneSecondaryPageLayout locale={locale} title={labels.title} active="bookmarks">')
     expect(page).not.toContain('bookmarks.module.css')
     expect(page).not.toContain('styles.css')
+    expect(page).toContain('presentation="x-timeline"')
+    expect(page).toContain('href={href}')
+    expect(page).toContain("import TwitterCloneSecondaryPageLayout from '../../(twitter-clone)/TwitterCloneSecondaryPageLayout'")
+    expect(route).toContain("import BookmarksPage from '../../(frontend)/bookmarks/BookmarksPage'")
     expect(shell).toContain("{ key: 'bookmarks', href: '/bookmarks', icon: 'bookmark' }")
     expect(shell).toContain("data-umami-event={item.key === 'bookmarks' ? 'bookmarks-open' : undefined}")
   })
