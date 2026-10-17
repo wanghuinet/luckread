@@ -47,7 +47,7 @@ describe('article summary card preview', () => {
 
   it('adds the summary component to both home and discovery cards without replacing the content API', () => {
     const home = read('src/app/(frontend)/HomeContentFeed.tsx')
-    const discovery = read('src/app/(frontend)/content/page.tsx')
+    const discovery = read('src/app/(frontend)/content/ContentBrowsePage.tsx')
     const detail = read('src/app/(frontend)/content/[contentId]/page.tsx')
     const api = read('src/app/api/v1/contents/route.ts')
     const w03 = read('../W03-content/src/index.ts')
