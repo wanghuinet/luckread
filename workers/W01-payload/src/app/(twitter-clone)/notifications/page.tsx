@@ -71,8 +71,15 @@ function notificationMessage(item: SocialNotification, labels: ReturnType<typeof
   const handle = typeof item.payload?.handle === 'string' && item.payload.handle.trim()
     ? '@' + item.payload.handle.replace(/^@/, '')
     : labels.user
-  const href = item.targetType === 'content'
-    ? '/content/' + encodeURIComponent(item.targetId)
+  const contentTargetId = item.targetType === 'content'
+    ? item.targetId
+    : item.targetType === 'comment' &&
+        typeof item.payload?.contentId === 'string' &&
+        item.payload.contentId.trim()
+      ? item.payload.contentId
+      : null
+  const href = contentTargetId
+    ? '/content/' + encodeURIComponent(contentTargetId)
     : item.type === 'FOLLOW'
       ? '/users/' + encodeURIComponent(item.actorUserId)
       : null
