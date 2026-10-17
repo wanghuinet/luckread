@@ -927,9 +927,6 @@ export async function updateContent(
   const operationId = 'updateContent'
   const hash = await requestHash(operationId, { contentId, input: normalized, ifMatch: normalizeEtag(ifMatch) })
   const { content, idempotency } = await loadMutationRow(db, contentId, operationId, idempotencyKey, principalUserId)
-  if (principalLayer === 'L2' && content && content.contentType !== 'post') {
-    throw new ContentRuntimeError('PERMISSION_DENIED', 403)
-  }
   const replay = inspectIdempotency(idempotency, principalUserId, hash, now)
   if (replay.replayed) {
     if (!replay.body) throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
@@ -937,6 +934,9 @@ export async function updateContent(
   }
   if (!content) throw new ContentRuntimeError('NOT_FOUND', 404)
   if (content.ownerUserId !== principalUserId) throw new ContentRuntimeError('PERMISSION_DENIED', 403)
+  if (isSocialOnlyLayer(principalLayer) && content.contentType !== 'post') {
+    throw new ContentRuntimeError('PERMISSION_DENIED', 403)
+  }
   assertEtag(content.etag, ifMatch)
   if (content.contentType !== normalized.contentType) {
     throw new ContentRuntimeError('VALIDATION_FAILED', 400)
@@ -1122,13 +1122,13 @@ export async function deleteContent(
   const operationId = 'deleteContent'
   const hash = await requestHash(operationId, { contentId, ifMatch: normalizeEtag(ifMatch) })
   const { content, idempotency } = await loadMutationRow(db, contentId, operationId, idempotencyKey, principalUserId)
-  if (principalLayer === 'L2' && content && content.contentType !== 'post') {
-    throw new ContentRuntimeError('PERMISSION_DENIED', 403)
-  }
   const replay = inspectIdempotency(idempotency, principalUserId, hash, now)
   if (replay.replayed) return
   if (!content) throw new ContentRuntimeError('NOT_FOUND', 404)
   if (content.ownerUserId !== principalUserId) throw new ContentRuntimeError('PERMISSION_DENIED', 403)
+  if (isSocialOnlyLayer(principalLayer) && content.contentType !== 'post') {
+    throw new ContentRuntimeError('PERMISSION_DENIED', 403)
+  }
   assertEtag(content.etag, ifMatch)
   if (!['DRAFT','PUBLISHED','UNPUBLISHED','ARCHIVED'].includes(content.state)) {
     throw new ContentRuntimeError('INVALID_STATE', 409)
@@ -1150,8 +1150,11 @@ export async function deleteContent(
   ])
 }
 
+const isSocialOnlyLayer = (layer: string | undefined): boolean =>
+  layer === 'L2' || /^L[5-8]$/.test(layer ?? '')
+
 const actorKindForLayer = (layer: string): 'SOCIAL_AUTHOR' | 'CREATOR' | null =>
-  layer === 'L2' ? 'SOCIAL_AUTHOR' : /^L[3-4]$/.test(layer) ? 'CREATOR' : null
+  isSocialOnlyLayer(layer) ? 'SOCIAL_AUTHOR' : /^L[3-4]$/.test(layer) ? 'CREATOR' : null
 
 export const canTransitionContentState = (
   from: ContentState,
@@ -1215,6 +1218,12 @@ export async function transitionContentState(
 
   const kind = actorKindForLayer(principalLayer)
   if (!kind) throw new ContentRuntimeError('PERMISSION_DENIED', 403)
+  // Social-author layers may only perform the explicit direct-publish transition.
+  // Higher-level accounts keep their own ordinary-post flow without inheriting
+  // creator article/video or moderation state-transition authority.
+  if (kind === 'SOCIAL_AUTHOR' && to !== 'PUBLISHED') {
+    throw new ContentRuntimeError('PERMISSION_DENIED', 403)
+  }
 
   const operationId = 'transitionContentState'
   const normalizedRequestedScheduledAt = to === 'SCHEDULED' ? normalizeScheduledAt(options.scheduledAt, now) : null
@@ -1237,6 +1246,9 @@ export async function transitionContentState(
   assertEtag(content.etag, ifMatch)
   const ownsContent = content.ownerUserId === principalUserId
   if (!ownsContent) {
+    throw new ContentRuntimeError('PERMISSION_DENIED', 403)
+  }
+  if (kind === 'SOCIAL_AUTHOR' && content.contentType !== 'post') {
     throw new ContentRuntimeError('PERMISSION_DENIED', 403)
   }
 
