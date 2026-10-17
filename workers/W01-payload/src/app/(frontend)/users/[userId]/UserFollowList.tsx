@@ -5,6 +5,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { fetchJson, getApiErrorMessage } from '../../../../lib/client-api.js'
 import TwitterCloneFollowRow from '../TwitterCloneFollowRow'
+import { usePublicLocale } from '../../i18n/PublicLanguageToggle'
+import TwitterCloneSecondaryPageLayout from '../../../(twitter-clone)/TwitterCloneSecondaryPageLayout'
 
 type Direction = 'followers' | 'following'
 
@@ -45,6 +47,54 @@ export default function UserFollowList({
   direction: Direction
 }) {
   const isFollowers = direction === 'followers'
+  const locale = usePublicLocale()
+  const labels = locale === 'en'
+    ? {
+        followers: 'Followers',
+        following: 'Following',
+        backProfile: 'Back to profile',
+        followersSuffix: "'s followers",
+        followingSuffix: ' follows',
+        people: 'people',
+        navigation: 'Profile relationships',
+        loading: 'Loading relationships…',
+        retry: 'Try again',
+        emptyFollowers: 'This creator has no followers yet.',
+        emptyFollowing: 'This creator is not following anyone yet.',
+        loadMore: 'Load more',
+        loadingMore: 'Loading…',
+      }
+    : locale === 'tw'
+      ? {
+          followers: '粉絲',
+          following: '追蹤中',
+          backProfile: '返回個人主頁',
+          followersSuffix: '的粉絲',
+          followingSuffix: '追蹤的用戶',
+          people: '人',
+          navigation: '個人關係導覽',
+          loading: '正在載入關係列表…',
+          retry: '重新載入',
+          emptyFollowers: '這位創作者目前還沒有粉絲。',
+          emptyFollowing: '這位創作者目前還沒有追蹤其他用戶。',
+          loadMore: '載入更多',
+          loadingMore: '載入中…',
+        }
+      : {
+          followers: '粉丝',
+          following: '关注',
+          backProfile: '返回作者主页',
+          followersSuffix: '的粉丝',
+          followingSuffix: '关注的用户',
+          people: '人',
+          navigation: '作者关系导航',
+          loading: '正在加载关系列表…',
+          retry: '重新加载',
+          emptyFollowers: '这位创作者还没有粉丝。',
+          emptyFollowing: '这位创作者还没有关注其他用户。',
+          loadMore: '加载更多',
+          loadingMore: '加载中…',
+        }
   const [profile, setProfile] = useState<PublicProfile | null>(null)
   const [items, setItems] = useState<FollowListItem[]>([])
   const [totalCount, setTotalCount] = useState<number | null>(null)
@@ -166,100 +216,124 @@ export default function UserFollowList({
   const displayName = profile?.displayName?.trim() || profile?.username || 'LuckRead 用户'
   const initial = displayName.slice(0, 1).toUpperCase()
 
+  const pageTitle = isFollowers ? labels.followers : labels.following
+  const relationshipSummary = displayName + (isFollowers ? labels.followersSuffix : labels.followingSuffix)
+  const localizedCount = totalCount === null
+    ? ''
+    : ' · ' + totalCount.toLocaleString(locale === 'en' ? 'en-US' : locale === 'tw' ? 'zh-TW' : 'zh-CN') + ' ' + labels.people
+
   return (
-    <main className="content-detail" aria-busy={loading || loadingMore}>
-      <div className="content-detail-top">
-        <div className="content-detail-breadcrumbs">
-          <Link href={'/users/' + encodeURIComponent(userId)}>← 返回作者主页</Link>
-          <Link href="/content">发现内容</Link>
-          <Link href="/">首页</Link>
-        </div>
-      </div>
-
-      <article className="content-detail-card">
-        <header className="content-detail-header">
-          <div
-            aria-label={displayName + ' 头像'}
-            role="img"
-            style={{
-              width: 64,
-              height: 64,
-              display: 'grid',
-              placeItems: 'center',
-              marginBottom: 14,
-              overflow: 'hidden',
-              borderRadius: '50%',
-              background: '#eef4ff',
-              color: '#2458e6',
-              fontSize: 24,
-              fontWeight: 800,
-            }}
+    <TwitterCloneSecondaryPageLayout
+      locale={locale}
+      title={pageTitle}
+      active={isFollowers ? 'connections' : 'following'}
+    >
+      <div className="flex flex-col" aria-busy={loading || loadingMore}>
+        <div className="border-b border-light-border px-4 py-3 dark:border-dark-border">
+          <Link
+            className="main-tab inline-flex items-center rounded-full px-3 py-2 text-sm font-bold hover:bg-light-primary/10 dark:hover:bg-dark-primary/10"
+            href={'/users/' + encodeURIComponent(userId)}
           >
-            {profile?.avatar ? (
-              <img alt="" height={64} loading="eager" src={profile.avatar} style={{ width: 64, height: 64, objectFit: 'cover' }} width={64} />
-            ) : initial}
-          </div>
-          <p className="eyebrow">LUCKREAD SOCIAL</p>
-          <h1>{isFollowers ? '粉丝列表' : '关注列表'}</h1>
-          <p style={{ margin: '6px 0 0', color: '#617086' }}>
-            {displayName}{isFollowers ? ' 的粉丝' : ' 关注的用户'}
-            {totalCount === null ? '' : ' · ' + totalCount.toLocaleString('zh-CN') + ' 人'}
-          </p>
-        </header>
-
-        <nav aria-label="作者关系导航" style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 18 }}>
-          <Link href={'/users/' + encodeURIComponent(userId) + '/followers'} aria-current={isFollowers ? 'page' : undefined}>
-            粉丝
+            <span aria-hidden="true">←</span>
+            <span className="ml-2">{labels.backProfile}</span>
           </Link>
-          <Link href={'/users/' + encodeURIComponent(userId) + '/following'} aria-current={!isFollowers ? 'page' : undefined}>
-            关注
+        </div>
+
+        <section className="border-b border-light-border px-4 py-4 dark:border-dark-border">
+          <div className="flex items-center gap-3">
+            {profile?.avatar ? (
+              <img alt={displayName} className="h-12 w-12 shrink-0 rounded-full object-cover" height={48} loading="eager" src={profile.avatar} width={48} />
+            ) : (
+              <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-main-sidebar-background text-lg font-bold" aria-hidden="true">
+                {initial}
+              </span>
+            )}
+            <div className="min-w-0">
+              <h2 className="truncate text-base font-bold">{displayName}</h2>
+              <p className="mt-1 text-sm text-light-secondary dark:text-dark-secondary">
+                {relationshipSummary}{localizedCount}
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <nav aria-label={labels.navigation} className="grid grid-cols-2 border-b border-light-border dark:border-dark-border">
+          <Link
+            className={isFollowers
+              ? 'main-tab relative flex min-h-14 items-center justify-center font-bold hover:bg-white/5'
+              : 'main-tab flex min-h-14 items-center justify-center text-light-secondary hover:bg-white/5 dark:text-dark-secondary'}
+            href={'/users/' + encodeURIComponent(userId) + '/followers'}
+            aria-current={isFollowers ? 'page' : undefined}
+          >
+            {labels.followers}
+            {isFollowers ? <span className="absolute bottom-0 h-1 w-14 rounded-full bg-main-accent" /> : null}
+          </Link>
+          <Link
+            className={!isFollowers
+              ? 'main-tab relative flex min-h-14 items-center justify-center font-bold hover:bg-white/5'
+              : 'main-tab flex min-h-14 items-center justify-center text-light-secondary hover:bg-white/5 dark:text-dark-secondary'}
+            href={'/users/' + encodeURIComponent(userId) + '/following'}
+            aria-current={!isFollowers ? 'page' : undefined}
+          >
+            {labels.following}
+            {!isFollowers ? <span className="absolute bottom-0 h-1 w-14 rounded-full bg-main-accent" /> : null}
           </Link>
         </nav>
-      </article>
 
-      {error ? (
-        <section className="content-detail-card" style={{ marginTop: 20 }}>
-          <p className="content-detail-action-status" role="alert">{error}</p>
-          <button className="content-detail-retry" onClick={() => void load()} type="button">重新加载</button>
-        </section>
-      ) : null}
+        {error ? (
+          <section className="border-b border-light-border px-4 py-4 dark:border-dark-border">
+            <p className="text-sm text-red-600 dark:text-red-400" role="alert">{error}</p>
+            <button
+              className="main-tab mt-3 rounded-full border border-light-border px-4 py-2 text-sm font-bold hover:bg-light-primary/10 dark:border-dark-border dark:hover:bg-dark-primary/10"
+              onClick={() => void load()}
+              type="button"
+            >
+              {labels.retry}
+            </button>
+          </section>
+        ) : null}
 
-      {!error && loading ? (
-        <section className="content-detail-card">
-          <p className="content-detail-state" role="status">正在加载…</p>
-        </section>
-      ) : null}
+        {!error && loading ? (
+          <section className="border-b border-light-border px-4 py-6 dark:border-dark-border">
+            <p className="text-sm text-light-secondary dark:text-dark-secondary" role="status">{labels.loading}</p>
+          </section>
+        ) : null}
 
-      {!error && !loading && items.length === 0 ? (
-        <section className="content-detail-card" style={{ marginTop: 20 }}>
-          <p className="content-detail-muted">{isFollowers ? '这个作者还没有粉丝。' : '这个作者还没有关注其他用户。'}</p>
-        </section>
-      ) : null}
+        {!error && !loading && items.length === 0 ? (
+          <section className="border-b border-light-border px-4 py-6 dark:border-dark-border">
+            <p className="text-sm text-light-secondary dark:text-dark-secondary">
+              {isFollowers ? labels.emptyFollowers : labels.emptyFollowing}
+            </p>
+          </section>
+        ) : null}
 
-      {!error && items.length > 0 ? (
-        <section className="content-detail-card" aria-label={isFollowers ? '粉丝列表' : '关注列表'} style={{ marginTop: 20 }}>
-          {items.map((item) => (
-            <TwitterCloneFollowRow
-              key={item.relationshipId}
-              userId={item.userId}
-              followedAt={item.followedAt}
-            />
-          ))}
+        {!error && items.length > 0 ? (
+          <section aria-label={pageTitle} className="flex flex-col">
+            {items.map((item) => (
+              <TwitterCloneFollowRow
+                key={item.relationshipId}
+                userId={item.userId}
+                followedAt={item.followedAt}
+                presentation="x-timeline"
+                locale={locale}
+              />
+            ))}
 
-          {hasMore && nextCursor ? (
-            <div style={{ display: 'flex', justifyContent: 'center', marginTop: 18 }}>
-              <button
-                className="content-detail-follow"
-                disabled={loadingMore}
-                onClick={() => void load(nextCursor)}
-                type="button"
-              >
-                {loadingMore ? '加载中…' : '加载更多'}
-              </button>
-            </div>
-          ) : null}
-        </section>
-      ) : null}
-    </main>
+            {hasMore && nextCursor ? (
+              <div className="flex justify-center border-b border-light-border px-4 py-5 dark:border-dark-border">
+                <button
+                  className="main-tab rounded-full border border-light-border px-5 py-2 text-sm font-bold hover:bg-light-primary/10 disabled:opacity-50 dark:border-dark-border dark:hover:bg-dark-primary/10"
+                  disabled={loadingMore}
+                  onClick={() => void load(nextCursor)}
+                  type="button"
+                >
+                  {loadingMore ? labels.loadingMore : labels.loadMore}
+                </button>
+              </div>
+            ) : null}
+          </section>
+        ) : null}
+      </div>
+    </TwitterCloneSecondaryPageLayout>
   )
 }
