@@ -53,6 +53,13 @@ describe('LuckRead H5 blue design system', () => {
     expect(publicProfilePage).not.toContain('creator-profile-button')
     expect(styles).not.toContain('.creator-profile-hero')
     expect(styles).not.toContain('.creator-profile-tabs')
+    const passwordPage = read('src/app/(frontend)/me/password/page.tsx')
+    expect(passwordPage).toContain('TwitterCloneSecondaryPageLayout')
+    expect(passwordPage).toContain('active="editProfile"')
+    expect(passwordPage).toContain("'/api/v1/auth/password/change'")
+    expect(passwordPage).toContain('MIN_PASSWORD_LENGTH = 15')
+    expect(passwordPage).toContain('MAX_PASSWORD_LENGTH = 128')
+    expect(passwordPage).not.toContain('style={{')
   })
 
   it('does not introduce another frontend page directory for the blue redesign', () => {
