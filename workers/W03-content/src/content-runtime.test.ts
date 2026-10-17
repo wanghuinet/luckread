@@ -469,6 +469,125 @@ describe('W03 content contract core', () => {
   })
 
 
+
+  it('allows higher global layers to publish only their own ordinary posts with preflight', async () => {
+    for (const layer of ['L5', 'L6', 'L7', 'L8']) {
+      const row = {
+        id: 'content_high_layer_post_' + layer,
+        content_type: 'post',
+        owner_user_id: 'user_high_layer_' + layer,
+        creator_id: 'user_high_layer_' + layer,
+        ip_id: null,
+        state: 'DRAFT',
+        scheduled_at: null,
+        version: 1,
+        revision: 1,
+        slug: 'high-layer-post-' + layer.toLowerCase(),
+        title: 'A useful update',
+        body_ref: 'https://cdn.example.com/post-body.txt',
+        media_refs_json: '[]',
+        cover_ref: null,
+        etag: 'W/"1"',
+        created_at: '2026-10-16T00:00:00.000Z',
+        updated_at: '2026-10-16T00:00:00.000Z',
+        idem_id: null,
+        idem_owner_user_id: null,
+        idem_request_hash: null,
+        idem_status: null,
+        idem_response_status: null,
+        idem_response_json: null,
+        idem_expires_at: null,
+      }
+      let batchCalled = false
+      const db = {
+        prepare() {
+          return { bind: () => ({ first: async () => row }) }
+        },
+        batch: async () => { batchCalled = true; return [] },
+      } as never
+
+      const result = await transitionContentState(
+        db,
+        'user_high_layer_' + layer,
+        layer,
+        row.id,
+        'PUBLISHED',
+        undefined,
+        'W/"1"',
+        'publish-high-layer-' + layer,
+        new Date('2026-10-16T00:01:00.000Z'),
+        {
+          preflight: {
+            contentType: 'post',
+            title: 'A useful update',
+            body: 'I am sharing a useful update from our recent work and a few lessons learned along the way.',
+            mediaRefs: [],
+            coverRef: null,
+            aiMode: 'none',
+            humanContribution: 'substantial',
+          },
+        },
+      )
+
+      expect(result).toMatchObject({ from: 'DRAFT', to: 'PUBLISHED', version: 2, etag: 'W/"2"' })
+      expect(batchCalled).toBe(true)
+    }
+  })
+
+  it('does not let a higher-layer social author publish an article', async () => {
+    const row = {
+      id: 'content_high_layer_article',
+      content_type: 'article',
+      owner_user_id: 'user_high_layer',
+      creator_id: 'user_high_layer',
+      ip_id: null,
+      state: 'DRAFT',
+      scheduled_at: null,
+      version: 1,
+      revision: 1,
+      slug: 'high-layer-article',
+      title: 'Article draft',
+      body_ref: 'https://cdn.example.com/article-body.txt',
+      media_refs_json: '[]',
+      cover_ref: null,
+      etag: 'W/"1"',
+      created_at: '2026-10-16T00:00:00.000Z',
+      updated_at: '2026-10-16T00:00:00.000Z',
+      idem_id: null,
+      idem_owner_user_id: null,
+      idem_request_hash: null,
+      idem_status: null,
+      idem_response_status: null,
+      idem_response_json: null,
+      idem_expires_at: null,
+    }
+    const db = {
+      prepare() { return { bind: () => ({ first: async () => row }) } },
+      batch: async () => { throw new Error('a denied article transition must not write') },
+    } as never
+
+    await expect(transitionContentState(
+      db,
+      'user_high_layer',
+      'L7',
+      row.id,
+      'PUBLISHED',
+      undefined,
+      'W/"1"',
+      'publish-high-layer-article',
+      new Date('2026-10-16T00:01:00.000Z'),
+      {
+        preflight: {
+          contentType: 'article',
+          title: 'Article draft',
+          body: 'An article body that should remain on the creator-only review lifecycle.',
+          mediaRefs: [],
+          coverRef: null,
+        },
+      },
+    )).rejects.toMatchObject({ code: 'PERMISSION_DENIED', status: 403 })
+  })
+
   it('requires a future timestamp before scheduling an approved content item', async () => {
     const db = {
       prepare() {
