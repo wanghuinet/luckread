@@ -34,6 +34,15 @@ describe('LuckRead H5 blue design system', () => {
     expect(shortsRoute).toContain('active="videos"')
     expect(shortsRoute).toContain('<ShortVideoFeed />')
     expect(shortsRoute).not.toContain('shorts.css')
+    const publicFollowList = read('src/app/(frontend)/users/[userId]/UserFollowList.tsx')
+    const publicFollowersRoute = read('src/app/(frontend)/users/[userId]/followers/page.tsx')
+    const publicFollowingRoute = read('src/app/(frontend)/users/[userId]/following/page.tsx')
+    expect(publicFollowList).toContain('TwitterCloneSecondaryPageLayout')
+    expect(publicFollowList).toContain("active={isFollowers ? 'connections' : 'following'}")
+    expect(publicFollowList).toContain('presentation="x-timeline"')
+    expect(publicFollowList).not.toContain('content-detail-card')
+    expect(publicFollowersRoute).toContain('UserFollowList')
+    expect(publicFollowingRoute).toContain('UserFollowList')
   })
 
   it('does not introduce another frontend page directory for the blue redesign', () => {
