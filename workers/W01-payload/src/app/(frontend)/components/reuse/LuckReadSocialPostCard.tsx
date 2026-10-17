@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react'
 import { fetchJson, getApiErrorMessage } from '../../../../lib/client-api.js'
 import { getCachedPublicProfile, type PublicProfile } from '../../../../lib/social-post-profile-cache.js'
 import { resolveSocialPostMedia } from '../../../../lib/social-post-media.js'
+import SocialPoll from './SocialPoll'
 import type { PublicLocale } from '../../i18n/public-locale'
 
 /**
@@ -823,6 +824,8 @@ export default function LuckReadSocialPostCard({
             ))}
           </div>
         ) : null}
+
+        <SocialPoll contentId={contentId} locale={locale} />
 
         <Link
           className="content-feed-open"

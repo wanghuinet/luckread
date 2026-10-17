@@ -28,6 +28,7 @@ import {
   setNotificationPreferences,
   syncSocialTokens,
 } from './social-closure-runtime.js'
+import { castContentPollVote, configureContentPoll, deleteContentPoll, getContentPoll, SocialPollError } from './poll-runtime.js'
 import {
   FollowRuntimeError,
   follow,
@@ -537,6 +538,60 @@ export default {
         return json({ data: await setNotificationPreferences(env.DB, actorUserId, input), requestId: crypto.randomUUID() })
       }
 
+      const pollVoteMatch = /^\/internal\/social\/contents\/([^/]+)\/poll\/votes$/.exec(url.pathname)
+      if (pollVoteMatch) {
+        if (request.method !== 'POST') return new Response(null, { status: 405, headers: { Allow: 'POST' } })
+        const actorUserId = requirePrincipal(request)
+        requireInteractionLayer(request)
+        const contentId = decodePathPart(pollVoteMatch[1])
+        if (contentId === null) throw new SocialPollError('VALIDATION_FAILED', 400)
+        const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
+        if (!idempotencyKey) throw new SocialPollError('PRECONDITION_REQUIRED', 428)
+        if (idempotencyKey.length > 256) throw new SocialPollError('VALIDATION_FAILED', 400)
+        let body: unknown
+        try { body = await request.json() } catch { throw new SocialPollError('VALIDATION_FAILED', 400) }
+        if (!body || typeof body !== 'object' || Array.isArray(body) || typeof (body as { optionId?: unknown }).optionId !== 'string') {
+          throw new SocialPollError('VALIDATION_FAILED', 400)
+        }
+        const poll = await castContentPollVote(env.DB, actorUserId, contentId, (body as { optionId: string }).optionId)
+        return json({ data: { poll }, requestId: createRequestId() }, 200)
+      }
+
+      const contentPollMatch = /^\/internal\/social\/contents\/([^/]+)\/poll$/.exec(url.pathname)
+      if (contentPollMatch) {
+        const contentId = decodePathPart(contentPollMatch[1])
+        if (contentId === null) throw new SocialPollError('VALIDATION_FAILED', 400)
+        if (request.method === 'GET') {
+          requireTransport(request)
+          const viewerUserId = request.headers.get('X-LuckRead-Principal-User-Id')?.trim() || null
+          const poll = await getContentPoll(env.DB, contentId, viewerUserId)
+          return json({ data: { poll }, requestId: createRequestId() })
+        }
+        if (request.method === 'POST') {
+          const actorUserId = requirePrincipal(request)
+          requireInteractionLayer(request)
+          const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
+          if (!idempotencyKey) throw new SocialPollError('PRECONDITION_REQUIRED', 428)
+          if (idempotencyKey.length > 256) throw new SocialPollError('VALIDATION_FAILED', 400)
+          let body: unknown
+          try { body = await request.json() } catch { throw new SocialPollError('VALIDATION_FAILED', 400) }
+          if (!body || typeof body !== 'object' || Array.isArray(body)) throw new SocialPollError('VALIDATION_FAILED', 400)
+          const raw = body as Record<string, unknown>
+          const poll = await configureContentPoll(env.DB, actorUserId, contentId, raw.options, raw.durationHours)
+          return json({ data: { poll }, requestId: createRequestId() }, 200)
+        }
+        if (request.method === 'DELETE') {
+          const actorUserId = requirePrincipal(request)
+          requireInteractionLayer(request)
+          const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
+          if (!idempotencyKey) throw new SocialPollError('PRECONDITION_REQUIRED', 428)
+          if (idempotencyKey.length > 256) throw new SocialPollError('VALIDATION_FAILED', 400)
+          await deleteContentPoll(env.DB, actorUserId, contentId)
+          return new Response(null, { status: 204 })
+        }
+        return new Response(null, { status: 405, headers: { Allow: 'GET, POST, DELETE' } })
+      }
+
       const commentContentId = parseCommentPath(url.pathname)
       if (commentContentId !== null) {
         if (request.method === 'GET') {
@@ -839,6 +894,7 @@ export default {
       })
     } catch (error) {
       if (
+        error instanceof SocialPollError ||
         error instanceof FollowRuntimeError ||
         error instanceof LikeRuntimeError ||
         error instanceof CommentRuntimeError ||

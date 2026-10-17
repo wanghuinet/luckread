@@ -58,6 +58,10 @@ type ContentResponse = {
   coverRef?: string | null
 }
 
+type PollOptionView = { optionId: string; text: string; position: number; votes: number }
+type DraftPoll = { options: PollOptionView[]; durationHours: 24 | 72 | 168 }
+type PollApiResponse = { data?: { poll?: { options?: PollOptionView[]; durationHours?: number } | null }; error?: { message?: string } }
+
 const CONTENT_MUTATED_EVENT = 'luckread:content-mutated'
 
 async function authorizedFetch<T = unknown>(
@@ -131,6 +135,9 @@ export default function PublishComposer({
   const [savedArticleSerialized, setSavedArticleSerialized] = useState('')
   const [assets, setAssets] = useState<UploadedAsset[]>([])
   const [coverRef, setCoverRef] = useState('')
+  const [pollEnabled, setPollEnabled] = useState(false)
+  const [pollOptions, setPollOptions] = useState<string[]>(['', ''])
+  const [pollDurationHours, setPollDurationHours] = useState<24 | 72 | 168>(24)
   const [videoMetadataByAssetId, setVideoMetadataByAssetId] = useState<Record<string, VideoMetadata>>({})
   const [draft, setDraft] = useState<ContentResponse | null>(null)
   const [savedBody, setSavedBody] = useState('')
@@ -180,6 +187,20 @@ export default function PublishComposer({
           })
           if (bodyResponse.ok) recoveredBody = await bodyResponse.text()
         }
+        let recoveredPoll: DraftPoll | null = null
+        if ((recovered.contentType ?? 'article') === 'post') {
+          const pollResult = await authorizedFetch<PollApiResponse>(
+            '/api/v1/contents/' + encodeURIComponent(recovered.id) + '/poll',
+            { method: 'GET', signal: controller.signal, headers: { accept: 'application/json' } },
+          )
+          const poll = pollResult.response.ok ? pollResult.data?.data?.poll : null
+          if (poll && Array.isArray(poll.options) && [24, 72, 168].includes(Number(poll.durationHours))) {
+            recoveredPoll = {
+              options: poll.options,
+              durationHours: Number(poll.durationHours) as 24 | 72 | 168,
+            }
+          }
+        }
         if (cancelled) return
         setDraft(recovered)
         setType(recovered.contentType ?? 'article')
@@ -198,6 +219,9 @@ export default function PublishComposer({
           setSavedArticleSerialized('')
         }
         setCoverRef(recovered.coverRef ?? '')
+        setPollEnabled(Boolean(recoveredPoll))
+        setPollOptions(recoveredPoll ? recoveredPoll.options.map((option) => option.text) : ['', ''])
+        setPollDurationHours(recoveredPoll?.durationHours ?? 24)
         setAssets((recovered.mediaRefs ?? []).map((url: string) => ({
           id: url,
           url,
@@ -345,6 +369,53 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
 
   const hasPublishableText = (): boolean =>
     Boolean(effectiveContentTitle() && body.trim())
+
+  const readValidPollOptions = (): string[] | null => {
+    if (!pollEnabled) return null
+    const options = pollOptions.map((option) => option.trim().normalize('NFKC'))
+    if (options.length < 2 || options.length > 4 || options.some((option) => !option || [...option].length > 50)) return null
+    const normalized = options.map((option) => option.toLocaleLowerCase('en-US'))
+    if (new Set(normalized).size !== normalized.length) return null
+    return options
+  }
+
+  function assertPollConfigurationValid() {
+    if (pollEnabled && !readValidPollOptions()) {
+      throw new Error('投票需要填写 2–4 个不重复的选项，每项最多 50 个字符。')
+    }
+  }
+
+  async function syncDraftPoll(contentId: string, strict = true) {
+    if (type !== 'post') return
+    if (pollEnabled) {
+      const options = readValidPollOptions()
+      if (!options) {
+        if (strict) assertPollConfigurationValid()
+        return
+      }
+      const { response, data } = await authorizedFetch<PollApiResponse>(
+        '/api/v1/contents/' + encodeURIComponent(contentId) + '/poll',
+        {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            'Idempotency-Key': 'social-poll-config:' + contentId + ':' + crypto.randomUUID(),
+          },
+          body: JSON.stringify({ options, durationHours: pollDurationHours }),
+        },
+      )
+      if (!response.ok) throw new Error(getApiErrorMessage(data, '投票保存失败，请稍后重试。'))
+      return
+    }
+    const { response, data } = await authorizedFetch<{ error?: { message?: string } }>(
+      '/api/v1/contents/' + encodeURIComponent(contentId) + '/poll',
+      {
+        method: 'DELETE',
+        headers: { 'Idempotency-Key': 'social-poll-remove:' + contentId + ':' + crypto.randomUUID() },
+      },
+    )
+    if (!response.ok) throw new Error(getApiErrorMessage(data, '移除投票失败，请稍后重试。'))
+  }
 
   async function persistDraft(): Promise<ContentResponse> {
     let bodyRef = draft?.bodyRef
@@ -501,7 +572,8 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
       autoSaveInFlightRef.current = true
       setAutoSaveStatus('saving')
       try {
-        await persistDraft()
+        const autoSavedDraft = await persistDraft()
+        await syncDraftPoll(autoSavedDraft.id, false)
         autoSaveLastSavedAtRef.current = Date.now()
         if (changeToken === autoSaveChangeTokenRef.current) {
           autoSaveDirtyRef.current = false
@@ -536,7 +608,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
         autoSaveTimerRef.current = null
       }
     }
-  }, [title, body, type, assets, coverRef, busy, articleDocument])
+  }, [title, body, type, assets, coverRef, busy, articleDocument, pollEnabled, pollOptions, pollDurationHours])
 
   function startNewContent() {
     setDraft(null)
@@ -547,6 +619,9 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
     setBody('')
     setAssets([])
     setCoverRef('')
+    setPollEnabled(false)
+    setPollOptions(['', ''])
+    setPollDurationHours(24)
     setPreview(false)
     setCopied(false)
     cancelPendingAutoSave()
@@ -578,6 +653,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
 
   async function runPreflight(): Promise<{ report: PublishPreflightResult; input: Record<string, unknown>; draft: ContentResponse }> {
     if (autoSaveInFlightRef.current) throw new Error('自动保存正在进行，请稍后重试。')
+    assertPollConfigurationValid()
     if (!hasPublishableText()) {
       throw new Error(type === 'post' ? '请先填写动态正文。' : '请先填写标题和正文。')
     }
@@ -588,6 +664,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
     }
 
     const savedDraft = await persistDraft()
+    await syncDraftPoll(savedDraft.id)
     autoSaveDirtyRef.current = false
     autoSaveLastSavedAtRef.current = Date.now()
     setAutoSaveStatus('saved')
@@ -640,8 +717,10 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
         setError('短视频至少需要添加一个视频素材。')
         return
       }
+      assertPollConfigurationValid()
       const savedChangeToken = autoSaveChangeTokenRef.current
-      await persistDraft()
+      const savedDraft = await persistDraft()
+      await syncDraftPoll(savedDraft.id)
       if (savedChangeToken === autoSaveChangeTokenRef.current) {
         autoSaveDirtyRef.current = false
         autoSaveLastSavedAtRef.current = Date.now()
@@ -671,6 +750,13 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
     setError('')
     setMessage('')
     try {
+      if (type === 'post') {
+        const pollResult = await authorizedFetch<{ error?: { message?: string } }>(
+          '/api/v1/contents/' + encodeURIComponent(draft.id) + '/poll',
+          { method: 'DELETE', headers: { 'Idempotency-Key': 'social-poll-discard:' + draft.id + ':' + crypto.randomUUID() } },
+        )
+        if (!pollResult.response.ok) throw new Error(getApiErrorMessage(pollResult.data, '投票清理失败。'))
+      }
       const { response, data } = await authorizedFetch<{ error?: { message?: string } }>(
         contentBasePath + '/' + encodeURIComponent(draft.id),
         {
@@ -934,6 +1020,96 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
       </div>
 
 
+      {type === 'post' ? (
+        <section className="lr-media-box" aria-label="投票设置">
+          <div className="lr-media-heading">
+            <div>
+              <strong>投票</strong>
+              <span>{pollEnabled ? '2–4 个选项 · 每人限投一次' : '为动态添加投票'}</span>
+            </div>
+            <button
+              className="lr-upload-button"
+              type="button"
+              disabled={busy || reviewLocked}
+              onClick={() => {
+                setPollEnabled((enabled) => !enabled)
+                if (!pollEnabled) setPollOptions(['', ''])
+                markDirty()
+              }}
+            >
+              {pollEnabled ? '移除投票' : '添加投票'}
+            </button>
+          </div>
+          {pollEnabled ? (
+            <div className="flex flex-col gap-3 p-1">
+              {pollOptions.map((option, index) => (
+                <div key={index} className="flex items-center gap-2">
+                  <label className="lr-field min-w-0 flex-1">
+                    <span>选项 {index + 1}</span>
+                    <input
+                      aria-label={'投票选项 ' + (index + 1)}
+                      maxLength={50}
+                      disabled={busy || reviewLocked}
+                      onChange={(event) => {
+                        setPollOptions((current) => current.map((value, optionIndex) => optionIndex === index ? event.target.value : value))
+                        markDirty()
+                      }}
+                      placeholder={'输入选项 ' + (index + 1)}
+                      value={option}
+                    />
+                    <small>{option.length}/50</small>
+                  </label>
+                  {pollOptions.length > 2 ? (
+                    <button
+                      className="ghost"
+                      type="button"
+                      disabled={busy || reviewLocked}
+                      aria-label={'移除选项 ' + (index + 1)}
+                      onClick={() => {
+                        setPollOptions((current) => current.filter((_value, optionIndex) => optionIndex !== index))
+                        markDirty()
+                      }}
+                    >
+                      移除
+                    </button>
+                  ) : null}
+                </div>
+              ))}
+              {pollOptions.length < 4 ? (
+                <button
+                  className="ghost self-start"
+                  type="button"
+                  disabled={busy || reviewLocked}
+                  onClick={() => {
+                    setPollOptions((current) => [...current, ''])
+                    markDirty()
+                  }}
+                >
+                  + 添加选项
+                </button>
+              ) : null}
+              <label className="lr-field">
+                <span>投票时长</span>
+                <select
+                  aria-label="投票时长"
+                  disabled={busy || reviewLocked}
+                  value={pollDurationHours}
+                  onChange={(event) => {
+                    setPollDurationHours(Number(event.target.value) as 24 | 72 | 168)
+                    markDirty()
+                  }}
+                >
+                  <option value={24}>1 天</option>
+                  <option value={72}>3 天</option>
+                  <option value={168}>7 天</option>
+                </select>
+              </label>
+              <p className="text-xs text-light-secondary dark:text-dark-secondary">投票会随动态一起发布；每个账号只能投一次，发布后不能修改选项。</p>
+            </div>
+          ) : null}
+        </section>
+      ) : null}
+
       <div className="lr-preflight-policy">
         <div className="lr-preflight-policy-heading">
           <strong>{isTweetModal ? '创作声明' : '创作者质量与 AI 规范'}</strong>
@@ -1069,6 +1245,15 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
                 )}
                 {assets.length > 4 ? <span>+{assets.length - 4} 个媒体</span> : null}
               </div>
+            ) : null}
+            {type === 'post' && pollEnabled ? (
+              <section className="lr-media-box" aria-label="投票预览">
+                <strong>投票</strong>
+                {pollOptions.filter((option) => option.trim()).map((option, index) => (
+                  <div key={index} className="rounded-full border border-light-border px-3 py-2 text-sm dark:border-dark-border">{option}</div>
+                ))}
+                <small>{pollDurationHours === 24 ? '1 天' : pollDurationHours === 72 ? '3 天' : '7 天'}</small>
+              </section>
             ) : null}
           </article>
         </section>

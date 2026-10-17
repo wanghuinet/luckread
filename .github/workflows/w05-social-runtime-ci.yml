@@ -245,6 +245,42 @@ jobs:
           print('SOCIAL_004_COMMENT_MIGRATION_STATIC=PASS')
           PY
 
+      - name: Verify poll migration shape
+        run: |
+          python - <<'PY'
+          import sqlite3
+          from pathlib import Path
+          db = sqlite3.connect(':memory:')
+          sql = Path('workers/W05-social/migrations/20261017_014_social_polls_v1.sql').read_text()
+          db.executescript(sql)
+          expected = {
+              'social_polls': ['poll_id','content_id','owner_user_id','duration_hours','ends_at','created_at','updated_at'],
+              'social_poll_options': ['option_id','poll_id','option_text','position'],
+              'social_poll_votes': ['vote_id','poll_id','option_id','user_id','created_at'],
+          }
+          for table, columns in expected.items():
+              actual = [row[1] for row in db.execute(f'PRAGMA table_info("{table}")').fetchall()]
+              if actual != columns:
+                  raise SystemExit(f'unexpected {table} schema: {actual}')
+          db.execute("INSERT INTO social_polls VALUES ('p1','c1','u1',24,NULL,'now','now')")
+          db.execute("INSERT INTO social_poll_options VALUES ('o1','p1','Yes',0)")
+          db.execute("INSERT INTO social_poll_options VALUES ('o2','p1','No',1)")
+          db.execute("INSERT INTO social_poll_votes VALUES ('v1','p1','o1','u2','now')")
+          try:
+              db.execute("INSERT INTO social_poll_votes VALUES ('v2','p1','o2','u2','now')")
+          except sqlite3.IntegrityError:
+              pass
+          else:
+              raise SystemExit('one-vote-per-user uniqueness boundary missing')
+          try:
+              db.execute("INSERT INTO social_polls VALUES ('p2','c1','u1',24,NULL,'now','now')")
+          except sqlite3.IntegrityError:
+              pass
+          else:
+              raise SystemExit('one-poll-per-content uniqueness boundary missing')
+          print('SOCIAL_008_POLL_MIGRATION_STATIC=PASS')
+          PY
+
       - name: Verify unified social closure migration shape
         run: |
           python - <<'PY'
@@ -268,4 +304,4 @@ jobs:
 
       - name: Run unified social closure runtime and adapter tests
         working-directory: workers/W01-payload
-        run: pnpm exec vitest run --config ./vitest.config.mts ../../workers/W05-social/src/social-closure-runtime.test.ts tests/int/social-closure-v1-adapter.int.spec.ts
+        run: pnpm exec vitest run --config ./vitest.config.mts ../../workers/W05-social/src/poll-runtime.test.ts ../../workers/W05-social/src/index.test.ts ../../workers/W05-social/src/social-closure-runtime.test.ts tests/int/social-closure-v1-adapter.int.spec.ts
