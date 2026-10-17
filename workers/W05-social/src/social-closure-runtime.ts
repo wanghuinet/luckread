@@ -288,6 +288,119 @@ export async function getTopicPage(
   }
 }
 
+
+type DiscoveryTopicCursor = {
+  version: 1
+  contentCount: number
+  latestContentAt: string
+  topicId: string
+}
+
+const encodeDiscoveryTopicCursor = (cursor: DiscoveryTopicCursor): string =>
+  btoa(JSON.stringify(cursor)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '')
+
+const decodeDiscoveryTopicCursor = (value: string | null): DiscoveryTopicCursor | null => {
+  if (!value) return null
+  const normalized = value.trim()
+  if (!normalized || normalized.length > MAX_CURSOR || !/^[A-Za-z0-9_-]+$/.test(normalized)) {
+    throw new SocialClosureRuntimeError('INVALID_CURSOR', 400)
+  }
+  try {
+    const padded = normalized.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - normalized.length % 4) % 4)
+    const parsed = JSON.parse(atob(padded)) as Partial<DiscoveryTopicCursor>
+    if (
+      parsed.version !== 1 ||
+      typeof parsed.contentCount !== 'number' ||
+      !Number.isSafeInteger(parsed.contentCount) ||
+      parsed.contentCount < 1 ||
+      typeof parsed.latestContentAt !== 'string' ||
+      !Number.isFinite(Date.parse(parsed.latestContentAt)) ||
+      typeof parsed.topicId !== 'string' ||
+      !/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(parsed.topicId)
+    ) {
+      throw new Error('invalid discovery topic cursor')
+    }
+    return {
+      version: 1,
+      contentCount: parsed.contentCount,
+      latestContentAt: parsed.latestContentAt,
+      topicId: parsed.topicId,
+    }
+  } catch {
+    throw new SocialClosureRuntimeError('INVALID_CURSOR', 400)
+  }
+}
+
+/**
+ * Returns active topics connected to public, published content updated in the
+ * last seven days. This is a bounded discovery projection over W05's canonical
+ * topic relations; search ranking and canonical content state remain elsewhere.
+ */
+export async function listDiscoveryTopics(
+  db: D1Database,
+  limitValue: string | null,
+  cursorValue: string | null,
+): Promise<{
+  items: Array<{ topicId: string; name: string; displayName: string; contentCount: number; latestContentAt: string }>
+  hasMore: boolean
+  nextCursor: string | null
+}> {
+  const limit = parseLimit(limitValue)
+  const cursor = decodeDiscoveryTopicCursor(cursorValue)
+  const cursorClause = cursor
+    ? 'WHERE (content_count < ? OR (content_count = ? AND (latest_content_at < ? OR (latest_content_at = ? AND topic_id > ?))))'
+    : ''
+  const cursorBindings: unknown[] = cursor
+    ? [cursor.contentCount, cursor.contentCount, cursor.latestContentAt, cursor.latestContentAt, cursor.topicId]
+    : []
+  const rows = await db.prepare(`
+    WITH ranked_topics AS (
+      SELECT t.topic_id, t.normalized_name, t.display_name,
+             COUNT(DISTINCT c.id) AS content_count,
+             MAX(c.updated_at) AS latest_content_at
+        FROM social_topics t
+        JOIN social_target_topics st ON st.topic_id = t.topic_id AND st.target_type = 'content'
+        JOIN contents c ON c.id = st.target_id
+       WHERE t.status = 'ACTIVE'
+         AND c.state = 'PUBLISHED'
+         AND julianday(c.updated_at) >= julianday('now', '-7 days')
+       GROUP BY t.topic_id, t.normalized_name, t.display_name
+    )
+    SELECT topic_id, normalized_name, display_name, content_count, latest_content_at
+      FROM ranked_topics
+      ${cursorClause}
+     ORDER BY content_count DESC, latest_content_at DESC, topic_id ASC
+     LIMIT ?
+  `).bind(...cursorBindings, limit + 1).all<{
+    topic_id: string
+    normalized_name: string
+    display_name: string
+    content_count: number
+    latest_content_at: string
+  }>()
+  const source = rows.results ?? []
+  const visible = source.slice(0, limit)
+  const last = visible.at(-1)
+  return {
+    items: visible.map((row) => ({
+      topicId: row.topic_id,
+      name: row.normalized_name,
+      displayName: row.display_name,
+      contentCount: Number(row.content_count),
+      latestContentAt: row.latest_content_at,
+    })),
+    hasMore: source.length > limit,
+    nextCursor: source.length > limit && last
+      ? encodeDiscoveryTopicCursor({
+          version: 1,
+          contentCount: Number(last.content_count),
+          latestContentAt: last.latest_content_at,
+          topicId: last.topic_id,
+        })
+      : null,
+  }
+}
+
 export async function enqueueNotification(
   db: D1Database,
   input: {

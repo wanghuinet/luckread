@@ -21,6 +21,7 @@ import {
   getNotificationPreferences,
   getSocialTargets,
   getTopicPage,
+  listDiscoveryTopics,
   listNotifications,
   markAllNotificationsRead,
   markNotificationRead,
@@ -453,6 +454,23 @@ export default {
             : (() => { throw new SocialClosureRuntimeError('VALIDATION_FAILED', 400) })()
         const result = await syncSocialTokens(env.DB, actorUserId, 'content', contentId, rawText, mentions)
         return json({ data: result, requestId: crypto.randomUUID() })
+      }
+
+      if (url.pathname === '/internal/social/discovery/topics') {
+        if (request.method !== 'GET') return new Response(null, { status: 405, headers: { Allow: 'GET' } })
+        requireTransport(request)
+        const discoveryUrl = new URL(request.url)
+        let invalidQueryKey = false
+        discoveryUrl.searchParams.forEach((_value, key) => {
+          if (key !== 'limit' && key !== 'cursor') invalidQueryKey = true
+        })
+        if (invalidQueryKey || discoveryUrl.searchParams.getAll('limit').length > 1 || discoveryUrl.searchParams.getAll('cursor').length > 1) {
+          throw new SocialClosureRuntimeError('VALIDATION_FAILED', 400)
+        }
+        return json({
+          data: await listDiscoveryTopics(env.DB, discoveryUrl.searchParams.get('limit'), discoveryUrl.searchParams.get('cursor')),
+          requestId: createRequestId(),
+        })
       }
 
       if (url.pathname.startsWith('/internal/social/topics/')) {

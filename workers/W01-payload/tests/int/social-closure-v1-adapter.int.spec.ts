@@ -39,6 +39,25 @@ describe('unified W05 social closure adapters', () => {
     expect(page).toContain("'/topics/' + encodeURIComponent(topic.topic.name)")
   })
 
+  it('exposes real recent-topic discovery and a shared-shell trends page', () => {
+    const route = read('src/app/api/v1/discovery/topics/route.ts')
+    const page = read('src/app/(twitter-clone)/trends/page.tsx')
+    const shell = read('src/app/(twitter-clone)/TwitterCloneSecondaryPageLayout.tsx')
+    const runtime = read('../../workers/W05-social/src/social-closure-runtime.ts')
+    const worker = read('../../workers/W05-social/src/index.ts')
+
+    expect(route).toContain('/internal/social/discovery/topics')
+    expect(route).toContain('enforcePublicReadRateLimit')
+    expect(page).toContain('/internal/social/discovery/topics?')
+    expect(page).toContain('contentCount')
+    expect(page).toContain('nextCursor')
+    expect(page).toContain('active="trends"')
+    expect(shell).toContain("{ key: 'trends', href: '/trends', icon: 'trending' }")
+    expect(worker).toContain("url.pathname === '/internal/social/discovery/topics'")
+    expect(runtime).toContain('listDiscoveryTopics')
+    expect(runtime).toContain("julianday(c.updated_at) >= julianday('now', '-7 days')")
+  })
+
   it('supports persisted topics and mentions in W05', () => {
     const runtime = read('../../workers/W05-social/src/social-closure-runtime.ts')
     const migration = read('../../workers/W05-social/migrations/20261008_011_social_closure_v1.sql')
