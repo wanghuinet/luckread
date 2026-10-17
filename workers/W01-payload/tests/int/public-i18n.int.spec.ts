@@ -16,8 +16,9 @@ describe('public frontend i18n', () => {
     expect(locale).toContain("case 'zh-TW':")
   })
 
-  it('keeps one shared language switch on the public reading routes after the clone landing migration', () => {
+  it('shows a globe-only language selector without activating page translation yet', () => {
     const toggle = read('src/app/(frontend)/i18n/PublicLanguageToggle.tsx')
+    const globeMenu = read('src/app/(frontend)/i18n/GlobeLanguageMenu.tsx')
     const landing = read('src/app/(twitter-clone)/page.tsx')
     const landingView = read('src/app/(twitter-clone)/TwitterCloneLanding.tsx')
     const home = read('src/app/(twitter-clone)/home/page.tsx')
@@ -30,7 +31,13 @@ describe('public frontend i18n', () => {
     const detailPage = read('src/app/(twitter-clone)/content/[contentId]/page.tsx')
     const comments = read('src/app/(frontend)/content/[contentId]/ContentComments.tsx')
 
-    expect(toggle).toContain('PUBLIC_LOCALES.map')
+    expect(toggle).toContain('GlobeLanguageMenu')
+    expect(toggle).not.toContain('setPublicLocaleCookie')
+    expect(globeMenu).toContain("value: 'pt-BR'")
+    expect(globeMenu).toContain("value: 'zh-TW'")
+    expect((globeMenu.match(/value: '/g) ?? []).length).toBeGreaterThanOrEqual(20)
+    expect(globeMenu).not.toContain('document.cookie')
+    expect(globeMenu).not.toContain('window.location.reload')
     expect(landing).toContain('normalizePublicLocale(localeCookie)')
     expect(landingView).toContain('<PublicLanguageToggle locale={locale} />')
     expect(landingView).toContain('copy.landing.happeningNow')
