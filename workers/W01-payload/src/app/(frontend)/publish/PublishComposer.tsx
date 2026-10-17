@@ -353,6 +353,53 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
   const hasPublishableText = (): boolean =>
     Boolean(effectiveContentTitle() && body.trim())
 
+  const readValidPollOptions = (): string[] | null => {
+    if (!pollEnabled) return null
+    const options = pollOptions.map((option) => option.trim().normalize('NFKC'))
+    if (options.length < 2 || options.length > 4 || options.some((option) => !option || [...option].length > 50)) return null
+    const normalized = options.map((option) => option.toLocaleLowerCase('en-US'))
+    if (new Set(normalized).size !== normalized.length) return null
+    return options
+  }
+
+  function assertPollConfigurationValid() {
+    if (pollEnabled && !readValidPollOptions()) {
+      throw new Error('投票需要填写 2–4 个不重复的选项，每项最多 50 个字符。')
+    }
+  }
+
+  async function syncDraftPoll(contentId: string, strict = true) {
+    if (type !== 'post') return
+    if (pollEnabled) {
+      const options = readValidPollOptions()
+      if (!options) {
+        if (strict) assertPollConfigurationValid()
+        return
+      }
+      const { response, data } = await authorizedFetch<PollApiResponse>(
+        '/api/v1/contents/' + encodeURIComponent(contentId) + '/poll',
+        {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            'Idempotency-Key': 'social-poll-config:' + contentId + ':' + crypto.randomUUID(),
+          },
+          body: JSON.stringify({ options, durationHours: pollDurationHours }),
+        },
+      )
+      if (!response.ok) throw new Error(getApiErrorMessage(data, '投票保存失败，请稍后重试。'))
+      return
+    }
+    const { response, data } = await authorizedFetch<{ error?: { message?: string } }>(
+      '/api/v1/contents/' + encodeURIComponent(contentId) + '/poll',
+      {
+        method: 'DELETE',
+        headers: { 'Idempotency-Key': 'social-poll-remove:' + contentId + ':' + crypto.randomUUID() },
+      },
+    )
+    if (!response.ok) throw new Error(getApiErrorMessage(data, '移除投票失败，请稍后重试。'))
+  }
+
   async function persistDraft(): Promise<ContentResponse> {
     let bodyRef = draft?.bodyRef
     let nextSavedArticleSerialized: string | null = null
