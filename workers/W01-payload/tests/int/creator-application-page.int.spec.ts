@@ -39,7 +39,7 @@ describe('creator qualification application page', () => {
 
   it('gates creator operations at L3 and exposes the qualification entry from profile', () => {
     const studio = read('src/app/(frontend)/creator-center/page.tsx')
-    const profile = read('src/app/(frontend)/me/profile/page.tsx')
+    const profile = read('src/app/(twitter-clone)/me/profile/page.tsx')
     expect(studio).toContain("if (principal.layer !== 'L3') redirect('/creator-application')")
     expect(profile).toContain('href="/creator-application"')
   })
