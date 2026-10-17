@@ -49,4 +49,21 @@ describe('Twitter Clone profile UI reuse on LuckRead public profile', () => {
     expect(notice).toContain('MIT License')
     expect(notice).toContain('No Firebase/Auth/Firestore logic is copied.')
   })
+  it('routes the main profile item to the signed-in public username page and keeps editing separate', () => {
+    const shell = read('src/app/(twitter-clone)/TwitterCloneSecondaryPageLayout.tsx')
+    const profileLink = read('src/app/(twitter-clone)/TwitterCloneSidebarPublicProfileLink.tsx')
+    const editor = read('src/app/(twitter-clone)/me/profile/page.tsx')
+    const publicProfile = read('src/app/(frontend)/users/[userId]/page.tsx')
+
+    expect(shell).toContain("import TwitterCloneSidebarPublicProfileLink from './TwitterCloneSidebarPublicProfileLink'")
+    expect(shell).toContain('<TwitterCloneSidebarPublicProfileLink locale={locale} />')
+    expect(shell).not.toContain("{ key: 'profile', href: '/me/profile', icon: 'user' }")
+    expect(profileLink).toContain("fetchJson<CurrentProfile>('/api/v1/users/me'")
+    expect(profileLink).toContain("setHref('/' + encodeURIComponent(data.username))")
+    expect(profileLink).toContain("href={href}")
+    expect(editor).toContain('active="editProfile"')
+    expect(publicProfile).toContain('TwitterCloneSecondaryPageLayout locale={locale} title={name} active="profile"')
+    expect(publicProfile).toContain('href="/me/profile"')
+  })
+
 })
