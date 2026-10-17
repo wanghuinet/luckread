@@ -6,7 +6,7 @@ const read = (relativePath: string) => readFileSync(resolve(process.cwd(), relat
 
 describe('public content type filter', () => {
   it('renders all, article, post and video tabs', () => {
-    const page = read('src/app/(frontend)/content/page.tsx')
+    const page = read('src/app/(frontend)/content/ContentBrowsePage.tsx')
 
     expect(page).toContain("useState<ContentType | 'all'>('all')")
     expect(page).toContain('copy.content.tabs.all')
@@ -19,7 +19,7 @@ describe('public content type filter', () => {
   })
 
   it('sends the selected type to the canonical contents API and resets pagination', () => {
-    const page = read('src/app/(frontend)/content/page.tsx')
+    const page = read('src/app/(frontend)/content/ContentBrowsePage.tsx')
     const route = read('src/app/api/v1/contents/route.ts')
 
     expect(page).toContain("if (selectedType !== 'all') params.set('type', selectedType)")
@@ -32,11 +32,10 @@ describe('public content type filter', () => {
     expect(page).toContain('}, [])')
     expect(page).toContain('}, [contentLoadError, contentType, load])')
     expect(route).toContain('validateContentListQuery')
-    expect(route).toContain('validateContentListQuery')
   })
 
   it('keeps filter requests public and read-only', () => {
-    const page = read('src/app/(frontend)/content/page.tsx')
+    const page = read('src/app/(frontend)/content/ContentBrowsePage.tsx')
 
     expect(page).toContain("headers: { accept: 'application/json' }")
     expect(page).toContain("cache: 'no-store'")

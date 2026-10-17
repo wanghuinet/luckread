@@ -7,7 +7,6 @@ const read = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8'
 describe('bookmarks page on the reused LuckRead content UI', () => {
   const page = read('src/app/(frontend)/bookmarks/page.tsx')
   const postCard = read('src/app/(frontend)/components/reuse/LuckReadSocialPostCard.tsx')
-  const contentBrowse = read('src/app/(frontend)/content/page.tsx')
   const shell = read('src/app/(twitter-clone)/TwitterCloneSecondaryPageLayout.tsx')
 
   it('loads private, cursor-paginated bookmarks through the canonical W01 endpoint', () => {
@@ -31,7 +30,7 @@ describe('bookmarks page on the reused LuckRead content UI', () => {
     expect(page).toContain('content-browse-grid')
     expect(page).not.toContain('bookmarks.module.css')
     expect(page).not.toContain('styles.css')
-    expect(contentBrowse).toContain('<Link className="button button-quiet" data-umami-event="bookmarks-open" href="/bookmarks">')
+    expect(shell).toContain("{ key: 'bookmarks', href: '/bookmarks', icon: 'bookmark' }")
     expect(shell).toContain("data-umami-event={item.key === 'bookmarks' ? 'bookmarks-open' : undefined}")
   })
 
