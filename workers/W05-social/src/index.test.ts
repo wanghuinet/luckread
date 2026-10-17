@@ -985,3 +985,75 @@ describe('W05 social comment transport', () => {
   })
 
 })
+
+describe('W05 social poll transport', () => {
+  it('rejects unauthenticated poll writes before touching D1', async () => {
+    const headers = {
+      'X-LuckRead-Caller': 'W01',
+      'X-LuckRead-Transport-Version': '1.0',
+      'X-LuckRead-Correlation-Id': 'poll-unauthenticated',
+      'X-LuckRead-Principal-Layer': 'L2',
+      'Idempotency-Key': 'poll-unauthenticated-1',
+      'content-type': 'application/json',
+    }
+    const d1 = dbFor()
+    const configure = await worker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/contents/content-1/poll', {
+        method: 'POST', headers, body: JSON.stringify({ options: ['Yes', 'No'], durationHours: 24 }),
+      }),
+      { DB: d1 },
+    )
+    const vote = await worker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/contents/content-1/poll/votes', {
+        method: 'POST', headers, body: JSON.stringify({ optionId: 'option-1' }),
+      }),
+      { DB: d1 },
+    )
+    expect(configure.status).toBe(401)
+    expect(vote.status).toBe(401)
+    expect((d1 as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).not.toHaveBeenCalled()
+  })
+
+  it('validates poll options before issuing database reads', async () => {
+    const d1 = dbFor()
+    const response = await worker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/contents/content-1/poll', {
+        method: 'POST',
+        headers: { ...transportHeaders, 'content-type': 'application/json', 'Idempotency-Key': 'poll-invalid-1' },
+        body: JSON.stringify({ options: ['Same', ' same '], durationHours: 24 }),
+      }),
+      { DB: d1 },
+    )
+    expect(response.status).toBe(422)
+    await expect(response.json()).resolves.toMatchObject({ error: { code: 'VALIDATION_FAILED' } })
+    expect((d1 as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).not.toHaveBeenCalled()
+  })
+
+  it('requires the canonical interaction layer and idempotency key before poll mutations', async () => {
+    const missingLayer = await worker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/contents/content-1/poll/votes', {
+        method: 'POST',
+        headers: {
+          ...transportHeaders,
+          'X-LuckRead-Principal-Layer': 'L1',
+          'Idempotency-Key': 'poll-layer-denied',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ optionId: 'option-1' }),
+      }),
+      { DB: dbFor() },
+    )
+    expect(missingLayer.status).toBe(403)
+
+    const missingKey = await worker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/contents/content-1/poll/votes', {
+        method: 'POST',
+        headers: { ...transportHeaders, 'content-type': 'application/json' },
+        body: JSON.stringify({ optionId: 'option-1' }),
+      }),
+      { DB: dbFor() },
+    )
+    expect(missingKey.status).toBe(428)
+  })
+})
+
