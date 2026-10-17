@@ -337,20 +337,23 @@ describe('W03 content contract core', () => {
     expect(canTransitionContentState('PUBLISHED', 'PENDING_REVIEW', 'CREATOR', true, 'other')).toBe(false)
   })
 
-  it('allows ordinary social post creation only at the authenticated L2-L4 layers', () => {
-    expect(hasSocialPostPermission('L2')).toBe(true)
-    expect(hasSocialPostPermission('L3')).toBe(true)
-    expect(hasSocialPostPermission('L4')).toBe(true)
-    expect(hasSocialPostPermission('L1')).toBe(false)
-    expect(hasSocialPostPermission('L5')).toBe(false)
-    expect(hasSocialPostPermission('')).toBe(false)
+  it('allows ordinary social posts for authenticated L2+ layers without granting creator-content authority', () => {
+    for (const layer of ['L2', 'L3', 'L4', 'L5', 'L6', 'L7', 'L8']) {
+      expect(hasSocialPostPermission(layer)).toBe(true)
+    }
+    for (const layer of ['L0', 'L1', 'L9', '']) {
+      expect(hasSocialPostPermission(layer)).toBe(false)
+    }
     expect(hasCreatorContentPermission('L2')).toBe(false)
     expect(hasCreatorContentPermission('L3')).toBe(true)
     expect(hasCreatorContentPermission('L4')).toBe(true)
+    expect(hasCreatorContentPermission('L5')).toBe(false)
+    expect(hasCreatorContentPermission('L7')).toBe(false)
+    expect(hasCreatorContentPermission('L8')).toBe(false)
   })
 
 
-  it('does not let an L2 post identity mutate or delete a canonical non-post item', async () => {
+  it('does not let social-only layers mutate or delete a canonical non-post item', async () => {
     const row = {
       id: 'content_article_guard_1',
       content_type: 'article',
@@ -384,31 +387,33 @@ describe('W03 content contract core', () => {
       batch: async () => { throw new Error('a denied mutation must not write') },
     } as never
 
-    await expect(
-      updateContent(
-        db,
-        'user_article_guard_1',
-        'content_article_guard_1',
-        { contentType: 'post', title: 'Spoofed type', bodyRef: 'https://cdn.example.com/body.txt', mediaRefs: [], coverRef: null },
-        'W/"1"',
-        'spoof-type-key',
-        new Date('2026-10-16T00:01:00.000Z'),
-        'test',
-        'L2',
-      ),
-    ).rejects.toMatchObject({ code: 'PERMISSION_DENIED', status: 403 })
+    for (const layer of ['L2', 'L5', 'L6', 'L7', 'L8']) {
+      await expect(
+        updateContent(
+          db,
+          'user_article_guard_1',
+          'content_article_guard_1',
+          { contentType: 'post', title: 'Spoofed type', bodyRef: 'https://cdn.example.com/body.txt', mediaRefs: [], coverRef: null },
+          'W/"1"',
+          'spoof-type-key-' + layer,
+          new Date('2026-10-16T00:01:00.000Z'),
+          'test',
+          layer,
+        ),
+      ).rejects.toMatchObject({ code: 'PERMISSION_DENIED', status: 403 })
 
-    await expect(
-      deleteContent(
-        db,
-        'user_article_guard_1',
-        'content_article_guard_1',
-        'W/"1"',
-        'delete-article-key',
-        new Date('2026-10-16T00:01:00.000Z'),
-        'L2',
-      ),
-    ).rejects.toMatchObject({ code: 'PERMISSION_DENIED', status: 403 })
+      await expect(
+        deleteContent(
+          db,
+          'user_article_guard_1',
+          'content_article_guard_1',
+          'W/"1"',
+          'delete-article-key-' + layer,
+          new Date('2026-10-16T00:01:00.000Z'),
+          layer,
+        ),
+      ).rejects.toMatchObject({ code: 'PERMISSION_DENIED', status: 403 })
+    }
   })
 
 
@@ -446,19 +451,21 @@ describe('W03 content contract core', () => {
       batch: async () => { throw new Error('preflight failures must happen before a state write') },
     } as never
 
-    await expect(
-      transitionContentState(
-        db,
-        'user_post_direct_1',
-        'L2',
-        'content_post_direct_1',
-        'PUBLISHED',
-        undefined,
-        'W/"1"',
-        'direct-post-idem',
-        new Date('2026-10-16T00:01:00.000Z'),
-      ),
-    ).rejects.toMatchObject({ code: 'VALIDATION_FAILED', status: 400 })
+    for (const layer of ['L2', 'L5', 'L6', 'L7', 'L8']) {
+      await expect(
+        transitionContentState(
+          db,
+          'user_post_direct_1',
+          layer,
+          'content_post_direct_1',
+          'PUBLISHED',
+          undefined,
+          'W/"1"',
+          'direct-post-idem-' + layer,
+          new Date('2026-10-16T00:01:00.000Z'),
+        ),
+      ).rejects.toMatchObject({ code: 'VALIDATION_FAILED', status: 400 })
+    }
   })
 
 
