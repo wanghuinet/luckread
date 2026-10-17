@@ -5,6 +5,8 @@ import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 import { fetchJson, getApiErrorMessage } from '../../../../lib/client-api.js'
+import { usePublicLocale } from '../../i18n/PublicLanguageToggle'
+import TwitterCloneSecondaryPageLayout from '../../../(twitter-clone)/TwitterCloneSecondaryPageLayout'
 import TwitterCloneProfileHeader from './TwitterCloneProfileHeader'
 import TwitterCloneProfileNav from './TwitterCloneProfileNav'
 import LuckReadSocialPostCard from '../../components/reuse/LuckReadSocialPostCard'
@@ -116,6 +118,7 @@ export default function PublicProfilePage({
   params: Promise<{ userId: string }>
 }) {
   const router = useRouter()
+  const locale = usePublicLocale()
   const [profile, setProfile] = useState<PublicProfile | null>(null)
   const [followers, setFollowers] = useState<number | null>(null)
   const [following, setFollowing] = useState<number | null>(null)
@@ -578,15 +581,27 @@ export default function PublicProfilePage({
   }
 
   if (loading) {
-    return <main className="creator-profile-state" aria-busy="true"><p role="status">正在加载作者资料…</p></main>
+    const loadingTitle = locale === 'en' ? 'Profile' : locale === 'tw' ? '個人主頁' : '个人主页'
+    return (
+      <TwitterCloneSecondaryPageLayout locale={locale} title={loadingTitle} active="profile">
+        <p className="px-4 py-5 text-sm text-light-secondary dark:text-dark-secondary" role="status" aria-busy="true">
+          {locale === 'en' ? 'Loading profile…' : locale === 'tw' ? '正在載入個人主頁…' : '正在加载个人主页…'}
+        </p>
+      </TwitterCloneSecondaryPageLayout>
+    )
   }
 
   if (error && !profile) {
+    const errorTitle = locale === 'en' ? 'Profile' : locale === 'tw' ? '個人主頁' : '个人主页'
     return (
-      <main className="creator-profile-state">
-        <p role="alert">{error}</p>
-        <Link href="/content">返回发现</Link>
-      </main>
+      <TwitterCloneSecondaryPageLayout locale={locale} title={errorTitle} active="profile">
+        <div className="flex flex-col items-start gap-3 px-4 py-8 text-sm" role="alert">
+          <p>{error}</p>
+          <Link className="rounded-full border border-light-border px-4 py-2 font-bold dark:border-dark-border" href="/content">
+            {locale === 'en' ? 'Explore content' : locale === 'tw' ? '探索內容' : '返回发现'}
+          </Link>
+        </div>
+      </TwitterCloneSecondaryPageLayout>
     )
   }
 
@@ -607,24 +622,8 @@ export default function PublicProfilePage({
   }
 
   return (
-    <div className="creator-profile-shell">
-      <aside className="creator-profile-sidebar" aria-label="主导航">
-        <Link className="creator-profile-brand" href="/" aria-label="LuckRead 首页">L</Link>
-        <nav>
-          <Link className="creator-profile-nav-link" href="/">首页</Link>
-          <Link className="creator-profile-nav-link" href="/content">发现</Link>
-          <Link className="creator-profile-nav-link" href="#works">作品</Link>
-          <Link className="creator-profile-nav-link" href="/me/profile">我的</Link>
-        </nav>
-      </aside>
-
-      <header className="creator-profile-mobile-header">
-        <Link className="creator-profile-mobile-icon" href="/content" aria-label="返回发现">←</Link>
-        <strong>{name}</strong>
-        <span aria-hidden="true" />
-      </header>
-
-      <main className="creator-profile-page">
+    <TwitterCloneSecondaryPageLayout locale={locale} title={name} active="profile">
+      <section className="creator-profile-page">
         <div className="creator-profile-toolbar">
           <Link href="/content">← 返回发现</Link>
         </div>
@@ -716,7 +715,11 @@ export default function PublicProfilePage({
           </div>
 
           <div className="creator-profile-actions">
-            {viewerUserId !== profile.id && !blocked && !blockedBy ? (
+            {viewerUserId === profile.id ? (
+              <Link className="creator-profile-button creator-profile-button-primary" href="/me/profile">
+                {locale === 'en' ? 'Edit profile' : locale === 'tw' ? '編輯個人資料' : '编辑资料'}
+              </Link>
+            ) : !blocked && !blockedBy ? (
               <button
                 className="creator-profile-button creator-profile-button-primary"
                 disabled={followBusy}
@@ -726,13 +729,15 @@ export default function PublicProfilePage({
                 {followBusy ? '处理中…' : isFollowing ? '已关注' : '关注'}
               </button>
             ) : null}
-            <button
-              className="creator-profile-button"
-              type="button"
-              onClick={() => setSafetyMessage('订阅入口将在会员功能接通后启用。')}
-            >
-              订阅
-            </button>
+            {viewerUserId !== profile.id ? (
+              <button
+                className="creator-profile-button"
+                type="button"
+                onClick={() => setSafetyMessage('订阅入口将在会员功能接通后启用。')}
+              >
+                订阅
+              </button>
+            ) : null}
             {mutualFollow ? <span className="creator-profile-badge">互相关注</span> : null}
           </div>
             </>
@@ -832,10 +837,10 @@ export default function PublicProfilePage({
             </div>
           ) : null}
         </section>
-      </main>
+      </section>
 
-      {error ? <p className="creator-profile-global-message" role="status">{error}</p> : null}
-    </div>
+      {error ? <p className="px-4 py-3 text-sm text-light-secondary dark:text-dark-secondary" role="status">{error}</p> : null}
+    </TwitterCloneSecondaryPageLayout>
   )
 }
 
