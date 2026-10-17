@@ -29,7 +29,7 @@ describe('public content type filter', () => {
     expect(page).toContain("selectedType: ContentType | 'all',")
     expect(page).toContain('fallbackError: string,')
     expect(page).toContain('const contentLoadError = copy.content.error')
-    expect(page).toContain('}, [contentLoadError])')
+    expect(page).toContain('}, [])')
     expect(page).toContain('}, [contentLoadError, contentType, load])')
     expect(route).toContain('validateContentListQuery')
   })
