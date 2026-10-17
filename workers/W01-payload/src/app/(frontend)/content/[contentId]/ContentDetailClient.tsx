@@ -40,6 +40,7 @@ export default function ContentDetailPage({
   showLanguageToggle?: boolean
 }) {
   const locale = usePublicLocale()
+  const Root = showLanguageToggle ? 'main' : 'section'
   const copy = getPublicCopy(locale)
   const dateLocale = locale === 'en' ? 'en-US' : locale === 'tw' ? 'zh-TW' : 'zh-CN'
   const typeLabels: Record<ContentType, string> = {
@@ -190,18 +191,18 @@ export default function ContentDetailPage({
   }, [initialContent, params, retryKey])
 
   if (loading) {
-    return <main aria-busy={loading} className="content-detail"><p className="content-detail-state" role="status">{copy.detail.loading}</p></main>
+    return <Root aria-busy={loading} className="content-detail"><p className="content-detail-state" role="status">{copy.detail.loading}</p></Root>
   }
 
   if (error || !content) {
     return (
-      <main className="content-detail">
+      <Root className="content-detail">
         <div className="content-detail-state">
           <p>{error || copy.detail.notFound}</p>
           <button className="content-detail-retry" onClick={() => { setError(''); setLoading(true); setContent(null); setBody(''); setRetryKey((value) => value + 1) }} type="button">{copy.detail.retry}</button>
           <Link href="/">{copy.common.backHome}</Link>
         </div>
-      </main>
+      </Root>
     )
   }
 
@@ -416,7 +417,7 @@ export default function ContentDetailPage({
   }
 
   return (
-    <main className="content-detail">
+    <Root className="content-detail">
       <div className="content-detail-top">
         <div className="content-detail-breadcrumbs">
           <Link href="/content">{copy.detail.backDiscover}</Link>
@@ -542,6 +543,6 @@ export default function ContentDetailPage({
         interactionRestricted={interactionRestricted}
         locale={locale}
       />
-    </main>
+    </Root>
   )
 }
