@@ -46,7 +46,7 @@ describe('Twitter Clone UI reuse through LuckRead API adapters', () => {
 
   it('uses the reusable social post card in both homepage and discovery for dynamic content', () => {
     const homeFeed = read('src/app/(frontend)/HomeContentFeed.tsx')
-    const contentBrowse = read('src/app/(frontend)/content/page.tsx')
+    const contentBrowse = read('src/app/(frontend)/content/ContentBrowsePage.tsx')
 
     for (const page of [homeFeed, contentBrowse]) {
       expect(page).toContain("import LuckReadSocialPostCard from")
