@@ -20,20 +20,23 @@ describe('Twitter-clone homepage reuse', () => {
     expect(layout).toContain("import '../../styles/twitter-clone-globals.scss'")
   })
 
-  it('keeps the clone feed, compose entry, profile, and discovery routes connected', async () => {
-    const home = await readFile('src/app/(twitter-clone)/home/page.tsx', 'utf8')
+  it('keeps the clone feed and compose entry connected through the shared X-style shell', async () => {
+    const [home, shell] = await Promise.all([
+      readFile('src/app/(twitter-clone)/home/page.tsx', 'utf8'),
+      readFile('src/app/(twitter-clone)/TwitterCloneSecondaryPageLayout.tsx', 'utf8'),
+    ])
     expect(home).toContain('<TwitterCloneHomeFeed key={feedMode} initialPage={initialPage} locale={locale} feedMode={feedMode} />')
-    expect(home).toContain("import TwitterClonePostComposerModal, { TwitterClonePostComposerTrigger } from '../TwitterClonePostComposerModal'")
-    expect(home).toContain('<TwitterClonePostComposerModal />')
+    expect(home).toContain('<TwitterCloneSecondaryPageLayout locale={locale} title={copy.home.home} active="home">')
     expect(home).toContain('<TwitterClonePostComposerTrigger')
     expect(home).not.toContain('href="/publish?type=post"')
-    expect(home).toContain('href="/me/profile"')
-    expect(home).toContain('TwitterCloneSidebarProfile locale={locale}')
+    expect(shell).toContain('<TwitterClonePostComposerModal />')
+    expect(shell).toContain('TwitterCloneSidebarProfile locale={locale}')
+    expect(shell).toContain("href: '/me/profile'")
+    expect(shell).toContain('href="/me/subscriptions"')
+    expect(shell).toContain('href="/shorts"')
     const sidebarProfile = await readFile('src/app/(twitter-clone)/TwitterCloneSidebarProfile.tsx', 'utf8')
     expect(sidebarProfile).toContain("'/api/v1/users/me'")
     expect(sidebarProfile).toContain("credentials: 'include'")
     expect(sidebarProfile).not.toContain('firebase/')
-    expect(home).toContain('href="/me/subscriptions"')
-    expect(home).toContain('href="/shorts"')
   })
 })
