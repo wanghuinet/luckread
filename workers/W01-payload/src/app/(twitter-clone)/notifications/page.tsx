@@ -145,7 +145,13 @@ export default function NotificationsPage() {
   }, [labels.loadError])
 
   useEffect(() => {
-    void loadPage(null, false)
+    let cancelled = false
+    void Promise.resolve().then(() => {
+      if (!cancelled) void loadPage(null, false)
+    })
+    return () => {
+      cancelled = true
+    }
   }, [loadPage])
 
   const signInHref = '/login?returnTo=' + encodeURIComponent('/notifications')
