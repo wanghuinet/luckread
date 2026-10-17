@@ -67,8 +67,10 @@ describe('frontend session management', () => {
   })
 
   it('links the profile security entry to the session management page', () => {
-    const profile = read('src/app/(frontend)/me/profile/page.tsx')
-    expect(profile).toContain('<Link href="/me/sessions">登录设备</Link>')
-    expect(profile).toContain('<Link href="/me/subscriptions">我的订阅</Link>')
+    const profile = read('src/app/(twitter-clone)/me/profile/page.tsx')
+    expect(profile).toContain('href="/me/sessions"')
+    expect(profile).toContain('Devices & sessions')
+    expect(profile).toContain('href="/me/subscriptions"')
+    expect(profile).toContain('Subscriptions')
   })
 })

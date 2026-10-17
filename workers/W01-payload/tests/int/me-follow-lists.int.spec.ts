@@ -43,7 +43,7 @@ describe('personal social relationship pages', () => {
   })
 
   it('links the personal relationship pages from the account profile', () => {
-    const profile = read('src/app/(frontend)/me/profile/page.tsx')
+    const profile = read('src/app/(twitter-clone)/me/profile/page.tsx')
 
     expect(profile).toContain('href="/me/followers"')
     expect(profile).toContain('href="/me/following"')

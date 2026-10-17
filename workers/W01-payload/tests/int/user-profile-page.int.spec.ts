@@ -6,7 +6,7 @@ const read = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8'
 
 describe('user profile page', () => {
   it('uses the canonical versioned self-profile API and optimistic concurrency', () => {
-    const page = read('src/app/(frontend)/me/profile/page.tsx')
+    const page = read('src/app/(twitter-clone)/me/profile/page.tsx')
     expect(page).toContain("fetchJson<Profile & { error?: { message?: string } }>('/api/v1/users/me'")
     expect(page).toContain("method: 'PATCH'")
     expect(page).toContain("'If-Match': etag")
@@ -30,7 +30,7 @@ describe('user profile page', () => {
   })
 
   it('uses the existing authenticated logout API and returns to the public homepage', () => {
-    const page = read('src/app/(frontend)/me/profile/page.tsx')
+    const page = read('src/app/(twitter-clone)/me/profile/page.tsx')
 
     expect(page).toContain("fetchJson('/api/v1/auth/logout'")
     expect(page).toContain("method: 'POST'")
@@ -43,7 +43,7 @@ describe('user profile page', () => {
   })
 
   it('uploads avatars through the existing authenticated media API and waits for profile save', () => {
-    const page = read('src/app/(frontend)/me/profile/page.tsx')
+    const page = read('src/app/(twitter-clone)/me/profile/page.tsx')
 
     expect(page).toContain("fetchJson<{ doc?: { url?: string }; url?: string; error?: { message?: string } }>('/api/v1/media'")
     expect(page).toContain("method: 'POST'")
