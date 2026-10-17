@@ -67,6 +67,12 @@ describe('LuckRead H5 blue design system', () => {
     expect(sessionsPage).toContain("'/api/v1/auth/sessions/'")
     expect(sessionsPage).toContain('session-revoke-')
     expect(sessionsPage).not.toContain('style={{')
+    const creatorApplication = read('src/app/(frontend)/creator-application/CreatorApplicationClient.tsx')
+    expect(creatorApplication).toContain('TwitterCloneSecondaryPageLayout')
+    expect(creatorApplication).toContain('showLanguageToggle={false}')
+    expect(creatorApplication).toContain("'/api/v1/creator-applications'")
+    expect(creatorApplication).toContain("'creator-apply:'")
+    expect(creatorApplication).not.toContain('styles.header')
   })
 
   it('does not introduce another frontend page directory for the blue redesign', () => {
