@@ -37,6 +37,7 @@ describe('Twitter-clone homepage reuse', () => {
     const sidebarProfile = await readFile('src/app/(twitter-clone)/TwitterCloneSidebarProfile.tsx', 'utf8')
     expect(sidebarProfile).toContain("'/api/v1/users/me'")
     expect(sidebarProfile).toContain("credentials: 'include'")
+    expect(sidebarProfile).toContain("profile?.username ? '/' + encodeURIComponent(profile.username) : '/me/profile'")
     expect(sidebarProfile).not.toContain('firebase/')
   })
 })
