@@ -58,6 +58,10 @@ type ContentResponse = {
   coverRef?: string | null
 }
 
+type PollOptionView = { optionId: string; text: string; position: number; votes: number }
+type DraftPoll = { options: PollOptionView[]; durationHours: 24 | 72 | 168 }
+type PollApiResponse = { data?: { poll?: { options?: PollOptionView[]; durationHours?: number } | null }; error?: { message?: string } }
+
 const CONTENT_MUTATED_EVENT = 'luckread:content-mutated'
 
 async function authorizedFetch<T = unknown>(
@@ -131,6 +135,9 @@ export default function PublishComposer({
   const [savedArticleSerialized, setSavedArticleSerialized] = useState('')
   const [assets, setAssets] = useState<UploadedAsset[]>([])
   const [coverRef, setCoverRef] = useState('')
+  const [pollEnabled, setPollEnabled] = useState(false)
+  const [pollOptions, setPollOptions] = useState<string[]>(['', ''])
+  const [pollDurationHours, setPollDurationHours] = useState<24 | 72 | 168>(24)
   const [videoMetadataByAssetId, setVideoMetadataByAssetId] = useState<Record<string, VideoMetadata>>({})
   const [draft, setDraft] = useState<ContentResponse | null>(null)
   const [savedBody, setSavedBody] = useState('')
