@@ -10,8 +10,8 @@ describe('X-style notifications page', () => {
   const home = read('src/app/(twitter-clone)/home/page.tsx')
 
   it('is reachable from the homepage sidebar and uses the shared X-style page shell', () => {
-    expect(home).toContain('href="/notifications"')
-    expect(home).toContain("<NavIcon name=\"bell\" />")
+    expect(home).toContain('<TwitterCloneSecondaryPageLayout locale={locale} title={copy.home.home} active="home">')
+    expect(shell).toContain("{ key: 'notifications', href: '/notifications', icon: 'bell' }")
     expect(page).toContain('TwitterCloneSecondaryPageLayout')
     expect(page).toContain('active="notifications"')
     expect(shell).toContain("href: '/notifications'")
