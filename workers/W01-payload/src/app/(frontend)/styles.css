@@ -837,52 +837,106 @@ a { color: inherit; }
 }
 
 
-/* Public frontend language switch. Locale is UI state; routes and content IDs stay unchanged. */
-.public-language-switch {
+/* UI-only globe menu. Language selection is local to the open menu until full i18n is implemented. */
+.locale-globe-selector {
+  position: relative;
+  z-index: 30;
   display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  min-height: 34px;
-  padding: 2px;
-  border: 1px solid #e4e7ec;
-  border-radius: 999px;
-  background: #f8fafc;
+  flex: 0 0 auto;
 }
 
-.public-language-button {
-  min-width: 42px;
-  min-height: 28px;
-  padding: 0 9px;
-  border: 0;
+.locale-globe-trigger {
+  display: inline-flex;
+  width: 40px;
+  height: 40px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid #d0d5dd;
   border-radius: 999px;
   background: transparent;
-  color: #667085;
-  font: inherit;
-  font-size: 11px;
-  font-weight: 700;
-  line-height: 1;
+  color: inherit;
   cursor: pointer;
-  transition: background-color 160ms ease, color 160ms ease, box-shadow 160ms ease;
+  transition: background-color 160ms ease, border-color 160ms ease;
 }
 
-.public-language-button:hover {
-  color: #1d2939;
+.locale-globe-trigger:hover {
+  background: rgba(127, 127, 127, .10);
+  border-color: #98a2b3;
 }
 
-.public-language-button.active {
-  color: #101828;
-  background: #fff;
-  box-shadow: 0 1px 4px rgba(16, 24, 40, .09);
-}
-
-.public-language-button:focus-visible {
+.locale-globe-trigger:focus-visible {
   outline: 2px solid #475467;
   outline-offset: 2px;
 }
 
-.public-language-button:disabled {
-  cursor: wait;
-  opacity: .65;
+.locale-globe-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 1000;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  box-sizing: border-box;
+  width: min(320px, calc(100vw - 24px));
+  max-height: min(360px, calc(100vh - 96px));
+  overflow-y: auto;
+  padding: 8px;
+  border: 1px solid #e4e7ec;
+  border-radius: 14px;
+  background: #fff;
+  color: #101828;
+  box-shadow: 0 12px 32px rgba(16, 24, 40, .16);
+}
+
+.locale-globe-option {
+  min-width: 0;
+  min-height: 34px;
+  padding: 7px 9px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #344054;
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.3;
+  text-align: left;
+  cursor: pointer;
+}
+
+.locale-globe-option:hover,
+.locale-globe-option:focus-visible {
+  outline: none;
+  background: #f2f4f7;
+  color: #101828;
+}
+
+.locale-globe-option.is-selected {
+  background: #eef4ff;
+  color: #1849a9;
+  font-weight: 700;
+}
+
+.dark .locale-globe-menu {
+  border-color: #38444d;
+  background: #15202b;
+  color: #e7e9ea;
+}
+
+.dark .locale-globe-option {
+  color: #e7e9ea;
+}
+
+.dark .locale-globe-option:hover,
+.dark .locale-globe-option:focus-visible {
+  background: #253341;
+  color: #fff;
+}
+
+.dark .locale-globe-option.is-selected {
+  background: #1d3b60;
+  color: #c6e2ff;
 }
 
 .content-detail-language {
@@ -892,11 +946,19 @@ a { color: inherit; }
 }
 
 @media (max-width: 760px) {
-  .public-language-switch { min-height: 32px; }
-  .public-language-button { min-width: 36px; padding-inline: 7px; font-size: 10px; }
-  .content-detail-language { margin-bottom: 6px; }
-}
+  .locale-globe-trigger {
+    width: 36px;
+    height: 36px;
+  }
 
+  .locale-globe-menu {
+    max-height: min(320px, calc(100vh - 80px));
+  }
+
+  .content-detail-language {
+    margin-bottom: 6px;
+  }
+}
 
 /* --------------------------------------------------------------------------
  * LuckRead Blue H5 design system
