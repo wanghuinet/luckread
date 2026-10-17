@@ -87,6 +87,18 @@ describe('unified W05 social closure adapters', () => {
     expect(migration).toContain('UNIQUE (poll_id, user_id)')
   })
 
+  it('preserves containing-content IDs for reply, comment-like, and comment-mention notifications', () => {
+    const worker = read('../../workers/W05-social/src/index.ts')
+    const runtime = read('../../workers/W05-social/src/social-closure-runtime.ts')
+    const notifications = read('src/app/(twitter-clone)/notifications/page.tsx')
+
+    expect(worker).toContain("payload: { contentId: commentContentId }")
+    expect(worker).toContain('SELECT content_id FROM social_comments WHERE id = ? LIMIT 1')
+    expect(runtime).toContain('...(relatedContentId ? { contentId: relatedContentId } : {})')
+    expect(notifications).toContain("item.targetType === 'comment'")
+    expect(notifications).toContain('item.payload?.contentId')
+  })
+
   it('supports persisted topics and mentions in W05', () => {
     const runtime = read('../../workers/W05-social/src/social-closure-runtime.ts')
     const migration = read('../../workers/W05-social/migrations/20261008_011_social_closure_v1.sql')
