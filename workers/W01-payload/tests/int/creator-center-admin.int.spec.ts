@@ -904,7 +904,7 @@ describe('Creator Center admin extension', () => {
   it('organizes the creator center around creator-first workflows', () => {
     const view = read('src/app/(frontend)/creator-center/CreatorStudio.tsx')
     const assistant = read('src/app/(payload)/v1beta/CreatorCenterAssistant.tsx')
-    const styles = read('src/app/(frontend)/styles.css')
+    const styles = read('src/app/(payload)/v1beta/creator-center.module.css')
     const moderation = read('src/app/(payload)/v1beta/CreatorModerationQueue.tsx')
 
 
