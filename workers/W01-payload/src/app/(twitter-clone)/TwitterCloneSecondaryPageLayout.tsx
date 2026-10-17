@@ -15,6 +15,7 @@ type Props = {
   title: string
   active: PageNavKey | 'subscriptions' | 'editProfile'
   children: ReactNode
+  showLanguageToggle?: boolean
 }
 
 const labels = (locale: PublicLocale) => ({
@@ -52,7 +53,7 @@ function SidebarIcon({ name }: { name: 'home' | 'search' | 'trending' | 'users' 
   return <svg aria-hidden="true" className="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8"><path d={paths[name]} /></svg>
 }
 
-export default function TwitterCloneSecondaryPageLayout({ locale, title, active, children }: Props) {
+export default function TwitterCloneSecondaryPageLayout({ locale, title, active, children, showLanguageToggle = true }: Props) {
   const copy = labels(locale)
   const links: Array<{ key: PageNavKey; href: string; icon: Parameters<typeof SidebarIcon>[0]['name'] }> = [
     { key: 'home', href: '/home', icon: 'home' },
@@ -91,7 +92,7 @@ export default function TwitterCloneSecondaryPageLayout({ locale, title, active,
         <main className="hover-animation flex min-h-screen w-full max-w-xl flex-col border-x border-light-border pb-32 dark:border-dark-border xs:pb-96">
           <header className="sticky top-0 z-10 flex items-center justify-between gap-6 bg-main-background/60 px-4 py-3 backdrop-blur-md">
             <h1 className="text-xl font-bold">{title}</h1>
-            <PublicLanguageToggle locale={locale} />
+            {showLanguageToggle ? <PublicLanguageToggle locale={locale} /> : null}
           </header>
           {children}
         </main>
