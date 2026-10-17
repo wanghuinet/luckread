@@ -37,6 +37,19 @@ describe('Creator Center admin extension', () => {
     expect(publisher).toContain("const isTweetModal = presentation === 'tweet-modal'")
   })
 
+  it('publishes social posts through the direct-publish preflight path', () => {
+    const publisher = read('src/app/(frontend)/publish/PublishComposer.tsx')
+    const runPreflight = publisher.split('async function runPreflight()')[1]?.split('\\n\\n  async function saveDraft()')[0] ?? ''
+    expect(runPreflight).toContain("if (type === 'post') {")
+    expect(runPreflight).toContain('return { report: null, input, draft: savedDraft }')
+    expect(runPreflight.indexOf("if (type === 'post') {")).toBeLessThan(runPreflight.indexOf('const preflightBasePath ='))
+
+    const submit = publisher.split('async function submitForReview()')[1]?.split('\\n\\n  return (')[0] ?? ''
+    expect(submit).toContain("if (type !== 'post') {")
+    expect(submit).toContain("to: type === 'post' ? 'PUBLISHED' : 'PENDING_REVIEW'")
+    expect(publisher).toContain("{type !== 'post' ? (")
+  })
+
   it('uses a single body field for social posts and derives their feed title', () => {
     const publisher = read('src/app/(frontend)/publish/PublishComposer.tsx')
     expect(publisher).toContain("type === 'post' ? body.trim().slice(0, 500) : title.trim()")
