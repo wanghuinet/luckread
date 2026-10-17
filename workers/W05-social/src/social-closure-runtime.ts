@@ -122,6 +122,12 @@ export async function syncSocialTokens(
   if (text.length > MAX_TEXT) throw new SocialClosureRuntimeError('VALIDATION_FAILED', 400)
 
   await assertTargetPublished(db, targetValue, actorUserId)
+  const relatedContent = targetValue.targetType === 'comment'
+    ? await db.prepare(
+        "SELECT content_id FROM social_comments WHERE id = ? AND state = 'PUBLISHED' LIMIT 1",
+      ).bind(targetValue.targetId).first<{ content_id: string }>()
+    : null
+  const relatedContentId = relatedContent?.content_id ?? null
   const tokens = extractSocialTokens(text)
   const now = new Date().toISOString()
 
@@ -178,7 +184,10 @@ export async function syncSocialTokens(
       type: 'MENTION',
       targetType: targetValue.targetType,
       targetId: targetValue.targetId,
-      payload: { handle: entry.handle },
+      payload: {
+        handle: entry.handle,
+        ...(relatedContentId ? { contentId: relatedContentId } : {}),
+      },
     })
     mentionCount += 1
   }
