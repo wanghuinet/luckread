@@ -1,0 +1,156 @@
+/// <reference types="@cloudflare/workers-types" />
+import { describe, expect, it, vi } from 'vitest'
+import { castContentPollVote, configureContentPoll, getContentPoll, SocialPollError } from './poll-runtime.js'
+
+const noDatabase = () => ({
+  prepare: vi.fn(() => { throw new Error('unexpected database access') }),
+  batch: vi.fn(async () => []),
+}) as unknown as D1Database
+
+type PollDbScenario = {
+  content?: { id: string; content_type: string; state: string; owner_user_id: string; updated_at: string }
+  poll?: { poll_id: string; content_id: string; owner_user_id: string; duration_hours: number; ends_at: string | null; created_at: string; updated_at: string }
+  options?: Array<{ option_id: string; option_text: string; position: number; votes: number }>
+  viewerOptionId?: string | null
+  voteCreatedAt?: string
+}
+
+const pollDb = (scenario: PollDbScenario) => {
+  const current = {
+    ...scenario,
+    options: [...(scenario.options ?? [])],
+    viewerOptionId: scenario.viewerOptionId ?? null,
+    voteCreatedAt: scenario.voteCreatedAt ?? '2026-10-17T05:00:00.000Z',
+  }
+  const prepare = vi.fn((sql: string) => ({
+    bind: (...args: unknown[]) => ({
+      first: async () => {
+        if (sql.includes('FROM contents WHERE id = ?')) return current.content ?? null
+        if (sql.includes('FROM social_user_interactions')) return null
+        if (sql.includes('FROM social_polls') && sql.includes('WHERE content_id = ?')) return current.poll ?? null
+        if (sql.includes('FROM social_polls p JOIN contents')) return current.poll ?? null
+        if (sql.includes('FROM social_poll_votes WHERE poll_id = ? AND user_id = ?')) {
+          return current.viewerOptionId ? { option_id: current.viewerOptionId, created_at: current.voteCreatedAt } : null
+        }
+        if (sql.includes('COUNT(*) AS count FROM social_poll_votes')) return { count: current.viewerOptionId ? 1 : 0 }
+        return null
+      },
+      all: async () => {
+        if (sql.includes('SELECT o.option_id, o.option_text')) {
+          return { results: current.options.map(option => ({ ...option, votes: option.votes + (option.optionId === current.viewerOptionId ? 1 : 0) })) }
+        }
+        if (sql.includes('SELECT option_text FROM social_poll_options')) {
+          return { results: current.options.map(option => ({ option_text: option.option_text })) }
+        }
+        return { results: [] }
+      },
+      run: async () => {
+        if (sql.includes('UPDATE social_polls SET ends_at') && current.poll && current.poll.ends_at === null) {
+          current.poll.ends_at = String(args[0])
+        }
+        if (sql.includes('INSERT OR IGNORE INTO social_poll_votes') && current.poll) {
+          current.viewerOptionId = String(args[3])
+          const index = current.options.findIndex(option => option.option_id === current.viewerOptionId)
+          if (index >= 0) current.options[index].votes += 1
+        }
+        return { success: true, meta: { changes: 1 } }
+      },
+    }),
+  }))
+  const batch = vi.fn(async () => [{ success: true, meta: { changes: 1 } }])
+  return { db: { prepare, batch } as unknown as D1Database, prepare, batch }
+}
+
+describe('W05 poll runtime', () => {
+  it('rejects duplicated or too-short options before touching D1', async () => {
+    const db = noDatabase()
+    await expect(configureContentPoll(db, 'author-1', 'content-1', ['同一', ' 同一 '], 24))
+      .rejects.toMatchObject({ code: 'VALIDATION_FAILED', status: 400 })
+    await expect(configureContentPoll(db, 'author-1', 'content-1', ['只有一项'], 24))
+      .rejects.toMatchObject({ code: 'VALIDATION_FAILED', status: 400 })
+    expect((db as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).not.toHaveBeenCalled()
+  })
+
+  it('returns public poll results and the current viewer vote', async () => {
+    const { db } = pollDb({
+      content: {
+        id: 'content-1', content_type: 'post', state: 'PUBLISHED',
+        owner_user_id: 'author-1', updated_at: '2026-10-17T04:00:00.000Z',
+      },
+      poll: {
+        poll_id: 'poll-1', content_id: 'content-1', owner_user_id: 'author-1',
+        duration_hours: 24, ends_at: '2026-10-18T04:00:00.000Z',
+        created_at: '2026-10-17T04:00:00.000Z', updated_at: '2026-10-17T04:00:00.000Z',
+      },
+      options: [
+        { option_id: 'option-1', option_text: '选项一', position: 0, votes: 3 },
+        { option_id: 'option-2', option_text: '选项二', position: 1, votes: 2 },
+      ],
+      viewerOptionId: 'option-2',
+    })
+    await expect(getContentPoll(db, 'content-1', 'viewer-1')).resolves.toMatchObject({
+      pollId: 'poll-1',
+      contentId: 'content-1',
+      totalVotes: 6,
+      viewerOptionId: 'option-2',
+      closed: false,
+      options: [
+        { optionId: 'option-1', text: '选项一', votes: 3 },
+        { optionId: 'option-2', text: '选项二', votes: 3 },
+      ],
+    })
+  })
+
+  it('starts the vote window from the published post time when first read', async () => {
+    const { db } = pollDb({
+      content: {
+        id: 'content-1', content_type: 'post', state: 'PUBLISHED',
+        owner_user_id: 'author-1', updated_at: '2026-10-17T04:00:00.000Z',
+      },
+      poll: {
+        poll_id: 'poll-1', content_id: 'content-1', owner_user_id: 'author-1',
+        duration_hours: 24, ends_at: null,
+        created_at: '2026-10-16T04:00:00.000Z', updated_at: '2026-10-16T04:00:00.000Z',
+      },
+      options: [
+        { option_id: 'option-1', option_text: 'Yes', position: 0, votes: 0 },
+        { option_id: 'option-2', option_text: 'No', position: 1, votes: 0 },
+      ],
+    })
+    await expect(getContentPoll(db, 'content-1', null)).resolves.toMatchObject({
+      endsAt: '2026-10-18T04:00:00.000Z',
+      totalVotes: 0,
+    })
+  })
+
+  it('does not allow a visitor to configure someone else’s poll', async () => {
+    const { db } = pollDb({
+      content: {
+        id: 'content-1', content_type: 'post', state: 'DRAFT',
+        owner_user_id: 'author-1', updated_at: '2026-10-17T04:00:00.000Z',
+      },
+    })
+    await expect(configureContentPoll(db, 'attacker-1', 'content-1', ['Yes', 'No'], 24))
+      .rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 })
+  })
+
+  it('prevents voting on a closed poll', async () => {
+    const { db } = pollDb({
+      content: {
+        id: 'content-1', content_type: 'post', state: 'PUBLISHED',
+        owner_user_id: 'author-1', updated_at: '2026-10-15T04:00:00.000Z',
+      },
+      poll: {
+        poll_id: 'poll-1', content_id: 'content-1', owner_user_id: 'author-1',
+        duration_hours: 24, ends_at: '2026-10-16T04:00:00.000Z',
+        created_at: '2026-10-15T04:00:00.000Z', updated_at: '2026-10-15T04:00:00.000Z',
+      },
+      options: [
+        { option_id: 'option-1', option_text: 'Yes', position: 0, votes: 0 },
+        { option_id: 'option-2', option_text: 'No', position: 1, votes: 0 },
+      ],
+    })
+    await expect(castContentPollVote(db, 'viewer-1', 'content-1', 'option-1'))
+      .rejects.toMatchObject({ code: 'POLL_CLOSED', status: 409 })
+  })
+})
