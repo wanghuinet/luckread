@@ -36,6 +36,12 @@ describe('X-style notifications page', () => {
     expect(page).toContain('setUnreadCount(0)')
   })
 
+  it('links comment-target notifications back to their containing published content', () => {
+    expect(page).toContain("item.targetType === 'comment'")
+    expect(page).toContain("typeof item.payload?.contentId === 'string'")
+    expect(page).toContain("'/content/' + encodeURIComponent(contentTargetId)")
+  })
+
   it('keeps notification UI on LuckRead auth and API boundaries without upstream backend code or bespoke CSS', () => {
     expect(page).not.toContain('firebase/')
     expect(page).not.toContain('tweetsCollection')

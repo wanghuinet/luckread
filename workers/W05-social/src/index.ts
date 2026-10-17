@@ -665,6 +665,7 @@ export default {
               type: 'REPLY',
               targetType: 'comment',
               targetId: comment.id,
+              payload: { contentId: commentContentId },
             })
           }
         } else if (contentOwner?.owner_user_id) {
@@ -767,6 +768,11 @@ export default {
         if (request.method === 'POST') {
           const result = await like(env.DB, viewerUserId, target)
           const recipientUserId = await getInteractionRecipient(env.DB, target.targetType, target.targetId)
+          const relatedContent = target.targetType === 'comment'
+            ? await env.DB.prepare(
+                'SELECT content_id FROM social_comments WHERE id = ? LIMIT 1',
+              ).bind(target.targetId).first<{ content_id: string }>()
+            : null
           if (recipientUserId) {
             await enqueueNotification(env.DB, {
               recipientUserId,
@@ -774,6 +780,7 @@ export default {
               type: 'LIKE',
               targetType: target.targetType as 'content' | 'comment',
               targetId: target.targetId,
+              payload: relatedContent?.content_id ? { contentId: relatedContent.content_id } : undefined,
             })
           }
           return json({ data: result, requestId: createRequestId() }, 200)
