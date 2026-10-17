@@ -1419,7 +1419,6 @@
 
 /* Minimal X-style dark post composer. These rules are scoped to the social modal. */
 .lr-post-modal-shell {
-  background: #000 !important;
   color: #e7e9ea;
 }
 .lr-post-modal-shell [role="dialog"] {
