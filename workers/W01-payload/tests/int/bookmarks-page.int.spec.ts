@@ -7,8 +7,8 @@ const read = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8'
 describe('bookmarks page on the reused LuckRead content UI', () => {
   const page = read('src/app/(frontend)/bookmarks/BookmarksPage.tsx')
   const postCard = read('src/app/(frontend)/components/reuse/LuckReadSocialPostCard.tsx')
-  const contentBrowse = read('src/app/(frontend)/content/page.tsx')
   const shell = read('src/app/(twitter-clone)/TwitterCloneSecondaryPageLayout.tsx')
+  const route = read('src/app/(twitter-clone)/bookmarks/page.tsx')
 
   it('loads private, cursor-paginated bookmarks through the canonical W01 endpoint', () => {
     expect(page).toContain("'/api/v1/interactions/bookmarks?'")
@@ -34,8 +34,8 @@ describe('bookmarks page on the reused LuckRead content UI', () => {
     expect(page).toContain('presentation="x-timeline"')
     expect(page).toContain('href={href}')
     expect(page).toContain("import TwitterCloneSecondaryPageLayout from '../../(twitter-clone)/TwitterCloneSecondaryPageLayout'")
-    expect(contentBrowse).toContain('<Link className="button button-quiet" data-umami-event="bookmarks-open" href="/bookmarks">')
     expect(shell).toContain("data-umami-event={item.key === 'bookmarks' ? 'bookmarks-open' : undefined}")
+    expect(route).toContain("import BookmarksPage from '../../(frontend)/bookmarks/BookmarksPage'")
   })
 
   it('removes saved items through the idempotent bookmark API and updates the visible list', () => {
