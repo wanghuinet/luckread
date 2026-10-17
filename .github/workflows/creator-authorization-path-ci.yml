@@ -12,6 +12,7 @@ on:
       - 'workers/W01-payload/src/app/(frontend)/creator-center/page.tsx'
       - 'workers/W01-payload/src/app/(frontend)/creator-center/CreatorStudio.tsx'
       - 'workers/W01-payload/src/app/(frontend)/me/profile/page.tsx'
+      - 'workers/W01-payload/src/app/(twitter-clone)/me/profile/page.tsx'
       - 'workers/W01-payload/tests/int/creator-application-page.int.spec.ts'
       - 'workers/W01-payload/playwright.production.config.ts'
       - 'workers/W01-payload/tests/live/**'
