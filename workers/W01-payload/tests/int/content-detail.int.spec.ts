@@ -156,11 +156,13 @@ it('keeps arbitrary cookies from bypassing the public content cache', () => {
 
 
 it('uses a server-side canonical metadata wrapper for public content', () => {
-  const page = read('src/app/(frontend)/content/[contentId]/page.tsx')
+  const page = read('src/app/(twitter-clone)/content/[contentId]/page.tsx')
   expect(page).toContain('generateMetadata')
   expect(page).toContain('alternates:')
   expect(page).toContain('cachedPublicGet')
   expect(page).toContain('permanentRedirect')
+  expect(page).toContain('<TwitterCloneSecondaryPageLayout locale={locale} title={pageTitle} active="explore">')
+  expect(page).toContain('showLanguageToggle={false}')
   expect(page).toContain("PUBLIC_ORIGIN = 'https://luckread.com'")
 })
 

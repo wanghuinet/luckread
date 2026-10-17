@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { headers } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 import { notFound, permanentRedirect } from 'next/navigation'
 import { cache } from 'react'
 
@@ -7,7 +7,9 @@ import { enforcePublicReadRateLimit } from '../../../../auth/traffic-limit.js'
 import { callW03Content, W03ContentClientError } from '../../../../content/w03-content-client.js'
 import { cachedPublicGet } from '../../../../lib/public-response-cache.js'
 
-import ContentDetailClient from './ContentDetailClient'
+import ContentDetailClient from '../../../(frontend)/content/[contentId]/ContentDetailClient'
+import { normalizePublicLocale, type PublicLocale } from '../../../(frontend)/i18n/public-locale'
+import TwitterCloneSecondaryPageLayout from '../../TwitterCloneSecondaryPageLayout'
 
 type ContentType = 'article' | 'post' | 'video'
 
@@ -113,10 +115,20 @@ export default async function ContentDetailPage({
     permanentRedirect('/content/' + encodeURIComponent(content.slug))
   }
 
+  const locale = normalizePublicLocale((await cookies()).get('luckread-ui-locale')?.value)
+  const pageTitle = content.contentType === 'article'
+    ? (locale === 'en' ? 'Article' : locale === 'tw' ? '文章' : '文章')
+    : content.contentType === 'video'
+      ? (locale === 'en' ? 'Video' : locale === 'tw' ? '影片' : '视频')
+      : (locale === 'en' ? 'Post' : locale === 'tw' ? '動態' : '动态')
+
   return (
-    <ContentDetailClient
-      initialContent={content}
-      params={Promise.resolve({ contentId: content.slug || contentId })}
-    />
+    <TwitterCloneSecondaryPageLayout locale={locale} title={pageTitle} active="explore">
+      <ContentDetailClient
+        initialContent={content}
+        params={Promise.resolve({ contentId: content.slug || contentId })}
+        showLanguageToggle={false}
+      />
+    </TwitterCloneSecondaryPageLayout>
   )
 }

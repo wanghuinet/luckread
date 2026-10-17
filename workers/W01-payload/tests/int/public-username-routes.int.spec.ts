@@ -22,8 +22,8 @@ describe('public username routes', () => {
     const article = read('src/app/(frontend)/[username]/article/[contentId]/page.tsx')
     const user = read('src/app/(frontend)/users/[userId]/page.tsx')
 
-    expect(article).toContain("import ContentDetailPage from '../../../content/[contentId]/page'")
-    expect(article).toContain('Promise.resolve({ contentId })')
+    expect(article).toContain("import { permanentRedirect } from 'next/navigation'")
+    expect(article).toContain("permanentRedirect('/content/' + encodeURIComponent(contentId))")
     expect(article).not.toContain('D1Database')
     expect(article).not.toContain('getPayload')
     expect(user).toContain("return '/content/' + encodeURIComponent(item.slug || item.id)")

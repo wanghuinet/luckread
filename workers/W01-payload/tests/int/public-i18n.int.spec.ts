@@ -27,7 +27,7 @@ describe('public frontend i18n', () => {
     const browse = read('src/app/(frontend)/content/ContentBrowsePage.tsx')
     const browseRoute = read('src/app/(twitter-clone)/content/page.tsx')
     const detail = read('src/app/(frontend)/content/[contentId]/ContentDetailClient.tsx')
-    const detailPage = read('src/app/(frontend)/content/[contentId]/page.tsx')
+    const detailPage = read('src/app/(twitter-clone)/content/[contentId]/page.tsx')
     const comments = read('src/app/(frontend)/content/[contentId]/ContentComments.tsx')
 
     expect(toggle).toContain('PUBLIC_LOCALES.map')
@@ -57,7 +57,7 @@ describe('public frontend i18n', () => {
     const browse = read('src/app/(frontend)/content/ContentBrowsePage.tsx')
     const feed = read('src/app/(frontend)/HomeContentFeed.tsx')
     const detail = read('src/app/(frontend)/content/[contentId]/ContentDetailClient.tsx')
-    const detailPage = read('src/app/(frontend)/content/[contentId]/page.tsx')
+    const detailPage = read('src/app/(twitter-clone)/content/[contentId]/page.tsx')
 
     expect(browse).toContain("const href = '/content/' + encodeURIComponent(item.slug || item.id)")
     expect(browse).toContain('href={href}')
