@@ -207,7 +207,7 @@ export default function ProfilePage() {
   const actionClass = 'rounded-full border border-light-border px-4 py-2 text-sm font-bold transition hover:bg-light-primary/10 disabled:cursor-not-allowed disabled:opacity-50 dark:border-dark-border dark:hover:bg-dark-primary/10'
 
   return (
-    <TwitterCloneSecondaryPageLayout locale={locale} title={copy.title} active="profile">
+    <TwitterCloneSecondaryPageLayout locale={locale} title={copy.title} active="editProfile">
       <section className="border-b border-light-border px-4 py-4 dark:border-dark-border">
         <p className="text-xs font-bold uppercase tracking-widest text-main-accent">{copy.eyebrow}</p>
         <p className="mt-2 text-sm leading-6 text-light-secondary dark:text-dark-secondary">{copy.description}</p>
