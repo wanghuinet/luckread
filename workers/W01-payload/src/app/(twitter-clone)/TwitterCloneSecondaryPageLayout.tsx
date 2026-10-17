@@ -30,6 +30,9 @@ const labels = (locale: PublicLocale) => ({
   exploreContent: locale === 'en' ? 'Articles and discussions' : locale === 'tw' ? '文章與討論' : '文章与讨论',
   shorts: locale === 'en' ? 'Short videos' : locale === 'tw' ? '短影片' : '短视频',
   subscriptions: locale === 'en' ? 'Subscriptions' : locale === 'tw' ? '訂閱' : '订阅',
+  forCreators: locale === 'en' ? 'For creators' : locale === 'tw' ? '創作者入口' : '创作者入口',
+  creatorDescription: locale === 'en' ? 'Publish articles, posts, and videos through LuckRead.' : locale === 'tw' ? '透過 LuckRead 發布文章、動態和影片。' : '通过 LuckRead 发布文章、动态和视频。',
+  openCreatorStudio: locale === 'en' ? 'Open Creator Studio' : locale === 'tw' ? '進入創作者中心' : '进入创作者中心',
 })
 
 function SidebarIcon({ name }: { name: 'home' | 'search' | 'users' | 'bookmark' | 'user' | 'video' | 'write' | 'bell' }) {
@@ -95,6 +98,11 @@ export default function TwitterCloneSecondaryPageLayout({ locale, title, active,
             <Link className="flex justify-between border-b border-light-border py-3 text-sm dark:border-dark-border" href="/content">{copy.exploreContent}<span>›</span></Link>
             <Link className="flex justify-between border-b border-light-border py-3 text-sm dark:border-dark-border" href="/shorts">{copy.shorts}<span>›</span></Link>
             <Link className="flex justify-between py-3 text-sm" href="/me/subscriptions">{copy.subscriptions}<span>›</span></Link>
+          </section>
+          <section className="rounded-2xl bg-main-sidebar-background p-4">
+            <h2 className="mb-3 text-xl font-bold">{copy.forCreators}</h2>
+            <p className="mb-4 text-sm leading-relaxed text-light-secondary dark:text-dark-secondary">{copy.creatorDescription}</p>
+            <Link className="inline-flex rounded-full bg-main-accent px-4 py-2 text-sm font-bold text-white" href="/creator-center">{copy.openCreatorStudio}</Link>
           </section>
         </aside>
       </div>
