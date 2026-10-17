@@ -297,7 +297,7 @@ type DiscoveryTopicCursor = {
 }
 
 const encodeDiscoveryTopicCursor = (cursor: DiscoveryTopicCursor): string =>
-  btoa(JSON.stringify(cursor)).replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/g, '')
+  btoa(JSON.stringify(cursor)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '')
 
 const decodeDiscoveryTopicCursor = (value: string | null): DiscoveryTopicCursor | null => {
   if (!value) return null
