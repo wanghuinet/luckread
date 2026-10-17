@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react'
 import { fetchJson, getApiErrorMessage } from '../../../lib/client-api.js'
 import styles from './creator-application.module.css'
+import TwitterCloneSecondaryPageLayout from '../../(twitter-clone)/TwitterCloneSecondaryPageLayout'
 
 type CreatorType = 'PERSONAL' | 'WRITER' | 'VIDEO_CREATOR' | 'DEVELOPER' | 'ARTIST' | 'OTHER'
 type ApplicationStatus = 'PENDING' | 'APPROVED' | 'REJECTED'
@@ -145,18 +146,8 @@ export default function CreatorApplicationClient({
   const hasPendingGrant = application?.status === 'APPROVED' && application.grant_state !== 'GRANTED'
 
   return (
-    <main className={styles.page}>
-      <header className={styles.header}>
-        <Link className={styles.brand} href="/" aria-label="LuckRead 首页">
-          <span className={styles.brandMark}>LR</span>
-          <span><strong>LuckRead</strong><small>创作者资格</small></span>
-        </Link>
-        <nav className={styles.headerLinks} aria-label="账户导航">
-          <Link href="/me/profile">个人资料</Link>
-          <Link href="/">返回首页</Link>
-        </nav>
-      </header>
-
+    <TwitterCloneSecondaryPageLayout locale="zh-CN" title="创作者资格" active="editProfile" showLanguageToggle={false}>
+      <div className={styles.page + ' text-light-primary dark:text-dark-primary'}>
       <section className={styles.hero}>
         <span className={styles.eyebrow}>CREATOR QUALIFICATION</span>
         <h1>成为 LuckRead 创作者</h1>
@@ -255,6 +246,7 @@ export default function CreatorApplicationClient({
         <span>LuckRead · 创作者资格服务</span>
         <span>审核通过后，系统还会独立确认创作者角色授权。</span>
       </footer>
-    </main>
+      </div>
+    </TwitterCloneSecondaryPageLayout>
   )
 }
