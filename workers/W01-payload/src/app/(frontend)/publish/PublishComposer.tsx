@@ -683,7 +683,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
         coverRef,
         type === 'article' ? mediaRefsFromArticleDocument(articleDocument) : [],
       ),
-      ...(type !== 'post' ? {
+      ...(type === 'article' ? {
         aiMode,
         humanContribution: humanConfirmed ? 'substantial' : 'light',
       } : {}),
@@ -1222,7 +1222,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
         </section>
       ) : null}
 
-{!isTweetModal ? (
+{!isTweetModal && type === 'article' ? (
       <div className="lr-preflight-policy">
         <div className="lr-preflight-policy-heading">
           <strong>{isTweetModal ? '创作声明' : '创作者质量与 AI 规范'}</strong>
