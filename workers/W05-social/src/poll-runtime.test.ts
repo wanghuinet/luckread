@@ -1,6 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 import { describe, expect, it, vi } from 'vitest'
-import { castContentPollVote, configureContentPoll, getContentPoll, SocialPollError } from './poll-runtime.js'
+import { castContentPollVote, configureContentPoll, getContentPoll } from './poll-runtime.js'
 
 const noDatabase = () => ({
   prepare: vi.fn(() => { throw new Error('unexpected database access') }),
@@ -37,7 +37,7 @@ const pollDb = (scenario: PollDbScenario) => {
       },
       all: async () => {
         if (sql.includes('SELECT o.option_id, o.option_text')) {
-          return { results: current.options.map(option => ({ ...option, votes: option.votes + (option.optionId === current.viewerOptionId ? 1 : 0) })) }
+          return { results: current.options.map(option => ({ ...option, votes: option.votes + (option.option_id === current.viewerOptionId ? 1 : 0) })) }
         }
         if (sql.includes('SELECT option_text FROM social_poll_options')) {
           return { results: current.options.map(option => ({ option_text: option.option_text })) }
