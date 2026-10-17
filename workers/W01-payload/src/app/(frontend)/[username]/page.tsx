@@ -1,8 +1,11 @@
 'use client'
 
+import Link from 'next/link'
 import { useEffect, useState } from 'react'
 
 import { fetchJson, getApiErrorMessage } from '../../../lib/client-api.js'
+import { usePublicLocale } from '../i18n/PublicLanguageToggle'
+import TwitterCloneSecondaryPageLayout from '../../(twitter-clone)/TwitterCloneSecondaryPageLayout'
 import UserProfilePage from '../users/[userId]/page'
 
 type PublicUserLookup = {
@@ -15,6 +18,7 @@ export default function UsernameProfilePage({
 }: {
   params: Promise<{ username: string }>
 }) {
+  const locale = usePublicLocale()
   const [userId, setUserId] = useState<string | null>(null)
   const [error, setError] = useState('')
 
@@ -46,19 +50,28 @@ export default function UsernameProfilePage({
     }
   }, [params])
 
+  const title = locale === 'en' ? 'Profile' : locale === 'tw' ? '個人主頁' : '个人主页'
+
   if (error) {
     return (
-      <main className="content-detail">
-        <div className="content-detail-state" role="alert">{error}</div>
-      </main>
+      <TwitterCloneSecondaryPageLayout locale={locale} title={title} active="profile">
+        <div className="flex flex-col items-start gap-3 px-4 py-8 text-sm" role="alert">
+          <p>{error}</p>
+          <Link className="rounded-full border border-light-border px-4 py-2 font-bold dark:border-dark-border" href="/content">
+            {locale === 'en' ? 'Explore content' : locale === 'tw' ? '探索內容' : '返回发现'}
+          </Link>
+        </div>
+      </TwitterCloneSecondaryPageLayout>
     )
   }
 
   if (!userId) {
     return (
-      <main className="content-detail" aria-busy="true">
-        <p className="content-detail-state" role="status">正在加载作者资料…</p>
-      </main>
+      <TwitterCloneSecondaryPageLayout locale={locale} title={title} active="profile">
+        <p className="px-4 py-5 text-sm text-light-secondary dark:text-dark-secondary" role="status" aria-busy="true">
+          {locale === 'en' ? 'Loading author profile…' : locale === 'tw' ? '正在載入作者資料…' : '正在加载作者资料…'}
+        </p>
+      </TwitterCloneSecondaryPageLayout>
     )
   }
 
