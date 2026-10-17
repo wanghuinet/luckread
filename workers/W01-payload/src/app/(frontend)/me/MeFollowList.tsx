@@ -42,7 +42,7 @@ export default function MeFollowList({ direction }: { direction: Direction }) {
   const isFollowers = direction === 'followers'
   const locale = usePublicLocale()
   const labels = locale === 'en' ? {
-    followers: 'My followers', following: 'Following', account: 'My account', followersOf: 'followers', follows: 'follows', relationships: 'relationships',
+    followers: 'My followers', following: 'Following', account: 'My account', followersOf: "'s followers", follows: 'follows', relationships: 'relationships',
     loading: 'Loading…', emptyFollowers: 'You do not have followers yet.', emptyFollowing: 'You are not following anyone yet.',
     emptyFollowersHelp: 'People who follow you will appear here.', emptyFollowingHelp: 'Visit a profile and follow creators to build your list.',
     discover: 'Discover content', unfollow: 'Unfollow', processing: 'Working…', more: 'Load more', loadingMore: 'Loading…', refresh: 'Refresh list',
@@ -260,6 +260,7 @@ export default function MeFollowList({ direction }: { direction: Direction }) {
                 userId={item.userId}
                 followedAt={item.followedAt}
                 presentation="x-timeline"
+                locale={locale}
                 action={!isFollowers ? (
                   <button
                     className="main-tab rounded-full border border-light-border px-4 py-2 text-sm font-bold hover:bg-light-primary/10 disabled:cursor-not-allowed disabled:opacity-50 dark:border-dark-border dark:hover:bg-dark-primary/10"
