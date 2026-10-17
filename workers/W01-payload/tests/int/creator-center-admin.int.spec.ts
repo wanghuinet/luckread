@@ -37,6 +37,19 @@ describe('Creator Center admin extension', () => {
     expect(publisher).toContain("const isTweetModal = presentation === 'tweet-modal'")
   })
 
+  it('publishes social posts through the direct-publish preflight path', () => {
+    const publisher = read('src/app/(frontend)/publish/PublishComposer.tsx')
+    const runPreflight = publisher.split('async function runPreflight()')[1]?.split('\n\n  async function saveDraft()')[0] ?? ''
+    expect(runPreflight).toContain("if (type === 'post') {")
+    expect(runPreflight).toContain('return { report: null, input, draft: savedDraft }')
+    expect(runPreflight.indexOf("if (type === 'post') {")).toBeLessThan(runPreflight.indexOf('const preflightBasePath ='))
+
+    const submit = publisher.split('async function submitForReview()')[1]?.split('\n\n  return (')[0] ?? ''
+    expect(submit).toContain("if (type !== 'post') {")
+    expect(submit).toContain("to: type === 'post' ? 'PUBLISHED' : 'PENDING_REVIEW'")
+    expect(publisher).toContain("{type !== 'post' ? (")
+  })
+
   it('uses a single body field for social posts and derives their feed title', () => {
     const publisher = read('src/app/(frontend)/publish/PublishComposer.tsx')
     expect(publisher).toContain("type === 'post' ? body.trim().slice(0, 500) : title.trim()")
@@ -1082,7 +1095,7 @@ describe('Creator Center admin extension', () => {
 
     expect(publisher).toContain("const preflightBasePath = contentBasePath === '/api/v1/contents'")
     expect(publisher).toContain("? '/api/creator/contents'")
-    expect(publisher).toContain("if (type !== 'post' && report.verdict === 'YELLOW')")
+    expect(publisher).toContain("if (type !== 'post') {")
     expect(publisher).toContain("to: type === 'post' ? 'PUBLISHED' : 'PENDING_REVIEW'")
     expect(publisher).toContain("'动态已发布，已进入公开信息流。'")
     expect(publisher).toContain("type === 'post' ? '发布动态' : '提交发布'")

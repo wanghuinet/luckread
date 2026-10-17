@@ -651,7 +651,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
     }
   }
 
-  async function runPreflight(): Promise<{ report: PublishPreflightResult; input: Record<string, unknown>; draft: ContentResponse }> {
+  async function runPreflight(): Promise<{ report: PublishPreflightResult | null; input: Record<string, unknown>; draft: ContentResponse }> {
     if (autoSaveInFlightRef.current) throw new Error('自动保存正在进行，请稍后重试。')
     assertPollConfigurationValid()
     if (!hasPublishableText()) {
@@ -685,6 +685,14 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
       aiMode,
       humanContribution: humanConfirmed ? 'substantial' : 'light',
     }
+    if (type === 'post') {
+      // Social posts use W03's direct-publish transition, which re-runs the
+      // authoritative preflight against stored content. Do not call the
+      // creator-only editorial preflight route for ordinary social authors.
+      setPreflightReport(null)
+      return { report: null, input, draft: savedDraft }
+    }
+
     const preflightBasePath = contentBasePath === '/api/v1/contents'
       ? '/api/creator/contents'
       : contentBasePath
@@ -803,10 +811,13 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
     setBusy(true); setError(''); setMessage('')
     try {
       const { report, input, draft: savedDraft } = await runPreflight()
-      if (report.verdict === 'RED') return
-      if (type !== 'post' && report.verdict === 'YELLOW') {
-        const warnings = report.findings.filter((item) => item.severity === 'WARN').slice(0, 4).map((item) => '• ' + item.title).join('\\n')
-        if (!window.confirm(report.summary + '\\n\\n建议先处理：\\n' + warnings + '\\n\\n确认仍然提交审核吗？')) return
+      if (type !== 'post') {
+        if (!report) throw new Error('发布前检查未返回结果，请稍后重试。')
+        if (report.verdict === 'RED') return
+        if (report.verdict === 'YELLOW') {
+          const warnings = report.findings.filter((item) => item.severity === 'WARN').slice(0, 4).map((item) => '• ' + item.title).join('\\n')
+          if (!window.confirm(report.summary + '\\n\\n建议先处理：\\n' + warnings + '\\n\\n确认仍然提交审核吗？')) return
+        }
       }
       const { response, data } = await authorizedFetch<{ to?: string; version?: number; etag?: string; error?: { message?: string } }>(
         contentBasePath + '/' + encodeURIComponent(savedDraft.id) + '/state',
@@ -1282,6 +1293,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
                 新建内容
               </button>
             ) : null}
+            {type !== 'post' ? (
             <button className="ghost" disabled={busy || reviewLocked} onClick={async () => {
               setBusy(true); setError(''); setMessage('')
               try { await runPreflight(); setMessage('发布前检查完成，请查看检查结果。') }
@@ -1290,6 +1302,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
             }} type="button">
               发布前自检
             </button>
+            ) : null}
             <button className="ghost" disabled={busy} onClick={() => setPreview((current) => !current)} type="button">
               {preview ? '关闭预览' : '预览'}
             </button>
