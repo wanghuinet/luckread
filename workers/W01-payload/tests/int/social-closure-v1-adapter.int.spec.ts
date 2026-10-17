@@ -31,10 +31,11 @@ describe('unified W05 social closure adapters', () => {
 
 
   it('exposes a public topic page backed by W05 topic data', () => {
-    const page = read('src/app/(frontend)/topics/[topicName]/page.tsx')
+    const page = read('src/app/(twitter-clone)/topics/[topicName]/page.tsx')
     expect(page).toContain('callW05SocialPublic')
     expect(page).toContain('/internal/social/topics/')
     expect(page).toContain('nextCursor')
+    expect(page).toContain('<TwitterCloneSecondaryPageLayout locale={locale} title={title} active="explore">')
     expect(page).toContain("'/topics/' + encodeURIComponent(topic.topic.name)")
   })
 
