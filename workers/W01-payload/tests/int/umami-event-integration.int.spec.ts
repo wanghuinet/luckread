@@ -24,7 +24,7 @@ describe('Umami content navigation event reuse', () => {
   })
 
   it('reuses the upstream data-attribute tracker for the public discovery list', () => {
-    const page = read('src/app/(frontend)/content/page.tsx')
+    const page = read('src/app/(frontend)/content/ContentBrowsePage.tsx')
     expect(page).toContain('data-umami-event="content-open"')
     expect(page).toContain('data-umami-event-content-type={item.contentType}')
     expect(page).not.toContain('umami.track(')
