@@ -117,7 +117,7 @@ export const hasCreatorContentPermission = (layer: string): boolean =>
   /^L[3-4]$/.test(layer)
 
 export const hasSocialPostPermission = (layer: string): boolean =>
-  /^L[2-4]$/.test(layer)
+  /^L[2-8]$/.test(layer)
 
 const requiredSocialPostPrincipal = (request: Request): { userId: string; layer: string } => {
   const principal = requiredPrincipal(request)
