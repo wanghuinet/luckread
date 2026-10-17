@@ -134,7 +134,7 @@ jobs:
           async function post(path, body, headers = {}) {
             const r = await fetch(base + path, {
               method: 'POST',
-              headers: { accept: 'application/json', 'content-type': 'application/json', ...headers },
+              headers: { accept: 'application/json', 'content-type': 'application/json', origin: 'https://luckread.com', ...headers },
               body: JSON.stringify(body),
             })
             const raw = await r.text()

@@ -123,7 +123,7 @@ jobs:
           const d1 = sql => execFileSync('npx',['--yes','wrangler@'+process.env.WRANGLER_VERSION,'d1','execute',process.env.DATABASE_NAME,'--remote','--yes','--config','deployed-source/workers/W01-payload/wrangler.jsonc','--command',sql],{encoding:'utf8',env:process.env})
 
           async function post(path, body, headers={}) {
-            const r = await fetch(base+path,{method:'POST',headers:{accept:'application/json','content-type':'application/json',...headers},body:JSON.stringify(body)})
+            const r = await fetch(base+path,{method:'POST',headers:{accept:'application/json','content-type':'application/json','origin':'https://luckread.com',...headers},body:JSON.stringify(body)})
             const raw = await r.text()
             let data = null
             try { data = raw ? JSON.parse(raw) : null } catch {}
