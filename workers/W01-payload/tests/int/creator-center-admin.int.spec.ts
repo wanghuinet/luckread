@@ -1067,7 +1067,7 @@ describe('Creator Center admin extension', () => {
     const page = read('src/app/(frontend)/creator-center/page.tsx')
     const home = read('src/app/(twitter-clone)/CreatorDomainHome.tsx')
     const view = read('src/app/(frontend)/creator-center/CreatorStudio.tsx')
-    const styles = read('src/app/(payload)/v1beta/creator-center.module.css')
+    const styles = read('src/app/(frontend)/styles.css')
 
     expect(toggle).toContain("'use client'")
     expect(toggle).toContain("GlobeLanguageMenu")
