@@ -1020,6 +1020,96 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
       </div>
 
 
+      {type === 'post' ? (
+        <section className="lr-media-box" aria-label="投票设置">
+          <div className="lr-media-heading">
+            <div>
+              <strong>投票</strong>
+              <span>{pollEnabled ? '2–4 个选项 · 每人限投一次' : '为动态添加投票'}</span>
+            </div>
+            <button
+              className="lr-upload-button"
+              type="button"
+              disabled={busy || reviewLocked}
+              onClick={() => {
+                setPollEnabled((enabled) => !enabled)
+                if (!pollEnabled) setPollOptions(['', ''])
+                markDirty()
+              }}
+            >
+              {pollEnabled ? '移除投票' : '添加投票'}
+            </button>
+          </div>
+          {pollEnabled ? (
+            <div className="flex flex-col gap-3 p-1">
+              {pollOptions.map((option, index) => (
+                <div key={index} className="flex items-center gap-2">
+                  <label className="lr-field min-w-0 flex-1">
+                    <span>选项 {index + 1}</span>
+                    <input
+                      aria-label={'投票选项 ' + (index + 1)}
+                      maxLength={50}
+                      disabled={busy || reviewLocked}
+                      onChange={(event) => {
+                        setPollOptions((current) => current.map((value, optionIndex) => optionIndex === index ? event.target.value : value))
+                        markDirty()
+                      }}
+                      placeholder={'输入选项 ' + (index + 1)}
+                      value={option}
+                    />
+                    <small>{option.length}/50</small>
+                  </label>
+                  {pollOptions.length > 2 ? (
+                    <button
+                      className="ghost"
+                      type="button"
+                      disabled={busy || reviewLocked}
+                      aria-label={'移除选项 ' + (index + 1)}
+                      onClick={() => {
+                        setPollOptions((current) => current.filter((_value, optionIndex) => optionIndex !== index))
+                        markDirty()
+                      }}
+                    >
+                      移除
+                    </button>
+                  ) : null}
+                </div>
+              ))}
+              {pollOptions.length < 4 ? (
+                <button
+                  className="ghost self-start"
+                  type="button"
+                  disabled={busy || reviewLocked}
+                  onClick={() => {
+                    setPollOptions((current) => [...current, ''])
+                    markDirty()
+                  }}
+                >
+                  + 添加选项
+                </button>
+              ) : null}
+              <label className="lr-field">
+                <span>投票时长</span>
+                <select
+                  aria-label="投票时长"
+                  disabled={busy || reviewLocked}
+                  value={pollDurationHours}
+                  onChange={(event) => {
+                    setPollDurationHours(Number(event.target.value) as 24 | 72 | 168)
+                    markDirty()
+                  }}
+                >
+                  <option value={24}>1 天</option>
+                  <option value={72}>3 天</option>
+                  <option value={168}>7 天</option>
+                </select>
+              </label>
+              <p className="text-xs text-light-secondary dark:text-dark-secondary">投票会随动态一起发布；每个账号只能投一次，发布后不能修改选项。</p>
+            </div>
+          ) : null}
+        </section>
+      ) : null}
+
       <div className="lr-preflight-policy">
         <div className="lr-preflight-policy-heading">
           <strong>{isTweetModal ? '创作声明' : '创作者质量与 AI 规范'}</strong>
@@ -1155,6 +1245,15 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
                 )}
                 {assets.length > 4 ? <span>+{assets.length - 4} 个媒体</span> : null}
               </div>
+            ) : null}
+            {type === 'post' && pollEnabled ? (
+              <section className="lr-media-box" aria-label="投票预览">
+                <strong>投票</strong>
+                {pollOptions.filter((option) => option.trim()).map((option, index) => (
+                  <div key={index} className="rounded-full border border-light-border px-3 py-2 text-sm dark:border-dark-border">{option}</div>
+                ))}
+                <small>{pollDurationHours === 24 ? '1 天' : pollDurationHours === 72 ? '3 天' : '7 天'}</small>
+              </section>
             ) : null}
           </article>
         </section>
