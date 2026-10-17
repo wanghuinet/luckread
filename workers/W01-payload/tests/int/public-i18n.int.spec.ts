@@ -59,7 +59,8 @@ describe('public frontend i18n', () => {
     const detail = read('src/app/(frontend)/content/[contentId]/ContentDetailClient.tsx')
     const detailPage = read('src/app/(frontend)/content/[contentId]/page.tsx')
 
-    expect(browse).toContain("href={'/content/' + encodeURIComponent(item.slug || item.id)}")
+    expect(browse).toContain("const href = '/content/' + encodeURIComponent(item.slug || item.id)")
+    expect(browse).toContain('href={href}')
     expect(feed).toContain('href={`/content/${encodeURIComponent(item.slug || item.id)}`}')
     expect(feed).toContain("if (activeFeed === 'forYou' && hasInitialItems && retryKey === 0) return")
     expect(detail).toContain("fetchJson<Content>(`/api/v1/contents/${encodeURIComponent(contentId)}`")
