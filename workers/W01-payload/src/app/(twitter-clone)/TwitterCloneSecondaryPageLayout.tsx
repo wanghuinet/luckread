@@ -12,7 +12,7 @@ type PageNavKey = 'home' | 'explore' | 'trends' | 'notifications' | 'connections
 type Props = {
   locale: PublicLocale
   title: string
-  active: PageNavKey
+  active: PageNavKey | 'subscriptions'
   children: ReactNode
 }
 
@@ -101,7 +101,7 @@ export default function TwitterCloneSecondaryPageLayout({ locale, title, active,
             <Link className="flex justify-between border-b border-light-border py-3 text-sm dark:border-dark-border" href="/trends">{copy.trends}<span>›</span></Link>
             <Link className="flex justify-between border-b border-light-border py-3 text-sm dark:border-dark-border" href="/content">{copy.exploreContent}<span>›</span></Link>
             <Link className="flex justify-between border-b border-light-border py-3 text-sm dark:border-dark-border" href="/shorts">{copy.shorts}<span>›</span></Link>
-            <Link className="flex justify-between py-3 text-sm" href="/me/subscriptions">{copy.subscriptions}<span>›</span></Link>
+            <Link aria-current={active === 'subscriptions' ? 'page' : undefined} className={'flex justify-between py-3 text-sm ' + (active === 'subscriptions' ? 'font-bold text-main-accent' : '')} href="/me/subscriptions">{copy.subscriptions}<span>›</span></Link>
           </section>
           <section className="rounded-2xl bg-main-sidebar-background p-4">
             <h2 className="mb-3 text-xl font-bold">{copy.forCreators}</h2>
