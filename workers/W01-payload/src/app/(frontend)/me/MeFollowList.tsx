@@ -28,7 +28,16 @@ type ProfileResponse = {
   username?: string
   displayName?: string | null
   avatar?: string | null
+  bio?: string | null
   error?: { message?: string }
+}
+
+type PublicFollowProfile = {
+  id: string
+  username: string
+  displayName: string | null
+  avatar: string | null
+  bio: string | null
 }
 
 type FollowListResponse = {
@@ -63,6 +72,8 @@ export default function MeFollowList({ direction }: { direction: Direction }) {
   const [userId, setUserId] = useState<string | null>(null)
   const [displayName, setDisplayName] = useState('')
   const [items, setItems] = useState<FollowListItem[]>([])
+  const [profilesById, setProfilesById] = useState<Record<string, PublicFollowProfile>>({})
+  const profileCacheRef = useRef<Record<string, PublicFollowProfile>>({})
   const [totalCount, setTotalCount] = useState<number | null>(null)
   const [nextCursor, setNextCursor] = useState<string | null>(null)
   const [hasMore, setHasMore] = useState(false)
@@ -93,6 +104,52 @@ export default function MeFollowList({ direction }: { direction: Direction }) {
     return data.id
   }, [])
 
+  const loadPublicProfiles = useCallback(async (targetUserIds: string[], signal?: AbortSignal) => {
+    const uniqueIds = Array.from(new Set(targetUserIds))
+      .filter((id) => id && !profileCacheRef.current[id])
+    // Keep a page of relationship rows bounded to five concurrent public profile reads.
+    for (let offset = 0; offset < uniqueIds.length; offset += 5) {
+      if (signal?.aborted) return
+      const batch = uniqueIds.slice(offset, offset + 5)
+      const resolved = await Promise.all(batch.map(async (targetUserId) => {
+        try {
+          const { response, data } = await fetchJson<ProfileResponse>(
+            '/api/v1/users/' + encodeURIComponent(targetUserId),
+            {
+              credentials: 'omit',
+              headers: { accept: 'application/json' },
+              signal,
+            },
+          )
+          if (
+            !response.ok ||
+            data?.id !== targetUserId ||
+            typeof data.username !== 'string' ||
+            !data.username.trim()
+          ) return null
+          return {
+            id: targetUserId,
+            username: data.username,
+            displayName: typeof data.displayName === 'string' ? data.displayName : null,
+            avatar: typeof data.avatar === 'string' ? data.avatar : null,
+            bio: typeof data.bio === 'string' ? data.bio : null,
+          } satisfies PublicFollowProfile
+        } catch {
+          return null
+        }
+      }))
+      if (signal?.aborted) return
+      const additions = Object.fromEntries(
+        resolved.filter((profile): profile is PublicFollowProfile => profile !== null)
+          .map((profile) => [profile.id, profile]),
+      )
+      if (Object.keys(additions).length > 0) {
+        profileCacheRef.current = { ...profileCacheRef.current, ...additions }
+        setProfilesById((current) => ({ ...current, ...additions }))
+      }
+    }
+  }, [])
+
   const loadList = useCallback(async (
     ownerId: string,
     cursor: string | null,
@@ -119,7 +176,8 @@ export default function MeFollowList({ direction }: { direction: Direction }) {
     setTotalCount(data.data.totalCount)
     setNextCursor(data.data.nextCursor)
     setHasMore(data.data.hasMore)
-  }, [direction])
+    void loadPublicProfiles(data.data.items.map((item) => item.userId), signal)
+  }, [direction, loadPublicProfiles])
 
   const beginRequest = useCallback(() => {
     requestControllerRef.current?.abort()
@@ -259,6 +317,7 @@ export default function MeFollowList({ direction }: { direction: Direction }) {
                 key={item.relationshipId}
                 userId={item.userId}
                 followedAt={item.followedAt}
+                profile={profilesById[item.userId]}
                 presentation="x-timeline"
                 locale={locale}
                 action={!isFollowers ? (
