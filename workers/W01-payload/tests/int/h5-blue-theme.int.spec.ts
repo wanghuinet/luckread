@@ -29,6 +29,11 @@ describe('LuckRead H5 blue design system', () => {
     expect(subscriptionsPage).toContain('border-b border-light-border')
     expect(subscriptionsRoute).toContain('TwitterCloneSecondaryPageLayout')
     expect(subscriptionsRoute).toContain('active="subscriptions"')
+    const shortsRoute = read('src/app/(frontend)/shorts/page.tsx')
+    expect(shortsRoute).toContain('TwitterCloneSecondaryPageLayout')
+    expect(shortsRoute).toContain('active="videos"')
+    expect(shortsRoute).toContain('<ShortVideoFeed />')
+    expect(shortsRoute).not.toContain('shorts.css')
   })
 
   it('does not introduce another frontend page directory for the blue redesign', () => {
