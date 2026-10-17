@@ -42,7 +42,7 @@ export default function TwitterCloneSidebarProfile({ locale }: { locale: PublicL
   const label = profile?.displayName?.trim() || profile?.username || (signedIn === false
     ? (locale === 'en' ? 'Sign in' : locale === 'tw' ? '登入' : '登录')
     : (locale === 'en' ? 'Loading profile…' : locale === 'tw' ? '載入個人資料…' : '正在加载个人资料…'))
-  const href = signedIn === false ? '/login?returnTo=%2Fhome' : '/me/profile'
+  const href = signedIn === false ? '/login?returnTo=%2Fhome' : profile?.username ? '/' + encodeURIComponent(profile.username) : '/me/profile'
   const initial = label.trim().charAt(0).toUpperCase() || 'L'
 
   return <Link className="hidden items-center gap-3 rounded-full p-3 transition hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 xl:flex" href={href} aria-label={copy.home.profileAndSettings}>
