@@ -11,20 +11,24 @@ describe('LuckRead H5 blue design system', () => {
     const login = read('src/app/(frontend)/login/login.css')
     const register = read('src/app/(frontend)/register/register.css')
     const publish = read('src/app/(frontend)/publish/publish.css')
-    const subscriptions = read('src/app/(frontend)/me/subscriptions/subscriptions.css')
 
     expect(styles).toContain('--lr-blue-600: #2563eb')
     expect(styles).toContain('--lr-h5-bg: #f5f9ff')
     expect(styles).toContain('.lr-auth-shell')
     expect(styles).toContain('.content-browse')
     expect(styles).toContain('.content-detail')
-    expect(styles).toContain('.my-subscriptions')
+    expect(styles).not.toContain('.my-subscriptions')
     expect(styles).toContain('.lr-publish-shell')
 
     expect(login).toContain('#102a56')
     expect(register).toContain('#2563eb')
     expect(publish).toContain('#2563eb')
-    expect(subscriptions).toContain('#175cd3')
+    const subscriptionsPage = read('src/app/(frontend)/me/subscriptions/MySubscriptionsPage.tsx')
+    const subscriptionsRoute = read('src/app/(twitter-clone)/me/subscriptions/page.tsx')
+    expect(subscriptionsPage).not.toContain('subscriptions.css')
+    expect(subscriptionsPage).toContain('border-b border-light-border')
+    expect(subscriptionsRoute).toContain('TwitterCloneSecondaryPageLayout')
+    expect(subscriptionsRoute).toContain('active="subscriptions"')
   })
 
   it('does not introduce another frontend page directory for the blue redesign', () => {
