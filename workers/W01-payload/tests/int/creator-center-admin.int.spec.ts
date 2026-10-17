@@ -904,7 +904,7 @@ describe('Creator Center admin extension', () => {
   it('organizes the creator center around creator-first workflows', () => {
     const view = read('src/app/(frontend)/creator-center/CreatorStudio.tsx')
     const assistant = read('src/app/(payload)/v1beta/CreatorCenterAssistant.tsx')
-    const styles = read('src/app/(payload)/v1beta/creator-center.module.css')
+    const styles = read('src/app/(frontend)/styles.css')
     const moderation = read('src/app/(payload)/v1beta/CreatorModerationQueue.tsx')
 
 
@@ -1061,19 +1061,22 @@ describe('Creator Center admin extension', () => {
     expect(importMap).not.toContain('/app/(payload)/v1beta/CreatorCenter')
   })
 
-  it('supports a persistent Chinese/English creator studio interface toggle', () => {
+  it('uses the temporary globe language selector in creator studio', () => {
     const toggle = read('src/app/(frontend)/creator-center/CreatorLanguageToggle.tsx')
+    const globeMenu = read('src/app/(frontend)/i18n/GlobeLanguageMenu.tsx')
     const page = read('src/app/(frontend)/creator-center/page.tsx')
     const home = read('src/app/(twitter-clone)/CreatorDomainHome.tsx')
     const view = read('src/app/(frontend)/creator-center/CreatorStudio.tsx')
     const styles = read('src/app/(payload)/v1beta/creator-center.module.css')
 
     expect(toggle).toContain("'use client'")
-    expect(toggle).toContain("const COOKIE_NAME = 'luckread-ui-locale'")
-    expect(toggle).toContain("中文")
-    expect(toggle).toContain("English")
-    expect(toggle).toContain('aria-pressed')
-    expect(toggle).toContain("Max-Age=31536000")
+    expect(toggle).toContain("GlobeLanguageMenu")
+    expect(toggle).not.toContain("COOKIE_NAME")
+    expect(toggle).not.toContain("window.location.reload")
+    expect(globeMenu).toContain("选择语言 / Choose language")
+    expect((globeMenu.match(/value: '/g) ?? []).length).toBeGreaterThanOrEqual(20)
+    expect(globeMenu).not.toContain("document.cookie")
+    expect(globeMenu).not.toContain("window.location.reload")
     expect(page).toContain("(await cookies()).get('luckread-ui-locale')?.value")
     expect(page).toContain("localeCookie === 'en-US' ? 'en-US' : 'zh-CN'")
     expect(page).toContain('locale={locale}')
@@ -1085,8 +1088,9 @@ describe('Creator Center admin extension', () => {
     expect(view).toContain('<CreatorLanguageToggle locale={locale} />')
     expect(view).toContain("locale === 'en-US' ? 'Publish check' : '发布检测'")
     expect(view).toContain("locale === 'en-US' ? 'Audience' : '粉丝'")
-    expect(styles).toContain('.languageSwitch')
-    expect(styles).toContain('.languageSwitchButtonActive')
+    expect(styles).toContain('.locale-globe-selector')
+    expect(styles).toContain('.locale-globe-menu')
+    expect(styles).toContain('.locale-globe-option.is-selected')
   })
 
 
