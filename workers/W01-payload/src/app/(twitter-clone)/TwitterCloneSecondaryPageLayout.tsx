@@ -69,7 +69,7 @@ export default function TwitterCloneSecondaryPageLayout({ locale, title, active,
               <h1 className="hidden xs:flex"><Link className="custom-button main-tab text-accent-blue dark:text-twitter-icon" href="/home" aria-label={copy.home}><TwitterLogo className="h-7 w-7" /></Link></h1>
               <nav className="flex items-center justify-around xs:flex-col xs:justify-center xl:block" aria-label={locale === 'en' ? 'Main navigation' : '主导航'}>
                 {links.map((item) => (
-                  <Link key={item.key} aria-current={active === item.key ? 'page' : undefined} className={'custom-button main-tab flex items-center gap-5 rounded-full hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 xl:justify-start' + (active === item.key ? ' font-bold' : '')} href={item.href}>
+                  <Link key={item.key} aria-current={active === item.key ? 'page' : undefined} className={'custom-button main-tab flex items-center gap-5 rounded-full hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 xl:justify-start' + (active === item.key ? ' font-bold' : '')} data-umami-event={item.key === 'bookmarks' ? 'bookmarks-open' : undefined} href={item.href}>
                     <SidebarIcon name={item.icon} /><span className="hidden text-xl xl:inline">{copy[item.key]}</span>
                   </Link>
                 ))}
