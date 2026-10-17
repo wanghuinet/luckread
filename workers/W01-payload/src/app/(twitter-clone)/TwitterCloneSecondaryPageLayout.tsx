@@ -7,7 +7,7 @@ import TwitterClonePostComposerModal, { TwitterClonePostComposerTrigger } from '
 import TwitterCloneSidebarProfile from './TwitterCloneSidebarProfile'
 import { TwitterLogo } from './TwitterCloneLanding'
 
-type PageNavKey = 'home' | 'explore' | 'notifications' | 'connections' | 'following' | 'bookmarks' | 'videos' | 'profile'
+type PageNavKey = 'home' | 'explore' | 'trends' | 'notifications' | 'connections' | 'following' | 'bookmarks' | 'videos' | 'profile'
 
 type Props = {
   locale: PublicLocale
@@ -19,6 +19,7 @@ type Props = {
 const labels = (locale: PublicLocale) => ({
   home: locale === 'en' ? 'Home' : locale === 'tw' ? '首頁' : '首页',
   explore: locale === 'en' ? 'Explore' : locale === 'tw' ? '探索' : '发现',
+  trends: locale === 'en' ? 'Trending topics' : locale === 'tw' ? '熱門話題' : '热门话题',
   notifications: locale === 'en' ? 'Notifications' : '通知',
   connections: locale === 'en' ? 'Connections' : locale === 'tw' ? '關係' : '关系',
   following: locale === 'en' ? 'Following' : locale === 'tw' ? '追蹤中' : '关注中',
@@ -35,10 +36,11 @@ const labels = (locale: PublicLocale) => ({
   openCreatorStudio: locale === 'en' ? 'Open Creator Studio' : locale === 'tw' ? '進入創作者中心' : '进入创作者中心',
 })
 
-function SidebarIcon({ name }: { name: 'home' | 'search' | 'users' | 'bookmark' | 'user' | 'video' | 'write' | 'bell' }) {
+function SidebarIcon({ name }: { name: 'home' | 'search' | 'trending' | 'users' | 'bookmark' | 'user' | 'video' | 'write' | 'bell' }) {
   const paths: Record<typeof name, string> = {
     home: 'M3 10.5 12 3l9 7.5V21h-6v-7H9v7H3z',
     search: 'M10.5 3a7.5 7.5 0 1 0 4.7 13.35L21 22l1-1-5.8-5.8A7.5 7.5 0 0 0 10.5 3z',
+    trending: 'M3 17l6-6 4 4 8-8M15 7h6v6',
     users: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2m7-10a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm7-7.8a4 4 0 0 1 0 7.6m1 4h1a4 4 0 0 1 4 4v1',
     bookmark: 'M6 3h12v18l-6-4-6 4z',
     user: 'M20 21a8 8 0 0 0-16 0m8-10a4 4 0 1 0 0-8 4 4 0 0 0 0 8z',
@@ -54,6 +56,7 @@ export default function TwitterCloneSecondaryPageLayout({ locale, title, active,
   const links: Array<{ key: PageNavKey; href: string; icon: Parameters<typeof SidebarIcon>[0]['name'] }> = [
     { key: 'home', href: '/home', icon: 'home' },
     { key: 'explore', href: '/content', icon: 'search' },
+    { key: 'trends', href: '/trends', icon: 'trending' },
     { key: 'notifications', href: '/notifications', icon: 'bell' },
     { key: 'connections', href: '/me/followers', icon: 'users' },
     { key: 'following', href: '/me/following', icon: 'user' },
@@ -95,6 +98,7 @@ export default function TwitterCloneSecondaryPageLayout({ locale, title, active,
           <Link className="flex items-center gap-3 rounded-full bg-main-search-background px-4 py-3 text-light-secondary hover:ring-1 hover:ring-main-accent dark:text-dark-secondary" href="/content"><SidebarIcon name="search" /><span>{copy.search}</span></Link>
           <section className="rounded-2xl bg-main-sidebar-background p-4">
             <h2 className="mb-4 text-xl font-bold">{locale === 'en' ? 'What to explore' : locale === 'tw' ? '探索內容' : '探索内容'}</h2>
+            <Link className="flex justify-between border-b border-light-border py-3 text-sm dark:border-dark-border" href="/trends">{copy.trends}<span>›</span></Link>
             <Link className="flex justify-between border-b border-light-border py-3 text-sm dark:border-dark-border" href="/content">{copy.exploreContent}<span>›</span></Link>
             <Link className="flex justify-between border-b border-light-border py-3 text-sm dark:border-dark-border" href="/shorts">{copy.shorts}<span>›</span></Link>
             <Link className="flex justify-between py-3 text-sm" href="/me/subscriptions">{copy.subscriptions}<span>›</span></Link>
