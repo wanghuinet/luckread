@@ -894,9 +894,8 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
 
   return (
     <div
-      className={isTweetModal ? "lr-composer-card lr-post-modal-card" : "lr-composer-card"}
+      className={isTweetModal ? "m-0 w-full rounded-none border-0 bg-black p-0 text-[#e7e9ea] shadow-none" : "lr-composer-card"}
       aria-busy={busy}
-      style={isTweetModal ? { width: '100%', marginTop: 0, padding: 0, border: 0, borderRadius: 0, background: '#000', color: '#e7e9ea', boxShadow: 'none' } : undefined}
     >
       {!isTweetModal ? (
       <div className="lr-type-tabs" role="tablist" aria-label="内容类型">
@@ -948,7 +947,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
           value={articleDocument}
         />
       ) : (
-        <label className={isTweetModal ? 'lr-field lr-post-modal-field' : 'lr-field'}>
+        <label className={isTweetModal ? 'm-0 grid min-w-0 gap-0' : 'lr-field'}>
           <span className={isTweetModal ? 'sr-only' : undefined}>{type === 'post' ? '推文正文' : '视频文案'}</span>
           <textarea
             aria-label={type === 'post' ? '推文正文' : '视频文案'}
@@ -957,7 +956,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
             onChange={(event) => { setBody(event.target.value); markDirty(); setPreflightReport(null) }}
             placeholder={type === 'post' ? '有什么新鲜事？' : '写下你的内容…'}
             rows={type === 'post' ? 5 : 14}
-            style={isTweetModal && type === 'post' ? { minHeight: '130px', fontSize: '20px', lineHeight: 1.5 } : undefined}
+            className={isTweetModal && type === 'post' ? 'block min-h-[130px] w-full resize-y rounded-none border-0 bg-black px-4 py-3.5 text-xl leading-[1.5] text-[#e7e9ea] outline-none placeholder:text-[#71767b] focus:border-0 focus:ring-0' : undefined}
             value={body}
           />
           {type === 'post' && !isTweetModal ? <small aria-live="polite">{body.length}/500</small> : null}
@@ -1078,22 +1077,22 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
             type="file"
           />
           {assets.length ? (
-            <div className="lr-post-modal-media-grid" aria-label="已添加媒体">
+            <div className="grid grid-cols-2 gap-2 px-3.5 pb-3" aria-label="已添加媒体">
               {assets.map((asset) => (
-                <div className="lr-post-modal-media-item" key={asset.id}>
+                <div className="relative min-w-0 overflow-hidden rounded-[14px] border border-[#2f3336] bg-[#16181c]" key={asset.id}>
                   {isVideoAsset(asset) ? (
-                    <video aria-label={asset.filename ?? '已上传视频'} muted playsInline preload="metadata" src={asset.url} />
+                    <video className="block aspect-[4/3] max-h-[280px] w-full object-cover" aria-label={asset.filename ?? '已上传视频'} muted playsInline preload="metadata" src={asset.url} />
                   ) : (
-                    <img alt={asset.filename ?? '已上传图片'} loading="lazy" src={asset.url} />
+                    <img className="block aspect-[4/3] max-h-[280px] w-full object-cover" alt={asset.filename ?? '已上传图片'} loading="lazy" src={asset.url} />
                   )}
                   <button
                     aria-label={'移除媒体 ' + (asset.filename ?? asset.id)}
-                    className="lr-post-modal-remove-media"
+                    className="absolute right-[7px] top-[7px] grid h-7 w-7 cursor-pointer place-items-center rounded-full border-0 bg-black/80 text-white"
                     disabled={busy || reviewLocked}
                     onClick={() => removeAsset(asset.id)}
                     type="button"
                   >
-                    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                    <svg aria-hidden="true" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
                       <path d="M18 6 6 18M6 6l12 12" />
                     </svg>
                   </button>
@@ -1196,11 +1195,12 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
       ) : null}
 
       {isTweetModal && type === 'post' && pollEnabled ? (
-        <section className="lr-post-modal-poll" aria-label="投票选项">
-          <div className="lr-post-modal-poll-options">
+        <section className="mx-3.5 mb-3 grid gap-[9px] rounded-[14px] border border-[#2f3336] bg-black p-3" aria-label="投票选项">
+          <div className="grid gap-2">
             {pollOptions.map((option, index) => (
-              <div className="lr-post-modal-poll-option-row" key={index}>
+              <div className="flex items-center gap-2" key={index}>
                 <input
+                  className="min-w-0 w-full rounded-lg border border-[#536471] bg-black px-3 py-2.5 text-[#e7e9ea] outline-none focus:border-[#1d9bf0]"
                   aria-label={'投票选项 ' + (index + 1)}
                   disabled={busy || reviewLocked}
                   maxLength={50}
@@ -1214,7 +1214,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
                 {pollOptions.length > 2 ? (
                   <button
                     aria-label={'移除选项 ' + (index + 1)}
-                    className="lr-post-modal-poll-remove"
+                    className="h-7 w-7 flex-none cursor-pointer rounded-full border-0 bg-transparent text-xl text-[#e7e9ea] disabled:cursor-not-allowed disabled:opacity-40"
                     disabled={busy || reviewLocked}
                     onClick={() => {
                       setPollOptions((current) => current.filter((_value, optionIndex) => optionIndex !== index))
@@ -1226,10 +1226,10 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
               </div>
             ))}
           </div>
-          <div className="lr-post-modal-poll-footer">
+          <div className="flex items-center justify-between gap-2.5">
             {pollOptions.length < 4 ? (
               <button
-                className="lr-post-modal-poll-add"
+                className="flex-none cursor-pointer border-0 bg-transparent text-xs text-main-accent"
                 disabled={busy || reviewLocked}
                 onClick={() => {
                   setPollOptions((current) => [...current, ''])
@@ -1239,6 +1239,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
               >+ 添加选项</button>
             ) : <span />}
             <select
+              className="rounded-full border border-[#536471] bg-black px-2.5 py-1.5 text-xs text-[#e7e9ea] outline-none"
               aria-label="投票时长"
               disabled={busy || reviewLocked}
               value={pollDurationHours}
@@ -1336,8 +1337,8 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
           </strong>
         </div>
       ) : null}
-      {(!isTweetModal || message === "正在上传媒体…") && message ? <div className={isTweetModal ? "lr-post-modal-progress" : "lr-success"} role="status">{message}</div> : null}
-      {error ? <div className={isTweetModal ? "lr-post-modal-error" : "lr-error"} role="alert">{error}</div> : null}
+      {(!isTweetModal || message === "正在上传媒体…") && message ? <div className={isTweetModal ? "mx-3.5 mb-2 mt-1 text-xs text-[#71767b]" : "lr-success"} role="status">{message}</div> : null}
+      {error ? <div className={isTweetModal ? "mx-3.5 mb-2 mt-1 text-xs text-[#f4212e]" : "lr-error"} role="alert">{error}</div> : null}
 
       {preview ? (
         <section className="lr-preview" aria-label="发布预览">
@@ -1406,19 +1407,19 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
         </section>
       ) : null}
 
-      <div className={isTweetModal ? "lr-post-modal-toolbar" : "lr-actions"}>
+      <div className={isTweetModal ? "flex min-h-[52px] items-center justify-between gap-3 border-t border-[#2f3336] bg-black px-3 pb-3 pt-2 sm:px-3.5" : "lr-actions"}>
         {isTweetModal ? (
           <>
-            <div className="lr-post-modal-toolbar-actions">
+            <div className="flex items-center gap-2">
               <button
                 aria-label="添加图片或视频"
-                className="lr-post-modal-tool-button"
+                className="grid h-9 w-9 place-items-center rounded-full border-0 bg-transparent text-main-accent hover:bg-main-accent/10 disabled:cursor-not-allowed disabled:opacity-40"
                 disabled={busy || reviewLocked || pollEnabled}
                 onClick={() => modalMediaInputRef.current?.click()}
                 title="图片或视频"
                 type="button"
               >
-                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <svg aria-hidden="true" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                   <rect x="3" y="4" width="18" height="16" rx="3" />
                   <circle cx="8.5" cy="9" r="1.5" />
                   <path d="m21 15-5-5L5 20" />
@@ -1427,7 +1428,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
               <button
                 aria-label={pollEnabled ? "移除投票" : "添加投票"}
                 aria-pressed={pollEnabled}
-                className={pollEnabled ? "lr-post-modal-tool-button active" : "lr-post-modal-tool-button"}
+                className={pollEnabled ? "grid h-9 w-9 place-items-center rounded-full border-0 bg-main-accent/10 text-main-accent hover:bg-main-accent/10 disabled:cursor-not-allowed disabled:opacity-40" : "grid h-9 w-9 place-items-center rounded-full border-0 bg-transparent text-main-accent hover:bg-main-accent/10 disabled:cursor-not-allowed disabled:opacity-40"}
                 disabled={busy || reviewLocked || assets.length > 0}
                 onClick={() => {
                   setPollEnabled((enabled) => !enabled)
@@ -1437,16 +1438,16 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
                 title="投票"
                 type="button"
               >
-                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <svg aria-hidden="true" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M4 19V5M4 19H21" />
                   <path d="M8 16v-5M13 16V7M18 16v-8" />
                 </svg>
               </button>
             </div>
-            <div className="lr-post-modal-toolbar-publish">
-              {body.length > 0 ? <span aria-live="polite">{body.length}/500</span> : null}
+            <div className="flex items-center gap-2">
+              {body.length > 0 ? <span className="text-[11px] tabular-nums text-[#71767b]" aria-live="polite">{body.length}/500</span> : null}
               <button
-                className="primary"
+                className="min-h-9 cursor-pointer rounded-full border-0 bg-[#eff3f4] px-[18px] text-[13px] font-bold text-[#0f1419] disabled:cursor-not-allowed disabled:opacity-50"
                 disabled={busy || autoSaveStatus === 'saving' || reviewLocked || (!body.trim() && assets.length === 0)}
                 onClick={submitForReview}
                 type="button"

@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import PublishComposer from '../(frontend)/publish/PublishComposer'
-import '../(frontend)/publish/publish.css'
 
 const OPEN_POST_COMPOSER_EVENT = 'luckread:open-post-composer'
 
@@ -66,7 +65,7 @@ export default function TwitterClonePostComposerModal() {
     <div
       aria-hidden={!open}
       className={open
-        ? 'lr-post-modal-shell fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/75 p-0 sm:items-center sm:p-4'
+        ? 'fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/75 p-0 sm:items-center sm:p-4'
         : 'hidden'}
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) setOpen(false)
@@ -94,10 +93,7 @@ export default function TwitterClonePostComposerModal() {
           </button>
           <h2 className="text-xl font-bold">发推文</h2>
         </header>
-        <div
-          className="lr-publish-shell lr-post-modal-shell"
-          style={{ minHeight: 'auto', padding: 0, background: '#000', color: '#e7e9ea' }}
-        >
+        <div className="m-0 min-h-0 w-full bg-black p-0 text-[#e7e9ea]">
           <PublishComposer initialType="post" presentation="tweet-modal" />
         </div>
       </section>
