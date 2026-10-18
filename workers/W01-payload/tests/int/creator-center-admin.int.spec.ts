@@ -799,10 +799,14 @@ describe('Creator Center admin extension', () => {
     expect(publisher).toContain('controller.abort()')
 
     expect(publisher).toContain('disabled={busy || reviewLocked}')
-    expect(publisher).toContain('className={isTweetModal ? "lr-composer-card lr-post-modal-card" : "lr-composer-card"}')
-    expect(publisher).toContain('lr-post-modal-toolbar')
-    expect(publisher).toContain('lr-post-modal-tool-button')
-    expect(publisher).toContain('lr-post-modal-media-grid')
+    const composerCss = read('src/app/(frontend)/publish/publish.css')
+    const composerModalSource = read('src/app/(twitter-clone)/TwitterClonePostComposerModal.tsx')
+    expect(composerModalSource).not.toContain("import '../(frontend)/publish/publish.css'")
+    expect(publisher).toContain('className={isTweetModal ? "m-0 w-full rounded-none border-0 bg-black p-0 text-[#e7e9ea] shadow-none" : "lr-composer-card"}')
+    expect(publisher).toContain('grid grid-cols-2 gap-2 px-3.5 pb-3')
+    expect(publisher).toContain('border-t border-[#2f3336] bg-black')
+    expect(publisher).not.toContain('lr-post-modal-')
+    expect(composerCss).not.toContain('.lr-post-modal-')
     expect(publisher).toContain('aria-busy={busy}')
 
     expect(publisher).toContain('当前状态')
