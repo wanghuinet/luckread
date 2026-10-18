@@ -1151,50 +1151,10 @@ main[style*="max-width"] p[style*="#666"] {
 }
 
 
-/* Public profile content surfaces; profile header and channel navigation use shared X utilities. */
-.creator-profile-works { width: 100%; min-width: 0; min-height: 260px; }
-.creator-profile-section-heading { display: flex; align-items: end; justify-content: space-between; gap: 16px; margin: 0 0 16px; }
-.creator-profile-section-heading h2 { margin: 0; font-size: 25px; letter-spacing: -.04em; }
-.creator-profile-more-link { border: 0; background: transparent; color: #555; font: inherit; font-size: 12px; font-weight: 800; cursor: pointer; }
-.creator-profile-more-link:disabled { cursor: wait; opacity: .55; }
-.creator-profile-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px; }
-.creator-profile-post-list { display: flex; flex-direction: column; min-width: 0; }
-.creator-profile-post-list > [data-testid="luckread-social-post-card"] { width: 100%; min-width: 0; }
-.creator-profile-reply-list { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
-.creator-profile-reply-list > .creator-profile-card { width: 100%; }
-.creator-profile-card { min-width: 0; overflow: hidden; border-radius: 14px; background: #fff; color: inherit; box-shadow: 0 5px 24px rgba(0,0,0,.05); transition: transform 140ms ease, box-shadow 140ms ease; }
-.creator-profile-card:hover { transform: translateY(-2px); box-shadow: 0 12px 34px rgba(0,0,0,.08); }
-.creator-profile-card-media { display: grid; place-items: center; aspect-ratio: 4/5; overflow: hidden; background: #dedede; }
-.creator-profile-card-media img { width: 100%; height: 100%; display: block; object-fit: cover; }
-.creator-profile-card-media span { color: #666; font-size: 40px; font-weight: 900; }
-.creator-profile-card-body { padding: 12px 13px 15px; }
-.creator-profile-card-body > span { display: block; color: #888; font-size: 10px; font-weight: 800; letter-spacing: .08em; }
-.creator-profile-card-body h3 { overflow: hidden; margin: 6px 0 5px; font-size: 15px; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
-.creator-profile-card-body time { color: #999; font-size: 10px; }
-.creator-profile-message, .creator-profile-empty { padding: 44px 20px; color: #888; text-align: center; }
-.creator-profile-message { margin: 0; font-size: 12px; }
-.creator-profile-empty p { margin: 0; font-size: 13px; }
-.creator-profile-state { min-height: 70vh; display: grid; place-content: center; justify-items: center; gap: 12px; color: #777; text-align: center; }
-.creator-profile-state p { margin: 0; }
-.creator-profile-state a { color: #111; font-weight: 800; }
-.creator-profile-stats { display: flex; gap: 42px; margin: 0; padding: 18px 32px 22px; border-top: 1px solid #ededed; }
-.creator-profile-stats div { display: grid; gap: 4px; }
-.creator-profile-stats dt { color: #888; font-size: 11px; }
-.creator-profile-stats dd { margin: 0; font-size: 18px; font-weight: 850; }
-.creator-profile-circle-button { display: grid; place-items: center; flex: 0 0 40px; width: 40px; height: 40px; padding: 0; border: 1px solid #dedede; border-radius: 50%; background: #fff; color: #222; font: inherit; font-size: 14px; font-weight: 850; cursor: pointer; box-shadow: 0 2px 10px rgba(0,0,0,.04); }
-.creator-profile-circle-button:hover:not(:disabled) { background: #f5f5f5; border-color: #d2d2d2; }
-.creator-profile-circle-button:disabled { cursor: wait; opacity: .55; }
-.creator-profile-circle-button span { line-height: 1; transform: translateY(-1px); }
-.creator-profile-card:focus-visible { outline: 2px solid #111; outline-offset: 3px; }
-@media (prefers-reduced-motion: reduce) { .creator-profile-card { transition: none; } .creator-profile-card:hover { transform: none; } }
 @media (max-width: 900px) {
-  .creator-profile-grid { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 9px; }
-  .creator-profile-card-body { padding: 10px 11px 12px; }
-  .creator-profile-card-body h3 { font-size: 14px; }
   .mobile-nav { display: grid; grid-template-columns: repeat(4,1fr); }
 }
 @media (min-width: 901px) { .mobile-nav { display: none; } }
-@media (max-width: 560px) { .creator-profile-card-body h3 { font-size: 13px; } }
 
 
 /* Reader-first homepage layout, inspired by Substack's feed and side-navigation model. */

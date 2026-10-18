@@ -73,7 +73,8 @@ describe('Twitter Clone profile UI reuse on LuckRead public profile', () => {
 
     expect(shell).toContain('w-full min-w-0 max-w-xl')
     expect(page).toContain('<section className="flex min-w-0 w-full flex-col pb-20">')
-    expect(styles).toContain('.creator-profile-works { width: 100%; min-width: 0; min-height: 260px; }')
+    expect(page).toContain('<section className="min-w-0 w-full" id="works"')
+    expect(styles).not.toContain('.creator-profile-works')
   })
 
   it('reserves mobile navigation clearance without adding a large desktop blank area', () => {

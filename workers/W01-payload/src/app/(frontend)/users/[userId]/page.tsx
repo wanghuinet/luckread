@@ -755,34 +755,52 @@ export default function PublicProfilePage({
           onSelect={(value) => { void reloadContents(value) }}
         />
 
-        <section className="creator-profile-works" id="works" aria-label="作者内容">
-          <header className="creator-profile-section-heading">
-            <div aria-hidden="true" />
+        <section className="min-w-0 w-full" id="works" aria-label="作者内容">
+          <header className="flex justify-end px-4 py-2">
             {contentHasMore && contentCursor ? (
-              <button className="creator-profile-more-link" type="button" disabled={contentLoading} onClick={() => void loadMoreContents()}>
+              <button
+                className="main-tab rounded-full px-3 py-1.5 text-sm font-bold text-light-secondary hover:bg-light-primary/10 disabled:cursor-wait disabled:opacity-50 dark:text-dark-secondary dark:hover:bg-dark-primary/10"
+                type="button"
+                disabled={contentLoading}
+                onClick={() => void loadMoreContents()}
+              >
                 {contentLoading ? '加载中…' : '加载更多'}
               </button>
             ) : null}
           </header>
 
-          {contentError ? <p className="creator-profile-message" role="status">{contentError}</p> : null}
+          {contentError ? (
+            <p className="border-b border-light-border px-4 py-3 text-sm text-light-secondary dark:border-dark-border dark:text-dark-secondary" role="status">
+              {contentError}
+            </p>
+          ) : null}
           {contentLoading && contents.length === 0 && replies.length === 0 ? (
-            <div className="creator-profile-empty"><p role="status">正在加载{filterLabels[filter]}…</p></div>
+            <div className="grid min-h-24 place-items-center border-b border-light-border px-4 py-10 text-center text-sm text-light-secondary dark:border-dark-border dark:text-dark-secondary">
+              <p role="status">正在加载{filterLabels[filter]}…</p>
+            </div>
           ) : null}
           {!contentLoading && visibleContents.length === 0 && replies.length === 0 && !contentError ? (
-            <div className="creator-profile-empty">
+            <div className="grid min-h-24 place-items-center border-b border-light-border px-4 py-10 text-center text-sm text-light-secondary dark:border-dark-border dark:text-dark-secondary">
               <p>{filter === 'replies' ? '暂无回复或讨论' : filter === 'likes' ? '暂无点赞内容' : '暂无' + filterLabels[filter] + '公开作品'}</p>
             </div>
           ) : null}
 
           {filter === 'replies' && replies.length > 0 ? (
-            <div className="creator-profile-reply-list">
+            <div className="flex min-w-0 flex-col">
               {replies.map((reply) => (
-                <Link className="creator-profile-card" href={'/content/' + encodeURIComponent(reply.contentId)} key={reply.id}>
-                  <div className="creator-profile-card-body">
-                    <span>{reply.parentId ? '回复讨论' : '讨论'}</span>
-                    <p>{reply.body}</p>
-                    <time dateTime={reply.createdAt}>{new Date(reply.createdAt).toLocaleDateString('zh-CN')}</time>
+                <Link
+                  className="block min-w-0 border-b border-light-border px-4 py-3 transition-colors hover:bg-black/[0.025] dark:border-dark-border dark:hover:bg-white/[0.03]"
+                  href={'/content/' + encodeURIComponent(reply.contentId)}
+                  key={reply.id}
+                >
+                  <div className="min-w-0">
+                    <span className="mb-1 block text-xs text-light-secondary dark:text-dark-secondary">
+                      {reply.parentId ? '回复讨论' : '讨论'}
+                    </span>
+                    <p className="whitespace-pre-wrap break-words text-[15px] leading-5">{reply.body}</p>
+                    <time className="mt-2 block text-xs text-light-secondary dark:text-dark-secondary" dateTime={reply.createdAt}>
+                      {new Date(reply.createdAt).toLocaleDateString('zh-CN')}
+                    </time>
                   </div>
                 </Link>
               ))}
@@ -790,7 +808,7 @@ export default function PublicProfilePage({
           ) : null}
 
           {visibleContents.length > 0 ? (
-            <div className={filter === 'articles' || (filter === 'media' && !visibleContents.some((item) => item.contentType === 'post')) ? 'creator-profile-grid' : 'creator-profile-post-list'}>
+            <div className="flex min-w-0 flex-col">
               {visibleContents.map((item) => {
                 if (item.contentType === 'post') {
                   return (
@@ -820,19 +838,32 @@ export default function PublicProfilePage({
                 }
 
                 return (
-                  <Link className="creator-profile-card" href={getContentHref(item)} key={item.id}>
-                    <div className="creator-profile-card-media">
-                      {item.coverRef ? (
-                        <img alt="" height={360} loading="lazy" src={item.coverRef} width={480} />
-                      ) : (
-                        <span>{item.contentType === 'video' ? '▶' : 'A'}</span>
-                      )}
-                    </div>
-                    <div className="creator-profile-card-body">
-                      <span>{contentTypeLabels[item.contentType]}</span>
-                      <h3>{item.title}</h3>
+                  <Link
+                    className="flex min-w-0 items-start gap-3 border-b border-light-border px-4 py-3 transition-colors hover:bg-black/[0.025] dark:border-dark-border dark:hover:bg-white/[0.03]"
+                    href={getContentHref(item)}
+                    key={item.id}
+                  >
+                    {item.coverRef ? (
+                      <img
+                        alt=""
+                        className="h-20 w-24 shrink-0 rounded-xl object-cover"
+                        height={80}
+                        loading="lazy"
+                        src={item.coverRef}
+                        width={96}
+                      />
+                    ) : (
+                      <span className="grid h-20 w-24 shrink-0 place-items-center rounded-xl bg-main-sidebar-background text-lg font-bold text-light-secondary dark:text-dark-secondary">
+                        {item.contentType === 'video' ? '▶' : 'A'}
+                      </span>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <span className="text-xs text-light-secondary dark:text-dark-secondary">
+                        {contentTypeLabels[item.contentType]}
+                      </span>
+                      <h3 className="mt-1 break-words text-[15px] font-bold leading-5">{item.title}</h3>
                       {item.updatedAt ? (
-                        <time dateTime={item.updatedAt}>
+                        <time className="mt-2 block text-xs text-light-secondary dark:text-dark-secondary" dateTime={item.updatedAt}>
                           {new Date(item.updatedAt).toLocaleDateString('zh-CN')}
                         </time>
                       ) : null}
