@@ -89,11 +89,11 @@ export default function ArticleSummaryPreview({ bodyRef, label }: Props) {
 
   return (
     <div ref={rootRef} aria-label={label}>
-      <span className="content-feed-meta">{label}</span>
+      <span className="block text-xs font-bold uppercase tracking-wide text-light-secondary dark:text-dark-secondary">{label}</span>
       {summary ? (
-        <p className="content-detail-action-status">{summary}</p>
+        <p className="mt-2 text-sm leading-5 text-light-secondary dark:text-dark-secondary">{summary}</p>
       ) : (
-        <span className="content-feed-skeleton-line content-feed-skeleton-line-title" aria-hidden="true" />
+        <span className="mt-2 block h-4 w-4/5 animate-pulse rounded-full bg-light-line-reply dark:bg-dark-line-reply" aria-hidden="true" />
       )}
     </div>
   )
