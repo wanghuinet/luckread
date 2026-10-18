@@ -12,7 +12,7 @@ import {
 import { ShareRuntimeError, createShare, resolveShare } from './share-runtime.js'
 import { RepostRuntimeError, createRepost, removeRepost } from './repost-runtime.js'
 import { ProfilePinRuntimeError, getProfilePin, pinProfileContent, unpinProfileContent } from './profile-pin-runtime.js'
-import { BlockMuteRuntimeError, removeRelation, setRelation } from './block-mute-runtime.js'
+import { BlockMuteRuntimeError, listRelations, parseBlockMuteListLimit, removeRelation, setRelation } from './block-mute-runtime.js'
 import { getRelationshipGraph, invalidateRelationshipGraph, RelationshipGraphRuntimeError } from './relationship-graph-runtime.js'
 import {
   SocialClosureRuntimeError,
@@ -306,6 +306,25 @@ export default {
       if (blockMuteMatch) {
         const relationType = blockMuteMatch[1] === 'blocks' ? 'block' as const : 'mute' as const
         const targetFromPath = blockMuteMatch[2] ? decodePathPart(blockMuteMatch[2]) : null
+        if (request.method === 'GET' && targetFromPath === null) {
+          const actorUserId = requirePrincipal(request)
+          requireInteractionLayer(request)
+          const cursorValues = url.searchParams.getAll('cursor')
+          const limitValues = url.searchParams.getAll('limit')
+          let invalidQuery = false
+          url.searchParams.forEach((_value, key) => {
+            if (key !== 'cursor' && key !== 'limit') invalidQuery = true
+          })
+          if (invalidQuery || cursorValues.length > 1 || limitValues.length > 1) {
+            throw new BlockMuteRuntimeError('VALIDATION_FAILED', 400)
+          }
+          const limit = parseBlockMuteListLimit(limitValues[0] ?? null)
+          return json({
+            data: await listRelations(env.DB, actorUserId, relationType, cursorValues[0] ?? null, limit),
+            requestId: createRequestId(),
+          })
+        }
+
         if (request.method === 'POST') {
           if (targetFromPath !== null) return new Response(null, { status: 405, headers: { Allow: 'POST' } })
           const actorUserId = requirePrincipal(request)
