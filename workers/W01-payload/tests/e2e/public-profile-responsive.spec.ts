@@ -50,6 +50,8 @@ test('keeps the public profile and timeline inside the responsive X-style center
   await page.goto('http://127.0.0.1:3000/wanghui')
   await expect(page.locator('#creator-profile-title')).toBeVisible()
   await expect(page.getByTestId('luckread-social-post-card')).toBeVisible()
+  await expect(page.getByTestId('luckread-social-post-card')).toHaveClass(/border-b/)
+  await expect(page.getByTestId('luckread-social-post-card')).not.toHaveClass(/content-feed-card/)
 
   for (const width of [390, 500, 768, 1024, 1280]) {
     await page.setViewportSize({ width, height: 900 })
