@@ -11,8 +11,8 @@ import type { PublicLocale } from '../../i18n/public-locale'
 
 /**
  * UI structure adapted from ccrsxx/twitter-clone's Tweet, TweetStats and user
- * components (MIT). The default LuckRead content-card surface remains available; the
- * X timeline presentation uses LuckRead W01/W05 APIs for all reads and mutations.
+ * components (MIT). All callers use this X timeline presentation; reads and
+ * mutations remain on the existing LuckRead W01/W05 APIs.
  */
 type ContentDetail = {
   id?: string
@@ -65,7 +65,6 @@ type Props = {
   mediaRefs?: string[]
   createdAt?: string
   updatedAt?: string
-  presentation?: 'content' | 'x-timeline'
   locale?: PublicLocale
   onBookmarkChanged?: (bookmarked: boolean) => void
   onPinChanged?: (contentId: string, pinned: boolean) => void
@@ -80,7 +79,6 @@ export default function LuckReadSocialPostCard({
   mediaRefs,
   createdAt,
   updatedAt,
-  presentation = 'content',
   locale = 'zh',
   onBookmarkChanged,
   onPinChanged,
@@ -116,7 +114,6 @@ export default function LuckReadSocialPostCard({
 
   const contentHref = '/content/' + encodeURIComponent(slug || contentId)
   const mediaItems = resolveSocialPostMedia(mediaRefs, coverRef)
-  const singleMedia = mediaItems.length === 1 ? mediaItems[0] : undefined
   const profileName = profile?.displayName?.trim() || profile?.username || ''
   const username = profile?.username ? '@' + profile.username : ''
   const profileHref = profile?.username ? '/' + encodeURIComponent(profile.username) : null
@@ -688,7 +685,6 @@ export default function LuckReadSocialPostCard({
   if (isDeleted) return null
 
 
-  if (presentation === 'x-timeline') {
     const authorHref = profileHref
     const label = (en: string, zh: string, tw = zh) => locale === 'en' ? en : locale === 'tw' ? tw : zh
     const actionClass = 'group/action inline-flex min-w-0 items-center justify-center gap-1.5 rounded-full p-2 text-light-secondary transition-colors hover:bg-sky-500/10 hover:text-sky-500 disabled:cursor-wait disabled:opacity-50 dark:text-dark-secondary'
@@ -767,204 +763,5 @@ export default function LuckReadSocialPostCard({
         </div>
       </article>
     )
-  }
 
-  return (
-    <article className="content-feed-card" data-testid="luckread-social-post-card">
-      <div className="content-feed-body">
-        <div className="content-feed-meta">
-          {profileHref ? (
-            <Link className="content-detail-follow" href={profileHref}>
-              {profileName}
-            </Link>
-          ) : profileName ? (
-            <strong>{profileName}</strong>
-          ) : null}
-          {username ? <span>{username}</span> : null}
-          {formattedDate ? <time dateTime={postTimestamp}>{formattedDate}</time> : null}
-          {pinned ? <span className="content-detail-action-status">{locale === 'en' ? 'Pinned' : locale === 'tw' ? '已置頂' : '已置顶'}</span> : null}
-        </div>
-
-        <h3>{title}</h3>
-
-        {singleMedia ? (
-          <div className="content-feed-cover">
-            {singleMedia.kind === 'video' ? (
-              <video
-                aria-label={title}
-                controls
-                muted
-                playsInline
-                preload="metadata"
-                poster={singleMedia.poster}
-                src={singleMedia.src}
-              />
-            ) : (
-              <img alt={title} loading="lazy" src={singleMedia.src} />
-            )}
-          </div>
-        ) : mediaItems.length > 1 ? (
-          <div className="lr-preview-media" role="group" aria-label={locale === 'en' ? 'Post media' : '动态媒体'}>
-            {mediaItems.map((media) => (
-              media.kind === 'video' ? (
-                <video
-                  key={media.src}
-                  aria-label={title}
-                  controls
-                  muted
-                  playsInline
-                  preload="metadata"
-                  poster={media.poster}
-                  src={media.src}
-                />
-              ) : (
-                <img key={media.src} alt="" loading="lazy" src={media.src} />
-              )
-            ))}
-          </div>
-        ) : null}
-
-        <SocialPoll contentId={contentId} locale={locale} />
-
-        <Link
-          className="content-feed-open"
-          href={contentHref}
-          data-umami-event="content-open"
-          data-umami-event-content-type="post"
-        >
-          {locale === 'en' ? 'Open discussion ↗' : locale === 'tw' ? '查看討論 ↗' : '查看讨论 ↗'}
-        </Link>
-
-        <footer className="content-detail-actions">
-          <Link className="content-comment-reply" href={contentHref} aria-label={locale === 'en' ? 'Open replies' : '打开评论'}>
-            {locale === 'en' ? 'Discuss' : locale === 'tw' ? '討論' : '讨论'}
-          </Link>
-          <button
-            className="content-detail-like"
-            type="button"
-            disabled={likeBusy || likeStateLoading}
-            aria-pressed={liked}
-            onClick={() => void toggleLike()}
-          >
-            {likeStateLoading
-              ? '…'
-              : likeCount === null
-                ? (liked ? (locale === 'en' ? 'Liked' : '已赞') : (locale === 'en' ? 'Like' : '点赞'))
-                : (locale === 'en' ? 'Likes ' : '点赞 ') + likeCount.toLocaleString(dateLocale)}
-          </button>
-          <button
-            className="content-detail-like"
-            type="button"
-            disabled={repostBusy || likeStateLoading}
-            aria-pressed={reposted}
-            onClick={() => void toggleRepost()}
-          >
-            {repostBusy
-              ? (locale === 'en' ? 'Reposting…' : locale === 'tw' ? '轉推中…' : '转推中…')
-              : (locale === 'en' ? (reposted ? 'Undo repost' : 'Repost') : locale === 'tw' ? (reposted ? '取消轉推' : '轉推') : (reposted ? '取消转推' : '转推'))}
-            {repostCount !== null ? ' ' + repostCount.toLocaleString(dateLocale) : ''}
-          </button>
-          <button
-            className="content-detail-like"
-            type="button"
-            disabled={bookmarkBusy || likeStateLoading}
-            aria-pressed={bookmarked}
-            onClick={() => void toggleBookmark()}
-          >
-            {bookmarkBusy
-              ? (locale === 'en' ? 'Saving…' : locale === 'tw' ? '處理中…' : '处理中…')
-              : bookmarked
-                ? (locale === 'en' ? 'Saved' : locale === 'tw' ? '已收藏' : '已收藏')
-                : (locale === 'en' ? 'Bookmark' : locale === 'tw' ? '收藏' : '收藏')}
-          </button>
-          <button
-            className="content-detail-share"
-            type="button"
-            disabled={shareBusy}
-            onClick={() => void shareContent()}
-          >
-            {shareBusy
-              ? (locale === 'en' ? 'Sharing…' : locale === 'tw' ? '分享中…' : '分享中…')
-              : (locale === 'en' ? 'Share' : locale === 'tw' ? '分享' : '分享')}
-          </button>
-          <button
-            aria-controls={'post-more-actions-' + contentId}
-            aria-expanded={moreOpen}
-            aria-haspopup="true"
-            className="content-detail-like"
-            type="button"
-            onClick={() => setMoreOpen((open) => !open)}
-          >
-            {locale === 'en' ? 'More' : locale === 'tw' ? '更多' : '更多操作'} ⋯
-          </button>
-          {moreOpen ? (
-            <div id={'post-more-actions-' + contentId} role="group" aria-label={locale === 'en' ? 'More post actions' : locale === 'tw' ? '更多動態操作' : '更多动态操作'}>
-              {resolvedCreatorId && !isOwnPost && !followRestricted ? (
-                <button
-                  className="content-detail-like"
-                  type="button"
-                  disabled={followBusy}
-                  onClick={() => void toggleFollow()}
-                >
-                  {followBusy
-                    ? (locale === 'en' ? 'Working…' : locale === 'tw' ? '處理中…' : '处理中…')
-                    : following
-                      ? (locale === 'en' ? 'Unfollow' : locale === 'tw' ? '取消追蹤' : '取消关注')
-                      : (locale === 'en' ? 'Follow creator' : locale === 'tw' ? '追蹤作者' : '关注作者')}
-                </button>
-              ) : null}
-              {canManagePost ? (
-                <>
-                  <button
-                    className="content-detail-like"
-                    type="button"
-                    disabled={pinBusy}
-                    aria-pressed={pinned}
-                    onClick={() => void toggleProfilePin()}
-                  >
-                    {pinBusy
-                      ? (locale === 'en' ? 'Working…' : locale === 'tw' ? '處理中…' : '处理中…')
-                      : pinned
-                        ? (locale === 'en' ? 'Unpin from profile' : locale === 'tw' ? '取消個人頁置頂' : '取消个人主页置顶')
-                        : (locale === 'en' ? 'Pin to profile' : locale === 'tw' ? '置頂到個人頁' : '置顶到个人主页')}
-                  </button>
-                  <button
-                    className="content-detail-like"
-                    type="button"
-                    disabled={ownerActionBusy}
-                    onClick={() => void editPost()}
-                  >
-                    {ownerActionBusy
-                      ? (locale === 'en' ? 'Working…' : locale === 'tw' ? '處理中…' : '处理中…')
-                      : (locale === 'en' ? 'Edit post' : locale === 'tw' ? '編輯動態' : '编辑动态')}
-                  </button>
-                  <button
-                    className="content-detail-like"
-                    type="button"
-                    disabled={ownerActionBusy}
-                    onClick={() => void deletePost()}
-                  >
-                    {ownerActionBusy
-                      ? (locale === 'en' ? 'Deleting…' : locale === 'tw' ? '刪除中…' : '删除中…')
-                      : (locale === 'en' ? 'Delete post' : locale === 'tw' ? '刪除動態' : '删除动态')}
-                  </button>
-                </>
-              ) : null}
-              <button
-                className="content-detail-like"
-                type="button"
-                disabled={reportBusy}
-                onClick={() => void reportContent()}
-              >
-                {reportBusy
-                  ? (locale === 'en' ? 'Reporting…' : locale === 'tw' ? '舉報中…' : '举报中…')
-                  : (locale === 'en' ? 'Report' : locale === 'tw' ? '舉報' : '举报')}
-              </button>
-            </div>
-          ) : null}
-          {message ? <span className="content-detail-action-status" role="status">{message}</span> : null}
-        </footer>
-      </div>
-    </article>
-  )
 }
