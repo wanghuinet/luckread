@@ -147,6 +147,7 @@
         "DELETE /v1/users/{userId}/follow",
         "GET /v1/content/{contentId}/comments",
         "GET /v1/contents/{contentId}/comments",
+        "GET /v1/interactions/blocks",
         "PATCH /v1/comments/{commentId}",
         "POST /v1/comments/{commentId}/likes",
         "POST /v1/content/{contentId}/comments",
