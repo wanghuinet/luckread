@@ -214,7 +214,7 @@ describe('1.1 content lifecycle closeout', () => {
   it('keeps autosave and manual save on the same authoritative content mutation path', () => {
     const publisher = read('src/app/(frontend)/publish/PublishComposer.tsx')
     expect(publisher).toContain("method: isUpdate ? 'PATCH' : 'POST'")
-    expect(publisher).toContain("const isUpdate = Boolean(draft?.id && draft.etag)")
+    expect(publisher).toContain("const isUpdate = Boolean(currentDraft?.id && currentDraft.etag)")
     expect(publisher).toContain("rollbackBodyAssetId = uploadedBody.id")
     expect(publisher).toContain("if (rollbackBodyAssetId) await cleanupUploadedBodyAsset(rollbackBodyAssetId)")
     expect(publisher).toContain("rollbackBodyAssetId = null")
