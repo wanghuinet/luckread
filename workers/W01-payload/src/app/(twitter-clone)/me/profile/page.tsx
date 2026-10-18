@@ -54,7 +54,7 @@ const pageCopy = (locale: PublicLocale) => ({
   backCreator: locale === 'en' ? 'Back to Creator Studio' : locale === 'tw' ? '返回創作者中心' : '返回创作者中心',
   followers: locale === 'en' ? 'Followers' : locale === 'tw' ? '粉絲' : '我的粉丝',
   following: locale === 'en' ? 'Following' : locale === 'tw' ? '追蹤中' : '我的关注',
-  blocked: locale === 'en' ? 'Blocked accounts' : locale === 'tw' ? '已封鎖的帳號' : '已屏蔽的账号',  following: locale === 'en' ? 'Following' : locale === 'tw' ? '追蹤中' : '我的关注',
+  blocked: locale === 'en' ? 'Blocked accounts' : locale === 'tw' ? '已封鎖的帳號' : '已屏蔽的账号',
   subscriptions: locale === 'en' ? 'Subscriptions' : locale === 'tw' ? '訂閱' : '我的订阅',
   sessions: locale === 'en' ? 'Devices & sessions' : locale === 'tw' ? '登入裝置' : '登录设备',
   password: locale === 'en' ? 'Change password' : locale === 'tw' ? '修改密碼' : '修改密码',
@@ -215,7 +215,7 @@ export default function ProfilePage() {
         <nav className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-sm" aria-label="账户与创作者设置">
           <Link className="main-tab rounded-md py-1" href="/me/followers">{copy.followers}</Link>
           <Link className="main-tab rounded-md py-1" href="/me/following">{copy.following}</Link>
-          <Link className="main-tab rounded-md py-1" href="/me/blocked">{copy.blocked}</Link>          <Link className="main-tab rounded-md py-1" href="/me/following">{copy.following}</Link>
+          <Link className="main-tab rounded-md py-1" href="/me/blocked">{copy.blocked}</Link>
           <Link className="main-tab rounded-md py-1" href="/me/subscriptions">{copy.subscriptions}</Link>
           <Link className="main-tab rounded-md py-1" href="/me/sessions">{copy.sessions}</Link>
           <Link className="main-tab rounded-md py-1" href="/me/password">{copy.password}</Link>
