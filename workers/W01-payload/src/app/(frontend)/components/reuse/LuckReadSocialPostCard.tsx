@@ -65,6 +65,8 @@ type Props = {
   mediaRefs?: string[]
   createdAt?: string
   updatedAt?: string
+  /** Existing call sites may declare this mode; rendering is X timeline only. */
+  presentation?: 'x-timeline'
   locale?: PublicLocale
   onBookmarkChanged?: (bookmarked: boolean) => void
   onPinChanged?: (contentId: string, pinned: boolean) => void
