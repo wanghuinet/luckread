@@ -105,16 +105,16 @@ function ResetPasswordForm() {
   }
 
   return (
-    <main className="lr-auth-shell">
-      <section className="lr-auth-card">
-        <div className="lr-brand">LuckRead</div>
-        <h1>重置密码</h1>
-        <p className="lr-muted">使用邮件中的一次性重置令牌设置新的登录密码。</p>
+    <main className="min-h-screen bg-main-background px-4 py-10 text-light-primary dark:text-dark-primary">
+      <section className="mx-auto flex w-full max-w-xl flex-col gap-5 border-x border-light-border px-6 py-8 dark:border-dark-border">
+        <div className="text-2xl font-bold">LuckRead</div>
+        <h1 className="text-2xl font-bold tracking-tight">重置密码</h1>
+        <p className="text-sm text-light-secondary dark:text-dark-secondary">使用邮件中的一次性重置令牌设置新的登录密码。</p>
 
-        <form className="lr-auth-form" onSubmit={submit} aria-busy={busy} noValidate>
-          <label>
+        <form className="grid gap-4" onSubmit={submit} aria-busy={busy} noValidate>
+          <label className="grid gap-2 text-sm font-semibold text-light-secondary dark:text-dark-secondary">
             重置令牌
-            <input
+            <input className="w-full rounded-xl border border-light-border bg-main-background px-3 py-3 text-base text-light-primary outline-none transition focus:border-main-accent focus:ring-2 focus:ring-main-accent/20 disabled:opacity-50 dark:border-dark-border dark:text-dark-primary"
               autoComplete="off"
               disabled={busy}
               onChange={(event) => setRecoveryToken(event.target.value)}
@@ -124,9 +124,9 @@ function ResetPasswordForm() {
               value={recoveryToken}
             />
           </label>
-          <label>
+          <label className="grid gap-2 text-sm font-semibold text-light-secondary dark:text-dark-secondary">
             新密码
-            <input
+            <input className="w-full rounded-xl border border-light-border bg-main-background px-3 py-3 text-base text-light-primary outline-none transition focus:border-main-accent focus:ring-2 focus:ring-main-accent/20 disabled:opacity-50 dark:border-dark-border dark:text-dark-primary"
               autoComplete="new-password"
               disabled={busy}
               maxLength={MAX_PASSWORD_LENGTH}
@@ -137,9 +137,9 @@ function ResetPasswordForm() {
               value={newPassword}
             />
           </label>
-          <label>
+          <label className="grid gap-2 text-sm font-semibold text-light-secondary dark:text-dark-secondary">
             确认新密码
-            <input
+            <input className="w-full rounded-xl border border-light-border bg-main-background px-3 py-3 text-base text-light-primary outline-none transition focus:border-main-accent focus:ring-2 focus:ring-main-accent/20 disabled:opacity-50 dark:border-dark-border dark:text-dark-primary"
               autoComplete="new-password"
               disabled={busy}
               maxLength={MAX_PASSWORD_LENGTH}
@@ -151,18 +151,18 @@ function ResetPasswordForm() {
             />
           </label>
 
-          <p className="lr-muted">密码长度要求：15–128 个字符。请使用较长且独一无二的密码。</p>
+          <p className="text-sm text-light-secondary dark:text-dark-secondary">密码长度要求：15–128 个字符。请使用较长且独一无二的密码。</p>
 
-          {error ? <div className="lr-error" role="alert" aria-live="assertive">{error}</div> : null}
-          {message ? <div role="status" aria-live="polite">{message}</div> : null}
+          {error ? <div className="rounded-xl border border-accent-red/20 bg-accent-red/10 p-3 text-sm text-accent-red" role="alert" aria-live="assertive">{error}</div> : null}
+          {message ? <div className="text-sm text-light-secondary dark:text-dark-secondary" role="status" aria-live="polite">{message}</div> : null}
 
           {!message ? (
-            <button aria-busy={busy} disabled={busy} type="submit">
+            <button className="min-h-11 w-full rounded-full border-0 bg-main-accent px-4 py-3 font-bold text-white transition hover:brightness-90 disabled:cursor-not-allowed disabled:opacity-50" aria-busy={busy} disabled={busy} type="submit">
               {busy ? '重置中…' : '确认重置密码'}
             </button>
           ) : null}
 
-          <Link className="lr-link" href="/login">返回登录</Link>
+          <Link className="text-sm font-medium text-main-accent hover:underline" href="/login">返回登录</Link>
         </form>
       </section>
     </main>
@@ -172,9 +172,9 @@ function ResetPasswordForm() {
 export default function ResetPasswordPage() {
   return (
     <Suspense fallback={
-      <main className="lr-auth-shell">
-        <section className="lr-auth-card">
-          <div className="lr-brand">LuckRead</div>
+      <main className="min-h-screen bg-main-background px-4 py-10 text-light-primary dark:text-dark-primary">
+        <section className="mx-auto flex w-full max-w-xl flex-col gap-5 border-x border-light-border px-6 py-8 dark:border-dark-border">
+          <div className="text-2xl font-bold">LuckRead</div>
           <p className="lr-muted" role="status">正在加载密码重置…</p>
         </section>
       </main>
