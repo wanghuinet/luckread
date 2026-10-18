@@ -1,14 +1,14 @@
 import { expect, test } from '@playwright/test'
 
 test('keeps the public profile and timeline inside the responsive X-style center column', async ({ page }) => {
-  const profile = {
+  const profile: { id: string; username: string; displayName: string; bio: string; avatar: string | null } = {
     id: 'profile-id',
     username: 'wanghui',
     displayName: 'Wang Hui',
     bio: 'Responsive profile layout test',
     avatar: null,
   }
-  const post = {
+  const post: { id: string; slug: string; creatorId: string; contentType: 'post'; title: string; mediaRefs: string[]; coverRef: string | null; createdAt: string; updatedAt: string } = {
     id: 'post-1',
     slug: 'responsive-layout-test-post',
     creatorId: profile.id,
