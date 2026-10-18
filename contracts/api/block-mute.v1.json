@@ -24,72 +24,303 @@
       "operationId": "blockUser",
       "method": "POST",
       "path": "/interactions/blocks",
-      "auth": { "required": true, "permission": "interaction.block", "scope": "self" },
-      "request": {
-        "required": ["targetUserId"],
-        "properties": { "targetUserId": { "$ref": "#/definitions/ResourceId" } }
+      "auth": {
+        "required": true,
+        "permission": "interaction.block",
+        "scope": "self"
       },
-      "success": { "status": 200, "idempotent": true },
-      "errors": ["AUTH_REQUIRED", "PERMISSION_DENIED", "RESOURCE_NOT_FOUND", "INVALID_RELATIONSHIP", "RATE_LIMITED", "CONFLICT"],
-      "stateRequirements": ["actor_active", "target_exists", "not_self_target"],
-      "concurrency": { "strategy": "ATOMIC_UNIQUE_CONSTRAINT_OR_UPSERT", "duplicateResult": "IDEMPOTENT_SUCCESS" },
-      "cache": { "mode": "PRIVATE_INVALIDATE_OR_VERSION_BUMP", "shared": false },
-      "events": { "asyncMax": 2, "fanoutMax": 0, "event": "interaction.blocked" },
-      "antiAbuse": { "required": true, "scopes": ["ip", "device", "account", "endpoint", "target", "global"] },
-      "audit": { "required": true, "record": "relationship mutation and security-sensitive actor/target identifiers" }
+      "request": {
+        "required": [
+          "targetUserId"
+        ],
+        "properties": {
+          "targetUserId": {
+            "$ref": "#/definitions/ResourceId"
+          }
+        }
+      },
+      "success": {
+        "status": 200,
+        "idempotent": true
+      },
+      "errors": [
+        "AUTH_REQUIRED",
+        "PERMISSION_DENIED",
+        "RESOURCE_NOT_FOUND",
+        "INVALID_RELATIONSHIP",
+        "RATE_LIMITED",
+        "CONFLICT"
+      ],
+      "stateRequirements": [
+        "actor_active",
+        "target_exists",
+        "not_self_target"
+      ],
+      "concurrency": {
+        "strategy": "ATOMIC_UNIQUE_CONSTRAINT_OR_UPSERT",
+        "duplicateResult": "IDEMPOTENT_SUCCESS"
+      },
+      "cache": {
+        "mode": "PRIVATE_INVALIDATE_OR_VERSION_BUMP",
+        "shared": false
+      },
+      "events": {
+        "asyncMax": 2,
+        "fanoutMax": 0,
+        "event": "interaction.blocked"
+      },
+      "antiAbuse": {
+        "required": true,
+        "scopes": [
+          "ip",
+          "device",
+          "account",
+          "endpoint",
+          "target",
+          "global"
+        ]
+      },
+      "audit": {
+        "required": true,
+        "record": "relationship mutation and security-sensitive actor/target identifiers"
+      }
+    },
+    {
+      "operationId": "listBlockedUsers",
+      "method": "GET",
+      "path": "/interactions/blocks",
+      "auth": {
+        "required": true,
+        "permission": "interaction.block",
+        "scope": "self"
+      },
+      "query": {
+        "cursor": {
+          "type": "string",
+          "maxLength": 2048,
+          "format": "opaque-cursor",
+          "optional": true
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50,
+          "default": 20,
+          "optional": true
+        }
+      },
+      "success": {
+        "status": 200,
+        "shape": {
+          "items": "BlockMuteListItem[]",
+          "nextCursor": "string|null",
+          "hasMore": "boolean"
+        },
+        "item": {
+          "relationshipId": "ResourceId",
+          "targetUserId": "ResourceId",
+          "createdAt": "date-time"
+        },
+        "cache": "NO_STORE"
+      },
+      "errors": [
+        "AUTH_REQUIRED",
+        "PERMISSION_DENIED",
+        "VALIDATION_FAILED",
+        "INVALID_CURSOR",
+        "RATE_LIMITED"
+      ],
+      "stateRequirements": [
+        "actor_active"
+      ],
+      "concurrency": {
+        "strategy": "ACTOR_AND_RELATION_SCOPED_CURSOR"
+      },
+      "cache": {
+        "mode": "NO_STORE",
+        "shared": false
+      },
+      "events": {
+        "asyncMax": 0,
+        "fanoutMax": 0
+      },
+      "antiAbuse": {
+        "required": true,
+        "scopes": [
+          "account",
+          "endpoint",
+          "global"
+        ]
+      },
+      "audit": {
+        "required": false
+      }
     },
     {
       "operationId": "unblockUser",
       "method": "DELETE",
       "path": "/interactions/blocks/{targetUserId}",
-      "auth": { "required": true, "permission": "interaction.block", "scope": "self" },
-      "success": { "status": 204, "idempotent": true },
-      "errors": ["AUTH_REQUIRED", "PERMISSION_DENIED", "RATE_LIMITED"],
-      "stateRequirements": ["actor_active"],
-      "concurrency": { "strategy": "ATOMIC_DELETE", "absentResult": "IDEMPOTENT_SUCCESS" },
-      "cache": { "mode": "PRIVATE_INVALIDATE_OR_VERSION_BUMP", "shared": false },
-      "events": { "asyncMax": 2, "fanoutMax": 0, "event": "interaction.unblocked" },
-      "audit": { "required": true }
+      "auth": {
+        "required": true,
+        "permission": "interaction.block",
+        "scope": "self"
+      },
+      "success": {
+        "status": 204,
+        "idempotent": true
+      },
+      "errors": [
+        "AUTH_REQUIRED",
+        "PERMISSION_DENIED",
+        "RATE_LIMITED"
+      ],
+      "stateRequirements": [
+        "actor_active"
+      ],
+      "concurrency": {
+        "strategy": "ATOMIC_DELETE",
+        "absentResult": "IDEMPOTENT_SUCCESS"
+      },
+      "cache": {
+        "mode": "PRIVATE_INVALIDATE_OR_VERSION_BUMP",
+        "shared": false
+      },
+      "events": {
+        "asyncMax": 2,
+        "fanoutMax": 0,
+        "event": "interaction.unblocked"
+      },
+      "audit": {
+        "required": true
+      }
     },
     {
       "operationId": "muteUser",
       "method": "POST",
       "path": "/interactions/mutes",
-      "auth": { "required": true, "permission": "interaction.mute", "scope": "self" },
-      "request": {
-        "required": ["targetUserId"],
-        "properties": { "targetUserId": { "$ref": "#/definitions/ResourceId" } }
+      "auth": {
+        "required": true,
+        "permission": "interaction.mute",
+        "scope": "self"
       },
-      "success": { "status": 200, "idempotent": true },
-      "errors": ["AUTH_REQUIRED", "PERMISSION_DENIED", "RESOURCE_NOT_FOUND", "INVALID_RELATIONSHIP", "RATE_LIMITED", "CONFLICT"],
-      "stateRequirements": ["actor_active", "target_exists", "not_self_target"],
-      "concurrency": { "strategy": "ATOMIC_UNIQUE_CONSTRAINT_OR_UPSERT", "duplicateResult": "IDEMPOTENT_SUCCESS" },
-      "cache": { "mode": "PRIVATE_INVALIDATE_OR_VERSION_BUMP", "shared": false },
-      "events": { "asyncMax": 2, "fanoutMax": 0, "event": "interaction.muted" },
-      "antiAbuse": { "required": true, "scopes": ["ip", "device", "account", "endpoint", "target", "global"] },
-      "audit": { "required": true }
+      "request": {
+        "required": [
+          "targetUserId"
+        ],
+        "properties": {
+          "targetUserId": {
+            "$ref": "#/definitions/ResourceId"
+          }
+        }
+      },
+      "success": {
+        "status": 200,
+        "idempotent": true
+      },
+      "errors": [
+        "AUTH_REQUIRED",
+        "PERMISSION_DENIED",
+        "RESOURCE_NOT_FOUND",
+        "INVALID_RELATIONSHIP",
+        "RATE_LIMITED",
+        "CONFLICT"
+      ],
+      "stateRequirements": [
+        "actor_active",
+        "target_exists",
+        "not_self_target"
+      ],
+      "concurrency": {
+        "strategy": "ATOMIC_UNIQUE_CONSTRAINT_OR_UPSERT",
+        "duplicateResult": "IDEMPOTENT_SUCCESS"
+      },
+      "cache": {
+        "mode": "PRIVATE_INVALIDATE_OR_VERSION_BUMP",
+        "shared": false
+      },
+      "events": {
+        "asyncMax": 2,
+        "fanoutMax": 0,
+        "event": "interaction.muted"
+      },
+      "antiAbuse": {
+        "required": true,
+        "scopes": [
+          "ip",
+          "device",
+          "account",
+          "endpoint",
+          "target",
+          "global"
+        ]
+      },
+      "audit": {
+        "required": true
+      }
     },
     {
       "operationId": "unmuteUser",
       "method": "DELETE",
       "path": "/interactions/mutes/{targetUserId}",
-      "auth": { "required": true, "permission": "interaction.mute", "scope": "self" },
-      "success": { "status": 204, "idempotent": true },
-      "errors": ["AUTH_REQUIRED", "PERMISSION_DENIED", "RATE_LIMITED"],
-      "stateRequirements": ["actor_active"],
-      "concurrency": { "strategy": "ATOMIC_DELETE", "absentResult": "IDEMPOTENT_SUCCESS" },
-      "cache": { "mode": "PRIVATE_INVALIDATE_OR_VERSION_BUMP", "shared": false },
-      "events": { "asyncMax": 2, "fanoutMax": 0, "event": "interaction.unmuted" },
-      "audit": { "required": true }
+      "auth": {
+        "required": true,
+        "permission": "interaction.mute",
+        "scope": "self"
+      },
+      "success": {
+        "status": 204,
+        "idempotent": true
+      },
+      "errors": [
+        "AUTH_REQUIRED",
+        "PERMISSION_DENIED",
+        "RATE_LIMITED"
+      ],
+      "stateRequirements": [
+        "actor_active"
+      ],
+      "concurrency": {
+        "strategy": "ATOMIC_DELETE",
+        "absentResult": "IDEMPOTENT_SUCCESS"
+      },
+      "cache": {
+        "mode": "PRIVATE_INVALIDATE_OR_VERSION_BUMP",
+        "shared": false
+      },
+      "events": {
+        "asyncMax": 2,
+        "fanoutMax": 0,
+        "event": "interaction.unmuted"
+      },
+      "audit": {
+        "required": true
+      }
     }
   ],
   "propagation": {
-    "block": ["follow", "comment", "message", "notification", "feed", "search", "profile_relationships"],
-    "mute": ["feed", "notification", "recommendation", "source_distribution"],
+    "block": [
+      "follow",
+      "comment",
+      "message",
+      "notification",
+      "feed",
+      "search",
+      "profile_relationships"
+    ],
+    "mute": [
+      "feed",
+      "notification",
+      "recommendation",
+      "source_distribution"
+    ],
     "principle": "Propagation is enforced server-side by domain policy; clients MUST NOT be trusted to filter blocked or muted users."
   },
   "definitions": {
-    "ResourceId": { "type": "string", "minLength": 1, "maxLength": 128 }
+    "ResourceId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    }
   },
   "greenEvidence": {
     "openapi": "required",
