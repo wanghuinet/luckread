@@ -137,6 +137,9 @@ export default function PublishComposer({
   const modalMediaInputRef = useRef<HTMLInputElement>(null)
   const [coverRef, setCoverRef] = useState('')
   const [pollEnabled, setPollEnabled] = useState(false)
+  // Only call W05 to remove a poll if this draft actually has a persisted poll.
+  // New text/video posts must not depend on an optional poll route being deployed.
+  const pollConfiguredRef = useRef(false)
   const [pollOptions, setPollOptions] = useState<string[]>(['', ''])
   const [pollDurationHours, setPollDurationHours] = useState<24 | 72 | 168>(24)
   const [videoMetadataByAssetId, setVideoMetadataByAssetId] = useState<Record<string, VideoMetadata>>({})
@@ -220,6 +223,7 @@ export default function PublishComposer({
           setSavedArticleSerialized('')
         }
         setCoverRef(recovered.coverRef ?? '')
+        pollConfiguredRef.current = Boolean(recoveredPoll)
         setPollEnabled(Boolean(recoveredPoll))
         setPollOptions(recoveredPoll ? recoveredPoll.options.map((option) => option.text) : ['', ''])
         setPollDurationHours(recoveredPoll?.durationHours ?? 24)
@@ -406,8 +410,10 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
         },
       )
       if (!response.ok) throw new Error(getApiErrorMessage(data, '投票保存失败，请稍后重试。'))
+      pollConfiguredRef.current = true
       return
     }
+    if (!pollConfiguredRef.current) return
     const { response, data } = await authorizedFetch<{ error?: { message?: string } }>(
       '/api/v1/contents/' + encodeURIComponent(contentId) + '/poll',
       {
@@ -416,6 +422,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
       },
     )
     if (!response.ok) throw new Error(getApiErrorMessage(data, '移除投票失败，请稍后重试。'))
+    pollConfiguredRef.current = false
   }
 
   async function persistDraft(): Promise<ContentResponse> {
@@ -620,6 +627,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
     setBody('')
     setAssets([])
     setCoverRef('')
+    pollConfiguredRef.current = false
     setPollEnabled(false)
     setPollOptions(['', ''])
     setPollDurationHours(24)
