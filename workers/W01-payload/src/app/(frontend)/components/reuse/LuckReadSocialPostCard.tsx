@@ -116,6 +116,7 @@ export default function LuckReadSocialPostCard({
 
   const contentHref = '/content/' + encodeURIComponent(slug || contentId)
   const mediaItems = resolveSocialPostMedia(mediaRefs, coverRef)
+  const singleMedia = mediaItems.length === 1 ? mediaItems[0] : undefined
   const profileName = profile?.displayName?.trim() || profile?.username || ''
   const username = profile?.username ? '@' + profile.username : ''
   const profileHref = profile?.username ? '/' + encodeURIComponent(profile.username) : null
