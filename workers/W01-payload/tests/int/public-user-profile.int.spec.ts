@@ -197,3 +197,16 @@ it('keeps public follower and following pages anonymous for shared-cache deliver
   expect(page).toContain("fetchJson<ListResponse>('/api/v1/users/' + encodeURIComponent(userId) + '/' + direction")
   expect(page).not.toContain("fetch('/api/v1/users/' + encodeURIComponent(userId)")
 })
+
+
+it('resolves public profile projections by Better Auth identity id without exposing the mapping field', () => {
+  const route = read('src/app/api/v1/users/by-identity-id/[identityId]/route.ts')
+
+  expect(route).toContain("where: { identityId: { equals: identityId } }")
+  expect(route).toContain("collection: 'users'")
+  expect(route).toContain("username: typeof publicUser.username === 'string' ? publicUser.username : ''")
+  expect(route).toContain("displayName: typeof publicUser.displayName === 'string' ? publicUser.displayName : null")
+  expect(route).toContain("avatar: typeof publicUser.avatar === 'string' ? publicUser.avatar : null")
+  expect(route).toContain("cachedPublicGet(")
+  expect(route).not.toContain("identityId: String(publicUser.identityId")
+})
