@@ -802,7 +802,7 @@ describe('Creator Center admin extension', () => {
     const composerCss = read('src/app/(frontend)/publish/publish.css')
     const composerModalSource = read('src/app/(twitter-clone)/TwitterClonePostComposerModal.tsx')
     expect(composerModalSource).not.toContain("import '../(frontend)/publish/publish.css'")
-    expect(publisher).toContain('className={isTweetModal ? "m-0 w-full rounded-none border-0 bg-black p-0 text-[#e7e9ea] shadow-none" : "lr-composer-card"}')
+    expect(publisher).toContain('isXWorkspace ? "min-w-0 bg-main-background text-light-primary dark:text-dark-primary" : "lr-composer-card"')
     expect(publisher).toContain('grid grid-cols-2 gap-2 px-3.5 pb-3')
     expect(publisher).toContain('border-t border-[#2f3336] bg-black')
     expect(publisher).not.toContain('lr-post-modal-')
