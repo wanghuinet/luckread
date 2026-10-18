@@ -847,10 +847,10 @@ export default function PublicProfilePage({
                       <img
                         alt=""
                         className="h-20 w-24 shrink-0 rounded-xl object-cover"
-                        height={80}
+                        height={360}
                         loading="lazy"
                         src={item.coverRef}
-                        width={96}
+                        width={480}
                       />
                     ) : (
                       <span className="grid h-20 w-24 shrink-0 place-items-center rounded-xl bg-main-sidebar-background text-lg font-bold text-light-secondary dark:text-dark-secondary">

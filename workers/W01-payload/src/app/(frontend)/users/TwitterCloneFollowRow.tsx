@@ -54,9 +54,9 @@ export default function TwitterCloneFollowRow({ userId, followedAt, action, pres
       </span>
       <div className="min-w-0 flex-1">
         <h3 className="truncate text-sm font-bold">用户 {userId}</h3>
-        <p className="mt-1 text-sm text-light-secondary dark:text-dark-secondary">
+        <time className="mt-1 block text-sm text-light-secondary dark:text-dark-secondary" dateTime={followedAt}>
           关系建立于 {formatDate(followedAt, locale)}
-        </p>
+        </time>
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <Link className="main-tab rounded-full border border-light-border px-4 py-2 text-sm font-bold hover:bg-light-primary/10 dark:border-dark-border dark:hover:bg-dark-primary/10" href={profileHref}>
