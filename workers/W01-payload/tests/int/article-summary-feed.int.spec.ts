@@ -67,7 +67,7 @@ describe('article summary card preview', () => {
     expect(component).toContain("referrerPolicy: 'no-referrer'")
     expect(component).toContain('resolvePublicArticleBodyUrl(bodyRef, window.location.origin)')
     expect(component).toContain('text-xs font-bold uppercase tracking-wide text-light-secondary dark:text-dark-secondary')
-    expect(component).toContain('className="content-detail-action-status"')
+    expect(component).toContain('mt-2 text-sm leading-5 text-light-secondary dark:text-dark-secondary')
     expect(component).toContain('animate-pulse rounded-full bg-light-line-reply dark:bg-dark-line-reply')
     expect(component).not.toContain('ArticleSummaryPreview.module.css')
     expect(existsSync(resolve(process.cwd(), 'src/components/ArticleSummaryPreview.module.css'))).toBe(false)
