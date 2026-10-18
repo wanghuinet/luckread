@@ -25,6 +25,8 @@ describe('Twitter Clone UI reuse through LuckRead API adapters', () => {
     expect(component).toContain('getCachedPublicProfile(authorId)')
     const profileCache = read('src/lib/social-post-profile-cache.ts')
     expect(profileCache).toContain("'/api/v1/users/' + encodeURIComponent(normalizedId)")
+    expect(profileCache).toContain("'/api/v1/users/by-identity-id/' + encodeURIComponent(normalizedId)")
+    expect(profileCache).toContain('identityId')
     expect(profileCache).toContain("credentials: 'omit'")
     expect(profileCache).toContain('ttlMs: 30_000')
     expect(profileCache).toContain('maxEntries: 200')

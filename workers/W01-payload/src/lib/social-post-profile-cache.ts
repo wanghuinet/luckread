@@ -88,18 +88,40 @@ export function getCachedPublicProfile(userId: string): Promise<PublicProfile> {
   }
 
   return publicProfileCache.get(normalizedId, async () => {
-    const { response, data } = await fetchJson<PublicProfile>(
-      '/api/v1/users/' + encodeURIComponent(normalizedId),
-      {
-        credentials: 'omit',
-        headers: { accept: 'application/json' },
-        cache: 'no-store',
-      },
-    )
+    const requestOptions = {
+      credentials: 'omit' as const,
+      headers: { accept: 'application/json' },
+      cache: 'no-store' as const,
+    }
 
-    if (!response.ok || !data || typeof data.id !== 'string' || data.id !== normalizedId) {
+    // Content authors may be identified by W02/Better Auth identity IDs,
+    // while W01 Payload stores its profile projection under a separate ID.
+    // Preserve the existing Payload-ID lookup first, then resolve the mapped
+    // public profile by identityId without exposing identityId in the response.
+    try {
+      const direct = await fetchJson<PublicProfile>(
+        '/api/v1/users/' + encodeURIComponent(normalizedId),
+        requestOptions,
+      )
+      if (
+        direct.response.ok &&
+        direct.data &&
+        typeof direct.data.id === 'string' &&
+        direct.data.id === normalizedId
+      ) {
+        return direct.data
+      }
+    } catch {
+      // A transient direct lookup failure should not block the identity lookup.
+    }
+
+    const mapped = await fetchJson<PublicProfile>(
+      '/api/v1/users/by-identity-id/' + encodeURIComponent(normalizedId),
+      requestOptions,
+    )
+    if (!mapped.response.ok || !mapped.data || typeof mapped.data.id !== 'string') {
       throw new Error('Public profile unavailable')
     }
-    return data
+    return mapped.data
   })
 }
