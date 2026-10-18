@@ -16,7 +16,11 @@ describe('LuckRead H5 blue design system', () => {
     expect(styles).toContain('--lr-h5-bg: #f5f9ff')
     expect(styles).toContain('.lr-auth-shell')
     expect(styles).toContain('.content-browse')
-    expect(styles).toContain('.content-detail')
+    expect(styles).not.toContain('.content-detail {')
+    expect(styles).not.toContain('.content-detail-card {')
+    const contentDetail = read('src/app/(frontend)/content/[contentId]/ContentDetailClient.tsx')
+    expect(contentDetail).toContain('flex min-w-0 flex-col border-b border-light-border dark:border-dark-border')
+    expect(contentDetail).toContain('main-tab rounded-full border border-light-border px-4 py-2 text-sm font-bold')
     expect(styles).not.toContain('.my-subscriptions')
     expect(styles).toContain('.lr-publish-shell')
 
