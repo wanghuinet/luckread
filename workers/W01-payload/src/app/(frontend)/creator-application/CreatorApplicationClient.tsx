@@ -3,7 +3,6 @@
 import Link from 'next/link'
 import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react'
 import { fetchJson, getApiErrorMessage } from '../../../lib/client-api.js'
-import styles from './creator-application.module.css'
 import TwitterCloneSecondaryPageLayout from '../../(twitter-clone)/TwitterCloneSecondaryPageLayout'
 
 type CreatorType = 'PERSONAL' | 'WRITER' | 'VIDEO_CREATOR' | 'DEVELOPER' | 'ARTIST' | 'OTHER'
@@ -147,94 +146,94 @@ export default function CreatorApplicationClient({
 
   return (
     <TwitterCloneSecondaryPageLayout locale="zh" title="创作者资格" active="editProfile" showLanguageToggle={false}>
-      <div className={styles.page + ' text-light-primary dark:text-dark-primary'}>
-      <section className={styles.hero}>
-        <span className={styles.eyebrow}>CREATOR QUALIFICATION</span>
+      <div className="w-full text-light-primary dark:text-dark-primary">
+      <section className="mx-auto mb-6 mt-9 w-full max-w-[840px]">
+        <span className="text-[11px] font-extrabold tracking-[0.14em] text-main-accent">CREATOR QUALIFICATION</span>
         <h1>成为 LuckRead 创作者</h1>
         <p>提交创作者资格申请。审核通过并完成权限确认后，即可进入创作者中心发布和管理原创内容。</p>
-        <div className={styles.applicant}>申请账号：<strong>{displayName}</strong></div>
+        <div className="mt-[18px] break-words text-[13px] text-light-secondary dark:text-dark-secondary">申请账号：<strong className="font-semibold text-light-primary dark:text-dark-primary">{displayName}</strong></div>
       </section>
 
-      <section className={styles.panel} aria-busy={loading || saving}>
-        <div className={styles.panelHeading}>
-          <div><span className={styles.eyebrow}>APPLICATION</span><h2>资格申请与状态</h2></div>
-          <button className={styles.refreshButton} type="button" onClick={() => void loadApplication()} disabled={loading || saving}>
+      <section className="mx-auto w-full max-w-[840px] rounded-2xl border border-light-border bg-main-background p-4 sm:p-6 md:p-8 dark:border-dark-border" aria-busy={loading || saving}>
+        <div className="flex items-center justify-between gap-3 border-b border-light-border pb-5 dark:border-dark-border">
+          <div><span className="text-[11px] font-extrabold tracking-[0.14em] text-main-accent">APPLICATION</span><h2 className="mt-1.5 text-xl font-bold tracking-tight">资格申请与状态</h2></div>
+          <button className="min-h-9 shrink-0 rounded-full border border-light-border px-3 text-[13px] text-light-primary hover:bg-main-accent/10 disabled:cursor-not-allowed disabled:opacity-50 dark:border-dark-border dark:text-dark-primary" type="button" onClick={() => void loadApplication()} disabled={loading || saving}>
             {loading ? '读取中…' : '刷新状态'}
           </button>
         </div>
 
-        {loading ? <p className={styles.loading} role="status">正在读取你的申请状态…</p> : null}
-        {error ? <div className={styles.error} role="alert">{error}<button type="button" onClick={() => void loadApplication()} disabled={loading}>重试读取</button></div> : null}
-        {notice ? <p className={styles.notice} role="status">{notice}</p> : null}
+        {loading ? <p className="text-sm text-light-secondary dark:text-dark-secondary" role="status">正在读取你的申请状态…</p> : null}
+        {error ? <div className="mt-4 flex flex-col items-stretch justify-between gap-3 rounded-xl border border-[#ffd8d6] bg-[#fff5f4] p-3 text-[13px] leading-6 text-[#a42b29] sm:flex-row sm:items-center" role="alert">{error}<button className="shrink-0 rounded-full border border-[#efc2bf] bg-white px-3 py-2 font-semibold text-[#9d2c28] hover:bg-red-50 disabled:opacity-50" type="button" onClick={() => void loadApplication()} disabled={loading}>重试读取</button></div> : null}
+        {notice ? <p className="mt-4 text-[13px] text-[#177246]" role="status">{notice}</p> : null}
 
         {!loading && application ? (
-          <article className={styles.statusCard} aria-label="当前申请状态">
-            <div className={styles.statusHeading}>
-              <span className={styles.statusLabel}>申请状态</span>
-              <span className={application.status === 'APPROVED' && application.grant_state === 'GRANTED' ? styles.statusSuccess : application.status === 'REJECTED' ? styles.statusRejected : styles.statusPending}>
+          <article className="mt-5 rounded-2xl border border-light-border bg-main-background p-4 sm:p-5 dark:border-dark-border" aria-label="当前申请状态">
+            <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
+              <span className="text-sm font-bold text-light-secondary dark:text-dark-secondary">申请状态</span>
+              <span className={application.status === 'APPROVED' && application.grant_state === 'GRANTED' ? 'rounded-full bg-emerald-100 px-3 py-2 text-center text-xs font-bold text-emerald-800' : application.status === 'REJECTED' ? 'rounded-full bg-red-100 px-3 py-2 text-center text-xs font-bold text-red-700' : 'rounded-full bg-amber-100 px-3 py-2 text-center text-xs font-bold text-amber-800'}>
                 {application.status === 'PENDING' ? '等待审核' : application.status === 'REJECTED' ? '申请未通过' : application.grant_state === 'GRANTED' ? '已通过 · 权限已生效' : '审核已通过 · 权限确认中'}
               </span>
             </div>
-            <dl className={styles.details}>
-              <div><dt>创作方向</dt><dd>{creatorTypes.find((item) => item.value === application.creator_type)?.label ?? application.creator_type}</dd></div>
-              <div><dt>提交时间</dt><dd>{dateLabel(application.created_at)}</dd></div>
-              <div><dt>最近更新</dt><dd>{dateLabel(application.updated_at)}</dd></div>
-              {application.decided_at ? <div><dt>审核时间</dt><dd>{dateLabel(application.decided_at)}</dd></div> : null}
+            <dl className="my-5 grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
+              <div><dt className="text-xs text-light-secondary dark:text-dark-secondary">创作方向</dt><dd className="mt-1.5 break-words text-sm text-light-primary dark:text-dark-primary">{creatorTypes.find((item) => item.value === application.creator_type)?.label ?? application.creator_type}</dd></div>
+              <div><dt className="text-xs text-light-secondary dark:text-dark-secondary">提交时间</dt><dd className="mt-1.5 break-words text-sm text-light-primary dark:text-dark-primary">{dateLabel(application.created_at)}</dd></div>
+              <div><dt className="text-xs text-light-secondary dark:text-dark-secondary">最近更新</dt><dd className="mt-1.5 break-words text-sm text-light-primary dark:text-dark-primary">{dateLabel(application.updated_at)}</dd></div>
+              {application.decided_at ? <div><dt className="text-xs text-light-secondary dark:text-dark-secondary">审核时间</dt><dd className="mt-1.5 break-words text-sm text-light-primary dark:text-dark-primary">{dateLabel(application.decided_at)}</dd></div> : null}
             </dl>
-            {application.statement ? <div className={styles.statement}><strong>申请说明</strong><p>{application.statement}</p></div> : null}
-            {application.status === 'PENDING' ? <p className={styles.statusMessage}>申请已收到，请等待审核。你可以随时刷新查看最新状态。</p> : null}
+            {application.statement ? <div className="border-t border-light-border pt-4 dark:border-dark-border"><strong className="text-[13px] font-bold">申请说明</strong><p className="mt-2 whitespace-pre-wrap break-words text-sm leading-7 text-light-secondary dark:text-dark-secondary">{application.statement}</p></div> : null}
+            {application.status === 'PENDING' ? <p className="mt-4 rounded-xl bg-main-sidebar-background p-3 text-[13px] leading-7 text-light-secondary dark:text-dark-secondary">申请已收到，请等待审核。你可以随时刷新查看最新状态。</p> : null}
             {application.status === 'REJECTED' ? (
-              <div className={styles.rejection}><strong>审核反馈</strong><p>{application.decision_reason || '当前没有附加说明。你可以参考平台规则修改申请内容后重新提交。'}</p></div>
+              <div className="border-t border-light-border pt-4 dark:border-dark-border"><strong className="text-[13px] font-bold">审核反馈</strong><p className="mt-2 whitespace-pre-wrap break-words text-sm leading-7 text-light-secondary dark:text-dark-secondary">{application.decision_reason || '当前没有附加说明。你可以参考平台规则修改申请内容后重新提交。'}</p></div>
             ) : null}
-            {hasPendingGrant ? <p className={styles.statusMessage}>审核已通过，但 W02 权限授予尚未确认。创作者权限暂未生效，请稍后刷新；若状态持续不变，请联系平台审核员重新确认授权。</p> : null}
+            {hasPendingGrant ? <p className="mt-4 rounded-xl bg-main-sidebar-background p-3 text-[13px] leading-7 text-light-secondary dark:text-dark-secondary">审核已通过，但 W02 权限授予尚未确认。创作者权限暂未生效，请稍后刷新；若状态持续不变，请联系平台审核员重新确认授权。</p> : null}
             {application.status === 'APPROVED' && application.grant_state === 'GRANTED' ? (
-              <Link className={styles.primaryLink} href="/creator-center">进入创作者中心 <span aria-hidden="true">→</span></Link>
+              <Link className="mt-4 inline-flex items-center gap-2 rounded-full bg-main-accent px-4 py-3 text-sm font-bold text-white hover:brightness-90" href="/creator-center">进入创作者中心 <span aria-hidden="true">→</span></Link>
             ) : null}
           </article>
         ) : null}
 
         {!loading && layer === 'L3' ? (
-          <div className={styles.eligibleNotice}>
-            <span className={styles.checkIcon} aria-hidden="true">✓</span>
-            <div><h3>你已具备创作者权限</h3><p>你的账号属于 L3 创作者层级，可以直接进入创作者中心。</p><Link href="/creator-center">进入创作者中心 →</Link></div>
+          <div className="mt-5 flex items-start gap-3 rounded-xl border border-[#cfe8d8] bg-[#f0fbf4] p-4 text-[#17683f]">
+            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#dcf6e8] font-extrabold text-[#147448]" aria-hidden="true">✓</span>
+            <div className="min-w-0"><h3 className="text-base font-bold">你已具备创作者权限</h3><p className="mb-3 mt-2 text-[13px] leading-7 text-light-secondary">你的账号属于 L3 创作者层级，可以直接进入创作者中心。</p><Link className="text-sm font-bold text-main-accent hover:underline" href="/creator-center">进入创作者中心 →</Link></div>
           </div>
         ) : null}
 
         {!loading && (layer === 'L7' || layer === 'L8') ? (
-          <div className={styles.eligibleNotice}>
-            <span className={styles.checkIcon} aria-hidden="true">✓</span>
-            <div><h3>管理员审核入口</h3><p>你的权限允许审核创作者资格申请。</p><Link href="/creator-review">打开创作者审核队列 →</Link></div>
+          <div className="mt-5 flex items-start gap-3 rounded-xl border border-[#cfe8d8] bg-[#f0fbf4] p-4 text-[#17683f]">
+            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#dcf6e8] font-extrabold text-[#147448]" aria-hidden="true">✓</span>
+            <div className="min-w-0"><h3 className="text-base font-bold">管理员审核入口</h3><p className="mb-3 mt-2 text-[13px] leading-7 text-light-secondary">你的权限允许审核创作者资格申请。</p><Link className="text-sm font-bold text-main-accent hover:underline" href="/creator-review">打开创作者审核队列 →</Link></div>
           </div>
         ) : null}
 
         {!loading && layer !== 'L2' && layer !== 'L3' && layer !== 'L7' && layer !== 'L8' ? (
-          <div className={styles.lockedNotice}>
-            <h3>暂不能提交创作者申请</h3>
-            <p>请先完成邮箱验证并获得 L2 普通用户权限。账号权限由系统依据验证和授权结果确定，页面不会自行提升权限。</p>
-            <Link href="/me/profile">查看个人资料</Link>
+          <div className="mt-5 rounded-xl border border-light-border bg-main-sidebar-background p-4 dark:border-dark-border">
+            <h3 className="text-base font-bold">暂不能提交创作者申请</h3>
+            <p className="mb-3 mt-2 text-[13px] leading-7 text-light-secondary">请先完成邮箱验证并获得 L2 普通用户权限。账号权限由系统依据验证和授权结果确定，页面不会自行提升权限。</p>
+            <Link className="text-sm font-bold text-main-accent hover:underline" href="/me/profile">查看个人资料</Link>
           </div>
         ) : null}
 
         {!loading && canApply ? (
-          <form className={styles.form} onSubmit={submitApplication}>
-            <div className={styles.formIntro}>
-              <h3>{application?.status === 'REJECTED' ? '修改申请后重新提交' : '填写创作者申请'}</h3>
-              <p>请选择与你的原创内容相符的方向，审核结果会显示在本页。</p>
+          <form className="mt-6 grid gap-4" onSubmit={submitApplication}>
+            <div className="grid gap-2">
+              <h3 className="text-lg font-bold">{application?.status === 'REJECTED' ? '修改申请后重新提交' : '填写创作者申请'}</h3>
+              <p className="text-[13px] leading-7 text-light-secondary">请选择与你的原创内容相符的方向，审核结果会显示在本页。</p>
             </div>
-            <label className={styles.field}>
-              <span>创作方向 <b aria-hidden="true">*</b></span>
-              <select value={creatorType} onChange={(event) => setCreatorType(event.target.value as CreatorType)} required disabled={saving}>
+            <label className="mt-4 grid gap-2 text-sm font-semibold text-light-primary dark:text-dark-primary">
+              <span className="flex items-center gap-2">创作方向 <b className="text-accent-red" aria-hidden="true">*</b></span>
+              <select className="block min-h-11 w-full rounded-xl border border-light-border bg-main-background px-3 py-3 text-sm leading-6 text-light-primary outline-none focus:border-main-accent focus:ring-2 focus:ring-main-accent/20 disabled:opacity-50 dark:border-dark-border dark:text-dark-primary" value={creatorType} onChange={(event) => setCreatorType(event.target.value as CreatorType)} required disabled={saving}>
                 {creatorTypes.map((item) => <option key={item.value} value={item.value}>{item.label} — {item.description}</option>)}
               </select>
             </label>
-            <label className={styles.field}>
-              <span>申请说明 <small>选填</small></span>
-              <textarea value={statement} onChange={(event) => setStatement(event.target.value)} rows={5} maxLength={2000} placeholder="简要介绍你的创作方向、计划发布的内容或相关作品。" disabled={saving} />
-              <span className={styles.counter}>{statement.length}/2000</span>
+            <label className="mt-4 grid gap-2 text-sm font-semibold text-light-primary dark:text-dark-primary">
+              <span className="flex items-center justify-between gap-2">申请说明 <small className="text-xs font-normal text-light-secondary">选填</small></span>
+              <textarea className="block min-h-[124px] w-full resize-y rounded-xl border border-light-border bg-main-background px-3 py-3 text-sm font-normal leading-6 text-light-primary outline-none focus:border-main-accent focus:ring-2 focus:ring-main-accent/20 disabled:opacity-50 dark:border-dark-border dark:text-dark-primary" value={statement} onChange={(event) => setStatement(event.target.value)} rows={5} maxLength={2000} placeholder="简要介绍你的创作方向、计划发布的内容或相关作品。" disabled={saving} />
+              <span className="flex justify-end text-xs font-normal text-light-secondary dark:text-dark-secondary">{statement.length}/2000</span>
             </label>
-            <div className={styles.formFoot}>
-              <p>提交后将进入平台审核。申请不会自动授予 L3 权限。</p>
-              <button className={styles.primaryButton} type="submit" disabled={saving}>
+            <div className="mt-5 flex flex-col items-stretch justify-between gap-4 border-t border-light-border pt-5 sm:flex-row sm:items-center dark:border-dark-border">
+              <p className="max-w-[390px] text-xs leading-7 text-light-secondary dark:text-dark-secondary">提交后将进入平台审核。申请不会自动授予 L3 权限。</p>
+              <button className="min-h-11 rounded-full border-0 bg-main-accent px-5 font-bold text-white hover:brightness-90 disabled:cursor-not-allowed disabled:opacity-50" type="submit" disabled={saving}>
                 {saving ? '提交中…' : application?.status === 'REJECTED' ? '重新提交申请' : '提交创作者申请'}
               </button>
             </div>
@@ -242,7 +241,7 @@ export default function CreatorApplicationClient({
         ) : null}
       </section>
 
-      <footer className={styles.footer}>
+      <footer className="mx-auto mt-6 flex w-full max-w-[840px] flex-wrap justify-between gap-3 text-[11px] leading-6 text-light-secondary dark:text-dark-secondary">
         <span>LuckRead · 创作者资格服务</span>
         <span>审核通过后，系统还会独立确认创作者角色授权。</span>
       </footer>
