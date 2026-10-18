@@ -79,6 +79,30 @@ describe('W05 social query transport', () => {
     }), { DB: dbFor() })
     expect(unsupported.status).toBe(405)
   })
+  it('lists the authenticated viewer block relations through the internal GET route', async () => {
+    const response = await worker.fetch(
+      request('/internal/social/interactions/blocks?limit=10', transportHeaders),
+      { DB: dbFor([
+        {
+          relationship_id: 'block-1',
+          actor_user_id: 'viewer-1',
+          target_user_id: 'target-1',
+          relation_type: 'block',
+          created_at: '2026-10-18T00:00:00.000Z',
+        },
+      ]) },
+    )
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({
+      data: {
+        items: [{ relationshipId: 'block-1', targetUserId: 'target-1', createdAt: '2026-10-18T00:00:00.000Z' }],
+        nextCursor: null,
+        hasMore: false,
+      },
+      requestId: expect.stringMatching(/^req_/),
+    })
+  })
+
   it('creates an idempotent block relation for an active actor and existing target', async () => {
     const response = await worker.fetch(
       new Request('https://luckread-w05.internal/internal/social/interactions/blocks', {
