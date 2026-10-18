@@ -117,10 +117,9 @@ export default function LuckReadSocialPostCard({
   const contentHref = '/content/' + encodeURIComponent(slug || contentId)
   const mediaItems = resolveSocialPostMedia(mediaRefs, coverRef)
   const singleMedia = mediaItems.length === 1 ? mediaItems[0] : undefined
-  const profileName = profile?.displayName?.trim() || profile?.username || (
-    locale === 'en' ? 'LuckRead creator' : locale === 'tw' ? 'LuckRead 創作者' : 'LuckRead 创作者'
-  )
+  const profileName = profile?.displayName?.trim() || profile?.username || ''
   const username = profile?.username ? '@' + profile.username : ''
+  const profileHref = profile?.username ? '/' + encodeURIComponent(profile.username) : null
   const dateLocale = locale === 'en' ? 'en-US' : locale === 'tw' ? 'zh-TW' : 'zh-CN'
   const isOwnPost = Boolean(viewerUserId && resolvedCreatorId && viewerUserId === resolvedCreatorId)
   const canManagePost = Boolean(
@@ -690,7 +689,7 @@ export default function LuckReadSocialPostCard({
 
 
   if (presentation === 'x-timeline') {
-    const authorHref = resolvedCreatorId ? '/users/' + encodeURIComponent(resolvedCreatorId) : null
+    const authorHref = profileHref
     const label = (en: string, zh: string, tw = zh) => locale === 'en' ? en : locale === 'tw' ? tw : zh
     const actionClass = 'group/action inline-flex min-w-0 items-center justify-center gap-1.5 rounded-full p-2 text-light-secondary transition-colors hover:bg-sky-500/10 hover:text-sky-500 disabled:cursor-wait disabled:opacity-50 dark:text-dark-secondary'
     const actionText = 'min-w-[14px] text-xs tabular-nums'
@@ -699,18 +698,18 @@ export default function LuckReadSocialPostCard({
         <div className="grid grid-cols-[auto,minmax(0,1fr)] gap-x-3">
           {authorHref ? (
             <Link href={authorHref} aria-label={profileName} className="mt-0.5 grid h-10 w-10 place-items-center overflow-hidden rounded-full bg-main-sidebar-background text-sm font-bold text-light-primary dark:text-dark-primary">
-              {profile?.avatar ? <img alt="" className="h-full w-full object-cover" height={40} loading="lazy" src={profile.avatar} width={40} /> : profileName.slice(0, 1).toUpperCase()}
+              {profile?.avatar ? <img alt="" className="h-full w-full object-cover" height={40} loading="lazy" src={profile.avatar} width={40} /> : profileName ? profileName.slice(0, 1).toUpperCase() : ''}
             </Link>
           ) : (
             <div aria-label={profileName} className="mt-0.5 grid h-10 w-10 place-items-center overflow-hidden rounded-full bg-main-sidebar-background text-sm font-bold text-light-primary dark:text-dark-primary">
-              {profile?.avatar ? <img alt="" className="h-full w-full object-cover" height={40} loading="lazy" src={profile.avatar} width={40} /> : profileName.slice(0, 1).toUpperCase()}
+              {profile?.avatar ? <img alt="" className="h-full w-full object-cover" height={40} loading="lazy" src={profile.avatar} width={40} /> : profileName ? profileName.slice(0, 1).toUpperCase() : ''}
             </div>
           )}
           <div className="min-w-0">
             {pinned ? <div className="mb-1 flex items-center gap-2 pl-1 text-xs font-bold text-light-secondary dark:text-dark-secondary"><TimelineIcon name="pin" /><span>{label('Pinned', '已置顶', '已置頂')}</span></div> : null}
             <div className="flex min-w-0 items-start justify-between gap-2">
               <div className="flex min-w-0 flex-wrap items-baseline gap-x-1 text-[15px] leading-5">
-                {authorHref ? <Link className="max-w-full truncate font-bold text-light-primary hover:underline dark:text-dark-primary" href={authorHref}>{profileName}</Link> : <strong className="max-w-full truncate font-bold text-light-primary dark:text-dark-primary">{profileName}</strong>}
+                {authorHref ? <Link className="max-w-full truncate font-bold text-light-primary hover:underline dark:text-dark-primary" href={authorHref}>{profileName}</Link> : profileName ? <strong className="max-w-full truncate font-bold text-light-primary dark:text-dark-primary">{profileName}</strong> : null}
                 {username ? <span className="max-w-full truncate text-light-secondary dark:text-dark-secondary">{username}</span> : null}
                 {formattedDate ? <><span aria-hidden="true" className="text-light-secondary dark:text-dark-secondary">·</span><time className="whitespace-nowrap text-light-secondary dark:text-dark-secondary" dateTime={postTimestamp}>{formattedDate}</time></> : null}
               </div>
@@ -774,13 +773,13 @@ export default function LuckReadSocialPostCard({
     <article className="content-feed-card" data-testid="luckread-social-post-card">
       <div className="content-feed-body">
         <div className="content-feed-meta">
-          {resolvedCreatorId ? (
-            <Link className="content-detail-follow" href={'/users/' + encodeURIComponent(resolvedCreatorId)}>
+          {profileHref ? (
+            <Link className="content-detail-follow" href={profileHref}>
               {profileName}
             </Link>
-          ) : (
+          ) : profileName ? (
             <strong>{profileName}</strong>
-          )}
+          ) : null}
           {username ? <span>{username}</span> : null}
           {formattedDate ? <time dateTime={postTimestamp}>{formattedDate}</time> : null}
           {pinned ? <span className="content-detail-action-status">{locale === 'en' ? 'Pinned' : locale === 'tw' ? '已置頂' : '已置顶'}</span> : null}
