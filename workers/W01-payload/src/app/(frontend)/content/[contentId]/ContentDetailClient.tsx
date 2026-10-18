@@ -191,15 +191,15 @@ export default function ContentDetailPage({
   }, [initialContent, params, retryKey])
 
   if (loading) {
-    return <Root aria-busy={loading} className="content-detail"><p className="content-detail-state" role="status">{copy.detail.loading}</p></Root>
+    return <Root aria-busy={loading} className="flex min-w-0 flex-col"><p className="flex min-h-40 items-center justify-center px-4 py-12 text-sm text-light-secondary dark:text-dark-secondary" role="status">{copy.detail.loading}</p></Root>
   }
 
   if (error || !content) {
     return (
-      <Root className="content-detail">
-        <div className="content-detail-state">
+      <Root className="flex min-w-0 flex-col">
+        <div className="flex min-h-[60vh] flex-col items-center justify-center gap-3 px-4 py-12 text-center text-sm text-light-secondary dark:text-dark-secondary">
           <p>{error || copy.detail.notFound}</p>
-          <button className="content-detail-retry" onClick={() => { setError(''); setLoading(true); setContent(null); setBody(''); setRetryKey((value) => value + 1) }} type="button">{copy.detail.retry}</button>
+          <button className="main-tab rounded-full border border-light-border px-4 py-2 text-sm font-bold hover:bg-light-primary/10 dark:border-dark-border dark:hover:bg-dark-primary/10" onClick={() => { setError(''); setLoading(true); setContent(null); setBody(''); setRetryKey((value) => value + 1) }} type="button">{copy.detail.retry}</button>
           <Link href="/">{copy.common.backHome}</Link>
         </div>
       </Root>
@@ -417,64 +417,65 @@ export default function ContentDetailPage({
   }
 
   return (
-    <Root className="content-detail">
-      <div className="content-detail-top">
-        <div className="content-detail-breadcrumbs">
-          <Link href="/content">{copy.detail.backDiscover}</Link>
-          <Link href="/">{copy.common.home}</Link>
+    <Root className="flex min-w-0 flex-col">
+      <div className="flex flex-col gap-3 border-b border-light-border px-4 py-3 text-sm text-light-secondary dark:border-dark-border dark:text-dark-secondary sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <Link className="main-tab rounded-full px-3 py-2 font-bold hover:bg-light-primary/10 dark:hover:bg-dark-primary/10" href="/content">{copy.detail.backDiscover}</Link>
+          <Link className="main-tab rounded-full px-3 py-2 font-bold hover:bg-light-primary/10 dark:hover:bg-dark-primary/10" href="/">{copy.common.home}</Link>
         </div>
-        <div className="content-detail-actions">
-          <span>{typeLabels[content.contentType]} · {copy.detail.published}</span>
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <span className="mr-1 text-xs text-light-secondary dark:text-dark-secondary">{typeLabels[content.contentType]} · {copy.detail.published}</span>
           {content.creatorId ? (
             <>
-              <Link className="content-detail-follow" href={'/users/' + encodeURIComponent(content.creatorId)}>{copy.detail.author}</Link>
+              <Link className="main-tab rounded-full border border-light-border px-4 py-2 text-sm font-bold hover:bg-light-primary/10 disabled:cursor-wait disabled:opacity-50 dark:border-dark-border dark:hover:bg-dark-primary/10" href={'/users/' + encodeURIComponent(content.creatorId)}>{copy.detail.author}</Link>
               {viewerUserId === content.creatorId ? (
-                <span className="content-detail-muted">{copy.detail.own}</span>
+                <span className="text-sm text-light-secondary dark:text-dark-secondary">{copy.detail.own}</span>
               ) : followRestricted ? (
-                <span className="content-detail-muted">{copy.detail.restricted}</span>
+                <span className="text-sm text-light-secondary dark:text-dark-secondary">{copy.detail.restricted}</span>
               ) : (
-                <button className="content-detail-follow" disabled={followBusy} onClick={() => void toggleFollow()} type="button">
+                <button className="main-tab rounded-full border border-light-border px-4 py-2 text-sm font-bold hover:bg-light-primary/10 disabled:cursor-wait disabled:opacity-50 dark:border-dark-border dark:hover:bg-dark-primary/10" disabled={followBusy} onClick={() => void toggleFollow()} type="button">
                   {followBusy ? copy.comments.processing : following ? copy.detail.following : copy.detail.follow}
                 </button>
               )}
             </>
           ) : null}
           {!interactionRestricted ? (
-            <button className="content-detail-like" disabled={likeBusy} onClick={() => void toggleLike()} type="button">
+            <button className="main-tab rounded-full border border-light-border px-4 py-2 text-sm font-bold hover:bg-light-primary/10 disabled:cursor-wait disabled:opacity-50 dark:border-dark-border dark:hover:bg-dark-primary/10" disabled={likeBusy} onClick={() => void toggleLike()} type="button">
               {likeBusy ? copy.comments.processing : liked ? copy.detail.liked : copy.detail.like}
               {likeCount === null ? '' : ' · ' + likeCount.toLocaleString(dateLocale)}
             </button>
           ) : null}
-          <button className="content-detail-like" disabled={bookmarkBusy} onClick={() => void toggleBookmark()} type="button">
+          <button className="main-tab rounded-full border border-light-border px-4 py-2 text-sm font-bold hover:bg-light-primary/10 disabled:cursor-wait disabled:opacity-50 dark:border-dark-border dark:hover:bg-dark-primary/10" disabled={bookmarkBusy} onClick={() => void toggleBookmark()} type="button">
             {bookmarkBusy ? copy.comments.processing : bookmarked ? copy.detail.favorited : copy.detail.favorite}
           </button>
-          <button className="content-detail-share" disabled={shareBusy} onClick={() => void copyContentLink()} type="button">
+          <button className="main-tab rounded-full border border-light-border px-4 py-2 text-sm font-bold hover:bg-light-primary/10 disabled:cursor-wait disabled:opacity-50 dark:border-dark-border dark:hover:bg-dark-primary/10" disabled={shareBusy} onClick={() => void copyContentLink()} type="button">
             {shareBusy ? copy.detail.generating : copied ? copy.detail.copied : copy.detail.share}
           </button>
           {viewerUserId && viewerUserId !== content.creatorId ? (
-            <button className="content-detail-share" disabled={reportBusy} onClick={() => void submitReport()} type="button">
+            <button className="main-tab rounded-full border border-light-border px-4 py-2 text-sm font-bold hover:bg-light-primary/10 disabled:cursor-wait disabled:opacity-50 dark:border-dark-border dark:hover:bg-dark-primary/10" disabled={reportBusy} onClick={() => void submitReport()} type="button">
               {reportBusy ? copy.detail.reporting : copy.detail.report}
             </button>
           ) : null}
-          {actionMessage ? <span className="content-detail-action-status" role="status">{actionMessage}</span> : null}
+          {actionMessage ? <span className="text-sm text-light-secondary dark:text-dark-secondary" role="status">{actionMessage}</span> : null}
         </div>
       </div>
-      <article className="content-detail-card">
-        <header className="content-detail-header">
-          {showLanguageToggle ? <div className="content-detail-language"><PublicLanguageToggle locale={locale} /></div> : null}
-          <p className="eyebrow">LUCKREAD CONTENT</p>
-          <h1>{content.title}</h1>
+      <article className="flex min-w-0 flex-col border-b border-light-border dark:border-dark-border">
+        <header className="px-4 py-5">
+          {showLanguageToggle ? <div className="mb-2 flex justify-end"><PublicLanguageToggle locale={locale} /></div> : null}
+          <p className="mb-2 text-xs font-bold uppercase tracking-widest text-main-accent">LUCKREAD CONTENT</p>
+          <h1 className="break-words text-xl font-bold leading-6 sm:text-2xl">{content.title}</h1>
           {content.updatedAt ? (
-            <time dateTime={content.updatedAt}>
+            <time className="mt-2 block text-sm text-light-secondary dark:text-dark-secondary" dateTime={content.updatedAt}>
               {copy.detail.updatedAt} {new Date(content.updatedAt).toLocaleString(dateLocale, { hour12: false })}
             </time>
           ) : null}
         </header>
 
         {content.contentType === 'video' && content.mediaRefs?.length ? (
-          <div className="content-detail-media content-detail-video-gallery">
+          <div className="grid gap-1">
             {content.mediaRefs.map((url, index) => (
               <video
+                className="block max-h-[720px] w-full bg-black object-cover"
                 aria-label={content.title + ' ' + copy.detail.video + ' ' + (index + 1)}
                 controls
                 key={url}
@@ -488,23 +489,23 @@ export default function ContentDetailPage({
         ) : null}
 
         {content.contentType !== 'video' && (content.coverRef || (content.mediaRefs?.length && !structuredArticle)) ? (
-          <div className="content-detail-media">
+          <div className="grid gap-1">
             {content.coverRef ? (
-              <img alt={content.title + ' ' + copy.detail.cover} loading="eager" src={content.coverRef} />
+              <img alt={content.title + ' ' + copy.detail.cover} className="block max-h-[720px] w-full object-cover" loading="eager" src={content.coverRef} />
             ) : null}
             {content.mediaRefs
               ?.filter((url) => url !== content.coverRef)
               .map((url, index) => (
-                <img alt={content.title + ' ' + copy.detail.image + ' ' + (index + 1)} key={url} loading="lazy" src={url} />
+                <img alt={content.title + ' ' + copy.detail.image + ' ' + (index + 1)} className="block max-h-[720px] w-full object-cover" key={url} loading="lazy" src={url} />
               ))}
           </div>
         ) : null}
 
         {socialTopics.length > 0 || socialMentions.length > 0 ? (
-          <section aria-label={copy.detail.tagAria} className="content-detail-social-tokens">
+          <section aria-label={copy.detail.tagAria} className="flex flex-wrap gap-2 border-b border-light-border px-4 py-3 dark:border-dark-border">
             {socialTopics.map((topic) => (
               <Link
-                className="content-detail-social-token"
+                className="main-tab rounded-full border border-light-border px-3 py-1.5 text-sm text-main-accent hover:bg-light-primary/10 dark:border-dark-border dark:hover:bg-dark-primary/10"
                 href={'/topics/' + encodeURIComponent(topic.name)}
                 key={'topic:' + topic.topicId}
               >
@@ -513,7 +514,7 @@ export default function ContentDetailPage({
             ))}
             {socialMentions.map((mention) => (
               <Link
-                className="content-detail-social-token"
+                className="main-tab rounded-full border border-light-border px-3 py-1.5 text-sm text-main-accent hover:bg-light-primary/10 dark:border-dark-border dark:hover:bg-dark-primary/10"
                 href={'/users/' + encodeURIComponent(mention.userId)}
                 key={'mention:' + mention.userId}
               >
@@ -524,15 +525,15 @@ export default function ContentDetailPage({
         ) : null}
 
         {!(content.contentType === 'post' && body.trim() === content.title.trim()) ? (
-          <div className="content-detail-body">
+          <div className="px-4 py-4 sm:py-6">
             {structuredArticle ? (
               <ArticleStructuredRenderer document={structuredArticle} />
             ) : body ? (
-              splitBodyIntoParagraphs(body).map((paragraph, index) => (
-                <p className="content-detail-paragraph" key={index}>{paragraph}</p>
-              ))
+              <div className="flex flex-col gap-4">{splitBodyIntoParagraphs(body).map((paragraph, index) => (
+                <p className="whitespace-pre-wrap break-words text-[15px] leading-6 text-light-primary dark:text-dark-primary" key={index}>{paragraph}</p>
+              ))}</div>
             ) : (
-              <p className="content-detail-muted">{copy.detail.bodyPreparing}</p>
+              <p className="text-sm text-light-secondary dark:text-dark-secondary">{copy.detail.bodyPreparing}</p>
             )}
           </div>
         ) : null}
