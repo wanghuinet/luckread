@@ -195,70 +195,34 @@ export default function RegisterForm({ policyVersion }: RegisterFormProps) {
   }
 
   return (
-    <main className="registerPage">
-      <div className="registerLayout">
-        <section className="registerStory" aria-label="关于 LuckRead">
-          <Link className="registerBrand" href="/" aria-label="LuckRead 首页">
-            <span className="registerMark" aria-hidden="true">L</span>
-            <span className="registerBrandName">LuckRead</span>
-          </Link>
+    <main className="min-h-screen bg-main-background text-light-primary dark:text-dark-primary">
+      <div className="mx-auto flex min-h-screen w-full max-w-xl flex-col border-x border-light-border dark:border-dark-border">
 
-          <div className="registerStoryContent">
-            <span className="registerEyebrow">
-              <span className="registerEyebrowDot" aria-hidden="true" />
-              READ · CREATE · CONNECT
-            </span>
-            <h1>让每一次阅读，<br />连接更大的世界。</h1>
-            <p className="registerStoryLead">
-              发现值得阅读的内容，关注喜欢的创作者，也让你的想法被更多人看见。
-            </p>
-
-            <div className="registerHighlights">
-              <div className="registerHighlight">
-                <span className="registerHighlightIcon" aria-hidden="true">↗</span>
-                <span><strong>发现新内容</strong><small>探索文章、动态与短视频</small></span>
-              </div>
-              <div className="registerHighlight">
-                <span className="registerHighlightIcon" aria-hidden="true">◎</span>
-                <span><strong>建立个人主页</strong><small>用自己的方式表达与分享</small></span>
-              </div>
-              <div className="registerHighlight">
-                <span className="registerHighlightIcon" aria-hidden="true">⌁</span>
-                <span><strong>连接感兴趣的人</strong><small>关注创作者，加入兴趣交流</small></span>
-              </div>
-            </div>
+        <section className="flex flex-1 flex-col px-4 py-6 sm:px-8" aria-labelledby="register-title">
+          <div className="mb-6 flex items-center justify-between">
+            <span className="flex items-center gap-2 font-bold"><span className="grid h-8 w-8 place-items-center rounded-lg bg-main-accent font-bold text-white" aria-hidden="true">L</span> LuckRead</span>
+            <span className="text-xs text-light-secondary dark:text-dark-secondary"><span aria-hidden="true">✦</span> 安全注册</span>
           </div>
 
-          <p className="registerStoryFoot">一个账号，开启你的 LuckRead 旅程。</p>
-          <div className="registerOrb registerOrbOne" aria-hidden="true" />
-          <div className="registerOrb registerOrbTwo" aria-hidden="true" />
-        </section>
-
-        <section className="registerPanel" aria-labelledby="register-title">
-          <div className="registerPanelTop">
-            <span className="registerMobileBrand"><span className="registerMark" aria-hidden="true">L</span> LuckRead</span>
-            <span className="registerSecure"><span aria-hidden="true">✦</span> 安全注册</span>
-          </div>
-
-          <div className="registerCard">
-            <div className="registerIntro">
-              <span className="registerStep">开启你的账号</span>
-              <h2 id="register-title">创建账号</h2>
-              <p>加入 LuckRead，开始阅读与分享。</p>
+          <div className="w-full">
+            <div className="mb-6 grid gap-2">
+              <span className="text-xs font-bold uppercase tracking-wide text-main-accent">开启你的账号</span>
+              <h2 className="text-2xl font-bold tracking-tight" id="register-title">创建账号</h2>
+              <p className="text-sm text-light-secondary dark:text-dark-secondary">加入 LuckRead，开始阅读与分享。</p>
             </div>
 
             {status === 'success' && result ? (
-              <div className="registerSuccess" role="status" aria-live="polite">
-                <div className="successIcon" aria-hidden="true">✓</div>
-                <h3>账号创建成功</h3>
-                <p className="registerSuccessLead">再完成邮箱验证，就可以继续使用你的账号。</p>
-                <div className="registerEmailSummary">
-                  <span className="registerEmailIcon" aria-hidden="true">✉</span>
-                  <span><small>验证邮箱</small><strong>{registeredEmail}</strong></span>
+              <div className="grid gap-4 rounded-2xl border border-light-border p-4 dark:border-dark-border" role="status" aria-live="polite">
+                <div className="grid h-10 w-10 place-items-center rounded-full bg-accent-green/10 text-xl font-bold text-accent-green" aria-hidden="true">✓</div>
+                <h3 className="text-lg font-bold">账号创建成功</h3>
+                <p className="text-sm text-light-secondary dark:text-dark-secondary">再完成邮箱验证，就可以继续使用你的账号。</p>
+                <div className="flex items-center gap-3 rounded-xl bg-main-sidebar-background p-3">
+                  <span className="grid h-10 w-10 place-items-center rounded-full bg-main-background text-main-accent" aria-hidden="true">✉</span>
+                  <span className="grid min-w-0 gap-1"><small className="text-xs text-light-secondary dark:text-dark-secondary">验证邮箱</small><strong className="break-all text-sm">{registeredEmail}</strong></span>
                 </div>
                 {verificationMessage ? (
                   <p
-                    className={verificationStatus === 'error' ? 'registerError' : 'registerVerificationStatus'}
+                    className={verificationStatus === 'error' ? 'rounded-xl border border-accent-red/20 bg-accent-red/10 p-3 text-sm text-accent-red' : 'text-sm text-light-secondary dark:text-dark-secondary'}
                     role={verificationStatus === 'error' ? 'alert' : 'status'}
                     aria-live="polite"
                   >
@@ -266,7 +230,7 @@ export default function RegisterForm({ policyVersion }: RegisterFormProps) {
                   </p>
                 ) : null}
                 <button
-                  className="registerPrimaryButton"
+                  className="flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-main-accent px-4 py-3 font-bold text-white transition hover:brightness-90 disabled:cursor-not-allowed disabled:opacity-50"
                   type="button"
                   disabled={verificationStatus === 'sending' || !registeredEmail}
                   onClick={() => void sendVerificationEmail(registeredEmail)}
@@ -277,13 +241,13 @@ export default function RegisterForm({ policyVersion }: RegisterFormProps) {
                       ? '重新发送验证邮件'
                       : '发送/重试验证邮件'}
                 </button>
-                <Link className="registerSecondaryButton" href="/login">前往登录</Link>
+                <Link className="flex min-h-11 w-full items-center justify-center rounded-full border border-light-border px-4 py-3 text-center font-bold text-main-accent hover:bg-main-accent/10 dark:border-dark-border" href="/login">前往登录</Link>
               </div>
             ) : (
-              <form aria-busy={status === 'submitting'} className="registerForm" onSubmit={handleSubmit} noValidate>
-                <label className="registerField">
+              <form aria-busy={status === 'submitting'} className="grid gap-4" onSubmit={handleSubmit} noValidate>
+                <label className="grid gap-2 text-sm font-semibold">
                   <span>邮箱地址</span>
-                  <input
+                  <input className="w-full rounded-xl border border-light-border bg-main-background px-3 py-3 text-base text-light-primary outline-none transition focus:border-main-accent focus:ring-2 focus:ring-main-accent/20 disabled:opacity-60 dark:border-dark-border dark:text-dark-primary"
                     autoComplete="email"
                     inputMode="email"
                     name="email"
@@ -297,9 +261,9 @@ export default function RegisterForm({ policyVersion }: RegisterFormProps) {
                   />
                 </label>
 
-                <label className="registerField">
+                <label className="grid gap-2 text-sm font-semibold">
                   <span>用户名</span>
-                  <input
+                  <input className="w-full rounded-xl border border-light-border bg-main-background px-3 py-3 text-base text-light-primary outline-none transition focus:border-main-accent focus:ring-2 focus:ring-main-accent/20 disabled:opacity-60 dark:border-dark-border dark:text-dark-primary"
                     autoComplete="username"
                     minLength={6}
                     maxLength={32}
@@ -315,9 +279,9 @@ export default function RegisterForm({ policyVersion }: RegisterFormProps) {
                   <small>用于你的公开主页：luckread.com/你的用户名。用户名需为 6–32 位英文字母或数字。</small>
                 </label>
 
-                <label className="registerField">
+                <label className="grid gap-2 text-sm font-semibold">
                   <span>设置密码</span>
-                  <input
+                  <input className="w-full rounded-xl border border-light-border bg-main-background px-3 py-3 text-base text-light-primary outline-none transition focus:border-main-accent focus:ring-2 focus:ring-main-accent/20 disabled:opacity-60 dark:border-dark-border dark:text-dark-primary"
                     autoComplete="new-password"
                     name="password"
                     minLength={15}
@@ -333,9 +297,9 @@ export default function RegisterForm({ policyVersion }: RegisterFormProps) {
                   <small id="register-password-hint">密码需为 15–128 个字符；可使用长句，不要使用其他网站的旧密码。</small>
                 </label>
 
-                <label className="registerField">
+                <label className="grid gap-2 text-sm font-semibold">
                   <span>确认密码</span>
-                  <input
+                  <input className="w-full rounded-xl border border-light-border bg-main-background px-3 py-3 text-base text-light-primary outline-none transition focus:border-main-accent focus:ring-2 focus:ring-main-accent/20 disabled:opacity-60 dark:border-dark-border dark:text-dark-primary"
                     autoComplete="new-password"
                     name="confirmPassword"
                     onChange={(event) => setConfirmPassword(event.target.value)}
@@ -349,39 +313,39 @@ export default function RegisterForm({ policyVersion }: RegisterFormProps) {
                   />
                 </label>
 
-                <label className="registerConsent">
-                  <input
+                <label className="flex items-start gap-2 text-sm text-light-secondary dark:text-dark-secondary">
+                  <input className="mt-1 h-4 w-4 accent-[#1d9bf0]"
                     checked={consent}
                     onChange={(event) => setConsent(event.target.checked)}
                     type="checkbox"
                   />
-                  <span>我已阅读并同意 <Link href="/terms" target="_blank">用户协议</Link> 和 <Link href="/privacy" target="_blank">隐私政策</Link></span>
+                  <span>我已阅读并同意 <Link className="text-main-accent hover:underline" href="/terms" target="_blank">用户协议</Link> 和 <Link className="text-main-accent hover:underline" href="/privacy" target="_blank">隐私政策</Link></span>
                 </label>
 
                 {status === 'error' ? (
-                  <p className="registerError" role="alert">{message}</p>
+                  <p className="rounded-xl border border-accent-red/20 bg-accent-red/10 p-3 text-sm text-accent-red" role="alert">{message}</p>
                 ) : null}
 
                 <button
                   aria-busy={status === 'submitting'}
-                  className="registerPrimaryButton"
+                  className="flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-main-accent px-4 py-3 font-bold text-white transition hover:brightness-90 disabled:cursor-not-allowed disabled:opacity-50"
                   disabled={status === 'submitting'}
                   type="submit"
                 >
                   {status === 'submitting' ? '正在创建账号…' : '创建 LuckRead 账号'}
                   {status !== 'submitting' ? <span aria-hidden="true">→</span> : null}
                 </button>
-                <p className="registerTermsHint">创建账号即表示你同意遵守 LuckRead 的社区规则。</p>
+                <p className="text-xs text-light-secondary dark:text-dark-secondary">创建账号即表示你同意遵守 LuckRead 的社区规则。</p>
               </form>
             )}
 
-            <div className="registerFooter">
+            <div className="mt-6 flex items-center justify-center gap-2 text-sm text-light-secondary dark:text-dark-secondary">
               <span>已经有账号？</span>
-              <Link href="/login">立即登录</Link>
+              <Link className="font-bold text-main-accent hover:underline" href="/login">立即登录</Link>
             </div>
           </div>
 
-          <p className="registerCopyright">© {new Date().getFullYear()} LuckRead <span>·</span> 让好内容连接彼此</p>
+          <p className="mt-8 text-center text-xs text-light-secondary dark:text-dark-secondary">© {new Date().getFullYear()} LuckRead <span>·</span> 让好内容连接彼此</p>
         </section>
       </div>
     </main>
