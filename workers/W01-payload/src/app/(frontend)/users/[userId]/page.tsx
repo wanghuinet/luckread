@@ -776,7 +776,7 @@ export default function PublicProfilePage({
           ) : null}
 
           {filter === 'replies' && replies.length > 0 ? (
-            <div className="creator-profile-grid">
+            <div className="creator-profile-reply-list">
               {replies.map((reply) => (
                 <Link className="creator-profile-card" href={'/content/' + encodeURIComponent(reply.contentId)} key={reply.id}>
                   <div className="creator-profile-card-body">
@@ -790,7 +790,7 @@ export default function PublicProfilePage({
           ) : null}
 
           {visibleContents.length > 0 ? (
-            <div className="creator-profile-grid">
+            <div className={filter === 'articles' || (filter === 'media' && !visibleContents.some((item) => item.contentType === 'post')) ? 'creator-profile-grid' : 'creator-profile-post-list'}>
               {visibleContents.map((item) => {
                 if (item.contentType === 'post') {
                   return (
