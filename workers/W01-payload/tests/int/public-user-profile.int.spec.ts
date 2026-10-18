@@ -123,6 +123,7 @@ describe('public creator profile', () => {
     expect(page).toContain("import LuckReadSocialPostCard from '../../components/reuse/LuckReadSocialPostCard'")
     expect(page).toContain("if (item.contentType === 'post')")
     expect(page).toContain('<LuckReadSocialPostCard')
+    expect(page).toContain('presentation="x-timeline"')
     expect(page).toContain('creatorId={item.creatorId ?? profile?.id}')
     expect(page).toContain('mediaRefs={item.mediaRefs}')
     expect(page).toContain('createdAt={item.createdAt}')
