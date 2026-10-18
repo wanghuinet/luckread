@@ -44,12 +44,12 @@ describe('creator qualification application page', () => {
     expect(profile).toContain('href="/creator-application"')
   })
 
-  it('uses responsive mobile and desktop layout styles', () => {
-    const css = read('src/app/(frontend)/creator-application/creator-application.module.css')
-    expect(css).toContain('@media (max-width: 640px)')
-    expect(css).toContain('@media (max-width: 380px)')
-    expect(css).toContain('grid-template-columns: repeat(3, minmax(0, 1fr))')
-    expect(css).toContain('grid-template-columns: 1fr')
+  it('uses responsive shared X utilities instead of bespoke module CSS', () => {
+    const client = read('src/app/(frontend)/creator-application/CreatorApplicationClient.tsx')
+    expect(client).toContain('max-w-[840px]')
+    expect(client).toContain('grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3')
+    expect(client).toContain('focus:ring-2')
+    expect(client).not.toContain('styles.')
   })
   it('preserves the canonical cookie or Bearer credential across the W01-to-W08 binding', () => {
     const client = read('src/auth/w08-creator-client.ts')
