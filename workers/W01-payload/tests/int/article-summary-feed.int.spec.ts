@@ -79,14 +79,13 @@ describe('article summary card preview', () => {
   it('keeps article summaries preview-only and leaves video content to the existing vertical player', () => {
     const component = read('src/components/ArticleSummaryPreview.tsx')
     const shorts = read('src/app/(frontend)/shorts/ShortVideoFeed.tsx')
-    const shortsCss = read('src/app/(frontend)/shorts/short-video.module.css')
 
     expect(component).not.toContain('method: \'POST\'')
     expect(component).not.toContain('method: \'PATCH\'')
     expect(shorts).toContain('scrollIntoView({ behavior: \'smooth\', block: \'start\' })')
     expect(shorts).toContain('showDoubleTapHeart')
     expect(shorts).toContain('playsInline')
-    expect(shortsCss).toContain('height: 100dvh')
-    expect(shortsCss).toContain('scroll-snap-type: y mandatory')
+    expect(shorts).toContain('relative h-dvh min-h-screen snap-start snap-always')
+    expect(shorts).toContain('snap-y snap-mandatory')
   })
 })

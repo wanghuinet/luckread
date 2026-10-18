@@ -16,7 +16,6 @@ describe('short video playback polish', () => {
 
   it('supports double-tap like feedback and active-video progress', () => {
     const feed = read('src/app/(frontend)/shorts/ShortVideoFeed.tsx')
-    const css = read('src/app/(frontend)/shorts/short-video.module.css')
     expect(feed).toContain('showDoubleTapHeart')
     expect(feed).toContain('const handleVideoTap')
     expect(feed).toContain('if (event.detail >= 2)')
@@ -24,12 +23,9 @@ describe('short video playback polish', () => {
     expect(feed).toContain('setActiveIndex(index)')
     expect(feed).toContain('onTimeUpdate')
     expect(feed).toContain('current.duration > 0')
-    expect(feed).toContain('styles.heartBurst')
-    expect(feed).toContain('styles.progressTrack')
-    expect(css).toContain('.heartBurst')
-    expect(css).toContain('@keyframes heart-pop')
-    expect(css).toContain('.progressTrack')
-    expect(css).toContain('.progressValue')
+    expect(feed).toContain('animate-ping motion-reduce:animate-none')
+    expect(feed).toContain('origin-left bg-white transition-[width] duration-150')
+    expect(feed).not.toContain('short-video.module.css')
   })
 
   it('does not turn scroll events into high-frequency React state updates', () => {
@@ -67,29 +63,25 @@ describe('short video playback polish', () => {
 
   it('shows paused feedback for the active short video', () => {
     const feed = read('src/app/(frontend)/shorts/ShortVideoFeed.tsx')
-    const css = read('src/app/(frontend)/shorts/short-video.module.css')
     expect(feed).toContain('const [playingById, setPlayingById]')
     expect(feed).toContain('onPlay={() => {')
     expect(feed).toContain('onPause={() => {')
-    expect(feed).toContain('styles.pausedFeedback')
+    expect(feed).toContain('z-[6] grid h-[72px] w-[72px]')
     expect(feed).toContain('fa-play')
     expect(feed).not.toContain('controls={true}')
-    expect(css).toContain('.pausedFeedback')
+    expect(feed).not.toContain('short-video.module.css')
   })
 
   it('shows an explicit buffering state for slow short-video playback', () => {
     const feed = read('src/app/(frontend)/shorts/ShortVideoFeed.tsx')
-    const css = read('src/app/(frontend)/shorts/short-video.module.css')
     expect(feed).toContain('const [bufferingById, setBufferingById]')
     expect(feed).toContain('onWaiting={() => {')
     expect(feed).toContain('onCanPlay={() => {')
     expect(feed).toContain('onPlaying={() => {')
-    expect(feed).toContain('styles.mediaBuffering')
-    expect(feed).toContain('styles.mediaSpinner')
+    expect(feed).toContain('z-[7] inline-flex')
+    expect(feed).toContain('animate-spin rounded-full border-2')
     expect(feed).toContain("视频加载中…")
-    expect(css).toContain('.mediaBuffering')
-    expect(css).toContain('.mediaSpinner')
-    expect(css).toContain('@keyframes media-spinner')
+    expect(feed).not.toContain('short-video.module.css')
   })
 
   it('separates single-tap playback from double-tap like gestures', () => {
@@ -111,8 +103,8 @@ describe('short video playback polish', () => {
     expect(feed).toContain('setMediaErrorById((current) => ({ ...current, [item.id]: true }))')
     expect(feed).toContain('const retryPlayback = (item: ContentItem) =>')
     expect(feed).toContain('video.load()')
-    expect(feed).toContain('styles.mediaError')
-    expect(feed).toContain('styles.mediaRetryButton')
+    expect(feed).toContain('grid w-[min(360px,calc(100%-40px))]')
+    expect(feed).toContain('min-h-9 cursor-pointer rounded-full border-0 bg-white')
   })
 
   it('keeps optional interaction state independent when one bootstrap request fails', () => {
@@ -133,17 +125,16 @@ describe('short video playback polish', () => {
   })
 
   it('polishes mobile comments and controls around safe-area insets', () => {
-    const css = read('src/app/(frontend)/shorts/short-video.module.css')
-    expect(css).toContain('bottom: calc(75px + env(safe-area-inset-bottom))')
-    expect(css).toContain('bottom: calc(76px + env(safe-area-inset-bottom))')
-    expect(css).toContain('height: min(78dvh, 720px)')
-    expect(css).toContain('border-radius: 18px 18px 0 0')
-    expect(css).toContain('padding-bottom: max(10px, env(safe-area-inset-bottom))')
+    const feed = read('src/app/(frontend)/shorts/ShortVideoFeed.tsx')
+    expect(feed).toContain('max-[640px]:bottom-[calc(75px+env(safe-area-inset-bottom))]')
+    expect(feed).toContain('max-[640px]:bottom-[calc(76px+env(safe-area-inset-bottom))]')
+    expect(feed).toContain('max-[640px]:h-[78dvh]')
+    expect(feed).toContain('max-[640px]:rounded-t-[18px]')
+    expect(feed).toContain('max-[640px]:pb-[max(10px,env(safe-area-inset-bottom))]')
   })
 
   it('keeps the simple TikTok-style social rail and swipe flow intact', () => {
     const feed = read('src/app/(frontend)/shorts/ShortVideoFeed.tsx')
-    const css = read('src/app/(frontend)/shorts/short-video.module.css')
     expect(feed).toContain('短视频')
     expect(feed).toContain('上下滑动继续刷视频。')
     expect(feed).toContain('toggleFollow')
@@ -153,7 +144,7 @@ describe('short video playback polish', () => {
     expect(feed).toContain('share(item)')
     expect(feed).not.toContain('markNotInterested')
     expect(feed).toContain('report(item)')
-    expect(css).toContain('scroll-snap-type: y mandatory')
+    expect(feed).toContain('snap-y snap-mandatory')
   })
 
   it('keeps the short-video route discoverable from the homepage', () => {

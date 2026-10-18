@@ -7,7 +7,6 @@ import { fetchJson, getApiErrorMessage } from '../../../lib/client-api.js'
 import ContentComments from '../content/[contentId]/ContentComments'
 import { usePublicLocale } from '../i18n/PublicLanguageToggle'
 
-import styles from './short-video.module.css'
 
 type ContentItem = {
   id: string
@@ -672,15 +671,15 @@ export default function ShortVideoFeed() {
 
   const activeItem = visibleItems[activeIndex]
   if (loading) {
-    return <main className={styles.shell}><div className={styles.loading}>正在加载短视频…</div></main>
+    return <main className="fixed inset-0 overflow-hidden bg-black text-white"><div className="grid min-h-full content-center place-items-center gap-3 bg-[#0b0f17] p-8 text-center">正在加载短视频…</div></main>
   }
 
   if (error && visibleItems.length === 0) {
     return (
-      <main className={styles.shell}>
-        <div className={styles.state}>
+      <main className="fixed inset-0 overflow-hidden bg-black text-white">
+        <div className="grid min-h-full content-center place-items-center gap-3 bg-[#0b0f17] p-8 text-center [&>span]:max-w-[34rem] [&>span]:text-white/70 [&_h1]:text-xl [&_h1]:font-bold [&_p]:max-w-[34rem] [&_p]:text-white/70">
           <p>{error}</p>
-          <button className={styles.button} onClick={() => void loadPage()} type="button">重试</button>
+          <button className="min-h-10 cursor-pointer rounded-full border-0 bg-white px-4 py-2 font-extrabold text-[#111827] disabled:cursor-not-allowed disabled:opacity-50" onClick={() => void loadPage()} type="button">重试</button>
         </div>
       </main>
     )
@@ -688,37 +687,37 @@ export default function ShortVideoFeed() {
 
   if (!activeItem) {
     return (
-      <main className={styles.shell}>
-        <header className={styles.topbar}>
-          <Link href="/" className={styles.brand}>LuckRead</Link>
-          <Link href="/publish?type=video" className={styles.createButton}>发视频</Link>
+      <main className="fixed inset-0 overflow-hidden bg-black text-white">
+        <header className="pointer-events-none fixed inset-x-0 top-0 z-30 flex h-16 items-center justify-between gap-4 bg-gradient-to-b from-black/60 to-transparent px-6 text-white [&>*]:pointer-events-auto max-[640px]:h-14 max-[640px]:px-3">
+          <Link href="/" className="text-xl font-extrabold tracking-tight text-white no-underline">LuckRead</Link>
+          <Link href="/publish?type=video" className="inline-flex min-h-[38px] items-center justify-center rounded-full bg-white px-[15px] py-2 text-sm font-extrabold text-[#111827] no-underline max-[640px]:px-[11px]">发视频</Link>
         </header>
-        <div className={styles.state}>
+        <div className="grid min-h-full content-center place-items-center gap-3 bg-[#0b0f17] p-8 text-center [&>span]:max-w-[34rem] [&>span]:text-white/70 [&_h1]:text-xl [&_h1]:font-bold [&_p]:max-w-[34rem] [&_p]:text-white/70">
           <strong>还没有可播放的短视频</strong>
           <span>先发布一个竖屏或横屏视频，作品会进入这里。</span>
-          <Link className={styles.primaryLink} href="/publish?type=video">创建视频</Link>
+          <Link className="inline-flex min-h-[38px] items-center justify-center rounded-full bg-white px-[15px] py-2 text-sm font-extrabold text-[#111827] no-underline" href="/publish?type=video">创建视频</Link>
         </div>
       </main>
     )
   }
 
   return (
-    <main className={styles.shell}>
-      <header className={styles.topbar}>
-        <Link href="/" className={styles.brand}>LuckRead</Link>
-        <div className={styles.feedTabs} aria-label="短视频频道">
-          <span className={styles.feedTabActive}>短视频</span>
-          <Link href="/content?type=video" className={styles.feedTab}>视频列表</Link>
+    <main className="fixed inset-0 overflow-hidden bg-black text-white">
+      <header className="pointer-events-none fixed inset-x-0 top-0 z-30 flex h-16 items-center justify-between gap-4 bg-gradient-to-b from-black/60 to-transparent px-6 text-white [&>*]:pointer-events-auto max-[640px]:h-14 max-[640px]:px-3">
+        <Link href="/" className="text-xl font-extrabold tracking-tight text-white no-underline">LuckRead</Link>
+        <div className="absolute left-1/2 top-[19px] flex -translate-x-1/2 gap-[22px] max-[640px]:top-[17px]" aria-label="短视频频道">
+          <span className="relative text-[15px] font-bold text-white no-underline after:absolute after:bottom-[-9px] after:left-1/2 after:h-[3px] after:w-6 after:-translate-x-1/2 after:rounded-full after:bg-white after:content-['']">短视频</span>
+          <Link href="/content?type=video" className="text-[15px] font-bold text-white/70 no-underline">视频列表</Link>
         </div>
-        <div className={styles.topbarActions}>
-          <button aria-label={muted ? '打开声音' : '关闭声音'} className={styles.iconButton} onClick={() => setMuted((value) => !value)} type="button">
+        <div className="flex items-center gap-2.5">
+          <button aria-label={muted ? '打开声音' : '关闭声音'} className="h-[38px] w-[38px] cursor-pointer rounded-full border-0 bg-white/10 text-white backdrop-blur-xl" onClick={() => setMuted((value) => !value)} type="button">
             <i className={muted ? 'fa-solid fa-volume-xmark' : 'fa-solid fa-volume-high'} aria-hidden="true" />
           </button>
-          <Link href="/publish?type=video" className={styles.createButton}>发视频</Link>
+          <Link href="/publish?type=video" className="inline-flex min-h-[38px] items-center justify-center rounded-full bg-white px-[15px] py-2 text-sm font-extrabold text-[#111827] no-underline max-[640px]:px-[11px]">发视频</Link>
         </div>
       </header>
 
-      <section ref={feedRef} className={styles.feed} aria-label="短视频流">
+      <section ref={feedRef} className="h-full touch-pan-y snap-y snap-mandatory overscroll-y-contain overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden" aria-label="短视频流">
         {visibleItems.map((item, index) => {
           const videoUrl = item.mediaRefs?.[0]
           const interaction = interactionById[item.id] ?? initialInteraction
@@ -735,17 +734,17 @@ export default function ShortVideoFeed() {
 
           return (
             <article
-              className={styles.slide}
+              className="relative h-dvh min-h-screen snap-start snap-always"
               data-index={index}
               key={item.id}
               ref={setItemRef(item.id)}
             >
               <div
-                className={styles.videoStage}
+                className="relative mx-auto h-full w-full max-w-[720px] touch-pan-y overflow-hidden bg-[#050505] shadow-[0_0_80px_rgba(0,0,0,.38)]"
               >
                 <video
                   aria-label={item.title}
-                  className={styles.video}
+                  className="block h-full w-full cursor-pointer select-none object-cover bg-[#090909] [-webkit-user-select:none] [-webkit-touch-callout:none]"
                   controls={false}
                   loop
                   muted={muted}
@@ -801,54 +800,54 @@ export default function ShortVideoFeed() {
                   }}
                 />
                 {activeIndex === index && !playingById[item.id] && !bufferingById[item.id] && !mediaErrorById[item.id] ? (
-                  <div className={styles.pausedFeedback} aria-hidden="true">
+                  <div className="absolute left-1/2 top-1/2 z-[6] grid h-[72px] w-[72px] -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border border-white/30 bg-black/40 text-white backdrop-blur-md" aria-hidden="true">
                     <i className="fa-solid fa-play" />
                   </div>
                 ) : null}
                 {bufferingById[item.id] && !mediaErrorById[item.id] ? (
-                  <div className={styles.mediaBuffering} aria-live="polite">
-                    <span className={styles.mediaSpinner} aria-hidden="true" />
+                  <div className="absolute left-1/2 top-1/2 z-[7] inline-flex -translate-x-1/2 -translate-y-1/2 items-center gap-2.5 rounded-full bg-black/65 px-3.5 py-2.5 text-sm text-white" aria-live="polite">
+                    <span className="h-[18px] w-[18px] animate-spin rounded-full border-2 border-white/30 border-t-white motion-reduce:animate-none" aria-hidden="true" />
                     <span>{locale === 'en' ? 'Loading video…' : '视频加载中…'}</span>
                   </div>
                 ) : null}
                 {mediaErrorById[item.id] ? (
-                  <div className={styles.mediaError} role="alert">
+                  <div className="absolute left-1/2 top-1/2 z-[7] grid w-[min(360px,calc(100%-40px))] -translate-x-1/2 -translate-y-1/2 justify-items-center gap-2 rounded-2xl border border-white/20 bg-black/80 p-5 text-center [&_span]:text-[13px] [&_span]:text-white/70" role="alert">
                     <strong>{locale === 'en' ? 'Video unavailable' : '视频暂时无法播放'}</strong>
                     <span>{locale === 'en' ? 'The media could not be loaded.' : '媒体加载失败，可以重新尝试。'}</span>
-                    <button className={styles.mediaRetryButton} onClick={() => retryPlayback(item)} type="button">
+                    <button className="min-h-9 cursor-pointer rounded-full border-0 bg-white px-[15px] py-2 text-[13px] font-extrabold text-[#111827]" onClick={() => retryPlayback(item)} type="button">
                       {locale === 'en' ? 'Retry' : '重试播放'}
                     </button>
                   </div>
                 ) : null}
                 {doubleTapHeartId === item.id ? (
-                  <div className={styles.heartBurst} aria-hidden="true">
+                  <div className="pointer-events-none absolute left-1/2 top-[48%] z-[5] grid h-[132px] w-[132px] -translate-x-1/2 -translate-y-1/2 place-items-center text-white animate-ping motion-reduce:animate-none [&_i]:text-[86px] [&_i]:text-white [&_i]:drop-shadow-[0_10px_28px_rgba(0,0,0,.32)]" aria-hidden="true">
                     <i className="fa-solid fa-heart" />
                   </div>
                 ) : null}
-                <div className={styles.topFade} />
-                <div className={styles.bottomFade} />
+                <div className="pointer-events-none absolute inset-x-0 top-0 h-[28%] bg-gradient-to-b from-black/55 to-transparent" />
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[46%] bg-gradient-to-t from-black/80 to-transparent" />
 
-                <div className={styles.slideHeader}>
+                <div className="absolute left-5 right-5 top-[86px] flex items-center justify-between font-extrabold [text-shadow:0_1px_10px_rgba(0,0,0,.35)] max-[640px]:left-3 max-[640px]:right-3 max-[640px]:top-[70px]">
                   <span>短视频</span>
-                  <span className={styles.indexMark}>{index + 1}/{visibleItems.length}</span>
+                  <span className="text-[13px] text-white/60">{index + 1}/{visibleItems.length}</span>
                 </div>
 
-                <div className={styles.contentOverlay}>
-                  <div className={styles.authorRow}>
+                <div className="absolute bottom-[58px] left-[18px] right-[104px] z-[3] max-[640px]:bottom-[calc(75px+env(safe-area-inset-bottom))] max-[640px]:left-3 max-[640px]:right-[91px] [&_h1]:m-0 [&_h1]:text-[clamp(19px,4vw,26px)] [&_h1]:leading-[1.3] [&_h1]:tracking-tight [&_h1]:[text-shadow:0_2px_16px_rgba(0,0,0,.48)] [&_p]:my-2 [&_p]:text-sm [&_p]:text-white/80">
+                  <div className="mb-[13px] flex items-center gap-2.5">
                     <Link
-                      className={styles.avatar}
+                      className="grid h-12 w-12 flex-none place-items-center overflow-hidden rounded-full border-2 border-white bg-[#273142] font-extrabold text-white no-underline [&_img]:h-full [&_img]:w-full [&_img]:object-cover"
                       href={creatorHref}
                       aria-label={'打开 ' + displayName + ' 的主页'}
                     >
                       {avatar ? <img alt="" src={avatar} /> : avatarFallback(displayName)}
                     </Link>
-                    <div className={styles.authorMeta}>
-                      <Link href={creatorHref} className={styles.authorName}>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Link href={creatorHref} className="font-extrabold text-white no-underline">
                         @{creatorName}
                       </Link>
                       {item.creatorId && viewerUserId !== item.creatorId && !interaction.restricted ? (
                         <button
-                          className={interaction.following ? styles.followingButton : styles.followButton}
+                          className={interaction.following ? 'min-h-7 cursor-pointer rounded-full border border-white/30 bg-black/20 px-[11px] py-1 text-xs font-extrabold text-white/70 disabled:cursor-not-allowed disabled:opacity-50' : 'min-h-7 cursor-pointer rounded-full border border-white/60 bg-black/20 px-[11px] py-1 text-xs font-extrabold text-white disabled:cursor-not-allowed disabled:opacity-50'}
                           disabled={busy === 'follow'}
                           onClick={(event) => { event.stopPropagation(); void toggleFollow(item) }}
                           type="button"
@@ -861,7 +860,7 @@ export default function ShortVideoFeed() {
                   <h1>{item.title}</h1>
                   <p>{locale === 'en' ? 'Swipe to keep watching.' : '上下滑动继续刷视频。'}</p>
                   <Link
-                    className={styles.detailLink}
+                    className="text-[13px] text-white/80 underline-offset-4"
                     data-umami-event="content-open"
                     data-umami-event-content-type="video"
                     href={'/content/' + encodeURIComponent(item.slug || item.id)}
@@ -870,35 +869,35 @@ export default function ShortVideoFeed() {
                   </Link>
                 </div>
 
-                <aside className={styles.actionRail} aria-label="视频操作">
-                  <button className={interaction.liked ? styles.actionActive : styles.action} disabled={busy === 'like' || interaction.restricted} onClick={() => void toggleLike(item)} type="button">
+                <aside className="absolute bottom-[66px] right-[14px] z-[4] flex w-[72px] flex-col items-center gap-[13px] max-[640px]:bottom-[calc(76px+env(safe-area-inset-bottom))] max-[640px]:right-[7px] max-[640px]:gap-[9px]" aria-label="视频操作">
+                  <button className={interaction.liked ? 'grid w-[68px] cursor-pointer justify-items-center gap-1 border-0 bg-transparent text-white [text-shadow:0_2px_12px_rgba(0,0,0,.45)] [&_i]:grid [&_i]:h-[49px] [&_i]:w-[49px] [&_i]:place-items-center [&_i]:rounded-full [&_i]:bg-black/30 [&_i]:text-[23px] [&_i]:backdrop-blur-[7px] [&_span]:text-[11px] [&_span]:font-extrabold max-[640px]:w-[62px] max-[640px]:[&_i]:h-11 max-[640px]:[&_i]:w-11 max-[640px]:[&_i]:text-xl [&_i]:text-[#ff315a]' : 'grid w-[68px] cursor-pointer justify-items-center gap-1 border-0 bg-transparent text-white [text-shadow:0_2px_12px_rgba(0,0,0,.45)] [&_i]:grid [&_i]:h-[49px] [&_i]:w-[49px] [&_i]:place-items-center [&_i]:rounded-full [&_i]:bg-black/30 [&_i]:text-[23px] [&_i]:backdrop-blur-[7px] [&_span]:text-[11px] [&_span]:font-extrabold max-[640px]:w-[62px] max-[640px]:[&_i]:h-11 max-[640px]:[&_i]:w-11 max-[640px]:[&_i]:text-xl'} disabled={busy === 'like' || interaction.restricted} onClick={() => void toggleLike(item)} type="button">
                     <i className={interaction.liked ? 'fa-solid fa-heart' : 'fa-regular fa-heart'} aria-hidden="true" />
                     <span>{interaction.likeCount === null ? '赞' : interaction.likeCount.toLocaleString()}</span>
                   </button>
-                  <button className={styles.action} onClick={() => toggleComments(item)} type="button">
+                  <button className="grid w-[68px] cursor-pointer justify-items-center gap-1 border-0 bg-transparent text-white [text-shadow:0_2px_12px_rgba(0,0,0,.45)] [&_i]:grid [&_i]:h-[49px] [&_i]:w-[49px] [&_i]:place-items-center [&_i]:rounded-full [&_i]:bg-black/30 [&_i]:text-[23px] [&_i]:backdrop-blur-[7px] [&_span]:text-[11px] [&_span]:font-extrabold max-[640px]:w-[62px] max-[640px]:[&_i]:h-11 max-[640px]:[&_i]:w-11 max-[640px]:[&_i]:text-xl" onClick={() => toggleComments(item)} type="button">
                     <i className="fa-regular fa-comment" aria-hidden="true" />
                     <span>评论</span>
                   </button>
-                  <button className={interaction.bookmarked ? styles.actionActive : styles.action} disabled={busy === 'bookmark'} onClick={() => void toggleBookmark(item)} type="button">
+                  <button className={interaction.bookmarked ? 'grid w-[68px] cursor-pointer justify-items-center gap-1 border-0 bg-transparent text-white [text-shadow:0_2px_12px_rgba(0,0,0,.45)] [&_i]:grid [&_i]:h-[49px] [&_i]:w-[49px] [&_i]:place-items-center [&_i]:rounded-full [&_i]:bg-black/30 [&_i]:text-[23px] [&_i]:backdrop-blur-[7px] [&_span]:text-[11px] [&_span]:font-extrabold max-[640px]:w-[62px] max-[640px]:[&_i]:h-11 max-[640px]:[&_i]:w-11 max-[640px]:[&_i]:text-xl [&_i]:text-[#ff315a]' : 'grid w-[68px] cursor-pointer justify-items-center gap-1 border-0 bg-transparent text-white [text-shadow:0_2px_12px_rgba(0,0,0,.45)] [&_i]:grid [&_i]:h-[49px] [&_i]:w-[49px] [&_i]:place-items-center [&_i]:rounded-full [&_i]:bg-black/30 [&_i]:text-[23px] [&_i]:backdrop-blur-[7px] [&_span]:text-[11px] [&_span]:font-extrabold max-[640px]:w-[62px] max-[640px]:[&_i]:h-11 max-[640px]:[&_i]:w-11 max-[640px]:[&_i]:text-xl'} disabled={busy === 'bookmark'} onClick={() => void toggleBookmark(item)} type="button">
                     <i className={interaction.bookmarked ? 'fa-solid fa-bookmark' : 'fa-regular fa-bookmark'} aria-hidden="true" />
                     <span>收藏</span>
                   </button>
-                  <button className={styles.action} disabled={busy === 'share'} onClick={() => void share(item)} type="button">
+                  <button className="grid w-[68px] cursor-pointer justify-items-center gap-1 border-0 bg-transparent text-white [text-shadow:0_2px_12px_rgba(0,0,0,.45)] [&_i]:grid [&_i]:h-[49px] [&_i]:w-[49px] [&_i]:place-items-center [&_i]:rounded-full [&_i]:bg-black/30 [&_i]:text-[23px] [&_i]:backdrop-blur-[7px] [&_span]:text-[11px] [&_span]:font-extrabold max-[640px]:w-[62px] max-[640px]:[&_i]:h-11 max-[640px]:[&_i]:w-11 max-[640px]:[&_i]:text-xl" disabled={busy === 'share'} onClick={() => void share(item)} type="button">
                     <i className="fa-solid fa-share" aria-hidden="true" />
                     <span>分享</span>
                   </button>
-                  <button className={styles.action} disabled={busy === 'report'} onClick={() => void report(item)} type="button">
+                  <button className="grid w-[68px] cursor-pointer justify-items-center gap-1 border-0 bg-transparent text-white [text-shadow:0_2px_12px_rgba(0,0,0,.45)] [&_i]:grid [&_i]:h-[49px] [&_i]:w-[49px] [&_i]:place-items-center [&_i]:rounded-full [&_i]:bg-black/30 [&_i]:text-[23px] [&_i]:backdrop-blur-[7px] [&_span]:text-[11px] [&_span]:font-extrabold max-[640px]:w-[62px] max-[640px]:[&_i]:h-11 max-[640px]:[&_i]:w-11 max-[640px]:[&_i]:text-xl" disabled={busy === 'report'} onClick={() => void report(item)} type="button">
                     <i className="fa-solid fa-ellipsis" aria-hidden="true" />
                     <span>更多</span>
                   </button>
                 </aside>
 
-                <div className={styles.progressTrack} aria-hidden="true">
-                  <span className={styles.progressValue} style={{ width: activeIndex === index ? activeProgress + '%' : '0%' }} />
+                <div className="absolute inset-x-0 bottom-0 z-[5] h-[3px] overflow-hidden bg-white/25" aria-hidden="true">
+                  <span className="block h-full origin-left bg-white transition-[width] duration-150" style={{ width: activeIndex === index ? activeProgress + '%' : '0%' }} />
                 </div>
 
-                <div className={styles.soundButtonWrap}>
-                  <button className={styles.soundButton} onClick={() => setMuted((value) => !value)} type="button">
+                <div className="absolute bottom-4 right-[18px] z-[4] max-[640px]:bottom-[calc(12px+env(safe-area-inset-bottom))] max-[640px]:right-3">
+                  <button className="h-[39px] w-[39px] cursor-pointer rounded-full border-0 bg-black/40 text-white backdrop-blur-[7px]" onClick={() => setMuted((value) => !value)} type="button">
                     <i className={muted ? 'fa-solid fa-volume-xmark' : 'fa-solid fa-volume-high'} aria-hidden="true" />
                   </button>
                 </div>
@@ -907,10 +906,10 @@ export default function ShortVideoFeed() {
           )
         })}
         {page.hasMore && page.nextCursor ? (
-          <div ref={loadMoreSentinelRef} className={styles.loadMoreSentinel} aria-live="polite">
+          <div ref={loadMoreSentinelRef} className="relative grid min-h-12 place-items-center pointer-events-none text-center text-[10px] text-white/45" aria-live="polite">
             {loadingMore ? '正在载入更多视频…' : '继续滑动加载更多'}
             <button
-              className={styles.hiddenLoadButton}
+              className="pointer-events-none absolute opacity-0"
               aria-label="加载更多短视频"
               disabled={loadingMore}
               onClick={() => void loadPage(page.nextCursor ?? null)}
@@ -921,28 +920,28 @@ export default function ShortVideoFeed() {
       </section>
 
       {message ? (
-        <div className={styles.toast} role="status">
+        <div className="fixed bottom-[88px] left-1/2 z-40 flex max-w-[calc(100%-32px)] -translate-x-1/2 items-center gap-3 rounded-full bg-[#171717] px-3 py-2.5 text-sm text-white shadow-lg [&_button]:border-0 [&_button]:bg-transparent [&_button]:text-lg [&_button]:text-white" role="status">
           {message}
           <button onClick={() => setMessage('')} type="button">×</button>
         </div>
       ) : null}
 
-      <nav className={styles.bottomNav} aria-label="主导航">
-        <Link href="/" className={styles.navItem}><i className="fa-solid fa-house" aria-hidden="true" /><span>首页</span></Link>
-        <Link href="/content?type=video" className={styles.navItem} data-umami-event="content-discovery-open"><i className="fa-solid fa-compass" aria-hidden="true" /><span>探索</span></Link>
-        <Link aria-label="发布视频" href="/publish?type=video" className={styles.navCreate}><i className="fa-solid fa-plus" aria-hidden="true" /></Link>
-        <Link href="/creator-center" className={styles.navItem} data-umami-event="creator-center-open"><i className="fa-solid fa-user-pen" aria-hidden="true" /><span>创作</span></Link>
-        <Link href="/me/profile" className={styles.navItem}><i className="fa-solid fa-user" aria-hidden="true" /><span>我</span></Link>
+      <nav className="fixed inset-x-0 bottom-0 z-[35] mx-auto grid min-h-[62px] w-full max-w-[720px] grid-cols-5 items-end bg-gradient-to-t from-black/80 to-transparent px-2 pt-1.5 pb-[max(7px,env(safe-area-inset-bottom))] max-[640px]:min-h-[68px] max-[640px]:pb-[max(10px,env(safe-area-inset-bottom))]" aria-label="主导航">
+        <Link href="/" className="grid justify-items-center gap-0.5 bg-transparent text-[10px] font-bold text-white/70 no-underline [&_i]:text-[17px]"><i className="fa-solid fa-house" aria-hidden="true" /><span>首页</span></Link>
+        <Link href="/content?type=video" className="grid justify-items-center gap-0.5 bg-transparent text-[10px] font-bold text-white/70 no-underline [&_i]:text-[17px]" data-umami-event="content-discovery-open"><i className="fa-solid fa-compass" aria-hidden="true" /><span>探索</span></Link>
+        <Link aria-label="发布视频" href="/publish?type=video" className="mb-[9px] grid h-[33px] w-[43px] place-items-center justify-self-center rounded-[10px] bg-gradient-to-br from-white to-[#b5c8ff] text-[#111827]"><i className="fa-solid fa-plus" aria-hidden="true" /></Link>
+        <Link href="/creator-center" className="grid justify-items-center gap-0.5 bg-transparent text-[10px] font-bold text-white/70 no-underline [&_i]:text-[17px]" data-umami-event="creator-center-open"><i className="fa-solid fa-user-pen" aria-hidden="true" /><span>创作</span></Link>
+        <Link href="/me/profile" className="grid justify-items-center gap-0.5 bg-transparent text-[10px] font-bold text-white/70 no-underline [&_i]:text-[17px]"><i className="fa-solid fa-user" aria-hidden="true" /><span>我</span></Link>
       </nav>
 
       {commentsOpen && commentsContentId ? (
-        <div className={styles.drawerBackdrop} role="presentation" onMouseDown={closeComments}>
-          <aside className={styles.commentsDrawer} onMouseDown={(event) => event.stopPropagation()} role="dialog" aria-modal="true" aria-label="评论">
-            <header className={styles.commentsHeader}>
+        <div className="fixed inset-0 z-[100] flex justify-end bg-black/50" role="presentation" onMouseDown={closeComments}>
+          <aside className="flex h-full w-full max-w-[560px] flex-col bg-white text-[#111827] shadow-[-20px_0_60px_rgba(0,0,0,.28)] max-[640px]:mt-auto max-[640px]:h-[78dvh] max-[640px]:max-h-[720px] max-[640px]:rounded-t-[18px] max-[640px]:shadow-[0_-20px_60px_rgba(0,0,0,.28)]" onMouseDown={(event) => event.stopPropagation()} role="dialog" aria-modal="true" aria-label="评论">
+            <header className="flex min-h-[62px] flex-none items-center justify-between border-b border-[#e5e7eb] px-[18px] max-[640px]:min-h-[58px] [&_button]:h-[38px] [&_button]:w-[38px] [&_button]:rounded-full [&_button]:bg-[#f3f4f6] [&_button]:text-2xl [&_button]:text-[#111827]">
               <strong>评论</strong>
               <button onClick={closeComments} type="button" aria-label="关闭评论">×</button>
             </header>
-            <div className={styles.commentsBody}>
+            <div className="min-h-0 overflow-y-auto p-2 [&_.content-comments]:m-0 [&_.content-comments]:shadow-none">
               <ContentComments
                 contentId={commentsContentId}
                 interactionRestricted={Boolean((interactionById[commentsContentId] ?? initialInteraction).restricted)}
