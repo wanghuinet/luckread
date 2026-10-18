@@ -914,19 +914,6 @@ main[style*="max-width"] a { color: var(--lr-blue-700); }
   border-color: var(--lr-blue-600);
 }
 
-/* Creator and publishing blue consistency */
-.lr-publish-shell {
-  background:
-    radial-gradient(circle at 86% 6%, rgba(59, 130, 246, .10), transparent 22rem),
-    var(--lr-h5-bg);
-  color: var(--lr-h5-text);
-}
-.lr-publish-shell .lr-wordmark { color: var(--lr-h5-text); }
-.lr-publish-shell .lr-publish-layout h1 { color: var(--lr-h5-text); }
-.lr-publish-shell .lr-type-tabs button.active { color: var(--lr-blue-700); }
-.lr-publish-shell .lr-field input:focus,
-.lr-publish-shell .lr-field textarea:focus,
-.lr-publish-shell .lr-field select:focus { border-color: var(--lr-blue-400); }
 
 @media (max-width: 640px) {
   main[style*="max-width"] { margin-top: 24px !important; margin-bottom: 40px !important; }

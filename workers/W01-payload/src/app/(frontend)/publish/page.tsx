@@ -1,5 +1,7 @@
-import Link from 'next/link'
+import { cookies } from 'next/headers'
 
+import TwitterCloneSecondaryPageLayout from '../../(twitter-clone)/TwitterCloneSecondaryPageLayout'
+import { normalizePublicLocale } from '../i18n/public-locale'
 import PublishComposer from './PublishComposer'
 import './publish.css'
 
@@ -17,20 +19,20 @@ export default async function PublishPage({
 }) {
   const params = await searchParams
   const initialType = normalizeContentType(params.type)
+  const locale = normalizePublicLocale((await cookies()).get('luckread-ui-locale')?.value)
+  const title = locale === 'en' ? 'Create content' : locale === 'tw' ? '發布內容' : '发布内容'
+  const description = locale === 'en'
+    ? 'Publish articles, posts, and videos through LuckRead.'
+    : locale === 'tw'
+      ? '透過 LuckRead 發布文章、動態和影片。'
+      : '通过 LuckRead 发布文章、动态和视频。'
+
   return (
-    <main className="lr-publish-shell">
-      <div className="lr-publish-topbar">
-        <Link href="/" className="lr-wordmark">LuckRead</Link>
-        <Link href="/login" className="lr-quiet-link">切换账号</Link>
-      </div>
-      <section className="lr-publish-layout">
-        <div>
-          <span className="lr-eyebrow">创作者中心</span>
-          <h1>发布内容</h1>
-          <p className="lr-subtitle">一套编辑器，覆盖文章、动态、图文与视频。</p>
-        </div>
-        <PublishComposer initialType={initialType} />
+    <TwitterCloneSecondaryPageLayout locale={locale} title={title} active="editProfile">
+      <section className="border-b border-light-border px-4 py-4 dark:border-dark-border">
+        <p className="text-sm text-light-secondary dark:text-dark-secondary">{description}</p>
       </section>
-    </main>
+      <PublishComposer initialType={initialType} presentation="x-workspace" />
+    </TwitterCloneSecondaryPageLayout>
   )
 }
