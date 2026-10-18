@@ -623,7 +623,7 @@ export default function PublicProfilePage({
 
   return (
     <TwitterCloneSecondaryPageLayout locale={locale} title={name} active="profile">
-      <section className="flex flex-col pb-20">
+      <section className="flex min-w-0 w-full flex-col pb-20">
         <div className="border-b border-light-border px-4 py-2 dark:border-dark-border">
           <Link className="main-tab inline-flex rounded-full px-3 py-2 text-sm font-bold hover:bg-light-primary/10 dark:hover:bg-dark-primary/10" href="/content">← 返回发现</Link>
         </div>
