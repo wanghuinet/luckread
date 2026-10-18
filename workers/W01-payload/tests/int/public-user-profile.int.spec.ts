@@ -210,3 +210,15 @@ it('resolves public profile projections by Better Auth identity id without expos
   expect(route).toContain("cachedPublicGet(")
   expect(route).not.toContain("identityId: String(publicUser.identityId")
 })
+
+
+it('keeps public-profile posts and replies in full-width vertical lists', () => {
+  const page = read('src/app/(frontend)/users/[userId]/page.tsx')
+  const styles = read('src/app/(frontend)/styles.css')
+
+  expect(page).toContain('className="creator-profile-reply-list"')
+  expect(page).toContain("filter === 'articles' || (filter === 'media' && !visibleContents.some((item) => item.contentType === 'post')) ? 'creator-profile-grid' : 'creator-profile-post-list'")
+  expect(styles).toContain('.creator-profile-post-list { display: flex; flex-direction: column; min-width: 0; }')
+  expect(styles).toContain('.creator-profile-post-list > [data-testid="luckread-social-post-card"] { width: 100%; min-width: 0; }')
+  expect(styles).toContain('.creator-profile-reply-list { display: flex; flex-direction: column; gap: 12px; min-width: 0; }')
+})
