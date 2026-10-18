@@ -77,6 +77,15 @@ describe('Twitter Clone profile UI reuse on LuckRead public profile', () => {
     expect(styles).not.toContain('.creator-profile-works')
   })
 
+  it('loads the exact shared X base stylesheet only for public profile routes', () => {
+    const profileLayout = read('src/app/(frontend)/users/[userId]/layout.tsx')
+
+    expect(profileLayout).toContain("import '../../../../styles/twitter-clone-globals.scss'")
+    expect(profileLayout).toContain('font-twitter-chirp leading-normal text-light-primary dark:text-dark-primary')
+    expect(profileLayout).not.toContain('styles.css')
+    expect(profileLayout).not.toContain('<style')
+  })
+
   it('reserves mobile navigation clearance without adding a large desktop blank area', () => {
     const shell = read('src/app/(twitter-clone)/TwitterCloneSecondaryPageLayout.tsx')
 
