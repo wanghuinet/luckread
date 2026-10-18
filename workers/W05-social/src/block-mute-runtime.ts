@@ -154,7 +154,7 @@ type RelationCursorPayload = {
 }
 
 const encodeRelationCursor = (payload: RelationCursorPayload): string =>
-  btoa(JSON.stringify(payload)).replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/g, '')
+  btoa(JSON.stringify(payload)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '')
 
 const decodeRelationCursor = (
   value: string | null,
