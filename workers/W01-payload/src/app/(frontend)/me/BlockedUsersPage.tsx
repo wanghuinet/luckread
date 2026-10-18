@@ -151,8 +151,11 @@ export default function BlockedUsersPage() {
   }, [labels.error, labels.loginMessage])
 
   useEffect(() => {
-    void load(null)
+    const timer = window.setTimeout(() => {
+      void load(null)
+    }, 0)
     return () => {
+      window.clearTimeout(timer)
       requestIdRef.current += 1
       abortControllerRef.current?.abort()
       abortControllerRef.current = null
