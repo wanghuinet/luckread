@@ -1081,8 +1081,6 @@ paths:
         '422': { $ref: '#/components/responses/ClientError' }
         '429': { $ref: '#/components/responses/RateLimited' }
     post:
-  /interactions/blocks:
-    post:
       tags: [Interactions]
       summary: Block a user
       operationId: blockUser
