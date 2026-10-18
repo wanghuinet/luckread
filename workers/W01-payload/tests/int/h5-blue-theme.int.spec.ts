@@ -9,7 +9,6 @@ describe('LuckRead H5 blue design system', () => {
   it('defines shared blue design tokens and applies them to shared frontend surfaces', () => {
     const styles = read('src/app/(frontend)/styles.css')
     const login = read('src/app/(frontend)/login/login.css')
-    const register = read('src/app/(frontend)/register/register.css')
     const publish = read('src/app/(frontend)/publish/publish.css')
 
     expect(styles).toContain('--lr-blue-600: #2563eb')
@@ -21,7 +20,9 @@ describe('LuckRead H5 blue design system', () => {
     expect(styles).toContain('.lr-publish-shell')
 
     expect(login).toContain('#102a56')
-    expect(register).toContain('#2563eb')
+    const registerForm = read('src/app/(frontend)/register/RegisterForm.tsx')
+    expect(registerForm).toContain('bg-main-accent')
+    expect(registerForm).not.toMatch(/className="register[A-Za-z]/)
     expect(publish).toContain('#2563eb')
     const subscriptionsPage = read('src/app/(frontend)/me/subscriptions/MySubscriptionsPage.tsx')
     const subscriptionsRoute = read('src/app/(twitter-clone)/me/subscriptions/page.tsx')
