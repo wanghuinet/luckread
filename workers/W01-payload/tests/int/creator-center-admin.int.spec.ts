@@ -66,7 +66,7 @@ describe('Creator Center admin extension', () => {
 
   it('waits for an in-flight autosave and uses the latest draft etag before publish', () => {
     const publisher = read('src/app/(frontend)/publish/PublishComposer.tsx')
-    const runPreflight = publisher.split('async function runPreflight()')[1]?.split('\\n\\n  async function saveDraft()')[0] ?? ''
+    const runPreflight = publisher.split('async function runPreflight()')[1]?.split('\n\n  async function saveDraft()')[0] ?? ''
 
     expect(publisher).toContain('const autoSaveInFlightPromiseRef = useRef<Promise<void> | null>(null)')
     expect(publisher).toContain('autoSaveInFlightPromiseRef.current = autoSaveTask')
