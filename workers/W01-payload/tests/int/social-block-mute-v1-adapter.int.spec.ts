@@ -18,7 +18,18 @@ describe('v1 block/mute adapters', () => {
     }
   })
 
-  it('enforces idempotency preconditions on unblock and unmute', () => {
+  it('lists blocked accounts through the authenticated W05 boundary with bounded query params', () => {
+    const route = readFileSync(resolve(process.cwd(), 'src/app/api/v1/interactions/blocks/route.ts'), 'utf8')
+    expect(route).toContain('export async function GET')
+    expect(route).toContain('resolveCookieSocialPrincipal')
+    expect(route).toContain("pathname: '/internal/social/interactions/blocks' + suffix")
+    expect(route).toContain("method: 'GET'")
+    expect(route).toContain("key !== 'cursor' && key !== 'limit'")
+    expect(route).toContain("limit.trim()")
+    expect(route).not.toContain('social_user_interactions')
+  })
+
+  it('enforces idempotency preconditions on unblock and unmute', () => {  it('enforces idempotency preconditions on unblock and unmute', () => {
     for (const path of [
       'src/app/api/v1/interactions/blocks/[targetUserId]/route.ts',
       'src/app/api/v1/interactions/mutes/[targetUserId]/route.ts',
