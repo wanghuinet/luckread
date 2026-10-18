@@ -8,7 +8,8 @@ describe('public content detail', () => {
   it('renders all published video media references', () => {
     const page = read('src/app/(frontend)/content/[contentId]/ContentDetailClient.tsx')
 
-    expect(page).toContain('content-detail-video-gallery')
+    expect(page).toContain('className="grid gap-1"')
+    expect(page).toContain('block max-h-[720px] w-full bg-black object-cover')
     expect(page).toContain('content.mediaRefs.map((url, index)')
     expect(page).toContain("preload={index === 0 ? 'metadata' : 'none'}")
     expect(page).toContain('poster={index === 0 ? content.coverRef || undefined : undefined}')
@@ -191,7 +192,7 @@ it('renders versioned structured article bodies instead of flattening them to pa
 it('keeps legacy plain-text article bodies on the backward-compatible renderer', () => {
   const page = read('src/app/(frontend)/content/[contentId]/ContentDetailClient.tsx')
   expect(page).toContain('splitBodyIntoParagraphs(body)')
-  expect(page).toContain('content-detail-paragraph')
+  expect(page).toContain('whitespace-pre-wrap break-words text-[15px] leading-6 text-light-primary dark:text-dark-primary')
 })
 
 
