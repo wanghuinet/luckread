@@ -361,6 +361,7 @@ paths:
                     $ref: '#/components/schemas/RequestId'
                   traceId:
                     $ref: '#/components/schemas/TraceId'
+        '400': { $ref: '#/components/responses/InvalidCursor' }
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '403': { $ref: '#/components/responses/PermissionDenied' }
         '422': { $ref: '#/components/responses/ClientError' }
