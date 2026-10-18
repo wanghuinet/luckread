@@ -50,6 +50,20 @@ describe('Creator Center admin extension', () => {
     expect(publisher).toContain("{type !== 'post' ? (")
   })
 
+  it('does not call the W05 poll delete route for drafts without a persisted poll', () => {
+    const publisher = read('src/app/(frontend)/publish/PublishComposer.tsx')
+    const syncStart = publisher.indexOf('async function syncDraftPoll')
+    const syncEnd = publisher.indexOf('\n\n  async function persistDraft()', syncStart)
+    const sync = publisher.slice(syncStart, syncEnd)
+
+    expect(publisher).toContain('const pollConfiguredRef = useRef(false)')
+    expect(publisher).toContain('pollConfiguredRef.current = Boolean(recoveredPoll)')
+    expect(sync).toContain('if (!pollConfiguredRef.current) return')
+    expect(sync).toContain('pollConfiguredRef.current = true')
+    expect(sync).toContain('pollConfiguredRef.current = false')
+    expect(sync.indexOf('if (!pollConfiguredRef.current) return')).toBeLessThan(sync.indexOf("method: 'DELETE'"))
+  })
+
   it('uses a single body field for social posts and derives their feed title', () => {
     const publisher = read('src/app/(frontend)/publish/PublishComposer.tsx')
     expect(publisher).toContain("type === 'post' ? body.trim().slice(0, 500) : title.trim()")
