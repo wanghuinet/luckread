@@ -21,6 +21,7 @@ describe('LuckRead H5 blue design system', () => {
     expect(contentDetail).toContain('flex min-w-0 flex-col border-b border-light-border dark:border-dark-border')
     expect(contentDetail).toContain('main-tab rounded-full border border-light-border px-4 py-2 text-sm font-bold')
     expect(styles).not.toContain('.my-subscriptions')
+    expect(styles).not.toContain('.lr-publish-shell')
     expect(publish).not.toContain('.lr-publish-shell')
     const publishPage = read('src/app/(frontend)/publish/page.tsx')
     const publishComposer = read('src/app/(frontend)/publish/PublishComposer.tsx')
