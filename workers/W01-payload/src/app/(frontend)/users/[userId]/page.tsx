@@ -800,6 +800,7 @@ export default function PublicProfilePage({
                       slug={item.slug}
                       title={item.title}
                       creatorId={item.creatorId ?? profile?.id}
+                      presentation="x-timeline"
                       coverRef={item.coverRef}
                       mediaRefs={item.mediaRefs}
                       createdAt={item.createdAt}
