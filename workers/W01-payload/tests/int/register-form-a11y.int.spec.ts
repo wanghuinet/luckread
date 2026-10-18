@@ -6,10 +6,10 @@ describe('Register form status accessibility', () => {
   it('exposes busy submission and polite success status', () => {
     const source = readFileSync(resolve(process.cwd(), 'src/app/(frontend)/register/RegisterForm.tsx'), 'utf8')
 
-    expect(source).toContain('<div className="registerSuccess" role="status" aria-live="polite">')
+    expect(source).toContain('<div className="grid gap-4 rounded-2xl border border-light-border p-4 dark:border-dark-border" role="status" aria-live="polite">')
     expect(source).toContain('aria-busy={status === \'submitting\'}')
     expect(source).toContain("disabled={status === 'submitting'}")
-    expect(source).toContain('<p className="registerError" role="alert">')
+    expect(source).toContain('<p className="rounded-xl border border-accent-red/20 bg-accent-red/10 p-3 text-sm text-accent-red" role="alert">
   })
 
   it('aligns password validation with the W02 Better Auth policy', () => {
