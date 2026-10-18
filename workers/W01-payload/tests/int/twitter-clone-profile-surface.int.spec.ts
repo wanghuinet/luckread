@@ -66,6 +66,16 @@ describe('Twitter Clone profile UI reuse on LuckRead public profile', () => {
     expect(publicProfile).toContain('href="/me/profile"')
   })
 
+  it('keeps the central profile column shrinkable within the three-column desktop shell', () => {
+    const shell = read('src/app/(twitter-clone)/TwitterCloneSecondaryPageLayout.tsx')
+    const page = read('src/app/(frontend)/users/[userId]/page.tsx')
+    const styles = read('src/app/(frontend)/styles.css')
+
+    expect(shell).toContain('w-full min-w-0 max-w-xl')
+    expect(page).toContain('<section className="flex min-w-0 w-full flex-col pb-20">')
+    expect(styles).toContain('.creator-profile-works { width: 100%; min-width: 0; min-height: 260px; }')
+  })
+
   it('reserves mobile navigation clearance without adding a large desktop blank area', () => {
     const shell = read('src/app/(twitter-clone)/TwitterCloneSecondaryPageLayout.tsx')
 
