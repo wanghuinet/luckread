@@ -425,22 +425,6 @@ a { color: inherit; }
   .content-feed-cover { aspect-ratio: 1.55; min-height: 0; }
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 .content-comment-reply {
   margin-top: 8px;
   border: 0;
@@ -829,7 +813,6 @@ main[style*="max-width"] button:hover:not(:disabled) { background: var(--lr-blue
 main[style*="max-width"] a { color: var(--lr-blue-700); }
 
 /* Discovery / social content surfaces */
-
 .content-feed-card,
 .content-comments,
 .content-comment-item {
