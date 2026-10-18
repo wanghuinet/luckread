@@ -91,7 +91,7 @@ describe('block/mute relation lists', () => {
       relationType: 'block',
       createdAt: '2026-10-17T00:00:00.000Z',
       relationshipId: 'block-1',
-    })).replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/g, '')
+    })).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '')
 
     await expect(listRelations(d, 'viewer-1', 'block', cursor, 20)).rejects.toMatchObject({
       code: 'INVALID_CURSOR',
