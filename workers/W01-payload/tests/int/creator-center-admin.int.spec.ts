@@ -53,7 +53,7 @@ describe('Creator Center admin extension', () => {
   it('does not call the W05 poll delete route for drafts without a persisted poll', () => {
     const publisher = read('src/app/(frontend)/publish/PublishComposer.tsx')
     const syncStart = publisher.indexOf('async function syncDraftPoll')
-    const syncEnd = publisher.indexOf('\\n\\n  async function persistDraft()', syncStart)
+    const syncEnd = publisher.indexOf('\n\n  async function persistDraft()', syncStart)
     const sync = publisher.slice(syncStart, syncEnd)
 
     expect(publisher).toContain('const pollConfiguredRef = useRef(false)')
