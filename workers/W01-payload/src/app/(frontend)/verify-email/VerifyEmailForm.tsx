@@ -54,10 +54,10 @@ export default function VerifyEmailForm() {
   }
 
   return (
-    <form className="lr-auth-form" onSubmit={submit} aria-busy={status === 'sending'}>
-      <label>
+    <form className="grid gap-4" onSubmit={submit} aria-busy={status === 'sending'}>
+      <label className="grid gap-2 text-sm font-semibold text-light-secondary dark:text-dark-secondary">
         注册邮箱
-        <input
+        <input className="w-full rounded-xl border border-light-border bg-main-background px-3 py-3 text-base text-light-primary outline-none transition focus:border-main-accent focus:ring-2 focus:ring-main-accent/20 disabled:opacity-50 dark:border-dark-border dark:text-dark-primary"
           autoComplete="email"
           inputMode="email"
           maxLength={254}
@@ -71,14 +71,14 @@ export default function VerifyEmailForm() {
       </label>
       {message ? (
         <div
-          className={status === 'error' ? 'lr-error' : 'lr-muted'}
+          className={status === 'error' ? 'rounded-xl border border-accent-red/20 bg-accent-red/10 p-3 text-sm text-accent-red' : 'text-sm text-light-secondary dark:text-dark-secondary'}
           role={status === 'error' ? 'alert' : 'status'}
           aria-live="polite"
         >
           {message}
         </div>
       ) : null}
-      <button type="submit" disabled={status === 'sending'}>
+      <button className="min-h-11 w-full rounded-full border-0 bg-main-accent px-4 py-3 font-bold text-white transition hover:brightness-90 disabled:cursor-not-allowed disabled:opacity-50" type="submit" disabled={status === 'sending'}>
         {status === 'sending'
           ? '正在提交…'
           : status === 'accepted'
