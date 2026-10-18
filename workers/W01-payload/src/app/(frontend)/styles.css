@@ -1158,6 +1158,10 @@ main[style*="max-width"] p[style*="#666"] {
 .creator-profile-more-link { border: 0; background: transparent; color: #555; font: inherit; font-size: 12px; font-weight: 800; cursor: pointer; }
 .creator-profile-more-link:disabled { cursor: wait; opacity: .55; }
 .creator-profile-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px; }
+.creator-profile-post-list { display: flex; flex-direction: column; min-width: 0; }
+.creator-profile-post-list > [data-testid="luckread-social-post-card"] { width: 100%; min-width: 0; }
+.creator-profile-reply-list { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.creator-profile-reply-list > .creator-profile-card { width: 100%; }
 .creator-profile-card { min-width: 0; overflow: hidden; border-radius: 14px; background: #fff; color: inherit; box-shadow: 0 5px 24px rgba(0,0,0,.05); transition: transform 140ms ease, box-shadow 140ms ease; }
 .creator-profile-card:hover { transform: translateY(-2px); box-shadow: 0 12px 34px rgba(0,0,0,.08); }
 .creator-profile-card-media { display: grid; place-items: center; aspect-ratio: 4/5; overflow: hidden; background: #dedede; }

@@ -66,4 +66,11 @@ describe('Twitter Clone profile UI reuse on LuckRead public profile', () => {
     expect(publicProfile).toContain('href="/me/profile"')
   })
 
+  it('reserves mobile navigation clearance without adding a large desktop blank area', () => {
+    const shell = read('src/app/(twitter-clone)/TwitterCloneSecondaryPageLayout.tsx')
+
+    expect(shell).toContain('pb-32 dark:border-dark-border xs:pb-8')
+    expect(shell).not.toContain('xs:pb-96')
+  })
+
 })
