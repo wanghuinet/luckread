@@ -827,7 +827,7 @@ describe('Creator Center admin extension', () => {
     expect(list).toContain('编辑视频资料')
     expect(publisher).toContain('1 个主视频 + 可选封面')
     expect(publisher).toContain('poster={type === \'video\' && coverRef ? coverRef : undefined}')
-    expect(publisher).toContain('className="lr-asset-preview"')
+    expect(publisher).toContain('isXWorkspace ? "overflow-hidden rounded-lg bg-main-sidebar-background" : "lr-asset-preview"')
     expect(publisher).toContain("asset.mimeType.startsWith('video/')")
 
 
