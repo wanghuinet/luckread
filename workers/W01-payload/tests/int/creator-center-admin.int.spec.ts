@@ -737,7 +737,7 @@ describe('Creator Center admin extension', () => {
     expect(publisher).toContain('useEffect')
     expect(publisher).toContain("searchParams.get('draft')")
     expect(page).toContain("normalizeContentType")
-    expect(page).toContain("<PublishComposer initialType={initialType} />")
+    expect(page).toContain('<PublishComposer initialType={initialType} presentation="x-workspace" />')
     expect(publisher).toContain("method: 'GET'")
     expect(publisher).toContain('window.history.replaceState')
     expect(publisher).toContain('async function copyDraftLink()')
