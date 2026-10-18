@@ -266,21 +266,6 @@
       "x-luckread-source": "contracts/api/api-inventory.v1.json"
     },
     {
-      "operationId": "listBlockedUsers",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "interaction.block"
-      ],
-      "auditRequired": false,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": false,
-      "stateMachine": "none",
-      "x-luckread-contract-status": "DISCOVERY_DRAFT",
-      "x-luckread-source": "contracts/api/interaction-operation-policy.v1.json"
-    },
-    {
       "operationId": "unblockUser",
       "auth": {
         "mode": "permission"
@@ -894,6 +879,21 @@
       "stateMachine": "none",
       "x-luckread-contract-status": "DISCOVERY_DRAFT",
       "x-luckread-source": "contracts/api/api-inventory.v1.json"
+    },
+    {
+      "operationId": "listBlockedUsers",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "interaction.block"
+      ],
+      "auditRequired": false,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none",
+      "x-luckread-contract-status": "DISCOVERY_DRAFT",
+      "x-luckread-source": "contracts/api/interaction-operation-policy.v1.json"
     },
     {
       "operationId": "getIpAssets",
