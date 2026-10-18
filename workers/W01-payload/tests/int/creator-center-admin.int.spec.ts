@@ -64,6 +64,18 @@ describe('Creator Center admin extension', () => {
     expect(sync.indexOf('if (!pollConfiguredRef.current) return')).toBeLessThan(sync.indexOf("method: 'DELETE'"))
   })
 
+  it('waits for an in-flight autosave and uses the latest draft etag before publish', () => {
+    const publisher = read('src/app/(frontend)/publish/PublishComposer.tsx')
+    const runPreflight = publisher.split('async function runPreflight()')[1]?.split('\n\n  async function saveDraft()')[0] ?? ''
+
+    expect(publisher).toContain('const autoSaveInFlightPromiseRef = useRef<Promise<void> | null>(null)')
+    expect(publisher).toContain('autoSaveInFlightPromiseRef.current = autoSaveTask')
+    expect(publisher).toContain('const currentDraft = latestDraftRef.current')
+    expect(runPreflight).toContain('await pendingAutoSave')
+    expect(runPreflight).toContain('cancelPendingAutoSave()')
+    expect(runPreflight).not.toContain("throw new Error('自动保存正在进行，请稍后重试。')")
+  })
+
   it('uses a single body field for social posts and derives their feed title', () => {
     const publisher = read('src/app/(frontend)/publish/PublishComposer.tsx')
     expect(publisher).toContain("type === 'post' ? body.trim().slice(0, 500) : title.trim()")
@@ -716,9 +728,9 @@ describe('Creator Center admin extension', () => {
     expect(publisher).not.toContain("Authorization', 'Bearer '")
     expect(publisher).toContain('const [draft, setDraft]')
     expect(publisher).toContain('const [savedBody, setSavedBody]')
-    expect(publisher).toContain('const isUpdate = Boolean(draft?.id && draft.etag)')
+    expect(publisher).toContain('const isUpdate = Boolean(currentDraft?.id && currentDraft.etag)')
     expect(publisher).toContain("method: isUpdate ? 'PATCH' : 'POST'")
-    expect(publisher).toContain("'If-Match': draft!.etag")
+    expect(publisher).toContain("'If-Match': currentDraft!.etag")
     expect(publisher).toContain('async function discardDraft()')
     expect(publisher).toContain("method: 'DELETE'")
     expect(publisher).toContain("'If-Match': draft.etag")

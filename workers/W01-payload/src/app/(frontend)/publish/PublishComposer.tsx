@@ -144,6 +144,8 @@ export default function PublishComposer({
   const [pollDurationHours, setPollDurationHours] = useState<24 | 72 | 168>(24)
   const [videoMetadataByAssetId, setVideoMetadataByAssetId] = useState<Record<string, VideoMetadata>>({})
   const [draft, setDraft] = useState<ContentResponse | null>(null)
+  // Keep the latest server etag outside render closures so a publish queued behind autosave uses the new version.
+  const latestDraftRef = useRef<ContentResponse | null>(null)
   const [savedBody, setSavedBody] = useState('')
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
@@ -156,6 +158,7 @@ export default function PublishComposer({
   const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'scheduled' | 'saving' | 'saved' | 'error'>('idle')
   const autoSaveTimerRef = useRef<number | null>(null)
   const autoSaveInFlightRef = useRef(false)
+  const autoSaveInFlightPromiseRef = useRef<Promise<void> | null>(null)
   const autoSaveLastSavedAtRef = useRef<number | null>(null)
   const autoSaveChangeTokenRef = useRef(0)
   const autoSaveDirtyRef = useRef(false)
@@ -206,6 +209,7 @@ export default function PublishComposer({
           }
         }
         if (cancelled) return
+        latestDraftRef.current = recovered
         setDraft(recovered)
         setType(recovered.contentType ?? 'article')
         setTitle(recovered.title ?? '')
@@ -426,7 +430,8 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
   }
 
   async function persistDraft(): Promise<ContentResponse> {
-    let bodyRef = draft?.bodyRef
+    const currentDraft = latestDraftRef.current
+    let bodyRef = currentDraft?.bodyRef
     let nextSavedArticleSerialized: string | null = null
     let rollbackBodyAssetId: string | null = null
 
@@ -472,16 +477,16 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
         ),
       }
 
-      const isUpdate = Boolean(draft?.id && draft.etag)
+      const isUpdate = Boolean(currentDraft?.id && currentDraft.etag)
       const { response, data } = await authorizedFetch<ContentResponse | { error?: { message?: string } }>(
         isUpdate
-          ? `${contentBasePath}/${encodeURIComponent(draft!.id)}`
+          ? `${contentBasePath}/${encodeURIComponent(currentDraft!.id)}`
           : contentBasePath,
         {
           method: isUpdate ? 'PATCH' : 'POST',
           headers: {
             'content-type': 'application/json',
-            ...(isUpdate ? { 'If-Match': draft!.etag } : {}),
+            ...(isUpdate ? { 'If-Match': currentDraft!.etag } : {}),
             'Idempotency-Key': crypto.randomUUID(),
           },
           body: JSON.stringify(payload),
@@ -500,6 +505,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
       const saved = data && 'id' in data ? data : null
       if (!saved?.id || !saved.etag) throw new Error('CONTENT_SAVE_FAILED')
 
+      latestDraftRef.current = saved
       setDraft(saved)
       setSavedBody(body)
       if (nextSavedArticleSerialized !== null) setSavedArticleSerialized(nextSavedArticleSerialized)
@@ -579,24 +585,34 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
 
       autoSaveInFlightRef.current = true
       setAutoSaveStatus('saving')
-      try {
-        const autoSavedDraft = await persistDraft()
-        await syncDraftPoll(autoSavedDraft.id, false)
-        autoSaveLastSavedAtRef.current = Date.now()
-        if (changeToken === autoSaveChangeTokenRef.current) {
-          autoSaveDirtyRef.current = false
-          setAutoSaveStatus('saved')
+      const autoSaveTask = (async () => {
+        try {
+          const autoSavedDraft = await persistDraft()
+          await syncDraftPoll(autoSavedDraft.id, false)
+          autoSaveLastSavedAtRef.current = Date.now()
+          if (changeToken === autoSaveChangeTokenRef.current) {
+            autoSaveDirtyRef.current = false
+            setAutoSaveStatus('saved')
+          }
+        } catch {
+          setAutoSaveStatus('error')
+        } finally {
+          autoSaveInFlightRef.current = false
+          if (
+            autoSaveDirtyRef.current &&
+            changeToken !== autoSaveChangeTokenRef.current &&
+            !reviewLocked
+          ) {
+            scheduleAutoSave()
+          }
         }
-      } catch {
-        setAutoSaveStatus('error')
+      })()
+      autoSaveInFlightPromiseRef.current = autoSaveTask
+      try {
+        await autoSaveTask
       } finally {
-        autoSaveInFlightRef.current = false
-        if (
-          autoSaveDirtyRef.current &&
-          changeToken !== autoSaveChangeTokenRef.current &&
-          !reviewLocked
-        ) {
-          scheduleAutoSave()
+        if (autoSaveInFlightPromiseRef.current === autoSaveTask) {
+          autoSaveInFlightPromiseRef.current = null
         }
       }
     }, delay)
@@ -619,6 +635,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
   }, [title, body, type, assets, coverRef, busy, articleDocument, pollEnabled, pollOptions, pollDurationHours])
 
   function startNewContent() {
+    latestDraftRef.current = null
     setDraft(null)
     setSavedBody('')
     setSavedArticleSerialized('')
@@ -661,7 +678,13 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
   }
 
   async function runPreflight(): Promise<{ report: PublishPreflightResult | null; input: Record<string, unknown>; draft: ContentResponse }> {
-    if (autoSaveInFlightRef.current) throw new Error('自动保存正在进行，请稍后重试。')
+    if (autoSaveInFlightRef.current) {
+      const pendingAutoSave = autoSaveInFlightPromiseRef.current
+      if (pendingAutoSave) await pendingAutoSave
+      // The completed autosave can queue a retry if the user edited while it was running.
+      // Cancel that timer before writing the latest form state for publication.
+      cancelPendingAutoSave()
+    }
     assertPollConfigurationValid()
     if (!hasPublishableText()) {
       throw new Error(type === 'post' ? '请先填写动态正文。' : '请先填写标题和正文。')
@@ -789,6 +812,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
       if (!response.ok) {
         throw new Error(getApiErrorMessage(data, 'CONTENT_DELETE_FAILED'))
       }
+      latestDraftRef.current = null
       setDraft(null)
       setSavedBody('')
       setSavedArticleSerialized('')
@@ -844,11 +868,12 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
       )
       if (!response.ok) throw new Error(getApiErrorMessage(data, 'SUBMIT_FAILED'))
       const transition = data
-      setDraft((current) =>
-        current && transition.to && typeof transition.version === 'number' && transition.etag
-          ? { ...current, state: transition.to, version: transition.version, etag: transition.etag }
-          : current,
-      )
+      const currentDraft = latestDraftRef.current
+      const transitionedDraft = currentDraft && transition.to && typeof transition.version === 'number' && transition.etag
+        ? { ...currentDraft, state: transition.to, version: transition.version, etag: transition.etag }
+        : currentDraft
+      latestDraftRef.current = transitionedDraft
+      setDraft(transitionedDraft)
       autoSaveDirtyRef.current = false
       window.dispatchEvent(new Event(CONTENT_MUTATED_EVENT))
       setMessage(type === 'post'
