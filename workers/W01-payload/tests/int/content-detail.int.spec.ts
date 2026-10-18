@@ -36,7 +36,7 @@ describe('public content detail', () => {
     expect(page).toContain("href={'/topics/' + encodeURIComponent(topic.name)}")
     expect(page).toContain("href={'/users/' + encodeURIComponent(mention.userId)}")
     expect(page).toContain('copy.detail.tagAria')
-    expect(page).toContain('content-detail-social-token')
+    expect(page).toContain('main-tab rounded-full border border-light-border px-3 py-1.5 text-sm text-main-accent')
     expect(page).not.toContain('extractSocialTokens(socialTokenBody)')
     expect(page).not.toContain('hashtags/resolve')
     expect(page).not.toContain('classification_edge')
