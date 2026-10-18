@@ -13,7 +13,7 @@ type PageNavKey = 'home' | 'explore' | 'trends' | 'notifications' | 'connections
 type Props = {
   locale: PublicLocale
   title: string
-  active: PageNavKey | 'subscriptions' | 'editProfile'
+  active: PageNavKey | 'subscriptions' | 'editProfile' | 'none'
   children: ReactNode
   showLanguageToggle?: boolean
 }
