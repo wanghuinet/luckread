@@ -125,6 +125,7 @@ describe('short video playback polish', () => {
   })
 
   it('polishes mobile comments and controls around safe-area insets', () => {
+    const feed = read('src/app/(frontend)/shorts/ShortVideoFeed.tsx')
     expect(feed).toContain('max-[640px]:bottom-[calc(75px+env(safe-area-inset-bottom))]')
     expect(feed).toContain('max-[640px]:bottom-[calc(76px+env(safe-area-inset-bottom))]')
     expect(feed).toContain('max-[640px]:h-[78dvh]')
