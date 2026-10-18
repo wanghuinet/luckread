@@ -29,7 +29,7 @@ describe('v1 block/mute adapters', () => {
     expect(route).not.toContain('social_user_interactions')
   })
 
-  it('enforces idempotency preconditions on unblock and unmute', () => {  it('enforces idempotency preconditions on unblock and unmute', () => {
+  it('enforces idempotency preconditions on unblock and unmute', () => {
     for (const path of [
       'src/app/api/v1/interactions/blocks/[targetUserId]/route.ts',
       'src/app/api/v1/interactions/mutes/[targetUserId]/route.ts',
