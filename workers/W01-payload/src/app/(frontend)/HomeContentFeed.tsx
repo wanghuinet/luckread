@@ -181,6 +181,10 @@ export default function HomeContentFeed({
 
   return (
     <section className="flex min-w-0 flex-col" id="content-feed" aria-labelledby="content-feed-title" aria-busy={loading}>
+      <header className="flex min-w-0 items-center justify-between gap-3 border-b border-light-border px-4 py-3 dark:border-dark-border">
+        <h2 className="min-w-0 break-words text-xl font-bold" id="content-feed-title">{activeFeed === 'following' ? followingLabel : copy.home.feedTitle}</h2>
+        <Link className="main-tab shrink-0 rounded-full px-3 py-2 text-sm font-bold hover:bg-light-primary/10 dark:hover:bg-dark-primary/10" href={activeFeed === 'following' ? '/me/following' : '/content'}>{activeFeed === 'following' ? (locale === 'en' ? 'Manage follows ↗' : locale === 'tw' ? '管理追蹤 ↗' : '管理关注 ↗') : copy.home.feedAll}</Link>
+      </header>
       <nav className="grid grid-cols-2 border-b border-light-border dark:border-dark-border" role="tablist" aria-label={locale === 'en' ? 'Home timeline' : locale === 'tw' ? '首頁動態' : '首页时间线'}>
         <button
           aria-selected={activeFeed === 'forYou'}
@@ -207,10 +211,6 @@ export default function HomeContentFeed({
           {activeFeed === 'following' ? <span className="absolute bottom-0 h-1 w-14 rounded-full bg-main-accent" /> : null}
         </button>
       </nav>
-      <header className="flex min-w-0 items-center justify-between gap-3 border-b border-light-border px-4 py-3 dark:border-dark-border">
-        <h2 className="min-w-0 break-words text-xl font-bold" id="content-feed-title">{activeFeed === 'following' ? followingLabel : copy.home.feedTitle}</h2>
-        <Link className="main-tab shrink-0 rounded-full px-3 py-2 text-sm font-bold hover:bg-light-primary/10 dark:hover:bg-dark-primary/10" href={activeFeed === 'following' ? '/me/following' : '/content'}>{activeFeed === 'following' ? (locale === 'en' ? 'Manage follows ↗' : locale === 'tw' ? '管理追蹤 ↗' : '管理关注 ↗') : copy.home.feedAll}</Link>
-      </header>
       {error && !loading ? (
         <div className="flex flex-col items-start gap-3 border-b border-light-border px-4 py-4 dark:border-dark-border sm:flex-row sm:items-center sm:justify-between" role="status">
           <p className="text-sm text-light-secondary dark:text-dark-secondary">{authRequired
@@ -226,7 +226,7 @@ export default function HomeContentFeed({
         </div>
       ) : null}
       {activeFeed === 'following' && candidateWindowTruncated && !loading ? (
-        <div className="flex flex-col items-start gap-3 border-b border-light-border px-4 py-4 dark:border-dark-border sm:flex-row sm:items-center sm:justify-between" role="status">
+        <div className="border-b border-light-border px-4 py-3 text-sm text-light-secondary dark:border-dark-border dark:text-dark-secondary" role="status">
           <p>{locale === 'en'
             ? 'This feed currently considers up to 500 followed accounts, so some followed creators may be missing.'
             : locale === 'tw'
