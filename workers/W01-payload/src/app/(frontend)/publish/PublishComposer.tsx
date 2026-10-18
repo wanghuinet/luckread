@@ -118,7 +118,7 @@ const resolveCoverRef = (
 type PublishComposerProps = {
   contentBasePath?: string
   initialType?: ContentType
-  presentation?: 'workspace' | 'tweet-modal'
+  presentation?: 'workspace' | 'tweet-modal' | 'x-workspace'
 }
 
 export default function PublishComposer({
@@ -128,6 +128,12 @@ export default function PublishComposer({
 }: PublishComposerProps) {
   const router = useRouter()
   const isTweetModal = presentation === 'tweet-modal'
+  const isXWorkspace = presentation === 'x-workspace'
+  const xButtonBase = 'main-tab inline-flex min-h-10 items-center justify-center rounded-full px-4 py-2 text-sm font-bold transition hover:bg-light-primary/5 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-white/5'
+  const xButtonSecondary = xButtonBase + ' border border-light-border text-light-primary dark:border-dark-border dark:text-dark-primary'
+  const xButtonGhost = xButtonBase + ' text-light-secondary dark:text-dark-secondary'
+  const xButtonPrimary = 'inline-flex min-h-10 items-center justify-center rounded-full bg-main-accent px-5 py-2.5 text-sm font-bold text-white transition hover:brightness-90 disabled:cursor-not-allowed disabled:opacity-50'
+  const xButtonDanger = xButtonBase + ' border border-red-500/50 text-red-600 dark:text-red-400'
   const [type, setType] = useState<ContentType>(initialType)
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
@@ -894,11 +900,11 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
 
   return (
     <div
-      className={isTweetModal ? "m-0 w-full rounded-none border-0 bg-black p-0 text-[#e7e9ea] shadow-none" : "lr-composer-card"}
+      className={isTweetModal ? "m-0 w-full rounded-none border-0 bg-black p-0 text-[#e7e9ea] shadow-none" : isXWorkspace ? "min-w-0 bg-main-background text-light-primary dark:text-dark-primary" : "lr-composer-card"}
       aria-busy={busy}
     >
       {!isTweetModal ? (
-      <div className="lr-type-tabs" role="tablist" aria-label="内容类型">
+      <div className={isXWorkspace ? "grid grid-cols-3 gap-0 border-b border-light-border dark:border-dark-border" : "lr-type-tabs"} role="tablist" aria-label="内容类型">
         {draft ? <p className="lr-type-lock-note">草稿创建后内容类型不可变更；需要更换类型请新建内容。</p> : null}
         {([
           ['article', '文章'],
@@ -907,7 +913,11 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
         ] as const).map(([value, label]) => (
           <button
             aria-selected={type === value}
-            className={type === value ? 'active' : ''}
+            className={isXWorkspace
+              ? type === value
+                ? "main-tab relative flex min-h-14 items-center justify-center font-bold"
+                : "main-tab flex min-h-14 items-center justify-center text-light-secondary dark:text-dark-secondary"
+              : type === value ? 'active' : ''}
             key={value}
             disabled={busy || reviewLocked || Boolean(draft)}
             onClick={() => handleContentTypeChange(value)}
@@ -915,15 +925,17 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
             type="button"
           >
             {label}
+            {isXWorkspace && type === value ? <span className="absolute bottom-0 h-1 w-14 rounded-full bg-main-accent" /> : null}
           </button>
         ))}
       </div>
       ) : null}
 
       {type !== 'post' ? (
-        <label className="lr-field">
+        <label className={isXWorkspace ? "mb-4 grid gap-2 px-4 pt-4 text-sm font-semibold text-light-primary dark:text-dark-primary" : "lr-field"}>
           <span>标题</span>
           <input
+            className={isXWorkspace ? "w-full rounded-md border border-light-border bg-main-background px-3 py-3 text-base text-light-primary outline-none transition focus:border-main-accent focus:ring-1 focus:ring-main-accent/30 dark:border-dark-border dark:text-dark-primary" : undefined}
             maxLength={512}
             disabled={busy || reviewLocked}
             onChange={(event) => { setTitle(event.target.value); markDirty() }}
@@ -947,7 +959,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
           value={articleDocument}
         />
       ) : (
-        <label className={isTweetModal ? 'm-0 grid min-w-0 gap-0' : 'lr-field'}>
+        <label className={isTweetModal ? 'm-0 grid min-w-0 gap-0' : isXWorkspace ? 'mb-4 grid gap-2 px-4 text-sm font-semibold text-light-primary dark:text-dark-primary' : 'lr-field'}>
           <span className={isTweetModal ? 'sr-only' : undefined}>{type === 'post' ? '推文正文' : '视频文案'}</span>
           <textarea
             aria-label={type === 'post' ? '推文正文' : '视频文案'}
@@ -956,7 +968,11 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
             onChange={(event) => { setBody(event.target.value); markDirty(); setPreflightReport(null) }}
             placeholder={type === 'post' ? '有什么新鲜事？' : '写下你的内容…'}
             rows={type === 'post' ? 5 : 14}
-            className={isTweetModal && type === 'post' ? 'block min-h-[130px] w-full resize-y rounded-none border-0 bg-black px-4 py-3.5 text-xl leading-[1.5] text-[#e7e9ea] outline-none placeholder:text-[#71767b] focus:border-0 focus:ring-0' : undefined}
+            className={isTweetModal && type === 'post'
+              ? 'block min-h-[130px] w-full resize-y rounded-none border-0 bg-black px-4 py-3.5 text-xl leading-[1.5] text-[#e7e9ea] outline-none placeholder:text-[#71767b] focus:border-0 focus:ring-0'
+              : isXWorkspace
+                ? 'block min-h-32 w-full resize-y rounded-md border border-light-border bg-main-background px-3 py-3 text-base leading-6 text-light-primary outline-none placeholder:text-light-secondary focus:border-main-accent focus:ring-1 focus:ring-main-accent/30 dark:border-dark-border dark:text-dark-primary'
+                : undefined}
             value={body}
           />
           {type === 'post' && !isTweetModal ? <small aria-live="polite">{body.length}/500</small> : null}
@@ -964,13 +980,13 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
       )}
 
 {!isTweetModal ? (
-      <div className="lr-media-box">
-        <div className="lr-media-heading">
+      <div className={isXWorkspace ? "mb-4 border-y border-light-border px-4 py-4 dark:border-dark-border" : "lr-media-box"}>
+        <div className={isXWorkspace ? "mb-3 flex items-center justify-between gap-3" : "lr-media-heading"}>
           <div>
             <strong>{type === 'video' ? '短视频素材' : '图片 / 视频'}</strong>
             <span>{type === 'video' ? '1 个主视频 + 可选封面' : assets.length + '/12'}</span>
           </div>
-          <label className="lr-upload-button">
+          <label className={isXWorkspace ? "inline-flex min-h-9 cursor-pointer items-center rounded-full border border-light-border px-4 py-2 text-sm font-bold text-main-accent hover:bg-main-accent/10 dark:border-dark-border" : "lr-upload-button"}>
             添加媒体
             <input
               accept={type === 'article' ? 'image/*' : 'image/*,video/*'}
@@ -1105,14 +1121,14 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
 
 
       {!isTweetModal && type === 'post' ? (
-        <section className="lr-media-box" aria-label="投票设置">
-          <div className="lr-media-heading">
+        <section className={isXWorkspace ? "my-4 border-y border-light-border px-4 py-4 dark:border-dark-border" : "lr-media-box"} aria-label="投票设置">
+          <div className={isXWorkspace ? "mb-3 flex items-center justify-between gap-3" : "lr-media-heading"}>
             <div>
               <strong>投票</strong>
               <span>{pollEnabled ? '2–4 个选项 · 每人限投一次' : '为动态添加投票'}</span>
             </div>
             <button
-              className="lr-upload-button"
+              className={isXWorkspace ? xButtonSecondary : "lr-upload-button"}
               type="button"
               disabled={busy || reviewLocked}
               onClick={() => {
@@ -1128,9 +1144,10 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
             <div className="flex flex-col gap-3 p-1">
               {pollOptions.map((option, index) => (
                 <div key={index} className="flex items-center gap-2">
-                  <label className="lr-field min-w-0 flex-1">
+                  <label className={isXWorkspace ? "grid min-w-0 flex-1 gap-2 text-sm font-semibold text-light-primary dark:text-dark-primary" : "lr-field min-w-0 flex-1"}>
                     <span>选项 {index + 1}</span>
                     <input
+                      className={isXWorkspace ? "min-w-0 w-full rounded-md border border-light-border bg-main-background px-3 py-2.5 text-sm text-light-primary outline-none focus:border-main-accent focus:ring-1 focus:ring-main-accent/30 dark:border-dark-border dark:text-dark-primary" : undefined}
                       aria-label={'投票选项 ' + (index + 1)}
                       maxLength={50}
                       disabled={busy || reviewLocked}
@@ -1175,6 +1192,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
               <label className="lr-field">
                 <span>投票时长</span>
                 <select
+                  className={isXWorkspace ? "rounded-md border border-light-border bg-main-background px-3 py-2.5 text-sm text-light-primary outline-none focus:border-main-accent dark:border-dark-border dark:text-dark-primary" : undefined}
                   aria-label="投票时长"
                   disabled={busy || reviewLocked}
                   value={pollDurationHours}
@@ -1257,14 +1275,14 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
       ) : null}
 
 {!isTweetModal && type === 'article' ? (
-      <div className="lr-preflight-policy">
-        <div className="lr-preflight-policy-heading">
+      <div className={isXWorkspace ? "my-4 grid gap-4 border-y border-light-border px-4 py-4 dark:border-dark-border" : "lr-preflight-policy"}>
+        <div className={isXWorkspace ? "flex flex-wrap items-center justify-between gap-3" : "lr-preflight-policy-heading"}>
           <strong>{isTweetModal ? '创作声明' : '创作者质量与 AI 规范'}</strong>
           <span>发布前自动检查</span>
         </div>
-        <label className="lr-field">
+        <label className={isXWorkspace ? "grid gap-2 text-sm font-semibold text-light-primary dark:text-dark-primary" : "lr-field"}>
           <span>{isTweetModal ? 'AI 使用方式' : 'AI 使用方式（请据实选择）'}</span>
-          <select aria-label="AI 使用方式" disabled={busy || reviewLocked} onChange={(event) => { setAiMode(event.target.value as AiMode); setPreflightReport(null) }} value={aiMode}>
+          <select className={isXWorkspace ? "w-full rounded-md border border-light-border bg-main-background px-3 py-3 text-base text-light-primary outline-none focus:border-main-accent focus:ring-1 focus:ring-main-accent/30 dark:border-dark-border dark:text-dark-primary" : undefined} aria-label="AI 使用方式" disabled={busy || reviewLocked} onChange={(event) => { setAiMode(event.target.value as AiMode); setPreflightReport(null) }} value={aiMode}>
             <option value="none">未使用 AI</option>
             <option value="outline">AI 只做提纲 / 框架</option>
             <option value="assist">AI 辅助整理 / 润色</option>
@@ -1307,9 +1325,10 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
 
 
       {!isTweetModal || type !== 'post' ? (
-      <label className="lr-field">
+      <label className={isXWorkspace ? "mb-4 grid gap-2 px-4 text-sm font-semibold text-light-primary dark:text-dark-primary" : "lr-field"}>
         <span>{type === 'video' ? '短视频封面' : '封面引用'}（可选）</span>
         <input
+          className={isXWorkspace ? "w-full rounded-md border border-light-border bg-main-background px-3 py-3 text-base text-light-primary outline-none focus:border-main-accent focus:ring-1 focus:ring-main-accent/30 dark:border-dark-border dark:text-dark-primary" : undefined}
           disabled={busy || reviewLocked}
           onChange={(event) => { setCoverRef(event.target.value); markDirty() }}
           placeholder={type === 'video' ? '默认使用第一张图片素材' : '默认使用第一个媒体文件'}
@@ -1337,8 +1356,8 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
           </strong>
         </div>
       ) : null}
-      {(!isTweetModal || message === "正在上传媒体…") && message ? <div className={isTweetModal ? "mx-3.5 mb-2 mt-1 text-xs text-[#71767b]" : "lr-success"} role="status">{message}</div> : null}
-      {error ? <div className={isTweetModal ? "mx-3.5 mb-2 mt-1 text-xs text-[#f4212e]" : "lr-error"} role="alert">{error}</div> : null}
+      {(!isTweetModal || message === "正在上传媒体…") && message ? <div className={isTweetModal ? "mx-3.5 mb-2 mt-1 text-xs text-[#71767b]" : isXWorkspace ? "mx-4 my-2 text-sm text-main-accent" : "lr-success"} role="status">{message}</div> : null}
+      {error ? <div className={isTweetModal ? "mx-3.5 mb-2 mt-1 text-xs text-[#f4212e]" : isXWorkspace ? "mx-4 my-2 text-sm text-red-600 dark:text-red-400" : "lr-error"} role="alert">{error}</div> : null}
 
       {preview ? (
         <section className="lr-preview" aria-label="发布预览">
@@ -1347,7 +1366,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
               <strong>发布预览</strong>
               {draft ? <span aria-label={'预览版本 ' + draft.version}>版本 v{draft.version}</span> : <span>当前草稿版本</span>}
             </div>
-            <button className="ghost" onClick={() => setPreview(false)} type="button">返回编辑</button>
+            <button className={isXWorkspace ? xButtonGhost : "ghost"} onClick={() => setPreview(false)} type="button">返回编辑</button>
           </div>
           <article className="lr-preview-card">
             <span className="lr-preview-type">{type === 'article' ? '文章' : type === 'post' ? '动态' : '视频'}</span>
@@ -1407,7 +1426,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
         </section>
       ) : null}
 
-      <div className={isTweetModal ? "flex min-h-[52px] items-center justify-between gap-3 border-t border-[#2f3336] bg-black px-3 pb-3 pt-2 sm:px-3.5" : "lr-actions"}>
+      <div className={isTweetModal ? "flex min-h-[52px] items-center justify-between gap-3 border-t border-[#2f3336] bg-black px-3 pb-3 pt-2 sm:px-3.5" : isXWorkspace ? "flex flex-wrap items-center justify-end gap-2 border-t border-light-border px-4 py-3 dark:border-dark-border" : "lr-actions"}>
         {isTweetModal ? (
           <>
             <div className="flex items-center gap-2">
@@ -1459,12 +1478,12 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
         ) : (
           <>
             {draft?.state === 'PENDING_REVIEW' || (type === 'post' && draft?.state === 'PUBLISHED') ? (
-              <button className="secondary" disabled={busy} onClick={startNewContent} type="button">
+              <button className={isXWorkspace ? xButtonSecondary : "secondary"} disabled={busy} onClick={startNewContent} type="button">
                 新建内容
               </button>
             ) : null}
             {type !== 'post' ? (
-            <button className="ghost" disabled={busy || reviewLocked} onClick={async () => {
+            <button className={isXWorkspace ? xButtonGhost : "ghost"} disabled={busy || reviewLocked} onClick={async () => {
               setBusy(true); setError(''); setMessage('')
               try { await runPreflight(); setMessage('发布前检查完成，请查看检查结果。') }
               catch (caught) { setError(caught instanceof Error ? caught.message : '发布前检查失败，请稍后重试。') }
@@ -1473,23 +1492,23 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
               发布前自检
             </button>
             ) : null}
-            <button className="ghost" disabled={busy} onClick={() => setPreview((current) => !current)} type="button">
+            <button className={isXWorkspace ? xButtonGhost : "ghost"} disabled={busy} onClick={() => setPreview((current) => !current)} type="button">
               {preview ? '关闭预览' : '预览'}
             </button>
             {draft?.id && draft.state === 'DRAFT' ? (
-              <button className="ghost" disabled={busy} onClick={copyDraftLink} type="button">
+              <button className={isXWorkspace ? xButtonGhost : "ghost"} disabled={busy} onClick={copyDraftLink} type="button">
                 {copied ? '已复制' : '复制恢复链接'}
               </button>
             ) : null}
             {draft?.state === 'DRAFT' ? (
-              <button className="danger" disabled={busy} onClick={discardDraft} type="button">
+              <button className={isXWorkspace ? xButtonDanger : "danger"} disabled={busy} onClick={discardDraft} type="button">
                 放弃草稿
               </button>
             ) : null}
-            <button className="secondary" disabled={busy || autoSaveStatus === 'saving' || reviewLocked} onClick={saveDraft} type="button">
+            <button className={isXWorkspace ? xButtonSecondary : "secondary"} disabled={busy || autoSaveStatus === 'saving' || reviewLocked} onClick={saveDraft} type="button">
               {busy ? '处理中…' : '保存草稿'}
             </button>
-            <button className="primary" disabled={busy || autoSaveStatus === 'saving' || reviewLocked} onClick={submitForReview} type="button">
+            <button className={isXWorkspace ? xButtonPrimary : "primary"} disabled={busy || autoSaveStatus === 'saving' || reviewLocked} onClick={submitForReview} type="button">
               {busy ? '处理中…' : draft?.state === 'PENDING_REVIEW' ? '审核中…' : type === 'post' && draft?.state === 'PUBLISHED' ? '已发布' : type === 'post' ? '发布动态' : '提交发布'}
             </button>
           </>

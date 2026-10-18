@@ -33,7 +33,7 @@ describe('Creator Center admin extension', () => {
     expect(modal).toContain("const OPEN_POST_COMPOSER_EVENT = 'luckread:open-post-composer'")
     expect(modal).toContain('window.addEventListener(OPEN_POST_COMPOSER_EVENT, showComposer)')
     expect(modal).toContain('<PublishComposer initialType="post" presentation="tweet-modal" />')
-    expect(publisher).toContain("presentation?: 'workspace' | 'tweet-modal'")
+    expect(publisher).toContain("presentation?: 'workspace' | 'tweet-modal' | 'x-workspace'")
     expect(publisher).toContain("const isTweetModal = presentation === 'tweet-modal'")
   })
 
