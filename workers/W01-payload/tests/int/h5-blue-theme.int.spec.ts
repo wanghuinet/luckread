@@ -8,13 +8,12 @@ const read = (relativePath: string) => readFileSync(resolve(process.cwd(), relat
 describe('LuckRead H5 blue design system', () => {
   it('defines shared blue design tokens and applies them to shared frontend surfaces', () => {
     const styles = read('src/app/(frontend)/styles.css')
-    const login = read('src/app/(frontend)/login/login.css')
-    const register = read('src/app/(frontend)/register/register.css')
     const publish = read('src/app/(frontend)/publish/publish.css')
 
     expect(styles).toContain('--lr-blue-600: #2563eb')
     expect(styles).toContain('--lr-h5-bg: #f5f9ff')
-    expect(styles).toContain('.lr-auth-shell')
+    expect(styles).not.toContain('.lr-auth-shell')
+    expect(styles).not.toContain('.lr-auth-form')
     expect(styles).toContain('.content-browse')
     expect(styles).not.toContain('.content-detail {')
     expect(styles).not.toContain('.content-detail-card {')
@@ -24,8 +23,15 @@ describe('LuckRead H5 blue design system', () => {
     expect(styles).not.toContain('.my-subscriptions')
     expect(styles).toContain('.lr-publish-shell')
 
-    expect(login).toContain('#102a56')
-    expect(register).toContain('#2563eb')
+    const forgotPage = read('src/app/(frontend)/forgot-password/page.tsx')
+    const resetPage = read('src/app/(frontend)/reset-password/page.tsx')
+    const verifyPage = read('src/app/(frontend)/verify-email/page.tsx')
+    expect(forgotPage).toContain('bg-main-background')
+    expect(resetPage).toContain('bg-main-background')
+    expect(verifyPage).toContain('bg-main-background')
+    const registerForm = read('src/app/(frontend)/register/RegisterForm.tsx')
+    expect(registerForm).toContain('bg-main-accent')
+    expect(registerForm).not.toMatch(/className="register[A-Za-z]/)
     expect(publish).toContain('#2563eb')
     const subscriptionsPage = read('src/app/(frontend)/me/subscriptions/MySubscriptionsPage.tsx')
     const subscriptionsRoute = read('src/app/(twitter-clone)/me/subscriptions/page.tsx')
