@@ -1152,7 +1152,7 @@ main[style*="max-width"] p[style*="#666"] {
 
 
 /* Public profile content surfaces; profile header and channel navigation use shared X utilities. */
-.creator-profile-works { min-height: 260px; }
+.creator-profile-works { width: 100%; min-width: 0; min-height: 260px; }
 .creator-profile-section-heading { display: flex; align-items: end; justify-content: space-between; gap: 16px; margin: 0 0 16px; }
 .creator-profile-section-heading h2 { margin: 0; font-size: 25px; letter-spacing: -.04em; }
 .creator-profile-more-link { border: 0; background: transparent; color: #555; font: inherit; font-size: 12px; font-weight: 800; cursor: pointer; }
