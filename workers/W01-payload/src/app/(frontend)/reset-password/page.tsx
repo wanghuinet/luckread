@@ -175,7 +175,7 @@ export default function ResetPasswordPage() {
       <main className="min-h-screen bg-main-background px-4 py-10 text-light-primary dark:text-dark-primary">
         <section className="mx-auto flex w-full max-w-xl flex-col gap-5 border-x border-light-border px-6 py-8 dark:border-dark-border">
           <div className="text-2xl font-bold">LuckRead</div>
-          <p className="lr-muted" role="status">正在加载密码重置…</p>
+          <p className="text-sm text-light-secondary dark:text-dark-secondary" role="status">正在加载密码重置…</p>
         </section>
       </main>
     }>
