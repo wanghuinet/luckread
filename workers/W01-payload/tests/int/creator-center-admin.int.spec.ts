@@ -1027,7 +1027,7 @@ describe('Creator Center admin extension', () => {
     const registerForm = read('src/app/(frontend)/register/RegisterForm.tsx')
     const loginForm = read('src/app/(frontend)/login/LoginForm.tsx')
 
-    expect(registerForm).toContain('<form aria-busy={status === \'submitting\'} className="registerForm" onSubmit={handleSubmit} noValidate>')
+    expect(registerForm).toContain('<form aria-busy={status === \'submitting\'} className="grid gap-4" onSubmit={handleSubmit} noValidate>')
     expect(registerForm).toContain("fetchJson<RegistrationResponse | ApiError>('/api/v1/auth/register'")
     expect(registerForm).not.toContain("fetch('/auth/register'")
     expect(loginForm).toContain('<form className="grid gap-4" onSubmit={submit} aria-busy={busy} noValidate>')
