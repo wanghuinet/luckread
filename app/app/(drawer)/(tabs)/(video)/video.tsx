@@ -205,10 +205,22 @@ const VideoItem = React.memo(({ item, isVisible, isFocused }: VideoItemProps) =>
   });
   const { isPlaying } = useEvent(player, 'playingChange', { isPlaying: player.playing });
   const { status, error } = useEvent(player, 'statusChange', { status: player?.status });
-  const { currentTime } = useEvent(player, 'timeUpdate', {
+  const [playback, setPlayback] = useState({
     currentTime: player.currentTime ?? 0,
+    duration: player.duration ?? 0,
   });
-  const duration = player.duration ?? 0;
+  const { currentTime, duration } = playback;
+
+  useEffect(() => {
+    if (!isVisible || !isFocused) return;
+    const interval = setInterval(() => {
+      setPlayback({
+        currentTime: player.currentTime ?? 0,
+        duration: player.duration ?? 0,
+      });
+    }, 250);
+    return () => clearInterval(interval);
+  }, [isFocused, isVisible, player]);
   const insets = useSafeAreaInsets();
   const [isMuted, setIsMuted] = useState(player?.muted ?? false);
 
