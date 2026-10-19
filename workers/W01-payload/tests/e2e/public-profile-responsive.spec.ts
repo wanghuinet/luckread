@@ -54,7 +54,7 @@ test('keeps the public profile and timeline inside the responsive X-style center
     bodyFontFamily: getComputedStyle(document.body).fontFamily,
     bodyBackgroundImage: getComputedStyle(document.body).backgroundImage,
   }))
-  expect(xShellStyles.rootClass.split(/\\s+/)).toContain('dark')
+  expect(xShellStyles.rootClass.split(/\s+/)).toContain('dark')
   expect(xShellStyles.bodyFontFamily).toContain('TwitterChirp')
   expect(xShellStyles.bodyBackgroundImage).toBe('none')
   await expect(page.getByTestId('luckread-social-post-card')).toBeVisible()
