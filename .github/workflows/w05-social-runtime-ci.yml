@@ -27,6 +27,12 @@ on:
       - 'workers/W01-payload/src/app/api/v1/interactions/likes/**'
       - 'workers/W01-payload/src/app/api/v1/interactions/bookmarks/**'
       - 'workers/W01-payload/src/app/api/v1/interactions/blocks/**'
+      - 'workers/W01-payload/src/app/api/v1/contents/[contentId]/reply-audience/**'
+      - 'workers/W01-payload/tests/int/social-reply-audience-v1-adapter.int.spec.ts'
+      - 'workers/W01-payload/vitest.w05-reply-audience.config.mts'
+      - 'workers/W01-payload/vitest.w05-reply-audience-route.config.mts'
+      - 'workers/W01-payload/src/content/w03-content-client.ts'
+      - 'workers/W01-payload/src/app/(frontend)/publish/PublishComposer.tsx'
       - 'workers/W01-payload/src/app/api/v1/interactions/mutes/**'
       - 'workers/W01-payload/src/app/api/v1/content/**/shares/**'
       - 'workers/W01-payload/src/app/api/v1/shares/**'
@@ -37,6 +43,12 @@ on:
       - 'workers/W01-payload/tests/int/content-detail.int.spec.ts'
       - 'workers/W01-payload/tests/int/public-user-profile.int.spec.ts'
       - 'workers/W01-payload/src/app/api/v1/contents/[contentId]/comments/**'
+      - 'workers/W01-payload/src/app/api/v1/contents/[contentId]/reply-audience/**'
+      - 'workers/W01-payload/tests/int/social-reply-audience-v1-adapter.int.spec.ts'
+      - 'workers/W01-payload/vitest.w05-reply-audience.config.mts'
+      - 'workers/W01-payload/vitest.w05-reply-audience-route.config.mts'
+      - 'workers/W01-payload/src/content/w03-content-client.ts'
+      - 'workers/W01-payload/src/app/(frontend)/publish/PublishComposer.tsx'
       - 'workers/W01-payload/src/app/api/v1/comments/**'
       - 'workers/W01-payload/src/app/(frontend)/content/[contentId]/ContentComments.tsx'
       - 'workers/W01-payload/tests/int/social-comments-v1-adapter.int.spec.ts'
@@ -111,7 +123,100 @@ jobs:
 
       - name: Run W05 Social and W01 adapter tests
         working-directory: workers/W01-payload
-        run: pnpm exec vitest run --config ./vitest.config.mts ../../workers/W05-social/src/follow-runtime.test.ts ../../workers/W05-social/src/following-feed.test.ts ../../workers/W05-social/src/like-runtime.test.ts ../../workers/W05-social/src/comment-runtime.test.ts ../../workers/W05-social/src/favorite-runtime.test.ts ../../workers/W05-social/src/share-runtime.test.ts ../../workers/W05-social/src/repost-runtime.test.ts ../../workers/W05-social/src/profile-pin-runtime.test.ts ../../workers/W05-social/src/block-policy.test.ts ../../workers/W05-social/src/relationship-graph-runtime.test.ts ../../workers/W05-social/src/block-mute-runtime.test.ts ../../workers/W05-social/src/index.test.ts ../../workers/W05-social/src/d1-traffic-guard.test.ts tests/int/social-followers-v1-adapter.int.spec.ts tests/int/social-follow-mutation-v1-adapter.int.spec.ts tests/int/social-likes-v1-adapter.int.spec.ts tests/int/social-comments-v1-adapter.int.spec.ts tests/int/social-comment-likes-v1-adapter.int.spec.ts tests/int/social-bookmarks-v1-adapter.int.spec.ts tests/int/social-shares-v1-adapter.int.spec.ts tests/int/social-shares-landing.int.spec.ts tests/int/social-block-mute-v1-adapter.int.spec.ts tests/int/social-reposts-v1-adapter.int.spec.ts tests/int/social-profile-pins-v1-adapter.int.spec.ts tests/int/w05-social-response-forwarding.int.spec.ts tests/int/content-detail.int.spec.ts tests/int/content-detail-comments.int.spec.ts
+        run: pnpm exec vitest run --config ./vitest.config.mts ../../workers/W05-social/src/follow-runtime.test.ts ../../workers/W05-social/src/following-feed.test.ts ../../workers/W05-social/src/like-runtime.test.ts ../../workers/W05-social/src/comment-runtime.test.ts ../../workers/W05-social/src/favorite-runtime.test.ts ../../workers/W05-social/src/share-runtime.test.ts ../../workers/W05-social/src/repost-runtime.test.ts ../../workers/W05-social/src/profile-pin-runtime.test.ts ../../workers/W05-social/src/block-policy.test.ts ../../workers/W05-social/src/relationship-graph-runtime.test.ts ../../workers/W05-social/src/block-mute-runtime.test.ts ../../workers/W05-social/src/index.test.ts ../../workers/W05-social/src/d1-traffic-guard.test.ts tests/int/social-followers-v1-adapter.int.spec.ts tests/int/social-follow-mutation-v1-adapter.int.spec.ts tests/int/social-likes-v1-adapter.int.spec.ts tests/int/social-comments-v1-adapter.int.spec.ts tests/int/social-reply-audience-v1-adapter.int.spec.ts tests/int/social-comment-likes-v1-adapter.int.spec.ts tests/int/social-bookmarks-v1-adapter.int.spec.ts tests/int/social-shares-v1-adapter.int.spec.ts tests/int/social-shares-landing.int.spec.ts tests/int/social-block-mute-v1-adapter.int.spec.ts tests/int/social-reposts-v1-adapter.int.spec.ts tests/int/social-profile-pins-v1-adapter.int.spec.ts tests/int/w05-social-response-forwarding.int.spec.ts tests/int/content-detail.int.spec.ts tests/int/content-detail-comments.int.spec.ts
+
+      - name: Run W05 reply audience runtime and comment tests
+        working-directory: workers/W01-payload
+        run: pnpm exec vitest run --config ./vitest.w05-reply-audience.config.mts --testNamePattern="reply audience|audience|published root comment|idempotent retry|idempotency key reused with a different comment payload|original published result|author deletion tombstone|blocked by the content relationship|rechecks published parent state|rechecks the Block policy|nested comment only|parent from another content item|non-published content"
+
+      - name: Run W05 reply audience route tests
+        working-directory: workers/W01-payload
+        run: pnpm exec vitest run --config ./vitest.w05-reply-audience-route.config.mts --testNamePattern="sets and reads reply audience policy|rejects replies outside the configured audience"
+
+      - name: Verify reply audience migration shape
+        run: |
+          python - <<'PY'
+          import json
+          import sqlite3
+          from pathlib import Path
+          db = sqlite3.connect(':memory:')
+          migration = Path('workers/W05-social/migrations/20261019_015_social_reply_audience_v1.sql')
+          db.executescript(migration.read_text())
+          expected = ['content_id','owner_user_id','audience','mentioned_user_ids_json','created_at','updated_at']
+          actual = [row[1] for row in db.execute('PRAGMA table_info("social_content_reply_policies")').fetchall()]
+          if actual != expected:
+              raise SystemExit(f'unexpected reply policy schema: {actual}')
+          db.execute(
+              'INSERT INTO social_content_reply_policies VALUES (?,?,?,?,?,?)',
+              ('c1','u1','mentioned',json.dumps(['u2']),'now','now'),
+          )
+          invalid_rows = [
+              ('c2','u1','anyone','[]','now','now'),
+              ('c3','u1','mentioned',json.dumps({'user':'u2'}),'now','now'),
+              ('c4','u1','mentioned',json.dumps([f'u{i}' for i in range(21)]),'now','now'),
+          ]
+          for row in invalid_rows:
+              try:
+                  db.execute('INSERT INTO social_content_reply_policies VALUES (?,?,?,?,?,?)', row)
+              except sqlite3.IntegrityError:
+                  continue
+              raise SystemExit(f'reply policy constraint did not reject invalid row: {row[0]}')
+          print('SOCIAL_015_REPLY_AUDIENCE_MIGRATION_STATIC=PASS')
+          PY
+
+      - name: Verify reply audience eligibility matrix against SQLite
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import re
+          import sqlite3
+          from pathlib import Path
+          runtime = Path('workers/W05-social/src/reply-audience-runtime.ts').read_text()
+          match = re.search(r"export const replyAudienceAllowedSql = `([\s\S]*?)`", runtime)
+          if not match:
+              raise SystemExit('reply audience SQL predicate not found')
+          predicate = match.group(1)
+          db = sqlite3.connect(':memory:')
+          db.executescript("""
+          CREATE TABLE contents (id TEXT PRIMARY KEY, owner_user_id TEXT NOT NULL, content_type TEXT NOT NULL, state TEXT NOT NULL);
+          CREATE TABLE social_content_reply_policies (content_id TEXT PRIMARY KEY, owner_user_id TEXT NOT NULL, audience TEXT NOT NULL, mentioned_user_ids_json TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+          CREATE TABLE social_follow_relationships (follower_user_id TEXT NOT NULL, target_user_id TEXT NOT NULL);
+          CREATE TABLE social_user_interactions (actor_user_id TEXT NOT NULL, target_user_id TEXT NOT NULL, relation_type TEXT NOT NULL);
+          INSERT INTO contents VALUES ('post-1','owner-1','post','PUBLISHED');
+          INSERT INTO social_content_reply_policies VALUES ('post-1','owner-1','everyone','[]','now','now');
+          """)
+          def set_policy(audience, mentioned=None):
+              db.execute(
+                  "UPDATE social_content_reply_policies SET audience=?, mentioned_user_ids_json=? WHERE content_id='post-1'",
+                  (audience, json.dumps(mentioned or [])),
+              )
+          def allowed(actor, verified=False):
+              params = [actor, 1 if verified else 0, actor, actor, actor, actor, actor, actor, 'post-1']
+              return db.execute(f"SELECT CASE WHEN {predicate} THEN 1 ELSE 0 END FROM contents content WHERE content.id=?", params).fetchone()[0] == 1
+          def assert_allowed(audience, actor, expected, verified=False, mentioned=None):
+              set_policy(audience, mentioned)
+              actual = allowed(actor, verified)
+              if actual != expected:
+                  raise SystemExit(f'{audience}: actor={actor}, verified={verified}, expected={expected}, actual={actual}')
+          assert_allowed('everyone', 'random-user', True)
+          assert_allowed('verified', 'owner-1', True, False)
+          assert_allowed('verified', 'verified-user', True, True)
+          assert_allowed('verified', 'unverified-user', False, False)
+          db.execute("INSERT INTO social_follow_relationships VALUES ('owner-1','followed-user')")
+          assert_allowed('following', 'followed-user', True)
+          assert_allowed('following', 'random-user', False)
+          assert_allowed('mentioned', 'mentioned-user', True, mentioned=['mentioned-user'])
+          assert_allowed('mentioned', 'random-user', False, mentioned=['mentioned-user'])
+          db.execute("INSERT INTO social_follow_relationships VALUES ('owner-1','middle-user')")
+          db.execute("INSERT INTO social_follow_relationships VALUES ('middle-user','second-degree-user')")
+          assert_allowed('followingNetwork', 'followed-user', True)
+          assert_allowed('followingNetwork', 'second-degree-user', True)
+          assert_allowed('followingNetwork', 'random-user', False)
+          db.execute("INSERT INTO social_user_interactions VALUES ('middle-user','second-degree-user','block')")
+          assert_allowed('followingNetwork', 'second-degree-user', False)
+          print('SOCIAL_015_REPLY_AUDIENCE_MATRIX_SQLITE=PASS')
+          PY
 
       - name: Verify comment delete tombstone migration
         run: |

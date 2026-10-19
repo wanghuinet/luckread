@@ -1,0 +1,151 @@
+name: SOCIAL-015 Reply Audience D1-02 Migration
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Exact 40-character merged source SHA containing the reply audience migration
+        required: true
+        type: string
+      confirm:
+        description: Type APPLY_SOCIAL_015_MIGRATION to permit remote D1 migration
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  WRANGLER_VERSION: 4.116.0
+  EXPECTED_DB_ID: 6c342634-97f6-4248-9f4a-85772af4f22c
+  EXPECTED_DB_NAME: luckreadpro
+  EXPECTED_WORKER: luckread-w05
+  EXPECTED_BINDING: DB
+
+jobs:
+  migrate:
+    if: ${{ github.ref == 'refs/heads/main' && inputs.confirm == 'APPLY_SOCIAL_015_MIGRATION' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Validate source SHA
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$SOURCE_SHA" | grep -Eq '^[0-9a-f]{40}$'
+
+      - name: Checkout exact source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha }}
+          fetch-depth: 0
+
+      - name: Verify exact source and main ancestry
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          git fetch --no-tags origin main
+          git merge-base --is-ancestor "$SOURCE_SHA" origin/main
+
+      - name: Verify target binding and migration source
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          config = json.loads(Path('workers/W05-social/wrangler.jsonc').read_text())
+          assert config['name'] == 'luckread-w05'
+          bindings = config.get('d1_databases', [])
+          assert len(bindings) == 1
+          assert bindings[0]['binding'] == 'DB'
+          assert bindings[0]['database_id'] == '6c342634-97f6-4248-9f4a-85772af4f22c'
+          assert bindings[0]['database_name'] == 'luckreadpro'
+          migration = Path('workers/W05-social/migrations/20261019_015_social_reply_audience_v1.sql')
+          assert migration.is_file()
+          assert 'MIG-SOCIAL-015-REPLY-AUDIENCE-V1' in migration.read_text()
+          print('SOCIAL_015_BINDING_SOURCE=PASS')
+          PY
+
+      - name: Verify migration shape statically
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import sqlite3
+          from pathlib import Path
+          db = sqlite3.connect(':memory:')
+          db.executescript(Path('workers/W05-social/migrations/20261019_015_social_reply_audience_v1.sql').read_text())
+          expected = ['content_id', 'owner_user_id', 'audience', 'mentioned_user_ids_json', 'created_at', 'updated_at']
+          actual = [row[1] for row in db.execute('PRAGMA table_info("social_content_reply_policies")').fetchall()]
+          if actual != expected:
+              raise SystemExit(f'unexpected reply policy schema: {actual}')
+          db.execute(
+              'INSERT INTO social_content_reply_policies VALUES (?,?,?,?,?,?)',
+              ('c1', 'u1', 'mentioned', json.dumps(['u2']), 'now', 'now'),
+          )
+          invalid_rows = [
+              ('c2', 'u1', 'anyone', '[]', 'now', 'now'),
+              ('c3', 'u1', 'mentioned', json.dumps({'user': 'u2'}), 'now', 'now'),
+              ('c4', 'u1', 'mentioned', json.dumps([f'u{i}' for i in range(21)]), 'now', 'now'),
+          ]
+          for row in invalid_rows:
+              try:
+                  db.execute('INSERT INTO social_content_reply_policies VALUES (?,?,?,?,?,?)', row)
+              except sqlite3.IntegrityError:
+                  continue
+              raise SystemExit(f'reply policy constraint did not reject invalid row: {row[0]}')
+          print('SOCIAL_015_MIGRATION_STATIC=PASS')
+          PY
+
+      - name: Apply SOCIAL-015 reply audience migration remotely
+        working-directory: workers/W05-social
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx --yes "wrangler@$WRANGLER_VERSION" d1 migrations apply "$EXPECTED_DB_NAME" --remote --config wrangler.jsonc
+
+      - name: Verify applied migration record
+        working-directory: workers/W05-social
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$EXPECTED_DB_NAME" --remote --json --config wrangler.jsonc --command "SELECT name FROM d1_migrations WHERE name = '20261019_015_social_reply_audience_v1.sql';" > /tmp/social-015-applied.json
+          python - <<'PY'
+          import json
+          data = json.load(open('/tmp/social-015-applied.json'))
+          rows = [row for item in data for row in item.get('results', [])] if isinstance(data, list) else data.get('results', [])
+          if not any(row.get('name') == '20261019_015_social_reply_audience_v1.sql' for row in rows):
+              raise SystemExit('SOCIAL-015 migration record missing after apply')
+          print('SOCIAL_015_MIGRATION_APPLIED=PASS')
+          PY
+
+      - name: Verify remote schema and constraints
+        working-directory: workers/W05-social
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$EXPECTED_DB_NAME" --remote --json --config wrangler.jsonc --command 'PRAGMA table_info("social_content_reply_policies");' > /tmp/social-015-schema.json
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$EXPECTED_DB_NAME" --remote --json --config wrangler.jsonc --command "SELECT sql FROM sqlite_master WHERE type='table' AND name='social_content_reply_policies';" > /tmp/social-015-table-sql.json
+          python - <<'PY'
+          import json
+          def rows(path):
+              data = json.load(open(path))
+              return [row for item in data for row in item.get('results', [])] if isinstance(data, list) else data.get('results', [])
+          schema = rows('/tmp/social-015-schema.json')
+          table_sql = rows('/tmp/social-015-table-sql.json')
+          expected = ['content_id', 'owner_user_id', 'audience', 'mentioned_user_ids_json', 'created_at', 'updated_at']
+          if [row.get('name') for row in schema] != expected:
+              raise SystemExit(f'remote reply audience schema mismatch: {[row.get("name") for row in schema]}')
+          statement = str(table_sql[0].get('sql', '')) if table_sql else ''
+          if not all(value in statement for value in ["'everyone'", "'verified'", "'following'", "'mentioned'", "'followingNetwork'", 'json_valid', 'json_array_length']):
+              raise SystemExit('remote reply audience constraints missing')
+          print('SOCIAL_015_REMOTE_SCHEMA=PASS')
+          PY

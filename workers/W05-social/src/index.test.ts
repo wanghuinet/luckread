@@ -65,6 +65,77 @@ describe('W05 social query transport', () => {
     })
   })
 
+  it('sets and reads reply audience policy through the authenticated W05 route', async () => {
+    const savedPolicy = {
+      id: 'content-1',
+      content_id: 'content-1',
+      owner_user_id: 'viewer-1',
+      content_type: 'post',
+      audience: 'following',
+      mentioned_user_ids_json: '[]',
+      updated_at: '2026-10-19T00:00:00.000Z',
+    }
+    const write = await worker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/contents/content-1/reply-audience', {
+        method: 'PUT',
+        headers: {
+          ...transportHeaders,
+          'content-type': 'application/json',
+          'Idempotency-Key': 'reply-audience-write-1',
+        },
+        body: JSON.stringify({ replyAudience: 'following', mentionedUserIds: [] }),
+      }),
+      { DB: dbFor([
+        { id: 'content-1', owner_user_id: 'viewer-1', content_type: 'post', state: 'DRAFT' },
+        savedPolicy,
+      ]) },
+    )
+    const writeBody = await write.clone().json()
+    expect(write.status, JSON.stringify(writeBody)).toBe(200)
+    await expect(write.json()).resolves.toMatchObject({
+      data: { contentId: 'content-1', ownerUserId: 'viewer-1', replyAudience: 'following' },
+    })
+
+    const read = await worker.fetch(
+      request('/internal/social/contents/content-1/reply-audience', transportHeaders),
+      { DB: dbFor([savedPolicy]) },
+    )
+    expect(read.status).toBe(200)
+    await expect(read.json()).resolves.toMatchObject({
+      data: { contentId: 'content-1', ownerUserId: 'viewer-1', replyAudience: 'following' },
+    })
+  })
+
+  it('rejects replies outside the configured audience on the W05 comment route', async () => {
+    const response = await worker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/contents/content-1/comments', {
+        method: 'POST',
+        headers: {
+          ...transportHeaders,
+          'X-LuckRead-Principal-Verified': 'false',
+          'content-type': 'application/json',
+          'Idempotency-Key': 'reply-audience-denied-1',
+        },
+        body: JSON.stringify({ body: 'Restricted reply', parentId: null }),
+      }),
+      { DB: dbFor([{
+        content_state: 'PUBLISHED',
+        content_owner_user_id: 'owner-1',
+        parent_content_id: null,
+        parent_author_user_id: null,
+        parent_state: null,
+        parent_depth: null,
+        recent_count: 0,
+        blocked: 0,
+        reply_audience_allowed: 0,
+      }]) },
+    )
+    expect(response.status).toBe(403)
+    await expect(response.json()).resolves.toMatchObject({
+      error: { code: 'PERMISSION_DENIED' },
+    })
+  })
+
   it('requires internal transport and rejects writes to profile channel routes', async () => {
     const unauthorized = await worker.fetch(request('/internal/social/users/user-1/replies'), { DB: dbFor() })
     expect(unauthorized.status).toBe(403)

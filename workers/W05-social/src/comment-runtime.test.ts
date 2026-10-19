@@ -1,6 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 import { describe, expect, it, vi } from 'vitest'
 import { createComment, deleteComment, listComments, parseCommentLimit, updateComment } from './comment-runtime.js'
+import { replyAudienceAllowedSql } from './reply-audience-runtime.js'
 
 const db = (firstResults: unknown[] = [], allResults: unknown[] = []) => {
   let firstIndex = 0
@@ -165,6 +166,25 @@ describe('comment runtime', () => {
     })
   })
 
+  it('rejects a reply outside the content owner’s configured audience before inserting', async () => {
+    const d = db([{
+      content_state: 'PUBLISHED',
+      content_owner_user_id: 'owner-1',
+      parent_content_id: null,
+      parent_author_user_id: null,
+      parent_state: null,
+      parent_depth: null,
+      blocked: 0,
+      recent_count: 0,
+      reply_audience_allowed: 0,
+    }])
+    await expect(createComment(d, 'viewer-1', 'content-1', {
+      body: 'not allowed',
+      idempotencyKey: 'reply-audience-denied',
+    })).rejects.toMatchObject({ code: 'PERMISSION_DENIED', status: 403 })
+    expect(d.prepare).toHaveBeenCalledTimes(1)
+  })
+
   it('rechecks published parent state in the final comment insert', async () => {
     const d = db([
       {
@@ -198,6 +218,36 @@ describe('comment runtime', () => {
     expect(prepare.mock.calls[1]?.[0]).toContain('parent.depth < 3')
   })
 
+  it('rechecks reply audience eligibility if the policy changes before the final insert', async () => {
+    const d = db([
+      {
+        content_state: 'PUBLISHED',
+        content_owner_user_id: 'user-2',
+        parent_content_id: null,
+        parent_author_user_id: null,
+        parent_state: null,
+        parent_depth: null,
+        blocked: 0,
+        recent_count: 0,
+        reply_audience_allowed: 1,
+      },
+      null,
+      { content_state: 'PUBLISHED', reply_audience_allowed: 0 },
+    ])
+
+    await expect(createComment(d, 'user-1', 'content-1', {
+      body: '权限在提交过程中收紧',
+      idempotencyKey: 'reply-audience-race-1',
+    })).rejects.toMatchObject({
+      code: 'PERMISSION_DENIED',
+      status: 403,
+    })
+
+    const prepare = (d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare
+    expect(String(prepare.mock.calls[1]?.[0])).toContain(replyAudienceAllowedSql)
+    expect(prepare).toHaveBeenCalledTimes(3)
+  })
+
   it('rechecks the Block policy in the final comment insert', async () => {
     const d = db([
       {
@@ -229,14 +279,18 @@ describe('comment runtime', () => {
       bind: vi.fn(() => ({
         first: vi.fn(async () => null),
       })),
+    })).mockImplementationOnce(() => ({
+      bind: vi.fn(() => ({
+        first: vi.fn(async () => ({ content_state: 'PUBLISHED', reply_audience_allowed: 1 })),
+      })),
     }))
 
     await expect(createComment(d, 'user-1', 'content-1', {
       body: '并发屏蔽期间的评论',
       idempotencyKey: 'block-race-1',
     })).rejects.toMatchObject({
-      code: 'INTERNAL_ERROR',
-      status: 500,
+      code: 'CONFLICT',
+      status: 409,
     })
 
     expect(prepare.mock.calls[1]?.[0]).toContain("block.relation_type = 'block'")

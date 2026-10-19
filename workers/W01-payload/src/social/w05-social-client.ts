@@ -161,6 +161,7 @@ export async function callW05Social(input: {
     'X-LuckRead-Principal-User-Id': input.principal.userId,
   })
   if (input.principal.layer) headers.set('X-LuckRead-Principal-Layer', input.principal.layer)
+  headers.set('X-LuckRead-Principal-Verified', input.principal.verified === true ? 'true' : 'false')
   if (input.body !== undefined) headers.set('content-type', 'application/json; charset=utf-8')
   const idempotencyKey = input.request.headers.get('Idempotency-Key')?.trim()
   if (idempotencyKey) headers.set('Idempotency-Key', idempotencyKey)
