@@ -1,6 +1,6 @@
 {
-  "name": "X on Expo",
-  "version": "1.0.0",
+  "name": "luckread-native",
+  "version": "0.1.0",
   "main": "expo-router/entry",
   "scripts": {
     "android": "expo run:android",
@@ -9,7 +9,9 @@
     "prebuild": "expo prebuild",
     "lint": "eslint \"**/*.{js,jsx,ts,tsx}\" && prettier -c \"**/*.{js,jsx,ts,tsx,json}\"",
     "format": "eslint \"**/*.{js,jsx,ts,tsx}\" --fix && prettier \"**/*.{js,jsx,ts,tsx,json}\" --write",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "typecheck": "tsc --noEmit",
+    "check:compat": "expo install --check"
   },
   "dependencies": {
     "@codeherence/react-native-header": "^0.14.0",
@@ -28,12 +30,12 @@
     "expo-image": "^2.0.7",
     "expo-linear-gradient": "~14.0.2",
     "expo-linking": "~7.0.5",
-    "expo-router": "~4.0.6",
+    "expo-router": "~4.0.22",
     "expo-status-bar": "~2.0.1",
     "expo-system-ui": "~4.0.9",
     "expo-video": "~2.0.6",
     "expo-web-browser": "~14.0.2",
-    "nativewind": "latest",
+    "nativewind": "4.1.23",
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "react-native": "0.76.9",
@@ -44,7 +46,7 @@
     "react-native-ios-context-menu": "3.1.0",
     "react-native-ios-utilities": "5.1.2",
     "react-native-pager-view": "6.5.1",
-    "react-native-reanimated": "3.16.2",
+    "react-native-reanimated": "~3.16.7",
     "react-native-safe-area-context": "4.12.0",
     "react-native-screens": "~4.4.0",
     "react-native-sortables": "^1.5.2",
@@ -52,10 +54,11 @@
     "react-native-svg-transformer": "^1.5.0",
     "react-native-swipe-list-view": "^3.2.9",
     "react-native-tab-view": "^4.0.10",
-    "react-native-web": "~0.19.10",
+    "react-native-web": "~0.19.13",
     "react-native-webview": "13.12.5",
     "zeego": "^3.0.6",
-    "zustand": "^4.5.1"
+    "zustand": "^4.5.1",
+    "expo-secure-store": "~14.0.1"
   },
   "devDependencies": {
     "@babel/core": "^7.20.0",
