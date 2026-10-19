@@ -217,6 +217,36 @@ describe('comment runtime', () => {
     expect(prepare.mock.calls[1]?.[0]).toContain('parent.depth < 3')
   })
 
+  it('rechecks reply audience eligibility if the policy changes before the final insert', async () => {
+    const d = db([
+      {
+        content_state: 'PUBLISHED',
+        content_owner_user_id: 'user-2',
+        parent_content_id: null,
+        parent_author_user_id: null,
+        parent_state: null,
+        parent_depth: null,
+        blocked: 0,
+        recent_count: 0,
+        reply_audience_allowed: 1,
+      },
+      null,
+      { content_state: 'PUBLISHED', reply_audience_allowed: 0 },
+    ])
+
+    await expect(createComment(d, 'user-1', 'content-1', {
+      body: '权限在提交过程中收紧',
+      idempotencyKey: 'reply-audience-race-1',
+    })).rejects.toMatchObject({
+      code: 'PERMISSION_DENIED',
+      status: 403,
+    })
+
+    const prepare = (d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare
+    expect(String(prepare.mock.calls[1]?.[0])).toContain('AND ${replyAudienceAllowedSql}')
+    expect(prepare).toHaveBeenCalledTimes(3)
+  })
+
   it('rechecks the Block policy in the final comment insert', async () => {
     const d = db([
       {
