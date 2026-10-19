@@ -2,6 +2,7 @@
 import { getLikeStatus, like, LikeRuntimeError, unlike } from './like-runtime.js'
 import { CommentRuntimeError, createComment, deleteComment, listComments, parseCommentLimit, updateComment } from './comment-runtime.js'
 import { listProfileLikedContents, listProfileReplies, ProfileChannelRuntimeError } from './profile-channel-runtime.js'
+import { getContentReplyAudience, ReplyAudienceRuntimeError, setContentReplyAudience } from './reply-audience-runtime.js'
 import {
   FavoriteRuntimeError,
   favorite,
@@ -611,6 +612,41 @@ export default {
         return new Response(null, { status: 405, headers: { Allow: 'GET, POST, DELETE' } })
       }
 
+      const replyAudienceMatch = /^\\/internal\\/social\\/contents\\/([^/]+)\\/reply-audience$/.exec(url.pathname)
+      if (replyAudienceMatch) {
+        const contentId = decodePathPart(replyAudienceMatch[1] ?? '')
+        if (contentId === null) throw new ReplyAudienceRuntimeError('VALIDATION_FAILED', 400)
+        if (request.method !== 'GET' && request.method !== 'PUT') {
+          return new Response(null, { status: 405, headers: { Allow: 'GET, PUT' } })
+        }
+        const actorUserId = requirePrincipal(request)
+        requireInteractionLayer(request)
+        if (request.method === 'GET') {
+          return json({ data: await getContentReplyAudience(env.DB, actorUserId, contentId), requestId: createRequestId() })
+        }
+
+        const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
+        if (!idempotencyKey) throw new ReplyAudienceRuntimeError('PRECONDITION_REQUIRED', 428)
+        if (idempotencyKey.length > 256) throw new ReplyAudienceRuntimeError('VALIDATION_FAILED', 400)
+        let body: unknown
+        try { body = await request.json() } catch { throw new ReplyAudienceRuntimeError('VALIDATION_FAILED', 400) }
+        if (!body || typeof body !== 'object' || Array.isArray(body)) {
+          throw new ReplyAudienceRuntimeError('VALIDATION_FAILED', 400)
+        }
+        const raw = body as Record<string, unknown>
+        if (Object.keys(raw).some((key) => key !== 'replyAudience' && key !== 'mentionedUserIds')) {
+          throw new ReplyAudienceRuntimeError('VALIDATION_FAILED', 400)
+        }
+        const policy = await setContentReplyAudience(
+          env.DB,
+          actorUserId,
+          contentId,
+          raw.replyAudience,
+          raw.mentionedUserIds,
+        )
+        return json({ data: policy, requestId: createRequestId() })
+      }
+
       const commentContentId = parseCommentPath(url.pathname)
       if (commentContentId !== null) {
         if (request.method === 'GET') {
@@ -661,11 +697,12 @@ export default {
           throw new CommentRuntimeError('VALIDATION_FAILED', 400)
         }
 
+        const actorVerified = request.headers.get('X-LuckRead-Principal-Verified') === 'true'
         const comment = await createComment(env.DB, viewerUserId, commentContentId, {
           body: bodyValue,
           parentId: parentId ?? null,
           idempotencyKey,
-        })
+        }, actorVerified)
         const mentionTargets = rawMentions === undefined ? [] : rawMentions as Array<{ userId: string; handle: string }>
         ctx.waitUntil(
           syncSocialTokens(env.DB, viewerUserId, 'comment', comment.id, bodyValue, mentionTargets).catch(() => undefined),
@@ -931,7 +968,8 @@ export default {
         error instanceof BlockMuteRuntimeError ||
         error instanceof RelationshipGraphRuntimeError ||
         error instanceof SocialClosureRuntimeError ||
-        error instanceof ProfileChannelRuntimeError
+        error instanceof ProfileChannelRuntimeError ||
+        error instanceof ReplyAudienceRuntimeError
       ) {
         return json({
           error: {
