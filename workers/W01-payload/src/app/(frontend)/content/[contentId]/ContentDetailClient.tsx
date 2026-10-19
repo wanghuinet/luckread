@@ -62,6 +62,8 @@ export default function ContentDetailPage({
   const [bookmarkBusy, setBookmarkBusy] = useState(false)
   const [shareBusy, setShareBusy] = useState(false)
   const [reportBusy, setReportBusy] = useState(false)
+  const [reportDialogOpen, setReportDialogOpen] = useState(false)
+  const [reportReasonCode, setReportReasonCode] = useState('SPAM')
   const [viewerUserId, setViewerUserId] = useState<string | null>(null)
   const [following, setFollowing] = useState(false)
   const [interactionRestricted, setInteractionRestricted] = useState(false)
@@ -318,16 +320,7 @@ export default function ContentDetailPage({
   }
 
   async function submitReport() {
-    if (!content || reportBusy) return
-    const reasonCode = window.prompt(
-      locale === 'en'
-        ? 'Enter a report reason (for example SPAM, COPYRIGHT, ABUSE)'
-        : locale === 'tw'
-          ? '請輸入檢舉原因（例如 SPAM、COPYRIGHT、ABUSE）'
-          : '请输入举报原因（例如 SPAM、COPYRIGHT、ABUSE）',
-      'SPAM',
-    )?.trim()
-    if (!reasonCode) return
+    if (!content || reportBusy || !reportReasonCode.trim()) return
 
     setReportBusy(true)
     setActionMessage('')
@@ -343,7 +336,7 @@ export default function ContentDetailPage({
         body: JSON.stringify({
           targetType: 'content',
           targetId: content.id,
-          reasonCode,
+          reasonCode: reportReasonCode,
         }),
       })
       if (response.status === 401) {
@@ -357,6 +350,7 @@ export default function ContentDetailPage({
           ? (locale === 'en' ? 'Report recorded: you have already reported this content.' : locale === 'tw' ? '檢舉已記錄：你先前已檢舉過此內容。' : '举报已记录：你此前已举报过该内容。')
           : (locale === 'en' ? 'Report submitted.' : locale === 'tw' ? '檢舉已提交。' : '举报已提交。'),
       )
+      setReportDialogOpen(false)
     } catch {
       setActionMessage(locale === 'en' ? 'Could not submit the report. Please try again.' : locale === 'tw' ? '檢舉提交失敗，請稍後再試。' : '举报提交失败，请稍后重试。')
     } finally {
@@ -452,7 +446,16 @@ export default function ContentDetailPage({
             {shareBusy ? copy.detail.generating : copied ? copy.detail.copied : copy.detail.share}
           </button>
           {viewerUserId && viewerUserId !== content.creatorId ? (
-            <button className="main-tab rounded-full border border-light-border px-4 py-2 text-sm font-bold hover:bg-light-primary/10 disabled:cursor-wait disabled:opacity-50 dark:border-dark-border dark:hover:bg-dark-primary/10" disabled={reportBusy} onClick={() => void submitReport()} type="button">
+            <button
+              className="main-tab rounded-full border border-light-border px-4 py-2 text-sm font-bold hover:bg-light-primary/10 disabled:cursor-wait disabled:opacity-50 dark:border-dark-border dark:hover:bg-dark-primary/10"
+              disabled={reportBusy}
+              onClick={() => {
+                setActionMessage('')
+                setReportReasonCode('SPAM')
+                setReportDialogOpen(true)
+              }}
+              type="button"
+            >
               {reportBusy ? copy.detail.reporting : copy.detail.report}
             </button>
           ) : null}
@@ -544,6 +547,78 @@ export default function ContentDetailPage({
         interactionRestricted={interactionRestricted}
         locale={locale}
       />
+      {reportDialogOpen ? (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 px-4 py-8"
+          onClick={(event) => {
+            if (event.target === event.currentTarget && !reportBusy) setReportDialogOpen(false)
+          }}
+          onKeyDown={(event) => {
+            if (event.key === 'Escape' && !reportBusy) setReportDialogOpen(false)
+          }}
+        >
+          <section
+            aria-labelledby="content-report-title"
+            aria-modal="true"
+            className="w-full max-w-md rounded-2xl border border-light-border bg-main-background p-5 shadow-xl dark:border-dark-border"
+            role="dialog"
+          >
+            <h2 className="text-lg font-bold" id="content-report-title">
+              {locale === 'en' ? 'Report content' : locale === 'tw' ? '檢舉內容' : '举报内容'}
+            </h2>
+            <p className="mt-2 text-sm text-light-secondary dark:text-dark-secondary">
+              {locale === 'en' ? 'Choose the reason that best describes this content.' : locale === 'tw' ? '請選擇最符合此內容情況的檢舉原因。' : '请选择最符合此内容情况的举报原因。'}
+            </p>
+            <fieldset className="mt-4 flex flex-col gap-2">
+              <legend className="sr-only">
+                {locale === 'en' ? 'Report reason' : locale === 'tw' ? '檢舉原因' : '举报原因'}
+              </legend>
+              {[
+                { value: 'SPAM', label: locale === 'en' ? 'Spam or unwanted promotion' : locale === 'tw' ? '垃圾訊息或廣告' : '垃圾信息或广告' },
+                { value: 'ABUSE', label: locale === 'en' ? 'Abuse or harassment' : locale === 'tw' ? '騷擾或辱罵' : '骚扰或辱骂' },
+                { value: 'IMPERSONATION', label: locale === 'en' ? 'Impersonation' : locale === 'tw' ? '冒充他人' : '冒充他人' },
+                { value: 'COPYRIGHT', label: locale === 'en' ? 'Copyright infringement' : locale === 'tw' ? '侵犯版權' : '侵犯版权' },
+                { value: 'OTHER', label: locale === 'en' ? 'Other' : locale === 'tw' ? '其他原因' : '其他原因' },
+              ].map((reason) => (
+                <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-xl px-3 hover:bg-light-primary/10 dark:hover:bg-dark-primary/10" key={reason.value}>
+                  <input
+                    checked={reportReasonCode === reason.value}
+                    className="h-4 w-4 accent-main-accent"
+                    name="content-report-reason"
+                    onChange={() => setReportReasonCode(reason.value)}
+                    type="radio"
+                    value={reason.value}
+                  />
+                  <span className="text-sm">{reason.label}</span>
+                </label>
+              ))}
+            </fieldset>
+            {actionMessage ? (
+              <p className="mt-3 text-sm text-light-secondary dark:text-dark-secondary" role="status">{actionMessage}</p>
+            ) : null}
+            <div className="mt-5 flex justify-end gap-3">
+              <button
+                className="main-tab rounded-full border border-light-border px-4 py-2 text-sm font-bold dark:border-dark-border"
+                disabled={reportBusy}
+                onClick={() => setReportDialogOpen(false)}
+                type="button"
+              >
+                {locale === 'en' ? 'Cancel' : locale === 'tw' ? '取消' : '取消'}
+              </button>
+              <button
+                className="rounded-full bg-main-accent px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
+                disabled={reportBusy || !reportReasonCode}
+                onClick={() => void submitReport()}
+                type="button"
+              >
+                {reportBusy
+                  ? copy.detail.reporting
+                  : locale === 'en' ? 'Submit report' : locale === 'tw' ? '提交檢舉' : '提交举报'}
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
     </Root>
   )
 }
