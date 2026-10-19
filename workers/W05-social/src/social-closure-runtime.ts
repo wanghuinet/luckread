@@ -475,24 +475,37 @@ export async function enqueueNotification(
   }
 }
 
+const NOTIFICATION_TYPES: readonly SocialNotificationType[] = ['FOLLOW', 'LIKE', 'COMMENT', 'REPLY', 'MENTION']
+
 export async function listNotifications(
   db: D1Database,
   recipientUserIdValue: string,
   cursorValue: string | null,
   limitValue: string | null,
+  typeValue: string | null = null,
 ) {
   const recipientUserId = id(recipientUserIdValue, 'UNAUTHENTICATED')
   const limit = parseLimit(limitValue)
   const cursor = decodeCursor(cursorValue)
+  const typeText = typeValue?.trim() ?? ''
+  const notificationType = typeText ? typeText : null
+  if (notificationType && !NOTIFICATION_TYPES.includes(notificationType as SocialNotificationType)) {
+    throw new SocialClosureRuntimeError('VALIDATION_FAILED', 400)
+  }
+  const whereType = notificationType ? ' AND notification_type = ?' : ''
   const whereCursor = cursor ? ' AND (created_at < ? OR (created_at = ? AND notification_id < ?))' : ''
-  const binds = cursor
-    ? [recipientUserId, cursor.createdAt, cursor.createdAt, cursor.notificationId, limit + 1]
-    : [recipientUserId, limit + 1]
+  const cursorBinds = cursor ? [cursor.createdAt, cursor.createdAt, cursor.notificationId] : []
+  const binds = [
+    recipientUserId,
+    ...(notificationType ? [notificationType] : []),
+    ...cursorBinds,
+    limit + 1,
+  ]
 
   const rows = await db.prepare(
     `SELECT notification_id, notification_type, actor_user_id, target_type, target_id, payload_json, read_at, created_at
        FROM social_notifications
-      WHERE recipient_user_id = ?${whereCursor}
+      WHERE recipient_user_id = ?${whereType}${whereCursor}
       ORDER BY created_at DESC, notification_id DESC
       LIMIT ?`,
   ).bind(...binds).all<{
