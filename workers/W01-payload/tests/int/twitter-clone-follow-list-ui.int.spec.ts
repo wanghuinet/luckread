@@ -48,6 +48,21 @@ describe('Twitter Clone follow-list UI reuse with LuckRead social authority', ()
     expect(row).not.toContain('.module.css')
   })
 
+  it('renders public profile names, handles and avatars with a safe ID fallback', () => {
+    const row = read('src/app/(frontend)/users/TwitterCloneFollowRow.tsx')
+    const profileCache = read('src/lib/social-post-profile-cache.ts')
+
+    expect(row).toContain('getCachedPublicProfile(userId)')
+    expect(row).toContain('profile?.displayName?.trim()')
+    expect(row).toContain('profile?.username?.trim()')
+    expect(row).toContain('profile?.avatar?.trim()')
+    expect(row).toContain('visibleName || fallbackName')
+    expect(row).toContain('cancelled')
+    expect(profileCache).toContain("'/api/v1/users/' + encodeURIComponent(normalizedId)")
+    expect(profileCache).toContain("'/api/v1/users/by-identity-id/' + encodeURIComponent(normalizedId)")
+    expect(row).not.toContain('.module.css')
+  })
+
   it('keeps public relationship reads on existing W05-backed paginated endpoints', () => {
     const list = read('src/app/(frontend)/users/[userId]/UserFollowList.tsx')
 
