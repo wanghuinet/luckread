@@ -891,16 +891,16 @@ export default function PublicProfilePage({
             className="w-full max-w-md rounded-2xl border border-light-border bg-main-background p-5 shadow-xl dark:border-dark-border"
             role="dialog"
           >
-            <h2 className="text-lg font-bold" id="profile-report-title">举报用户</h2>
-            <p className="mt-2 text-sm text-light-secondary dark:text-dark-secondary">请选择最符合情况的举报原因。</p>
+            <h2 className="text-lg font-bold" id="profile-report-title">{locale === 'en' ? 'Report user' : locale === 'tw' ? '檢舉使用者' : '举报用户'}</h2>
+            <p className="mt-2 text-sm text-light-secondary dark:text-dark-secondary">{locale === 'en' ? 'Choose the reason that best describes this account.' : locale === 'tw' ? '請選擇最符合此帳號情況的檢舉原因。' : '请选择最符合此账号情况的举报原因。'}</p>
             <fieldset className="mt-4 flex flex-col gap-2">
-              <legend className="sr-only">举报原因</legend>
+              <legend className="sr-only">{locale === 'en' ? 'Report reason' : locale === 'tw' ? '檢舉原因' : '举报原因'}</legend>
               {[
-                { value: 'ABUSE', label: '骚扰或辱骂' },
-                { value: 'SPAM', label: '垃圾信息或广告' },
-                { value: 'IMPERSONATION', label: '冒充他人' },
-                { value: 'COPYRIGHT', label: '侵犯版权' },
-                { value: 'OTHER', label: '其他原因' },
+                { value: 'ABUSE', label: locale === 'en' ? 'Abuse or harassment' : locale === 'tw' ? '騷擾或辱罵' : '骚扰或辱骂' },
+                { value: 'SPAM', label: locale === 'en' ? 'Spam or unwanted promotion' : locale === 'tw' ? '垃圾訊息或廣告' : '垃圾信息或广告' },
+                { value: 'IMPERSONATION', label: locale === 'en' ? 'Impersonation' : locale === 'tw' ? '冒充他人' : '冒充他人' },
+                { value: 'COPYRIGHT', label: locale === 'en' ? 'Copyright infringement' : locale === 'tw' ? '侵犯版權' : '侵犯版权' },
+                { value: 'OTHER', label: locale === 'en' ? 'Other' : locale === 'tw' ? '其他原因' : '其他原因' },
               ].map((reason) => (
                 <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-xl px-3 hover:bg-light-primary/10 dark:hover:bg-dark-primary/10" key={reason.value}>
                   <input
@@ -922,7 +922,7 @@ export default function PublicProfilePage({
                 onClick={() => setReportDialogOpen(false)}
                 type="button"
               >
-                取消
+                {locale === 'en' ? 'Cancel' : '取消'}
               </button>
               <button
                 className="rounded-full bg-main-accent px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
@@ -930,7 +930,7 @@ export default function PublicProfilePage({
                 onClick={() => void reportProfile()}
                 type="button"
               >
-                {reportBusy ? '提交中…' : '提交举报'}
+                {reportBusy ? (locale === 'en' ? 'Submitting…' : '提交中…') : locale === 'en' ? 'Submit report' : locale === 'tw' ? '提交檢舉' : '提交举报'}
               </button>
             </div>
           </section>
