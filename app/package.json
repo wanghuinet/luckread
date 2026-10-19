@@ -77,5 +77,15 @@
     "extends": "universe/native",
     "root": true
   },
-  "private": true
+  "private": true,
+  "expo": {
+    "doctor": {
+      "reactNativeDirectoryCheck": {
+        "exclude": [
+          "react-native-collapsible-tab-view",
+          "react-native-animated-splash-screen"
+        ]
+      }
+    }
+  }
 }
