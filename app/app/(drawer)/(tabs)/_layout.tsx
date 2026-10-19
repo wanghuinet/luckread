@@ -23,26 +23,28 @@ import { useColorScheme } from "nativewind";
 
 
 const TabBarBackground = () => {
-  const isDark = useColorScheme() === 'dark';
-  const BackgroundComponent = Platform.OS === 'ios' ? BlurView : View
-  const backgroundProps =
-    Platform.OS === 'ios'
-      ? {
-        tint: isDark ? 'systemThickMaterialDark' : 'systemThickMaterialLight',
-        
-        intensity: 40,
-        style: StyleSheet.absoluteFill,
-      }
-      : {
-        style: {
-          backgroundColor: isDark ? '#1e1e1e' : '#fff',
-          ...StyleSheet.absoluteFill,
-        },
-      }
+  const { colorScheme } = useColorScheme();
+  const isDark = colorScheme === 'dark';
 
-  return <BackgroundComponent {...backgroundProps} />
-}
+  if (Platform.OS === 'ios') {
+    return (
+      <BlurView
+        tint={isDark ? 'systemThickMaterialDark' : 'systemThickMaterialLight'}
+        intensity={40}
+        style={StyleSheet.absoluteFill}
+      />
+    );
+  }
 
+  return (
+    <View
+      style={[
+        StyleSheet.absoluteFill,
+        { backgroundColor: isDark ? '#1e1e1e' : '#fff' },
+      ]}
+    />
+  );
+};
 
 
 export default function TabLayout() {
