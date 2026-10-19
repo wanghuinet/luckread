@@ -362,7 +362,25 @@ export async function createComment(
     updated_at: string
   }>()
 
-  if (!inserted) throw new CommentRuntimeError('INTERNAL_ERROR', 500)
+  if (!inserted) {
+    // The final INSERT re-checks policy, follow graph, block relations, and
+    // parent visibility. Distinguish a concurrent audience denial from other
+    // stale preconditions without ever allowing the comment to bypass policy.
+    const finalState = await db.prepare(
+      `SELECT content.state AS content_state,
+              CASE WHEN ${replyAudienceAllowedSql} THEN 1 ELSE 0 END AS reply_audience_allowed
+         FROM contents content
+        WHERE content.id = ? LIMIT 1`,
+    ).bind(...replyAudienceAllowedParams(actor, actorVerified), contentId)
+      .first<{ content_state: string; reply_audience_allowed: number }>()
+    if (!finalState || finalState.content_state !== 'PUBLISHED') {
+      throw new CommentRuntimeError('NOT_FOUND', 404)
+    }
+    if (Number(finalState.reply_audience_allowed) !== 1) {
+      throw new CommentRuntimeError('PERMISSION_DENIED', 403)
+    }
+    throw new CommentRuntimeError('CONFLICT', 409)
+  }
   return toCommentItem(inserted)
 
 }
