@@ -638,8 +638,8 @@ export async function listComments(
        c.state,
        c.depth,
        c.created_at,
-       c.updated_at
-        EXISTS (
+       c.updated_at,
+       EXISTS (
           SELECT 1
             FROM interaction_likes liked
             JOIN viewer v ON v.user_id = liked.actor_user_id
