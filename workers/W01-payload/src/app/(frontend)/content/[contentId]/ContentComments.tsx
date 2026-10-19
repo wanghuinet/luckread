@@ -1,9 +1,11 @@
 'use client'
 
+import Image from 'next/image'
 import Link from 'next/link'
 import { FormEvent, useCallback, useEffect, useRef, useState } from 'react'
 
 import { fetchJson, getApiErrorMessage } from '../../../../lib/client-api.js'
+import { getCachedPublicProfile, type PublicProfile } from '../../../../lib/social-post-profile-cache.js'
 import { getPublicCopy, type PublicLocale } from '../../i18n/public-locale'
 import DiscussionThread from './DiscussionThread'
 
@@ -39,6 +41,7 @@ export default function ContentComments({
   const copy = getPublicCopy(locale)
   const dateLocale = locale === 'en' ? 'en-US' : locale === 'tw' ? 'zh-TW' : 'zh-CN'
   const [comments, setComments] = useState<CommentItem[]>([])
+  const [commentProfiles, setCommentProfiles] = useState<Record<string, PublicProfile>>({})
   const [cursor, setCursor] = useState<string | null>(null)
   const [hasMore, setHasMore] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -108,6 +111,32 @@ export default function ContentComments({
       commentsRequestIdRef.current += 1
     }
   }, [loadComments])
+
+  useEffect(() => {
+    let active = true
+    const authorIds = [...new Set(comments.map((comment) => comment.authorUserId).filter(Boolean))]
+    if (authorIds.length === 0) return () => { active = false }
+
+    void Promise.all(authorIds.map(async (authorId) => {
+      try {
+        return [authorId, await getCachedPublicProfile(authorId)] as const
+      } catch {
+        return [authorId, null] as const
+      }
+    })).then((results) => {
+      if (!active) return
+      const resolved: Record<string, PublicProfile> = {}
+      for (const [authorId, profile] of results) {
+        if (profile) resolved[authorId] = profile
+      }
+      if (Object.keys(resolved).length > 0) {
+        setCommentProfiles((current) => ({ ...current, ...resolved }))
+      }
+    })
+
+    return () => { active = false }
+  }, [comments])
+
 
 
 
@@ -382,15 +411,36 @@ export default function ContentComments({
           comments={comments}
           renderComment={(comment) => (
             <article className="content-comment-item" key={comment.id} style={{ marginInlineStart: Math.min(comment.depth, 3) * 24 }}>
-                <header>
-                  <strong>{copy.comments.reader}</strong>
-                <Link href={'/users/' + encodeURIComponent(comment.authorUserId)}>
-                  {copy.comments.profile}
-                </Link>
-                <time dateTime={comment.createdAt}>
-                  {new Date(comment.createdAt).toLocaleString(dateLocale, { hour12: false })}
-                </time>
-              </header>
+              {(() => {
+                const authorProfile = commentProfiles[comment.authorUserId]
+                const authorName = authorProfile?.displayName?.trim() || authorProfile?.username?.trim() || copy.comments.reader
+                const authorHref = authorProfile?.id
+                  ? '/users/' + encodeURIComponent(authorProfile.id)
+                  : '/users/' + encodeURIComponent(comment.authorUserId)
+                const authorInitial = authorName.slice(0, 1).toUpperCase() || 'L'
+                return (
+                  <header className="flex items-center gap-2">
+                    <Link
+                      aria-label={authorName}
+                      className="grid h-8 w-8 shrink-0 place-items-center overflow-hidden rounded-full bg-main-sidebar-background text-xs font-bold text-main-accent"
+                      href={authorHref}
+                    >
+                      {authorProfile?.avatar?.trim()
+                        ? <Image alt="" className="h-8 w-8 rounded-full object-cover" height={32} loading="lazy" src={authorProfile.avatar} unoptimized width={32} />
+                        : authorInitial}
+                    </Link>
+                    <div className="flex min-w-0 flex-wrap items-baseline gap-x-2">
+                      <Link className="font-bold hover:underline" href={authorHref}>{authorName}</Link>
+                      {authorProfile?.username?.trim() ? (
+                        <span className="text-sm text-light-secondary dark:text-dark-secondary">@{authorProfile.username.trim()}</span>
+                      ) : null}
+                      <time className="text-xs text-light-secondary dark:text-dark-secondary" dateTime={comment.createdAt}>
+                        {new Date(comment.createdAt).toLocaleString(dateLocale, { hour12: false })}
+                      </time>
+                    </div>
+                  </header>
+                )
+              })()}
               {editingId === comment.id ? (
                 <div className="content-comment-form">
                   <label htmlFor={'content-comment-edit-' + comment.id}>{locale === 'en' ? 'Edit comment' : locale === 'tw' ? '編輯留言' : '编辑评论'}</label>
