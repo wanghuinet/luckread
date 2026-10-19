@@ -225,7 +225,7 @@ const NotificationItem = ({ notification }: { notification: typeof notifications
   userIds.push(...selectedUserIds);
 
   
-  let icon = null;
+  let icon: React.ReactNode = null;
   let iconColor = '#000';
   let actionText = '';
 
@@ -332,12 +332,6 @@ export default function Notifications() {
               fontWeight: 'bold', textTransform: 'capitalize', textAlign: 'center', height: 24,
               color: '#606E79'
             }}
-            headerContainerStyle={{
-              backgroundColor: 'transparent',
-              elevation: 0,
-              shadowOpacity: 0,
-            }}
-
           />
         )}
 
