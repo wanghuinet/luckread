@@ -67,8 +67,10 @@ describe('W05 social query transport', () => {
 
   it('sets and reads reply audience policy through the authenticated W05 route', async () => {
     const savedPolicy = {
+      id: 'content-1',
       content_id: 'content-1',
       owner_user_id: 'viewer-1',
+      content_type: 'post',
       audience: 'following',
       mentioned_user_ids_json: '[]',
       updated_at: '2026-10-19T00:00:00.000Z',
