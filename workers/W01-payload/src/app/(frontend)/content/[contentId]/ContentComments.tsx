@@ -19,6 +19,7 @@ type CommentItem = {
   depth: number
   createdAt: string
   updatedAt: string
+  likedByViewer?: boolean
 }
 
 type CommentPage = {
@@ -85,6 +86,10 @@ export default function ContentComments({
       }
       const page = data.data as CommentPage
       if (requestId !== commentsRequestIdRef.current) return
+      const pageLikeState = Object.fromEntries(
+        page.items.map((item) => [item.id, item.likedByViewer === true]),
+      )
+      setLikedComments((current) => nextCursor ? { ...current, ...pageLikeState } : pageLikeState)
       setComments((current) => nextCursor ? [...current, ...page.items] : page.items)
       setCursor(page.nextCursor)
       setHasMore(page.hasMore)
