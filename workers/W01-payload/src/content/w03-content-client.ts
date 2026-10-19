@@ -9,6 +9,8 @@ type W03ContentService = {
 export type ContentPrincipal = {
   userId: string
   layer: string | null
+  /** Derived from W02's authoritative verified_user role assignment. */
+  verified?: boolean
 }
 
 export class W03ContentClientError extends Error {
@@ -37,7 +39,11 @@ export async function resolveContentPrincipal(request: Request): Promise<Content
     await enforcePublicReadRateLimit(request)
     const principal = await getBetterAuthPrincipal(request)
     if (!principal.active) return errorResponse(401, 'UNAUTHENTICATED', 'Authentication required')
-    return { userId: principal.userId, layer: principal.layer ?? null }
+    return {
+      userId: principal.userId,
+      layer: principal.layer ?? null,
+      verified: principal.roleAssignments?.some((assignment) => assignment.roleId === 'verified_user') === true,
+    }
   } catch (error) {
     if (error instanceof TrafficLimitError) return rateLimitResponse(request)
     if (error instanceof W02AuthClientError && error.status === 401) return errorResponse(401, 'UNAUTHENTICATED', 'Authentication required')
@@ -85,6 +91,9 @@ export async function callW03Content(input: {
   }
   if (input.principal?.layer) {
     headers.set('X-LuckRead-Principal-Layer', input.principal.layer)
+  }
+  if (input.principal) {
+    headers.set('X-LuckRead-Principal-Verified', input.principal.verified === true ? 'true' : 'false')
   }
 
   const ifMatch = input.request.headers.get('If-Match')
