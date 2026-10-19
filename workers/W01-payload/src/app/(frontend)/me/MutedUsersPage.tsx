@@ -32,15 +32,15 @@ export default function MutedUsersPage() {
   const labels = locale === 'en' ? {
     title: 'Muted accounts',
     eyebrow: 'PRIVACY AND SAFETY',
-    description: 'Accounts you have blocked. You can unblock an account here at any time.',
+    description: 'Accounts you have muted. You can unmute an account here at any time.',
     mutedSince: 'Blocked since',
     loading: 'Loading muted accounts…',
     loadingMore: 'Loading…',
     more: 'Load more',
-    empty: 'You have not blocked any accounts.',
-    emptyHelp: 'When you block an account from its profile, it will appear here.',
+    empty: 'You have not muted any accounts.',
+    emptyHelp: 'When you mute an account from its profile, it will appear here.',
     error: 'Muted accounts could not be loaded. Please try again.',
-    unblock: 'Unmute',
+    unmute: 'Unmute',
     unmuting: 'Unmuting…',
     unmuteError: 'Could not unmute this account. Please try again.',
     loginMessage: 'Sign in to manage muted accounts.',
@@ -58,8 +58,8 @@ export default function MutedUsersPage() {
     empty: '你目前沒有靜音任何帳號。',
     emptyHelp: '從帳號個人主頁靜音後，該帳號會出現在這裡。',
     error: '無法載入靜音帳號，請重試。',
-    unblock: '取消靜音',
-    unmuting: '正在解除…',
+    unmute: '取消靜音',
+    unmuting: '正在取消静音…',
     unmuteError: '取消靜音失敗，請重試。',
     loginMessage: '登入後即可管理靜音帳號。',
     login: '登入',
@@ -76,8 +76,8 @@ export default function MutedUsersPage() {
     empty: '你目前没有静音任何账号。',
     emptyHelp: '在其他账号的个人主页静音用户后，对方会显示在这里。',
     error: '静音账号列表加载失败，请重试。',
-    unblock: '取消静音',
-    unmuting: '正在解除…',
+    unmute: '取消静音',
+    unmuting: '正在取消静音…',
     unmuteError: '取消静音失败，请重试。',
     loginMessage: '登录后即可管理已静音账号。',
     login: '登录',
@@ -88,7 +88,7 @@ export default function MutedUsersPage() {
   const [page, setPage] = useState<MutedUserPage>({ items: [], nextCursor: null, hasMore: false })
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
-  const [unmutingIds, setUnmuteingIds] = useState<Set<string>>(() => new Set())
+  const [unmutingIds, setUnmutingIds] = useState<Set<string>>(() => new Set())
   const [error, setError] = useState('')
   const [authRequired, setAuthRequired] = useState(false)
   const requestIdRef = useRef(0)
@@ -164,7 +164,7 @@ export default function MutedUsersPage() {
 
   const unmute = async (targetUserId: string) => {
     if (unmutingIds.has(targetUserId)) return
-    setUnmuteingIds((current) => new Set(current).add(targetUserId))
+    setUnmutingIds((current) => new Set(current).add(targetUserId))
     setError('')
     try {
       const { response, data } = await fetchJson<{ error?: { message?: string } }>(
@@ -194,7 +194,7 @@ export default function MutedUsersPage() {
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : labels.unmuteError)
     } finally {
-      setUnmuteingIds((current) => {
+      setUnmutingIds((current) => {
         const next = new Set(current)
         next.delete(targetUserId)
         return next
