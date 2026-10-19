@@ -1,6 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 import { describe, expect, it, vi } from 'vitest'
 import { createComment, deleteComment, listComments, parseCommentLimit, updateComment } from './comment-runtime.js'
+import { replyAudienceAllowedSql } from './reply-audience-runtime.js'
 
 const db = (firstResults: unknown[] = [], allResults: unknown[] = []) => {
   let firstIndex = 0
@@ -243,7 +244,7 @@ describe('comment runtime', () => {
     })
 
     const prepare = (d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare
-    expect(String(prepare.mock.calls[1]?.[0])).toContain('AND ${replyAudienceAllowedSql}')
+    expect(String(prepare.mock.calls[1]?.[0])).toContain(replyAudienceAllowedSql)
     expect(prepare).toHaveBeenCalledTimes(3)
   })
 
