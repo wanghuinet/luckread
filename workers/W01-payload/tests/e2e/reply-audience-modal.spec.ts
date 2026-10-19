@@ -112,7 +112,7 @@ for (const viewport of [
     await page.setViewportSize({ width: viewport.width, height: viewport.height })
     await page.goto('http://127.0.0.1:3000/home?feed=following')
 
-    const postTriggers = page.getByRole('button', { name: '发帖', exact: true })
+    const postTriggers = page.locator('button[aria-haspopup="dialog"]')
     let triggerClicked = false
     for (let index = 0; index < await postTriggers.count(); index += 1) {
       const trigger = postTriggers.nth(index)
