@@ -534,6 +534,33 @@ describe('comment runtime', () => {
     expect(page.nextCursor).toEqual(expect.any(String))
   })
 
+  it('returns the authenticated viewer like state in the same bounded comment list query', async () => {
+    const d = db([], [{
+      id: 'c-liked',
+      content_id: 'content-1',
+      author_user_id: 'author-1',
+      parent_id: null,
+      body: '已点赞评论',
+      state: 'PUBLISHED',
+      depth: 0,
+      created_at: '2026-10-02T00:00:00.000Z',
+      updated_at: '2026-10-02T00:00:00.000Z',
+      liked_by_viewer: 1,
+    }])
+
+    await expect(listComments(d, 'content-1', null, 20, 'viewer-1')).resolves.toMatchObject({
+      items: [{ id: 'c-liked', likedByViewer: true }],
+      hasMore: false,
+    })
+
+    const sql = String((d.prepare as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[0])
+    expect(sql).toContain('WITH RECURSIVE viewer AS (SELECT ? AS user_id)')
+    expect(sql).toContain('FROM interaction_likes liked')
+    expect(sql).toContain('JOIN viewer v ON v.user_id = liked.actor_user_id')
+    expect(sql).toContain("liked.target_type = 'comment'")
+    expect(sql).toContain('AS liked_by_viewer')
+  })
+
   it('rejects comment cursors reused against another content ID', async () => {
     const d = db([], [
       { id: 'c1', content_id: 'content-1', author_user_id: 'user-1', parent_id: null, body: 'one', state: 'PUBLISHED', depth: 0, created_at: '2026-10-02T00:00:00.000Z', updated_at: '2026-10-02T00:00:00.000Z' },
