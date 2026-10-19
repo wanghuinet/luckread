@@ -612,7 +612,7 @@ export default {
         return new Response(null, { status: 405, headers: { Allow: 'GET, POST, DELETE' } })
       }
 
-      const replyAudienceMatch = /^\\/internal\\/social\\/contents\\/([^/]+)\\/reply-audience$/.exec(url.pathname)
+      const replyAudienceMatch = /^\/internal\/social\/contents\/([^/]+)\/reply-audience$/.exec(url.pathname)
       if (replyAudienceMatch) {
         const contentId = decodePathPart(replyAudienceMatch[1] ?? '')
         if (contentId === null) throw new ReplyAudienceRuntimeError('VALIDATION_FAILED', 400)
