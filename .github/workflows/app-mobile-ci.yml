@@ -1,0 +1,133 @@
+name: LuckRead Native App CI
+
+on:
+  pull_request:
+    paths:
+      - "app/**"
+      - ".github/workflows/app-mobile-ci.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "app/**"
+      - ".github/workflows/app-mobile-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: app-mobile-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  EXPO_NO_TELEMETRY: "1"
+  CI: "1"
+
+jobs:
+  dependency-compatibility:
+    name: Expo install, doctor and typecheck
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20.19.5"
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.1.38"
+      - name: Install Expo app dependencies
+        run: bun install
+      - name: Verify versions bundled for the Expo SDK
+        run: bunx expo install --check
+      - name: Run Expo compatibility doctor
+        run: bunx expo-doctor@latest
+      - name: Check public Expo config
+        run: bunx expo config --type public
+      - name: TypeScript typecheck
+        run: bun run typecheck
+
+  android-build:
+    name: Android debug build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20.19.5"
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.1.38"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: android-actions/setup-android@v3
+      - name: Install Android SDK components
+        run: |
+          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0" "cmake;3.22.1" "ndk;26.1.10909125"
+      - name: Install Expo app dependencies
+        run: bun install
+      - name: Generate Android native project
+        run: bunx expo prebuild --platform android --clean --no-install
+      - name: Compile debug APK
+        run: |
+          chmod +x android/gradlew
+          cd android
+          ./gradlew assembleDebug --no-daemon
+      - uses: actions/upload-artifact@v4
+        with:
+          name: luckread-android-debug-apk
+          path: app/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 7
+
+  ios-build:
+    name: iOS simulator build
+    runs-on: macos-15
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20.19.5"
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.1.38"
+      - name: Install Expo app dependencies
+        run: bun install
+      - name: Generate iOS native project
+        run: bunx expo prebuild --platform ios --clean --no-install
+      - name: Install CocoaPods dependencies
+        run: cd ios && pod install
+      - name: Compile iOS simulator app
+        run: |
+          WORKSPACE_PATH="$(find ios -maxdepth 1 -name '*.xcworkspace' -print -quit)"
+          if [ -z "$WORKSPACE_PATH" ]; then
+            echo "Expo prebuild did not generate an Xcode workspace" >&2
+            exit 1
+          fi
+          SCHEME="$(basename "$WORKSPACE_PATH" .xcworkspace)"
+          xcodebuild \
+            -workspace "$WORKSPACE_PATH" \
+            -scheme "$SCHEME" \
+            -sdk iphonesimulator \
+            -configuration Debug \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath ios/build \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: luckread-ios-simulator-app
+          path: app/ios/build/Build/Products/Debug-iphonesimulator/
+          if-no-files-found: error
+          retention-days: 7
