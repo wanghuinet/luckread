@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import ContentComments from './ContentComments'
+import ContentLikesModal from './ContentLikesModal'
 import ArticleStructuredRenderer from '../../../../components/ArticleStructuredRenderer.js'
 import { tryDeserializeArticleDocument } from '../../../../lib/article-document.js'
 import { useEffect, useMemo, useState } from 'react'
@@ -58,6 +59,7 @@ export default function ContentDetailPage({
   const [liked, setLiked] = useState(false)
   const [likeCount, setLikeCount] = useState<number | null>(null)
   const [likeBusy, setLikeBusy] = useState(false)
+  const [likesOpen, setLikesOpen] = useState(false)
   const [bookmarked, setBookmarked] = useState(false)
   const [bookmarkBusy, setBookmarkBusy] = useState(false)
   const [shareBusy, setShareBusy] = useState(false)
@@ -434,10 +436,27 @@ export default function ContentDetailPage({
             </>
           ) : null}
           {!interactionRestricted ? (
-            <button className="main-tab rounded-full border border-light-border px-4 py-2 text-sm font-bold hover:bg-light-primary/10 disabled:cursor-wait disabled:opacity-50 dark:border-dark-border dark:hover:bg-dark-primary/10" disabled={likeBusy} onClick={() => void toggleLike()} type="button">
-              {likeBusy ? copy.comments.processing : liked ? copy.detail.liked : copy.detail.like}
-              {likeCount === null ? '' : ' · ' + likeCount.toLocaleString(dateLocale)}
-            </button>
+            <>
+              {likeCount !== null && likeCount > 0 ? (
+                <button
+                  aria-haspopup="dialog"
+                  aria-label={locale === 'en' ? (likeCount === 1 ? '1 like' : likeCount.toLocaleString(dateLocale) + ' likes') : locale === 'tw' ? likeCount.toLocaleString(dateLocale) + ' 個讚' : likeCount.toLocaleString(dateLocale) + ' 个赞'}
+                  className="main-tab rounded-full px-3 py-2 text-sm font-bold hover:bg-light-primary/10 dark:hover:bg-dark-primary/10"
+                  onClick={() => setLikesOpen(true)}
+                  type="button"
+                >
+                  {locale === 'en'
+                    ? likeCount.toLocaleString(dateLocale) + (likeCount === 1 ? ' Like' : ' Likes')
+                    : locale === 'tw'
+                      ? likeCount.toLocaleString(dateLocale) + ' 個讚'
+                      : likeCount.toLocaleString(dateLocale) + ' 个赞'}
+                </button>
+              ) : null}
+              <button className="main-tab rounded-full border border-light-border px-4 py-2 text-sm font-bold hover:bg-light-primary/10 disabled:cursor-wait disabled:opacity-50 dark:border-dark-border dark:hover:bg-dark-primary/10" disabled={likeBusy} onClick={() => void toggleLike()} type="button">
+                {likeBusy ? copy.comments.processing : liked ? copy.detail.liked : copy.detail.like}
+                {likeCount === null ? '' : ' · ' + likeCount.toLocaleString(dateLocale)}
+              </button>
+            </>
           ) : null}
           <button className="main-tab rounded-full border border-light-border px-4 py-2 text-sm font-bold hover:bg-light-primary/10 disabled:cursor-wait disabled:opacity-50 dark:border-dark-border dark:hover:bg-dark-primary/10" disabled={bookmarkBusy} onClick={() => void toggleBookmark()} type="button">
             {bookmarkBusy ? copy.comments.processing : bookmarked ? copy.detail.favorited : copy.detail.favorite}
@@ -619,6 +638,13 @@ export default function ContentDetailPage({
           </section>
         </div>
       ) : null}
+      <ContentLikesModal
+        open={likesOpen}
+        contentId={content.id}
+        likeCount={likeCount}
+        locale={locale}
+        onClose={() => setLikesOpen(false)}
+      />
     </Root>
   )
 }
