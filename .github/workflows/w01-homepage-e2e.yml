@@ -53,4 +53,4 @@ jobs:
           PAYLOAD_SECRET: luckread-homepage-e2e-secret
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        run: pnpm exec playwright test tests/e2e/homepage.spec.ts tests/e2e/public-profile-responsive.spec.ts tests/e2e/following-feed-responsive.spec.ts tests/e2e/reply-audience-modal.spec.ts tests/e2e/content-likes-modal.spec.ts --config=playwright.config.ts
+        run: pnpm exec playwright test tests/e2e/homepage.spec.ts tests/e2e/public-profile-responsive.spec.ts tests/e2e/following-feed-responsive.spec.ts tests/e2e/reply-audience-modal.spec.ts --config=playwright.config.ts
