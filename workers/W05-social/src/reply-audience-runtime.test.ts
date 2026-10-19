@@ -9,13 +9,17 @@ import {
 
 const db = (firstResults: unknown[] = []) => {
   let index = 0
+  const bindCalls: unknown[][] = []
   const prepare = vi.fn((sql: string) => ({
-    bind: vi.fn((...args: unknown[]) => ({
-      first: vi.fn(async () => firstResults[index++] ?? null),
-      run: vi.fn(async () => ({ success: true, meta: { changes: 1 }, sql, args })),
-    })),
+    bind: vi.fn((...args: unknown[]) => {
+      bindCalls.push(args)
+      return {
+        first: vi.fn(async () => firstResults[index++] ?? null),
+        run: vi.fn(async () => ({ success: true, meta: { changes: 1 }, sql, args })),
+      }
+    }),
   }))
-  return { prepare } as unknown as D1Database & { prepare: ReturnType<typeof vi.fn> }
+  return { prepare, bindCalls } as unknown as D1Database & { prepare: ReturnType<typeof vi.fn>; bindCalls: unknown[][] }
 }
 
 describe('W05 reply audience runtime', () => {
@@ -60,21 +64,22 @@ describe('W05 reply audience runtime', () => {
     )).rejects.toMatchObject({ code: 'VALIDATION_FAILED', status: 400 })
   })
 
-  it('stores only a bounded, de-duplicated mention allowlist for mentioned-only replies', async () => {
+  it('stores a bounded, de-duplicated mention allowlist for every reply audience', async () => {
     const d = db([
       { id: 'content-1', owner_user_id: 'owner-1', content_type: 'post', state: 'DRAFT' },
       {
         content_id: 'content-1',
         owner_user_id: 'owner-1',
-        audience: 'mentioned',
+        audience: 'following',
         mentioned_user_ids_json: '["user-2"]',
         updated_at: '2026-10-19T00:00:00.000Z',
       },
     ])
-    await setContentReplyAudience(d, 'owner-1', 'content-1', 'mentioned', ['user-2', 'user-2'])
+    await setContentReplyAudience(d, 'owner-1', 'content-1', 'following', ['user-2', 'user-2'])
     const prepare = d.prepare as unknown as ReturnType<typeof vi.fn>
     expect(prepare.mock.calls[1]?.[0]).toContain('mentioned_user_ids_json')
     expect(prepare.mock.calls[1]?.[0]).toContain('RETURNING')
+    expect(d.bindCalls[1]?.[3]).toBe('["user-2"]')
   })
 
   it('returns the persisted owner policy and defaults existing posts to everyone', async () => {
@@ -102,6 +107,7 @@ describe('W05 reply audience runtime', () => {
     expect(replyAudienceAllowedSql).toContain('json_each')
     expect(replyAudienceAllowedSql).toContain('second_degree')
     expect(replyAudienceAllowedSql).toContain("= 'verified'")
-    expect(replyAudienceAllowedParams('reply-1', true)).toEqual(['reply-1', 1, 'reply-1', 'reply-1', 'reply-1', 'reply-1', 'reply-1', 'reply-1'])
+    expect(replyAudienceAllowedSql).toContain('mentioned_override')
+    expect(replyAudienceAllowedParams('reply-1', true)).toEqual(['reply-1', 1, 'reply-1', 'reply-1', 'reply-1', 'reply-1', 'reply-1', 'reply-1', 'reply-1'])
   })
 })

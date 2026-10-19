@@ -39,13 +39,13 @@ const validateAudience = (value: unknown): ReplyAudience => {
   return value as ReplyAudience
 }
 
-const validateMentionedUserIds = (value: unknown, audience: ReplyAudience): string[] => {
+const validateMentionedUserIds = (value: unknown): string[] => {
   if (value === undefined || value === null) return []
   if (!Array.isArray(value) || value.length > MAX_MENTIONS || value.some((item) => typeof item !== 'string')) {
     throw new ReplyAudienceRuntimeError('VALIDATION_FAILED', 400)
   }
   const ids = [...new Set((value as string[]).map((item) => validateId(item)))]
-  return audience === 'mentioned' ? ids : []
+  return ids
 }
 
 /**
@@ -62,7 +62,7 @@ export async function setContentReplyAudience(
   const actorUserId = validateId(actorUserIdValue, true)
   const contentId = validateId(contentIdValue)
   const replyAudience = validateAudience(audienceValue)
-  const mentionedUserIds = validateMentionedUserIds(mentionedUserIdsValue, replyAudience)
+  const mentionedUserIds = validateMentionedUserIds(mentionedUserIdsValue)
   const mentionedUserIdsJson = JSON.stringify(mentionedUserIds)
 
   const target = await db.prepare(
@@ -217,11 +217,18 @@ export const replyAudienceAllowedSql = `(
       )
     )
   )
+  OR EXISTS (
+    SELECT 1 FROM json_each(
+      COALESCE((SELECT policy.mentioned_user_ids_json FROM social_content_reply_policies policy WHERE policy.content_id = content.id), '[]')
+    ) AS mentioned_override
+     WHERE CAST(mentioned_override.value AS TEXT) = ?
+  )
 )`
 
 export const replyAudienceAllowedParams = (actorUserId: string, actorVerified: boolean): unknown[] => [
   actorUserId,
   actorVerified ? 1 : 0,
+  actorUserId,
   actorUserId,
   actorUserId,
   actorUserId,

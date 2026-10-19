@@ -206,7 +206,7 @@ jobs:
                   (audience, json.dumps(mentioned or [])),
               )
           def allowed(actor, verified=False):
-              params = [actor, 1 if verified else 0, actor, actor, actor, actor, actor, actor, 'post-1']
+              params = [actor, 1 if verified else 0, actor, actor, actor, actor, actor, actor, actor, 'post-1']
               return db.execute(f"SELECT CASE WHEN {predicate} THEN 1 ELSE 0 END FROM contents content WHERE content.id=?", params).fetchone()[0] == 1
           def assert_allowed(audience, actor, expected, verified=False, mentioned=None):
               set_policy(audience, mentioned)
@@ -217,9 +217,11 @@ jobs:
           assert_allowed('verified', 'owner-1', True, False)
           assert_allowed('verified', 'verified-user', True, True)
           assert_allowed('verified', 'unverified-user', False, False)
+          assert_allowed('verified', 'mentioned-user', True, False, mentioned=['mentioned-user'])
           db.execute("INSERT INTO social_follow_relationships VALUES ('owner-1','followed-user')")
           assert_allowed('following', 'followed-user', True)
           assert_allowed('following', 'random-user', False)
+          assert_allowed('following', 'mentioned-user', True, False, mentioned=['mentioned-user'])
           assert_allowed('mentioned', 'mentioned-user', True, mentioned=['mentioned-user'])
           assert_allowed('mentioned', 'random-user', False, mentioned=['mentioned-user'])
           db.execute("INSERT INTO social_follow_relationships VALUES ('owner-1','middle-user')")
@@ -227,6 +229,7 @@ jobs:
           assert_allowed('followingNetwork', 'followed-user', True)
           assert_allowed('followingNetwork', 'second-degree-user', True)
           assert_allowed('followingNetwork', 'random-user', False)
+          assert_allowed('followingNetwork', 'mentioned-user', True, False, mentioned=['mentioned-user'])
           db.execute("INSERT INTO social_user_interactions VALUES ('middle-user','second-degree-user','block')")
           assert_allowed('followingNetwork', 'second-degree-user', False)
           print('SOCIAL_015_REPLY_AUDIENCE_MATRIX_SQLITE=PASS')
