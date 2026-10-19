@@ -18,15 +18,20 @@ describe('v1 block/mute adapters', () => {
     }
   })
 
-  it('lists blocked accounts through the authenticated W05 boundary with bounded query params', () => {
-    const route = readFileSync(resolve(process.cwd(), 'src/app/api/v1/interactions/blocks/route.ts'), 'utf8')
-    expect(route).toContain('export async function GET')
-    expect(route).toContain('resolveCookieSocialPrincipal')
-    expect(route).toContain("pathname: '/internal/social/interactions/blocks' + suffix")
-    expect(route).toContain("method: 'GET'")
-    expect(route).toContain("key !== 'cursor' && key !== 'limit'")
-    expect(route).toContain("limit.trim()")
-    expect(route).not.toContain('social_user_interactions')
+  it('lists blocked and muted accounts through the authenticated W05 boundary with bounded query params', () => {
+    for (const [path, relation] of [
+      ['src/app/api/v1/interactions/blocks/route.ts', 'blocks'],
+      ['src/app/api/v1/interactions/mutes/route.ts', 'mutes'],
+    ] as const) {
+      const route = readFileSync(resolve(process.cwd(), path), 'utf8')
+      expect(route).toContain('export async function GET')
+      expect(route).toContain('resolveCookieSocialPrincipal')
+      expect(route).toContain(`pathname: '/internal/social/interactions/${relation}' + suffix`)
+      expect(route).toContain("method: 'GET'")
+      expect(route).toContain("key !== 'cursor' && key !== 'limit'")
+      expect(route).toContain('limit.trim()')
+      expect(route).not.toContain('social_user_interactions')
+    }
   })
 
   it('enforces idempotency preconditions on unblock and unmute', () => {

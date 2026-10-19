@@ -1117,6 +1117,49 @@ paths:
         '4XX': { $ref: '#/components/responses/ClientError' }
 
   /interactions/mutes:
+    get:
+      tags: [Interactions]
+      summary: List the current user's muted accounts
+      operationId: listMutedUsers
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: A cursor-paginated, private list of the current user's mute relationships.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, requestId]
+                additionalProperties: false
+                properties:
+                  data:
+                    type: object
+                    required: [items, nextCursor, hasMore]
+                    additionalProperties: false
+                    properties:
+                      items:
+                        type: array
+                        maxItems: 50
+                        items:
+                          type: object
+                          required: [relationshipId, targetUserId, createdAt]
+                          additionalProperties: false
+                          properties:
+                            relationshipId: { $ref: '#/components/schemas/ResourceId' }
+                            targetUserId: { $ref: '#/components/schemas/ResourceId' }
+                            createdAt: { type: string, format: date-time }
+                      nextCursor:
+                        anyOf:
+                          - { $ref: '#/components/schemas/Cursor' }
+                          - { type: 'null' }
+                      hasMore: { type: boolean }
+                  requestId: { $ref: '#/components/schemas/RequestId' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/PermissionDenied' }
+        '422': { $ref: '#/components/responses/ClientError' }
+        '429': { $ref: '#/components/responses/RateLimited' }
     post:
       tags: [Interactions]
       summary: Mute a user

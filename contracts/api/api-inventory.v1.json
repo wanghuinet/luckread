@@ -148,6 +148,7 @@
         "GET /v1/content/{contentId}/comments",
         "GET /v1/contents/{contentId}/comments",
         "GET /v1/interactions/blocks",
+        "GET /v1/interactions/mutes",
         "PATCH /v1/comments/{commentId}",
         "POST /v1/comments/{commentId}/likes",
         "POST /v1/content/{contentId}/comments",

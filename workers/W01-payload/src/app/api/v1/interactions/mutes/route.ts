@@ -11,6 +11,47 @@ const errorResponse = (status: number, code: string, message: string) =>
     { status: code === 'VALIDATION_FAILED' && status === 400 ? 422 : status, headers: { 'cache-control': 'no-store' } },
   )
 
+export async function GET(request: Request): Promise<Response> {
+  try {
+    const principal = await resolveCookieSocialPrincipal(request)
+    if (principal instanceof Response) return principal
+
+    const url = new URL(request.url)
+    const cursorValues = url.searchParams.getAll('cursor')
+    const limitValues = url.searchParams.getAll('limit')
+    let invalidQuery = false
+    url.searchParams.forEach((_value, key) => {
+      if (key !== 'cursor' && key !== 'limit') invalidQuery = true
+    })
+    if (invalidQuery || cursorValues.length > 1 || limitValues.length > 1) {
+      return errorResponse(422, 'VALIDATION_FAILED', 'Invalid muted-user list query')
+    }
+
+    const cursor = cursorValues[0]
+    const limit = limitValues[0]
+    if (cursor !== undefined && (!cursor.trim() || cursor.length > 2048)) {
+      return errorResponse(422, 'VALIDATION_FAILED', 'Invalid cursor')
+    }
+    if (limit !== undefined && !/^(?:[1-9]|[1-4][0-9]|50)$/.test(limit.trim())) {
+      return errorResponse(422, 'VALIDATION_FAILED', 'Invalid limit')
+    }
+
+    const query = new URLSearchParams()
+    if (cursor !== undefined) query.set('cursor', cursor)
+    if (limit !== undefined) query.set('limit', limit.trim())
+    const suffix = query.toString() ? '?' + query.toString() : ''
+    return await callW05Social({
+      request,
+      pathname: '/internal/social/interactions/mutes' + suffix,
+      method: 'GET',
+      principal,
+    })
+  } catch (error) {
+    if (error instanceof W05SocialClientError) return errorResponse(error.status, error.code, error.message)
+    return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Social service unavailable')
+  }
+}
+
 export async function POST(request: Request): Promise<Response> {
   try {
     const principal = await resolveCookieSocialPrincipal(request)
