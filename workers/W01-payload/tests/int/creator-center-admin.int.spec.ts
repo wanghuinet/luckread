@@ -1129,9 +1129,14 @@ describe('Creator Center admin extension', () => {
     expect(view).toContain('<CreatorLanguageToggle locale={locale} />')
     expect(view).toContain("locale === 'en-US' ? 'Publish check' : '发布检测'")
     expect(view).toContain("locale === 'en-US' ? 'Audience' : '粉丝'")
-    expect(styles).toContain('.locale-globe-selector')
-    expect(styles).toContain('.locale-globe-menu')
-    expect(styles).toContain('.locale-globe-option.is-selected')
+    // The globe menu now reuses X/Tailwind utility classes instead of a custom CSS system.
+    expect(globeMenu).toContain('relative z-30 inline-flex shrink-0')
+    expect(globeMenu).toContain('border-light-border')
+    expect(globeMenu).toContain('absolute right-0 top-[calc(100%+8px)]')
+    expect(globeMenu).toContain('aria-pressed:bg-[#eef4ff]')
+    expect(styles).not.toContain('.locale-globe-selector')
+    expect(styles).not.toContain('.locale-globe-menu')
+    expect(styles).not.toContain('.locale-globe-option.is-selected')
   })
 
 
