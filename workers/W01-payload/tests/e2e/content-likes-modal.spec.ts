@@ -1,6 +1,22 @@
 import { expect, test } from '@playwright/test'
 
-const content = {
+type ContentFixture = {
+  id: string
+  slug: string
+  creatorId: string
+  contentType: 'post'
+  state: string
+  title: string
+  bodyRef: string
+  mediaRefs: string[]
+  coverRef: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+type ProfileFixture = { id: string; username: string; displayName: string; avatar: string | null }
+
+const content: ContentFixture = {
   id: 'post-1',
   slug: 'liked-by-e2e-post',
   creatorId: 'author-1',
@@ -14,7 +30,7 @@ const content = {
   updatedAt: '2026-10-19T10:00:00.000Z',
 }
 
-const profiles = {
+const profiles: Record<string, ProfileFixture> = {
   'liker-1': { id: 'liker-1', username: 'likerone', displayName: 'Liker One', avatar: null },
   'liker-2': { id: 'liker-2', username: 'likertwo', displayName: 'Liker Two', avatar: null },
   'liker-3': { id: 'liker-3', username: 'likerthree', displayName: 'Liker Three', avatar: null },
