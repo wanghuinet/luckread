@@ -11,7 +11,7 @@ import {
 import { FlashList } from '@shopify/flash-list';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { useEvent } from 'expo';
-import Icon from 'react-native-vector-icons/FontAwesome';
+import { FontAwesome as Icon } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import Fontisto from '@expo/vector-icons/Fontisto';
@@ -198,17 +198,17 @@ const formatTime = (seconds: number) => {
 };
 
 const VideoItem = React.memo(({ item, isVisible, isFocused }: VideoItemProps) => {
-  const videoViewRef = useRef(null);
+  const videoViewRef = useRef<React.ElementRef<typeof VideoView> | null>(null);
   const player = useVideoPlayer(item.videoUrl, (p) => {
     p.loop = true;
     p.timeUpdateEventInterval = 250;
   });
   const { isPlaying } = useEvent(player, 'playingChange', { isPlaying: player.playing });
   const { status, error } = useEvent(player, 'statusChange', { status: player?.status });
-  const { currentTime, duration } = useEvent(player, 'timeUpdate', {
-    currentTime: player?.currentTime ?? 0,
-    duration: player?.duration ?? 0,
+  const { currentTime } = useEvent(player, 'timeUpdate', {
+    currentTime: player.currentTime ?? 0,
   });
+  const duration = player.duration ?? 0;
   const insets = useSafeAreaInsets();
   const [isMuted, setIsMuted] = useState(player?.muted ?? false);
 
@@ -216,7 +216,7 @@ const VideoItem = React.memo(({ item, isVisible, isFocused }: VideoItemProps) =>
     if (!player) return;
     if (isVisible && isFocused) {
       player.muted = false;
-      player.play()?.catch(() => {});
+      try { player.play(); } catch { /* player state can change during navigation */ }
     } else {
       player.pause();
     }
@@ -263,7 +263,7 @@ const VideoItem = React.memo(({ item, isVisible, isFocused }: VideoItemProps) =>
           allowsFullscreen={false}
           allowsPictureInPicture={false}
           nativeControls={false}
-          onError={(e) => console.error(`VideoView Error (${item.videoId}):`, e.error)}
+
         />
       </TouchableOpacity>
 
