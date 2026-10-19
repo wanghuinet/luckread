@@ -39,12 +39,18 @@ describe('X-style notifications page', () => {
     expect(page).toContain('actorProfile?.displayName?.trim()')
     expect(page).toContain('actorProfile?.username?.trim()')
     expect(page).toContain('actorProfile?.avatar?.trim()')
-    expect(page).toContain("'/users/' + encodeURIComponent(item.actorUserId)")
+    expect(page).toContain("'/users/' + encodeURIComponent(actorProfile?.id || item.actorUserId)")
     expect(page).toContain('href={message.actorHref}')
     expect(page).toContain('message.actorHandle !== message.actor')
     expect(page).toContain('next/image')
     expect(page).toContain('unoptimized')
     expect(page).not.toContain('notifications.module.css')
+  })
+
+  it('uses the resolved public profile ID for actor links and falls back to the notification identity ID', () => {
+    expect(page).toContain("const actorHref = '/users/' + encodeURIComponent(actorProfile?.id || item.actorUserId)")
+    expect(page).toContain('const actorProfile = actorProfiles[item.actorUserId]')
+    expect(page).toContain('href={message.actorHref}')
   })
 
   it('filters the notification timeline to mentions through the existing W05 authority', () => {
