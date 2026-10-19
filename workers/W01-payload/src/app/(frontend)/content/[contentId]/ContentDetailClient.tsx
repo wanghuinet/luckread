@@ -638,13 +638,14 @@ export default function ContentDetailPage({
           </section>
         </div>
       ) : null}
-      <ContentLikesModal
-        open={likesOpen}
-        contentId={content.id}
-        likeCount={likeCount}
-        locale={locale}
-        onClose={() => setLikesOpen(false)}
-      />
+      {likesOpen ? (
+        <ContentLikesModal
+          contentId={content.id}
+          likeCount={likeCount}
+          locale={locale}
+          onClose={() => setLikesOpen(false)}
+        />
+      ) : null}
     </Root>
   )
 }
