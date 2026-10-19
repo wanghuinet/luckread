@@ -35,6 +35,26 @@ describe('content comments UI', () => {
     expect(component).toContain('likedComments[comment.id]')
   })
 
+  it('reports another user\'s comment through the canonical W01 report API with an accessible reason dialog', () => {
+    const comments = read('src/app/(frontend)/content/[contentId]/ContentComments.tsx')
+
+    expect(comments).toContain("const [reportingCommentId, setReportingCommentId] = useState<string | null>(null)")
+    expect(comments).toContain('function openCommentReport(comment: CommentItem)')
+    expect(comments).toContain("body: JSON.stringify({ targetType: 'comment', targetId: commentId, reasonCode: reportReasonCode })")
+    expect(comments).toContain("'Idempotency-Key': 'report:comment:' + commentId + ':' + crypto.randomUUID()")
+    expect(comments).toContain('aria-modal="true"')
+    expect(comments).toContain('role="dialog"')
+    expect(comments).toContain('comment.authorUserId !== viewerUserId')
+    expect(comments).toContain("value: 'SPAM'")
+    expect(comments).toContain("value: 'ABUSE'")
+    expect(comments).toContain("value: 'IMPERSONATION'")
+    expect(comments).toContain("value: 'COPYRIGHT'")
+    expect(comments).toContain("value: 'OTHER'")
+    expect(comments).toContain("'/login?returnTo=' + encodeURIComponent(returnTo)")
+    expect(comments).not.toContain('window.prompt(')
+    expect(comments).not.toContain('ContentComments.module.css')
+  })
+
   it('reuses the content detail viewer identity instead of requesting /users/me again', () => {
     const component = read('src/app/(frontend)/content/[contentId]/ContentComments.tsx')
     expect(component).toContain('viewerUserId: string | null')
