@@ -65,6 +65,35 @@ describe('W05 social query transport', () => {
     })
   })
 
+  it('serves a bounded list of users who liked a published content item', async () => {
+    const response = await worker.fetch(
+      request('/internal/social/content/content-1/likes?limit=6', transportHeaders),
+      { DB: dbFor([{
+        relationship_id: 'like-1',
+        actor_user_id: 'liker-1',
+        created_at: '2026-10-19T10:00:00.000Z',
+      }]) },
+    )
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({
+      data: {
+        items: [{ userId: 'liker-1', likedAt: '2026-10-19T10:00:00.000Z' }],
+        hasMore: false,
+        nextCursor: null,
+      },
+      requestId: expect.stringMatching(/^req_/),
+    })
+  })
+
+  it('allows only GET on the content likers endpoint', async () => {
+    const response = await worker.fetch(
+      requestWithMethod('/internal/social/content/content-1/likes', 'POST', transportHeaders),
+      { DB: dbFor() },
+    )
+    expect(response.status).toBe(405)
+    expect(response.headers.get('allow')).toBe('GET')
+  })
+
   it('sets and reads reply audience policy through the authenticated W05 route', async () => {
     const savedPolicy = {
       id: 'content-1',
