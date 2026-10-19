@@ -22,7 +22,7 @@ describe('user profile page', () => {
 
 
   it('loads the viewer profile and hides self-follow on the public profile', () => {
-    const page = read('src/app/(frontend)/users/[userId]/page.tsx')
+    const page = read('src/app/(frontend)/users/[userId]/UserProfilePage.tsx')
     expect(page).toContain("fetchJson<{ id?: string }>('/api/v1/users/me'")
     expect(page).toContain('setViewerUserId(typeof viewerData?.id === \'string\' ? viewerData.id : null)')
     expect(page).toContain('viewerUserId !== profile.id')
@@ -59,7 +59,7 @@ describe('user profile page', () => {
 
 describe('password change page', () => {
   it('uses the versioned password-change API and existing session lifecycle', () => {
-    const page = read('src/app/(frontend)/me/password/page.tsx')
+    const page = read('src/app/(twitter-clone)/me/password/page.tsx')
     expect(page).toContain("fetchJson<{ error?: { message?: string } }>('/api/v1/auth/password/change'")
     expect(page).toContain("method: 'POST'")
     expect(page).toContain("'Idempotency-Key'")

@@ -16,7 +16,7 @@ describe('v1 profile pin adapters', () => {
 
   it('exposes the owner’s published pinned-content reference through W05', () => {
     const route = readFileSync(resolve(process.cwd(), 'src/app/api/v1/users/[userId]/pinned-content/route.ts'), 'utf8')
-    const profile = readFileSync(resolve(process.cwd(), 'src/app/(frontend)/users/[userId]/page.tsx'), 'utf8')
+    const profile = readFileSync(resolve(process.cwd(), 'src/app/(frontend)/users/[userId]/UserProfilePage.tsx'), 'utf8')
     expect(route).toContain('callW05SocialPublic')
     expect(route).toContain('/pinned-content')
     expect(profile).toContain('/pinned-content')

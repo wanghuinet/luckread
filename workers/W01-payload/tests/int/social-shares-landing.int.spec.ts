@@ -5,7 +5,7 @@ import { resolve } from 'node:path'
 describe('share landing page', () => {
   it('resolves an opaque share id and redirects to canonical content', () => {
     const page = readFileSync(
-      resolve(process.cwd(), 'src/app/(frontend)/s/[shareId]/page.tsx'),
+      resolve(process.cwd(), 'src/app/(twitter-clone)/s/[shareId]/page.tsx'),
       'utf8',
     )
     expect(page).toContain('/api/v1/shares/')

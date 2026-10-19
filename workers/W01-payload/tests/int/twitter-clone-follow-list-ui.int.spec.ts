@@ -6,7 +6,7 @@ const read = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8'
 
 describe('Twitter Clone follow-list UI reuse with LuckRead social authority', () => {
   it('uses an accessible reason selector instead of a browser prompt for profile reports', () => {
-    const profile = read("src/app/(frontend)/users/[userId]/page.tsx")
+    const profile = read("src/app/(frontend)/users/[userId]/UserProfilePage.tsx")
 
     expect(profile).toContain("const [reportDialogOpen, setReportDialogOpen] = useState(false)")
     expect(profile).toContain('aria-modal="true"')

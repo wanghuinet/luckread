@@ -2,7 +2,7 @@ import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { getBetterAuthPrincipal, W02AuthClientError } from '@/auth/w02-session-client'
 
-import CreatorApplicationClient from './CreatorApplicationClient'
+import CreatorApplicationClient from '../../(frontend)/creator-application/CreatorApplicationClient'
 
 export const dynamic = 'force-dynamic'
 

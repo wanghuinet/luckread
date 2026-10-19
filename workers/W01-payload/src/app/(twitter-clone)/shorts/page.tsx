@@ -1,9 +1,9 @@
 import type { Metadata } from 'next'
 import { cookies } from 'next/headers'
 
-import TwitterCloneSecondaryPageLayout from '../../(twitter-clone)/TwitterCloneSecondaryPageLayout'
-import { normalizePublicLocale, type PublicLocale } from '../i18n/public-locale'
-import ShortVideoFeed from './ShortVideoFeed'
+import TwitterCloneSecondaryPageLayout from '../TwitterCloneSecondaryPageLayout'
+import { normalizePublicLocale, type PublicLocale } from '../../(frontend)/i18n/public-locale'
+import ShortVideoFeed from '../../(frontend)/shorts/ShortVideoFeed'
 
 export const metadata: Metadata = {
   title: '短视频 · LuckRead',

@@ -1,4 +1,4 @@
-import UserFollowList from '../UserFollowList'
+import UserFollowList from '../../../../(frontend)/users/[userId]/UserFollowList'
 
 export default async function UserFollowersPage({
   params,
