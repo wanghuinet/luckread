@@ -165,6 +165,25 @@ describe('comment runtime', () => {
     })
   })
 
+  it('rejects a reply outside the content owner’s configured audience before inserting', async () => {
+    const d = db([{
+      content_state: 'PUBLISHED',
+      content_owner_user_id: 'owner-1',
+      parent_content_id: null,
+      parent_author_user_id: null,
+      parent_state: null,
+      parent_depth: null,
+      blocked: 0,
+      recent_count: 0,
+      reply_audience_allowed: 0,
+    }])
+    await expect(createComment(d, 'viewer-1', 'content-1', {
+      body: 'not allowed',
+      idempotencyKey: 'reply-audience-denied',
+    })).rejects.toMatchObject({ code: 'PERMISSION_DENIED', status: 403 })
+    expect(d.prepare).toHaveBeenCalledTimes(1)
+  })
+
   it('rechecks published parent state in the final comment insert', async () => {
     const d = db([
       {
