@@ -84,6 +84,7 @@ export default function Grok() {
       
       <View className="flex-1">
         <Header
+          title="Grok"
           centerContent={
             <View className="flex-row items-center gap-1">
               <Text className="text-lg font-bold text-black">Grok 3</Text>
