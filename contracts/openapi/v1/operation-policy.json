@@ -896,6 +896,21 @@
       "x-luckread-source": "contracts/api/interaction-operation-policy.v1.json"
     },
     {
+      "operationId": "listMutedUsers",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "interaction.mute"
+      ],
+      "auditRequired": false,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none",
+      "x-luckread-contract-status": "DISCOVERY_DRAFT",
+      "x-luckread-source": "contracts/api/interaction-operation-policy.v1.json"
+    },
+    {
       "operationId": "getIpAssets",
       "auth": {
         "mode": "permission"
