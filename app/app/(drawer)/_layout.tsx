@@ -361,7 +361,7 @@ function DrawerLayout() {
       drawerContent={(props) => <CustomDrawerContent {...props} />}
       screenOptions={{
         headerShown: false,
-        swipeEnabled: allowedDrawerRoutes.includes(pathname[3] || ''),
+        swipeEnabled: allowedDrawerRoutes.some((route) => pathname.includes(route)),
         swipeEdgeWidth: width,
 
 
@@ -387,7 +387,7 @@ function DrawerLayout() {
       <Drawer.Screen name="settings" options={{ headerTitle: 'Settings' /*, headerShown: false */ }} />
       <Drawer.Screen name="help" options={{ headerTitle: 'Help Center' /*, headerShown: false */ }} />
       <Drawer.Screen name="verified-orgs" options={{ headerTitle: 'Verified Orgs' /*, headerShown: false */ }} />
-      <Drawer.Screen name="modal" options={{ presentation: 'modal', headerShown: false }} />
+      <Drawer.Screen name="modal" options={{ headerShown: false }} />
       <Drawer.Screen name="edit-accounts" options={{ headerTitle: 'Edit Accounts' /*, headerShown: false */ }} />
     </Drawer>
   );
