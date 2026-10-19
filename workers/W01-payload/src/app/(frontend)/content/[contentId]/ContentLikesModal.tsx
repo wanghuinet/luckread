@@ -20,7 +20,6 @@ type LikerPageResponse = {
 }
 
 type Props = {
-  open: boolean
   contentId: string
   likeCount: number | null
   locale: PublicLocale
@@ -63,31 +62,23 @@ const copyFor = (locale: PublicLocale) => locale === 'en'
         likedAt: '点赞于',
       }
 
-export default function ContentLikesModal({ open, contentId, likeCount, locale, onClose }: Props) {
+export default function ContentLikesModal({ contentId, likeCount, locale, onClose }: Props) {
   const copy = copyFor(locale)
   const [items, setItems] = useState<Liker[]>([])
   const [nextCursor, setNextCursor] = useState<string | null>(null)
   const [hasMore, setHasMore] = useState(false)
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState('')
   const requestControllerRef = useRef<AbortController | null>(null)
   const requestIdRef = useRef(0)
 
   useEffect(() => {
-    if (!open) return
     requestControllerRef.current?.abort()
     const controller = new AbortController()
     requestControllerRef.current = controller
     const requestId = ++requestIdRef.current
     let cancelled = false
-
-    setItems([])
-    setNextCursor(null)
-    setHasMore(false)
-    setError('')
-    setLoading(true)
-    setLoadingMore(false)
 
     void (async () => {
       try {
@@ -120,7 +111,7 @@ export default function ContentLikesModal({ open, contentId, likeCount, locale, 
       requestControllerRef.current?.abort()
       requestControllerRef.current = null
     }
-  }, [open, contentId, copy.error])
+  }, [contentId, copy.error])
 
   async function loadMore() {
     if (loading || loadingMore || !hasMore || !nextCursor) return
@@ -156,8 +147,6 @@ export default function ContentLikesModal({ open, contentId, likeCount, locale, 
       if (requestId === requestIdRef.current) setLoadingMore(false)
     }
   }
-
-  if (!open) return null
 
   return (
     <div
