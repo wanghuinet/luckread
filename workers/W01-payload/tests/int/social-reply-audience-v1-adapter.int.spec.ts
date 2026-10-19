@@ -51,7 +51,8 @@ describe('reply audience backend closure', () => {
     expect(policy).toContain('social_follow_relationships')
     expect(policy).toContain('json_each')
     expect(policy).toContain('second_degree')
-    expect(policy).toContain("actorUserId, actorVerified")
+    expect(policy).toContain('actorVerified: boolean')
+    expect(policy).toContain('replyAudienceAllowedParams')
   })
 
   it('stores reply policies outside canonical W03 content and defaults legacy posts to everyone', () => {
