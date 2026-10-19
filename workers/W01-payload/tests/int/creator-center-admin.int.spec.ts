@@ -38,6 +38,10 @@ describe('Creator Center admin extension', () => {
     expect(publisher).toContain('谁可以回复？')
     expect(publisher).toContain('REPLY_AUDIENCE_OPTIONS.map((option) => (')
     expect(publisher).toContain('min-h-[42dvh]')
+    // These responsive layout and control classes are reused from ccrsxx/twitter-clone's Input/InputOptions.
+    expect(publisher).toContain('grid-cols-[auto,1fr]')
+    expect(publisher).toContain('xs:[&>button:nth-child(n+6)]:hidden md:[&>button]:!block [&>button:nth-child(n+4)]:hidden')
+    expect(publisher).toContain('custom-button accent-tab accent-bg-tab group relative rounded-full p-2')
     expect(publisher).toContain("const isTweetModal = presentation === 'tweet-modal'")
   })
 
