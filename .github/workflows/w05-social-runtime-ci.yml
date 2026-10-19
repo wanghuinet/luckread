@@ -136,29 +136,31 @@ jobs:
       - name: Verify reply audience migration shape
         run: |
           python - <<'PY'
+          import json
           import sqlite3
           from pathlib import Path
           db = sqlite3.connect(':memory:')
           migration = Path('workers/W05-social/migrations/20261019_015_social_reply_audience_v1.sql')
-          sql = migration.read_text()
-          db.executescript(sql)
+          db.executescript(migration.read_text())
           expected = ['content_id','owner_user_id','audience','mentioned_user_ids_json','created_at','updated_at']
           actual = [row[1] for row in db.execute('PRAGMA table_info("social_content_reply_policies")').fetchall()]
           if actual != expected:
               raise SystemExit(f'unexpected reply policy schema: {actual}')
-          db.execute("INSERT INTO social_content_reply_policies VALUES ('c1','u1','mentioned','[\\"u2\\"]','now','now')")
-          try:
-              db.execute("INSERT INTO social_content_reply_policies VALUES ('c2','u1','anyone','[]','now','now')")
-          except sqlite3.IntegrityError:
-              pass
-          else:
-              raise SystemExit('reply audience allowlist constraint missing')
-          try:
-              db.execute("INSERT INTO social_content_reply_policies VALUES ('c3','u1','mentioned','{}','now','now')")
-          except sqlite3.IntegrityError:
-              pass
-          else:
-              raise SystemExit('reply audience mention JSON array constraint missing')
+          db.execute(
+              'INSERT INTO social_content_reply_policies VALUES (?,?,?,?,?,?)',
+              ('c1','u1','mentioned',json.dumps(['u2']),'now','now'),
+          )
+          invalid_rows = [
+              ('c2','u1','anyone','[]','now','now'),
+              ('c3','u1','mentioned',json.dumps({'user':'u2'}),'now','now'),
+              ('c4','u1','mentioned',json.dumps([f'u{i}' for i in range(21)]),'now','now'),
+          ]
+          for row in invalid_rows:
+              try:
+                  db.execute('INSERT INTO social_content_reply_policies VALUES (?,?,?,?,?,?)', row)
+              except sqlite3.IntegrityError:
+                  continue
+              raise SystemExit(f'reply policy constraint did not reject invalid row: {row[0]}')
           print('SOCIAL_015_REPLY_AUDIENCE_MIGRATION_STATIC=PASS')
           PY
 
