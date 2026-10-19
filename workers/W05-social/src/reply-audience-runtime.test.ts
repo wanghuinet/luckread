@@ -102,6 +102,6 @@ describe('W05 reply audience runtime', () => {
     expect(replyAudienceAllowedSql).toContain('json_each')
     expect(replyAudienceAllowedSql).toContain('second_degree')
     expect(replyAudienceAllowedSql).toContain("= 'verified'")
-    expect(replyAudienceAllowedParams('reply-1', true)).toEqual(['reply-1', 1, 'reply-1', 'reply-1', 'reply-1', 'reply-1'])
+    expect(replyAudienceAllowedParams('reply-1', true)).toEqual(['reply-1', 1, 'reply-1', 'reply-1', 'reply-1', 'reply-1', 'reply-1', 'reply-1'])
   })
 })
