@@ -76,12 +76,12 @@ export default function GlobeLanguageMenu({ initialLocale = 'zh-CN' }: { initial
   // UI-only for now: selecting a language changes only this menu's local highlight.
   // Page translation, cookies, storage, and reload behavior are intentionally deferred.
   return (
-    <div className="locale-globe-selector" ref={containerRef}>
+    <div className="relative z-30 inline-flex shrink-0" ref={containerRef}>
       <button
         aria-label="选择语言 / Choose language"
         aria-expanded={open}
         aria-controls={menuId}
-        className="locale-globe-trigger"
+        className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-light-border bg-transparent p-0 text-light-primary transition-colors hover:bg-light-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#878a8c] dark:border-dark-border dark:text-dark-primary dark:hover:bg-dark-primary/10 dark:focus-visible:ring-white max-[760px]:h-9 max-[760px]:w-9"
         onClick={() => setOpen((value) => !value)}
         ref={triggerRef}
         title="选择语言 / Choose language"
@@ -93,11 +93,11 @@ export default function GlobeLanguageMenu({ initialLocale = 'zh-CN' }: { initial
         </svg>
       </button>
       {open ? (
-        <div aria-label="选择语言 / Choose language" className="locale-globe-menu" id={menuId} role="group">
+        <div aria-label="选择语言 / Choose language" className="absolute right-0 top-[calc(100%+8px)] z-[1000] grid max-h-[min(360px,calc(100vh-96px))] w-[min(320px,calc(100vw-24px))] grid-cols-2 gap-1 overflow-y-auto rounded-[14px] border border-[#e4e7ec] bg-white p-2 text-[#101828] shadow-[0_12px_32px_rgba(16,24,40,.16)] dark:border-[#38444d] dark:bg-[#15202b] dark:text-[#e7e9ea] max-[760px]:max-h-[min(320px,calc(100vh-80px))]" id={menuId} role="group">
           {LANGUAGES.map((language) => (
             <button
               aria-pressed={selectedLanguage === language.value}
-              className={'locale-globe-option' + (selectedLanguage === language.value ? ' is-selected' : '')}
+              className={'min-h-[34px] min-w-0 cursor-pointer rounded-lg border-0 bg-transparent px-[9px] py-[7px] text-left text-xs leading-[1.3] text-[#344054] hover:bg-[#f2f4f7] hover:text-[#101828] focus-visible:bg-[#f2f4f7] focus-visible:text-[#101828] focus-visible:outline-none dark:text-[#e7e9ea] dark:hover:bg-[#253341] dark:hover:text-white dark:focus-visible:bg-[#253341] dark:focus-visible:text-white' + (selectedLanguage === language.value ? ' aria-pressed:bg-[#eef4ff] aria-pressed:text-[#1849a9] aria-pressed:font-bold dark:aria-pressed:bg-[#1d3b60] dark:aria-pressed:text-[#c6e2ff]' : '')}
               key={language.value}
               onClick={() => {
                 setSelectedLanguage(language.value)
