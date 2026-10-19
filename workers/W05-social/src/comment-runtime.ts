@@ -20,6 +20,7 @@ export type CommentItem = {
   depth: number
   createdAt: string
   updatedAt: string
+  likedByViewer?: boolean
 }
 
 export type CommentPage = {
@@ -582,16 +583,16 @@ export async function listComments(
             AND mute.target_user_id = child.author_user_id
        )`
     : ''
-  const params = cursor
+  const params = [viewerUserId, ...(cursor
     ? viewerUserId
       ? [contentId, viewerUserId, viewerUserId, viewerUserId, viewerUserId, viewerUserId, viewerUserId, contentId, cursor.createdAt, cursor.createdAt, cursor.id, limit + 1]
       : [contentId, contentId, cursor.createdAt, cursor.createdAt, cursor.id, limit + 1]
     : viewerUserId
       ? [contentId, viewerUserId, viewerUserId, viewerUserId, viewerUserId, viewerUserId, viewerUserId, contentId, limit + 1]
-      : [contentId, contentId, limit + 1]
+      : [contentId, contentId, limit + 1])]
 
   const result = await db.prepare(
-    `WITH RECURSIVE public_comments AS (
+    `WITH RECURSIVE viewer AS (SELECT ? AS user_id), public_comments AS (
        SELECT
          c.id,
          c.content_id,
@@ -638,6 +639,13 @@ export async function listComments(
        c.depth,
        c.created_at,
        c.updated_at
+        EXISTS (
+          SELECT 1
+            FROM interaction_likes liked
+            JOIN viewer v ON v.user_id = liked.actor_user_id
+           WHERE liked.target_type = 'comment'
+             AND liked.target_id = c.id
+        ) AS liked_by_viewer
      FROM public_comments c
      WHERE c.content_id = ?
        ${whereCursor}
@@ -653,6 +661,7 @@ export async function listComments(
     depth: number
     created_at: string
     updated_at: string
+    liked_by_viewer: number
   }>()
 
   const rows = result.results ?? []
@@ -661,7 +670,10 @@ export async function listComments(
   const last = visible.at(-1)
 
   return {
-    items: visible.map(toCommentItem),
+    items: visible.map((row) => ({
+      ...toCommentItem(row),
+      likedByViewer: Number(row.liked_by_viewer) === 1,
+    })),
     hasMore,
     nextCursor:
       hasMore && last
