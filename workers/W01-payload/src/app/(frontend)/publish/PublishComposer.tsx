@@ -115,16 +115,47 @@ const resolveCoverRef = (
   return fallbackRefs[0] ?? assets[0]?.url ?? null
 }
 
+type ReplyAudience = 'everyone' | 'verified' | 'following' | 'mentioned' | 'followingNetwork'
+
+type CurrentProfile = {
+  id: string
+  username: string
+  displayName: string | null
+  avatar: string | null
+}
+
+const REPLY_AUDIENCE_OPTIONS: ReadonlyArray<{
+  value: ReplyAudience
+  label: string
+  description: string
+}> = [
+  { value: 'everyone', label: '每个人', description: '所有账号都可以回复' },
+  { value: 'verified', label: '认证账号', description: '只有认证账号可以回复' },
+  { value: 'following', label: '你关注的账号', description: '只有你关注的账号可以回复' },
+  { value: 'mentioned', label: '只有你提及的账号', description: '只有你在帖子中提及的账号可以回复' },
+  { value: 'followingNetwork', label: '你关注的账号及其关注的账号', description: '你关注的账号及其关注的账号可以回复' },
+]
+
+const replyAudienceLabels: Record<ReplyAudience, string> = {
+  everyone: '所有人可以回复',
+  verified: '认证账号可以回复',
+  following: '你关注的账号可以回复',
+  mentioned: '只有你提及的账号可以回复',
+  followingNetwork: '你关注的账号及其关注的账号可以回复',
+}
+
 type PublishComposerProps = {
   contentBasePath?: string
   initialType?: ContentType
   presentation?: 'workspace' | 'tweet-modal' | 'x-workspace'
+  onClose?: () => void
 }
 
 export default function PublishComposer({
   contentBasePath = '/api/v1/contents',
   initialType = 'article',
   presentation = 'workspace',
+  onClose,
 }: PublishComposerProps) {
   const router = useRouter()
   const isTweetModal = presentation === 'tweet-modal'
@@ -135,6 +166,9 @@ export default function PublishComposer({
   const xButtonPrimary = 'inline-flex min-h-10 items-center justify-center rounded-full bg-main-accent px-5 py-2.5 text-sm font-bold text-white transition hover:brightness-90 disabled:cursor-not-allowed disabled:opacity-50'
   const xButtonDanger = xButtonBase + ' border border-red-500/50 text-red-600 dark:text-red-400'
   const [type, setType] = useState<ContentType>(initialType)
+  const [profile, setProfile] = useState<CurrentProfile | null>(null)
+  const [replyAudience, setReplyAudience] = useState<ReplyAudience>('everyone')
+  const [replyAudienceOpen, setReplyAudienceOpen] = useState(false)
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
   const [articleDocument, setArticleDocument] = useState<ArticleDocument>(() => createArticleDocument())
@@ -898,11 +932,50 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
     }
   }
 
+  useEffect(() => {
+    if (!isTweetModal) return
+    let cancelled = false
+    void fetchJson<CurrentProfile>('/api/v1/users/me', {
+      credentials: 'include',
+      cache: 'no-store',
+      headers: { accept: 'application/json' },
+    }).then(({ response, data }) => {
+      if (cancelled) return
+      if (response.ok && data?.id && data.username) setProfile(data)
+      else setProfile(null)
+    }).catch(() => {
+      if (!cancelled) setProfile(null)
+    })
+    return () => { cancelled = true }
+  }, [isTweetModal])
+
   return (
     <div
-      className={isTweetModal ? "m-0 w-full rounded-none border-0 bg-black p-0 text-[#e7e9ea] shadow-none" : isXWorkspace ? "min-w-0 bg-main-background text-light-primary dark:text-dark-primary" : "lr-composer-card"}
+      className={isTweetModal ? "m-0 flex h-full min-h-0 w-full flex-1 flex-col overflow-y-auto rounded-none border-0 bg-black p-0 text-[#e7e9ea] shadow-none" : isXWorkspace ? "min-w-0 bg-main-background text-light-primary dark:text-dark-primary" : "lr-composer-card"}
       aria-busy={busy}
     >
+      {isTweetModal ? (
+        <header className="sticky top-0 z-20 flex shrink-0 items-center justify-between bg-black px-3.5 py-2.5 text-[#e7e9ea] pt-[max(env(safe-area-inset-top),0.5rem)]">
+          <button
+            aria-label="关闭发布窗口"
+            className="custom-button accent-tab grid h-9 w-9 place-items-center rounded-full text-[#e7e9ea] hover:bg-light-primary/10 dark:hover:bg-dark-primary/10"
+            onClick={() => onClose?.()}
+            type="button"
+          >
+            <svg aria-hidden="true" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="2">
+              <path d="M18 6 6 18M6 6l12 12" />
+            </svg>
+          </button>
+          <button
+            className="rounded-full accent-tab bg-main-accent px-4 py-1.5 text-[13px] font-bold text-white transition enabled:hover:bg-main-accent/90 enabled:active:bg-main-accent/75 disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={busy || autoSaveStatus === 'saving' || reviewLocked || (!body.trim() && assets.length === 0)}
+            onClick={submitForReview}
+            type="button"
+          >
+            {busy ? '发布中…' : type === 'post' && draft?.state === 'PUBLISHED' ? '已发布' : '发帖'}
+          </button>
+        </header>
+      ) : null}
       {!isTweetModal ? (
       <div className={isXWorkspace ? "grid grid-cols-3 gap-0 border-b border-light-border dark:border-dark-border" : "lr-type-tabs"} role="tablist" aria-label="内容类型">
         {draft ? <p className={isXWorkspace ? "col-span-3 border-b border-light-border px-4 py-2 text-xs text-light-secondary dark:border-dark-border dark:text-dark-secondary" : "lr-type-lock-note"}>草稿创建后内容类型不可变更；需要更换类型请新建内容。</p> : null}
@@ -959,24 +1032,33 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
           value={articleDocument}
         />
       ) : (
-        <label className={isTweetModal ? 'm-0 grid min-w-0 gap-0' : isXWorkspace ? 'mb-4 grid gap-2 px-4 text-sm font-semibold text-light-primary dark:text-dark-primary' : 'lr-field'}>
-          <span className={isTweetModal ? 'sr-only' : undefined}>{type === 'post' ? '推文正文' : '视频文案'}</span>
-          <textarea
-            aria-label={type === 'post' ? '推文正文' : '视频文案'}
-            disabled={busy || reviewLocked}
-            maxLength={type === 'post' ? 500 : 160000}
-            onChange={(event) => { setBody(event.target.value); markDirty(); setPreflightReport(null) }}
-            placeholder={type === 'post' ? '有什么新鲜事？' : '写下你的内容…'}
-            rows={type === 'post' ? 5 : 14}
-            className={isTweetModal && type === 'post'
-              ? 'block min-h-[130px] w-full resize-y rounded-none border-0 bg-black px-4 py-3.5 text-xl leading-[1.5] text-[#e7e9ea] outline-none placeholder:text-[#71767b] focus:border-0 focus:ring-0'
-              : isXWorkspace
-                ? 'block min-h-32 w-full resize-y rounded-md border border-light-border bg-main-background px-3 py-3 text-base leading-6 text-light-primary outline-none placeholder:text-light-secondary focus:border-main-accent focus:ring-1 focus:ring-main-accent/30 dark:border-dark-border dark:text-dark-primary'
-                : undefined}
-            value={body}
-          />
-          {type === 'post' && !isTweetModal ? <small aria-live="polite">{body.length}/500</small> : null}
-        </label>
+        <div className={isTweetModal && type === 'post' ? "hover-animation grid w-full grid-cols-[auto,1fr] gap-3 px-4 py-3" : undefined}>
+          {isTweetModal && type === 'post' ? (
+            <div className="blur-picture flex h-12 w-12 shrink-0 items-center justify-center self-start overflow-hidden bg-[#16181c] text-sm font-semibold text-[#e7e9ea]">
+              {profile?.avatar
+                ? <img alt="" className="h-full w-full object-cover" src={profile.avatar} />
+                : (profile?.displayName?.trim() || profile?.username || 'L').slice(0, 1).toUpperCase()}
+            </div>
+          ) : null}
+          <label className={isTweetModal ? 'm-0 grid min-w-0 flex-1 gap-0' : isXWorkspace ? 'mb-4 grid gap-2 px-4 text-sm font-semibold text-light-primary dark:text-dark-primary' : 'lr-field'}>
+            <span className={isTweetModal ? 'sr-only' : undefined}>{type === 'post' ? '推文正文' : '视频文案'}</span>
+            <textarea
+              aria-label={type === 'post' ? '推文正文' : '视频文案'}
+              disabled={busy || reviewLocked}
+              maxLength={type === 'post' ? 500 : 160000}
+              onChange={(event) => { setBody(event.target.value); markDirty(); setPreflightReport(null) }}
+              placeholder={type === 'post' ? '有什么新鲜事？' : '写下你的内容…'}
+              rows={type === 'post' ? 5 : 14}
+              className={isTweetModal && type === 'post'
+                ? 'block min-h-[42dvh] w-full min-w-0 resize-none bg-transparent px-0 py-2 text-xl leading-[1.5] text-[#e7e9ea] outline-none placeholder:text-[#71767b] focus:border-0 focus:ring-0 sm:min-h-[320px]'
+                : isXWorkspace
+                  ? 'block min-h-32 w-full resize-y rounded-md border border-light-border bg-main-background px-3 py-3 text-base leading-6 text-light-primary outline-none placeholder:text-light-secondary focus:border-main-accent focus:ring-1 focus:ring-main-accent/30 dark:border-dark-border dark:text-dark-primary'
+                  : undefined}
+              value={body}
+            />
+            {type === 'post' && !isTweetModal ? <small aria-live="polite">{body.length}/500</small> : null}
+          </label>
+        </div>
       )}
 
 {!isTweetModal ? (
@@ -1122,34 +1204,48 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
       )}
 
 
-      {!isTweetModal && type === 'post' ? (
-        <section className={isXWorkspace ? "my-4 border-y border-light-border px-4 py-4 dark:border-dark-border" : "lr-media-box"} aria-label="投票设置">
-          <div className={isXWorkspace ? "mb-3 flex items-center justify-between gap-3" : "lr-media-heading"}>
-            <div>
-              <strong>投票</strong>
-              <span>{pollEnabled ? '2–4 个选项 · 每人限投一次' : '为动态添加投票'}</span>
+      {type === 'post' && (pollEnabled || !isTweetModal) ? (
+        <section className={isTweetModal ? "mx-3.5 mb-3 grid gap-3 rounded-xl border border-[#2f3336] p-3" : isXWorkspace ? "my-4 border-y border-light-border px-4 py-4 dark:border-dark-border" : "lr-media-box"} aria-label="投票设置">
+          {isTweetModal ? (
+            <div className="flex items-center justify-between gap-3">
+              <strong className="text-sm font-semibold">投票</strong>
+              <button
+                className="rounded-full px-3 py-1 text-xs font-semibold text-[#71767b] transition hover:bg-[#16181c]"
+                type="button"
+                disabled={busy || reviewLocked}
+                onClick={() => { setPollEnabled(false); markDirty() }}
+              >
+                移除投票
+              </button>
             </div>
-            <button
-              className={isXWorkspace ? xButtonSecondary : "lr-upload-button"}
-              type="button"
-              disabled={busy || reviewLocked}
-              onClick={() => {
-                setPollEnabled((enabled) => !enabled)
-                if (!pollEnabled) setPollOptions(['', ''])
-                markDirty()
-              }}
-            >
-              {pollEnabled ? '移除投票' : '添加投票'}
-            </button>
-          </div>
+          ) : (
+            <div className={isXWorkspace ? "mb-3 flex items-center justify-between gap-3" : "lr-media-heading"}>
+              <div>
+                <strong>投票</strong>
+                <span>{pollEnabled ? '2–4 个选项 · 每人限投一次' : '为动态添加投票'}</span>
+              </div>
+              <button
+                className={isXWorkspace ? xButtonSecondary : "lr-upload-button"}
+                type="button"
+                disabled={busy || reviewLocked}
+                onClick={() => {
+                  setPollEnabled((enabled) => !enabled)
+                  if (!pollEnabled) setPollOptions(['', ''])
+                  markDirty()
+                }}
+              >
+                {pollEnabled ? '移除投票' : '添加投票'}
+              </button>
+            </div>
+          )}
           {pollEnabled ? (
             <div className="flex flex-col gap-3 p-1">
               {pollOptions.map((option, index) => (
                 <div key={index} className="flex items-center gap-2">
-                  <label className={isXWorkspace ? "grid min-w-0 flex-1 gap-2 text-sm font-semibold text-light-primary dark:text-dark-primary" : "lr-field min-w-0 flex-1"}>
+                  <label className={isTweetModal ? "grid min-w-0 flex-1 gap-1 text-sm text-[#e7e9ea]" : isXWorkspace ? "grid min-w-0 flex-1 gap-2 text-sm font-semibold text-light-primary dark:text-dark-primary" : "lr-field min-w-0 flex-1"}>
                     <span>选项 {index + 1}</span>
                     <input
-                      className={isXWorkspace ? "min-w-0 w-full rounded-md border border-light-border bg-main-background px-3 py-2.5 text-sm text-light-primary outline-none focus:border-main-accent focus:ring-1 focus:ring-main-accent/30 dark:border-dark-border dark:text-dark-primary" : undefined}
+                      className={isTweetModal ? "min-w-0 w-full rounded-lg border border-[#2f3336] bg-black px-3 py-2.5 text-sm text-[#e7e9ea] outline-none placeholder:text-[#71767b] focus:border-main-accent" : isXWorkspace ? "min-w-0 w-full rounded-md border border-light-border bg-main-background px-3 py-2.5 text-sm text-light-primary outline-none focus:border-main-accent focus:ring-1 focus:ring-main-accent/30 dark:border-dark-border dark:text-dark-primary" : undefined}
                       aria-label={'投票选项 ' + (index + 1)}
                       maxLength={50}
                       disabled={busy || reviewLocked}
@@ -1160,11 +1256,11 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
                       placeholder={'输入选项 ' + (index + 1)}
                       value={option}
                     />
-                    <small>{option.length}/50</small>
+                    <small className={isTweetModal ? "text-xs text-[#71767b]" : undefined}>{option.length}/50</small>
                   </label>
                   {pollOptions.length > 2 ? (
                     <button
-                      className="ghost"
+                      className={isTweetModal ? "shrink-0 rounded-full px-3 py-2 text-xs text-[#71767b] hover:bg-[#16181c]" : "ghost"}
                       type="button"
                       disabled={busy || reviewLocked}
                       aria-label={'移除选项 ' + (index + 1)}
@@ -1180,7 +1276,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
               ))}
               {pollOptions.length < 4 ? (
                 <button
-                  className="ghost self-start"
+                  className={isTweetModal ? "self-start rounded-full px-3 py-1.5 text-sm font-semibold text-main-accent hover:bg-main-accent/10" : "ghost self-start"}
                   type="button"
                   disabled={busy || reviewLocked}
                   onClick={() => {
@@ -1191,10 +1287,10 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
                   + 添加选项
                 </button>
               ) : null}
-              <label className="lr-field">
+              <label className={isTweetModal ? "grid gap-1 text-sm text-[#e7e9ea]" : "lr-field"}>
                 <span>投票时长</span>
                 <select
-                  className={isXWorkspace ? "rounded-md border border-light-border bg-main-background px-3 py-2.5 text-sm text-light-primary outline-none focus:border-main-accent dark:border-dark-border dark:text-dark-primary" : undefined}
+                  className={isTweetModal ? "w-full rounded-lg border border-[#2f3336] bg-black px-3 py-2.5 text-sm text-[#e7e9ea]" : isXWorkspace ? "rounded-md border border-light-border bg-main-background px-3 py-2.5 text-sm text-light-primary outline-none focus:border-main-accent dark:border-dark-border dark:text-dark-primary" : undefined}
                   aria-label="投票时长"
                   disabled={busy || reviewLocked}
                   value={pollDurationHours}
@@ -1208,7 +1304,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
                   <option value={168}>7 天</option>
                 </select>
               </label>
-              <p className="text-xs text-light-secondary dark:text-dark-secondary">投票会随动态一起发布；每个账号只能投一次，发布后不能修改选项。</p>
+              <p className={isTweetModal ? "text-xs leading-5 text-[#71767b]" : "text-xs text-light-secondary dark:text-dark-secondary"}>投票会随动态一起发布；每个账号只能投一次，发布后不能修改选项。</p>
             </div>
           ) : null}
         </section>
@@ -1432,13 +1528,31 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
         </section>
       ) : null}
 
-      <div className={isTweetModal ? "flex min-h-[52px] items-center justify-between gap-3 border-t border-[#2f3336] bg-black px-3 pb-3 pt-2 sm:px-3.5" : isXWorkspace ? "flex flex-wrap items-center justify-end gap-2 border-t border-light-border px-4 py-3 dark:border-dark-border" : "lr-actions"}>
+      {isTweetModal ? (
+        <div className="flex-1" aria-hidden="true" />
+      ) : null}
+      {isTweetModal ? (
+        <button
+          aria-haspopup="dialog"
+          className="flex w-full shrink-0 items-center gap-3 border-y border-[#2f3336] px-5 py-3 text-left text-sm font-medium text-main-accent transition hover:bg-[#080808]"
+          onClick={() => setReplyAudienceOpen(true)}
+          type="button"
+        >
+          <svg aria-hidden="true" className="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+            <circle cx="12" cy="12" r="9" />
+            <ellipse cx="12" cy="12" rx="4" ry="9" />
+            <path d="M3 12h18M5.5 6.5h13M5.5 17.5h13" />
+          </svg>
+          <span>{replyAudienceLabels[replyAudience]}</span>
+        </button>
+      ) : null}
+      <div className={isTweetModal ? "sticky bottom-0 z-10 flex min-h-[52px] shrink-0 items-center justify-between gap-3 bg-black px-3 pb-[max(env(safe-area-inset-bottom),0.5rem)] pt-2 sm:px-3.5" : isXWorkspace ? "flex flex-wrap items-center justify-end gap-2 border-t border-light-border px-4 py-3 dark:border-dark-border" : "lr-actions"}>
         {isTweetModal ? (
           <>
-            <div className="flex items-center gap-2">
+            <div className="flex text-main-accent xs:[&>button:nth-child(n+6)]:hidden md:[&>button]:!block [&>button:nth-child(n+4)]:hidden">
               <button
                 aria-label="添加图片或视频"
-                className="grid h-9 w-9 place-items-center rounded-full border-0 bg-transparent text-main-accent hover:bg-main-accent/10 disabled:cursor-not-allowed disabled:opacity-40"
+                className="custom-button accent-tab accent-bg-tab group relative rounded-full p-2 text-main-accent hover:bg-main-accent/10 active:bg-main-accent/20"
                 disabled={busy || reviewLocked || pollEnabled}
                 onClick={() => modalMediaInputRef.current?.click()}
                 title="图片或视频"
@@ -1453,7 +1567,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
               <button
                 aria-label={pollEnabled ? "移除投票" : "添加投票"}
                 aria-pressed={pollEnabled}
-                className={pollEnabled ? "grid h-9 w-9 place-items-center rounded-full border-0 bg-main-accent/10 text-main-accent hover:bg-main-accent/10 disabled:cursor-not-allowed disabled:opacity-40" : "grid h-9 w-9 place-items-center rounded-full border-0 bg-transparent text-main-accent hover:bg-main-accent/10 disabled:cursor-not-allowed disabled:opacity-40"}
+                className={pollEnabled ? "custom-button accent-tab accent-bg-tab group relative rounded-full bg-main-accent/10 p-2 text-main-accent hover:bg-main-accent/10 active:bg-main-accent/20" : "custom-button accent-tab accent-bg-tab group relative rounded-full p-2 text-main-accent hover:bg-main-accent/10 active:bg-main-accent/20"}
                 disabled={busy || reviewLocked || assets.length > 0}
                 onClick={() => {
                   setPollEnabled((enabled) => !enabled)
@@ -1468,17 +1582,27 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
                   <path d="M8 16v-5M13 16V7M18 16v-8" />
                 </svg>
               </button>
-            </div>
-            <div className="flex items-center gap-2">
-              {body.length > 0 ? <span className="text-[11px] tabular-nums text-[#71767b]" aria-live="polite">{body.length}/500</span> : null}
-              <button
-                className="min-h-9 cursor-pointer rounded-full border-0 bg-[#eff3f4] px-[18px] text-[13px] font-bold text-[#0f1419] disabled:cursor-not-allowed disabled:opacity-50"
-                disabled={busy || autoSaveStatus === 'saving' || reviewLocked || (!body.trim() && assets.length === 0)}
-                onClick={submitForReview}
-                type="button"
-              >
-                {busy ? '发布中…' : type === 'post' && draft?.state === 'PUBLISHED' ? '已发布' : '发布'}
+              <button aria-label="GIF（暂不可用）" className="custom-button accent-tab accent-bg-tab group relative rounded-full p-2 text-main-accent" disabled title="GIF 暂不可用" type="button">
+                <span className="rounded border border-current px-1 text-[9px] font-extrabold">GIF</span>
               </button>
+              <button aria-label="表情（暂不可用）" className="custom-button accent-tab accent-bg-tab group relative rounded-full p-2 text-main-accent" disabled title="表情功能暂不可用" type="button">
+                <svg aria-hidden="true" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+                  <circle cx="12" cy="12" r="9" /><path d="M8 14s1.5 2 4 2 4-2 4-2M9 9h.01M15 9h.01" />
+                </svg>
+              </button>
+              <button aria-label="定时发布（暂不可用）" className="custom-button accent-tab accent-bg-tab group relative rounded-full p-2 text-main-accent" disabled title="定时发布暂不可用" type="button">
+                <svg aria-hidden="true" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" />
+                </svg>
+              </button>
+              <button aria-label="位置（暂不可用）" className="custom-button accent-tab accent-bg-tab group relative rounded-full p-2 text-main-accent" disabled title="位置功能暂不可用" type="button">
+                <svg aria-hidden="true" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M20 10c0 5-8 12-8 12S4 15 4 10a8 8 0 1 1 16 0Z" /><circle cx="12" cy="10" r="2.5" />
+                </svg>
+              </button>
+            </div>
+            <div className="flex min-w-10 items-center justify-end gap-2">
+              {body.length > 0 ? <span className="text-[11px] tabular-nums text-[#71767b]" aria-live="polite">{body.length}/500</span> : null}
             </div>
           </>
         ) : (
@@ -1520,7 +1644,72 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
           </>
         )}
       </div>
-
+      {isTweetModal && replyAudienceOpen ? (
+        <div
+          className="fixed inset-0 z-[70] flex items-end justify-center bg-black/70 sm:items-center sm:p-4"
+          onMouseDown={(event) => { if (event.target === event.currentTarget) setReplyAudienceOpen(false) }}
+        >
+          <section
+            aria-labelledby="luckread-reply-audience-title"
+            aria-modal="true"
+            className="max-h-[86dvh] w-full overflow-y-auto border-t border-[#2f3336] bg-black pb-[max(env(safe-area-inset-bottom),1rem)] text-[#e7e9ea] sm:max-w-xl sm:rounded-2xl sm:border"
+            onMouseDown={(event) => event.stopPropagation()}
+            role="dialog"
+          >
+            <div className="mx-auto mt-3 h-1 w-12 rounded-full bg-[#2f3336] sm:hidden" />
+            <header className="px-5 pb-3 pt-5">
+              <h2 className="text-2xl font-bold tracking-tight" id="luckread-reply-audience-title">谁可以回复？</h2>
+              <p className="mt-2 text-sm leading-5 text-[#71767b]">选择谁可以回复这个帖子。请记住，只要是提及的人就都能回复。</p>
+            </header>
+            {REPLY_AUDIENCE_OPTIONS.map((option) => (
+              <button
+                aria-pressed={replyAudience === option.value}
+                className="flex w-full items-center gap-4 px-5 py-4 text-left transition hover:bg-[#16181c]"
+                key={option.value}
+                onClick={() => {
+                  setReplyAudience(option.value)
+                  setReplyAudienceOpen(false)
+                }}
+                type="button"
+              >
+                <span className="grid h-8 w-8 shrink-0 place-items-center text-[#e7e9ea]">
+                  {option.value === 'everyone' ? (
+                    <svg aria-hidden="true" className="h-7 w-7" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm6.93 9h-3.1a15.7 15.7 0 0 0-1.32-5.1A8.04 8.04 0 0 1 18.93 11ZM12 4.05c.9 1.3 1.6 3.75 1.85 6.95h-3.7C10.4 7.8 11.1 5.35 12 4.05ZM4.07 13h3.1c.2 1.9.7 3.7 1.32 5.1A8.04 8.04 0 0 1 4.07 13Zm3.1-2h-3.1a8.04 8.04 0 0 1 4.42-5.1A15.7 15.7 0 0 0 7.17 11Zm4.83 8.95c-.9-1.3-1.6-3.75-1.85-6.95h3.7c-.25 3.2-.95 5.65-1.85 6.95Zm2.51-1.85A15.7 15.7 0 0 0 15.83 13h3.1a8.04 8.04 0 0 1-4.42 5.1Z" />
+                    </svg>
+                  ) : option.value === 'verified' ? (
+                    <svg aria-hidden="true" className="h-7 w-7" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="m12 2 2.5 2 3.2-.2 1.1 3 2.7 1.7-1 3 1 3-2.7 1.7-1.1 3-3.2-.2-2.5 2-2.5-2-3.2.2-1.1-3L2.5 14.5l1-3-1-3 2.7-1.7 1.1-3 3.2.2L12 2Z" />
+                      <path d="m8.5 12 2.2 2.2 4.8-5" fill="none" stroke="#000" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  ) : option.value === 'following' ? (
+                    <svg aria-hidden="true" className="h-7 w-7" viewBox="0 0 24 24" fill="currentColor">
+                      <circle cx="9" cy="7" r="4" />
+                      <path d="M2 21v-2a7 7 0 0 1 14 0v2Z" />
+                      <path d="m16 12 2 2 4-4" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  ) : option.value === 'mentioned' ? (
+                    <span aria-hidden="true" className="text-3xl font-extrabold">@</span>
+                  ) : (
+                    <svg aria-hidden="true" className="h-7 w-7" viewBox="0 0 24 24" fill="currentColor">
+                      <circle cx="8" cy="8" r="3.5" />
+                      <circle cx="17" cy="9" r="2.7" />
+                      <path d="M1 20v-1a7 7 0 0 1 14 0v1ZM14 15a5.5 5.5 0 0 1 9 4v1h-6v-1a8.8 8.8 0 0 0-3-4Z" />
+                    </svg>
+                  )}
+                </span>
+                <span className="grid min-w-0 flex-1 gap-1">
+                  <span className="text-base font-medium">{option.label}</span>
+                  <span className="text-sm text-[#71767b]">{option.description}</span>
+                </span>
+                <span className={replyAudience === option.value ? "grid h-5 w-5 shrink-0 place-items-center rounded-full border-2 border-main-accent" : "h-5 w-5 shrink-0 rounded-full border-2 border-[#71767b]"}>
+                  {replyAudience === option.value ? <span className="h-2.5 w-2.5 rounded-full bg-main-accent" /> : null}
+                </span>
+              </button>
+            ))}
+          </section>
+        </div>
+      ) : null}
 
     </div>
   )

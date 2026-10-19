@@ -32,8 +32,16 @@ describe('Creator Center admin extension', () => {
     expect(modal).toContain('role="dialog"')
     expect(modal).toContain("const OPEN_POST_COMPOSER_EVENT = 'luckread:open-post-composer'")
     expect(modal).toContain('window.addEventListener(OPEN_POST_COMPOSER_EVENT, showComposer)')
-    expect(modal).toContain('<PublishComposer initialType="post" presentation="tweet-modal" />')
+    expect(modal).toContain('<PublishComposer initialType="post" presentation="tweet-modal" onClose={() => setOpen(false)} />')
     expect(publisher).toContain("presentation?: 'workspace' | 'tweet-modal' | 'x-workspace'")
+    expect(publisher).toContain("fetchJson<CurrentProfile>('/api/v1/users/me'")
+    expect(publisher).toContain('谁可以回复？')
+    expect(publisher).toContain('REPLY_AUDIENCE_OPTIONS.map((option) => (')
+    expect(publisher).toContain('min-h-[42dvh]')
+    // These responsive layout and control classes are reused from ccrsxx/twitter-clone's Input/InputOptions.
+    expect(publisher).toContain('grid-cols-[auto,1fr]')
+    expect(publisher).toContain('xs:[&>button:nth-child(n+6)]:hidden md:[&>button]:!block [&>button:nth-child(n+4)]:hidden')
+    expect(publisher).toContain('custom-button accent-tab accent-bg-tab group relative rounded-full p-2')
     expect(publisher).toContain("const isTweetModal = presentation === 'tweet-modal'")
   })
 

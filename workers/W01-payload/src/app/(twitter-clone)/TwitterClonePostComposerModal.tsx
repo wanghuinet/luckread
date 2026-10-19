@@ -72,30 +72,15 @@ export default function TwitterClonePostComposerModal() {
       }}
     >
       <section
-        aria-label="发推文窗口"
+        aria-label="发布动态窗口"
         aria-modal="true"
-        className="mt-0 flex max-h-[100dvh] w-full max-w-xl flex-col overflow-y-auto rounded-none border border-[#2f3336] bg-black text-[#e7e9ea] shadow-xl sm:max-h-[calc(100dvh-2rem)] sm:rounded-2xl"
+        className="mt-0 flex h-[100dvh] max-h-[100dvh] w-full max-w-xl flex-col overflow-hidden rounded-none border border-[#2f3336] bg-black text-[#e7e9ea] shadow-xl sm:h-[82vh] sm:max-h-[720px] sm:rounded-2xl"
         onMouseDown={(event) => event.stopPropagation()}
         ref={panelRef}
         role="dialog"
         tabIndex={-1}
       >
-        <header className="sticky top-0 z-10 flex items-center gap-5 border-b border-[#2f3336] bg-black px-4 py-3 text-[#e7e9ea]">
-          <button
-            aria-label="关闭发推文窗口"
-            className="custom-button accent-tab grid h-9 w-9 place-items-center rounded-full hover:bg-light-primary/10 dark:hover:bg-dark-primary/10"
-            onClick={() => setOpen(false)}
-            type="button"
-          >
-            <svg aria-hidden="true" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="2">
-              <path d="M18 6 6 18M6 6l12 12" />
-            </svg>
-          </button>
-          <h2 className="text-xl font-bold">发推文</h2>
-        </header>
-        <div className="m-0 min-h-0 w-full bg-black p-0 text-[#e7e9ea]">
-          <PublishComposer initialType="post" presentation="tweet-modal" />
-        </div>
+        <PublishComposer initialType="post" presentation="tweet-modal" onClose={() => setOpen(false)} />
       </section>
     </div>,
     document.body,
