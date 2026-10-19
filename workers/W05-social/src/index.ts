@@ -866,11 +866,13 @@ export default {
         if (contentId === null) throw new LikeRuntimeError('VALIDATION_FAILED', 400)
         const limits = url.searchParams.getAll('limit')
         const cursors = url.searchParams.getAll('cursor')
-        if (
-          limits.length > 1 ||
-          cursors.length > 1 ||
-          [...url.searchParams.keys()].some((key) => key !== 'limit' && key !== 'cursor')
-        ) throw new LikeRuntimeError('VALIDATION_FAILED', 400)
+        let hasUnsupportedQueryKey = false
+        url.searchParams.forEach((_value, key) => {
+          if (key !== 'limit' && key !== 'cursor') hasUnsupportedQueryKey = true
+        })
+        if (limits.length > 1 || cursors.length > 1 || hasUnsupportedQueryKey) {
+          throw new LikeRuntimeError('VALIDATION_FAILED', 400)
+        }
         const limit = parseCommentLimit(limits[0] ?? null)
         const cursor = cursors[0] ?? null
         if (cursors.length && (!cursor?.trim() || cursor.length > 2048 || !/^[A-Za-z0-9_-]+$/.test(cursor))) {
