@@ -164,6 +164,60 @@ jobs:
           print('SOCIAL_015_REPLY_AUDIENCE_MIGRATION_STATIC=PASS')
           PY
 
+      - name: Verify reply audience eligibility matrix against SQLite
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import re
+          import sqlite3
+          from pathlib import Path
+          runtime = Path('workers/W05-social/src/reply-audience-runtime.ts').read_text()
+          match = re.search(r"export const replyAudienceAllowedSql = `([\s\S]*?)`", runtime)
+          if not match:
+              raise SystemExit('reply audience SQL predicate not found')
+          predicate = match.group(1)
+          db = sqlite3.connect(':memory:')
+          db.executescript("""
+          CREATE TABLE contents (id TEXT PRIMARY KEY, owner_user_id TEXT NOT NULL, content_type TEXT NOT NULL, state TEXT NOT NULL);
+          CREATE TABLE social_content_reply_policies (content_id TEXT PRIMARY KEY, owner_user_id TEXT NOT NULL, audience TEXT NOT NULL, mentioned_user_ids_json TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+          CREATE TABLE social_follow_relationships (follower_user_id TEXT NOT NULL, target_user_id TEXT NOT NULL);
+          CREATE TABLE social_user_interactions (actor_user_id TEXT NOT NULL, target_user_id TEXT NOT NULL, relation_type TEXT NOT NULL);
+          INSERT INTO contents VALUES ('post-1','owner-1','post','PUBLISHED');
+          INSERT INTO social_content_reply_policies VALUES ('post-1','owner-1','everyone','[]','now','now');
+          """)
+          def set_policy(audience, mentioned=None):
+              db.execute(
+                  "UPDATE social_content_reply_policies SET audience=?, mentioned_user_ids_json=? WHERE content_id='post-1'",
+                  (audience, json.dumps(mentioned or [])),
+              )
+          def allowed(actor, verified=False):
+              params = [actor, 1 if verified else 0, actor, actor, actor, actor, actor, actor, 'post-1']
+              return db.execute(f"SELECT CASE WHEN {predicate} THEN 1 ELSE 0 END FROM contents content WHERE content.id=?", params).fetchone()[0] == 1
+          def assert_allowed(audience, actor, expected, verified=False, mentioned=None):
+              set_policy(audience, mentioned)
+              actual = allowed(actor, verified)
+              if actual != expected:
+                  raise SystemExit(f'{audience}: actor={actor}, verified={verified}, expected={expected}, actual={actual}')
+          assert_allowed('everyone', 'random-user', True)
+          assert_allowed('verified', 'owner-1', True, False)
+          assert_allowed('verified', 'verified-user', True, True)
+          assert_allowed('verified', 'unverified-user', False, False)
+          db.execute("INSERT INTO social_follow_relationships VALUES ('owner-1','followed-user')")
+          assert_allowed('following', 'followed-user', True)
+          assert_allowed('following', 'random-user', False)
+          assert_allowed('mentioned', 'mentioned-user', True, mentioned=['mentioned-user'])
+          assert_allowed('mentioned', 'random-user', False, mentioned=['mentioned-user'])
+          db.execute("INSERT INTO social_follow_relationships VALUES ('owner-1','middle-user')")
+          db.execute("INSERT INTO social_follow_relationships VALUES ('middle-user','second-degree-user')")
+          assert_allowed('followingNetwork', 'followed-user', True)
+          assert_allowed('followingNetwork', 'second-degree-user', True)
+          assert_allowed('followingNetwork', 'random-user', False)
+          db.execute("INSERT INTO social_user_interactions VALUES ('middle-user','second-degree-user','block')")
+          assert_allowed('followingNetwork', 'second-degree-user', False)
+          print('SOCIAL_015_REPLY_AUDIENCE_MATRIX_SQLITE=PASS')
+          PY
+
       - name: Verify comment delete tombstone migration
         run: |
           python - <<'PY'
