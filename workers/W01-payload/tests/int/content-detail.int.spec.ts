@@ -42,6 +42,21 @@ describe('public content detail', () => {
     expect(page).not.toContain('classification_edge')
   })
 
+  it('uses an accessible reason dialog instead of a native prompt for content reports', () => {
+    const page = read('src/app/(frontend)/content/[contentId]/ContentDetailClient.tsx')
+    expect(page).toContain("const [reportDialogOpen, setReportDialogOpen] = useState(false)")
+    expect(page).toContain('aria-modal="true"')
+    expect(page).toContain('role="dialog"')
+    expect(page).toContain("value: 'SPAM'")
+    expect(page).toContain("value: 'ABUSE'")
+    expect(page).toContain("value: 'IMPERSONATION'")
+    expect(page).toContain("value: 'COPYRIGHT'")
+    expect(page).toContain("value: 'OTHER'")
+    expect(page).toContain("setReportDialogOpen(true)")
+    expect(page).toContain('reasonCode: reportReasonCode')
+    expect(page).not.toContain('window.prompt(')
+  })
+
   it('connects the content detail page to the canonical report API', () => {
     const page = read('src/app/(frontend)/content/[contentId]/ContentDetailClient.tsx')
     expect(page).toContain("fetchJson<{ data?: { status?: string }; error?: { message?: string } }>('/api/v1/reports'")
