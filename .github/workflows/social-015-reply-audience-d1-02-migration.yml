@@ -74,6 +74,7 @@ jobs:
         run: |
           set -euo pipefail
           python - <<'PY'
+          import json
           import sqlite3
           from pathlib import Path
           db = sqlite3.connect(':memory:')
@@ -82,17 +83,21 @@ jobs:
           actual = [row[1] for row in db.execute('PRAGMA table_info("social_content_reply_policies")').fetchall()]
           if actual != expected:
               raise SystemExit(f'unexpected reply policy schema: {actual}')
-          db.execute("INSERT INTO social_content_reply_policies VALUES ('c1','u1','mentioned','[\\"u2\\"]','now','now')")
-          for values in [
-              ("c2", "u1", "anyone", "[]", "now", "now"),
-              ("c3", "u1", "mentioned", "{}", "now", "now"),
-              ("c4", "u1", "mentioned", '[\\"u2\\",\\"u3\\",\\"u4\\",\\"u5\\",\\"u6\\",\\"u7\\",\\"u8\\",\\"u9\\",\\"u10\\",\\"u11\\",\\"u12\\",\\"u13\\",\\"u14\\",\\"u15\\",\\"u16\\",\\"u17\\",\\"u18\\",\\"u19\\",\\"u20\\",\\"u21\\"]', "now", "now"),
-          ]:
+          db.execute(
+              'INSERT INTO social_content_reply_policies VALUES (?,?,?,?,?,?)',
+              ('c1', 'u1', 'mentioned', json.dumps(['u2']), 'now', 'now'),
+          )
+          invalid_rows = [
+              ('c2', 'u1', 'anyone', '[]', 'now', 'now'),
+              ('c3', 'u1', 'mentioned', json.dumps({'user': 'u2'}), 'now', 'now'),
+              ('c4', 'u1', 'mentioned', json.dumps([f'u{i}' for i in range(21)]), 'now', 'now'),
+          ]
+          for row in invalid_rows:
               try:
-                  db.execute("INSERT INTO social_content_reply_policies VALUES (?,?,?,?,?,?)", values)
+                  db.execute('INSERT INTO social_content_reply_policies VALUES (?,?,?,?,?,?)', row)
               except sqlite3.IntegrityError:
                   continue
-              raise SystemExit(f'reply policy constraint did not reject invalid row: {values[0]}')
+              raise SystemExit(f'reply policy constraint did not reject invalid row: {row[0]}')
           print('SOCIAL_015_MIGRATION_STATIC=PASS')
           PY
 
