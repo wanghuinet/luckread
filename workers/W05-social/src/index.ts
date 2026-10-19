@@ -1,4 +1,5 @@
 /// <reference types="@cloudflare/workers-types" />
+import { listContentLikers } from './like-list-runtime.js'
 import { getLikeStatus, like, LikeRuntimeError, unlike } from './like-runtime.js'
 import { CommentRuntimeError, createComment, deleteComment, listComments, parseCommentLimit, updateComment } from './comment-runtime.js'
 import { listProfileLikedContents, listProfileReplies, ProfileChannelRuntimeError } from './profile-channel-runtime.js'
@@ -855,6 +856,29 @@ export default {
         const viewerUserId = requireFollowingFeedPrincipal(request)
         const candidates = await listFollowingAuthorIds(env.DB, viewerUserId)
         return json({ data: candidates, requestId: createRequestId() })
+      }
+
+      const contentLikersMatch = /^\/internal\/social\/content\/([^/]+)\/likes$/.exec(url.pathname)
+      if (contentLikersMatch) {
+        if (request.method !== 'GET') return new Response(null, { status: 405, headers: { Allow: 'GET' } })
+        requireTransport(request)
+        const contentId = decodePathPart(contentLikersMatch[1] ?? '')
+        if (contentId === null) throw new LikeRuntimeError('VALIDATION_FAILED', 400)
+        const limits = url.searchParams.getAll('limit')
+        const cursors = url.searchParams.getAll('cursor')
+        if (
+          limits.length > 1 ||
+          cursors.length > 1 ||
+          [...url.searchParams.keys()].some((key) => key !== 'limit' && key !== 'cursor')
+        ) throw new LikeRuntimeError('VALIDATION_FAILED', 400)
+        const limit = parseCommentLimit(limits[0] ?? null)
+        const cursor = cursors[0] ?? null
+        if (cursors.length && (!cursor?.trim() || cursor.length > 2048 || !/^[A-Za-z0-9_-]+$/.test(cursor))) {
+          throw new LikeRuntimeError('INVALID_CURSOR', 400)
+        }
+        const viewerUserId = request.headers.get('X-LuckRead-Principal-User-Id')?.trim() || null
+        const data = await listContentLikers(env.DB, contentId, cursor, limit, viewerUserId)
+        return json({ data, requestId: createRequestId() })
       }
 
       const profileChannel = parseProfileChannelPath(url.pathname)
