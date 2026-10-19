@@ -2,14 +2,14 @@ import { describe, expect, it } from 'vitest'
 import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-const workerRoot = existsSync(resolve(process.cwd(), 'src/app/(frontend)/creator-application/page.tsx'))
+const workerRoot = existsSync(resolve(process.cwd(), 'src/app/(twitter-clone)/creator-application/page.tsx'))
   ? process.cwd()
   : resolve(process.cwd(), 'workers/W01-payload')
 const read = (path: string) => readFileSync(resolve(workerRoot, path), 'utf8')
 
 describe('creator qualification application page', () => {
   it('uses W02 authenticated principal and redirects expired sessions to login', () => {
-    const page = read('src/app/(frontend)/creator-application/page.tsx')
+    const page = read('src/app/(twitter-clone)/creator-application/page.tsx')
     expect(page).toContain('getBetterAuthPrincipal')
     expect(page).toContain('W02AuthClientError')
     expect(page).toContain("redirect('/login?returnTo=%2Fcreator-application')")

@@ -1,9 +1,9 @@
 import { cookies } from 'next/headers'
 
-import TwitterCloneSecondaryPageLayout from '../../(twitter-clone)/TwitterCloneSecondaryPageLayout'
-import { normalizePublicLocale } from '../i18n/public-locale'
-import PublishComposer from './PublishComposer'
-import './publish.css'
+import TwitterCloneSecondaryPageLayout from '../TwitterCloneSecondaryPageLayout'
+import { normalizePublicLocale } from '../../(frontend)/i18n/public-locale'
+import PublishComposer from '../../(frontend)/publish/PublishComposer'
+import '../../(frontend)/publish/publish.css'
 
 type ContentType = 'article' | 'post' | 'video'
 

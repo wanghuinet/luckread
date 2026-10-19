@@ -4,9 +4,9 @@ import Link from 'next/link'
 import { FormEvent, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { fetchJson, getApiErrorMessage } from '../../../../lib/client-api.js'
-import { usePublicLocale } from '../../i18n/PublicLanguageToggle'
-import type { PublicLocale } from '../../i18n/public-locale'
-import TwitterCloneSecondaryPageLayout from '../../../(twitter-clone)/TwitterCloneSecondaryPageLayout'
+import { usePublicLocale } from '../../../(frontend)/i18n/PublicLanguageToggle'
+import type { PublicLocale } from '../../../(frontend)/i18n/public-locale'
+import TwitterCloneSecondaryPageLayout from '../../TwitterCloneSecondaryPageLayout'
 
 const MIN_PASSWORD_LENGTH = 15
 const MAX_PASSWORD_LENGTH = 128

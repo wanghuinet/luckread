@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react'
 import { fetchJson, getApiErrorMessage } from '../../../lib/client-api.js'
 import { usePublicLocale } from '../../(frontend)/i18n/PublicLanguageToggle'
 import TwitterCloneSecondaryPageLayout from '../TwitterCloneSecondaryPageLayout'
-import UserProfilePage from '../../(frontend)/users/[userId]/page'
+import UserProfilePage from '../../(frontend)/users/[userId]/UserProfilePage'
 
 type PublicUserLookup = {
   id?: string

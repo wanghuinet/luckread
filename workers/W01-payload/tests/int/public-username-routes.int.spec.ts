@@ -15,12 +15,19 @@ describe('public username routes', () => {
     expect(route).toContain('cachedPublicGet')
     expect(route).toContain('enforcePublicReadRateLimit')
     expect(profile).toContain("fetchJson<PublicUserLookup>('/api/v1/users/by-username/")
-    expect(profile).toContain("import UserProfilePage from '../../(frontend)/users/[userId]/page'")
+    expect(profile).toContain("import UserProfilePage from '../../(frontend)/users/[userId]/UserProfilePage'")
+  })
+
+  it('routes ID-based public profiles through the X root layout', () => {
+    const route = read('src/app/(twitter-clone)/users/[userId]/page.tsx')
+    const layout = read('src/app/(twitter-clone)/layout.tsx')
+    expect(route).toContain("from '../../../(frontend)/users/[userId]/UserProfilePage'")
+    expect(layout).toContain("import '../../styles/twitter-clone-globals.scss'")
   })
 
   it('routes username profile works through the canonical content detail authority', () => {
     const article = read('src/app/(frontend)/[username]/article/[contentId]/page.tsx')
-    const user = read('src/app/(frontend)/users/[userId]/page.tsx')
+    const user = read('src/app/(frontend)/users/[userId]/UserProfilePage.tsx')
 
     expect(article).toContain("import { permanentRedirect } from 'next/navigation'")
     expect(article).toContain("permanentRedirect('/content/' + encodeURIComponent(contentId))")

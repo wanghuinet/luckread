@@ -153,7 +153,7 @@ it('links published content to the public author profile when creatorId is prese
 })
 
 it('cancels stale public profile content pagination requests', () => {
-  const page = read('src/app/(frontend)/users/[userId]/page.tsx')
+  const page = read('src/app/(frontend)/users/[userId]/UserProfilePage.tsx')
   expect(page).toContain('contentRequestRef')
   expect(page).toContain('contentRequestIdRef')
   expect(page).toContain('contentRequestRef.current?.abort()')

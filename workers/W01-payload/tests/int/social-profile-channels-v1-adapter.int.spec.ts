@@ -32,7 +32,7 @@ describe('v1 user profile social channels', () => {
   })
 
   it('keeps the frontend channels connected to the author-scoped read APIs', () => {
-    const page = read('src/app/(frontend)/users/[userId]/page.tsx')
+    const page = read('src/app/(frontend)/users/[userId]/UserProfilePage.tsx')
     expect(page).toContain("'/api/v1/users/' + encodeURIComponent(profile.id) + '/replies?limit=6'")
     expect(page).toContain("'/api/v1/users/' + encodeURIComponent(profile.id) + '/likes?limit=6'")
     expect(page).toContain('loadLikedContentDetails')

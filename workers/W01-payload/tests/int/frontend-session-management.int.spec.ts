@@ -31,7 +31,7 @@ describe('frontend session management', () => {
     expect(route).toContain('normalizeApiErrorResponse(')
   })
   it('loads the current session marker through the W02 bounded session-list boundary', () => {
-    const page = read('src/app/(frontend)/me/sessions/page.tsx')
+    const page = read('src/app/(twitter-clone)/me/sessions/page.tsx')
     const route = read('src/app/auth/sessions/[[...segments]]/route.ts')
     const client = read('src/auth/w02-session-client.ts')
 
@@ -44,7 +44,7 @@ describe('frontend session management', () => {
   })
 
   it('revokes only non-current sessions through the existing DELETE API with idempotency', () => {
-    const page = read('src/app/(frontend)/me/sessions/page.tsx')
+    const page = read('src/app/(twitter-clone)/me/sessions/page.tsx')
 
     expect(page).toContain("if (sessionId === currentSessionId || revokingId) return")
     expect(page).toContain("method: 'DELETE'")
@@ -55,13 +55,13 @@ describe('frontend session management', () => {
   })
 
   it('preserves the full return path when the session list expires', () => {
-    const page = read('src/app/(frontend)/me/sessions/page.tsx')
+    const page = read('src/app/(twitter-clone)/me/sessions/page.tsx')
     expect(page).toContain("const returnTo = window.location.pathname + window.location.search + window.location.hash")
     expect(page).toContain("router.replace('/login?returnTo=' + encodeURIComponent(returnTo))")
   })
 
   it('preserves the full return path when revoking an expired session', () => {
-    const page = read('src/app/(frontend)/me/sessions/page.tsx')
+    const page = read('src/app/(twitter-clone)/me/sessions/page.tsx')
     expect(page).toContain("const returnTo = window.location.pathname + window.location.search + window.location.hash")
     expect(page).toContain("router.replace('/login?returnTo=' + encodeURIComponent(returnTo))")
   })

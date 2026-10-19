@@ -6,7 +6,7 @@ const read = (relativePath: string) => readFileSync(resolve(process.cwd(), relat
 
 describe('public creator profile', () => {
   it('renders the responsive creator profile surface without exposing private profile fields', () => {
-    const page = read('src/app/(frontend)/users/[userId]/page.tsx')
+    const page = read('src/app/(frontend)/users/[userId]/UserProfilePage.tsx')
     const route = read('src/app/api/v1/users/[userId]/route.ts')
     const profileHeader = read('src/app/(frontend)/users/[userId]/TwitterCloneProfileHeader.tsx')
     const profileNav = read('src/app/(frontend)/users/[userId]/TwitterCloneProfileNav.tsx')
@@ -60,13 +60,13 @@ describe('public creator profile', () => {
   })
 
   it('preserves the full return path when follow authentication expires', () => {
-    const page = read('src/app/(frontend)/users/[userId]/page.tsx')
+    const page = read('src/app/(frontend)/users/[userId]/UserProfilePage.tsx')
     expect(page).toContain("const returnTo = window.location.pathname + window.location.search + window.location.hash")
     expect(page).toContain("router.replace('/login?returnTo=' + encodeURIComponent(returnTo))")
   })
 
   it('keeps follow, block, mute and report on canonical interaction adapters', () => {
-    const page = read('src/app/(frontend)/users/[userId]/page.tsx')
+    const page = read('src/app/(frontend)/users/[userId]/UserProfilePage.tsx')
     const reportRoute = read('src/app/api/v1/reports/route.ts')
     const socialClient = read('src/social/w05-social-client.ts')
 
@@ -92,7 +92,7 @@ describe('public creator profile', () => {
   })
 
   it('uses bounded creator content reads and keeps type filtering cache-compatible', () => {
-    const page = read('src/app/(frontend)/users/[userId]/page.tsx')
+    const page = read('src/app/(frontend)/users/[userId]/UserProfilePage.tsx')
     const cache = read('src/lib/public-response-cache.ts')
 
     expect(page).toContain('/api/v1/contents?')
@@ -108,7 +108,7 @@ describe('public creator profile', () => {
   })
 
   it('invalidates stale public-profile content requests on navigation', () => {
-    const page = read('src/app/(frontend)/users/[userId]/page.tsx')
+    const page = read('src/app/(frontend)/users/[userId]/UserProfilePage.tsx')
     expect(page).toContain('const contentRequestRef = useRef<AbortController | null>(null)')
     expect(page).toContain('const contentRequestIdRef = useRef(0)')
     expect(page).toContain('contentRequestIdRef.current += 1')
@@ -117,7 +117,7 @@ describe('public creator profile', () => {
   })
 
   it('reuses the Twitter Clone social post card for dynamic items on public profiles', () => {
-    const page = read('src/app/(frontend)/users/[userId]/page.tsx')
+    const page = read('src/app/(frontend)/users/[userId]/UserProfilePage.tsx')
     const card = read('src/app/(frontend)/components/reuse/LuckReadSocialPostCard.tsx')
 
     expect(page).toContain("import LuckReadSocialPostCard from '../../components/reuse/LuckReadSocialPostCard'")
@@ -151,7 +151,7 @@ describe('public creator profile', () => {
 
 
   it('connects post, reply, media, likes, and article profile channels to canonical read APIs', () => {
-    const page = read('src/app/(frontend)/users/[userId]/page.tsx')
+    const page = read('src/app/(frontend)/users/[userId]/UserProfilePage.tsx')
     const nav = read('src/app/(frontend)/users/[userId]/TwitterCloneProfileNav.tsx')
 
     expect(nav).toContain("'posts' | 'replies' | 'media' | 'likes' | 'articles'")
@@ -164,13 +164,13 @@ describe('public creator profile', () => {
   })
 
   it('routes profile works through the canonical content detail route', () => {
-    const page = read('src/app/(frontend)/users/[userId]/page.tsx')
+    const page = read('src/app/(frontend)/users/[userId]/UserProfilePage.tsx')
     expect(page).toContain("return '/content/' + encodeURIComponent(item.slug || item.id)")
     expect(page).not.toContain("return '/' + encodeURIComponent(profile!.username) + '/' + item.contentType + '/' + encodeURIComponent(item.id)")
   })
 
   it('uses real public thumbnails without inline image background URLs', () => {
-    const page = read('src/app/(frontend)/users/[userId]/page.tsx')
+    const page = read('src/app/(frontend)/users/[userId]/UserProfilePage.tsx')
     expect(page).toContain('src={item.coverRef}')
     expect(page).toContain('height={360}')
     expect(page).toContain('width={480}')
@@ -181,7 +181,7 @@ describe('public creator profile', () => {
 
 
   it('localizes the profile-report reason dialog in English, Traditional Chinese, and Simplified Chinese', () => {
-    const page = read('src/app/(frontend)/users/[userId]/page.tsx')
+    const page = read('src/app/(frontend)/users/[userId]/UserProfilePage.tsx')
 
     expect(page).toContain("locale === 'en' ? 'Report user' : locale === 'tw' ? '檢舉使用者' : '举报用户'")
     expect(page).toContain("locale === 'en' ? 'Choose the reason that best describes this account.' : locale === 'tw' ? '請選擇最符合此帳號情況的檢舉原因。' : '请选择最符合此账号情况的举报原因。'")
@@ -193,7 +193,7 @@ describe('public creator profile', () => {
 
 
 it('handles the profile follow DELETE no-body response without requiring a JSON payload', () => {
-  const page = read('src/app/(frontend)/users/[userId]/page.tsx')
+  const page = read('src/app/(frontend)/users/[userId]/UserProfilePage.tsx')
   expect(page).toContain('if (isFollowing) {')
   expect(page).toContain('setIsFollowing(false)')
   expect(page).toContain('setFollowers((value) => value === null ? value : Math.max(0, value - 1))')
@@ -226,7 +226,7 @@ it('resolves public profile projections by Better Auth identity id without expos
 
 
 it('keeps public-profile posts and replies in full-width vertical lists', () => {
-  const page = read('src/app/(frontend)/users/[userId]/page.tsx')
+  const page = read('src/app/(frontend)/users/[userId]/UserProfilePage.tsx')
   const styles = read('src/app/(frontend)/styles.css')
 
   expect(page).toContain('<section className="min-w-0 w-full" id="works"')
