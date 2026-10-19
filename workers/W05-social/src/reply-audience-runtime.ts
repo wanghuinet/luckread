@@ -196,6 +196,24 @@ export const replyAudienceAllowedSql = `(
             ON second_degree.follower_user_id = owner_follow.target_user_id
          WHERE owner_follow.follower_user_id = content.owner_user_id
            AND second_degree.target_user_id = ?
+           AND NOT EXISTS (
+             SELECT 1 FROM social_user_interactions owner_middle_block
+              WHERE owner_middle_block.relation_type = 'block'
+                AND (
+                  (owner_middle_block.actor_user_id = content.owner_user_id AND owner_middle_block.target_user_id = owner_follow.target_user_id)
+                  OR
+                  (owner_middle_block.actor_user_id = owner_follow.target_user_id AND owner_middle_block.target_user_id = content.owner_user_id)
+                )
+           )
+           AND NOT EXISTS (
+             SELECT 1 FROM social_user_interactions middle_actor_block
+              WHERE middle_actor_block.relation_type = 'block'
+                AND (
+                  (middle_actor_block.actor_user_id = owner_follow.target_user_id AND middle_actor_block.target_user_id = ?)
+                  OR
+                  (middle_actor_block.actor_user_id = ? AND middle_actor_block.target_user_id = owner_follow.target_user_id)
+                )
+           )
       )
     )
   )
@@ -204,6 +222,8 @@ export const replyAudienceAllowedSql = `(
 export const replyAudienceAllowedParams = (actorUserId: string, actorVerified: boolean): unknown[] => [
   actorUserId,
   actorVerified ? 1 : 0,
+  actorUserId,
+  actorUserId,
   actorUserId,
   actorUserId,
   actorUserId,
