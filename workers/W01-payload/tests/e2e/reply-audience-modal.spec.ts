@@ -146,7 +146,7 @@ for (const viewport of [
       expect(bounds.left, 'reply audience sheet left edge').toBeGreaterThanOrEqual(-1)
       expect(bounds.right, 'reply audience sheet right edge').toBeLessThanOrEqual(bounds.viewportWidth + 1)
 
-      await selector.getByRole('button', { name: new RegExp(choice.optionLabel) }).click()
+      await selector.getByRole('button', { name: new RegExp('^' + choice.optionLabel + '\\s') }).click()
       await expect(composer.getByRole('button', { name: choice.summaryLabel })).toBeVisible()
       currentSummaryLabel = choice.summaryLabel
     }
