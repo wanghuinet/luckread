@@ -85,9 +85,7 @@ export async function PUT(
 
     // Mention targets are resolved server-side from the post text; clients never
     // choose the IDs that receive permission to reply.
-    const mentionTargets = candidate.replyAudience === 'mentioned'
-      ? await resolveSocialMentionTargets(candidate.text)
-      : []
+    const mentionTargets = await resolveSocialMentionTargets(candidate.text)
 
     return await callW05Social({
       request,
