@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
-import { fetchJson, getApiErrorMessage } from '../../../../../lib/client-api.js'
+import { fetchJson, getApiErrorMessage } from '../../../../lib/client-api.js'
 import { usePublicLocale } from '../../../(frontend)/i18n/PublicLanguageToggle'
 import TwitterCloneSecondaryPageLayout from '../../TwitterCloneSecondaryPageLayout'
 
@@ -113,6 +113,7 @@ export default function NotificationPreferencesPage() {
         })
         if (response.status === 401) {
           const returnTo = window.location.pathname + window.location.search + window.location.hash
+          setError(copy.loginMessage)
           router.replace('/login?returnTo=' + encodeURIComponent(returnTo))
           return
         }
@@ -136,7 +137,7 @@ export default function NotificationPreferencesPage() {
 
     void loadPreferences()
     return () => { cancelled = true }
-  }, [router, reloadVersion, copy.loadError])
+  }, [router, reloadVersion, copy.loadError, copy.loginMessage])
 
   async function savePreferences() {
     if (!preferences || saving) return
