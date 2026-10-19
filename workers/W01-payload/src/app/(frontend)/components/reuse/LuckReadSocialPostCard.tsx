@@ -112,6 +112,8 @@ export default function LuckReadSocialPostCard({
   const [pinBusy, setPinBusy] = useState(false)
   const [shareBusy, setShareBusy] = useState(false)
   const [reportBusy, setReportBusy] = useState(false)
+  const [reportDialogOpen, setReportDialogOpen] = useState(false)
+  const [reportReasonCode, setReportReasonCode] = useState('ABUSE')
   const [message, setMessage] = useState('')
 
   const contentHref = '/content/' + encodeURIComponent(slug || contentId)
@@ -538,15 +540,7 @@ export default function LuckReadSocialPostCard({
   }
 
   const reportContent = async () => {
-    if (reportBusy) return
-    setMoreOpen(false)
-    const reasonCode = window.prompt(
-      locale === 'en'
-        ? 'Enter a report reason (for example SPAM, ABUSE, or COPYRIGHT).'
-        : '请输入举报原因（例如 SPAM、ABUSE、COPYRIGHT）',
-      'ABUSE',
-    )?.trim()
-    if (!reasonCode) return
+    if (reportBusy || !reportReasonCode.trim()) return
 
     setReportBusy(true)
     setMessage('')
@@ -559,7 +553,7 @@ export default function LuckReadSocialPostCard({
           'content-type': 'application/json',
           'Idempotency-Key': 'twitter-clone-reuse-report:content:' + contentId + ':' + crypto.randomUUID(),
         },
-        body: JSON.stringify({ targetType: 'content', targetId: contentId, reasonCode }),
+        body: JSON.stringify({ targetType: 'content', targetId: contentId, reasonCode: reportReasonCode }),
       })
       if (response.status === 401) {
         requireLogin()
@@ -571,6 +565,7 @@ export default function LuckReadSocialPostCard({
       setMessage(data.data.status === 'DEDUPLICATED'
         ? (locale === 'en' ? 'You have already reported this post.' : '你此前已举报过这条动态。')
         : (locale === 'en' ? 'Report submitted.' : '举报已提交。'))
+      setReportDialogOpen(false)
     } catch (cause) {
       setMessage(cause instanceof Error
         ? cause.message
@@ -954,7 +949,12 @@ export default function LuckReadSocialPostCard({
                 className="content-detail-like"
                 type="button"
                 disabled={reportBusy}
-                onClick={() => void reportContent()}
+                onClick={() => {
+                  setMoreOpen(false)
+                  setMessage('')
+                  setReportReasonCode('ABUSE')
+                  setReportDialogOpen(true)
+                }}
               >
                 {reportBusy
                   ? (locale === 'en' ? 'Reporting…' : locale === 'tw' ? '舉報中…' : '举报中…')
@@ -962,9 +962,83 @@ export default function LuckReadSocialPostCard({
               </button>
             </div>
           ) : null}
-          {message ? <span className="content-detail-action-status" role="status">{message}</span> : null}
+          {message && !reportDialogOpen ? <span className="content-detail-action-status" role="status">{message}</span> : null}
         </footer>
       </div>
+      {reportDialogOpen ? (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 px-4 py-8"
+          onClick={(event) => {
+            if (event.target === event.currentTarget && !reportBusy) setReportDialogOpen(false)
+          }}
+          onKeyDown={(event) => {
+            if (event.key === 'Escape' && !reportBusy) setReportDialogOpen(false)
+          }}
+        >
+          <section
+            aria-labelledby={'post-report-title-' + contentId}
+            aria-modal="true"
+            autoFocus
+            className="w-full max-w-md rounded-2xl border border-light-border bg-main-background p-5 shadow-xl dark:border-dark-border"
+            role="dialog"
+            tabIndex={-1}
+          >
+            <h2 className="text-lg font-bold" id={'post-report-title-' + contentId}>
+              {locale === 'en' ? 'Report post' : locale === 'tw' ? '檢舉動態' : '举报动态'}
+            </h2>
+            <p className="mt-2 text-sm text-light-secondary dark:text-dark-secondary">
+              {locale === 'en' ? 'Choose the reason that best describes this post.' : locale === 'tw' ? '請選擇最符合此動態情況的檢舉原因。' : '请选择最符合这条动态情况的举报原因。'}
+            </p>
+            <fieldset className="mt-4 flex flex-col gap-2">
+              <legend className="sr-only">
+                {locale === 'en' ? 'Report reason' : locale === 'tw' ? '檢舉原因' : '举报原因'}
+              </legend>
+              {[
+                { value: 'ABUSE', label: locale === 'en' ? 'Abuse or harassment' : locale === 'tw' ? '騷擾或辱罵' : '骚扰或辱骂' },
+                { value: 'SPAM', label: locale === 'en' ? 'Spam or unwanted promotion' : locale === 'tw' ? '垃圾訊息或廣告' : '垃圾信息或广告' },
+                { value: 'IMPERSONATION', label: locale === 'en' ? 'Impersonation' : locale === 'tw' ? '冒充他人' : '冒充他人' },
+                { value: 'COPYRIGHT', label: locale === 'en' ? 'Copyright infringement' : locale === 'tw' ? '侵犯版權' : '侵犯版权' },
+                { value: 'OTHER', label: locale === 'en' ? 'Other' : locale === 'tw' ? '其他原因' : '其他原因' },
+              ].map((reason) => (
+                <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-xl px-3 hover:bg-light-primary/10 dark:hover:bg-dark-primary/10" key={reason.value}>
+                  <input
+                    checked={reportReasonCode === reason.value}
+                    className="h-4 w-4 accent-main-accent"
+                    name={'post-report-reason-' + contentId}
+                    onChange={() => setReportReasonCode(reason.value)}
+                    type="radio"
+                    value={reason.value}
+                  />
+                  <span className="text-sm">{reason.label}</span>
+                </label>
+              ))}
+            </fieldset>
+            {message ? (
+              <p className="mt-3 text-sm text-light-secondary dark:text-dark-secondary" role="status">{message}</p>
+            ) : null}
+            <div className="mt-5 flex justify-end gap-3">
+              <button
+                className="content-detail-like"
+                disabled={reportBusy}
+                onClick={() => setReportDialogOpen(false)}
+                type="button"
+              >
+                {locale === 'en' ? 'Cancel' : locale === 'tw' ? '取消' : '取消'}
+              </button>
+              <button
+                className="rounded-full bg-main-accent px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
+                disabled={reportBusy || !reportReasonCode}
+                onClick={() => void reportContent()}
+                type="button"
+              >
+                {reportBusy
+                  ? (locale === 'en' ? 'Reporting…' : locale === 'tw' ? '舉報中…' : '举报中…')
+                  : (locale === 'en' ? 'Submit report' : locale === 'tw' ? '提交檢舉' : '提交举报')}
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
     </article>
   )
 }
