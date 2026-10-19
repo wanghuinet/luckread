@@ -4,9 +4,9 @@
   --lr-line: #dfe7f0;
   --lr-accent: #2458e6;
 }
-* { box-sizing: border-box; }
-html { scroll-behavior: smooth; background: #f8fafc; -webkit-font-smoothing: antialiased; }
-body {
+html.frontend-legacy-root, html.frontend-legacy-root * { box-sizing: border-box; }
+html.frontend-legacy-root { scroll-behavior: smooth; background: #f8fafc; -webkit-font-smoothing: antialiased; }
+html.frontend-legacy-root body {
   margin: 0;
   color: var(--lr-ink);
   background:
@@ -17,7 +17,7 @@ body {
   font-size: 16px;
   line-height: 1.6;
 }
-a { color: inherit; }
+html.frontend-legacy-root a { color: inherit; }
 /* Shared classes retained for the legacy content-feed component. */
 .eyebrow, .card-eyebrow { margin: 0 0 18px; color: var(--lr-accent); font-size: 11px; font-weight: 800; letter-spacing: .18em; text-transform: uppercase; }
 .button {
@@ -532,119 +532,6 @@ a { color: inherit; }
 }
 
 
-/* UI-only globe menu. Language selection is local to the open menu until full i18n is implemented. */
-.locale-globe-selector {
-  position: relative;
-  z-index: 30;
-  display: inline-flex;
-  flex: 0 0 auto;
-}
-
-.locale-globe-trigger {
-  display: inline-flex;
-  width: 40px;
-  height: 40px;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  border: 1px solid #d0d5dd;
-  border-radius: 999px;
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
-  transition: background-color 160ms ease, border-color 160ms ease;
-}
-
-.locale-globe-trigger:hover {
-  background: rgba(127, 127, 127, .10);
-  border-color: #98a2b3;
-}
-
-.locale-globe-trigger:focus-visible {
-  outline: 2px solid #475467;
-  outline-offset: 2px;
-}
-
-.locale-globe-menu {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  z-index: 1000;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 4px;
-  box-sizing: border-box;
-  width: min(320px, calc(100vw - 24px));
-  max-height: min(360px, calc(100vh - 96px));
-  overflow-y: auto;
-  padding: 8px;
-  border: 1px solid #e4e7ec;
-  border-radius: 14px;
-  background: #fff;
-  color: #101828;
-  box-shadow: 0 12px 32px rgba(16, 24, 40, .16);
-}
-
-.locale-globe-option {
-  min-width: 0;
-  min-height: 34px;
-  padding: 7px 9px;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: #344054;
-  font: inherit;
-  font-size: 12px;
-  line-height: 1.3;
-  text-align: left;
-  cursor: pointer;
-}
-
-.locale-globe-option:hover,
-.locale-globe-option:focus-visible {
-  outline: none;
-  background: #f2f4f7;
-  color: #101828;
-}
-
-.locale-globe-option.is-selected {
-  background: #eef4ff;
-  color: #1849a9;
-  font-weight: 700;
-}
-
-.dark .locale-globe-menu {
-  border-color: #38444d;
-  background: #15202b;
-  color: #e7e9ea;
-}
-
-.dark .locale-globe-option {
-  color: #e7e9ea;
-}
-
-.dark .locale-globe-option:hover,
-.dark .locale-globe-option:focus-visible {
-  background: #253341;
-  color: #fff;
-}
-
-.dark .locale-globe-option.is-selected {
-  background: #1d3b60;
-  color: #c6e2ff;
-}
-
-@media (max-width: 760px) {
-  .locale-globe-trigger {
-    width: 36px;
-    height: 36px;
-  }
-
-  .locale-globe-menu {
-    max-height: min(320px, calc(100vh - 80px));
-  }
-}
-
 /* --------------------------------------------------------------------------
  * LuckRead Blue H5 design system
  * Shared visual language for public/mobile web surfaces.
@@ -667,11 +554,11 @@ a { color: inherit; }
   --lr-h5-shadow: 0 12px 36px rgba(30, 64, 175, .08);
 }
 
-html, body {
+html.frontend-legacy-root, html.frontend-legacy-root body {
   background: var(--lr-h5-bg);
 }
 
-body {
+html.frontend-legacy-root body {
   color: var(--lr-h5-text);
 }
 
@@ -679,28 +566,28 @@ body {
 .lr-error { color: #b42318; background: #fff5f4; border: 1px solid #fecdca; border-radius: 10px; padding: 10px 12px; font-size: 14px; }
 
 /* Inline-styled account/security pages still inherit the same blue surface. */
-main[style*="max-width"] {
+html.frontend-legacy-root main[style*="max-width"] {
   color: var(--lr-h5-text);
 }
-main[style*="max-width"] h1 { color: var(--lr-h5-text) !important; }
-main[style*="max-width"] p[style*="color: '#666'"] { color: var(--lr-h5-muted) !important; }
-main[style*="max-width"] label { color: #29476f; }
-main[style*="max-width"] input,
-main[style*="max-width"] textarea,
-main[style*="max-width"] select {
+html.frontend-legacy-root main[style*="max-width"] h1 { color: var(--lr-h5-text) !important; }
+html.frontend-legacy-root main[style*="max-width"] p[style*="color: '#666'"] { color: var(--lr-h5-muted) !important; }
+html.frontend-legacy-root main[style*="max-width"] label { color: #29476f; }
+html.frontend-legacy-root main[style*="max-width"] input,
+html.frontend-legacy-root main[style*="max-width"] textarea,
+html.frontend-legacy-root main[style*="max-width"] select {
   border-color: #cbdcf2 !important;
   border-radius: 10px !important;
   background: #fff !important;
   color: var(--lr-h5-text) !important;
 }
-main[style*="max-width"] input:focus,
-main[style*="max-width"] textarea:focus,
-main[style*="max-width"] select:focus {
+html.frontend-legacy-root main[style*="max-width"] input:focus,
+html.frontend-legacy-root main[style*="max-width"] textarea:focus,
+html.frontend-legacy-root main[style*="max-width"] select:focus {
   border-color: var(--lr-blue-500) !important;
   box-shadow: 0 0 0 4px rgba(59, 130, 246, .11);
   outline: none;
 }
-main[style*="max-width"] button {
+html.frontend-legacy-root main[style*="max-width"] button {
   border: 1px solid var(--lr-blue-200);
   border-radius: 10px;
   background: var(--lr-blue-600);
@@ -709,8 +596,8 @@ main[style*="max-width"] button {
   font-weight: 700;
   cursor: pointer;
 }
-main[style*="max-width"] button:hover:not(:disabled) { background: var(--lr-blue-700); }
-main[style*="max-width"] a { color: var(--lr-blue-700); }
+html.frontend-legacy-root main[style*="max-width"] button:hover:not(:disabled) { background: var(--lr-blue-700); }
+html.frontend-legacy-root main[style*="max-width"] a { color: var(--lr-blue-700); }
 
 /* Discovery / social content surfaces */
 .content-feed-card,
@@ -724,20 +611,20 @@ main[style*="max-width"] a { color: var(--lr-blue-700); }
 
 
 @media (max-width: 640px) {
-  main[style*="max-width"] { margin-top: 24px !important; margin-bottom: 40px !important; }
+  html.frontend-legacy-root main[style*="max-width"] { margin-top: 24px !important; margin-bottom: 40px !important; }
 }
 
-main[style*="max-width"] {
+html.frontend-legacy-root main[style*="max-width"] {
   border: 1px solid var(--lr-h5-line);
   border-radius: 20px;
   background: rgba(255,255,255,.94);
   box-shadow: var(--lr-h5-shadow);
 }
-main[style*="max-width"] header a,
-main[style*="max-width"] a {
+html.frontend-legacy-root main[style*="max-width"] header a,
+html.frontend-legacy-root main[style*="max-width"] a {
   color: var(--lr-blue-700);
 }
-main[style*="max-width"] p[style*="#666"] {
+html.frontend-legacy-root main[style*="max-width"] p[style*="#666"] {
   color: var(--lr-h5-muted) !important;
 }
 

@@ -4,9 +4,9 @@ import Link from 'next/link'
 import { useEffect, useState } from 'react'
 
 import { fetchJson, getApiErrorMessage } from '../../../lib/client-api.js'
-import { usePublicLocale } from '../i18n/PublicLanguageToggle'
-import TwitterCloneSecondaryPageLayout from '../../(twitter-clone)/TwitterCloneSecondaryPageLayout'
-import UserProfilePage from '../users/[userId]/page'
+import { usePublicLocale } from '../../(frontend)/i18n/PublicLanguageToggle'
+import TwitterCloneSecondaryPageLayout from '../TwitterCloneSecondaryPageLayout'
+import UserProfilePage from '../../(frontend)/users/[userId]/page'
 
 type PublicUserLookup = {
   id?: string
