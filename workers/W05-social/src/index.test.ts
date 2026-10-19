@@ -88,7 +88,8 @@ describe('W05 social query transport', () => {
         savedPolicy,
       ]) },
     )
-    expect(write.status).toBe(200)
+    const writeBody = await write.clone().json()
+    expect(write.status, JSON.stringify(writeBody)).toBe(200)
     await expect(write.json()).resolves.toMatchObject({
       data: { contentId: 'content-1', ownerUserId: 'viewer-1', replyAudience: 'following' },
     })
