@@ -15,7 +15,7 @@ describe('Twitter Clone follow-list UI reuse with LuckRead social authority', ()
     expect(profile).toContain("value: 'SPAM'")
     expect(profile).toContain("value: 'IMPERSONATION'")
     expect(profile).toContain("setReportDialogOpen(true)")
-    expect(profile).toContain("body: JSON.stringify({ targetType: 'profile', targetId: profile.id, reasonCode })")
+    expect(profile).toContain("body: JSON.stringify({ targetType: 'profile', targetId: profile.id, reasonCode: reportReasonCode })")
     expect(profile).not.toContain('window.prompt(')
   })
 
