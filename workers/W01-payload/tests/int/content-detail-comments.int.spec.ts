@@ -55,6 +55,23 @@ describe('content comments UI', () => {
     expect(comments).not.toContain('ContentComments.module.css')
   })
 
+  it('loads public comment author names, handles and avatars through the shared bounded profile cache', () => {
+    const component = read('src/app/(frontend)/content/[contentId]/ContentComments.tsx')
+    const profileCache = read('src/lib/social-post-profile-cache.ts')
+
+    expect(component).toContain("import { getCachedPublicProfile, type PublicProfile } from '../../../../lib/social-post-profile-cache.js'")
+    expect(component).toContain('const [commentProfiles, setCommentProfiles] = useState<Record<string, PublicProfile>>({})')
+    expect(component).toContain('[...new Set(comments.map((comment) => comment.authorUserId).filter(Boolean))]')
+    expect(component).toContain('getCachedPublicProfile(authorId)')
+    expect(component).toContain('authorProfile?.displayName?.trim()')
+    expect(component).toContain('authorProfile?.username?.trim()')
+    expect(component).toContain('authorProfile.avatar')
+    expect(component).toContain("'/users/' + encodeURIComponent(authorProfile.id)")
+    expect(component).toContain('if (!active) return')
+    expect(profileCache).toContain('createTtlPromiseCache<string, PublicProfile>')
+    expect(profileCache).toContain("'/api/v1/users/by-identity-id/' + encodeURIComponent(normalizedId)")
+  })
+
   it('reuses the content detail viewer identity instead of requesting /users/me again', () => {
     const component = read('src/app/(frontend)/content/[contentId]/ContentComments.tsx')
     expect(component).toContain('viewerUserId: string | null')
@@ -98,7 +115,12 @@ describe('content comments UI', () => {
     expect(component).toContain("method: 'POST'")
     expect(component).toContain("credentials: 'include'")
     expect(component).toContain("'Idempotency-Key': idempotencyKey")
-    expect(component).toContain("href={'/users/' + encodeURIComponent(comment.authorUserId)}")
-    expect(component).toContain('copy.comments.profile')
+    expect(component).toContain("import { getCachedPublicProfile, type PublicProfile } from '../../../../lib/social-post-profile-cache.js'")
+    expect(component).toContain("const authorIds = [...new Set(comments.map((comment) => comment.authorUserId).filter(Boolean))]")
+    expect(component).toContain('getCachedPublicProfile(authorId)')
+    expect(component).toContain('@{authorProfile.username.trim()}')
+    expect(component).toContain('authorProfile.avatar')
+    expect(component).toContain("'/users/' + encodeURIComponent(authorProfile.id)")
+    expect(component).toContain('copy.comments.reader')
   })
 })
