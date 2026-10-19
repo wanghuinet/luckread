@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 export default function RootLayout(props: { children: React.ReactNode }) {
   const { children } = props
   return (
-    <html lang="zh-CN">
+    <html className="frontend-legacy-root" lang="zh-CN">
       <body>
         <UmamiAnalytics />
         <main>{children}</main>
