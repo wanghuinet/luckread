@@ -95,7 +95,7 @@ function notificationMessage(
   const href = contentTargetId
     ? '/content/' + encodeURIComponent(contentTargetId)
     : null
-  const actorHref = '/users/' + encodeURIComponent(item.actorUserId)
+  const actorHref = '/users/' + encodeURIComponent(actorProfile?.id || item.actorUserId)
   return { text: typeText[item.type] ?? labels.user, actor, actorHandle, actorHref, href }
 }
 
