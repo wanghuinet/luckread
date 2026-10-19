@@ -11,6 +11,7 @@ import type { PublicLocale } from '../../(frontend)/i18n/public-locale'
 import TwitterCloneSecondaryPageLayout from '../TwitterCloneSecondaryPageLayout'
 
 type NotificationType = 'FOLLOW' | 'LIKE' | 'COMMENT' | 'REPLY' | 'MENTION'
+type NotificationFilter = 'all' | 'mentions'
 
 type SocialNotification = {
   id: string
@@ -37,6 +38,9 @@ type NotificationResponse = {
 
 const copy = (locale: PublicLocale) => ({
   title: locale === 'en' ? 'Notifications' : '通知',
+  filters: locale === 'en' ? 'Notification filters' : locale === 'tw' ? '通知篩選' : '通知筛选',
+  allTab: locale === 'en' ? 'All' : locale === 'tw' ? '全部' : '全部',
+  mentionsTab: locale === 'en' ? 'Mentions' : locale === 'tw' ? '提及' : '提及',
   allCaughtUp: locale === 'en' ? "You're all caught up" : locale === 'tw' ? '目前沒有新通知' : '暂时没有新通知',
   empty: locale === 'en' ? 'When someone follows, likes, replies to, or mentions you, it will show up here.' : locale === 'tw' ? '有人追蹤、按讚、回覆或提及你時，通知會顯示在這裡。' : '当有人关注、点赞、回复或提及你时，通知会显示在这里。',
   readAll: locale === 'en' ? 'Mark all as read' : locale === 'tw' ? '全部標記為已讀' : '全部标记为已读',
@@ -109,6 +113,7 @@ export default function NotificationsPage() {
   const locale = usePublicLocale()
   const labels = useMemo(() => copy(locale), [locale])
   const [items, setItems] = useState<SocialNotification[]>([])
+  const [filter, setFilter] = useState<NotificationFilter>('all')
   const [nextCursor, setNextCursor] = useState<string | null>(null)
   const [hasMore, setHasMore] = useState(false)
   const [unreadCount, setUnreadCount] = useState(0)
@@ -123,11 +128,17 @@ export default function NotificationsPage() {
 
   const loadPage = useCallback(async (cursor: string | null, append: boolean) => {
     if (append) setLoadingMore(true)
-    else setLoading(true)
+    else {
+      setLoading(true)
+      setItems([])
+      setNextCursor(null)
+      setHasMore(false)
+    }
     setError('')
     try {
       const params = new URLSearchParams({ limit: '20' })
       if (cursor) params.set('cursor', cursor)
+      if (filter === 'mentions') params.set('type', 'MENTION')
       const { response, data } = await fetchJson<NotificationResponse>('/api/v1/notifications?' + params.toString(), {
         credentials: 'include',
         headers: { accept: 'application/json' },
@@ -159,7 +170,7 @@ export default function NotificationsPage() {
       setLoading(false)
       setLoadingMore(false)
     }
-  }, [labels.loadError])
+  }, [filter, labels.loadError])
 
   useEffect(() => {
     let cancelled = false
@@ -253,6 +264,29 @@ export default function NotificationsPage() {
   return (
     <TwitterCloneSecondaryPageLayout locale={locale} title={labels.title} active="notifications">
       <section aria-busy={loading || loadingMore} aria-label={labels.title}>
+        <div className="grid grid-cols-2 border-b border-light-border dark:border-dark-border" role="tablist" aria-label={labels.filters}>
+          <button
+            aria-selected={filter === 'all'}
+            className={filter === 'all' ? 'main-tab relative flex min-h-14 items-center justify-center font-bold' : 'main-tab flex min-h-14 items-center justify-center text-light-secondary dark:text-dark-secondary'}
+            onClick={() => setFilter('all')}
+            role="tab"
+            type="button"
+          >
+            {labels.allTab}
+            {filter === 'all' ? <span className="absolute bottom-0 h-1 w-14 rounded-full bg-main-accent" /> : null}
+          </button>
+          <button
+            aria-selected={filter === 'mentions'}
+            className={filter === 'mentions' ? 'main-tab relative flex min-h-14 items-center justify-center font-bold' : 'main-tab flex min-h-14 items-center justify-center text-light-secondary dark:text-dark-secondary'}
+            onClick={() => setFilter('mentions')}
+            role="tab"
+            type="button"
+          >
+            {labels.mentionsTab}
+            {filter === 'mentions' ? <span className="absolute bottom-0 h-1 w-14 rounded-full bg-main-accent" /> : null}
+          </button>
+        </div>
+
         <div className="flex items-center justify-between border-b border-light-border px-4 py-3 dark:border-dark-border">
           <div>
             <p className="text-sm text-light-secondary dark:text-dark-secondary">{labels.unreadLabel}</p>
