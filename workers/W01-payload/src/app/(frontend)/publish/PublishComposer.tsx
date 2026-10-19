@@ -958,7 +958,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
         <header className="sticky top-0 z-20 flex shrink-0 items-center justify-between bg-black px-3.5 py-2.5 text-[#e7e9ea] pt-[max(env(safe-area-inset-top),0.5rem)]">
           <button
             aria-label="关闭发布窗口"
-            className="grid h-9 w-9 place-items-center rounded-full text-[#e7e9ea] transition hover:bg-[#16181c]"
+            className="custom-button accent-tab grid h-9 w-9 place-items-center rounded-full text-[#e7e9ea] hover:bg-light-primary/10 dark:hover:bg-dark-primary/10"
             onClick={() => onClose?.()}
             type="button"
           >
@@ -967,7 +967,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
             </svg>
           </button>
           <button
-            className="min-h-9 cursor-pointer rounded-full border-0 bg-main-accent px-[18px] text-[13px] font-bold text-white transition hover:brightness-90 disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-full accent-tab bg-main-accent px-4 py-1.5 text-[13px] font-bold text-white transition enabled:hover:bg-main-accent/90 enabled:active:bg-main-accent/75 disabled:cursor-not-allowed disabled:opacity-50"
             disabled={busy || autoSaveStatus === 'saving' || reviewLocked || (!body.trim() && assets.length === 0)}
             onClick={submitForReview}
             type="button"
@@ -1032,9 +1032,9 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
           value={articleDocument}
         />
       ) : (
-        <div className={isTweetModal && type === 'post' ? "flex items-start gap-3 px-3.5 pt-2" : undefined}>
+        <div className={isTweetModal && type === 'post' ? "hover-animation grid w-full grid-cols-[auto,1fr] gap-3 px-4 py-3" : undefined}>
           {isTweetModal && type === 'post' ? (
-            <div className="mt-2 grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-full bg-[#16181c] text-sm font-semibold text-[#e7e9ea]">
+            <div className="blur-picture flex h-12 w-12 shrink-0 items-center justify-center self-start overflow-hidden bg-[#16181c] text-sm font-semibold text-[#e7e9ea]">
               {profile?.avatar
                 ? <img alt="" className="h-full w-full object-cover" src={profile.avatar} />
                 : (profile?.displayName?.trim() || profile?.username || 'L').slice(0, 1).toUpperCase()}
@@ -1050,7 +1050,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
               placeholder={type === 'post' ? '有什么新鲜事？' : '写下你的内容…'}
               rows={type === 'post' ? 5 : 14}
               className={isTweetModal && type === 'post'
-                ? 'block min-h-[42dvh] w-full resize-none rounded-none border-0 bg-black px-0 py-2 text-xl leading-[1.5] text-[#e7e9ea] outline-none placeholder:text-[#71767b] focus:border-0 focus:ring-0 sm:min-h-[320px]'
+                ? 'block min-h-[42dvh] w-full min-w-0 resize-none bg-transparent px-0 py-2 text-xl leading-[1.5] text-[#e7e9ea] outline-none placeholder:text-[#71767b] focus:border-0 focus:ring-0 sm:min-h-[320px]'
                 : isXWorkspace
                   ? 'block min-h-32 w-full resize-y rounded-md border border-light-border bg-main-background px-3 py-3 text-base leading-6 text-light-primary outline-none placeholder:text-light-secondary focus:border-main-accent focus:ring-1 focus:ring-main-accent/30 dark:border-dark-border dark:text-dark-primary'
                   : undefined}
@@ -1549,10 +1549,10 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
       <div className={isTweetModal ? "sticky bottom-0 z-10 flex min-h-[52px] shrink-0 items-center justify-between gap-3 bg-black px-3 pb-[max(env(safe-area-inset-bottom),0.5rem)] pt-2 sm:px-3.5" : isXWorkspace ? "flex flex-wrap items-center justify-end gap-2 border-t border-light-border px-4 py-3 dark:border-dark-border" : "lr-actions"}>
         {isTweetModal ? (
           <>
-            <div className="flex items-center gap-2">
+            <div className="flex text-main-accent xs:[&>button:nth-child(n+6)]:hidden md:[&>button]:!block [&>button:nth-child(n+4)]:hidden">
               <button
                 aria-label="添加图片或视频"
-                className="grid h-9 w-9 place-items-center rounded-full border-0 bg-transparent text-main-accent hover:bg-main-accent/10 disabled:cursor-not-allowed disabled:opacity-40"
+                className="custom-button accent-tab accent-bg-tab group relative rounded-full p-2 text-main-accent hover:bg-main-accent/10 active:bg-main-accent/20"
                 disabled={busy || reviewLocked || pollEnabled}
                 onClick={() => modalMediaInputRef.current?.click()}
                 title="图片或视频"
@@ -1567,7 +1567,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
               <button
                 aria-label={pollEnabled ? "移除投票" : "添加投票"}
                 aria-pressed={pollEnabled}
-                className={pollEnabled ? "grid h-9 w-9 place-items-center rounded-full border-0 bg-main-accent/10 text-main-accent hover:bg-main-accent/10 disabled:cursor-not-allowed disabled:opacity-40" : "grid h-9 w-9 place-items-center rounded-full border-0 bg-transparent text-main-accent hover:bg-main-accent/10 disabled:cursor-not-allowed disabled:opacity-40"}
+                className={pollEnabled ? "custom-button accent-tab accent-bg-tab group relative rounded-full bg-main-accent/10 p-2 text-main-accent hover:bg-main-accent/10 active:bg-main-accent/20" : "custom-button accent-tab accent-bg-tab group relative rounded-full p-2 text-main-accent hover:bg-main-accent/10 active:bg-main-accent/20"}
                 disabled={busy || reviewLocked || assets.length > 0}
                 onClick={() => {
                   setPollEnabled((enabled) => !enabled)
@@ -1582,20 +1582,20 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
                   <path d="M8 16v-5M13 16V7M18 16v-8" />
                 </svg>
               </button>
-              <button aria-label="GIF（暂不可用）" className="grid h-9 w-9 cursor-not-allowed place-items-center rounded-full text-main-accent opacity-40" disabled title="GIF 暂不可用" type="button">
+              <button aria-label="GIF（暂不可用）" className="custom-button accent-tab accent-bg-tab group relative rounded-full p-2 text-main-accent" disabled title="GIF 暂不可用" type="button">
                 <span className="rounded border border-current px-1 text-[9px] font-extrabold">GIF</span>
               </button>
-              <button aria-label="表情（暂不可用）" className="grid h-9 w-9 cursor-not-allowed place-items-center rounded-full text-main-accent opacity-40" disabled title="表情功能暂不可用" type="button">
+              <button aria-label="表情（暂不可用）" className="custom-button accent-tab accent-bg-tab group relative rounded-full p-2 text-main-accent" disabled title="表情功能暂不可用" type="button">
                 <svg aria-hidden="true" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
                   <circle cx="12" cy="12" r="9" /><path d="M8 14s1.5 2 4 2 4-2 4-2M9 9h.01M15 9h.01" />
                 </svg>
               </button>
-              <button aria-label="定时发布（暂不可用）" className="grid h-9 w-9 cursor-not-allowed place-items-center rounded-full text-main-accent opacity-40" disabled title="定时发布暂不可用" type="button">
+              <button aria-label="定时发布（暂不可用）" className="custom-button accent-tab accent-bg-tab group relative rounded-full p-2 text-main-accent" disabled title="定时发布暂不可用" type="button">
                 <svg aria-hidden="true" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                   <circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" />
                 </svg>
               </button>
-              <button aria-label="位置（暂不可用）" className="grid h-9 w-9 cursor-not-allowed place-items-center rounded-full text-main-accent opacity-40" disabled title="位置功能暂不可用" type="button">
+              <button aria-label="位置（暂不可用）" className="custom-button accent-tab accent-bg-tab group relative rounded-full p-2 text-main-accent" disabled title="位置功能暂不可用" type="button">
                 <svg aria-hidden="true" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M20 10c0 5-8 12-8 12S4 15 4 10a8 8 0 1 1 16 0Z" /><circle cx="12" cy="10" r="2.5" />
                 </svg>
