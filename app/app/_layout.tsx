@@ -29,9 +29,7 @@ export default function RootLayout() {
   useEffect(() => {
     if (!navigationState?.key || !isLoaded || status === 'loading') return;
     const isLoginRoute = segments[0] === 'login';
-    if (status !== 'authenticated' && !isLoginRoute) {
-      router.replace('/login' as never);
-    } else if (status === 'authenticated' && isLoginRoute) {
+    if (status === 'authenticated' && isLoginRoute) {
       router.replace('/' as never);
     }
   }, [isLoaded, navigationState?.key, router, segments, status]);
