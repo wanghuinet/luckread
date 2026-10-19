@@ -116,6 +116,9 @@ const resolveCoverRef = (
 }
 
 type ReplyAudience = 'everyone' | 'verified' | 'following' | 'mentioned' | 'followingNetwork'
+type ReplyAudienceApiResponse = { data?: { replyAudience?: unknown }; error?: { message?: string } }
+const isReplyAudience = (value: unknown): value is ReplyAudience =>
+  value === 'everyone' || value === 'verified' || value === 'following' || value === 'mentioned' || value === 'followingNetwork'
 
 type CurrentProfile = {
   id: string
@@ -225,6 +228,17 @@ export default function PublishComposer({
           throw new Error(getApiErrorMessage(data, 'DRAFT_RECOVERY_FAILED'))
         }
         const recovered = data as ContentResponse
+        let recoveredReplyAudience: ReplyAudience = 'everyone'
+        if ((recovered.contentType ?? 'article') === 'post') {
+          const policy = await authorizedFetch<ReplyAudienceApiResponse>(
+            '/api/v1/contents/' + encodeURIComponent(recovered.id) + '/reply-audience',
+            { method: 'GET', signal: controller.signal, headers: { accept: 'application/json' } },
+          )
+          if (!policy.response.ok || !isReplyAudience(policy.data?.data?.replyAudience)) {
+            throw new Error(getApiErrorMessage(policy.data, 'REPLY_AUDIENCE_RECOVERY_FAILED'))
+          }
+          recoveredReplyAudience = policy.data.data.replyAudience
+        }
         let recoveredBody = ''
         if (recovered.bodyRef) {
           const bodyResponse = await fetch(recovered.bodyRef, {
@@ -252,6 +266,7 @@ export default function PublishComposer({
         latestDraftRef.current = recovered
         setDraft(recovered)
         setType(recovered.contentType ?? 'article')
+        setReplyAudience(recoveredReplyAudience)
         setTitle(recovered.title ?? '')
         if ((recovered.contentType ?? 'article') === 'article') {
           const recoveredDocument = articleDocumentFromBody(recoveredBody)
@@ -431,6 +446,24 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
   function assertPollConfigurationValid() {
     if (pollEnabled && !readValidPollOptions()) {
       throw new Error('投票需要填写 2–4 个不重复的选项，每项最多 50 个字符。')
+    }
+  }
+
+  async function syncDraftReplyAudience(contentId: string) {
+    if (type !== 'post') return
+    const { response, data } = await authorizedFetch<ReplyAudienceApiResponse>(
+      '/api/v1/contents/' + encodeURIComponent(contentId) + '/reply-audience',
+      {
+        method: 'PUT',
+        headers: {
+          'content-type': 'application/json',
+          'Idempotency-Key': 'reply-audience:' + contentId + ':' + crypto.randomUUID(),
+        },
+        body: JSON.stringify({ replyAudience, text: body }),
+      },
+    )
+    if (!response.ok || !isReplyAudience(data?.data?.replyAudience)) {
+      throw new Error(getApiErrorMessage(data, '回复权限保存失败，请稍后重试。'))
     }
   }
 
@@ -629,6 +662,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
         try {
           const autoSavedDraft = await persistDraft()
           await syncDraftPoll(autoSavedDraft.id, false)
+          await syncDraftReplyAudience(autoSavedDraft.id)
           autoSaveLastSavedAtRef.current = Date.now()
           if (changeToken === autoSaveChangeTokenRef.current) {
             autoSaveDirtyRef.current = false
@@ -672,7 +706,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
         autoSaveTimerRef.current = null
       }
     }
-  }, [title, body, type, assets, coverRef, busy, articleDocument, pollEnabled, pollOptions, pollDurationHours])
+  }, [title, body, type, assets, coverRef, busy, articleDocument, pollEnabled, pollOptions, pollDurationHours, replyAudience])
 
   function startNewContent() {
     latestDraftRef.current = null
@@ -684,6 +718,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
     setBody('')
     setAssets([])
     setCoverRef('')
+    setReplyAudience('everyone')
     pollConfiguredRef.current = false
     setPollEnabled(false)
     setPollOptions(['', ''])
@@ -737,6 +772,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
 
     const savedDraft = await persistDraft()
     await syncDraftPoll(savedDraft.id)
+    await syncDraftReplyAudience(savedDraft.id)
     autoSaveDirtyRef.current = false
     autoSaveLastSavedAtRef.current = Date.now()
     setAutoSaveStatus('saved')
@@ -803,6 +839,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
       const savedChangeToken = autoSaveChangeTokenRef.current
       const savedDraft = await persistDraft()
       await syncDraftPoll(savedDraft.id)
+      await syncDraftReplyAudience(savedDraft.id)
       if (savedChangeToken === autoSaveChangeTokenRef.current) {
         autoSaveDirtyRef.current = false
         autoSaveLastSavedAtRef.current = Date.now()
@@ -1668,6 +1705,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
                 key={option.value}
                 onClick={() => {
                   setReplyAudience(option.value)
+                  markDirty()
                   setReplyAudienceOpen(false)
                 }}
                 type="button"
