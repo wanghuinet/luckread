@@ -43,6 +43,7 @@ const copy = (locale: PublicLocale) => ({
   mentionsTab: locale === 'en' ? 'Mentions' : locale === 'tw' ? '提及' : '提及',
   allCaughtUp: locale === 'en' ? "You're all caught up" : locale === 'tw' ? '目前沒有新通知' : '暂时没有新通知',
   empty: locale === 'en' ? 'When someone follows, likes, replies to, or mentions you, it will show up here.' : locale === 'tw' ? '有人追蹤、按讚、回覆或提及你時，通知會顯示在這裡。' : '当有人关注、点赞、回复或提及你时，通知会显示在这里。',
+  emptyMentions: locale === 'en' ? 'When someone mentions you, it will show up here.' : locale === 'tw' ? '有人提及你時，通知會顯示在這裡。' : '有人提及你时，通知会显示在这里。',
   readAll: locale === 'en' ? 'Mark all as read' : locale === 'tw' ? '全部標記為已讀' : '全部标记为已读',
   markRead: locale === 'en' ? 'Mark as read' : locale === 'tw' ? '標記為已讀' : '标记为已读',
   loading: locale === 'en' ? 'Loading notifications…' : locale === 'tw' ? '正在載入通知…' : '正在加载通知…',
@@ -310,7 +311,7 @@ export default function NotificationsPage() {
           <div className="flex flex-col items-center gap-2 px-6 py-16 text-center">
             <div className="grid h-14 w-14 place-items-center rounded-full bg-main-sidebar-background text-main-accent"><svg aria-hidden="true" className="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path strokeLinecap="round" strokeLinejoin="round" d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" /></svg></div>
             <h2 className="text-xl font-bold">{labels.allCaughtUp}</h2>
-            <p className="max-w-sm text-sm text-light-secondary dark:text-dark-secondary">{labels.empty}</p>
+            <p className="max-w-sm text-sm text-light-secondary dark:text-dark-secondary">{filter === 'mentions' ? labels.emptyMentions : labels.empty}</p>
             <Link className="mt-2 rounded-full bg-main-accent px-5 py-2 font-bold text-white" href="/home">{labels.backHome}</Link>
           </div>
         ) : null}
