@@ -49,6 +49,14 @@ test('keeps the public profile and timeline inside the responsive X-style center
   await page.setViewportSize({ width: 390, height: 900 })
   await page.goto('http://127.0.0.1:3000/wanghui')
   await expect(page.locator('#creator-profile-title')).toBeVisible()
+  const xShellStyles = await page.evaluate(() => ({
+    rootClass: document.documentElement.className,
+    bodyFontFamily: getComputedStyle(document.body).fontFamily,
+    bodyBackgroundImage: getComputedStyle(document.body).backgroundImage,
+  }))
+  expect(xShellStyles.rootClass.split(/\\s+/)).toContain('dark')
+  expect(xShellStyles.bodyFontFamily).toContain('TwitterChirp')
+  expect(xShellStyles.bodyBackgroundImage).toBe('none')
   await expect(page.getByTestId('luckread-social-post-card')).toBeVisible()
   await expect(page.getByTestId('luckread-social-post-card')).toHaveClass(/border-b/)
   await expect(page.getByTestId('luckread-social-post-card')).not.toHaveClass(/content-feed-card/)
