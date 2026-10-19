@@ -29,7 +29,6 @@ on:
       - 'workers/W01-payload/src/app/(frontend)/content/[contentId]/ContentLikesModal.tsx'
       - 'workers/W01-payload/src/app/(frontend)/content/[contentId]/ContentDetailClient.tsx'
       - 'workers/W01-payload/tests/int/social-likers-v1-adapter.int.spec.ts'
-      - 'workers/W01-payload/tests/e2e/content-likes-modal.spec.ts'
       - 'workers/W01-payload/src/app/api/v1/users/[userId]/likes/**'
       - 'workers/W01-payload/tests/int/social-profile-channels-v1-adapter.int.spec.ts'
       - 'workers/W01-payload/vitest.w05-social-profile-channels.config.mts'
@@ -92,7 +91,6 @@ on:
       - 'workers/W01-payload/src/app/(frontend)/content/[contentId]/ContentLikesModal.tsx'
       - 'workers/W01-payload/src/app/(frontend)/content/[contentId]/ContentDetailClient.tsx'
       - 'workers/W01-payload/tests/int/social-likers-v1-adapter.int.spec.ts'
-      - 'workers/W01-payload/tests/e2e/content-likes-modal.spec.ts'
       - 'workers/W01-payload/src/app/api/v1/users/[userId]/likes/**'
       - 'workers/W01-payload/tests/int/social-profile-channels-v1-adapter.int.spec.ts'
       - 'workers/W01-payload/vitest.w05-social-profile-channels.config.mts'
@@ -139,7 +137,7 @@ jobs:
 
       - name: Run W05 Social and W01 adapter tests
         working-directory: workers/W01-payload
-        run: pnpm exec vitest run --config ./vitest.config.mts ../../workers/W05-social/src/follow-runtime.test.ts ../../workers/W05-social/src/following-feed.test.ts ../../workers/W05-social/src/like-runtime.test.ts ../../workers/W05-social/src/like-list-runtime.test.ts ../../workers/W05-social/src/comment-runtime.test.ts ../../workers/W05-social/src/favorite-runtime.test.ts ../../workers/W05-social/src/share-runtime.test.ts ../../workers/W05-social/src/repost-runtime.test.ts ../../workers/W05-social/src/profile-pin-runtime.test.ts ../../workers/W05-social/src/block-policy.test.ts ../../workers/W05-social/src/relationship-graph-runtime.test.ts ../../workers/W05-social/src/block-mute-runtime.test.ts ../../workers/W05-social/src/index.test.ts ../../workers/W05-social/src/d1-traffic-guard.test.ts tests/int/social-followers-v1-adapter.int.spec.ts tests/int/social-profile-channels-v1-adapter.int.spec.ts tests/int/social-follow-mutation-v1-adapter.int.spec.ts tests/int/social-likes-v1-adapter.int.spec.ts tests/int/social-likers-v1-adapter.int.spec.ts tests/int/social-comments-v1-adapter.int.spec.ts tests/int/social-reply-audience-v1-adapter.int.spec.ts tests/int/social-comment-likes-v1-adapter.int.spec.ts tests/int/social-bookmarks-v1-adapter.int.spec.ts tests/int/social-shares-v1-adapter.int.spec.ts tests/int/social-shares-landing.int.spec.ts tests/int/social-block-mute-v1-adapter.int.spec.ts tests/int/social-reposts-v1-adapter.int.spec.ts tests/int/social-profile-pins-v1-adapter.int.spec.ts tests/int/w05-social-response-forwarding.int.spec.ts tests/int/content-detail.int.spec.ts tests/int/content-detail-comments.int.spec.ts
+        run: pnpm exec vitest run --config ./vitest.config.mts ../../workers/W05-social/src/follow-runtime.test.ts ../../workers/W05-social/src/following-feed.test.ts ../../workers/W05-social/src/like-runtime.test.ts ../../workers/W05-social/src/like-list-runtime.test.ts ../../workers/W05-social/src/comment-runtime.test.ts ../../workers/W05-social/src/favorite-runtime.test.ts ../../workers/W05-social/src/share-runtime.test.ts ../../workers/W05-social/src/repost-runtime.test.ts ../../workers/W05-social/src/profile-pin-runtime.test.ts ../../workers/W05-social/src/block-policy.test.ts ../../workers/W05-social/src/relationship-graph-runtime.test.ts ../../workers/W05-social/src/block-mute-runtime.test.ts ../../workers/W05-social/src/index.test.ts ../../workers/W05-social/src/d1-traffic-guard.test.ts tests/int/social-followers-v1-adapter.int.spec.ts tests/int/social-profile-channels-v1-adapter.int.spec.ts tests/int/social-follow-mutation-v1-adapter.int.spec.ts tests/int/social-likes-v1-adapter.int.spec.ts tests/int/social-likers-v1-adapter.int.spec.ts tests/int/social-comments-v1-adapter.int.spec.ts tests/int/social-reply-audience-v1-adapter.int.spec.ts tests/int/social-comment-likes-v1-adapter.int.spec.ts tests/int/social-bookmarks-v1-adapter.int.spec.ts tests/int/social-shares-v1-adapter.int.spec.ts tests/int/social-shares-landing.int.spec.ts tests/int/social-block-mute-v1-adapter.int.spec.ts tests/int/social-reposts-v1-adapter.int.spec.ts tests/int/social-profile-pins-v1-adapter.int.spec.ts tests/int/w05-social-response-forwarding.int.spec.ts tests/int/content-detail.int.spec.ts tests/int/content-detail-comments.int.spec.ts tests/int/content-likes-modal.int.spec.ts
 
       - name: Run W05 reply audience runtime and comment tests
         working-directory: workers/W01-payload
