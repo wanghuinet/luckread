@@ -53,6 +53,9 @@ export default function ContentComments({
   const [editBody, setEditBody] = useState('')
   const [savingEdit, setSavingEdit] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [reportingCommentId, setReportingCommentId] = useState<string | null>(null)
+  const [reportReasonCode, setReportReasonCode] = useState('ABUSE')
+  const [reportBusy, setReportBusy] = useState(false)
   const commentsRequestRef = useRef<AbortController | null>(null)
   const commentsRequestIdRef = useRef(0)
 
@@ -242,6 +245,61 @@ export default function ContentComments({
     }
   }
 
+  function openCommentReport(comment: CommentItem) {
+    if (comment.authorUserId === viewerUserId) return
+    if (!viewerUserId) {
+      const returnTo = window.location.pathname + window.location.search + window.location.hash
+      window.location.assign('/login?returnTo=' + encodeURIComponent(returnTo))
+      return
+    }
+    setMessage('')
+    setReportReasonCode('ABUSE')
+    setReportingCommentId(comment.id)
+  }
+
+  async function submitCommentReport() {
+    const commentId = reportingCommentId
+    if (!commentId || reportBusy || !reportReasonCode.trim()) return
+    if (!viewerUserId) {
+      const returnTo = window.location.pathname + window.location.search + window.location.hash
+      window.location.assign('/login?returnTo=' + encodeURIComponent(returnTo))
+      return
+    }
+
+    setReportBusy(true)
+    setMessage('')
+    try {
+      const { response, data } = await fetchJson<{ data?: { status?: string }; error?: { message?: string } }>('/api/v1/reports', {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          accept: 'application/json',
+          'content-type': 'application/json',
+          'Idempotency-Key': 'report:comment:' + commentId + ':' + crypto.randomUUID(),
+        },
+        body: JSON.stringify({ targetType: 'comment', targetId: commentId, reasonCode: reportReasonCode }),
+      })
+      if (response.status === 401) {
+        const returnTo = window.location.pathname + window.location.search + window.location.hash
+        window.location.assign('/login?returnTo=' + encodeURIComponent(returnTo))
+        return
+      }
+      if (!response.ok || !data?.data) {
+        throw new Error(getApiErrorMessage(data, locale === 'en' ? 'Report failed.' : locale === 'tw' ? '檢舉失敗，請稍後再試。' : '举报失败，请稍后重试。'))
+      }
+      setReportingCommentId(null)
+      setMessage(data.data.status === 'DEDUPLICATED'
+        ? (locale === 'en' ? 'You have already reported this comment.' : locale === 'tw' ? '你先前已檢舉過此留言。' : '你此前已举报过这条评论。')
+        : (locale === 'en' ? 'Comment report submitted.' : locale === 'tw' ? '留言檢舉已提交。' : '评论举报已提交。'))
+    } catch (error) {
+      setMessage(error instanceof Error
+        ? error.message
+        : (locale === 'en' ? 'Report failed.' : locale === 'tw' ? '檢舉失敗，請稍後再試。' : '举报失败，请稍后重试。'))
+    } finally {
+      setReportBusy(false)
+    }
+  }
+
   async function submitComment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!body.trim() || submitting) return
@@ -313,7 +371,7 @@ export default function ContentComments({
         <p className="content-comment-message" role="status">{copy.comments.restricted}</p>
       )}
 
-      {message ? <p className="content-comment-message" role="status">{message}</p> : null}
+      {message && !reportingCommentId ? <p className="content-comment-message" role="status">{message}</p> : null}
 
       {loading ? (
         <p className="content-comment-state" role="status">{copy.comments.loading}</p>
@@ -395,6 +453,16 @@ export default function ContentComments({
                       {copy.comments.edit}
                     </button>
                   ) : null}
+                  {comment.authorUserId !== viewerUserId ? (
+                    <button
+                      className="content-comment-reply"
+                      disabled={reportBusy}
+                      onClick={() => openCommentReport(comment)}
+                      type="button"
+                    >
+                      {locale === 'en' ? 'Report' : locale === 'tw' ? '檢舉' : '举报'}
+                    </button>
+                  ) : null}
                   {comment.authorUserId === viewerUserId ? (
                     <button
                       className="content-comment-reply"
@@ -434,6 +502,86 @@ export default function ContentComments({
         >
           {loadingMore ? copy.content.loading : copy.comments.more}
         </button>
+      ) : null}
+
+      {reportingCommentId ? (
+        <div
+          className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 px-4 py-8"
+          onClick={(event) => {
+            if (event.target === event.currentTarget && !reportBusy) setReportingCommentId(null)
+          }}
+          onKeyDown={(event) => {
+            if (event.key === 'Escape' && !reportBusy) setReportingCommentId(null)
+          }}
+        >
+          <section
+            aria-labelledby="comment-report-title"
+            aria-modal="true"
+            autoFocus
+            className="w-full max-w-md rounded-2xl border border-light-border bg-main-background p-5 text-light-primary shadow-xl dark:border-dark-border dark:text-dark-primary"
+            role="dialog"
+            tabIndex={-1}
+          >
+            <h2 className="text-lg font-bold" id="comment-report-title">
+              {locale === 'en' ? 'Report comment' : locale === 'tw' ? '檢舉留言' : '举报评论'}
+            </h2>
+            <p className="mt-2 text-sm text-light-secondary dark:text-dark-secondary">
+              {locale === 'en' ? 'Choose the reason that best describes this comment.' : locale === 'tw' ? '請選擇最符合此留言情況的檢舉原因。' : '请选择最符合这条评论情况的举报原因。'}
+            </p>
+            {comments.find((comment) => comment.id === reportingCommentId) ? (
+              <blockquote className="mt-3 line-clamp-3 rounded-xl bg-main-sidebar-background px-3 py-2 text-sm">
+                {comments.find((comment) => comment.id === reportingCommentId)?.body}
+              </blockquote>
+            ) : null}
+            <fieldset className="mt-4 flex flex-col gap-2">
+              <legend className="sr-only">
+                {locale === 'en' ? 'Report reason' : locale === 'tw' ? '檢舉原因' : '举报原因'}
+              </legend>
+              {[
+                { value: 'SPAM', label: locale === 'en' ? 'Spam or unwanted promotion' : locale === 'tw' ? '垃圾訊息或廣告' : '垃圾信息或广告' },
+                { value: 'ABUSE', label: locale === 'en' ? 'Abuse or harassment' : locale === 'tw' ? '騷擾或辱罵' : '骚扰或辱骂' },
+                { value: 'IMPERSONATION', label: locale === 'en' ? 'Impersonation' : locale === 'tw' ? '冒充他人' : '冒充他人' },
+                { value: 'COPYRIGHT', label: locale === 'en' ? 'Copyright infringement' : locale === 'tw' ? '侵犯版權' : '侵犯版权' },
+                { value: 'OTHER', label: locale === 'en' ? 'Other' : locale === 'tw' ? '其他原因' : '其他原因' },
+              ].map((reason) => (
+                <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-xl px-3 hover:bg-light-primary/10 dark:hover:bg-dark-primary/10" key={reason.value}>
+                  <input
+                    checked={reportReasonCode === reason.value}
+                    className="h-4 w-4 accent-main-accent"
+                    name="comment-report-reason"
+                    onChange={() => setReportReasonCode(reason.value)}
+                    type="radio"
+                    value={reason.value}
+                  />
+                  <span className="text-sm">{reason.label}</span>
+                </label>
+              ))}
+            </fieldset>
+            {message ? (
+              <p className="mt-3 text-sm text-light-secondary dark:text-dark-secondary" role="status">{message}</p>
+            ) : null}
+            <div className="mt-5 flex justify-end gap-3">
+              <button
+                className="content-comment-reply"
+                disabled={reportBusy}
+                onClick={() => setReportingCommentId(null)}
+                type="button"
+              >
+                {locale === 'en' ? 'Cancel' : locale === 'tw' ? '取消' : '取消'}
+              </button>
+              <button
+                className="rounded-full bg-main-accent px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
+                disabled={reportBusy || !reportReasonCode}
+                onClick={() => void submitCommentReport()}
+                type="button"
+              >
+                {reportBusy
+                  ? (locale === 'en' ? 'Submitting…' : locale === 'tw' ? '提交中…' : '提交中…')
+                  : (locale === 'en' ? 'Submit report' : locale === 'tw' ? '提交檢舉' : '提交举报')}
+              </button>
+            </div>
+          </section>
+        </div>
       ) : null}
     </section>
   )
