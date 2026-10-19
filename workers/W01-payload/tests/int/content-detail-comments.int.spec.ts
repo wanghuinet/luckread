@@ -35,6 +35,17 @@ describe('content comments UI', () => {
     expect(component).toContain('likedComments[comment.id]')
   })
 
+  it('hydrates each comment like button from the list response without per-comment status requests', () => {
+    const component = read('src/app/(frontend)/content/[contentId]/ContentComments.tsx')
+
+    expect(component).toContain('likedByViewer?: boolean')
+    expect(component).toContain('const pageLikeState = Object.fromEntries(')
+    expect(component).toContain('page.items.map((item) => [item.id, item.likedByViewer === true])')
+    expect(component).toContain('setLikedComments((current) => nextCursor ? { ...current, ...pageLikeState } : pageLikeState)')
+    expect(component).toContain('likedComments[comment.id]')
+    expect(component).not.toContain('Promise.all(page.items.map')
+  })
+
   it('reports another user\'s comment through the canonical W01 report API with an accessible reason dialog', () => {
     const comments = read('src/app/(frontend)/content/[contentId]/ContentComments.tsx')
 
