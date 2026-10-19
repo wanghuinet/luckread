@@ -12,7 +12,6 @@ import { Tabs, MaterialTabBar } from 'react-native-collapsible-tab-view';
 import { BlurView } from 'expo-blur';
 
 import { FeedContent, FeedItem } from '~/components/FeedItem';
-import { StyledExpoImage } from '~/components/Image';
 import X from '~/assets/svg/aside/x.svg';
 import { apiRequest, getApiErrorMessage } from '~/lib/api-client';
 import { useAuthStore } from '~/store/auth-store';
