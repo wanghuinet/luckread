@@ -1,5 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
+import { replyAudienceAllowedParams, replyAudienceAllowedSql } from './reply-audience-runtime.js'
+
 export class CommentRuntimeError extends Error {
   constructor(readonly code: string, readonly status: number) { super(code) }
 }
@@ -144,6 +146,7 @@ export async function createComment(
   actorUserId: string,
   contentIdValue: string,
   input: CommentCreateInput,
+  actorVerified = false,
 ): Promise<CommentItem> {
   const actor = validateId(actorUserId, 'UNAUTHENTICATED')
   const contentId = validateId(contentIdValue)
@@ -186,7 +189,12 @@ export async function createComment(
              OR
              (block.actor_user_id = (SELECT author_user_id FROM social_comments WHERE id = ? LIMIT 1) AND block.target_user_id = ?)
            )
-       ) AS blocked
+       ) AS blocked,
+       (
+         SELECT CASE WHEN ${replyAudienceAllowedSql} THEN 1 ELSE 0 END
+           FROM contents content
+          WHERE content.id = ?
+       ) AS reply_audience_allowed
      FROM (SELECT 1) seed
      LEFT JOIN existing_comment ec ON 1 = 1`,
   ).bind(
@@ -207,6 +215,8 @@ export async function createComment(
     parentId,
     parentId,
     actor,
+    ...replyAudienceAllowedParams(actor, actorVerified),
+    contentId,
   ).first<{
     existing_id: string | null
     existing_content_id: string | null
@@ -225,6 +235,7 @@ export async function createComment(
     parent_depth: number | null
     recent_count: number
     blocked: number
+    reply_audience_allowed: number
   }>();
 
   if (validation?.existing_id) {
@@ -254,6 +265,10 @@ export async function createComment(
 
   if (Number(validation.blocked) === 1) {
     throw new CommentRuntimeError('CONFLICT', 409)
+  }
+
+  if (Number(validation.reply_audience_allowed ?? 1) !== 1) {
+    throw new CommentRuntimeError('PERMISSION_DENIED', 403)
   }
 
   if (Number(validation.recent_count) >= 10) {
@@ -311,6 +326,7 @@ export async function createComment(
                ) AND block.target_user_id = ?)
              )
         )
+        AND ${replyAudienceAllowedSql}
      ON CONFLICT(author_user_id, idempotency_key)
      DO UPDATE SET id = social_comments.id
      RETURNING id, content_id, author_user_id, parent_id, body, state, depth, created_at, updated_at`,
@@ -333,6 +349,7 @@ export async function createComment(
     parentId,
     parentId,
     actor,
+    ...replyAudienceAllowedParams(actor, actorVerified),
   ).first<{
     id: string
     content_id: string
