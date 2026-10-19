@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
 import { fetchJson, getApiErrorMessage } from '../../../../lib/client-api.js'
@@ -91,6 +92,8 @@ export default function NotificationPreferencesPage() {
     login: '登录',
     back: '账户设置',
   }
+  const loadError = copy.loadError
+  const loginMessage = copy.loginMessage
   const [preferences, setPreferences] = useState<NotificationPreferences | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -113,12 +116,12 @@ export default function NotificationPreferencesPage() {
         })
         if (response.status === 401) {
           const returnTo = window.location.pathname + window.location.search + window.location.hash
-          setError(copy.loginMessage)
+          setError(loginMessage)
           router.replace('/login?returnTo=' + encodeURIComponent(returnTo))
           return
         }
         if (!response.ok || !data?.data || preferenceKeys.some((key) => typeof data.data?.[key] !== 'boolean')) {
-          throw new Error(getApiErrorMessage(data, copy.loadError))
+          throw new Error(getApiErrorMessage(data, loadError))
         }
         if (cancelled) return
         setPreferences({
@@ -129,7 +132,7 @@ export default function NotificationPreferencesPage() {
         })
       } catch (cause) {
         if (cancelled) return
-        setError(cause instanceof Error ? cause.message : copy.loadError)
+        setError(cause instanceof Error ? cause.message : loadError)
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -137,7 +140,7 @@ export default function NotificationPreferencesPage() {
 
     void loadPreferences()
     return () => { cancelled = true }
-  }, [router, reloadVersion, copy.loadError, copy.loginMessage])
+  }, [router, reloadVersion, loadError, loginMessage])
 
   async function savePreferences() {
     if (!preferences || saving) return
@@ -190,7 +193,7 @@ export default function NotificationPreferencesPage() {
         <header className="border-b border-light-border px-4 py-4 dark:border-dark-border">
           <p className="text-xs font-bold uppercase tracking-widest text-main-accent">{copy.eyebrow}</p>
           <p className="mt-2 text-sm leading-6 text-light-secondary dark:text-dark-secondary">{copy.description}</p>
-          <a className="main-tab mt-3 inline-flex rounded-md py-1 text-sm" href="/me/profile">{copy.back}</a>
+          <Link className="main-tab mt-3 inline-flex rounded-md py-1 text-sm" href="/me/profile">{copy.back}</Link>
         </header>
 
         {loading ? <p className="px-4 py-5 text-sm text-light-secondary dark:text-dark-secondary" role="status">{copy.loading}</p> : null}
@@ -202,7 +205,7 @@ export default function NotificationPreferencesPage() {
               {copy.retry}
             </button>
             {error === copy.loginMessage ? (
-              <a className="rounded-full bg-main-accent px-5 py-2 text-sm font-bold text-white" href={'/login?returnTo=' + encodeURIComponent('/me/notification-preferences')}>{copy.login}</a>
+              <Link className="rounded-full bg-main-accent px-5 py-2 text-sm font-bold text-white" href={'/login?returnTo=' + encodeURIComponent('/me/notification-preferences')}>{copy.login}</Link>
             ) : null}
           </div>
         ) : null}
