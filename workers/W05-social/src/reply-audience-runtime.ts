@@ -157,6 +157,8 @@ export async function getContentReplyAudience(
  * re-evaluates it to close races with follow/block/policy changes.
  */
 export const replyAudienceAllowedSql = `(
+  ? = content.owner_user_id
+  OR
   COALESCE((SELECT policy.audience FROM social_content_reply_policies policy WHERE policy.content_id = content.id), 'everyone') = 'everyone'
   OR (
     COALESCE((SELECT policy.audience FROM social_content_reply_policies policy WHERE policy.content_id = content.id), 'everyone') = 'verified'
@@ -200,6 +202,7 @@ export const replyAudienceAllowedSql = `(
 )`
 
 export const replyAudienceAllowedParams = (actorUserId: string, actorVerified: boolean): unknown[] => [
+  actorUserId,
   actorVerified ? 1 : 0,
   actorUserId,
   actorUserId,
