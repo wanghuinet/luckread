@@ -5,6 +5,20 @@ import { resolve } from 'node:path'
 const read = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8')
 
 describe('Twitter Clone follow-list UI reuse with LuckRead social authority', () => {
+  it('uses an accessible reason selector instead of a browser prompt for profile reports', () => {
+    const profile = read("src/app/(frontend)/users/[userId]/page.tsx")
+
+    expect(profile).toContain("const [reportDialogOpen, setReportDialogOpen] = useState(false)")
+    expect(profile).toContain('aria-modal="true"')
+    expect(profile).toContain('role="dialog"')
+    expect(profile).toContain("value: 'ABUSE'")
+    expect(profile).toContain("value: 'SPAM'")
+    expect(profile).toContain("value: 'IMPERSONATION'")
+    expect(profile).toContain("setReportDialogOpen(true)")
+    expect(profile).toContain("body: JSON.stringify({ targetType: 'profile', targetId: profile.id, reasonCode })")
+    expect(profile).not.toContain('window.prompt(')
+  })
+
   it('uses the upstream X utility composition for the shared row', () => {
     const row = read('src/app/(frontend)/users/TwitterCloneFollowRow.tsx')
     const styles = read('src/app/(frontend)/styles.css')
