@@ -35,7 +35,7 @@ jobs:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
         with:
-          node-version: "20.19.5"
+          node-version: "22.13.1"
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: "1.1.38"
@@ -60,7 +60,7 @@ jobs:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
         with:
-          node-version: "20.19.5"
+          node-version: "22.13.1"
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: "1.1.38"
@@ -70,10 +70,16 @@ jobs:
           java-version: "17"
       - name: Configure preinstalled Android SDK and install required components
         run: |
-          echo "ANDROID_HOME=${ANDROID_HOME:-/usr/local/lib/android/sdk}" >> "$GITHUB_ENV"
-          echo "ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}" >> "$GITHUB_ENV"
-          yes | sdkmanager --licenses
-          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0" "cmake;3.22.1" "ndk;26.1.10909125"
+          SDK_ROOT="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          echo "ANDROID_HOME=$SDK_ROOT" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$SDK_ROOT" >> "$GITHUB_ENV"
+          SDKMANAGER="$(find "$SDK_ROOT/cmdline-tools" -type f -name sdkmanager -print -quit)"
+          if [ -z "$SDKMANAGER" ]; then
+            echo "Android SDK command-line tools not found under $SDK_ROOT/cmdline-tools" >&2
+            exit 1
+          fi
+          yes | "$SDKMANAGER" --licenses
+          "$SDKMANAGER" "platform-tools" "platforms;android-35" "build-tools;35.0.0" "cmake;3.22.1" "ndk;26.1.10909125"
       - name: Install Expo app dependencies
         run: bun install
       - name: Generate Android native project
@@ -100,7 +106,7 @@ jobs:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
         with:
-          node-version: "20.19.5"
+          node-version: "22.13.1"
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: "1.1.38"
