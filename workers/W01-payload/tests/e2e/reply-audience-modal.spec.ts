@@ -157,7 +157,9 @@ for (const viewport of [
     await composer.getByRole('textbox', { name: '推文正文' }).fill('Reply audience permission regression test')
     await composer.getByRole('button', { name: '发帖', exact: true }).click()
 
-    await expect(composer.getByText('动态已发布，已进入公开信息流。')).toBeVisible()
+    const publishedButton = composer.getByRole('button', { name: '已发布', exact: true })
+    await expect(publishedButton).toBeVisible()
+    await expect(publishedButton).toBeDisabled()
     expect(policyWrites.length).toBeGreaterThan(0)
     expect(policyWrites[policyWrites.length - 1]).toMatchObject({
       replyAudience: 'followingNetwork',
