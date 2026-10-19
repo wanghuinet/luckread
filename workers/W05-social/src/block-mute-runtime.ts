@@ -128,3 +128,133 @@ export async function removeRelation(
     'DELETE FROM social_user_interactions WHERE actor_user_id = ? AND target_user_id = ? AND relation_type = ?',
   ).bind(actor, target, relationType).run()
 }
+
+export type BlockMuteListItem = {
+  relationshipId: string
+  targetUserId: string
+  createdAt: string
+}
+
+export type BlockMuteListPage = {
+  items: BlockMuteListItem[]
+  nextCursor: string | null
+  hasMore: boolean
+}
+
+const DEFAULT_RELATION_LIST_LIMIT = 20
+const MAX_RELATION_LIST_LIMIT = 50
+const MAX_RELATION_CURSOR_LENGTH = 2048
+
+type RelationCursorPayload = {
+  version: 1
+  actorUserId: string
+  relationType: BlockMuteType
+  createdAt: string
+  relationshipId: string
+}
+
+const encodeRelationCursor = (payload: RelationCursorPayload): string =>
+  btoa(JSON.stringify(payload)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '')
+
+const decodeRelationCursor = (
+  value: string | null,
+  actorUserId: string,
+  relationType: BlockMuteType,
+): RelationCursorPayload | null => {
+  if (value === null) return null
+  const normalized = value.trim()
+  if (!normalized || normalized.length > MAX_RELATION_CURSOR_LENGTH) {
+    throw new BlockMuteRuntimeError('INVALID_CURSOR', 400)
+  }
+  try {
+    const padded = normalized.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - normalized.length % 4) % 4)
+    const parsed = JSON.parse(atob(padded)) as Partial<RelationCursorPayload>
+    if (
+      parsed.version !== 1 ||
+      parsed.actorUserId !== actorUserId ||
+      parsed.relationType !== relationType ||
+      typeof parsed.createdAt !== 'string' ||
+      !Number.isFinite(Date.parse(parsed.createdAt)) ||
+      typeof parsed.relationshipId !== 'string' ||
+      !/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(parsed.relationshipId)
+    ) {
+      throw new Error('invalid cursor')
+    }
+    return {
+      version: 1,
+      actorUserId,
+      relationType,
+      createdAt: parsed.createdAt,
+      relationshipId: parsed.relationshipId,
+    }
+  } catch {
+    throw new BlockMuteRuntimeError('INVALID_CURSOR', 400)
+  }
+}
+
+export const parseBlockMuteListLimit = (value: string | null): number => {
+  if (value === null || value.trim() === '') return DEFAULT_RELATION_LIST_LIMIT
+  const normalized = value.trim()
+  if (!/^(?:[1-9]|[1-4][0-9]|50)$/.test(normalized)) {
+    throw new BlockMuteRuntimeError('VALIDATION_FAILED', 400)
+  }
+  return Math.min(Number(normalized), MAX_RELATION_LIST_LIMIT)
+}
+
+/**
+ * Lists a viewer's own block or mute relationships from W05's authoritative
+ * D1 table. Cursors are bound to the viewer and relation type to prevent reuse
+ * across principals or between the block and mute lists.
+ */
+export async function listRelations(
+  db: D1Database,
+  actorUserId: string,
+  relationType: BlockMuteType,
+  cursorValue: string | null,
+  limit: number,
+): Promise<BlockMuteListPage> {
+  const actor = validateActor(actorUserId)
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > MAX_RELATION_LIST_LIMIT) {
+    throw new BlockMuteRuntimeError('VALIDATION_FAILED', 400)
+  }
+  const cursor = decodeRelationCursor(cursorValue, actor, relationType)
+  const where = cursor
+    ? `WHERE actor_user_id = ? AND relation_type = ?
+       AND (created_at < ? OR (created_at = ? AND relationship_id < ?))`
+    : 'WHERE actor_user_id = ? AND relation_type = ?'
+  const statement = `SELECT relationship_id, target_user_id, created_at
+    FROM social_user_interactions
+    ${where}
+    ORDER BY created_at DESC, relationship_id DESC
+    LIMIT ?`
+  const parameters = cursor
+    ? [actor, relationType, cursor.createdAt, cursor.createdAt, cursor.relationshipId, limit + 1]
+    : [actor, relationType, limit + 1]
+  const result = await db.prepare(statement).bind(...parameters).all<{
+    relationship_id: string
+    target_user_id: string
+    created_at: string
+  }>()
+  const rows = result.results ?? []
+  const hasMore = rows.length > limit
+  const visibleRows = hasMore ? rows.slice(0, limit) : rows
+  const last = visibleRows.at(-1)
+
+  return {
+    items: visibleRows.map((row) => ({
+      relationshipId: row.relationship_id,
+      targetUserId: row.target_user_id,
+      createdAt: row.created_at,
+    })),
+    hasMore,
+    nextCursor: hasMore && last
+      ? encodeRelationCursor({
+          version: 1,
+          actorUserId: actor,
+          relationType,
+          createdAt: last.created_at,
+          relationshipId: last.relationship_id,
+        })
+      : null,
+  }
+}

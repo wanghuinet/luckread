@@ -361,6 +361,7 @@ paths:
                     $ref: '#/components/schemas/RequestId'
                   traceId:
                     $ref: '#/components/schemas/TraceId'
+        '400': { $ref: '#/components/responses/InvalidCursor' }
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '403': { $ref: '#/components/responses/PermissionDenied' }
         '422': { $ref: '#/components/responses/ClientError' }
@@ -1037,6 +1038,49 @@ paths:
               schema: { $ref: '#/components/schemas/ListResponse' }
         '4XX': { $ref: '#/components/responses/ClientError' }
   /interactions/blocks:
+    get:
+      tags: [Interactions]
+      summary: List the current user's blocked accounts
+      operationId: listBlockedUsers
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: A cursor-paginated, private list of the current user's block relationships.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, requestId]
+                additionalProperties: false
+                properties:
+                  data:
+                    type: object
+                    required: [items, nextCursor, hasMore]
+                    additionalProperties: false
+                    properties:
+                      items:
+                        type: array
+                        maxItems: 50
+                        items:
+                          type: object
+                          required: [relationshipId, targetUserId, createdAt]
+                          additionalProperties: false
+                          properties:
+                            relationshipId: { $ref: '#/components/schemas/ResourceId' }
+                            targetUserId: { $ref: '#/components/schemas/ResourceId' }
+                            createdAt: { type: string, format: date-time }
+                      nextCursor:
+                        anyOf:
+                          - { $ref: '#/components/schemas/Cursor' }
+                          - { type: 'null' }
+                      hasMore: { type: boolean }
+                  requestId: { $ref: '#/components/schemas/RequestId' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/PermissionDenied' }
+        '422': { $ref: '#/components/responses/ClientError' }
+        '429': { $ref: '#/components/responses/RateLimited' }
     post:
       tags: [Interactions]
       summary: Block a user
