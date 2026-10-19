@@ -75,6 +75,8 @@ export default function ShortVideoFeed() {
   const [profileById, setProfileById] = useState<Record<string, Profile>>({})
   const [busyById, setBusyById] = useState<Record<string, string>>({})
   const [message, setMessage] = useState('')
+  const [reportTarget, setReportTarget] = useState<ContentItem | null>(null)
+  const [reportReasonCode, setReportReasonCode] = useState('SPAM')
   const [activeProgress, setActiveProgress] = useState(0)
   const [doubleTapHeartId, setDoubleTapHeartId] = useState<string | null>(null)
   const [mediaErrorById, setMediaErrorById] = useState<Record<string, boolean>>({})
@@ -243,7 +245,7 @@ export default function ShortVideoFeed() {
         return
       }
 
-      if (commentsOpen || !resumeAfterVisibilityRef.current) {
+      if (commentsOpen || reportTarget || !resumeAfterVisibilityRef.current) {
         resumeAfterVisibilityRef.current = false
         return
       }
@@ -254,7 +256,7 @@ export default function ShortVideoFeed() {
 
     document.addEventListener('visibilitychange', handleVisibilityChange)
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
-  }, [commentsOpen, visibleItems])
+  }, [commentsOpen, reportTarget, visibleItems])
 
   useEffect(() => {
     if (!visibleItems.length) return
@@ -267,7 +269,7 @@ export default function ShortVideoFeed() {
         return
       }
       video.muted = muted
-      if (isActive && !commentsOpen && playbackIntentRef.current) {
+      if (isActive && !commentsOpen && !reportTarget && playbackIntentRef.current) {
         void video.play().catch(() => {
           // Autoplay may be blocked until the first user gesture.
         })
@@ -275,7 +277,7 @@ export default function ShortVideoFeed() {
         video.pause()
       }
     })
-  }, [activeIndex, commentsOpen, mediaErrorById, muted, visibleItems])
+  }, [activeIndex, commentsOpen, mediaErrorById, muted, reportTarget, visibleItems])
 
   useEffect(() => {
     const active = visibleItems[activeIndex]
@@ -558,14 +560,17 @@ export default function ShortVideoFeed() {
     }
   }
 
-  const report = async (item: ContentItem) => {
-    if (!viewerUserId || busyById[item.id]) return requireAuth()
-    const reasonCode = window.prompt(
-      locale === 'en' ? 'Report reason' : locale === 'tw' ? '請輸入檢舉原因' : '请输入举报原因',
-      'SPAM',
-    )?.trim()
-    if (!reasonCode) return
+  const openReportDialog = (item: ContentItem) => {
+    if (!viewerUserId) return requireAuth()
+    if (busyById[item.id]) return
+    setMessage('')
+    setReportReasonCode('SPAM')
+    setReportTarget(item)
+  }
 
+  const report = async () => {
+    const item = reportTarget
+    if (!item || !viewerUserId || busyById[item.id] || !reportReasonCode.trim()) return
     updateBusy(item.id, 'report')
     setMessage('')
     try {
@@ -577,11 +582,12 @@ export default function ShortVideoFeed() {
           'content-type': 'application/json',
           'Idempotency-Key': 'short-video-report:' + item.id + ':' + crypto.randomUUID(),
         },
-        body: JSON.stringify({ targetType: 'content', targetId: item.id, reasonCode }),
+        body: JSON.stringify({ targetType: 'content', targetId: item.id, reasonCode: reportReasonCode }),
       })
       if (response.status === 401) return requireAuth()
       if (!response.ok || !data?.data) throw new Error(getApiErrorMessage(data, '举报失败。'))
       setMessage(data.data.status === 'DEDUPLICATED' ? '举报已记录。' : '举报已提交。')
+      setReportTarget(null)
     } catch (cause) {
       setMessage(cause instanceof Error ? cause.message : '举报失败。')
     } finally {
@@ -886,7 +892,7 @@ export default function ShortVideoFeed() {
                     <i className="fa-solid fa-share" aria-hidden="true" />
                     <span>分享</span>
                   </button>
-                  <button className="grid w-[68px] cursor-pointer justify-items-center gap-1 border-0 bg-transparent text-white [text-shadow:0_2px_12px_rgba(0,0,0,.45)] [&_i]:grid [&_i]:h-[49px] [&_i]:w-[49px] [&_i]:place-items-center [&_i]:rounded-full [&_i]:bg-black/30 [&_i]:text-[23px] [&_i]:backdrop-blur-[7px] [&_span]:text-[11px] [&_span]:font-extrabold max-[640px]:w-[62px] max-[640px]:[&_i]:h-11 max-[640px]:[&_i]:w-11 max-[640px]:[&_i]:text-xl" disabled={busy === 'report'} onClick={() => void report(item)} type="button">
+                  <button className="grid w-[68px] cursor-pointer justify-items-center gap-1 border-0 bg-transparent text-white [text-shadow:0_2px_12px_rgba(0,0,0,.45)] [&_i]:grid [&_i]:h-[49px] [&_i]:w-[49px] [&_i]:place-items-center [&_i]:rounded-full [&_i]:bg-black/30 [&_i]:text-[23px] [&_i]:backdrop-blur-[7px] [&_span]:text-[11px] [&_span]:font-extrabold max-[640px]:w-[62px] max-[640px]:[&_i]:h-11 max-[640px]:[&_i]:w-11 max-[640px]:[&_i]:text-xl" disabled={busy === 'report'} onClick={() => openReportDialog(item)} type="button">
                     <i className="fa-solid fa-ellipsis" aria-hidden="true" />
                     <span>更多</span>
                   </button>
@@ -919,7 +925,7 @@ export default function ShortVideoFeed() {
         ) : null}
       </section>
 
-      {message ? (
+      {message && !reportTarget ? (
         <div className="fixed bottom-[88px] left-1/2 z-40 flex max-w-[calc(100%-32px)] -translate-x-1/2 items-center gap-3 rounded-full bg-[#171717] px-3 py-2.5 text-sm text-white shadow-lg [&_button]:border-0 [&_button]:bg-transparent [&_button]:text-lg [&_button]:text-white" role="status">
           {message}
           <button onClick={() => setMessage('')} type="button">×</button>
@@ -933,6 +939,81 @@ export default function ShortVideoFeed() {
         <Link href="/creator-center" className="grid justify-items-center gap-0.5 bg-transparent text-[10px] font-bold text-white/70 no-underline [&_i]:text-[17px]" data-umami-event="creator-center-open"><i className="fa-solid fa-user-pen" aria-hidden="true" /><span>创作</span></Link>
         <Link href="/me/profile" className="grid justify-items-center gap-0.5 bg-transparent text-[10px] font-bold text-white/70 no-underline [&_i]:text-[17px]"><i className="fa-solid fa-user" aria-hidden="true" /><span>我</span></Link>
       </nav>
+
+      {reportTarget ? (
+        <div
+          className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 px-4 py-8"
+          onClick={(event) => {
+            if (event.target === event.currentTarget && !busyById[reportTarget.id]) setReportTarget(null)
+          }}
+          onKeyDown={(event) => {
+            if (event.key === 'Escape' && !busyById[reportTarget.id]) setReportTarget(null)
+          }}
+        >
+          <section
+            aria-labelledby="short-video-report-title"
+            aria-modal="true"
+            autoFocus
+            className="w-full max-w-md rounded-2xl border border-light-border bg-main-background p-5 text-light-primary shadow-xl dark:border-dark-border dark:text-dark-primary"
+            role="dialog"
+            tabIndex={-1}
+          >
+            <h2 className="text-lg font-bold" id="short-video-report-title">
+              {locale === 'en' ? 'Report video' : locale === 'tw' ? '檢舉影片' : '举报视频'}
+            </h2>
+            <p className="mt-2 text-sm text-light-secondary dark:text-dark-secondary">
+              {locale === 'en' ? 'Choose the reason that best describes this video.' : locale === 'tw' ? '請選擇最符合此影片情況的檢舉原因。' : '请选择最符合此视频情况的举报原因。'}
+            </p>
+            <fieldset className="mt-4 flex flex-col gap-2">
+              <legend className="sr-only">
+                {locale === 'en' ? 'Report reason' : locale === 'tw' ? '檢舉原因' : '举报原因'}
+              </legend>
+              {[
+                { value: 'SPAM', label: locale === 'en' ? 'Spam or unwanted promotion' : locale === 'tw' ? '垃圾訊息或廣告' : '垃圾信息或广告' },
+                { value: 'ABUSE', label: locale === 'en' ? 'Abuse or harassment' : locale === 'tw' ? '騷擾或辱罵' : '骚扰或辱骂' },
+                { value: 'IMPERSONATION', label: locale === 'en' ? 'Impersonation' : locale === 'tw' ? '冒充他人' : '冒充他人' },
+                { value: 'COPYRIGHT', label: locale === 'en' ? 'Copyright infringement' : locale === 'tw' ? '侵犯版權' : '侵犯版权' },
+                { value: 'OTHER', label: locale === 'en' ? 'Other' : locale === 'tw' ? '其他原因' : '其他原因' },
+              ].map((reason) => (
+                <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-xl px-3 hover:bg-light-primary/10 dark:hover:bg-dark-primary/10" key={reason.value}>
+                  <input
+                    checked={reportReasonCode === reason.value}
+                    className="h-4 w-4 accent-main-accent"
+                    name="short-video-report-reason"
+                    onChange={() => setReportReasonCode(reason.value)}
+                    type="radio"
+                    value={reason.value}
+                  />
+                  <span className="text-sm">{reason.label}</span>
+                </label>
+              ))}
+            </fieldset>
+            {message ? (
+              <p className="mt-3 text-sm text-light-secondary dark:text-dark-secondary" role="status">{message}</p>
+            ) : null}
+            <div className="mt-5 flex justify-end gap-3">
+              <button
+                className="main-tab rounded-full border border-light-border px-4 py-2 text-sm font-bold dark:border-dark-border"
+                disabled={Boolean(busyById[reportTarget.id])}
+                onClick={() => setReportTarget(null)}
+                type="button"
+              >
+                {locale === 'en' ? 'Cancel' : locale === 'tw' ? '取消' : '取消'}
+              </button>
+              <button
+                className="rounded-full bg-main-accent px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
+                disabled={Boolean(busyById[reportTarget.id]) || !reportReasonCode}
+                onClick={() => void report()}
+                type="button"
+              >
+                {busyById[reportTarget.id] === 'report'
+                  ? (locale === 'en' ? 'Reporting…' : locale === 'tw' ? '舉報中…' : '举报中…')
+                  : (locale === 'en' ? 'Submit report' : locale === 'tw' ? '提交檢舉' : '提交举报')}
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
 
       {commentsOpen && commentsContentId ? (
         <div className="fixed inset-0 z-[100] flex justify-end bg-black/50" role="presentation" onMouseDown={closeComments}>

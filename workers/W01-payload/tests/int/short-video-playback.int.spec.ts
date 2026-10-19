@@ -50,7 +50,7 @@ describe('short video playback polish', () => {
     const feed = read('src/app/(frontend)/shorts/ShortVideoFeed.tsx')
     expect(feed).toContain('const resumeAfterVisibilityRef = useRef(false)')
     expect(feed).toContain('resumeAfterVisibilityRef.current = Boolean(video && !video.paused && !video.ended)')
-    expect(feed).toContain('if (commentsOpen || !resumeAfterVisibilityRef.current)')
+    expect(feed).toContain('if (commentsOpen || reportTarget || !resumeAfterVisibilityRef.current)')
     expect(feed).toContain('resumeAfterVisibilityRef.current = false')
     expect(feed).toContain("mediaErrorById[id] || document.visibilityState === 'hidden'")
     expect(feed).toContain('const playbackIntentRef = useRef(true)')
@@ -143,7 +143,8 @@ describe('short video playback polish', () => {
     expect(feed).toContain('toggleBookmark')
     expect(feed).toContain('share(item)')
     expect(feed).not.toContain('markNotInterested')
-    expect(feed).toContain('report(item)')
+    expect(feed).toContain('openReportDialog(item)')
+    expect(feed).toContain('const report = async () => {')
     expect(feed).toContain('snap-y snap-mandatory')
   })
 
