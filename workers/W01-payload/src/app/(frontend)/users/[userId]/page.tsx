@@ -132,6 +132,8 @@ export default function PublicProfilePage({
   const [muted, setMuted] = useState(false)
   const [muteBusy, setMuteBusy] = useState(false)
   const [reportBusy, setReportBusy] = useState(false)
+  const [reportDialogOpen, setReportDialogOpen] = useState(false)
+  const [reportReasonCode, setReportReasonCode] = useState('ABUSE')
   const [actionsOpen, setActionsOpen] = useState(false)
   const [safetyMessage, setSafetyMessage] = useState('')
   const [filter, setFilter] = useState<ProfileChannel>('posts')
@@ -477,9 +479,7 @@ export default function PublicProfilePage({
   }
 
   async function reportProfile() {
-    if (!profile || reportBusy) return
-    const reasonCode = window.prompt('请输入举报原因（例如 SPAM、ABUSE、IMPERSONATION）', 'ABUSE')?.trim()
-    if (!reasonCode) return
+    if (!profile || reportBusy || !reportReasonCode.trim()) return
 
     setReportBusy(true)
     setSafetyMessage('')
@@ -492,7 +492,7 @@ export default function PublicProfilePage({
           'content-type': 'application/json',
           'Idempotency-Key': 'report:profile:' + profile.id + ':' + crypto.randomUUID(),
         },
-        body: JSON.stringify({ targetType: 'profile', targetId: profile.id, reasonCode }),
+        body: JSON.stringify({ targetType: 'profile', targetId: profile.id, reasonCode: reportReasonCode }),
       })
       if (response.status === 401) {
         const returnTo = window.location.pathname + window.location.search + window.location.hash
@@ -501,6 +501,7 @@ export default function PublicProfilePage({
       }
       if (!response.ok || !data?.data) throw new Error(getApiErrorMessage(data, 'REPORT_FAILED'))
       setSafetyMessage(data.data.status === 'DEDUPLICATED' ? '举报已记录：你此前已举报过该用户。' : '举报已提交。')
+      setReportDialogOpen(false)
     } catch (cause) {
       if (cause instanceof DOMException && cause.name === 'AbortError') return
       setSafetyMessage('举报提交失败，请稍后重试。')
@@ -707,7 +708,8 @@ export default function PublicProfilePage({
                         disabled={reportBusy}
                         onClick={() => {
                           setActionsOpen(false)
-                          void reportProfile()
+                          setReportReasonCode('ABUSE')
+                          setReportDialogOpen(true)
                         }}
                       >
                         {reportBusy ? '举报中…' : '举报'}
@@ -876,6 +878,64 @@ export default function PublicProfilePage({
         </section>
       </section>
 
+      {reportDialogOpen ? (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 px-4 py-8"
+          onClick={(event) => {
+            if (event.target === event.currentTarget && !reportBusy) setReportDialogOpen(false)
+          }}
+        >
+          <section
+            aria-labelledby="profile-report-title"
+            aria-modal="true"
+            className="w-full max-w-md rounded-2xl border border-light-border bg-main-background p-5 shadow-xl dark:border-dark-border"
+            role="dialog"
+          >
+            <h2 className="text-lg font-bold" id="profile-report-title">举报用户</h2>
+            <p className="mt-2 text-sm text-light-secondary dark:text-dark-secondary">请选择最符合情况的举报原因。</p>
+            <fieldset className="mt-4 flex flex-col gap-2">
+              <legend className="sr-only">举报原因</legend>
+              {[
+                { value: 'ABUSE', label: '骚扰或辱骂' },
+                { value: 'SPAM', label: '垃圾信息或广告' },
+                { value: 'IMPERSONATION', label: '冒充他人' },
+                { value: 'COPYRIGHT', label: '侵犯版权' },
+                { value: 'OTHER', label: '其他原因' },
+              ].map((reason) => (
+                <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-xl px-3 hover:bg-light-primary/10 dark:hover:bg-dark-primary/10" key={reason.value}>
+                  <input
+                    checked={reportReasonCode === reason.value}
+                    className="h-4 w-4 accent-main-accent"
+                    name="profile-report-reason"
+                    onChange={() => setReportReasonCode(reason.value)}
+                    type="radio"
+                    value={reason.value}
+                  />
+                  <span className="text-sm">{reason.label}</span>
+                </label>
+              ))}
+            </fieldset>
+            <div className="mt-5 flex justify-end gap-3">
+              <button
+                className="main-tab rounded-full border border-light-border px-4 py-2 text-sm font-bold dark:border-dark-border"
+                disabled={reportBusy}
+                onClick={() => setReportDialogOpen(false)}
+                type="button"
+              >
+                取消
+              </button>
+              <button
+                className="rounded-full bg-main-accent px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
+                disabled={reportBusy || !reportReasonCode}
+                onClick={() => void reportProfile()}
+                type="button"
+              >
+                {reportBusy ? '提交中…' : '提交举报'}
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
       {error ? <p className="px-4 py-3 text-sm text-light-secondary dark:text-dark-secondary" role="status">{error}</p> : null}
     </TwitterCloneSecondaryPageLayout>
   )
