@@ -29,17 +29,16 @@ const formatDate = (value: string, locale: 'zh' | 'en' | 'tw' = 'zh'): string =>
  * endpoint/cache; both layouts reuse the reference's Tailwind utility classes.
  */
 export default function TwitterCloneFollowRow({ userId, followedAt, dateLabel, action, presentation = 'legacy', locale = 'zh' }: Props) {
-  const [profile, setProfile] = useState<PublicProfile | null>(null)
+  const [loadedProfile, setLoadedProfile] = useState<{ userId: string; profile: PublicProfile } | null>(null)
+  const profile = loadedProfile?.userId === userId ? loadedProfile.profile : null
 
   useEffect(() => {
     let cancelled = false
-    setProfile(null)
 
     void getCachedPublicProfile(userId).then((value) => {
-      if (!cancelled) setProfile(value)
+      if (!cancelled) setLoadedProfile({ userId, profile: value })
     }).catch(() => {
-      // Relationship management must remain usable when profile metadata is unavailable.
-      if (!cancelled) setProfile(null)
+      // Relationship management remains usable with the ID fallback on lookup failure.
     })
 
     return () => { cancelled = true }
