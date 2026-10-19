@@ -126,8 +126,14 @@ export default function NotificationsPage() {
   const [busyIds, setBusyIds] = useState<Set<string>>(() => new Set())
   const [actorProfiles, setActorProfiles] = useState<Record<string, PublicProfile>>({})
   const requestedActorIdsRef = useRef(new Set<string>())
+  const requestIdRef = useRef(0)
+  const abortControllerRef = useRef<AbortController | null>(null)
 
   const loadPage = useCallback(async (cursor: string | null, append: boolean) => {
+    const requestId = ++requestIdRef.current
+    abortControllerRef.current?.abort()
+    const controller = new AbortController()
+    abortControllerRef.current = controller
     if (append) setLoadingMore(true)
     else {
       setLoading(true)
@@ -144,7 +150,9 @@ export default function NotificationsPage() {
         credentials: 'include',
         headers: { accept: 'application/json' },
         cache: 'no-store',
+        signal: controller.signal,
       })
+      if (requestId !== requestIdRef.current || controller.signal.aborted) return
       if (response.status === 401 || data?.error?.code === 'UNAUTHENTICATED') {
         setAuthRequired(true)
         setItems([])
@@ -166,10 +174,14 @@ export default function NotificationsPage() {
       setNextCursor(data.data.nextCursor ?? null)
       setHasMore(data.data.hasMore === true)
     } catch (cause) {
+      if (requestId !== requestIdRef.current || controller.signal.aborted) return
+      if (cause instanceof DOMException && cause.name === 'AbortError') return
       setError(cause instanceof Error ? cause.message : labels.loadError)
     } finally {
+      if (requestId !== requestIdRef.current || controller.signal.aborted) return
       setLoading(false)
       setLoadingMore(false)
+      if (abortControllerRef.current === controller) abortControllerRef.current = null
     }
   }, [filter, labels.loadError])
 
@@ -180,6 +192,9 @@ export default function NotificationsPage() {
     })
     return () => {
       cancelled = true
+      requestIdRef.current += 1
+      abortControllerRef.current?.abort()
+      abortControllerRef.current = null
     }
   }, [loadPage])
 
