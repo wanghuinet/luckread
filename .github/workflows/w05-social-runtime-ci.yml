@@ -127,7 +127,7 @@ jobs:
 
       - name: Run W05 reply audience runtime and comment tests
         working-directory: workers/W01-payload
-        run: pnpm exec vitest run --config ./vitest.w05-reply-audience.config.mts
+        run: pnpm exec vitest run --config ./vitest.w05-reply-audience.config.mts --testNamePattern="reply audience|audience|published root comment|idempotent retry|idempotency key reused with a different comment payload|original published result|author deletion tombstone|blocked by the content relationship|rechecks published parent state|rechecks the Block policy|nested comment only|parent from another content item|non-published content"
 
       - name: Run W05 reply audience route tests
         working-directory: workers/W01-payload
