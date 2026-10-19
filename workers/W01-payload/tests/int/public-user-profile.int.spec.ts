@@ -180,6 +180,18 @@ describe('public creator profile', () => {
 })
 
 
+  it('localizes the profile-report reason dialog in English, Traditional Chinese, and Simplified Chinese', () => {
+    const page = read('src/app/(frontend)/users/[userId]/page.tsx')
+
+    expect(page).toContain("locale === 'en' ? 'Report user' : locale === 'tw' ? '檢舉使用者' : '举报用户'")
+    expect(page).toContain("locale === 'en' ? 'Choose the reason that best describes this account.' : locale === 'tw' ? '請選擇最符合此帳號情況的檢舉原因。' : '请选择最符合此账号情况的举报原因。'")
+    expect(page).toContain("locale === 'en' ? 'Abuse or harassment' : locale === 'tw' ? '騷擾或辱罵' : '骚扰或辱骂'")
+    expect(page).toContain("locale === 'en' ? 'Spam or unwanted promotion' : locale === 'tw' ? '垃圾訊息或廣告' : '垃圾信息或广告'")
+    expect(page).toContain("locale === 'en' ? 'Copyright infringement' : locale === 'tw' ? '侵犯版權' : '侵犯版权'")
+    expect(page).toContain("reportBusy ? (locale === 'en' ? 'Submitting…' : '提交中…') : locale === 'en' ? 'Submit report' : locale === 'tw' ? '提交檢舉' : '提交举报'")
+  })
+
+
 it('handles the profile follow DELETE no-body response without requiring a JSON payload', () => {
   const page = read('src/app/(frontend)/users/[userId]/page.tsx')
   expect(page).toContain('if (isFollowing) {')
