@@ -52,6 +52,7 @@ describe('X-style notifications page', () => {
     expect(page).toContain("params.set('type', 'MENTION')")
     expect(page).toContain('role="tablist"')
     expect(page).toContain("setFilter('mentions')")
+    expect(page).toContain('labels.emptyMentions')
     expect(w05Worker).toContain("url.searchParams.get('type')")
     expect(w05Runtime).toContain("notification_type = ?")
     expect(w05Runtime).toContain("NOTIFICATION_TYPES.includes")
