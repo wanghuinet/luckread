@@ -1,9 +1,11 @@
 'use client'
 
+import Image from 'next/image'
 import Link from 'next/link'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { fetchJson, getApiErrorMessage } from '../../../lib/client-api.js'
+import { getCachedPublicProfile, type PublicProfile } from '../../../lib/social-post-profile-cache.js'
 import { usePublicLocale } from '../../(frontend)/i18n/PublicLanguageToggle'
 import type { PublicLocale } from '../../(frontend)/i18n/public-locale'
 import TwitterCloneSecondaryPageLayout from '../TwitterCloneSecondaryPageLayout'
@@ -60,7 +62,11 @@ const copy = (locale: PublicLocale) => ({
 
 const dateLocale = (locale: PublicLocale) => locale === 'en' ? 'en-US' : locale === 'tw' ? 'zh-TW' : 'zh-CN'
 
-function notificationMessage(item: SocialNotification, labels: ReturnType<typeof copy>) {
+function notificationMessage(
+  item: SocialNotification,
+  labels: ReturnType<typeof copy>,
+  actorProfile?: PublicProfile,
+) {
   const typeText: Record<NotificationType, string> = {
     FOLLOW: labels.follow,
     LIKE: labels.like,
@@ -68,9 +74,12 @@ function notificationMessage(item: SocialNotification, labels: ReturnType<typeof
     REPLY: labels.reply,
     MENTION: labels.mention,
   }
-  const handle = typeof item.payload?.handle === 'string' && item.payload.handle.trim()
+  const payloadHandle = typeof item.payload?.handle === 'string' && item.payload.handle.trim()
     ? '@' + item.payload.handle.replace(/^@/, '')
-    : labels.user
+    : null
+  const username = actorProfile?.username?.trim()
+  const actorHandle = username ? '@' + username : payloadHandle
+  const actor = actorProfile?.displayName?.trim() || actorHandle || labels.user
   const contentTargetId = item.targetType === 'content'
     ? item.targetId
     : item.targetType === 'comment' &&
@@ -80,10 +89,9 @@ function notificationMessage(item: SocialNotification, labels: ReturnType<typeof
       : null
   const href = contentTargetId
     ? '/content/' + encodeURIComponent(contentTargetId)
-    : item.type === 'FOLLOW'
-      ? '/users/' + encodeURIComponent(item.actorUserId)
-      : null
-  return { text: typeText[item.type] ?? labels.user, actor: handle, href }
+    : null
+  const actorHref = '/users/' + encodeURIComponent(item.actorUserId)
+  return { text: typeText[item.type] ?? labels.user, actor, actorHandle, actorHref, href }
 }
 
 function formatDate(value: string, locale: PublicLocale) {
@@ -110,6 +118,8 @@ export default function NotificationsPage() {
   const [authRequired, setAuthRequired] = useState(false)
   const [readAllBusy, setReadAllBusy] = useState(false)
   const [busyIds, setBusyIds] = useState<Set<string>>(() => new Set())
+  const [actorProfiles, setActorProfiles] = useState<Record<string, PublicProfile>>({})
+  const requestedActorIdsRef = useRef(new Set<string>())
 
   const loadPage = useCallback(async (cursor: string | null, append: boolean) => {
     if (append) setLoadingMore(true)
@@ -160,6 +170,31 @@ export default function NotificationsPage() {
       cancelled = true
     }
   }, [loadPage])
+
+  useEffect(() => {
+    const actorIds = [...new Set(items.map((item) => item.actorUserId.trim()).filter(Boolean))]
+    const pendingIds = actorIds.filter((id) => !requestedActorIdsRef.current.has(id))
+    if (!pendingIds.length) return
+    pendingIds.forEach((id) => requestedActorIdsRef.current.add(id))
+
+    void Promise.all(pendingIds.map(async (id) => {
+      try {
+        return { id, profile: await getCachedPublicProfile(id) }
+      } catch {
+        // Keep the notification readable using its payload handle or localized fallback.
+        requestedActorIdsRef.current.delete(id)
+        return null
+      }
+    })).then((results) => {
+      const resolved = results.filter((entry): entry is { id: string; profile: PublicProfile } => entry !== null)
+      if (!resolved.length) return
+      setActorProfiles((current) => {
+        const next = { ...current }
+        for (const entry of resolved) next[entry.id] = entry.profile
+        return next
+      })
+    })
+  }, [items])
 
   const signInHref = '/login?returnTo=' + encodeURIComponent('/notifications')
 
@@ -247,21 +282,34 @@ export default function NotificationsPage() {
         ) : null}
 
         {items.map((item) => {
-          const message = notificationMessage(item, labels)
+          const actorProfile = actorProfiles[item.actorUserId]
+          const message = notificationMessage(item, labels, actorProfile)
           const isBusy = busyIds.has(item.id)
+          const activityIcon = item.type === 'FOLLOW' ? '↗' : item.type === 'LIKE' ? '♥' : item.type === 'MENTION' ? '@' : '↩'
+          const actorInitial = (actorProfile?.displayName?.trim() || actorProfile?.username?.trim() || item.actorUserId).slice(0, 1).toUpperCase() || 'L'
           return (
             <article className={'flex gap-3 border-b border-light-border px-4 py-4 dark:border-dark-border' + (item.readAt ? '' : ' bg-main-accent/5')} key={item.id}>
-              <div className="mt-1 grid h-10 w-10 shrink-0 place-items-center rounded-full bg-main-sidebar-background text-sm font-bold text-main-accent" aria-hidden="true">
-                {item.type === 'FOLLOW' ? '↗' : item.type === 'LIKE' ? '♥' : item.type === 'MENTION' ? '@' : '↩'}
+              <div className="relative mt-1 h-10 w-10 shrink-0">
+                {actorProfile?.avatar?.trim() ? (
+                  <Link aria-label={message.actor} className="block h-10 w-10 rounded-full" href={message.actorHref}>
+                    <Image alt="" className="h-10 w-10 rounded-full object-cover" height={40} loading="lazy" src={actorProfile.avatar} unoptimized width={40} />
+                  </Link>
+                ) : (
+                  <Link aria-label={message.actor} className="grid h-10 w-10 place-items-center rounded-full bg-main-sidebar-background text-sm font-bold text-main-accent" href={message.actorHref}>
+                    {actorInitial}
+                  </Link>
+                )}
+                <span aria-hidden="true" className="absolute -bottom-1 -right-1 grid h-5 w-5 place-items-center rounded-full border-2 border-main-background bg-main-sidebar-background text-xs font-bold text-main-accent">
+                  {activityIcon}
+                </span>
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-start gap-2">
                   {!item.readAt ? <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-main-accent" aria-label={labels.unread} /> : null}
                   <div className="min-w-0 flex-1">
                     <p className="text-sm leading-6">
-                      {message.href && item.type === 'FOLLOW' ? (
-                        <Link className="font-bold hover:underline" href={message.href}>{message.actor}</Link>
-                      ) : <span className="font-bold">{message.actor}</span>}
+                      <Link className="font-bold hover:underline" href={message.actorHref}>{message.actor}</Link>
+                      {message.actorHandle && message.actorHandle !== message.actor ? <span className="ml-1 text-xs font-normal text-light-secondary dark:text-dark-secondary">{message.actorHandle}</span> : null}
                       {' '}{message.text}
                     </p>
                     <time className="mt-1 block text-xs text-light-secondary dark:text-dark-secondary" dateTime={item.createdAt}>{formatDate(item.createdAt, locale)}</time>
