@@ -126,12 +126,12 @@ for (const viewport of [
 
     const composer = page.getByRole('dialog', { name: '发布动态窗口' })
     await expect(composer).toBeVisible()
-    const audienceButton = composer.getByRole('button', { name: '所有人可以回复' })
+    let currentSummaryLabel = '所有人可以回复'
 
     // Verify all five options remain usable in both the compact mobile sheet
     // and the centered desktop dialog, without the selector extending off-screen.
     for (const choice of audienceChoices) {
-      await audienceButton.click()
+      await composer.getByRole('button', { name: currentSummaryLabel }).click()
       const selector = page.getByRole('dialog', { name: '谁可以回复？' })
       await expect(selector).toBeVisible()
 
@@ -148,6 +148,7 @@ for (const viewport of [
 
       await selector.getByRole('button', { name: new RegExp(choice.optionLabel) }).click()
       await expect(composer.getByRole('button', { name: choice.summaryLabel })).toBeVisible()
+      currentSummaryLabel = choice.summaryLabel
     }
 
     // Publish once through the real composer path to verify the selected policy
