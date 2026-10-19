@@ -29,6 +29,21 @@ describe('X-style notifications page', () => {
     expect(page).toContain("encodeURIComponent('/notifications')")
   })
 
+  it('resolves actor names and avatars through the existing public-profile cache', () => {
+    expect(page).toContain("getCachedPublicProfile(id)")
+    expect(page).toContain('const [actorProfiles, setActorProfiles]')
+    expect(page).toContain('requestedActorIdsRef')
+    expect(page).toContain('actorProfile?.displayName?.trim()')
+    expect(page).toContain('actorProfile?.username?.trim()')
+    expect(page).toContain('actorProfile?.avatar?.trim()')
+    expect(page).toContain("'/users/' + encodeURIComponent(item.actorUserId)")
+    expect(page).toContain('href={message.actorHref}')
+    expect(page).toContain('message.actorHandle !== message.actor')
+    expect(page).toContain('next/image')
+    expect(page).toContain('unoptimized')
+    expect(page).not.toContain('notifications.module.css')
+  })
+
   it('marks a single notification and all notifications read through existing endpoints', () => {
     expect(page).toContain("'/api/v1/notifications/' + encodeURIComponent(item.id) + '/read'")
     expect(page).toContain("'/api/v1/notifications/read-all'")
