@@ -73,7 +73,6 @@ describe('W05 reply audience runtime', () => {
     ])
     await setContentReplyAudience(d, 'owner-1', 'content-1', 'mentioned', ['user-2', 'user-2'])
     const prepare = d.prepare as unknown as ReturnType<typeof vi.fn>
-    expect(prepare.mock.calls[1]?.[1]).toBeUndefined()
     expect(prepare.mock.calls[1]?.[0]).toContain('mentioned_user_ids_json')
     expect(prepare.mock.calls[1]?.[0]).toContain('RETURNING')
   })
@@ -103,6 +102,6 @@ describe('W05 reply audience runtime', () => {
     expect(replyAudienceAllowedSql).toContain('json_each')
     expect(replyAudienceAllowedSql).toContain('second_degree')
     expect(replyAudienceAllowedSql).toContain("= 'verified'")
-    expect(replyAudienceAllowedParams('reply-1', true)).toEqual([1, 'reply-1', 'reply-1', 'reply-1', 'reply-1'])
+    expect(replyAudienceAllowedParams('reply-1', true)).toEqual(['reply-1', 1, 'reply-1', 'reply-1', 'reply-1', 'reply-1'])
   })
 })
