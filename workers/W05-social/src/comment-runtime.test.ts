@@ -248,14 +248,18 @@ describe('comment runtime', () => {
       bind: vi.fn(() => ({
         first: vi.fn(async () => null),
       })),
+    })).mockImplementationOnce(() => ({
+      bind: vi.fn(() => ({
+        first: vi.fn(async () => ({ content_state: 'PUBLISHED', reply_audience_allowed: 1 })),
+      })),
     }))
 
     await expect(createComment(d, 'user-1', 'content-1', {
       body: '并发屏蔽期间的评论',
       idempotencyKey: 'block-race-1',
     })).rejects.toMatchObject({
-      code: 'INTERNAL_ERROR',
-      status: 500,
+      code: 'CONFLICT',
+      status: 409,
     })
 
     expect(prepare.mock.calls[1]?.[0]).toContain("block.relation_type = 'block'")
