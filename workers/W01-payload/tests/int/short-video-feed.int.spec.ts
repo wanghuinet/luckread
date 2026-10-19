@@ -46,6 +46,23 @@ describe('TikTok-style short video feed', () => {
     expect(feed).toContain('aria-label="发布视频"')
   })
 
+  it('uses an accessible reason dialog instead of a browser prompt for short-video reports', () => {
+    const feed = read('src/app/(frontend)/shorts/ShortVideoFeed.tsx')
+
+    expect(feed).toContain("const [reportTarget, setReportTarget] = useState<ContentItem | null>(null)")
+    expect(feed).toContain('aria-modal="true"')
+    expect(feed).toContain('role="dialog"')
+    expect(feed).toContain("value: 'SPAM'")
+    expect(feed).toContain("value: 'ABUSE'")
+    expect(feed).toContain("value: 'IMPERSONATION'")
+    expect(feed).toContain("value: 'COPYRIGHT'")
+    expect(feed).toContain("value: 'OTHER'")
+    expect(feed).toContain('setReportTarget(item)')
+    expect(feed).toContain('reasonCode: reportReasonCode')
+    expect(feed).not.toContain('window.prompt(')
+    expect(feed).toContain('!reportTarget && playbackIntentRef.current')
+  })
+
   it('reuses canonical like, bookmark, follow, share, report, and comment authorities', () => {
     const feed = read('src/app/(frontend)/shorts/ShortVideoFeed.tsx')
     expect(feed).toContain('/api/v1/interactions/likes')
