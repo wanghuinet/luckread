@@ -7,7 +7,15 @@ import Views from "~/assets/svg/views.svg";
 import LikeButton from './LikeButton';
 import { Feather } from '@expo/vector-icons';
 
-export const EngagementActions = ({ detailView ,    itemData }: { detailView?: boolean, itemData: FeedContent }) => {
+type EngagementData = {
+    reply_count?: number;
+    retweet_count?: number;
+    like_count?: number;
+    view_count?: string;
+    save_count?: number;
+};
+
+export const EngagementActions = ({ detailView, itemData }: { detailView?: boolean; itemData?: EngagementData }) => {
     const { colorScheme } = useColorScheme();
     const iconColor = colorScheme === 'dark' ? '#8b98a5' : '#536471';
     const textColor = "text-sm text-neutral-600 dark:text-neutral-400";
