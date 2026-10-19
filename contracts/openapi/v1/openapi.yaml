@@ -896,6 +896,13 @@ paths:
       parameters:
         - $ref: '#/components/parameters/Cursor'
         - $ref: '#/components/parameters/Limit'
+        - name: type
+          in: query
+          required: false
+          description: Optional notification type filter.
+          schema:
+            type: string
+            enum: [FOLLOW, LIKE, COMMENT, REPLY, MENTION]
       responses:
         '200':
           description: Notifications.

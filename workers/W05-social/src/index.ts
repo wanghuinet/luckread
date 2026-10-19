@@ -513,7 +513,7 @@ export default {
         requireInteractionLayer(request)
         const url = new URL(request.url)
         return json({
-          data: await listNotifications(env.DB, actorUserId, url.searchParams.get('cursor'), url.searchParams.get('limit')),
+          data: await listNotifications(env.DB, actorUserId, url.searchParams.get('cursor'), url.searchParams.get('limit'), url.searchParams.get('type')),
           requestId: crypto.randomUUID(),
         })
       }

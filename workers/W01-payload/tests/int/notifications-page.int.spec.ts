@@ -8,6 +8,9 @@ describe('X-style notifications page', () => {
   const page = read('src/app/(twitter-clone)/notifications/page.tsx')
   const shell = read('src/app/(twitter-clone)/TwitterCloneSecondaryPageLayout.tsx')
   const home = read('src/app/(twitter-clone)/home/page.tsx')
+  const w05Runtime = read('../../workers/W05-social/src/social-closure-runtime.ts')
+  const w05Worker = read('../../workers/W05-social/src/index.ts')
+  const apiContract = read('../../contracts/openapi/v1/openapi.yaml')
 
   it('is reachable from the homepage sidebar and uses the shared X-style page shell', () => {
     expect(home).toContain('<TwitterCloneSecondaryPageLayout locale={locale} title={copy.home.home} active="home">')
@@ -42,6 +45,18 @@ describe('X-style notifications page', () => {
     expect(page).toContain('next/image')
     expect(page).toContain('unoptimized')
     expect(page).not.toContain('notifications.module.css')
+  })
+
+  it('filters the notification timeline to mentions through the existing W05 authority', () => {
+    expect(page).toContain("type NotificationFilter = 'all' | 'mentions'")
+    expect(page).toContain("params.set('type', 'MENTION')")
+    expect(page).toContain('role="tablist"')
+    expect(page).toContain("setFilter('mentions')")
+    expect(page).toContain('labels.emptyMentions')
+    expect(w05Worker).toContain("url.searchParams.get('type')")
+    expect(w05Runtime).toContain("notification_type = ?")
+    expect(w05Runtime).toContain("NOTIFICATION_TYPES.includes")
+    expect(apiContract).toContain('description: Optional notification type filter.')
   })
 
   it('marks a single notification and all notifications read through existing endpoints', () => {
