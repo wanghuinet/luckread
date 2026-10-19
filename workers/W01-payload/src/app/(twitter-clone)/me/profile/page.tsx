@@ -56,6 +56,7 @@ const pageCopy = (locale: PublicLocale) => ({
   following: locale === 'en' ? 'Following' : locale === 'tw' ? '追蹤中' : '我的关注',
   blocked: locale === 'en' ? 'Blocked accounts' : locale === 'tw' ? '已封鎖的帳號' : '已屏蔽的账号',
   muted: locale === 'en' ? 'Muted accounts' : locale === 'tw' ? '已靜音的帳號' : '已静音的账号',
+  notificationPreferences: locale === 'en' ? 'Notification preferences' : locale === 'tw' ? '通知偏好設定' : '通知偏好设置',
   subscriptions: locale === 'en' ? 'Subscriptions' : locale === 'tw' ? '訂閱' : '我的订阅',
   sessions: locale === 'en' ? 'Devices & sessions' : locale === 'tw' ? '登入裝置' : '登录设备',
   password: locale === 'en' ? 'Change password' : locale === 'tw' ? '修改密碼' : '修改密码',
@@ -218,6 +219,7 @@ export default function ProfilePage() {
           <Link className="main-tab rounded-md py-1" href="/me/following">{copy.following}</Link>
           <Link className="main-tab rounded-md py-1" href="/me/blocked">{copy.blocked}</Link>
           <Link className="main-tab rounded-md py-1" href="/me/muted">{copy.muted}</Link>
+          <Link className="main-tab rounded-md py-1" href="/me/notification-preferences">{copy.notificationPreferences}</Link>
           <Link className="main-tab rounded-md py-1" href="/me/subscriptions">{copy.subscriptions}</Link>
           <Link className="main-tab rounded-md py-1" href="/me/sessions">{copy.sessions}</Link>
           <Link className="main-tab rounded-md py-1" href="/me/password">{copy.password}</Link>
