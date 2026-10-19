@@ -10,8 +10,8 @@ test('renders the Following timeline without horizontal overflow on H5 and PC wi
     updatedAt: '2026-10-18T00:00:00.000Z',
     contentType: 'post' as const,
     title: 'Following timeline regression post',
-    mediaRefs: [],
-    coverRef: null,
+    mediaRefs: [] as string[],
+    coverRef: null as string | null,
   }
 
   await page.route((url) => url.pathname.startsWith('/api/v1/'), async (route) => {
