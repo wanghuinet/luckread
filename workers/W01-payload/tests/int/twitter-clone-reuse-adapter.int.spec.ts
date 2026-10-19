@@ -18,7 +18,7 @@ describe('Twitter Clone UI reuse through LuckRead API adapters', () => {
     expect(component).toContain('/api/v1/interactions/likes')
     expect(component).toContain("const reportContent = async () =>")
     expect(component).toContain("'/api/v1/reports'")
-    expect(component).toContain("targetType: 'content', targetId: contentId, reasonCode")
+    expect(component).toContain("targetType: 'content', targetId: contentId, reasonCode: reportReasonCode")
     expect(component).toContain("'Idempotency-Key': 'twitter-clone-reuse-report:content:' + contentId + ':' + crypto.randomUUID()")
     expect(component).toContain("'Idempotency-Key': 'twitter-clone-reuse-like:' + crypto.randomUUID()")
     expect(component).toContain("JSON.stringify({ targetType: 'content', targetId: contentId })")
@@ -44,6 +44,22 @@ describe('Twitter Clone UI reuse through LuckRead API adapters', () => {
     expect(component).toContain('className="content-comment-reply"')
     expect(component).toContain('className="content-detail-like"')
     expect(component).toContain('className="content-detail-follow"')
+  })
+
+  it('uses an accessible reason dialog instead of a browser prompt for social post reports', () => {
+    const component = read('src/app/(frontend)/components/reuse/LuckReadSocialPostCard.tsx')
+
+    expect(component).toContain("const [reportDialogOpen, setReportDialogOpen] = useState(false)")
+    expect(component).toContain('aria-modal="true"')
+    expect(component).toContain('role="dialog"')
+    expect(component).toContain("value: 'ABUSE'")
+    expect(component).toContain("value: 'SPAM'")
+    expect(component).toContain("value: 'IMPERSONATION'")
+    expect(component).toContain("value: 'COPYRIGHT'")
+    expect(component).toContain("value: 'OTHER'")
+    expect(component).toContain("setReportDialogOpen(true)")
+    expect(component).toContain("reasonCode: reportReasonCode")
+    expect(component).not.toContain('window.prompt(')
   })
 
   it('uses the reusable social post card in both homepage and discovery for dynamic content', () => {
@@ -175,7 +191,7 @@ describe('Twitter Clone UI reuse through LuckRead API adapters', () => {
     expect(component).toContain("method: 'DELETE'")
     expect(component).toContain("'If-Match': contentEtag")
     expect(component).toContain("'/api/v1/reports'")
-    expect(component).toContain("targetType: 'content', targetId: contentId, reasonCode")
+    expect(component).toContain("targetType: 'content', targetId: contentId, reasonCode: reportReasonCode")
     expect(component).toContain("window.dispatchEvent(new Event('luckread:content-mutated'))")
     expect(component).toContain("'/api/v1/content/' + encodeURIComponent(contentId) + '/reposts'")
     expect(component).toContain("'/api/v1/content/' + encodeURIComponent(contentId) + '/pin'")
