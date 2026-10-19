@@ -47,12 +47,19 @@ const validUser = (value: unknown): value is LuckReadUser => {
   );
 };
 
-export const useAuthStore = create<AuthStore>((set, get) => ({
+export const useAuthStore = create<AuthStore>((set) => ({
   status: 'loading',
   user: null,
 
   bootstrap: async () => {
-    const [token, cachedUser] = await Promise.all([readSessionToken(), readCachedUser()]);
+    let token: string | null = null;
+    let cachedUser: LuckReadUser | null = null;
+    try {
+      [token, cachedUser] = await Promise.all([readSessionToken(), readCachedUser()]);
+    } catch {
+      set({ status: 'anonymous', user: null });
+      return;
+    }
     if (!token) {
       set({ status: 'anonymous', user: null });
       return;
