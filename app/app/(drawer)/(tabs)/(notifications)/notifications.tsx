@@ -24,7 +24,17 @@ import usersData from "~/dummy/users.json";
 
 
 
-const notificationsData = [
+type NotificationRecord = {
+  id: string;
+  type: string;
+  mainUser: { id: string };
+  otherCount: number;
+  postPreview?: string;
+  isRead: boolean;
+  timestamp: string;
+};
+
+const notificationsData: NotificationRecord[] = [
   {
     id: '1',
     type: 'like',
@@ -36,7 +46,6 @@ const notificationsData = [
     isRead: false,
     timestamp: '2h',
   },
-  ,
   {
     id: '7',
     type: 'reply',
@@ -312,8 +321,7 @@ export default function Notifications() {
             scrollEnabled={true}
             style={{
               paddingHorizontal: 16,
-              textAlign: 'center',
-              elevation: 0, shadowOpacity: 0, borderBottomWidth: 0,
+              elevation: 0, shadowOpacity: 0,
               borderBottomWidth: 1, borderBottomColor: '#f0f0f0',
                backgroundColor: 'white',
             }}
