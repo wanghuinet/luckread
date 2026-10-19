@@ -954,7 +954,7 @@ export default function ShortVideoFeed() {
             aria-labelledby="short-video-report-title"
             aria-modal="true"
             autoFocus
-            className="w-full max-w-md rounded-2xl border border-light-border bg-main-background p-5 text-main-primary shadow-xl dark:border-dark-border"
+            className="w-full max-w-md rounded-2xl border border-light-border bg-main-background p-5 text-light-primary shadow-xl dark:border-dark-border dark:text-dark-primary"
             role="dialog"
             tabIndex={-1}
           >
