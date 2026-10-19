@@ -492,7 +492,7 @@ export default function PublicProfilePage({
           'content-type': 'application/json',
           'Idempotency-Key': 'report:profile:' + profile.id + ':' + crypto.randomUUID(),
         },
-        body: JSON.stringify({ targetType: 'profile', targetId: profile.id, reasonCode }),
+        body: JSON.stringify({ targetType: 'profile', targetId: profile.id, reasonCode: reportReasonCode }),
       })
       if (response.status === 401) {
         const returnTo = window.location.pathname + window.location.search + window.location.hash
