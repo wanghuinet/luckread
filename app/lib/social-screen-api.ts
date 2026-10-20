@@ -42,12 +42,9 @@ export function markAllNotificationsRead() {
 
 /** Fetch the signed-in user's real saved content list. */
 export function fetchBookmarksPage(options: PageRequestOptions = {}) {
-  const query = pageQuery(options.limit, options.cursor);
-  query.set('list', 'true');
-  // Keep list=true before limit/cursor in the URL independent of parameter mutation.
-  const normalizedQuery = new URLSearchParams({ list: 'true', limit: String(options.limit ?? 20) });
-  if (options.cursor) normalizedQuery.set('cursor', options.cursor);
-  return apiRequest<unknown>('/interactions/bookmarks?' + normalizedQuery.toString(), {
+  const query = new URLSearchParams({ list: 'true', limit: String(options.limit ?? 20) });
+  if (options.cursor) query.set('cursor', options.cursor);
+  return apiRequest<unknown>('/interactions/bookmarks?' + query.toString(), {
     method: 'GET',
     signal: options.signal,
   });
