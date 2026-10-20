@@ -104,7 +104,7 @@ export const useAuthStore = create<AuthStore>((set) => ({
     const payload = data as LoginPayload | null;
     const user = payload?.data?.user;
     if (!response.ok) {
-      throw new Error(getApiErrorMessage(data, 'Unable to sign in. Please try again.'));
+      throw new Error(getApiErrorMessage(data, 'Unable to sign in. Please try again.', response.status));
     }
     if (!validUser(user)) {
       throw new Error('The sign-in response was incomplete. Please try again.');
