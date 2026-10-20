@@ -42,7 +42,8 @@ const media = fs.readFileSync(path.join(root, 'src/collections/Media.ts'), 'utf8
 
 const usesBetterAuth =
   currentUsers.includes('betterAuthPayloadStrategy') &&
-  currentUsers.includes('disableLocalStrategy: true')
+  /auth\s*:\s*\{/.test(currentUsers) &&
+  /disableLocalStrategy\s*:/.test(currentUsers)
 
 if (usesBetterAuth) {
   const testedCommit = run('git', ['rev-parse', 'HEAD'], repoRoot).trim()
@@ -140,8 +141,8 @@ fs.writeFileSync(path.join(outDir, 'generation-manifest.json'), JSON.stringify({
   repository: 'wanghuinet/luckread',
   testedCommitSha: testedCommit,
   historicalBaselineSha: baselineSha,
-  payloadVersion: '3.87.1',
-  d1AdapterVersion: '3.87.1',
+  payloadVersion: '3.90.2',
+  d1AdapterVersion: '3.90.2',
   generationCommand: 'pnpm exec payload migrate:create MIG-AUTH-002-SESSION-V1 --skip-empty',
   baselineGenerationCommand: 'pnpm exec payload migrate:create E5_BASELINE_FIXTURE --skip-empty',
   baselineConfigProvenance: baselineSha,
