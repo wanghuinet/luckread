@@ -609,16 +609,16 @@ export default function UserProfileScreen() {
         apiRequest<unknown>(
           '/users/' + encodeURIComponent(profile.id) + '/followers?limit=1',
           { method: 'GET', signal: controller.signal },
-        ),
+        ).catch(() => null),
         apiRequest<unknown>(
           '/users/' + encodeURIComponent(profile.id) + '/following?limit=1',
           { method: 'GET', signal: controller.signal },
-        ),
+        ).catch(() => null),
       ]);
-      const followersPage = followersResult.response.ok
+      const followersPage = followersResult?.response.ok
         ? unwrapApiData<{ totalCount?: number }>(followersResult.data)
         : null;
-      const followingPage = followingResult.response.ok
+      const followingPage = followingResult?.response.ok
         ? unwrapApiData<{ totalCount?: number }>(followingResult.data)
         : null;
       if (controller.signal.aborted) return;
