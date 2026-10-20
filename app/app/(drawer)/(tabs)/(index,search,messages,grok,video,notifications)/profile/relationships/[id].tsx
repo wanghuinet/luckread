@@ -13,7 +13,7 @@ import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { apiRequest, getApiErrorMessage } from '~/lib/api-client';
-import { unwrapApiData } from '~/lib/content-adapter';
+import { resolvePublicProfileById, unwrapApiData } from '~/lib/content-adapter';
 
 type FollowRelation = {
   relationshipId: string;
@@ -83,15 +83,8 @@ export default function ProfileRelationships() {
       if (!page || !Array.isArray(page.items)) throw new Error('关注列表返回的数据格式无效。');
 
       const profileRows = await Promise.all(page.items.map(async (relation): Promise<FollowListRow> => {
-        try {
-          const profileResult = await apiRequest<unknown>('/users/' + encodeURIComponent(relation.userId), {
-            method: 'GET',
-          });
-          if (!profileResult.response.ok) return { relation, profile: null };
-          return { relation, profile: unwrapApiData<PublicUser>(profileResult.data) };
-        } catch {
-          return { relation, profile: null };
-        }
+        const profile = await resolvePublicProfileById(relation.userId);
+        return { relation, profile: profile as PublicUser | null };
       }));
 
       setRows((current) => {
