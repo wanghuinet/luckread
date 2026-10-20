@@ -51,6 +51,8 @@ jobs:
         run: bun run typecheck
       - name: Test unified native API client rules
         run: bun run test:api-client
+      - name: Test native publishing and media upload contracts
+        run: bun run test:publish-api
       - name: Enforce shared API client boundary
         run: bun run check:api-boundary
 

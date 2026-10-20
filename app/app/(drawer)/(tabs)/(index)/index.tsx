@@ -7,6 +7,7 @@ import {
   View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Tabs, MaterialTabBar } from 'react-native-collapsible-tab-view';
 import { BlurView } from 'expo-blur';
@@ -35,12 +36,16 @@ const API_PAGE_SIZE = '20';
 
 const Header = () => {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
 
   return (
     <View style={{ paddingTop: insets.top }} className="w-full bg-white">
       <View className="w-full flex-row items-center justify-center py-3">
         <X width={26} height={26} fill="black" />
         <Text style={styles.headerLabel}>LuckRead</Text>
+        <Pressable accessibilityRole="button" accessibilityLabel="发布动态" onPress={() => router.push('/publish' as never)} style={styles.composeButton}>
+          <Feather name="edit-3" size={19} color={APP_PRIMARY_COLOR} />
+        </Pressable>
       </View>
     </View>
   );
@@ -289,6 +294,7 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: 'white', width: '100%', height: '100%' },
   headerLabel: { color: '#101828', fontSize: 12, fontWeight: '800', marginLeft: 8 },
+  composeButton: { alignItems: 'center', justifyContent: 'center', position: 'absolute', right: 16, top: 5, width: 38, height: 38, borderRadius: 19, backgroundColor: '#eff8ff' },
   stateContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 28, paddingVertical: 32 },
   stateTitle: { color: '#101828', fontSize: 18, fontWeight: '800', textAlign: 'center' },
   stateDescription: { color: '#667085', fontSize: 14, lineHeight: 21, marginTop: 10, textAlign: 'center' },
