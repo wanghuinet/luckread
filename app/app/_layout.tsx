@@ -43,14 +43,6 @@ export default function RootLayout() {
             <Stack.Screen name="login" options={{ headerShown: false, gestureEnabled: false }} />
             <Stack.Screen name="publish" options={{ headerShown: false, presentation: 'modal', animation: 'slide_from_bottom' }} />
             <Stack.Screen name="modal" options={{ title: 'Modal', presentation: 'modal' }} />
-            <Stack.Screen
-              name="edit-accounts"
-              options={{
-                headerShown: false,
-                presentation: 'fullScreenModal',
-                animation: 'slide_from_bottom',
-              }}
-            />
           </Stack>
           {(!isLoaded || status === 'loading') ? (
             <View style={styles.splash} pointerEvents="auto">

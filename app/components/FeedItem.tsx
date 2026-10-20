@@ -20,11 +20,11 @@ import Views from "~/assets/svg/views.svg"
 import { ImageProps } from 'expo-image';
 import { router, useRouter } from 'expo-router';
 import LikeButton from './LikeButton';
+import FollowButton from './FollowButton';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { EngagementActions } from './EngagementActions';
-import users from '~/dummy/users.json';
 import * as ContextMenu from 'zeego/context-menu';
 import * as DropdownMenu from 'zeego/dropdown-menu';
 import { apiRequest, getApiErrorMessage } from '~/lib/api-client';
@@ -147,23 +147,6 @@ export const ProfileImage: React.FC<ProfileImageProps> = ({ style, displaySize =
 };
 
 
-const FollowButton = () => {
-    const { colorScheme } = useColorScheme();
-    return (
-        <TouchableOpacity
-            className="py-1.5 px-4 rounded-full bg-black dark:bg-white"
-            onPress={() => console.log('Follow pressed')}
-        >
-            <Text className="font-bold text-white dark:text-black">Follow</Text>
-        </TouchableOpacity>
-    );
-};
-
-
-export const findUserById = (id: string) => {
-    return users.find(user => user.id === id);
-};
-
 const FeedVideoAttachment = ({ uri, headers }: { uri: string; headers?: Record<string, string> }) => {
     const source = headers ? { uri, headers } : uri;
     const player = useVideoPlayer(source, (instance) => {
@@ -231,7 +214,6 @@ export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailVie
     const { colorScheme } = useColorScheme();
 
 
-    const userInfo = itemData.contentId ? undefined : findUserById(itemData.poster_id);
     const mediaItems = itemData.media_items?.length
         ? itemData.media_items
         : itemData.media_url
@@ -239,15 +221,15 @@ export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailVie
             : [];
 
 
-    const authorName = itemData.authorName || userInfo?.name || 'Unknown';
-    const authorHandle = itemData.authorHandle || userInfo?.handle || 'unknown';
+    const authorName = itemData.authorName || 'LuckRead 用户';
+    const authorHandle = itemData.authorHandle || 'unknown';
     const profileIdentifier = itemData.contentId && itemData.poster_id && itemData.poster_id !== 'unknown'
         ? itemData.poster_id
         : authorHandle;
-    const authorImageUrl = itemData.authorImageUrl || userInfo?.profile_picture || '';
+    const authorImageUrl = itemData.authorImageUrl || '';
     const authorImageHeaders = itemData.authorImageHeaders;
-    const isOrganization = itemData.is_organization || userInfo?.is_organization || false;
-    const verified_badge = itemData?.verified_badge || userInfo?.verified_badge;
+    const isOrganization = itemData.is_organization || false;
+    const verified_badge = itemData?.verified_badge;
 
     const router = useRouter();
     const sessionStatus = useAuthStore((state) => state.status);
@@ -489,53 +471,8 @@ export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailVie
                             <ContextMenu.ItemTitle>Delete post</ContextMenu.ItemTitle>
                             <ContextMenu.ItemIcon ios={{ name: 'trash' }} />
                         </ContextMenu.Item>
-                        <ContextMenu.Separator />
                     </>
                 ) : null}
-                <ContextMenu.Item key="report" destructive onSelect={() => console.log('Report post', itemData.contentId)}>
-                    <ContextMenu.ItemTitle>Report post</ContextMenu.ItemTitle>
-                    <ContextMenu.ItemIcon ios={{ name: 'flag' }} />
-                </ContextMenu.Item>
-
-                <ContextMenu.Item key="community-note" onSelect={() => console.log('Request Community Note', itemData.contentId)}>
-                    <ContextMenu.ItemTitle>Request community note</ContextMenu.ItemTitle>
-                    <ContextMenu.ItemIcon ios={{ name: 'note.text' }} />
-                </ContextMenu.Item>
-
-                <ContextMenu.Separator />
-                <ContextMenu.Label>{authorName} @{authorHandle}</ContextMenu.Label>
-
-                <ContextMenu.Item key="follow" onSelect={() => console.log('Follow/Unfollow', userInfo?.id)}>
-                    <ContextMenu.ItemTitle>Follow @{authorHandle}</ContextMenu.ItemTitle>
-                    <ContextMenu.ItemIcon ios={{ name: 'person.badge.plus' }} />
-                </ContextMenu.Item>
-
-                <ContextMenu.Sub>
-                    <ContextMenu.SubTrigger key="follow-up-trigger">
-                        <ContextMenu.ItemTitle>More @{authorHandle}</ContextMenu.ItemTitle>
-                    </ContextMenu.SubTrigger>
-                    <ContextMenu.SubContent>
-                        <ContextMenu.Item key="interactions" onSelect={() => console.log('View Interactions', itemData.contentId)}>
-                            <ContextMenu.ItemTitle>Interactions</ContextMenu.ItemTitle>
-                            <ContextMenu.ItemIcon ios={{ name: 'bubble.left.and.bubble.right' }} />
-                        </ContextMenu.Item>
-
-                        <ContextMenu.Item key="add-to-lists" onSelect={() => console.log('Add to Lists', userInfo?.id)}>
-                            <ContextMenu.ItemTitle>Add to Lists</ContextMenu.ItemTitle>
-                            <ContextMenu.ItemIcon ios={{ name: 'list.bullet' }} />
-                        </ContextMenu.Item>
-
-                        <ContextMenu.Item key="block" destructive onSelect={() => console.log('Block User', userInfo?.id)}>
-                            <ContextMenu.ItemTitle>Block @{authorHandle}</ContextMenu.ItemTitle>
-                            <ContextMenu.ItemIcon ios={{ name: 'nosign' }} />
-                        </ContextMenu.Item>
-
-                        <ContextMenu.Item key="mute" onSelect={() => console.log('Mute User', userInfo?.id)}>
-                            <ContextMenu.ItemTitle>Mute @{authorHandle}</ContextMenu.ItemTitle>
-                            <ContextMenu.ItemIcon ios={{ name: 'speaker.slash' }} />
-                        </ContextMenu.Item>
-                    </ContextMenu.SubContent>
-                </ContextMenu.Sub>
             </ContextMenu.Content>
         </ContextMenu.Root>
     );
@@ -546,7 +483,6 @@ export const FeedItemDetailView: React.FC<FeedItemProps> = ({ itemData, onPress,
     const { colorScheme } = useColorScheme();
 
 
-    const userInfo = itemData.contentId ? undefined : findUserById(itemData.poster_id);
     const mediaItems = itemData.media_items?.length
         ? itemData.media_items
         : itemData.media_url
@@ -554,15 +490,15 @@ export const FeedItemDetailView: React.FC<FeedItemProps> = ({ itemData, onPress,
             : [];
 
 
-    const authorName = itemData.authorName || userInfo?.name || 'Unknown';
-    const authorHandle = itemData.authorHandle || userInfo?.handle || 'unknown';
+    const authorName = itemData.authorName || 'LuckRead 用户';
+    const authorHandle = itemData.authorHandle || 'unknown';
     const profileIdentifier = itemData.contentId && itemData.poster_id && itemData.poster_id !== 'unknown'
         ? itemData.poster_id
         : authorHandle;
-    const authorImageUrl = itemData.authorImageUrl || userInfo?.profile_picture || '';
+    const authorImageUrl = itemData.authorImageUrl || '';
     const authorImageHeaders = itemData.authorImageHeaders;
-    const isOrganization = itemData.is_organization || userInfo?.is_organization || false;
-    const verified_badge = itemData?.verified_badge || userInfo?.verified_badge;
+    const isOrganization = itemData.is_organization || false;
+    const verified_badge = itemData?.verified_badge;
 
     const router = useRouter();
 
@@ -603,7 +539,7 @@ export const FeedItemDetailView: React.FC<FeedItemProps> = ({ itemData, onPress,
                         </View>
                     </TouchableOpacity>
                 </View>
-                <FollowButton />
+                <FollowButton targetUsername={authorHandle} />
             </View>
 
             <View className="mt-2">

@@ -51,7 +51,7 @@ import { FeedItem, FeedContent, ProfileImage, PROFILE_IMAGE_SIZE_MAP } from '~/c
 import FollowButton from '~/components/FollowButton';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { apiRequest, getApiErrorMessage } from '~/lib/api-client';
-import { mapContentToFeedContent, readContentBody, readContentSocial, readContentAuthor, resolveNativeMediaSource, unwrapApiData, type ApiContentPage, type ApiContentRecord } from '~/lib/content-adapter';
+import { mapContentToFeedContent, readContentBody, readContentSocial, readContentAuthor, resolveNativeMediaSource, resolvePublicProfileById, unwrapApiData, type ApiContentPage, type ApiContentRecord } from '~/lib/content-adapter';
 import { useAuthStore } from '~/store/auth-store';
 import { readSessionToken } from '~/lib/secure-session';
 import Messages from "~/assets/svg/tabs/messages.svg"
@@ -408,15 +408,11 @@ const ProfileHeader = ({ navBarVisibility, scrollOffset, refreshing, user, curre
               />
             </TouchableOpacity>
           </Animated.View>
-          {user.id === currentUserId ? (
-            <TouchableOpacity className="absolute bottom-0 right-0 py-1 px-3 bg-transparent rounded-full border border-neutral-400/50 dark:border-neutral-600/50 flex flex-start  ">
-              <Text className="text-base font-bold text-black dark:text-white">Edit Profile</Text>
-            </TouchableOpacity>
-          ) : (
+          {user.id !== currentUserId ? (
             <View className="absolute bottom-0 right-0">
               <FollowButton targetUsername={user.handle} />
             </View>
-          )}
+          ) : null}
 
         </Animated.View>
       </Animated.View>
@@ -426,6 +422,7 @@ const ProfileHeader = ({ navBarVisibility, scrollOffset, refreshing, user, curre
 
 const ProfileDetailsHeader = ({ user }: { user: User }) => {
   const { top: topInset } = useSafeAreaInsets();
+  const router = useRouter();
 
   const handleLinkPress = useCallback(async (url: string) => {
     const formattedUrl = url.startsWith('http://') || url.startsWith('https://') ? url : `https://${url}`;
@@ -487,16 +484,24 @@ const ProfileDetailsHeader = ({ user }: { user: User }) => {
         {(typeof user.following_count === 'number' || user.followed_by) ? (
           <View className="flex-row gap-4 items-center">
             {typeof user.following_count === 'number' ? (
-              <View className="flex-row gap-1.5 items-center">
+              <TouchableOpacity
+                accessibilityRole="button"
+                onPress={() => router.push(('/profile/relationships/' + encodeURIComponent(user.id) + '?type=following') as never)}
+                className="flex-row gap-1.5 items-center"
+              >
                 <Text className="text-black dark:text-white text-base font-semibold">{user.following_count}</Text>
                 <Text className="text-neutral-500 dark:text-neutral-400 text-base">Following</Text>
-              </View>
+              </TouchableOpacity>
             ) : null}
             {user.followed_by ? (
-              <View className="flex-row gap-1.5 items-center">
+              <TouchableOpacity
+                accessibilityRole="button"
+                onPress={() => router.push(('/profile/relationships/' + encodeURIComponent(user.id) + '?type=followers') as never)}
+                className="flex-row gap-1.5 items-center"
+              >
                 <Text className="text-black dark:text-white text-base font-semibold">{user.followed_by}</Text>
                 <Text className="text-neutral-500 dark:text-neutral-400 text-base">Followers</Text>
-              </View>
+              </TouchableOpacity>
             ) : null}
           </View>
         ) : null}
@@ -551,22 +556,12 @@ export default function UserProfileScreen() {
       }>(profileResult.data) : null;
 
       if (!profile?.id) {
-        profileResult = await apiRequest<{
-          id?: string; username?: string; displayName?: string | null; bio?: string | null; avatar?: string | null;
-          website?: string | null; category?: string | null; createdAt?: string; followerCount?: number; followingCount?: number;
-          coverImage?: string | null; headerImage?: string | null; isVerified?: boolean; verifiedBadge?: string | null;
-          isOrganization?: boolean; error?: { message?: string };
-        }>('/users/' + encodeURIComponent(userHandle), { method: 'GET', signal: controller.signal });
-        profile = profileResult.response.ok ? unwrapApiData<{
-          id?: string; username?: string; displayName?: string | null; bio?: string | null; avatar?: string | null;
-          website?: string | null; category?: string | null; createdAt?: string; followerCount?: number; followingCount?: number;
-          coverImage?: string | null; headerImage?: string | null; isVerified?: boolean; verifiedBadge?: string | null;
-          isOrganization?: boolean;
-        }>(profileResult.data) : null;
+        // The public profile ID and Better Auth identity ID can differ. Reuse
+        // the existing identity mapping instead of inventing a profile.
+        profile = await resolvePublicProfileById(userHandle, controller.signal);
       }
-
-      if (!profileResult.response.ok || !profile?.id) {
-        throw new Error(getApiErrorMessage(profileResult.data, 'Could not load this profile.'));
+      if (!profile?.id) {
+        throw new Error(getApiErrorMessage(profileResult.data, 'Could not load this profile.', profileResult.response.status));
       }
       if (controller.signal.aborted) return;
 
@@ -600,6 +595,24 @@ export default function UserProfileScreen() {
       }
       if (controller.signal.aborted) return;
 
+      const [followersResult, followingResult] = await Promise.all([
+        apiRequest<unknown>(
+          '/users/' + encodeURIComponent(profile.id) + '/followers?limit=1',
+          { method: 'GET', signal: controller.signal },
+        ).catch(() => null),
+        apiRequest<unknown>(
+          '/users/' + encodeURIComponent(profile.id) + '/following?limit=1',
+          { method: 'GET', signal: controller.signal },
+        ).catch(() => null),
+      ]);
+      const followersPage = followersResult?.response.ok
+        ? unwrapApiData<{ totalCount?: number }>(followersResult.data)
+        : null;
+      const followingPage = followingResult?.response.ok
+        ? unwrapApiData<{ totalCount?: number }>(followingResult.data)
+        : null;
+      if (controller.signal.aborted) return;
+
       const profileAvatarSource = resolveNativeMediaSource(profile.avatar, sessionToken);
       const profileHeaderSource = resolveNativeMediaSource(profile.headerImage || profile.coverImage, sessionToken);
 
@@ -609,8 +622,12 @@ export default function UserProfileScreen() {
         handle: profile.username || userHandle || profile.id,
         bio: profile.bio || '',
         url: profile.website || '',
-        followed_by: typeof profile.followerCount === 'number' ? String(profile.followerCount) : '',
-        following_count: typeof profile.followingCount === 'number' ? profile.followingCount : undefined,
+        followed_by: typeof followersPage?.totalCount === 'number'
+          ? String(followersPage.totalCount)
+          : typeof profile.followerCount === 'number' ? String(profile.followerCount) : '',
+        following_count: typeof followingPage?.totalCount === 'number'
+          ? followingPage.totalCount
+          : typeof profile.followingCount === 'number' ? profile.followingCount : undefined,
         items_count: hasMorePosts ? String(posts.length) + '+' : String(posts.length),
         joined_date: profile.createdAt ? new Date(profile.createdAt).toLocaleDateString() : '',
         category: profile.category || '',
@@ -644,7 +661,8 @@ export default function UserProfileScreen() {
     { title: 'Feed', data: userPosts },
   ], [userPosts]);
 
-  const profileTabs = ['Posts', 'Affiliates', 'Replies', 'Highlights', 'Videos', 'Photos', 'Articles'];
+  // Only the Posts tab is wired to a real content query in this beta.
+  const profileTabs = ['Posts'];
 
   const handleRefresh = useCallback(() => {
     void loadProfile();

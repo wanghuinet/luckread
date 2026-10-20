@@ -8,6 +8,15 @@ export type ApiAuthor = {
   handle?: string;
   displayName?: string | null;
   avatar?: string | null;
+  bio?: string | null;
+};
+
+export type ApiPublicProfile = {
+  id: string;
+  username?: string;
+  displayName?: string | null;
+  avatar?: string | null;
+  bio?: string | null;
 };
 
 export type ApiContentRecord = {
@@ -76,6 +85,40 @@ export function unwrapApiData<T>(value: unknown): T | null {
     return (record.data ?? null) as T | null;
   }
   return record as T;
+}
+
+/**
+ * Resolve a profile using either its Payload profile ID or a Better Auth
+ * identity ID. These IDs can differ; the second existing route performs the
+ * profile projection lookup without exposing the identity mapping.
+ */
+export async function resolvePublicProfileById(
+  userId: string,
+  signal?: AbortSignal,
+): Promise<ApiPublicProfile | null> {
+  const normalizedId = userId.trim();
+  if (!normalizedId || normalizedId.length > 128) return null;
+
+  const paths = [
+    '/users/' + encodeURIComponent(normalizedId),
+    '/users/by-identity-id/' + encodeURIComponent(normalizedId),
+  ];
+  for (const path of paths) {
+    try {
+      const result = await apiRequest<unknown>(path, {
+        method: 'GET',
+        auth: false,
+        signal,
+      });
+      if (signal?.aborted) return null;
+      if (!result.response.ok) continue;
+      const profile = unwrapApiData<ApiPublicProfile>(result.data);
+      if (profile && typeof profile.id === 'string' && profile.id.trim()) return profile;
+    } catch (error) {
+      if (signal?.aborted || (error instanceof Error && error.name === 'AbortError')) return null;
+    }
+  }
+  return null;
 }
 
 function nonNegativeCount(...values: unknown[]): number | undefined {
@@ -199,23 +242,14 @@ export async function readContentAuthor(item: ApiContentRecord): Promise<ApiAuth
   let pending = publicAuthorReads.get(authorId);
   if (!pending) {
     pending = (async () => {
-      try {
-        const { response, data } = await apiRequest<unknown>(
-          '/users/' + encodeURIComponent(authorId),
-          { method: 'GET' },
-        );
-        if (!response.ok) return null;
-        const profile = unwrapApiData<ApiAuthor>(data);
-        if (!profile || typeof profile.id !== 'string') return null;
-        return {
-          id: profile.id,
-          username: profile.username,
-          displayName: profile.displayName,
-          avatar: profile.avatar,
-        };
-      } catch {
-        return null;
-      }
+      const profile = await resolvePublicProfileById(authorId);
+      if (!profile) return null;
+      return {
+        id: profile.id,
+        username: profile.username,
+        displayName: profile.displayName,
+        avatar: profile.avatar,
+      };
     })();
     publicAuthorReads.set(authorId, pending);
     if (publicAuthorReads.size > 200) {
