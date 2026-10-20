@@ -1,0 +1,16 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "strict": true,
+    "noEmit": true
+  },
+  "files": [
+    "app-env.d.ts",
+    "nativewind-env.d.ts",
+    "app/_layout.tsx",
+    "app/login.tsx",
+    "app/real-feed.tsx",
+    "lib/luckread-api.ts"
+  ],
+  "include": []
+}
