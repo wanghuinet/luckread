@@ -43,12 +43,12 @@ jobs:
             throw new Error('AUTH-013 direct D1 metadata permission preflight is missing');
           }
           const preflightJobStart = workflow.indexOf('      - name: Verify Cloudflare token and D1 read access before evidence capture');
-          const preflightCommandStart = workflow.indexOf("node - <<'NODE'\\n", preflightJobStart);
+          const preflightCommandStart = workflow.indexOf("node - <<'NODE'\n", preflightJobStart);
           if (preflightJobStart < 0 || preflightCommandStart < 0) {
             throw new Error('AUTH-013 authentication preflight Node script is missing');
           }
-          const sourceStart = preflightCommandStart + "node - <<'NODE'\\n".length;
-          const sourceEnd = workflow.indexOf('\\n          NODE\\n', sourceStart);
+          const sourceStart = preflightCommandStart + "node - <<'NODE'\n".length;
+          const sourceEnd = workflow.indexOf('\n          NODE\n', sourceStart);
           if (sourceEnd < 0) throw new Error('AUTH-013 authentication preflight heredoc is unterminated');
           const preflightSource = workflow.slice(sourceStart, sourceEnd).replace(/^ {10}/gm, '');
           new vm.Script(preflightSource, { filename: 'auth-013-cloudflare-preflight.js' });
