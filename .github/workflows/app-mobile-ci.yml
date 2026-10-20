@@ -59,8 +59,8 @@ jobs:
           node <<'NODE'
           const fs = require("node:fs");
           const gradle = fs.readFileSync("android/app/build.gradle", "utf8");
-          const buildTypesStart = gradle.indexOf("\\n    buildTypes {");
-          const releaseBlockStart = buildTypesStart >= 0 ? gradle.indexOf("\\n        release {", buildTypesStart) : -1;
+          const buildTypesStart = gradle.indexOf("\n    buildTypes {");
+          const releaseBlockStart = buildTypesStart >= 0 ? gradle.indexOf("\n        release {", buildTypesStart) : -1;
           const releaseSuffix = releaseBlockStart >= 0 ? gradle.slice(releaseBlockStart) : "";
           if (!releaseSuffix.includes("signingConfig signingConfigs.release")) {
             throw new Error("Android Release build is not configured to use the stable Release keystore.");
