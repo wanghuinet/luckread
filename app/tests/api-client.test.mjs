@@ -31,6 +31,13 @@ const {
   toggleContentRepost,
 } = await import('../lib/content-repost-state.ts');
 
+const {
+  getUserFollowSnapshot,
+  refreshUserFollowStatus,
+  resolveUserProfileId,
+  toggleUserFollow,
+} = await import('../lib/user-follow-state.ts');
+
 beforeEach(() => {
   storedToken = 'secure-test-token';
   savedTokens = [];
@@ -474,4 +481,198 @@ test('deduplicates rapid repost taps while a POST is in flight', async () => {
     repostCount: 1,
     pending: false,
   });
+});
+
+
+test('loads authoritative follow state from the existing W01/W05 relationship route', async () => {
+  const targetUserId = 'stage3-follow-status-user';
+  let capturedUrl;
+  let capturedHeaders;
+  pendingFetch = async (input, init) => {
+    capturedUrl = new URL(String(input));
+    capturedHeaders = new Headers(init.headers);
+    return new Response(JSON.stringify({ data: { following: true } }), { status: 200 });
+  };
+
+  await refreshUserFollowStatus(targetUserId);
+
+  expect(capturedUrl.pathname).toBe('/api/v1/social/follows/' + targetUserId);
+  expect(capturedHeaders.get('Authorization')).toBe('Bearer secure-test-token');
+  expect(getUserFollowSnapshot(targetUserId)).toMatchObject({
+    following: true,
+    loaded: true,
+    loading: false,
+    pending: false,
+    error: null,
+  });
+});
+
+test('follows through POST with an idempotency key and reconciles server state', async () => {
+  const targetUserId = 'stage3-follow-toggle-user';
+  let getCount = 0;
+  let mutationRequest;
+  pendingFetch = async (input, init) => {
+    const url = new URL(String(input));
+    const method = String(init.method || 'GET').toUpperCase();
+    if (method === 'GET') {
+      getCount += 1;
+      return new Response(JSON.stringify({
+        data: { following: getCount > 1 },
+      }), { status: 200 });
+    }
+    mutationRequest = { url, init };
+    return new Response(JSON.stringify({
+      data: { relationshipId: 'follow-stage3', targetUserId },
+    }), { status: 200 });
+  };
+
+  await refreshUserFollowStatus(targetUserId);
+  const outcome = await toggleUserFollow(targetUserId);
+
+  const headers = new Headers(mutationRequest.init.headers);
+  expect(outcome.ok).toBe(true);
+  expect(mutationRequest.url.pathname).toBe('/api/v1/social/follows/' + targetUserId);
+  expect(String(mutationRequest.init.method).toUpperCase()).toBe('POST');
+  expect(headers.get('Authorization')).toBe('Bearer secure-test-token');
+  expect(headers.get('Idempotency-Key')).toBeTruthy();
+  expect(getCount).toBe(2);
+  expect(getUserFollowSnapshot(targetUserId)).toMatchObject({
+    following: true,
+    loaded: true,
+    pending: false,
+    loading: false,
+    error: null,
+  });
+});
+
+test('unfollows through DELETE and reconciles the status after a 204 response', async () => {
+  const targetUserId = 'stage3-unfollow-toggle-user';
+  let getCount = 0;
+  let deleteInit;
+  pendingFetch = async (_input, init) => {
+    const method = String(init.method || 'GET').toUpperCase();
+    if (method === 'GET') {
+      getCount += 1;
+      return new Response(JSON.stringify({
+        data: { following: getCount === 1 },
+      }), { status: 200 });
+    }
+    deleteInit = init;
+    return new Response(null, { status: 204 });
+  };
+
+  await refreshUserFollowStatus(targetUserId);
+  const outcome = await toggleUserFollow(targetUserId);
+
+  const headers = new Headers(deleteInit.headers);
+  expect(outcome.ok).toBe(true);
+  expect(String(deleteInit.method).toUpperCase()).toBe('DELETE');
+  expect(headers.get('Authorization')).toBe('Bearer secure-test-token');
+  expect(headers.get('Idempotency-Key')).toBeTruthy();
+  expect(getCount).toBe(2);
+  expect(getUserFollowSnapshot(targetUserId)).toMatchObject({
+    following: false,
+    loaded: true,
+    pending: false,
+    loading: false,
+    error: null,
+  });
+});
+
+test('rolls back an optimistic follow change after an authorization failure', async () => {
+  const targetUserId = 'stage3-follow-rollback-user';
+  pendingFetch = async (_input, init) => {
+    const method = String(init.method || 'GET').toUpperCase();
+    if (method === 'GET') {
+      return new Response(JSON.stringify({ data: { following: false } }), { status: 200 });
+    }
+    return new Response(JSON.stringify({
+      error: { code: 'FORBIDDEN', message: 'You do not have permission to follow this user.' },
+    }), { status: 403 });
+  };
+
+  await refreshUserFollowStatus(targetUserId);
+  const outcome = await toggleUserFollow(targetUserId);
+
+  expect(outcome).toMatchObject({ ok: false, status: 403 });
+  expect(outcome.message).toContain('permission');
+  expect(getUserFollowSnapshot(targetUserId)).toMatchObject({
+    following: false,
+    loaded: true,
+    pending: false,
+    loading: false,
+  });
+});
+
+test('deduplicates rapid follow taps while a POST is in flight', async () => {
+  const targetUserId = 'stage3-follow-deduplicate-user';
+  let mutationCount = 0;
+  let releasePost;
+  let markPostStarted;
+  const postStarted = new Promise((resolve) => { markPostStarted = resolve; });
+
+  pendingFetch = async (_input, init) => {
+    const method = String(init.method || 'GET').toUpperCase();
+    if (method === 'GET') {
+      return new Response(JSON.stringify({
+        data: { following: mutationCount > 0 },
+      }), { status: 200 });
+    }
+    mutationCount += 1;
+    markPostStarted();
+    return await new Promise((resolve) => {
+      releasePost = () => resolve(new Response(JSON.stringify({
+        data: { relationshipId: 'follow-stage3-once', targetUserId },
+      }), { status: 200 }));
+    });
+  };
+
+  await refreshUserFollowStatus(targetUserId);
+  const firstToggle = toggleUserFollow(targetUserId);
+  await postStarted;
+  const secondToggle = await toggleUserFollow(targetUserId);
+
+  expect(secondToggle.ok).toBe(false);
+  expect(mutationCount).toBe(1);
+  releasePost();
+  expect((await firstToggle).ok).toBe(true);
+  expect(getUserFollowSnapshot(targetUserId)).toMatchObject({
+    following: true,
+    loaded: true,
+    pending: false,
+  });
+});
+
+
+test('resolves a public username to the canonical W01 user ID without forwarding a session token', async () => {
+  let capturedUrl;
+  let capturedHeaders;
+  pendingFetch = async (input, init) => {
+    capturedUrl = new URL(String(input));
+    capturedHeaders = new Headers(init.headers);
+    return new Response(JSON.stringify({ id: 'canonical-user-uuid', username: 'official_handle' }), { status: 200 });
+  };
+
+  const result = await resolveUserProfileId('@official_handle');
+
+  expect(result).toEqual({ id: 'canonical-user-uuid' });
+  expect(capturedUrl.pathname).toBe('/api/v1/users/by-username/official_handle');
+  expect(capturedHeaders.has('Authorization')).toBe(false);
+});
+
+test('does not invent a canonical follow target when username lookup returns 404', async () => {
+  let capturedMethod;
+  pendingFetch = async (_input, init) => {
+    capturedMethod = String(init.method || 'GET').toUpperCase();
+    return new Response(JSON.stringify({
+      error: { code: 'NOT_FOUND', message: 'User not found' },
+    }), { status: 404 });
+  };
+
+  const result = await resolveUserProfileId('missing-profile');
+
+  expect(result.id).toBeNull();
+  expect(result.status).toBe(404);
+  expect(result.message).toBe('User not found');
+  expect(capturedMethod).toBe('GET');
 });
