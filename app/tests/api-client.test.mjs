@@ -25,6 +25,12 @@ const {
   toggleContentLike,
 } = await import('../lib/content-like-state.ts');
 
+const {
+  getContentRepostSnapshot,
+  refreshContentRepostStatus,
+  toggleContentRepost,
+} = await import('../lib/content-repost-state.ts');
+
 beforeEach(() => {
   storedToken = 'secure-test-token';
   savedTokens = [];
@@ -309,4 +315,163 @@ test('deduplicates rapid like taps while a mutation is in flight', async () => {
   releasePost();
   expect((await firstToggle).ok).toBe(true);
   expect(getContentLikeSnapshot(contentId)).toMatchObject({ liked: true, likeCount: 2, pending: false });
+});
+
+
+test('loads authoritative repost state and aggregate count from the W01 content social summary', async () => {
+  const contentId = 'stage3-repost-status-content';
+  let capturedUrl;
+  let capturedHeaders;
+  pendingFetch = async (input, init) => {
+    capturedUrl = new URL(String(input));
+    capturedHeaders = new Headers(init.headers);
+    return new Response(JSON.stringify({
+      data: { counts: { reposts: 12 }, viewer: { reposted: true } },
+    }), { status: 200 });
+  };
+
+  await refreshContentRepostStatus(contentId);
+
+  expect(capturedUrl.pathname).toBe('/api/v1/contents/' + contentId + '/social');
+  expect(capturedHeaders.get('Authorization')).toBe('Bearer secure-test-token');
+  expect(getContentRepostSnapshot(contentId)).toMatchObject({
+    reposted: true,
+    repostCount: 12,
+    loading: false,
+  });
+});
+
+test('reposts the original content through POST and reconciles the real aggregate', async () => {
+  const contentId = 'stage3-repost-toggle-content';
+  let getCount = 0;
+  let mutationRequest;
+  pendingFetch = async (input, init) => {
+    const url = new URL(String(input));
+    const method = String(init.method || 'GET').toUpperCase();
+    if (method === 'GET') {
+      getCount += 1;
+      const data = getCount === 1
+        ? { counts: { reposts: 4 }, viewer: { reposted: false } }
+        : { counts: { reposts: 5 }, viewer: { reposted: true } };
+      return new Response(JSON.stringify({ data }), { status: 200 });
+    }
+    mutationRequest = { url, init };
+    return new Response(JSON.stringify({ data: { contentId, actorUserId: 'viewer-1' } }), { status: 200 });
+  };
+
+  await refreshContentRepostStatus(contentId);
+  const outcome = await toggleContentRepost(contentId);
+
+  const headers = new Headers(mutationRequest.init.headers);
+  expect(outcome.ok).toBe(true);
+  expect(mutationRequest.url.pathname).toBe('/api/v1/content/' + contentId + '/reposts');
+  expect(String(mutationRequest.init.method).toUpperCase()).toBe('POST');
+  expect(headers.get('Authorization')).toBe('Bearer secure-test-token');
+  expect(headers.get('Idempotency-Key')).toBeTruthy();
+  expect(getContentRepostSnapshot(contentId)).toMatchObject({
+    reposted: true,
+    repostCount: 5,
+    pending: false,
+    loading: false,
+    error: null,
+  });
+});
+
+test('undoes a repost through DELETE and accepts the contract 204 response', async () => {
+  const contentId = 'stage3-unrepost-toggle-content';
+  let getCount = 0;
+  let mutationRequest;
+  pendingFetch = async (input, init) => {
+    const url = new URL(String(input));
+    const method = String(init.method || 'GET').toUpperCase();
+    if (method === 'GET') {
+      getCount += 1;
+      const data = getCount === 1
+        ? { counts: { reposts: 7 }, viewer: { reposted: true } }
+        : { counts: { reposts: 6 }, viewer: { reposted: false } };
+      return new Response(JSON.stringify({ data }), { status: 200 });
+    }
+    mutationRequest = { url, init };
+    return new Response(null, { status: 204 });
+  };
+
+  await refreshContentRepostStatus(contentId);
+  const outcome = await toggleContentRepost(contentId);
+
+  const headers = new Headers(mutationRequest.init.headers);
+  expect(outcome.ok).toBe(true);
+  expect(mutationRequest.url.pathname).toBe('/api/v1/content/' + contentId + '/reposts');
+  expect(String(mutationRequest.init.method).toUpperCase()).toBe('DELETE');
+  expect(headers.get('Idempotency-Key')).toBeTruthy();
+  expect(getContentRepostSnapshot(contentId)).toMatchObject({
+    reposted: false,
+    repostCount: 6,
+    pending: false,
+    loading: false,
+    error: null,
+  });
+});
+
+test('rolls back repost state and count when the server rejects a mutation', async () => {
+  const contentId = 'stage3-repost-rollback-content';
+  pendingFetch = async (_input, init) => {
+    const method = String(init.method || 'GET').toUpperCase();
+    if (method === 'GET') {
+      return new Response(JSON.stringify({
+        data: { counts: { reposts: 9 }, viewer: { reposted: false } },
+      }), { status: 200 });
+    }
+    return new Response(JSON.stringify({
+      error: { code: 'FORBIDDEN', message: 'You do not have permission to repost this content.' },
+    }), { status: 403 });
+  };
+
+  await refreshContentRepostStatus(contentId);
+  const outcome = await toggleContentRepost(contentId);
+
+  expect(outcome).toMatchObject({ ok: false, status: 403 });
+  expect(outcome.message).toContain('permission');
+  expect(getContentRepostSnapshot(contentId)).toMatchObject({
+    reposted: false,
+    repostCount: 9,
+    pending: false,
+    loading: false,
+  });
+});
+
+test('deduplicates rapid repost taps while a POST is in flight', async () => {
+  const contentId = 'stage3-repost-deduplicate-content';
+  let mutationCount = 0;
+  let releasePost;
+  let markPostStarted;
+  const postStarted = new Promise((resolve) => { markPostStarted = resolve; });
+
+  pendingFetch = async (_input, init) => {
+    const method = String(init.method || 'GET').toUpperCase();
+    if (method === 'GET') {
+      return new Response(JSON.stringify({
+        data: { counts: { reposts: mutationCount > 0 ? 1 : 0 }, viewer: { reposted: mutationCount > 0 } },
+      }), { status: 200 });
+    }
+    mutationCount += 1;
+    markPostStarted();
+    return await new Promise((resolve) => {
+      releasePost = () => resolve(new Response(JSON.stringify({ data: { ok: true } }), { status: 200 }));
+    });
+  };
+
+  await refreshContentRepostStatus(contentId);
+  const firstToggle = toggleContentRepost(contentId);
+  await postStarted;
+  const secondToggle = await toggleContentRepost(contentId);
+
+  expect(secondToggle.ok).toBe(false);
+  expect(mutationCount).toBe(1);
+  releasePost();
+  expect((await firstToggle).ok).toBe(true);
+  expect(getContentRepostSnapshot(contentId)).toMatchObject({
+    reposted: true,
+    repostCount: 1,
+    pending: false,
+  });
 });
