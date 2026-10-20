@@ -8,6 +8,8 @@ import LikeButton from './LikeButton';
 import { Feather } from '@expo/vector-icons';
 
 type EngagementData = {
+    contentId?: string;
+    liked?: boolean;
     reply_count?: number;
     retweet_count?: number;
     like_count?: number;
@@ -34,7 +36,7 @@ export const EngagementActions = ({ detailView, itemData }: { detailView?: boole
                 <Text className={textColor}>{itemData?.retweet_count}</Text>
             </TouchableOpacity>
 
-            <LikeButton iconColor={iconColor} textColor={textColor} likes={itemData?.like_count} />
+            <LikeButton contentId={itemData?.contentId} initialLiked={itemData?.liked} iconColor={iconColor} textColor={textColor} likes={itemData?.like_count} />
 
             {!detailView && (
                 <TouchableOpacity className="flex-row items-center gap-1.5">

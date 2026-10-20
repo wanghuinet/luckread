@@ -1,16 +1,16 @@
-import { useState, useEffect } from "react"
-import { TouchableOpacity, Text, View, StyleSheet } from "react-native"
+import { useState, useEffect, useRef } from "react"
+import { Alert, TouchableOpacity, Text, View, StyleSheet } from "react-native"
 import Animated, { 
     useSharedValue, 
     useAnimatedStyle, 
     withTiming, 
     withDelay,
     withSequence,
-    Easing,
-    runOnJS
+    Easing
 } from 'react-native-reanimated';
 import Like from "~/assets/svg/like.svg"
 import LikeFilled from "~/assets/svg/like-filled.svg"
+import { useContentLike } from "~/lib/content-like-state";
 
 
 const ConfettiParticle = ({ 
@@ -90,8 +90,8 @@ const ConfettiParticle = ({
     );
 };
 
-function LikeButton({ iconColor, textColor, likes }: { iconColor: string; textColor: string; likes?: number }) {
-    const [isLiked, setIsLiked] = useState(false);
+function LikeButton({ iconColor, textColor, likes, contentId, initialLiked }: { iconColor: string; textColor: string; likes?: number; contentId?: string; initialLiked?: boolean }) {
+    const { liked: isLiked, likeCount, loading: isLoadingLike, pending: isSavingLike, toggleLike } = useContentLike(contentId, likes, initialLiked);
     const [showConfetti, setShowConfetti] = useState(false);
     const [currentIconColor, setCurrentIconColor] = useState(iconColor);
     
@@ -122,74 +122,74 @@ function LikeButton({ iconColor, textColor, likes }: { iconColor: string; textCo
         opacity: likedIconScale.value,
     }));
     
-    const handlePress = () => {
-        const willBeLiked = !isLiked;
-        setIsLiked(willBeLiked);
-        
-        if (willBeLiked) {
-            
-            setCurrentIconColor("#f91880");
-            
-            
-            unlikedIconScale.value = withTiming(0, { 
-                duration: 35, 
+    const previousLikedRef = useRef(isLiked);
+
+    useEffect(() => {
+        setCurrentIconColor(isLiked ? "#f91880" : iconColor);
+
+        if (isLiked && !previousLikedRef.current) {
+            unlikedIconScale.value = withTiming(0, {
+                duration: 35,
                 easing: Easing.bezier(0.25, 0.1, 0.25, 1)
             });
-            
-            
+
             setTimeout(() => {
-                
                 redCircleScale.value = withTiming(1.05, {
-                    duration: 70, 
+                    duration: 70,
                     easing: Easing.bezier(0.2, 0.8, 0.2, 1)
                 });
-                
-                
+
                 setTimeout(() => {
-                    
                     setShowConfetti(true);
-                    
-                    
                     whiteCircleScale.value = withTiming(1, {
-                        duration: 60, 
+                        duration: 60,
                         easing: Easing.bezier(0.1, 0.8, 0.2, 1)
                     });
-                    
-                    
+
                     setTimeout(() => {
-                        
                         likedIconScale.value = withSequence(
-                            withTiming(0.8, { duration: 10 }),  
-                            withTiming(1, { duration: 150 }),   
-                            withTiming(1.05, { duration: 60 }), 
-                            withTiming(1, { duration: 80 })     
+                            withTiming(0.8, { duration: 10 }),
+                            withTiming(1, { duration: 150 }),
+                            withTiming(1.05, { duration: 60 }),
+                            withTiming(1, { duration: 80 })
                         );
-                    }, 20); 
-                    
-                    
+                    }, 20);
+
                     setTimeout(() => {
-                        redCircleScale.value = withTiming(0, { duration: 50 }); 
-                        
-                        
-                        setTimeout(() => {
-                            setShowConfetti(false);
-                        }, 140); 
-                    }, 105); 
-                }, 70); 
-            }, 35); 
-        } else {
-            
+                        redCircleScale.value = withTiming(0, { duration: 50 });
+                        setTimeout(() => setShowConfetti(false), 140);
+                    }, 105);
+                }, 70);
+            }, 35);
+        } else if (!isLiked) {
             setShowConfetti(false);
-            
-            setCurrentIconColor(iconColor);
-            unlikedIconScale.value = withTiming(1, { duration: 70 }); 
+            unlikedIconScale.value = withTiming(1, { duration: 70 });
             likedIconScale.value = 0;
             redCircleScale.value = 0;
             whiteCircleScale.value = 0;
         }
+
+        previousLikedRef.current = isLiked;
+    }, [isLiked, iconColor, unlikedIconScale, redCircleScale, whiteCircleScale, likedIconScale]);
+
+    const handlePress = async () => {
+        if (!contentId || isLoadingLike || isSavingLike) return;
+
+        const result = await toggleLike();
+        if (!result.ok) {
+            const title = result.status === 401
+                ? "Sign in required"
+                : result.status === 403
+                    ? "Action not allowed"
+                    : result.status === 409
+                        ? "Like could not be updated"
+                        : result.status === 429
+                            ? "Please slow down"
+                            : "Like failed";
+            Alert.alert(title, result.message || "Please try again.");
+        }
     };
-    
-    
+
     const confettiParticles = [
         { delay: 0, x: -20, y: -20, size: 4, color: '#91D2FA' },
         { delay: 20, x: 0, y: -25, size: 5, color: '#9FC7FA' },
@@ -209,6 +209,7 @@ function LikeButton({ iconColor, textColor, likes }: { iconColor: string; textCo
     return (
         <TouchableOpacity 
             className="flex-row items-center gap-1.5" 
+            disabled={!contentId || isLoadingLike || isSavingLike}
             onPress={handlePress}
             activeOpacity={0.7}
         >
@@ -253,7 +254,7 @@ function LikeButton({ iconColor, textColor, likes }: { iconColor: string; textCo
                     color: isLiked ? "#f91880" : iconColor 
                 }}
             >
-               {likes}
+               {likeCount ?? likes}
             </Text>
         </TouchableOpacity>
     );
