@@ -52,26 +52,6 @@ type RecoveryDefaults = {
   retryable: boolean;
 };
 
-export class LuckReadApiError extends Error {
-  readonly status: number;
-  readonly code: string | undefined;
-  readonly requestId: string | undefined;
-  readonly recoveryAction: ApiRecoveryAction;
-  readonly retryable: boolean;
-  readonly retryAfterMs: number | undefined;
-
-  constructor(failure: ApiFailure) {
-    super(failure.message);
-    this.name = 'LuckReadApiError';
-    this.status = failure.status;
-    this.code = failure.code;
-    this.requestId = failure.requestId;
-    this.recoveryAction = failure.recoveryAction;
-    this.retryable = failure.retryable;
-    this.retryAfterMs = failure.retryAfterMs;
-  }
-}
-
 export class LuckReadNetworkError extends Error {
   readonly recoveryAction = 'retry-request' as const;
   readonly retryable = true;
