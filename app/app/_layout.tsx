@@ -41,6 +41,7 @@ export default function RootLayout() {
           <Stack>
             <Stack.Screen name="(drawer)" options={{ headerShown: false }} />
             <Stack.Screen name="login" options={{ headerShown: false, gestureEnabled: false }} />
+            <Stack.Screen name="publish" options={{ headerShown: false, presentation: 'modal', animation: 'slide_from_bottom' }} />
             <Stack.Screen name="modal" options={{ title: 'Modal', presentation: 'modal' }} />
             <Stack.Screen
               name="edit-accounts"

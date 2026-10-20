@@ -13,6 +13,14 @@
       "expo-router",
       "expo-video",
       [
+        "expo-image-picker",
+        {
+          "photosPermission": "LuckRead needs access to your photos so you can attach pictures and short videos to posts.",
+          "cameraPermission": false,
+          "microphonePermission": false
+        }
+      ],
+      [
         "expo-secure-store",
         {
           "configureAndroidBackup": true
