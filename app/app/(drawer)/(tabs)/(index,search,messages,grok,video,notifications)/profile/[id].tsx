@@ -48,6 +48,7 @@ import Category from "~/assets/svg/category.svg"
 import Grok from "~/assets/svg/tabs/grok.svg";
 
 import { FeedItem, FeedContent, ProfileImage, PROFILE_IMAGE_SIZE_MAP, findUserById } from '~/components/FeedItem';
+import FollowButton from '~/components/FollowButton';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import users from '~/dummy/users.json';
 import sampleFeedItems from '~/dummy/posts.json';
@@ -85,11 +86,12 @@ interface User {
   is_organization: boolean;
 }
 
-const ProfileHeader = ({ navBarVisibility, scrollOffset, refreshing, user }: {
+const ProfileHeader = ({ navBarVisibility, scrollOffset, refreshing, user, targetUsername }: {
   navBarVisibility: any;
   scrollOffset: any;
   refreshing: any;
   user: User;
+  targetUsername: string;
 }) => {
   const navigation = useNavigation();
   const { left: leftInset, right: rightInset, top: safeAreaTop } = useSafeAreaInsets();
@@ -407,10 +409,9 @@ const ProfileHeader = ({ navBarVisibility, scrollOffset, refreshing, user }: {
               <Text className="text-base font-bold text-black dark:text-white">Edit Profile</Text>
             </TouchableOpacity>
           ) : (
-            <TouchableOpacity className="absolute bottom-0 right-0 py-1 px-8 bg-black rounded-full border border-neutral-400/50 dark:border-neutral-600/50 flex flex-start  ">
-              <Text className="text-base font-bold text-white">Follow</Text>
-            </TouchableOpacity>
-
+            <View className="absolute bottom-0 right-0">
+              <FollowButton targetUsername={targetUsername} />
+            </View>
           )}
 
         </Animated.View>
@@ -645,7 +646,7 @@ export default function UserProfileScreen() {
     <>
       <StatusBar style="light" />
       <ScrollingListWithHeader
-        NavigationBarComponent={(props) => <ProfileHeader {...props} user={user} refreshing={refreshing} />}
+        NavigationBarComponent={(props) => <ProfileHeader {...props} user={user} refreshing={refreshing} targetUsername={userHandle} />}
 
         ExpandedHeaderComponent={(props) => <ProfileDetailsHeader {...props} user={user} />}
         sections={feedSections}
