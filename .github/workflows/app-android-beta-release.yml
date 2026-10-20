@@ -100,7 +100,7 @@ jobs:
           const fs = require("node:fs");
           const version = process.env.BETA_VERSION_NAME ?? "";
           const versionCode = Number(process.env.BETA_VERSION_CODE);
-          if (!/^\\d+\\.\\d+\\.\\d+(?:[-+][0-9A-Za-z.-]+)?$/.test(version)) {
+          if (!/^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/.test(version)) {
             throw new Error("version_name must look like 1.0.0 or 1.0.0-beta.1");
           }
           if (!Number.isSafeInteger(versionCode) || versionCode < 1) {
@@ -109,7 +109,7 @@ jobs:
           const config = JSON.parse(fs.readFileSync("app.json", "utf8"));
           config.expo.version = version;
           config.expo.android = { ...config.expo.android, versionCode };
-          fs.writeFileSync("app.json", JSON.stringify(config, null, 2) + "\\n");
+          fs.writeFileSync("app.json", JSON.stringify(config, null, 2) + "\n");
           console.log(`Building LuckRead Android ${version} (versionCode ${versionCode})`);
           NODE
           bunx expo config --type public
@@ -140,7 +140,7 @@ jobs:
         run: |
           APK="android/app/build/outputs/apk/release/app-release.apk"
           test -s "$APK" || { echo "Release APK was not created" >&2; exit 1; }
-          if ! unzip -l "$APK" | grep -Eq 'assets/index\\.android\\.bundle'; then
+          if ! unzip -l "$APK" | grep -Eq 'assets/index\.android\.bundle'; then
             echo "Release APK is missing assets/index.android.bundle; refusing to publish a Metro-dependent build." >&2
             exit 1
           fi
