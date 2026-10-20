@@ -1,6 +1,13 @@
 name: LuckRead Android Beta Release
 
 on:
+  # Build a phone-test APK whenever the release workflow itself changes on main.
+  # This creates a standalone artifact without requiring a manual dispatch step.
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/app-android-beta-release.yml"
   workflow_dispatch:
     inputs:
       version_name:
@@ -127,8 +134,8 @@ jobs:
 
       - name: Set requested app version and Android versionCode
         env:
-          BETA_VERSION_NAME: ${{ inputs.version_name }}
-          BETA_VERSION_CODE: ${{ inputs.version_code }}
+          BETA_VERSION_NAME: ${{ inputs.version_name || format('1.0.0-beta.{0}', github.run_number) }}
+          BETA_VERSION_CODE: ${{ inputs.version_code || github.run_number }}
         run: |
           node <<'NODE'
           const fs = require("node:fs");
@@ -173,8 +180,8 @@ jobs:
           test -n "$APKSIGNER" || { echo "Android apksigner was not found" >&2; exit 1; }
           "$APKSIGNER" verify --verbose --print-certs "$APK"
           mkdir -p "$GITHUB_WORKSPACE/dist"
-          VERSION_NAME="${{ inputs.version_name }}"
-          VERSION_CODE="${{ inputs.version_code }}"
+          VERSION_NAME="${{ inputs.version_name || format('1.0.0-beta.{0}', github.run_number) }}"
+          VERSION_CODE="${{ inputs.version_code || github.run_number }}"
           SIGNING_KIND="test"
           if [ "$LUCKREAD_STABLE_SIGNING" = "true" ]; then SIGNING_KIND="signed"; fi
           APK_NAME="LuckRead-Android-Beta-$VERSION_NAME-$SIGNING_KIND-code$VERSION_CODE.apk"
@@ -186,7 +193,7 @@ jobs:
       - name: Upload downloadable APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: luckread-android-beta-${{ inputs.version_name }}-code-${{ inputs.version_code }}
+          name: luckread-android-beta-${{ inputs.version_name || format('1.0.0-beta.{0}', github.run_number) }}-code-${{ inputs.version_code || github.run_number }}
           path: dist/*
           if-no-files-found: error
           retention-days: 30
