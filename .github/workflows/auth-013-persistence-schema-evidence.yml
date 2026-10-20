@@ -47,7 +47,7 @@ jobs:
               throw new Error('AUTH-013 credential-type-aware preflight marker is missing: ' + marker);
             }
           }
-          const preflightJobStart = workflow.indexOf('      - name: Verify Cloudflare token and D1 read access before evidence capture');
+          const preflightJobStart = workflow.indexOf('      - name: Verify Cloudflare token type and D1 read access before evidence capture');
           const preflightCommandStart = workflow.indexOf("node - <<'NODE'\n", preflightJobStart);
           if (preflightJobStart < 0 || preflightCommandStart < 0) {
             throw new Error('AUTH-013 authentication preflight Node script is missing');
