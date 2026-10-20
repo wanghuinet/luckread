@@ -12,6 +12,7 @@
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
     "test:api-client": "bun test tests/api-client.test.mjs",
+    "check:api-boundary": "node scripts/verify-api-client-boundary.mjs",
     "check:compat": "expo install --check"
   },
   "dependencies": {
