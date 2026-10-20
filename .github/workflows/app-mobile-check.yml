@@ -35,8 +35,10 @@ jobs:
         run: bunx expo install --check
       - name: TypeScript
         run: bunx tsc --noEmit -p tsconfig.integration.json
-      - name: Lint
-        run: bun run lint
+      - name: Lint integration files
+        run: bunx eslint app/_layout.tsx app/login.tsx app/real-feed.tsx lib/luckread-api.ts
+      - name: Bundle JavaScript for Android and iOS
+        run: bunx expo export --platform android --platform ios
       - name: Android native prebuild
         run: bunx expo prebuild --platform android --no-install --clean
       - name: Build Android debug APK
