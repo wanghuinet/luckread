@@ -36,11 +36,16 @@ jobs:
           const config = JSON.parse(fs.readFileSync('workers/W01-payload/wrangler.jsonc', 'utf8'));
           const pkg = JSON.parse(fs.readFileSync('workers/W01-payload/package.json', 'utf8'));
           const workflow = fs.readFileSync('.github/workflows/auth-013-persistence-schema-evidence.yml', 'utf8');
-          if (!workflow.includes('/user/tokens/verify')) {
-            throw new Error('AUTH-013 Cloudflare token-verification preflight is missing');
-          }
-          if (!workflow.includes('/d1/database/${database.database_id}')) {
-            throw new Error('AUTH-013 direct D1 metadata permission preflight is missing');
+          for (const marker of [
+            '/user/tokens/verify',
+            '/accounts/${encodeURIComponent(accountId)}/tokens/verify',
+            'cfat_',
+            'cfut_',
+            '/d1/database/${database.database_id}',
+          ]) {
+            if (!workflow.includes(marker)) {
+              throw new Error('AUTH-013 credential-type-aware preflight marker is missing: ' + marker);
+            }
           }
           const preflightJobStart = workflow.indexOf('      - name: Verify Cloudflare token and D1 read access before evidence capture');
           const preflightCommandStart = workflow.indexOf("node - <<'NODE'\n", preflightJobStart);
@@ -123,7 +128,7 @@ jobs:
           test -f "$W01_WRANGLER_CONFIG"
           mkdir -p artifacts/evidence/auth-013
 
-      - name: Verify Cloudflare token and D1 read access before evidence capture
+      - name: Verify Cloudflare token type and D1 read access before evidence capture
         shell: bash
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -145,24 +150,75 @@ jobs:
             );
             if (!database?.database_id) throw new Error('W01 luckread D1 database_id is missing from Wrangler config');
 
-            const headers = { Authorization: `Bearer ${token}` };
-            const tokenResponse = await fetch('https://api.cloudflare.com/client/v4/user/tokens/verify', { headers });
-            const tokenBody = await tokenResponse.json().catch(() => ({}));
-            const tokenErrors = Array.isArray(tokenBody.errors)
-              ? tokenBody.errors.map(({ code, message }) => ({ code, message }))
-              : [];
-            console.log(JSON.stringify({
-              check: 'cloudflare-token-verification',
-              httpStatus: tokenResponse.status,
-              success: tokenBody.success === true,
-              tokenStatus: tokenBody.result?.status ?? null,
-              errors: tokenErrors,
-            }, null, 2));
-            if (!tokenResponse.ok || tokenBody.success !== true || tokenBody.result?.status !== 'active') {
-              throw new Error('Cloudflare token verification failed; check the Actions secret value/type/validity. Token value was not logged.');
+            const apiBase = 'https://api.cloudflare.com/client/v4';
+            const credentialKind = token.startsWith('cfat_')
+              ? 'account-owned-api-token'
+              : token.startsWith('cfut_')
+                ? 'user-api-token'
+                : token.startsWith('cfk_')
+                  ? 'global-api-key'
+                  : 'legacy-unprefixed-credential';
+            if (credentialKind === 'global-api-key') {
+              throw new Error('CLOUDFLARE_API_TOKEN appears to contain a Global API Key, not an API Token. This workflow expects a Bearer API Token; do not paste the credential value into logs.');
             }
 
-            const d1Url = `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(accountId)}/d1/database/${database.database_id}`;
+            const verificationCandidates = credentialKind === 'account-owned-api-token'
+              ? [{
+                  kind: 'account-owned-api-token',
+                  url: `${apiBase}/accounts/${encodeURIComponent(accountId)}/tokens/verify`,
+                }]
+              : credentialKind === 'user-api-token'
+                ? [{
+                    kind: 'user-api-token',
+                    url: `${apiBase}/user/tokens/verify`,
+                  }]
+                : [
+                    {
+                      kind: 'account-owned-api-token',
+                      url: `${apiBase}/accounts/${encodeURIComponent(accountId)}/tokens/verify`,
+                    },
+                    {
+                      kind: 'user-api-token',
+                      url: `${apiBase}/user/tokens/verify`,
+                    },
+                  ];
+
+            const headers = { Authorization: `Bearer ${token}` };
+            let verified = false;
+            const verificationResults = [];
+            for (const candidate of verificationCandidates) {
+              const response = await fetch(candidate.url, { headers });
+              const body = await response.json().catch(() => ({}));
+              const errors = Array.isArray(body.errors)
+                ? body.errors.map(({ code, message }) => ({ code, message }))
+                : [];
+              const result = {
+                check: 'cloudflare-token-verification',
+                credentialKind,
+                endpointKind: candidate.kind,
+                httpStatus: response.status,
+                success: body.success === true,
+                tokenStatus: body.result?.status ?? null,
+                errors,
+              };
+              verificationResults.push(result);
+              console.log(JSON.stringify(result, null, 2));
+              if (response.ok && body.success === true && body.result?.status === 'active') {
+                verified = true;
+                break;
+              }
+            }
+            if (!verified) {
+              console.error(JSON.stringify({
+                check: 'cloudflare-token-verification-summary',
+                success: false,
+                attemptedEndpointKinds: verificationResults.map((item) => item.endpointKind),
+                note: 'User-owned and account-owned API tokens use different verification endpoints. A token-type mismatch must not be diagnosed as a D1 permission failure.',
+              }, null, 2));
+              throw new Error('Cloudflare did not validate the credential on the token-type-appropriate verification endpoint(s). Check whether the secret is a supported API Token and whether CLOUDFLARE_ACCOUNT_ID matches the token-owning account.');
+            }
+
+            const d1Url = `${apiBase}/accounts/${encodeURIComponent(accountId)}/d1/database/${database.database_id}`;
             const d1Response = await fetch(d1Url, { headers });
             const d1Body = await d1Response.json().catch(() => ({}));
             const d1Errors = Array.isArray(d1Body.errors)
