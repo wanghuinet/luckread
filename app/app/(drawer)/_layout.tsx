@@ -18,17 +18,8 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useWindowDimensions } from 'react-native';
 
-import { apiRequest } from '~/lib/api-client';
-import { unwrapApiData } from '~/lib/content-adapter';
+import { resolvePublicProfileById, type ApiPublicProfile } from '~/lib/content-adapter';
 import { useAuthStore } from '~/store/auth-store';
-
-type PublicProfile = {
-  id: string;
-  username?: string;
-  displayName?: string | null;
-  avatar?: string | null;
-  bio?: string | null;
-};
 
 function CustomDrawerContent(props: any) {
   const router = useRouter();
@@ -37,7 +28,7 @@ function CustomDrawerContent(props: any) {
   const user = useAuthStore((state) => state.user);
   const authStatus = useAuthStore((state) => state.status);
   const logout = useAuthStore((state) => state.logout);
-  const [profile, setProfile] = useState<PublicProfile | null>(null);
+  const [profile, setProfile] = useState<ApiPublicProfile | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileError, setProfileError] = useState('');
   const [signOutBusy, setSignOutBusy] = useState(false);
@@ -52,14 +43,13 @@ function CustomDrawerContent(props: any) {
       return () => { active = false; };
     }
 
+    const controller = new AbortController();
     setProfileLoading(true);
     setProfileError('');
-    void apiRequest<unknown>('/users/' + encodeURIComponent(user.id), { method: 'GET' })
-      .then((result) => {
+    void resolvePublicProfileById(user.id, controller.signal)
+      .then((value) => {
         if (!active) return;
-        if (!result.response.ok) throw new Error('无法加载个人资料。');
-        const value = unwrapApiData<PublicProfile>(result.data);
-        if (!value?.id) throw new Error('用户资料返回的数据格式无效。');
+        if (!value?.id) throw new Error('无法加载个人资料。');
         setProfile(value);
       })
       .catch((cause) => {
@@ -68,7 +58,7 @@ function CustomDrawerContent(props: any) {
       .finally(() => {
         if (active) setProfileLoading(false);
       });
-    return () => { active = false; };
+    return () => { active = false; controller.abort(); };
   }, [authStatus, user?.id]);
 
   const openMyProfile = useCallback(() => {
