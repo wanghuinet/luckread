@@ -1,0 +1,290 @@
+import type { FeedContent, FeedMediaAttachment } from '~/components/FeedItem';
+import { apiRequest, fetchContentBodyReference, getApiBaseUrl } from './api-client';
+
+export type ApiAuthor = {
+  id?: string;
+  userId?: string;
+  username?: string;
+  handle?: string;
+  displayName?: string | null;
+  avatar?: string | null;
+};
+
+export type ApiContentRecord = {
+  id: string;
+  ownerUserId?: string;
+  creatorId?: string | null;
+  contentType?: 'article' | 'post' | 'video' | string;
+  state?: string;
+  title?: string;
+  body?: string | null;
+  bodyText?: string | null;
+  text?: string | null;
+  summary?: string | null;
+  excerpt?: string | null;
+  description?: string | null;
+  bodyRef?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+  coverRef?: string | null;
+  mediaRefs?: string[];
+  author?: ApiAuthor | null;
+  creator?: ApiAuthor | null;
+  counts?: ApiContentCounts | null;
+  social?: ApiContentSocial | null;
+  likeCount?: number;
+  like_count?: number;
+  retweetCount?: number;
+  retweet_count?: number;
+  replyCount?: number;
+  reply_count?: number;
+  viewCount?: number | string;
+  view_count?: number | string;
+  saveCount?: number;
+  save_count?: number;
+};
+
+export type ApiContentCounts = {
+  likes?: number;
+  comments?: number;
+  replies?: number;
+  retweets?: number;
+  reposts?: number;
+  views?: number;
+  favorites?: number;
+  shares?: number;
+  saves?: number;
+};
+
+export type ApiContentSocial = {
+  counts?: ApiContentCounts;
+  viewer?: { liked?: boolean; favorited?: boolean } | null;
+};
+
+export type ApiContentPage = {
+  items: ApiContentRecord[];
+  nextCursor?: string | null;
+  hasMore?: boolean;
+  candidateWindowTruncated?: boolean;
+};
+
+export function unwrapApiData<T>(value: unknown): T | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const record = value as Record<string, unknown>;
+  if (Object.prototype.hasOwnProperty.call(record, 'data')) {
+    return (record.data ?? null) as T | null;
+  }
+  return record as T;
+}
+
+function nonNegativeCount(...values: unknown[]): number | undefined {
+  for (const value of values) {
+    const parsed = typeof value === 'number' ? value : typeof value === 'string' && value.trim() ? Number(value) : Number.NaN;
+    if (Number.isFinite(parsed) && parsed >= 0) return Math.floor(parsed);
+  }
+  return undefined;
+}
+
+function resolveMediaUrl(value: unknown): string | null {
+  if (typeof value !== 'string' || !value.trim()) return null;
+  const reference = value.trim();
+
+  // W03 media references can be absolute URLs or same-origin paths returned by
+  // the existing Payload/R2 delivery path. React Native Image/Video requires an
+  // absolute URL, so resolve only root-relative paths against the configured
+  // LuckRead API origin. Do not guess URLs for logical storage schemes (e.g. r2://).
+  if (/^https?:\/\//i.test(reference)) return reference;
+  if (!reference.startsWith('/') || reference.startsWith('//')) return null;
+
+  try {
+    const base = new URL(getApiBaseUrl());
+    const resolved = new URL(reference, base);
+    return resolved.origin === base.origin ? resolved.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Resolve a media reference for native image/video views without leaking auth off-origin. */
+export function resolveNativeMediaSource(
+  value: unknown,
+  sessionToken?: string | null,
+): { uri: string; headers?: Record<string, string> } | null {
+  const uri = resolveMediaUrl(value);
+  if (!uri) return null;
+  if (!sessionToken) return { uri };
+
+  try {
+    const baseOrigin = new URL(getApiBaseUrl()).origin;
+    if (new URL(uri).origin !== baseOrigin) return { uri };
+    return { uri, headers: { Authorization: 'Bearer ' + sessionToken } };
+  } catch {
+    return { uri };
+  }
+}
+
+export function mapContentToFeedContent(
+  item: ApiContentRecord,
+  bodyText?: string,
+  social?: ApiContentSocial | null,
+  resolvedAuthor?: ApiAuthor | null,
+  sessionToken?: string | null,
+): FeedContent {
+  const creator = { ...(resolvedAuthor ?? {}), ...(item.creator ?? {}), ...(item.author ?? {}) };
+  const userId = item.creatorId || item.ownerUserId || creator?.id || creator?.userId || '';
+  const createdAt = item.createdAt || item.updatedAt;
+  const parsedTime = createdAt ? Date.parse(createdAt) : Number.NaN;
+  const postedTime = Number.isFinite(parsedTime) ? Math.floor(parsedTime / 1000) : 0;
+  const title = item.title?.trim() || '';
+  const body = (bodyText ?? item.bodyText ?? item.body ?? item.text ?? item.excerpt ?? item.summary ?? item.description ?? '').trim();
+  const message = body && title && body !== title ? title + '\n\n' + body : body || title;
+  const cover = resolveMediaUrl(item.coverRef) ?? undefined;
+  const mediaCandidates = [
+    ...(Array.isArray(item.mediaRefs) ? item.mediaRefs : []),
+    ...(cover ? [cover] : []),
+  ]
+    .map(resolveMediaUrl)
+    .filter((url): url is string => Boolean(url));
+  const mediaItems: FeedMediaAttachment[] = Array.from(new Set(mediaCandidates))
+    .slice(0, 4)
+    .map((src) => {
+      const media = resolveNativeMediaSource(src, sessionToken);
+      return {
+        src: media?.uri ?? src,
+        kind: /\.(?:mp4|webm|mov|m4v|avi|mkv)(?:[?#].*)?$/i.test(src) ? 'video' : 'image',
+        ...(media?.headers ? { headers: media.headers } : {}),
+      };
+    });
+  const authorImage = resolveNativeMediaSource(creator?.avatar, sessionToken);
+  const authorImageUrl = authorImage?.uri;
+  const authorImageHeaders = authorImage?.headers;
+  const counts: ApiContentCounts = { ...item.counts, ...item.social?.counts, ...social?.counts };
+
+  return {
+    contentId: item.id,
+    poster_id: userId || creator?.username || creator?.handle || 'unknown',
+    authorName: creator?.displayName?.trim() || creator?.username || creator?.handle || 'LuckRead member',
+    authorHandle: creator?.username || creator?.handle || userId || 'unknown',
+    authorImageUrl,
+    authorImageHeaders,
+    posted_time: postedTime,
+    message,
+    media_url: cover || mediaItems[0]?.src,
+    media_items: mediaItems,
+    like_count: nonNegativeCount(counts?.likes, item.likeCount, item.like_count),
+    retweet_count: nonNegativeCount(counts?.retweets, counts?.reposts, item.retweetCount, item.retweet_count),
+    reply_count: nonNegativeCount(counts?.comments, counts?.replies, item.replyCount, item.reply_count),
+    view_count: (() => {
+      const count = nonNegativeCount(counts?.views, item.viewCount, item.view_count);
+      return count === undefined ? undefined : String(count);
+    })(),
+    save_count: nonNegativeCount(counts?.favorites, counts?.saves, item.saveCount, item.save_count),
+  };
+}
+
+/** Read author metadata from W01's public profile API when W03 only returns creatorId/ownerUserId. */
+const publicAuthorReads = new Map<string, Promise<ApiAuthor | null>>();
+
+export async function readContentAuthor(item: ApiContentRecord): Promise<ApiAuthor | null> {
+  const embedded = item.creator || item.author;
+  if (embedded && (embedded.username || embedded.displayName || embedded.avatar)) return embedded;
+
+  const authorId = item.creatorId || item.ownerUserId || embedded?.id || embedded?.userId;
+  if (!authorId) return null;
+
+  let pending = publicAuthorReads.get(authorId);
+  if (!pending) {
+    pending = (async () => {
+      try {
+        const { response, data } = await apiRequest<unknown>(
+          '/users/' + encodeURIComponent(authorId),
+          { method: 'GET' },
+        );
+        if (!response.ok) return null;
+        const profile = unwrapApiData<ApiAuthor>(data);
+        if (!profile || typeof profile.id !== 'string') return null;
+        return {
+          id: profile.id,
+          username: profile.username,
+          displayName: profile.displayName,
+          avatar: profile.avatar,
+        };
+      } catch {
+        return null;
+      }
+    })();
+    publicAuthorReads.set(authorId, pending);
+    if (publicAuthorReads.size > 200) {
+      const oldest = publicAuthorReads.keys().next().value;
+      if (oldest) publicAuthorReads.delete(oldest);
+    }
+  }
+
+  const author = await pending;
+  if (!author) publicAuthorReads.delete(authorId);
+  return author;
+}
+
+/** Read the W05-authoritative interaction summary for the same canonical content ID. */
+export async function readContentSocial(
+  contentId: string,
+  signal?: AbortSignal,
+): Promise<ApiContentSocial | null> {
+  try {
+    const { response, data } = await apiRequest<unknown>(
+      '/contents/' + encodeURIComponent(contentId) + '/social',
+      { method: 'GET', signal },
+    );
+    if (!response.ok) return null;
+    return unwrapApiData<ApiContentSocial>(data);
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') throw error;
+    return null;
+  }
+}
+
+/**
+ * W03 may expose the body directly or by bodyRef. Do not derive a body from a
+ * local sample post; if the body is absent, use the real content's summary/title.
+ */
+export async function readContentBody(
+  item: ApiContentRecord,
+  signal?: AbortSignal,
+  sessionToken?: string | null,
+): Promise<string> {
+  const directBody = item.bodyText ?? item.body ?? item.text;
+  if (typeof directBody === 'string' && directBody.trim()) return directBody.trim();
+
+  const bodyRef = item.bodyRef?.trim();
+  if (bodyRef) {
+    try {
+      // Resolve only HTTP(S) references. Logical storage references such as
+      // r2:// are not public URLs and must never be guessed into a delivery URL.
+      const base = new URL(getApiBaseUrl());
+      const url = new URL(bodyRef, base);
+      const localDevelopmentHost = ['localhost', '127.0.0.1', '[::1]'].includes(base.hostname);
+      const protocolAllowed = url.protocol === 'https:' ||
+        (localDevelopmentHost && url.origin === base.origin && url.protocol === 'http:');
+      const trustedHost = url.origin === base.origin ||
+        url.hostname === 'luckread.com' || url.hostname.endsWith('.luckread.com');
+      if (
+        protocolAllowed &&
+        trustedHost &&
+        !url.username &&
+        !url.password &&
+        !url.hash
+      ) {
+        const response = await fetchContentBodyReference(url.toString(), { signal, sessionToken });
+        if (response.ok && response.status < 300) {
+          const text = (await response.text()).trim();
+          if (text) return text;
+        }
+      }
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') throw error;
+      // A bodyRef failure must not make valid metadata/media unavailable.
+    }
+  }
+
+  return (item.excerpt ?? item.summary ?? item.description ?? item.title ?? '').trim();
+}

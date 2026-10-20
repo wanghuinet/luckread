@@ -264,3 +264,58 @@ export async function apiRequest<T>(
     error: response.ok ? null : classifyApiFailure(response, data),
   };
 }
+
+
+/**
+ * Fetch a trusted W03 body reference through the shared native transport boundary.
+ * This is for content-body text only; ordinary API calls must use apiRequest.
+ */
+export async function fetchContentBodyReference(
+  value: string,
+  options: { signal?: AbortSignal; sessionToken?: string | null } = {},
+): Promise<Response> {
+  const base = new URL(getApiBaseUrl());
+  const target = new URL(value, base);
+  const localDevelopmentHost = ['localhost', '127.0.0.1', '[::1]'].includes(base.hostname);
+  const protocolAllowed = target.protocol === 'https:' ||
+    (localDevelopmentHost && target.origin === base.origin && target.protocol === 'http:');
+  const trustedHost = target.origin === base.origin ||
+    target.hostname === 'luckread.com' || target.hostname.endsWith('.luckread.com');
+
+  if (
+    !protocolAllowed ||
+    !trustedHost ||
+    target.username ||
+    target.password ||
+    target.hash
+  ) {
+    throw new TypeError('Unsupported LuckRead content body reference.');
+  }
+
+  const headers = new Headers({ Accept: 'text/plain, application/json;q=0.9, */*;q=0.8' });
+  if (target.origin === base.origin) {
+    const token = options.sessionToken === undefined
+      ? await readSessionToken().catch(() => null)
+      : options.sessionToken;
+    if (token) headers.set('Authorization', 'Bearer ' + token);
+  }
+
+  let response: Response;
+  try {
+    response = await fetch(target.toString(), {
+      method: 'GET',
+      cache: 'no-store',
+      signal: options.signal,
+      headers,
+      redirect: 'manual',
+    });
+  } catch {
+    throw new LuckReadNetworkError();
+  }
+
+  if (target.origin === base.origin) {
+    const renewedCredential = response.headers.get('X-LuckRead-Session-Token');
+    if (renewedCredential) await saveSessionToken(renewedCredential);
+  }
+  return response;
+}

@@ -1,13 +1,14 @@
-import React, { useState, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useRef, useMemo, useCallback, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { useLocalSearchParams, Stack, useRouter } from 'expo-router';
 import { FeedItem, FeedContent } from '~/components/FeedItem';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import sampleFeedItems from '~/dummy/posts.json';
 import Grok from '~/assets/svg/tabs/grok.svg';
 import AntDesign from '@expo/vector-icons/AntDesign';
 import Comments from '~/components/Comments';
-import users from '~/dummy/users.json';
+import { apiRequest, getApiErrorMessage } from '~/lib/api-client';
+import { mapContentToFeedContent, readContentBody, unwrapApiData, type ApiContentRecord, type ApiContentSocial } from '~/lib/content-adapter';
+import { readSessionToken } from '~/lib/secure-session';
 
 import {
     BottomSheetModal,
@@ -109,105 +110,175 @@ const PostHeader = ({ username }: { username?: string }) => {
     );
 };
 
-const findUserById = (id: string) => {
-    const user = users.find(user => user.id === id);
-    return user;
+
+
+type ContentDetailResponse = ApiContentRecord & {
+    data?: ApiContentRecord;
+    error?: { code?: string; message?: string };
+};
+type SocialResponse = {
+    data?: ApiContentSocial;
+    error?: { code?: string; message?: string };
+};
+type PublicAuthor = {
+    id: string;
+    username?: string;
+    displayName?: string | null;
+    avatar?: string | null;
 };
 
 export default function PostDetailScreen() {
     const params = useLocalSearchParams();
     const router = useRouter();
     const insets = useSafeAreaInsets();
-    const postId = params.id as string;
-
+    const rawId = params.id;
+    const postId = Array.isArray(rawId) ? rawId[0] || '' : rawId || '';
     const [selectedSort, setSelectedSort] = useState<SortType>('relevant');
-
+    const [findPost, setFindPost] = useState<FeedContent | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [errorMessage, setErrorMessage] = useState('');
+    const [retryKey, setRetryKey] = useState(0);
     const bottomSheetModalRef = useRef<BottomSheetModal>(null);
-
     const snapPoints = useMemo(() => ['25%', '30%'], []);
 
     const handlePresentModalPress = useCallback(() => {
         bottomSheetModalRef.current?.present();
     }, []);
 
-    const handleSheetChanges = useCallback((index: number) => {
-        console.log('handleSheetChanges', index);
+    const handleSheetChanges = useCallback((_index: number) => {
+        // Sort selection is local presentation state; W05 remains authoritative for reply ordering.
     }, []);
 
     const handleSelectSort = useCallback((sortType: SortType) => {
         setSelectedSort(sortType);
         bottomSheetModalRef.current?.dismiss();
-        console.log('Selected sort:', sortType);
     }, []);
 
-    const findPost = useMemo(() => {
-        let post = sampleFeedItems.find(item =>
-            (item as any).contentId === postId
-        );
-
-        if (!post && postId.startsWith('post-')) {
-            const parts = postId.split('-');
-            if (parts.length >= 2) {
-                const potentialPosterId = parts[1];
-
-                post = sampleFeedItems.find(item =>
-                    (item as any).poster_id === potentialPosterId
-                );
-            }
+    useEffect(() => {
+        if (!postId) {
+            setErrorMessage('The post ID is missing.');
+            setLoading(false);
+            return;
         }
 
-        return post as FeedContent | undefined;
-    }, [postId]);
+        const controller = new AbortController();
+        let active = true;
+        setLoading(true);
+        setErrorMessage('');
+        setFindPost(null);
 
-    const authorHandle = useMemo(() => {
-        if (!findPost) return undefined;
-        const user = findUserById(findPost.poster_id);
-        return user?.handle || findPost.authorHandle;
-    }, [findPost]);
+        void (async () => {
+            try {
+                const { response, data } = await apiRequest<ContentDetailResponse>(
+                    '/contents/' + encodeURIComponent(postId),
+                    { method: 'GET', signal: controller.signal },
+                );
+                const record = unwrapApiData<ApiContentRecord>(data);
+                if (!response.ok || !record || typeof record.id !== 'string') {
+                    throw new Error(getApiErrorMessage(data, 'Could not load this post. Please retry.'));
+                }
+                if (record.id !== postId) {
+                    throw new Error('The content service returned a different content ID.');
+                }
 
-    const handleNavigateToProfile = (handle: string) => {
-        router.push(`/profile/${handle}`);
-    };
+                const creatorId = record.creatorId || record.ownerUserId || record.creator?.id || record.author?.id;
+                const tasks: Promise<unknown>[] = [
+                    apiRequest<SocialResponse>(
+                        '/contents/' + encodeURIComponent(postId) + '/social',
+                        { method: 'GET', signal: controller.signal },
+                    ).catch(() => null),
+                ];
+                if (creatorId && !record.creator?.username && !record.author?.username) {
+                    tasks.push(
+                        apiRequest<PublicAuthor & { error?: { message?: string } }>(
+                            '/users/' + encodeURIComponent(creatorId),
+                            { method: 'GET', signal: controller.signal },
+                        ).catch(() => null),
+                    );
+                }
 
-    if (!findPost) {
+                const [socialResult, authorResult] = await Promise.all(tasks);
+                if (!active || controller.signal.aborted) return;
+
+                const socialResponse = socialResult as { response?: Response; data?: unknown } | null;
+                const social = socialResponse?.response?.ok
+                    ? unwrapApiData<ApiContentSocial>(socialResponse.data)
+                    : null;
+                let hydratedRecord = record;
+                if (authorResult && typeof authorResult === 'object' && 'response' in authorResult) {
+                    const profileResult = authorResult as { response?: Response; data?: unknown };
+                    const profile = profileResult.response?.ok
+                        ? unwrapApiData<PublicAuthor>(profileResult.data)
+                        : null;
+                    if (profile?.id) {
+                        hydratedRecord = { ...record, creator: profile };
+                    }
+                }
+
+                const sessionToken = await readSessionToken().catch(() => null);
+                if (!active || controller.signal.aborted) return;
+                const body = await readContentBody(hydratedRecord, controller.signal, sessionToken);
+                if (!active || controller.signal.aborted) return;
+                setFindPost(mapContentToFeedContent(hydratedRecord, body, social, null, sessionToken));
+            } catch (error) {
+                if (!active || controller.signal.aborted) return;
+                setErrorMessage(error instanceof Error ? error.message : 'Could not load this post. Please retry.');
+            } finally {
+                if (active) setLoading(false);
+            }
+        })();
+
+        return () => {
+            active = false;
+            controller.abort();
+        };
+    }, [postId, retryKey]);
+
+    const authorHandle = findPost?.authorHandle || findPost?.poster_id || undefined;
+
+    if (loading) {
         return (
             <View className="flex-1 justify-center items-center bg-white dark:bg-black" style={{ paddingTop: insets.top }}>
-                
-                <Text className="text-neutral-500 dark:text-neutral-400">Could not find the requested post (ID: {postId}).</Text>
+                <Text className="text-neutral-500 dark:text-neutral-400">Loading post…</Text>
             </View>
         );
     }
+
+    if (errorMessage || !findPost) {
+        return (
+            <View className="flex-1 justify-center items-center bg-white dark:bg-black px-6" style={{ paddingTop: insets.top }}>
+                <Text className="text-neutral-500 dark:text-neutral-400 text-center">{errorMessage || 'Post not found.'}</Text>
+                <TouchableOpacity
+                    accessibilityRole="button"
+                    className="mt-4 rounded-full bg-sky-500 px-5 py-3"
+                    onPress={() => setRetryKey((value) => value + 1)}
+                >
+                    <Text className="font-bold text-white">Retry</Text>
+                </TouchableOpacity>
+            </View>
+        );
+    }
+
     return (
         <>
-
             <ScrollView
                 className="flex-1 bg-white dark:bg-black"
                 style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
                 contentContainerStyle={{ flexGrow: 1 }}
             >
-                
-
                 <PostHeader username={authorHandle} />
-
-                <FeedItem
-                    itemData={findPost}
-                    detailView={true}
-
-                />
-
-                <View className="px-4 mt-2 ">
-
+                <FeedItem itemData={findPost} detailView />
+                <View className="px-4 mt-2">
                     <TouchableOpacity
                         onPress={handlePresentModalPress}
                         className="flex-row items-center mb-3"
                     >
-                        <Text className="text-base font-bold text-neutral-500 dark:text-blue-400 mr-1 ">
+                        <Text className="text-base font-bold text-neutral-500 dark:text-blue-400 mr-1">
                             {sortOptions[selectedSort]}
                         </Text>
                         <Feather name="chevron-down" size={18} color={'#536471'} />
                     </TouchableOpacity>
-
-                    <Comments postId={postId} />
+                    <Comments contentId={postId} />
                 </View>
             </ScrollView>
 
@@ -224,13 +295,10 @@ export default function PostDetailScreen() {
                     />
                 )}
                 handleIndicatorStyle={{ backgroundColor: '#EEF3F4', height: 5, width: 35 }}
-                backgroundStyle={{
-                    backgroundColor: '#ffffff',
-                    borderRadius: 30
-                }}
+                backgroundStyle={{ backgroundColor: '#ffffff', borderRadius: 30 }}
             >
                 <BottomSheetView style={styles.contentContainer}>
-                    <Text className="text-lg font-extrabold text-black dark:text-white  text-center">Sort replies</Text>
+                    <Text className="text-lg font-extrabold text-black dark:text-white text-center">Sort replies</Text>
                     {Object.entries(sortOptions).map(([key, value]) => (
                         <TouchableOpacity
                             key={key}
@@ -239,12 +307,12 @@ export default function PostDetailScreen() {
                         >
                             <Text className="text-base font-semibold text-black dark:text-white">{value}</Text>
                             {selectedSort === key ? (
-                                <View className="w-[22px] h-[22px]  bg-[#1D9BF0] flex items-center justify-center   rounded-full">
+                                <View className="w-[22px] h-[22px] bg-[#1D9BF0] flex items-center justify-center rounded-full">
                                     <Feather name="check" size={16} color={'white'} />
                                 </View>
-                            ) : <>
-                                <View className="w-[22px] h-[22px]  border-2 border-gray-400   rounded-full"></View>
-                            </>}
+                            ) : (
+                                <View className="w-[22px] h-[22px] border-2 border-gray-400 rounded-full" />
+                            )}
                         </TouchableOpacity>
                     ))}
                 </BottomSheetView>

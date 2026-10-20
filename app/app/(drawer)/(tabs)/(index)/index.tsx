@@ -11,44 +11,17 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Tabs, MaterialTabBar } from 'react-native-collapsible-tab-view';
 import { BlurView } from 'expo-blur';
 
-import { FeedContent, FeedItem, type FeedMediaAttachment } from '~/components/FeedItem';
+import { FeedContent, FeedItem } from '~/components/FeedItem';
 import X from '~/assets/svg/aside/x.svg';
 import { apiRequest, getApiErrorMessage } from '~/lib/api-client';
+import { mapContentToFeedContent, readContentBody, readContentSocial, readContentAuthor, type ApiContentPage, type ApiContentRecord } from '~/lib/content-adapter';
 import { useAuthStore } from '~/store/auth-store';
+import { readSessionToken } from '~/lib/secure-session';
 
 type FeedKind = 'for-you' | 'following';
 
-type ApiContent = {
-  id: string;
-  ownerUserId?: string;
-  creatorId?: string | null;
-  contentType?: 'article' | 'post' | 'video';
-  title?: string;
-  createdAt?: string;
-  updatedAt?: string;
-  coverRef?: string | null;
-  mediaRefs?: string[];
-  author?: {
-    username?: string;
-    displayName?: string;
-    avatar?: string | null;
-  };
-  creator?: {
-    username?: string;
-    displayName?: string;
-    avatar?: string | null;
-  };
-};
-
-type ContentPage = {
-  items: ApiContent[];
-  nextCursor?: string | null;
-  hasMore?: boolean;
-  candidateWindowTruncated?: boolean;
-};
-
 type ContentPageResponse = {
-  data?: ContentPage;
+  data?: ApiContentPage;
   error?: {
     code?: string;
     message?: string;
@@ -58,64 +31,7 @@ type ContentPageResponse = {
 const APP_PRIMARY_COLOR = '#1769aa';
 const API_PAGE_SIZE = '20';
 
-const VIDEO_MEDIA_EXTENSION = /\.(?:mp4|webm|mov|m4v|avi|mkv)(?:[?#].*)?$/i;
 
-const isVideoMediaRef = (value: string): boolean => {
-  try {
-    return VIDEO_MEDIA_EXTENSION.test(new URL(value).pathname);
-  } catch {
-    return VIDEO_MEDIA_EXTENSION.test(value);
-  }
-};
-
-const resolveFeedMedia = (item: ApiContent): FeedMediaAttachment[] => {
-  const candidates = (Array.isArray(item.mediaRefs) ? item.mediaRefs : [])
-    .map((ref) => ref.trim())
-    .filter((ref) => /^https?:\/\//i.test(ref));
-
-  if (
-    candidates.length === 0 &&
-    typeof item.coverRef === 'string' &&
-    /^https?:\/\//i.test(item.coverRef.trim())
-  ) {
-    candidates.push(item.coverRef.trim());
-  }
-
-  return Array.from(new Set(candidates))
-    .slice(0, 4)
-    .map((src) => ({
-      src,
-      kind: isVideoMediaRef(src) ? 'video' : 'image',
-    }));
-};
-
-const mapContent = (item: ApiContent): FeedContent => {
-  const userId = item.creatorId || item.ownerUserId || 'unknown';
-  const createdAt = item.createdAt || item.updatedAt;
-  const parsedTime = createdAt ? Date.parse(createdAt) : Number.NaN;
-  const timestampSeconds = Number.isFinite(parsedTime)
-    ? Math.floor(parsedTime / 1000)
-    : Math.floor(Date.now() / 1000);
-  const cover = item.coverRef || item.mediaRefs?.[0] || undefined;
-  const mediaUrl = cover && /^https?:\/\//i.test(cover) ? cover : undefined;
-  const creator = item.creator || item.author;
-
-  return {
-    contentId: item.id,
-    poster_id: userId,
-    authorName: creator?.displayName || creator?.username || 'LuckRead member',
-    authorHandle: creator?.username || userId.slice(0, 16),
-    authorImageUrl: creator?.avatar || undefined,
-    posted_time: timestampSeconds,
-    message: item.title || '',
-    media_url: mediaUrl,
-    media_items: resolveFeedMedia(item),
-    like_count: 0,
-    retweet_count: 0,
-    reply_count: 0,
-    view_count: '0',
-  };
-};
 
 const Header = () => {
   const insets = useSafeAreaInsets();
@@ -184,12 +100,22 @@ function FeedTimeline({ kind }: { kind: FeedKind }) {
       const payload = data as ContentPageResponse | null;
       const page = payload?.data;
       if (!response.ok || !page || !Array.isArray(page.items)) {
-        throw new Error(getApiErrorMessage(data, 'Could not load this timeline. Please retry.', response.status));
+        throw new Error(getApiErrorMessage(data, 'Could not load this timeline. Please retry.'));
       }
 
-      const mapped = page.items
-        .filter((item): item is ApiContent => Boolean(item && typeof item.id === 'string'))
-        .map(mapContent);
+      const sessionToken = await readSessionToken().catch(() => null);
+      const mapped = await Promise.all(
+        page.items
+          .filter((item): item is ApiContentRecord => Boolean(item && typeof item.id === 'string'))
+          .map(async (item) => {
+            const [body, social, author] = await Promise.all([
+              readContentBody(item, undefined, sessionToken),
+              readContentSocial(item.id),
+              readContentAuthor(item),
+            ]);
+            return mapContentToFeedContent(item, body, social, author, sessionToken);
+          }),
+      );
 
       if (append) {
         setItems((current) => {
@@ -236,20 +162,13 @@ function FeedTimeline({ kind }: { kind: FeedKind }) {
 
   const footer = useMemo(() => {
     if (loadingMore) return <ActivityIndicator style={styles.footer} color={APP_PRIMARY_COLOR} />;
-    if (errorMessage && items.length > 0) {
-      return (
-        <Pressable style={styles.loadMore} onPress={() => setRefreshKey((value) => value + 1)}>
-          <Text style={styles.loadMoreText}>Retry loading posts</Text>
-        </Pressable>
-      );
-    }
     if (!hasMore || loading || authRequired || errorMessage) return <View style={{ height: 20 }} />;
     return (
       <Pressable style={styles.loadMore} onPress={() => void loadPage(cursor, true)}>
         <Text style={styles.loadMoreText}>Load more</Text>
       </Pressable>
     );
-  }, [authRequired, cursor, errorMessage, hasMore, items.length, loadPage, loading, loadingMore]);
+  }, [authRequired, cursor, errorMessage, hasMore, loadPage, loading, loadingMore]);
 
   if (authRequired) {
     return (
