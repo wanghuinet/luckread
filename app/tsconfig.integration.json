@@ -10,7 +10,8 @@
     "app/_layout.tsx",
     "app/login.tsx",
     "app/real-feed.tsx",
-    "lib/luckread-api.ts"
+    "lib/luckread-api.ts",
+    "types/react-native-animated-splash-screen.d.ts"
   ],
   "include": []
 }
