@@ -78,6 +78,9 @@ jobs:
             fi
             STORE_PASSWORD="$(openssl rand -hex 16)"
             KEY_PASSWORD="$(openssl rand -hex 16)"
+            # Ensure generated one-run passwords never appear in subsequent step logs.
+            echo "::add-mask::$STORE_PASSWORD"
+            echo "::add-mask::$KEY_PASSWORD"
             KEY_ALIAS="luckread-beta-test"
             KEYSTORE_PATH="$GITHUB_WORKSPACE/app/android/app/luckread-test.keystore"
             keytool -genkeypair -noprompt -v \
@@ -159,10 +162,8 @@ jobs:
         run: bunx expo prebuild --platform android --clean --no-install
 
       - name: Compile signed Release APK with embedded JavaScript bundle
-        env:
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        # Keep the values selected by the preceding step (stable or temporary key).
+        # Re-declaring these from repository secrets would blank them in test-key mode.
         run: |
           chmod +x android/gradlew
           cd android
