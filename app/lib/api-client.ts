@@ -95,7 +95,7 @@ export function createIdempotencyKey(): string {
 
 export function getApiBaseUrl(): string {
   const configured = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
-  return (configured || DEFAULT_API_BASE_URL).replace(/\\/+$/, '');
+  return (configured || DEFAULT_API_BASE_URL).replace(/\/+$/, '');
 }
 
 function isFormDataBody(body: BodyInit | null | undefined): body is FormData {
@@ -106,7 +106,7 @@ function parseRetryAfter(response: Response): number | undefined {
   const value = response.headers.get('Retry-After')?.trim();
   if (!value) return undefined;
 
-  if (/^\\d+(?:\\.\\d+)?$/.test(value)) return Math.max(0, Number(value) * 1000);
+  if (/^\d+(?:\.\d+)?$/.test(value)) return Math.max(0, Number(value) * 1000);
 
   const retryAt = Date.parse(value);
   return Number.isFinite(retryAt) ? Math.max(0, retryAt - Date.now()) : undefined;
@@ -197,7 +197,7 @@ export function classifyApiFailure(response: Response, data: unknown): ApiFailur
     requestId: typeof body?.requestId === 'string' ? body.requestId : undefined,
     recoveryAction: defaults.action,
     retryable: defaults.retryable,
-    retryAfterMs: status === 429 || status === 503 ? parseRetryAfter(response) : undefined,
+    retryAfterMs: status === 429 || status >= 500 ? parseRetryAfter(response) : undefined,
   };
 }
 
@@ -241,15 +241,12 @@ export async function apiRequest<T>(
   // Writes get a key by default. Callers can provide a stable key for retries
   // of the same logical operation, or opt out for endpoints whose contract
   // explicitly does not use idempotency (for example login).
-  if (MUTATING_METHODS.has(method) && idempotencyKey !== false && !headers.has('Idempotency-Key')) {
-    headers.set(
-      'Idempotency-Key',
-      typeof idempotencyKey === 'string' && idempotencyKey.trim()
-        ? idempotencyKey.trim()
-        : createIdempotencyKey(),
-    );
-  } else if (MUTATING_METHODS.has(method) && typeof idempotencyKey === 'string') {
-    headers.set('Idempotency-Key', idempotencyKey.trim());
+  if (MUTATING_METHODS.has(method)) {
+    if (typeof idempotencyKey === 'string' && idempotencyKey.trim()) {
+      headers.set('Idempotency-Key', idempotencyKey.trim());
+    } else if (idempotencyKey !== false && !headers.has('Idempotency-Key')) {
+      headers.set('Idempotency-Key', createIdempotencyKey());
+    }
   }
 
   if (auth) {
