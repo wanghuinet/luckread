@@ -33,7 +33,7 @@
     "@payloadcms/db-d1-sqlite": "3.90.2",
     "@payloadcms/next": "3.90.2",
     "@payloadcms/richtext-lexical": "3.90.2",
-    "next": "16.2.6",
+    "next": "16.3.3",
     "payload": "3.90.2",
     "react": "19.2.6",
     "react-dom": "19.2.6",
