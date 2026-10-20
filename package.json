@@ -30,13 +30,13 @@
     "upstream:immutability:ci": "node scripts/upstream-product-immutability-check.mjs"
   },
   "dependencies": {
-    "@payloadcms/db-d1-sqlite": "3.87.1",
-    "@payloadcms/next": "3.87.1",
-    "@payloadcms/richtext-lexical": "3.87.1",
-    "next": "16.2.6",
-    "payload": "3.87.1",
-    "react": "19.2.0",
-    "react-dom": "19.2.0",
+    "@payloadcms/db-d1-sqlite": "3.90.2",
+    "@payloadcms/next": "3.90.2",
+    "@payloadcms/richtext-lexical": "3.90.2",
+    "next": "16.3.3",
+    "payload": "3.90.2",
+    "react": "19.2.6",
+    "react-dom": "19.2.6",
     "@moderation-api/unicode-spoofing": "0.4.0",
     "libphonenumber-js": "1.13.13",
     "tldts": "7.4.16"
@@ -44,8 +44,8 @@
   "devDependencies": {
     "@cloudflare/workers-types": "5.20260914.1",
     "@types/node": "24.3.0",
-    "@types/react": "19.1.10",
-    "@types/react-dom": "19.1.7",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
     "typescript": "5.9.3",
     "tsx": "4.20.3",
     "vitest": "3.2.4"
