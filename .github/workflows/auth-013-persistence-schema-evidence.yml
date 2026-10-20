@@ -38,7 +38,7 @@ jobs:
           if (!workflow.includes('/user/tokens/verify')) {
             throw new Error('AUTH-013 Cloudflare token-verification preflight is missing');
           }
-          if (!workflow.includes('/d1/database/\${databaseId}')) {
+          if (!workflow.includes('/d1/database/${database.database_id}')) {
             throw new Error('AUTH-013 direct D1 metadata permission preflight is missing');
           }
           const d1 = (config.d1_databases ?? []).find((item) => item.binding === 'D1' && item.database_name === 'luckread');
