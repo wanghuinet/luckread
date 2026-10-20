@@ -39,6 +39,8 @@ jobs:
         run: bun run lint
       - name: Android native prebuild
         run: bunx expo prebuild --platform android --no-install --clean
+      - name: Build Android debug APK
+        run: cd android && chmod +x gradlew && ./gradlew assembleDebug
       - name: Upload Android native project
         if: always()
         uses: actions/upload-artifact@v4
@@ -69,4 +71,4 @@ jobs:
       - name: Install CocoaPods
         run: cd ios && pod install
       - name: Build iOS simulator
-        run: xcodebuild -workspace ios/*.xcworkspace -scheme "$(basename ios/*.xcodeproj .xcodeproj)" -sdk iphonesimulator -configuration Debug CODE_SIGNING_ALLOWED=NO
+        run: xcodebuild -workspace ios/luckread-mobile.xcworkspace -scheme luckread-mobile -sdk iphonesimulator -configuration Debug CODE_SIGNING_ALLOWED=NO
