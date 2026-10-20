@@ -18,7 +18,10 @@ if (pkg.dependencies?.['@payloadcms/db-d1-sqlite'] !== '3.90.2') fail('W01 D1 ad
 if (!config.includes('sqliteD1Adapter')) fail('W01 sqliteD1Adapter is not configured')
 if (!config.includes('push: false')) fail('W01 push:false is required')
 if (!config.includes('migrationDir')) fail('W01 migrationDir is not configured')
-const usesBetterAuth = users.includes('betterAuthPayloadStrategy') && users.includes('disableLocalStrategy: true')
+const usesBetterAuth =
+  users.includes('betterAuthPayloadStrategy') &&
+  /auth\s*:\s*\{/.test(users) &&
+  /disableLocalStrategy\s*:/.test(users)
 if (usesBetterAuth && !users.includes('auth: true')) {
   console.log('AUTH-002_MIGRATION_GENERATION_NOT_APPLICABLE: W01 identity authentication is owned by Better Auth; Payload native Users auth migration generation is intentionally disabled')
   process.exit(0)
