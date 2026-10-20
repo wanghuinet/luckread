@@ -184,7 +184,7 @@ function FeedTimeline({ kind }: { kind: FeedKind }) {
       const payload = data as ContentPageResponse | null;
       const page = payload?.data;
       if (!response.ok || !page || !Array.isArray(page.items)) {
-        throw new Error(getApiErrorMessage(data, 'Could not load this timeline. Please retry.'));
+        throw new Error(getApiErrorMessage(data, 'Could not load this timeline. Please retry.', response.status));
       }
 
       const mapped = page.items
@@ -236,13 +236,20 @@ function FeedTimeline({ kind }: { kind: FeedKind }) {
 
   const footer = useMemo(() => {
     if (loadingMore) return <ActivityIndicator style={styles.footer} color={APP_PRIMARY_COLOR} />;
+    if (errorMessage && items.length > 0) {
+      return (
+        <Pressable style={styles.loadMore} onPress={() => setRefreshKey((value) => value + 1)}>
+          <Text style={styles.loadMoreText}>Retry loading posts</Text>
+        </Pressable>
+      );
+    }
     if (!hasMore || loading || authRequired || errorMessage) return <View style={{ height: 20 }} />;
     return (
       <Pressable style={styles.loadMore} onPress={() => void loadPage(cursor, true)}>
         <Text style={styles.loadMoreText}>Load more</Text>
       </Pressable>
     );
-  }, [authRequired, cursor, errorMessage, hasMore, loadPage, loading, loadingMore]);
+  }, [authRequired, cursor, errorMessage, hasMore, items.length, loadPage, loading, loadingMore]);
 
   if (authRequired) {
     return (

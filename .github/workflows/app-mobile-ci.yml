@@ -49,6 +49,8 @@ jobs:
         run: bunx expo config --type public
       - name: TypeScript typecheck
         run: bun run typecheck
+      - name: Test unified native API client rules
+        run: bun run test:api-client
 
   android-build:
     name: Android debug build
