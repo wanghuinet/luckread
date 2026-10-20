@@ -13,7 +13,7 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 
 import { apiRequest, getApiErrorMessage } from '~/lib/api-client';
-import { unwrapApiData } from '~/lib/content-adapter';
+import { resolvePublicProfileById, unwrapApiData } from '~/lib/content-adapter';
 import { useAuthStore } from '~/store/auth-store';
 
 type NotificationType = 'FOLLOW' | 'LIKE' | 'COMMENT' | 'REPLY' | 'MENTION';
@@ -101,30 +101,25 @@ export default function Notifications() {
     const actorIds = Array.from(new Set(notifications.map((item) => item.actorUserId)))
       .filter((id) => id && !requestedActorsRef.current.has(id));
     actorIds.forEach((id) => requestedActorsRef.current.add(id));
-    const results = await Promise.all(actorIds.map(async (id) => {
-      try {
-        const result = await apiRequest<unknown>('/users/' + encodeURIComponent(id), {
-          method: 'GET',
-          signal,
-        });
-        if (!result.response.ok) return null;
-        const profile = unwrapApiData<PublicUser>(result.data);
-        return profile?.id ? profile : null;
-      } catch {
-        return null;
-      }
-    }));
-    if (signal.aborted) return;
+    const results = await Promise.all(actorIds.map(async (id) => ({
+      id,
+      profile: await resolvePublicProfileById(id, signal),
+    })));
+    if (signal.aborted) {
+      actorIds.forEach((id) => requestedActorsRef.current.delete(id));
+      return;
+    }
     setActorProfiles((current) => {
       const next = { ...current };
-      for (const profile of results) {
-        if (profile?.id) next[profile.id] = profile;
+      // Key by the notification's actor ID, not the mapped Payload profile ID.
+      for (const result of results) {
+        if (result.profile?.id) next[result.id] = result.profile;
       }
       return next;
     });
     // Permit retry for profile lookups that failed transiently.
-    results.forEach((profile, index) => {
-      if (!profile) requestedActorsRef.current.delete(actorIds[index]);
+    results.forEach((result) => {
+      if (!result.profile) requestedActorsRef.current.delete(result.id);
     });
   }, []);
 
