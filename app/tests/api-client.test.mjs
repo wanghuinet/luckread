@@ -217,6 +217,41 @@ test('likes through the real API client with an idempotency key and reconciles c
   });
 });
 
+test('unlikes through DELETE and reconciles the server count after a 204 response', async () => {
+  const contentId = 'stage3-unlike-toggle-content';
+  let getCount = 0;
+  let deleteInit;
+  pendingFetch = async (input, init) => {
+    const url = new URL(String(input));
+    const method = String(init.method || 'GET').toUpperCase();
+    if (method === 'GET') {
+      getCount += 1;
+      const data = getCount === 1 ? { liked: true, likeCount: 5 } : { liked: false, likeCount: 4 };
+      return new Response(JSON.stringify({ data }), { status: 200 });
+    }
+    deleteInit = init;
+    return new Response(null, { status: 204 });
+  };
+
+  await refreshContentLikeStatus(contentId);
+  const outcome = await toggleContentLike(contentId);
+
+  const headers = new Headers(deleteInit.headers);
+  expect(outcome.ok).toBe(true);
+  expect(String(deleteInit.method).toUpperCase()).toBe('DELETE');
+  expect(headers.get('Idempotency-Key')).toBeTruthy();
+  expect(headers.get('Authorization')).toBe('Bearer secure-test-token');
+  expect(JSON.parse(String(deleteInit.body))).toEqual({ targetType: 'content', targetId: contentId });
+  expect(getCount).toBe(2);
+  expect(getContentLikeSnapshot(contentId)).toMatchObject({
+    liked: false,
+    likeCount: 4,
+    loading: false,
+    pending: false,
+    error: null,
+  });
+});
+
 test('rolls back the optimistic like state after an authorization failure', async () => {
   const contentId = 'stage3-like-rollback-content';
   let mutationCount = 0;
