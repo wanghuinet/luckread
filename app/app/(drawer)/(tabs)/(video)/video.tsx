@@ -11,7 +11,7 @@ import {
 import { FlashList } from '@shopify/flash-list';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { useEvent } from 'expo';
-import Icon from 'react-native-vector-icons/FontAwesome';
+import { FontAwesome as Icon } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import Fontisto from '@expo/vector-icons/Fontisto';
