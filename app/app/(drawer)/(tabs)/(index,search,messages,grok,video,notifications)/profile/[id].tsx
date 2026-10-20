@@ -51,7 +51,7 @@ import { FeedItem, FeedContent, ProfileImage, PROFILE_IMAGE_SIZE_MAP } from '~/c
 import FollowButton from '~/components/FollowButton';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { apiRequest, getApiErrorMessage } from '~/lib/api-client';
-import { mapContentToFeedContent, readContentBody, readContentSocial, readContentAuthor, resolveNativeMediaSource, unwrapApiData, type ApiContentPage, type ApiContentRecord } from '~/lib/content-adapter';
+import { mapContentToFeedContent, readContentBody, readContentSocial, readContentAuthor, resolveNativeMediaSource, resolvePublicProfileById, unwrapApiData, type ApiContentPage, type ApiContentRecord } from '~/lib/content-adapter';
 import { useAuthStore } from '~/store/auth-store';
 import { readSessionToken } from '~/lib/secure-session';
 import Messages from "~/assets/svg/tabs/messages.svg"
@@ -556,22 +556,12 @@ export default function UserProfileScreen() {
       }>(profileResult.data) : null;
 
       if (!profile?.id) {
-        profileResult = await apiRequest<{
-          id?: string; username?: string; displayName?: string | null; bio?: string | null; avatar?: string | null;
-          website?: string | null; category?: string | null; createdAt?: string; followerCount?: number; followingCount?: number;
-          coverImage?: string | null; headerImage?: string | null; isVerified?: boolean; verifiedBadge?: string | null;
-          isOrganization?: boolean; error?: { message?: string };
-        }>('/users/' + encodeURIComponent(userHandle), { method: 'GET', signal: controller.signal });
-        profile = profileResult.response.ok ? unwrapApiData<{
-          id?: string; username?: string; displayName?: string | null; bio?: string | null; avatar?: string | null;
-          website?: string | null; category?: string | null; createdAt?: string; followerCount?: number; followingCount?: number;
-          coverImage?: string | null; headerImage?: string | null; isVerified?: boolean; verifiedBadge?: string | null;
-          isOrganization?: boolean;
-        }>(profileResult.data) : null;
+        // The public profile ID and Better Auth identity ID can differ. Reuse
+        // the existing identity mapping instead of inventing a profile.
+        profile = await resolvePublicProfileById(userHandle, controller.signal);
       }
-
-      if (!profileResult.response.ok || !profile?.id) {
-        throw new Error(getApiErrorMessage(profileResult.data, 'Could not load this profile.'));
+      if (!profile?.id) {
+        throw new Error(getApiErrorMessage(profileResult.data, 'Could not load this profile.', profileResult.response.status));
       }
       if (controller.signal.aborted) return;
 
