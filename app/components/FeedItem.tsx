@@ -483,7 +483,6 @@ export const FeedItemDetailView: React.FC<FeedItemProps> = ({ itemData, onPress,
     const { colorScheme } = useColorScheme();
 
 
-    const userInfo = itemData.contentId ? undefined : findUserById(itemData.poster_id);
     const mediaItems = itemData.media_items?.length
         ? itemData.media_items
         : itemData.media_url
@@ -491,15 +490,15 @@ export const FeedItemDetailView: React.FC<FeedItemProps> = ({ itemData, onPress,
             : [];
 
 
-    const authorName = itemData.authorName || userInfo?.name || 'Unknown';
-    const authorHandle = itemData.authorHandle || userInfo?.handle || 'unknown';
+    const authorName = itemData.authorName || 'LuckRead 用户';
+    const authorHandle = itemData.authorHandle || 'unknown';
     const profileIdentifier = itemData.contentId && itemData.poster_id && itemData.poster_id !== 'unknown'
         ? itemData.poster_id
         : authorHandle;
-    const authorImageUrl = itemData.authorImageUrl || userInfo?.profile_picture || '';
+    const authorImageUrl = itemData.authorImageUrl || '';
     const authorImageHeaders = itemData.authorImageHeaders;
-    const isOrganization = itemData.is_organization || userInfo?.is_organization || false;
-    const verified_badge = itemData?.verified_badge || userInfo?.verified_badge;
+    const isOrganization = itemData.is_organization || false;
+    const verified_badge = itemData?.verified_badge;
 
     const router = useRouter();
 
