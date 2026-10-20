@@ -398,6 +398,11 @@ export const FeedItemDetailView: React.FC<FeedItemProps> = ({ itemData, onPress,
 
 
     const userInfo = findUserById(itemData.poster_id);
+    const mediaItems = itemData.media_items?.length
+        ? itemData.media_items
+        : itemData.media_url
+            ? [{ src: itemData.media_url, kind: 'image' as const }]
+            : [];
 
 
     const authorName = itemData.authorName || userInfo?.name || 'Unknown';
