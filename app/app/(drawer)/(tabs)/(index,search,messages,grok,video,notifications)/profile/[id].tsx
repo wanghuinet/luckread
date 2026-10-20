@@ -414,7 +414,7 @@ const ProfileHeader = ({ navBarVisibility, scrollOffset, refreshing, user, curre
             </TouchableOpacity>
           ) : (
             <View className="absolute bottom-0 right-0">
-              <FollowButton targetUsername={targetUsername} />
+              <FollowButton targetUsername={user.handle} />
             </View>
           )}
 
