@@ -5,7 +5,7 @@ import RepostButton from './RepostButton';
 import BookmarkButton from './BookmarkButton';
 import Views from "~/assets/svg/views.svg";
 import LikeButton from './LikeButton';
-import { Feather } from '@expo/vector-icons';
+import ShareButton from './ShareButton';
 
 type EngagementData = {
     contentId?: string;
@@ -16,6 +16,7 @@ type EngagementData = {
     like_count?: number;
     view_count?: string;
     save_count?: number;
+    message?: string;
 };
 
 export const EngagementActions = ({ detailView, itemData }: { detailView?: boolean; itemData?: EngagementData }) => {
@@ -52,9 +53,11 @@ export const EngagementActions = ({ detailView, itemData }: { detailView?: boole
 
             <BookmarkButton contentId={itemData?.contentId} iconColor={iconColor} />
 
-            <TouchableOpacity className="flex-row items-center gap-1.5">
-                <Feather name="share" size={18} color={iconColor} />
-            </TouchableOpacity>
+            <ShareButton
+                contentId={itemData?.contentId}
+                contentText={itemData?.message}
+                iconColor={iconColor}
+            />
         </View>
     );
 };
