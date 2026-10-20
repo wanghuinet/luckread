@@ -1,0 +1,60 @@
+name: Temporary W01 Next.js lock sync
+
+on:
+  push:
+    branches:
+      - chore/payload-version-align-3.90.2
+    paths:
+      - workers/W01-payload/package.json
+      - .github/workflows/temporary-w01-next-lock-sync.yml
+
+permissions:
+  contents: write
+
+jobs:
+  sync-w01-lock:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout alignment branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 0
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.5
+          run_install: false
+      - name: Regenerate W01 lockfile
+        working-directory: workers/W01-payload
+        run: pnpm install --lockfile-only --ignore-workspace
+      - name: Commit generated W01 lockfile
+        run: |
+          if git diff --quiet -- workers/W01-payload/pnpm-lock.yaml; then
+            echo "W01 pnpm-lock.yaml already current"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+users.noreply.github.com"
+            git add workers/W01-payload/pnpm-lock.yaml
+            git commit -m "chore: sync W01 lockfile for Next.js 16.3.3"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          fi
+      - name: Install frozen W01 dependencies
+        working-directory: workers/W01-payload
+        run: pnpm install --frozen-lockfile --ignore-workspace
+      - name: Verify Next.js package versions
+        working-directory: workers/W01-payload
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs'
+          const pkg = JSON.parse(readFileSync('package.json', 'utf8'))
+          const lock = readFileSync('pnpm-lock.yaml', 'utf8')
+          if (pkg.dependencies.next !== '16.3.3') throw new Error('next must be 16.3.3')
+          if (pkg.devDependencies['eslint-config-next'] !== '16.3.3') throw new Error('eslint-config-next must be 16.3.3')
+          if (!lock.includes('next@16.3.3')) throw new Error('lockfile missing Next.js 16.3.3')
+          console.log('W01 Next.js and eslint-config-next pins verified')
+          NODE
