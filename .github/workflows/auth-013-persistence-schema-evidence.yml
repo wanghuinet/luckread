@@ -19,7 +19,54 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  validate-pr-config:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate W01 config without production credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const config = JSON.parse(fs.readFileSync('workers/W01-payload/wrangler.jsonc', 'utf8'));
+          const pkg = JSON.parse(fs.readFileSync('workers/W01-payload/package.json', 'utf8'));
+          const workflow = fs.readFileSync('.github/workflows/auth-013-persistence-schema-evidence.yml', 'utf8');
+          const d1 = (config.d1_databases ?? []).find((item) => item.binding === 'D1' && item.database_name === 'luckread');
+          if (!d1) throw new Error('W01 luckread D1 binding is missing');
+          if (Object.hasOwn(d1, 'remote')) throw new Error('Unsupported D1 remote field must not be configured');
+          if (!Array.isArray(config.ratelimits) || config.ratelimits.length === 0) {
+            throw new Error('W01 rate-limit bindings must remain configured');
+          }
+          if (pkg.devDependencies?.wrangler !== '~4.116.0') {
+            throw new Error('W01 Wrangler dependency is not pinned to ~4.116.0');
+          }
+          if (!workflow.includes('WRANGLER_VERSION: "4.116.0"')) {
+            throw new Error('AUTH-013 workflow version does not match the W01 Wrangler baseline');
+          }
+          for (const command of [
+            "PRAGMA table_info(\"users\");",
+            "PRAGMA index_list(\"users\");",
+            "SELECT COUNT(*) AS users_count FROM users;",
+            "SELECT id,name,batch FROM payload_migrations ORDER BY id;",
+          ]) {
+            if (!workflow.includes(command)) throw new Error('AUTH-013 read-only query missing: ' + command);
+          }
+          console.log(JSON.stringify({
+            AUTH_013_PR_CONFIG_VALIDATION: 'PASS',
+            database: d1.database_name,
+            d1Binding: d1.binding,
+            rateLimitBindings: config.ratelimits.length,
+            wranglerVersion: pkg.devDependencies.wrangler,
+            remoteEvidence: 'deferred to main push or manual dispatch; requires Cloudflare credentials',
+          }, null, 2));
+          NODE
+
   schema-evidence:
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     env:
       WRANGLER_VERSION: "4.116.0"
