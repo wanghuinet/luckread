@@ -2,7 +2,7 @@ import { Text, TouchableOpacity, View } from 'react-native';
 import { useColorScheme } from "nativewind";
 import Comment from "~/assets/svg/comment.svg";
 import RepostButton from './RepostButton';
-import Save from "~/assets/svg/save.svg";
+import BookmarkButton from './BookmarkButton';
 import Views from "~/assets/svg/views.svg";
 import LikeButton from './LikeButton';
 import { Feather } from '@expo/vector-icons';
@@ -50,10 +50,7 @@ export const EngagementActions = ({ detailView, itemData }: { detailView?: boole
             )}
 
 
-            <TouchableOpacity className="flex-row items-center gap-1.5">
-                <Save width={18} height={18} fill={iconColor} />
-                {detailView && <Text className={textColor}>{itemData?.save_count}</Text>}
-            </TouchableOpacity>
+            <BookmarkButton contentId={itemData?.contentId} iconColor={iconColor} />
 
             <TouchableOpacity className="flex-row items-center gap-1.5">
                 <Feather name="share" size={18} color={iconColor} />

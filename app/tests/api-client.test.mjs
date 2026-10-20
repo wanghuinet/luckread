@@ -32,6 +32,12 @@ const {
 } = await import('../lib/content-repost-state.ts');
 
 const {
+  getContentBookmarkSnapshot,
+  refreshContentBookmarkStatus,
+  toggleContentBookmark,
+} = await import('../lib/content-bookmark-state.ts');
+
+const {
   getUserFollowSnapshot,
   refreshUserFollowStatus,
   resolveUserProfileId,
@@ -675,4 +681,168 @@ test('does not invent a canonical follow target when username lookup returns 404
   expect(result.status).toBe(404);
   expect(result.message).toBe('User not found');
   expect(capturedMethod).toBe('GET');
+});
+
+
+test('loads authoritative bookmark state from the existing W01/W05 endpoint', async () => {
+  const contentId = 'stage3-bookmark-status-content';
+  let capturedUrl;
+  let capturedHeaders;
+  pendingFetch = async (input, init) => {
+    capturedUrl = new URL(String(input));
+    capturedHeaders = new Headers(init.headers);
+    return new Response(JSON.stringify({ data: { favorited: true } }), { status: 200 });
+  };
+
+  await refreshContentBookmarkStatus(contentId);
+
+  expect(capturedUrl.pathname).toBe('/api/v1/interactions/bookmarks');
+  expect(capturedUrl.searchParams.get('targetType')).toBe('content');
+  expect(capturedUrl.searchParams.get('targetId')).toBe(contentId);
+  expect(capturedHeaders.get('Authorization')).toBe('Bearer secure-test-token');
+  expect(getContentBookmarkSnapshot(contentId)).toMatchObject({
+    bookmarked: true,
+    loaded: true,
+    loading: false,
+    pending: false,
+    error: null,
+  });
+});
+
+test('creates a bookmark through POST and reconciles the current viewer state', async () => {
+  const contentId = 'stage3-bookmark-toggle-content';
+  let getCount = 0;
+  let mutationRequest;
+  pendingFetch = async (input, init) => {
+    const url = new URL(String(input));
+    const method = String(init.method || 'GET').toUpperCase();
+    if (method === 'GET') {
+      getCount += 1;
+      return new Response(JSON.stringify({
+        data: { favorited: getCount > 1 },
+      }), { status: 200 });
+    }
+    mutationRequest = { url, init };
+    return new Response(JSON.stringify({
+      data: { relationshipId: 'bookmark-stage3', targetId: contentId },
+    }), { status: 200 });
+  };
+
+  await refreshContentBookmarkStatus(contentId);
+  const outcome = await toggleContentBookmark(contentId);
+
+  const headers = new Headers(mutationRequest.init.headers);
+  expect(outcome.ok).toBe(true);
+  expect(mutationRequest.url.pathname).toBe('/api/v1/interactions/bookmarks');
+  expect(String(mutationRequest.init.method).toUpperCase()).toBe('POST');
+  expect(JSON.parse(String(mutationRequest.init.body))).toEqual({ targetType: 'content', targetId: contentId });
+  expect(headers.get('Authorization')).toBe('Bearer secure-test-token');
+  expect(headers.get('Idempotency-Key')).toBeTruthy();
+  expect(getCount).toBe(2);
+  expect(getContentBookmarkSnapshot(contentId)).toMatchObject({
+    bookmarked: true,
+    loaded: true,
+    pending: false,
+    loading: false,
+    error: null,
+  });
+});
+
+test('removes a bookmark through DELETE and accepts the contract 204 response', async () => {
+  const contentId = 'stage3-unbookmark-toggle-content';
+  let getCount = 0;
+  let deleteInit;
+  pendingFetch = async (_input, init) => {
+    const method = String(init.method || 'GET').toUpperCase();
+    if (method === 'GET') {
+      getCount += 1;
+      return new Response(JSON.stringify({
+        data: { favorited: getCount === 1 },
+      }), { status: 200 });
+    }
+    deleteInit = init;
+    return new Response(null, { status: 204 });
+  };
+
+  await refreshContentBookmarkStatus(contentId);
+  const outcome = await toggleContentBookmark(contentId);
+
+  const headers = new Headers(deleteInit.headers);
+  expect(outcome.ok).toBe(true);
+  expect(String(deleteInit.method).toUpperCase()).toBe('DELETE');
+  expect(JSON.parse(String(deleteInit.body))).toEqual({ targetType: 'content', targetId: contentId });
+  expect(headers.get('Authorization')).toBe('Bearer secure-test-token');
+  expect(headers.get('Idempotency-Key')).toBeTruthy();
+  expect(getCount).toBe(2);
+  expect(getContentBookmarkSnapshot(contentId)).toMatchObject({
+    bookmarked: false,
+    loaded: true,
+    pending: false,
+    loading: false,
+    error: null,
+  });
+});
+
+test('rolls back bookmark state when W01/W05 rejects the mutation', async () => {
+  const contentId = 'stage3-bookmark-rollback-content';
+  pendingFetch = async (_input, init) => {
+    const method = String(init.method || 'GET').toUpperCase();
+    if (method === 'GET') {
+      return new Response(JSON.stringify({ data: { favorited: false } }), { status: 200 });
+    }
+    return new Response(JSON.stringify({
+      error: { code: 'FORBIDDEN', message: 'You do not have permission to bookmark this content.' },
+    }), { status: 403 });
+  };
+
+  await refreshContentBookmarkStatus(contentId);
+  const outcome = await toggleContentBookmark(contentId);
+
+  expect(outcome).toMatchObject({ ok: false, status: 403 });
+  expect(outcome.message).toContain('permission');
+  expect(getContentBookmarkSnapshot(contentId)).toMatchObject({
+    bookmarked: false,
+    loaded: true,
+    pending: false,
+    loading: false,
+  });
+});
+
+test('deduplicates rapid bookmark taps while a POST is in flight', async () => {
+  const contentId = 'stage3-bookmark-deduplicate-content';
+  let mutationCount = 0;
+  let releasePost;
+  let markPostStarted;
+  const postStarted = new Promise((resolve) => { markPostStarted = resolve; });
+
+  pendingFetch = async (_input, init) => {
+    const method = String(init.method || 'GET').toUpperCase();
+    if (method === 'GET') {
+      return new Response(JSON.stringify({
+        data: { favorited: mutationCount > 0 },
+      }), { status: 200 });
+    }
+    mutationCount += 1;
+    markPostStarted();
+    return await new Promise((resolve) => {
+      releasePost = () => resolve(new Response(JSON.stringify({
+        data: { relationshipId: 'bookmark-stage3-once', targetId: contentId },
+      }), { status: 200 }));
+    });
+  };
+
+  await refreshContentBookmarkStatus(contentId);
+  const firstToggle = toggleContentBookmark(contentId);
+  await postStarted;
+  const secondToggle = await toggleContentBookmark(contentId);
+
+  expect(secondToggle.ok).toBe(false);
+  expect(mutationCount).toBe(1);
+  releasePost();
+  expect((await firstToggle).ok).toBe(true);
+  expect(getContentBookmarkSnapshot(contentId)).toMatchObject({
+    bookmarked: true,
+    loaded: true,
+    pending: false,
+  });
 });
