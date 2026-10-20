@@ -34,7 +34,7 @@ jobs:
       - name: Expo dependency compatibility
         run: bunx expo install --check
       - name: TypeScript
-        run: bunx tsc --noEmit
+        run: bunx tsc --noEmit -p tsconfig.integration.json
       - name: Lint
         run: bun run lint
       - name: Android native prebuild
