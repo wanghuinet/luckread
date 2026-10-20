@@ -3,6 +3,12 @@ name: AUTH-013 Persistence Schema Evidence
 on:
   push:
     branches: [main]
+  pull_request:
+    paths:
+      - '.github/workflows/auth-013-persistence-schema-evidence.yml'
+      - 'workers/W01-payload/wrangler.jsonc'
+      - 'workers/W01-payload/package.json'
+      - 'workers/W01-payload/pnpm-lock.yaml'
   workflow_dispatch:
 
 permissions:
@@ -13,10 +19,79 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  validate-pr-config:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate W01 config without production credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const vm = require('node:vm');
+          const config = JSON.parse(fs.readFileSync('workers/W01-payload/wrangler.jsonc', 'utf8'));
+          const pkg = JSON.parse(fs.readFileSync('workers/W01-payload/package.json', 'utf8'));
+          const workflow = fs.readFileSync('.github/workflows/auth-013-persistence-schema-evidence.yml', 'utf8');
+          for (const marker of [
+            '/user/tokens/verify',
+            '/accounts/${encodeURIComponent(accountId)}/tokens/verify',
+            'cfat_',
+            'cfut_',
+            '/d1/database/${database.database_id}',
+          ]) {
+            if (!workflow.includes(marker)) {
+              throw new Error('AUTH-013 credential-type-aware preflight marker is missing: ' + marker);
+            }
+          }
+          const preflightJobStart = workflow.indexOf('      - name: Verify Cloudflare token type and D1 read access before evidence capture');
+          const preflightCommandStart = workflow.indexOf("node - <<'NODE'\n", preflightJobStart);
+          if (preflightJobStart < 0 || preflightCommandStart < 0) {
+            throw new Error('AUTH-013 authentication preflight Node script is missing');
+          }
+          const sourceStart = preflightCommandStart + "node - <<'NODE'\n".length;
+          const sourceEnd = workflow.indexOf('\n          NODE\n', sourceStart);
+          if (sourceEnd < 0) throw new Error('AUTH-013 authentication preflight heredoc is unterminated');
+          const preflightSource = workflow.slice(sourceStart, sourceEnd).replace(/^ {10}/gm, '');
+          new vm.Script(preflightSource, { filename: 'auth-013-cloudflare-preflight.js' });
+          const d1 = (config.d1_databases ?? []).find((item) => item.binding === 'D1' && item.database_name === 'luckread');
+          if (!d1) throw new Error('W01 luckread D1 binding is missing');
+          if (Object.hasOwn(d1, 'remote')) throw new Error('Unsupported D1 remote field must not be configured');
+          if (!Array.isArray(config.ratelimits) || config.ratelimits.length === 0) {
+            throw new Error('W01 rate-limit bindings must remain configured');
+          }
+          if (pkg.devDependencies?.wrangler !== '~4.116.0') {
+            throw new Error('W01 Wrangler dependency is not pinned to ~4.116.0');
+          }
+          if (!workflow.includes('WRANGLER_VERSION: "4.116.0"')) {
+            throw new Error('AUTH-013 workflow version does not match the W01 Wrangler baseline');
+          }
+          for (const command of [
+            "PRAGMA table_info(\"users\");",
+            "PRAGMA index_list(\"users\");",
+            "SELECT COUNT(*) AS users_count FROM users;",
+            "SELECT id,name,batch FROM payload_migrations ORDER BY id;",
+          ]) {
+            if (!workflow.includes(command)) throw new Error('AUTH-013 read-only query missing: ' + command);
+          }
+          console.log(JSON.stringify({
+            AUTH_013_PR_CONFIG_VALIDATION: 'PASS',
+            database: d1.database_name,
+            d1Binding: d1.binding,
+            rateLimitBindings: config.ratelimits.length,
+            wranglerVersion: pkg.devDependencies.wrangler,
+            remoteEvidence: 'deferred to main push or manual dispatch; requires Cloudflare credentials',
+          }, null, 2));
+          NODE
+
   schema-evidence:
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     env:
-      WRANGLER_VERSION: "4.33.1"
+      WRANGLER_VERSION: "4.116.0"
       W01_WRANGLER_CONFIG: workers/W01-payload/wrangler.jsonc
       DATABASE_NAME: luckread
       EVIDENCE_ENVIRONMENT: CONTROLLED_REMOTE_D1
@@ -52,6 +127,118 @@ jobs:
           test -n "$CLOUDFLARE_ACCOUNT_ID"
           test -f "$W01_WRANGLER_CONFIG"
           mkdir -p artifacts/evidence/auth-013
+
+      - name: Verify Cloudflare token type and D1 read access before evidence capture
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          W01_WRANGLER_CONFIG: workers/W01-payload/wrangler.jsonc
+        run: |
+          set -euo pipefail
+          node - <<'NODE'
+          (async () => {
+            const token = process.env.CLOUDFLARE_API_TOKEN;
+            const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
+            if (!token) throw new Error('CLOUDFLARE_API_TOKEN is empty');
+            if (!accountId) throw new Error('CLOUDFLARE_ACCOUNT_ID is empty');
+
+            const fs = require('node:fs');
+            const config = JSON.parse(fs.readFileSync(process.env.W01_WRANGLER_CONFIG, 'utf8'));
+            const database = (config.d1_databases ?? []).find(
+              (item) => item.binding === 'D1' && item.database_name === 'luckread',
+            );
+            if (!database?.database_id) throw new Error('W01 luckread D1 database_id is missing from Wrangler config');
+
+            const apiBase = 'https://api.cloudflare.com/client/v4';
+            const credentialKind = token.startsWith('cfat_')
+              ? 'account-owned-api-token'
+              : token.startsWith('cfut_')
+                ? 'user-api-token'
+                : token.startsWith('cfk_')
+                  ? 'global-api-key'
+                  : 'legacy-unprefixed-credential';
+            if (credentialKind === 'global-api-key') {
+              throw new Error('CLOUDFLARE_API_TOKEN appears to contain a Global API Key, not an API Token. This workflow expects a Bearer API Token; do not paste the credential value into logs.');
+            }
+
+            const verificationCandidates = credentialKind === 'account-owned-api-token'
+              ? [{
+                  kind: 'account-owned-api-token',
+                  url: `${apiBase}/accounts/${encodeURIComponent(accountId)}/tokens/verify`,
+                }]
+              : credentialKind === 'user-api-token'
+                ? [{
+                    kind: 'user-api-token',
+                    url: `${apiBase}/user/tokens/verify`,
+                  }]
+                : [
+                    {
+                      kind: 'account-owned-api-token',
+                      url: `${apiBase}/accounts/${encodeURIComponent(accountId)}/tokens/verify`,
+                    },
+                    {
+                      kind: 'user-api-token',
+                      url: `${apiBase}/user/tokens/verify`,
+                    },
+                  ];
+
+            const headers = { Authorization: `Bearer ${token}` };
+            let verified = false;
+            const verificationResults = [];
+            for (const candidate of verificationCandidates) {
+              const response = await fetch(candidate.url, { headers });
+              const body = await response.json().catch(() => ({}));
+              const errors = Array.isArray(body.errors)
+                ? body.errors.map(({ code, message }) => ({ code, message }))
+                : [];
+              const result = {
+                check: 'cloudflare-token-verification',
+                credentialKind,
+                endpointKind: candidate.kind,
+                httpStatus: response.status,
+                success: body.success === true,
+                tokenStatus: body.result?.status ?? null,
+                errors,
+              };
+              verificationResults.push(result);
+              console.log(JSON.stringify(result, null, 2));
+              if (response.ok && body.success === true && body.result?.status === 'active') {
+                verified = true;
+                break;
+              }
+            }
+            if (!verified) {
+              console.error(JSON.stringify({
+                check: 'cloudflare-token-verification-summary',
+                success: false,
+                attemptedEndpointKinds: verificationResults.map((item) => item.endpointKind),
+                note: 'User-owned and account-owned API tokens use different verification endpoints. A token-type mismatch must not be diagnosed as a D1 permission failure.',
+              }, null, 2));
+              throw new Error('Cloudflare did not validate the credential on the token-type-appropriate verification endpoint(s). Check whether the secret is a supported API Token and whether CLOUDFLARE_ACCOUNT_ID matches the token-owning account.');
+            }
+
+            const d1Url = `${apiBase}/accounts/${encodeURIComponent(accountId)}/d1/database/${database.database_id}`;
+            const d1Response = await fetch(d1Url, { headers });
+            const d1Body = await d1Response.json().catch(() => ({}));
+            const d1Errors = Array.isArray(d1Body.errors)
+              ? d1Body.errors.map(({ code, message }) => ({ code, message }))
+              : [];
+            console.log(JSON.stringify({
+              check: 'w01-d1-metadata-read',
+              httpStatus: d1Response.status,
+              success: d1Body.success === true,
+              databaseName: d1Body.result?.name ?? null,
+              errors: d1Errors,
+            }, null, 2));
+            if (!d1Response.ok || d1Body.success !== true) {
+              throw new Error('Token verification passed but D1 metadata read failed; check Account ID, D1 Read scope, and resource scope.');
+            }
+          })().catch((error) => {
+            console.error(error.message || 'Cloudflare authentication preflight failed');
+            process.exitCode = 1;
+          });
+          NODE
 
       - name: Capture D1 metadata
         shell: bash
