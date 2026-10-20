@@ -1,0 +1,211 @@
+name: LuckRead Android Beta Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_name:
+        description: Android versionName for this Beta build
+        required: true
+        type: string
+        default: "1.0.0-beta.1"
+      version_code:
+        description: Android versionCode (increase for every new release)
+        required: true
+        type: number
+        default: 1
+      publish_release:
+        description: Publish the signed APK to GitHub Releases
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: luckread-android-beta-release
+  cancel-in-progress: false
+
+env:
+  EXPO_NO_TELEMETRY: "1"
+  CI: "1"
+
+jobs:
+  android-beta-release:
+    name: Build and verify standalone Android Beta APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v5
+
+      - name: Prepare stable or temporary test signing keystore
+        id: signing
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD_SECRET: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS_SECRET: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD_SECRET: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          PUBLISH_RELEASE: ${{ inputs.publish_release }}
+        run: |
+          mkdir -p android/app
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ] && [ -n "$ANDROID_KEYSTORE_PASSWORD_SECRET" ] && [ -n "$ANDROID_KEY_ALIAS_SECRET" ] && [ -n "$ANDROID_KEY_PASSWORD_SECRET" ]; then
+            printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/app/luckread-release.keystore
+            chmod 600 android/app/luckread-release.keystore
+            {
+              echo "ANDROID_KEYSTORE_PATH=$GITHUB_WORKSPACE/app/android/app/luckread-release.keystore"
+              echo "ANDROID_KEYSTORE_PASSWORD=$ANDROID_KEYSTORE_PASSWORD_SECRET"
+              echo "ANDROID_KEY_ALIAS=$ANDROID_KEY_ALIAS_SECRET"
+              echo "ANDROID_KEY_PASSWORD=$ANDROID_KEY_PASSWORD_SECRET"
+              echo "LUCKREAD_STABLE_SIGNING=true"
+              echo "stable_signing=true" >> "$GITHUB_OUTPUT"
+            } >> "$GITHUB_ENV"
+            echo "Using repository-configured stable Android signing key."
+          else
+            if [ "$PUBLISH_RELEASE" = "true" ]; then
+              echo "::error::Publishing to GitHub Releases requires the stable Android signing secrets. Disable publish_release to create a temporary phone-test APK."
+              exit 1
+            fi
+            STORE_PASSWORD="$(openssl rand -hex 16)"
+            KEY_PASSWORD="$(openssl rand -hex 16)"
+            KEY_ALIAS="luckread-beta-test"
+            KEYSTORE_PATH="$GITHUB_WORKSPACE/app/android/app/luckread-test.keystore"
+            keytool -genkeypair -noprompt -v \
+              -keystore "$KEYSTORE_PATH" \
+              -storetype JKS \
+              -storepass "$STORE_PASSWORD" \
+              -keypass "$KEY_PASSWORD" \
+              -alias "$KEY_ALIAS" \
+              -keyalg RSA -keysize 2048 -validity 3650 \
+              -dname "CN=LuckRead Beta Test, OU=Mobile, O=LuckRead, L=NA, ST=NA, C=US"
+            chmod 600 "$KEYSTORE_PATH"
+            {
+              echo "ANDROID_KEYSTORE_PATH=$KEYSTORE_PATH"
+              echo "ANDROID_KEYSTORE_PASSWORD=$STORE_PASSWORD"
+              echo "ANDROID_KEY_ALIAS=$KEY_ALIAS"
+              echo "ANDROID_KEY_PASSWORD=$KEY_PASSWORD"
+              echo "LUCKREAD_STABLE_SIGNING=false"
+              echo "stable_signing=false" >> "$GITHUB_OUTPUT"
+            } >> "$GITHUB_ENV"
+            echo "::warning::Generated a temporary signing key. This APK is for device testing only and will not be published to GitHub Releases."
+          fi
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22.13.1"
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.1.38"
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Configure Android SDK
+        run: |
+          SDK_ROOT="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          echo "ANDROID_HOME=$SDK_ROOT" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$SDK_ROOT" >> "$GITHUB_ENV"
+          SDKMANAGER="$(find "$SDK_ROOT/cmdline-tools" -type f -name sdkmanager -print -quit)"
+          if [ -z "$SDKMANAGER" ]; then
+            echo "Android SDK command-line tools not found under $SDK_ROOT/cmdline-tools" >&2
+            exit 1
+          fi
+          yes | "$SDKMANAGER" --licenses
+          "$SDKMANAGER" "platform-tools" "platforms;android-35" "build-tools;35.0.0" "cmake;3.22.1" "ndk;26.1.10909125"
+
+      - name: Install Expo app dependencies
+        run: bun install
+
+      - name: Set requested app version and Android versionCode
+        env:
+          BETA_VERSION_NAME: ${{ inputs.version_name }}
+          BETA_VERSION_CODE: ${{ inputs.version_code }}
+        run: |
+          node <<'NODE'
+          const fs = require("node:fs");
+          const version = process.env.BETA_VERSION_NAME ?? "";
+          const versionCode = Number(process.env.BETA_VERSION_CODE);
+          if (!/^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/.test(version)) {
+            throw new Error("version_name must look like 1.0.0 or 1.0.0-beta.1");
+          }
+          if (!Number.isSafeInteger(versionCode) || versionCode < 1) {
+            throw new Error("version_code must be a positive integer");
+          }
+          const config = JSON.parse(fs.readFileSync("app.json", "utf8"));
+          config.expo.version = version;
+          config.expo.android = { ...config.expo.android, versionCode };
+          fs.writeFileSync("app.json", JSON.stringify(config, null, 2) + "\n");
+          console.log(`Building LuckRead Android ${version} (versionCode ${versionCode})`);
+          NODE
+          bunx expo config --type public
+
+      - name: Generate Android native project
+        run: bunx expo prebuild --platform android --clean --no-install
+
+      - name: Compile signed Release APK with embedded JavaScript bundle
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          chmod +x android/gradlew
+          cd android
+          ./gradlew :app:assembleRelease --no-daemon
+
+      - name: Verify APK bundle and signing
+        run: |
+          APK="android/app/build/outputs/apk/release/app-release.apk"
+          test -s "$APK" || { echo "Release APK was not created" >&2; exit 1; }
+          if ! unzip -l "$APK" | grep -Eq 'assets/index\.android\.bundle'; then
+            echo "Release APK is missing assets/index.android.bundle; refusing to publish a Metro-dependent build." >&2
+            exit 1
+          fi
+          APKSIGNER="$(find "${ANDROID_HOME:-/usr/local/lib/android/sdk}/build-tools" -type f -name apksigner -print | sort -V | tail -n 1)"
+          test -n "$APKSIGNER" || { echo "Android apksigner was not found" >&2; exit 1; }
+          "$APKSIGNER" verify --verbose --print-certs "$APK"
+          mkdir -p "$GITHUB_WORKSPACE/dist"
+          VERSION_NAME="${{ inputs.version_name }}"
+          VERSION_CODE="${{ inputs.version_code }}"
+          SIGNING_KIND="test"
+          if [ "$LUCKREAD_STABLE_SIGNING" = "true" ]; then SIGNING_KIND="signed"; fi
+          APK_NAME="LuckRead-Android-Beta-$VERSION_NAME-$SIGNING_KIND-code$VERSION_CODE.apk"
+          cp "$APK" "$GITHUB_WORKSPACE/dist/$APK_NAME"
+          (cd "$GITHUB_WORKSPACE/dist" && sha256sum "$APK_NAME" > "$APK_NAME.sha256")
+          echo "Verified signed APK: dist/$APK_NAME"
+          ls -lh "$GITHUB_WORKSPACE/dist"
+
+      - name: Upload downloadable APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: luckread-android-beta-${{ inputs.version_name }}-code-${{ inputs.version_code }}
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish APK to GitHub Releases
+        if: ${{ inputs.publish_release && steps.signing.outputs.stable_signing == 'true' }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: luckread-android-beta-v${{ inputs.version_name }}-code${{ inputs.version_code }}
+          target_commitish: ${{ github.sha }}
+          name: LuckRead Android Beta ${{ inputs.version_name }} (code ${{ inputs.version_code }})
+          prerelease: true
+          draft: false
+          make_latest: false
+          generate_release_notes: true
+          overwrite_files: true
+          fail_on_unmatched_files: true
+          files: |
+            dist/LuckRead-Android-Beta-${{ inputs.version_name }}-signed-code${{ inputs.version_code }}.apk
+            dist/LuckRead-Android-Beta-${{ inputs.version_name }}-signed-code${{ inputs.version_code }}.apk.sha256
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

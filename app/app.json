@@ -25,7 +25,8 @@
         {
           "configureAndroidBackup": true
         }
-      ]
+      ],
+      "./plugins/withAndroidReleaseSigning"
     ],
     "experiments": {
       "typedRoutes": true,

@@ -53,6 +53,23 @@ jobs:
         run: bunx expo-doctor@latest
       - name: Check public Expo config
         run: bunx expo config --type public
+      - name: Verify generated Android Release signing configuration
+        run: |
+          bunx expo prebuild --platform android --clean --no-install
+          node <<'NODE'
+          const fs = require("node:fs");
+          const gradle = fs.readFileSync("android/app/build.gradle", "utf8");
+          const buildTypesStart = gradle.indexOf("\n    buildTypes {");
+          const releaseBlockStart = buildTypesStart >= 0 ? gradle.indexOf("\n        release {", buildTypesStart) : -1;
+          const releaseSuffix = releaseBlockStart >= 0 ? gradle.slice(releaseBlockStart) : "";
+          if (!releaseSuffix.includes("signingConfig signingConfigs.release")) {
+            throw new Error("Android Release build is not configured to use the stable Release keystore.");
+          }
+          if (!gradle.includes('System.getenv("ANDROID_KEYSTORE_PATH")')) {
+            throw new Error("Android Release build is missing environment-based keystore configuration.");
+          }
+          console.log("Android Release signing configuration is generated correctly.");
+          NODE
       - name: TypeScript typecheck
         run: bun run typecheck
       - name: Test unified native API client rules
