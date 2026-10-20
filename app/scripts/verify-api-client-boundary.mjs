@@ -34,13 +34,11 @@ async function scanDirectory(directory) {
     if (allowedFiles.has(relativePath)) continue;
 
     const source = await readFile(absolutePath, 'utf8');
-    const lines = source.split(/\r?\n/);
-    for (let index = 0; index < lines.length; index += 1) {
-      for (const rule of forbiddenPatterns) {
-        rule.pattern.lastIndex = 0;
-        if (rule.pattern.test(lines[index])) {
-          violations.push(relativePath + ':' + String(index + 1) + ' uses ' + rule.label);
-        }
+    for (const rule of forbiddenPatterns) {
+      rule.pattern.lastIndex = 0;
+      for (const match of source.matchAll(rule.pattern)) {
+        const line = source.slice(0, match.index).split(/\r?\n/).length;
+        violations.push(relativePath + ':' + String(line) + ' uses ' + rule.label);
       }
     }
   }
