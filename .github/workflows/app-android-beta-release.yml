@@ -17,7 +17,7 @@ on:
         description: Publish the signed APK to GitHub Releases
         required: true
         type: boolean
-        default: true
+        default: false
 
 permissions:
   contents: write
@@ -42,21 +42,52 @@ jobs:
       - name: Checkout source
         uses: actions/checkout@v5
 
-      - name: Validate Android release signing secrets
+      - name: Prepare stable or temporary test signing keystore
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_KEYSTORE_PASSWORD_SECRET: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS_SECRET: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD_SECRET: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          PUBLISH_RELEASE: ${{ inputs.publish_release }}
         run: |
-          missing=()
-          [ -n "$ANDROID_KEYSTORE_BASE64" ] || missing+=("ANDROID_KEYSTORE_BASE64")
-          [ -n "$ANDROID_KEYSTORE_PASSWORD" ] || missing+=("ANDROID_KEYSTORE_PASSWORD")
-          [ -n "$ANDROID_KEY_ALIAS" ] || missing+=("ANDROID_KEY_ALIAS")
-          [ -n "$ANDROID_KEY_PASSWORD" ] || missing+=("ANDROID_KEY_PASSWORD")
-          if [ "${#missing[@]}" -gt 0 ]; then
-            echo "::error::Android Beta Release requires repository Actions secrets: ${missing[*]}. Configure a stable Android signing keystore before publishing user-downloadable APKs."
-            exit 1
+          mkdir -p android/app
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ] && [ -n "$ANDROID_KEYSTORE_PASSWORD_SECRET" ] && [ -n "$ANDROID_KEY_ALIAS_SECRET" ] && [ -n "$ANDROID_KEY_PASSWORD_SECRET" ]; then
+            printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/app/luckread-release.keystore
+            chmod 600 android/app/luckread-release.keystore
+            {
+              echo "ANDROID_KEYSTORE_PATH=$GITHUB_WORKSPACE/app/android/app/luckread-release.keystore"
+              echo "ANDROID_KEYSTORE_PASSWORD=$ANDROID_KEYSTORE_PASSWORD_SECRET"
+              echo "ANDROID_KEY_ALIAS=$ANDROID_KEY_ALIAS_SECRET"
+              echo "ANDROID_KEY_PASSWORD=$ANDROID_KEY_PASSWORD_SECRET"
+              echo "LUCKREAD_STABLE_SIGNING=true"
+            } >> "$GITHUB_ENV"
+            echo "Using repository-configured stable Android signing key."
+          else
+            if [ "$PUBLISH_RELEASE" = "true" ]; then
+              echo "::error::Publishing to GitHub Releases requires the stable Android signing secrets. Disable publish_release to create a temporary phone-test APK."
+              exit 1
+            fi
+            STORE_PASSWORD="$(openssl rand -hex 16)"
+            KEY_PASSWORD="$(openssl rand -hex 16)"
+            KEY_ALIAS="luckread-beta-test"
+            KEYSTORE_PATH="$GITHUB_WORKSPACE/app/android/app/luckread-test.keystore"
+            keytool -genkeypair -noprompt -v \
+              -keystore "$KEYSTORE_PATH" \
+              -storetype JKS \
+              -storepass "$STORE_PASSWORD" \
+              -keypass "$KEY_PASSWORD" \
+              -alias "$KEY_ALIAS" \
+              -keyalg RSA -keysize 2048 -validity 3650 \
+              -dname "CN=LuckRead Beta Test, OU=Mobile, O=LuckRead, L=NA, ST=NA, C=US"
+            chmod 600 "$KEYSTORE_PATH"
+            {
+              echo "ANDROID_KEYSTORE_PATH=$KEYSTORE_PATH"
+              echo "ANDROID_KEYSTORE_PASSWORD=$STORE_PASSWORD"
+              echo "ANDROID_KEY_ALIAS=$KEY_ALIAS"
+              echo "ANDROID_KEY_PASSWORD=$KEY_PASSWORD"
+              echo "LUCKREAD_STABLE_SIGNING=false"
+            } >> "$GITHUB_ENV"
+            echo "::warning::Generated a temporary signing key. This APK is for device testing only and will not be published to GitHub Releases."
           fi
 
       - name: Set up Node.js
@@ -117,15 +148,6 @@ jobs:
       - name: Generate Android native project
         run: bunx expo prebuild --platform android --clean --no-install
 
-      - name: Prepare stable Release keystore
-        env:
-          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-        run: |
-          mkdir -p android/app
-          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/app/luckread-release.keystore
-          chmod 600 android/app/luckread-release.keystore
-          echo "ANDROID_KEYSTORE_PATH=$GITHUB_WORKSPACE/app/android/app/luckread-release.keystore" >> "$GITHUB_ENV"
-
       - name: Compile signed Release APK with embedded JavaScript bundle
         env:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
@@ -150,7 +172,9 @@ jobs:
           mkdir -p "$GITHUB_WORKSPACE/dist"
           VERSION_NAME="${{ inputs.version_name }}"
           VERSION_CODE="${{ inputs.version_code }}"
-          APK_NAME="LuckRead-Android-Beta-$VERSION_NAME-code$VERSION_CODE.apk"
+          SIGNING_KIND="test"
+          if [ "$LUCKREAD_STABLE_SIGNING" = "true" ]; then SIGNING_KIND="signed"; fi
+          APK_NAME="LuckRead-Android-Beta-$VERSION_NAME-$SIGNING_KIND-code$VERSION_CODE.apk"
           cp "$APK" "$GITHUB_WORKSPACE/dist/$APK_NAME"
           (cd "$GITHUB_WORKSPACE/dist" && sha256sum "$APK_NAME" > "$APK_NAME.sha256")
           echo "Verified signed APK: dist/$APK_NAME"
@@ -165,7 +189,7 @@ jobs:
           retention-days: 30
 
       - name: Publish APK to GitHub Releases
-        if: ${{ inputs.publish_release }}
+        if: ${{ inputs.publish_release && env.LUCKREAD_STABLE_SIGNING == 'true' }}
         uses: softprops/action-gh-release@v2
         with:
           tag_name: luckread-android-beta-v${{ inputs.version_name }}-code${{ inputs.version_code }}
@@ -178,7 +202,7 @@ jobs:
           overwrite_files: true
           fail_on_unmatched_files: true
           files: |
-            dist/LuckRead-Android-Beta-${{ inputs.version_name }}-code${{ inputs.version_code }}.apk
-            dist/LuckRead-Android-Beta-${{ inputs.version_name }}-code${{ inputs.version_code }}.apk.sha256
+            dist/LuckRead-Android-Beta-${{ inputs.version_name }}-signed-code${{ inputs.version_code }}.apk
+            dist/LuckRead-Android-Beta-${{ inputs.version_name }}-signed-code${{ inputs.version_code }}.apk.sha256
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
