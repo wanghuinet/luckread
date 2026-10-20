@@ -37,3 +37,5 @@ jobs:
           git add package-lock.json
           git commit -m "chore: sync npm lockfile for Payload 3.90.2"
           git push origin "HEAD:${GITHUB_REF_NAME}"
+      - name: Validate frozen root dependency installation
+        run: npm ci --ignore-scripts --no-audit --no-fund
