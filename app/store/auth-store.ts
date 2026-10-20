@@ -97,6 +97,7 @@ export const useAuthStore = create<AuthStore>((set) => ({
     const { response, data } = await apiRequest<LoginPayload>('/auth/login', {
       method: 'POST',
       auth: false,
+      idempotencyKey: false,
       body: JSON.stringify({ identity: normalizedIdentity, credential }),
     });
 
@@ -122,7 +123,7 @@ export const useAuthStore = create<AuthStore>((set) => ({
     try {
       const token = await readSessionToken();
       if (token) {
-        await apiRequest<unknown>('/auth/logout', { method: 'POST' });
+        await apiRequest<unknown>('/auth/logout', { method: 'POST', idempotencyKey: false });
       }
     } finally {
       await clearStoredSession();
