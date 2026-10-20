@@ -55,6 +55,8 @@ jobs:
         run: bun run test:publish-api
       - name: Test native publishing flow and owner-only post actions
         run: bun run test:publish-flow
+      - name: Test native notifications, bookmarks, relationships and discovery API routes
+        run: bun run test:social-screen-api
       - name: Enforce shared API client boundary
         run: bun run check:api-boundary
 

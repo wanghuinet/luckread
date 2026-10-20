@@ -11,7 +11,8 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 
 import { FeedContent, FeedItem } from '~/components/FeedItem';
-import { apiRequest, getApiErrorMessage } from '~/lib/api-client';
+import { getApiErrorMessage } from '~/lib/api-client';
+import { fetchBookmarksPage } from '~/lib/social-screen-api';
 import {
   mapContentToFeedContent,
   readContentAuthor,
@@ -24,7 +25,6 @@ import {
 import { readSessionToken } from '~/lib/secure-session';
 import { useAuthStore } from '~/store/auth-store';
 
-const PAGE_SIZE = '20';
 const PRIMARY = '#1d9bf0';
 
 export default function Bookmarks() {
@@ -52,11 +52,7 @@ export default function Bookmarks() {
     setError('');
 
     try {
-      const params = new URLSearchParams({ list: 'true', limit: PAGE_SIZE });
-      if (nextCursor) params.set('cursor', nextCursor);
-      const result = await apiRequest<unknown>('/interactions/bookmarks?' + params.toString(), {
-        method: 'GET',
-      });
+      const result = await fetchBookmarksPage({ cursor: nextCursor });
       if (result.response.status === 401) {
         setAuthRequired(true);
         setItems([]);

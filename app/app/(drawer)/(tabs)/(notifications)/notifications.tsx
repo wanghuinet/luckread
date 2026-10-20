@@ -12,7 +12,8 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 
-import { apiRequest, getApiErrorMessage } from '~/lib/api-client';
+import { getApiErrorMessage } from '~/lib/api-client';
+import { fetchNotificationsPage, markAllNotificationsRead, markNotificationRead } from '~/lib/social-screen-api';
 import { resolvePublicProfileById, unwrapApiData } from '~/lib/content-adapter';
 import { useAuthStore } from '~/store/auth-store';
 
@@ -44,7 +45,6 @@ type PublicUser = {
   avatar?: string | null;
 };
 
-const PAGE_SIZE = '20';
 const PRIMARY = '#1d9bf0';
 
 function messageFor(item: SocialNotification): string {
@@ -146,11 +146,9 @@ export default function Notifications() {
     setError('');
 
     try {
-      const params = new URLSearchParams({ limit: PAGE_SIZE });
-      if (nextCursor) params.set('cursor', nextCursor);
-      if (filter === 'mentions') params.set('type', 'MENTION');
-      const result = await apiRequest<unknown>('/notifications?' + params.toString(), {
-        method: 'GET',
+      const result = await fetchNotificationsPage({
+        cursor: nextCursor,
+        filter,
         signal: controller.signal,
       });
       if (requestId !== requestIdRef.current || controller.signal.aborted) return;
@@ -204,10 +202,7 @@ export default function Notifications() {
     setBusyIds((current) => new Set(current).add(item.id));
     setError('');
     try {
-      const result = await apiRequest<unknown>(
-        '/notifications/' + encodeURIComponent(item.id) + '/read',
-        { method: 'POST' },
-      );
+      const result = await markNotificationRead(item.id);
       if (!result.response.ok) {
         throw new Error(getApiErrorMessage(result.data, '无法标记通知为已读。', result.response.status));
       }
@@ -232,7 +227,7 @@ export default function Notifications() {
     setReadAllBusy(true);
     setError('');
     try {
-      const result = await apiRequest<unknown>('/notifications/read-all', { method: 'POST' });
+      const result = await markAllNotificationsRead();
       if (!result.response.ok) {
         throw new Error(getApiErrorMessage(result.data, '无法将通知全部标记为已读。', result.response.status));
       }
