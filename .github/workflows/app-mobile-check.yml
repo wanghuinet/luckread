@@ -52,12 +52,16 @@ jobs:
           if-no-files-found: ignore
 
   ios-prebuild:
-    runs-on: macos-latest
+    runs-on: macos-15
     defaults:
       run:
         working-directory: app
     steps:
       - uses: actions/checkout@v4
+      - name: Select stable Xcode toolchain for legacy native dependencies
+        run: |
+          sudo xcode-select -s /Applications/Xcode_16.4.app/Contents/Developer
+          xcodebuild -version
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
