@@ -14,7 +14,8 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 
-import { apiRequest, getApiErrorMessage } from '~/lib/api-client';
+import { getApiErrorMessage } from '~/lib/api-client';
+import { fetchDiscoveryTopics, findPublicUserByUsername } from '~/lib/social-screen-api';
 import { unwrapApiData } from '~/lib/content-adapter';
 import { useAuthStore } from '~/store/auth-store';
 
@@ -57,7 +58,7 @@ export default function Search() {
     setTopicsLoading(true);
     setTopicsError('');
     try {
-      const result = await apiRequest<unknown>('/discovery/topics?limit=20', { method: 'GET' });
+      const result = await fetchDiscoveryTopics();
       if (!result.response.ok) {
         throw new Error(getApiErrorMessage(result.data, '专题暂时无法加载。', result.response.status));
       }
@@ -91,10 +92,7 @@ export default function Search() {
     try {
       // Only the confirmed exact username lookup is used here. No generic search
       // endpoint or new backend contract is assumed by the native app.
-      const result = await apiRequest<unknown>(
-        '/users/by-username/' + encodeURIComponent(username),
-        { method: 'GET' },
-      );
+      const result = await findPublicUserByUsername(username);
       if (!result.response.ok) {
         if (result.response.status === 404) {
           throw new Error('没有找到这个用户名对应的公开资料。');

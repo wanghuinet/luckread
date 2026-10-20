@@ -12,7 +12,8 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
-import { apiRequest, getApiErrorMessage } from '~/lib/api-client';
+import { getApiErrorMessage } from '~/lib/api-client';
+import { fetchUserRelationshipsPage } from '~/lib/social-screen-api';
 import { resolvePublicProfileById, unwrapApiData } from '~/lib/content-adapter';
 
 type FollowRelation = {
@@ -42,7 +43,6 @@ type FollowListRow = {
 };
 
 const PRIMARY = '#1d9bf0';
-const PAGE_SIZE = '20';
 
 export default function ProfileRelationships() {
   const params = useLocalSearchParams<{ id?: string | string[]; type?: string | string[] }>();
@@ -70,12 +70,9 @@ export default function ProfileRelationships() {
     else setLoading(true);
     setError('');
     try {
-      const query = new URLSearchParams({ limit: PAGE_SIZE });
-      if (nextCursor) query.set('cursor', nextCursor);
-      const result = await apiRequest<unknown>(
-        '/users/' + encodeURIComponent(ownerId) + '/' + relationType + '?' + query.toString(),
-        { method: 'GET' },
-      );
+      const result = await fetchUserRelationshipsPage(ownerId, relationType, {
+        cursor: nextCursor,
+      });
       if (!result.response.ok) {
         throw new Error(getApiErrorMessage(result.data, '无法读取关注列表。', result.response.status));
       }

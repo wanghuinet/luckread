@@ -15,7 +15,8 @@
     "check:api-boundary": "node scripts/verify-api-client-boundary.mjs",
     "check:compat": "expo install --check",
     "test:publish-api": "bun test tests/publish-api.test.mjs",
-    "test:publish-flow": "bun test tests/publish-flow.test.mjs"
+    "test:publish-flow": "bun test tests/publish-flow.test.mjs",
+    "test:social-screen-api": "bun test tests/social-screen-api.test.mjs"
   },
   "dependencies": {
     "@codeherence/react-native-header": "^0.14.0",

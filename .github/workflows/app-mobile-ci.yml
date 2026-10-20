@@ -12,6 +12,12 @@ on:
       - "app/**"
       - ".github/workflows/app-mobile-ci.yml"
   workflow_dispatch:
+    inputs:
+      run_native_builds:
+        description: Run long Android Debug and iOS simulator builds for final native validation
+        required: true
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -55,12 +61,16 @@ jobs:
         run: bun run test:publish-api
       - name: Test native publishing flow and owner-only post actions
         run: bun run test:publish-flow
+      - name: Test native notifications, bookmarks, relationships and discovery API routes
+        run: bun run test:social-screen-api
       - name: Enforce shared API client boundary
         run: bun run check:api-boundary
 
   android-build:
     name: Android debug build
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_native_builds }}
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     defaults:
       run:
         working-directory: app
@@ -106,7 +116,9 @@ jobs:
 
   ios-build:
     name: iOS simulator build
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_native_builds }}
     runs-on: macos-15
+    timeout-minutes: 45
     defaults:
       run:
         working-directory: app
