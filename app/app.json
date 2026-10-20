@@ -1,9 +1,9 @@
 {
   "expo": {
-    "name": "twitter-ui",
-    "slug": "twitter-ui",
+    "name": "LuckRead",
+    "slug": "luckread",
     "version": "1.0.0",
-    "scheme": "twitter-ui",
+    "scheme": "luckread",
     "web": {
       "bundler": "metro",
       "output": "static",
@@ -11,14 +11,20 @@
     },
     "plugins": [
       "expo-router",
-      "expo-video"
+      "expo-video",
+      [
+        "expo-secure-store",
+        {
+          "configureAndroidBackup": true
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
       "tsconfigPaths": true
     },
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/favicon.png",
     "userInterfaceStyle": "light",
     "splash": {
       "image": "./assets/splash.png",
@@ -30,14 +36,17 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.qlur.twitterui"
+      "bundleIdentifier": "com.luckread.app",
+      "config": {
+        "usesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
+        "foregroundImage": "./assets/favicon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.qlur.twitterui"
+      "package": "com.luckread.app"
     }
   }
 }

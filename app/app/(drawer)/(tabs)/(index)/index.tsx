@@ -1,251 +1,342 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-    View,
-    Text,
-    StyleSheet,
-    Dimensions,
-    FlatList,
-    TouchableOpacity,
+  ActivityIndicator,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { FeedItem, FeedContent, findUserById } from '~/components/FeedItem';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Tabs, MaterialTabBar } from 'react-native-collapsible-tab-view';
-import Animated from 'react-native-reanimated';
-import sampleFeedItems from '~/dummy/posts.json';
-import users from '~/dummy/users.json';
-import { StyledExpoImage } from "~/components/Image";
-import X from "~/assets/svg/aside/x.svg";
 import { BlurView } from 'expo-blur';
-import { AntDesign } from '@expo/vector-icons';
 
+import { FeedContent, FeedItem } from '~/components/FeedItem';
+import X from '~/assets/svg/aside/x.svg';
+import { apiRequest, getApiErrorMessage } from '~/lib/api-client';
+import { useAuthStore } from '~/store/auth-store';
 
-const APP_PRIMARY_COLOR = '#1DA1F2';
+type FeedKind = 'for-you' | 'following';
 
+type ApiContent = {
+  id: string;
+  ownerUserId?: string;
+  creatorId?: string | null;
+  contentType?: 'article' | 'post' | 'video';
+  title?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  coverRef?: string | null;
+  mediaRefs?: string[];
+  author?: {
+    username?: string;
+    displayName?: string;
+    avatar?: string | null;
+  };
+  creator?: {
+    username?: string;
+    displayName?: string;
+    avatar?: string | null;
+  };
+};
 
-const categoryTabs = ['For you', 'Following', 'Premier League', 'Design', 'React & Expo', 'Al'];
+type ContentPage = {
+  items: ApiContent[];
+  nextCursor?: string | null;
+  hasMore?: boolean;
+  candidateWindowTruncated?: boolean;
+};
 
+type ContentPageResponse = {
+  data?: ContentPage;
+  error?: {
+    code?: string;
+    message?: string;
+  };
+};
 
-const processedFeedItems: FeedContent[] = sampleFeedItems.map((item: any): FeedContent => {
+const APP_PRIMARY_COLOR = '#1769aa';
+const API_PAGE_SIZE = '20';
 
-    if (typeof item.poster_id === 'string') {
-        return {
-            contentId: item.contentId || `post-${item.poster_id}-${Date.now()}`,
-            poster_id: item.poster_id,
-            posted_time: typeof item.posted_time === 'string' ? parseInt(item.posted_time, 10) :
-                typeof item.posted_time === 'number' ? item.posted_time : Date.now(),
-            message: item.message || '',
-            media_url: item.media_url || undefined,
-            like_count: item.like_count || 0,
-            retweet_count: item.retweet_count || 0,
-            reply_count: item.reply_count || 0,
-            view_count: item.view_count || '0',
-            category: item.category || 'For you'
-        };
-    }
+const mapContent = (item: ApiContent): FeedContent => {
+  const userId = item.creatorId || item.ownerUserId || 'unknown';
+  const createdAt = item.createdAt || item.updatedAt;
+  const parsedTime = createdAt ? Date.parse(createdAt) : Number.NaN;
+  const timestampSeconds = Number.isFinite(parsedTime)
+    ? Math.floor(parsedTime / 1000)
+    : Math.floor(Date.now() / 1000);
+  const cover = item.coverRef || item.mediaRefs?.[0] || undefined;
+  const mediaUrl = cover && /^https?:\/\//i.test(cover) ? cover : undefined;
+  const creator = item.creator || item.author;
 
-    else if (typeof item.authorName === 'string') {
-
-        const matchingUser = users.find(user => user.name === item.authorName);
-        const userId = matchingUser ? matchingUser.id : '0';
-
-        return {
-            contentId: item.contentId || `post-legacy-${Date.now()}`,
-            poster_id: userId,
-            authorName: item.authorName,
-            authorHandle: item.authorHandle,
-            authorImageUrl: item.authorImageUrl,
-            posted_time: typeof item.postedTime === 'string' ? parseInt(item.postedTime, 10) :
-                typeof item.postedTime === 'number' ? item.postedTime : Date.now(),
-            message: item.message || '',
-            media_url: item.mediaUrl || undefined,
-            like_count: item.likeCount || 0,
-            retweet_count: item.retweetCount || 0,
-            reply_count: item.replyCount || 0,
-            view_count: item.viewCount || '0',
-            category: item.category || 'For you'
-        };
-    }
-
-    else {
-        return {
-            contentId: `post-unknown-${Date.now()}`,
-            poster_id: '0',
-            posted_time: Date.now(),
-            message: 'Unknown post format',
-            media_url: undefined,
-            like_count: 0,
-            retweet_count: 0,
-            reply_count: 0,
-            view_count: '0',
-            category: 'For you'
-        };
-    }
-});
-
+  return {
+    contentId: item.id,
+    poster_id: userId,
+    authorName: creator?.displayName || creator?.username || 'LuckRead member',
+    authorHandle: creator?.username || userId.slice(0, 16),
+    authorImageUrl: creator?.avatar || undefined,
+    posted_time: timestampSeconds,
+    message: item.title || '',
+    media_url: mediaUrl,
+    like_count: 0,
+    retweet_count: 0,
+    reply_count: 0,
+    view_count: '0',
+  };
+};
 
 const Header = () => {
-    const currentUser = users[0];
-    const insets = useSafeAreaInsets();
+  const insets = useSafeAreaInsets();
 
-    return (
-        <View style={{ paddingTop: insets.top }} className="bg-white w-full">
-            <View className="flex-row items-center w-full justify-center py-3">
-                <StyledExpoImage source={{ uri: currentUser.profile_picture }} className="w-10 h-10 rounded-full absolute left-4" />
-                <X width={26} height={26} fill="black" />
-            </View>
-        </View>
-    );
+  return (
+    <View style={{ paddingTop: insets.top }} className="w-full bg-white">
+      <View className="w-full flex-row items-center justify-center py-3">
+        <X width={26} height={26} fill="black" />
+        <Text style={styles.headerLabel}>LuckRead</Text>
+      </View>
+    </View>
+  );
 };
 
+function FeedTimeline({ kind }: { kind: FeedKind }) {
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const authStatus = useAuthStore((state) => state.status);
+  const invalidateSession = useAuthStore((state) => state.invalidateSession);
+  const [items, setItems] = useState<FeedContent[]>([]);
+  const [cursor, setCursor] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [candidateWindowTruncated, setCandidateWindowTruncated] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [authRequired, setAuthRequired] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
-const AddPostButton = () => {
-    const insets = useSafeAreaInsets();
-    return (
-        <TouchableOpacity className="absolute bottom-6 right-6 bg-blue-500 rounded-full 
-        w-14 h-14 shadow-lg flex items-center justify-center z-10"
-            style={{
-                bottom: insets.bottom * 3,
-            }}
-        >
-            <AntDesign name="plus" size={24} color="#ffffff" />
-        </TouchableOpacity>
-    );
-};
+  const endpoint = kind === 'following' ? '/feed/following' : '/contents';
 
+  const loadPage = useCallback(async (nextCursor: string | null, append: boolean) => {
+    if (kind === 'following' && authStatus !== 'authenticated') {
+      setAuthRequired(true);
+      setItems([]);
+      setCursor(null);
+      setHasMore(false);
+      setLoading(false);
+      setLoadingMore(false);
+      return;
+    }
 
+    if (append) setLoadingMore(true);
+    else setLoading(true);
+    setErrorMessage('');
 
-export default function HomeScreen() {
-    const router = useRouter();
-    const insets = useSafeAreaInsets();
+    try {
+      const params = new URLSearchParams({ limit: API_PAGE_SIZE });
+      if (nextCursor) params.set('cursor', nextCursor);
+      if (kind === 'for-you') params.set('type', 'post');
 
-    const handleItemPress = (postId: string) => {
-        router.push(`/post/${postId}`);
+      const { response, data } = await apiRequest<ContentPageResponse>(
+        endpoint + '?' + params.toString(),
+        { method: 'GET' },
+      );
+
+      if (response.status === 401 && kind === 'following') {
+        if (authStatus === 'authenticated') await invalidateSession();
+        setAuthRequired(true);
+        setItems([]);
+        setCursor(null);
+        setHasMore(false);
+        return;
+      }
+
+      const payload = data as ContentPageResponse | null;
+      const page = payload?.data;
+      if (!response.ok || !page || !Array.isArray(page.items)) {
+        throw new Error(getApiErrorMessage(data, 'Could not load this timeline. Please retry.'));
+      }
+
+      const mapped = page.items
+        .filter((item): item is ApiContent => Boolean(item && typeof item.id === 'string'))
+        .map(mapContent);
+
+      if (append) {
+        setItems((current) => {
+          const known = new Set(current.map((item) => item.contentId));
+          return [...current, ...mapped.filter((item) => !known.has(item.contentId))];
+        });
+      } else {
+        setItems(mapped);
+      }
+
+      setCursor(page.nextCursor || null);
+      setHasMore(page.hasMore === true);
+      setCandidateWindowTruncated(page.candidateWindowTruncated === true);
+      setAuthRequired(false);
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : 'Could not load this timeline. Please retry.',
+      );
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
+    }
+  }, [authStatus, endpoint, invalidateSession, kind]);
+
+  useEffect(() => {
+    let active = true;
+    void Promise.resolve().then(() => {
+      if (active) void loadPage(null, false);
+    });
+    return () => {
+      active = false;
     };
+  }, [loadPage, refreshKey]);
 
+  const openLogin = () => router.push('/login' as never);
 
-    const feedItemsByCategory = useMemo(() => {
-        const itemsByCategory: Record<string, FeedContent[]> = {};
+  const renderItem = useCallback(({ item }: { item: FeedContent }) => (
+    <FeedItem itemData={item} onPress={() => {
+      if (item.contentId) router.push(('/post/' + encodeURIComponent(item.contentId)) as never);
+    }} />
+  ), [router]);
 
-
-        categoryTabs.forEach(category => {
-            itemsByCategory[category] = [];
-        });
-
-
-        itemsByCategory['For you'] = [...processedFeedItems].sort((a, b) => {
-            const timeA = typeof a.posted_time === 'number' ? a.posted_time : parseInt(String(a.posted_time), 10);
-            const timeB = typeof b.posted_time === 'number' ? b.posted_time : parseInt(String(b.posted_time), 10);
-            return timeB - timeA;
-        });
-
-
-        processedFeedItems.forEach(item => {
-            if (item.category && item.category !== 'For you') {
-                if (itemsByCategory[item.category]) {
-                    itemsByCategory[item.category].push(item);
-                }
-            }
-        });
-
-        return itemsByCategory;
-    }, []);
-
-
-    const renderTab = useCallback((tabName: string) => {
-
-        const tabPosts = feedItemsByCategory[tabName] || [];
-
-
-        if (tabPosts.length === 0) {
-            return (
-                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
-                    <Text style={{ fontSize: 18, fontWeight: '600', color: '#555' }}>
-                        You are all caught up.
-                    </Text>
-                </View>
-            );
-        }
-
-        const renderFeedItem = ({ item }: { item: FeedContent }) => (
-            <FeedItem itemData={item} onPress={() => handleItemPress(item.contentId || '')} />
-        );
-
-        return (
-            <Tabs.FlatList
-                data={tabPosts}
-                renderItem={renderFeedItem}
-                keyExtractor={(item) => {
-
-                    return `${tabName}-${item.contentId || `post-${item.poster_id}-${item.posted_time}`}`;
-                }}
-                contentContainerStyle={{
-                    paddingBottom: insets.bottom,
-                }}
-            />
-        );
-    }, [insets.bottom, feedItemsByCategory]);
-
-
-    const renderTabBar = (props: any) => (
-        <MaterialTabBar
-            {...props}
-            indicatorStyle={{ backgroundColor: APP_PRIMARY_COLOR, height: 3, borderRadius: 50 }}
-            activeColor="black"
-            scrollEnabled={true}
-            style={{
-                paddingHorizontal: 16,
-                textAlign: 'center',
-                elevation: 0, shadowOpacity: 0, borderBottomWidth: 0,
-                backgroundColor: 'white',
-            }}
-
-            labelStyle={{
-                marginHorizontal: 10,
-                opacity: 1,
-                fontWeight: 'bold', textTransform: 'capitalize', textAlign: 'center', height: 24,
-                fontSize: 15,
-                color: '#606E79'
-            }}
-
-        />
-    );
-
+  const footer = useMemo(() => {
+    if (loadingMore) return <ActivityIndicator style={styles.footer} color={APP_PRIMARY_COLOR} />;
+    if (!hasMore || loading || authRequired || errorMessage) return <View style={{ height: 20 }} />;
     return (
-        <BlurView style={styles.container} className="flex-1" intensity={80} tint={"light"}>
-
-            <AddPostButton />
-            <Tabs.Container
-
-                renderHeader={Header}
-                renderTabBar={renderTabBar}
-                pagerProps={{ scrollEnabled: true }}
-                initialTabName="For you"
-                minHeaderHeight={-60}
-                revealHeaderOnScroll
-
-                headerContainerStyle={{
-                    backgroundColor: 'transparent',
-                    elevation: 0,
-                    shadowOpacity: 0,
-                }}
-            >
-                {categoryTabs.map((tab) => (
-                    <Tabs.Tab name={tab} key={tab}>
-                        {renderTab(tab)}
-                    </Tabs.Tab>
-                ))}
-            </Tabs.Container>
-        </BlurView>
+      <Pressable style={styles.loadMore} onPress={() => void loadPage(cursor, true)}>
+        <Text style={styles.loadMoreText}>Load more</Text>
+      </Pressable>
     );
+  }, [authRequired, cursor, errorMessage, hasMore, loadPage, loading, loadingMore]);
+
+  if (authRequired) {
+    return (
+      <View style={styles.stateContainer}>
+        <Text style={styles.stateTitle}>Sign in to see your Following timeline</Text>
+        <Text style={styles.stateDescription}>Your followed creators’ posts will appear here after you sign in.</Text>
+        <Pressable accessibilityRole="button" onPress={openLogin} style={styles.primaryButton}>
+          <Text style={styles.primaryButtonText}>Sign in</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  if (loading && items.length === 0) {
+    return (
+      <View style={styles.stateContainer}>
+        <ActivityIndicator color={APP_PRIMARY_COLOR} size="large" />
+        <Text style={styles.stateDescription}>Loading LuckRead posts…</Text>
+      </View>
+    );
+  }
+
+  if (errorMessage && items.length === 0) {
+    return (
+      <View style={styles.stateContainer}>
+        <Text style={styles.stateTitle}>Unable to load posts</Text>
+        <Text style={styles.stateDescription}>{errorMessage}</Text>
+        <Pressable accessibilityRole="button" onPress={() => setRefreshKey((value) => value + 1)} style={styles.primaryButton}>
+          <Text style={styles.primaryButtonText}>Retry</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  if (!loading && !errorMessage && items.length === 0) {
+    return (
+      <View style={styles.stateContainer}>
+        <Text style={styles.stateTitle}>{kind === 'following' ? 'No posts from followed creators yet' : 'No public posts yet'}</Text>
+        <Text style={styles.stateDescription}>
+          {kind === 'following' ? 'Follow creators on LuckRead to build your timeline.' : 'Public LuckRead posts will appear here.'}
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <Tabs.FlatList
+      data={items}
+      renderItem={renderItem}
+      keyExtractor={(item, index) => item.contentId || 'content-' + index}
+      contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
+      ListFooterComponent={footer}
+      onRefresh={() => setRefreshKey((value) => value + 1)}
+      refreshing={loading && items.length > 0}
+      onEndReached={() => {
+        if (hasMore && cursor && !loadingMore && !errorMessage) void loadPage(cursor, true);
+      }}
+      onEndReachedThreshold={0.5}
+    />
+  );
 }
 
+export default function HomeScreen() {
+  const insets = useSafeAreaInsets();
+
+  const renderTabBar = (props: any) => (
+    <MaterialTabBar
+      {...props}
+      indicatorStyle={{ backgroundColor: APP_PRIMARY_COLOR, height: 3, borderRadius: 50 }}
+      activeColor="black"
+      scrollEnabled={false}
+      style={{
+        paddingHorizontal: 16,
+        elevation: 0,
+        shadowOpacity: 0,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: '#e4e7ec',
+        backgroundColor: 'white',
+      }}
+      labelStyle={{
+        marginHorizontal: 10,
+        fontWeight: '700',
+        textTransform: 'none',
+        textAlign: 'center',
+        fontSize: 15,
+        color: '#475467',
+      }}
+    />
+  );
+
+  return (
+    <BlurView style={styles.container} className="flex-1" intensity={80} tint="light">
+      <Tabs.Container
+        renderHeader={Header}
+        renderTabBar={renderTabBar}
+        pagerProps={{ scrollEnabled: true }}
+        initialTabName="For you"
+        minHeaderHeight={-60}
+        revealHeaderOnScroll
+        headerContainerStyle={{
+          backgroundColor: 'transparent',
+          elevation: 0,
+          shadowOpacity: 0,
+        }}
+      >
+        <Tabs.Tab name="For you">
+          <FeedTimeline kind="for-you" />
+        </Tabs.Tab>
+        <Tabs.Tab name="Following">
+          <FeedTimeline kind="following" />
+        </Tabs.Tab>
+      </Tabs.Container>
+      <View style={{ height: Math.max(0, insets.bottom - 8) }} />
+    </BlurView>
+  );
+}
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: 'white',
-        width: '100%',
-        height: '100%',
-    },
+  container: { flex: 1, backgroundColor: 'white', width: '100%', height: '100%' },
+  headerLabel: { color: '#101828', fontSize: 12, fontWeight: '800', marginLeft: 8 },
+  stateContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 28, paddingVertical: 32 },
+  stateTitle: { color: '#101828', fontSize: 18, fontWeight: '800', textAlign: 'center' },
+  stateDescription: { color: '#667085', fontSize: 14, lineHeight: 21, marginTop: 10, textAlign: 'center' },
+  primaryButton: { alignItems: 'center', backgroundColor: APP_PRIMARY_COLOR, borderRadius: 999, marginTop: 18, minWidth: 130, paddingHorizontal: 22, paddingVertical: 12 },
+  primaryButtonText: { color: '#ffffff', fontSize: 15, fontWeight: '800' },
+  loadMore: { alignItems: 'center', paddingVertical: 16 },
+  loadMoreText: { color: APP_PRIMARY_COLOR, fontSize: 14, fontWeight: '700' },
+  footer: { paddingVertical: 18 },
 });

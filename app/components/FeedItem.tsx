@@ -61,6 +61,8 @@ export interface FeedContent {
     reply_count?: number;
     view_count?: string;
     is_organization?: boolean;
+    verified_badge?: string;
+    save_count?: number;
     category?: string;
 }
 

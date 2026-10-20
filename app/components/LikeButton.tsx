@@ -90,7 +90,7 @@ const ConfettiParticle = ({
     );
 };
 
-function LikeButton({ iconColor, textColor, likes }: { iconColor: string, textColor: string }) {
+function LikeButton({ iconColor, textColor, likes }: { iconColor: string; textColor: string; likes?: number }) {
     const [isLiked, setIsLiked] = useState(false);
     const [showConfetti, setShowConfetti] = useState(false);
     const [currentIconColor, setCurrentIconColor] = useState(iconColor);
