@@ -53,6 +53,8 @@ jobs:
         run: bun run test:api-client
       - name: Test native publishing and media upload contracts
         run: bun run test:publish-api
+      - name: Test native publishing flow and owner-only post actions
+        run: bun run test:publish-flow
       - name: Enforce shared API client boundary
         run: bun run check:api-boundary
 

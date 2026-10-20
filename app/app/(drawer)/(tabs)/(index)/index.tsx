@@ -6,7 +6,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Tabs, MaterialTabBar } from 'react-native-collapsible-tab-view';
@@ -51,7 +51,7 @@ const Header = () => {
   );
 };
 
-function FeedTimeline({ kind }: { kind: FeedKind }) {
+function FeedTimeline({ kind, refreshSignal = '' }: { kind: FeedKind; refreshSignal?: string }) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const authStatus = useAuthStore((state) => state.status);
@@ -155,12 +155,14 @@ function FeedTimeline({ kind }: { kind: FeedKind }) {
     return () => {
       active = false;
     };
-  }, [loadPage, refreshKey]);
+  }, [loadPage, refreshKey, refreshSignal]);
 
   const openLogin = () => router.push('/login' as never);
 
   const renderItem = useCallback(({ item }: { item: FeedContent }) => (
-    <FeedItem itemData={item} onPress={() => {
+    <FeedItem itemData={item} onDeleted={(contentId) => {
+      setItems((current) => current.filter((post) => post.contentId !== contentId));
+    }} onPress={() => {
       if (item.contentId) router.push(('/post/' + encodeURIComponent(item.contentId)) as never);
     }} />
   ), [router]);
@@ -238,6 +240,8 @@ function FeedTimeline({ kind }: { kind: FeedKind }) {
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
+  const params = useLocalSearchParams<{ published?: string; refresh?: string }>();
+  const refreshSignal = (typeof params.published === 'string' ? params.published : '') + ':' + (typeof params.refresh === 'string' ? params.refresh : '');
 
   const renderTabBar = (props: any) => (
     <MaterialTabBar
@@ -280,10 +284,10 @@ export default function HomeScreen() {
         }}
       >
         <Tabs.Tab name="For you">
-          <FeedTimeline kind="for-you" />
+          <FeedTimeline kind="for-you" refreshSignal={refreshSignal} />
         </Tabs.Tab>
         <Tabs.Tab name="Following">
-          <FeedTimeline kind="following" />
+          <FeedTimeline kind="following" refreshSignal={refreshSignal} />
         </Tabs.Tab>
       </Tabs.Container>
       <View style={{ height: Math.max(0, insets.bottom - 8) }} />

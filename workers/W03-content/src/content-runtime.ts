@@ -1169,11 +1169,17 @@ export const canTransitionContentState = (
   }
   if (!owns) return false
 
-  // L2 is allowed to create and directly publish only ordinary social posts.
-  // Creator roles retain the existing article/video lifecycle, and may also
-  // publish ordinary posts without routing them through human review.
+  // Social authors may publish an ordinary post directly. Editing a published
+  // post preserves immutable public revisions by requiring it to be unpublished,
+  // returned to draft, edited under If-Match, and explicitly published again.
+  // This never grants article/video, review, scheduling, or moderation authority.
   if (kind === 'SOCIAL_AUTHOR') {
-    return contentType === 'post' && from === 'DRAFT' && to === 'PUBLISHED'
+    if (contentType !== 'post') return false
+    return (
+      (from === 'DRAFT' && to === 'PUBLISHED') ||
+      (from === 'PUBLISHED' && to === 'UNPUBLISHED') ||
+      (from === 'UNPUBLISHED' && to === 'DRAFT')
+    )
   }
   if (contentType === 'post' && from === 'DRAFT' && to === 'PUBLISHED') return true
 
@@ -1218,10 +1224,11 @@ export async function transitionContentState(
 
   const kind = actorKindForLayer(principalLayer)
   if (!kind) throw new ContentRuntimeError('PERMISSION_DENIED', 403)
-  // Social-author layers may only perform the explicit direct-publish transition.
-  // Higher-level accounts keep their own ordinary-post flow without inheriting
-  // creator article/video or moderation state-transition authority.
-  if (kind === 'SOCIAL_AUTHOR' && to !== 'PUBLISHED') {
+  // Social authors can publish drafts directly, and can edit their own published
+  // posts only through the explicit PUBLISHED -> UNPUBLISHED -> DRAFT path.
+  // Reject unrelated targets before D1; resource ownership and source state are
+  // re-checked against the authoritative row below.
+  if (kind === 'SOCIAL_AUTHOR' && !['PUBLISHED', 'UNPUBLISHED', 'DRAFT'].includes(to)) {
     throw new ContentRuntimeError('PERMISSION_DENIED', 403)
   }
 
@@ -1248,8 +1255,16 @@ export async function transitionContentState(
   if (!ownsContent) {
     throw new ContentRuntimeError('PERMISSION_DENIED', 403)
   }
-  if (kind === 'SOCIAL_AUTHOR' && content.contentType !== 'post') {
-    throw new ContentRuntimeError('PERMISSION_DENIED', 403)
+  if (kind === 'SOCIAL_AUTHOR') {
+    if (content.contentType !== 'post') {
+      throw new ContentRuntimeError('PERMISSION_DENIED', 403)
+    }
+    const isOwnerPostEditTransition =
+      (content.state === 'PUBLISHED' && to === 'UNPUBLISHED') ||
+      (content.state === 'UNPUBLISHED' && to === 'DRAFT')
+    if (to !== 'PUBLISHED' && !isOwnerPostEditTransition) {
+      throw new ContentRuntimeError('PERMISSION_DENIED', 403)
+    }
   }
 
   // Direct publication is narrowly available for draft social posts only.
