@@ -63,6 +63,7 @@ jobs:
   android-build:
     name: Android debug build
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     defaults:
       run:
         working-directory: app
@@ -109,6 +110,7 @@ jobs:
   ios-build:
     name: iOS simulator build
     runs-on: macos-15
+    timeout-minutes: 45
     defaults:
       run:
         working-directory: app
