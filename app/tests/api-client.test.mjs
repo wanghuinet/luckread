@@ -44,6 +44,8 @@ const {
   toggleUserFollow,
 } = await import('../lib/user-follow-state.ts');
 
+const { createContentShareLink } = await import('../lib/content-share.ts');
+
 beforeEach(() => {
   storedToken = 'secure-test-token';
   savedTokens = [];
@@ -845,4 +847,59 @@ test('deduplicates rapid bookmark taps while a POST is in flight', async () => {
     loaded: true,
     pending: false,
   });
+});
+
+
+test('creates a public share URL through the existing W01/W05 shares endpoint', async () => {
+  const contentId = 'stage3-share-content';
+  let capturedRequest;
+  pendingFetch = async (input, init) => {
+    capturedRequest = { url: new URL(String(input)), init };
+    return new Response(JSON.stringify({
+      data: { shareId: 'share id/one', contentId },
+    }), { status: 201 });
+  };
+
+  const result = await createContentShareLink(contentId);
+
+  expect(result).toEqual({
+    ok: true,
+    url: 'https://luckread.com/s/share%20id%2Fone',
+  });
+  expect(capturedRequest.url.pathname).toBe('/api/v1/content/stage3-share-content/shares');
+  expect(String(capturedRequest.init.method).toUpperCase()).toBe('POST');
+  expect(JSON.parse(String(capturedRequest.init.body))).toEqual({ contentId });
+  const headers = new Headers(capturedRequest.init.headers);
+  expect(headers.get('Authorization')).toBe('Bearer secure-test-token');
+  expect(headers.get('Idempotency-Key')).toBeTruthy();
+});
+
+test('does not create a share link when W01/W05 rejects the share', async () => {
+  pendingFetch = async () => new Response(JSON.stringify({
+    error: { code: 'FORBIDDEN', message: 'Sharing is not allowed for this content.' },
+  }), { status: 403 });
+
+  const result = await createContentShareLink('stage3-share-forbidden-content');
+
+  expect(result).toMatchObject({
+    ok: false,
+    status: 403,
+    message: 'Sharing is not allowed for this content.',
+  });
+});
+
+test('rejects missing content IDs and malformed successful share responses', async () => {
+  let requestCount = 0;
+  pendingFetch = async () => {
+    requestCount += 1;
+    return new Response(JSON.stringify({ data: { contentId: 'no-share-id' } }), { status: 201 });
+  };
+
+  const missingContentId = await createContentShareLink('  ');
+  expect(missingContentId.ok).toBe(false);
+  expect(requestCount).toBe(0);
+
+  const missingShareId = await createContentShareLink('stage3-share-missing-id');
+  expect(missingShareId.ok).toBe(false);
+  expect(requestCount).toBe(1);
 });
