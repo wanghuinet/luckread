@@ -47,8 +47,10 @@ async function request<T>(path: string, init: RequestInit = {}, token?: string |
   const nextToken = response.headers.get('X-LuckRead-Session-Token');
   if (nextToken) await SecureStore.setItemAsync(SESSION_KEY, nextToken);
 
-  let payload: unknown = null;
-  try { payload = await response.json(); } catch { /* handled as invalid response below */ }
+  let payload: unknown = {};
+  if (response.status !== 204) {
+    try { payload = await response.json(); } catch { payload = null; }
+  }
   if (!response.ok) {
     const body = payload as ApiEnvelope<unknown> | null;
     throw new ApiError(body?.error?.message || `请求失败（${response.status}）`, response.status, body?.error?.code);
