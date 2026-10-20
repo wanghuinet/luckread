@@ -16,6 +16,7 @@ mock.module('../lib/secure-session.ts', () => ({
 const {
   apiRequest,
   createIdempotencyKey,
+  fetchContentBodyReference,
   LuckReadNetworkError,
 } = await import('../lib/api-client.ts');
 
@@ -902,4 +903,36 @@ test('rejects missing content IDs and malformed successful share responses', asy
   const missingShareId = await createContentShareLink('stage3-share-missing-id');
   expect(missingShareId.ok).toBe(false);
   expect(requestCount).toBe(1);
+});
+
+
+test('fetches trusted W03 body references through the shared client with same-origin credentials only', async () => {
+  let capturedRequest;
+  pendingFetch = async (input, init) => {
+    capturedRequest = { url: new URL(String(input)), init };
+    return new Response('The full content body', { status: 200, headers: { 'Content-Type': 'text/plain' } });
+  };
+
+  const response = await fetchContentBodyReference('/content-bodies/body-1.txt', { sessionToken: 'secure-test-token' });
+
+  expect(response.status).toBe(200);
+  expect(await response.text()).toBe('The full content body');
+  expect(capturedRequest.url.origin).toBe('https://luckread.com');
+  expect(capturedRequest.url.pathname).toBe('/content-bodies/body-1.txt');
+  const headers = new Headers(capturedRequest.init.headers);
+  expect(headers.get('Authorization')).toBe('Bearer secure-test-token');
+  expect(headers.get('Accept')).toContain('text/plain');
+  expect(capturedRequest.init.cache).toBe('no-store');
+});
+
+test('rejects untrusted body-reference origins before making a network request', async () => {
+  let requestCount = 0;
+  pendingFetch = async () => {
+    requestCount += 1;
+    return new Response('unexpected', { status: 200 });
+  };
+
+  await expect(fetchContentBodyReference('https://untrusted.example/body.txt')).rejects.toThrow('Unsupported LuckRead content body reference');
+  await expect(fetchContentBodyReference('https://luckread.com@untrusted.example/body.txt')).rejects.toThrow('Unsupported LuckRead content body reference');
+  expect(requestCount).toBe(0);
 });

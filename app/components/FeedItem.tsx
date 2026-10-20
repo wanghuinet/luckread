@@ -51,6 +51,7 @@ export const PROFILE_IMAGE_SIZE_MAP = { ...PROFILE_IMAGE_DIMENSIONS };
 export type FeedMediaAttachment = {
     src: string;
     kind: 'image' | 'video';
+    headers?: Record<string, string>;
 };
 
 export interface FeedContent {
@@ -59,6 +60,7 @@ export interface FeedContent {
     authorName?: string;
     authorHandle?: string;
     authorImageUrl?: string;
+    authorImageHeaders?: Record<string, string>;
     posted_time: number;
     message: string;
     media_url?: string;
@@ -156,8 +158,9 @@ export const findUserById = (id: string) => {
     return users.find(user => user.id === id);
 };
 
-const FeedVideoAttachment = ({ uri }: { uri: string }) => {
-    const player = useVideoPlayer(uri, (instance) => {
+const FeedVideoAttachment = ({ uri, headers }: { uri: string; headers?: Record<string, string> }) => {
+    const source = headers ? { uri, headers } : uri;
+    const player = useVideoPlayer(source, (instance) => {
         instance.loop = false;
     });
 
@@ -192,12 +195,12 @@ const FeedMediaGallery = ({
                         : "w-[48%] overflow-hidden rounded-lg bg-neutral-100 dark:bg-neutral-900"}
                 >
                     {media.kind === 'video' ? (
-                        <FeedVideoAttachment uri={media.src} />
+                        <FeedVideoAttachment uri={media.src} headers={media.headers} />
                     ) : (
                         <Galeria urls={[media.src]}>
                             <Galeria.Image>
                                 <Image
-                                    source={{ uri: media.src }}
+                                    source={{ uri: media.src, headers: media.headers }}
                                     className="w-full aspect-square"
                                     contentFit="cover"
                                 />
@@ -221,7 +224,7 @@ export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailVie
     const { colorScheme } = useColorScheme();
 
 
-    const userInfo = findUserById(itemData.poster_id);
+    const userInfo = itemData.contentId ? undefined : findUserById(itemData.poster_id);
     const mediaItems = itemData.media_items?.length
         ? itemData.media_items
         : itemData.media_url
@@ -231,7 +234,11 @@ export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailVie
 
     const authorName = itemData.authorName || userInfo?.name || 'Unknown';
     const authorHandle = itemData.authorHandle || userInfo?.handle || 'unknown';
+    const profileIdentifier = itemData.contentId && itemData.poster_id && itemData.poster_id !== 'unknown'
+        ? itemData.poster_id
+        : authorHandle;
     const authorImageUrl = itemData.authorImageUrl || userInfo?.profile_picture || '';
+    const authorImageHeaders = itemData.authorImageHeaders;
     const isOrganization = itemData.is_organization || userInfo?.is_organization || false;
     const verified_badge = itemData?.verified_badge || userInfo?.verified_badge;
 
@@ -252,11 +259,11 @@ export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailVie
             <ContextMenu.Trigger asChild>
                 <TouchableOpacity onPress={onPress} className="p-1 py-2 pr-4 border-b border-neutral-200 dark:border-neutral-800">
                     <View className="flex-row">
-                        <ProfileImage source={{ uri: authorImageUrl }} displaySize="s" is_organization={isOrganization} />
+                        <ProfileImage source={{ uri: authorImageUrl, headers: authorImageHeaders }} displaySize="s" is_organization={isOrganization} />
                         <View className="ml-2 flex-1">
 
                             <View className="flex-row items-center justify-between">
-                                <TouchableOpacity onPress={() => router.push(`/profile/${authorHandle}`)}>
+                                <TouchableOpacity onPress={() => router.push(`/profile/${encodeURIComponent(profileIdentifier)}`)}>
                                     <View className="flex-row items-center">
                                         <Text className=" text-lg font-bold text-black dark:text-white mr-1">{authorName}</Text>
                                         {verified_badge && (
@@ -397,7 +404,7 @@ export const FeedItemDetailView: React.FC<FeedItemProps> = ({ itemData, onPress,
     const { colorScheme } = useColorScheme();
 
 
-    const userInfo = findUserById(itemData.poster_id);
+    const userInfo = itemData.contentId ? undefined : findUserById(itemData.poster_id);
     const mediaItems = itemData.media_items?.length
         ? itemData.media_items
         : itemData.media_url
@@ -407,7 +414,11 @@ export const FeedItemDetailView: React.FC<FeedItemProps> = ({ itemData, onPress,
 
     const authorName = itemData.authorName || userInfo?.name || 'Unknown';
     const authorHandle = itemData.authorHandle || userInfo?.handle || 'unknown';
+    const profileIdentifier = itemData.contentId && itemData.poster_id && itemData.poster_id !== 'unknown'
+        ? itemData.poster_id
+        : authorHandle;
     const authorImageUrl = itemData.authorImageUrl || userInfo?.profile_picture || '';
+    const authorImageHeaders = itemData.authorImageHeaders;
     const isOrganization = itemData.is_organization || userInfo?.is_organization || false;
     const verified_badge = itemData?.verified_badge || userInfo?.verified_badge;
 
@@ -430,12 +441,12 @@ export const FeedItemDetailView: React.FC<FeedItemProps> = ({ itemData, onPress,
             <View className="flex-row justify-between items-center mb-3">
                 <View className="flex-row items-center">
                     <ProfileImage
-                        source={{ uri: authorImageUrl }}
+                        source={{ uri: authorImageUrl, headers: authorImageHeaders }}
                         displaySize="s"
                         is_organization={isOrganization}
                     />
                     <TouchableOpacity
-                        onPress={() => router.push(`/profile/${authorHandle}`)}
+                        onPress={() => router.push(`/profile/${encodeURIComponent(profileIdentifier)}`)}
                     >
                         <View className="flex-col">
                             <Text className="text-lg font-bold text-black dark:text-white">{authorName}</Text>

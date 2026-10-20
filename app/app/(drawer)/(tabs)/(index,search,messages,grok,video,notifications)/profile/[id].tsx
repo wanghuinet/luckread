@@ -47,11 +47,13 @@ import Views from "~/assets/svg/views.svg"
 import Category from "~/assets/svg/category.svg"
 import Grok from "~/assets/svg/tabs/grok.svg";
 
-import { FeedItem, FeedContent, ProfileImage, PROFILE_IMAGE_SIZE_MAP, findUserById } from '~/components/FeedItem';
+import { FeedItem, FeedContent, ProfileImage, PROFILE_IMAGE_SIZE_MAP } from '~/components/FeedItem';
 import FollowButton from '~/components/FollowButton';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import users from '~/dummy/users.json';
-import sampleFeedItems from '~/dummy/posts.json';
+import { apiRequest, getApiErrorMessage } from '~/lib/api-client';
+import { mapContentToFeedContent, readContentBody, readContentSocial, readContentAuthor, resolveNativeMediaSource, unwrapApiData, type ApiContentPage, type ApiContentRecord } from '~/lib/content-adapter';
+import { useAuthStore } from '~/store/auth-store';
+import { readSessionToken } from '~/lib/secure-session';
 import Messages from "~/assets/svg/tabs/messages.svg"
 
 const PULL_TO_REFRESH_THRESHOLD = 70; 
@@ -76,22 +78,24 @@ interface User {
   url: string;
   followed_by: string;
   items_count: string;
-  following_count: number;
+  following_count?: number;
   joined_date: string;
   category: string;
   profile_picture: string;
+  profile_picture_headers?: Record<string, string>;
   header_picture: string;
+  header_picture_headers?: Record<string, string>;
   is_verified: boolean;
   verified_badge: string;
   is_organization: boolean;
 }
 
-const ProfileHeader = ({ navBarVisibility, scrollOffset, refreshing, user, targetUsername }: {
+const ProfileHeader = ({ navBarVisibility, scrollOffset, refreshing, user, currentUserId }: {
   navBarVisibility: any;
   scrollOffset: any;
   refreshing: any;
   user: User;
-  targetUsername: string;
+  currentUserId: string | null;
 }) => {
   const navigation = useNavigation();
   const { left: leftInset, right: rightInset, top: safeAreaTop } = useSafeAreaInsets();
@@ -293,7 +297,7 @@ const ProfileHeader = ({ navBarVisibility, scrollOffset, refreshing, user, targe
 
 
             <Image
-              source={{ uri: user.header_picture }}
+              source={user.header_picture ? { uri: user.header_picture, headers: user.header_picture_headers } : undefined}
               contentFit="cover"
               contentPosition="center"
               style={[
@@ -396,7 +400,7 @@ const ProfileHeader = ({ navBarVisibility, scrollOffset, refreshing, user, targe
             <TouchableOpacity>
               <ProfileImage
                 displaySize={HEADER_PROFILE_IMAGE_SIZE}
-                source={{ uri: user.profile_picture }}
+                source={{ uri: user.profile_picture, headers: user.profile_picture_headers }}
                 style={{
                   padding: 10,
                   backgroundColor: 'white'
@@ -404,7 +408,7 @@ const ProfileHeader = ({ navBarVisibility, scrollOffset, refreshing, user, targe
               />
             </TouchableOpacity>
           </Animated.View>
-          {user.id === '1' || user.id === '2' ? (
+          {user.id === currentUserId ? (
             <TouchableOpacity className="absolute bottom-0 right-0 py-1 px-3 bg-transparent rounded-full border border-neutral-400/50 dark:border-neutral-600/50 flex flex-start  ">
               <Text className="text-base font-bold text-black dark:text-white">Edit Profile</Text>
             </TouchableOpacity>
@@ -456,58 +460,46 @@ const ProfileDetailsHeader = ({ user }: { user: User }) => {
         <Text className="text-black dark:text-white text-lg leading-relaxed">
           {user.bio}
         </Text>
-        <View className="flex-row gap-2 items-center flex-wrap">
+        {(user.category || user.url) ? (
+          <View className="flex-row gap-2 items-center flex-wrap">
+            {user.category ? (
+              <View className="flex-row gap-1.5 items-center">
+                <Category width={16} height={16} opacity={0.5} />
+                <Text className="text-neutral-500 dark:text-neutral-400 text-base">{user.category}</Text>
+              </View>
+            ) : null}
+            {user.url ? (
+              <View className="flex-row gap-1.5 items-center">
+                <Feather name="link" color="rgb(163 163 163)" size={14} />
+                <Text onPress={() => handleLinkPress(user.url)} className="text-sky-500 dark:text-sky-400 text-base">
+                  {user.url}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+        ) : null}
+        {user.joined_date ? (
           <View className="flex-row gap-1.5 items-center">
-            <Category width={16} height={16} opacity={0.5} />
-            <Text className="text-neutral-500 dark:text-neutral-400 text-base">{user.category}</Text>
+            <Feather name="calendar" color="rgb(163 163 163)" size={14} />
+            <Text className="text-neutral-500 dark:text-neutral-400 text-base">Joined {user.joined_date}</Text>
           </View>
-          <View className="flex-row gap-1.5 items-center">
-            <Feather name="link" color="rgb(163 163 163)" size={14} />
-            <Text onPress={() => handleLinkPress(user.url)} className="text-sky-500 dark:text-sky-400 text-base">
-              {user.url}
-            </Text>
+        ) : null}
+        {(typeof user.following_count === 'number' || user.followed_by) ? (
+          <View className="flex-row gap-4 items-center">
+            {typeof user.following_count === 'number' ? (
+              <View className="flex-row gap-1.5 items-center">
+                <Text className="text-black dark:text-white text-base font-semibold">{user.following_count}</Text>
+                <Text className="text-neutral-500 dark:text-neutral-400 text-base">Following</Text>
+              </View>
+            ) : null}
+            {user.followed_by ? (
+              <View className="flex-row gap-1.5 items-center">
+                <Text className="text-black dark:text-white text-base font-semibold">{user.followed_by}</Text>
+                <Text className="text-neutral-500 dark:text-neutral-400 text-base">Followers</Text>
+              </View>
+            ) : null}
           </View>
-        </View>
-        <View className="flex-row gap-1.5 items-center">
-          <Feather name="calendar" color="rgb(163 163 163)" size={14} />
-          <Text className="text-neutral-500 dark:text-neutral-400 text-base">Joined {user.joined_date}</Text>
-        </View>
-        <View className="flex-row gap-4 items-center">
-          <TouchableOpacity className="flex-row gap-1.5 items-center">
-            <Text className="text-black dark:text-white text-base font-semibold">{user.following_count}</Text>
-            <Text className="text-neutral-500 dark:text-neutral-400 text-base">Following</Text>
-          </TouchableOpacity>
-          <TouchableOpacity className="flex-row gap-1.5 items-center">
-            <Text className="text-black dark:text-white text-base font-semibold">{user.followed_by}</Text>
-            <Text className="text-neutral-500 dark:text-neutral-400 text-base">Followers</Text>
-          </TouchableOpacity>
-        </View>
-        <View className="flex-row gap-8 items-center">
-          <View className="relative flex-row" style={{ width: PROFILE_IMAGE_SIZE_MAP.xs + (PROFILE_IMAGE_SIZE_MAP.xs / 1.8) * 2, height: PROFILE_IMAGE_SIZE_MAP.xs + 6 }}>
-            {[10, 20, 30].map((imgNum, index) => (
-              <ProfileImage
-                key={`follower-${imgNum}`}
-                displaySize="xs"
-                source={{
-                  uri: index === 0 ? "https://pbs.twimg.com/profile_images/1676741952014897152/j5t0mY_I_400x400.jpg" :
-                    index === 1 ? "https://pbs.twimg.com/profile_images/1785867863191932928/EpOqfO6d_400x400.png" :
-                      "https://pbs.twimg.com/profile_images/1776070739319214080/TBARcp9C_400x400.jpg"
-                }}
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  zIndex: 3 - index,
-                  left: (PROFILE_IMAGE_SIZE_MAP.xs / 1.8) * index,
-                  borderRadius: 100,
-                }}
-                className="border-2 border-white dark:border-black"
-              />
-            ))}
-          </View>
-          <Text className="text-neutral-500 dark:text-neutral-400 text-sm flex-1 -ml-2">
-            Followed by Expo, React Native, and 15 others
-          </Text>
-        </View>
+        ) : null}
       </View>
     </ExpandedHeader>
   );
@@ -524,113 +516,139 @@ export default function UserProfileScreen() {
 
   
   const params = useLocalSearchParams();
-  const userHandle = params.id as string;
+  const rawUserHandle = params.id;
+  const userHandle = (Array.isArray(rawUserHandle) ? rawUserHandle[0] : rawUserHandle || '').replace(/^@/, '');
+  const currentUserId = useAuthStore((state) => state.user?.id ?? null);
+  const [user, setUser] = useState<User | null>(null);
+  const [userPosts, setUserPosts] = useState<FeedContent[]>([]);
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [profileError, setProfileError] = useState('');
+  const [feedError, setFeedError] = useState('');
+  const requestRef = useRef<AbortController | null>(null);
 
-  
-  const user = useMemo(() => {
-    return users.find((user) => user.handle.toLowerCase() === userHandle.toLowerCase()) || users[0];
+  const loadProfile = useCallback(async () => {
+    requestRef.current?.abort();
+    const controller = new AbortController();
+    requestRef.current = controller;
+    setProfileLoading(true);
+    setRefreshing(true);
+    setProfileError('');
+    setFeedError('');
+
+    try {
+      const profilePath = '/users/by-username/' + encodeURIComponent(userHandle);
+      let profileResult = await apiRequest<{
+        id?: string; username?: string; displayName?: string | null; bio?: string | null; avatar?: string | null;
+        website?: string | null; category?: string | null; createdAt?: string; followerCount?: number; followingCount?: number;
+        coverImage?: string | null; headerImage?: string | null; isVerified?: boolean; verifiedBadge?: string | null;
+        isOrganization?: boolean; error?: { message?: string };
+      }>(profilePath, { method: 'GET', signal: controller.signal });
+      let profile = profileResult.response.ok ? unwrapApiData<{
+        id?: string; username?: string; displayName?: string | null; bio?: string | null; avatar?: string | null;
+        website?: string | null; category?: string | null; createdAt?: string; followerCount?: number; followingCount?: number;
+        coverImage?: string | null; headerImage?: string | null; isVerified?: boolean; verifiedBadge?: string | null;
+        isOrganization?: boolean;
+      }>(profileResult.data) : null;
+
+      if (!profile?.id) {
+        profileResult = await apiRequest<{
+          id?: string; username?: string; displayName?: string | null; bio?: string | null; avatar?: string | null;
+          website?: string | null; category?: string | null; createdAt?: string; followerCount?: number; followingCount?: number;
+          coverImage?: string | null; headerImage?: string | null; isVerified?: boolean; verifiedBadge?: string | null;
+          isOrganization?: boolean; error?: { message?: string };
+        }>('/users/' + encodeURIComponent(userHandle), { method: 'GET', signal: controller.signal });
+        profile = profileResult.response.ok ? unwrapApiData<{
+          id?: string; username?: string; displayName?: string | null; bio?: string | null; avatar?: string | null;
+          website?: string | null; category?: string | null; createdAt?: string; followerCount?: number; followingCount?: number;
+          coverImage?: string | null; headerImage?: string | null; isVerified?: boolean; verifiedBadge?: string | null;
+          isOrganization?: boolean;
+        }>(profileResult.data) : null;
+      }
+
+      if (!profileResult.response.ok || !profile?.id) {
+        throw new Error(getApiErrorMessage(profileResult.data, 'Could not load this profile.'));
+      }
+      if (controller.signal.aborted) return;
+
+      const sessionToken = await readSessionToken().catch(() => null);
+      if (controller.signal.aborted) return;
+
+      let posts: FeedContent[] = [];
+      let hasMorePosts = false;
+      const contentParams = new URLSearchParams({ creatorId: profile.id, type: 'post', limit: '20' });
+      const feedResult = await apiRequest<{ data?: ApiContentPage; error?: { message?: string } }>(
+        '/contents?' + contentParams.toString(),
+        { method: 'GET', signal: controller.signal },
+      );
+      const page = feedResult.response.ok ? unwrapApiData<ApiContentPage>(feedResult.data) : null;
+      if (!feedResult.response.ok || !page || !Array.isArray(page.items)) {
+        setFeedError(getApiErrorMessage(feedResult.data, 'Could not load posts from this profile.'));
+      } else {
+        hasMorePosts = page.hasMore === true;
+        posts = await Promise.all(
+          page.items
+            .filter((item): item is ApiContentRecord => Boolean(item && typeof item.id === 'string'))
+            .map(async (item) => {
+              const [body, social, author] = await Promise.all([
+                readContentBody(item, controller.signal, sessionToken),
+                readContentSocial(item.id, controller.signal),
+                readContentAuthor(item),
+              ]);
+              return mapContentToFeedContent(item, body, social, author, sessionToken);
+            }),
+        );
+      }
+      if (controller.signal.aborted) return;
+
+      const profileAvatarSource = resolveNativeMediaSource(profile.avatar, sessionToken);
+      const profileHeaderSource = resolveNativeMediaSource(profile.headerImage || profile.coverImage, sessionToken);
+
+      setUser({
+        id: profile.id,
+        name: profile.displayName?.trim() || profile.username || 'LuckRead member',
+        handle: profile.username || userHandle || profile.id,
+        bio: profile.bio || '',
+        url: profile.website || '',
+        followed_by: typeof profile.followerCount === 'number' ? String(profile.followerCount) : '',
+        following_count: typeof profile.followingCount === 'number' ? profile.followingCount : undefined,
+        items_count: hasMorePosts ? String(posts.length) + '+' : String(posts.length),
+        joined_date: profile.createdAt ? new Date(profile.createdAt).toLocaleDateString() : '',
+        category: profile.category || '',
+        profile_picture: profileAvatarSource?.uri || '',
+        profile_picture_headers: profileAvatarSource?.headers,
+        header_picture: profileHeaderSource?.uri || '',
+        header_picture_headers: profileHeaderSource?.headers,
+        is_verified: profile.isVerified === true,
+        verified_badge: profile.verifiedBadge || '',
+        is_organization: profile.isOrganization === true,
+      });
+      setUserPosts(posts);
+    } catch (error) {
+      if (controller.signal.aborted) return;
+      setProfileError(error instanceof Error ? error.message : 'Could not load this profile.');
+    } finally {
+      if (requestRef.current === controller) {
+        requestRef.current = null;
+        setProfileLoading(false);
+        setRefreshing(false);
+      }
+    }
   }, [userHandle]);
 
-  
-  const userPosts = useMemo(() => {
-    
-    const processedFeedItems: FeedContent[] = sampleFeedItems.map((item: any): FeedContent => {
-      
-      if (typeof item.poster_id === 'string') {
-        return {
-          contentId: item.contentId || `post-${item.poster_id}-${Date.now()}`,
-          poster_id: item.poster_id,
-          posted_time: typeof item.posted_time === 'string' ? parseInt(item.posted_time, 10) :
-            typeof item.posted_time === 'number' ? item.posted_time : Date.now(),
-          message: item.message || '',
-          media_url: item.media_url || undefined,
-          like_count: item.like_count || 0,
-          retweet_count: item.retweet_count || 0,
-          reply_count: item.reply_count || 0,
-          view_count: item.view_count || '0',
-          category: item.category || 'For you'
-        };
-      }
-      
-      else if (typeof item.authorName === 'string') {
-        
-        const matchingUser = users.find(user => user.name === item.authorName);
-        const userId = matchingUser ? matchingUser.id : '0';
-
-        return {
-          contentId: item.contentId || `post-legacy-${Date.now()}`,
-          poster_id: userId,
-          authorName: item.authorName,
-          authorHandle: item.authorHandle,
-          authorImageUrl: item.authorImageUrl,
-          posted_time: typeof item.postedTime === 'string' ? parseInt(item.postedTime, 10) :
-            typeof item.postedTime === 'number' ? item.postedTime : Date.now(),
-          message: item.message || '',
-          media_url: item.mediaUrl || undefined,
-          like_count: item.likeCount || 0,
-          retweet_count: item.retweetCount || 0,
-          reply_count: item.replyCount || 0,
-          view_count: item.viewCount || '0',
-          category: item.category || 'For you'
-        };
-      }
-      
-      else {
-        return {
-          contentId: `post-unknown-${Date.now()}`,
-          poster_id: '0', 
-          posted_time: Date.now(),
-          message: 'Unknown post format',
-          media_url: undefined,
-          like_count: 0,
-          retweet_count: 0,
-          reply_count: 0,
-          view_count: '0',
-          category: 'For you'
-        };
-      }
-    });
-
-    
-    return processedFeedItems
-      .filter(post => post.poster_id === user.id)
-      .sort((a, b) => {
-        const timeA = typeof a.posted_time === 'number' ? a.posted_time : parseInt(String(a.posted_time), 10);
-        const timeB = typeof b.posted_time === 'number' ? b.posted_time : parseInt(String(b.posted_time), 10);
-        return timeB - timeA; 
-      });
-  }, [user.id]);
+  useEffect(() => {
+    void loadProfile();
+    return () => requestRef.current?.abort();
+  }, [loadProfile]);
 
   const feedSections: SectionListData<FeedContent, { title: string }>[] = useMemo(() => [
-    {
-      title: 'Feed',
-      data: userPosts.length > 0 ? userPosts : [
-        
-        {
-          contentId: 'post-empty',
-          poster_id: user.id,
-          authorName: user.name,
-          authorHandle: user.handle,
-          authorImageUrl: user.profile_picture,
-          posted_time: Date.now(),
-          message: 'No posts yet',
-          like_count: 0,
-          retweet_count: 0,
-          reply_count: 0,
-          view_count: '0'
-        }
-      ]
-    },
-  ], [user, userPosts]);
+    { title: 'Feed', data: userPosts },
+  ], [userPosts]);
 
   const profileTabs = ['Posts', 'Affiliates', 'Replies', 'Highlights', 'Videos', 'Photos', 'Articles'];
 
   const handleRefresh = useCallback(() => {
-    setRefreshing(true);
-    setTimeout(() => {
-      setRefreshing(false);
-    }, 2000);
-  }, []);
+    void loadProfile();
+  }, [loadProfile]);
 
   const handleItemPress = (postId: string) => {
     router.push(`/post/${postId}`);
@@ -642,14 +660,42 @@ export default function UserProfileScreen() {
     },
   });
 
+
+  if (profileLoading && !user) {
+    return (
+      <View className="flex-1 items-center justify-center bg-white dark:bg-black">
+        <ActivityIndicator size="large" color={APP_PRIMARY_COLOR} />
+        <Text className="mt-3 text-sm text-neutral-500">Loading profile…</Text>
+      </View>
+    );
+  }
+
+  if (profileError || !user) {
+    return (
+      <View className="flex-1 items-center justify-center bg-white dark:bg-black px-6">
+        <Text className="text-center text-base text-neutral-500">{profileError || 'Profile not found.'}</Text>
+        <TouchableOpacity accessibilityRole="button" className="mt-4 rounded-full bg-sky-500 px-5 py-3" onPress={() => void loadProfile()}>
+          <Text className="font-bold text-white">Retry</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   return (
     <>
       <StatusBar style="light" />
       <ScrollingListWithHeader
-        NavigationBarComponent={(props) => <ProfileHeader {...props} user={user} refreshing={refreshing} targetUsername={userHandle} />}
+        NavigationBarComponent={(props) => <ProfileHeader {...props} user={user} refreshing={refreshing} currentUserId={currentUserId} />}
 
         ExpandedHeaderComponent={(props) => <ProfileDetailsHeader {...props} user={user} />}
         sections={feedSections}
+        ListEmptyComponent={(
+          <View className="items-center px-6 py-12">
+            <Text className="text-center text-sm text-neutral-500">
+              {feedError || 'No public posts yet.'}
+            </Text>
+          </View>
+        )}
         ignoreLeftPadding
         ignoreRightPadding
         expandedHeaderCollapseThreshold={0.25}
