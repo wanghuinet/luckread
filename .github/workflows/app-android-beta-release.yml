@@ -58,12 +58,13 @@ jobs:
           ANDROID_KEY_PASSWORD_SECRET: ${{ secrets.ANDROID_KEY_PASSWORD }}
           PUBLISH_RELEASE: ${{ inputs.publish_release }}
         run: |
-          mkdir -p android/app
+          SIGNING_DIR="${RUNNER_TEMP}/luckread-android-signing"
+          mkdir -p "$SIGNING_DIR"
           if [ -n "$ANDROID_KEYSTORE_BASE64" ] && [ -n "$ANDROID_KEYSTORE_PASSWORD_SECRET" ] && [ -n "$ANDROID_KEY_ALIAS_SECRET" ] && [ -n "$ANDROID_KEY_PASSWORD_SECRET" ]; then
-            printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/app/luckread-release.keystore
-            chmod 600 android/app/luckread-release.keystore
+            printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$SIGNING_DIR/luckread-release.keystore"
+            chmod 600 "$SIGNING_DIR/luckread-release.keystore"
             {
-              echo "ANDROID_KEYSTORE_PATH=$GITHUB_WORKSPACE/app/android/app/luckread-release.keystore"
+              echo "ANDROID_KEYSTORE_PATH=$SIGNING_DIR/luckread-release.keystore"
               echo "ANDROID_KEYSTORE_PASSWORD=$ANDROID_KEYSTORE_PASSWORD_SECRET"
               echo "ANDROID_KEY_ALIAS=$ANDROID_KEY_ALIAS_SECRET"
               echo "ANDROID_KEY_PASSWORD=$ANDROID_KEY_PASSWORD_SECRET"
@@ -82,7 +83,7 @@ jobs:
             echo "::add-mask::$STORE_PASSWORD"
             echo "::add-mask::$KEY_PASSWORD"
             KEY_ALIAS="luckread-beta-test"
-            KEYSTORE_PATH="$GITHUB_WORKSPACE/app/android/app/luckread-test.keystore"
+            KEYSTORE_PATH="$SIGNING_DIR/luckread-test.keystore"
             keytool -genkeypair -noprompt -v \
               -keystore "$KEYSTORE_PATH" \
               -storetype JKS \
