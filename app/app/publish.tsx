@@ -381,7 +381,7 @@ export default function PublishScreen() {
         if (!result.response.ok) {
           throw new Error(getApiErrorMessage(result.data, 'Unable to save post changes.', result.response.status));
         }
-        router.back();
+        router.replace(('/?published=' + encodeURIComponent(contentId) + '&refresh=' + Date.now()) as never);
         return;
       }
 
@@ -464,7 +464,7 @@ export default function PublishScreen() {
 
       submitAttemptRef.current = null;
       recordRef.current = null;
-      router.back();
+      router.replace(('/?published=' + encodeURIComponent(draft.id) + '&refresh=' + Date.now()) as never);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Publishing failed. Please retry.');
       setStatusMessage('');

@@ -5,6 +5,7 @@ import {
     View,
     ActivityIndicator,
     Platform,
+    Alert,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useColorScheme } from "nativewind";
@@ -26,6 +27,8 @@ import { EngagementActions } from './EngagementActions';
 import users from '~/dummy/users.json';
 import * as ContextMenu from 'zeego/context-menu';
 import * as DropdownMenu from 'zeego/dropdown-menu';
+import { apiRequest, getApiErrorMessage } from '~/lib/api-client';
+import { useAuthStore } from '~/store/auth-store';
 
 
 dayjs.extend(relativeTime);
@@ -56,6 +59,9 @@ export type FeedMediaAttachment = {
 
 export interface FeedContent {
     contentId?: string;
+    etag?: string;
+    ownerUserId?: string;
+    creatorId?: string | null;
     poster_id: string;
     authorName?: string;
     authorHandle?: string;
@@ -217,10 +223,11 @@ interface FeedItemProps {
     itemData: FeedContent;
     onPress?: () => void;
     detailView?: boolean;
+    onDeleted?: (contentId: string) => void;
 }
 
 
-export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailView }) => {
+export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailView, onDeleted }) => {
     const { colorScheme } = useColorScheme();
 
 
@@ -243,6 +250,115 @@ export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailVie
     const verified_badge = itemData?.verified_badge || userInfo?.verified_badge;
 
     const router = useRouter();
+    const sessionStatus = useAuthStore((state) => state.status);
+    const currentUser = useAuthStore((state) => state.user);
+    const isOwnPost = sessionStatus === 'authenticated' && Boolean(itemData.contentId && currentUser?.id && itemData.ownerUserId === currentUser.id);
+
+    const beginEditOwnPost = () => {
+        const contentId = itemData.contentId;
+        if (!contentId || !isOwnPost) return;
+        Alert.alert(
+            '编辑动态',
+            '为保留已发布内容的历史版本，这条动态会先下线，再进入编辑。保存后会重新发布。继续吗？',
+            [
+                { text: '取消', style: 'cancel' },
+                { text: '下线并编辑', onPress: () => {
+                    void (async () => {
+                        try {
+                            const readLatest = async () => {
+                                const result = await apiRequest<any>('/contents/' + encodeURIComponent(contentId), { method: 'GET' });
+                                if (!result.response.ok) throw new Error(result.error?.message || getApiErrorMessage(result.data, '无法读取动态当前状态。', result.response.status));
+                                const envelope = result.data as any;
+                                const record = envelope?.data?.id ? envelope.data : envelope?.doc?.id ? envelope.doc : envelope;
+                                if (!record?.id) throw new Error('服务器未返回动态信息。');
+                                if (record.ownerUserId && currentUser?.id && record.ownerUserId !== currentUser.id) {
+                                    throw new Error('只能编辑自己发布的动态。');
+                                }
+                                return {
+                                    state: typeof record.state === 'string' ? record.state : '',
+                                    etag: typeof record.etag === 'string' ? record.etag : result.response.headers.get('ETag') || '',
+                                    contentType: record.contentType,
+                                };
+                            };
+                            const transition = async (to: 'UNPUBLISHED' | 'DRAFT', etag: string) => {
+                                const result = await apiRequest<any>('/contents/' + encodeURIComponent(contentId) + '/state', {
+                                    method: 'POST',
+                                    headers: { 'If-Match': etag },
+                                    idempotencyKey: 'native-post-edit-' + to.toLowerCase() + ':' + contentId + ':' + etag,
+                                    body: JSON.stringify({ to }),
+                                });
+                                if (!result.response.ok) {
+                                    throw new Error(result.error?.message || getApiErrorMessage(result.data, '无法安全切换动态状态。', result.response.status));
+                                }
+                                const envelope = result.data as any;
+                                const record = envelope?.data ?? envelope;
+                                const nextEtag = typeof record?.etag === 'string' ? record.etag : result.response.headers.get('ETag') || '';
+                                if (!nextEtag) throw new Error('状态已更新但版本号未返回。再次点击编辑即可继续。');
+                                return { state: typeof record?.to === 'string' ? record.to : to, etag: nextEtag, contentType: 'post' };
+                            };
+
+                            let current = await readLatest();
+                            if (current.contentType !== 'post') throw new Error('当前页面只支持编辑普通社交动态。');
+                            if (!current.etag) throw new Error('服务器未返回内容版本，无法安全编辑。');
+                            if (current.state === 'PUBLISHED') {
+                                current = await transition('UNPUBLISHED', current.etag);
+                            }
+                            if (current.state === 'UNPUBLISHED') {
+                                current = await transition('DRAFT', current.etag);
+                            }
+                            if (current.state !== 'DRAFT') throw new Error('当前状态不支持编辑，请刷新信息流后重试。');
+                            router.push(('/publish?contentId=' + encodeURIComponent(contentId)) as never);
+                        } catch (error) {
+                            Alert.alert('无法编辑动态', error instanceof Error ? error.message : '请稍后重试。');
+                        }
+                    })();
+                } },
+            ],
+        );
+    };
+
+    const removeOwnPost = () => {
+        const contentId = itemData.contentId;
+        if (!contentId || !isOwnPost) return;
+        Alert.alert('删除动态', '确定删除这条动态吗？删除后无法恢复。', [
+            { text: '取消', style: 'cancel' },
+            { text: '删除', style: 'destructive', onPress: () => {
+                void (async () => {
+                    try {
+                        // Always read the current ETag; the timeline version may be stale.
+                        const latest = await apiRequest<any>('/contents/' + encodeURIComponent(contentId), { method: 'GET' });
+                        if (!latest.response.ok) {
+                            throw new Error(latest.error?.message || getApiErrorMessage(latest.data, '无法读取动态当前状态。', latest.response.status));
+                        }
+                        const payload = latest.data as any;
+                        const record = payload?.data?.id ? payload.data : payload?.doc?.id ? payload.doc : payload;
+                        if (!record?.id) throw new Error('服务器未返回动态信息。');
+                        if (record.contentType && record.contentType !== 'post') throw new Error('当前页面只能删除普通社交动态。');
+                        if (record.ownerUserId && currentUser?.id && record.ownerUserId !== currentUser.id) {
+                            throw new Error('只能删除自己发布的动态。');
+                        }
+                        const etag = typeof record.etag === 'string'
+                            ? record.etag
+                            : latest.response.headers.get('ETag') || '';
+                        if (!etag) throw new Error('服务器未返回内容版本，不能安全删除。请刷新后重试.');
+                        const result = await apiRequest('/contents/' + encodeURIComponent(contentId), {
+                            method: 'DELETE',
+                            headers: { 'If-Match': etag },
+                            idempotencyKey: 'native-content-delete:' + contentId + ':' + etag,
+                        });
+                        if (!result.response.ok) {
+                            throw new Error(result.error?.message || getApiErrorMessage(result.data, '删除动态失败，请重试。', result.response.status));
+                        }
+                        onDeleted?.(contentId);
+                        Alert.alert('已删除', '这条动态已删除。');
+                    } catch (error) {
+                        Alert.alert('删除失败', error instanceof Error ? error.message : '删除动态失败，请稍后重试。');
+                    }
+                })();
+            } },
+        ]);
+    };
+
 
 
     const goToPost = () => {
@@ -286,6 +402,19 @@ export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailVie
                                             </TouchableOpacity>
                                         </DropdownMenu.Trigger>
                                         <DropdownMenu.Content>
+                                            {isOwnPost ? (
+                                                <>
+                                                    <DropdownMenu.Item key="edit-own-post" onSelect={beginEditOwnPost}>
+                                                        <DropdownMenu.ItemTitle>Edit post</DropdownMenu.ItemTitle>
+                                                        <DropdownMenu.ItemIcon ios={{ name: 'pencil' }} />
+                                                    </DropdownMenu.Item>
+                                                    <DropdownMenu.Item key="delete-own-post" destructive onSelect={removeOwnPost}>
+                                                        <DropdownMenu.ItemTitle>Delete post</DropdownMenu.ItemTitle>
+                                                        <DropdownMenu.ItemIcon ios={{ name: 'trash' }} />
+                                                    </DropdownMenu.Item>
+                                                    <DropdownMenu.Separator />
+                                                </>
+                                            ) : null}
                                             <DropdownMenu.Item key="interactions">
                                                 <DropdownMenu.ItemTitle>View post interactions</DropdownMenu.ItemTitle>
                                                 <DropdownMenu.ItemIcon
@@ -350,6 +479,19 @@ export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailVie
                     <ContextMenu.ItemIcon ios={{ name: 'doc.text' }} />
                 </ContextMenu.Item>
 
+                {isOwnPost ? (
+                    <>
+                        <ContextMenu.Item key="edit-own-post" onSelect={beginEditOwnPost}>
+                            <ContextMenu.ItemTitle>Edit post</ContextMenu.ItemTitle>
+                            <ContextMenu.ItemIcon ios={{ name: 'pencil' }} />
+                        </ContextMenu.Item>
+                        <ContextMenu.Item key="delete-own-post" destructive onSelect={removeOwnPost}>
+                            <ContextMenu.ItemTitle>Delete post</ContextMenu.ItemTitle>
+                            <ContextMenu.ItemIcon ios={{ name: 'trash' }} />
+                        </ContextMenu.Item>
+                        <ContextMenu.Separator />
+                    </>
+                ) : null}
                 <ContextMenu.Item key="report" destructive onSelect={() => console.log('Report post', itemData.contentId)}>
                     <ContextMenu.ItemTitle>Report post</ContextMenu.ItemTitle>
                     <ContextMenu.ItemIcon ios={{ name: 'flag' }} />

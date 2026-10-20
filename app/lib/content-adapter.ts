@@ -12,6 +12,7 @@ export type ApiAuthor = {
 
 export type ApiContentRecord = {
   id: string;
+  etag?: string;
   ownerUserId?: string;
   creatorId?: string | null;
   contentType?: 'article' | 'post' | 'video' | string;
@@ -162,6 +163,9 @@ export function mapContentToFeedContent(
 
   return {
     contentId: item.id,
+    etag: item.etag,
+    ownerUserId: item.ownerUserId,
+    creatorId: item.creatorId,
     poster_id: userId || creator?.username || creator?.handle || 'unknown',
     authorName: creator?.displayName?.trim() || creator?.username || creator?.handle || 'LuckRead member',
     authorHandle: creator?.username || creator?.handle || userId || 'unknown',

@@ -114,7 +114,7 @@
       "queue": {"enqueueMax": 1, "taskType": "content_state_projection"},
       "antiAbuse": {"required": true, "scopes": ["account", "endpoint", "resource", "global"], "actions": ["ALLOW", "CHALLENGE", "BLOCK", "REVIEW"]},
       "idempotency": {"required": true},
-      "security": ["explicit_transition_matrix", "no_direct_state_field_mutation", "approval_required_for_moderation_transitions", "audit_required"],
+      "security": ["explicit_transition_matrix", "no_direct_state_field_mutation", "approval_required_for_moderation_transitions", "social_post_edit_requires_owner_unpublish_to_draft", "audit_required"],
       "stateMachine": {"required": true, "states": ["DRAFT", "PENDING_REVIEW", "REJECTED", "APPROVED", "SCHEDULED", "PUBLISHED", "UNPUBLISHED", "ARCHIVED", "DELETED", "RESTORED"]},
       "evidence": {"openapi": "PASS", "permission": "MISSING", "state": "MISSING", "resource": "MISSING", "cache": "MISSING", "integration": "MISSING", "securityE2E": "MISSING"}
     },
