@@ -25,7 +25,7 @@ jobs:
         with:
           node-version: 24
       - name: Regenerate npm lockfile from package.json
-        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund --force
       - name: Commit generated lockfile when changed
         run: |
           if git diff --quiet -- package-lock.json; then
