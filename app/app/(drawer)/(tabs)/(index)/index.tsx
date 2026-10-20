@@ -11,7 +11,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Tabs, MaterialTabBar } from 'react-native-collapsible-tab-view';
 import { BlurView } from 'expo-blur';
 
-import { FeedContent, FeedItem } from '~/components/FeedItem';
+import { FeedContent, FeedItem, type FeedMediaAttachment } from '~/components/FeedItem';
 import X from '~/assets/svg/aside/x.svg';
 import { apiRequest, getApiErrorMessage } from '~/lib/api-client';
 import { useAuthStore } from '~/store/auth-store';
@@ -58,6 +58,37 @@ type ContentPageResponse = {
 const APP_PRIMARY_COLOR = '#1769aa';
 const API_PAGE_SIZE = '20';
 
+const VIDEO_MEDIA_EXTENSION = /\.(?:mp4|webm|mov|m4v|avi|mkv)(?:[?#].*)?$/i;
+
+const isVideoMediaRef = (value: string): boolean => {
+  try {
+    return VIDEO_MEDIA_EXTENSION.test(new URL(value).pathname);
+  } catch {
+    return VIDEO_MEDIA_EXTENSION.test(value);
+  }
+};
+
+const resolveFeedMedia = (item: ApiContent): FeedMediaAttachment[] => {
+  const candidates = (Array.isArray(item.mediaRefs) ? item.mediaRefs : [])
+    .map((ref) => ref.trim())
+    .filter((ref) => /^https?:\/\//i.test(ref));
+
+  if (
+    candidates.length === 0 &&
+    typeof item.coverRef === 'string' &&
+    /^https?:\/\//i.test(item.coverRef.trim())
+  ) {
+    candidates.push(item.coverRef.trim());
+  }
+
+  return Array.from(new Set(candidates))
+    .slice(0, 4)
+    .map((src) => ({
+      src,
+      kind: isVideoMediaRef(src) ? 'video' : 'image',
+    }));
+};
+
 const mapContent = (item: ApiContent): FeedContent => {
   const userId = item.creatorId || item.ownerUserId || 'unknown';
   const createdAt = item.createdAt || item.updatedAt;
@@ -78,6 +109,7 @@ const mapContent = (item: ApiContent): FeedContent => {
     posted_time: timestampSeconds,
     message: item.title || '',
     media_url: mediaUrl,
+    media_items: resolveFeedMedia(item),
     like_count: 0,
     retweet_count: 0,
     reply_count: 0,

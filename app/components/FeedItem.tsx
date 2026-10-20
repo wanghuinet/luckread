@@ -19,6 +19,7 @@ import Views from "~/assets/svg/views.svg"
 import { ImageProps } from 'expo-image';
 import { router, useRouter } from 'expo-router';
 import LikeButton from './LikeButton';
+import { VideoView, useVideoPlayer } from 'expo-video';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { EngagementActions } from './EngagementActions';
@@ -47,6 +48,11 @@ const PROFILE_IMAGE_DIMENSIONS: Record<ProfileImageSize, number> = {
 export const PROFILE_IMAGE_SIZE_MAP = { ...PROFILE_IMAGE_DIMENSIONS };
 
 
+export type FeedMediaAttachment = {
+    src: string;
+    kind: 'image' | 'video';
+};
+
 export interface FeedContent {
     contentId?: string;
     poster_id: string;
@@ -56,6 +62,7 @@ export interface FeedContent {
     posted_time: number;
     message: string;
     media_url?: string;
+    media_items?: FeedMediaAttachment[];
     like_count?: number;
     retweet_count?: number;
     reply_count?: number;
@@ -149,6 +156,59 @@ export const findUserById = (id: string) => {
     return users.find(user => user.id === id);
 };
 
+const FeedVideoAttachment = ({ uri }: { uri: string }) => {
+    const player = useVideoPlayer(uri, (instance) => {
+        instance.loop = false;
+    });
+
+    return (
+        <VideoView
+            player={player}
+            style={{ width: '100%', aspectRatio: 1 }}
+            contentFit="contain"
+            nativeControls
+            allowsFullscreen
+            allowsPictureInPicture={false}
+        />
+    );
+};
+
+const FeedMediaGallery = ({
+    items,
+    detailView = false,
+}: {
+    items: FeedMediaAttachment[];
+    detailView?: boolean;
+}) => {
+    if (items.length === 0) return null;
+
+    return (
+        <View className={detailView ? "mt-4 flex-row flex-wrap gap-2" : "mt-2 flex-row flex-wrap gap-2"}>
+            {items.map((media, index) => (
+                <View
+                    key={media.src + '-' + index}
+                    className={items.length === 1
+                        ? "w-full overflow-hidden rounded-lg bg-neutral-100 dark:bg-neutral-900"
+                        : "w-[48%] overflow-hidden rounded-lg bg-neutral-100 dark:bg-neutral-900"}
+                >
+                    {media.kind === 'video' ? (
+                        <FeedVideoAttachment uri={media.src} />
+                    ) : (
+                        <Galeria urls={[media.src]}>
+                            <Galeria.Image>
+                                <Image
+                                    source={{ uri: media.src }}
+                                    className="w-full aspect-square"
+                                    contentFit="cover"
+                                />
+                            </Galeria.Image>
+                        </Galeria>
+                    )}
+                </View>
+            ))}
+        </View>
+    );
+};
 
 interface FeedItemProps {
     itemData: FeedContent;
@@ -162,6 +222,11 @@ export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailVie
 
 
     const userInfo = findUserById(itemData.poster_id);
+    const mediaItems = itemData.media_items?.length
+        ? itemData.media_items
+        : itemData.media_url
+            ? [{ src: itemData.media_url, kind: 'image' as const }]
+            : [];
 
 
     const authorName = itemData.authorName || userInfo?.name || 'Unknown';
@@ -266,17 +331,7 @@ export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailVie
                             </View>
 
                             <Text className="text-black dark:text-white mt-1 text-lg leading-6">{itemData.message}</Text>
-                            {itemData.media_url && (
-                                <Galeria urls={[itemData.media_url].filter(url => !!url) as string[]}>
-                                    <Galeria.Image>
-                                        <Image
-                                            source={{ uri: itemData.media_url }}
-                                            className="w-full aspect-[4/4] mt-2 rounded-lg"
-                                            contentFit="cover"
-                                        />
-                                    </Galeria.Image>
-                                </Galeria>
-                            )}
+                            <FeedMediaGallery items={mediaItems} />
                             <EngagementActions itemData={itemData} detailView={false} />
                         </View>
                     </View>
@@ -343,6 +398,11 @@ export const FeedItemDetailView: React.FC<FeedItemProps> = ({ itemData, onPress,
 
 
     const userInfo = findUserById(itemData.poster_id);
+    const mediaItems = itemData.media_items?.length
+        ? itemData.media_items
+        : itemData.media_url
+            ? [{ src: itemData.media_url, kind: 'image' as const }]
+            : [];
 
 
     const authorName = itemData.authorName || userInfo?.name || 'Unknown';
@@ -396,17 +456,7 @@ export const FeedItemDetailView: React.FC<FeedItemProps> = ({ itemData, onPress,
             <View className="mt-2">
                 <Text className="text-lg text-black dark:text-white">{itemData.message}</Text>
 
-                {itemData.media_url && (
-                    <Galeria urls={[itemData.media_url].filter(url => !!url) as string[]}>
-                        <Galeria.Image>
-                            <Image
-                                source={{ uri: itemData.media_url }}
-                                className="w-full aspect-[4/4] mt-4 rounded-lg"
-                                contentFit="cover"
-                            />
-                        </Galeria.Image>
-                    </Galeria>
-                )}
+                <FeedMediaGallery items={mediaItems} detailView />
 
 
                 <View className="flex-row items-center mt-2 gap-2">
