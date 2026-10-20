@@ -73,4 +73,4 @@ jobs:
       - name: Install CocoaPods
         run: cd ios && pod install
       - name: Build iOS simulator
-        run: xcodebuild -workspace ios/luckread-mobile.xcworkspace -scheme luckread-mobile -sdk iphonesimulator -configuration Debug CODE_SIGNING_ALLOWED=NO
+        run: xcodebuild -workspace ios/LuckRead.xcworkspace -scheme LuckRead -sdk iphonesimulator -configuration Debug CODE_SIGNING_ALLOWED=NO
