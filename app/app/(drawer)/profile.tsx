@@ -1,14 +1,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { apiRequest } from '~/lib/api-client';
-import { unwrapApiData } from '~/lib/content-adapter';
+import { resolvePublicProfileById } from '~/lib/content-adapter';
 import { useAuthStore } from '~/store/auth-store';
-
-type PublicProfile = {
-  id: string;
-  username?: string;
-};
 
 export default function MyProfileEntry() {
   const router = useRouter();
@@ -23,12 +17,9 @@ export default function MyProfileEntry() {
     }
     setError('');
     try {
-      const result = await apiRequest<unknown>('/users/' + encodeURIComponent(user.id), { method: 'GET' });
-      if (!result.response.ok) {
-        throw new Error(result.error?.message || '无法读取个人资料。');
-      }
-      const profile = unwrapApiData<PublicProfile>(result.data);
-      router.replace(('/profile/' + encodeURIComponent(profile?.username || user.id)) as never);
+      const profile = await resolvePublicProfileById(user.id);
+      if (!profile?.id) throw new Error('无法读取个人资料。');
+      router.replace(('/profile/' + encodeURIComponent(profile.username || profile.id)) as never);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : '无法读取个人资料。');
     }
