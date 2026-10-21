@@ -1,4 +1,8 @@
 import { beforeEach, expect, mock, test } from 'bun:test';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
+const bookmarkScreenSource = readFileSync(resolve(process.cwd(), 'app/(drawer)/bookmarks.tsx'), 'utf8');
 
 const calls = [];
 mock.module('../lib/api-client.ts', () => ({
@@ -90,4 +94,13 @@ test('loads recent public discovery topics with the existing limit', async () =>
   expect(calls[0].path).toBe('/discovery/topics?limit=20');
   expect(calls[0].options.method).toBe('GET');
   expect(calls[0].options.signal).toBe(controller.signal);
+});
+
+
+test('saved list removes an item only after shared bookmark status confirms it is no longer saved', () => {
+  expect(bookmarkScreenSource).toContain("import { useContentBookmark } from '~/lib/content-bookmark-state';");
+  expect(bookmarkScreenSource).toContain('function BookmarkFeedRow(');
+  expect(bookmarkScreenSource).toContain('if (!contentId || !bookmark.loaded || bookmark.loading || bookmark.pending || bookmark.bookmarked) return;');
+  expect(bookmarkScreenSource).toContain('onRemoved(contentId);');
+  expect(bookmarkScreenSource).toContain('onRemoved={removeUnbookmarkedItem}');
 });
