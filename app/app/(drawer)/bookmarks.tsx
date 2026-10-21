@@ -23,9 +23,46 @@ import {
   type ApiContentRecord,
 } from '~/lib/content-adapter';
 import { readSessionToken } from '~/lib/secure-session';
+import { useContentBookmark } from '~/lib/content-bookmark-state';
 import { useAuthStore } from '~/store/auth-store';
 
 const PRIMARY = '#1d9bf0';
+
+function BookmarkFeedRow({
+  item,
+  onOpen,
+  onRemoved,
+}: {
+  item: FeedContent;
+  onOpen: (contentId: string) => void;
+  onRemoved: (contentId: string) => void;
+}) {
+  const bookmark = useContentBookmark(item.contentId);
+
+  useEffect(() => {
+    const contentId = item.contentId;
+    // Only remove the row after the shared W05-backed bookmark status is known.
+    // A loading state or failed status read must not hide a still-saved item.
+    if (!contentId || !bookmark.loaded || bookmark.loading || bookmark.pending || bookmark.bookmarked) return;
+    onRemoved(contentId);
+  }, [
+    item.contentId,
+    bookmark.bookmarked,
+    bookmark.loaded,
+    bookmark.loading,
+    bookmark.pending,
+    onRemoved,
+  ]);
+
+  return (
+    <FeedItem
+      itemData={item}
+      onPress={() => {
+        if (item.contentId) onOpen(item.contentId);
+      }}
+    />
+  );
+}
 
 export default function Bookmarks() {
   const router = useRouter();
@@ -37,6 +74,14 @@ export default function Bookmarks() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState('');
   const [authRequired, setAuthRequired] = useState(false);
+
+  const removeUnbookmarkedItem = useCallback((contentId: string) => {
+    setItems((current) => current.filter((item) => item.contentId !== contentId));
+  }, []);
+
+  const openPost = useCallback((contentId: string) => {
+    router.push(('/post/' + encodeURIComponent(contentId)) as never);
+  }, [router]);
 
   const loadPage = useCallback(async (nextCursor: string | null, append: boolean) => {
     if (authStatus === 'loading') return;
@@ -129,9 +174,13 @@ export default function Bookmarks() {
       <FlatList
         data={items}
         keyExtractor={(item, index) => item.contentId || 'bookmark-' + index}
-        renderItem={({ item }) => <FeedItem itemData={item} onPress={() => {
-          if (item.contentId) router.push(('/post/' + encodeURIComponent(item.contentId)) as never);
-        }} />}
+        renderItem={({ item }) => (
+          <BookmarkFeedRow
+            item={item}
+            onOpen={openPost}
+            onRemoved={removeUnbookmarkedItem}
+          />
+        )}
         ListEmptyComponent={(
           <View className="items-center px-8 py-14">
             {loading ? <ActivityIndicator color={PRIMARY} /> : (
