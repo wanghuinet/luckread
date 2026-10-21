@@ -5,8 +5,11 @@ import { StyleSheet, Text, View } from 'react-native';
 import { Stack, useRootNavigationState, useRouter, useSegments } from 'expo-router';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
+import * as SecureStore from 'expo-secure-store';
+import { useColorScheme } from 'nativewind';
 
 import { useAuthStore } from '../store/auth-store';
+import { isThemePreference, THEME_PREFERENCE_KEY } from '../lib/theme-preference';
 
 export const unstable_settings = {
   initialRouteName: '(drawer)',
@@ -14,8 +17,10 @@ export const unstable_settings = {
 
 export default function RootLayout() {
   const [isLoaded, setIsLoaded] = useState(false);
+  const [isThemeLoaded, setIsThemeLoaded] = useState(false);
   const status = useAuthStore((state) => state.status);
   const bootstrap = useAuthStore((state) => state.bootstrap);
+  const { setColorScheme } = useColorScheme();
   const segments = useSegments();
   const router = useRouter();
   const navigationState = useRootNavigationState();
@@ -25,6 +30,21 @@ export default function RootLayout() {
     const timer = setTimeout(() => setIsLoaded(true), 350);
     return () => clearTimeout(timer);
   }, [bootstrap]);
+
+  useEffect(() => {
+    let active = true;
+    void SecureStore.getItemAsync(THEME_PREFERENCE_KEY)
+      .then((savedPreference) => {
+        if (active && isThemePreference(savedPreference)) setColorScheme(savedPreference);
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (active) setIsThemeLoaded(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, [setColorScheme]);
 
   useEffect(() => {
     if (!navigationState?.key || !isLoaded || status === 'loading') return;
@@ -47,8 +67,8 @@ export default function RootLayout() {
             <Stack.Screen name="publish" options={{ headerShown: false, presentation: 'modal', animation: 'slide_from_bottom' }} />
             <Stack.Screen name="modal" options={{ title: 'Modal', presentation: 'modal' }} />
           </Stack>
-          {(!isLoaded || status === 'loading') ? (
-            <View style={styles.splash} pointerEvents="auto">
+          {(!isLoaded || !isThemeLoaded || status === 'loading') ? (
+            <View className="flex-1" style={styles.splash} pointerEvents="auto">
               <Text style={styles.brand}>LuckRead</Text>
             </View>
           ) : null}
