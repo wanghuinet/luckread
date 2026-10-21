@@ -1494,7 +1494,7 @@ describe('W05 social poll transport', () => {
     expect(response.status).toBe(200)
     expect(binding.fetch).toHaveBeenCalledTimes(1)
     const prepare = (db as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare
-    expect(prepare.mock.calls.some(([sql]) => /(?:FROM|JOIN)\\s+contents/i.test(String(sql)))).toBe(false)
+    expect(prepare.mock.calls.some(([sql]) => /(?:FROM|JOIN)\s+contents/i.test(String(sql)))).toBe(false)
     await expect(response.json()).resolves.toMatchObject({ data: { poll: null } })
   })
 
@@ -1522,7 +1522,7 @@ describe('W05 social poll transport', () => {
     expect(response.status).toBe(200)
     expect(binding.fetch).toHaveBeenCalledTimes(2)
     const prepare = (db as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare
-    expect(prepare.mock.calls.some(([sql]) => /(?:FROM|JOIN)\\s+contents/i.test(String(sql)))).toBe(false)
+    expect(prepare.mock.calls.some(([sql]) => /(?:FROM|JOIN)\s+contents/i.test(String(sql)))).toBe(false)
     await expect(response.json()).resolves.toMatchObject({ data: { poll: null } })
   })
 
