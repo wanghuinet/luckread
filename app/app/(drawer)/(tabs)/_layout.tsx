@@ -8,8 +8,6 @@ import Home from "~/assets/svg/tabs/home.svg"
 import FilledHome from "~/assets/svg/tabs/filled/home.svg"
 import Search from "~/assets/svg/tabs/search.svg"
 import FilledSearch from "~/assets/svg/tabs/filled/search.svg"
-import Grok from "~/assets/svg/tabs/grok.svg"
-import FilledGrok from "~/assets/svg/tabs/filled/grok.svg"
 import Notifications from "~/assets/svg/tabs/notifications.svg"
 import FilledNotifications from "~/assets/svg/tabs/filled/notifications.svg"
 import Messages from "~/assets/svg/tabs/messages.svg"
@@ -91,13 +89,7 @@ export default function TabLayout() {
           tabBarIcon: ({ color }) => <Foundation name="play-circle" size={26} color={'#000'} />,
         }}
       />
-
-      <Tabs.Screen
-        name="(grok)"
-        options={{
-          tabBarIcon: ({ focused, color }) => focused ? <FilledGrok width={26} height={26} color={color} /> : <Grok width={26} height={26} color={color} />,
-        }}
-      />
+      <Tabs.Screen name="(grok)" options={{ href: null }} />
       <Tabs.Screen
         name="(notifications)"
         options={{
