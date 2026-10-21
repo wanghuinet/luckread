@@ -34,13 +34,19 @@ export const MoreContextIcons = ({
     username = "unknown_user",
     targetUserId,
     contentId,
+    postId,
 }: {
     size?: 'sm' | 'lg';
     username?: string;
     targetUserId?: string | null;
     contentId?: string;
+    postId?: string;
 }) => {
     const router = useRouter();
+    const openPostInteractions = () => {
+        if (!postId) return;
+        router.push(('/post-interactions/' + encodeURIComponent(postId)) as never);
+    };
     const [reportDialogOpen, setReportDialogOpen] = useState(false);
     const currentUserId = useAuthStore((state) => state.user?.id);
     const isOwnTarget = Boolean(targetUserId && currentUserId && targetUserId === currentUserId);
@@ -98,7 +104,7 @@ export const MoreContextIcons = ({
                     </TouchableOpacity>
                 </DropdownMenu.Trigger>
                 <DropdownMenu.Content>
-                    <DropdownMenu.Item key="interactions">
+                    <DropdownMenu.Item key="interactions" onSelect={openPostInteractions} disabled={!postId}>
                         <DropdownMenu.ItemTitle>View post interactions</DropdownMenu.ItemTitle>
                         <DropdownMenu.ItemIcon
                             ios={{ name: 'chart.bar.xaxis' }}
@@ -154,7 +160,7 @@ export const MoreContextIcons = ({
     );
 };
 
-const PostHeader = ({ username, targetUserId, contentId }: { username?: string; targetUserId?: string | null; contentId: string }) => {
+const PostHeader = ({ username, targetUserId, contentId, postId }: { username?: string; targetUserId?: string | null; contentId: string; postId: string }) => {
     const insets = useSafeAreaInsets();
     const router = useRouter();
     return (
@@ -167,7 +173,7 @@ const PostHeader = ({ username, targetUserId, contentId }: { username?: string; 
             <Text className="text-xl font-bold text-black dark:text-white">Post</Text>
 
             <View className="absolute right-4">
-                <MoreContextIcons username={username} targetUserId={targetUserId} contentId={contentId} />
+                <MoreContextIcons username={username} targetUserId={targetUserId} contentId={contentId} postId={postId} />
             </View>
         </View>
     );
@@ -336,7 +342,7 @@ export default function PostDetailScreen() {
                 style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
                 contentContainerStyle={{ flexGrow: 1 }}
             >
-                <PostHeader username={authorHandle} targetUserId={findPost.creatorId || findPost.ownerUserId} contentId={postId} />
+                <PostHeader username={authorHandle} targetUserId={findPost.creatorId || findPost.ownerUserId} contentId={postId} postId={postId} />
                 <FeedItem itemData={findPost} detailView onCommentPress={handleScrollToComments} />
                 <View
                     className="px-4 mt-2"

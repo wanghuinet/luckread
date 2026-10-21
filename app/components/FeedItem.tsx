@@ -433,6 +433,15 @@ export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailVie
 
 
 
+    const openPostInteractions = () => {
+        const postId = itemData.contentId;
+        if (!postId) {
+            Alert.alert('无法查看帖子互动', '这条动态缺少有效的内容 ID。');
+            return;
+        }
+        router.push(('/post-interactions/' + encodeURIComponent(postId)) as never);
+    };
+
     const goToPost = () => {
         const postId = itemData.contentId;
         if (postId) {
@@ -503,7 +512,7 @@ export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailVie
                                                     <DropdownMenu.Separator />
                                                 </>
                                             ) : null}
-                                            <DropdownMenu.Item key="interactions">
+                                            <DropdownMenu.Item key="interactions" onSelect={openPostInteractions} disabled={!itemData.contentId}>
                                                 <DropdownMenu.ItemTitle>View post interactions</DropdownMenu.ItemTitle>
                                                 <DropdownMenu.ItemIcon
                                                     ios={{ name: 'chart.bar.xaxis' }}
