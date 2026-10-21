@@ -83,7 +83,6 @@ describe('W05 reply audience runtime', () => {
 
   it('stores a bounded, de-duplicated mention allowlist for every reply audience', async () => {
     const d = db([
-      { id: 'content-1', owner_user_id: 'owner-1', content_type: 'post', state: 'DRAFT' },
       {
         content_id: 'content-1',
         owner_user_id: 'owner-1',
