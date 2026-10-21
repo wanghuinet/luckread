@@ -743,6 +743,12 @@ export default function UserProfileScreen() {
   useEffect(() => {
     setSelectedTabIndex(0);
     setLikesError('');
+    setLikesLoading(false);
+    setLikesLoadingMore(false);
+    setLikesLoadedForUserId(null);
+    setLikedPosts([]);
+    setLikesCursor(null);
+    setLikesHasMore(false);
     likesRequestRef.current?.abort();
   }, [userHandle]);
 
