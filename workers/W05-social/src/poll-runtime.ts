@@ -1,4 +1,5 @@
 /// <reference types="@cloudflare/workers-types" />
+import type { OwnedPostContext } from './owned-post-context.js'
 
 export class SocialPollError extends Error {
   constructor(readonly code: string, readonly status: number) { super(code) }
@@ -95,6 +96,28 @@ type PollRow = {
   updated_at: string
 }
 
+const rowFromOwnedPostContext = (
+  contentId: string,
+  context: OwnedPostContext | undefined,
+): ContentRow | null => {
+  if (
+    !context ||
+    context.contentId !== contentId ||
+    context.contentType !== 'post' ||
+    !['DRAFT', 'PUBLISHED', 'UNPUBLISHED'].includes(context.state) ||
+    !context.updatedAt.trim()
+  ) {
+    return null
+  }
+  return {
+    id: context.contentId,
+    content_type: context.contentType,
+    state: context.state,
+    owner_user_id: context.ownerUserId,
+    updated_at: context.updatedAt,
+  }
+}
+
 const readPollRow = (db: D1Database, contentId: string) => db.prepare(
   `SELECT poll_id, content_id, owner_user_id, duration_hours, ends_at, created_at, updated_at
      FROM social_polls
@@ -114,12 +137,15 @@ export async function getContentPoll(
   db: D1Database,
   contentIdValue: string,
   viewerUserIdValue: string | null,
+  contentContext?: OwnedPostContext,
 ): Promise<PollView | null> {
   const contentId = validateId(contentIdValue)
   const viewerUserId = viewerUserIdValue ? validateId(viewerUserIdValue, 'UNAUTHENTICATED') : null
-  const content = await db.prepare(
-    'SELECT id, content_type, state, owner_user_id, updated_at FROM contents WHERE id = ? LIMIT 1',
-  ).bind(contentId).first<ContentRow>()
+  const content = contentContext
+    ? rowFromOwnedPostContext(contentId, contentContext)
+    : await db.prepare(
+        'SELECT id, content_type, state, owner_user_id, updated_at FROM contents WHERE id = ? LIMIT 1',
+      ).bind(contentId).first<ContentRow>()
 
   if (!content || content.content_type !== 'post') throw new SocialPollError('NOT_FOUND', 404)
   const isOwner = Boolean(viewerUserId && content.owner_user_id === viewerUserId)
@@ -186,14 +212,14 @@ export async function configureContentPoll(
   contentIdValue: string,
   optionsInput: unknown,
   durationInput: unknown,
+  contentContext?: OwnedPostContext,
 ): Promise<PollView> {
   const actorUserId = validateId(actorUserIdValue, 'UNAUTHENTICATED')
   const contentId = validateId(contentIdValue)
   const options = validateOptions(optionsInput)
   const durationHours = validateDuration(durationInput)
-  const content = await db.prepare(
-    'SELECT id, content_type, state, owner_user_id, updated_at FROM contents WHERE id = ? LIMIT 1',
-  ).bind(contentId).first<ContentRow>()
+  if (!contentContext) throw new SocialPollError('SERVICE_UNAVAILABLE', 503)
+  const content = rowFromOwnedPostContext(contentId, contentContext)
 
   if (!content || content.content_type !== 'post' || content.owner_user_id !== actorUserId) {
     throw new SocialPollError('NOT_FOUND', 404)
@@ -209,7 +235,7 @@ export async function configureContentPoll(
     if (existing.duration_hours !== durationHours || JSON.stringify(sameOptions) !== JSON.stringify(options)) {
       throw new SocialPollError('CONFLICT', 409)
     }
-    const current = await getContentPoll(db, contentId, actorUserId)
+    const current = await getContentPoll(db, contentId, actorUserId, contentContext)
     if (!current) throw new SocialPollError('CONFLICT', 409)
     return current
   }
@@ -225,13 +251,13 @@ export async function configureContentPoll(
     const sameOptions = JSON.stringify(currentOptions) === JSON.stringify(options)
     if (Number(voteCount?.count ?? 0) > 0) {
       if (sameOptions && Number(existing.duration_hours) === durationHours) {
-        const current = await getContentPoll(db, contentId, actorUserId)
+        const current = await getContentPoll(db, contentId, actorUserId, contentContext)
         if (current) return current
       }
       throw new SocialPollError('CONFLICT', 409)
     }
     if (sameOptions && Number(existing.duration_hours) === durationHours) {
-      const current = await getContentPoll(db, contentId, actorUserId)
+      const current = await getContentPoll(db, contentId, actorUserId, contentContext)
       if (current) return current
     }
 
@@ -251,7 +277,7 @@ export async function configureContentPoll(
       ).bind(crypto.randomUUID(), existing.poll_id, text, position, existing.poll_id, now, existing.poll_id)),
     ]
     await db.batch(statements)
-    const refreshed = await getContentPoll(db, contentId, actorUserId)
+    const refreshed = await getContentPoll(db, contentId, actorUserId, contentContext)
     if (!refreshed || refreshed.options.length !== options.length) throw new SocialPollError('CONFLICT', 409)
     return refreshed
   }
@@ -269,7 +295,7 @@ export async function configureContentPoll(
     ).bind(crypto.randomUUID(), pollId, text, position, pollId)),
   ]
   await db.batch(statements)
-  const configured = await getContentPoll(db, contentId, actorUserId)
+  const configured = await getContentPoll(db, contentId, actorUserId, contentContext)
   if (!configured || configured.options.length !== options.length ||
       configured.durationHours !== durationHours ||
       configured.options.some((option, i) => option.text !== options[i])) {
@@ -282,12 +308,12 @@ export async function deleteContentPoll(
   db: D1Database,
   actorUserIdValue: string,
   contentIdValue: string,
+  contentContext?: OwnedPostContext,
 ): Promise<void> {
   const actorUserId = validateId(actorUserIdValue, 'UNAUTHENTICATED')
   const contentId = validateId(contentIdValue)
-  const content = await db.prepare(
-    'SELECT id, content_type, state, owner_user_id FROM contents WHERE id = ? LIMIT 1',
-  ).bind(contentId).first<{ id: string; content_type: string; state: string; owner_user_id: string | null }>()
+  if (!contentContext) throw new SocialPollError('SERVICE_UNAVAILABLE', 503)
+  const content = rowFromOwnedPostContext(contentId, contentContext)
   if (!content || content.content_type !== 'post' || content.owner_user_id !== actorUserId) {
     throw new SocialPollError('NOT_FOUND', 404)
   }

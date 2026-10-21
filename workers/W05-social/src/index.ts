@@ -645,7 +645,13 @@ export default {
           try { body = await request.json() } catch { throw new SocialPollError('VALIDATION_FAILED', 400) }
           if (!body || typeof body !== 'object' || Array.isArray(body)) throw new SocialPollError('VALIDATION_FAILED', 400)
           const raw = body as Record<string, unknown>
-          const poll = await configureContentPoll(env.DB, actorUserId, contentId, raw.options, raw.durationHours)
+          const contentContext = await fetchOwnedPostContext(env.W03_CONTENT, {
+            principalUserId: actorUserId,
+            principalLayer: request.headers.get('X-LuckRead-Principal-Layer')?.trim() ?? '',
+            contentId,
+            correlationId: request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? '',
+          })
+          const poll = await configureContentPoll(env.DB, actorUserId, contentId, raw.options, raw.durationHours, contentContext)
           return json({ data: { poll }, requestId: createRequestId() }, 200)
         }
         if (request.method === 'DELETE') {
@@ -654,7 +660,13 @@ export default {
           const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
           if (!idempotencyKey) throw new SocialPollError('PRECONDITION_REQUIRED', 428)
           if (idempotencyKey.length > 256) throw new SocialPollError('VALIDATION_FAILED', 400)
-          await deleteContentPoll(env.DB, actorUserId, contentId)
+          const contentContext = await fetchOwnedPostContext(env.W03_CONTENT, {
+            principalUserId: actorUserId,
+            principalLayer: request.headers.get('X-LuckRead-Principal-Layer')?.trim() ?? '',
+            contentId,
+            correlationId: request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? '',
+          })
+          await deleteContentPoll(env.DB, actorUserId, contentId, contentContext)
           return new Response(null, { status: 204 })
         }
         return new Response(null, { status: 405, headers: { Allow: 'GET, POST, DELETE' } })

@@ -1,6 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 import { describe, expect, it, vi } from 'vitest'
-import { castContentPollVote, configureContentPoll, getContentPoll } from './poll-runtime.js'
+import { castContentPollVote, configureContentPoll, deleteContentPoll, getContentPoll } from './poll-runtime.js'
 
 const noDatabase = () => ({
   prepare: vi.fn(() => { throw new Error('unexpected database access') }),
@@ -123,15 +123,105 @@ describe('W05 poll runtime', () => {
     })
   })
 
-  it('does not allow a visitor to configure someone else’s poll', async () => {
-    const { db } = pollDb({
-      content: {
-        id: 'content-1', content_type: 'post', state: 'DRAFT',
-        owner_user_id: 'author-1', updated_at: '2026-10-17T04:00:00.000Z',
-      },
-    })
-    await expect(configureContentPoll(db, 'attacker-1', 'content-1', ['Yes', 'No'], 24))
+  it('fails closed when owner context is missing and denies a mismatched owner before touching D1', async () => {
+    const db = noDatabase()
+    await expect(configureContentPoll(db, 'author-1', 'content-1', ['Yes', 'No'], 24))
+      .rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE', status: 503 })
+    const context = {
+      contentId: 'content-1',
+      ownerUserId: 'author-1',
+      contentType: 'post',
+      state: 'DRAFT',
+      updatedAt: '2026-10-17T04:00:00.000Z',
+    } as const
+    await expect(configureContentPoll(db, 'attacker-1', 'content-1', ['Yes', 'No'], 24, context))
       .rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 })
+    await expect(deleteContentPoll(db, 'attacker-1', 'content-1', context))
+      .rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 })
+    await expect(deleteContentPoll(db, 'author-1', 'content-1'))
+      .rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE', status: 503 })
+    expect((db as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).not.toHaveBeenCalled()
+  })
+
+  it('configures a draft poll from W03 owner context without reading canonical contents', async () => {
+    const queries: string[] = []
+    let pollRead = 0
+    const optionRows = [
+      { option_id: 'option-1', option_text: 'Yes', position: 0, votes: 0 },
+      { option_id: 'option-2', option_text: 'No', position: 1, votes: 0 },
+    ]
+    const pollRow = {
+      poll_id: 'poll-1',
+      content_id: 'content-1',
+      owner_user_id: 'author-1',
+      duration_hours: 24,
+      ends_at: null,
+      created_at: '2026-10-17T04:00:00.000Z',
+      updated_at: '2026-10-17T04:00:00.000Z',
+    }
+    const prepare = vi.fn((sql: string) => {
+      queries.push(sql)
+      return {
+        bind: (..._args: unknown[]) => ({
+          first: async () => {
+            if (sql.includes('FROM social_polls') && sql.includes('WHERE content_id = ?')) {
+              pollRead += 1
+              return pollRead === 1 ? null : pollRow
+            }
+            return null
+          },
+          all: async () => sql.includes('SELECT o.option_id, o.option_text')
+            ? { results: optionRows }
+            : { results: [] },
+          run: async () => ({ success: true, meta: { changes: 1 } }),
+        }),
+      }
+    })
+    const batch = vi.fn(async () => [{ success: true, meta: { changes: 1 } }])
+    const db = { prepare, batch } as unknown as D1Database
+    const context = {
+      contentId: 'content-1',
+      ownerUserId: 'author-1',
+      contentType: 'post',
+      state: 'DRAFT',
+      updatedAt: '2026-10-17T04:00:00.000Z',
+    } as const
+
+    await expect(configureContentPoll(db, 'author-1', 'content-1', ['Yes', 'No'], 24, context))
+      .resolves.toMatchObject({
+        pollId: 'poll-1',
+        contentId: 'content-1',
+        options: [{ text: 'Yes' }, { text: 'No' }],
+        durationHours: 24,
+      })
+    expect(batch).toHaveBeenCalledTimes(1)
+    expect(queries.some(sql => /(?:FROM|JOIN)\s+contents/i.test(sql))).toBe(false)
+  })
+
+  it('deletes a draft poll with owner context without reading canonical contents', async () => {
+    const queries: string[] = []
+    const prepare = vi.fn((sql: string) => {
+      queries.push(sql)
+      return {
+        bind: (..._args: unknown[]) => ({
+          first: async () => null,
+          all: async () => ({ results: [] }),
+          run: async () => ({ success: true, meta: { changes: 1 } }),
+        }),
+      }
+    })
+    const batch = vi.fn(async () => [{ success: true, meta: { changes: 1 } }])
+    const db = { prepare, batch } as unknown as D1Database
+    const context = {
+      contentId: 'content-1',
+      ownerUserId: 'author-1',
+      contentType: 'post',
+      state: 'DRAFT',
+      updatedAt: '2026-10-17T04:00:00.000Z',
+    } as const
+    await expect(deleteContentPoll(db, 'author-1', 'content-1', context)).resolves.toBeUndefined()
+    expect(batch).not.toHaveBeenCalled()
+    expect(queries.some(sql => /(?:FROM|JOIN)\s+contents/i.test(sql))).toBe(false)
   })
 
   it('prevents voting on a closed poll', async () => {
