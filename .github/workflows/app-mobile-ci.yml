@@ -80,6 +80,8 @@ jobs:
         run: bun run test:publish-flow
       - name: Test native notifications, bookmarks, relationships and discovery API routes
         run: bun run test:social-screen-api
+      - name: Test native block and mute management
+        run: bun test tests/block-mute-management.test.mjs
       - name: Test native video feed API requests
         run: bun run test:video-feed-api
       - name: Test native feed comment navigation
