@@ -9,6 +9,7 @@ import {
   getOwnedPostContext,
   getPublishedOwnerPostContext,
   getPublishedContentSocialContext,
+  getPublishedContentSocialContexts,
   listContents,
   searchPublishedContents,
   listFollowingOwnerContents,
@@ -250,8 +251,39 @@ const worker = {
   async fetch(request: Request, env: Env): Promise<Response> {
     try {
       const url = new URL(request.url)
-      const isRead = request.method === 'GET' || (request.method === 'POST' && ['/internal/content/following-feed', '/internal/content/search'].includes(url.pathname))
+      const isRead = request.method === 'GET' || (request.method === 'POST' && ['/internal/content/following-feed', '/internal/content/search', '/internal/content/published-social-context-batch'].includes(url.pathname))
       await enforceRateLimits(request, env, isRead ? 'read' : 'write')
+
+      if (url.pathname === '/internal/content/published-social-context-batch') {
+        if (request.method !== 'POST') {
+          return new Response(null, { status: 405, headers: { Allow: 'POST' } })
+        }
+        if (
+          request.headers.get('X-LuckRead-Caller') !== 'W05' ||
+          request.headers.get('X-LuckRead-Transport-Version') !== '1.0' ||
+          !request.headers.get('X-LuckRead-Correlation-Id')?.trim() ||
+          request.headers.has('Authorization') ||
+          request.headers.has('Cookie')
+        ) {
+          throw new ContentRuntimeError('PERMISSION_DENIED', 403)
+        }
+        if (url.search !== '') throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+        let body: unknown
+        try { body = await request.json() } catch { throw new ContentRuntimeError('VALIDATION_FAILED', 400) }
+        if (
+          !body || typeof body !== 'object' || Array.isArray(body) ||
+          !Array.isArray((body as { contentIds?: unknown }).contentIds) ||
+          ((body as { contentIds: unknown[] }).contentIds).length > 50 ||
+          !((body as { contentIds: unknown[] }).contentIds).every(value => typeof value === 'string')
+        ) {
+          throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+        }
+        const items = await getPublishedContentSocialContexts(
+          env.D1_02,
+          (body as { contentIds: string[] }).contentIds,
+        )
+        return json({ data: { items }, requestId: createRequestId() })
+      }
 
       const publishedSocialContextMatch = /^\/internal\/content\/contents\/([^/]+)\/published-social-context$/.exec(url.pathname)
       if (publishedSocialContextMatch) {
