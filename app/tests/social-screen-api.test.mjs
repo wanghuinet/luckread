@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 const bookmarkScreenSource = readFileSync(resolve(process.cwd(), 'app/(drawer)/bookmarks.tsx'), 'utf8');
 const feedItemSource = readFileSync(new URL('../components/FeedItem.tsx', import.meta.url), 'utf8');
 const postDetailSource = readFileSync(new URL('../app/(drawer)/(tabs)/(index,search,messages,grok,video,notifications)/post/[id].tsx', import.meta.url), 'utf8');
+const profileScreenSource = readFileSync(resolve(process.cwd(), 'app/(drawer)/(tabs)/(index,search,messages,grok,video,notifications)/profile/[id].tsx'), 'utf8');
 
 const calls = [];
 let keyCounter = 0;
@@ -22,6 +23,7 @@ const {
   fetchDiscoveryTopics,
   fetchNotificationsPage,
   fetchUserRelationshipsPage,
+  fetchUserLikedContentsPage,
   findPublicUserByUsername,
   markAllNotificationsRead,
   markNotificationRead,
@@ -78,6 +80,28 @@ test('loads the real bookmark list with cursor pagination', async () => {
 
   expect(calls[0].path).toBe('/interactions/bookmarks?list=true&limit=20&cursor=bookmark+cursor%2F1');
   expect(calls[0].options.method).toBe('GET');
+});
+
+test('loads a real profile Likes page with cursor pagination through the existing route', async () => {
+  const controller = new AbortController();
+  await fetchUserLikedContentsPage('profile/id', { cursor: 'liked-next', signal: controller.signal });
+
+  expect(calls).toHaveLength(1);
+  expect(calls[0].path).toBe('/users/profile%2Fid/likes?limit=20&cursor=liked-next');
+  expect(calls[0].options.method).toBe('GET');
+  expect(calls[0].options.signal).toBe(controller.signal);
+});
+
+test('rejects a missing profile ID before requesting its Likes page', () => {
+  expect(() => fetchUserLikedContentsPage('   ')).toThrow('A valid profile user ID is required.');
+  expect(calls).toHaveLength(0);
+});
+
+test('only wires the native profile Likes tab for the signed-in profile and real liked content', () => {
+  expect(profileScreenSource).toContain("const profileTabs = isOwnProfile ? ['Posts', 'Likes'] : ['Posts'];");
+  expect(profileScreenSource).toContain('fetchUserLikedContentsPage(');
+  expect(profileScreenSource).toContain("'/contents/' + encodeURIComponent(likedItem.contentId)");
+  expect(profileScreenSource).toContain('Load more liked posts');
 });
 
 test('loads follower and following lists with encoded profile IDs', async () => {

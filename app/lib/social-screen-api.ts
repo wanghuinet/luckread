@@ -50,6 +50,17 @@ export function fetchBookmarksPage(options: PageRequestOptions = {}) {
   });
 }
 
+/** Fetch one profile's liked-content references using the existing W01/W05 read route. */
+export function fetchUserLikedContentsPage(userIdValue: string, options: PageRequestOptions = {}) {
+  const userId = userIdValue.trim();
+  if (!userId || userId.length > 128) throw new TypeError('A valid profile user ID is required.');
+  const query = pageQuery(options.limit, options.cursor);
+  return apiRequest<unknown>(
+    '/users/' + encodeURIComponent(userId) + '/likes?' + query.toString(),
+    { method: 'GET', signal: options.signal },
+  );
+}
+
 /** Fetch real follower or following relationships for the given profile ID. */
 export function fetchUserRelationshipsPage(
   ownerId: string,
