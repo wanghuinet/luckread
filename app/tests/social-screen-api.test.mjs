@@ -129,14 +129,17 @@ test('rejects a missing profile ID before requesting its Likes page', () => {
   expect(calls).toHaveLength(0);
 });
 
-test('wires public profile Replies and own-profile Likes to real channel endpoints', () => {
-  expect(profileScreenSource).toContain("const profileTabs = isOwnProfile ? ['Posts', 'Replies', 'Likes'] : ['Posts', 'Replies'];");
-  expect(profileScreenSource).toContain("title: showingReplies ? 'Replies' : showingLikes ? 'Likes' : 'Feed'");
+test('wires public profile Replies and Media plus own-profile Likes to real channel endpoints', () => {
+  expect(profileScreenSource).toContain("const profileTabs = isOwnProfile\n    ? ['Posts', 'Replies', 'Media', 'Likes']\n    : ['Posts', 'Replies', 'Media'];");
+  expect(profileScreenSource).toContain("title: showingReplies ? 'Replies' : showingMedia ? 'Media' : showingLikes ? 'Likes' : 'Feed'");
   expect(profileScreenSource).toContain('fetchUserRepliesPage(');
   expect(profileScreenSource).toContain("'/contents/' + encodeURIComponent(contentId)");
   expect(profileScreenSource).toContain('profileReply: {');
   expect(profileScreenSource).toContain('Replying to @');
   expect(profileScreenSource).toContain('Load more replies');
+  expect(profileScreenSource).toContain('fetchUserProfileContentPage(');
+  expect(profileScreenSource).toContain('Load more media');
+  expect(profileScreenSource).toContain('mapped.media_items?.length');
   expect(profileScreenSource).toContain('fetchUserLikedContentsPage(');
   expect(profileScreenSource).toContain("'/contents/' + encodeURIComponent(likedItem.contentId)");
   expect(profileScreenSource).toContain('Load more liked posts');
