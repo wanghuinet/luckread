@@ -491,7 +491,7 @@ export async function getContent(
   return toContent(row)
 }
 
-export type ReplyAudienceContentContext = {
+export type OwnedPostContext = {
   contentId: string
   ownerUserId: string
   contentType: 'post'
@@ -501,13 +501,13 @@ export type ReplyAudienceContentContext = {
 
 /**
  * W03 is the sole authority for content ownership and lifecycle. W05 uses this
- * owner-scoped context only to read the creator's reply-audience policy.
+ * owner-scoped context for W05 social actions on the caller's own post.
  */
-export async function getReplyAudienceContentContext(
+export async function getOwnedPostContext(
   db: ContentD1,
   contentIdValue: string,
   principalUserIdValue: string,
-): Promise<ReplyAudienceContentContext> {
+): Promise<OwnedPostContext> {
   const contentId = contentIdValue.trim()
   const principalUserId = principalUserIdValue.trim()
   if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(contentId)) {
