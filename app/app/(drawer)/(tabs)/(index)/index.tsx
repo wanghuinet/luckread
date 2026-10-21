@@ -1,13 +1,15 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   Pressable,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
+import { DrawerActions } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Tabs, MaterialTabBar } from 'react-native-collapsible-tab-view';
 import { BlurView } from 'expo-blur';
@@ -32,20 +34,37 @@ type ContentPageResponse = {
 const APP_PRIMARY_COLOR = '#1769aa';
 const API_PAGE_SIZE = '20';
 
-
-
 const Header = () => {
   const insets = useSafeAreaInsets();
-  const router = useRouter();
+  const navigation = useNavigation();
+  const user = useAuthStore((state) => state.user);
+
+  const openDrawer = useCallback(() => {
+    // This screen is nested inside the tab navigator; the drawer action bubbles
+    // to the containing drawer without coupling the screen to a route name.
+    navigation.dispatch(DrawerActions.openDrawer());
+  }, [navigation]);
 
   return (
-    <View style={{ paddingTop: insets.top }} className="w-full bg-white">
-      <View className="w-full flex-row items-center justify-center py-3">
-        <X width={26} height={26} fill="black" />
-        <Text style={styles.headerLabel}>LuckRead</Text>
-        <Pressable accessibilityRole="button" accessibilityLabel="发布动态" onPress={() => router.push('/publish' as never)} style={styles.composeButton}>
-          <Feather name="edit-3" size={19} color={APP_PRIMARY_COLOR} />
+    <View style={[styles.headerContainer, { paddingTop: insets.top }]}>
+      <View style={styles.headerRow}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="打开导航菜单"
+          onPress={openDrawer}
+          style={styles.profileButton}
+          hitSlop={8}
+        >
+          {user?.image ? (
+            <Image source={{ uri: user.image }} style={styles.profileAvatar} />
+          ) : (
+            <Feather name="user" size={22} color="#667085" />
+          )}
         </Pressable>
+        <View pointerEvents="none" style={styles.headerLogoWrap}>
+          <X width={28} height={28} fill="#000000" />
+        </View>
+        <View style={styles.headerRightSpacer} />
       </View>
     </View>
   );
@@ -226,7 +245,7 @@ function FeedTimeline({ kind, refreshSignal = '' }: { kind: FeedKind; refreshSig
       data={items}
       renderItem={renderItem}
       keyExtractor={(item, index) => item.contentId || 'content-' + index}
-      contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
+      contentContainerStyle={{ paddingBottom: insets.bottom + 88 }}
       ListFooterComponent={footer}
       onRefresh={() => setRefreshKey((value) => value + 1)}
       refreshing={loading && items.length > 0}
@@ -240,6 +259,7 @@ function FeedTimeline({ kind, refreshSignal = '' }: { kind: FeedKind; refreshSig
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const params = useLocalSearchParams<{ published?: string; refresh?: string }>();
   const refreshSignal = (typeof params.published === 'string' ? params.published : '') + ':' + (typeof params.refresh === 'string' ? params.refresh : '');
 
@@ -291,14 +311,27 @@ export default function HomeScreen() {
         </Tabs.Tab>
       </Tabs.Container>
       <View style={{ height: Math.max(0, insets.bottom - 8) }} />
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="发布动态"
+        onPress={() => router.push('/publish' as never)}
+        style={[styles.floatingCompose, { bottom: insets.bottom + 72 }]}
+      >
+        <Feather name="plus" size={28} color="#ffffff" />
+      </Pressable>
     </BlurView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: 'white', width: '100%', height: '100%' },
-  headerLabel: { color: '#101828', fontSize: 12, fontWeight: '800', marginLeft: 8 },
-  composeButton: { alignItems: 'center', justifyContent: 'center', position: 'absolute', right: 16, top: 5, width: 38, height: 38, borderRadius: 19, backgroundColor: '#eff8ff' },
+  headerContainer: { width: '100%', backgroundColor: 'white' },
+  headerRow: { height: 48, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', position: 'relative' },
+  profileButton: { width: 36, height: 36, borderRadius: 18, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f2f4f7', zIndex: 1 },
+  profileAvatar: { width: 36, height: 36, borderRadius: 18 },
+  headerLogoWrap: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
+  headerRightSpacer: { width: 36, height: 36 },
+  floatingCompose: { position: 'absolute', right: 20, width: 56, height: 56, borderRadius: 28, backgroundColor: APP_PRIMARY_COLOR, alignItems: 'center', justifyContent: 'center', elevation: 6, shadowColor: '#000000', shadowOpacity: 0.22, shadowRadius: 5, shadowOffset: { width: 0, height: 3 }, zIndex: 20 },
   stateContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 28, paddingVertical: 32 },
   stateTitle: { color: '#101828', fontSize: 18, fontWeight: '800', textAlign: 'center' },
   stateDescription: { color: '#667085', fontSize: 14, lineHeight: 21, marginTop: 10, textAlign: 'center' },
