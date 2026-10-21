@@ -513,7 +513,11 @@ export default {
           : Array.isArray(rawMentions) && rawMentions.every((value) => value && typeof value === 'object' && !Array.isArray(value) && typeof (value as { userId?: unknown }).userId === 'string' && typeof (value as { handle?: unknown }).handle === 'string')
             ? rawMentions as Array<{ userId: string; handle: string }>
             : (() => { throw new SocialClosureRuntimeError('VALIDATION_FAILED', 400) })()
-        const result = await syncSocialTokens(env.DB, actorUserId, 'content', contentId, rawText, mentions)
+        const contentContext = await fetchPublishedContentSocialContext(env.W03_CONTENT, {
+          contentId,
+          correlationId: request.headers.get('X-LuckRead-Correlation-Id') ?? '',
+        })
+        const result = await syncSocialTokens(env.DB, actorUserId, 'content', contentId, rawText, mentions, contentContext)
         return json({ data: result, requestId: crypto.randomUUID() })
       }
 

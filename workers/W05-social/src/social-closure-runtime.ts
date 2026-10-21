@@ -90,13 +90,21 @@ const assertTargetPublished = async (
   db: D1Database,
   targetValue: { targetType: SocialTargetType; targetId: string },
   actorUserId: string,
+  contentContext?: PublishedContentSocialContext,
 ): Promise<void> => {
   if (targetValue.targetType === 'content') {
-    const row = await db.prepare(
-      'SELECT owner_user_id, state FROM contents WHERE id = ? LIMIT 1',
-    ).bind(targetValue.targetId).first<{ owner_user_id: string | null; state: string }>()
-    if (!row || row.state !== 'PUBLISHED') throw new SocialClosureRuntimeError('NOT_FOUND', 404)
-    if (row.owner_user_id !== actorUserId) throw new SocialClosureRuntimeError('PERMISSION_DENIED', 403)
+    if (!contentContext) {
+      throw new SocialClosureRuntimeError('SERVICE_UNAVAILABLE', 503)
+    }
+    if (
+      contentContext.contentId !== targetValue.targetId ||
+      contentContext.state !== 'PUBLISHED'
+    ) {
+      throw new SocialClosureRuntimeError('NOT_FOUND', 404)
+    }
+    if (contentContext.ownerUserId !== actorUserId) {
+      throw new SocialClosureRuntimeError('PERMISSION_DENIED', 403)
+    }
     return
   }
 
@@ -116,13 +124,14 @@ export async function syncSocialTokens(
   targetIdValue: string,
   textValue: string,
   mentions: MentionTarget[] = [],
+  contentContext?: PublishedContentSocialContext,
 ): Promise<{ topics: number; mentions: number }> {
   const actorUserId = id(actorUserIdValue, 'UNAUTHENTICATED')
   const targetValue = target(targetTypeValue, targetIdValue)
   const text = textValue.normalize('NFKC').trim()
   if (text.length > MAX_TEXT) throw new SocialClosureRuntimeError('VALIDATION_FAILED', 400)
 
-  await assertTargetPublished(db, targetValue, actorUserId)
+  await assertTargetPublished(db, targetValue, actorUserId, contentContext)
   const relatedContent = targetValue.targetType === 'comment'
     ? await db.prepare(
         "SELECT content_id FROM social_comments WHERE id = ? AND state = 'PUBLISHED' LIMIT 1",

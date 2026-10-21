@@ -69,7 +69,8 @@
       "Public pinned-content GET reads only the W05 pin reference and validates published owner/type/lifecycle through W03 before returning it.",
       "W05 content-like and root-comment notification recipient lookup resolves the canonical owner through W03; notification relationships and events remain W05-owned.",
       "Share creation and resolution read or write W05-owned social_share_links only; W03's published-content context is the authority for current target publication state.",
-      "The W05 content social summary reads canonical publication/type/owner context through W03; counts, viewer interaction state, topics, mentions and profile-pin references remain W05-owned."
+      "The W05 content social summary reads canonical publication/type/owner context through W03; counts, viewer interaction state, topics, mentions and profile-pin references remain W05-owned.",
+      "Content hashtag/mention synchronization gets canonical published state and owner from W03; W05 continues to own social topic/mention edges."
     ],
     "outOfScope": [
       "Comment insertion's atomic content-state/policy recheck remains unchanged.",
@@ -94,7 +95,8 @@
     "W05 content-like notification owner lookup uses W03 and does not query contents for recipient resolution",
     "W05 root-comment notification owner lookup uses W03 while parent-comment notifications remain based on W05-owned social_comments",
     "W05 share creation and resolution call W03 published-content context without Authorization/Cookie forwarding and do not query contents directly.",
-    "W05 content social summary uses W03_CONTENT for published-content validation, fails closed when unavailable and issues no direct contents-table query."
+    "W05 content social summary uses W03_CONTENT for published-content validation, fails closed when unavailable and issues no direct contents-table query.",
+    "W05 content token synchronization resolves owner/publication through W03, fails closed when context is missing, and does not query the canonical contents table."
   ],
   "operations": [
     {
@@ -188,7 +190,7 @@
       "internalPath": "/internal/content/contents/{contentId}/published-social-context",
       "principalRequired": false,
       "caller": "W05 only through W03_CONTENT Service Binding",
-      "purpose": "Resolve notification recipients, validate share-link targets and provide canonical state/type/owner context for the published content social summary",
+      "purpose": "Resolve notification recipients, validate share-link targets, provide social summary context, and authorize published content token synchronization",
       "allowedContentTypes": [
         "article",
         "post",
@@ -216,7 +218,8 @@
         "root-comment notification recipient",
         "share-link creation",
         "share-link resolution",
-        "content social summary state/type and profile-pin validation"
+        "content social summary state/type and profile-pin validation",
+        "content topic/mention synchronization owner validation"
       ]
     }
   ]

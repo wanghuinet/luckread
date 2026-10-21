@@ -1,6 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 import { describe, expect, it, vi } from 'vitest'
-import { enqueueNotification, extractSocialTokens, getContentSocialSummary, listDiscoveryTopics } from './social-closure-runtime.js'
+import { enqueueNotification, extractSocialTokens, getContentSocialSummary, listDiscoveryTopics, syncSocialTokens } from './social-closure-runtime.js'
 
 describe('W05 unified social closure', () => {
   it('normalizes and deduplicates mentions and hashtags', () => {
@@ -74,6 +74,44 @@ describe('W05 unified social closure', () => {
       contentType: 'post',
       state: 'UNPUBLISHED',
     } as never)).rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 })
+    expect(prepare).not.toHaveBeenCalled()
+  })
+
+  it('validates content token synchronization through W03 context and writes only W05-owned edges', async () => {
+    const queries: string[] = []
+    const batch = vi.fn(async () => [])
+    const db = {
+      prepare: (sql: string) => {
+        queries.push(sql)
+        return { bind: (..._values: unknown[]) => ({ run: async () => ({ success: true, meta: { changes: 1 } } }) }
+      },
+      batch,
+    } as unknown as D1Database
+    const contentContext = {
+      contentId: 'content-1',
+      ownerUserId: 'owner-1',
+      contentType: 'post',
+      state: 'PUBLISHED',
+    } as const
+
+    await expect(syncSocialTokens(db, 'owner-1', 'content', 'content-1', 'plain text', [], contentContext))
+      .resolves.toEqual({ topics: 0, mentions: 0 })
+    expect(batch).toHaveBeenCalledTimes(1)
+    expect(queries.some(sql => /(?:FROM|JOIN)\s+contents/i.test(sql))).toBe(false)
+    expect(queries.every(sql => !/\b(?:FROM|JOIN)\s+contents\b/i.test(sql))).toBe(true)
+  })
+
+  it('fails closed for content token sync without W03 context or when the actor is not the owner', async () => {
+    const prepare = vi.fn()
+    const db = { prepare } as unknown as D1Database
+    await expect(syncSocialTokens(db, 'owner-1', 'content', 'content-1', 'plain text'))
+      .rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE', status: 503 })
+    await expect(syncSocialTokens(db, 'owner-1', 'content', 'content-1', 'plain text', [], {
+      contentId: 'content-1',
+      ownerUserId: 'someone-else',
+      contentType: 'post',
+      state: 'PUBLISHED',
+    })).rejects.toMatchObject({ code: 'PERMISSION_DENIED', status: 403 })
     expect(prepare).not.toHaveBeenCalled()
   })
 
