@@ -4,7 +4,6 @@ import { useRouter } from 'expo-router';
 
 import { apiRequest, createIdempotencyKey, getApiErrorMessage } from '~/lib/api-client';
 import { unwrapApiData } from '~/lib/content-adapter';
-import { useAuthStore } from '~/store/auth-store';
 
 type PollOption = {
   optionId: string;
@@ -32,7 +31,6 @@ const PRIMARY = '#1d9bf0';
 
 export default function SocialPoll({ contentId }: { contentId: string }) {
   const router = useRouter();
-  const authStatus = useAuthStore((state) => state.status);
   const [poll, setPoll] = useState<Poll | null>(null);
   const [selectedOptionId, setSelectedOptionId] = useState('');
   const [loading, setLoading] = useState(true);
