@@ -742,6 +742,7 @@ export default function UserProfileScreen() {
 
   useEffect(() => {
     setSelectedTabIndex(0);
+    setRefreshing(false);
     setLikesError('');
     setLikesLoading(false);
     setLikesLoadingMore(false);
