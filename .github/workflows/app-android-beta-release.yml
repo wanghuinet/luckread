@@ -1,13 +1,14 @@
 name: LuckRead Android Beta Release
 
 on:
-  # Build a phone-test APK whenever the release workflow itself changes on main.
+  # Build a phone-test APK whenever the release workflow or mobile app code changes on main.
   # This creates a standalone artifact without requiring a manual dispatch step.
   push:
     branches:
       - main
     paths:
       - ".github/workflows/app-android-beta-release.yml"
+      - "app/**"
   workflow_dispatch:
     inputs:
       version_name:
