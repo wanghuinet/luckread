@@ -1,152 +1,158 @@
 import React, { useState } from 'react';
-import {
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  SafeAreaView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Pressable, Text, View } from 'react-native';
 
+import {
+  AuthInput,
+  AuthMessage,
+  AuthPrimaryButton,
+  AuthScreen,
+  AuthSecondaryButton,
+  AuthTextLink,
+  AUTH_COLORS,
+} from '../components/auth/AuthScreen';
+import { requestEmailVerification, normalizeAuthEmail, isValidAuthEmail } from '../lib/auth-flow-api';
 import { getApiErrorMessage } from '../lib/api-client';
-import { useAuthStore } from '../store/auth-store';
+import { AuthStoreError, useAuthStore } from '../store/auth-store';
 
 export default function LoginScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ verified?: string }>();
   const login = useAuthStore((state) => state.login);
-  const [identity, setIdentity] = useState('');
-  const [credential, setCredential] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [resending, setResending] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [verificationMessage, setVerificationMessage] = useState('');
+  const [needsVerification, setNeedsVerification] = useState(false);
 
   const submit = async () => {
     if (submitting) return;
     setErrorMessage('');
+    setVerificationMessage('');
+    setNeedsVerification(false);
+
+    const normalizedEmail = normalizeAuthEmail(email);
+    if (!isValidAuthEmail(normalizedEmail)) {
+      setErrorMessage('请输入有效的邮箱地址。');
+      return;
+    }
+    if (!password) {
+      setErrorMessage('请输入密码。');
+      return;
+    }
+
     setSubmitting(true);
     try {
-      await login(identity, credential);
+      await login(normalizedEmail, password);
       router.replace('/' as never);
-    } catch (error) {
-      setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : getApiErrorMessage(error, 'Unable to sign in. Please try again.'),
-      );
+    } catch (cause) {
+      if (cause instanceof AuthStoreError && (cause.code === 'EMAIL_NOT_VERIFIED' || cause.status === 403)) {
+        setNeedsVerification(true);
+        setErrorMessage('这个邮箱还没有完成验证。请检查收件箱，或重新发送验证邮件。');
+      } else {
+        setErrorMessage(cause instanceof Error ? cause.message : '登录暂时无法完成，请检查网络后重试。');
+      }
     } finally {
       setSubmitting(false);
     }
   };
 
+  const resendVerification = async () => {
+    const normalizedEmail = normalizeAuthEmail(email);
+    if (!isValidAuthEmail(normalizedEmail)) {
+      setVerificationMessage('请先填写有效的注册邮箱。');
+      return;
+    }
+
+    setResending(true);
+    setVerificationMessage('');
+    try {
+      const { response, data } = await requestEmailVerification(normalizedEmail);
+      if (response.ok) {
+        setVerificationMessage('如果该邮箱对应尚未验证的账号，系统已受理验证邮件请求。请检查收件箱和垃圾邮件。');
+      } else if (response.status === 429) {
+        setVerificationMessage('请求过于频繁，请稍等片刻后重试。');
+      } else if (response.status >= 500) {
+        setVerificationMessage('验证邮件服务暂时不可用，请稍后重试。');
+      } else {
+        setVerificationMessage(getApiErrorMessage(data, '验证邮件请求未能完成，请稍后重试。', response.status));
+      }
+    } catch (cause) {
+      setVerificationMessage(cause instanceof Error ? cause.message : '网络异常，验证邮件请求未能完成。');
+    } finally {
+      setResending(false);
+    }
+  };
+
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        <View style={styles.container}>
-          <Text style={styles.brand}>LuckRead</Text>
-          <Text style={styles.title}>Sign in to LuckRead</Text>
-          <Text style={styles.subtitle}>
-            Use your LuckRead account to view your timeline and follow creators.
-          </Text>
+    <AuthScreen title="登录 LuckRead" subtitle="继续阅读你关注的内容，与创作者和社区保持联系。">
+      {params.verified === '1' ? <AuthMessage message="邮箱验证成功，现在可以登录了。" variant="success" /> : null}
 
-          <Text style={styles.label}>Email</Text>
-          <TextInput
-            accessibilityLabel="Email"
-            autoCapitalize="none"
-            autoComplete="email"
-            autoCorrect={false}
-            keyboardType="email-address"
-            onChangeText={setIdentity}
-            onSubmitEditing={() => undefined}
-            placeholder="you@example.com"
-            placeholderTextColor="#7b8794"
-            returnKeyType="next"
-            style={styles.input}
-            textContentType="emailAddress"
-            value={identity}
+      <AuthInput
+        label="邮箱"
+        accessibilityLabel="邮箱"
+        autoCapitalize="none"
+        autoComplete="email"
+        autoCorrect={false}
+        keyboardType="email-address"
+        maxLength={254}
+        onChangeText={(value) => {
+          setEmail(value);
+          setNeedsVerification(false);
+          setVerificationMessage('');
+        }}
+        placeholder="name@example.com"
+        returnKeyType="next"
+        textContentType="emailAddress"
+        value={email}
+      />
+      <AuthInput
+        label="密码"
+        accessibilityLabel="密码"
+        autoCapitalize="none"
+        autoComplete="current-password"
+        onChangeText={setPassword}
+        onSubmitEditing={() => void submit()}
+        placeholder="输入密码"
+        returnKeyType="go"
+        secureTextEntry
+        textContentType="password"
+        value={password}
+      />
+
+      <View style={{ alignItems: 'flex-end', marginTop: -12, marginBottom: 8 }}>
+        <AuthTextLink label="忘记密码？" onPress={() => router.push('/forgot-password' as never)} />
+      </View>
+
+      <AuthMessage message={errorMessage} />
+      {needsVerification ? (
+        <View style={{ marginBottom: 8 }}>
+          <AuthSecondaryButton
+            label={resending ? '正在发送验证邮件…' : '重新发送验证邮件'}
+            onPress={() => void resendVerification()}
+            disabled={resending}
           />
-
-          <Text style={styles.label}>Password</Text>
-          <TextInput
-            accessibilityLabel="Password"
-            autoCapitalize="none"
-            autoComplete="password"
-            onChangeText={setCredential}
-            onSubmitEditing={() => void submit()}
-            placeholder="Password"
-            placeholderTextColor="#7b8794"
-            returnKeyType="go"
-            secureTextEntry
-            style={styles.input}
-            textContentType="password"
-            value={credential}
-          />
-
-          {errorMessage ? (
-            <Text accessibilityRole="alert" style={styles.error}>
-              {errorMessage}
-            </Text>
-          ) : null}
-
-          <Pressable
-            accessibilityRole="button"
-            disabled={submitting || !identity.trim() || !credential}
-            onPress={() => void submit()}
-            style={({ pressed }) => [
-              styles.button,
-              (submitting || !identity.trim() || !credential) && styles.buttonDisabled,
-              pressed && !submitting ? styles.buttonPressed : null,
-            ]}
-          >
-            {submitting ? (
-              <ActivityIndicator color="#ffffff" />
-            ) : (
-              <Text style={styles.buttonText}>Sign in</Text>
-            )}
-          </Pressable>
-
-          <Text style={styles.footnote}>
-            Your session credential is stored in platform-secure storage.
-          </Text>
+          <AuthMessage message={verificationMessage} variant="info" />
         </View>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+      ) : null}
+
+      <AuthPrimaryButton label="登录" busy={submitting} onPress={() => void submit()} />
+      <View style={{ marginTop: 20 }}>
+        <Text style={{ color: AUTH_COLORS.secondary, fontSize: 14, lineHeight: 21 }}>还没有账号？</Text>
+        <AuthSecondaryButton label="创建账号" onPress={() => router.push('/register' as never)} />
+      </View>
+
+      <View style={{ marginTop: 14, alignItems: 'center' }}>
+        <Pressable onPress={() => router.push('/verify-email' as never)} accessibilityRole="button" hitSlop={8}>
+          <Text style={{ color: AUTH_COLORS.accent, fontSize: 13, fontWeight: '700' }}>收不到验证邮件？</Text>
+        </Pressable>
+      </View>
+
+      <Text style={{ color: '#8b98a5', fontSize: 12, lineHeight: 18, marginTop: 22, textAlign: 'center' }}>
+        登录即表示你同意 LuckRead 的用户协议和隐私政策。
+      </Text>
+    </AuthScreen>
   );
 }
-
-const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#ffffff' },
-  flex: { flex: 1 },
-  container: { flex: 1, justifyContent: 'center', paddingHorizontal: 26, paddingVertical: 30 },
-  brand: { color: '#1769aa', fontSize: 19, fontWeight: '800', marginBottom: 20 },
-  title: { color: '#101828', fontSize: 28, fontWeight: '800', marginBottom: 8 },
-  subtitle: { color: '#667085', fontSize: 15, lineHeight: 22, marginBottom: 28 },
-  label: { color: '#344054', fontSize: 14, fontWeight: '700', marginBottom: 8, marginTop: 14 },
-  input: {
-    borderColor: '#d0d5dd',
-    borderRadius: 12,
-    borderWidth: 1,
-    color: '#101828',
-    fontSize: 16,
-    minHeight: 50,
-    paddingHorizontal: 14,
-  },
-  error: { color: '#b42318', fontSize: 14, lineHeight: 20, marginTop: 14 },
-  button: {
-    alignItems: 'center',
-    backgroundColor: '#1769aa',
-    borderRadius: 999,
-    justifyContent: 'center',
-    marginTop: 24,
-    minHeight: 50,
-  },
-  buttonDisabled: { opacity: 0.55 },
-  buttonPressed: { opacity: 0.8 },
-  buttonText: { color: '#ffffff', fontSize: 16, fontWeight: '800' },
-  footnote: { color: '#667085', fontSize: 12, lineHeight: 18, marginTop: 20, textAlign: 'center' },
-});
