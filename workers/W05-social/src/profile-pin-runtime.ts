@@ -1,4 +1,5 @@
 /// <reference types="@cloudflare/workers-types" />
+import type { OwnedPostContext } from './owned-post-context.js'
 
 export class ProfilePinRuntimeError extends Error {
   constructor(readonly code: string, readonly status: number) { super(code) }
@@ -23,15 +24,15 @@ export async function pinProfileContent(
   db: D1Database,
   actorUserIdValue: string,
   contentIdValue: string,
+  context: OwnedPostContext,
 ): Promise<ProfilePinRecord> {
   const actorUserId = validateId(actorUserIdValue, true)
   const contentId = validateId(contentIdValue)
-  const target = await db.prepare(
-    'SELECT id, content_type, state, owner_user_id FROM contents WHERE id = ? LIMIT 1',
-  ).bind(contentId).first<{ id: string; content_type: string; state: string; owner_user_id: string | null }>()
 
-  if (!target || target.content_type !== 'post' || target.state !== 'PUBLISHED') throw new ProfilePinRuntimeError('NOT_FOUND', 404)
-  if (target.owner_user_id !== actorUserId) throw new ProfilePinRuntimeError('PERMISSION_DENIED', 403)
+  if (!context || context.contentId !== contentId || context.contentType !== 'post' || context.state !== 'PUBLISHED') {
+    throw new ProfilePinRuntimeError('NOT_FOUND', 404)
+  }
+  if (context.ownerUserId !== actorUserId) throw new ProfilePinRuntimeError('PERMISSION_DENIED', 403)
 
   const pinnedAt = new Date().toISOString()
   await db.prepare(
