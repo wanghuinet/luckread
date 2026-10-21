@@ -54,6 +54,7 @@ import { apiRequest, getApiErrorMessage } from '~/lib/api-client';
 import { mapContentToFeedContent, readContentBody, readContentSocial, readContentAuthor, resolveNativeMediaSource, resolvePublicProfileById, unwrapApiData, type ApiContentPage, type ApiContentRecord } from '~/lib/content-adapter';
 import { useAuthStore } from '~/store/auth-store';
 import { readSessionToken } from '~/lib/secure-session';
+import { fetchUserLikedContentsPage } from '~/lib/social-screen-api';
 import Messages from "~/assets/svg/tabs/messages.svg"
 
 const PULL_TO_REFRESH_THRESHOLD = 70; 
@@ -69,6 +70,12 @@ const canUseBlurEffect =
   Platform.OS === 'ios' || (Platform.OS === 'android' && Number(Platform.Version) >= 31);
 
 const APP_PRIMARY_COLOR = '#1d9bf0';
+
+type ProfileLikedContentPage = {
+  items: Array<{ contentId: string; likedAt: string }>;
+  nextCursor?: string | null;
+  hasMore?: boolean;
+};
 
 interface User {
   id: string;
@@ -526,10 +533,18 @@ export default function UserProfileScreen() {
   const currentUserId = useAuthStore((state) => state.user?.id ?? null);
   const [user, setUser] = useState<User | null>(null);
   const [userPosts, setUserPosts] = useState<FeedContent[]>([]);
+  const [likedPosts, setLikedPosts] = useState<FeedContent[]>([]);
+  const [likesCursor, setLikesCursor] = useState<string | null>(null);
+  const [likesHasMore, setLikesHasMore] = useState(false);
+  const [likesLoading, setLikesLoading] = useState(false);
+  const [likesLoadingMore, setLikesLoadingMore] = useState(false);
+  const [likesError, setLikesError] = useState('');
+  const [likesLoadedForUserId, setLikesLoadedForUserId] = useState<string | null>(null);
   const [profileLoading, setProfileLoading] = useState(true);
   const [profileError, setProfileError] = useState('');
   const [feedError, setFeedError] = useState('');
   const requestRef = useRef<AbortController | null>(null);
+  const likesRequestRef = useRef<AbortController | null>(null);
 
   const loadProfile = useCallback(async () => {
     requestRef.current?.abort();
@@ -719,19 +734,135 @@ export default function UserProfileScreen() {
 
   useEffect(() => {
     void loadProfile();
-    return () => requestRef.current?.abort();
+    return () => {
+      requestRef.current?.abort();
+      likesRequestRef.current?.abort();
+    };
   }, [loadProfile]);
 
-  const feedSections: SectionListData<FeedContent, { title: string }>[] = useMemo(() => [
-    { title: 'Feed', data: userPosts },
-  ], [userPosts]);
+  useEffect(() => {
+    setSelectedTabIndex(0);
+    setLikesError('');
+    likesRequestRef.current?.abort();
+  }, [userHandle]);
 
-  // Only the Posts tab is wired to a real content query in this beta.
-  const profileTabs = ['Posts'];
+  const loadLikedPosts = useCallback(async (
+    profileUserId: string,
+    nextCursor: string | null,
+    append: boolean,
+    showRefreshIndicator = false,
+  ) => {
+    if (!currentUserId || profileUserId !== currentUserId) {
+      setLikesError('Sign in to view your Likes.');
+      return;
+    }
+
+    likesRequestRef.current?.abort();
+    const controller = new AbortController();
+    likesRequestRef.current = controller;
+    if (append) setLikesLoadingMore(true);
+    else {
+      setLikesLoading(true);
+      setLikedPosts([]);
+      setLikesCursor(null);
+      setLikesHasMore(false);
+    }
+    setLikesError('');
+    if (showRefreshIndicator) setRefreshing(true);
+
+    try {
+      const result = await fetchUserLikedContentsPage(profileUserId, {
+        cursor: nextCursor,
+        limit: 20,
+        signal: controller.signal,
+      });
+      const page = result.response.ok
+        ? unwrapApiData<ProfileLikedContentPage>(result.data)
+        : null;
+      if (!result.response.ok || !page || !Array.isArray(page.items)) {
+        throw new Error(getApiErrorMessage(result.data, 'Could not load liked posts. Please retry.', result.response.status));
+      }
+
+      const sessionToken = await readSessionToken().catch(() => null);
+      if (controller.signal.aborted) return;
+      const mappedItems = await Promise.all(page.items.map(async (likedItem): Promise<FeedContent | null> => {
+        const contentId = typeof likedItem?.contentId === 'string' ? likedItem.contentId.trim() : '';
+        if (!contentId) return null;
+
+        const contentResult = await apiRequest<unknown>(
+          '/contents/' + encodeURIComponent(likedItem.contentId),
+          { method: 'GET', signal: controller.signal },
+        );
+        if (!contentResult.response.ok) {
+          if ([403, 404, 410].includes(contentResult.response.status)) return null;
+          throw new Error(getApiErrorMessage(contentResult.data, 'Could not load a liked post. Please retry.', contentResult.response.status));
+        }
+        const record = unwrapApiData<ApiContentRecord>(contentResult.data);
+        if (
+          !record ||
+          record.id !== contentId ||
+          (record.state && record.state !== 'PUBLISHED')
+        ) return null;
+
+        const [body, social, author] = await Promise.all([
+          readContentBody(record, controller.signal, sessionToken),
+          readContentSocial(record.id, controller.signal),
+          readContentAuthor(record),
+        ]);
+        return mapContentToFeedContent(record, body, social, author, sessionToken);
+      }));
+
+      if (controller.signal.aborted || profileUserId !== currentUserId) return;
+      const mapped = mappedItems.filter((item): item is FeedContent => item !== null);
+      setLikedPosts((current) => {
+        if (!append) return mapped;
+        const known = new Set(current.map((item) => item.contentId));
+        return [...current, ...mapped.filter((item) => item.contentId && !known.has(item.contentId))];
+      });
+      setLikesCursor(page.nextCursor || null);
+      setLikesHasMore(page.hasMore === true);
+      setLikesLoadedForUserId(profileUserId);
+    } catch (cause) {
+      if (controller.signal.aborted) return;
+      setLikesError(cause instanceof Error ? cause.message : 'Could not load liked posts. Please retry.');
+    } finally {
+      if (likesRequestRef.current === controller) likesRequestRef.current = null;
+      if (!controller.signal.aborted) {
+        setLikesLoading(false);
+        setLikesLoadingMore(false);
+        if (showRefreshIndicator) setRefreshing(false);
+      }
+    }
+  }, [currentUserId]);
+
+  const isOwnProfile = Boolean(user?.id && currentUserId && user.id === currentUserId);
+  const showingLikes = isOwnProfile && selectedTabIndex === 1;
+  const profileTabs = isOwnProfile ? ['Posts', 'Likes'] : ['Posts'];
+
+  useEffect(() => {
+    if (
+      showingLikes &&
+      user?.id &&
+      likesLoadedForUserId !== user.id &&
+      !likesLoading &&
+      !likesError
+    ) {
+      void loadLikedPosts(user.id, null, false);
+    }
+  }, [showingLikes, user?.id, likesLoadedForUserId, likesLoading, likesError, loadLikedPosts]);
+
+  const displayedPosts = showingLikes ? likedPosts : userPosts;
+  const feedSections: SectionListData<FeedContent, { title: string }>[] = useMemo(() => [
+    { title: showingLikes ? 'Likes' : 'Feed', data: displayedPosts },
+  ], [displayedPosts, showingLikes]);
 
   const handleRefresh = useCallback(() => {
+    if (showingLikes && user?.id) {
+      void loadLikedPosts(user.id, null, false, true);
+      return;
+    }
     void loadProfile();
-  }, [loadProfile]);
+  }, [loadLikedPosts, loadProfile, showingLikes, user?.id]);
 
   const handleItemPress = (postId: string) => {
     router.push(`/post/${postId}`);
@@ -774,9 +905,27 @@ export default function UserProfileScreen() {
         sections={feedSections}
         ListEmptyComponent={(
           <View className="items-center px-6 py-12">
-            <Text className="text-center text-sm text-neutral-500">
-              {feedError || 'No public posts yet.'}
-            </Text>
+            {showingLikes && likesLoading ? (
+              <>
+                <ActivityIndicator color={APP_PRIMARY_COLOR} />
+                <Text className="mt-3 text-center text-sm text-neutral-500">Loading liked posts…</Text>
+              </>
+            ) : showingLikes && likesError ? (
+              <>
+                <Text className="text-center text-sm text-neutral-500">{likesError}</Text>
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  className="mt-3 rounded-full bg-sky-500 px-4 py-2"
+                  onPress={() => user?.id && void loadLikedPosts(user.id, null, false)}
+                >
+                  <Text className="font-bold text-white">Retry</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <Text className="text-center text-sm text-neutral-500">
+                {showingLikes ? 'No liked posts yet.' : feedError || 'No public posts yet.'}
+              </Text>
+            )}
           </View>
         )}
         ignoreLeftPadding
@@ -786,6 +935,36 @@ export default function UserProfileScreen() {
 
         contentContainerStyle={{ paddingBottom: bottomInset, flexGrow: 1, backgroundColor: colorScheme === 'light' ? 'white' : 'black' }}
         renderItem={({ item }: { item: FeedContent }) => <FeedItem itemData={item} onPress={() => handleItemPress(item.contentId || '')} />}
+        ListFooterComponent={showingLikes && likesHasMore && likesCursor ? (
+          <View className="items-center px-4 py-4">
+            {likesError ? (
+              <>
+                <Text className="mb-3 text-center text-sm text-rose-600">{likesError}</Text>
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  disabled={likesLoadingMore}
+                  className="rounded-full border border-neutral-300 px-5 py-2 dark:border-neutral-700"
+                  onPress={() => user?.id && void loadLikedPosts(user.id, likesCursor, true)}
+                >
+                  <Text className="font-bold text-sky-600">Retry loading likes</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <TouchableOpacity
+                accessibilityRole="button"
+                disabled={likesLoadingMore}
+                className="rounded-full border border-neutral-300 px-5 py-2 dark:border-neutral-700"
+                onPress={() => user?.id && void loadLikedPosts(user.id, likesCursor, true)}
+              >
+                {likesLoadingMore ? (
+                  <ActivityIndicator color={APP_PRIMARY_COLOR} />
+                ) : (
+                  <Text className="font-bold text-sky-600">Load more liked posts</Text>
+                )}
+              </TouchableOpacity>
+            )}
+          </View>
+        ) : null}
         stickySectionHeadersEnabled
         renderSectionHeader={() => (
           <View className=" border-b border-neutral-200 dark:border-neutral-700">
