@@ -299,7 +299,7 @@ describe('W05 poll runtime', () => {
     expect(sent.headers.get('X-LuckRead-Caller')).toBe('W05')
     expect(sent.headers.has('Authorization')).toBe(false)
     expect(sent.headers.has('Cookie')).toBe(false)
-    expect(prepare.mock.calls.some(([sql]) => /\\b(?:FROM|JOIN|UPDATE|INSERT\\s+INTO)\\s+contents\\b/i.test(String(sql)))).toBe(false)
+    expect(prepare.mock.calls.some(([sql]) => /FROM contents|JOIN contents|UPDATE contents|INSERT INTO contents/i.test(String(sql)))).toBe(false)
   })
 
   it('fails closed when W03 cannot validate the poll owner or binding', async () => {
