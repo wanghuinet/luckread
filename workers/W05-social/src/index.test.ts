@@ -1095,19 +1095,38 @@ describe('W05 social comment transport', () => {
     expect(missingKey.status).toBe(428)
   })
 
-  it('pins only the authenticated owner content and unpins idempotently', async () => {
+  it('pins only W03-verified owner content and unpins idempotently', async () => {
+    const contextBinding = {
+      fetch: vi.fn(async (_input: RequestInfo | URL) => Response.json({
+        data: {
+          contentId: 'content-1',
+          ownerUserId: 'viewer-1',
+          contentType: 'post',
+          state: 'PUBLISHED',
+          updatedAt: '2026-10-20T00:00:00.000Z',
+        },
+        requestId: 'req_w03',
+      })),
+    }
+    const writeDb = dbFor([
+      { user_id: 'viewer-1', content_id: 'content-1', pinned_at: '2026-10-16T00:00:00.000Z' },
+    ])
     const pinResponse = await worker.fetch(
       requestWithMethod('/internal/social/content/content-1/pin', 'POST', {
         ...transportHeaders,
         'X-LuckRead-Principal-Layer': 'L2',
         'Idempotency-Key': 'pin-1',
       }),
-      { DB: dbFor([
-        { id: 'content-1', content_type: 'post', state: 'PUBLISHED', owner_user_id: 'viewer-1' },
-        { user_id: 'viewer-1', content_id: 'content-1', pinned_at: '2026-10-16T00:00:00.000Z' },
-      ]) },
+      { DB: writeDb, W03_CONTENT: contextBinding },
     )
     expect(pinResponse.status).toBe(200)
+    expect(contextBinding.fetch).toHaveBeenCalledTimes(1)
+    const forwarded = contextBinding.fetch.mock.calls[0]?.[0] as Request
+    expect(forwarded.url).toContain('/internal/content/contents/content-1/owned-post-context')
+    expect(forwarded.headers.get('X-LuckRead-Caller')).toBe('W05')
+    expect(forwarded.headers.get('X-LuckRead-Principal-User-Id')).toBe('viewer-1')
+    expect(forwarded.headers.has('Authorization')).toBe(false)
+    expect((writeDb as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).toHaveBeenCalledTimes(2)
     await expect(pinResponse.json()).resolves.toMatchObject({
       data: { userId: 'viewer-1', contentId: 'content-1' },
     })
@@ -1121,6 +1140,20 @@ describe('W05 social comment transport', () => {
       { DB: dbFor() },
     )
     expect(unpinResponse.status).toBe(204)
+  })
+
+  it('fails profile pin writes closed when W03 context binding is missing', async () => {
+    const d = dbFor()
+    const response = await worker.fetch(
+      requestWithMethod('/internal/social/content/content-1/pin', 'POST', {
+        ...transportHeaders,
+        'X-LuckRead-Principal-Layer': 'L2',
+        'Idempotency-Key': 'pin-no-w03',
+      }),
+      { DB: d },
+    )
+    expect(response.status).toBe(503)
+    expect((d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).not.toHaveBeenCalled()
   })
 
   it('rejects profile pin writes from below L2', async () => {
