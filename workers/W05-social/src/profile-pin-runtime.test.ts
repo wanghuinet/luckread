@@ -1,7 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 import { describe, expect, it, vi } from 'vitest'
 import type { OwnedPostContext } from './owned-post-context.js'
-import { getProfilePin, isContentProfilePinned, pinProfileContent, unpinProfileContent } from './profile-pin-runtime.js'
+import { getProfilePinReference, pinProfileContent, unpinProfileContent } from './profile-pin-runtime.js'
 
 const db = (firstResults: unknown[] = []) => {
   let firstIndex = 0
@@ -77,15 +77,15 @@ describe('profile pin runtime', () => {
     expect(prepare.mock.calls[0]?.[0]).toContain('content_id')
   })
 
-  it('reads only a published post pin that still belongs to the user', async () => {
-    await expect(getProfilePin(db([pin]), 'viewer-1')).resolves.toEqual({
+  it('reads only the W05-owned pin reference and leaves content state to W03', async () => {
+    const d = db([pin])
+    await expect(getProfilePinReference(d, 'viewer-1')).resolves.toEqual({
       userId: 'viewer-1', contentId: 'content-1', pinnedAt: pin.pinned_at,
     })
-    await expect(getProfilePin(db([null]), 'viewer-1')).resolves.toBeNull()
-  })
-
-  it('reports a pin publicly only for published owner content', async () => {
-    await expect(isContentProfilePinned(db([{ pinned: 1 }]), 'content-1')).resolves.toBe(true)
-    await expect(isContentProfilePinned(db([{ pinned: 0 }]), 'content-1')).resolves.toBe(false)
+    const prepare = (d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare
+    expect(prepare).toHaveBeenCalledTimes(1)
+    expect(String(prepare.mock.calls[0]?.[0])).toContain('FROM social_profile_pins')
+    expect(String(prepare.mock.calls[0]?.[0])).not.toContain('JOIN contents')
+    await expect(getProfilePinReference(db([null]), 'viewer-1')).resolves.toBeNull()
   })
 })
