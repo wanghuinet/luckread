@@ -101,6 +101,7 @@ describe('W05 to W03 owned-post context binding', () => {
       ownerUserId: 'owner-1',
       contentType: 'post',
       state: 'PUBLISHED',
+      updatedAt: '2026-10-17T04:00:00.000Z',
     })
     const request = forwarded as unknown as Request
     expect(request.url).toContain('/internal/content/contents/content-1/public-post-context/owner-1')
@@ -144,6 +145,7 @@ describe('W05 to W03 owned-post context binding', () => {
             ownerUserId: 'owner-1',
             contentType: 'article',
             state: 'PUBLISHED',
+            updatedAt: '2026-10-17T04:00:00.000Z',
           },
           requestId: 'req_social_context',
         })
@@ -157,6 +159,7 @@ describe('W05 to W03 owned-post context binding', () => {
       ownerUserId: 'owner-1',
       contentType: 'article',
       state: 'PUBLISHED',
+      updatedAt: '2026-10-17T04:00:00.000Z',
     })
     const request = forwarded as unknown as Request
     expect(request.url).toContain('/internal/content/contents/content-1/published-social-context')
