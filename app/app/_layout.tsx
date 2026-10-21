@@ -28,8 +28,8 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (!navigationState?.key || !isLoaded || status === 'loading') return;
-    const isLoginRoute = segments[0] === 'login';
-    if (status === 'authenticated' && isLoginRoute) {
+    const isAuthEntryRoute = ['login', 'register', 'forgot-password', 'verify-email'].includes(String(segments[0] ?? ''));
+    if (status === 'authenticated' && isAuthEntryRoute) {
       router.replace('/' as never);
     }
   }, [isLoaded, navigationState?.key, router, segments, status]);
@@ -41,6 +41,9 @@ export default function RootLayout() {
           <Stack>
             <Stack.Screen name="(drawer)" options={{ headerShown: false }} />
             <Stack.Screen name="login" options={{ headerShown: false, gestureEnabled: false }} />
+            <Stack.Screen name="register" options={{ headerShown: false, gestureEnabled: false }} />
+            <Stack.Screen name="forgot-password" options={{ headerShown: false }} />
+            <Stack.Screen name="verify-email" options={{ headerShown: false }} />
             <Stack.Screen name="publish" options={{ headerShown: false, presentation: 'modal', animation: 'slide_from_bottom' }} />
             <Stack.Screen name="modal" options={{ title: 'Modal', presentation: 'modal' }} />
           </Stack>
