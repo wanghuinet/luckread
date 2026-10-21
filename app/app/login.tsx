@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Pressable, Text, View } from 'react-native';
+import { Linking, Pressable, Text, View } from 'react-native';
 
 import {
   AuthInput,
@@ -150,9 +150,16 @@ export default function LoginScreen() {
         </Pressable>
       </View>
 
-      <Text style={{ color: '#8b98a5', fontSize: 12, lineHeight: 18, marginTop: 22, textAlign: 'center' }}>
-        登录即表示你同意 LuckRead 的用户协议和隐私政策。
-      </Text>
+      <View style={{ marginTop: 22, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 5 }}>
+        <Text style={{ color: '#8b98a5', fontSize: 12 }}>查看 LuckRead</Text>
+        <Pressable accessibilityRole="link" onPress={() => void Linking.openURL('https://luckread.com/terms').catch(() => undefined)}>
+          <Text style={{ color: AUTH_COLORS.accent, fontSize: 12, fontWeight: '700' }}>用户协议</Text>
+        </Pressable>
+        <Text style={{ color: '#8b98a5', fontSize: 12 }}>和</Text>
+        <Pressable accessibilityRole="link" onPress={() => void Linking.openURL('https://luckread.com/privacy').catch(() => undefined)}>
+          <Text style={{ color: AUTH_COLORS.accent, fontSize: 12, fontWeight: '700' }}>隐私政策</Text>
+        </Pressable>
+      </View>
     </AuthScreen>
   );
 }
