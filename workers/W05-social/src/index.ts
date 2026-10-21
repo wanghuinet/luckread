@@ -255,7 +255,7 @@ export default {
         if (idempotencyKey.length > 256) throw new RepostRuntimeError('VALIDATION_FAILED', 400)
         if (request.method === 'POST') {
           return json({
-            data: await createRepost(env.DB, actorUserId, contentId),
+            data: await createRepost(env.DB, env.W03_CONTENT, actorUserId, contentId, request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? ''),
             requestId: createRequestId(),
           }, 201)
         }

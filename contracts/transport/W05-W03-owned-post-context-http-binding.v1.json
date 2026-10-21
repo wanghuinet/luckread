@@ -72,13 +72,15 @@
       "The W05 content social summary reads canonical publication/type/owner context through W03; counts, viewer interaction state, topics, mentions and profile-pin references remain W05-owned.",
       "Content hashtag/mention synchronization gets canonical published state and owner from W03; W05 continues to own social topic/mention edges.",
       "GET content token reads validate the target's published state through W03 before reading W05-owned topic/mention metadata.",
-      "Poll configuration and draft-poll deletion obtain canonical post owner/type/lifecycle through the existing W03 owned-post context before W05 reads or writes poll tables."
+      "Poll configuration and draft-poll deletion obtain canonical post owner/type/lifecycle through the existing W03 owned-post context before W05 reads or writes poll tables.",
+      "Repost creation validates canonical published content and owner through W03_CONTENT, checks block relationships in W05-owned social_user_interactions, and writes only social_reposts."
     ],
     "outOfScope": [
       "Comment insertion's atomic content-state/policy recheck remains unchanged.",
       "Other W05 reads from the contents table are not claimed as fixed.",
       "Comment insertion's atomic W05 policy, block and publication rechecks still query canonical content state within the existing transaction.",
-      "Cross-Worker publication changes cannot be transactionally locked with a W05 share-link write; every share resolution revalidates through W03 and denies unpublished or missing content."
+      "Cross-Worker publication changes cannot be transactionally locked with a W05 share-link write; every share resolution revalidates through W03 and denies unpublished or missing content.",
+      "A W03 publication change cannot be transactionally locked with a W05 repost insert; feed/read paths must independently revalidate canonical visibility before disclosing repost targets."
     ]
   },
   "evidenceRequired": [
@@ -100,7 +102,8 @@
     "W05 content social summary uses W03_CONTENT for published-content validation, fails closed when unavailable and issues no direct contents-table query.",
     "W05 content token synchronization resolves owner/publication through W03, fails closed when context is missing, and does not query the canonical contents table.",
     "W05 content token GET checks W03 publication before W05 D1 reads and fails closed for missing W03 binding or unpublished content.",
-    "W05 poll configure/delete use W03 owned-post context, forward only validated principal/correlation metadata and perform no direct contents-table validation."
+    "W05 poll configure/delete use W03 owned-post context, forward only validated principal/correlation metadata and perform no direct contents-table validation.",
+    "W05 repost creation validates published state through W03 without forwarding Authorization/Cookie, preserves W05 block checks, writes only social_reposts, and fails closed before W05 D1 access if W03 is unavailable or the target is unpublished."
   ],
   "operations": [
     {
@@ -198,7 +201,7 @@
       "internalPath": "/internal/content/contents/{contentId}/published-social-context",
       "principalRequired": false,
       "caller": "W05 only through W03_CONTENT Service Binding",
-      "purpose": "Resolve notification recipients, validate share-link targets, provide social summary context, authorize content token sync, and gate public content token reads",
+      "purpose": "Resolve notification recipients, validate share-link targets, repost creation, provide social summary context, authorize content token sync, and gate public content token reads",
       "allowedContentTypes": [
         "article",
         "post",
@@ -228,7 +231,8 @@
         "share-link resolution",
         "content social summary state/type and profile-pin validation",
         "content topic/mention synchronization owner validation",
-        "content topic/mention read visibility validation"
+        "content topic/mention read visibility validation",
+        "repost creation"
       ]
     }
   ]
