@@ -13,6 +13,7 @@ import { StyledExpoImage as Image } from '~/components/Image';
 import CommentEditAction from '~/components/CommentEditAction';
 
 import { apiRequest, getApiErrorMessage } from '~/lib/api-client';
+import ReportCommentDialog from '~/components/ReportCommentDialog';
 import { CommentLikeApiError, toggleCommentLike as toggleCommentLikeRequest } from '~/lib/comment-likes-api';
 import { CommentDeleteApiError, deleteComment as deleteCommentRequest } from '~/lib/comment-delete-api';
 import { resolveNativeMediaSource, unwrapApiData } from '~/lib/content-adapter';
@@ -78,6 +79,7 @@ const formatDate = (value: string): string => {
 export default function Comments({ contentId }: CommentsProps) {
   const router = useRouter();
   const currentUserId = useAuthStore((state) => state.user?.id ?? null);
+  const viewer = useAuthStore((state) => state.user);
   const [comments, setComments] = useState<ApiComment[]>([]);
   const [profiles, setProfiles] = useState<Record<string, PublicUser>>({});
   const [likedComments, setLikedComments] = useState<Record<string, boolean>>({});
@@ -92,6 +94,7 @@ export default function Comments({ contentId }: CommentsProps) {
   const [submitting, setSubmitting] = useState(false);
   const [deletingIds, setDeletingIds] = useState<Set<string>>(() => new Set());
   const [message, setMessage] = useState('');
+  const [reportingCommentId, setReportingCommentId] = useState<string | null>(null);
   const pendingDeleteKeysRef = useRef<Record<string, string>>({});
   const requestIdRef = useRef(0);
   const pendingSubmissionRef = useRef<{
@@ -452,6 +455,16 @@ export default function Comments({ contentId }: CommentsProps) {
                           : 'Like'}
                     </Text>
                   </TouchableOpacity>
+                  {comment.authorUserId !== viewer?.id ? (
+                    <TouchableOpacity
+                      accessibilityRole="button"
+                      accessibilityLabel="Report comment"
+                      className="ml-5"
+                      onPress={() => setReportingCommentId(comment.id)}
+                    >
+                      <Text className="text-sm font-semibold text-neutral-500">Report</Text>
+                    </TouchableOpacity>
+                  ) : null}
                   {currentUserId && comment.authorUserId === currentUserId ? (
                     <TouchableOpacity
                       accessibilityRole="button"
@@ -471,6 +484,13 @@ export default function Comments({ contentId }: CommentsProps) {
           </View>
         );
       })}
+
+      {reportingCommentId ? (
+        <ReportCommentDialog
+          commentId={reportingCommentId}
+          onClose={() => setReportingCommentId(null)}
+        />
+      ) : null}
 
       {hasMore && cursor ? (
         <TouchableOpacity
