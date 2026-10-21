@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/transport/W05-W03-reply-audience-context-http-binding.v1.json",
+  "title": "W05 to W03 Reply Audience Content Context Binding",
+  "version": "1.0.0",
+  "status": "CONTRACTED_PARTIAL",
+  "featureId": "SOCIAL-015",
+  "implementationAuthorization": true,
+  "caller": {
+    "logicalWorker": "W05",
+    "role": "Social / Community",
+    "authority": "Reply-audience policy and social relationship state"
+  },
+  "callee": {
+    "logicalWorker": "W03",
+    "role": "Content / Article / Media",
+    "authority": "Canonical content ownership, type and lifecycle in D1-02"
+  },
+  "transport": {
+    "kind": "Cloudflare Worker Service Binding HTTP",
+    "binding": "W03_CONTENT",
+    "targetWorker": "luckread-w03",
+    "publicExposure": false,
+    "workerCountDelta": 0,
+    "databaseCountDelta": 0,
+    "queueCountDelta": 0
+  },
+  "operation": {
+    "operationId": "getReplyAudienceContentContext",
+    "method": "GET",
+    "internalPath": "/internal/content/contents/{contentId}/reply-audience-context",
+    "principalRequired": true,
+    "principalSource": "W01 verified principal forwarded by W05",
+    "ownerScoped": true,
+    "allowedContentType": "post",
+    "allowedContentStates": [
+      "DRAFT",
+      "PUBLISHED",
+      "UNPUBLISHED"
+    ],
+    "cache": "NO_STORE",
+    "resourceBudget": {
+      "w03D1ReadMax": 1,
+      "w05D1ReadMax": 1,
+      "w05ServiceBindingCallsMax": 1
+    }
+  },
+  "headers": {
+    "requiredOnEveryCall": {
+      "X-LuckRead-Caller": "W05",
+      "X-LuckRead-Transport-Version": "1.0",
+      "X-LuckRead-Correlation-Id": "required"
+    },
+    "principal": {
+      "X-LuckRead-Principal-User-Id": "required",
+      "X-LuckRead-Principal-Layer": "required",
+      "source": "W01 authenticated server principal; never from public request body"
+    },
+    "forbidden": [
+      "Authorization",
+      "Cookie",
+      "client-provided ownerUserId"
+    ]
+  },
+  "failurePolicy": {
+    "timeoutMs": 2000,
+    "automaticRetries": 0,
+    "failClosed": [
+      "missing W03_CONTENT binding",
+      "invalid caller metadata",
+      "non-owner content",
+      "non-post content",
+      "invalid response envelope"
+    ]
+  },
+  "scope": {
+    "inScope": [
+      "Owner-only GET of the reply-audience policy uses W03 for canonical content context and W05 for policy state."
+    ],
+    "outOfScope": [
+      "Reply-audience PUT remains unchanged in this slice.",
+      "Comment insertion's atomic content-state/policy recheck remains unchanged.",
+      "Other W05 reads from the contents table are not claimed as fixed."
+    ]
+  },
+  "evidenceRequired": [
+    "W03 positive owner-context test",
+    "W03 wrong-caller denial test",
+    "W05 binding header/no-credential-forwarding test",
+    "W05 policy-only query test",
+    "W03_CONTENT deployment/binding evidence",
+    "runtime cross-Worker E2E evidence"
+  ]
+}
