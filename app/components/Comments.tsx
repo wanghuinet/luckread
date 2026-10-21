@@ -11,7 +11,7 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { StyledExpoImage as Image } from '~/components/Image';
 
-import { apiRequest, createIdempotencyKey, getApiErrorMessage } from '~/lib/api-client';
+import { apiRequest, getApiErrorMessage } from '~/lib/api-client';
 import { CommentDeleteApiError, deleteComment as deleteCommentRequest } from '~/lib/comment-delete-api';
 import { resolveNativeMediaSource, unwrapApiData } from '~/lib/content-adapter';
 import { readSessionToken } from '~/lib/secure-session';
@@ -231,7 +231,7 @@ export default function Comments({ contentId }: CommentsProps) {
 
     setDeletingIds((current) => new Set(current).add(comment.id));
     setMessage('');
-    const key = pendingDeleteKeysRef.current[comment.id] || createIdempotencyKey();
+    const key = pendingDeleteKeysRef.current[comment.id] || createIdempotencyKey(contentId + ':delete:' + comment.id);
     pendingDeleteKeysRef.current[comment.id] = key;
 
     try {
