@@ -120,11 +120,19 @@ export default function RegisterScreen() {
 
       if (!response.ok) {
         const code = readAuthApiErrorCode(data);
+        // Only keep a key when a request may have committed but its result is
+        // uncertain (in-progress, rate-limited, or service/transport failure).
+        // A known input/identity conflict must not reuse that key after edits.
+        if (response.status < 500 && response.status !== 409 && response.status !== 429) {
+          idempotencyKeyRef.current = null;
+        }
         if (code === 'EMAIL_ALREADY_REGISTERED' || code === 'EMAIL_TAKEN' || code === 'USER_ALREADY_EXISTS') {
+          idempotencyKeyRef.current = null;
           setEmailConflict(true);
           throw new Error('该邮箱可能已注册。请尝试登录，或使用忘记密码找回账号。');
         }
         if (code === 'USERNAME_TAKEN' || code === 'USERNAME_ALREADY_EXISTS') {
+          idempotencyKeyRef.current = null;
           throw new Error('该用户名已被使用，请换一个用户名。');
         }
         if (response.status === 429) {
@@ -251,6 +259,7 @@ export default function RegisterScreen() {
       <Pressable
         accessibilityRole="checkbox"
         accessibilityState={{ checked: consent, disabled: registrationState === 'submitting' }}
+        disabled={registrationState === 'submitting'}
         onPress={() => setConsent((value) => !value)}
         style={{ alignItems: 'flex-start', flexDirection: 'row', gap: 10, marginTop: 2, marginBottom: 6 }}
       >
