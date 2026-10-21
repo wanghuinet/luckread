@@ -41,6 +41,42 @@ const publishedContextBinding = () => ({
 })
 
 describe('W05 social query transport', () => {
+  it('gets content social summary through W03 and keeps canonical-content reads out of W05', async () => {
+    const binding = publishedContextBinding()
+    const d = dbFor()
+    const response = await worker.fetch(
+      request('/internal/social/contents/content-1/summary', transportHeaders),
+      { DB: d, W03_CONTENT: binding },
+    )
+    expect(response.status).toBe(200)
+    expect(binding.fetch).toHaveBeenCalledTimes(1)
+    const forwarded = binding.fetch.mock.calls[0]?.[0] as Request
+    expect(forwarded.url).toContain('/internal/content/contents/content-1/published-social-context')
+    expect(forwarded.headers.get('X-LuckRead-Caller')).toBe('W05')
+    expect(forwarded.headers.has('Authorization')).toBe(false)
+    expect(forwarded.headers.has('Cookie')).toBe(false)
+    const prepare = (d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare
+    expect(prepare.mock.calls.some(([sql]) => /(?:FROM|JOIN)\s+contents/i.test(String(sql)))).toBe(false)
+    await expect(response.json()).resolves.toMatchObject({
+      data: {
+        contentId: 'content-1',
+        contentType: 'post',
+        counts: { likes: 0, comments: 0, favorites: 0, shares: 0, reposts: 0 },
+        pinned: false,
+      },
+    })
+  })
+
+  it('fails closed for social summary when W03 content context is unavailable', async () => {
+    const d = dbFor()
+    const response = await worker.fetch(
+      request('/internal/social/contents/content-1/summary', transportHeaders),
+      { DB: d },
+    )
+    expect(response.status).toBe(503)
+    expect((d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).not.toHaveBeenCalled()
+  })
+
   it('serves profile replies through a bounded public GET route', async () => {
     const response = await worker.fetch(
       request('/internal/social/users/user-1/replies?limit=6', {

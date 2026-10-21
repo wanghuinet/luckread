@@ -1,4 +1,5 @@
 /// <reference types="@cloudflare/workers-types" />
+import type { PublishedContentSocialContext } from './w03-content-context-client.js'
 
 export class SocialClosureRuntimeError extends Error {
   constructor(readonly code: string, readonly status: number) { super(code) }
@@ -616,14 +617,23 @@ export async function setNotificationPreferences(
 export async function getContentSocialSummary(
   db: D1Database,
   contentIdValue: string,
+  contentContext: PublishedContentSocialContext,
   viewerUserIdValue?: string | null,
 ) {
   const contentId = id(contentIdValue)
-  const content = await db.prepare(
-    'SELECT id, content_type, state FROM contents WHERE id = ? LIMIT 1',
-  ).bind(contentId).first<{ id: string; content_type: string; state: string }>()
-  if (!content || content.state !== 'PUBLISHED') throw new SocialClosureRuntimeError('NOT_FOUND', 404)
+  if (
+    contentContext.contentId !== contentId ||
+    contentContext.state !== 'PUBLISHED'
+  ) {
+    throw new SocialClosureRuntimeError('NOT_FOUND', 404)
+  }
+  if (!['article', 'post', 'video'].includes(contentContext.contentType)) {
+    throw new SocialClosureRuntimeError('INTERNAL_ERROR', 500)
+  }
 
+  const pinnedOwnerUserId = contentContext.contentType === 'post'
+    ? contentContext.ownerUserId
+    : null
   const counts = await db.prepare(
     `SELECT
        (SELECT COUNT(*) FROM interaction_likes WHERE target_type = 'content' AND target_id = ?) AS likes,
@@ -633,10 +643,9 @@ export async function getContentSocialSummary(
        (SELECT COUNT(*) FROM social_reposts WHERE content_id = ?) AS reposts,
        EXISTS (
          SELECT 1 FROM social_profile_pins p
-         JOIN contents pinned ON pinned.id = p.content_id AND pinned.owner_user_id = p.user_id
-         WHERE p.content_id = ? AND pinned.content_type = 'post' AND pinned.state = 'PUBLISHED'
+         WHERE p.content_id = ? AND p.user_id = ?
        ) AS pinned`,
-  ).bind(contentId, contentId, contentId, contentId, contentId, contentId).first<{
+  ).bind(contentId, contentId, contentId, contentId, contentId, contentId, pinnedOwnerUserId).first<{
     likes: number; comments: number; favorites: number; shares: number; reposts: number; pinned: number
   }>()
 
@@ -661,7 +670,7 @@ export async function getContentSocialSummary(
 
   return {
     contentId,
-    contentType: content.content_type,
+    contentType: contentContext.contentType,
     counts: {
       likes: Number(counts?.likes ?? 0),
       comments: Number(counts?.comments ?? 0),

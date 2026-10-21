@@ -481,7 +481,11 @@ export default {
         const contentId = decodePathPart(parts[3])
         if (contentId === null) throw new SocialClosureRuntimeError('VALIDATION_FAILED', 400)
         const viewerUserId = request.headers.get('X-LuckRead-Principal-User-Id')?.trim() || null
-        return json({ data: await getContentSocialSummary(env.DB, contentId, viewerUserId), requestId: crypto.randomUUID() })
+        const contentContext = await fetchPublishedContentSocialContext(env.W03_CONTENT, {
+          contentId,
+          correlationId: request.headers.get('X-LuckRead-Correlation-Id') ?? '',
+        })
+        return json({ data: await getContentSocialSummary(env.DB, contentId, contentContext, viewerUserId), requestId: crypto.randomUUID() })
       }
 
       if (url.pathname.match(/^\/internal\/social\/contents\/[^/]+\/tokens$/)) {
