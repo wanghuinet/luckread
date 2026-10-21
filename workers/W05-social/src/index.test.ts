@@ -29,6 +29,17 @@ const transportHeaders = {
   'X-LuckRead-Principal-Layer': 'L2',
 }
 
+const publishedContextsBatchBinding = () => ({
+  fetch: vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const request = input instanceof Request ? input : new Request(input, init)
+    const body = await request.json() as { contentIds: string[] }
+    return Response.json({ data: { items: body.contentIds.map(contentId => ({
+      contentId, ownerUserId: 'owner-1', contentType: 'post', state: 'PUBLISHED',
+      updatedAt: '2026-10-17T04:00:00.000Z',
+    })) } })
+  }),
+})
+
 const publishedContextBinding = () => ({
   fetch: vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const request = input instanceof Request ? input : new Request(input, init)
@@ -181,20 +192,31 @@ describe('W05 social query transport', () => {
     expect((d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).not.toHaveBeenCalled()
   })
 
-  it('serves profile replies through a bounded public GET route', async () => {
+  it('serves profile replies through W03 batch visibility context without direct canonical reads', async () => {
+    const binding = publishedContextsBatchBinding()
+    const d = dbFor([{
+      id: 'reply-1', content_id: 'content-1', author_user_id: 'user-1', parent_id: 'comment-0',
+      body: 'Reply body', state: 'PUBLISHED', depth: 1,
+      created_at: '2026-10-15T10:00:00.000Z', updated_at: '2026-10-15T10:00:00.000Z',
+    }])
     const response = await worker.fetch(
       request('/internal/social/users/user-1/replies?limit=6', {
         'X-LuckRead-Caller': 'W01',
         'X-LuckRead-Transport-Version': '1.0',
         'X-LuckRead-Correlation-Id': 'profile-replies',
       }),
-      { DB: dbFor([{
-        id: 'reply-1', content_id: 'content-1', author_user_id: 'user-1', parent_id: 'comment-0',
-        body: 'Reply body', state: 'PUBLISHED', depth: 1,
-        created_at: '2026-10-15T10:00:00.000Z', updated_at: '2026-10-15T10:00:00.000Z',
-      }]) },
+      { DB: d, W03_CONTENT: binding },
     )
     expect(response.status).toBe(200)
+    expect(binding.fetch).toHaveBeenCalledTimes(1)
+    const forwarded = binding.fetch.mock.calls[0]?.[0] as Request
+    expect(forwarded.url).toContain('/internal/content/published-social-context-batch')
+    expect(forwarded.headers.get('X-LuckRead-Caller')).toBe('W05')
+    expect(forwarded.headers.has('Authorization')).toBe(false)
+    expect(forwarded.headers.has('Cookie')).toBe(false)
+    await expect(forwarded.json()).resolves.toEqual({ contentIds: ['content-1'] })
+    const queries = (d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare.mock.calls.map(([sql]) => String(sql))
+    expect(queries.every(sql => !sql.toLowerCase().includes('join contents') && !sql.toLowerCase().includes('from contents'))).toBe(true)
     await expect(response.json()).resolves.toMatchObject({
       data: { items: [{ id: 'reply-1', contentId: 'content-1', authorUserId: 'user-1' }], hasMore: false, nextCursor: null },
       requestId: expect.stringMatching(/^req_/),
