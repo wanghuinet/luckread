@@ -590,6 +590,52 @@ export async function getPublishedContentSocialContext(
   }
 }
 
+export async function getPublishedContentSocialContexts(
+  db: ContentD1,
+  contentIdsValue: string[],
+): Promise<PublishedContentSocialContext[]> {
+  if (!Array.isArray(contentIdsValue) || contentIdsValue.length > 50) {
+    throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+  }
+  const contentIds = contentIdsValue.map(value => typeof value === 'string' ? value.trim() : '')
+  if (contentIds.some(contentId => !/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(contentId))) {
+    throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+  }
+  const uniqueContentIds = [...new Set(contentIds)]
+  if (uniqueContentIds.length === 0) return []
+
+  const placeholders = uniqueContentIds.map(() => '?').join(', ')
+  const rows = await db.prepare(
+    `SELECT id, owner_user_id, content_type, updated_at
+       FROM contents
+      WHERE state = 'PUBLISHED'
+        AND id IN (${placeholders})`,
+  ).bind(...uniqueContentIds).all<{
+    id: string
+    owner_user_id: string | null
+    content_type: string
+    updated_at: string
+  }>()
+  const byId = new Map<string, PublishedContentSocialContext>()
+  for (const row of rows.results ?? []) {
+    if (!uniqueContentIds.includes(row.id)) throw new ContentRuntimeError('INTERNAL_ERROR', 500)
+    if (!['article', 'post', 'video'].includes(row.content_type)) {
+      throw new ContentRuntimeError('INTERNAL_ERROR', 500)
+    }
+    byId.set(row.id, {
+      contentId: row.id,
+      ownerUserId: row.owner_user_id,
+      contentType: row.content_type as ContentType,
+      state: 'PUBLISHED',
+      updatedAt: row.updated_at,
+    })
+  }
+  return uniqueContentIds.flatMap(contentId => {
+    const context = byId.get(contentId)
+    return context ? [context] : []
+  })
+}
+
 export async function getPublishedOwnerPostContext(
   db: ContentD1,
   contentIdValue: string,
