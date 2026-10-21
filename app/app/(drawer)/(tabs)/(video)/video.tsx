@@ -1,422 +1,464 @@
-import React, { useRef, useState, useCallback, useEffect } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  StyleSheet,
-  View,
-  Text,
+  ActivityIndicator,
   Dimensions,
   Image,
+  Pressable,
+  StyleSheet,
+  Text,
   TouchableOpacity,
-  ActivityIndicator,
+  View,
+  type ViewToken,
 } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { useEvent } from 'expo';
-import { FontAwesome as Icon } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
-import Fontisto from '@expo/vector-icons/Fontisto';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useIsFocused } from '@react-navigation/native';
+import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNavigation, useRouter } from 'expo-router';
-import SettingsIcon from '~/assets/svg/video/settings.svg';
-import P2PIcon from '~/assets/svg/video/p2p.svg';
-import AudioIcon from '~/assets/svg/video/audio.svg';
+
 import Comment from '~/assets/svg/comment.svg';
-import Repost from '~/assets/svg/repost.svg';
-import Save from '~/assets/svg/save.svg';
 import Views from '~/assets/svg/views.svg';
 import LikeButton from '~/components/LikeButton';
-import Ionicons from '@expo/vector-icons/Ionicons';
-
+import FollowButton from '~/components/FollowButton';
+import RepostButton from '~/components/RepostButton';
+import BookmarkButton from '~/components/BookmarkButton';
+import ShareButton from '~/components/ShareButton';
+import {
+  mapContentToFeedContent,
+  readContentAuthor,
+  readContentBody,
+  readContentSocial,
+  resolveNativeMediaSource,
+  unwrapApiData,
+  type ApiContentPage,
+  type ApiContentRecord,
+} from '~/lib/content-adapter';
+import { getMediaPlayback } from '~/lib/publish-api';
+import { readSessionToken } from '~/lib/secure-session';
+import { fetchVideoFeedPage } from '~/lib/video-feed-api';
+import { getApiErrorMessage } from '~/lib/api-client';
+import { useAuthStore } from '~/store/auth-store';
+import type { FeedContent } from '~/components/FeedItem';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const PAGE_SIZE = 12;
+const PRIMARY = '#1d9bf0';
 
-interface VideoItemProps {
-  item: {
-    videoId: string;
-    videoUrl: string;
-    poster: {
-      avatar: string;
-      headerImage: string;
-      name: string;
-      username: string;
-      isFollowing: boolean;
-    };
-    title: string;
-    postedTime: string;
-    engagement: {
-      commentCount: number;
-      retweetCount: number;
-      likeCount: number;
-      viewCount: number;
-    };
-  };
-  isVisible: boolean;
-  isFocused: boolean;
-}
-
-const samplePosts = [
-  {
-    videoId: '1k3xgqw',
-    videoUrl: 'https://v.redd.it/hr2t3u7a92we1/DASH_720.mp4?source=fallback',
-    poster: {
-      avatar: 'https://pbs.twimg.com/profile_images/1898802886877806592/dslk-y0m_400x400.jpg',
-      headerImage: 'https://placehold.co/400x100/cccccc/ffffff?text=Header+1k3xgqw',
-      name: '77SidVid77',
-      username: '77SidVid77',
-      isFollowing: false,
-    },
-    title: "Valverde's Volley Goal (Stand View)",
-    postedTime: '2h ago',
-    engagement: {
-      commentCount: 44,
-      retweetCount: 530,
-      likeCount: 2649,
-      viewCount: 132450,
-    },
-  },
-  {
-    videoId: '1k3sgxg',
-    videoUrl: 'https://v.redd.it/4lag4v1a41we1/DASH_1080.mp4?source=fallback',
-    poster: {
-      avatar: 'https://pbs.twimg.com/profile_images/1905447267160784897/goaYbX6R_400x400.jpg',
-      headerImage: 'https://placehold.co/400x100/cccccc/ffffff?text=Header+1k3sgxg',
-      name: 'SirSlapBot',
-      username: 'SirSlapBot',
-      isFollowing: true,
-    },
-    title: 'Trent Alexander-Arnold on Special Moments',
-    postedTime: '6h ago',
-    engagement: {
-      commentCount: 322,
-      retweetCount: 505,
-      likeCount: 2523,
-      viewCount: 126150,
-    },
-  },
-  {
-    videoId: '1k3irtu',
-    videoUrl: 'https://v.redd.it/aup4fk6ekyve1/DASH_720.mp4?source=fallback',
-    poster: {
-      avatar: 'https://pbs.twimg.com/profile_images/1845213323593220101/jNt6G0xt_400x400.jpg',
-      headerImage: 'https://placehold.co/400x100/cccccc/ffffff?text=Header+1k3irtu',
-      name: 'BFobia',
-      username: 'BFobia',
-      isFollowing: false,
-    },
-    title: 'Old Trafford Vibes: Pitch Invader Hugs Security',
-    postedTime: '15h ago',
-    engagement: {
-      commentCount: 75,
-      retweetCount: 1228,
-      likeCount: 6142,
-      viewCount: 307100,
-    },
-  },
-  {
-    videoId: '1k3skev',
-    videoUrl: 'https://v.redd.it/rtodftfl41we1/DASH_480.mp4?source=fallback',
-    poster: {
-      avatar: 'https://pbs.twimg.com/profile_images/1905926124506411008/E8IOv8Mx_400x400.jpg',
-      headerImage: 'https://placehold.co/400x100/cccccc/ffffff?text=Header+1k3skev',
-      name: 'TastefulAss',
-      username: 'TastefulAss',
-      isFollowing: true,
-    },
-    title: 'Barca [4] - 1 Chelsea - Pina Goal (Putellas Assist)',
-    postedTime: '6h ago',
-    engagement: {
-      commentCount: 39,
-      retweetCount: 139,
-      likeCount: 693,
-      viewCount: 34650,
-    },
-  },
-  {
-    videoId: '1k3k52t',
-    videoUrl: 'https://v.redd.it/3j6fd5ilwyve1/DASH_1080.mp4?source=fallback',
-    poster: {
-      avatar: 'https://pbs.twimg.com/profile_images/1497695860313972736/sKT3BlvB_400x400.jpg',
-      headerImage: 'https://placehold.co/400x100/cccccc/ffffff?text=Header+1k3k52t',
-      name: '-kousor',
-      username: '-kousor',
-      isFollowing: false,
-    },
-    title: "Arabic Commentary: Aston Villa's 4th Goal",
-    postedTime: '13h ago',
-    engagement: {
-      commentCount: 92,
-      retweetCount: 475,
-      likeCount: 2374,
-      viewCount: 118700,
-    },
-  },
-  {
-    videoId: '1k3wj7z',
-    videoUrl: 'https://v.redd.it/7kw26eoi12we1/DASH_480.mp4?source=fallback',
-    poster: {
-      avatar: 'https://pbs.twimg.com/profile_images/1770660656250810368/DA6_Wh7A_400x400.jpg',
-      headerImage: 'https://placehold.co/400x100/cccccc/ffffff?text=Header+1k3wj7z',
-      name: 'EiMidagi',
-      username: 'EiMidagi',
-      isFollowing: true,
-    },
-    title: 'Vini Jr Trivela Cross',
-    postedTime: '3h ago',
-    engagement: {
-      commentCount: 15,
-      retweetCount: 65,
-      likeCount: 324,
-      viewCount: 16200,
-    },
-  },
-  {
-    videoId: '1k3zoeu',
-    videoUrl: 'https://v.redd.it/wfhtpcqis2we1/DASH_1080.mp4?source=fallback',
-    poster: {
-      avatar: 'https://pbs.twimg.com/profile_images/1890200382866849792/R8Yjaf4p_400x400.jpg',
-      headerImage: 'https://placehold.co/400x100/cccccc/ffffff?text=Header+1k3zoeu',
-      name: 'SirSlapBot',
-      username: 'SirSlapBot',
-      isFollowing: false,
-    },
-    title: 'Djokovic Reacts to Valverde Golazo',
-    postedTime: '49m ago',
-    engagement: {
-      commentCount: 17,
-      retweetCount: 32,
-      likeCount: 161,
-      viewCount: 8050,
-    },
-  },
-];
-
-const formatTime = (seconds: number) => {
-  if (isNaN(seconds) || seconds < 0) return '00:00';
-  const minutes = Math.floor(seconds / 60);
-  const secs = Math.floor(seconds % 60);
-  return `${minutes < 10 ? '0' : ''}${minutes}:${secs < 10 ? '0' : ''}${secs}`;
+type NativeVideoSource = {
+  uri: string;
+  headers?: Record<string, string>;
 };
 
-const VideoItem = React.memo(({ item, isVisible, isFocused }: VideoItemProps) => {
-  const videoViewRef = useRef<React.ElementRef<typeof VideoView> | null>(null);
-  const player = useVideoPlayer(item.videoUrl, (p) => {
-    p.loop = true;
-    p.timeUpdateEventInterval = 250;
+type VideoFeedItem = FeedContent & {
+  videoSource: NativeVideoSource | null;
+  mediaError?: string;
+};
+
+async function resolveVideoSource(
+  item: ApiContentRecord,
+  sessionToken: string | null,
+): Promise<{ source: NativeVideoSource | null; error?: string }> {
+  const reference = item.mediaRefs?.find((value) => typeof value === 'string' && value.trim())?.trim();
+  if (!reference) return { source: null, error: 'This video has no playable media attached.' };
+
+  // Published media references may already be absolute URLs or same-origin delivery
+  // paths. Resolve them using the existing trusted media adapter, never by guessing
+  // a public R2 URL from a storage key.
+  const directSource = resolveNativeMediaSource(reference, sessionToken);
+  if (directSource) return { source: directSource };
+
+  if (/^(?:r2|s3):\/\//i.test(reference)) {
+    return { source: null, error: 'This video references private storage and has no public playback URL.' };
+  }
+
+  // Opaque media IDs must use the existing playback authorization endpoint.
+  try {
+    const playback = await getMediaPlayback(reference);
+    const source = resolveNativeMediaSource(playback.url, sessionToken);
+    return source
+      ? { source }
+      : { source: null, error: 'The playback service did not return a usable video URL.' };
+  } catch (cause) {
+    return {
+      source: null,
+      error: cause instanceof Error ? cause.message : 'Unable to authorize video playback.',
+    };
+  }
+}
+
+function formatCount(value: number | undefined): string {
+  if (value === undefined || value === null) return '0';
+  if (value >= 1_000_000) return (value / 1_000_000).toFixed(value % 1_000_000 === 0 ? 0 : 1) + 'M';
+  if (value >= 1_000) return (value / 1_000).toFixed(value % 1_000 === 0 ? 0 : 1) + 'K';
+  return String(value);
+}
+
+function VideoItem({
+  item,
+  isVisible,
+  isFocused,
+  muted,
+  onToggleMute,
+  onOpenPost,
+  onRetry,
+}: {
+  item: VideoFeedItem;
+  isVisible: boolean;
+  isFocused: boolean;
+  muted: boolean;
+  onToggleMute: () => void;
+  onOpenPost: () => void;
+  onRetry: () => void;
+}) {
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const currentUserId = useAuthStore((state) => state.user?.id);
+  const authorId = item.creatorId || item.ownerUserId;
+  const player = useVideoPlayer(item.videoSource, (instance) => {
+    instance.loop = true;
   });
   const { isPlaying } = useEvent(player, 'playingChange', { isPlaying: player.playing });
-  const { status, error } = useEvent(player, 'statusChange', { status: player?.status });
-  const [playback, setPlayback] = useState({
-    currentTime: player.currentTime ?? 0,
-    duration: player.duration ?? 0,
-  });
-  const { currentTime, duration } = playback;
+  const { status, error } = useEvent(player, 'statusChange', { status: player.status });
 
   useEffect(() => {
-    if (!isVisible || !isFocused) return;
-    const interval = setInterval(() => {
-      setPlayback({
-        currentTime: player.currentTime ?? 0,
-        duration: player.duration ?? 0,
-      });
-    }, 250);
-    return () => clearInterval(interval);
-  }, [isFocused, isVisible, player]);
-  const insets = useSafeAreaInsets();
-  const [isMuted, setIsMuted] = useState(player?.muted ?? false);
-
-  useEffect(() => {
-    if (!player) return;
-    if (isVisible && isFocused) {
-      player.muted = false;
-      try { player.play(); } catch { /* player state can change during navigation */ }
-    } else {
+    if (!isFocused || !isVisible || !item.videoSource) {
       player.pause();
+      return;
     }
-  }, [isVisible, isFocused, player]);
-
-  useEffect(() => {
-    if (status === 'error' && error) {
-      console.error(`Video Error (${item.videoId}):`, error.message, error);
+    player.muted = muted;
+    try {
+      player.play();
+    } catch {
+      // Playback can be interrupted while the user changes tabs.
     }
-  }, [status, error, item.videoId]);
+  }, [isFocused, isVisible, item.videoSource, muted, player]);
 
   const togglePlayPause = useCallback(() => {
-    if (!player) return;
+    if (!item.videoSource) return;
     if (isPlaying) player.pause();
-    else player.play();
-  }, [player, isPlaying]);
-
-  const toggleMute = useCallback(() => {
-    if (!player) return;
-    const newMutedState = !isMuted;
-    player.muted = newMutedState;
-    setIsMuted(newMutedState);
-  }, [player, isMuted]);
-
-  const formatCount = (count: number) => {
-    if (count >= 1000000) return (count / 1000000).toFixed(1) + 'm';
-    if (count >= 1000) {
-      const value = count / 1000;
-      return value % 1 === 0 ? value.toFixed(0) + 'k' : value.toFixed(1) + 'k';
+    else {
+      player.muted = muted;
+      player.play();
     }
-    return count;
-  };
+  }, [isPlaying, item.videoSource, muted, player]);
 
-  const progress = duration > 0 ? currentTime / duration : 0;
+  const openAuthor = useCallback(() => {
+    const identifier = item.poster_id && item.poster_id !== 'unknown'
+      ? item.poster_id
+      : item.authorHandle;
+    if (identifier) router.push(('/profile/' + encodeURIComponent(identifier)) as never);
+  }, [item.authorHandle, item.poster_id, router]);
+
+  const playbackFailed = Boolean(item.mediaError) || status === 'error';
 
   return (
     <View style={styles.videoContainer}>
-      <TouchableOpacity activeOpacity={1} onPress={togglePlayPause} style={[StyleSheet.absoluteFill, { top: insets.top }]}>
-        <VideoView
-          ref={videoViewRef}
-          player={player}
-          style={styles.videoPlayer}
-          contentFit="cover"
-          allowsFullscreen={false}
-          allowsPictureInPicture={false}
-          nativeControls={false}
-
-        />
-      </TouchableOpacity>
-
-      {status === 'loading' && <ActivityIndicator size="large" color="#fff" style={styles.loadingIndicator} />}
-
-      <LinearGradient colors={['transparent', 'rgba(0,0,0,0.5)', 'rgba(0,0,0,0.75)']} style={styles.overlayGradient}>
-        <View style={styles.controlsRow}>
-          <View style={styles.timeDisplayContainer}>
-            <Text style={styles.timeText}>{formatTime(currentTime)}</Text>
-            <Text style={styles.timeText}>/ {formatTime(duration)}</Text>
-          </View>
-          <View style={styles.iconControlsContainer}>
-            <TouchableOpacity style={styles.controlButton}>
-              <SettingsIcon width={20} height={20} fill="#fff" />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.controlButton}>
-              <Fontisto name="airplay" size={16} color="#fff" />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.controlButton} onPress={toggleMute}>
-              <AudioIcon width={20} height={20} fill={isMuted ? '#aaa' : '#fff'} />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.controlButton}>
-              <P2PIcon width={20} height={20} fill="#fff" />
-            </TouchableOpacity>
-          </View>
+      {item.videoSource ? (
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel={isPlaying ? 'Pause video' : 'Play video'}
+          activeOpacity={1}
+          onPress={togglePlayPause}
+          style={StyleSheet.absoluteFill}
+        >
+          <VideoView
+            player={player}
+            style={styles.videoPlayer}
+            contentFit="cover"
+            allowsFullscreen={false}
+            allowsPictureInPicture={false}
+            nativeControls={false}
+          />
+        </TouchableOpacity>
+      ) : (
+        <View style={styles.unavailableVideo}>
+          <Feather name="video-off" size={42} color="#ffffff" />
+          <Text style={styles.unavailableTitle}>Video unavailable</Text>
+          <Text style={styles.unavailableMessage}>{item.mediaError || 'This post has no playable media.'}</Text>
+          <Pressable accessibilityRole="button" onPress={onRetry} style={styles.retryButton}>
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </Pressable>
         </View>
+      )}
 
-        <View style={styles.progressContainer}>
-          <TouchableOpacity onPress={togglePlayPause}>
-            <Ionicons name={isPlaying ? 'pause' : 'play'} size={24} color="#fff" />
-          </TouchableOpacity>
-          <View style={styles.progressBarTouchableArea}>
-            <View style={styles.progressBarBackground}>
-              <View style={[styles.progressBarFill, { width: `${progress * 100}%` }]} />
-            </View>
-          </View>
+      {item.videoSource && status === 'loading' ? (
+        <ActivityIndicator size="large" color="#ffffff" style={styles.loadingIndicator} />
+      ) : null}
+
+      {item.videoSource && !isPlaying && status === 'readyToPlay' && !playbackFailed ? (
+        <Pressable accessibilityRole="button" onPress={togglePlayPause} style={styles.playPauseIndicator}>
+          <Feather name="play" size={50} color="#ffffff" />
+        </Pressable>
+      ) : null}
+
+      {item.videoSource && status === 'error' ? (
+        <View style={styles.playbackError} pointerEvents="box-none">
+          <Feather name="alert-triangle" size={30} color="#ffffff" />
+          <Text style={styles.unavailableMessage}>{error?.message || 'Unable to play this video.'}</Text>
+          <Pressable accessibilityRole="button" onPress={onRetry} style={styles.retryButton}>
+            <Text style={styles.retryButtonText}>Retry feed</Text>
+          </Pressable>
         </View>
+      ) : null}
 
-        <View style={styles.posterInfoRow}>
-          <Image source={{ uri: item.poster.avatar }} style={styles.avatar} />
-          <View style={styles.posterTextContainer}>
-            <Text style={styles.posterName} numberOfLines={1}>
-              {item.poster.name}
-            </Text>
-            <Text style={styles.posterUsername} numberOfLines={1}>
-              @{item.poster.username} · {item.postedTime}
-            </Text>
-          </View>
+      <LinearGradient
+        pointerEvents="box-none"
+        colors={['rgba(0,0,0,0.26)', 'transparent', 'rgba(0,0,0,0.82)']}
+        style={[styles.overlayGradient, { paddingTop: insets.top + 12, paddingBottom: insets.bottom + 18 }]}
+      >
+        <View style={styles.topBar}>
           <TouchableOpacity
-            style={[styles.followButton, item.poster.isFollowing ? styles.followingButton : {}]}
+            accessibilityRole="button"
+            accessibilityLabel="Back"
+            onPress={() => router.back()}
+            style={styles.iconButton}
           >
-            <Text style={[styles.followButtonText, item.poster.isFollowing ? styles.followingButtonText : {}]}>
-              {item.poster.isFollowing ? 'Following' : 'Follow'}
-            </Text>
+            <Feather name="arrow-left" size={23} color="#ffffff" />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.moreButton}>
-            <Icon name="ellipsis-h" size={16} color="#fff" />
+          <Text style={styles.headerTitle}>Videos</Text>
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel={muted ? 'Unmute video' : 'Mute video'}
+            onPress={onToggleMute}
+            style={styles.iconButton}
+          >
+            <Feather name={muted ? 'volume-x' : 'volume-2'} size={22} color="#ffffff" />
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.title} numberOfLines={3}>
-          {item.title}
-        </Text>
+        <View style={styles.bottomContent}>
+          <View style={styles.authorRow}>
+            <TouchableOpacity accessibilityRole="button" onPress={openAuthor} style={styles.avatarButton}>
+              {item.authorImageUrl ? (
+                <Image
+                  source={{ uri: item.authorImageUrl, headers: item.authorImageHeaders }}
+                  style={styles.avatar}
+                />
+              ) : (
+                <View style={[styles.avatar, styles.avatarFallback]}>
+                  <Feather name="user" size={20} color="#ffffff" />
+                </View>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity accessibilityRole="button" onPress={openAuthor} style={styles.authorText}>
+              <Text numberOfLines={1} style={styles.authorName}>{item.authorName || 'LuckRead 用户'}</Text>
+              <Text numberOfLines={1} style={styles.authorHandle}>
+                @{item.authorHandle || 'unknown'}
+              </Text>
+            </TouchableOpacity>
+            {authorId && authorId !== currentUserId ? <FollowButton targetUserId={authorId} /> : null}
+          </View>
 
-        <View style={styles.engagementRow}>
-          <TouchableOpacity style={styles.engagementButton}>
-            <Comment width={16} height={16} fill="#ccc" />
-            <Text style={styles.engagementText}>{formatCount(item.engagement.commentCount)}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.engagementButton}>
-            <Repost width={16} height={16} fill="#ccc" />
-            <Text style={styles.engagementText}>{formatCount(item.engagement.retweetCount)}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.engagementButton}>
-            <LikeButton textColor="#fff" iconColor="#fff" />
-            <Text style={styles.engagementText}>{formatCount(item.engagement.likeCount)}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.engagementButton}>
-            <Views width={16} height={16} fill="#ccc" />
-            <Text style={styles.engagementText}>{formatCount(item.engagement.viewCount)}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.engagementButton}>
-            <Save width={16} height={16} fill="#ccc" />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.engagementButton}>
-            <Feather name="share" size={16} color="#ccc" />
-          </TouchableOpacity>
+          {item.message ? (
+            <TouchableOpacity activeOpacity={0.9} onPress={onOpenPost}>
+              <Text numberOfLines={4} style={styles.videoCaption}>{item.message}</Text>
+            </TouchableOpacity>
+          ) : null}
+
+          <View style={styles.engagementRow}>
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Open comments"
+              onPress={onOpenPost}
+              style={styles.engagementButton}
+            >
+              <Comment width={19} height={19} fill="#ffffff" />
+              <Text style={styles.engagementText}>{formatCount(item.reply_count)}</Text>
+            </TouchableOpacity>
+            <RepostButton
+              contentId={item.contentId}
+              initialCount={item.retweet_count}
+              iconColor="#ffffff"
+              textColor="text-xs text-white"
+            />
+            <LikeButton
+              contentId={item.contentId}
+              likes={item.like_count}
+              iconColor="#ffffff"
+              textColor="text-xs text-white"
+            />
+            <View style={styles.engagementButton}>
+              <Views width={19} height={19} fill="#ffffff" />
+              <Text style={styles.engagementText}>{formatCount(item.view_count === undefined ? undefined : Number(item.view_count))}</Text>
+            </View>
+            <BookmarkButton contentId={item.contentId} iconColor="#ffffff" />
+            <ShareButton contentId={item.contentId} contentText={item.message} iconColor="#ffffff" />
+          </View>
         </View>
       </LinearGradient>
-
-      {!isPlaying && status === 'readyToPlay' && (
-        <View style={styles.playPauseIndicator} pointerEvents="none">
-          <Icon name="play" size={60} color="rgba(255, 255, 255, 0.7)" />
-        </View>
-      )}
-
-      {status === 'error' && (
-        <View style={styles.playPauseIndicator}>
-          <Icon name="exclamation-triangle" size={60} color="rgba(255, 0, 0, 0.7)" />
-          <Text style={styles.errorText}>Video Error</Text>
-        </View>
-      )}
     </View>
   );
-});
+}
 
-const VideoFeed = () => {
-  const [currentId, setCurrentId] = useState<string | null>(samplePosts[0]?.videoId ?? null);
-  const navigation = useNavigation();
+export default function VideoFeed() {
   const router = useRouter();
-  const insets = useSafeAreaInsets();
+  const isFocused = useIsFocused();
+  const [items, setItems] = useState<VideoFeedItem[]>([]);
+  const [cursor, setCursor] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [currentId, setCurrentId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [muted, setMuted] = useState(true);
+  const requestIdRef = useRef(0);
+  const loadingMoreRef = useRef(false);
 
-  const onViewableItemsChanged = useCallback(({ viewableItems }) => {
-    if (!viewableItems?.length) return;
-    const most = viewableItems.reduce((a, b) =>
-      (a?.percentVisible || 0) > (b?.percentVisible || 0) ? a : b
-    );
-    if (most?.item?.videoId) setCurrentId(most.item.videoId);
+  const loadPage = useCallback(async (nextCursor: string | null = null, append = false) => {
+    if (append && loadingMoreRef.current) return;
+    const requestId = ++requestIdRef.current;
+    loadingMoreRef.current = append;
+    if (append) setLoadingMore(true);
+    else setLoading(true);
+    setErrorMessage('');
+
+    try {
+      const result = await fetchVideoFeedPage({
+        cursor: nextCursor,
+        limit: PAGE_SIZE,
+      });
+      if (requestId !== requestIdRef.current) return;
+      const page = unwrapApiData<ApiContentPage>(result.data);
+      if (!result.response.ok || !page || !Array.isArray(page.items)) {
+        throw new Error(getApiErrorMessage(result.data, 'Could not load LuckRead videos.', result.response.status));
+      }
+
+      const sessionToken = await readSessionToken().catch(() => null);
+      const videoRecords = page.items.filter((item): item is ApiContentRecord =>
+        Boolean(item && typeof item.id === 'string' && item.contentType === 'video'),
+      );
+      const mapped = await Promise.all(videoRecords.map(async (record): Promise<VideoFeedItem> => {
+        const [body, social, author, playback] = await Promise.all([
+          readContentBody(record, undefined, sessionToken),
+          readContentSocial(record.id),
+          readContentAuthor(record),
+          resolveVideoSource(record, sessionToken),
+        ]);
+        return {
+          ...mapContentToFeedContent(record, body, social, author, sessionToken),
+          videoSource: playback.source,
+          mediaError: playback.error,
+        };
+      }));
+      if (requestId !== requestIdRef.current) return;
+
+      setItems((current) => {
+        if (!append) return mapped;
+        const known = new Set(current.map((item) => item.contentId));
+        return [...current, ...mapped.filter((item) => !known.has(item.contentId))];
+      });
+      setCursor(page.nextCursor || null);
+      setHasMore(page.hasMore === true);
+      setCurrentId((current) => current ?? mapped[0]?.contentId ?? null);
+    } catch (cause) {
+      if (requestId !== requestIdRef.current) return;
+      setErrorMessage(cause instanceof Error ? cause.message : 'Could not load LuckRead videos.');
+    } finally {
+      if (requestId === requestIdRef.current) {
+        loadingMoreRef.current = false;
+        setLoading(false);
+        setLoadingMore(false);
+        setRefreshing(false);
+      }
+    }
   }, []);
 
-  const viewabilityConfig = { itemVisiblePercentThreshold: 50 };
-
-  const renderItem = ({ item }) => (
-    <VideoItem item={item} isVisible={item.videoId === currentId} isFocused={true} />
-  );
-
   useEffect(() => {
-    const unsubscribeBeforeRemove = navigation.addListener('beforeRemove', () => setCurrentId(null));
-    return () => unsubscribeBeforeRemove();
-  }, [navigation]);
+    void loadPage();
+    return () => {
+      requestIdRef.current += 1;
+    };
+  }, [loadPage]);
+
+  const onViewableItemsChanged = useRef(
+    ({ viewableItems }: { viewableItems: Array<ViewToken<VideoFeedItem>> }) => {
+      const mostVisible = viewableItems.find((token) => token.isViewable && token.item?.contentId);
+      if (mostVisible?.item?.contentId) setCurrentId(mostVisible.item.contentId);
+    },
+  ).current;
+  const viewabilityConfig = useMemo(() => ({ itemVisiblePercentThreshold: 65 }), []);
+
+  const currentIndex = items.findIndex((item) => item.contentId === currentId);
+  const retry = useCallback(() => {
+    setItems([]);
+    setCursor(null);
+    setCurrentId(null);
+    void loadPage();
+  }, [loadPage]);
+
+  const openPost = useCallback((contentId?: string) => {
+    if (contentId) router.push(('/post/' + encodeURIComponent(contentId)) as never);
+  }, [router]);
+
+  if (loading && items.length === 0) {
+    return (
+      <View style={styles.stateContainer}>
+        <ActivityIndicator color={PRIMARY} size="large" />
+        <Text style={styles.stateDescription}>Loading LuckRead videos…</Text>
+      </View>
+    );
+  }
+
+  if (errorMessage && items.length === 0) {
+    return (
+      <View style={styles.stateContainer}>
+        <Feather name="wifi-off" size={36} color="#667085" />
+        <Text style={styles.stateTitle}>Unable to load videos</Text>
+        <Text style={styles.stateDescription}>{errorMessage}</Text>
+        <Pressable accessibilityRole="button" onPress={retry} style={styles.retryButtonLight}>
+          <Text style={styles.retryButtonText}>Retry</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  if (!loading && items.length === 0) {
+    return (
+      <View style={styles.stateContainer}>
+        <Feather name="video" size={36} color="#667085" />
+        <Text style={styles.stateTitle}>No videos yet</Text>
+        <Text style={styles.stateDescription}>
+          Videos published on LuckRead will appear here. Sample videos are not shown.
+        </Text>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.push('/publish' as never)}
+          style={styles.retryButtonLight}
+        >
+          <Text style={styles.retryButtonText}>Publish a video</Text>
+        </Pressable>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity onPress={() => router.back()} style={[styles.backButton, { top: insets.top + 10 }]}>
-        <Feather name="arrow-left" size={22} color="#fff" />
-      </TouchableOpacity>
-
+      {errorMessage ? (
+        <View style={styles.inlineError}>
+          <Text style={styles.inlineErrorText}>{errorMessage}</Text>
+          <Pressable accessibilityRole="button" onPress={retry}>
+            <Text style={styles.inlineRetryText}>Retry</Text>
+          </Pressable>
+        </View>
+      ) : null}
       <FlashList
-        data={samplePosts}
-        renderItem={renderItem}
-        keyExtractor={(item) => item.videoId}
+        data={items}
+        renderItem={({ item }) => (
+          <VideoItem
+            item={item}
+            isVisible={item.contentId === currentId && currentIndex >= 0}
+            isFocused={isFocused}
+            muted={muted}
+            onToggleMute={() => setMuted((value) => !value)}
+            onOpenPost={() => openPost(item.contentId)}
+            onRetry={retry}
+          />
+        )}
+        keyExtractor={(item, index) => item.contentId || 'video-' + index}
         estimatedItemSize={SCREEN_HEIGHT}
         pagingEnabled
         snapToInterval={SCREEN_HEIGHT}
@@ -424,189 +466,164 @@ const VideoFeed = () => {
         showsVerticalScrollIndicator={false}
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig}
+        onRefresh={() => {
+          setRefreshing(true);
+          void loadPage();
+        }}
+        refreshing={refreshing}
+        onEndReached={() => {
+          if (hasMore && cursor && !loadingMoreRef.current) void loadPage(cursor, true);
+        }}
+        onEndReachedThreshold={0.5}
+        ListFooterComponent={loadingMore ? <ActivityIndicator color={PRIMARY} style={styles.footerLoader} /> : null}
       />
     </View>
   );
-};
+}
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#000',
-  },
-  backButton: {
-    position: 'absolute',
-    left: 15,
-    zIndex: 10,
-    padding: 5,
-  },
+  container: { flex: 1, backgroundColor: '#000000' },
   videoContainer: {
     width: SCREEN_WIDTH,
     height: SCREEN_HEIGHT,
-    backgroundColor: '#000',
+    backgroundColor: '#000000',
     justifyContent: 'center',
     alignItems: 'center',
     overflow: 'hidden',
   },
   videoPlayer: {
-    position: 'absolute',
-    top: SCREEN_HEIGHT / 12,
-    left: 0,
-    bottom: 0,
-    right: 0,
-    height: SCREEN_HEIGHT / 1.75,
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#000000',
   },
   overlayGradient: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    paddingTop: 10,
-    paddingBottom: 35,
-    paddingHorizontal: 15,
-  },
-  progressContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 10,
-    height: 20,
-    gap: 10,
-  },
-  timeDisplayContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-  },
-  timeText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: 'bold',
-    minWidth: 40,
-    textAlign: 'center',
-  },
-  progressBarTouchableArea: {
-    flex: 1,
-    marginHorizontal: 8,
-    paddingVertical: 5,
-  },
-  progressBarBackground: {
-    height: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    borderRadius: 2,
-    overflow: 'hidden',
-  },
-  progressBarFill: {
-    height: '100%',
-    backgroundColor: '#fff',
-    borderRadius: 2,
-  },
-  controlsRow: {
-    flexDirection: 'row',
+    ...StyleSheet.absoluteFillObject,
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 5,
-  },
-  iconControlsContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  controlButton: {
-    padding: 5,
-  },
-  posterInfoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#fff',
-    marginRight: 10,
-    backgroundColor: '#333',
-  },
-  posterTextContainer: {
-    flex: 1,
-    marginRight: 10,
-  },
-  posterName: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 15,
-  },
-  posterUsername: {
-    color: '#ccc',
-    fontSize: 13,
-  },
-  followButton: {
-    paddingVertical: 6,
     paddingHorizontal: 16,
-    backgroundColor: '#fff',
-    borderRadius: 15,
-    marginHorizontal: 10,
   },
-  followingButton: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.5)',
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
-  followButtonText: {
-    color: '#000',
-    fontWeight: 'bold',
-    fontSize: 13,
-    textAlign: 'center',
+  headerTitle: {
+    color: '#ffffff',
+    fontSize: 18,
+    fontWeight: '800',
   },
-  followingButtonText: {
-    color: '#fff',
+  iconButton: {
+    minWidth: 42,
+    minHeight: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 21,
+    backgroundColor: 'rgba(0,0,0,0.28)',
   },
-  moreButton: {
-    padding: 5,
+  bottomContent: {
+    paddingBottom: 8,
   },
-  title: {
-    color: '#fff',
-    fontSize: 14,
-    marginBottom: 15,
-    lineHeight: 18,
+  authorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  avatarButton: { marginRight: 10 },
+  avatar: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#394150',
+  },
+  avatarFallback: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  authorText: { flex: 1, marginRight: 10 },
+  authorName: { color: '#ffffff', fontWeight: '800', fontSize: 15 },
+  authorHandle: { color: '#e5e7eb', fontSize: 12, marginTop: 3 },
+  videoCaption: {
+    color: '#ffffff',
+    fontSize: 15,
+    lineHeight: 21,
+    marginBottom: 14,
   },
   engagementRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    minHeight: 38,
   },
   engagementButton: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 34,
+    gap: 5,
   },
-  engagementText: {
-    color: '#ccc',
-    fontSize: 13,
-    marginLeft: 6,
-    fontWeight: '600',
-  },
-  loadingIndicator: {
-    position: 'absolute',
-  },
+  engagementText: { color: '#ffffff', fontSize: 12, fontWeight: '700', marginLeft: 3 },
+  loadingIndicator: { position: 'absolute', top: '45%', alignSelf: 'center' },
   playPauseIndicator: {
     position: 'absolute',
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.2)',
-    top: 0,
+    top: '42%',
     left: 0,
     right: 0,
-    bottom: 0,
+    alignItems: 'center',
+    zIndex: 2,
   },
-  errorText: {
-    color: 'rgba(255, 255, 255, 0.8)',
-    marginTop: 10,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
+  playbackError: {
+    position: 'absolute',
+    top: '35%',
+    left: 26,
+    right: 26,
+    zIndex: 4,
+    alignItems: 'center',
+    gap: 8,
   },
+  unavailableVideo: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 30,
+    gap: 10,
+    backgroundColor: '#111827',
+  },
+  unavailableTitle: { color: '#ffffff', fontSize: 18, fontWeight: '800' },
+  unavailableMessage: { color: '#e5e7eb', fontSize: 13, textAlign: 'center', lineHeight: 19 },
+  retryButton: {
+    marginTop: 6,
+    borderRadius: 999,
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+  },
+  retryButtonText: { color: '#111827', fontWeight: '800', fontSize: 14 },
+  stateContainer: {
+    flex: 1,
+    backgroundColor: '#ffffff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 28,
+    paddingVertical: 32,
+  },
+  stateTitle: { color: '#101828', fontSize: 18, fontWeight: '800', textAlign: 'center', marginTop: 12 },
+  stateDescription: { color: '#667085', fontSize: 14, lineHeight: 21, marginTop: 10, textAlign: 'center' },
+  retryButtonLight: {
+    marginTop: 18,
+    alignItems: 'center',
+    backgroundColor: PRIMARY,
+    borderRadius: 999,
+    minWidth: 130,
+    paddingHorizontal: 22,
+    paddingVertical: 12,
+  },
+  inlineError: {
+    backgroundColor: '#991b1b',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  inlineErrorText: { flex: 1, color: '#ffffff', fontSize: 12 },
+  inlineRetryText: { color: '#ffffff', fontWeight: '800', paddingLeft: 10 },
+  footerLoader: { paddingVertical: 18 },
 });
-
-export default VideoFeed;
