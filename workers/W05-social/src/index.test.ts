@@ -41,6 +41,61 @@ const publishedContextBinding = () => ({
 })
 
 describe('W05 social query transport', () => {
+  it('reads content topics and mentions only after W03 confirms the target is published', async () => {
+    const binding = publishedContextBinding()
+    const d = dbFor()
+    const response = await worker.fetch(
+      request('/internal/social/contents/content-1/tokens', {
+        'X-LuckRead-Caller': 'W01',
+        'X-LuckRead-Transport-Version': '1.0',
+        'X-LuckRead-Correlation-Id': 'content-token-read',
+      }),
+      { DB: d, W03_CONTENT: binding },
+    )
+    expect(response.status).toBe(200)
+    expect(binding.fetch).toHaveBeenCalledTimes(1)
+    const forwarded = binding.fetch.mock.calls[0]?.[0] as Request
+    expect(forwarded.url).toContain('/internal/content/contents/content-1/published-social-context')
+    expect(forwarded.headers.get('X-LuckRead-Caller')).toBe('W05')
+    expect(forwarded.headers.has('X-LuckRead-Principal-User-Id')).toBe(false)
+    expect(forwarded.headers.has('Authorization')).toBe(false)
+    expect(forwarded.headers.has('Cookie')).toBe(false)
+    const prepare = (d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare
+    expect(prepare.mock.calls.some(([sql]) => /(?:FROM|JOIN)\s+contents/i.test(String(sql)))).toBe(false)
+    await expect(response.json()).resolves.toMatchObject({
+      data: { topics: [], mentions: [] },
+    })
+  })
+
+  it('fails closed before W05 D1 when W03 context is missing or content is unpublished', async () => {
+    const unavailableDb = dbFor()
+    const noBinding = await worker.fetch(
+      request('/internal/social/contents/content-1/tokens', {
+        'X-LuckRead-Caller': 'W01',
+        'X-LuckRead-Transport-Version': '1.0',
+        'X-LuckRead-Correlation-Id': 'content-token-read-no-binding',
+      }),
+      { DB: unavailableDb },
+    )
+    expect(noBinding.status).toBe(503)
+    expect((unavailableDb as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).not.toHaveBeenCalled()
+
+    const unpublishedDb = dbFor()
+    const unpublishedBinding = {
+      fetch: vi.fn(async () => Response.json({ error: { code: 'NOT_FOUND' } }, { status: 404 })),
+    }
+    const unpublished = await worker.fetch(
+      request('/internal/social/contents/content-1/tokens', {
+        'X-LuckRead-Caller': 'W01',
+        'X-LuckRead-Transport-Version': '1.0',
+        'X-LuckRead-Correlation-Id': 'content-token-read-unpublished',
+      }),
+      { DB: unpublishedDb, W03_CONTENT: unpublishedBinding },
+    )
+    expect(unpublished.status).toBe(404)
+    expect((unpublishedDb as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).not.toHaveBeenCalled()
+  })
+
   it('synchronizes content topics and mentions only after W03 validates published ownership', async () => {
     const binding = {
       fetch: vi.fn(async () => Response.json({
