@@ -57,11 +57,6 @@ type VideoFeedItem = FeedContent & {
   mediaError?: string;
 };
 
-type ContentPageResponse = {
-  data?: ApiContentPage;
-  error?: { code?: string; message?: string };
-};
-
 async function resolveVideoSource(
   item: ApiContentRecord,
   sessionToken: string | null,
@@ -121,6 +116,7 @@ function VideoItem({
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const currentUserId = useAuthStore((state) => state.user?.id);
+  const authorId = item.creatorId || item.ownerUserId;
   const player = useVideoPlayer(item.videoSource, (instance) => {
     instance.loop = true;
   });
@@ -253,9 +249,7 @@ function VideoItem({
                 @{item.authorHandle || 'unknown'}
               </Text>
             </TouchableOpacity>
-            {item.creatorId && item.creatorId !== currentUserId ? (
-              <FollowButton targetUserId={item.creatorId} />
-            ) : null}
+            {authorId && authorId !== currentUserId ? <FollowButton targetUserId={authorId} /> : null}
           </View>
 
           {item.message ? (
