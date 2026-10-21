@@ -6,7 +6,7 @@ import {
   createRequestId,
   deleteContent,
   getContent,
-  getReplyAudienceContentContext,
+  getOwnedPostContext,
   listContents,
   searchPublishedContents,
   listFollowingOwnerContents,
@@ -251,8 +251,8 @@ const worker = {
       const isRead = request.method === 'GET' || (request.method === 'POST' && ['/internal/content/following-feed', '/internal/content/search'].includes(url.pathname))
       await enforceRateLimits(request, env, isRead ? 'read' : 'write')
 
-      const replyAudienceContextMatch = /^\/internal\/content\/contents\/([^/]+)\/reply-audience-context$/.exec(url.pathname)
-      if (replyAudienceContextMatch) {
+      const ownedPostContextMatch = /^\/internal\/content\/contents\/([^/]+)\/owned-post-context$/.exec(url.pathname)
+      if (ownedPostContextMatch) {
         if (request.method !== 'GET') {
           return new Response(null, { status: 405, headers: { Allow: 'GET' } })
         }
@@ -270,8 +270,8 @@ const worker = {
         if (!hasSocialPostPermission(principal.layer)) {
           throw new ContentRuntimeError('PERMISSION_DENIED', 403)
         }
-        const contentId = decodePathSegment(replyAudienceContextMatch[1] ?? '')
-        const context = await getReplyAudienceContentContext(env.D1_02, contentId, principal.userId)
+        const contentId = decodePathSegment(ownedPostContextMatch[1] ?? '')
+        const context = await getOwnedPostContext(env.D1_02, contentId, principal.userId)
         return json({ data: context, requestId: createRequestId() })
       }
 
