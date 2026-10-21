@@ -996,7 +996,7 @@ export default {
         if (cursor && cursor.length > 2048) throw new ProfileChannelRuntimeError('INVALID_CURSOR', 400)
         const viewerUserId = request.headers.get('X-LuckRead-Principal-User-Id')?.trim() || null
         const data = profileChannel.kind === 'replies'
-          ? await listProfileReplies(env.DB, profileChannel.userId, cursor, limit, viewerUserId)
+          ? await listProfileReplies(env.DB, env.W03_CONTENT, profileChannel.userId, cursor, limit, viewerUserId, request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? '')
           : await listProfileLikedContents(env.DB, profileChannel.userId, cursor, limit, viewerUserId)
         return json({ data, requestId: createRequestId() })
       }

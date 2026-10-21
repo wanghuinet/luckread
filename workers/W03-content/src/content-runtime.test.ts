@@ -216,6 +216,55 @@ describe('W03 content contract core', () => {
     expect((await w03Worker.fetch(request('W05', {}, 'missing_content'), env, {} as never)).status).toBe(404)
   })
 
+  it('serves a bounded batch of published social contexts only through the W05 internal transport', async () => {
+    const rows = [
+      { id: 'content_1', owner_user_id: 'owner_1', content_type: 'post', updated_at: '2026-10-17T04:00:00.000Z' },
+      { id: 'content_2', owner_user_id: 'owner_2', content_type: 'article', updated_at: '2026-10-18T04:00:00.000Z' },
+    ]
+    let query = ''
+    let bindings: unknown[] = []
+    const env = {
+      D1_02: {
+        prepare(sql: string) {
+          query = sql
+          return {
+            bind(...values: unknown[]) {
+              bindings = values
+              return { all: async () => ({ results: rows.filter(row => values.includes(row.id)) }) }
+            },
+          }
+        },
+      },
+    } as never
+    const request = (caller = 'W05', headers: Record<string, string> = {}) => new Request(
+      'https://luckread-w03.internal/internal/content/published-social-context-batch',
+      {
+        method: 'POST',
+        headers: {
+          'X-LuckRead-Caller': caller,
+          'X-LuckRead-Transport-Version': '1.0',
+          'X-LuckRead-Correlation-Id': 'context-batch-test',
+          'content-type': 'application/json',
+          ...headers,
+        },
+        body: JSON.stringify({ contentIds: ['content_1', 'content_2'] }),
+      },
+    )
+    const response = await w03Worker.fetch(request(), env, {} as never)
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({
+      data: { items: [
+        { contentId: 'content_1', ownerUserId: 'owner_1', contentType: 'post', state: 'PUBLISHED', updatedAt: '2026-10-17T04:00:00.000Z' },
+        { contentId: 'content_2', ownerUserId: 'owner_2', contentType: 'article', state: 'PUBLISHED', updatedAt: '2026-10-18T04:00:00.000Z' },
+      ] },
+    })
+    expect(query).toContain("state = 'PUBLISHED'")
+    expect(query).toContain('id IN (?, ?)')
+    expect(bindings).toEqual(['content_1', 'content_2'])
+    expect((await w03Worker.fetch(request('W01'), env, {} as never)).status).toBe(403)
+    expect((await w03Worker.fetch(request('W05', { Cookie: 'must-not-be-forwarded' }), env, {} as never)).status).toBe(403)
+  })
+
   it('loads a bounded list of published content IDs in bookmark order', async () => {
     const rows = [
       {

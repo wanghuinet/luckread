@@ -1,6 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 import { describe, expect, it, vi } from 'vitest'
-import { fetchOwnedPostContext, fetchPublishedContentSocialContext, fetchPublishedOwnerPostContext } from './w03-content-context-client.js'
+import { fetchOwnedPostContext, fetchPublishedContentSocialContext, fetchPublishedContentSocialContexts, fetchPublishedOwnerPostContext } from './w03-content-context-client.js'
 
 describe('W05 to W03 owned-post context binding', () => {
   it('forwards only the trusted principal and correlation metadata', async () => {
@@ -168,6 +168,37 @@ describe('W05 to W03 owned-post context binding', () => {
     expect(request.headers.has('X-LuckRead-Principal-User-Id')).toBe(false)
     expect(request.headers.has('Authorization')).toBe(false)
     expect(request.headers.has('Cookie')).toBe(false)
+  })
+
+  it('fetches a bounded batch of published social contexts without forwarding credentials', async () => {
+    const binding = {
+      fetch: vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const request = input instanceof Request ? input : new Request(input, init)
+        const body = await request.json() as { contentIds: string[] }
+        return Response.json({ data: { items: body.contentIds.map(contentId => ({
+          contentId,
+          ownerUserId: 'owner-1',
+          contentType: 'post',
+          state: 'PUBLISHED',
+          updatedAt: '2026-10-17T04:00:00.000Z',
+        })) } })
+      }),
+    }
+    const result = await fetchPublishedContentSocialContexts(binding, {
+      contentIds: ['content-1', 'content-2', 'content-1'],
+      correlationId: 'context-batch-test',
+    })
+    expect(result.size).toBe(2)
+    expect(result.get('content-1')).toMatchObject({
+      contentId: 'content-1', ownerUserId: 'owner-1', state: 'PUBLISHED',
+    })
+    const forwarded = binding.fetch.mock.calls[0]?.[0] as Request
+    expect(forwarded.method).toBe('POST')
+    expect(forwarded.url).toContain('/internal/content/published-social-context-batch')
+    expect(forwarded.headers.get('X-LuckRead-Caller')).toBe('W05')
+    expect(forwarded.headers.has('Authorization')).toBe(false)
+    expect(forwarded.headers.has('Cookie')).toBe(false)
+    await expect(forwarded.json()).resolves.toEqual({ contentIds: ['content-1', 'content-2'] })
   })
 
   it('fails closed for missing, non-published, or malformed social context', async () => {
