@@ -1168,19 +1168,72 @@ describe('W05 social comment transport', () => {
     expect(response.status).toBe(403)
   })
 
-  it('returns the public pinned-content reference without requiring a viewer', async () => {
+  it('returns public pinned-content references only after W03 confirms the post is published and owned by the profile', async () => {
+    const binding = {
+      fetch: vi.fn(async (input: RequestInfo | URL) => Response.json({
+        data: {
+          contentId: 'content-1',
+          ownerUserId: 'owner-1',
+          contentType: 'post',
+          state: 'PUBLISHED',
+          updatedAt: '2026-10-20T00:00:00.000Z',
+        },
+        requestId: 'req_public_pin',
+      })),
+    }
+    const d = dbFor([{ user_id: 'owner-1', content_id: 'content-1', pinned_at: '2026-10-16T00:00:00.000Z' }])
     const response = await worker.fetch(
       request('/internal/social/users/owner-1/pinned-content', {
         'X-LuckRead-Caller': 'W01',
         'X-LuckRead-Transport-Version': '1.0',
         'X-LuckRead-Correlation-Id': 'public-pin',
       }),
-      { DB: dbFor([{ user_id: 'owner-1', content_id: 'content-1', pinned_at: '2026-10-16T00:00:00.000Z' }]) },
+      { DB: d, W03_CONTENT: binding },
     )
     expect(response.status).toBe(200)
+    expect(binding.fetch).toHaveBeenCalledTimes(1)
+    const forwarded = binding.fetch.mock.calls[0]?.[0] as Request
+    expect(forwarded.url).toContain('/internal/content/contents/content-1/public-post-context/owner-1')
+    expect(forwarded.headers.get('X-LuckRead-Caller')).toBe('W05')
+    expect(forwarded.headers.has('X-LuckRead-Principal-User-Id')).toBe(false)
+    expect(forwarded.headers.has('Authorization')).toBe(false)
+    const prepare = (d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare
+    expect(prepare).toHaveBeenCalledTimes(1)
+    expect(String(prepare.mock.calls[0]?.[0])).toContain('FROM social_profile_pins')
+    expect(String(prepare.mock.calls[0]?.[0])).not.toContain('JOIN contents')
     await expect(response.json()).resolves.toMatchObject({
       data: { userId: 'owner-1', contentId: 'content-1' },
     })
+  })
+
+  it('hides a stale profile pin when W03 no longer exposes the post as published owner content', async () => {
+    const binding = {
+      fetch: vi.fn(async () => Response.json({ error: { code: 'NOT_FOUND' } }, { status: 404 })),
+    }
+    const response = await worker.fetch(
+      request('/internal/social/users/owner-1/pinned-content', {
+        'X-LuckRead-Caller': 'W01',
+        'X-LuckRead-Transport-Version': '1.0',
+        'X-LuckRead-Correlation-Id': 'stale-public-pin',
+      }),
+      { DB: dbFor([{ user_id: 'owner-1', content_id: 'content-1', pinned_at: '2026-10-16T00:00:00.000Z' }]), W03_CONTENT: binding },
+    )
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({ data: null })
+  })
+
+  it('fails closed on public profile pin reads when W03 is unavailable', async () => {
+    const d = dbFor([{ user_id: 'owner-1', content_id: 'content-1', pinned_at: '2026-10-16T00:00:00.000Z' }])
+    const response = await worker.fetch(
+      request('/internal/social/users/owner-1/pinned-content', {
+        'X-LuckRead-Caller': 'W01',
+        'X-LuckRead-Transport-Version': '1.0',
+        'X-LuckRead-Correlation-Id': 'public-pin-no-w03',
+      }),
+      { DB: d },
+    )
+    expect(response.status).toBe(503)
+    expect((d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).toHaveBeenCalledTimes(1)
   })
 
 })
