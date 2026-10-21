@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 const composer = readFileSync(new URL('../app/publish.tsx', import.meta.url), 'utf8');
 const feedItem = readFileSync(new URL('../components/FeedItem.tsx', import.meta.url), 'utf8');
 const home = readFileSync(new URL('../app/(drawer)/(tabs)/(index)/index.tsx', import.meta.url), 'utf8');
+const socialPoll = readFileSync(new URL('../components/SocialPoll.tsx', import.meta.url), 'utf8');
 
 test('native publisher uses the shared media API helpers and existing W01 state endpoint', () => {
   expect(composer).toContain('uploadMediaFile(file, asset.uploadKey)');
@@ -50,4 +51,31 @@ test('successful publishing requests a fresh page rather than mutating a sample 
   expect(home).toContain("useLocalSearchParams<{ published?: string; refresh?: string }>()");
   expect(home).toContain('refreshSignal={refreshSignal}');
   expect(home).toContain('[loadPage, refreshKey, refreshSignal]');
+});
+
+
+test('native post composer validates and configures a real poll on the same draft before publication', () => {
+  expect(composer).toContain("const [pollEnabled, setPollEnabled] = useState(false)");
+  expect(composer).toContain('MAX_POLL_OPTIONS = 4');
+  expect(composer).toContain('MAX_POLL_OPTION_LENGTH = 50');
+  expect(composer).toContain("pollKey: createIdempotencyKey()");
+  expect(composer).toContain("'/contents/' + encodeURIComponent(draft.id) + '/poll'");
+  expect(composer).toContain('options: cleanPollOptions');
+  expect(composer).toContain('durationHours: pollDurationHours');
+  expect(composer).toContain('idempotencyKey: attempt.pollKey');
+  expect(composer).toContain("setPublishPending(true)");
+  expect(composer.indexOf("'/contents/' + encodeURIComponent(draft.id) + '/poll'"))
+    .toBeLessThan(composer.indexOf("'/contents/' + encodeURIComponent(draft.id) + '/state'"));
+  expect(composer).toContain('Published poll options cannot be changed.');
+});
+
+test('native post detail reads poll state and submits votes through existing W01/W05 routes', () => {
+  expect(feedItem).toContain("import SocialPoll from './SocialPoll';");
+  expect(feedItem).toContain("itemData.contentType === 'post'");
+  expect(socialPoll).toContain("'/contents/' + encodeURIComponent(contentId) + '/poll'");
+  expect(socialPoll).toContain("'/contents/' + encodeURIComponent(contentId) + '/poll/votes'");
+  expect(socialPoll).toContain('idempotencyKey: createIdempotencyKey()');
+  expect(socialPoll).toContain('viewerOptionId');
+  expect(socialPoll).toContain('option.votes / poll.totalVotes');
+  expect(socialPoll).toContain('poll.closed');
 });

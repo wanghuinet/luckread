@@ -206,6 +206,7 @@ export function mapContentToFeedContent(
 
   return {
     contentId: item.id,
+    contentType: item.contentType,
     etag: item.etag,
     ownerUserId: item.ownerUserId,
     creatorId: item.creatorId,

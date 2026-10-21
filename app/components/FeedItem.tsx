@@ -29,6 +29,7 @@ import * as ContextMenu from 'zeego/context-menu';
 import * as DropdownMenu from 'zeego/dropdown-menu';
 import { apiRequest, getApiErrorMessage } from '~/lib/api-client';
 import { useAuthStore } from '~/store/auth-store';
+import SocialPoll from './SocialPoll';
 
 
 dayjs.extend(relativeTime);
@@ -59,6 +60,7 @@ export type FeedMediaAttachment = {
 
 export interface FeedContent {
     contentId?: string;
+    contentType?: 'article' | 'post' | 'video' | string;
     etag?: string;
     ownerUserId?: string;
     creatorId?: string | null;
@@ -450,6 +452,9 @@ export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailVie
 
                             <Text className="text-black dark:text-white mt-1 text-lg leading-6">{itemData.message}</Text>
                             <FeedMediaGallery items={mediaItems} />
+                            {detailView && itemData.contentType === 'post' && itemData.contentId ? (
+                                <SocialPoll contentId={itemData.contentId} />
+                            ) : null}
                             <EngagementActions itemData={itemData} detailView={false} />
                         </View>
                     </View>
