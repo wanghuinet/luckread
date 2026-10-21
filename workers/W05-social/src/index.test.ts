@@ -1481,6 +1481,63 @@ describe('W05 social comment transport', () => {
 })
 
 describe('W05 social poll transport', () => {
+  it('fails closed before W05 D1 when W03 owner context is unavailable for poll configure/delete', async () => {
+    const headers = {
+      ...transportHeaders,
+      'Idempotency-Key': 'poll-context-unavailable',
+      'content-type': 'application/json',
+    }
+    const configureDb = dbFor()
+    const configure = await worker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/contents/content-1/poll', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ options: ['Yes', 'No'], durationHours: 24 }),
+      }),
+      { DB: configureDb },
+    )
+    expect(configure.status).toBe(503)
+    expect((configureDb as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).not.toHaveBeenCalled()
+
+    const deleteDb = dbFor()
+    const deletion = await worker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/contents/content-1/poll', {
+        method: 'DELETE',
+        headers: { ...transportHeaders, 'Idempotency-Key': 'poll-delete-context-unavailable' },
+      }),
+      { DB: deleteDb },
+    )
+    expect(deletion.status).toBe(503)
+    expect((deleteDb as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).not.toHaveBeenCalled()
+  })
+
+  it('validates poll owner through W03 before touching W05 poll state', async () => {
+    const binding = {
+      fetch: vi.fn(async (input: RequestInfo | URL) => {
+        const request = input instanceof Request ? input : new Request(input)
+        expect(request.url).toContain('/internal/content/contents/content-1/owned-post-context')
+        expect(request.headers.get('X-LuckRead-Caller')).toBe('W05')
+        expect(request.headers.get('X-LuckRead-Principal-User-Id')).toBe('viewer-1')
+        expect(request.headers.get('X-LuckRead-Principal-Layer')).toBe('L2')
+        expect(request.headers.has('Authorization')).toBe(false)
+        expect(request.headers.has('Cookie')).toBe(false)
+        return Response.json({ error: { code: 'NOT_FOUND' } }, { status: 404 })
+      }),
+    }
+    const db = dbFor()
+    const response = await worker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/contents/content-1/poll', {
+        method: 'POST',
+        headers: { ...transportHeaders, 'Idempotency-Key': 'poll-non-owner', 'content-type': 'application/json' },
+        body: JSON.stringify({ options: ['Yes', 'No'], durationHours: 24 }),
+      }),
+      { DB: db, W03_CONTENT: binding },
+    )
+    expect(response.status).toBe(404)
+    expect(binding.fetch).toHaveBeenCalledTimes(1)
+    expect((db as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).not.toHaveBeenCalled()
+  })
+
   it('rejects unauthenticated poll writes before touching D1', async () => {
     const headers = {
       'X-LuckRead-Caller': 'W01',
