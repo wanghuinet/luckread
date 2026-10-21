@@ -1,9 +1,9 @@
 import { beforeEach, expect, mock, test } from 'bun:test';
 
-const calls: Array<{ path: string; options: Record<string, unknown> }> = [];
+const calls = [];
 
 mock.module('../lib/api-client.ts', () => ({
-  apiRequest: async (path: string, options: Record<string, unknown>) => {
+  apiRequest: async (path, options) => {
     calls.push({ path, options });
     return {
       response: { ok: true, status: 200 },
