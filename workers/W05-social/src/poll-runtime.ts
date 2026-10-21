@@ -1,5 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 import type { OwnedPostContext } from './owned-post-context.js'
+import type { PublishedContentSocialContext } from './w03-content-context-client.js'
 
 export class SocialPollError extends Error {
   constructor(readonly code: string, readonly status: number) { super(code) }
@@ -118,6 +119,31 @@ const rowFromOwnedPostContext = (
   }
 }
 
+type PollContentContext = OwnedPostContext | PublishedContentSocialContext
+
+const rowFromPollContentContext = (
+  contentId: string,
+  context: PollContentContext | undefined,
+): ContentRow | null => {
+  if (
+    !context ||
+    context.contentId !== contentId ||
+    context.contentType !== 'post' ||
+    !['DRAFT', 'PUBLISHED', 'UNPUBLISHED'].includes(context.state) ||
+    typeof context.updatedAt !== 'string' ||
+    !context.updatedAt.trim()
+  ) {
+    return null
+  }
+  return {
+    id: context.contentId,
+    content_type: context.contentType,
+    state: context.state,
+    owner_user_id: context.ownerUserId,
+    updated_at: context.updatedAt,
+  }
+}
+
 const readPollRow = (db: D1Database, contentId: string) => db.prepare(
   `SELECT poll_id, content_id, owner_user_id, duration_hours, ends_at, created_at, updated_at
      FROM social_polls
@@ -137,15 +163,11 @@ export async function getContentPoll(
   db: D1Database,
   contentIdValue: string,
   viewerUserIdValue: string | null,
-  contentContext?: OwnedPostContext,
+  contentContext: PollContentContext,
 ): Promise<PollView | null> {
   const contentId = validateId(contentIdValue)
   const viewerUserId = viewerUserIdValue ? validateId(viewerUserIdValue, 'UNAUTHENTICATED') : null
-  const content = contentContext
-    ? rowFromOwnedPostContext(contentId, contentContext)
-    : await db.prepare(
-        'SELECT id, content_type, state, owner_user_id, updated_at FROM contents WHERE id = ? LIMIT 1',
-      ).bind(contentId).first<ContentRow>()
+  const content = rowFromPollContentContext(contentId, contentContext)
 
   if (!content || content.content_type !== 'post') throw new SocialPollError('NOT_FOUND', 404)
   const isOwner = Boolean(viewerUserId && content.owner_user_id === viewerUserId)
@@ -335,13 +357,12 @@ export async function castContentPollVote(
   actorUserIdValue: string,
   contentIdValue: string,
   optionIdValue: string,
+  contentContext: PublishedContentSocialContext,
 ): Promise<PollView> {
   const actorUserId = validateId(actorUserIdValue, 'UNAUTHENTICATED')
   const contentId = validateId(contentIdValue)
   const optionId = validateId(optionIdValue)
-  const content = await db.prepare(
-    'SELECT id, content_type, state, owner_user_id, updated_at FROM contents WHERE id = ? LIMIT 1',
-  ).bind(contentId).first<ContentRow>()
+  const content = rowFromPollContentContext(contentId, contentContext)
   if (!content || content.content_type !== 'post' || content.state !== 'PUBLISHED') {
     throw new SocialPollError('NOT_FOUND', 404)
   }
@@ -350,7 +371,7 @@ export async function castContentPollVote(
   }
   const poll = await readPollRow(db, contentId)
   if (!poll) throw new SocialPollError('NOT_FOUND', 404)
-  const currentPoll = await getContentPoll(db, contentId, actorUserId)
+  const currentPoll = await getContentPoll(db, contentId, actorUserId, contentContext)
   if (!currentPoll) throw new SocialPollError('NOT_FOUND', 404)
   if (!currentPoll.options.some(option => option.optionId === optionId)) {
     throw new SocialPollError('VALIDATION_FAILED', 400)
@@ -394,7 +415,7 @@ export async function castContentPollVote(
   ).bind(poll.poll_id, actorUserId).first<{ option_id: string }>()
   if (!savedVote) throw new SocialPollError('POLL_CLOSED', 409)
   if (savedVote.option_id !== optionId) throw new SocialPollError('ALREADY_VOTED', 409)
-  const refreshed = await getContentPoll(db, contentId, actorUserId)
+  const refreshed = await getContentPoll(db, contentId, actorUserId, contentContext)
   if (!refreshed) throw new SocialPollError('NOT_FOUND', 404)
   return refreshed
 }

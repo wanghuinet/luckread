@@ -621,7 +621,11 @@ export default {
         if (!body || typeof body !== 'object' || Array.isArray(body) || typeof (body as { optionId?: unknown }).optionId !== 'string') {
           throw new SocialPollError('VALIDATION_FAILED', 400)
         }
-        const poll = await castContentPollVote(env.DB, actorUserId, contentId, (body as { optionId: string }).optionId)
+        const contentContext = await fetchPublishedContentSocialContext(env.W03_CONTENT, {
+          contentId,
+          correlationId: request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? '',
+        })
+        const poll = await castContentPollVote(env.DB, actorUserId, contentId, (body as { optionId: string }).optionId, contentContext)
         return json({ data: { poll }, requestId: createRequestId() }, 200)
       }
 
@@ -632,7 +636,22 @@ export default {
         if (request.method === 'GET') {
           requireTransport(request)
           const viewerUserId = request.headers.get('X-LuckRead-Principal-User-Id')?.trim() || null
-          const poll = await getContentPoll(env.DB, contentId, viewerUserId)
+          let contentContext: Awaited<ReturnType<typeof fetchPublishedContentSocialContext>> | Awaited<ReturnType<typeof fetchOwnedPostContext>>
+          try {
+            contentContext = await fetchPublishedContentSocialContext(env.W03_CONTENT, {
+              contentId,
+              correlationId: request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? '',
+            })
+          } catch (error) {
+            if (!(error instanceof ReplyAudienceRuntimeError) || error.status !== 404 || !viewerUserId) throw error
+            contentContext = await fetchOwnedPostContext(env.W03_CONTENT, {
+              principalUserId: viewerUserId,
+              principalLayer: request.headers.get('X-LuckRead-Principal-Layer')?.trim() ?? '',
+              contentId,
+              correlationId: request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? '',
+            })
+          }
+          const poll = await getContentPoll(env.DB, contentId, viewerUserId, contentContext)
           return json({ data: { poll }, requestId: createRequestId() })
         }
         if (request.method === 'POST') {

@@ -35,7 +35,7 @@ const publishedContextBinding = () => ({
     const parts = new URL(request.url).pathname.split('/').filter(Boolean)
     const contentId = decodeURIComponent(parts.at(-2) ?? '')
     return Response.json({
-      data: { contentId, ownerUserId: 'owner-1', contentType: 'post', state: 'PUBLISHED' },
+      data: { contentId, ownerUserId: 'owner-1', contentType: 'post', state: 'PUBLISHED', updatedAt: '2026-10-17T04:00:00.000Z' },
     })
   }),
 })
@@ -104,6 +104,7 @@ describe('W05 social query transport', () => {
           ownerUserId: 'viewer-1',
           contentType: 'post',
           state: 'PUBLISHED',
+          updatedAt: '2026-10-17T04:00:00.000Z',
         },
       })),
     }
@@ -700,6 +701,7 @@ describe('W05 social query transport', () => {
           ownerUserId: 'owner-1',
           contentType: 'post',
           state: 'PUBLISHED',
+          updatedAt: '2026-10-17T04:00:00.000Z',
         },
         requestId: 'req_notification_owner',
       })),
@@ -1196,6 +1198,7 @@ describe('W05 social comment transport', () => {
           ownerUserId: 'owner-1',
           contentType: 'post',
           state: 'PUBLISHED',
+          updatedAt: '2026-10-17T04:00:00.000Z',
         },
         requestId: 'req_comment_owner',
       })),
@@ -1481,6 +1484,62 @@ describe('W05 social comment transport', () => {
 })
 
 describe('W05 social poll transport', () => {
+  it('reads poll results through W03 published context without querying canonical contents', async () => {
+    const binding = publishedContextBinding()
+    const db = dbFor()
+    const response = await worker.fetch(
+      request('/internal/social/contents/content-1/poll', transportHeaders),
+      { DB: db, W03_CONTENT: binding },
+    )
+    expect(response.status).toBe(200)
+    expect(binding.fetch).toHaveBeenCalledTimes(1)
+    const prepare = (db as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare
+    expect(prepare.mock.calls.some(([sql]) => /(?:FROM|JOIN)\\s+contents/i.test(String(sql)))).toBe(false)
+    await expect(response.json()).resolves.toMatchObject({ data: { poll: null } })
+  })
+
+  it('preserves draft poll preview through the owner-scoped W03 context', async () => {
+    const binding = {
+      fetch: vi.fn(async (input: RequestInfo | URL) => {
+        const forwarded = input instanceof Request ? input : new Request(input)
+        if (new URL(forwarded.url).pathname.endsWith('/published-social-context')) {
+          return Response.json({ error: { code: 'NOT_FOUND' } }, { status: 404 })
+        }
+        return Response.json({ data: {
+          contentId: 'content-1',
+          ownerUserId: 'viewer-1',
+          contentType: 'post',
+          state: 'DRAFT',
+          updatedAt: '2026-10-17T04:00:00.000Z',
+        } })
+      }),
+    }
+    const db = dbFor()
+    const response = await worker.fetch(
+      request('/internal/social/contents/content-1/poll', transportHeaders),
+      { DB: db, W03_CONTENT: binding },
+    )
+    expect(response.status).toBe(200)
+    expect(binding.fetch).toHaveBeenCalledTimes(2)
+    const prepare = (db as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare
+    expect(prepare.mock.calls.some(([sql]) => /(?:FROM|JOIN)\\s+contents/i.test(String(sql)))).toBe(false)
+    await expect(response.json()).resolves.toMatchObject({ data: { poll: null } })
+  })
+
+  it('fails closed before D1 when W03 published context is unavailable for a vote', async () => {
+    const db = dbFor()
+    const response = await worker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/contents/content-1/poll/votes', {
+        method: 'POST',
+        headers: { ...transportHeaders, 'Idempotency-Key': 'poll-vote-no-w03', 'content-type': 'application/json' },
+        body: JSON.stringify({ optionId: 'option-1' }),
+      }),
+      { DB: db },
+    )
+    expect(response.status).toBe(503)
+    expect((db as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).not.toHaveBeenCalled()
+  })
+
   it('fails closed before W05 D1 when W03 owner context is unavailable for poll configure/delete', async () => {
     const headers = {
       ...transportHeaders,

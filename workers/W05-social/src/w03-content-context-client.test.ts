@@ -144,6 +144,7 @@ describe('W05 to W03 owned-post context binding', () => {
             ownerUserId: 'owner-1',
             contentType: 'article',
             state: 'PUBLISHED',
+            updatedAt: '2026-10-17T04:00:00.000Z',
           },
           requestId: 'req_social_context',
         })
@@ -157,6 +158,7 @@ describe('W05 to W03 owned-post context binding', () => {
       ownerUserId: 'owner-1',
       contentType: 'article',
       state: 'PUBLISHED',
+      updatedAt: '2026-10-17T04:00:00.000Z',
     })
     const request = forwarded as unknown as Request
     expect(request.url).toContain('/internal/content/contents/content-1/published-social-context')
@@ -175,10 +177,11 @@ describe('W05 to W03 owned-post context binding', () => {
       fetch: async () => Response.json({ error: { code: 'NOT_FOUND' } }, { status: 404 }),
     }, input)).rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 })
     for (const data of [
-      { contentId: 'other-content', ownerUserId: 'owner-1', contentType: 'post', state: 'PUBLISHED' },
-      { contentId: 'content-1', ownerUserId: 'owner-1', contentType: 'comment', state: 'PUBLISHED' },
-      { contentId: 'content-1', ownerUserId: 'owner-1', contentType: 'post', state: 'DRAFT' },
-      { contentId: 'content-1', ownerUserId: 'bad/id', contentType: 'post', state: 'PUBLISHED' },
+      { contentId: 'other-content', ownerUserId: 'owner-1', contentType: 'post', state: 'PUBLISHED', updatedAt: '2026-10-17T04:00:00.000Z' },
+      { contentId: 'content-1', ownerUserId: 'owner-1', contentType: 'comment', state: 'PUBLISHED', updatedAt: '2026-10-17T04:00:00.000Z' },
+      { contentId: 'content-1', ownerUserId: 'owner-1', contentType: 'post', state: 'DRAFT', updatedAt: '2026-10-17T04:00:00.000Z' },
+      { contentId: 'content-1', ownerUserId: 'bad/id', contentType: 'post', state: 'PUBLISHED', updatedAt: '2026-10-17T04:00:00.000Z' },
+      { contentId: 'content-1', ownerUserId: 'owner-1', contentType: 'post', state: 'PUBLISHED', updatedAt: '' },
     ]) {
       await expect(fetchPublishedContentSocialContext({
         fetch: async () => Response.json({ data }),

@@ -551,11 +551,12 @@ export type PublishedContentSocialContext = {
   ownerUserId: string | null
   contentType: ContentType
   state: 'PUBLISHED'
+  updatedAt: string
 }
 
 /**
- * Minimal published-content context for W05 notification recipient resolution.
- * Only expose canonical owner/type for a currently published item.
+ * Minimal published-content context for W05 social reads and preflight checks.
+ * Includes updatedAt so poll expiry fallback preserves the canonical timestamp.
  */
 export async function getPublishedContentSocialContext(
   db: ContentD1,
@@ -566,7 +567,7 @@ export async function getPublishedContentSocialContext(
     throw new ContentRuntimeError('VALIDATION_FAILED', 400)
   }
   const row = await db.prepare(
-    `SELECT id, owner_user_id, content_type
+    `SELECT id, owner_user_id, content_type, updated_at
        FROM contents
       WHERE id = ? AND state = 'PUBLISHED'
       LIMIT 1`,
@@ -574,6 +575,7 @@ export async function getPublishedContentSocialContext(
     id: string
     owner_user_id: string | null
     content_type: string
+    updated_at: string
   }>()
   if (!row) throw new ContentRuntimeError('NOT_FOUND', 404)
   if (!['article', 'post', 'video'].includes(row.content_type)) {
@@ -584,6 +586,7 @@ export async function getPublishedContentSocialContext(
     ownerUserId: row.owner_user_id,
     contentType: row.content_type as ContentType,
     state: 'PUBLISHED',
+    updatedAt: row.updated_at,
   }
 }
 

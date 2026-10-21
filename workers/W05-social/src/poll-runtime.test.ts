@@ -1,11 +1,23 @@
 /// <reference types="@cloudflare/workers-types" />
 import { describe, expect, it, vi } from 'vitest'
 import { castContentPollVote, configureContentPoll, deleteContentPoll, getContentPoll } from './poll-runtime.js'
+import type { PublishedContentSocialContext } from './w03-content-context-client.js'
 
 const noDatabase = () => ({
   prepare: vi.fn(() => { throw new Error('unexpected database access') }),
   batch: vi.fn(async () => []),
 }) as unknown as D1Database
+
+const publishedPollContext = (
+  ownerUserId: string | null = 'author-1',
+  updatedAt = '2026-10-17T04:00:00.000Z',
+): PublishedContentSocialContext => ({
+  contentId: 'content-1',
+  ownerUserId,
+  contentType: 'post',
+  state: 'PUBLISHED',
+  updatedAt,
+})
 
 type PollDbScenario = {
   content?: { id: string; content_type: string; state: string; owner_user_id: string; updated_at: string }
@@ -88,7 +100,7 @@ describe('W05 poll runtime', () => {
       ],
       viewerOptionId: 'option-2',
     })
-    await expect(getContentPoll(db, 'content-1', 'viewer-1')).resolves.toMatchObject({
+    await expect(getContentPoll(db, 'content-1', 'viewer-1', publishedPollContext())).resolves.toMatchObject({
       pollId: 'poll-1',
       contentId: 'content-1',
       totalVotes: 6,
@@ -117,7 +129,7 @@ describe('W05 poll runtime', () => {
         { option_id: 'option-2', option_text: 'No', position: 1, votes: 0 },
       ],
     })
-    await expect(getContentPoll(db, 'content-1', null)).resolves.toMatchObject({
+    await expect(getContentPoll(db, 'content-1', null, publishedPollContext('author-1', '2026-10-17T04:00:00.000Z'))).resolves.toMatchObject({
       endsAt: '2026-10-18T04:00:00.000Z',
       totalVotes: 0,
     })
@@ -224,6 +236,33 @@ describe('W05 poll runtime', () => {
     expect(queries.some(sql => /(?:FROM|JOIN)\s+contents/i.test(sql))).toBe(false)
   })
 
+  it('uses W03 preflight context and retains the atomic canonical publication guard for vote writes', async () => {
+    const { db, prepare } = pollDb({
+      content: {
+        id: 'content-1', content_type: 'post', state: 'PUBLISHED',
+        owner_user_id: 'author-1', updated_at: '2099-10-17T04:00:00.000Z',
+      },
+      poll: {
+        poll_id: 'poll-1', content_id: 'content-1', owner_user_id: 'author-1',
+        duration_hours: 24, ends_at: '2099-10-18T04:00:00.000Z',
+        created_at: '2099-10-17T04:00:00.000Z', updated_at: '2099-10-17T04:00:00.000Z',
+      },
+      options: [
+        { option_id: 'option-1', option_text: 'Yes', position: 0, votes: 0 },
+        { option_id: 'option-2', option_text: 'No', position: 1, votes: 0 },
+      ],
+    })
+    await expect(castContentPollVote(
+      db, 'viewer-1', 'content-1', 'option-1', publishedPollContext('author-1', '2099-10-17T04:00:00.000Z'),
+    )).resolves.toMatchObject({ pollId: 'poll-1', viewerOptionId: 'option-1' })
+
+    const voteInsert = prepare.mock.calls.map(([sql]) => String(sql)).find(sql => sql.includes('INSERT OR IGNORE INTO social_poll_votes'))
+    expect(voteInsert).toContain('JOIN contents c ON c.id = p.content_id')
+    expect(voteInsert).toContain("c.state = 'PUBLISHED'")
+    expect(voteInsert).toContain("c.content_type = 'post'")
+    expect(voteInsert).toContain("b.relation_type = 'block'")
+  })
+
   it('prevents voting on a closed poll', async () => {
     const { db } = pollDb({
       content: {
@@ -240,7 +279,12 @@ describe('W05 poll runtime', () => {
         { option_id: 'option-2', option_text: 'No', position: 1, votes: 0 },
       ],
     })
-    await expect(castContentPollVote(db, 'viewer-1', 'content-1', 'option-1'))
-      .rejects.toMatchObject({ code: 'POLL_CLOSED', status: 409 })
+    await expect(castContentPollVote(
+      db,
+      'viewer-1',
+      'content-1',
+      'option-1',
+      publishedPollContext('author-1', '2026-10-15T04:00:00.000Z'),
+    )).rejects.toMatchObject({ code: 'POLL_CLOSED', status: 409 })
   })
 })
