@@ -1,4 +1,4 @@
-import React, { useReducer, Reducer } from 'react';
+import React, { useReducer, Reducer, useState } from 'react';
 import {
     Text,
     TouchableOpacity,
@@ -31,6 +31,7 @@ import { apiRequest, getApiErrorMessage } from '~/lib/api-client';
 import { useAuthStore } from '~/store/auth-store';
 import { blockUser, muteUser } from '~/lib/social-screen-api';
 import { setProfilePin, useProfilePinSnapshot } from '~/lib/profile-pin-state';
+import ReportPostDialog from './ReportPostDialog';
 import SocialPoll from './SocialPoll';
 
 
@@ -240,6 +241,7 @@ export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailVie
     const router = useRouter();
     const sessionStatus = useAuthStore((state) => state.status);
     const currentUser = useAuthStore((state) => state.user);
+    const [reportDialogOpen, setReportDialogOpen] = useState(false);
     const isOwnPost = sessionStatus === 'authenticated' && Boolean(itemData.contentId && currentUser?.id && (itemData.ownerUserId === currentUser.id || itemData.creatorId === currentUser.id));
     const profilePinSnapshot = useProfilePinSnapshot(isOwnPost ? currentUser?.id : null);
     const hasAuthoritativePinState = profilePinSnapshot.userId === currentUser?.id && profilePinSnapshot.loaded;
@@ -507,7 +509,7 @@ export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailVie
                                                     ios={{ name: 'chart.bar.xaxis' }}
                                                 />
                                             </DropdownMenu.Item>
-                                            <DropdownMenu.Item key="report">
+                                            <DropdownMenu.Item key="report" onSelect={() => setReportDialogOpen(true)} disabled={!itemData.contentId}>
                                                 <DropdownMenu.ItemTitle>Report post</DropdownMenu.ItemTitle>
                                                 <DropdownMenu.ItemIcon
                                                     ios={{ name: 'flag' }}
@@ -591,6 +593,11 @@ export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailVie
                     </>
                 ) : null}
             </ContextMenu.Content>
+            <ReportPostDialog
+                visible={reportDialogOpen}
+                contentId={itemData.contentId}
+                onClose={() => setReportDialogOpen(false)}
+            />
         </ContextMenu.Root>
     );
 };

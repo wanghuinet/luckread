@@ -88,6 +88,8 @@ jobs:
         run: bun run test:content-search
       - name: Test native profile pin and unpin actions
         run: bun test tests/profile-pin.test.mjs
+      - name: Test native post reporting
+        run: bun test tests/report-api.test.mjs
       - name: Test native registration, verification and recovery API contracts
         run: bun run test:auth-flow
       - name: Enforce shared API client boundary

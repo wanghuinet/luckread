@@ -11,6 +11,7 @@ import { mapContentToFeedContent, readContentBody, unwrapApiData, type ApiConten
 import { readSessionToken } from '~/lib/secure-session';
 import { blockUser, muteUser } from '~/lib/social-screen-api';
 import { useAuthStore } from '~/store/auth-store';
+import ReportPostDialog from '~/components/ReportPostDialog';
 
 import {
     BottomSheetModal,
@@ -32,12 +33,15 @@ export const MoreContextIcons = ({
     size = "lg",
     username = "unknown_user",
     targetUserId,
+    contentId,
 }: {
     size?: 'sm' | 'lg';
     username?: string;
     targetUserId?: string | null;
+    contentId?: string;
 }) => {
     const router = useRouter();
+    const [reportDialogOpen, setReportDialogOpen] = useState(false);
     const currentUserId = useAuthStore((state) => state.user?.id);
     const isOwnTarget = Boolean(targetUserId && currentUserId && targetUserId === currentUserId);
 
@@ -100,7 +104,7 @@ export const MoreContextIcons = ({
                             ios={{ name: 'chart.bar.xaxis' }}
                         />
                     </DropdownMenu.Item>
-                    <DropdownMenu.Item key="report">
+                    <DropdownMenu.Item key="report" onSelect={() => setReportDialogOpen(true)} disabled={!contentId}>
                         <DropdownMenu.ItemTitle>Report post</DropdownMenu.ItemTitle>
                         <DropdownMenu.ItemIcon
                             ios={{ name: 'flag' }}
@@ -141,11 +145,16 @@ export const MoreContextIcons = ({
                     </DropdownMenu.Sub>
                 </DropdownMenu.Content>
             </DropdownMenu.Root>
+            <ReportPostDialog
+                visible={reportDialogOpen}
+                contentId={contentId}
+                onClose={() => setReportDialogOpen(false)}
+            />
         </View>
     );
 };
 
-const PostHeader = ({ username, targetUserId }: { username?: string; targetUserId?: string | null }) => {
+const PostHeader = ({ username, targetUserId, contentId }: { username?: string; targetUserId?: string | null; contentId: string }) => {
     const insets = useSafeAreaInsets();
     const router = useRouter();
     return (
@@ -158,7 +167,7 @@ const PostHeader = ({ username, targetUserId }: { username?: string; targetUserI
             <Text className="text-xl font-bold text-black dark:text-white">Post</Text>
 
             <View className="absolute right-4">
-                <MoreContextIcons username={username} targetUserId={targetUserId} />
+                <MoreContextIcons username={username} targetUserId={targetUserId} contentId={contentId} />
             </View>
         </View>
     );
@@ -327,7 +336,7 @@ export default function PostDetailScreen() {
                 style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
                 contentContainerStyle={{ flexGrow: 1 }}
             >
-                <PostHeader username={authorHandle} targetUserId={findPost.creatorId || findPost.ownerUserId} />
+                <PostHeader username={authorHandle} targetUserId={findPost.creatorId || findPost.ownerUserId} contentId={postId} />
                 <FeedItem itemData={findPost} detailView onCommentPress={handleScrollToComments} />
                 <View
                     className="px-4 mt-2"
