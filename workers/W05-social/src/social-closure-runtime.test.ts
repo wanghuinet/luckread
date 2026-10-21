@@ -42,6 +42,7 @@ describe('W05 unified social closure', () => {
       ownerUserId: 'owner-1',
       contentType: 'post',
       state: 'PUBLISHED',
+      updatedAt: '2026-10-17T04:00:00.000Z',
     } as const
 
     await expect(getContentSocialSummary(db, 'content-1', contentContext, 'viewer-1')).resolves.toMatchObject({
@@ -67,6 +68,7 @@ describe('W05 unified social closure', () => {
       ownerUserId: 'owner-1',
       contentType: 'post',
       state: 'PUBLISHED',
+      updatedAt: '2026-10-17T04:00:00.000Z',
     })).rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 })
     await expect(getContentSocialSummary(db, 'content-1', {
       contentId: 'content-1',
@@ -92,6 +94,7 @@ describe('W05 unified social closure', () => {
       ownerUserId: 'owner-1',
       contentType: 'post',
       state: 'PUBLISHED',
+      updatedAt: '2026-10-17T04:00:00.000Z',
     } as const
 
     await expect(syncSocialTokens(db, 'owner-1', 'content', 'content-1', 'plain text', [], contentContext))
@@ -111,6 +114,7 @@ describe('W05 unified social closure', () => {
       ownerUserId: 'someone-else',
       contentType: 'post',
       state: 'PUBLISHED',
+      updatedAt: '2026-10-17T04:00:00.000Z',
     })).rejects.toMatchObject({ code: 'PERMISSION_DENIED', status: 403 })
     expect(prepare).not.toHaveBeenCalled()
   })
