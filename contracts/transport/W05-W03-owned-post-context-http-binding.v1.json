@@ -1,0 +1,144 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/transport/W05-W03-owned-post-context-http-binding.v1.json",
+  "title": "W05 to W03 Owner-Scoped Post Context Binding",
+  "version": "1.0.0",
+  "status": "CONTRACTED_PARTIAL",
+  "featureId": "SOCIAL-015",
+  "implementationAuthorization": true,
+  "caller": {
+    "logicalWorker": "W05",
+    "role": "Social / Community",
+    "authority": "Reply-audience policy, profile-pin state and social relationship state"
+  },
+  "callee": {
+    "logicalWorker": "W03",
+    "role": "Content / Article / Media",
+    "authority": "Canonical content ownership, type and lifecycle in D1-02"
+  },
+  "transport": {
+    "kind": "Cloudflare Worker Service Binding HTTP",
+    "binding": "W03_CONTENT",
+    "targetWorker": "luckread-w03",
+    "publicExposure": false,
+    "workerCountDelta": 0,
+    "databaseCountDelta": 0,
+    "queueCountDelta": 0
+  },
+  "headers": {
+    "requiredOnEveryCall": {
+      "X-LuckRead-Caller": "W05",
+      "X-LuckRead-Transport-Version": "1.0",
+      "X-LuckRead-Correlation-Id": "required"
+    },
+    "principal": {
+      "X-LuckRead-Principal-User-Id": "required",
+      "X-LuckRead-Principal-Layer": "required",
+      "source": "W01 authenticated server principal; never from public request body"
+    },
+    "forbidden": [
+      "Authorization",
+      "Cookie",
+      "client-provided ownerUserId"
+    ]
+  },
+  "failurePolicy": {
+    "timeoutMs": 2000,
+    "automaticRetries": 0,
+    "failClosed": [
+      "missing W03_CONTENT binding",
+      "invalid caller metadata",
+      "non-owner content",
+      "non-post content",
+      "invalid response envelope"
+    ]
+  },
+  "scope": {
+    "inScope": [
+      "Owner-only reply-audience GET uses W03 for canonical post context and W05 for reply policy state.",
+      "Reply-audience PUT obtains owner/type/lifecycle context from W03 before W05 writes only the W05-owned reply policy table.",
+      "Profile-pin POST obtains owner/type/lifecycle context from W03 before W05 writes only social_profile_pins."
+    ],
+    "outOfScope": [
+      "Comment insertion's atomic content-state/policy recheck remains unchanged.",
+      "Profile-pin GET paths still join contents to filter published owner content; a viewer-safe W03 read-context path is a separate scope.",
+      "Other W05 reads from the contents table are not claimed as fixed."
+    ]
+  },
+  "evidenceRequired": [
+    "W03 positive owner-context test",
+    "W03 wrong-caller denial test",
+    "W05 binding header/no-credential-forwarding test",
+    "W05 policy-only query and mutation tests",
+    "profile-pin mutation consumes W03-owned post context and writes only social_profile_pins",
+    "missing W03 binding fails closed before reply-policy or profile-pin write",
+    "W03_CONTENT deployment/binding evidence",
+    "runtime cross-Worker E2E evidence"
+  ],
+  "operations": [
+    {
+      "operationId": "getOwnedPostContext",
+      "method": "GET",
+      "internalPath": "/internal/content/contents/{contentId}/owned-post-context",
+      "principalRequired": true,
+      "principalSource": "W01 verified principal forwarded by W05",
+      "ownerScoped": true,
+      "allowedContentType": "post",
+      "allowedContentStates": [
+        "DRAFT",
+        "PUBLISHED",
+        "UNPUBLISHED"
+      ],
+      "cache": "NO_STORE",
+      "resourceBudget": {
+        "w03D1ReadMax": 1,
+        "w05D1WriteMax": 0,
+        "w05ServiceBindingCallsMax": 1
+      }
+    },
+    {
+      "operationId": "setContentReplyAudience",
+      "method": "PUT",
+      "callerPath": "/internal/social/contents/{contentId}/reply-audience",
+      "validationOperation": "getOwnedPostContext",
+      "principalRequired": true,
+      "idempotencyHeaderRequired": true,
+      "principalSource": "W01 verified principal forwarded by W05",
+      "ownerScoped": true,
+      "allowedContentType": "post",
+      "allowedContentStates": [
+        "DRAFT",
+        "PUBLISHED",
+        "UNPUBLISHED"
+      ],
+      "writeAuthority": "W05 social_content_reply_policies only",
+      "resourceBudget": {
+        "w03D1ReadMax": 1,
+        "w05D1ReadMax": 0,
+        "w05D1WriteMax": 1,
+        "w05ServiceBindingCallsMax": 1
+      }
+    },
+    {
+      "operationId": "pinProfileContent",
+      "method": "POST",
+      "callerPath": "/internal/social/content/{contentId}/pin",
+      "validationOperation": "getOwnedPostContext",
+      "principalRequired": true,
+      "idempotencyHeaderRequired": true,
+      "principalSource": "W01 verified principal forwarded by W05",
+      "ownerScoped": true,
+      "allowedContentType": "post",
+      "allowedContentStates": [
+        "PUBLISHED"
+      ],
+      "writeAuthority": "W05 social_profile_pins only",
+      "resourceBudget": {
+        "w03D1ReadMax": 1,
+        "w05D1ReadMax": 1,
+        "w05D1WriteMax": 1,
+        "w05ServiceBindingCallsMax": 1
+      }
+    }
+  ]
+}
