@@ -468,10 +468,15 @@ export async function enqueueNotification(
     JSON.stringify(input.payload ?? {}),
     now,
     ).run()
-  } catch {
+  } catch (error) {
     // Notifications are a non-authoritative social side effect.
-    // A missing/temporarily unavailable notification store must not fail
-    // the authoritative follow/like/comment mutation.
+    // Preserve the authoritative follow/like/comment result, but make failed
+    // delivery observable without logging user IDs, target IDs or DB details.
+    console.warn('W05_SOCIAL_NOTIFICATION_WRITE_FAILED', {
+      type: input.type,
+      targetType: input.targetType,
+      errorName: error instanceof Error ? error.name : 'UnknownError',
+    })
   }
 }
 
