@@ -1,12 +1,13 @@
 /// <reference types="@cloudflare/workers-types" />
 
-import { ReplyAudienceRuntimeError, type ReplyAudienceContentContext } from './reply-audience-runtime.js'
+import { ReplyAudienceRuntimeError } from './reply-audience-runtime.js'
+import type { OwnedPostContext } from './owned-post-context.js'
 
 export type W03ContentBinding = {
   fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response>
 }
 
-type ReplyAudienceContextInput = {
+type OwnedPostContextInput = {
   principalUserId: string
   principalLayer: string
   contentId: string
@@ -16,10 +17,14 @@ type ReplyAudienceContextInput = {
 const validId = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/
 const serviceUnavailable = () => new ReplyAudienceRuntimeError('SERVICE_UNAVAILABLE', 503)
 
-export async function fetchReplyAudienceContentContext(
+/**
+ * Fetch the authenticated owner's canonical post context from W03. The result
+ * can be used by W05 social mutations without querying W03-owned contents.
+ */
+export async function fetchOwnedPostContext(
   binding: W03ContentBinding | undefined,
-  input: ReplyAudienceContextInput,
-): Promise<ReplyAudienceContentContext> {
+  input: OwnedPostContextInput,
+): Promise<OwnedPostContext> {
   if (!binding) throw serviceUnavailable()
   if (
     !validId.test(input.principalUserId) ||
@@ -33,7 +38,7 @@ export async function fetchReplyAudienceContentContext(
   let response: Response
   try {
     response = await binding.fetch(new Request(
-      `https://luckread-w03.internal/internal/content/contents/${encodeURIComponent(input.contentId)}/reply-audience-context`,
+      `https://luckread-w03.internal/internal/content/contents/${encodeURIComponent(input.contentId)}/owned-post-context`,
       {
         method: 'GET',
         headers: {
@@ -68,7 +73,7 @@ export async function fetchReplyAudienceContentContext(
     : null
   if (!data || typeof data !== 'object' || Array.isArray(data)) throw serviceUnavailable()
 
-  const context = data as Partial<ReplyAudienceContentContext>
+  const context = data as Partial<OwnedPostContext>
   if (
     context.contentId !== input.contentId ||
     context.ownerUserId !== input.principalUserId ||
@@ -84,7 +89,7 @@ export async function fetchReplyAudienceContentContext(
     contentId: context.contentId,
     ownerUserId: context.ownerUserId,
     contentType: 'post',
-    state: context.state as ReplyAudienceContentContext['state'],
+    state: context.state as OwnedPostContext['state'],
     updatedAt: context.updatedAt,
   }
 }
