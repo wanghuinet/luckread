@@ -321,7 +321,7 @@ export default {
         requireTransport(request)
         const shareId = decodePathPart(parts[3])
         if (shareId === null) throw new ShareRuntimeError('VALIDATION_FAILED', 400)
-        return json({ data: await resolveShare(env.DB, shareId), requestId: createRequestId() })
+        return json({ data: await resolveShare(env.DB, env.W03_CONTENT, shareId, request.headers.get('X-LuckRead-Correlation-Id') ?? ''), requestId: createRequestId() })
       }
 
       if (url.pathname.startsWith('/internal/social/content/')) {
@@ -334,7 +334,7 @@ export default {
         if (contentId === null) throw new ShareRuntimeError('VALIDATION_FAILED', 400)
         const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
         return json({
-          data: await createShare(env.DB, actorUserId, contentId, idempotencyKey),
+          data: await createShare(env.DB, env.W03_CONTENT, actorUserId, contentId, idempotencyKey, request.headers.get('X-LuckRead-Correlation-Id') ?? ''),
           requestId: createRequestId(),
         }, 201)
       }

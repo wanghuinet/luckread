@@ -1,5 +1,8 @@
 /// <reference types="@cloudflare/workers-types" />
 
+import { ReplyAudienceRuntimeError } from './reply-audience-runtime.js'
+import { fetchPublishedContentSocialContext, type W03ContentBinding } from './w03-content-context-client.js'
+
 export class ShareRuntimeError extends Error {
   constructor(readonly code: string, readonly status: number) { super(code) }
 }
@@ -38,23 +41,42 @@ const validateIdempotencyKey = (value: string): string => {
   return normalized
 }
 
+const assertPublishedContent = async (
+  binding: W03ContentBinding | undefined,
+  contentId: string,
+  correlationId: string,
+): Promise<void> => {
+  try {
+    await fetchPublishedContentSocialContext(binding, { contentId, correlationId })
+  } catch (error) {
+    if (error instanceof ReplyAudienceRuntimeError) {
+      if (error.status === 404) throw new ShareRuntimeError('NOT_FOUND', 404)
+      if (error.status === 400) throw new ShareRuntimeError('VALIDATION_FAILED', 400)
+      if (error.status === 403) throw new ShareRuntimeError('PERMISSION_DENIED', 403)
+      if (error.status === 429) throw new ShareRuntimeError('RATE_LIMITED', 429)
+    }
+    throw new ShareRuntimeError('SERVICE_UNAVAILABLE', 503)
+  }
+}
+
+/**
+ * W05 stores share-link records; W03 is the sole authority for whether the
+ * referenced content is currently published. Since cross-Worker state cannot
+ * be transactionally locked, every resolve repeats this check before disclosure.
+ */
 export async function createShare(
   db: D1Database,
+  w03Content: W03ContentBinding | undefined,
   actorUserId: string,
   contentIdValue: string,
   idempotencyKeyValue: string,
+  correlationId: string,
 ): Promise<ShareRecord> {
   const actor = validateActor(actorUserId)
   const contentId = validateId(contentIdValue)
   const idempotencyKey = validateIdempotencyKey(idempotencyKeyValue)
 
-  const content = await db.prepare(
-    'SELECT id, state FROM contents WHERE id = ? LIMIT 1',
-  ).bind(contentId).first<{ id: string; state: string }>()
-
-  if (!content || content.state !== 'PUBLISHED') {
-    throw new ShareRuntimeError('NOT_FOUND', 404)
-  }
+  await assertPublishedContent(w03Content, contentId, correlationId)
 
   const existing = await db.prepare(
     'SELECT share_id, content_id, actor_user_id, created_at FROM social_share_links WHERE actor_user_id = ? AND idempotency_key = ? LIMIT 1',
@@ -81,17 +103,9 @@ export async function createShare(
   const createdAt = new Date().toISOString()
 
   try {
-    const inserted = await db.prepare(
-      `INSERT INTO social_share_links (share_id, content_id, actor_user_id, idempotency_key, created_at)
-         SELECT ?, content.id, ?, ?, ?
-           FROM contents content
-          WHERE content.id = ?
-            AND content.state = 'PUBLISHED'`,
-    ).bind(shareId, actor, idempotencyKey, createdAt, contentId).run()
-
-    if (Number(inserted.meta?.changes ?? 0) !== 1) {
-      throw new ShareRuntimeError('NOT_FOUND', 404)
-    }
+    await db.prepare(
+      'INSERT INTO social_share_links (share_id, content_id, actor_user_id, idempotency_key, created_at) VALUES (?, ?, ?, ?, ?)',
+    ).bind(shareId, contentId, actor, idempotencyKey, createdAt).run()
   } catch (error) {
     if (!(error instanceof Error) || !error.message.toLowerCase().includes('unique')) {
       throw error
@@ -120,29 +134,21 @@ export async function createShare(
 
 export async function resolveShare(
   db: D1Database,
+  w03Content: W03ContentBinding | undefined,
   shareIdValue: string,
+  correlationId: string,
 ): Promise<{ shareId: string; contentId: string; createdAt: string }> {
   const shareId = validateId(shareIdValue)
   const row = await db.prepare(
-    `SELECT
-       s.share_id,
-       s.content_id,
-       s.created_at,
-       c.state
-     FROM social_share_links s
-     JOIN contents c ON c.id = s.content_id
-     WHERE s.share_id = ?
-     LIMIT 1`,
+    'SELECT share_id, content_id, created_at FROM social_share_links WHERE share_id = ? LIMIT 1',
   ).bind(shareId).first<{
     share_id: string
     content_id: string
     created_at: string
-    state: string
   }>()
 
-  if (!row || row.state !== 'PUBLISHED') {
-    throw new ShareRuntimeError('NOT_FOUND', 404)
-  }
+  if (!row) throw new ShareRuntimeError('NOT_FOUND', 404)
+  await assertPublishedContent(w03Content, row.content_id, correlationId)
 
   return {
     shareId: row.share_id,

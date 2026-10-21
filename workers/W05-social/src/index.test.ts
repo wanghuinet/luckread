@@ -29,6 +29,17 @@ const transportHeaders = {
   'X-LuckRead-Principal-Layer': 'L2',
 }
 
+const publishedContextBinding = () => ({
+  fetch: vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const request = input instanceof Request ? input : new Request(input, init)
+    const parts = new URL(request.url).pathname.split('/').filter(Boolean)
+    const contentId = decodeURIComponent(parts.at(-2) ?? '')
+    return Response.json({
+      data: { contentId, ownerUserId: 'owner-1', contentType: 'post', state: 'PUBLISHED' },
+    })
+  }),
+})
+
 describe('W05 social query transport', () => {
   it('serves profile replies through a bounded public GET route', async () => {
     const response = await worker.fetch(
@@ -379,10 +390,10 @@ describe('W05 social query transport', () => {
       }),
       {
         DB: dbFor([
-          { id: 'content-1', state: 'PUBLISHED' },
           null,
           { share_id: 'share-1', content_id: 'content-1', actor_user_id: 'viewer-1', created_at: '2026-10-02T00:00:00.000Z' },
         ]),
+        W03_CONTENT: publishedContextBinding(),
       },
     )
     expect(response.status).toBe(201)
@@ -398,7 +409,7 @@ describe('W05 social query transport', () => {
           'X-LuckRead-Correlation-Id': 'share-resolve',
         },
       }),
-      { DB: dbFor([{ share_id: 'share-1', content_id: 'content-1', created_at: '2026-10-02T00:00:00.000Z', state: 'PUBLISHED' }]) },
+      { DB: dbFor([{ share_id: 'share-1', content_id: 'content-1', created_at: '2026-10-02T00:00:00.000Z' }]), W03_CONTENT: publishedContextBinding() },
     )
     expect(response.status).toBe(200)
     await expect(response.json()).resolves.toMatchObject({ data: { contentId: 'content-1' } })
