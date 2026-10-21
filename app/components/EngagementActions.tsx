@@ -1,4 +1,5 @@
 import { Text, TouchableOpacity, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useColorScheme } from "nativewind";
 import Comment from "~/assets/svg/comment.svg";
 import RepostButton from './RepostButton';
@@ -19,8 +20,19 @@ type EngagementData = {
     message?: string;
 };
 
-export const EngagementActions = ({ detailView, itemData }: { detailView?: boolean; itemData?: EngagementData }) => {
+export const EngagementActions = ({ detailView, itemData, onCommentPress }: { detailView?: boolean; itemData?: EngagementData; onCommentPress?: () => void }) => {
     const { colorScheme } = useColorScheme();
+    const router = useRouter();
+    const handleCommentPress = (event?: { stopPropagation?: () => void }) => {
+        event?.stopPropagation?.();
+        if (onCommentPress) {
+            onCommentPress();
+            return;
+        }
+        if (!detailView && itemData?.contentId?.trim()) {
+            router.push(('/post/' + encodeURIComponent(itemData.contentId)) as never);
+        }
+    };
     const iconColor = colorScheme === 'dark' ? '#8b98a5' : '#536471';
     const textColor = "text-sm text-neutral-600 dark:text-neutral-400";
 
@@ -28,7 +40,14 @@ export const EngagementActions = ({ detailView, itemData }: { detailView?: boole
 
     return (
         <View className="flex-row items-center justify-between mt-2">
-            <TouchableOpacity className="flex-row items-center gap-1.5">
+            <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel="Open comments"
+                accessibilityState={{ disabled: !onCommentPress && !itemData?.contentId?.trim() }}
+                disabled={!onCommentPress && !itemData?.contentId?.trim()}
+                onPress={handleCommentPress}
+                className="flex-row items-center gap-1.5"
+            >
                 <Comment width={18} height={18} fill={iconColor} />
                 <Text className={textColor}>{itemData?.reply_count}</Text>
             </TouchableOpacity>

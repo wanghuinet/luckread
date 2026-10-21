@@ -139,10 +139,16 @@ export default function PostDetailScreen() {
     const [errorMessage, setErrorMessage] = useState('');
     const [retryKey, setRetryKey] = useState(0);
     const bottomSheetModalRef = useRef<BottomSheetModal>(null);
+    const scrollViewRef = useRef<ScrollView | null>(null);
+    const commentsOffsetRef = useRef(0);
     const snapPoints = useMemo(() => ['25%', '30%'], []);
 
     const handlePresentModalPress = useCallback(() => {
         bottomSheetModalRef.current?.present();
+    }, []);
+
+    const handleScrollToComments = useCallback(() => {
+        scrollViewRef.current?.scrollTo({ y: commentsOffsetRef.current, animated: true });
     }, []);
 
     const handleSheetChanges = useCallback((_index: number) => {
@@ -262,13 +268,19 @@ export default function PostDetailScreen() {
     return (
         <>
             <ScrollView
+                ref={scrollViewRef}
                 className="flex-1 bg-white dark:bg-black"
                 style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
                 contentContainerStyle={{ flexGrow: 1 }}
             >
                 <PostHeader username={authorHandle} />
-                <FeedItem itemData={findPost} detailView />
-                <View className="px-4 mt-2">
+                <FeedItem itemData={findPost} detailView onCommentPress={handleScrollToComments} />
+                <View
+                    className="px-4 mt-2"
+                    onLayout={(event) => {
+                        commentsOffsetRef.current = event.nativeEvent.layout.y;
+                    }}
+                >
                     <TouchableOpacity
                         onPress={handlePresentModalPress}
                         className="flex-row items-center mb-3"
