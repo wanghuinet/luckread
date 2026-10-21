@@ -60,16 +60,22 @@ type ComposerAsset = {
   existing?: boolean;
 };
 
+type PollDurationHours = 24 | 72 | 168;
+
 type SubmitAttempt = {
   fingerprint: string;
   contentKey: string;
   stateKey: string;
   mutationKey: string;
+  pollKey: string;
 };
 
 const PRIMARY = '#1769aa';
 const MAX_TEXT_LENGTH = 500;
 const MAX_IMAGES = 4;
+const MIN_POLL_OPTIONS = 2;
+const MAX_POLL_OPTIONS = 4;
+const MAX_POLL_OPTION_LENGTH = 50;
 
 const isVideoAsset = (asset: Pick<ComposerAsset, 'mimeType' | 'filename'>): boolean =>
   asset.mimeType.startsWith('video/') || /\.(mp4|webm|mov|m4v|avi|mkv)(?:[?#].*)?$/i.test(asset.filename);
@@ -107,6 +113,9 @@ export default function PublishScreen() {
   const [errorMessage, setErrorMessage] = useState('');
   const [statusMessage, setStatusMessage] = useState('');
   const [publishPending, setPublishPending] = useState(false);
+  const [pollEnabled, setPollEnabled] = useState(false);
+  const [pollOptions, setPollOptions] = useState<string[]>(['', '']);
+  const [pollDurationHours, setPollDurationHours] = useState<PollDurationHours>(24);
 
   const recordRef = useRef<ContentRecord | null>(null);
   const originalBodyRef = useRef<{ text: string; bodyRef: string | null }>({ text: '', bodyRef: null });
@@ -310,11 +319,27 @@ export default function PublishScreen() {
       return;
     }
 
+    const cleanPollOptions = pollEnabled
+      ? pollOptions.map((option) => option.normalize('NFKC').trim())
+      : [];
+    if (pollEnabled) {
+      const optionKeys = cleanPollOptions.map((option) => option.toLocaleLowerCase('en-US'));
+      if (
+        cleanPollOptions.length < MIN_POLL_OPTIONS ||
+        cleanPollOptions.length > MAX_POLL_OPTIONS ||
+        cleanPollOptions.some((option) => !option || [...option].length > MAX_POLL_OPTION_LENGTH) ||
+        new Set(optionKeys).size !== optionKeys.length
+      ) {
+        setErrorMessage('A poll needs 2–4 different, non-empty options. Each option can be up to 50 characters.');
+        return;
+      }
+    }
+
     const mediaRefs = Array.from(new Set(assets.map((asset) => asset.serverUrl)));
     const nextCover = coverRef && mediaRefs.includes(coverRef)
       ? coverRef
       : assets.find((asset) => asset.mimeType.startsWith('image/'))?.serverUrl || null;
-    const fingerprint = JSON.stringify([contentId || '', trimmedBody, mediaRefs, nextCover]);
+    const fingerprint = JSON.stringify([contentId || '', trimmedBody, mediaRefs, nextCover, pollEnabled, cleanPollOptions, pollEnabled ? pollDurationHours : null]);
     let attempt = submitAttemptRef.current;
     if (attempt && attempt.fingerprint !== fingerprint) {
       if (!contentId && !recordRef.current && publishPending) {
@@ -329,6 +354,7 @@ export default function PublishScreen() {
         contentKey: createIdempotencyKey(),
         stateKey: createIdempotencyKey(),
         mutationKey: createIdempotencyKey(),
+        pollKey: createIdempotencyKey(),
       };
       submitAttemptRef.current = attempt;
     }
@@ -433,6 +459,38 @@ export default function PublishScreen() {
       if (!draft.etag || draft.etag === '*') {
         setPublishPending(true);
         throw new Error('The post exists, but the server did not return its version. Retry publication; another content record will not be created.');
+      }
+
+      if (pollEnabled && !contentId) {
+        let pollResult;
+        try {
+          pollResult = await apiRequest<unknown>(
+            '/contents/' + encodeURIComponent(draft.id) + '/poll',
+            {
+              method: 'POST',
+              body: JSON.stringify({
+                options: cleanPollOptions,
+                durationHours: pollDurationHours,
+              }),
+              idempotencyKey: attempt.pollKey,
+            },
+          );
+        } catch (cause) {
+          setPublishPending(true);
+          throw new Error(
+            cause instanceof Error
+              ? cause.message
+              : 'The post draft exists, but its poll could not be saved. Retry to finish the same post.',
+          );
+        }
+        if (!pollResult.response.ok) {
+          setPublishPending(true);
+          throw new Error(getApiErrorMessage(
+            pollResult.data,
+            'The post draft exists, but its poll could not be saved. Retry to finish the same post.',
+            pollResult.response.status,
+          ));
+        }
       }
 
       const transitioned = await apiRequest<Record<string, unknown>>(
@@ -596,6 +654,92 @@ export default function PublishScreen() {
             </Pressable>
           </View>
 
+          {!contentId ? (
+            <View style={styles.pollSection}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ selected: pollEnabled, disabled: busy || loadingEdit || publishPending }}
+                disabled={busy || loadingEdit || publishPending}
+                onPress={() => {
+                  setPollEnabled((value) => !value);
+                  setErrorMessage('');
+                }}
+                style={styles.pollToggle}
+              >
+                <Feather name="bar-chart-2" size={19} color={PRIMARY} />
+                <Text style={styles.mediaButtonText}>{pollEnabled ? 'Remove poll' : 'Add poll'}</Text>
+              </Pressable>
+              {pollEnabled ? (
+                <View style={styles.pollEditor}>
+                  <Text style={styles.pollHelper}>
+                    Add 2–4 different options. Published poll options cannot be changed.
+                  </Text>
+                  {pollOptions.map((option, index) => (
+                    <View key={'poll-option-' + index} style={styles.pollOptionRow}>
+                      <TextInput
+                        accessibilityLabel={'Poll option ' + (index + 1)}
+                        editable={!busy && !publishPending}
+                        maxLength={MAX_POLL_OPTION_LENGTH}
+                        onChangeText={(value) => setPollOptions((current) =>
+                          current.map((existing, optionIndex) => optionIndex === index ? value : existing),
+                        )}
+                        placeholder={'Option ' + (index + 1)}
+                        placeholderTextColor="#667085"
+                        style={styles.pollOptionInput}
+                        value={option}
+                      />
+                      {pollOptions.length > MIN_POLL_OPTIONS ? (
+                        <Pressable
+                          accessibilityRole="button"
+                          accessibilityLabel={'Remove poll option ' + (index + 1)}
+                          disabled={busy || publishPending}
+                          onPress={() => setPollOptions((current) => current.filter((_, optionIndex) => optionIndex !== index))}
+                          style={styles.pollRemoveButton}
+                        >
+                          <Feather name="x-circle" size={20} color="#667085" />
+                        </Pressable>
+                      ) : null}
+                    </View>
+                  ))}
+                  {pollOptions.length < MAX_POLL_OPTIONS ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      disabled={busy || publishPending}
+                      onPress={() => setPollOptions((current) => current.length < MAX_POLL_OPTIONS ? [...current, ''] : current)}
+                      style={styles.pollAddOption}
+                    >
+                      <Feather name="plus" size={17} color={PRIMARY} />
+                      <Text style={styles.mediaButtonText}>Add option</Text>
+                    </Pressable>
+                  ) : null}
+                  <Text style={styles.pollHelper}>Poll duration</Text>
+                  <View style={styles.pollDurationRow}>
+                    {([24, 72, 168] as const).map((duration) => (
+                      <Pressable
+                        key={duration}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: pollDurationHours === duration, disabled: busy || publishPending }}
+                        disabled={busy || publishPending}
+                        onPress={() => setPollDurationHours(duration)}
+                        style={[
+                          styles.pollDurationOption,
+                          pollDurationHours === duration && styles.pollDurationSelected,
+                        ]}
+                      >
+                        <Text style={[
+                          styles.pollDurationText,
+                          pollDurationHours === duration && styles.pollDurationSelectedText,
+                        ]}>
+                          {duration === 24 ? '1 day' : duration === 72 ? '3 days' : '7 days'}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                </View>
+              ) : null}
+            </View>
+          ) : null}
+
           {statusMessage ? <Text accessibilityLiveRegion="polite" style={styles.statusText}>{statusMessage}</Text> : null}
           {errorMessage ? <Text accessibilityLiveRegion="assertive" style={styles.errorText}>{errorMessage}</Text> : null}
 
@@ -635,6 +779,20 @@ const styles = StyleSheet.create({
   mediaActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingTop: 18, paddingBottom: 10 },
   mediaButton: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: '#d0d5dd', borderRadius: 999, paddingHorizontal: 15, paddingVertical: 10 },
   mediaButtonText: { color: PRIMARY, fontSize: 13, fontWeight: '800' },
+  pollSection: { marginTop: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#eaecf0', paddingBottom: 14 },
+  pollToggle: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 8, borderWidth: 1, borderColor: '#d0d5dd', borderRadius: 999, paddingHorizontal: 15, paddingVertical: 10 },
+  pollEditor: { marginTop: 12, padding: 12, borderWidth: 1, borderColor: '#d0d5dd', borderRadius: 14 },
+  pollHelper: { fontSize: 12, lineHeight: 17, color: '#667085', marginBottom: 8 },
+  pollOptionRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
+  pollOptionInput: { flex: 1, minHeight: 42, borderWidth: 1, borderColor: '#d0d5dd', borderRadius: 9, paddingHorizontal: 10, color: '#101828', fontSize: 14 },
+  pollRemoveButton: { width: 32, height: 36, alignItems: 'center', justifyContent: 'center' },
+  pollAddOption: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 6, paddingVertical: 8 },
+  pollDurationRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
+  pollDurationOption: { borderWidth: 1, borderColor: '#d0d5dd', borderRadius: 999, paddingVertical: 8, paddingHorizontal: 14 },
+  pollDurationSelected: { backgroundColor: '#e8f4ff', borderColor: PRIMARY },
+  pollDurationText: { color: '#344054', fontSize: 12, fontWeight: '700' },
+  pollDurationSelectedText: { color: PRIMARY },
+
   statusText: { color: '#027a48', fontSize: 13, marginTop: 10, lineHeight: 19 },
   footer: { flexDirection: 'row', gap: 8, alignItems: 'flex-start', paddingTop: 22 },
   footerText: { flex: 1, color: '#667085', fontSize: 12, lineHeight: 18 },
