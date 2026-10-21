@@ -79,3 +79,19 @@ export function fetchDiscoveryTopics(signal?: AbortSignal) {
     signal,
   });
 }
+
+
+/** Search public LuckRead content through the canonical W01 -> W04 -> W03 route. */
+export function fetchContentSearchPage(queryValue: string, options: PageRequestOptions = {}) {
+  const query = queryValue.trim()
+  const params = new URLSearchParams({
+    q: query,
+    limit: String(options.limit ?? 20),
+  })
+  if (options.cursor) params.set('cursor', options.cursor)
+  return apiRequest<unknown>('/search?' + params.toString(), {
+    method: 'GET',
+    auth: false,
+    signal: options.signal,
+  })
+}

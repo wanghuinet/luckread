@@ -35,7 +35,7 @@ jobs:
         run: >-
           npx --no-install vitest run
           workers/W04-feed-search/src/auth-013-projection.test.ts
-          workers/W04-feed-search/src/following-feed.test.ts
+          workers/W04-feed-search/src/following-feed.test.ts workers/W04-feed-search/src/content-search.test.ts
 
       - name: Typecheck W04 feed runtime
         run: >-

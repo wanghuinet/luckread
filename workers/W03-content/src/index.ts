@@ -7,6 +7,7 @@ import {
   deleteContent,
   getContent,
   listContents,
+  searchPublishedContents,
   listFollowingOwnerContents,
   listPublishedContentsByIds,
   listCreatorContents,
@@ -246,7 +247,7 @@ const worker = {
   async fetch(request: Request, env: Env): Promise<Response> {
     try {
       const url = new URL(request.url)
-      const isRead = request.method === 'GET' || (request.method === 'POST' && url.pathname === '/internal/content/following-feed')
+      const isRead = request.method === 'GET' || (request.method === 'POST' && ['/internal/content/following-feed', '/internal/content/search'].includes(url.pathname))
       await enforceRateLimits(request, env, isRead ? 'read' : 'write')
 
       if (request.method === 'POST' && url.pathname === '/internal/content/following-feed') {
@@ -313,9 +314,73 @@ const worker = {
               createdAt: item.createdAt,
               contentType: item.contentType,
               title: item.title,
-              bodyRef: item.bodyRef,
-              mediaRefs: item.mediaRefs,
-              coverRef: item.coverRef,
+              // Search is metadata-only until the canonical visibility/entitlement
+              // recheck is admitted. Never expose protected body or media references.
+              updatedAt: item.updatedAt,
+            })),
+            nextCursor: page.nextCursor,
+            hasMore: page.hasMore,
+          },
+          requestId: createRequestId(),
+        })
+      }
+
+
+      if (request.method === 'POST' && url.pathname === '/internal/content/search') {
+        if (
+          request.headers.get('X-LuckRead-Caller') !== 'W04' ||
+          request.headers.get('X-LuckRead-Transport-Version') !== '1.0' ||
+          !request.headers.get('X-LuckRead-Correlation-Id')?.trim() ||
+          request.headers.has('Authorization') ||
+          request.headers.has('Cookie')
+        ) {
+          throw new ContentRuntimeError('PERMISSION_DENIED', 403)
+        }
+        if (url.search !== '') throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+
+        const rawBody = await request.text()
+        if (rawBody.length > 10000) throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+        let parsedBody: unknown
+        try { parsedBody = JSON.parse(rawBody) } catch {
+          throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+        }
+        if (!parsedBody || typeof parsedBody !== 'object' || Array.isArray(parsedBody)) {
+          throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+        }
+        const body = parsedBody as Record<string, unknown>
+        if (Object.keys(body).some((key) => !['q', 'cursor', 'limit'].includes(key))) {
+          throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+        }
+        if (typeof body.q !== 'string') throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+        const query = body.q.normalize('NFKC').trim()
+        if (!query || query.length > 256) throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+        const cursor = body.cursor === null || body.cursor === undefined
+          ? null
+          : typeof body.cursor === 'string'
+            ? body.cursor.trim() || null
+            : (() => { throw new ContentRuntimeError('VALIDATION_FAILED', 400) })()
+        if (cursor && cursor.length > 2048) throw new ContentRuntimeError('INVALID_CURSOR', 400)
+        if (body.limit !== undefined && typeof body.limit !== 'number' && typeof body.limit !== 'string') {
+          throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+        }
+
+        const page = await searchPublishedContents(
+          env.D1_02,
+          query,
+          cursor,
+          parseListLimit(body.limit === undefined ? null : String(body.limit)),
+        )
+        return json({
+          data: {
+            items: page.items.map((item) => ({
+              id: item.id,
+              slug: item.slug,
+              creatorId: item.creatorId ?? item.ownerUserId,
+              createdAt: item.createdAt,
+              contentType: item.contentType,
+              title: item.title,
+              // Search is metadata-only until canonical visibility/entitlement
+              // rechecks are admitted. Never expose protected body/media references.
               updatedAt: item.updatedAt,
             })),
             nextCursor: page.nextCursor,

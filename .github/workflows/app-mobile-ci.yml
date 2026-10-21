@@ -84,6 +84,8 @@ jobs:
         run: bun run test:video-feed-api
       - name: Test native feed comment navigation
         run: bun run test:comment-navigation
+      - name: Test native public content search
+        run: bun run test:content-search
       - name: Test native registration, verification and recovery API contracts
         run: bun run test:auth-flow
       - name: Enforce shared API client boundary
