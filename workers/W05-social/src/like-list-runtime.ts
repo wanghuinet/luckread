@@ -1,6 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
 import { LikeRuntimeError } from './like-runtime.js'
+import type { PublishedContentSocialContext } from './w03-content-context-client.js'
 
 const MAX_ID = 128
 const MAX_CURSOR = 2048
@@ -82,6 +83,7 @@ export async function listContentLikers(
   cursorValue: string | null,
   limit: number,
   viewerUserIdValue: string | null = null,
+  contentContext: PublishedContentSocialContext,
 ): Promise<ContentLikerPage> {
   const contentId = validateId(contentIdValue)
   const viewerUserId = viewerUserIdValue ? validateId(viewerUserIdValue) : null
@@ -89,16 +91,24 @@ export async function listContentLikers(
   if (!Number.isInteger(limit) || limit < 1 || limit > 50) {
     throw new LikeRuntimeError('VALIDATION_FAILED', 400)
   }
+  if (
+    contentContext.contentId !== contentId ||
+    contentContext.state !== 'PUBLISHED' ||
+    !['article', 'post', 'video'].includes(contentContext.contentType)
+  ) {
+    throw new LikeRuntimeError('NOT_FOUND', 404)
+  }
 
-  const params: unknown[] = [contentId]
+  const contentOwnerUserId = contentContext.ownerUserId
+  const params: unknown[] = [contentId, contentOwnerUserId, contentOwnerUserId]
   let visibility = `
     AND NOT EXISTS (
       SELECT 1
         FROM social_user_interactions content_block
        WHERE content_block.relation_type = 'block'
          AND (
-           (content_block.actor_user_id = il.actor_user_id AND content_block.target_user_id = content.owner_user_id)
-           OR (content_block.actor_user_id = content.owner_user_id AND content_block.target_user_id = il.actor_user_id)
+           (content_block.actor_user_id = il.actor_user_id AND content_block.target_user_id = ?)
+           OR (content_block.actor_user_id = ? AND content_block.target_user_id = il.actor_user_id)
          )
     )`
 
@@ -109,8 +119,8 @@ export async function listContentLikers(
         FROM social_user_interactions viewer_block
        WHERE viewer_block.relation_type = 'block'
          AND (
-           (viewer_block.actor_user_id = ? AND viewer_block.target_user_id = content.owner_user_id)
-           OR (viewer_block.actor_user_id = content.owner_user_id AND viewer_block.target_user_id = ?)
+           (viewer_block.actor_user_id = ? AND viewer_block.target_user_id = ?)
+           OR (viewer_block.actor_user_id = ? AND viewer_block.target_user_id = ?)
          )
     )
     AND NOT EXISTS (
@@ -122,7 +132,7 @@ export async function listContentLikers(
            OR (liker_block.actor_user_id = il.actor_user_id AND liker_block.target_user_id = ?)
          )
     )`
-    params.push(viewerUserId, viewerUserId, viewerUserId, viewerUserId)
+    params.push(viewerUserId, contentOwnerUserId, contentOwnerUserId, viewerUserId, viewerUserId, viewerUserId)
   }
 
   const cursorSql = cursor
@@ -134,10 +144,8 @@ export async function listContentLikers(
   const result = await db.prepare(`
     SELECT il.relationship_id, il.actor_user_id, il.created_at
       FROM interaction_likes il
-      JOIN contents content ON content.id = il.target_id
      WHERE il.target_type = 'content'
        AND il.target_id = ?
-       AND content.state = 'PUBLISHED'
        ${visibility}
        ${cursorSql}
      ORDER BY il.created_at DESC, il.relationship_id DESC
