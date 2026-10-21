@@ -29,6 +29,7 @@ import * as ContextMenu from 'zeego/context-menu';
 import * as DropdownMenu from 'zeego/dropdown-menu';
 import { apiRequest, getApiErrorMessage } from '~/lib/api-client';
 import { useAuthStore } from '~/store/auth-store';
+import { blockUser, muteUser } from '~/lib/social-screen-api';
 import SocialPoll from './SocialPoll';
 
 
@@ -237,7 +238,7 @@ export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailVie
     const router = useRouter();
     const sessionStatus = useAuthStore((state) => state.status);
     const currentUser = useAuthStore((state) => state.user);
-    const isOwnPost = sessionStatus === 'authenticated' && Boolean(itemData.contentId && currentUser?.id && itemData.ownerUserId === currentUser.id);
+    const isOwnPost = sessionStatus === 'authenticated' && Boolean(itemData.contentId && currentUser?.id && (itemData.ownerUserId === currentUser.id || itemData.creatorId === currentUser.id));
 
     const beginEditOwnPost = () => {
         const contentId = itemData.contentId;
@@ -298,6 +299,57 @@ export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailVie
                         }
                     })();
                 } },
+            ],
+        );
+    };
+
+    const targetUserId = itemData.creatorId || itemData.ownerUserId || '';
+
+    const muteAuthor = () => {
+        if (!targetUserId || isOwnPost) {
+            Alert.alert('无法静音', '当前内容未提供可验证的作者账号 ID。');
+            return;
+        }
+        void (async () => {
+            try {
+                const result = await muteUser(targetUserId);
+                if (!result.response.ok) {
+                    throw new Error(result.error?.message || getApiErrorMessage(result.data, '静音用户失败，请稍后重试。', result.response.status));
+                }
+                Alert.alert('已静音', '已静音 @' + authorHandle + '。静音不会屏蔽该用户。');
+            } catch (error) {
+                Alert.alert('静音失败', error instanceof Error ? error.message : '静音用户失败，请稍后重试。');
+            }
+        })();
+    };
+
+    const confirmBlockAuthor = () => {
+        if (!targetUserId || isOwnPost) {
+            Alert.alert('无法屏蔽', '当前内容未提供可验证的作者账号 ID。');
+            return;
+        }
+        Alert.alert(
+            '屏蔽 @' + authorHandle,
+            '屏蔽后，LuckRead 会按服务端规则过滤双方的相关内容与互动。确定继续吗？',
+            [
+                { text: '取消', style: 'cancel' },
+                {
+                    text: '屏蔽',
+                    style: 'destructive',
+                    onPress: () => {
+                        void (async () => {
+                            try {
+                                const result = await blockUser(targetUserId);
+                                if (!result.response.ok) {
+                                    throw new Error(result.error?.message || getApiErrorMessage(result.data, '屏蔽用户失败，请稍后重试。', result.response.status));
+                                }
+                                Alert.alert('已屏蔽', '@' + authorHandle + ' 已加入屏蔽名单。刷新信息流以同步过滤结果。');
+                            } catch (error) {
+                                Alert.alert('屏蔽失败', error instanceof Error ? error.message : '屏蔽用户失败，请稍后重试。');
+                            }
+                        })();
+                    },
+                },
             ],
         );
     };
@@ -435,11 +487,11 @@ export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailVie
                                                         <DropdownMenu.ItemTitle>Add/remove @{authorHandle} from list</DropdownMenu.ItemTitle>
                                                         <DropdownMenu.ItemIcon ios={{ name: 'list.bullet' }} />
                                                     </DropdownMenu.Item>
-                                                    <DropdownMenu.Item key="mute">
+                                                    <DropdownMenu.Item key="mute" onSelect={muteAuthor} disabled={!targetUserId || isOwnPost}>
                                                         <DropdownMenu.ItemTitle>Mute @{authorHandle}</DropdownMenu.ItemTitle>
                                                         <DropdownMenu.ItemIcon ios={{ name: 'speaker.slash' }} />
                                                     </DropdownMenu.Item>
-                                                    <DropdownMenu.Item key="block" destructive>
+                                                    <DropdownMenu.Item key="block" destructive onSelect={confirmBlockAuthor} disabled={!targetUserId || isOwnPost}>
                                                         <DropdownMenu.ItemTitle>Block @{authorHandle}</DropdownMenu.ItemTitle>
                                                         <DropdownMenu.ItemIcon ios={{ name: 'nosign' }} />
                                                     </DropdownMenu.Item>

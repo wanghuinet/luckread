@@ -1,5 +1,5 @@
 import React, { useState, useRef, useMemo, useCallback, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import { Alert, View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { useLocalSearchParams, Stack, useRouter } from 'expo-router';
 import { FeedItem, FeedContent } from '~/components/FeedItem';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -9,6 +9,8 @@ import Comments from '~/components/Comments';
 import { apiRequest, getApiErrorMessage } from '~/lib/api-client';
 import { mapContentToFeedContent, readContentBody, unwrapApiData, type ApiContentRecord, type ApiContentSocial } from '~/lib/content-adapter';
 import { readSessionToken } from '~/lib/secure-session';
+import { blockUser, muteUser } from '~/lib/social-screen-api';
+import { useAuthStore } from '~/store/auth-store';
 
 import {
     BottomSheetModal,
@@ -26,8 +28,60 @@ const sortOptions: Record<SortType, string> = {
     liked: 'Most liked replies',
 };
 
-export const MoreContextIcons = ({ size = "lg", username = "unknown_user" }: { size?: 'sm' | 'lg', username?: string }) => {
+export const MoreContextIcons = ({
+    size = "lg",
+    username = "unknown_user",
+    targetUserId,
+}: {
+    size?: 'sm' | 'lg';
+    username?: string;
+    targetUserId?: string | null;
+}) => {
     const router = useRouter();
+    const currentUserId = useAuthStore((state) => state.user?.id);
+    const isOwnTarget = Boolean(targetUserId && currentUserId && targetUserId === currentUserId);
+
+    const muteTarget = () => {
+        if (!targetUserId || isOwnTarget) {
+            Alert.alert('无法静音', '当前帖子未提供可验证的作者账号 ID。');
+            return;
+        }
+        void (async () => {
+            try {
+                const result = await muteUser(targetUserId);
+                if (!result.response.ok) throw new Error(result.error?.message || getApiErrorMessage(result.data, '静音用户失败，请稍后重试。', result.response.status));
+                Alert.alert('已静音', '已静音 @' + username + '。静音不会屏蔽该用户。');
+            } catch (error) {
+                Alert.alert('静音失败', error instanceof Error ? error.message : '静音用户失败，请稍后重试。');
+            }
+        })();
+    };
+
+    const confirmBlockTarget = () => {
+        if (!targetUserId || isOwnTarget) {
+            Alert.alert('无法屏蔽', '当前帖子未提供可验证的作者账号 ID。');
+            return;
+        }
+        Alert.alert('屏蔽 @' + username, '屏蔽后，LuckRead 会按服务端规则过滤双方的相关内容与互动。确定继续吗？', [
+            { text: '取消', style: 'cancel' },
+            {
+                text: '屏蔽',
+                style: 'destructive',
+                onPress: () => {
+                    void (async () => {
+                        try {
+                            const result = await blockUser(targetUserId);
+                            if (!result.response.ok) throw new Error(result.error?.message || getApiErrorMessage(result.data, '屏蔽用户失败，请稍后重试。', result.response.status));
+                            Alert.alert('已屏蔽', '@' + username + ' 已加入屏蔽名单。刷新信息流以同步过滤结果。');
+                        } catch (error) {
+                            Alert.alert('屏蔽失败', error instanceof Error ? error.message : '屏蔽用户失败，请稍后重试。');
+                        }
+                    })();
+                },
+            },
+        ]);
+    };
+
     return (
         <View className="flex-row items-center gap-3  ">
             <TouchableOpacity onPress={() => { router.back() }}>
@@ -75,11 +129,11 @@ export const MoreContextIcons = ({ size = "lg", username = "unknown_user" }: { s
                                 <DropdownMenu.ItemTitle>Add/remove to list</DropdownMenu.ItemTitle>
                                 <DropdownMenu.ItemIcon ios={{ name: 'list.bullet' }} />
                             </DropdownMenu.Item>
-                            <DropdownMenu.Item key="mute">
+                            <DropdownMenu.Item key="mute" onSelect={muteTarget} disabled={!targetUserId || isOwnTarget}>
                                 <DropdownMenu.ItemTitle>Mute @{username}</DropdownMenu.ItemTitle>
                                 <DropdownMenu.ItemIcon ios={{ name: 'speaker.slash' }} />
                             </DropdownMenu.Item>
-                            <DropdownMenu.Item key="block" destructive>
+                            <DropdownMenu.Item key="block" destructive onSelect={confirmBlockTarget} disabled={!targetUserId || isOwnTarget}>
                                 <DropdownMenu.ItemTitle>Block @{username}</DropdownMenu.ItemTitle>
                                 <DropdownMenu.ItemIcon ios={{ name: 'nosign' }} />
                             </DropdownMenu.Item>
@@ -91,7 +145,7 @@ export const MoreContextIcons = ({ size = "lg", username = "unknown_user" }: { s
     );
 };
 
-const PostHeader = ({ username }: { username?: string }) => {
+const PostHeader = ({ username, targetUserId }: { username?: string; targetUserId?: string | null }) => {
     const insets = useSafeAreaInsets();
     const router = useRouter();
     return (
@@ -104,7 +158,7 @@ const PostHeader = ({ username }: { username?: string }) => {
             <Text className="text-xl font-bold text-black dark:text-white">Post</Text>
 
             <View className="absolute right-4">
-                <MoreContextIcons username={username} />
+                <MoreContextIcons username={username} targetUserId={targetUserId} />
             </View>
         </View>
     );
@@ -273,7 +327,7 @@ export default function PostDetailScreen() {
                 style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
                 contentContainerStyle={{ flexGrow: 1 }}
             >
-                <PostHeader username={authorHandle} />
+                <PostHeader username={authorHandle} targetUserId={findPost.creatorId || findPost.ownerUserId} />
                 <FeedItem itemData={findPost} detailView onCommentPress={handleScrollToComments} />
                 <View
                     className="px-4 mt-2"

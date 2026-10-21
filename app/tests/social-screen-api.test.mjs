@@ -3,9 +3,13 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const bookmarkScreenSource = readFileSync(resolve(process.cwd(), 'app/(drawer)/bookmarks.tsx'), 'utf8');
+const feedItemSource = readFileSync(new URL('../components/FeedItem.tsx', import.meta.url), 'utf8');
+const postDetailSource = readFileSync(new URL('../app/(drawer)/(tabs)/(index,search,messages,grok,video,notifications)/post/[id].tsx', import.meta.url), 'utf8');
 
 const calls = [];
+let keyCounter = 0;
 mock.module('../lib/api-client.ts', () => ({
+  createIdempotencyKey: () => 'test-key-' + ++keyCounter,
   apiRequest: async (path, options) => {
     const call = { path, options };
     calls.push(call);
@@ -21,10 +25,15 @@ const {
   findPublicUserByUsername,
   markAllNotificationsRead,
   markNotificationRead,
+  blockUser,
+  unblockUser,
+  muteUser,
+  unmuteUser,
 } = await import('../lib/social-screen-api.ts');
 
 beforeEach(() => {
   calls.length = 0;
+  keyCounter = 0;
 });
 
 test('loads the first notification page through the shared client', async () => {
@@ -103,4 +112,46 @@ test('saved list removes an item only after shared bookmark status confirms it i
   expect(bookmarkScreenSource).toContain('if (!contentId || !bookmark.loaded || bookmark.loading || bookmark.pending || bookmark.bookmarked) return;');
   expect(bookmarkScreenSource).toContain('onRemoved(contentId);');
   expect(bookmarkScreenSource).toContain('onRemoved={removeUnbookmarkedItem}');
+});
+
+
+test('block and mute actions use authenticated canonical endpoints and supported target IDs', async () => {
+  await blockUser(' user-id_123 ');
+  await muteUser(' user-id_123 ');
+  await unblockUser('user-id_123');
+  await unmuteUser('user-id_123');
+
+  expect(calls).toHaveLength(4);
+  expect(calls[0].path).toBe('/interactions/blocks');
+  expect(calls[0].options.method).toBe('POST');
+  expect(JSON.parse(calls[0].options.body)).toEqual({ targetUserId: 'user-id_123' });
+  expect(calls[0].options.idempotencyKey).toMatch(/^native-block-user:user-id_123:/);
+  expect(calls[1].path).toBe('/interactions/mutes');
+  expect(calls[1].options.method).toBe('POST');
+  expect(JSON.parse(calls[1].options.body)).toEqual({ targetUserId: 'user-id_123' });
+  expect(calls[1].options.idempotencyKey).toMatch(/^native-mute-user:user-id_123:/);
+  expect(calls[2].path).toBe('/interactions/blocks/user-id_123');
+  expect(calls[2].options.method).toBe('DELETE');
+  expect(calls[3].path).toBe('/interactions/mutes/user-id_123');
+  expect(calls[3].options.method).toBe('DELETE');
+});
+
+test('block and mute menu items invoke real actions in feed and post detail', () => {
+  expect(feedItemSource).toContain('onSelect={muteAuthor}');
+  expect(feedItemSource).toContain('onSelect={confirmBlockAuthor}');
+  expect(feedItemSource).toContain("itemData.creatorId || itemData.ownerUserId || ''");
+  expect(postDetailSource).toContain('onSelect={muteTarget}');
+  expect(postDetailSource).toContain('onSelect={confirmBlockTarget}');
+  expect(postDetailSource).toContain('targetUserId={findPost.creatorId || findPost.ownerUserId}');
+  expect(postDetailSource).toContain('targetUserId === currentUserId');
+  expect(postDetailSource).toContain('disabled={!targetUserId || isOwnTarget}');
+  expect(feedItemSource).toContain('itemData.ownerUserId === currentUser.id || itemData.creatorId === currentUser.id');
+});
+
+test('block and mute mutations reject missing target identities before sending requests', async () => {
+  expect(() => blockUser('   ')).toThrow('A target user ID is required.');
+  expect(() => muteUser('   ')).toThrow('A target user ID is required.');
+  expect(() => unblockUser('')).toThrow('A target user ID is required.');
+  expect(() => unmuteUser('')).toThrow('A target user ID is required.');
+  expect(calls).toHaveLength(0);
 });
