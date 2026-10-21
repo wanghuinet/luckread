@@ -177,6 +177,7 @@ describe('W03 content contract core', () => {
       owner_user_id: 'owner_1',
       content_type: 'article',
       state: 'PUBLISHED',
+      updated_at: '2026-10-17T04:00:00.000Z',
     }
     const env = {
       D1_02: {
@@ -204,9 +205,10 @@ describe('W03 content contract core', () => {
     const response = await w03Worker.fetch(request(), env, {} as never)
     expect(response.status).toBe(200)
     await expect(response.json()).resolves.toMatchObject({
-      data: { contentId: 'content_1', ownerUserId: 'owner_1', contentType: 'article', state: 'PUBLISHED' },
+      data: { contentId: 'content_1', ownerUserId: 'owner_1', contentType: 'article', state: 'PUBLISHED', updatedAt: '2026-10-17T04:00:00.000Z' },
     })
     expect(query).toContain("state = 'PUBLISHED'")
+    expect(query).toContain('updated_at')
     expect(bindings).toEqual(['content_1'])
 
     expect((await w03Worker.fetch(request('W01'), env, {} as never)).status).toBe(403)

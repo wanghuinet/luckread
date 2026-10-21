@@ -75,7 +75,8 @@
       "Poll configuration and draft-poll deletion obtain canonical post owner/type/lifecycle through the existing W03 owned-post context before W05 reads or writes poll tables.",
       "Repost creation validates canonical published content and owner through W03_CONTENT, checks block relationships in W05-owned social_user_interactions, and writes only social_reposts.",
       "Favorite creation and status validate canonical publication through W03_CONTENT; W05 reads and writes only interaction_favorites, and the local status cache is consulted only after W03 confirms the target is published.",
-      "Poll vote submission reads the W05-owned poll record to get its expected owner, asks W03's existing published-owner-post context to verify that the canonical target is still a PUBLISHED post owned by that user, then keeps block, vote-window and duplicate-vote checks within W05-owned tables. The vote path does not query canonical contents directly."
+      "Poll vote submission reads the W05-owned poll record to get its expected owner, asks W03's existing published-owner-post context to verify that the canonical target is still a PUBLISHED post owned by that user, then keeps block, vote-window and duplicate-vote checks within W05-owned tables. The final vote INSERT retains its existing atomic canonical publication/type/block checks as the race-safe final guard.",
+      "W05 poll result GET validates canonical published post context through W03_CONTENT before reading W05 poll tables; if public lookup returns 404, an authenticated owner may use the existing owner-scoped context to preview their draft poll."
     ],
     "outOfScope": [
       "Comment insertion's atomic content-state/policy recheck remains unchanged.",
@@ -84,7 +85,7 @@
       "Cross-Worker publication changes cannot be transactionally locked with a W05 share-link write; every share resolution revalidates through W03 and denies unpublished or missing content.",
       "A W03 publication change cannot be transactionally locked with a W05 repost insert; feed/read paths must independently revalidate canonical visibility before disclosing repost targets.",
       "Cross-Worker publication changes cannot be transactionally locked with a W05 favorite insert; a stale relation may remain after unpublish but status reads return false and do not disclose unpublished content.",
-      "Publication can change after W03 validates the post but before W05 inserts a poll vote; the cross-Worker operation cannot be transactionally locked, and subsequent public poll/feed reads must continue validating canonical visibility."
+      "Publication can change after W03 validates a poll read or vote preflight; W05 cannot transactionally lock publication state across Workers, so every public poll read revalidates through W03 and the final vote INSERT keeps its atomic visibility guard."
     ]
   },
   "evidenceRequired": [
@@ -109,7 +110,8 @@
     "W05 poll configure/delete use W03 owned-post context, forward only validated principal/correlation metadata and perform no direct contents-table validation.",
     "W05 repost creation validates published state through W03 without forwarding Authorization/Cookie, preserves W05 block checks, writes only social_reposts, and fails closed before W05 D1 access if W03 is unavailable or the target is unpublished.",
     "W05 favorite creation/status call W03 published-content context without forwarding Authorization/Cookie, query only interaction_favorites in W05, fail closed if W03 is unavailable, and invalidate/avoid cached true state for unpublished content.",
-    "W05 castContentPollVote calls the W03 published-owner-post context, forwards only W05 caller/correlation metadata, uses W05 social poll/relationship tables only, preserves block/window/single-vote guards, and fails without inserting when W03 is missing or the canonical post is unpublished or owned by another user."
+    "W05 castContentPollVote calls the W03 published-owner-post context, forwards only W05 caller/correlation metadata, uses W05 social poll/relationship tables only, preserves block/window/single-vote guards, and fails without inserting when W03 is missing or the canonical post is unpublished or owned by another user.",
+    "W05 poll result GET validates published visibility through W03, preserves owner-only draft preview fallback, fails closed on missing binding, and performs no direct canonical contents read."
   ],
   "operations": [
     {
@@ -133,7 +135,8 @@
       },
       "consumers": [
         "poll configuration",
-        "draft poll deletion"
+        "draft poll deletion",
+        "draft poll preview fallback"
       ]
     },
     {
@@ -210,7 +213,7 @@
       "internalPath": "/internal/content/contents/{contentId}/published-social-context",
       "principalRequired": false,
       "caller": "W05 only through W03_CONTENT Service Binding",
-      "purpose": "Resolve notification recipients, validate share-link targets, repost creation, provide social summary context, authorize content token sync, and gate public content token reads, validate favorite creation and status reads",
+      "purpose": "Resolve notification recipients, validate share/repost/favorite targets, provide social summary/token context, and gate public poll result reads.",
       "allowedContentTypes": [
         "article",
         "post",
@@ -223,7 +226,8 @@
         "contentId",
         "ownerUserId",
         "contentType",
-        "state"
+        "state",
+        "updatedAt"
       ],
       "ownerUserIdNullable": true,
       "cache": "NO_STORE",
@@ -243,7 +247,8 @@
         "content topic/mention read visibility validation",
         "repost creation",
         "favorite creation",
-        "favorite status visibility"
+        "favorite status visibility",
+        "poll result read"
       ]
     }
   ]

@@ -1,12 +1,23 @@
 /// <reference types="@cloudflare/workers-types" />
 import { describe, expect, it, vi } from 'vitest'
 import { castContentPollVote, configureContentPoll, deleteContentPoll, getContentPoll } from './poll-runtime.js'
-import type { W03ContentBinding } from './w03-content-context-client.js'
+import type { PublishedContentSocialContext, W03ContentBinding } from './w03-content-context-client.js'
 
 const noDatabase = () => ({
   prepare: vi.fn(() => { throw new Error('unexpected database access') }),
   batch: vi.fn(async () => []),
 }) as unknown as D1Database
+
+const publishedPollContext = (
+  ownerUserId: string | null = 'author-1',
+  updatedAt = '2026-10-17T04:00:00.000Z',
+): PublishedContentSocialContext => ({
+  contentId: 'content-1',
+  ownerUserId,
+  contentType: 'post',
+  state: 'PUBLISHED',
+  updatedAt,
+})
 
 type PollDbScenario = {
   content?: { id: string; content_type: string; state: string; owner_user_id: string; updated_at: string }
@@ -105,7 +116,7 @@ describe('W05 poll runtime', () => {
       ],
       viewerOptionId: 'option-2',
     })
-    await expect(getContentPoll(db, 'content-1', 'viewer-1')).resolves.toMatchObject({
+    await expect(getContentPoll(db, 'content-1', 'viewer-1', publishedPollContext())).resolves.toMatchObject({
       pollId: 'poll-1',
       contentId: 'content-1',
       totalVotes: 6,
@@ -116,6 +127,8 @@ describe('W05 poll runtime', () => {
         { optionId: 'option-2', text: '选项二', votes: 3 },
       ],
     })
+    const prepare = (db as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare
+    expect(prepare.mock.calls.some(([sql]) => /FROM contents WHERE id = \?/i.test(String(sql)))).toBe(false)
   })
 
   it('starts the vote window from the published post time when first read', async () => {
@@ -134,7 +147,7 @@ describe('W05 poll runtime', () => {
         { option_id: 'option-2', option_text: 'No', position: 1, votes: 0 },
       ],
     })
-    await expect(getContentPoll(db, 'content-1', null)).resolves.toMatchObject({
+    await expect(getContentPoll(db, 'content-1', null, publishedPollContext('author-1', '2026-10-17T04:00:00.000Z'))).resolves.toMatchObject({
       endsAt: '2026-10-18T04:00:00.000Z',
       totalVotes: 0,
     })

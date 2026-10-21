@@ -180,6 +180,7 @@ export type PublishedContentSocialContext = {
   ownerUserId: string | null
   contentType: 'article' | 'post' | 'video'
   state: 'PUBLISHED'
+  updatedAt: string
 }
 
 type PublishedContentSocialContextInput = {
@@ -241,6 +242,8 @@ export async function fetchPublishedContentSocialContext(
     context.contentId !== input.contentId ||
     !['article', 'post', 'video'].includes(String(context.contentType)) ||
     context.state !== 'PUBLISHED' ||
+    typeof context.updatedAt !== 'string' ||
+    !context.updatedAt.trim() ||
     !(context.ownerUserId === null || (typeof context.ownerUserId === 'string' && validId.test(context.ownerUserId)))
   ) {
     throw serviceUnavailable()
@@ -251,5 +254,6 @@ export async function fetchPublishedContentSocialContext(
     ownerUserId: context.ownerUserId,
     contentType: context.contentType as PublishedContentSocialContext['contentType'],
     state: 'PUBLISHED',
+    updatedAt: context.updatedAt,
   }
 }
