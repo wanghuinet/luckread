@@ -570,6 +570,10 @@ export default function UserProfileScreen() {
 
       let posts: FeedContent[] = [];
       let hasMorePosts = false;
+      const pinResultPromise = apiRequest<unknown>(
+        '/users/' + encodeURIComponent(profile.id) + '/pinned-content',
+        { method: 'GET', auth: false, signal: controller.signal },
+      ).catch(() => null);
       const contentParams = new URLSearchParams({ creatorId: profile.id, type: 'post', limit: '20' });
       const feedResult = await apiRequest<{ data?: ApiContentPage; error?: { message?: string } }>(
         '/contents?' + contentParams.toString(),
@@ -593,6 +597,67 @@ export default function UserProfileScreen() {
             }),
         );
       }
+      if (controller.signal.aborted) return;
+
+      // The pin is a reference to canonical W03 content; never copy body/media into W05.
+      const pinResult = await pinResultPromise;
+      const pinRecord = pinResult?.response.ok
+        ? unwrapApiData<{ contentId?: string } | null>(pinResult.data)
+        : null;
+      const pinnedContentId = typeof pinRecord?.contentId === 'string' && pinRecord.contentId.trim()
+        ? pinRecord.contentId.trim()
+        : null;
+      let pinnedPost = pinnedContentId
+        ? posts.find((post) => post.contentId === pinnedContentId) ?? null
+        : null;
+
+      // A pin may be older than the latest content page. Load only that referenced
+      // post so it remains visible at the top of its owner's profile.
+      if (pinnedContentId && !pinnedPost) {
+        try {
+          const pinnedResult = await apiRequest<unknown>(
+            '/contents/' + encodeURIComponent(pinnedContentId),
+            { method: 'GET', signal: controller.signal },
+          );
+          const pinnedRecord = pinnedResult.response.ok
+            ? unwrapApiData<ApiContentRecord>(pinnedResult.data)
+            : null;
+          const ownerMatches = pinnedRecord && (
+            pinnedRecord.ownerUserId === profile.id ||
+            pinnedRecord.creatorId === profile.id
+          );
+          if (
+            pinnedRecord?.id === pinnedContentId &&
+            ownerMatches &&
+            (!pinnedRecord.contentType || pinnedRecord.contentType === 'post') &&
+            (!pinnedRecord.state || pinnedRecord.state === 'PUBLISHED')
+          ) {
+            const [body, social, author] = await Promise.all([
+              readContentBody(pinnedRecord, controller.signal, sessionToken),
+              readContentSocial(pinnedRecord.id, controller.signal),
+              readContentAuthor(pinnedRecord),
+            ]);
+            pinnedPost = mapContentToFeedContent(
+              pinnedRecord,
+              body,
+              social,
+              author,
+              sessionToken,
+            );
+            posts = [pinnedPost, ...posts];
+          }
+        } catch {
+          // Failure to resolve an old pin must not break the rest of the public profile.
+        }
+      }
+      const postCountBeforePinDecoration = posts.length;
+      if (pinnedPost) {
+        posts = [
+          { ...pinnedPost, isProfilePinned: true },
+          ...posts.filter((post) => post.contentId !== pinnedContentId),
+        ];
+      }
+
       if (controller.signal.aborted) return;
 
       const [followersResult, followingResult] = await Promise.all([
@@ -628,7 +693,7 @@ export default function UserProfileScreen() {
         following_count: typeof followingPage?.totalCount === 'number'
           ? followingPage.totalCount
           : typeof profile.followingCount === 'number' ? profile.followingCount : undefined,
-        items_count: hasMorePosts ? String(posts.length) + '+' : String(posts.length),
+        items_count: hasMorePosts ? String(postCountBeforePinDecoration) + '+' : String(postCountBeforePinDecoration),
         joined_date: profile.createdAt ? new Date(profile.createdAt).toLocaleDateString() : '',
         category: profile.category || '',
         profile_picture: profileAvatarSource?.uri || '',

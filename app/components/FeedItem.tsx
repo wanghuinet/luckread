@@ -30,6 +30,7 @@ import * as DropdownMenu from 'zeego/dropdown-menu';
 import { apiRequest, getApiErrorMessage } from '~/lib/api-client';
 import { useAuthStore } from '~/store/auth-store';
 import { blockUser, muteUser } from '~/lib/social-screen-api';
+import { setProfilePin, useProfilePinSnapshot } from '~/lib/profile-pin-state';
 import SocialPoll from './SocialPoll';
 
 
@@ -61,6 +62,7 @@ export type FeedMediaAttachment = {
 
 export interface FeedContent {
     contentId?: string;
+    isProfilePinned?: boolean;
     contentType?: 'article' | 'post' | 'video' | string;
     etag?: string;
     ownerUserId?: string;
@@ -239,6 +241,37 @@ export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailVie
     const sessionStatus = useAuthStore((state) => state.status);
     const currentUser = useAuthStore((state) => state.user);
     const isOwnPost = sessionStatus === 'authenticated' && Boolean(itemData.contentId && currentUser?.id && (itemData.ownerUserId === currentUser.id || itemData.creatorId === currentUser.id));
+    const profilePinSnapshot = useProfilePinSnapshot(isOwnPost ? currentUser?.id : null);
+    const hasAuthoritativePinState = profilePinSnapshot.userId === currentUser?.id && profilePinSnapshot.loaded;
+    const isProfilePinned = hasAuthoritativePinState
+        ? profilePinSnapshot.contentId === itemData.contentId
+        : itemData.isProfilePinned === true;
+
+    const toggleProfilePin = () => {
+        const contentId = itemData.contentId;
+        if (!contentId || !isOwnPost || !currentUser?.id) return;
+        if (profilePinSnapshot.loading || profilePinSnapshot.pending) {
+            Alert.alert('置顶状态同步中', '请等待当前置顶操作完成后重试。');
+            return;
+        }
+        const nextPinned = !isProfilePinned;
+        void (async () => {
+            const result = await setProfilePin(currentUser.id, contentId, nextPinned);
+            if (!result.ok) {
+                Alert.alert(
+                    nextPinned ? '置顶失败' : '取消置顶失败',
+                    result.message || '请刷新后重试。',
+                );
+                return;
+            }
+            Alert.alert(
+                nextPinned ? '已置顶' : '已取消置顶',
+                nextPinned ? '这条动态已置顶在个人主页。' : '这条动态已从个人主页移除置顶。',
+            );
+        })();
+    };
+
+
 
     const beginEditOwnPost = () => {
         const contentId = itemData.contentId;
@@ -411,6 +444,12 @@ export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailVie
         <ContextMenu.Root>
             <ContextMenu.Trigger asChild>
                 <TouchableOpacity onPress={onPress} className="p-1 py-2 pr-4 border-b border-neutral-200 dark:border-neutral-800">
+                    {isProfilePinned ? (
+                        <View className="ml-11 mb-1 flex-row items-center gap-1">
+                            <Feather name="bookmark" size={13} color={colorScheme === 'dark' ? '#a3a3a3' : '#737373'} />
+                            <Text className="text-xs font-semibold text-neutral-500 dark:text-neutral-400">Pinned</Text>
+                        </View>
+                    ) : null}
                     <View className="flex-row">
                         <ProfileImage source={{ uri: authorImageUrl, headers: authorImageHeaders }} displaySize="s" is_organization={isOrganization} />
                         <View className="ml-2 flex-1">
@@ -441,6 +480,16 @@ export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailVie
                                         <DropdownMenu.Content>
                                             {isOwnPost ? (
                                                 <>
+                                                    <DropdownMenu.Item
+                                                        key="pin-profile-post"
+                                                        onSelect={toggleProfilePin}
+                                                        disabled={profilePinSnapshot.pending || profilePinSnapshot.loading}
+                                                    >
+                                                        <DropdownMenu.ItemTitle>
+                                                            {isProfilePinned ? 'Unpin from profile' : 'Pin to profile'}
+                                                        </DropdownMenu.ItemTitle>
+                                                        <DropdownMenu.ItemIcon ios={{ name: 'pin' }} />
+                                                    </DropdownMenu.Item>
                                                     <DropdownMenu.Item key="edit-own-post" onSelect={beginEditOwnPost}>
                                                         <DropdownMenu.ItemTitle>Edit post</DropdownMenu.ItemTitle>
                                                         <DropdownMenu.ItemIcon ios={{ name: 'pencil' }} />
@@ -521,6 +570,16 @@ export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailVie
 
                 {isOwnPost ? (
                     <>
+                        <ContextMenu.Item
+                            key="pin-profile-post"
+                            onSelect={toggleProfilePin}
+                            disabled={profilePinSnapshot.pending || profilePinSnapshot.loading}
+                        >
+                            <ContextMenu.ItemTitle>
+                                {isProfilePinned ? 'Unpin from profile' : 'Pin to profile'}
+                            </ContextMenu.ItemTitle>
+                            <ContextMenu.ItemIcon ios={{ name: 'pin' }} />
+                        </ContextMenu.Item>
                         <ContextMenu.Item key="edit-own-post" onSelect={beginEditOwnPost}>
                             <ContextMenu.ItemTitle>Edit post</ContextMenu.ItemTitle>
                             <ContextMenu.ItemIcon ios={{ name: 'pencil' }} />
