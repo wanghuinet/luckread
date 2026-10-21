@@ -89,7 +89,7 @@ describe('like runtime', () => {
     const sql = (d.prepare as unknown as ReturnType<typeof vi.fn>).mock.calls.map(([query]) => String(query))
     expect(sql[0]).toContain('social_user_interactions')
     expect(sql[1]).toContain('interaction_likes')
-    expect(sql.every(query => !/(?:FROM|JOIN)\\s+contents/i.test(query))).toBe(true)
+    expect(sql.every(query => !query.toLowerCase().includes('from contents') && !query.toLowerCase().includes('join contents'))).toBe(true)
 
     const unpublished = db([])
     await expect(getLikeStatus(unpublished, publishedContextBinding('user-2', 404), 'user-1', { targetType: 'content', targetId: 'content-3' }, correlationId))
