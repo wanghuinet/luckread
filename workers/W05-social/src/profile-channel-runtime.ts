@@ -1,5 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
+import { fetchPublishedContentSocialContexts, type W03ContentBinding } from './w03-content-context-client.js'
+
 export class ProfileChannelRuntimeError extends Error {
   constructor(readonly code: string, readonly status: number) { super(code) }
 }
@@ -86,10 +88,12 @@ export type ProfileReplyPage = {
 
 export async function listProfileReplies(
   db: D1Database,
+  w03Content: W03ContentBinding | undefined,
   profileUserIdValue: string,
   cursorValue: string | null,
   limit: number,
-  viewerUserIdValue: string | null = null,
+  viewerUserIdValue: string | null,
+  correlationId: string,
 ): Promise<ProfileReplyPage> {
   const profileUserId = validateId(profileUserIdValue)
   const viewerUserId = viewerUserIdValue ? validateId(viewerUserIdValue) : null
@@ -97,49 +101,43 @@ export async function listProfileReplies(
   if (!Number.isInteger(limit) || limit < 1 || limit > 50) {
     throw new ProfileChannelRuntimeError('VALIDATION_FAILED', 400)
   }
+  if (!correlationId.trim()) throw new ProfileChannelRuntimeError('VALIDATION_FAILED', 400)
 
-  const params: unknown[] = [profileUserId]
-  let visibility = `
-    AND NOT EXISTS (
-      SELECT 1 FROM social_user_interactions block
-       WHERE block.relation_type = 'block'
-         AND (
-           (block.actor_user_id = c.author_user_id AND block.target_user_id = content.owner_user_id)
-           OR (block.actor_user_id = content.owner_user_id AND block.target_user_id = c.author_user_id)
-         )
-    )`
   if (viewerUserId) {
-    visibility += `
-    AND NOT EXISTS (
-      SELECT 1 FROM social_user_interactions block
-       WHERE block.relation_type = 'block'
-         AND ((block.actor_user_id = ? AND block.target_user_id = c.author_user_id)
-           OR (block.actor_user_id = c.author_user_id AND block.target_user_id = ?))
-    )
-    AND NOT EXISTS (
-      SELECT 1 FROM social_user_interactions mute
-       WHERE mute.relation_type = 'mute'
-         AND mute.actor_user_id = ? AND mute.target_user_id = c.author_user_id
-    )`
-    params.push(viewerUserId, viewerUserId, viewerUserId)
+    const policy = await db.prepare(
+      `SELECT
+         EXISTS (
+           SELECT 1 FROM social_user_interactions block
+            WHERE block.relation_type = 'block'
+              AND ((block.actor_user_id = ? AND block.target_user_id = ?)
+                OR (block.actor_user_id = ? AND block.target_user_id = ?))
+         ) AS blocked,
+         EXISTS (
+           SELECT 1 FROM social_user_interactions mute
+            WHERE mute.relation_type = 'mute'
+              AND mute.actor_user_id = ? AND mute.target_user_id = ?
+         ) AS muted`,
+    ).bind(viewerUserId, profileUserId, profileUserId, viewerUserId, viewerUserId, profileUserId)
+      .first<{ blocked: number; muted: number }>()
+    if (Number(policy?.blocked ?? 0) === 1 || Number(policy?.muted ?? 0) === 1) {
+      return { items: [], nextCursor: null, hasMore: false }
+    }
   }
 
+  const params: unknown[] = [profileUserId]
   const cursorSql = cursor ? ' AND (c.created_at < ? OR (c.created_at = ? AND c.id < ?))' : ''
   if (cursor) params.push(cursor.createdAt, cursor.createdAt, cursor.tieBreaker)
   params.push(limit + 1)
 
-  const result = await db.prepare(`
-    SELECT c.id, c.content_id, c.author_user_id, c.parent_id, c.body, c.state, c.depth, c.created_at, c.updated_at
-      FROM social_comments c
-      JOIN contents content ON content.id = c.content_id
-     WHERE c.author_user_id = ?
-       AND c.state = 'PUBLISHED'
-       AND content.state = 'PUBLISHED'
-       ${visibility}
-       ${cursorSql}
-     ORDER BY c.created_at DESC, c.id DESC
-     LIMIT ?
-  `).bind(...params).all<{
+  const result = await db.prepare(
+    `SELECT c.id, c.content_id, c.author_user_id, c.parent_id, c.body, c.state, c.depth, c.created_at, c.updated_at
+       FROM social_comments c
+      WHERE c.author_user_id = ?
+        AND c.state = 'PUBLISHED'
+        ${cursorSql}
+      ORDER BY c.created_at DESC, c.id DESC
+      LIMIT ?`,
+  ).bind(...params).all<{
     id: string
     content_id: string
     author_user_id: string
@@ -151,10 +149,41 @@ export async function listProfileReplies(
     updated_at: string
   }>()
 
-  const rows = result.results ?? []
-  const hasMore = rows.length > limit
-  const visible = hasMore ? rows.slice(0, limit) : rows
-  const last = visible.at(-1)
+  const candidates = result.results ?? []
+  const hasMore = candidates.length > limit
+  const scanned = hasMore ? candidates.slice(0, limit) : candidates
+  const contentIds = [...new Set(scanned.map(row => row.content_id))]
+  const contexts = await fetchPublishedContentSocialContexts(w03Content, { contentIds, correlationId })
+  const ownerIds = [...new Set(
+    scanned
+      .map(row => contexts.get(row.content_id)?.ownerUserId)
+      .filter((ownerId): ownerId is string => typeof ownerId === 'string' && ownerId.length > 0),
+  )]
+
+  const blockedOwners = new Set<string>()
+  if (ownerIds.length > 0) {
+    const placeholders = ownerIds.map(() => '?').join(', ')
+    const blockedRows = await db.prepare(
+      `SELECT actor_user_id, target_user_id
+         FROM social_user_interactions
+        WHERE relation_type = 'block'
+          AND (
+            (actor_user_id = ? AND target_user_id IN (${placeholders}))
+            OR (target_user_id = ? AND actor_user_id IN (${placeholders}))
+          )`,
+    ).bind(profileUserId, ...ownerIds, profileUserId, ...ownerIds)
+      .all<{ actor_user_id: string; target_user_id: string }>()
+    for (const row of blockedRows.results ?? []) {
+      blockedOwners.add(row.actor_user_id === profileUserId ? row.target_user_id : row.actor_user_id)
+    }
+  }
+
+  const visible = scanned.filter(row => {
+    const context = contexts.get(row.content_id)
+    if (!context || context.contentId !== row.content_id || context.state !== 'PUBLISHED') return false
+    return context.ownerUserId === null || !blockedOwners.has(context.ownerUserId)
+  })
+  const lastScanned = scanned.at(-1)
   return {
     items: visible.map((row) => ({
       id: row.id,
@@ -168,13 +197,13 @@ export async function listProfileReplies(
       updatedAt: row.updated_at,
     })),
     hasMore,
-    nextCursor: hasMore && last ? encodeCursor({
+    nextCursor: hasMore && lastScanned ? encodeCursor({
       version: 1,
       channel: 'replies',
       profileUserId,
       viewerUserId,
-      createdAt: last.created_at,
-      tieBreaker: last.id,
+      createdAt: lastScanned.created_at,
+      tieBreaker: lastScanned.id,
     }) : null,
   }
 }
