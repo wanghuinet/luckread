@@ -843,6 +843,10 @@ export default function UserProfileScreen() {
 
   const isOwnProfile = Boolean(user?.id && currentUserId && user.id === currentUserId);
   const showingLikes = isOwnProfile && selectedTabIndex === 1;
+
+  useEffect(() => {
+    if (!isOwnProfile) setSelectedTabIndex(0);
+  }, [isOwnProfile]);
   const profileTabs = isOwnProfile ? ['Posts', 'Likes'] : ['Posts'];
 
   useEffect(() => {
