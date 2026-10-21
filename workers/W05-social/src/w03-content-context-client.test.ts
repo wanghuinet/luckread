@@ -1,8 +1,8 @@
 /// <reference types="@cloudflare/workers-types" />
 import { describe, expect, it, vi } from 'vitest'
-import { fetchReplyAudienceContentContext } from './w03-content-context-client.js'
+import { fetchOwnedPostContext } from './w03-content-context-client.js'
 
-describe('W05 to W03 reply-audience context binding', () => {
+describe('W05 to W03 owned-post context binding', () => {
   it('forwards only the trusted principal and correlation metadata', async () => {
     let forwarded: Request | null = null
     const binding = {
@@ -20,7 +20,7 @@ describe('W05 to W03 reply-audience context binding', () => {
         })
       }),
     }
-    await expect(fetchReplyAudienceContentContext(binding, {
+    await expect(fetchOwnedPostContext(binding, {
       principalUserId: 'owner-1',
       principalLayer: 'L2',
       contentId: 'content-1',
@@ -28,7 +28,7 @@ describe('W05 to W03 reply-audience context binding', () => {
     })).resolves.toMatchObject({ ownerUserId: 'owner-1', contentType: 'post', state: 'PUBLISHED' })
     expect(binding.fetch).toHaveBeenCalledTimes(1)
     const request = forwarded as unknown as Request
-    expect(request.url).toContain('/internal/content/contents/content-1/reply-audience-context')
+    expect(request.url).toContain('/internal/content/contents/content-1/owned-post-context')
     expect(request.headers.get('X-LuckRead-Caller')).toBe('W05')
     expect(request.headers.get('X-LuckRead-Principal-User-Id')).toBe('owner-1')
     expect(request.headers.get('X-LuckRead-Principal-Layer')).toBe('L2')
@@ -38,14 +38,14 @@ describe('W05 to W03 reply-audience context binding', () => {
   })
 
   it('fails closed when the binding is missing or returns invalid ownership context', async () => {
-    await expect(fetchReplyAudienceContentContext(undefined, {
+    await expect(fetchOwnedPostContext(undefined, {
       principalUserId: 'owner-1',
       principalLayer: 'L2',
       contentId: 'content-1',
       correlationId: 'correlation-1',
     })).rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE', status: 503 })
 
-    await expect(fetchReplyAudienceContentContext({
+    await expect(fetchOwnedPostContext({
       fetch: async () => Response.json({ data: {
         contentId: 'content-1',
         ownerUserId: 'other-user',
@@ -68,7 +68,7 @@ describe('W05 to W03 reply-audience context binding', () => {
         requestId: 'req_2',
       }, { status: 404 }),
     }
-    await expect(fetchReplyAudienceContentContext(binding, {
+    await expect(fetchOwnedPostContext(binding, {
       principalUserId: 'owner-1',
       principalLayer: 'L2',
       contentId: 'content-1',
