@@ -187,7 +187,7 @@ export default function SocialPoll({ contentId }: { contentId: string }) {
             )}
             {showResults ? (
               <View style={styles.progressTrack}>
-                <View style={[styles.progressFill, { width: percentage + '%' }]} />
+                <View style={[styles.progressFill, { width: (percentage + '%') as `${number}%` }]} />
               </View>
             ) : null}
           </View>
