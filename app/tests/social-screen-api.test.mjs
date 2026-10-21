@@ -115,6 +115,7 @@ test('rejects a missing profile ID before requesting its Likes page', () => {
 
 test('wires public profile Replies and own-profile Likes to real channel endpoints', () => {
   expect(profileScreenSource).toContain("const profileTabs = isOwnProfile ? ['Posts', 'Replies', 'Likes'] : ['Posts', 'Replies'];");
+  expect(profileScreenSource).toContain("title: showingReplies ? 'Replies' : showingLikes ? 'Likes' : 'Feed'");
   expect(profileScreenSource).toContain('fetchUserRepliesPage(');
   expect(profileScreenSource).toContain("'/contents/' + encodeURIComponent(contentId)");
   expect(profileScreenSource).toContain('profileReply: {');
