@@ -462,7 +462,7 @@ export default function PublishScreen() {
       }
 
       if (pollEnabled && !contentId) {
-        let pollResult;
+        let pollResult: { response: Response; data: unknown };
         try {
           pollResult = await apiRequest<unknown>(
             '/contents/' + encodeURIComponent(draft.id) + '/poll',
