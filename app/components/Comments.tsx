@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Text,
   TextInput,
   TouchableOpacity,
@@ -11,8 +12,10 @@ import { useRouter } from 'expo-router';
 import { StyledExpoImage as Image } from '~/components/Image';
 
 import { apiRequest, getApiErrorMessage } from '~/lib/api-client';
+import { CommentDeleteApiError, deleteComment as deleteCommentRequest } from '~/lib/comment-delete-api';
 import { resolveNativeMediaSource, unwrapApiData } from '~/lib/content-adapter';
 import { readSessionToken } from '~/lib/secure-session';
+import { useAuthStore } from '~/store/auth-store';
 
 type ApiComment = {
   id: string;
@@ -71,6 +74,7 @@ const formatDate = (value: string): string => {
 
 export default function Comments({ contentId }: CommentsProps) {
   const router = useRouter();
+  const currentUserId = useAuthStore((state) => state.user?.id ?? null);
   const [comments, setComments] = useState<ApiComment[]>([]);
   const [profiles, setProfiles] = useState<Record<string, PublicUser>>({});
   const [cursor, setCursor] = useState<string | null>(null);
@@ -81,7 +85,9 @@ export default function Comments({ contentId }: CommentsProps) {
   const [body, setBody] = useState('');
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [deletingIds, setDeletingIds] = useState<Set<string>>(() => new Set());
   const [message, setMessage] = useState('');
+  const pendingDeleteKeysRef = useRef<Record<string, string>>({});
   const requestIdRef = useRef(0);
   const pendingSubmissionRef = useRef<{
     body: string;
@@ -220,6 +226,63 @@ export default function Comments({ contentId }: CommentsProps) {
     }
   }, [body, contentId, loadComments, replyingTo, router, submitting]);
 
+  const deleteOwnComment = useCallback(async (comment: ApiComment) => {
+    if (!currentUserId || comment.authorUserId !== currentUserId || deletingIds.has(comment.id)) return;
+
+    setDeletingIds((current) => new Set(current).add(comment.id));
+    setMessage('');
+    const key = pendingDeleteKeysRef.current[comment.id] || createIdempotencyKey(contentId + ':delete:' + comment.id);
+    pendingDeleteKeysRef.current[comment.id] = key;
+
+    try {
+      await deleteCommentRequest(comment.id, key);
+      delete pendingDeleteKeysRef.current[comment.id];
+      setComments((current) => current.filter((candidate) => candidate.id !== comment.id));
+      setReplyingTo((current) => current === comment.id ? null : current);
+      setMessage('Reply deleted.');
+    } catch (cause) {
+      if (cause instanceof CommentDeleteApiError && cause.status === 401) {
+        router.push('/login' as never);
+        return;
+      }
+      // Keep the same idempotency key for uncertain transport/5xx retries.
+      // For definitive client errors, let a later user retry start a new attempt.
+      if (
+        cause instanceof CommentDeleteApiError &&
+        typeof cause.status === 'number' &&
+        cause.status >= 400 &&
+        cause.status < 500 &&
+        cause.status !== 408 &&
+        cause.status !== 429
+      ) {
+        delete pendingDeleteKeysRef.current[comment.id];
+      }
+      setMessage(cause instanceof Error ? cause.message : 'Could not delete this reply. Please retry.');
+    } finally {
+      setDeletingIds((current) => {
+        const next = new Set(current);
+        next.delete(comment.id);
+        return next;
+      });
+    }
+  }, [currentUserId, deletingIds, router]);
+
+  const confirmDeleteOwnComment = useCallback((comment: ApiComment) => {
+    if (!currentUserId || comment.authorUserId !== currentUserId || deletingIds.has(comment.id)) return;
+    Alert.alert(
+      'Delete this reply?',
+      'This cannot be undone. A comment with replies may need to be kept.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => { void deleteOwnComment(comment); },
+        },
+      ],
+    );
+  }, [currentUserId, deleteOwnComment, deletingIds]);
+
   const beginReply = useCallback((comment: ApiComment) => {
     setReplyingTo(comment.id);
     setMessage('');
@@ -330,13 +393,28 @@ export default function Comments({ contentId }: CommentsProps) {
                 </TouchableOpacity>
                 <Text className="mt-0.5 text-xs text-neutral-500">{createdAt}</Text>
                 <Text className="mt-2 text-base leading-6 text-black dark:text-white">{comment.body}</Text>
-                <TouchableOpacity
-                  accessibilityRole="button"
-                  className="mt-2 self-start"
-                  onPress={() => beginReply(comment)}
-                >
-                  <Text className="text-sm font-semibold text-neutral-500">Reply</Text>
-                </TouchableOpacity>
+                <View className="mt-2 flex-row items-center gap-4">
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    className="self-start"
+                    onPress={() => beginReply(comment)}
+                  >
+                    <Text className="text-sm font-semibold text-neutral-500">Reply</Text>
+                  </TouchableOpacity>
+                  {currentUserId && comment.authorUserId === currentUserId ? (
+                    <TouchableOpacity
+                      accessibilityRole="button"
+                      accessibilityLabel="Delete your reply"
+                      className="self-start"
+                      disabled={deletingIds.has(comment.id)}
+                      onPress={() => confirmDeleteOwnComment(comment)}
+                    >
+                      <Text className={'text-sm font-semibold ' + (deletingIds.has(comment.id) ? 'text-neutral-400' : 'text-rose-600')}>
+                        {deletingIds.has(comment.id) ? 'Deleting…' : 'Delete'}
+                      </Text>
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
               </View>
             </View>
           </View>
