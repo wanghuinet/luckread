@@ -92,6 +92,8 @@ jobs:
         run: bun test tests/report-api.test.mjs
       - name: Test native post interaction API contracts
         run: bun test tests/post-interactions-api.test.mjs
+      - name: Test native comment like API and UI wiring
+        run: bun test tests/comment-likes-api.test.mjs
       - name: Test native registration, verification and recovery API contracts
         run: bun run test:auth-flow
       - name: Enforce shared API client boundary

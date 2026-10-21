@@ -13,6 +13,7 @@ import { StyledExpoImage as Image } from '~/components/Image';
 import CommentEditAction from '~/components/CommentEditAction';
 
 import { apiRequest, getApiErrorMessage } from '~/lib/api-client';
+import { CommentLikeApiError, toggleCommentLike as toggleCommentLikeRequest } from '~/lib/comment-likes-api';
 import { CommentDeleteApiError, deleteComment as deleteCommentRequest } from '~/lib/comment-delete-api';
 import { resolveNativeMediaSource, unwrapApiData } from '~/lib/content-adapter';
 import { readSessionToken } from '~/lib/secure-session';
@@ -28,6 +29,7 @@ type ApiComment = {
   depth?: number;
   createdAt: string;
   updatedAt?: string;
+  likedByViewer?: boolean;
 };
 
 type CommentPage = {
@@ -78,6 +80,8 @@ export default function Comments({ contentId }: CommentsProps) {
   const currentUserId = useAuthStore((state) => state.user?.id ?? null);
   const [comments, setComments] = useState<ApiComment[]>([]);
   const [profiles, setProfiles] = useState<Record<string, PublicUser>>({});
+  const [likedComments, setLikedComments] = useState<Record<string, boolean>>({});
+  const [likingCommentId, setLikingCommentId] = useState<string | null>(null);
   const [cursor, setCursor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -119,6 +123,11 @@ export default function Comments({ contentId }: CommentsProps) {
         if (!nextCursor) return page.items;
         const known = new Set(current.map((item) => item.id));
         return [...current, ...page.items.filter((item) => !known.has(item.id))];
+      });
+      setLikedComments((current) => {
+        const next = nextCursor ? { ...current } : {};
+        for (const item of page.items) next[item.id] = item.likedByViewer === true;
+        return next;
       });
       setCursor(page.nextCursor || null);
       setHasMore(page.hasMore === true);
@@ -290,6 +299,24 @@ export default function Comments({ contentId }: CommentsProps) {
     inputRef.current?.focus();
   }, []);
 
+  const toggleCommentLike = useCallback(async (comment: ApiComment) => {
+    if (likingCommentId) return;
+    setLikingCommentId(comment.id);
+    setMessage('');
+    try {
+      const result = await toggleCommentLikeRequest(comment.id);
+      setLikedComments((current) => ({ ...current, [comment.id]: result.liked }));
+    } catch (cause) {
+      if (cause instanceof CommentLikeApiError && cause.status === 401) {
+        router.push('/login' as never);
+        return;
+      }
+      setMessage(cause instanceof Error ? cause.message : 'Could not update the reply like. Please retry.');
+    } finally {
+      setLikingCommentId(null);
+    }
+  }, [likingCommentId, router]);
+
   return (
     <View className="mt-3 border-t border-neutral-200 dark:border-neutral-800 px-3 pb-5">
       <View className="flex-row items-center justify-between py-3">
@@ -402,6 +429,28 @@ export default function Comments({ contentId }: CommentsProps) {
                     onPress={() => beginReply(comment)}
                   >
                     <Text className="text-sm font-semibold text-neutral-500">Reply</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    accessibilityLabel={likedComments[comment.id] ? 'Unlike reply' : 'Like reply'}
+                    disabled={likingCommentId !== null}
+                    onPress={() => void toggleCommentLike(comment)}
+                    className="flex-row items-center"
+                  >
+                    <Feather
+                      name="heart"
+                      size={15}
+                      color={likedComments[comment.id] ? '#1D9BF0' : '#536471'}
+                    />
+                    <Text className={likedComments[comment.id]
+                      ? "ml-1 text-sm font-semibold text-sky-500"
+                      : "ml-1 text-sm font-semibold text-neutral-500"}>
+                      {likingCommentId === comment.id
+                        ? 'Saving…'
+                        : likedComments[comment.id]
+                          ? 'Liked'
+                          : 'Like'}
+                    </Text>
                   </TouchableOpacity>
                   {currentUserId && comment.authorUserId === currentUserId ? (
                     <TouchableOpacity
