@@ -67,29 +67,20 @@ export async function unpinProfileContent(
   ).bind(actorUserId, contentId).run()
 }
 
-export async function getProfilePin(
+/**
+ * Read only W05-owned pin state. The caller must validate the referenced
+ * content through W03 before presenting this reference as a public profile pin.
+ */
+export async function getProfilePinReference(
   db: D1Database,
   userIdValue: string,
 ): Promise<ProfilePinRecord | null> {
   const userId = validateId(userIdValue)
   const row = await db.prepare(
-    `SELECT p.user_id, p.content_id, p.pinned_at
-       FROM social_profile_pins p
-       JOIN contents c ON c.id = p.content_id
-      WHERE p.user_id = ? AND c.owner_user_id = p.user_id AND c.content_type = 'post' AND c.state = 'PUBLISHED'
+    `SELECT user_id, content_id, pinned_at
+       FROM social_profile_pins
+      WHERE user_id = ?
       LIMIT 1`,
   ).bind(userId).first<{ user_id: string; content_id: string; pinned_at: string }>()
   return row ? { userId: row.user_id, contentId: row.content_id, pinnedAt: row.pinned_at } : null
-}
-
-export async function isContentProfilePinned(db: D1Database, contentIdValue: string): Promise<boolean> {
-  const contentId = validateId(contentIdValue)
-  const row = await db.prepare(
-    `SELECT EXISTS (
-       SELECT 1 FROM social_profile_pins p
-       JOIN contents c ON c.id = p.content_id AND c.owner_user_id = p.user_id
-       WHERE p.content_id = ? AND c.content_type = 'post' AND c.state = 'PUBLISHED'
-     ) AS pinned`,
-  ).bind(contentId).first<{ pinned: number }>()
-  return Number(row?.pinned ?? 0) === 1
 }
