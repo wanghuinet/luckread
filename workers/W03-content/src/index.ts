@@ -7,6 +7,7 @@ import {
   deleteContent,
   getContent,
   getOwnedPostContext,
+  getPublishedOwnerPostContext,
   listContents,
   searchPublishedContents,
   listFollowingOwnerContents,
@@ -250,6 +251,27 @@ const worker = {
       const url = new URL(request.url)
       const isRead = request.method === 'GET' || (request.method === 'POST' && ['/internal/content/following-feed', '/internal/content/search'].includes(url.pathname))
       await enforceRateLimits(request, env, isRead ? 'read' : 'write')
+
+      const publicPostContextMatch = /^\/internal\/content\/contents\/([^/]+)\/public-post-context\/([^/]+)$/.exec(url.pathname)
+      if (publicPostContextMatch) {
+        if (request.method !== 'GET') {
+          return new Response(null, { status: 405, headers: { Allow: 'GET' } })
+        }
+        if (
+          request.headers.get('X-LuckRead-Caller') !== 'W05' ||
+          request.headers.get('X-LuckRead-Transport-Version') !== '1.0' ||
+          !request.headers.get('X-LuckRead-Correlation-Id')?.trim() ||
+          request.headers.has('Authorization') ||
+          request.headers.has('Cookie')
+        ) {
+          throw new ContentRuntimeError('PERMISSION_DENIED', 403)
+        }
+        if (url.search !== '') throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+        const contentId = decodePathSegment(publicPostContextMatch[1] ?? '')
+        const ownerUserId = decodePathSegment(publicPostContextMatch[2] ?? '')
+        const context = await getPublishedOwnerPostContext(env.D1_02, contentId, ownerUserId)
+        return json({ data: context, requestId: createRequestId() })
+      }
 
       const ownedPostContextMatch = /^\/internal\/content\/contents\/([^/]+)\/owned-post-context$/.exec(url.pathname)
       if (ownedPostContextMatch) {
