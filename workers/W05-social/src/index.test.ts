@@ -542,7 +542,18 @@ describe('W05 social query transport', () => {
     expect(response.status).toBe(403)
   })
 
-  it('accepts an idempotent content like', async () => {
+  it('accepts an idempotent content like and resolves its notification owner through W03', async () => {
+    const contextBinding = {
+      fetch: vi.fn(async (_input: RequestInfo | URL) => Response.json({
+        data: {
+          contentId: 'content-1',
+          ownerUserId: 'owner-1',
+          contentType: 'post',
+          state: 'PUBLISHED',
+        },
+        requestId: 'req_notification_owner',
+      })),
+    }
     const response = await worker.fetch(
       new Request('https://luckread-w05.internal/internal/social/interactions/likes', {
         method: 'POST',
@@ -560,9 +571,15 @@ describe('W05 social query transport', () => {
             created_at: '2026-10-02T00:00:00.000Z',
           },
         ]),
+        W03_CONTENT: contextBinding,
       },
     )
     expect(response.status).toBe(200)
+    expect(contextBinding.fetch).toHaveBeenCalledTimes(1)
+    const forwarded = contextBinding.fetch.mock.calls[0]?.[0] as Request
+    expect(forwarded.url).toContain('/internal/content/contents/content-1/published-social-context')
+    expect(forwarded.headers.get('X-LuckRead-Caller')).toBe('W05')
+    expect(forwarded.headers.has('Authorization')).toBe(false)
     await expect(response.json()).resolves.toMatchObject({
       data: { relationshipId: 'like-1', targetId: 'content-1' },
     })
