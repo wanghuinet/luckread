@@ -25,6 +25,7 @@ const {
   fetchUserRelationshipsPage,
   fetchUserLikedContentsPage,
   fetchUserRepliesPage,
+  fetchUserProfileContentPage,
   findPublicUserByUsername,
   markAllNotificationsRead,
   markNotificationRead,
@@ -81,6 +82,21 @@ test('loads the real bookmark list with cursor pagination', async () => {
 
   expect(calls[0].path).toBe('/interactions/bookmarks?list=true&limit=20&cursor=bookmark+cursor%2F1');
   expect(calls[0].options.method).toBe('GET');
+});
+
+test('loads all content types for the native profile Media tab with creator filtering and pagination', async () => {
+  const controller = new AbortController();
+  await fetchUserProfileContentPage('profile/id', { cursor: 'media-next', limit: 15, signal: controller.signal });
+
+  expect(calls).toHaveLength(1);
+  expect(calls[0].path).toBe('/contents?creatorId=profile%2Fid&limit=15&cursor=media-next');
+  expect(calls[0].options.method).toBe('GET');
+  expect(calls[0].options.signal).toBe(controller.signal);
+});
+
+test('rejects a missing profile ID before requesting profile media', () => {
+  expect(() => fetchUserProfileContentPage('   ')).toThrow('A valid profile user ID is required.');
+  expect(calls).toHaveLength(0);
 });
 
 test('loads a real profile Replies page with cursor pagination through the existing route', async () => {
