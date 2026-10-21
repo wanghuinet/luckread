@@ -82,7 +82,7 @@ export async function listContentLikers(
   contentIdValue: string,
   cursorValue: string | null,
   limit: number,
-  viewerUserIdValue: string | null = null,
+  viewerUserIdValue: string | null,
   contentContext: PublishedContentSocialContext,
 ): Promise<ContentLikerPage> {
   const contentId = validateId(contentIdValue)
