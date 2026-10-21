@@ -83,23 +83,39 @@ describe('W05 reply audience runtime', () => {
   })
 
   it('returns the persisted owner policy and defaults existing posts to everyone', async () => {
+    const context = {
+      contentId: 'content-1',
+      ownerUserId: 'owner-1',
+      contentType: 'post' as const,
+      state: 'PUBLISHED' as const,
+      updatedAt: '2026-10-19T00:00:00.000Z',
+    }
     await expect(getContentReplyAudience(db([{
-      id: 'content-1',
+      content_id: 'content-1',
       owner_user_id: 'owner-1',
-      content_type: 'post',
       audience: 'followingNetwork',
       mentioned_user_ids_json: '[]',
       updated_at: '2026-10-19T00:00:00.000Z',
-    }]), 'owner-1', 'content-1')).resolves.toMatchObject({ replyAudience: 'followingNetwork' })
+    }]), 'owner-1', 'content-1', context)).resolves.toMatchObject({ replyAudience: 'followingNetwork' })
 
-    await expect(getContentReplyAudience(db([{
-      id: 'content-1',
-      owner_user_id: 'owner-1',
-      content_type: 'post',
-      audience: 'everyone',
-      mentioned_user_ids_json: '[]',
-      updated_at: '2026-10-19T00:00:00.000Z',
-    }]), 'owner-1', 'content-1')).resolves.toMatchObject({ replyAudience: 'everyone' })
+    const emptyDb = db([])
+    await expect(getContentReplyAudience(emptyDb, 'owner-1', 'content-1', context)).resolves.toMatchObject({
+      replyAudience: 'everyone',
+      updatedAt: '2026-10-19T00:00:00.000Z',
+    })
+    expect(String((emptyDb.prepare as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[0])).not.toContain('FROM contents')
+  })
+
+  it('rejects a reply-policy context that does not match the actor and content before querying W05 policy state', async () => {
+    const d = db([])
+    await expect(getContentReplyAudience(d, 'viewer-1', 'content-1', {
+      contentId: 'content-1',
+      ownerUserId: 'owner-1',
+      contentType: 'post',
+      state: 'PUBLISHED',
+      updatedAt: '2026-10-19T00:00:00.000Z',
+    })).rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 })
+    expect((d.prepare as unknown as ReturnType<typeof vi.fn>)).not.toHaveBeenCalled()
   })
 
   it('uses W05 follow, mention, second-degree, and trusted verified facts in the final SQL predicate', () => {
