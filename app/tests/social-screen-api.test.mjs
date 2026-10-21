@@ -24,6 +24,7 @@ const {
   fetchNotificationsPage,
   fetchUserRelationshipsPage,
   fetchUserLikedContentsPage,
+  fetchUserRepliesPage,
   findPublicUserByUsername,
   markAllNotificationsRead,
   markNotificationRead,
@@ -82,6 +83,21 @@ test('loads the real bookmark list with cursor pagination', async () => {
   expect(calls[0].options.method).toBe('GET');
 });
 
+test('loads a real profile Replies page with cursor pagination through the existing route', async () => {
+  const controller = new AbortController();
+  await fetchUserRepliesPage('profile/id', { cursor: 'reply-next', signal: controller.signal });
+
+  expect(calls).toHaveLength(1);
+  expect(calls[0].path).toBe('/users/profile%2Fid/replies?limit=20&cursor=reply-next');
+  expect(calls[0].options.method).toBe('GET');
+  expect(calls[0].options.signal).toBe(controller.signal);
+});
+
+test('rejects a missing profile ID before requesting its Replies page', () => {
+  expect(() => fetchUserRepliesPage('   ')).toThrow('A valid profile user ID is required.');
+  expect(calls).toHaveLength(0);
+});
+
 test('loads a real profile Likes page with cursor pagination through the existing route', async () => {
   const controller = new AbortController();
   await fetchUserLikedContentsPage('profile/id', { cursor: 'liked-next', signal: controller.signal });
@@ -97,8 +113,13 @@ test('rejects a missing profile ID before requesting its Likes page', () => {
   expect(calls).toHaveLength(0);
 });
 
-test('only wires the native profile Likes tab for the signed-in profile and real liked content', () => {
-  expect(profileScreenSource).toContain("const profileTabs = isOwnProfile ? ['Posts', 'Likes'] : ['Posts'];");
+test('wires public profile Replies and own-profile Likes to real channel endpoints', () => {
+  expect(profileScreenSource).toContain("const profileTabs = isOwnProfile ? ['Posts', 'Replies', 'Likes'] : ['Posts', 'Replies'];");
+  expect(profileScreenSource).toContain('fetchUserRepliesPage(');
+  expect(profileScreenSource).toContain("'/contents/' + encodeURIComponent(contentId)");
+  expect(profileScreenSource).toContain('profileReply: {');
+  expect(profileScreenSource).toContain('Replying to @');
+  expect(profileScreenSource).toContain('Load more replies');
   expect(profileScreenSource).toContain('fetchUserLikedContentsPage(');
   expect(profileScreenSource).toContain("'/contents/' + encodeURIComponent(likedItem.contentId)");
   expect(profileScreenSource).toContain('Load more liked posts');
