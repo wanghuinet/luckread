@@ -542,7 +542,18 @@ describe('W05 social query transport', () => {
     expect(response.status).toBe(403)
   })
 
-  it('accepts an idempotent content like', async () => {
+  it('accepts an idempotent content like and resolves its notification owner through W03', async () => {
+    const contextBinding = {
+      fetch: vi.fn(async (_input: RequestInfo | URL) => Response.json({
+        data: {
+          contentId: 'content-1',
+          ownerUserId: 'owner-1',
+          contentType: 'post',
+          state: 'PUBLISHED',
+        },
+        requestId: 'req_notification_owner',
+      })),
+    }
     const response = await worker.fetch(
       new Request('https://luckread-w05.internal/internal/social/interactions/likes', {
         method: 'POST',
@@ -560,9 +571,15 @@ describe('W05 social query transport', () => {
             created_at: '2026-10-02T00:00:00.000Z',
           },
         ]),
+        W03_CONTENT: contextBinding,
       },
     )
     expect(response.status).toBe(200)
+    expect(contextBinding.fetch).toHaveBeenCalledTimes(1)
+    const forwarded = contextBinding.fetch.mock.calls[0]?.[0] as Request
+    expect(forwarded.url).toContain('/internal/content/contents/content-1/published-social-context')
+    expect(forwarded.headers.get('X-LuckRead-Caller')).toBe('W05')
+    expect(forwarded.headers.has('Authorization')).toBe(false)
     await expect(response.json()).resolves.toMatchObject({
       data: { relationshipId: 'like-1', targetId: 'content-1' },
     })
@@ -1019,6 +1036,81 @@ describe('W05 social comment transport', () => {
       { DB: dbFor([]) },
     )
     expect(response.status).toBe(405)
+  })
+
+  it('resolves root comment notification recipients through W03', async () => {
+    const contextBinding = {
+      fetch: vi.fn(async (_input: RequestInfo | URL) => Response.json({
+        data: {
+          contentId: 'content-1',
+          ownerUserId: 'owner-1',
+          contentType: 'post',
+          state: 'PUBLISHED',
+        },
+        requestId: 'req_comment_owner',
+      })),
+    }
+    const d = dbFor([
+      {
+        existing_id: null,
+        existing_content_id: null,
+        existing_parent_id: null,
+        existing_body: null,
+        existing_author_user_id: null,
+        existing_state: null,
+        existing_depth: null,
+        existing_created_at: null,
+        existing_updated_at: null,
+        content_state: 'PUBLISHED',
+        content_owner_user_id: 'owner-1',
+        parent_content_id: null,
+        parent_author_user_id: null,
+        parent_state: null,
+        parent_depth: null,
+        recent_count: 0,
+        blocked: 0,
+        reply_audience_allowed: 1,
+      },
+      {
+        id: 'comment-1',
+        content_id: 'content-1',
+        author_user_id: 'viewer-1',
+        parent_id: null,
+        body: 'hello',
+        state: 'PUBLISHED',
+        depth: 0,
+        created_at: '2026-10-20T00:00:00.000Z',
+        updated_at: '2026-10-20T00:00:00.000Z',
+      },
+      null,
+      null,
+      null,
+    ])
+    const context = { waitUntil: vi.fn() }
+    const response = await worker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/contents/content-1/comments', {
+        method: 'POST',
+        headers: {
+          ...transportHeaders,
+          'X-LuckRead-Principal-Verified': 'false',
+          'content-type': 'application/json',
+          'Idempotency-Key': 'comment-root-notification-1',
+        },
+        body: JSON.stringify({ body: 'hello' }),
+      }),
+      { DB: d, W03_CONTENT: contextBinding },
+      context as never,
+    )
+    expect(response.status).toBe(201)
+    expect(contextBinding.fetch).toHaveBeenCalledTimes(1)
+    const forwarded = contextBinding.fetch.mock.calls[0]?.[0] as Request
+    expect(forwarded.url).toContain('/internal/content/contents/content-1/published-social-context')
+    expect(forwarded.headers.get('X-LuckRead-Caller')).toBe('W05')
+    const prepare = (d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare
+    expect(prepare.mock.calls.some(([sql]) => String(sql) === "SELECT owner_user_id FROM contents WHERE id = ? AND state = 'PUBLISHED' LIMIT 1")).toBe(false)
+    await expect(response.json()).resolves.toMatchObject({
+      data: { id: 'comment-1', contentId: 'content-1', authorUserId: 'viewer-1' },
+    })
   })
 
   it('requires an authenticated principal for comment creation', async () => {

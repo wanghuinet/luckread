@@ -546,6 +546,47 @@ export async function getOwnedPostContext(
  * owner as an authenticated principal. Only a published post owned by that
  * profile can be returned through this read-only internal context.
  */
+export type PublishedContentSocialContext = {
+  contentId: string
+  ownerUserId: string | null
+  contentType: ContentType
+  state: 'PUBLISHED'
+}
+
+/**
+ * Minimal published-content context for W05 notification recipient resolution.
+ * Only expose canonical owner/type for a currently published item.
+ */
+export async function getPublishedContentSocialContext(
+  db: ContentD1,
+  contentIdValue: string,
+): Promise<PublishedContentSocialContext> {
+  const contentId = contentIdValue.trim()
+  if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(contentId)) {
+    throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+  }
+  const row = await db.prepare(
+    `SELECT id, owner_user_id, content_type
+       FROM contents
+      WHERE id = ? AND state = 'PUBLISHED'
+      LIMIT 1`,
+  ).bind(contentId).first<{
+    id: string
+    owner_user_id: string | null
+    content_type: string
+  }>()
+  if (!row) throw new ContentRuntimeError('NOT_FOUND', 404)
+  if (!['article', 'post', 'video'].includes(row.content_type)) {
+    throw new ContentRuntimeError('INTERNAL_ERROR', 500)
+  }
+  return {
+    contentId: row.id,
+    ownerUserId: row.owner_user_id,
+    contentType: row.content_type as ContentType,
+    state: 'PUBLISHED',
+  }
+}
+
 export async function getPublishedOwnerPostContext(
   db: ContentD1,
   contentIdValue: string,

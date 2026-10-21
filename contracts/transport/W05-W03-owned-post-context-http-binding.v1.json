@@ -9,7 +9,7 @@
   "caller": {
     "logicalWorker": "W05",
     "role": "Social / Community",
-    "authority": "Reply-audience policy, profile-pin state and social relationship state"
+    "authority": "Reply-audience policy, profile-pin state, notification recipient routing and social relationship state"
   },
   "callee": {
     "logicalWorker": "W03",
@@ -66,11 +66,13 @@
       "Owner-only reply-audience GET uses W03 for canonical post context and W05 for reply policy state.",
       "Reply-audience PUT obtains owner/type/lifecycle context from W03 before W05 writes only the W05-owned reply policy table.",
       "Profile-pin POST obtains owner/type/lifecycle context from W03 before W05 writes only social_profile_pins.",
-      "Public pinned-content GET reads only the W05 pin reference and validates published owner/type/lifecycle through W03 before returning it."
+      "Public pinned-content GET reads only the W05 pin reference and validates published owner/type/lifecycle through W03 before returning it.",
+      "W05 content-like and root-comment notification recipient lookup resolves the canonical owner through W03; notification relationships and events remain W05-owned."
     ],
     "outOfScope": [
       "Comment insertion's atomic content-state/policy recheck remains unchanged.",
-      "Other W05 reads from the contents table are not claimed as fixed."
+      "Other W05 reads from the contents table are not claimed as fixed.",
+      "Comment insertion's atomic W05 policy, block and publication rechecks still query canonical content state within the existing transaction."
     ]
   },
   "evidenceRequired": [
@@ -84,7 +86,10 @@
     "runtime cross-Worker E2E evidence",
     "W03 published public-post context positive, wrong-owner and wrong-caller tests",
     "W05 public pinned-content GET reads W05 pin state only and asks W03 to validate public visibility",
-    "W05 public pinned-content GET returns null for stale or unpublished pins and fails closed when W03 is unavailable"
+    "W05 public pinned-content GET returns null for stale or unpublished pins and fails closed when W03 is unavailable",
+    "W03 published-content social context returns only ID, owner, type and PUBLISHED state",
+    "W05 content-like notification owner lookup uses W03 and does not query contents for recipient resolution",
+    "W05 root-comment notification owner lookup uses W03 while parent-comment notifications remain based on W05-owned social_comments"
   ],
   "operations": [
     {
@@ -164,6 +169,36 @@
       "allowedContentStates": [
         "PUBLISHED"
       ],
+      "cache": "NO_STORE",
+      "resourceBudget": {
+        "w03D1ReadMax": 1,
+        "w05D1ReadMax": 0,
+        "w05D1WriteMax": 0,
+        "w05ServiceBindingCallsMax": 1
+      }
+    },
+    {
+      "operationId": "getPublishedContentSocialContext",
+      "method": "GET",
+      "internalPath": "/internal/content/contents/{contentId}/published-social-context",
+      "principalRequired": false,
+      "caller": "W05 only through W03_CONTENT Service Binding",
+      "purpose": "Resolve notification recipient for a published content target",
+      "allowedContentTypes": [
+        "article",
+        "post",
+        "video"
+      ],
+      "allowedContentStates": [
+        "PUBLISHED"
+      ],
+      "responseFields": [
+        "contentId",
+        "ownerUserId",
+        "contentType",
+        "state"
+      ],
+      "ownerUserIdNullable": true,
       "cache": "NO_STORE",
       "resourceBudget": {
         "w03D1ReadMax": 1,
