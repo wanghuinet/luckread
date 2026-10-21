@@ -64,6 +64,92 @@ const json = (body: unknown, status = 200) =>
 export default {
   async fetch(request: Request, env?: Env): Promise<Response> {
     const url = new URL(request.url)
+    if (url.pathname === '/internal/search/contents') {
+      if (request.method !== 'GET') return new Response(null, { status: 405, headers: { Allow: 'GET' } })
+      if (
+        request.headers.get('X-LuckRead-Caller') !== 'W01' ||
+        request.headers.get('X-LuckRead-Transport-Version') !== '1.0' ||
+        !request.headers.get('X-LuckRead-Correlation-Id')?.trim() ||
+        request.headers.has('Authorization') ||
+        request.headers.has('Cookie') ||
+        request.headers.has('X-LuckRead-Principal-User-Id')
+      ) {
+        return json({ error: { code: 'PERMISSION_DENIED', message: 'PERMISSION_DENIED', details: {} } }, 403)
+      }
+
+      const allowed = new Set(['q', 'cursor', 'limit'])
+      let invalidQuery = url.search.length > 4096
+      url.searchParams.forEach((_value, key) => {
+        if (!allowed.has(key)) invalidQuery = true
+      })
+      const qValues = url.searchParams.getAll('q')
+      const cursorValues = url.searchParams.getAll('cursor')
+      const limitValues = url.searchParams.getAll('limit')
+      const query = qValues[0]?.normalize('NFKC').trim() ?? ''
+      const cursor = cursorValues[0]?.trim() ?? ''
+      const limit = limitValues[0]?.trim() ?? '20'
+      if (
+        invalidQuery ||
+        qValues.length !== 1 ||
+        cursorValues.length > 1 ||
+        limitValues.length > 1 ||
+        !query ||
+        query.length > 256 ||
+        (cursor && (cursor.length > 2048 || !/^[A-Za-z0-9_-]+$/.test(cursor))) ||
+        !/^(?:[1-9]|[1-4][0-9]|50)$/.test(limit)
+      ) {
+        return json({ error: { code: 'VALIDATION_FAILED', message: 'Invalid search query', details: {} } }, 422)
+      }
+      if (!env?.W03_CONTENT) {
+        return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Search content service unavailable', details: {} } }, 503)
+      }
+
+      const correlationId = request.headers.get('X-LuckRead-Correlation-Id')!.trim()
+      const transportHeaders = new Headers({
+        'X-LuckRead-Caller': 'W04',
+        'X-LuckRead-Transport-Version': '1.0',
+        'X-LuckRead-Correlation-Id': correlationId,
+        'X-LuckRead-Rate-Key': request.headers.get('X-LuckRead-Rate-Key')?.trim() || 'transport:W01',
+        'content-type': 'application/json; charset=utf-8',
+      })
+      try {
+        const contentResponse = await env.W03_CONTENT.fetch(new Request(
+          'https://luckread-w03.internal/internal/content/search',
+          {
+            method: 'POST',
+            headers: transportHeaders,
+            body: JSON.stringify({ q: query, cursor: cursor || null, limit: Number(limit) }),
+          },
+        ))
+        const contentText = await contentResponse.text()
+        if (!contentResponse.ok) {
+          return new Response(contentText, {
+            status: contentResponse.status,
+            headers: {
+              'content-type': contentResponse.headers.get('content-type') ?? 'application/json; charset=utf-8',
+              'cache-control': 'no-store',
+            },
+          })
+        }
+
+        let payload: { data?: { items?: unknown[]; nextCursor?: unknown; hasMore?: unknown }; requestId?: unknown }
+        try { payload = JSON.parse(contentText) as typeof payload } catch {
+          return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Content service returned invalid search data', details: {} } }, 503)
+        }
+        if (
+          !payload.data ||
+          !Array.isArray(payload.data.items) ||
+          typeof payload.data.hasMore !== 'boolean' ||
+          (payload.data.nextCursor !== null && typeof payload.data.nextCursor !== 'string')
+        ) {
+          return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Content service returned invalid search data', details: {} } }, 503)
+        }
+        return json(payload)
+      } catch {
+        return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Search content service unavailable', details: {} } }, 503)
+      }
+    }
+
     if (url.pathname === '/internal/feed/following') {
       if (request.method !== 'GET') return new Response(null, { status: 405, headers: { Allow: 'GET' } })
       if (request.headers.get('X-LuckRead-Caller') !== 'W01' ||

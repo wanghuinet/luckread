@@ -73,6 +73,7 @@ const normalizeLanguage = (request: Request): string => {
 
 const CACHE_QUERY_KEYS: Record<string, readonly string[]> = {
   'content-list': ['creatorId', 'cursor', 'limit', 'type'],
+  'social-discovery-topics': ['cursor', 'limit'],
   'content-detail': [],
   'content-comments': ['cursor', 'limit'],
   'content-relationships': ['cursor', 'limit', 'direction'],

@@ -682,6 +682,60 @@ export async function listContents(
   }
 }
 
+/**
+ * Search only published canonical content metadata. The cursor is scoped to the
+ * normalized query so it cannot be reused to enumerate a different search.
+ * Search is intentionally limited to title/slug until an admitted derived
+ * full-text index exists; body references are opaque IDs/URLs, not body text.
+ */
+export async function searchPublishedContents(
+  db: ContentD1,
+  queryValue: string,
+  cursorValue: string | null,
+  limit: number,
+): Promise<{ items: ContentRecord[]; nextCursor: string | null; hasMore: boolean }> {
+  const query = queryValue.normalize('NFKC').trim()
+  if (!query || query.length > 256) {
+    throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+  }
+
+  const pageSize = Math.min(Math.max(Number.isSafeInteger(limit) ? limit : 20, 1), 50)
+  const scope = JSON.stringify({
+    type: 'published-content-search',
+    query: query.toLowerCase(),
+  })
+  const decoded = cursorValue ? decodeScopedCursor(cursorValue, scope) : null
+  const cursorClause = decoded
+    ? 'AND (created_at < ? OR (created_at = ? AND id < ?))'
+    : ''
+  const cursorBindings: unknown[] = decoded
+    ? [decoded.updatedAt, decoded.updatedAt, decoded.id]
+    : []
+
+  const rows = await db.prepare(`
+    SELECT id, content_type, owner_user_id, creator_id, ip_id, state, scheduled_at,
+           version, revision, slug, title, body_ref, media_refs_json, cover_ref,
+           etag, created_at, updated_at
+      FROM contents
+     WHERE state = 'PUBLISHED'
+       AND (instr(lower(title), lower(?)) > 0 OR instr(lower(slug), lower(?)) > 0)
+       ${cursorClause}
+     ORDER BY created_at DESC, id DESC
+     LIMIT ?`).bind(query, query, ...cursorBindings, pageSize + 1).all<ContentRow>()
+
+  const hasMore = rows.results.length > pageSize
+  const items = rows.results.slice(0, pageSize).map(toContent)
+  const last = items.at(-1)
+  return {
+    items,
+    hasMore,
+    nextCursor: hasMore && last
+      ? encodeScopedCursor(last.createdAt, last.id, scope)
+      : null,
+  }
+}
+
+
 
 type FollowingContentsCursor = {
   version: 1

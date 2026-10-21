@@ -50,6 +50,34 @@ describe('public response cache', () => {
     delete (globalThis as Record<string, unknown>).caches
   })
 
+  it('caches public discovery topic pages with a bounded key and TTL', async () => {
+    Object.defineProperty(globalThis, 'caches', { value: { default: cache }, configurable: true })
+    const request = new Request('https://luckread.com/api/v1/discovery/topics?limit=10&cursor=cursor_1')
+    const payload: { data: { items: Array<{ topicId: string; name: string }>; hasMore: boolean; nextCursor: string | null } } = {
+      data: { items: [{ topicId: 'topic_1', name: 'LuckRead' }], hasMore: false, nextCursor: null },
+    }
+    const loader = vi.fn(async () => Response.json(payload))
+
+    const first = await cachedPublicGet(request, 'social-discovery-topics', loader, 30)
+
+    expect(loader).toHaveBeenCalledTimes(1)
+    expect(first.headers.get('X-LuckRead-Cache')).toBe('MISS')
+    const putCalls = cache.put.mock.calls as unknown as Array<[Request, Response | undefined]>
+    const stored = putCalls.find(([key]) => key.url.includes('__edge-cache'))
+    expect(stored?.[0].url).toContain('n=social-discovery-topics')
+    expect(stored?.[0].url).toContain('cursor%3Dcursor_1%26limit%3D10')
+    expect(stored?.[1]?.headers.get('cache-control')).toBe('public, max-age=0, s-maxage=30')
+
+    const cachedResponse = Response.json(payload)
+    cache.match.mockImplementation(async (key: Request) => (
+      key.url.includes('__edge-cache') ? cachedResponse.clone() : undefined
+    ))
+    const second = await cachedPublicGet(request.clone(), 'social-discovery-topics', loader, 30)
+
+    expect(loader).toHaveBeenCalledTimes(1)
+    expect(second.headers.get('X-LuckRead-Cache')).toBe('HIT')
+  })
+
   it('serves a cache hit without executing the origin loader', async () => {
     const cached = new Response(JSON.stringify({ data: 'cached' }), {
       status: 200,
