@@ -1,5 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 import type { OwnedPostContext } from './owned-post-context.js'
+import type { PublishedContentSocialContext } from './w03-content-context-client.js'
 import { ReplyAudienceRuntimeError } from './reply-audience-runtime.js'
 import { fetchPublishedOwnerPostContext, type W03ContentBinding } from './w03-content-context-client.js'
 
@@ -120,6 +121,31 @@ const rowFromOwnedPostContext = (
   }
 }
 
+type PollContentContext = OwnedPostContext | PublishedContentSocialContext
+
+const rowFromPollContentContext = (
+  contentId: string,
+  context: PollContentContext | undefined,
+): ContentRow | null => {
+  if (
+    !context ||
+    context.contentId !== contentId ||
+    context.contentType !== 'post' ||
+    !['DRAFT', 'PUBLISHED', 'UNPUBLISHED'].includes(context.state) ||
+    typeof context.updatedAt !== 'string' ||
+    !context.updatedAt.trim()
+  ) {
+    return null
+  }
+  return {
+    id: context.contentId,
+    content_type: context.contentType,
+    state: context.state,
+    owner_user_id: context.ownerUserId,
+    updated_at: context.updatedAt,
+  }
+}
+
 const readPollRow = (db: D1Database, contentId: string) => db.prepare(
   `SELECT poll_id, content_id, owner_user_id, duration_hours, ends_at, created_at, updated_at
      FROM social_polls
@@ -139,15 +165,11 @@ export async function getContentPoll(
   db: D1Database,
   contentIdValue: string,
   viewerUserIdValue: string | null,
-  contentContext?: OwnedPostContext,
+  contentContext: PollContentContext,
 ): Promise<PollView | null> {
   const contentId = validateId(contentIdValue)
   const viewerUserId = viewerUserIdValue ? validateId(viewerUserIdValue, 'UNAUTHENTICATED') : null
-  const content = contentContext
-    ? rowFromOwnedPostContext(contentId, contentContext)
-    : await db.prepare(
-        'SELECT id, content_type, state, owner_user_id, updated_at FROM contents WHERE id = ? LIMIT 1',
-      ).bind(contentId).first<ContentRow>()
+  const content = rowFromPollContentContext(contentId, contentContext)
 
   if (!content || content.content_type !== 'post') throw new SocialPollError('NOT_FOUND', 404)
   const isOwner = Boolean(viewerUserId && content.owner_user_id === viewerUserId)
