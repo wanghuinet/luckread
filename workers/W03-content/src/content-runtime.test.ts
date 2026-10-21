@@ -62,7 +62,7 @@ describe('W03 content contract core', () => {
   })
 
 
-  it('serves owner-scoped reply-audience context only over the W05 internal binding', async () => {
+  it('serves owner-scoped owned-post context only over the W05 internal binding', async () => {
     let query = ''
     let bindings: unknown[] = []
     const row = {
@@ -84,12 +84,12 @@ describe('W03 content contract core', () => {
       },
     } as never
     const request = (caller: string, userId = 'user_1') => new Request(
-      'https://luckread-w03.internal/internal/content/contents/content_1/reply-audience-context',
+      'https://luckread-w03.internal/internal/content/contents/content_1/owned-post-context',
       {
         headers: {
           'X-LuckRead-Caller': caller,
           'X-LuckRead-Transport-Version': '1.0',
-          'X-LuckRead-Correlation-Id': 'reply-audience-context-test',
+          'X-LuckRead-Correlation-Id': 'owned-post-context-test',
           'X-LuckRead-Principal-User-Id': userId,
           'X-LuckRead-Principal-Layer': 'L2',
         },
