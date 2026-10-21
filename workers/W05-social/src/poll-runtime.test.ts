@@ -317,12 +317,12 @@ describe('W05 poll runtime', () => {
     const absent = pollDb(scenario)
     await expect(castContentPollVote(absent.db, undefined, 'viewer-1', 'content-1', 'option-1', 'poll-vote-no-binding'))
       .rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE', status: 503 })
-    expect(absent.prepare.some(([sql]) => /INSERT OR IGNORE INTO social_poll_votes/.test(String(sql)))).toBe(false)
+    expect(absent.prepare.mock.calls.some(([sql]) => /INSERT OR IGNORE INTO social_poll_votes/.test(String(sql)))).toBe(false)
 
     const unpublished = pollDb(scenario)
     await expect(castContentPollVote(unpublished.db, publishedOwnerContextBinding(404), 'viewer-1', 'content-1', 'option-1', 'poll-vote-unpublished'))
       .rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 })
-    expect(unpublished.prepare.some(([sql]) => /INSERT OR IGNORE INTO social_poll_votes/.test(String(sql)))).toBe(false)
+    expect(unpublished.prepare.mock.calls.some(([sql]) => /INSERT OR IGNORE INTO social_poll_votes/.test(String(sql)))).toBe(false)
   })
 
 })
