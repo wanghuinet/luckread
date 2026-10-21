@@ -497,6 +497,10 @@ export default {
         if (contentId === null) throw new SocialClosureRuntimeError('VALIDATION_FAILED', 400)
         if (request.method === 'GET') {
           requireTransport(request)
+          await fetchPublishedContentSocialContext(env.W03_CONTENT, {
+            contentId,
+            correlationId: request.headers.get('X-LuckRead-Correlation-Id') ?? '',
+          })
           return json({ data: await getSocialTargets(env.DB, 'content', contentId), requestId: crypto.randomUUID() })
         }
         if (request.method !== 'POST') return new Response(null, { status: 405, headers: { Allow: 'GET, POST' } })
