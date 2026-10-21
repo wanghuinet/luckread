@@ -11,6 +11,8 @@ import {
   TextInput,
   View,
   type TextInputProps,
+  type StyleProp,
+  type ViewStyle,
 } from 'react-native';
 
 export const AUTH_COLORS = {
@@ -60,7 +62,7 @@ export function AuthInput({
   label,
   containerStyle,
   ...inputProps
-}: TextInputProps & { label: string; containerStyle?: object }) {
+}: TextInputProps & { label: string; containerStyle?: StyleProp<ViewStyle> }) {
   return (
     <View style={[styles.fieldContainer, containerStyle]}>
       <Text style={styles.label}>{label}</Text>
