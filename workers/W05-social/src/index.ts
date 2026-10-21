@@ -649,12 +649,19 @@ export default {
         if (Object.keys(raw).some((key) => key !== 'replyAudience' && key !== 'mentionedUserIds')) {
           throw new ReplyAudienceRuntimeError('VALIDATION_FAILED', 400)
         }
+        const context = await fetchReplyAudienceContentContext(env.W03_CONTENT, {
+          principalUserId: actorUserId,
+          principalLayer: request.headers.get('X-LuckRead-Principal-Layer')?.trim() ?? '',
+          contentId,
+          correlationId: request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? '',
+        })
         const policy = await setContentReplyAudience(
           env.DB,
           actorUserId,
           contentId,
           raw.replyAudience,
           raw.mentionedUserIds,
+          context,
         )
         return json({ data: policy, requestId: createRequestId() })
       }
