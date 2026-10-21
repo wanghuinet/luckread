@@ -1,5 +1,8 @@
 /// <reference types="@cloudflare/workers-types" />
 
+import { ReplyAudienceRuntimeError } from './reply-audience-runtime.js'
+import { fetchPublishedContentSocialContext, type PublishedContentSocialContext, type W03ContentBinding } from './w03-content-context-client.js'
+
 export class LikeRuntimeError extends Error {
   constructor(readonly code: string, readonly status: number) { super(code) }
 }
@@ -151,69 +154,111 @@ const validateActor = (actorUserId: string): string => {
   return value
 }
 
-export async function like(
+type LikeTargetContext = {
+  relatedUserIds: string[]
+}
+
+const resolvePublishedContext = async (
+  binding: W03ContentBinding | undefined,
+  contentId: string,
+  correlationId: string,
+): Promise<PublishedContentSocialContext | null> => {
+  try {
+    return await fetchPublishedContentSocialContext(binding, { contentId, correlationId })
+  } catch (error) {
+    if (error instanceof ReplyAudienceRuntimeError) {
+      if (error.status === 404) return null
+      if (error.status === 400) throw new LikeRuntimeError('VALIDATION_FAILED', 400)
+      if (error.status === 403) throw new LikeRuntimeError('PERMISSION_DENIED', 403)
+      if (error.status === 429) throw new LikeRuntimeError('RATE_LIMITED', 429)
+    }
+    throw new LikeRuntimeError('SERVICE_UNAVAILABLE', 503)
+  }
+}
+
+const resolveLikeTargetContext = async (
+  db: D1Database,
+  w03Content: W03ContentBinding | undefined,
+  targetType: 'content' | 'comment',
+  targetId: string,
+  correlationId: string,
+  prevalidatedContentContext?: PublishedContentSocialContext,
+): Promise<LikeTargetContext | null> => {
+  if (targetType === 'content') {
+    const context = prevalidatedContentContext
+      ? (
+          prevalidatedContentContext.contentId === targetId &&
+          prevalidatedContentContext.state === 'PUBLISHED'
+            ? prevalidatedContentContext
+            : null
+        )
+      : await resolvePublishedContext(w03Content, targetId, correlationId)
+    if (!context) return null
+    return { relatedUserIds: context.ownerUserId ? [context.ownerUserId] : [] }
+  }
+
+  const comment = await db.prepare(
+    'SELECT id, state, author_user_id, content_id FROM social_comments WHERE id = ? LIMIT 1',
+  ).bind(targetId).first<{
+    id: string
+    state: string
+    author_user_id: string | null
+    content_id: string
+  }>()
+  if (!comment || comment.state !== 'PUBLISHED') return null
+
+  const parentContext = await resolvePublishedContext(w03Content, comment.content_id, correlationId)
+  if (!parentContext) return null
+  return {
+    relatedUserIds: [comment.author_user_id, parentContext.ownerUserId]
+      .filter((userId): userId is string => typeof userId === 'string' && userId.length > 0),
+  }
+}
+
+const assertTargetNotBlocked = async (
   db: D1Database,
   actorUserId: string,
+  relatedUserIds: string[],
+): Promise<void> => {
+  const targets = [...new Set(relatedUserIds.filter(userId => userId !== actorUserId))]
+  if (targets.length === 0) return
+  const placeholders = targets.map(() => '?').join(', ')
+  const row = await db.prepare(
+    `SELECT EXISTS (
+       SELECT 1
+       FROM social_user_interactions block
+       WHERE block.relation_type = 'block'
+         AND (
+           (block.actor_user_id = ? AND block.target_user_id IN (${placeholders}))
+           OR
+           (block.target_user_id = ? AND block.actor_user_id IN (${placeholders}))
+         )
+     ) AS blocked`,
+  ).bind(actorUserId, ...targets, actorUserId, ...targets).first<{ blocked: number }>()
+  if (Number(row?.blocked ?? 0) === 1) throw new LikeRuntimeError('CONFLICT', 409)
+}
+
+export async function like(
+  db: D1Database,
+  w03Content: W03ContentBinding | undefined,
+  actorUserId: string,
   target: LikeTarget,
+  correlationId: string,
+  prevalidatedContentContext?: PublishedContentSocialContext,
 ): Promise<LikeResult> {
   const actor = validateActor(actorUserId)
   const { targetType, targetId } = validateTarget(target)
 
-  const targetRow = targetType === 'content'
-    ? await db.prepare(
-        `SELECT
-           c.id,
-           c.state,
-           c.owner_user_id,
-           EXISTS (
-             SELECT 1
-             FROM social_user_interactions block
-             WHERE block.relation_type = 'block'
-               AND (
-                 (block.actor_user_id = ? AND block.target_user_id = c.owner_user_id)
-                 OR
-                 (block.actor_user_id = c.owner_user_id AND block.target_user_id = ?)
-               )
-           ) AS blocked
-           FROM contents c
-          WHERE c.id = ?
-          LIMIT 1`,
-      ).bind(actor, actor, targetId).first<{ id: string; state: string; owner_user_id: string; blocked: number }>()
-    : await db.prepare(
-        `SELECT
-           c.id,
-           c.state,
-           c.author_user_id,
-           content.owner_user_id AS content_owner_user_id,
-           EXISTS (
-             SELECT 1
-             FROM social_user_interactions block
-             WHERE block.relation_type = 'block'
-               AND (
-                 (block.actor_user_id = ? AND block.target_user_id = c.author_user_id)
-                 OR
-                 (block.actor_user_id = c.author_user_id AND block.target_user_id = ?)
-                 OR
-                 (block.actor_user_id = ? AND block.target_user_id = content.owner_user_id)
-                 OR
-                 (block.actor_user_id = content.owner_user_id AND block.target_user_id = ?)
-               )
-           ) AS blocked
-           FROM social_comments c
-           JOIN contents content ON content.id = c.content_id
-          WHERE c.id = ?
-            AND c.state = 'PUBLISHED'
-            AND content.state = 'PUBLISHED'
-          LIMIT 1`,
-      ).bind(actor, actor, actor, actor, targetId).first<{ id: string; state: string; author_user_id: string; content_owner_user_id: string; blocked: number }>()
-
-  if (!targetRow || targetRow.state !== 'PUBLISHED') {
-    throw new LikeRuntimeError('NOT_FOUND', 404)
-  }
-
-  if (Number(targetRow.blocked) === 1) {
-    throw new LikeRuntimeError('CONFLICT', 409)
-  }
+  const targetContext = await resolveLikeTargetContext(
+    db,
+    w03Content,
+    targetType,
+    targetId,
+    correlationId,
+    prevalidatedContentContext,
+  )
+  if (!targetContext) throw new LikeRuntimeError('NOT_FOUND', 404)
+  await assertTargetNotBlocked(db, actor, targetContext.relatedUserIds)
 
   const createdAt = new Date().toISOString()
   const relationshipId = crypto.randomUUID()
@@ -293,11 +338,32 @@ export async function like(
 
 export async function getLikeStatus(
   db: D1Database,
+  w03Content: W03ContentBinding | undefined,
   actorUserId: string,
   target: LikeTarget,
+  correlationId: string,
+  prevalidatedContentContext?: PublishedContentSocialContext,
 ): Promise<{ liked: boolean; likeCount: number }> {
   const actor = validateActor(actorUserId)
   const { targetType, targetId } = validateTarget(target)
+
+  // Validate target visibility and block relationships before consulting caches.
+  const targetContext = await resolveLikeTargetContext(
+    db,
+    w03Content,
+    targetType,
+    targetId,
+    correlationId,
+    prevalidatedContentContext,
+  )
+  if (!targetContext) {
+    await Promise.all([
+      invalidateCachedLikeViewerState(actor, targetType, targetId),
+      invalidateCachedLikeAggregate(targetType, targetId),
+    ])
+    return { liked: false, likeCount: 0 }
+  }
+  await assertTargetNotBlocked(db, actor, targetContext.relatedUserIds)
 
   const [cachedLiked, cachedCount] = await Promise.all([
     readCachedLikeViewerState(actor, targetType, targetId),
@@ -307,88 +373,30 @@ export async function getLikeStatus(
     return { liked: cachedLiked, likeCount: cachedCount }
   }
 
-  const likeCountSelect = cachedCount === null
-    ? `(SELECT COUNT(*)
-       FROM interaction_likes il_count
-      WHERE il_count.target_type = ?
-        AND il_count.target_id = c.id) AS like_count,`
+  const countSelect = cachedCount === null
+    ? `, (SELECT COUNT(*)
+         FROM interaction_likes il_count
+        WHERE il_count.target_type = ?
+          AND il_count.target_id = ?) AS like_count`
     : ''
+  const row = await db.prepare(
+    `SELECT EXISTS (
+       SELECT 1
+       FROM interaction_likes il
+       WHERE il.actor_user_id = ?
+         AND il.target_type = ?
+         AND il.target_id = ?
+     ) AS liked${countSelect}`,
+  ).bind(
+    actor,
+    targetType,
+    targetId,
+    ...(cachedCount === null ? [targetType, targetId] : []),
+  ).first<{ liked: number; like_count?: number }>()
 
-  const row = targetType === 'content'
-    ? await db.prepare(
-        `SELECT
-           EXISTS (
-             SELECT 1
-             FROM interaction_likes il
-             WHERE il.actor_user_id = ?
-               AND il.target_type = ?
-               AND il.target_id = c.id
-           ) AS liked,
-           ${likeCountSelect}
-           EXISTS (
-             SELECT 1
-             FROM social_user_interactions block
-             WHERE block.relation_type = 'block'
-               AND (
-                 (block.actor_user_id = ? AND block.target_user_id = c.owner_user_id)
-                 OR
-                 (block.actor_user_id = c.owner_user_id AND block.target_user_id = ?)
-               )
-           ) AS blocked
-           FROM contents c
-          WHERE c.id = ? AND c.state = 'PUBLISHED'
-          LIMIT 1`,
-      ).bind(...(cachedCount === null
-        ? [actor, targetType, targetType, actor, actor, targetId]
-        : [actor, targetType, actor, actor, targetId]))
-        .first<{ liked: number; like_count?: number; blocked: number }>()
-    : await db.prepare(
-        `SELECT
-           EXISTS (
-             SELECT 1
-             FROM interaction_likes il
-             WHERE il.actor_user_id = ?
-               AND il.target_type = ?
-               AND il.target_id = c.id
-           ) AS liked,
-           ${likeCountSelect.replace('c.id', 'c.id')}
-           EXISTS (
-             SELECT 1
-             FROM social_user_interactions block
-             WHERE block.relation_type = 'block'
-               AND (
-                 (block.actor_user_id = ? AND block.target_user_id = c.author_user_id)
-                 OR
-                 (block.actor_user_id = c.author_user_id AND block.target_user_id = ?)
-                 OR
-                 (block.actor_user_id = ? AND block.target_user_id = content.owner_user_id)
-                 OR
-                 (block.actor_user_id = content.owner_user_id AND block.target_user_id = ?)
-               )
-           ) AS blocked
-           FROM social_comments c
-          JOIN contents content ON content.id = c.content_id
-          WHERE c.id = ?
-            AND c.state = 'PUBLISHED'
-            AND content.state = 'PUBLISHED'
-          LIMIT 1`,
-      ).bind(...(cachedCount === null
-        ? [actor, targetType, targetType, actor, actor, actor, actor, targetId]
-        : [actor, targetType, actor, actor, actor, actor, targetId]))
-        .first<{ liked: number; like_count?: number; blocked: number }>()
-
-  if (!row) {
-    const result = { liked: false, likeCount: 0 }
-    await writeCachedLikeViewerState(actor, targetType, targetId, false)
-    return result
-  }
-  if (Number(row.blocked) === 1) {
-    throw new LikeRuntimeError('CONFLICT', 409)
-  }
-
-  const likeCount = cachedCount ?? Math.max(0, Number(row.like_count ?? 0))
+  const likeCount = cachedCount ?? Math.max(0, Number(row?.like_count ?? 0))
   const result = {
-    liked: Boolean(row.liked),
+    liked: Boolean(row?.liked),
     likeCount,
   }
   await writeCachedLikeViewerState(actor, targetType, targetId, result.liked)

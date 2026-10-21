@@ -731,7 +731,7 @@ describe('W05 social query transport', () => {
       }),
       {
         DB: dbFor([
-          { id: 'content-1', state: 'PUBLISHED' },
+          { blocked: 0 },
           {
             relationship_id: 'like-1',
             actor_user_id: 'user-1',
@@ -760,7 +760,7 @@ describe('W05 social query transport', () => {
         method: 'GET',
         headers: { ...transportHeaders, 'X-LuckRead-Principal-Layer': 'L2' },
       }),
-      { DB: dbFor([{ relationship_id: 'like-1' }]) },
+      { DB: dbFor([{ blocked: 0 }, { liked: 1, like_count: 1 }]), W03_CONTENT: publishedContextBinding() },
     )
     expect(response.status).toBe(200)
     await expect(response.json()).resolves.toMatchObject({
@@ -777,7 +777,8 @@ describe('W05 social query transport', () => {
       }),
       {
         DB: dbFor([
-          { id: 'comment-1', state: 'PUBLISHED', author_user_id: 'author-1', content_owner_user_id: 'owner-1', blocked: 0 },
+          { id: 'comment-1', state: 'PUBLISHED', author_user_id: 'author-1', content_id: 'content-1' },
+          { blocked: 0 },
           {
             relationship_id: 'comment-like-1',
             actor_user_id: 'viewer-1',
@@ -785,7 +786,10 @@ describe('W05 social query transport', () => {
             target_id: 'comment-1',
             created_at: '2026-10-02T00:00:00.000Z',
           },
+          { author_user_id: 'author-1' },
+          { content_id: 'content-1' },
         ]),
+        W03_CONTENT: publishedContextBinding('owner-1'),
       },
     )
     expect(response.status).toBe(200)
@@ -800,7 +804,11 @@ describe('W05 social query transport', () => {
         method: 'GET',
         headers: { ...transportHeaders, 'X-LuckRead-Principal-Layer': 'L2' },
       }),
-      { DB: dbFor([{ liked: 1, like_count: 2 }]) },
+      { DB: dbFor([
+          { id: 'comment-1', state: 'PUBLISHED', author_user_id: 'author-1', content_id: 'content-1' },
+          { blocked: 0 },
+          { liked: 1, like_count: 2 },
+        ]), W03_CONTENT: publishedContextBinding('owner-1') },
     )
     expect(response.status).toBe(200)
     await expect(response.json()).resolves.toMatchObject({

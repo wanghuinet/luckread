@@ -908,7 +908,7 @@ export default {
             }
           : await parseJsonTarget(request)
         if (request.method === 'GET') {
-          const result = await getLikeStatus(env.DB, viewerUserId, target)
+          const result = await getLikeStatus(env.DB, env.W03_CONTENT, viewerUserId, target, request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? '')
           return json({ data: result, requestId: createRequestId() }, 200)
         }
 
@@ -917,8 +917,14 @@ export default {
           if (idempotencyKey.length > 256) throw new LikeRuntimeError('VALIDATION_FAILED', 400)
 
         if (request.method === 'POST') {
-          const result = await like(env.DB, viewerUserId, target)
-          const recipientUserId = await getInteractionRecipient(env.DB, target.targetType, target.targetId, env.W03_CONTENT, request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? '')
+          const correlationId = request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? ''
+          const publishedContentContext = target.targetType === 'content'
+            ? await fetchPublishedContentSocialContext(env.W03_CONTENT, { contentId: target.targetId, correlationId })
+            : undefined
+          const result = await like(env.DB, env.W03_CONTENT, viewerUserId, target, correlationId, publishedContentContext)
+          const recipientUserId = publishedContentContext
+            ? publishedContentContext.ownerUserId
+            : await getInteractionRecipient(env.DB, target.targetType, target.targetId, env.W03_CONTENT, correlationId)
           const relatedContent = target.targetType === 'comment'
             ? await env.DB.prepare(
                 'SELECT content_id FROM social_comments WHERE id = ? LIMIT 1',

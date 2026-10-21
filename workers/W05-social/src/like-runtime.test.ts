@@ -3,6 +3,27 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { getLikeStatus, like, unlike } from './like-runtime.js'
+import type { W03ContentBinding } from './w03-content-context-client.js'
+
+const publishedContextBinding = (
+  ownerUserId = 'user-2',
+  status = 200,
+): W03ContentBinding & { fetch: ReturnType<typeof vi.fn> } => ({
+  fetch: vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const request = input instanceof Request ? input : new Request(input, init)
+    const contentId = decodeURIComponent(new URL(request.url).pathname.split('/').at(-2) ?? '')
+    if (status !== 200) return Response.json({ error: { code: 'NOT_FOUND' } }, { status })
+    return Response.json({ data: {
+      contentId,
+      ownerUserId,
+      contentType: 'post',
+      state: 'PUBLISHED',
+      updatedAt: '2026-10-17T04:00:00.000Z',
+    } })
+  }),
+})
+
+const correlationId = 'like-runtime-test'
 
 const db = (firstResults: unknown[] = []) => {
   let firstIndex = 0
@@ -25,7 +46,7 @@ describe('like runtime', () => {
 
   afterEach(() => { delete (globalThis as Record<string, unknown>).caches })
 
-  it('serves cached viewer state plus shared aggregate without touching D1', async () => {
+  it('validates visibility and Block policy before serving cached like state', async () => {
     const cache = {
       match: vi.fn(async (request: Request) => {
         if (request.url.includes('__social-like-viewer-state')) return Response.json({ liked: true })
@@ -36,9 +57,10 @@ describe('like runtime', () => {
       delete: vi.fn(async () => true),
     }
     Object.defineProperty(globalThis, 'caches', { value: { default: cache }, configurable: true })
-    const d = db([])
-    await expect(getLikeStatus(d, 'user-1', { targetType: 'content', targetId: 'content-hot' })).resolves.toEqual({ liked: true, likeCount: 9 })
-    expect(d.prepare).not.toHaveBeenCalled()
+    const d = db([{ blocked: 0 }])
+    await expect(getLikeStatus(d, publishedContextBinding(), 'user-1', { targetType: 'content', targetId: 'content-hot' }, correlationId)).resolves.toEqual({ liked: true, likeCount: 9 })
+    expect(d.prepare).toHaveBeenCalledTimes(1)
+    expect(String((d.prepare as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[0])).toContain('social_user_interactions')
   })
 
   it('reuses a shared aggregate without executing COUNT for another viewer', async () => {
@@ -52,29 +74,32 @@ describe('like runtime', () => {
       delete: vi.fn(async () => true),
     }
     Object.defineProperty(globalThis, 'caches', { value: { default: cache }, configurable: true })
-    const d = db([{ liked: 1, blocked: 0 }])
-    await expect(getLikeStatus(d, 'user-2', { targetType: 'content', targetId: 'content-hot' })).resolves.toEqual({ liked: true, likeCount: 21 })
+    const d = db([{ blocked: 0 }])
+    await expect(getLikeStatus(d, publishedContextBinding('user-3'), 'user-2', { targetType: 'content', targetId: 'content-hot' }, correlationId)).resolves.toEqual({ liked: false, likeCount: 21 })
     expect(d.prepare).toHaveBeenCalledTimes(1)
+    expect(String((d.prepare as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[0])).toContain('social_user_interactions')
     expect(String((d.prepare as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[0])).not.toContain('COUNT(*)')
   })
 
-  it('reads effective like status for the actor and target', async () => {
-    const existing = {
-      liked: 1,
-      like_count: 3,
-    }
-    const d = db([existing])
-    await expect(getLikeStatus(d, 'user-1', { targetType: 'content', targetId: 'content-1' })).resolves.toEqual({ liked: true, likeCount: 3 })
-    await expect(getLikeStatus(d, 'user-1', { targetType: 'content', targetId: 'content-2' })).resolves.toEqual({ liked: false, likeCount: 0 })
+  it('reads effective like status from W05 relation tables after W03 visibility validation', async () => {
+    const d = db([{ blocked: 0 }, { liked: 1, like_count: 3 }])
+    await expect(getLikeStatus(d, publishedContextBinding('user-2'), 'user-1', { targetType: 'content', targetId: 'content-1' }, correlationId))
+      .resolves.toEqual({ liked: true, likeCount: 3 })
     expect(d.prepare).toHaveBeenCalledTimes(2)
-    const unpublished = db([null])
-    await expect(getLikeStatus(unpublished, 'user-1', { targetType: 'content', targetId: 'content-1' })).resolves.toEqual({ liked: false, likeCount: 0 })
+    const sql = (d.prepare as unknown as ReturnType<typeof vi.fn>).mock.calls.map(([query]) => String(query))
+    expect(sql[0]).toContain('social_user_interactions')
+    expect(sql[1]).toContain('interaction_likes')
+    expect(sql.every(query => !query.toLowerCase().includes('from contents') && !query.toLowerCase().includes('join contents'))).toBe(true)
+
+    const unpublished = db([])
+    await expect(getLikeStatus(unpublished, publishedContextBinding('user-2', 404), 'user-1', { targetType: 'content', targetId: 'content-3' }, correlationId))
+      .resolves.toEqual({ liked: false, likeCount: 0 })
+    expect(unpublished.prepare).not.toHaveBeenCalled()
   })
 
-
   it('hides content like status when either actor or owner is blocked', async () => {
-    const d = db([{ liked: 1, like_count: 9, blocked: 1 }])
-    await expect(getLikeStatus(d, 'user-1', { targetType: 'content', targetId: 'content-1' })).rejects.toMatchObject({
+    const d = db([{ blocked: 1 }])
+    await expect(getLikeStatus(d, publishedContextBinding('user-2'), 'user-1', { targetType: 'content', targetId: 'content-1' }, correlationId)).rejects.toMatchObject({
       code: 'CONFLICT',
       status: 409,
     })
@@ -82,17 +107,20 @@ describe('like runtime', () => {
   })
 
   it('hides comment like status when a comment-side relationship is blocked', async () => {
-    const d = db([{ liked: 1, like_count: 4, blocked: 1 }])
-    await expect(getLikeStatus(d, 'user-1', { targetType: 'comment', targetId: 'comment-1' })).rejects.toMatchObject({
+    const d = db([
+      { id: 'comment-1', state: 'PUBLISHED', author_user_id: 'user-2', content_id: 'content-1' },
+      { blocked: 1 },
+    ])
+    await expect(getLikeStatus(d, publishedContextBinding('user-3'), 'user-1', { targetType: 'comment', targetId: 'comment-1' }, correlationId)).rejects.toMatchObject({
       code: 'CONFLICT',
       status: 409,
     })
-    expect(d.prepare).toHaveBeenCalledTimes(1)
+    expect(d.prepare).toHaveBeenCalledTimes(2)
   })
 
   it('binds the final content like write to published visibility and Block policy', async () => {
-    const d = db([{ id: 'content-1', state: 'PUBLISHED', owner_user_id: 'user-2', blocked: 0 }, null])
-    await expect(like(d, 'user-1', { targetType: 'content', targetId: 'content-1' })).rejects.toMatchObject({
+    const d = db([{ blocked: 0 }, null])
+    await expect(like(d, publishedContextBinding('user-2'), 'user-1', { targetType: 'content', targetId: 'content-1' }, correlationId)).rejects.toMatchObject({
       code: 'NOT_FOUND',
       status: 404,
     })
@@ -104,7 +132,7 @@ describe('like runtime', () => {
 
   it('creates a content like after verifying published visibility', async () => {
     const d = db([
-      { id: 'content-1', state: 'PUBLISHED' },
+      { blocked: 0 },
       {
         relationship_id: 'like-1',
         actor_user_id: 'user-1',
@@ -113,7 +141,7 @@ describe('like runtime', () => {
         created_at: '2026-10-02T00:00:00.000Z',
       },
     ])
-    await expect(like(d, 'user-1', { targetType: 'content', targetId: 'content-1' })).resolves.toEqual({
+    await expect(like(d, publishedContextBinding('user-2'), 'user-1', { targetType: 'content', targetId: 'content-1' }, correlationId)).resolves.toEqual({
       relationshipId: 'like-1',
       actorUserId: 'user-1',
       targetType: 'content',
@@ -124,10 +152,8 @@ describe('like runtime', () => {
   })
 
   it('rejects likes when the content owner has blocked the actor or is blocked by the actor', async () => {
-    const d = db([
-      { id: 'content-1', state: 'PUBLISHED', owner_user_id: 'user-2', blocked: 1 },
-    ])
-    await expect(like(d, 'user-1', { targetType: 'content', targetId: 'content-1' })).rejects.toMatchObject({
+    const d = db([{ blocked: 1 }])
+    await expect(like(d, publishedContextBinding('user-2'), 'user-1', { targetType: 'content', targetId: 'content-1' }, correlationId)).rejects.toMatchObject({
       code: 'CONFLICT',
       status: 409,
     })
@@ -142,29 +168,33 @@ describe('like runtime', () => {
       target_id: 'content-1',
       created_at: '2026-10-02T00:00:00.000Z',
     }
-    const d = db([{ id: 'content-1', state: 'PUBLISHED' }, existing])
-    await expect(like(d, 'user-1', { targetType: 'content', targetId: 'content-1' })).resolves.toMatchObject({
+    const d = db([{ blocked: 0 }, existing])
+    await expect(like(d, publishedContextBinding('user-2'), 'user-1', { targetType: 'content', targetId: 'content-1' }, correlationId)).resolves.toMatchObject({
       relationshipId: 'like-existing',
       targetId: 'content-1',
     })
   })
 
   it('rejects unpublished content without creating a like', async () => {
-    const d = db([{ id: 'content-1', state: 'DRAFT' }])
-    await expect(like(d, 'user-1', { targetType: 'content', targetId: 'content-1' })).rejects.toMatchObject({
+    const d = db([])
+    await expect(like(d, publishedContextBinding('user-2', 404), 'user-1', { targetType: 'content', targetId: 'content-1' }, correlationId)).rejects.toMatchObject({
       code: 'NOT_FOUND',
       status: 404,
     })
-    expect(d.prepare).toHaveBeenCalledTimes(1)
+    expect(d.prepare).not.toHaveBeenCalled()
   })
 
   it('binds the final comment like write to published visibility and Block policy', async () => {
-    const d = db([{ id: 'comment-1', state: 'PUBLISHED', author_user_id: 'user-2', content_owner_user_id: 'user-3', blocked: 0 }, null])
-    await expect(like(d, 'user-1', { targetType: 'comment', targetId: 'comment-1' })).rejects.toMatchObject({
+    const d = db([
+      { id: 'comment-1', state: 'PUBLISHED', author_user_id: 'user-2', content_id: 'content-1' },
+      { blocked: 0 },
+      null,
+    ])
+    await expect(like(d, publishedContextBinding('user-3'), 'user-1', { targetType: 'comment', targetId: 'comment-1' }, correlationId)).rejects.toMatchObject({
       code: 'NOT_FOUND',
       status: 404,
     })
-    const sql = String((d.prepare as unknown as ReturnType<typeof vi.fn>).mock.calls[1]?.[0])
+    const sql = String((d.prepare as unknown as ReturnType<typeof vi.fn>).mock.calls[2]?.[0])
     expect(sql).toContain("c.state = 'PUBLISHED'")
     expect(sql).toContain("content.state = 'PUBLISHED'")
     expect(sql).toContain("block.relation_type = 'block'")
@@ -173,7 +203,8 @@ describe('like runtime', () => {
 
   it('creates a like on a published comment after validating its parent content', async () => {
     const d = db([
-      { id: 'comment-1', state: 'PUBLISHED', author_user_id: 'user-2', content_owner_user_id: 'user-3', blocked: 0 },
+      { id: 'comment-1', state: 'PUBLISHED', author_user_id: 'user-2', content_id: 'content-1' },
+      { blocked: 0 },
       {
         relationship_id: 'comment-like-1',
         actor_user_id: 'user-1',
@@ -182,34 +213,38 @@ describe('like runtime', () => {
         created_at: '2026-10-02T00:00:00.000Z',
       },
     ])
-    await expect(like(d, 'user-1', { targetType: 'comment', targetId: 'comment-1' })).resolves.toEqual({
+    await expect(like(d, publishedContextBinding('user-3'), 'user-1', { targetType: 'comment', targetId: 'comment-1' }, correlationId)).resolves.toEqual({
       relationshipId: 'comment-like-1',
       actorUserId: 'user-1',
       targetType: 'comment',
       targetId: 'comment-1',
       createdAt: '2026-10-02T00:00:00.000Z',
     })
-    expect(d.prepare).toHaveBeenCalledTimes(2)
+    expect(d.prepare).toHaveBeenCalledTimes(3)
   })
 
   it('reads like status for a published comment', async () => {
-    const d = db([{ liked: 1, like_count: 4 }])
-    await expect(getLikeStatus(d, 'user-1', { targetType: 'comment', targetId: 'comment-1' })).resolves.toEqual({
+    const d = db([
+      { id: 'comment-1', state: 'PUBLISHED', author_user_id: 'user-2', content_id: 'content-1' },
+      { blocked: 0 },
+      { liked: 1, like_count: 4 },
+    ])
+    await expect(getLikeStatus(d, publishedContextBinding('user-3'), 'user-1', { targetType: 'comment', targetId: 'comment-1' }, correlationId)).resolves.toEqual({
       liked: true,
       likeCount: 4,
     })
   })
 
   it('rejects likes on comments that are no longer public', async () => {
-    const d = db([{ id: 'comment-1', state: 'REJECTED', author_user_id: 'user-2', content_owner_user_id: 'user-3', blocked: 0 }])
-    await expect(like(d, 'user-1', { targetType: 'comment', targetId: 'comment-1' })).rejects.toMatchObject({
+    const d = db([{ id: 'comment-1', state: 'REJECTED', author_user_id: 'user-2', content_id: 'content-1' }])
+    await expect(like(d, publishedContextBinding('user-3'), 'user-1', { targetType: 'comment', targetId: 'comment-1' }, correlationId)).rejects.toMatchObject({
       code: 'NOT_FOUND',
       status: 404,
     })
   })
 
   it('rejects unsupported target types', async () => {
-    await expect(like(db(), 'user-1', { targetType: 'media', targetId: 'media-1' })).rejects.toMatchObject({
+    await expect(like(db(), undefined, 'user-1', { targetType: 'media', targetId: 'media-1' }, correlationId)).rejects.toMatchObject({
       code: 'VALIDATION_FAILED',
       status: 400,
     })
@@ -242,7 +277,7 @@ describe('like runtime', () => {
   })
 
   it('rejects invalid actor ids', async () => {
-    await expect(like(db(), '', { targetType: 'content', targetId: 'content-1' })).rejects.toMatchObject({
+    await expect(like(db(), undefined, '', { targetType: 'content', targetId: 'content-1' }, correlationId)).rejects.toMatchObject({
       code: 'UNAUTHENTICATED',
       status: 401,
     })
