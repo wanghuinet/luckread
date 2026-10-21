@@ -56,7 +56,7 @@ describe('W05 profile channel runtime', () => {
     expect(queries.every(query => !query.toLowerCase().includes('join contents') && !query.toLowerCase().includes('from contents'))).toBe(true)
     expect(queries.some(query => query.includes("block.relation_type = 'block'"))).toBe(true)
     expect(queries.some(query => query.includes("mute.relation_type = 'mute'"))).toBe(true)
-    expect(queries[0]).toContain('ORDER BY c.created_at DESC, c.id DESC')
+    expect(queries[1]).toContain('ORDER BY c.created_at DESC, c.id DESC')
     expect(binding.fetch).toHaveBeenCalledTimes(1)
   })
 
