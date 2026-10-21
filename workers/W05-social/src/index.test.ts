@@ -578,16 +578,14 @@ describe('W05 social query transport', () => {
         body: JSON.stringify({ targetType: 'content', targetId: 'content-1' }),
       }),
       {
-        DB: dbFor([
-          { id: 'content-1', state: 'PUBLISHED' },
-          {
-            relationship_id: 'favorite-1',
-            actor_user_id: 'viewer-1',
-            target_type: 'content',
-            target_id: 'content-1',
-            created_at: '2026-10-02T00:00:00.000Z',
-          },
-        ]),
+        DB: dbFor([{
+          relationship_id: 'favorite-1',
+          actor_user_id: 'viewer-1',
+          target_type: 'content',
+          target_id: 'content-1',
+          created_at: '2026-10-02T00:00:00.000Z',
+        }]),
+        W03_CONTENT: publishedContextBinding(),
       },
     )
     expect(response.status).toBe(200)
@@ -634,12 +632,31 @@ describe('W05 social query transport', () => {
         method: 'GET',
         headers: { ...transportHeaders, 'X-LuckRead-Principal-Layer': 'L2' },
       }),
-      { DB: dbFor([{ favorited: 1 }]) },
+      { DB: dbFor([{ favorited: 1 }]), W03_CONTENT: publishedContextBinding() },
     )
     expect(response.status).toBe(200)
     await expect(response.json()).resolves.toMatchObject({
       data: { favorited: true },
     })
+  })
+
+  it('fails closed before favorite D1 access when W03 context is unavailable', async () => {
+    const d = dbFor()
+    const response = await worker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/interactions/bookmarks', {
+        method: 'POST',
+        headers: {
+          ...transportHeaders,
+          'X-LuckRead-Principal-Layer': 'L2',
+          'content-type': 'application/json',
+          'Idempotency-Key': 'favorite-no-binding',
+        },
+        body: JSON.stringify({ targetType: 'content', targetId: 'content-1' }),
+      }),
+      { DB: d },
+    )
+    expect(response.status).toBe(503)
+    expect((d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).not.toHaveBeenCalled()
   })
 
   it('requires an idempotency key for favorite mutations', async () => {

@@ -1,5 +1,8 @@
 /// <reference types="@cloudflare/workers-types" />
 
+import { ReplyAudienceRuntimeError } from './reply-audience-runtime.js'
+import { fetchPublishedContentSocialContext, type W03ContentBinding } from './w03-content-context-client.js'
+
 export class FavoriteRuntimeError extends Error {
   constructor(readonly code: string, readonly status: number) { super(code) }
 }
@@ -36,7 +39,7 @@ const validateTarget = (target: FavoriteTarget): { targetType: 'content'; target
   }
 
   const targetId = target.targetId?.trim() ?? ''
-  if (!targetId || targetId.length > RESOURCE_ID_MAX) {
+  if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(targetId) || targetId.length > RESOURCE_ID_MAX) {
     throw new FavoriteRuntimeError('VALIDATION_FAILED', 400)
   }
 
@@ -51,38 +54,53 @@ const validateActor = (actorUserId: string): string => {
   return value
 }
 
+const fetchPublishedTarget = async (
+  binding: W03ContentBinding | undefined,
+  targetId: string,
+  correlationId: string,
+): Promise<void> => {
+  try {
+    await fetchPublishedContentSocialContext(binding, { contentId: targetId, correlationId })
+  } catch (error) {
+    if (error instanceof ReplyAudienceRuntimeError) {
+      if (error.status === 404) throw new FavoriteRuntimeError('NOT_FOUND', 404)
+      if (error.status === 400) throw new FavoriteRuntimeError('VALIDATION_FAILED', 400)
+      if (error.status === 403) throw new FavoriteRuntimeError('PERMISSION_DENIED', 403)
+      if (error.status === 429) throw new FavoriteRuntimeError('RATE_LIMITED', 429)
+    }
+    throw new FavoriteRuntimeError('SERVICE_UNAVAILABLE', 503)
+  }
+}
+
+/**
+ * W03 owns canonical content lifecycle; W05 owns only the favorite relation.
+ * Cross-Worker publication changes cannot be locked in the same transaction,
+ * so reads revalidate published visibility through W03 before using the cache.
+ */
 export async function favorite(
   db: D1Database,
+  w03Content: W03ContentBinding | undefined,
   actorUserId: string,
   target: FavoriteTarget,
+  correlationId: string,
 ): Promise<FavoriteResult> {
   const actor = validateActor(actorUserId)
   const { targetType, targetId } = validateTarget(target)
 
-  const targetRow = await db.prepare(
-    'SELECT id, state FROM contents WHERE id = ? LIMIT 1',
-  ).bind(targetId).first<{ id: string; state: string }>()
-
-  if (!targetRow || targetRow.state !== 'PUBLISHED') {
-    throw new FavoriteRuntimeError('NOT_FOUND', 404)
-  }
+  await fetchPublishedTarget(w03Content, targetId, correlationId)
 
   const relationshipId = crypto.randomUUID()
   const createdAt = new Date().toISOString()
   const row = await db.prepare(
     `INSERT INTO interaction_favorites
       (relationship_id, actor_user_id, target_type, target_id, created_at)
-     SELECT ?, ?, 'content', c.id, ?
-       FROM contents c
-      WHERE c.id = ?
-        AND c.state = 'PUBLISHED'
+     VALUES (?, ?, 'content', ?, ?)
      ON CONFLICT(actor_user_id, target_type, target_id)
      DO UPDATE SET relationship_id = interaction_favorites.relationship_id
      RETURNING relationship_id, actor_user_id, target_type, target_id, created_at`,
   ).bind(
     relationshipId,
     actor,
-    targetId,
     targetId,
     createdAt,
   ).first<{
@@ -108,12 +126,25 @@ export async function favorite(
 
 export async function getFavoriteStatus(
   db: D1Database,
+  w03Content: W03ContentBinding | undefined,
   actorUserId: string,
   target: FavoriteTarget,
+  correlationId: string,
 ): Promise<{ favorited: boolean }> {
   const actor = validateActor(actorUserId)
   const { targetType, targetId } = validateTarget(target)
   const cacheKey = favoriteStatusKey(actor, targetId)
+
+  try {
+    await fetchPublishedTarget(w03Content, targetId, correlationId)
+  } catch (error) {
+    if (error instanceof FavoriteRuntimeError && error.status === 404) {
+      favoriteStatusCache.delete(cacheKey)
+      return { favorited: false }
+    }
+    throw error
+  }
+
   const cached = favoriteStatusCache.get(cacheKey)
   if (cached) {
     if (cached.expiresAt > Date.now()) return { ...cached.value }
@@ -126,12 +157,8 @@ export async function getFavoriteStatus(
        FROM interaction_favorites
        WHERE actor_user_id = ?
          AND target_type = ?
-         AND target_id = c.id
-     ) AS favorited
-     FROM contents c
-     WHERE c.id = ?
-       AND c.state = 'PUBLISHED'
-     LIMIT 1`,
+         AND target_id = ?
+     ) AS favorited`,
   ).bind(actor, targetType, targetId).first<{ favorited: number }>()
 
   const value = { favorited: Boolean(row?.favorited) }
@@ -153,8 +180,6 @@ export async function unfavorite(
   ).bind(actor, targetType, targetId).run()
   favoriteStatusCache.delete(favoriteStatusKey(actor, targetId))
 }
-
-
 
 export type FavoriteListPage = {
   items: Array<{ targetId: string; createdAt: string }>
