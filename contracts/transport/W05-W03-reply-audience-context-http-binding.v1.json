@@ -25,26 +25,6 @@
     "databaseCountDelta": 0,
     "queueCountDelta": 0
   },
-  "operation": {
-    "operationId": "getReplyAudienceContentContext",
-    "method": "GET",
-    "internalPath": "/internal/content/contents/{contentId}/reply-audience-context",
-    "principalRequired": true,
-    "principalSource": "W01 verified principal forwarded by W05",
-    "ownerScoped": true,
-    "allowedContentType": "post",
-    "allowedContentStates": [
-      "DRAFT",
-      "PUBLISHED",
-      "UNPUBLISHED"
-    ],
-    "cache": "NO_STORE",
-    "resourceBudget": {
-      "w03D1ReadMax": 1,
-      "w05D1ReadMax": 1,
-      "w05ServiceBindingCallsMax": 1
-    }
-  },
   "headers": {
     "requiredOnEveryCall": {
       "X-LuckRead-Caller": "W05",
@@ -75,10 +55,10 @@
   },
   "scope": {
     "inScope": [
-      "Owner-only GET of the reply-audience policy uses W03 for canonical content context and W05 for policy state."
+      "Owner-only GET of the reply-audience policy uses W03 for canonical content context and W05 for policy state.",
+      "Reply-audience PUT obtains owner/type/lifecycle context from W03 before W05 writes only the W05-owned policy table."
     ],
     "outOfScope": [
-      "Reply-audience PUT remains unchanged in this slice.",
       "Comment insertion's atomic content-state/policy recheck remains unchanged.",
       "Other W05 reads from the contents table are not claimed as fixed."
     ]
@@ -87,8 +67,54 @@
     "W03 positive owner-context test",
     "W03 wrong-caller denial test",
     "W05 binding header/no-credential-forwarding test",
-    "W05 policy-only query test",
+    "W05 policy-only query and mutation tests",
+    "missing W03 binding fails closed before W05 write",
     "W03_CONTENT deployment/binding evidence",
     "runtime cross-Worker E2E evidence"
+  ],
+  "operations": [
+    {
+      "operationId": "getReplyAudienceContentContext",
+      "method": "GET",
+      "internalPath": "/internal/content/contents/{contentId}/reply-audience-context",
+      "principalRequired": true,
+      "principalSource": "W01 verified principal forwarded by W05",
+      "ownerScoped": true,
+      "allowedContentType": "post",
+      "allowedContentStates": [
+        "DRAFT",
+        "PUBLISHED",
+        "UNPUBLISHED"
+      ],
+      "cache": "NO_STORE",
+      "resourceBudget": {
+        "w03D1ReadMax": 1,
+        "w05D1WriteMax": 0,
+        "w05ServiceBindingCallsMax": 1
+      }
+    },
+    {
+      "operationId": "setContentReplyAudience",
+      "method": "PUT",
+      "callerPath": "/internal/social/contents/{contentId}/reply-audience",
+      "validationOperation": "getReplyAudienceContentContext",
+      "principalRequired": true,
+      "idempotencyHeaderRequired": true,
+      "principalSource": "W01 verified principal forwarded by W05",
+      "ownerScoped": true,
+      "allowedContentType": "post",
+      "allowedContentStates": [
+        "DRAFT",
+        "PUBLISHED",
+        "UNPUBLISHED"
+      ],
+      "writeAuthority": "W05 social_content_reply_policies only",
+      "resourceBudget": {
+        "w03D1ReadMax": 1,
+        "w05D1ReadMax": 0,
+        "w05D1WriteMax": 1,
+        "w05ServiceBindingCallsMax": 1
+      }
+    }
   ]
 }
