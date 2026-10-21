@@ -4,7 +4,7 @@ import { getLikeStatus, like, LikeRuntimeError, unlike } from './like-runtime.js
 import { CommentRuntimeError, createComment, deleteComment, listComments, parseCommentLimit, updateComment } from './comment-runtime.js'
 import { listProfileLikedContents, listProfileReplies, ProfileChannelRuntimeError } from './profile-channel-runtime.js'
 import { getContentReplyAudience, ReplyAudienceRuntimeError, setContentReplyAudience } from './reply-audience-runtime.js'
-import { fetchOwnedPostContext, fetchPublishedOwnerPostContext, type W03ContentBinding } from './w03-content-context-client.js'
+import { fetchOwnedPostContext, fetchPublishedContentSocialContext, fetchPublishedOwnerPostContext, type W03ContentBinding } from './w03-content-context-client.js'
 import {
   FavoriteRuntimeError,
   favorite,
@@ -140,16 +140,29 @@ const parseJsonTarget = async (request: Request) => {
 }
 
 
+const getPublishedContentOwnerUserId = async (
+  binding: W03ContentBinding | undefined,
+  contentId: string,
+  correlationId: string,
+): Promise<string | null> => {
+  try {
+    const context = await fetchPublishedContentSocialContext(binding, { contentId, correlationId })
+    return context.ownerUserId
+  } catch (error) {
+    if (error instanceof ReplyAudienceRuntimeError && error.status === 404) return null
+    throw error
+  }
+}
+
 const getInteractionRecipient = async (
   db: D1Database,
   targetType: string,
   targetId: string,
+  w03Content: W03ContentBinding | undefined,
+  correlationId: string,
 ): Promise<string | null> => {
   if (targetType === 'content') {
-    const row = await db.prepare(
-      'SELECT owner_user_id FROM contents WHERE id = ? AND state = \'PUBLISHED\' LIMIT 1',
-    ).bind(targetId).first<{ owner_user_id: string | null }>()
-    return row?.owner_user_id ?? null
+    return getPublishedContentOwnerUserId(w03Content, targetId, correlationId)
   }
   if (targetType === 'comment') {
     const row = await db.prepare(
@@ -746,9 +759,6 @@ export default {
         ctx.waitUntil(
           syncSocialTokens(env.DB, viewerUserId, 'comment', comment.id, bodyValue, mentionTargets).catch(() => undefined),
         )
-        const contentOwner = await env.DB.prepare(
-          'SELECT owner_user_id FROM contents WHERE id = ? AND state = \'PUBLISHED\' LIMIT 1',
-        ).bind(commentContentId).first<{ owner_user_id: string | null }>()
         if (parentId) {
           const parent = await env.DB.prepare(
             'SELECT author_user_id FROM social_comments WHERE id = ? AND state = \'PUBLISHED\' LIMIT 1',
@@ -763,14 +773,21 @@ export default {
               payload: { contentId: commentContentId },
             })
           }
-        } else if (contentOwner?.owner_user_id) {
-          await enqueueNotification(env.DB, {
-            recipientUserId: contentOwner.owner_user_id,
-            actorUserId: viewerUserId,
-            type: 'COMMENT',
-            targetType: 'content',
-            targetId: commentContentId,
-          })
+        } else {
+          const contentOwnerUserId = await getPublishedContentOwnerUserId(
+            env.W03_CONTENT,
+            commentContentId,
+            request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? '',
+          )
+          if (contentOwnerUserId) {
+            await enqueueNotification(env.DB, {
+              recipientUserId: contentOwnerUserId,
+              actorUserId: viewerUserId,
+              type: 'COMMENT',
+              targetType: 'content',
+              targetId: commentContentId,
+            })
+          }
         }
         return json({ data: comment, requestId: createRequestId() }, 201)
       }
@@ -862,7 +879,7 @@ export default {
 
         if (request.method === 'POST') {
           const result = await like(env.DB, viewerUserId, target)
-          const recipientUserId = await getInteractionRecipient(env.DB, target.targetType, target.targetId)
+          const recipientUserId = await getInteractionRecipient(env.DB, target.targetType, target.targetId, env.W03_CONTENT, request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? '')
           const relatedContent = target.targetType === 'comment'
             ? await env.DB.prepare(
                 'SELECT content_id FROM social_comments WHERE id = ? LIMIT 1',
