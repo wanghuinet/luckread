@@ -41,6 +41,54 @@ const publishedContextBinding = () => ({
 })
 
 describe('W05 social query transport', () => {
+  it('synchronizes content topics and mentions only after W03 validates published ownership', async () => {
+    const binding = {
+      fetch: vi.fn(async () => Response.json({
+        data: {
+          contentId: 'content-1',
+          ownerUserId: 'viewer-1',
+          contentType: 'post',
+          state: 'PUBLISHED',
+        },
+      })),
+    }
+    const d = dbFor()
+    const batch = vi.fn(async () => [])
+    ;(d as unknown as { batch: typeof batch }).batch = batch
+    const response = await worker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/contents/content-1/tokens', {
+        method: 'POST',
+        headers: { ...transportHeaders, 'content-type': 'application/json' },
+        body: JSON.stringify({ text: 'plain text', mentions: [] }),
+      }),
+      { DB: d, W03_CONTENT: binding },
+    )
+    expect(response.status).toBe(200)
+    expect(binding.fetch).toHaveBeenCalledTimes(1)
+    const forwarded = binding.fetch.mock.calls[0]?.[0] as Request
+    expect(forwarded.url).toContain('/internal/content/contents/content-1/published-social-context')
+    expect(forwarded.headers.get('X-LuckRead-Caller')).toBe('W05')
+    expect(forwarded.headers.has('Authorization')).toBe(false)
+    expect(forwarded.headers.has('Cookie')).toBe(false)
+    const prepare = (d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare
+    expect(prepare.mock.calls.some(([sql]) => /(?:FROM|JOIN)\s+contents/i.test(String(sql)))).toBe(false)
+    await expect(response.json()).resolves.toMatchObject({ data: { topics: 0, mentions: 0 } })
+  })
+
+  it('fails closed without W03 before content-token D1 access', async () => {
+    const d = dbFor()
+    const response = await worker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/contents/content-1/tokens', {
+        method: 'POST',
+        headers: { ...transportHeaders, 'content-type': 'application/json' },
+        body: JSON.stringify({ text: 'plain text', mentions: [] }),
+      }),
+      { DB: d },
+    )
+    expect(response.status).toBe(503)
+    expect((d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).not.toHaveBeenCalled()
+  })
+
   it('gets content social summary through W03 and keeps canonical-content reads out of W05', async () => {
     const binding = publishedContextBinding()
     const d = dbFor()
