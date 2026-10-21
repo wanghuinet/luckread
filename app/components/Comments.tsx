@@ -10,6 +10,7 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { StyledExpoImage as Image } from '~/components/Image';
+import CommentEditAction from '~/components/CommentEditAction';
 
 import { apiRequest, getApiErrorMessage } from '~/lib/api-client';
 import { CommentDeleteApiError, deleteComment as deleteCommentRequest } from '~/lib/comment-delete-api';
@@ -392,6 +393,7 @@ export default function Comments({ contentId }: CommentsProps) {
                   </Text>
                 </TouchableOpacity>
                 <Text className="mt-0.5 text-xs text-neutral-500">{createdAt}</Text>
+                <CommentEditAction comment={comment} onSaved={() => loadComments()} />
                 <Text className="mt-2 text-base leading-6 text-black dark:text-white">{comment.body}</Text>
                 <View className="mt-2 flex-row items-center gap-4">
                   <TouchableOpacity

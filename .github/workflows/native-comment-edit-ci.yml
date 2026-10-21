@@ -1,0 +1,52 @@
+name: Native Comment Edit CI
+
+on:
+  pull_request:
+    paths:
+      - "app/components/Comments.tsx"
+      - "app/components/CommentEditAction.tsx"
+      - "app/lib/comment-edit-api.ts"
+      - "app/tests/comment-edit-api.test.mjs"
+      - ".github/workflows/native-comment-edit-ci.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "app/components/Comments.tsx"
+      - "app/components/CommentEditAction.tsx"
+      - "app/lib/comment-edit-api.ts"
+      - "app/tests/comment-edit-api.test.mjs"
+      - ".github/workflows/native-comment-edit-ci.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-comment-edit-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  native-comment-edit:
+    name: Native comment edit adapter and UI
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22.13.1"
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.1.38"
+      - name: Install Expo app dependencies
+        run: bun install
+      - name: Verify Expo package compatibility
+        run: bunx expo install --check
+      - name: Typecheck native app
+        run: bun run typecheck
+      - name: Test native comment editing and stale-version protection
+        run: bun test tests/comment-edit-api.test.mjs
+      - name: Enforce shared API client boundary
+        run: bun run check:api-boundary
