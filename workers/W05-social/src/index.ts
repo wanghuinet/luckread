@@ -4,6 +4,7 @@ import { getLikeStatus, like, LikeRuntimeError, unlike } from './like-runtime.js
 import { CommentRuntimeError, createComment, deleteComment, listComments, parseCommentLimit, updateComment } from './comment-runtime.js'
 import { listProfileLikedContents, listProfileReplies, ProfileChannelRuntimeError } from './profile-channel-runtime.js'
 import { getContentReplyAudience, ReplyAudienceRuntimeError, setContentReplyAudience } from './reply-audience-runtime.js'
+import { fetchReplyAudienceContentContext, type W03ContentBinding } from './w03-content-context-client.js'
 import {
   FavoriteRuntimeError,
   favorite,
@@ -46,6 +47,7 @@ type RateLimitBinding = { limit(input: { key: string }): Promise<{ success: bool
 
 interface Env {
   DB: D1Database
+  W03_CONTENT?: W03ContentBinding
   SOCIAL_READ_LIMITER?: RateLimitBinding
   SOCIAL_WRITE_LIMITER?: RateLimitBinding
   SOCIAL_ORIGIN_GLOBAL_LIMITER?: RateLimitBinding
@@ -623,7 +625,16 @@ export default {
         const actorUserId = requirePrincipal(request)
         requireInteractionLayer(request)
         if (request.method === 'GET') {
-          return json({ data: await getContentReplyAudience(env.DB, actorUserId, contentId), requestId: createRequestId() })
+          const context = await fetchReplyAudienceContentContext(env.W03_CONTENT, {
+            principalUserId: actorUserId,
+            principalLayer: request.headers.get('X-LuckRead-Principal-Layer')?.trim() ?? '',
+            contentId,
+            correlationId: request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? '',
+          })
+          return json({
+            data: await getContentReplyAudience(env.DB, actorUserId, contentId, context),
+            requestId: createRequestId(),
+          })
         }
 
         const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
@@ -638,12 +649,19 @@ export default {
         if (Object.keys(raw).some((key) => key !== 'replyAudience' && key !== 'mentionedUserIds')) {
           throw new ReplyAudienceRuntimeError('VALIDATION_FAILED', 400)
         }
+        const context = await fetchReplyAudienceContentContext(env.W03_CONTENT, {
+          principalUserId: actorUserId,
+          principalLayer: request.headers.get('X-LuckRead-Principal-Layer')?.trim() ?? '',
+          contentId,
+          correlationId: request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? '',
+        })
         const policy = await setContentReplyAudience(
           env.DB,
           actorUserId,
           contentId,
           raw.replyAudience,
           raw.mentionedUserIds,
+          context,
         )
         return json({ data: policy, requestId: createRequestId() })
       }

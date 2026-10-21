@@ -7,12 +7,14 @@ const contractPath = resolve(root, 'contracts/transport/public-worker-terminal-r
 const w01Path = resolve(root, 'workers/W01-payload/wrangler.jsonc')
 const w03Path = resolve(root, 'workers/W03-content/wrangler.jsonc')
 const w06Path = resolve(root, 'workers/W06-governance/wrangler.jsonc')
+const w05Path = resolve(root, 'workers/W05-social/wrangler.jsonc')
 const w08Path = resolve(root, 'workers/W08-creator/wrangler.jsonc')
 
 const contract = JSON.parse(readFileSync(contractPath, 'utf8'))
 const w01 = JSON.parse(readFileSync(w01Path, 'utf8'))
 const w03 = JSON.parse(readFileSync(w03Path, 'utf8'))
 const w06 = JSON.parse(readFileSync(w06Path, 'utf8'))
+const w05 = JSON.parse(readFileSync(w05Path, 'utf8'))
 const w08 = JSON.parse(readFileSync(w08Path, 'utf8'))
 
 const route = (family) => contract.routes.find((x) => x.operationIdFamily === family)
@@ -38,6 +40,9 @@ if (!creator || creator.ingressWorker !== 'W01' || creator.terminalWorker !== 'W
 const service = (config, binding) => (config.services ?? []).find((x) => x.binding === binding)
 if (service(w01, 'W03_CONTENT')?.service !== 'luckread-w03') {
   throw new Error('W01 W03_CONTENT binding mismatch')
+}
+if (service(w05, 'W03_CONTENT')?.service !== 'luckread-w03') {
+  throw new Error('W05 W03_CONTENT context binding mismatch')
 }
 if (service(w01, 'W06_MODERATION')?.service !== 'luckread-w06') {
   throw new Error('W01 W06_MODERATION binding mismatch')
@@ -68,6 +73,7 @@ console.log(JSON.stringify({
   creator: { ingress: creator.ingressWorker, terminal: creator.terminalWorker },
   bindings: {
     W03_CONTENT: service(w01, 'W03_CONTENT')?.service,
+    W05_W03_CONTENT: service(w05, 'W03_CONTENT')?.service,
     W06_MODERATION: service(w01, 'W06_MODERATION')?.service,
     W08_CREATOR: service(w01, 'W08_CREATOR')?.service,
     W08_W02_AUTH: service(w08, 'W02_AUTH')?.service,

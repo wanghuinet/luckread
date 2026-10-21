@@ -23,50 +23,66 @@ const db = (firstResults: unknown[] = []) => {
 }
 
 describe('W05 reply audience runtime', () => {
-  it('persists a verified-only policy only for the authenticated post owner', async () => {
-    const d = db([
-      { id: 'content-1', owner_user_id: 'owner-1', content_type: 'post', state: 'DRAFT' },
-      {
-        content_id: 'content-1',
-        owner_user_id: 'owner-1',
-        audience: 'verified',
-        mentioned_user_ids_json: '[]',
-        updated_at: '2026-10-19T00:00:00.000Z',
-      },
-    ])
-    await expect(setContentReplyAudience(d, 'owner-1', 'content-1', 'verified')).resolves.toMatchObject({
+  it('persists a verified-only policy using W03-validated content context and only writes W05-owned state', async () => {
+    const d = db([{
+      content_id: 'content-1',
+      owner_user_id: 'owner-1',
+      audience: 'verified',
+      mentioned_user_ids_json: '[]',
+      updated_at: '2026-10-19T00:00:00.000Z',
+    }])
+    const context = {
+      contentId: 'content-1',
+      ownerUserId: 'owner-1',
+      contentType: 'post' as const,
+      state: 'DRAFT' as const,
+      updatedAt: '2026-10-19T00:00:00.000Z',
+    }
+    await expect(setContentReplyAudience(d, 'owner-1', 'content-1', 'verified', [], context)).resolves.toMatchObject({
       contentId: 'content-1',
       ownerUserId: 'owner-1',
       replyAudience: 'verified',
       mentionedUserIds: [],
     })
     const prepare = d.prepare as unknown as ReturnType<typeof vi.fn>
-    expect(String(prepare.mock.calls[1]?.[0])).toContain('ON CONFLICT(content_id) DO UPDATE')
-    expect(String(prepare.mock.calls[1]?.[0])).toContain("content.state IN ('DRAFT','PUBLISHED','UNPUBLISHED')")
+    expect(prepare).toHaveBeenCalledTimes(1)
+    expect(String(prepare.mock.calls[0]?.[0])).toContain('INSERT INTO social_content_reply_policies')
+    expect(String(prepare.mock.calls[0]?.[0])).not.toContain('FROM contents')
+    expect(String(prepare.mock.calls[0]?.[0])).toContain('ON CONFLICT(content_id) DO UPDATE')
   })
 
-  it('rejects a non-owner without attempting a policy write', async () => {
-    const d = db([{ id: 'content-1', owner_user_id: 'someone-else', content_type: 'post', state: 'PUBLISHED' }])
-    await expect(setContentReplyAudience(d, 'viewer-1', 'content-1', 'following'))
-      .rejects.toMatchObject({ code: 'PERMISSION_DENIED', status: 403 })
-    expect((d.prepare as unknown as ReturnType<typeof vi.fn>)).toHaveBeenCalledTimes(1)
+  it('rejects a non-owner context without attempting a W05 policy write', async () => {
+    const d = db([])
+    await expect(setContentReplyAudience(d, 'viewer-1', 'content-1', 'following', [], {
+      contentId: 'content-1',
+      ownerUserId: 'someone-else',
+      contentType: 'post',
+      state: 'PUBLISHED',
+      updatedAt: '2026-10-19T00:00:00.000Z',
+    })).rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 })
+    expect(d.prepare).not.toHaveBeenCalled()
   })
 
-  it('rejects non-post and invalid audience values', async () => {
-    await expect(setContentReplyAudience(
-      db([{ id: 'content-1', owner_user_id: 'owner-1', content_type: 'article', state: 'DRAFT' }]),
-      'owner-1', 'content-1', 'everyone',
-    )).rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 })
-
-    await expect(setContentReplyAudience(
-      db([{ id: 'content-1', owner_user_id: 'owner-1', content_type: 'post', state: 'DRAFT' }]),
-      'owner-1', 'content-1', 'anyone',
-    )).rejects.toMatchObject({ code: 'VALIDATION_FAILED', status: 400 })
+  it('rejects invalid content context and invalid audience values', async () => {
+    const context = {
+      contentId: 'content-1',
+      ownerUserId: 'owner-1',
+      contentType: 'post' as const,
+      state: 'DRAFT' as const,
+      updatedAt: '2026-10-19T00:00:00.000Z',
+    }
+    const d = db([])
+    await expect(setContentReplyAudience(d, 'owner-1', 'content-1', 'everyone', [], {
+      ...context,
+      contentType: 'article',
+    } as never)).rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 })
+    await expect(setContentReplyAudience(d, 'owner-1', 'content-1', 'anyone', [], context))
+      .rejects.toMatchObject({ code: 'VALIDATION_FAILED', status: 400 })
+    expect(d.prepare).not.toHaveBeenCalled()
   })
 
   it('stores a bounded, de-duplicated mention allowlist for every reply audience', async () => {
     const d = db([
-      { id: 'content-1', owner_user_id: 'owner-1', content_type: 'post', state: 'DRAFT' },
       {
         content_id: 'content-1',
         owner_user_id: 'owner-1',
@@ -75,31 +91,53 @@ describe('W05 reply audience runtime', () => {
         updated_at: '2026-10-19T00:00:00.000Z',
       },
     ])
-    await setContentReplyAudience(d, 'owner-1', 'content-1', 'following', ['user-2', 'user-2'])
+    await setContentReplyAudience(d, 'owner-1', 'content-1', 'following', ['user-2', 'user-2'], {
+      contentId: 'content-1',
+      ownerUserId: 'owner-1',
+      contentType: 'post',
+      state: 'PUBLISHED',
+      updatedAt: '2026-10-19T00:00:00.000Z',
+    })
     const prepare = d.prepare as unknown as ReturnType<typeof vi.fn>
-    expect(prepare.mock.calls[1]?.[0]).toContain('mentioned_user_ids_json')
-    expect(prepare.mock.calls[1]?.[0]).toContain('RETURNING')
-    expect(d.bindCalls[1]?.[3]).toBe('["user-2"]')
+    expect(prepare.mock.calls[0]?.[0]).toContain('mentioned_user_ids_json')
+    expect(prepare.mock.calls[0]?.[0]).toContain('RETURNING')
+    expect(d.bindCalls[0]?.[3]).toBe('["user-2"]')
   })
 
   it('returns the persisted owner policy and defaults existing posts to everyone', async () => {
+    const context = {
+      contentId: 'content-1',
+      ownerUserId: 'owner-1',
+      contentType: 'post' as const,
+      state: 'PUBLISHED' as const,
+      updatedAt: '2026-10-19T00:00:00.000Z',
+    }
     await expect(getContentReplyAudience(db([{
-      id: 'content-1',
+      content_id: 'content-1',
       owner_user_id: 'owner-1',
-      content_type: 'post',
       audience: 'followingNetwork',
       mentioned_user_ids_json: '[]',
       updated_at: '2026-10-19T00:00:00.000Z',
-    }]), 'owner-1', 'content-1')).resolves.toMatchObject({ replyAudience: 'followingNetwork' })
+    }]), 'owner-1', 'content-1', context)).resolves.toMatchObject({ replyAudience: 'followingNetwork' })
 
-    await expect(getContentReplyAudience(db([{
-      id: 'content-1',
-      owner_user_id: 'owner-1',
-      content_type: 'post',
-      audience: 'everyone',
-      mentioned_user_ids_json: '[]',
-      updated_at: '2026-10-19T00:00:00.000Z',
-    }]), 'owner-1', 'content-1')).resolves.toMatchObject({ replyAudience: 'everyone' })
+    const emptyDb = db([])
+    await expect(getContentReplyAudience(emptyDb, 'owner-1', 'content-1', context)).resolves.toMatchObject({
+      replyAudience: 'everyone',
+      updatedAt: '2026-10-19T00:00:00.000Z',
+    })
+    expect(String((emptyDb.prepare as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[0])).not.toContain('FROM contents')
+  })
+
+  it('rejects a reply-policy context that does not match the actor and content before querying W05 policy state', async () => {
+    const d = db([])
+    await expect(getContentReplyAudience(d, 'viewer-1', 'content-1', {
+      contentId: 'content-1',
+      ownerUserId: 'owner-1',
+      contentType: 'post',
+      state: 'PUBLISHED',
+      updatedAt: '2026-10-19T00:00:00.000Z',
+    })).rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 })
+    expect((d.prepare as unknown as ReturnType<typeof vi.fn>)).not.toHaveBeenCalled()
   })
 
   it('uses W05 follow, mention, second-degree, and trusted verified facts in the final SQL predicate', () => {

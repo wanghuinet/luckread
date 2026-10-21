@@ -6,6 +6,7 @@ import {
   createRequestId,
   deleteContent,
   getContent,
+  getReplyAudienceContentContext,
   listContents,
   searchPublishedContents,
   listFollowingOwnerContents,
@@ -249,6 +250,30 @@ const worker = {
       const url = new URL(request.url)
       const isRead = request.method === 'GET' || (request.method === 'POST' && ['/internal/content/following-feed', '/internal/content/search'].includes(url.pathname))
       await enforceRateLimits(request, env, isRead ? 'read' : 'write')
+
+      const replyAudienceContextMatch = /^\/internal\/content\/contents\/([^/]+)\/reply-audience-context$/.exec(url.pathname)
+      if (replyAudienceContextMatch) {
+        if (request.method !== 'GET') {
+          return new Response(null, { status: 405, headers: { Allow: 'GET' } })
+        }
+        if (
+          request.headers.get('X-LuckRead-Caller') !== 'W05' ||
+          request.headers.get('X-LuckRead-Transport-Version') !== '1.0' ||
+          !request.headers.get('X-LuckRead-Correlation-Id')?.trim() ||
+          request.headers.has('Authorization') ||
+          request.headers.has('Cookie')
+        ) {
+          throw new ContentRuntimeError('PERMISSION_DENIED', 403)
+        }
+        if (url.search !== '') throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+        const principal = requiredPrincipal(request)
+        if (!hasSocialPostPermission(principal.layer)) {
+          throw new ContentRuntimeError('PERMISSION_DENIED', 403)
+        }
+        const contentId = decodePathSegment(replyAudienceContextMatch[1] ?? '')
+        const context = await getReplyAudienceContentContext(env.D1_02, contentId, principal.userId)
+        return json({ data: context, requestId: createRequestId() })
+      }
 
       if (request.method === 'POST' && url.pathname === '/internal/content/following-feed') {
         if (

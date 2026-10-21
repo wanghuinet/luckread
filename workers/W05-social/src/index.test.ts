@@ -104,6 +104,19 @@ describe('W05 social query transport', () => {
       mentioned_user_ids_json: '[]',
       updated_at: '2026-10-19T00:00:00.000Z',
     }
+    const contextBinding = {
+      fetch: vi.fn(async () => Response.json({
+        data: {
+          contentId: 'content-1',
+          ownerUserId: 'viewer-1',
+          contentType: 'post',
+          state: 'DRAFT',
+          updatedAt: '2026-10-19T00:00:00.000Z',
+        },
+        requestId: 'req_context',
+      })),
+    }
+    const writeDb = dbFor([savedPolicy])
     const write = await worker.fetch(
       new Request('https://luckread-w05.internal/internal/social/contents/content-1/reply-audience', {
         method: 'PUT',
@@ -114,25 +127,54 @@ describe('W05 social query transport', () => {
         },
         body: JSON.stringify({ replyAudience: 'following', mentionedUserIds: [] }),
       }),
-      { DB: dbFor([
-        { id: 'content-1', owner_user_id: 'viewer-1', content_type: 'post', state: 'DRAFT' },
-        savedPolicy,
-      ]) },
+      { DB: writeDb, W03_CONTENT: contextBinding },
     )
+    expect(contextBinding.fetch).toHaveBeenCalledTimes(1)
+    expect(writeDb.prepare).toHaveBeenCalledTimes(1)
     const writeBody = await write.clone().json()
     expect(write.status, JSON.stringify(writeBody)).toBe(200)
     await expect(write.json()).resolves.toMatchObject({
       data: { contentId: 'content-1', ownerUserId: 'viewer-1', replyAudience: 'following' },
     })
 
+    const readContextBinding = {
+      fetch: vi.fn(async () => Response.json({
+        data: {
+          contentId: 'content-1',
+          ownerUserId: 'viewer-1',
+          contentType: 'post',
+          state: 'PUBLISHED',
+          updatedAt: '2026-10-19T00:00:00.000Z',
+        },
+        requestId: 'req_context',
+      })),
+    }
     const read = await worker.fetch(
       request('/internal/social/contents/content-1/reply-audience', transportHeaders),
-      { DB: dbFor([savedPolicy]) },
+      { DB: dbFor([savedPolicy]), W03_CONTENT: readContextBinding },
     )
     expect(read.status).toBe(200)
     await expect(read.json()).resolves.toMatchObject({
       data: { contentId: 'content-1', ownerUserId: 'viewer-1', replyAudience: 'following' },
     })
+  })
+
+  it('fails closed on reply-audience PUT when W03 context binding is missing', async () => {
+    const d = dbFor([])
+    const response = await worker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/contents/content-1/reply-audience', {
+        method: 'PUT',
+        headers: {
+          ...transportHeaders,
+          'content-type': 'application/json',
+          'Idempotency-Key': 'reply-audience-no-binding',
+        },
+        body: JSON.stringify({ replyAudience: 'following', mentionedUserIds: [] }),
+      }),
+      { DB: d },
+    )
+    expect(response.status).toBe(503)
+    expect(d.prepare).not.toHaveBeenCalled()
   })
 
   it('rejects replies outside the configured audience on the W05 comment route', async () => {

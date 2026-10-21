@@ -14,6 +14,14 @@ export type ReplyAudienceRecord = {
   updatedAt: string
 }
 
+export type ReplyAudienceContentContext = {
+  contentId: string
+  ownerUserId: string
+  contentType: 'post'
+  state: 'DRAFT' | 'PUBLISHED' | 'UNPUBLISHED'
+  updatedAt: string
+}
+
 const MAX_ID = 128
 const MAX_MENTIONS = 20
 const allowedAudiences = new Set<ReplyAudience>([
@@ -57,45 +65,36 @@ export async function setContentReplyAudience(
   actorUserIdValue: string,
   contentIdValue: string,
   audienceValue: unknown,
-  mentionedUserIdsValue?: unknown,
+  mentionedUserIdsValue: unknown,
+  context: ReplyAudienceContentContext,
 ): Promise<ReplyAudienceRecord> {
   const actorUserId = validateId(actorUserIdValue, true)
   const contentId = validateId(contentIdValue)
   const replyAudience = validateAudience(audienceValue)
   const mentionedUserIds = validateMentionedUserIds(mentionedUserIdsValue)
   const mentionedUserIdsJson = JSON.stringify(mentionedUserIds)
-
-  const target = await db.prepare(
-    'SELECT id, owner_user_id, content_type, state FROM contents WHERE id = ? LIMIT 1',
-  ).bind(contentId).first<{ id: string; owner_user_id: string | null; content_type: string; state: string }>()
-
-  if (!target || target.content_type !== 'post') {
+  if (
+    context.contentId !== contentId ||
+    context.ownerUserId !== actorUserId ||
+    context.contentType !== 'post' ||
+    !['DRAFT', 'PUBLISHED', 'UNPUBLISHED'].includes(context.state) ||
+    !context.updatedAt
+  ) {
     throw new ReplyAudienceRuntimeError('NOT_FOUND', 404)
-  }
-  if (target.owner_user_id !== actorUserId) {
-    throw new ReplyAudienceRuntimeError('PERMISSION_DENIED', 403)
-  }
-  if (!['DRAFT', 'PUBLISHED', 'UNPUBLISHED'].includes(target.state)) {
-    throw new ReplyAudienceRuntimeError('INVALID_STATE', 409)
   }
 
   const now = new Date().toISOString()
   const saved = await db.prepare(
     `INSERT INTO social_content_reply_policies
        (content_id, owner_user_id, audience, mentioned_user_ids_json, created_at, updated_at)
-     SELECT ?, ?, ?, ?, ?, ?
-       FROM contents content
-      WHERE content.id = ?
-        AND content.owner_user_id = ?
-        AND content.content_type = 'post'
-        AND content.state IN ('DRAFT','PUBLISHED','UNPUBLISHED')
+     VALUES (?, ?, ?, ?, ?, ?)
      ON CONFLICT(content_id) DO UPDATE SET
        audience = excluded.audience,
        mentioned_user_ids_json = excluded.mentioned_user_ids_json,
        updated_at = excluded.updated_at
      WHERE social_content_reply_policies.owner_user_id = excluded.owner_user_id
      RETURNING content_id, owner_user_id, audience, mentioned_user_ids_json, updated_at`,
-  ).bind(contentId, actorUserId, replyAudience, mentionedUserIdsJson, now, now, contentId, actorUserId)
+  ).bind(contentId, actorUserId, replyAudience, mentionedUserIdsJson, now, now)
     .first<{ content_id: string; owner_user_id: string; audience: ReplyAudience; mentioned_user_ids_json: string; updated_at: string }>()
 
   if (!saved) throw new ReplyAudienceRuntimeError('CONFLICT', 409)
@@ -115,40 +114,46 @@ export async function setContentReplyAudience(
   }
 }
 
-/** The policy is visible to the content owner only, including while a post is a draft. */
+/** The owner check comes from W03; W05 reads only its own persisted reply policy. */
 export async function getContentReplyAudience(
   db: D1Database,
   actorUserIdValue: string,
   contentIdValue: string,
+  context: ReplyAudienceContentContext,
 ): Promise<ReplyAudienceRecord> {
   const actorUserId = validateId(actorUserIdValue, true)
   const contentId = validateId(contentIdValue)
+  if (
+    context.contentId !== contentId ||
+    context.ownerUserId !== actorUserId ||
+    context.contentType !== 'post' ||
+    !['DRAFT', 'PUBLISHED', 'UNPUBLISHED'].includes(context.state) ||
+    !context.updatedAt
+  ) {
+    throw new ReplyAudienceRuntimeError('NOT_FOUND', 404)
+  }
   const row = await db.prepare(
-    `SELECT content.id, content.owner_user_id, content.content_type,
-            COALESCE(policy.audience, 'everyone') AS audience,
-            COALESCE(policy.mentioned_user_ids_json, '[]') AS mentioned_user_ids_json,
-            COALESCE(policy.updated_at, content.updated_at) AS updated_at
-       FROM contents content
-       LEFT JOIN social_content_reply_policies policy ON policy.content_id = content.id
-      WHERE content.id = ? AND content.owner_user_id = ? LIMIT 1`,
+    `SELECT content_id, owner_user_id, audience, mentioned_user_ids_json, updated_at
+       FROM social_content_reply_policies
+      WHERE content_id = ? AND owner_user_id = ?
+      LIMIT 1`,
   ).bind(contentId, actorUserId).first<{
-    id: string; owner_user_id: string; content_type: string; audience: ReplyAudience;
+    content_id: string; owner_user_id: string; audience: ReplyAudience;
     mentioned_user_ids_json: string; updated_at: string
   }>()
-  if (!row || row.content_type !== 'post') throw new ReplyAudienceRuntimeError('NOT_FOUND', 404)
   let mentionedUserIds: unknown
-  try { mentionedUserIds = JSON.parse(row.mentioned_user_ids_json) } catch {
+  try { mentionedUserIds = JSON.parse(row?.mentioned_user_ids_json ?? '[]') } catch {
     throw new ReplyAudienceRuntimeError('INTERNAL_ERROR', 500)
   }
   if (!Array.isArray(mentionedUserIds) || mentionedUserIds.some((id) => typeof id !== 'string')) {
     throw new ReplyAudienceRuntimeError('INTERNAL_ERROR', 500)
   }
   return {
-    contentId: row.id,
-    ownerUserId: row.owner_user_id,
-    replyAudience: row.audience,
+    contentId,
+    ownerUserId: actorUserId,
+    replyAudience: row?.audience ?? 'everyone',
     mentionedUserIds: mentionedUserIds as string[],
-    updatedAt: row.updated_at,
+    updatedAt: row?.updated_at ?? context.updatedAt,
   }
 }
 
