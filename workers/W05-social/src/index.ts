@@ -621,7 +621,7 @@ export default {
         if (!body || typeof body !== 'object' || Array.isArray(body) || typeof (body as { optionId?: unknown }).optionId !== 'string') {
           throw new SocialPollError('VALIDATION_FAILED', 400)
         }
-        const poll = await castContentPollVote(env.DB, actorUserId, contentId, (body as { optionId: string }).optionId)
+        const poll = await castContentPollVote(env.DB, env.W03_CONTENT, actorUserId, contentId, (body as { optionId: string }).optionId, request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? '')
         return json({ data: { poll }, requestId: createRequestId() }, 200)
       }
 

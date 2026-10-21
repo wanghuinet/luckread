@@ -1,6 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 import { describe, expect, it, vi } from 'vitest'
 import { castContentPollVote, configureContentPoll, deleteContentPoll, getContentPoll } from './poll-runtime.js'
+import type { W03ContentBinding } from './w03-content-context-client.js'
 
 const noDatabase = () => ({
   prepare: vi.fn(() => { throw new Error('unexpected database access') }),
@@ -50,8 +51,6 @@ const pollDb = (scenario: PollDbScenario) => {
         }
         if (sql.includes('INSERT OR IGNORE INTO social_poll_votes') && current.poll) {
           current.viewerOptionId = String(args[3])
-          const index = current.options.findIndex(option => option.option_id === current.viewerOptionId)
-          if (index >= 0) current.options[index].votes += 1
         }
         return { success: true, meta: { changes: 1 } }
       },
@@ -60,6 +59,24 @@ const pollDb = (scenario: PollDbScenario) => {
   const batch = vi.fn(async () => [{ success: true, meta: { changes: 1 } }])
   return { db: { prepare, batch } as unknown as D1Database, prepare, batch }
 }
+
+const publishedOwnerContextBinding = (status = 200) => ({
+  fetch: vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const request = input instanceof Request ? input : new Request(input, init)
+    const parts = new URL(request.url).pathname.split('/').filter(Boolean)
+    const contentId = decodeURIComponent(parts.at(-3) ?? '')
+    const ownerUserId = decodeURIComponent(parts.at(-1) ?? '')
+    return Response.json(status === 200 ? {
+      data: {
+        contentId,
+        ownerUserId,
+        contentType: 'post',
+        state: 'PUBLISHED',
+        updatedAt: '2026-10-15T04:00:00.000Z',
+      },
+    } : { error: { code: 'NOT_FOUND' } }, { status })
+  }),
+}) as W03ContentBinding & { fetch: ReturnType<typeof vi.fn> }
 
 describe('W05 poll runtime', () => {
   it('rejects duplicated or too-short options before touching D1', async () => {
@@ -240,7 +257,72 @@ describe('W05 poll runtime', () => {
         { option_id: 'option-2', option_text: 'No', position: 1, votes: 0 },
       ],
     })
-    await expect(castContentPollVote(db, 'viewer-1', 'content-1', 'option-1'))
-      .rejects.toMatchObject({ code: 'POLL_CLOSED', status: 409 })
+    await expect(castContentPollVote(
+      db,
+      publishedOwnerContextBinding(),
+      'viewer-1',
+      'content-1',
+      'option-1',
+      'poll-vote-closed',
+    )).rejects.toMatchObject({ code: 'POLL_CLOSED', status: 409 })
   })
+  it('validates vote target through W03 and writes the vote only in W05-owned tables', async () => {
+    const { db, prepare } = pollDb({
+      poll: {
+        poll_id: 'poll-1', content_id: 'content-1', owner_user_id: 'author-1',
+        duration_hours: 24, ends_at: '2099-10-16T04:00:00.000Z',
+        created_at: '2026-10-15T04:00:00.000Z', updated_at: '2026-10-15T04:00:00.000Z',
+      },
+      options: [
+        { option_id: 'option-1', option_text: 'Yes', position: 0, votes: 0 },
+        { option_id: 'option-2', option_text: 'No', position: 1, votes: 0 },
+      ],
+    })
+    const binding = publishedOwnerContextBinding()
+    await expect(castContentPollVote(
+      db,
+      binding,
+      'viewer-1',
+      'content-1',
+      'option-1',
+      'poll-vote-context',
+    )).resolves.toMatchObject({
+      pollId: 'poll-1',
+      viewerOptionId: 'option-1',
+      totalVotes: 1,
+      options: [{ optionId: 'option-1', votes: 1 }],
+    })
+
+    expect(binding.fetch).toHaveBeenCalledTimes(1)
+    const sent = binding.fetch.mock.calls[0]?.[0] as Request
+    expect(sent.url).toContain('/internal/content/contents/content-1/public-post-context/author-1')
+    expect(sent.headers.get('X-LuckRead-Caller')).toBe('W05')
+    expect(sent.headers.has('Authorization')).toBe(false)
+    expect(sent.headers.has('Cookie')).toBe(false)
+    expect(prepare.mock.calls.some(([sql]) => /\\b(?:FROM|JOIN|UPDATE|INSERT\\s+INTO)\\s+contents\\b/i.test(String(sql)))).toBe(false)
+  })
+
+  it('fails closed when W03 cannot validate the poll owner or binding', async () => {
+    const scenario = {
+      poll: {
+        poll_id: 'poll-1', content_id: 'content-1', owner_user_id: 'author-1',
+        duration_hours: 24, ends_at: '2099-10-16T04:00:00.000Z',
+        created_at: '2026-10-15T04:00:00.000Z', updated_at: '2026-10-15T04:00:00.000Z',
+      },
+      options: [
+        { option_id: 'option-1', option_text: 'Yes', position: 0, votes: 0 },
+        { option_id: 'option-2', option_text: 'No', position: 1, votes: 0 },
+      ],
+    }
+    const absent = pollDb(scenario)
+    await expect(castContentPollVote(absent.db, undefined, 'viewer-1', 'content-1', 'option-1', 'poll-vote-no-binding'))
+      .rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE', status: 503 })
+    expect(absent.prepare.some(([sql]) => /INSERT OR IGNORE INTO social_poll_votes/.test(String(sql)))).toBe(false)
+
+    const unpublished = pollDb(scenario)
+    await expect(castContentPollVote(unpublished.db, publishedOwnerContextBinding(404), 'viewer-1', 'content-1', 'option-1', 'poll-vote-unpublished'))
+      .rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 })
+    expect(unpublished.prepare.some(([sql]) => /INSERT OR IGNORE INTO social_poll_votes/.test(String(sql)))).toBe(false)
+  })
+
 })

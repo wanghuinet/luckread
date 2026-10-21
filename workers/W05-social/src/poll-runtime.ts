@@ -1,5 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 import type { OwnedPostContext } from './owned-post-context.js'
+import { ReplyAudienceRuntimeError } from './reply-audience-runtime.js'
+import { fetchPublishedOwnerPostContext, type W03ContentBinding } from './w03-content-context-client.js'
 
 export class SocialPollError extends Error {
   constructor(readonly code: string, readonly status: number) { super(code) }
@@ -332,25 +334,54 @@ export async function deleteContentPoll(
 
 export async function castContentPollVote(
   db: D1Database,
+  w03Content: W03ContentBinding | undefined,
   actorUserIdValue: string,
   contentIdValue: string,
   optionIdValue: string,
+  correlationId: string,
 ): Promise<PollView> {
   const actorUserId = validateId(actorUserIdValue, 'UNAUTHENTICATED')
   const contentId = validateId(contentIdValue)
   const optionId = validateId(optionIdValue)
-  const content = await db.prepare(
-    'SELECT id, content_type, state, owner_user_id, updated_at FROM contents WHERE id = ? LIMIT 1',
-  ).bind(contentId).first<ContentRow>()
-  if (!content || content.content_type !== 'post' || content.state !== 'PUBLISHED') {
-    throw new SocialPollError('NOT_FOUND', 404)
-  }
-  if (content.owner_user_id && await isBlocked(db, actorUserId, content.owner_user_id)) {
-    throw new SocialPollError('NOT_FOUND', 404)
-  }
+  if (!correlationId.trim()) throw new SocialPollError('VALIDATION_FAILED', 400)
+
+  // Resolve the expected owner from W05's own poll record, then ask W03 to
+  // verify that the canonical item is still a published post owned by them.
   const poll = await readPollRow(db, contentId)
   if (!poll) throw new SocialPollError('NOT_FOUND', 404)
-  const currentPoll = await getContentPoll(db, contentId, actorUserId)
+
+  let contentContext: OwnedPostContext
+  try {
+    contentContext = await fetchPublishedOwnerPostContext(w03Content, {
+      ownerUserId: validateId(poll.owner_user_id),
+      contentId,
+      correlationId,
+    })
+  } catch (error) {
+    if (error instanceof ReplyAudienceRuntimeError) {
+      if (error.status === 404) throw new SocialPollError('NOT_FOUND', 404)
+      if (error.status === 400) throw new SocialPollError('VALIDATION_FAILED', 400)
+      if (error.status === 403) throw new SocialPollError('PERMISSION_DENIED', 403)
+      if (error.status === 429) throw new SocialPollError('RATE_LIMITED', 429)
+    }
+    throw new SocialPollError('SERVICE_UNAVAILABLE', 503)
+  }
+
+  if (
+    contentContext.contentId !== contentId ||
+    contentContext.ownerUserId !== poll.owner_user_id ||
+    contentContext.contentType !== 'post' ||
+    contentContext.state !== 'PUBLISHED'
+  ) {
+    throw new SocialPollError('NOT_FOUND', 404)
+  }
+
+  const ownerUserId = contentContext.ownerUserId
+  if (await isBlocked(db, actorUserId, ownerUserId)) {
+    throw new SocialPollError('NOT_FOUND', 404)
+  }
+
+  const currentPoll = await getContentPoll(db, contentId, actorUserId, contentContext)
   if (!currentPoll) throw new SocialPollError('NOT_FOUND', 404)
   if (!currentPoll.options.some(option => option.optionId === optionId)) {
     throw new SocialPollError('VALIDATION_FAILED', 400)
@@ -370,31 +401,42 @@ export async function castContentPollVote(
     `INSERT OR IGNORE INTO social_poll_votes (vote_id, poll_id, option_id, user_id, created_at)
      SELECT ?, p.poll_id, o.option_id, ?, ?
        FROM social_polls p
-       JOIN contents c ON c.id = p.content_id
        JOIN social_poll_options o ON o.poll_id = p.poll_id AND o.option_id = ?
       WHERE p.content_id = ?
-        AND c.content_type = 'post'
-        AND c.state = 'PUBLISHED'
+        AND p.owner_user_id = ?
         AND p.ends_at IS NOT NULL
         AND p.ends_at > ?
         AND NOT EXISTS (
           SELECT 1 FROM social_user_interactions b
            WHERE b.relation_type = 'block'
-             AND ((b.actor_user_id = ? AND b.target_user_id = c.owner_user_id)
-               OR (b.actor_user_id = c.owner_user_id AND b.target_user_id = ?))
+             AND ((b.actor_user_id = ? AND b.target_user_id = ?)
+               OR (b.actor_user_id = ? AND b.target_user_id = ?))
         )
         AND NOT EXISTS (
           SELECT 1 FROM social_poll_votes existing
            WHERE existing.poll_id = p.poll_id AND existing.user_id = ?
         )`,
-  ).bind(crypto.randomUUID(), actorUserId, now, optionId, contentId, now, actorUserId, actorUserId, actorUserId).run()
+  ).bind(
+    crypto.randomUUID(),
+    actorUserId,
+    now,
+    optionId,
+    contentId,
+    ownerUserId,
+    now,
+    actorUserId,
+    ownerUserId,
+    ownerUserId,
+    actorUserId,
+    actorUserId,
+  ).run()
 
   const savedVote = await db.prepare(
     'SELECT option_id FROM social_poll_votes WHERE poll_id = ? AND user_id = ? LIMIT 1',
   ).bind(poll.poll_id, actorUserId).first<{ option_id: string }>()
   if (!savedVote) throw new SocialPollError('POLL_CLOSED', 409)
   if (savedVote.option_id !== optionId) throw new SocialPollError('ALREADY_VOTED', 409)
-  const refreshed = await getContentPoll(db, contentId, actorUserId)
+  const refreshed = await getContentPoll(db, contentId, actorUserId, contentContext)
   if (!refreshed) throw new SocialPollError('NOT_FOUND', 404)
   return refreshed
 }
