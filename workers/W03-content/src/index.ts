@@ -251,7 +251,7 @@ const worker = {
       const isRead = request.method === 'GET' || (request.method === 'POST' && ['/internal/content/following-feed', '/internal/content/search'].includes(url.pathname))
       await enforceRateLimits(request, env, isRead ? 'read' : 'write')
 
-      const replyAudienceContextMatch = /^\\/internal\\/content\\/contents\\/([^/]+)\\/reply-audience-context$/.exec(url.pathname)
+      const replyAudienceContextMatch = /^\/internal\/content\/contents\/([^/]+)\/reply-audience-context$/.exec(url.pathname)
       if (replyAudienceContextMatch) {
         if (request.method !== 'GET') {
           return new Response(null, { status: 405, headers: { Allow: 'GET' } })
