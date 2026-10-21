@@ -491,6 +491,56 @@ export async function getContent(
   return toContent(row)
 }
 
+export type ReplyAudienceContentContext = {
+  contentId: string
+  ownerUserId: string
+  contentType: 'post'
+  state: 'DRAFT' | 'PUBLISHED' | 'UNPUBLISHED'
+  updatedAt: string
+}
+
+/**
+ * W03 is the sole authority for content ownership and lifecycle. W05 uses this
+ * owner-scoped context only to read the creator's reply-audience policy.
+ */
+export async function getReplyAudienceContentContext(
+  db: ContentD1,
+  contentIdValue: string,
+  principalUserIdValue: string,
+): Promise<ReplyAudienceContentContext> {
+  const contentId = contentIdValue.trim()
+  const principalUserId = principalUserIdValue.trim()
+  if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(contentId)) {
+    throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+  }
+  if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(principalUserId)) {
+    throw new ContentRuntimeError('UNAUTHENTICATED', 401)
+  }
+  const row = await db.prepare(
+    `SELECT id, owner_user_id, content_type, state, updated_at
+       FROM contents
+      WHERE id = ?
+        AND owner_user_id = ?
+        AND content_type = 'post'
+        AND state IN ('DRAFT', 'PUBLISHED', 'UNPUBLISHED')
+      LIMIT 1`,
+  ).bind(contentId, principalUserId).first<{
+    id: string
+    owner_user_id: string
+    content_type: string
+    state: string
+    updated_at: string
+  }>()
+  if (!row) throw new ContentRuntimeError('NOT_FOUND', 404)
+  return {
+    contentId: row.id,
+    ownerUserId: row.owner_user_id,
+    contentType: 'post',
+    state: row.state as 'DRAFT' | 'PUBLISHED' | 'UNPUBLISHED',
+    updatedAt: row.updated_at,
+  }
+}
+
 export async function listContentRevisions(
   db: ContentD1,
   principalUserId: string,
