@@ -169,6 +169,51 @@ describe('W03 content contract core', () => {
     expect(forwardedCredentials.status).toBe(403)
   })
 
+  it('serves only minimal published content social context through the W05 internal binding', async () => {
+    let query = ''
+    let bindings: unknown[] = []
+    const row = {
+      id: 'content_1',
+      owner_user_id: 'owner_1',
+      content_type: 'article',
+      state: 'PUBLISHED',
+    }
+    const env = {
+      D1_02: {
+        prepare(sql: string) {
+          query = sql
+          return { bind: (...values: unknown[]) => {
+            bindings = values
+            return { first: async () => values[0] === 'missing_content' ? null : row }
+          } }
+        },
+      },
+    } as never
+    const request = (caller = 'W05', extraHeaders: Record<string, string> = {}, contentId = 'content_1') =>
+      new Request(
+        `https://luckread-w03.internal/internal/content/contents/${contentId}/published-social-context`,
+        {
+          headers: {
+            'X-LuckRead-Caller': caller,
+            'X-LuckRead-Transport-Version': '1.0',
+            'X-LuckRead-Correlation-Id': 'published-social-context-test',
+            ...extraHeaders,
+          },
+        },
+      )
+    const response = await w03Worker.fetch(request(), env, {} as never)
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({
+      data: { contentId: 'content_1', ownerUserId: 'owner_1', contentType: 'article', state: 'PUBLISHED' },
+    })
+    expect(query).toContain("state = 'PUBLISHED'")
+    expect(bindings).toEqual(['content_1'])
+
+    expect((await w03Worker.fetch(request('W01'), env, {} as never)).status).toBe(403)
+    expect((await w03Worker.fetch(request('W05', { Authorization: 'Bearer not-forwarded' }), env, {} as never)).status).toBe(403)
+    expect((await w03Worker.fetch(request('W05', {}, 'missing_content'), env, {} as never)).status).toBe(404)
+  })
+
   it('loads a bounded list of published content IDs in bookmark order', async () => {
     const rows = [
       {
