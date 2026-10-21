@@ -54,7 +54,7 @@ import { apiRequest, getApiErrorMessage } from '~/lib/api-client';
 import { mapContentToFeedContent, readContentBody, readContentSocial, readContentAuthor, resolveNativeMediaSource, resolvePublicProfileById, unwrapApiData, type ApiContentPage, type ApiContentRecord } from '~/lib/content-adapter';
 import { useAuthStore } from '~/store/auth-store';
 import { readSessionToken } from '~/lib/secure-session';
-import { fetchUserLikedContentsPage, fetchUserRepliesPage } from '~/lib/social-screen-api';
+import { fetchUserLikedContentsPage, fetchUserProfileContentPage, fetchUserRepliesPage } from '~/lib/social-screen-api';
 import Messages from "~/assets/svg/tabs/messages.svg"
 
 const PULL_TO_REFRESH_THRESHOLD = 70; 
@@ -569,12 +569,20 @@ export default function UserProfileScreen() {
   const [repliesLoadingMore, setRepliesLoadingMore] = useState(false);
   const [repliesError, setRepliesError] = useState('');
   const [repliesLoadedForUserId, setRepliesLoadedForUserId] = useState<string | null>(null);
+  const [mediaPosts, setMediaPosts] = useState<FeedContent[]>([]);
+  const [mediaCursor, setMediaCursor] = useState<string | null>(null);
+  const [mediaHasMore, setMediaHasMore] = useState(false);
+  const [mediaLoading, setMediaLoading] = useState(false);
+  const [mediaLoadingMore, setMediaLoadingMore] = useState(false);
+  const [mediaError, setMediaError] = useState('');
+  const [mediaLoadedForUserId, setMediaLoadedForUserId] = useState<string | null>(null);
   const [profileLoading, setProfileLoading] = useState(true);
   const [profileError, setProfileError] = useState('');
   const [feedError, setFeedError] = useState('');
   const requestRef = useRef<AbortController | null>(null);
   const likesRequestRef = useRef<AbortController | null>(null);
   const repliesRequestRef = useRef<AbortController | null>(null);
+  const mediaRequestRef = useRef<AbortController | null>(null);
 
   const loadProfile = useCallback(async () => {
     requestRef.current?.abort();
@@ -768,6 +776,7 @@ export default function UserProfileScreen() {
       requestRef.current?.abort();
       likesRequestRef.current?.abort();
       repliesRequestRef.current?.abort();
+      mediaRequestRef.current?.abort();
     };
   }, [loadProfile]);
 
@@ -790,6 +799,14 @@ export default function UserProfileScreen() {
     setRepliesLoadingMore(false);
     setRepliesLoadedForUserId(null);
     repliesRequestRef.current?.abort();
+    setMediaPosts([]);
+    setMediaCursor(null);
+    setMediaHasMore(false);
+    setMediaError('');
+    setMediaLoading(false);
+    setMediaLoadingMore(false);
+    setMediaLoadedForUserId(null);
+    mediaRequestRef.current?.abort();
   }, [userHandle]);
 
   const loadLikedPosts = useCallback(async (
@@ -987,14 +1004,99 @@ export default function UserProfileScreen() {
     }
   }, []);
 
+  const loadProfileMedia = useCallback(async (
+    profileUserId: string,
+    nextCursor: string | null,
+    append: boolean,
+    showRefreshIndicator = false,
+  ) => {
+    mediaRequestRef.current?.abort();
+    const controller = new AbortController();
+    mediaRequestRef.current = controller;
+    if (append) setMediaLoadingMore(true);
+    else {
+      setMediaLoading(true);
+      setMediaPosts([]);
+      setMediaCursor(null);
+      setMediaHasMore(false);
+    }
+    setMediaError('');
+    if (showRefreshIndicator) setRefreshing(true);
+
+    try {
+      const result = await fetchUserProfileContentPage(profileUserId, {
+        cursor: nextCursor,
+        limit: 20,
+        signal: controller.signal,
+      });
+      const page = result.response.ok ? unwrapApiData<ApiContentPage>(result.data) : null;
+      if (
+        !result.response.ok ||
+        !page ||
+        !Array.isArray(page.items) ||
+        typeof page.hasMore !== 'boolean' ||
+        (page.nextCursor !== null && typeof page.nextCursor !== 'string')
+      ) {
+        throw new Error(getApiErrorMessage(
+          result.data,
+          'Could not load profile media. Please retry.',
+          result.response.status,
+        ));
+      }
+
+      const sessionToken = await readSessionToken().catch(() => null);
+      if (controller.signal.aborted) return;
+      const mappedItems = await Promise.all(page.items.map(async (item): Promise<FeedContent | null> => {
+        if (!item || typeof item.id !== 'string' || !item.id.trim()) return null;
+        const hasMediaReference = item.contentType === 'video' ||
+          (typeof item.coverRef === 'string' && item.coverRef.trim().length > 0) ||
+          (Array.isArray(item.mediaRefs) && item.mediaRefs.some((ref) => typeof ref === 'string' && ref.trim().length > 0));
+        if (!hasMediaReference) return null;
+
+        const [body, social, author] = await Promise.all([
+          readContentBody(item, controller.signal, sessionToken),
+          readContentSocial(item.id, controller.signal),
+          readContentAuthor(item),
+        ]);
+        const mapped = mapContentToFeedContent(item, body, social, author, sessionToken);
+        return mapped.media_items?.length ? mapped : null;
+      }));
+
+      if (controller.signal.aborted) return;
+      const mapped = mappedItems.filter((item): item is FeedContent => item !== null);
+      setMediaPosts((current) => {
+        if (!append) return mapped;
+        const known = new Set(current.map((item) => item.contentId));
+        return [...current, ...mapped.filter((item) => item.contentId && !known.has(item.contentId))];
+      });
+      setMediaCursor(page.nextCursor || null);
+      setMediaHasMore(page.hasMore);
+      setMediaLoadedForUserId(profileUserId);
+    } catch (cause) {
+      if (!controller.signal.aborted) {
+        setMediaError(cause instanceof Error ? cause.message : 'Could not load profile media. Please retry.');
+      }
+    } finally {
+      if (mediaRequestRef.current === controller) mediaRequestRef.current = null;
+      if (!controller.signal.aborted) {
+        setMediaLoading(false);
+        setMediaLoadingMore(false);
+        if (showRefreshIndicator) setRefreshing(false);
+      }
+    }
+  }, []);
+
   const isOwnProfile = Boolean(user?.id && currentUserId && user.id === currentUserId);
   const showingReplies = selectedTabIndex === 1;
-  const showingLikes = isOwnProfile && selectedTabIndex === 2;
+  const showingMedia = selectedTabIndex === 2;
+  const showingLikes = isOwnProfile && selectedTabIndex === 3;
 
   useEffect(() => {
-    if (!isOwnProfile && selectedTabIndex > 1) setSelectedTabIndex(0);
+    if (!isOwnProfile && selectedTabIndex > 2) setSelectedTabIndex(0);
   }, [isOwnProfile, selectedTabIndex]);
-  const profileTabs = isOwnProfile ? ['Posts', 'Replies', 'Likes'] : ['Posts', 'Replies'];
+  const profileTabs = isOwnProfile
+    ? ['Posts', 'Replies', 'Media', 'Likes']
+    : ['Posts', 'Replies', 'Media'];
 
   useEffect(() => {
     if (
@@ -1010,6 +1112,18 @@ export default function UserProfileScreen() {
 
   useEffect(() => {
     if (
+      showingMedia &&
+      user?.id &&
+      mediaLoadedForUserId !== user.id &&
+      !mediaLoading &&
+      !mediaError
+    ) {
+      void loadProfileMedia(user.id, null, false);
+    }
+  }, [showingMedia, user?.id, mediaLoadedForUserId, mediaLoading, mediaError, loadProfileMedia]);
+
+  useEffect(() => {
+    if (
       showingLikes &&
       user?.id &&
       likesLoadedForUserId !== user.id &&
@@ -1022,14 +1136,19 @@ export default function UserProfileScreen() {
 
   const displayedPosts: FeedContent[] = showingReplies
     ? profileReplies
+    : showingMedia ? mediaPosts
     : showingLikes ? likedPosts : userPosts;
   const feedSections: SectionListData<FeedContent, { title: string }>[] = useMemo(() => [
-    { title: showingReplies ? 'Replies' : showingLikes ? 'Likes' : 'Feed', data: displayedPosts },
-  ], [displayedPosts, showingLikes, showingReplies]);
+    { title: showingReplies ? 'Replies' : showingMedia ? 'Media' : showingLikes ? 'Likes' : 'Feed', data: displayedPosts },
+  ], [displayedPosts, showingLikes, showingMedia, showingReplies]);
 
   const handleRefresh = useCallback(() => {
     if (showingReplies && user?.id) {
       void loadProfileReplies(user.id, null, false, true);
+      return;
+    }
+    if (showingMedia && user?.id) {
+      void loadProfileMedia(user.id, null, false, true);
       return;
     }
     if (showingLikes && user?.id) {
@@ -1037,7 +1156,7 @@ export default function UserProfileScreen() {
       return;
     }
     void loadProfile();
-  }, [loadLikedPosts, loadProfile, loadProfileReplies, showingLikes, showingReplies, user?.id]);
+  }, [loadLikedPosts, loadProfile, loadProfileMedia, loadProfileReplies, showingLikes, showingMedia, showingReplies, user?.id]);
 
   const handleItemPress = (postId: string) => {
     router.push(`/post/${postId}`);
@@ -1096,6 +1215,22 @@ export default function UserProfileScreen() {
                   <Text className="font-bold text-white">Retry</Text>
                 </TouchableOpacity>
               </>
+            ) : showingMedia && mediaLoading ? (
+              <>
+                <ActivityIndicator color={APP_PRIMARY_COLOR} />
+                <Text className="mt-3 text-center text-sm text-neutral-500">Loading media…</Text>
+              </>
+            ) : showingMedia && mediaError ? (
+              <>
+                <Text className="text-center text-sm text-neutral-500">{mediaError}</Text>
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  className="mt-3 rounded-full bg-sky-500 px-4 py-2"
+                  onPress={() => user?.id && void loadProfileMedia(user.id, null, false)}
+                >
+                  <Text className="font-bold text-white">Retry</Text>
+                </TouchableOpacity>
+              </>
             ) : showingLikes && likesLoading ? (
               <>
                 <ActivityIndicator color={APP_PRIMARY_COLOR} />
@@ -1114,7 +1249,7 @@ export default function UserProfileScreen() {
               </>
             ) : (
               <Text className="text-center text-sm text-neutral-500">
-                {showingReplies ? 'No public replies yet.' : showingLikes ? 'No liked posts yet.' : feedError || 'No public posts yet.'}
+                {showingReplies ? 'No public replies yet.' : showingMedia ? 'No public media yet.' : showingLikes ? 'No liked posts yet.' : feedError || 'No public posts yet.'}
               </Text>
             )}
           </View>
@@ -1154,7 +1289,36 @@ export default function UserProfileScreen() {
             </View>
           );
         }}
-        ListFooterComponent={showingReplies && repliesHasMore && repliesCursor ? (
+        ListFooterComponent={showingMedia && mediaHasMore && mediaCursor ? (
+          <View className="items-center px-4 py-4">
+            {mediaError ? (
+              <>
+                <Text className="mb-3 text-center text-sm text-rose-600">{mediaError}</Text>
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  disabled={mediaLoadingMore}
+                  className="rounded-full border border-neutral-300 px-5 py-2 dark:border-neutral-700"
+                  onPress={() => user?.id && void loadProfileMedia(user.id, mediaCursor, true)}
+                >
+                  <Text className="font-bold text-sky-600">Retry loading media</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <TouchableOpacity
+                accessibilityRole="button"
+                disabled={mediaLoadingMore}
+                className="rounded-full border border-neutral-300 px-5 py-2 dark:border-neutral-700"
+                onPress={() => user?.id && void loadProfileMedia(user.id, mediaCursor, true)}
+              >
+                {mediaLoadingMore ? (
+                  <ActivityIndicator color={APP_PRIMARY_COLOR} />
+                ) : (
+                  <Text className="font-bold text-sky-600">Load more media</Text>
+                )}
+              </TouchableOpacity>
+            )}
+          </View>
+        ) : showingReplies && repliesHasMore && repliesCursor ? (
           <View className="items-center px-4 py-4">
             {repliesError ? (
               <>
