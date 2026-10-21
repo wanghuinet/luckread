@@ -125,9 +125,21 @@ describe('W05 social query transport', () => {
       data: { contentId: 'content-1', ownerUserId: 'viewer-1', replyAudience: 'following' },
     })
 
+    const contextBinding = {
+      fetch: vi.fn(async () => Response.json({
+        data: {
+          contentId: 'content-1',
+          ownerUserId: 'viewer-1',
+          contentType: 'post',
+          state: 'PUBLISHED',
+          updatedAt: '2026-10-19T00:00:00.000Z',
+        },
+        requestId: 'req_context',
+      })),
+    }
     const read = await worker.fetch(
       request('/internal/social/contents/content-1/reply-audience', transportHeaders),
-      { DB: dbFor([savedPolicy]) },
+      { DB: dbFor([savedPolicy]), W03_CONTENT: contextBinding },
     )
     expect(read.status).toBe(200)
     await expect(read.json()).resolves.toMatchObject({
