@@ -864,14 +864,14 @@ export default {
 
         if (request.method === 'GET') {
           return json({
-            data: await getFavoriteStatus(env.DB, viewerUserId, target),
+            data: await getFavoriteStatus(env.DB, env.W03_CONTENT, viewerUserId, target, request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? ''),
             requestId: createRequestId(),
           })
         }
 
         if (request.method === 'POST') {
           return json({
-            data: await favorite(env.DB, viewerUserId, target),
+            data: await favorite(env.DB, env.W03_CONTENT, viewerUserId, target, request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? ''),
             requestId: createRequestId(),
           })
         }

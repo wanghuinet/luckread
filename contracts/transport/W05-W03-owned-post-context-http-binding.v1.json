@@ -9,7 +9,7 @@
   "caller": {
     "logicalWorker": "W05",
     "role": "Social / Community",
-    "authority": "Reply-audience policy, profile-pin state, notification recipient routing, share-link validation and social relationship state"
+    "authority": "Reply-audience policy, profile-pin state, notification recipient routing, share-link validation, favorite relations and social relationship state"
   },
   "callee": {
     "logicalWorker": "W03",
@@ -73,14 +73,16 @@
       "Content hashtag/mention synchronization gets canonical published state and owner from W03; W05 continues to own social topic/mention edges.",
       "GET content token reads validate the target's published state through W03 before reading W05-owned topic/mention metadata.",
       "Poll configuration and draft-poll deletion obtain canonical post owner/type/lifecycle through the existing W03 owned-post context before W05 reads or writes poll tables.",
-      "Repost creation validates canonical published content and owner through W03_CONTENT, checks block relationships in W05-owned social_user_interactions, and writes only social_reposts."
+      "Repost creation validates canonical published content and owner through W03_CONTENT, checks block relationships in W05-owned social_user_interactions, and writes only social_reposts.",
+      "Favorite creation and status validate canonical publication through W03_CONTENT; W05 reads and writes only interaction_favorites, and the local status cache is consulted only after W03 confirms the target is published."
     ],
     "outOfScope": [
       "Comment insertion's atomic content-state/policy recheck remains unchanged.",
       "Other W05 reads from the contents table are not claimed as fixed.",
       "Comment insertion's atomic W05 policy, block and publication rechecks still query canonical content state within the existing transaction.",
       "Cross-Worker publication changes cannot be transactionally locked with a W05 share-link write; every share resolution revalidates through W03 and denies unpublished or missing content.",
-      "A W03 publication change cannot be transactionally locked with a W05 repost insert; feed/read paths must independently revalidate canonical visibility before disclosing repost targets."
+      "A W03 publication change cannot be transactionally locked with a W05 repost insert; feed/read paths must independently revalidate canonical visibility before disclosing repost targets.",
+      "Cross-Worker publication changes cannot be transactionally locked with a W05 favorite insert; a stale relation may remain after unpublish but status reads return false and do not disclose unpublished content."
     ]
   },
   "evidenceRequired": [
@@ -103,7 +105,8 @@
     "W05 content token synchronization resolves owner/publication through W03, fails closed when context is missing, and does not query the canonical contents table.",
     "W05 content token GET checks W03 publication before W05 D1 reads and fails closed for missing W03 binding or unpublished content.",
     "W05 poll configure/delete use W03 owned-post context, forward only validated principal/correlation metadata and perform no direct contents-table validation.",
-    "W05 repost creation validates published state through W03 without forwarding Authorization/Cookie, preserves W05 block checks, writes only social_reposts, and fails closed before W05 D1 access if W03 is unavailable or the target is unpublished."
+    "W05 repost creation validates published state through W03 without forwarding Authorization/Cookie, preserves W05 block checks, writes only social_reposts, and fails closed before W05 D1 access if W03 is unavailable or the target is unpublished.",
+    "W05 favorite creation/status call W03 published-content context without forwarding Authorization/Cookie, query only interaction_favorites in W05, fail closed if W03 is unavailable, and invalidate/avoid cached true state for unpublished content."
   ],
   "operations": [
     {
@@ -201,7 +204,7 @@
       "internalPath": "/internal/content/contents/{contentId}/published-social-context",
       "principalRequired": false,
       "caller": "W05 only through W03_CONTENT Service Binding",
-      "purpose": "Resolve notification recipients, validate share-link targets, repost creation, provide social summary context, authorize content token sync, and gate public content token reads",
+      "purpose": "Resolve notification recipients, validate share-link targets, repost creation, provide social summary context, authorize content token sync, and gate public content token reads, validate favorite creation and status reads",
       "allowedContentTypes": [
         "article",
         "post",
@@ -232,7 +235,9 @@
         "content social summary state/type and profile-pin validation",
         "content topic/mention synchronization owner validation",
         "content topic/mention read visibility validation",
-        "repost creation"
+        "repost creation",
+        "favorite creation",
+        "favorite status visibility"
       ]
     }
   ]
