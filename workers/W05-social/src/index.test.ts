@@ -1307,11 +1307,14 @@ describe('W05 social comment transport', () => {
         ...transportHeaders,
         'Idempotency-Key': 'repost-1',
       }),
-      { DB: dbFor([
-        { id: 'content-1', state: 'PUBLISHED', owner_user_id: 'owner-1', blocked: 0 },
-        null,
-        { repost_id: 'repost-1', content_id: 'content-1', actor_user_id: 'viewer-1', created_at: '2026-10-16T00:00:00.000Z' },
-      ]) },
+      {
+        DB: dbFor([
+          { blocked: 0 },
+          null,
+          { repost_id: 'repost-1', content_id: 'content-1', actor_user_id: 'viewer-1', created_at: '2026-10-16T00:00:00.000Z' },
+        ]),
+        W03_CONTENT: publishedContextBinding(),
+      },
     )
     expect(response.status).toBe(201)
     await expect(response.json()).resolves.toMatchObject({
