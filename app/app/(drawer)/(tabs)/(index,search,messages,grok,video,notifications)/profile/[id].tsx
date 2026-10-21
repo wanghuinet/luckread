@@ -54,7 +54,7 @@ import { apiRequest, getApiErrorMessage } from '~/lib/api-client';
 import { mapContentToFeedContent, readContentBody, readContentSocial, readContentAuthor, resolveNativeMediaSource, resolvePublicProfileById, unwrapApiData, type ApiContentPage, type ApiContentRecord } from '~/lib/content-adapter';
 import { useAuthStore } from '~/store/auth-store';
 import { readSessionToken } from '~/lib/secure-session';
-import { fetchUserLikedContentsPage } from '~/lib/social-screen-api';
+import { fetchUserLikedContentsPage, fetchUserRepliesPage } from '~/lib/social-screen-api';
 import Messages from "~/assets/svg/tabs/messages.svg"
 
 const PULL_TO_REFRESH_THRESHOLD = 70; 
@@ -75,6 +75,28 @@ type ProfileLikedContentPage = {
   items: Array<{ contentId: string; likedAt: string }>;
   nextCursor?: string | null;
   hasMore?: boolean;
+};
+
+type ProfileReplyRecord = {
+  id: string;
+  contentId: string;
+  authorUserId: string;
+  parentId: string | null;
+  body: string;
+  state: 'PUBLISHED';
+  depth: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+type ProfileReplyPage = {
+  items: ProfileReplyRecord[];
+  nextCursor?: string | null;
+  hasMore?: boolean;
+};
+
+type ProfileReplyDisplay = FeedContent & {
+  profileReply?: Pick<ProfileReplyRecord, 'id' | 'authorUserId' | 'parentId' | 'body' | 'createdAt' | 'depth'>;
 };
 
 interface User {
@@ -540,11 +562,19 @@ export default function UserProfileScreen() {
   const [likesLoadingMore, setLikesLoadingMore] = useState(false);
   const [likesError, setLikesError] = useState('');
   const [likesLoadedForUserId, setLikesLoadedForUserId] = useState<string | null>(null);
+  const [profileReplies, setProfileReplies] = useState<ProfileReplyDisplay[]>([]);
+  const [repliesCursor, setRepliesCursor] = useState<string | null>(null);
+  const [repliesHasMore, setRepliesHasMore] = useState(false);
+  const [repliesLoading, setRepliesLoading] = useState(false);
+  const [repliesLoadingMore, setRepliesLoadingMore] = useState(false);
+  const [repliesError, setRepliesError] = useState('');
+  const [repliesLoadedForUserId, setRepliesLoadedForUserId] = useState<string | null>(null);
   const [profileLoading, setProfileLoading] = useState(true);
   const [profileError, setProfileError] = useState('');
   const [feedError, setFeedError] = useState('');
   const requestRef = useRef<AbortController | null>(null);
   const likesRequestRef = useRef<AbortController | null>(null);
+  const repliesRequestRef = useRef<AbortController | null>(null);
 
   const loadProfile = useCallback(async () => {
     requestRef.current?.abort();
@@ -737,6 +767,7 @@ export default function UserProfileScreen() {
     return () => {
       requestRef.current?.abort();
       likesRequestRef.current?.abort();
+      repliesRequestRef.current?.abort();
     };
   }, [loadProfile]);
 
@@ -751,6 +782,14 @@ export default function UserProfileScreen() {
     setLikesCursor(null);
     setLikesHasMore(false);
     likesRequestRef.current?.abort();
+    setProfileReplies([]);
+    setRepliesCursor(null);
+    setRepliesHasMore(false);
+    setRepliesError('');
+    setRepliesLoading(false);
+    setRepliesLoadingMore(false);
+    setRepliesLoadedForUserId(null);
+    repliesRequestRef.current?.abort();
   }, [userHandle]);
 
   const loadLikedPosts = useCallback(async (
@@ -842,13 +881,132 @@ export default function UserProfileScreen() {
     }
   }, [currentUserId]);
 
+  const loadProfileReplies = useCallback(async (
+    profileUserId: string,
+    nextCursor: string | null,
+    append: boolean,
+    showRefreshIndicator = false,
+  ) => {
+    repliesRequestRef.current?.abort();
+    const controller = new AbortController();
+    repliesRequestRef.current = controller;
+    if (append) setRepliesLoadingMore(true);
+    else {
+      setRepliesLoading(true);
+      setProfileReplies([]);
+      setRepliesCursor(null);
+      setRepliesHasMore(false);
+    }
+    setRepliesError('');
+    if (showRefreshIndicator) setRefreshing(true);
+
+    try {
+      const result = await fetchUserRepliesPage(profileUserId, {
+        cursor: nextCursor,
+        limit: 20,
+        signal: controller.signal,
+      });
+      const page = result.response.ok ? unwrapApiData<ProfileReplyPage>(result.data) : null;
+      if (
+        !result.response.ok ||
+        !page ||
+        !Array.isArray(page.items) ||
+        typeof page.hasMore !== 'boolean' ||
+        (page.nextCursor !== null && typeof page.nextCursor !== 'string')
+      ) {
+        throw new Error(getApiErrorMessage(
+          result.data,
+          'Could not load replies. Please retry.',
+          result.response.status,
+        ));
+      }
+
+      const sessionToken = await readSessionToken().catch(() => null);
+      if (controller.signal.aborted) return;
+      const mappedItems = await Promise.all(page.items.map(async (reply): Promise<ProfileReplyDisplay | null> => {
+        const replyId = typeof reply?.id === 'string' ? reply.id.trim() : '';
+        const contentId = typeof reply?.contentId === 'string' ? reply.contentId.trim() : '';
+        const body = typeof reply?.body === 'string' ? reply.body.trim() : '';
+        if (!replyId || !contentId || !body) return null;
+
+        const contentResult = await apiRequest<unknown>(
+          '/contents/' + encodeURIComponent(contentId),
+          { method: 'GET', signal: controller.signal },
+        );
+        if (!contentResult.response.ok) {
+          if ([403, 404, 410].includes(contentResult.response.status)) return null;
+          throw new Error(getApiErrorMessage(
+            contentResult.data,
+            'Could not load the original post for a reply. Please retry.',
+            contentResult.response.status,
+          ));
+        }
+        const record = unwrapApiData<ApiContentRecord>(contentResult.data);
+        if (!record || record.id !== contentId || (record.state && record.state !== 'PUBLISHED')) return null;
+
+        const [parentBody, social, author] = await Promise.all([
+          readContentBody(record, controller.signal, sessionToken),
+          readContentSocial(record.id, controller.signal),
+          readContentAuthor(record),
+        ]);
+        const parentPost = mapContentToFeedContent(record, parentBody, social, author, sessionToken);
+        return {
+          ...parentPost,
+          profileReply: {
+            id: replyId,
+            authorUserId: reply.authorUserId,
+            parentId: reply.parentId,
+            body,
+            createdAt: reply.createdAt,
+            depth: reply.depth,
+          },
+        };
+      }));
+
+      if (controller.signal.aborted) return;
+      const mapped = mappedItems.filter((item): item is ProfileReplyDisplay => item !== null);
+      setProfileReplies((current) => {
+        if (!append) return mapped;
+        const known = new Set(current.map((item) => item.profileReply?.id));
+        return [...current, ...mapped.filter((item) => item.profileReply && !known.has(item.profileReply.id))];
+      });
+      setRepliesCursor(page.nextCursor || null);
+      setRepliesHasMore(page.hasMore);
+      setRepliesLoadedForUserId(profileUserId);
+    } catch (cause) {
+      if (!controller.signal.aborted) {
+        setRepliesError(cause instanceof Error ? cause.message : 'Could not load replies. Please retry.');
+      }
+    } finally {
+      if (repliesRequestRef.current === controller) repliesRequestRef.current = null;
+      if (!controller.signal.aborted) {
+        setRepliesLoading(false);
+        setRepliesLoadingMore(false);
+        if (showRefreshIndicator) setRefreshing(false);
+      }
+    }
+  }, []);
+
   const isOwnProfile = Boolean(user?.id && currentUserId && user.id === currentUserId);
-  const showingLikes = isOwnProfile && selectedTabIndex === 1;
+  const showingReplies = selectedTabIndex === 1;
+  const showingLikes = isOwnProfile && selectedTabIndex === 2;
 
   useEffect(() => {
-    if (!isOwnProfile) setSelectedTabIndex(0);
-  }, [isOwnProfile]);
-  const profileTabs = isOwnProfile ? ['Posts', 'Likes'] : ['Posts'];
+    if (!isOwnProfile && selectedTabIndex > 1) setSelectedTabIndex(0);
+  }, [isOwnProfile, selectedTabIndex]);
+  const profileTabs = isOwnProfile ? ['Posts', 'Replies', 'Likes'] : ['Posts', 'Replies'];
+
+  useEffect(() => {
+    if (
+      showingReplies &&
+      user?.id &&
+      repliesLoadedForUserId !== user.id &&
+      !repliesLoading &&
+      !repliesError
+    ) {
+      void loadProfileReplies(user.id, null, false);
+    }
+  }, [showingReplies, user?.id, repliesLoadedForUserId, repliesLoading, repliesError, loadProfileReplies]);
 
   useEffect(() => {
     if (
@@ -862,18 +1020,24 @@ export default function UserProfileScreen() {
     }
   }, [showingLikes, user?.id, likesLoadedForUserId, likesLoading, likesError, loadLikedPosts]);
 
-  const displayedPosts = showingLikes ? likedPosts : userPosts;
+  const displayedPosts: FeedContent[] = showingReplies
+    ? profileReplies
+    : showingLikes ? likedPosts : userPosts;
   const feedSections: SectionListData<FeedContent, { title: string }>[] = useMemo(() => [
-    { title: showingLikes ? 'Likes' : 'Feed', data: displayedPosts },
-  ], [displayedPosts, showingLikes]);
+    { title: showingReplies ? 'Replies' : showingLikes ? 'Likes' : 'Feed', data: displayedPosts },
+  ], [displayedPosts, showingLikes, showingReplies]);
 
   const handleRefresh = useCallback(() => {
+    if (showingReplies && user?.id) {
+      void loadProfileReplies(user.id, null, false, true);
+      return;
+    }
     if (showingLikes && user?.id) {
       void loadLikedPosts(user.id, null, false, true);
       return;
     }
     void loadProfile();
-  }, [loadLikedPosts, loadProfile, showingLikes, user?.id]);
+  }, [loadLikedPosts, loadProfile, loadProfileReplies, showingLikes, showingReplies, user?.id]);
 
   const handleItemPress = (postId: string) => {
     router.push(`/post/${postId}`);
@@ -916,7 +1080,23 @@ export default function UserProfileScreen() {
         sections={feedSections}
         ListEmptyComponent={(
           <View className="items-center px-6 py-12">
-            {showingLikes && likesLoading ? (
+            {showingReplies && repliesLoading ? (
+              <>
+                <ActivityIndicator color={APP_PRIMARY_COLOR} />
+                <Text className="mt-3 text-center text-sm text-neutral-500">Loading replies…</Text>
+              </>
+            ) : showingReplies && repliesError ? (
+              <>
+                <Text className="text-center text-sm text-neutral-500">{repliesError}</Text>
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  className="mt-3 rounded-full bg-sky-500 px-4 py-2"
+                  onPress={() => user?.id && void loadProfileReplies(user.id, null, false)}
+                >
+                  <Text className="font-bold text-white">Retry</Text>
+                </TouchableOpacity>
+              </>
+            ) : showingLikes && likesLoading ? (
               <>
                 <ActivityIndicator color={APP_PRIMARY_COLOR} />
                 <Text className="mt-3 text-center text-sm text-neutral-500">Loading liked posts…</Text>
@@ -934,7 +1114,7 @@ export default function UserProfileScreen() {
               </>
             ) : (
               <Text className="text-center text-sm text-neutral-500">
-                {showingLikes ? 'No liked posts yet.' : feedError || 'No public posts yet.'}
+                {showingReplies ? 'No public replies yet.' : showingLikes ? 'No liked posts yet.' : feedError || 'No public posts yet.'}
               </Text>
             )}
           </View>
@@ -945,8 +1125,65 @@ export default function UserProfileScreen() {
         style={{ flex: 1, backgroundColor: 'white' }}
 
         contentContainerStyle={{ paddingBottom: bottomInset, flexGrow: 1, backgroundColor: colorScheme === 'light' ? 'white' : 'black' }}
-        renderItem={({ item }: { item: FeedContent }) => <FeedItem itemData={item} onPress={() => handleItemPress(item.contentId || '')} />}
-        ListFooterComponent={showingLikes && likesHasMore && likesCursor ? (
+        keyExtractor={(item: FeedContent, index: number) => {
+          const reply = (item as ProfileReplyDisplay).profileReply;
+          return reply?.id ? 'profile-reply:' + reply.id : item.contentId || 'profile-post:' + index;
+        }}
+        renderItem={({ item }: { item: FeedContent }) => {
+          const reply = (item as ProfileReplyDisplay).profileReply;
+          return (
+            <View>
+              {reply ? (
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityLabel="打开回复对应的原帖"
+                  onPress={() => handleItemPress(item.contentId || '')}
+                  className="border-b border-neutral-100 px-4 py-3 dark:border-neutral-800"
+                  activeOpacity={0.75}
+                >
+                  <View className="mb-2 flex-row items-center gap-2">
+                    <Feather name="message-circle" size={15} color="#6b7280" />
+                    <Text className="text-sm text-neutral-500">
+                      Replying to @{item.authorHandle || 'author'}
+                    </Text>
+                  </View>
+                  <Text className="text-base leading-6 text-neutral-900 dark:text-neutral-100">{reply.body}</Text>
+                </TouchableOpacity>
+              ) : null}
+              <FeedItem itemData={item} onPress={() => handleItemPress(item.contentId || '')} />
+            </View>
+          );
+        }}
+        ListFooterComponent={showingReplies && repliesHasMore && repliesCursor ? (
+          <View className="items-center px-4 py-4">
+            {repliesError ? (
+              <>
+                <Text className="mb-3 text-center text-sm text-rose-600">{repliesError}</Text>
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  disabled={repliesLoadingMore}
+                  className="rounded-full border border-neutral-300 px-5 py-2 dark:border-neutral-700"
+                  onPress={() => user?.id && void loadProfileReplies(user.id, repliesCursor, true)}
+                >
+                  <Text className="font-bold text-sky-600">Retry loading replies</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <TouchableOpacity
+                accessibilityRole="button"
+                disabled={repliesLoadingMore}
+                className="rounded-full border border-neutral-300 px-5 py-2 dark:border-neutral-700"
+                onPress={() => user?.id && void loadProfileReplies(user.id, repliesCursor, true)}
+              >
+                {repliesLoadingMore ? (
+                  <ActivityIndicator color={APP_PRIMARY_COLOR} />
+                ) : (
+                  <Text className="font-bold text-sky-600">Load more replies</Text>
+                )}
+              </TouchableOpacity>
+            )}
+          </View>
+        ) : showingLikes && likesHasMore && likesCursor ? (
           <View className="items-center px-4 py-4">
             {likesError ? (
               <>
