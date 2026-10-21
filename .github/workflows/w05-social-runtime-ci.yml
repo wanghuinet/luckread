@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'workers/W05-social/**'
+      - 'contracts/transport/W05-W03-owned-post-context-http-binding.v1.json'
       - 'workers/W01-payload/src/app/api/v1/content/[contentId]/reposts/**'
       - 'workers/W01-payload/src/app/api/v1/content/[contentId]/pin/**'
       - 'workers/W01-payload/src/app/api/v1/users/[userId]/pinned-content/**'
@@ -70,6 +71,7 @@ on:
       - main
     paths:
       - 'workers/W05-social/**'
+      - 'contracts/transport/W05-W03-owned-post-context-http-binding.v1.json'
       - 'workers/W01-payload/src/app/api/v1/content/[contentId]/reposts/**'
       - 'workers/W01-payload/src/app/api/v1/content/[contentId]/pin/**'
       - 'workers/W01-payload/src/app/api/v1/users/[userId]/pinned-content/**'

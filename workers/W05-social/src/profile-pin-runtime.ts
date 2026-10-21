@@ -1,4 +1,5 @@
 /// <reference types="@cloudflare/workers-types" />
+import type { OwnedPostContext } from './owned-post-context.js'
 
 export class ProfilePinRuntimeError extends Error {
   constructor(readonly code: string, readonly status: number) { super(code) }
@@ -23,15 +24,15 @@ export async function pinProfileContent(
   db: D1Database,
   actorUserIdValue: string,
   contentIdValue: string,
+  context: OwnedPostContext,
 ): Promise<ProfilePinRecord> {
   const actorUserId = validateId(actorUserIdValue, true)
   const contentId = validateId(contentIdValue)
-  const target = await db.prepare(
-    'SELECT id, content_type, state, owner_user_id FROM contents WHERE id = ? LIMIT 1',
-  ).bind(contentId).first<{ id: string; content_type: string; state: string; owner_user_id: string | null }>()
 
-  if (!target || target.content_type !== 'post' || target.state !== 'PUBLISHED') throw new ProfilePinRuntimeError('NOT_FOUND', 404)
-  if (target.owner_user_id !== actorUserId) throw new ProfilePinRuntimeError('PERMISSION_DENIED', 403)
+  if (!context || context.contentId !== contentId || context.contentType !== 'post' || context.state !== 'PUBLISHED') {
+    throw new ProfilePinRuntimeError('NOT_FOUND', 404)
+  }
+  if (context.ownerUserId !== actorUserId) throw new ProfilePinRuntimeError('PERMISSION_DENIED', 403)
 
   const pinnedAt = new Date().toISOString()
   await db.prepare(
@@ -66,29 +67,20 @@ export async function unpinProfileContent(
   ).bind(actorUserId, contentId).run()
 }
 
-export async function getProfilePin(
+/**
+ * Read only W05-owned pin state. The caller must validate the referenced
+ * content through W03 before presenting this reference as a public profile pin.
+ */
+export async function getProfilePinReference(
   db: D1Database,
   userIdValue: string,
 ): Promise<ProfilePinRecord | null> {
   const userId = validateId(userIdValue)
   const row = await db.prepare(
-    `SELECT p.user_id, p.content_id, p.pinned_at
-       FROM social_profile_pins p
-       JOIN contents c ON c.id = p.content_id
-      WHERE p.user_id = ? AND c.owner_user_id = p.user_id AND c.content_type = 'post' AND c.state = 'PUBLISHED'
+    `SELECT user_id, content_id, pinned_at
+       FROM social_profile_pins
+      WHERE user_id = ?
       LIMIT 1`,
   ).bind(userId).first<{ user_id: string; content_id: string; pinned_at: string }>()
   return row ? { userId: row.user_id, contentId: row.content_id, pinnedAt: row.pinned_at } : null
-}
-
-export async function isContentProfilePinned(db: D1Database, contentIdValue: string): Promise<boolean> {
-  const contentId = validateId(contentIdValue)
-  const row = await db.prepare(
-    `SELECT EXISTS (
-       SELECT 1 FROM social_profile_pins p
-       JOIN contents c ON c.id = p.content_id AND c.owner_user_id = p.user_id
-       WHERE p.content_id = ? AND c.content_type = 'post' AND c.state = 'PUBLISHED'
-     ) AS pinned`,
-  ).bind(contentId).first<{ pinned: number }>()
-  return Number(row?.pinned ?? 0) === 1
 }

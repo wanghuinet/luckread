@@ -1095,19 +1095,38 @@ describe('W05 social comment transport', () => {
     expect(missingKey.status).toBe(428)
   })
 
-  it('pins only the authenticated owner content and unpins idempotently', async () => {
+  it('pins only W03-verified owner content and unpins idempotently', async () => {
+    const contextBinding = {
+      fetch: vi.fn(async (_input: RequestInfo | URL) => Response.json({
+        data: {
+          contentId: 'content-1',
+          ownerUserId: 'viewer-1',
+          contentType: 'post',
+          state: 'PUBLISHED',
+          updatedAt: '2026-10-20T00:00:00.000Z',
+        },
+        requestId: 'req_w03',
+      })),
+    }
+    const writeDb = dbFor([
+      { user_id: 'viewer-1', content_id: 'content-1', pinned_at: '2026-10-16T00:00:00.000Z' },
+    ])
     const pinResponse = await worker.fetch(
       requestWithMethod('/internal/social/content/content-1/pin', 'POST', {
         ...transportHeaders,
         'X-LuckRead-Principal-Layer': 'L2',
         'Idempotency-Key': 'pin-1',
       }),
-      { DB: dbFor([
-        { id: 'content-1', content_type: 'post', state: 'PUBLISHED', owner_user_id: 'viewer-1' },
-        { user_id: 'viewer-1', content_id: 'content-1', pinned_at: '2026-10-16T00:00:00.000Z' },
-      ]) },
+      { DB: writeDb, W03_CONTENT: contextBinding },
     )
     expect(pinResponse.status).toBe(200)
+    expect(contextBinding.fetch).toHaveBeenCalledTimes(1)
+    const forwarded = contextBinding.fetch.mock.calls[0]?.[0] as Request
+    expect(forwarded.url).toContain('/internal/content/contents/content-1/owned-post-context')
+    expect(forwarded.headers.get('X-LuckRead-Caller')).toBe('W05')
+    expect(forwarded.headers.get('X-LuckRead-Principal-User-Id')).toBe('viewer-1')
+    expect(forwarded.headers.has('Authorization')).toBe(false)
+    expect((writeDb as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).toHaveBeenCalledTimes(2)
     await expect(pinResponse.json()).resolves.toMatchObject({
       data: { userId: 'viewer-1', contentId: 'content-1' },
     })
@@ -1123,6 +1142,20 @@ describe('W05 social comment transport', () => {
     expect(unpinResponse.status).toBe(204)
   })
 
+  it('fails profile pin writes closed when W03 context binding is missing', async () => {
+    const d = dbFor()
+    const response = await worker.fetch(
+      requestWithMethod('/internal/social/content/content-1/pin', 'POST', {
+        ...transportHeaders,
+        'X-LuckRead-Principal-Layer': 'L2',
+        'Idempotency-Key': 'pin-no-w03',
+      }),
+      { DB: d },
+    )
+    expect(response.status).toBe(503)
+    expect((d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).not.toHaveBeenCalled()
+  })
+
   it('rejects profile pin writes from below L2', async () => {
     const response = await worker.fetch(
       requestWithMethod('/internal/social/content/content-1/pin', 'POST', {
@@ -1135,19 +1168,72 @@ describe('W05 social comment transport', () => {
     expect(response.status).toBe(403)
   })
 
-  it('returns the public pinned-content reference without requiring a viewer', async () => {
+  it('returns public pinned-content references only after W03 confirms the post is published and owned by the profile', async () => {
+    const binding = {
+      fetch: vi.fn(async (input: RequestInfo | URL) => Response.json({
+        data: {
+          contentId: 'content-1',
+          ownerUserId: 'owner-1',
+          contentType: 'post',
+          state: 'PUBLISHED',
+          updatedAt: '2026-10-20T00:00:00.000Z',
+        },
+        requestId: 'req_public_pin',
+      })),
+    }
+    const d = dbFor([{ user_id: 'owner-1', content_id: 'content-1', pinned_at: '2026-10-16T00:00:00.000Z' }])
     const response = await worker.fetch(
       request('/internal/social/users/owner-1/pinned-content', {
         'X-LuckRead-Caller': 'W01',
         'X-LuckRead-Transport-Version': '1.0',
         'X-LuckRead-Correlation-Id': 'public-pin',
       }),
-      { DB: dbFor([{ user_id: 'owner-1', content_id: 'content-1', pinned_at: '2026-10-16T00:00:00.000Z' }]) },
+      { DB: d, W03_CONTENT: binding },
     )
     expect(response.status).toBe(200)
+    expect(binding.fetch).toHaveBeenCalledTimes(1)
+    const forwarded = binding.fetch.mock.calls[0]?.[0] as Request
+    expect(forwarded.url).toContain('/internal/content/contents/content-1/public-post-context/owner-1')
+    expect(forwarded.headers.get('X-LuckRead-Caller')).toBe('W05')
+    expect(forwarded.headers.has('X-LuckRead-Principal-User-Id')).toBe(false)
+    expect(forwarded.headers.has('Authorization')).toBe(false)
+    const prepare = (d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare
+    expect(prepare).toHaveBeenCalledTimes(1)
+    expect(String(prepare.mock.calls[0]?.[0])).toContain('FROM social_profile_pins')
+    expect(String(prepare.mock.calls[0]?.[0])).not.toContain('JOIN contents')
     await expect(response.json()).resolves.toMatchObject({
       data: { userId: 'owner-1', contentId: 'content-1' },
     })
+  })
+
+  it('hides a stale profile pin when W03 no longer exposes the post as published owner content', async () => {
+    const binding = {
+      fetch: vi.fn(async () => Response.json({ error: { code: 'NOT_FOUND' } }, { status: 404 })),
+    }
+    const response = await worker.fetch(
+      request('/internal/social/users/owner-1/pinned-content', {
+        'X-LuckRead-Caller': 'W01',
+        'X-LuckRead-Transport-Version': '1.0',
+        'X-LuckRead-Correlation-Id': 'stale-public-pin',
+      }),
+      { DB: dbFor([{ user_id: 'owner-1', content_id: 'content-1', pinned_at: '2026-10-16T00:00:00.000Z' }]), W03_CONTENT: binding },
+    )
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({ data: null })
+  })
+
+  it('fails closed on public profile pin reads when W03 is unavailable', async () => {
+    const d = dbFor([{ user_id: 'owner-1', content_id: 'content-1', pinned_at: '2026-10-16T00:00:00.000Z' }])
+    const response = await worker.fetch(
+      request('/internal/social/users/owner-1/pinned-content', {
+        'X-LuckRead-Caller': 'W01',
+        'X-LuckRead-Transport-Version': '1.0',
+        'X-LuckRead-Correlation-Id': 'public-pin-no-w03',
+      }),
+      { DB: d },
+    )
+    expect(response.status).toBe(503)
+    expect((d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).toHaveBeenCalledTimes(1)
   })
 
 })

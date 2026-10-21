@@ -1,4 +1,5 @@
 /// <reference types="@cloudflare/workers-types" />
+import type { OwnedPostContext } from './owned-post-context.js'
 
 export type ReplyAudience = 'everyone' | 'verified' | 'following' | 'mentioned' | 'followingNetwork'
 
@@ -11,14 +12,6 @@ export type ReplyAudienceRecord = {
   ownerUserId: string
   replyAudience: ReplyAudience
   mentionedUserIds: string[]
-  updatedAt: string
-}
-
-export type ReplyAudienceContentContext = {
-  contentId: string
-  ownerUserId: string
-  contentType: 'post'
-  state: 'DRAFT' | 'PUBLISHED' | 'UNPUBLISHED'
   updatedAt: string
 }
 
@@ -66,7 +59,7 @@ export async function setContentReplyAudience(
   contentIdValue: string,
   audienceValue: unknown,
   mentionedUserIdsValue: unknown,
-  context: ReplyAudienceContentContext,
+  context: OwnedPostContext,
 ): Promise<ReplyAudienceRecord> {
   const actorUserId = validateId(actorUserIdValue, true)
   const contentId = validateId(contentIdValue)
@@ -119,7 +112,7 @@ export async function getContentReplyAudience(
   db: D1Database,
   actorUserIdValue: string,
   contentIdValue: string,
-  context: ReplyAudienceContentContext,
+  context: OwnedPostContext,
 ): Promise<ReplyAudienceRecord> {
   const actorUserId = validateId(actorUserIdValue, true)
   const contentId = validateId(contentIdValue)

@@ -1,6 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 import { describe, expect, it, vi } from 'vitest'
-import { getProfilePin, isContentProfilePinned, pinProfileContent, unpinProfileContent } from './profile-pin-runtime.js'
+import type { OwnedPostContext } from './owned-post-context.js'
+import { getProfilePinReference, pinProfileContent, unpinProfileContent } from './profile-pin-runtime.js'
 
 const db = (firstResults: unknown[] = []) => {
   let firstIndex = 0
@@ -13,40 +14,57 @@ const db = (firstResults: unknown[] = []) => {
   return { prepare } as unknown as D1Database
 }
 
-const published = { id: 'content-1', content_type: 'post', state: 'PUBLISHED', owner_user_id: 'viewer-1' }
+const publishedContext: OwnedPostContext = {
+  contentId: 'content-1',
+  ownerUserId: 'viewer-1',
+  contentType: 'post',
+  state: 'PUBLISHED',
+  updatedAt: '2026-10-20T00:00:00.000Z',
+}
 const pin = { user_id: 'viewer-1', content_id: 'content-1', pinned_at: '2026-10-16T00:00:00.000Z' }
 
 describe('profile pin runtime', () => {
-  it('pins canonical published content for the owner without duplicating content', async () => {
-    const d = db([published, pin])
-    await expect(pinProfileContent(d, 'viewer-1', 'content-1')).resolves.toEqual({
+  it('pins W03-verified published owner content and writes only W05-owned state', async () => {
+    const d = db([pin])
+    await expect(pinProfileContent(d, 'viewer-1', 'content-1', publishedContext)).resolves.toEqual({
       userId: 'viewer-1', contentId: 'content-1', pinnedAt: pin.pinned_at,
     })
     const prepare = (d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare
-    expect(String(prepare.mock.calls[1]?.[0])).toContain('ON CONFLICT(user_id) DO UPDATE')
-    expect(String(prepare.mock.calls[1]?.[0])).toContain('social_profile_pins.content_id = excluded.content_id')
-    expect(String(prepare.mock.calls[1]?.[0])).not.toContain('body')
+    expect(prepare).toHaveBeenCalledTimes(2)
+    expect(String(prepare.mock.calls[0]?.[0])).toContain('INSERT INTO social_profile_pins')
+    expect(String(prepare.mock.calls[0]?.[0])).toContain('ON CONFLICT(user_id) DO UPDATE')
+    expect(String(prepare.mock.calls[0]?.[0])).toContain('social_profile_pins.content_id = excluded.content_id')
+    expect(String(prepare.mock.calls[0]?.[0])).not.toContain('FROM contents')
+    expect(String(prepare.mock.calls[1]?.[0])).toContain('FROM social_profile_pins')
   })
 
-  it('rejects pins from non-owners and does not write', async () => {
-    const d = db([{ ...published, owner_user_id: 'someone-else' }])
-    await expect(pinProfileContent(d, 'viewer-1', 'content-1'))
-      .rejects.toMatchObject({ code: 'PERMISSION_DENIED', status: 403 })
-    expect((d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).toHaveBeenCalledTimes(1)
-  })
-
-  it('rejects missing, non-post, or unpublished content', async () => {
-    await expect(pinProfileContent(db([{ ...published, content_type: 'article' }]), 'viewer-1', 'content-1'))
-      .rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 })
-    await expect(pinProfileContent(db([null]), 'viewer-1', 'content-1'))
-      .rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 })
-    await expect(pinProfileContent(db([{ ...published, state: 'DRAFT' }]), 'viewer-1', 'content-1'))
-      .rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 })
-  })
-
-  it('rejects invalid identifiers before querying the database', async () => {
+  it('rejects non-owner context and does not query or write W05 state', async () => {
     const d = db()
-    await expect(pinProfileContent(d, 'viewer-1', 'content/1'))
+    await expect(pinProfileContent(d, 'viewer-1', 'content-1', {
+      ...publishedContext, ownerUserId: 'someone-else',
+    })).rejects.toMatchObject({ code: 'PERMISSION_DENIED', status: 403 })
+    expect((d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).not.toHaveBeenCalled()
+  })
+
+  it('rejects missing, mismatched, non-post, or unpublished context before writing', async () => {
+    const cases = [
+      null,
+      { ...publishedContext, contentId: 'other-content' },
+      { ...publishedContext, contentType: 'article' },
+      { ...publishedContext, state: 'DRAFT' },
+      { ...publishedContext, state: 'UNPUBLISHED' },
+    ]
+    for (const context of cases) {
+      const d = db()
+      await expect(pinProfileContent(d, 'viewer-1', 'content-1', context as never))
+        .rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 })
+      expect((d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).not.toHaveBeenCalled()
+    }
+  })
+
+  it('rejects invalid identifiers before querying W05 state', async () => {
+    const d = db()
+    await expect(pinProfileContent(d, 'viewer-1', 'content/1', publishedContext))
       .rejects.toMatchObject({ code: 'VALIDATION_FAILED', status: 400 })
     expect((d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).not.toHaveBeenCalled()
   })
@@ -59,15 +77,15 @@ describe('profile pin runtime', () => {
     expect(prepare.mock.calls[0]?.[0]).toContain('content_id')
   })
 
-  it('reads only a published post pin that still belongs to the user', async () => {
-    await expect(getProfilePin(db([pin]), 'viewer-1')).resolves.toEqual({
+  it('reads only the W05-owned pin reference and leaves content state to W03', async () => {
+    const d = db([pin])
+    await expect(getProfilePinReference(d, 'viewer-1')).resolves.toEqual({
       userId: 'viewer-1', contentId: 'content-1', pinnedAt: pin.pinned_at,
     })
-    await expect(getProfilePin(db([null]), 'viewer-1')).resolves.toBeNull()
-  })
-
-  it('reports a pin publicly only for published owner content', async () => {
-    await expect(isContentProfilePinned(db([{ pinned: 1 }]), 'content-1')).resolves.toBe(true)
-    await expect(isContentProfilePinned(db([{ pinned: 0 }]), 'content-1')).resolves.toBe(false)
+    const prepare = (d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare
+    expect(prepare).toHaveBeenCalledTimes(1)
+    expect(String(prepare.mock.calls[0]?.[0])).toContain('FROM social_profile_pins')
+    expect(String(prepare.mock.calls[0]?.[0])).not.toContain('JOIN contents')
+    await expect(getProfilePinReference(db([null]), 'viewer-1')).resolves.toBeNull()
   })
 })

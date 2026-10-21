@@ -4,7 +4,7 @@ import { getLikeStatus, like, LikeRuntimeError, unlike } from './like-runtime.js
 import { CommentRuntimeError, createComment, deleteComment, listComments, parseCommentLimit, updateComment } from './comment-runtime.js'
 import { listProfileLikedContents, listProfileReplies, ProfileChannelRuntimeError } from './profile-channel-runtime.js'
 import { getContentReplyAudience, ReplyAudienceRuntimeError, setContentReplyAudience } from './reply-audience-runtime.js'
-import { fetchReplyAudienceContentContext, type W03ContentBinding } from './w03-content-context-client.js'
+import { fetchOwnedPostContext, fetchPublishedOwnerPostContext, type W03ContentBinding } from './w03-content-context-client.js'
 import {
   FavoriteRuntimeError,
   favorite,
@@ -14,7 +14,7 @@ import {
 } from './favorite-runtime.js'
 import { ShareRuntimeError, createShare, resolveShare } from './share-runtime.js'
 import { RepostRuntimeError, createRepost, removeRepost } from './repost-runtime.js'
-import { ProfilePinRuntimeError, getProfilePin, pinProfileContent, unpinProfileContent } from './profile-pin-runtime.js'
+import { ProfilePinRuntimeError, getProfilePinReference, pinProfileContent, unpinProfileContent } from './profile-pin-runtime.js'
 import { BlockMuteRuntimeError, listRelations, parseBlockMuteListLimit, removeRelation, setRelation } from './block-mute-runtime.js'
 import { getRelationshipGraph, invalidateRelationshipGraph, RelationshipGraphRuntimeError } from './relationship-graph-runtime.js'
 import {
@@ -263,8 +263,14 @@ export default {
         if (!idempotencyKey) throw new ProfilePinRuntimeError('PRECONDITION_REQUIRED', 428)
         if (idempotencyKey.length > 256) throw new ProfilePinRuntimeError('VALIDATION_FAILED', 400)
         if (request.method === 'POST') {
+          const context = await fetchOwnedPostContext(env.W03_CONTENT, {
+            principalUserId: actorUserId,
+            principalLayer: request.headers.get('X-LuckRead-Principal-Layer')?.trim() ?? '',
+            contentId,
+            correlationId: request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? '',
+          })
           return json({
-            data: await pinProfileContent(env.DB, actorUserId, contentId),
+            data: await pinProfileContent(env.DB, actorUserId, contentId, context),
             requestId: createRequestId(),
           })
         }
@@ -278,7 +284,21 @@ export default {
         requireTransport(request)
         const userId = decodePathPart(pinnedContentMatch[1] ?? '')
         if (userId === null) throw new ProfilePinRuntimeError('VALIDATION_FAILED', 400)
-        return json({ data: await getProfilePin(env.DB, userId), requestId: createRequestId() })
+        const pin = await getProfilePinReference(env.DB, userId)
+        if (!pin) return json({ data: null, requestId: createRequestId() })
+        try {
+          await fetchPublishedOwnerPostContext(env.W03_CONTENT, {
+            ownerUserId: userId,
+            contentId: pin.contentId,
+            correlationId: request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? '',
+          })
+        } catch (error) {
+          if (error instanceof ReplyAudienceRuntimeError && error.code === 'NOT_FOUND') {
+            return json({ data: null, requestId: createRequestId() })
+          }
+          throw error
+        }
+        return json({ data: pin, requestId: createRequestId() })
       }
 
       if (url.pathname.startsWith('/internal/social/shares/')) {
@@ -625,7 +645,7 @@ export default {
         const actorUserId = requirePrincipal(request)
         requireInteractionLayer(request)
         if (request.method === 'GET') {
-          const context = await fetchReplyAudienceContentContext(env.W03_CONTENT, {
+          const context = await fetchOwnedPostContext(env.W03_CONTENT, {
             principalUserId: actorUserId,
             principalLayer: request.headers.get('X-LuckRead-Principal-Layer')?.trim() ?? '',
             contentId,
@@ -649,7 +669,7 @@ export default {
         if (Object.keys(raw).some((key) => key !== 'replyAudience' && key !== 'mentionedUserIds')) {
           throw new ReplyAudienceRuntimeError('VALIDATION_FAILED', 400)
         }
-        const context = await fetchReplyAudienceContentContext(env.W03_CONTENT, {
+        const context = await fetchOwnedPostContext(env.W03_CONTENT, {
           principalUserId: actorUserId,
           principalLayer: request.headers.get('X-LuckRead-Principal-Layer')?.trim() ?? '',
           contentId,

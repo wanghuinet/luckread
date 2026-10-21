@@ -62,7 +62,7 @@ describe('W03 content contract core', () => {
   })
 
 
-  it('serves owner-scoped reply-audience context only over the W05 internal binding', async () => {
+  it('serves owner-scoped owned-post context only over the W05 internal binding', async () => {
     let query = ''
     let bindings: unknown[] = []
     const row = {
@@ -84,12 +84,12 @@ describe('W03 content contract core', () => {
       },
     } as never
     const request = (caller: string, userId = 'user_1') => new Request(
-      'https://luckread-w03.internal/internal/content/contents/content_1/reply-audience-context',
+      'https://luckread-w03.internal/internal/content/contents/content_1/owned-post-context',
       {
         headers: {
           'X-LuckRead-Caller': caller,
           'X-LuckRead-Transport-Version': '1.0',
-          'X-LuckRead-Correlation-Id': 'reply-audience-context-test',
+          'X-LuckRead-Correlation-Id': 'owned-post-context-test',
           'X-LuckRead-Principal-User-Id': userId,
           'X-LuckRead-Principal-Layer': 'L2',
         },
@@ -111,6 +111,62 @@ describe('W03 content contract core', () => {
     const denied = await w03Worker.fetch(request('W01'), env, {} as never)
     expect(denied.status).toBe(403)
     expect(query).toContain('owner_user_id = ?')
+  })
+
+  it('serves public profile-pin context only for the matching published post owner', async () => {
+    let query = ''
+    let bindings: unknown[] = []
+    const row = {
+      id: 'content_1',
+      owner_user_id: 'user_1',
+      content_type: 'post',
+      state: 'PUBLISHED',
+      updated_at: '2026-10-20T00:00:00.000Z',
+    }
+    const env = {
+      D1_02: {
+        prepare(sql: string) {
+          query = sql
+          return { bind: (...values: unknown[]) => {
+            bindings = values
+            return { first: async () => values[1] === 'user_1' ? row : null }
+          } }
+        },
+      },
+    } as never
+    const request = (ownerUserId = 'user_1', caller = 'W05', extraHeaders: Record<string, string> = {}) =>
+      new Request(
+        `https://luckread-w03.internal/internal/content/contents/content_1/public-post-context/${ownerUserId}`,
+        {
+          headers: {
+            'X-LuckRead-Caller': caller,
+            'X-LuckRead-Transport-Version': '1.0',
+            'X-LuckRead-Correlation-Id': 'public-profile-pin-context',
+            ...extraHeaders,
+          },
+        },
+      )
+
+    const response = await w03Worker.fetch(request(), env, {} as never)
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({
+      data: { contentId: 'content_1', ownerUserId: 'user_1', contentType: 'post', state: 'PUBLISHED' },
+    })
+    expect(query).toContain('owner_user_id = ?')
+    expect(query).toContain("content_type = 'post'")
+    expect(query).toContain("state = 'PUBLISHED'")
+    expect(bindings).toEqual(['content_1', 'user_1'])
+
+    const wrongOwner = await w03Worker.fetch(request('user_2'), env, {} as never)
+    expect(wrongOwner.status).toBe(404)
+    const wrongCaller = await w03Worker.fetch(request('user_1', 'W01'), env, {} as never)
+    expect(wrongCaller.status).toBe(403)
+    const forwardedCredentials = await w03Worker.fetch(
+      request('user_1', 'W05', { Authorization: 'Bearer should-not-be-forwarded' }),
+      env,
+      {} as never,
+    )
+    expect(forwardedCredentials.status).toBe(403)
   })
 
   it('loads a bounded list of published content IDs in bookmark order', async () => {
