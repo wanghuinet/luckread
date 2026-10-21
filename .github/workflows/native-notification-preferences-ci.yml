@@ -1,0 +1,52 @@
+name: Native Notification Preferences CI
+
+on:
+  pull_request:
+    paths:
+      - "app/app/(drawer)/_layout.tsx"
+      - "app/app/(drawer)/notification-preferences.tsx"
+      - "app/lib/notification-preferences-api.ts"
+      - "app/tests/notification-preferences-api.test.mjs"
+      - ".github/workflows/native-notification-preferences-ci.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "app/app/(drawer)/_layout.tsx"
+      - "app/app/(drawer)/notification-preferences.tsx"
+      - "app/lib/notification-preferences-api.ts"
+      - "app/tests/notification-preferences-api.test.mjs"
+      - ".github/workflows/native-notification-preferences-ci.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-notification-preferences-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  native-notification-preferences:
+    name: Notification preferences adapter and screen
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22.13.1"
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.1.38"
+      - name: Install Expo app dependencies
+        run: bun install
+      - name: Verify Expo package compatibility
+        run: bunx expo install --check
+      - name: Typecheck native app
+        run: bun run typecheck
+      - name: Test native notification preference requests and UI wiring
+        run: bun test tests/notification-preferences-api.test.mjs
+      - name: Enforce shared API client boundary
+        run: bun run check:api-boundary
