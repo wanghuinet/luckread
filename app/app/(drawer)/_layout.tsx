@@ -256,6 +256,18 @@ function CustomDrawerContent(props: any) {
             else router.push('/notification-preferences' as never);
           }}
         />
+        <DrawerMenuItem
+          icon="shield"
+          label="屏蔽和静音"
+          isDark={isDark}
+          onPress={() => {
+            if (authStatus !== 'authenticated') {
+              router.push(('/login?returnTo=' + encodeURIComponent('/blocked-muted')) as never);
+            } else {
+              router.push('/blocked-muted' as never);
+            }
+          }}
+        />
         <DrawerMenuItem icon="list" label="列表" onPress={() => showUnavailable('列表')} isDark={isDark} />
         <DrawerMenuItem icon="mic" label="空间" onPress={() => showUnavailable('空间')} isDark={isDark} />
         <DrawerMenuItem icon="edit-3" label="创作者工作室" onPress={() => showUnavailable('创作者工作室')} isDark={isDark} />
@@ -370,6 +382,7 @@ function DrawerLayout() {
       <Drawer.Screen name="profile" options={{ headerShown: false }} />
       <Drawer.Screen name="bookmarks" options={{ headerShown: false }} />
       <Drawer.Screen name="notification-preferences" options={{ headerShown: false }} />
+      <Drawer.Screen name="blocked-muted" options={{ headerShown: false }} />
     </Drawer>
   );
 }
