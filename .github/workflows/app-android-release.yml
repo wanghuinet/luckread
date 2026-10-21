@@ -55,7 +55,9 @@ jobs:
             echo "Android SDK command-line tools not found under $SDK_ROOT/cmdline-tools" >&2
             exit 1
           fi
+          set +o pipefail
           yes | "$SDKMANAGER" --licenses
+          set -o pipefail
           "$SDKMANAGER" "platform-tools" "platforms;android-35" "build-tools;35.0.0" "cmake;3.22.1" "ndk;26.1.10909125"
 
       - name: Install Expo dependencies
