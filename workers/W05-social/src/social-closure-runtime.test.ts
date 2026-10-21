@@ -1,6 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
-import { describe, expect, it } from 'vitest'
-import { extractSocialTokens, getContentSocialSummary, listDiscoveryTopics } from './social-closure-runtime.js'
+import { describe, expect, it, vi } from 'vitest'
+import { enqueueNotification, extractSocialTokens, getContentSocialSummary, listDiscoveryTopics } from './social-closure-runtime.js'
 
 describe('W05 unified social closure', () => {
   it('normalizes and deduplicates mentions and hashtags', () => {
@@ -77,6 +77,45 @@ describe('W05 unified social closure', () => {
   it('rejects malformed discovery topic cursors', async () => {
     const db = { prepare: () => { throw new Error('database must not be queried for an invalid cursor') } } as unknown as D1Database
     await expect(listDiscoveryTopics(db, '20', 'not-a-cursor')).rejects.toMatchObject({ code: 'INVALID_CURSOR', status: 400 })
+  })
+
+
+  it('logs notification write failures without exposing identifiers or database details', async () => {
+    const db = {
+      prepare: (sql: string) => ({
+        bind: (..._values: unknown[]) => ({
+          first: async () => null,
+          run: async () => {
+            if (sql.includes('INSERT OR IGNORE INTO social_notifications')) {
+              throw new Error('private database detail that must not be logged')
+            }
+            return { success: true, meta: { changes: 1 } }
+          },
+        }),
+      }),
+    } as unknown as D1Database
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+
+    try {
+      await expect(enqueueNotification(db, {
+        recipientUserId: 'recipient-1',
+        actorUserId: 'actor-1',
+        type: 'COMMENT',
+        targetType: 'content',
+        targetId: 'content-1',
+      })).resolves.toBeUndefined()
+
+      expect(warning).toHaveBeenCalledWith('W05_SOCIAL_NOTIFICATION_WRITE_FAILED', {
+        type: 'COMMENT',
+        targetType: 'content',
+        errorName: 'Error',
+      })
+      expect(JSON.stringify(warning.mock.calls)).not.toContain('recipient-1')
+      expect(JSON.stringify(warning.mock.calls)).not.toContain('content-1')
+      expect(JSON.stringify(warning.mock.calls)).not.toContain('private database detail')
+    } finally {
+      warning.mockRestore()
+    }
   })
 
 })
