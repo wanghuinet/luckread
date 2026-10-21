@@ -290,7 +290,10 @@ describe('W05 poll runtime', () => {
       pollId: 'poll-1',
       viewerOptionId: 'option-1',
       totalVotes: 1,
-      options: [{ optionId: 'option-1', votes: 1 }],
+      options: [
+        { optionId: 'option-1', votes: 1 },
+        { optionId: 'option-2', votes: 0 },
+      ],
     })
 
     expect(binding.fetch).toHaveBeenCalledTimes(1)
