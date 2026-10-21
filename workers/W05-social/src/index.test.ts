@@ -216,16 +216,25 @@ describe('W05 social query transport', () => {
     })
   })
 
-  it('serves a bounded list of users who liked a published content item', async () => {
+  it('serves a bounded list of users who liked a published content item through W03 visibility context', async () => {
+    const binding = publishedContextBinding()
     const response = await worker.fetch(
       request('/internal/social/content/content-1/likes?limit=6', transportHeaders),
-      { DB: dbFor([{
-        relationship_id: 'like-1',
-        actor_user_id: 'liker-1',
-        created_at: '2026-10-19T10:00:00.000Z',
-      }]) },
+      {
+        DB: dbFor([{
+          relationship_id: 'like-1',
+          actor_user_id: 'liker-1',
+          created_at: '2026-10-19T10:00:00.000Z',
+        }]),
+        W03_CONTENT: binding,
+      },
     )
     expect(response.status).toBe(200)
+    expect(binding.fetch).toHaveBeenCalledTimes(1)
+    const forwarded = binding.fetch.mock.calls[0]?.[0] as Request
+    expect(forwarded.url).toContain('/internal/content/contents/content-1/published-social-context')
+    expect(forwarded.headers.has('Authorization')).toBe(false)
+    expect(forwarded.headers.has('Cookie')).toBe(false)
     await expect(response.json()).resolves.toMatchObject({
       data: {
         items: [{ userId: 'liker-1', likedAt: '2026-10-19T10:00:00.000Z' }],

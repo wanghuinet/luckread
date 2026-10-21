@@ -979,7 +979,11 @@ export default {
           throw new LikeRuntimeError('INVALID_CURSOR', 400)
         }
         const viewerUserId = request.headers.get('X-LuckRead-Principal-User-Id')?.trim() || null
-        const data = await listContentLikers(env.DB, contentId, cursor, limit, viewerUserId)
+        const contentContext = await fetchPublishedContentSocialContext(env.W03_CONTENT, {
+          contentId,
+          correlationId: request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? '',
+        })
+        const data = await listContentLikers(env.DB, contentId, cursor, limit, viewerUserId, contentContext)
         return json({ data, requestId: createRequestId() })
       }
 
