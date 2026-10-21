@@ -1024,8 +1024,8 @@ export default function UserProfileScreen() {
     ? profileReplies
     : showingLikes ? likedPosts : userPosts;
   const feedSections: SectionListData<FeedContent, { title: string }>[] = useMemo(() => [
-    { title: showingLikes ? 'Likes' : 'Feed', data: displayedPosts },
-  ], [displayedPosts, showingLikes]);
+    { title: showingReplies ? 'Replies' : showingLikes ? 'Likes' : 'Feed', data: displayedPosts },
+  ], [displayedPosts, showingLikes, showingReplies]);
 
   const handleRefresh = useCallback(() => {
     if (showingReplies && user?.id) {
