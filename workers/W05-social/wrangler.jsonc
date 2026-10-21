@@ -27,5 +27,11 @@
       "database_id": "6c342634-97f6-4248-9f4a-85772af4f22c",
       "database_name": "luckreadpro"
     }
+  ],
+  "services": [
+    {
+      "binding": "W03_CONTENT",
+      "service": "luckread-w03"
+    }
   ]
 }
