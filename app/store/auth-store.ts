@@ -12,6 +12,24 @@ import {
 
 type AuthStatus = 'loading' | 'authenticated' | 'anonymous';
 
+export class AuthStoreError extends Error {
+  readonly status: number;
+  readonly code?: string;
+
+  constructor(message: string, status: number, code?: string) {
+    super(message);
+    this.name = 'AuthStoreError';
+    this.status = status;
+    this.code = code;
+  }
+}
+
+const readAuthErrorCode = (value: unknown): string | undefined => {
+  if (!value || typeof value !== 'object' || !('error' in value)) return undefined;
+  const nested = (value as { error?: { code?: unknown } }).error;
+  return typeof nested?.code === 'string' ? nested.code.toUpperCase() : undefined;
+};
+
 type AuthStore = {
   status: AuthStatus;
   user: LuckReadUser | null;
@@ -104,7 +122,11 @@ export const useAuthStore = create<AuthStore>((set) => ({
     const payload = data as LoginPayload | null;
     const user = payload?.data?.user;
     if (!response.ok) {
-      throw new Error(getApiErrorMessage(data, 'Unable to sign in. Please try again.', response.status));
+      throw new AuthStoreError(
+        getApiErrorMessage(data, '无法登录，请检查邮箱和密码后重试。', response.status),
+        response.status,
+        readAuthErrorCode(data),
+      );
     }
     if (!validUser(user)) {
       throw new Error('The sign-in response was incomplete. Please try again.');
