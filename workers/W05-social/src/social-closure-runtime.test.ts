@@ -20,29 +20,61 @@ describe('W05 unified social closure', () => {
     expect(['FOLLOW', 'LIKE', 'COMMENT', 'REPLY', 'MENTION']).toHaveLength(5)
   })
 
-  it('includes canonical repost counts, viewer repost state, and profile pin state', async () => {
+  it('uses W03 content context and W05-only SQL for social summary counts and pin state', async () => {
     const firstResults: unknown[] = [
-      { id: 'content-1', content_type: 'post', state: 'PUBLISHED' },
       { likes: 3, comments: 2, favorites: 1, shares: 4, reposts: 7, pinned: 1 },
       { liked: 1, favorited: 0, reposted: 1 },
     ]
+    const queries: string[] = []
     const db = {
-      prepare: () => ({
-        bind: () => ({
-          first: async () => firstResults.shift() ?? null,
-          all: async () => ({ results: [] }),
-        }),
-      }),
+      prepare: (sql: string) => {
+        queries.push(sql)
+        return {
+          bind: (..._values: unknown[]) => ({
+            first: async () => firstResults.shift() ?? null,
+            all: async () => ({ results: [] }),
+          }),
+        }
+      },
     } as unknown as D1Database
-
-    await expect(getContentSocialSummary(db, 'content-1', 'viewer-1')).resolves.toMatchObject({
+    const contentContext = {
       contentId: 'content-1',
+      ownerUserId: 'owner-1',
+      contentType: 'post',
+      state: 'PUBLISHED',
+    } as const
+
+    await expect(getContentSocialSummary(db, 'content-1', contentContext, 'viewer-1')).resolves.toMatchObject({
+      contentId: 'content-1',
+      contentType: 'post',
       counts: { likes: 3, comments: 2, favorites: 1, shares: 4, reposts: 7 },
       pinned: true,
       viewer: { liked: true, favorited: false, reposted: true },
       topics: [],
       mentions: [],
     })
+    expect(queries.some(sql => /(?:FROM|JOIN)\s+contents/i.test(sql))).toBe(false)
+    const countsQuery = queries.find(sql => sql.includes('AS pinned'))
+    expect(countsQuery).toContain('FROM social_profile_pins p')
+    expect(countsQuery).not.toContain('JOIN contents')
+  })
+
+  it('rejects a mismatched or unpublished social context before querying W05', async () => {
+    const prepare = vi.fn()
+    const db = { prepare } as unknown as D1Database
+    await expect(getContentSocialSummary(db, 'content-1', {
+      contentId: 'another-content',
+      ownerUserId: 'owner-1',
+      contentType: 'post',
+      state: 'PUBLISHED',
+    })).rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 })
+    await expect(getContentSocialSummary(db, 'content-1', {
+      contentId: 'content-1',
+      ownerUserId: 'owner-1',
+      contentType: 'post',
+      state: 'UNPUBLISHED',
+    } as never)).rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 })
+    expect(prepare).not.toHaveBeenCalled()
   })
 
   it('returns recent active discovery topics with bounded pagination', async () => {
