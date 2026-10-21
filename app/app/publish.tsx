@@ -529,7 +529,7 @@ export default function PublishScreen() {
     } finally {
       setBusy(false);
     }
-  }, [assets, body, contentId, coverRef, publishPending, router]);
+  }, [assets, body, contentId, coverRef, pollDurationHours, pollEnabled, pollOptions, publishPending, router]);
 
   if (authStatus !== 'authenticated') {
     return (
