@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://luckread.com/contracts/v1/transport/W05-W03-owned-post-context-http-binding.v1.json",
-  "title": "W05 to W03 Owner-Scoped Post Context Binding",
+  "title": "W05 to W03 Owned Post Context Binding",
   "version": "1.0.0",
   "status": "CONTRACTED_PARTIAL",
   "featureId": "SOCIAL-015",
@@ -34,13 +34,19 @@
     "principal": {
       "X-LuckRead-Principal-User-Id": "required",
       "X-LuckRead-Principal-Layer": "required",
-      "source": "W01 authenticated server principal; never from public request body"
+      "source": "W01 authenticated server principal; never from public request body",
+      "requiredForOwnerScopedMutationContext": true
     },
     "forbidden": [
       "Authorization",
       "Cookie",
-      "client-provided ownerUserId"
-    ]
+      "client-provided ownerUserId in mutation body or principal headers"
+    ],
+    "publicProfileRead": {
+      "principalRequired": false,
+      "subjectOwnerIdSource": "Validated target user ID from the public profile route; it is not asserted as the authenticated caller",
+      "constraint": "W03 returns only the requested owner's PUBLISHED post and only the minimal public context fields"
+    }
   },
   "failurePolicy": {
     "timeoutMs": 2000,
@@ -50,18 +56,20 @@
       "invalid caller metadata",
       "non-owner content",
       "non-post content",
-      "invalid response envelope"
+      "invalid response envelope",
+      "public profile target owner does not own the referenced post",
+      "referenced post is not PUBLISHED"
     ]
   },
   "scope": {
     "inScope": [
       "Owner-only reply-audience GET uses W03 for canonical post context and W05 for reply policy state.",
       "Reply-audience PUT obtains owner/type/lifecycle context from W03 before W05 writes only the W05-owned reply policy table.",
-      "Profile-pin POST obtains owner/type/lifecycle context from W03 before W05 writes only social_profile_pins."
+      "Profile-pin POST obtains owner/type/lifecycle context from W03 before W05 writes only social_profile_pins.",
+      "Public pinned-content GET reads only the W05 pin reference and validates published owner/type/lifecycle through W03 before returning it."
     ],
     "outOfScope": [
       "Comment insertion's atomic content-state/policy recheck remains unchanged.",
-      "Profile-pin GET paths still join contents to filter published owner content; a viewer-safe W03 read-context path is a separate scope.",
       "Other W05 reads from the contents table are not claimed as fixed."
     ]
   },
@@ -73,7 +81,10 @@
     "profile-pin mutation consumes W03-owned post context and writes only social_profile_pins",
     "missing W03 binding fails closed before reply-policy or profile-pin write",
     "W03_CONTENT deployment/binding evidence",
-    "runtime cross-Worker E2E evidence"
+    "runtime cross-Worker E2E evidence",
+    "W03 published public-post context positive, wrong-owner and wrong-caller tests",
+    "W05 public pinned-content GET reads W05 pin state only and asks W03 to validate public visibility",
+    "W05 public pinned-content GET returns null for stale or unpublished pins and fails closed when W03 is unavailable"
   ],
   "operations": [
     {
@@ -137,6 +148,27 @@
         "w03D1ReadMax": 1,
         "w05D1ReadMax": 1,
         "w05D1WriteMax": 1,
+        "w05ServiceBindingCallsMax": 1
+      }
+    },
+    {
+      "operationId": "getPublishedOwnerPostContext",
+      "method": "GET",
+      "internalPath": "/internal/content/contents/{contentId}/public-post-context/{ownerUserId}",
+      "principalRequired": false,
+      "subjectOwnerIdInPath": true,
+      "subjectOwnerIdSource": "Requested public profile route, not the authenticated caller principal",
+      "ownerScoped": true,
+      "accessModel": "Read-only; disclose minimal context only for a PUBLISHED post whose canonical owner_user_id equals ownerUserId",
+      "allowedContentType": "post",
+      "allowedContentStates": [
+        "PUBLISHED"
+      ],
+      "cache": "NO_STORE",
+      "resourceBudget": {
+        "w03D1ReadMax": 1,
+        "w05D1ReadMax": 0,
+        "w05D1WriteMax": 0,
         "w05ServiceBindingCallsMax": 1
       }
     }
