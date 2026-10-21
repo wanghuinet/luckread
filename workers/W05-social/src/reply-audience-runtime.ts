@@ -65,45 +65,36 @@ export async function setContentReplyAudience(
   actorUserIdValue: string,
   contentIdValue: string,
   audienceValue: unknown,
-  mentionedUserIdsValue?: unknown,
+  mentionedUserIdsValue: unknown,
+  context: ReplyAudienceContentContext,
 ): Promise<ReplyAudienceRecord> {
   const actorUserId = validateId(actorUserIdValue, true)
   const contentId = validateId(contentIdValue)
   const replyAudience = validateAudience(audienceValue)
   const mentionedUserIds = validateMentionedUserIds(mentionedUserIdsValue)
   const mentionedUserIdsJson = JSON.stringify(mentionedUserIds)
-
-  const target = await db.prepare(
-    'SELECT id, owner_user_id, content_type, state FROM contents WHERE id = ? LIMIT 1',
-  ).bind(contentId).first<{ id: string; owner_user_id: string | null; content_type: string; state: string }>()
-
-  if (!target || target.content_type !== 'post') {
+  if (
+    context.contentId !== contentId ||
+    context.ownerUserId !== actorUserId ||
+    context.contentType !== 'post' ||
+    !['DRAFT', 'PUBLISHED', 'UNPUBLISHED'].includes(context.state) ||
+    !context.updatedAt
+  ) {
     throw new ReplyAudienceRuntimeError('NOT_FOUND', 404)
-  }
-  if (target.owner_user_id !== actorUserId) {
-    throw new ReplyAudienceRuntimeError('PERMISSION_DENIED', 403)
-  }
-  if (!['DRAFT', 'PUBLISHED', 'UNPUBLISHED'].includes(target.state)) {
-    throw new ReplyAudienceRuntimeError('INVALID_STATE', 409)
   }
 
   const now = new Date().toISOString()
   const saved = await db.prepare(
     `INSERT INTO social_content_reply_policies
        (content_id, owner_user_id, audience, mentioned_user_ids_json, created_at, updated_at)
-     SELECT ?, ?, ?, ?, ?, ?
-       FROM contents content
-      WHERE content.id = ?
-        AND content.owner_user_id = ?
-        AND content.content_type = 'post'
-        AND content.state IN ('DRAFT','PUBLISHED','UNPUBLISHED')
+     VALUES (?, ?, ?, ?, ?, ?)
      ON CONFLICT(content_id) DO UPDATE SET
        audience = excluded.audience,
        mentioned_user_ids_json = excluded.mentioned_user_ids_json,
        updated_at = excluded.updated_at
      WHERE social_content_reply_policies.owner_user_id = excluded.owner_user_id
      RETURNING content_id, owner_user_id, audience, mentioned_user_ids_json, updated_at`,
-  ).bind(contentId, actorUserId, replyAudience, mentionedUserIdsJson, now, now, contentId, actorUserId)
+  ).bind(contentId, actorUserId, replyAudience, mentionedUserIdsJson, now, now)
     .first<{ content_id: string; owner_user_id: string; audience: ReplyAudience; mentioned_user_ids_json: string; updated_at: string }>()
 
   if (!saved) throw new ReplyAudienceRuntimeError('CONFLICT', 409)
