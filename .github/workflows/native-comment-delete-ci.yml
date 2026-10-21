@@ -20,7 +20,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: native-comment-delete-\${{ github.ref }}
+  group: native-comment-delete-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
