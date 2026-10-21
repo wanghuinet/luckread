@@ -209,10 +209,11 @@ interface FeedItemProps {
     onPress?: () => void;
     detailView?: boolean;
     onDeleted?: (contentId: string) => void;
+    onCommentPress?: () => void;
 }
 
 
-export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailView, onDeleted }) => {
+export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailView, onDeleted, onCommentPress }) => {
     const { colorScheme } = useColorScheme();
 
 
@@ -455,7 +456,7 @@ export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailVie
                             {detailView && itemData.contentType === 'post' && itemData.contentId ? (
                                 <SocialPoll contentId={itemData.contentId} />
                             ) : null}
-                            <EngagementActions itemData={itemData} detailView={false} />
+                            <EngagementActions itemData={itemData} detailView={Boolean(detailView)} onCommentPress={onCommentPress} />
                         </View>
                     </View>
                 </TouchableOpacity>
@@ -484,7 +485,7 @@ export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailVie
 };
 
 
-export const FeedItemDetailView: React.FC<FeedItemProps> = ({ itemData, onPress, detailView }) => {
+export const FeedItemDetailView: React.FC<FeedItemProps> = ({ itemData, onPress, detailView, onCommentPress }) => {
     const { colorScheme } = useColorScheme();
 
 
@@ -562,7 +563,8 @@ export const FeedItemDetailView: React.FC<FeedItemProps> = ({ itemData, onPress,
                 <View className="">
                     <EngagementActions
                         itemData={itemData}
-                        detailView={true} />
+                        detailView={true}
+                        onCommentPress={onCommentPress} />
                 </View>
             </View>
         </View>
