@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import type { PublicLocale } from '../../(frontend)/i18n/public-locale'
 
 type SearchTrend = { term: string; count: number; lastSeenAt: string }
@@ -36,6 +36,9 @@ const copy = (locale: PublicLocale) => locale === 'en'
       video: 'Video',
       openContent: 'Open content',
       recentSearches: 'Search suggestions',
+      loadMore: 'Load more results',
+      loadingMore: 'Loading more…',
+      loadMoreError: 'Could not load more results. Please try again.',
     }
   : locale === 'tw'
     ? {
@@ -56,6 +59,9 @@ const copy = (locale: PublicLocale) => locale === 'en'
         video: '影片',
         openContent: '查看內容',
         recentSearches: '搜尋建議',
+        loadMore: '載入更多結果',
+        loadingMore: '正在載入更多…',
+        loadMoreError: '無法載入更多結果，請重試。',
       }
     : {
         title: '你在寻找什么？',
@@ -75,6 +81,9 @@ const copy = (locale: PublicLocale) => locale === 'en'
         video: '视频',
         openContent: '查看内容',
         recentSearches: '搜索建议',
+        loadMore: '加载更多结果',
+        loadingMore: '正在加载更多…',
+        loadMoreError: '无法加载更多结果，请重试。',
       }
 
 export default function SearchDiscoveryClient({
@@ -92,6 +101,11 @@ export default function SearchDiscoveryClient({
   const [results, setResults] = useState<SearchResult[]>([])
   const [resultStatus, setResultStatus] = useState<Status>(initialQuery ? 'loading' : 'idle')
   const [searchRetryToken, setSearchRetryToken] = useState(0)
+  const [nextCursor, setNextCursor] = useState<string | null>(null)
+  const [hasMore, setHasMore] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [loadMoreError, setLoadMoreError] = useState('')
+  const loadMoreControllerRef = useRef<AbortController | null>(null)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -136,19 +150,83 @@ export default function SearchDiscoveryClient({
     }).then(async (response) => {
       if (!response.ok) throw new Error('Search request failed')
       const payload = await response.json() as { data?: SearchPageData }
-      if (!payload.data || !Array.isArray(payload.data.items)) throw new Error('Invalid search response')
-      setResults(payload.data.items.filter((item) =>
+      const page = payload.data
+      if (
+        !page ||
+        !Array.isArray(page.items) ||
+        (page.nextCursor !== null && typeof page.nextCursor !== 'string') ||
+        typeof page.hasMore !== 'boolean' ||
+        (page.hasMore && !page.nextCursor)
+      ) throw new Error('Invalid search response')
+      setResults(page.items.filter((item) =>
         Boolean(item) && typeof item.id === 'string' && typeof item.title === 'string',
       ))
+      setNextCursor(page.nextCursor)
+      setHasMore(page.hasMore)
+      setLoadMoreError('')
       setResultStatus('ready')
     }).catch(() => {
       if (!controller.signal.aborted) {
         setResults([])
+        setNextCursor(null)
+        setHasMore(false)
         setResultStatus('error')
       }
     })
     return () => controller.abort()
   }, [initialQuery, searchRetryToken])
+
+  useEffect(() => () => {
+    loadMoreControllerRef.current?.abort()
+  }, [])
+
+  const loadMoreResults = async () => {
+    if (!initialQuery || !hasMore || !nextCursor || loadingMore || resultStatus !== 'ready') return
+
+    loadMoreControllerRef.current?.abort()
+    const controller = new AbortController()
+    loadMoreControllerRef.current = controller
+    setLoadingMore(true)
+    setLoadMoreError('')
+
+    try {
+      const params = new URLSearchParams({ q: initialQuery, limit: '20', cursor: nextCursor })
+      const response = await fetch('/api/v1/search?' + params.toString(), {
+        method: 'GET',
+        cache: 'no-store',
+        credentials: 'same-origin',
+        headers: { accept: 'application/json' },
+        signal: controller.signal,
+      })
+      if (!response.ok) throw new Error('Search pagination request failed')
+      const payload = await response.json() as { data?: SearchPageData }
+      const page = payload.data
+      if (
+        !page ||
+        !Array.isArray(page.items) ||
+        (page.nextCursor !== null && typeof page.nextCursor !== 'string') ||
+        typeof page.hasMore !== 'boolean' ||
+        (page.hasMore && !page.nextCursor)
+      ) throw new Error('Invalid search page response')
+
+      const validItems = page.items.filter((item) =>
+        Boolean(item) && typeof item.id === 'string' && typeof item.title === 'string',
+      )
+      setResults((current) => {
+        const seen = new Set(current.map((item) => item.id))
+        return [...current, ...validItems.filter((item) => !seen.has(item.id))]
+      })
+      setNextCursor(page.nextCursor)
+      setHasMore(page.hasMore)
+    } catch {
+      if (!controller.signal.aborted) setLoadMoreError(labels.loadMoreError)
+    } finally {
+      if (!controller.signal.aborted) {
+        setLoadingMore(false)
+        if (loadMoreControllerRef.current === controller) loadMoreControllerRef.current = null
+      }
+    }
+  }
 
   const submitSearch = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -240,6 +318,19 @@ export default function SearchDiscoveryClient({
               ))}
             </ul>
           )}
+          {loadMoreError ? <p className="px-4 pt-4 text-sm text-red-500" role="alert">{loadMoreError}</p> : null}
+          {hasMore && nextCursor ? (
+            <div className="flex justify-center px-4 py-5">
+              <button
+                className="rounded-full border border-light-border px-5 py-2 text-sm font-bold hover:bg-light-primary/10 disabled:opacity-50 dark:border-dark-border dark:hover:bg-dark-primary/10"
+                disabled={loadingMore}
+                onClick={() => void loadMoreResults()}
+                type="button"
+              >
+                {loadingMore ? labels.loadingMore : loadMoreError ? labels.retry : labels.loadMore}
+              </button>
+            </div>
+          ) : null}
         </section>
       ) }
     </div>
