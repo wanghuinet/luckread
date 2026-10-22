@@ -221,10 +221,12 @@ export type ProfileLikedContentPage = {
 
 export async function listProfileLikedContents(
   db: D1Database,
+  w03Content: W03ContentBinding | undefined,
   profileUserIdValue: string,
   cursorValue: string | null,
   limit: number,
-  viewerUserIdValue: string | null = null,
+  viewerUserIdValue: string | null,
+  correlationId: string,
 ): Promise<ProfileLikedContentPage> {
   const profileUserId = validateId(profileUserIdValue)
   const viewerUserId = viewerUserIdValue ? validateId(viewerUserIdValue) : null
@@ -232,30 +234,12 @@ export async function listProfileLikedContents(
   if (!Number.isInteger(limit) || limit < 1 || limit > 50) {
     throw new ProfileChannelRuntimeError('VALIDATION_FAILED', 400)
   }
+  if (!correlationId.trim()) throw new ProfileChannelRuntimeError('VALIDATION_FAILED', 400)
 
   const params: unknown[] = [profileUserId]
-  let visibility = `
-    AND NOT EXISTS (
-      SELECT 1 FROM social_user_interactions block
-       WHERE block.relation_type = 'block'
-         AND (
-           (block.actor_user_id = il.actor_user_id AND block.target_user_id = content.owner_user_id)
-           OR (block.actor_user_id = content.owner_user_id AND block.target_user_id = il.actor_user_id)
-         )
-    )`
+  let viewerVisibility = ''
   if (viewerUserId) {
-    visibility += `
-    AND NOT EXISTS (
-      SELECT 1 FROM social_user_interactions block
-       WHERE block.relation_type = 'block'
-         AND ((block.actor_user_id = ? AND block.target_user_id = content.owner_user_id)
-           OR (block.actor_user_id = content.owner_user_id AND block.target_user_id = ?))
-    )
-    AND NOT EXISTS (
-      SELECT 1 FROM social_user_interactions mute
-       WHERE mute.relation_type = 'mute'
-         AND mute.actor_user_id = ? AND mute.target_user_id = content.owner_user_id
-    )
+    viewerVisibility = `
     AND NOT EXISTS (
       SELECT 1 FROM social_user_interactions block_profile
        WHERE block_profile.relation_type = 'block'
@@ -267,21 +251,21 @@ export async function listProfileLikedContents(
        WHERE mute_profile.relation_type = 'mute'
          AND mute_profile.actor_user_id = ? AND mute_profile.target_user_id = il.actor_user_id
     )`
-    params.push(viewerUserId, viewerUserId, viewerUserId, viewerUserId, viewerUserId, viewerUserId)
+    params.push(viewerUserId, viewerUserId, viewerUserId)
   }
 
   const cursorSql = cursor ? ' AND (il.created_at < ? OR (il.created_at = ? AND il.relationship_id < ?))' : ''
   if (cursor) params.push(cursor.createdAt, cursor.createdAt, cursor.tieBreaker)
   params.push(limit + 1)
 
+  // W05 first pages through its own like relationships only. Canonical
+  // publication and owner context are validated in one bounded W03 call.
   const result = await db.prepare(`
     SELECT il.relationship_id, il.target_id, il.created_at
       FROM interaction_likes il
-      JOIN contents content ON content.id = il.target_id
      WHERE il.actor_user_id = ?
        AND il.target_type = 'content'
-       AND content.state = 'PUBLISHED'
-       ${visibility}
+       ${viewerVisibility}
        ${cursorSql}
      ORDER BY il.created_at DESC, il.relationship_id DESC
      LIMIT ?
@@ -291,20 +275,76 @@ export async function listProfileLikedContents(
     created_at: string
   }>()
 
-  const rows = result.results ?? []
-  const hasMore = rows.length > limit
-  const visible = hasMore ? rows.slice(0, limit) : rows
-  const last = visible.at(-1)
+  const candidates = result.results ?? []
+  const hasMore = candidates.length > limit
+  const scanned = hasMore ? candidates.slice(0, limit) : candidates
+  const contentIds = [...new Set(scanned.map(row => row.target_id))]
+  const contexts = await fetchPublishedContentSocialContexts(w03Content, { contentIds, correlationId })
+  const ownerIds = [...new Set(
+    scanned
+      .map(row => contexts.get(row.target_id)?.ownerUserId)
+      .filter((ownerId): ownerId is string => typeof ownerId === 'string' && ownerId.length > 0),
+  )]
+
+  const blockedPrincipals = new Set([profileUserId, ...(viewerUserId ? [viewerUserId] : [])])
+  const blockedOwners = new Set<string>()
+  const mutedOwners = new Set<string>()
+  if (ownerIds.length > 0) {
+    const ownerPlaceholders = ownerIds.map(() => '?').join(', ')
+    const principalPlaceholders = [...blockedPrincipals].map(() => '?').join(', ')
+    const blockRows = await db.prepare(`
+      SELECT actor_user_id, target_user_id
+        FROM social_user_interactions
+       WHERE relation_type = 'block'
+         AND (
+           (actor_user_id IN (${principalPlaceholders}) AND target_user_id IN (${ownerPlaceholders}))
+           OR
+           (target_user_id IN (${principalPlaceholders}) AND actor_user_id IN (${ownerPlaceholders}))
+         )
+    `).bind(
+      ...blockedPrincipals, ...ownerIds,
+      ...blockedPrincipals, ...ownerIds,
+    ).all<{ actor_user_id: string; target_user_id: string }>()
+
+    const ownerSet = new Set(ownerIds)
+    for (const row of blockRows.results ?? []) {
+      if (blockedPrincipals.has(row.actor_user_id) && ownerSet.has(row.target_user_id)) {
+        blockedOwners.add(row.target_user_id)
+      }
+      if (blockedPrincipals.has(row.target_user_id) && ownerSet.has(row.actor_user_id)) {
+        blockedOwners.add(row.actor_user_id)
+      }
+    }
+
+    if (viewerUserId) {
+      const muteRows = await db.prepare(`
+        SELECT target_user_id
+          FROM social_user_interactions
+         WHERE relation_type = 'mute'
+           AND actor_user_id = ?
+           AND target_user_id IN (${ownerPlaceholders})
+      `).bind(viewerUserId, ...ownerIds).all<{ target_user_id: string }>()
+      for (const row of muteRows.results ?? []) mutedOwners.add(row.target_user_id)
+    }
+  }
+
+  const visible = scanned.filter(row => {
+    const context = contexts.get(row.target_id)
+    if (!context || context.contentId !== row.target_id || context.state !== 'PUBLISHED') return false
+    if (context.ownerUserId === null) return true
+    return !blockedOwners.has(context.ownerUserId) && !mutedOwners.has(context.ownerUserId)
+  })
+  const lastScanned = scanned.at(-1)
   return {
     items: visible.map((row) => ({ contentId: row.target_id, likedAt: row.created_at })),
     hasMore,
-    nextCursor: hasMore && last ? encodeCursor({
+    nextCursor: hasMore && lastScanned ? encodeCursor({
       version: 1,
       channel: 'likes',
       profileUserId,
       viewerUserId,
-      createdAt: last.created_at,
-      tieBreaker: last.relationship_id,
+      createdAt: lastScanned.created_at,
+      tieBreaker: lastScanned.relationship_id,
     }) : null,
   }
 }
