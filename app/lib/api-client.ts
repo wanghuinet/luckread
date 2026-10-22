@@ -251,6 +251,7 @@ function mutationSignature(
   url: string,
   body: BodyInit | null | undefined,
   ifMatch: string | null,
+  uploadFingerprint: string | null,
 ): string | null {
   let bodyShape: string;
   if (body === undefined || body === null) {
@@ -276,7 +277,7 @@ function mutationSignature(
   } else {
     return null;
   }
-  return fingerprintText([method, url, ifMatch ?? '', bodyShape].join('\\0'));
+  return fingerprintText([method, url, ifMatch ?? '', uploadFingerprint ?? '', bodyShape].join('\\0'));
 }
 
 function acquireMutationKey(
@@ -387,7 +388,13 @@ export async function apiRequest<T>(
   // timeout, rate limit, or 5xx response—even when a caller generated a fresh
   // explicit key on re-entry. Successful/definitive responses release the key.
   if (MUTATING_METHODS.has(method) && idempotencyKey !== false) {
-    const signature = mutationSignature(method, requestUrl, init.body, headers.get('If-Match'));
+    const signature = mutationSignature(
+      method,
+      requestUrl,
+      init.body,
+      headers.get('If-Match'),
+      headers.get('X-LuckRead-Upload-Fingerprint'),
+    );
     const explicitKey = typeof idempotencyKey === 'string' && idempotencyKey.trim()
       ? idempotencyKey.trim()
       : headers.get('Idempotency-Key')?.trim() || undefined;
