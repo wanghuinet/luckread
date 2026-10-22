@@ -46,6 +46,23 @@ describe('W11 analytics event quality', () => {
     expect(result.reason).toBe('SOURCE_WORKER_NOT_AUTHORIZED_FOR_EVENT')
   })
 
+  it('accepts W01 as the collector for client content telemetry', () => {
+    const result = validateAnalyticsEvent(event({ sourceWorker: 'W01' }), { now })
+
+    expect(result.quality).toBe('VALID')
+    expect(result.event?.sourceWorker).toBe('W01')
+  })
+
+  it('does not allow W01 to claim an authoritative social action', () => {
+    const result = validateAnalyticsEvent(
+      event({ eventName: 'like_created', sourceWorker: 'W01' }),
+      { now },
+    )
+
+    expect(result.quality).toBe('REJECTED')
+    expect(result.reason).toBe('SOURCE_WORKER_NOT_AUTHORIZED_FOR_EVENT')
+  })
+
   it('rejects an unsupported event schema version', () => {
     const result = validateAnalyticsEvent(
       { ...event(), schemaVersion: '9.0' },
