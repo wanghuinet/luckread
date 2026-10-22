@@ -264,6 +264,11 @@ function mutationSignature(
     }
   } else if (typeof URLSearchParams !== 'undefined' && body instanceof URLSearchParams) {
     bodyShape = body.toString();
+  } else if (isFormDataBody(body) && uploadFingerprint) {
+    // For file streams, the caller-provided fingerprint is the stable semantic
+    // identity; multipart boundaries and native File wrapper timestamps vary
+    // between attempts and must not generate a new key.
+    bodyShape = 'upload:' + uploadFingerprint;
   } else if (isFormDataBody(body)) {
     const entries: unknown[] = [];
     try {
