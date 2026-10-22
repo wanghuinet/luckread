@@ -383,7 +383,7 @@ const decodeDiscoveryTopicCursor = (value: string | null): DiscoveryTopicCursor 
       typeof parsed.latestContentAt !== 'string' ||
       !Number.isFinite(Date.parse(parsed.latestContentAt)) ||
       typeof parsed.topicId !== 'string' ||
-      !/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(parsed.topicId)
+      !/^[A-Za-z0-9][\\p{L}\\p{N}_-]{0,127}$/u.test(parsed.topicId)
     ) {
       throw new Error('invalid discovery topic cursor')
     }
@@ -441,16 +441,16 @@ export async function listDiscoveryTopics(
     const cursorBindings: unknown[] = relationCursor
       ? [relationCursor.topicId, relationCursor.topicId, relationCursor.targetId]
       : []
-    const result = await db.prepare(\`
+    const result = await db.prepare(`
       SELECT DISTINCT t.topic_id, t.normalized_name, t.display_name, st.target_id
         FROM social_topics t
         JOIN social_target_topics st
           ON st.topic_id = t.topic_id AND st.target_type = 'content'
        WHERE t.status = 'ACTIVE'
-         \${cursorClause}
+         ${cursorClause}
        ORDER BY t.topic_id ASC, st.target_id ASC
        LIMIT ?
-    \`).bind(...cursorBindings, relationBatchSize).all<{
+    `).bind(...cursorBindings, relationBatchSize).all<{
       topic_id: string
       normalized_name: string
       display_name: string
@@ -503,10 +503,11 @@ export async function listDiscoveryTopics(
     if (edges.length < relationBatchSize) break
   }
 
+  const compareText = (left: string, right: string) => left < right ? -1 : left > right ? 1 : 0
   const ranked = [...stats.values()].sort((a, b) =>
     b.contentCount - a.contentCount ||
-    b.latestContentAt.localeCompare(a.latestContentAt) ||
-    a.topicId.localeCompare(b.topicId),
+    compareText(b.latestContentAt, a.latestContentAt) ||
+    compareText(a.topicId, b.topicId),
   )
   const afterCursor = cursor
     ? ranked.filter(item =>
