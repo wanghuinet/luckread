@@ -13,7 +13,7 @@ export interface PublicMediaUrlInput {
 export function createPublicMediaUrl({ filename, prefix = '' }: PublicMediaUrlInput): string {
   const segments = [...prefix.split('/'), filename].filter(Boolean)
 
-  if (!filename.trim() || segments.some((segment) => segment === '.' || segment === '..')) {
+  if (!filename.trim() || filename.includes('/') || filename.includes('\\\\') || segments.some((segment) => segment === '.' || segment === '..')) {
     throw new Error('Invalid R2 media object key')
   }
 
