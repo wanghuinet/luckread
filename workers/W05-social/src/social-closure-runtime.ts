@@ -659,6 +659,30 @@ export async function listDiscoveryTopics(
   }
 }
 
+const NOTIFICATION_DB_RETRY_DELAYS_MS = [25, 75] as const
+
+/**
+ * Retry the complete inbox-write attempt for transient D1 errors. The operation
+ * reuses one notification ID and one unique dedupe key across attempts, so an
+ * ambiguous first-write result cannot create duplicate inbox notifications.
+ * This is bounded in-request recovery, not a substitute for a durable Queue.
+ */
+const withNotificationDbRetry = async <T>(operation: () => Promise<T>): Promise<T> => {
+  let lastError: unknown
+  for (let attempt = 0; attempt <= NOTIFICATION_DB_RETRY_DELAYS_MS.length; attempt += 1) {
+    try {
+      return await operation()
+    } catch (error) {
+      lastError = error
+      const delay = NOTIFICATION_DB_RETRY_DELAYS_MS[attempt]
+      if (delay !== undefined) {
+        await new Promise<void>((resolveDelay) => setTimeout(resolveDelay, delay))
+      }
+    }
+  }
+  throw lastError
+}
+
 export async function enqueueNotification(
   db: D1Database,
   input: {
@@ -672,55 +696,60 @@ export async function enqueueNotification(
 ): Promise<void> {
   try {
     const recipientUserId = id(input.recipientUserId)
-  const actorUserId = id(input.actorUserId, 'UNAUTHENTICATED')
-  const targetId = id(input.targetId)
-  if (recipientUserId === actorUserId) return
+    const actorUserId = id(input.actorUserId, 'UNAUTHENTICATED')
+    const targetId = id(input.targetId)
+    if (recipientUserId === actorUserId) return
 
-  const blocked = await db.prepare(
-    `SELECT 1 FROM social_user_interactions
-      WHERE relation_type = 'block'
-        AND (
-          (actor_user_id = ? AND target_user_id = ?)
-          OR (actor_user_id = ? AND target_user_id = ?)
-        )
-      LIMIT 1`,
-  ).bind(actorUserId, recipientUserId, recipientUserId, actorUserId).first()
-  if (blocked) return
+    const dedupeKey = [input.type, recipientUserId, actorUserId, input.targetType, targetId].join(':')
+    const notificationId = crypto.randomUUID()
+    const payloadJson = JSON.stringify(input.payload ?? {})
+    const now = new Date().toISOString()
 
-  const preferenceColumn = ({
-    FOLLOW: 'follow_enabled',
-    LIKE: 'like_enabled',
-    COMMENT: 'comment_enabled',
-    REPLY: 'comment_enabled',
-    MENTION: 'mention_enabled',
-  } as const)[input.type]
+    await withNotificationDbRetry(async () => {
+      const blocked = await db.prepare(
+        `SELECT 1 FROM social_user_interactions
+          WHERE relation_type = 'block'
+            AND (
+              (actor_user_id = ? AND target_user_id = ?)
+              OR (actor_user_id = ? AND target_user_id = ?)
+            )
+          LIMIT 1`,
+      ).bind(actorUserId, recipientUserId, recipientUserId, actorUserId).first()
+      if (blocked) return
 
-  const preference = await db.prepare(
-    'SELECT ' + preferenceColumn + ' AS enabled FROM social_notification_preferences WHERE user_id = ? LIMIT 1',
-  ).bind(recipientUserId).first<{ enabled: number }>()
-  if (preference && Number(preference.enabled) === 0) return
+      const preferenceColumn = ({
+        FOLLOW: 'follow_enabled',
+        LIKE: 'like_enabled',
+        COMMENT: 'comment_enabled',
+        REPLY: 'comment_enabled',
+        MENTION: 'mention_enabled',
+      } as const)[input.type]
 
-  const dedupeKey = [input.type, recipientUserId, actorUserId, input.targetType, targetId].join(':')
-  const now = new Date().toISOString()
-    await db.prepare(
-      `INSERT OR IGNORE INTO social_notifications
-      (notification_id, recipient_user_id, actor_user_id, notification_type, target_type, target_id, dedupe_key, payload_json, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  ).bind(
-    crypto.randomUUID(),
-    recipientUserId,
-    actorUserId,
-    input.type,
-    input.targetType,
-    targetId,
-    dedupeKey,
-    JSON.stringify(input.payload ?? {}),
-    now,
-    ).run()
+      const preference = await db.prepare(
+        'SELECT ' + preferenceColumn + ' AS enabled FROM social_notification_preferences WHERE user_id = ? LIMIT 1',
+      ).bind(recipientUserId).first<{ enabled: number }>()
+      if (preference && Number(preference.enabled) === 0) return
+
+      await db.prepare(
+        `INSERT OR IGNORE INTO social_notifications
+          (notification_id, recipient_user_id, actor_user_id, notification_type, target_type, target_id, dedupe_key, payload_json, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ).bind(
+        notificationId,
+        recipientUserId,
+        actorUserId,
+        input.type,
+        input.targetType,
+        targetId,
+        dedupeKey,
+        payloadJson,
+        now,
+      ).run()
+    })
   } catch (error) {
-    // Notifications are a non-authoritative social side effect.
-    // Preserve the authoritative follow/like/comment result, but make failed
-    // delivery observable without logging user IDs, target IDs or DB details.
+    // Notifications are a non-authoritative social side effect. A bounded
+    // retry exhaustion must never roll back a successful follow/like/comment.
+    // Keep logs free of user IDs, target IDs, payload data and DB messages.
     console.warn('W05_SOCIAL_NOTIFICATION_WRITE_FAILED', {
       type: input.type,
       targetType: input.targetType,
