@@ -519,23 +519,25 @@ export async function listDiscoveryTopics(
   if (ranked === null) {
   const relationBatchSize = 200
   const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000
-  const contextCache = new Map<string, PublishedContentSocialContext | null>()
-  const rememberContext = (contentId: string, context: PublishedContentSocialContext | null) => {
+  // Ranking needs only publication's canonical update timestamp. Do not
+  // retain W03 owner/type/title payloads in the long-lived LRU.
+  const contextCache = new Map<string, string | null>()
+  const rememberContext = (contentId: string, updatedAt: string | null) => {
     contextCache.delete(contentId)
-    contextCache.set(contentId, context)
+    contextCache.set(contentId, updatedAt)
     while (contextCache.size > DISCOVERY_TOPIC_CONTEXT_CACHE_MAX_ENTRIES) {
       const oldestContentId = contextCache.keys().next().value
       if (oldestContentId === undefined) break
       contextCache.delete(oldestContentId)
     }
   }
-  const getRememberedContext = (contentId: string): PublishedContentSocialContext | null | undefined => {
+  const getRememberedContext = (contentId: string): string | null | undefined => {
     if (!contextCache.has(contentId)) return undefined
-    const context = contextCache.get(contentId) ?? null
+    const updatedAt = contextCache.get(contentId) ?? null
     // Map insertion order is used as an inexpensive LRU recency queue.
     contextCache.delete(contentId)
-    contextCache.set(contentId, context)
-    return context
+    contextCache.set(contentId, updatedAt)
+    return updatedAt
   }
   const stats = new Map<string, RankedDiscoveryTopic>()
   type DiscoveryTopicRelation = { topic_id: string; normalized_name: string; display_name: string; target_id: string }
@@ -572,7 +574,7 @@ export async function listDiscoveryTopics(
     // Keep this bounded relation batch's resolved context separate from the
     // global LRU: adding new entries may evict an older context also referenced
     // by this same batch before the aggregation loop reads it.
-    const batchContexts = new Map<string, PublishedContentSocialContext | null>()
+    const batchContexts = new Map<string, string | null>()
     for (const contentId of new Set(edges.map(edge => edge.target_id))) {
       const remembered = getRememberedContext(contentId)
       if (remembered !== undefined) batchContexts.set(contentId, remembered)
@@ -588,16 +590,16 @@ export async function listDiscoveryTopics(
         correlationId,
       })
       for (const contentId of contentIds) {
-        const context = contexts.get(contentId) ?? null
-        batchContexts.set(contentId, context)
-        rememberContext(contentId, context)
+        const updatedAt = contexts.get(contentId)?.updatedAt ?? null
+        batchContexts.set(contentId, updatedAt)
+        rememberContext(contentId, updatedAt)
       }
     }
 
     for (const edge of edges) {
-      const context = batchContexts.get(edge.target_id)
-      if (!context) continue
-      const updatedAtMs = Date.parse(context.updatedAt)
+      const updatedAt = batchContexts.get(edge.target_id)
+      if (!updatedAt) continue
+      const updatedAtMs = Date.parse(updatedAt)
       // SQLite julianday(..., '-7 days') excludes unparseable timestamps.
       if (!Number.isFinite(updatedAtMs) || updatedAtMs < cutoff) continue
 
@@ -608,12 +610,12 @@ export async function listDiscoveryTopics(
           name: edge.normalized_name,
           displayName: edge.display_name,
           contentCount: 1,
-          latestContentAt: context.updatedAt,
+          latestContentAt: updatedAt,
         })
       } else {
         current.contentCount += 1
         // Match SQLite MAX(text) and the established lexical sort contract.
-        if (context.updatedAt > current.latestContentAt) current.latestContentAt = context.updatedAt
+        if (updatedAt > current.latestContentAt) current.latestContentAt = updatedAt
       }
     }
 

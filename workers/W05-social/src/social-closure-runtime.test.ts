@@ -235,6 +235,8 @@ describe('W05 unified social closure', () => {
   it('bounds W03 context retention and preserves contexts referenced by the current LRU batch', async () => {
     vi.stubGlobal('caches', undefined)
     const now = new Date().toISOString()
+    // Topic ranking must not retain large optional card titles in its LRU.
+    const largeTitle = 'x'.repeat(512)
     const edges = Array.from({ length: 5000 }, (_, index) => {
       const suffix = String(index).padStart(5, '0')
       return {
@@ -302,6 +304,7 @@ describe('W05 unified social closure', () => {
               contentType: 'post',
               state: 'PUBLISHED',
               updatedAt: now,
+              title: largeTitle,
             })),
           },
         })
@@ -315,7 +318,7 @@ describe('W05 unified social closure', () => {
       ])
       expect(page.hasMore).toBe(true)
       expect(queries.every(sql => !/(?:FROM|JOIN)\s+contents\b/i.test(sql))).toBe(true)
-    expect(queries.some(sql => sql.includes('(st.topic_id, st.target_id) > (?, ?)'))).toBe(true)
+      expect(queries.some(sql => sql.includes('(st.topic_id, st.target_id) > (?, ?)'))).toBe(true)
       expect(requestedIds).toHaveLength(5200)
       expect(requestedIds.filter(contentId => contentId === 'content-00001')).toHaveLength(2)
       expect(binding.fetch).toHaveBeenCalledTimes(105)
