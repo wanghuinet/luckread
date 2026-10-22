@@ -96,6 +96,14 @@ describe('traffic limits', () => {
     })
   })
 
+  it('fails closed when W01 write limiter context cannot be resolved', async () => {
+    contextMock.mockRejectedValue(new Error('Cloudflare context unavailable'))
+
+    await expect(
+      enforceW01WriteRateLimit(new Request('https://luckread.com/api/v1/media')),
+    ).rejects.toThrow('RATE_LIMIT_CONTEXT_UNAVAILABLE:W01_WRITE_LIMITER')
+  })
+
   it('checks W01 write origin and IP limits before Payload writes', async () => {
     const calls: string[] = []
     const globalLimiter = { limit: vi.fn(async ({ key }: { key: string }) => { calls.push(key); return { success: true } }) }
@@ -144,6 +152,14 @@ describe('traffic limits', () => {
     expect(writeLimiter.limit).not.toHaveBeenCalled()
   })
 
+  it('fails closed when account-scope limiter context cannot be resolved', async () => {
+    contextMock.mockRejectedValue(new Error('Cloudflare context unavailable'))
+
+    await expect(enforceW01WriteAccountRateLimit('operator-42')).rejects.toThrow(
+      'RATE_LIMIT_CONTEXT_UNAVAILABLE:W01_WRITE_LIMITER',
+    )
+  })
+
   it('checks the authenticated account bucket for W01 writes', async () => {
     const calls: string[] = []
     const writeLimiter = { limit: vi.fn(async ({ key }: { key: string }) => { calls.push(key); return { success: true } }) }
@@ -170,6 +186,14 @@ describe('traffic limits', () => {
     )
   })
 
+
+  it('fails closed when endpoint-scope limiter context cannot be resolved', async () => {
+    contextMock.mockRejectedValue(new Error('Cloudflare context unavailable'))
+
+    await expect(enforceW01WriteEndpointRateLimit('transitionAccountState')).rejects.toThrow(
+      'RATE_LIMIT_CONTEXT_UNAVAILABLE:W01_WRITE_LIMITER',
+    )
+  })
 
   it('checks the fixed W01 endpoint bucket', async () => {
     const writeLimiter = { limit: vi.fn(async ({ key }: { key: string }) => ({ success: true })) }
