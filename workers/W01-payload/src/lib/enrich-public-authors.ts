@@ -44,9 +44,9 @@ const looksHydrated = (value: unknown): boolean => {
   const author = asRecord(value)
   return Boolean(
     author &&
-    stringValue(author.username) &&
-    Object.prototype.hasOwnProperty.call(author, 'displayName') &&
-    Object.prototype.hasOwnProperty.call(author, 'avatar'),
+    ['username', 'displayName', 'avatar'].every((key) =>
+      Object.prototype.hasOwnProperty.call(author, key),
+    ),
   )
 }
 
