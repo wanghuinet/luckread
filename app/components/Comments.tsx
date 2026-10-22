@@ -189,6 +189,11 @@ export default function Comments({ contentId }: CommentsProps) {
         };
       }
 
+      if (Object.keys(next).length > 0) {
+        setProfiles((current) => ({ ...current, ...next }));
+      }
+      if (authorIds.length === 0) return;
+
       const results = await Promise.all(authorIds.map(async (authorId) => {
         try {
           const { response, data } = await apiRequest<PublicUserResponse>(
@@ -209,10 +214,13 @@ export default function Comments({ contentId }: CommentsProps) {
       }));
 
       if (!active) return;
+      const fallbackProfiles: Record<string, PublicUser> = {};
       for (const result of results) {
-        if (result) next[result[0]] = result[1];
+        if (result) fallbackProfiles[result[0]] = result[1];
       }
-      if (Object.keys(next).length > 0) setProfiles((current) => ({ ...current, ...next }));
+      if (Object.keys(fallbackProfiles).length > 0) {
+        setProfiles((current) => ({ ...current, ...fallbackProfiles }));
+      }
     })();
 
     return () => { active = false; };
