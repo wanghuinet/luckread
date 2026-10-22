@@ -408,6 +408,13 @@
       "visibility": "public_authenticated_legacy",
       "capability": "legacy_session_read",
       "contractStatus": "DEPRECATED_COMPATIBILITY_ALIAS",
+      "status": "DEPRECATED",
+      "deprecationReason": "Legacy compatibility alias only; clients must use GET /auth/session for the canonical session read.",
+      "canonicalReference": {
+        "operationId": "authSessionGet",
+        "method": "GET",
+        "path": "/auth/session"
+      },
       "auth": {
         "mode": "session_cookie_or_bearer",
         "subject": "current_session"
