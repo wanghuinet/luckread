@@ -1,4 +1,5 @@
 /// <reference types="@cloudflare/workers-types" />
+import type { PublishedContentSocialContext } from './w03-content-context-client.js'
 
 import { replyAudienceAllowedParams, replyAudienceAllowedSql } from './reply-audience-runtime.js'
 
@@ -570,9 +571,13 @@ export async function listComments(
   contentIdValue: string,
   cursorValue: string | null,
   limit: number,
+  contentContext: PublishedContentSocialContext,
   viewerUserIdValue: string | null = null,
 ): Promise<CommentPage> {
   const contentId = validateId(contentIdValue)
+  if (!contentContext || contentContext.contentId !== contentId || contentContext.state !== 'PUBLISHED') {
+    throw new CommentRuntimeError('NOT_FOUND', 404)
+  }
   const viewerUserId = viewerUserIdValue ? validateId(viewerUserIdValue, 'UNAUTHENTICATED') : null
   const cursor = decodeCursor(cursorValue, contentId, viewerUserId)
 
@@ -639,9 +644,7 @@ export async function listComments(
          c.created_at,
          c.updated_at
        FROM social_comments c
-       JOIN contents content ON content.id = c.content_id
        WHERE c.content_id = ?
-         AND content.state = 'PUBLISHED'
          AND c.state = 'PUBLISHED'
          AND c.parent_id IS NULL
          ${visibilitySql}
