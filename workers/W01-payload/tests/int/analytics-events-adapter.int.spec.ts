@@ -67,7 +67,8 @@ const requestFor = (events: unknown[], extraHeaders: Record<string, string> = {}
 
 beforeEach(() => {
   mocks.w11Fetch.mockClear()
-  mocks.enforceLimit.mockClear()
+  mocks.enforceLimit.mockReset()
+  mocks.enforceLimit.mockResolvedValue(undefined)
   mocks.resolvePrincipal.mockReset()
   mocks.resolvePrincipal.mockResolvedValue(null)
   mocks.rateLimitResponse.mockClear()
