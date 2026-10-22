@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import type { PublicLocale } from '../../(frontend)/i18n/public-locale'
+import { appendUniqueSearchResults } from './search-results.js'
 
 type SearchTrend = { term: string; count: number; lastSeenAt: string }
 type SearchResult = {
@@ -215,10 +216,7 @@ export default function SearchDiscoveryClient({
       const validItems = page.items.filter((item) =>
         Boolean(item) && typeof item.id === 'string' && typeof item.title === 'string',
       )
-      setResults((current) => {
-        const seen = new Set(current.map((item) => item.id))
-        return [...current, ...validItems.filter((item) => !seen.has(item.id))]
-      })
+      setResults((current) => appendUniqueSearchResults(current, validItems))
       setNextCursor(page.nextCursor)
       setHasMore(page.hasMore)
     } catch {
