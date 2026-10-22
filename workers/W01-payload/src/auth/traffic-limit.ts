@@ -64,7 +64,7 @@ export async function enforcePublicReadRateLimit(request: Request): Promise<void
     const context = await getCloudflareContext({ async: true })
     env = context.env as unknown as Record<string, unknown>
   } catch {
-    return
+    throw new Error('RATE_LIMIT_CONTEXT_UNAVAILABLE:PUBLIC_READ_LIMITER')
   }
 
   const globalLimiter = env.PUBLIC_ORIGIN_GLOBAL_LIMITER as RateLimitBinding | undefined
