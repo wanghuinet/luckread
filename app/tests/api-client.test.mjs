@@ -15,6 +15,7 @@ mock.module('../lib/secure-session.ts', () => ({
 
 const {
   apiRequest,
+  clearPendingMutationKeys,
   createIdempotencyKey,
   fetchContentBodyReference,
   LuckReadNetworkError,
@@ -1079,4 +1080,35 @@ test('reuses a media upload key for a repeated multipart request with the same u
   expect(result.response.status).toBe(201);
   expect(seenFingerprints).toEqual([fingerprint, fingerprint]);
   expect(seenKeys[1]).toBe(seenKeys[0]);
+});
+
+
+test('clears pending mutation keys when the authenticated identity changes', async () => {
+  const seenKeys = [];
+  const url = '/retry-key-session-boundary-20261022';
+  const body = JSON.stringify({ title: 'same request after account switch' });
+  pendingFetch = async (_input, init) => {
+    seenKeys.push(new Headers(init.headers).get('Idempotency-Key'));
+    throw new TypeError('connection interrupted');
+  };
+
+  await expect(apiRequest(url, {
+    method: 'POST',
+    body,
+    idempotencyKey: createIdempotencyKey(),
+  })).rejects.toBeInstanceOf(LuckReadNetworkError);
+
+  clearPendingMutationKeys();
+
+  pendingFetch = async (_input, init) => {
+    seenKeys.push(new Headers(init.headers).get('Idempotency-Key'));
+    return new Response(JSON.stringify({ data: { ok: true } }), { status: 201 });
+  };
+  await apiRequest(url, {
+    method: 'POST',
+    body,
+    idempotencyKey: createIdempotencyKey(),
+  });
+
+  expect(seenKeys[1]).not.toBe(seenKeys[0]);
 });
