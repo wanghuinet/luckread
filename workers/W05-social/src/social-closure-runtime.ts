@@ -19,6 +19,89 @@ const MAX_TEXT = 10000
 const MAX_LIMIT = 50
 const DEFAULT_LIMIT = 20
 const MAX_CURSOR = 2048
+
+const DISCOVERY_TOPIC_RANKING_CACHE_TTL_SECONDS = 15
+type RankedDiscoveryTopic = {
+  topicId: string
+  name: string
+  displayName: string
+  contentCount: number
+  latestContentAt: string
+}
+
+const compareText = (left: string, right: string): number => {
+  const leftPoints = Array.from(left, character => character.codePointAt(0)!)
+  const rightPoints = Array.from(right, character => character.codePointAt(0)!)
+  const length = Math.min(leftPoints.length, rightPoints.length)
+  for (let index = 0; index < length; index += 1) {
+    if (leftPoints[index] !== rightPoints[index]) return leftPoints[index]! - rightPoints[index]!
+  }
+  return leftPoints.length - rightPoints.length
+}
+
+
+const getSocialDefaultCache = (): Cache | null => {
+  if (typeof globalThis.caches === 'undefined') return null
+  return (globalThis.caches as unknown as { default?: Cache }).default ?? null
+}
+
+const discoveryTopicRankingCacheKey = (): Request =>
+  new Request('https://cache.luckread.internal/__social-discovery-topics-ranking?v=1', { method: 'GET' })
+
+const readCachedDiscoveryTopicRanking = async (): Promise<RankedDiscoveryTopic[] | null> => {
+  const cache = getSocialDefaultCache()
+  if (!cache) return null
+  try {
+    const response = await cache.match(discoveryTopicRankingCacheKey())
+    if (!response) return null
+    const value = await response.json() as unknown
+    if (!Array.isArray(value) || value.length > 10000) return null
+    const items: RankedDiscoveryTopic[] = []
+    for (const item of value) {
+      if (!item || typeof item !== 'object' || Array.isArray(item)) return null
+      const row = item as Partial<RankedDiscoveryTopic>
+      if (
+        typeof row.topicId !== 'string' ||
+        !/^[A-Za-z0-9][\p{L}\p{N}_-]{0,127}$/u.test(row.topicId) ||
+        typeof row.name !== 'string' ||
+        typeof row.displayName !== 'string' ||
+        typeof row.contentCount !== 'number' ||
+        !Number.isSafeInteger(row.contentCount) ||
+        row.contentCount < 1 ||
+        typeof row.latestContentAt !== 'string' ||
+        !Number.isFinite(Date.parse(row.latestContentAt))
+      ) return null
+      items.push({
+        topicId: row.topicId,
+        name: row.name,
+        displayName: row.displayName,
+        contentCount: row.contentCount,
+        latestContentAt: row.latestContentAt,
+      })
+    }
+    return items
+  } catch {
+    return null
+  }
+}
+
+const writeCachedDiscoveryTopicRanking = async (items: RankedDiscoveryTopic[]): Promise<void> => {
+  const cache = getSocialDefaultCache()
+  if (!cache || items.length > 10000) return
+  try {
+    await cache.put(
+      discoveryTopicRankingCacheKey(),
+      Response.json(items, {
+        headers: {
+          'content-type': 'application/json; charset=utf-8',
+          'cache-control': 'public, max-age=0, s-maxage=' + DISCOVERY_TOPIC_RANKING_CACHE_TTL_SECONDS,
+        },
+      }),
+    )
+  } catch {
+    // Discovery stays correct if the optional edge cache is unavailable.
+  }
+}
 const tokenPattern = /(^|[\s([{"'“‘，。！？；：、])([@#])([\p{L}\p{N}_]{1,64})/gu
 
 const id = (value: string, code: 'VALIDATION_FAILED' | 'UNAUTHENTICATED' = 'VALIDATION_FAILED') => {
@@ -262,6 +345,7 @@ export async function getTopicPage(
     throw new SocialClosureRuntimeError('VALIDATION_FAILED', 400)
   }
   if (!correlationId.trim()) throw new SocialClosureRuntimeError('VALIDATION_FAILED', 400)
+
   const limit = parseLimit(limitValue)
   const cursor = cursorValue ? decodeCursor(cursorValue) : null
   const topic = await db.prepare(
@@ -422,16 +506,12 @@ export async function listDiscoveryTopics(
   // Enumerate W05-owned topic/content edges in bounded keyset pages, resolve
   // their canonical content context in batches of at most 50, and aggregate
   // only W03-confirmed published content inside the original seven-day window.
+  let ranked: RankedDiscoveryTopic[] | null = await readCachedDiscoveryTopicRanking()
+  if (ranked === null) {
   const relationBatchSize = 200
   const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000
   const contextCache = new Map<string, PublishedContentSocialContext | null>()
-  const stats = new Map<string, {
-    topicId: string
-    name: string
-    displayName: string
-    contentCount: number
-    latestContentAt: string
-  }>()
+  const stats = new Map<string, RankedDiscoveryTopic>()
   type DiscoveryTopicRelation = { topic_id: string; normalized_name: string; display_name: string; target_id: string }
   let relationCursor: { topicId: string; targetId: string } | null = null
 
@@ -499,21 +579,26 @@ export async function listDiscoveryTopics(
     if (edges.length < relationBatchSize) break
   }
 
-  const compareText = (left: string, right: string) => left < right ? -1 : left > right ? 1 : 0
-  const ranked = [...stats.values()].sort((a, b) =>
+  // Match SQLite's BINARY text ordering for Unicode topic IDs. JavaScript's
+  // default string comparison orders UTF-16 code units, which differs for
+  // supplementary-plane letters that valid hashtag tokens can contain.
+  ranked = [...stats.values()].sort((a, b) =>
     b.contentCount - a.contentCount ||
     compareText(b.latestContentAt, a.latestContentAt) ||
     compareText(a.topicId, b.topicId),
   )
+  await writeCachedDiscoveryTopicRanking(ranked)
+  }
+  const rankedItems: RankedDiscoveryTopic[] = ranked ?? []
   const afterCursor = cursor
-    ? ranked.filter(item =>
+    ? rankedItems.filter(item =>
         item.contentCount < cursor.contentCount ||
         (item.contentCount === cursor.contentCount && (
-          item.latestContentAt < cursor.latestContentAt ||
-          (item.latestContentAt === cursor.latestContentAt && item.topicId > cursor.topicId)
+          compareText(item.latestContentAt, cursor.latestContentAt) < 0 ||
+          (compareText(item.latestContentAt, cursor.latestContentAt) === 0 && compareText(item.topicId, cursor.topicId) > 0)
         )),
       )
-    : ranked
+    : rankedItems
   const visible = afterCursor.slice(0, limit)
   const lastVisible = visible.at(-1)
   const hasMore = afterCursor.length > limit
