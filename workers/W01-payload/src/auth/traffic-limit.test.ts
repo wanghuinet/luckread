@@ -51,6 +51,18 @@ describe('traffic limits', () => {
     ).rejects.toThrow('RATE_LIMIT_BINDING_UNAVAILABLE:AUTH_LOGIN_LIMITER')
   })
 
+  it('fails closed when the auth limiter Cloudflare context is unavailable', async () => {
+    contextMock.mockRejectedValue(new Error('Cloudflare context unavailable'))
+
+    await expect(
+      enforceAuthRateLimit(
+        new Request('https://luckread.com/auth/login'),
+        'AUTH_LOGIN_LIMITER',
+        ['ip:127.0.0.1'],
+      ),
+    ).rejects.toThrow('RATE_LIMIT_CONTEXT_UNAVAILABLE:AUTH_LOGIN_LIMITER')
+  })
+
   it('rejects auth traffic when the origin breaker is exhausted', async () => {
     const globalLimiter = { limit: vi.fn(async () => ({ success: false })) }
     const actorLimiter = { limit: vi.fn(async () => ({ success: true })) }
