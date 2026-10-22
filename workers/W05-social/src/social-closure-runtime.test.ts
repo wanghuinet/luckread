@@ -210,6 +210,70 @@ describe('W05 unified social closure', () => {
     expect(fourthPage.nextCursor).toBeNull()
   })
 
+
+  it('reuses the ranked discovery snapshot across cursor pages', async () => {
+    const cacheEntries = new Map<string, Response>()
+    const cache = {
+      match: vi.fn(async (key: Request) => cacheEntries.get(key.url)?.clone()),
+      put: vi.fn(async (key: Request, response: Response) => {
+        cacheEntries.set(key.url, response.clone())
+      }),
+    }
+    vi.stubGlobal('caches', { default: cache })
+
+    const now = Date.now()
+    const edges = [
+      { topic_id: 'topic-1', normalized_name: 'reading', display_name: 'Reading', target_id: 'content-1' },
+      { topic_id: 'topic-2', normalized_name: 'books', display_name: 'Books', target_id: 'content-2' },
+    ]
+    const queries: string[] = []
+    const db = {
+      prepare: (sql: string) => {
+        queries.push(sql)
+        return { bind: () => ({ all: async () => ({ results: edges }) }) }
+      },
+    } as unknown as D1Database
+    const binding = {
+      fetch: vi.fn(async (input: RequestInfo | URL) => {
+        const request = input instanceof Request ? input : new Request(input)
+        const body = await request.json() as { contentIds: string[] }
+        return Response.json({
+          data: {
+            items: body.contentIds.map((contentId, index) => ({
+              contentId,
+              ownerUserId: 'owner-' + (index + 1),
+              contentType: 'post',
+              state: 'PUBLISHED',
+              updatedAt: new Date(now - index * 60_000).toISOString(),
+            })),
+          },
+        })
+      }),
+    }
+
+    try {
+      const firstPage = await listDiscoveryTopics(db, binding, 'discovery-cache-test', '1', null)
+      expect(firstPage.items).toMatchObject([
+        { topicId: 'topic-1', contentCount: 1 },
+      ])
+      expect(firstPage.hasMore).toBe(true)
+      expect(firstPage.nextCursor).toEqual(expect.any(String))
+
+      const secondPage = await listDiscoveryTopics(db, binding, 'discovery-cache-test', '1', firstPage.nextCursor)
+      expect(secondPage.items).toMatchObject([
+        { topicId: 'topic-2', contentCount: 1 },
+      ])
+      expect(secondPage.hasMore).toBe(false)
+      expect(secondPage.nextCursor).toBeNull()
+      expect(queries).toHaveLength(1)
+      expect(binding.fetch).toHaveBeenCalledTimes(1)
+      expect(cache.put).toHaveBeenCalledTimes(1)
+      expect(cache.match).toHaveBeenCalledTimes(2)
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
   it('rejects malformed discovery topic cursors', async () => {
     const db = { prepare: () => { throw new Error('database must not be queried for an invalid cursor') } } as unknown as D1Database
     await expect(listDiscoveryTopics(db, '20', 'not-a-cursor')).rejects.toMatchObject({ code: 'INVALID_CURSOR', status: 400 })
