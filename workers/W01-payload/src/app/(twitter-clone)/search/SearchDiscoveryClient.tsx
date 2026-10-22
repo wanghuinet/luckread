@@ -91,6 +91,7 @@ export default function SearchDiscoveryClient({
   const [trendingStatus, setTrendingStatus] = useState<Status>('loading')
   const [results, setResults] = useState<SearchResult[]>([])
   const [resultStatus, setResultStatus] = useState<Status>(initialQuery ? 'loading' : 'idle')
+  const [searchRetryToken, setSearchRetryToken] = useState(0)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -154,12 +155,16 @@ export default function SearchDiscoveryClient({
       }
     })
     return () => controller.abort()
-  }, [initialQuery])
+  }, [initialQuery, searchRetryToken])
 
   const submitSearch = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     const normalized = query.normalize('NFKC').trim()
     if (!normalized || normalized.length > 256) return
+    if (normalized === initialQuery) {
+      setSearchRetryToken((token) => token + 1)
+      return
+    }
     router.push('/search?q=' + encodeURIComponent(normalized))
   }
 
