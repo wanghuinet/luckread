@@ -196,9 +196,9 @@ describe('like runtime', () => {
     })
     const sql = String((d.prepare as unknown as ReturnType<typeof vi.fn>).mock.calls[2]?.[0])
     expect(sql).toContain("c.state = 'PUBLISHED'")
-    expect(sql).toContain("content.state = 'PUBLISHED'")
     expect(sql).toContain("block.relation_type = 'block'")
     expect(sql).toContain('NOT EXISTS')
+    expect(sql).not.toMatch(/(?:FROM|JOIN)\\s+contents/i)
   })
 
   it('creates a like on a published comment after validating its parent content', async () => {
@@ -221,6 +221,10 @@ describe('like runtime', () => {
       createdAt: '2026-10-02T00:00:00.000Z',
     })
     expect(d.prepare).toHaveBeenCalledTimes(3)
+    const sql = (d.prepare as unknown as ReturnType<typeof vi.fn>).mock.calls.map(([query]) => String(query))
+    expect(sql.every(query => !/(?:FROM|JOIN)\\s+contents/i.test(query))).toBe(true)
+    expect(sql[2]).toContain('FROM social_comments c')
+    expect(sql[2]).toContain('block.target_user_id = ?')
   })
 
   it('reads like status for a published comment', async () => {
