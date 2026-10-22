@@ -33,16 +33,19 @@ describe('W04 edge-cache search trend projection', () => {
     const fake = fakeCache()
     await recordSearchTrend('LuckRead', fake.cache)
     await recordSearchTrend('luckread', fake.cache)
+    await recordSearchTrend('luckread', fake.cache)
     await recordSearchTrend('reading', fake.cache)
     await recordSearchTrend('reading', fake.cache)
+    await recordSearchTrend('reading', fake.cache)
+    await recordSearchTrend('oneoff', fake.cache)
 
     await expect(listTrendingSearches(2, fake.cache)).resolves.toMatchObject([
-      { term: 'reading', count: 2 },
-      { term: 'luckread', count: 2 },
+      { term: 'reading', count: 3 },
+      { term: 'luckread', count: 3 },
     ])
     const stored = fake.read() as { items: Array<Record<string, unknown>> }
     expect(stored.items.every((item) => !('userId' in item) && !('actorUserId' in item))).toBe(true)
-    expect(fake.put).toHaveBeenCalledTimes(4)
+    expect(fake.put).toHaveBeenCalledTimes(7)
   })
 
   it('keeps only terms seen within the retention window', async () => {
