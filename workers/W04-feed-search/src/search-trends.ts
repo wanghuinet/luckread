@@ -1,5 +1,3 @@
-/// <reference types="@cloudflare/workers-types" />
-
 export type SearchTrend = {
   term: string
   count: number
