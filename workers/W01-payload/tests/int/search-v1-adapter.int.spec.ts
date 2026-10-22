@@ -65,7 +65,7 @@ describe('public search v1 adapter', () => {
     const shell = read('src/app/(twitter-clone)/TwitterCloneSecondaryPageLayout.tsx')
     expect(shell).toContain("{ key: 'search', href: '/search', icon: 'search' }")
     expect(shell).toContain('href="/search"><SidebarIcon name="search" />')
-    expect(page).toContain('<SearchDiscoveryClient locale={locale} initialQuery={initialQuery} />')
+    expect(page).toContain('<SearchDiscoveryClient key={initialQuery} locale={locale} initialQuery={initialQuery} />')
     expect(client).toContain("fetch('/api/v1/search/trending?limit=10'")
     expect(client).toContain("fetch('/api/v1/search?' + new URLSearchParams({ q: normalized, limit: '20' }).toString()")
     expect(client).toContain("router.push('/search?q=' + encodeURIComponent(term))")
