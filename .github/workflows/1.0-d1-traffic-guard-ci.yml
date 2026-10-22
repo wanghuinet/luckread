@@ -10,6 +10,8 @@ on:
       - 'workers/W01-payload/src/lib/public-response-cache.ts'
       - 'workers/W01-payload/src/lib/public-response-cache.test.ts'
       - 'workers/W01-payload/src/auth/traffic-limit.ts'
+      - 'workers/W01-payload/src/app/users/[userId]/account-state/route.ts'
+      - 'workers/W01-payload/tests/int/auth013-account-state-route.int.spec.ts'
       - 'workers/W01-payload/src/app/auth/register/route.ts'
       - 'workers/W01-payload/src/app/auth/login/route.ts'
       - 'workers/W01-payload/src/app/auth/refresh/route.ts'
@@ -45,6 +47,8 @@ on:
       - 'workers/W01-payload/src/lib/public-response-cache.ts'
       - 'workers/W01-payload/src/lib/public-response-cache.test.ts'
       - 'workers/W01-payload/src/auth/traffic-limit.ts'
+      - 'workers/W01-payload/src/app/users/[userId]/account-state/route.ts'
+      - 'workers/W01-payload/tests/int/auth013-account-state-route.int.spec.ts'
       - 'workers/W01-payload/src/app/auth/**'
       - 'workers/W01-payload/src/app/api/v1/contents/**'
       - 'workers/W01-payload/src/content/w03-content-client.ts'
@@ -125,7 +129,7 @@ jobs:
           NODE
       - name: Run traffic guard tests
         working-directory: workers/W01-payload
-        run: npx --no-install vitest run src/lib/public-response-cache.test.ts src/auth/traffic-limit.test.ts ../W03-content/src/d1-traffic-guard.test.ts ../W05-social/src/d1-traffic-guard.test.ts ../W05-social/src/favorite-runtime.test.ts ../W05-social/src/relationship-graph-runtime.test.ts ../W06-governance/src/d1-traffic-guard.test.ts ../W07-subscription-commerce/src/d1-traffic-guard.test.ts tests/int/homepage-d1-guard.int.spec.ts tests/int/content-detail.int.spec.ts tests/int/media-access.int.spec.ts tests/int/users-me-v1-adapter.int.spec.ts tests/int/auth-password-change-v1-adapter.int.spec.ts
+        run: npx --no-install vitest run src/lib/public-response-cache.test.ts src/auth/traffic-limit.test.ts ../W03-content/src/d1-traffic-guard.test.ts ../W05-social/src/d1-traffic-guard.test.ts ../W05-social/src/favorite-runtime.test.ts ../W05-social/src/relationship-graph-runtime.test.ts ../W06-governance/src/d1-traffic-guard.test.ts ../W07-subscription-commerce/src/d1-traffic-guard.test.ts tests/int/homepage-d1-guard.int.spec.ts tests/int/content-detail.int.spec.ts tests/int/media-access.int.spec.ts tests/int/users-me-v1-adapter.int.spec.ts tests/int/auth-password-change-v1-adapter.int.spec.ts tests/int/auth013-account-state-route.int.spec.ts
       - name: Typecheck W03
         run: ./node_modules/.bin/tsc --noEmit --strict --skipLibCheck --target ES2022 --module ESNext --moduleResolution Bundler --lib ES2022,DOM --types @cloudflare/workers-types workers/W03-content/src/index.ts workers/W03-content/src/content-runtime.ts
       - name: Validate Wrangler JSON structure

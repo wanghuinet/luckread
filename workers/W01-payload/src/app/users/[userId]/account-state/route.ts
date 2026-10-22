@@ -1,5 +1,5 @@
 import { getBetterAuthPrincipal, transitionAccountState, W02AuthClientError } from '../../../../auth/w02-session-client.js'
-import { TrafficLimitError, enforceW01WriteRateLimit, rateLimitResponse } from '../../../../auth/traffic-limit.js'
+import { TrafficLimitError, enforceW01WriteAccountRateLimit, enforceW01WriteRateLimit, rateLimitResponse } from '../../../../auth/traffic-limit.js'
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' } })
@@ -52,6 +52,14 @@ export async function POST(request: Request, context: { params: Promise<{ userId
       )
     }
     return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Authentication service unavailable')
+  }
+
+
+  try {
+    await enforceW01WriteAccountRateLimit(principal.userId)
+  } catch (error) {
+    if (error instanceof TrafficLimitError) return rateLimitResponse(request)
+    return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Rate limit service unavailable')
   }
 
   try {

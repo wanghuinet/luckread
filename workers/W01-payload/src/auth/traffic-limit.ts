@@ -102,3 +102,27 @@ export async function enforceW01WriteRateLimit(request: Request): Promise<void> 
   const result = await limiter.limit({ key: 'w01-write:ip:' + clientIp })
   if (!result.success) throw new TrafficLimitError()
 }
+
+/**
+ * Apply the authenticated actor-account bucket after W01 has established the
+ * Better Auth principal. The edge/IP and origin guards remain before auth.
+ */
+export async function enforceW01WriteAccountRateLimit(accountId: string): Promise<void> {
+  const subject = accountId.trim()
+  if (!subject || subject.length > 128) {
+    throw new Error('RATE_LIMIT_ACCOUNT_SUBJECT_INVALID')
+  }
+
+  let env: Record<string, unknown>
+  try {
+    const context = await getCloudflareContext({ async: true })
+    env = context.env as unknown as Record<string, unknown>
+  } catch {
+    return
+  }
+
+  const limiter = env.W01_WRITE_LIMITER as RateLimitBinding | undefined
+  if (!limiter) throw new Error('RATE_LIMIT_BINDING_UNAVAILABLE:W01_WRITE_LIMITER')
+  const result = await limiter.limit({ key: 'w01-write:account:' + encodeURIComponent(subject) })
+  if (!result.success) throw new TrafficLimitError()
+}
