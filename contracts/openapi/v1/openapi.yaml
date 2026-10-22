@@ -138,6 +138,7 @@ paths:
                   requestId: { type: string }
         '400': { $ref: '#/components/responses/ValidationFailed' }
         '401': { $ref: '#/components/responses/Unauthenticated' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
         '403':
           description: Email verification is required before sign-in.
           content:
