@@ -43,7 +43,6 @@ jobs:
         run: node --check scripts/api-app-live-smoke.mjs
 
   smoke:
-    if: ${{ github.event_name != 'pull_request' }}
     name: Safe public and unauthenticated API probes
     runs-on: ubuntu-latest
     timeout-minutes: 5
