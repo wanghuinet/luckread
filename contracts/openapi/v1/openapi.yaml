@@ -2629,7 +2629,7 @@ paths:
                 properties:
                   data:
                     type: object
-                    required: [items]
+                    required: [items, nextCursor, hasMore]
                     additionalProperties: false
                     properties:
                       items:
@@ -2643,7 +2643,10 @@ paths:
                             term: { type: string, minLength: 2, maxLength: 64 }
                             count: { type: integer, minimum: 1, maximum: 1000000 }
                             lastSeenAt: { type: string, format: date-time }
+                      nextCursor: { type: [string, 'null'], const: null }
+                      hasMore: { type: boolean, const: false }
                   requestId: { type: string }
+                  traceId: { type: string }
         '4XX': { $ref: '#/components/responses/ClientError' }
 
   /subscriptions:
