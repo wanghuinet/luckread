@@ -95,6 +95,7 @@
       "The publication state may change after W03 validates a content-liker list request because W03 and W05 cannot share a read transaction; the next request revalidates through W03.",
       "Publication may change after W03 returns a profile-replies batch because W03 and W05 cannot share a read transaction; every profile-replies page revalidates parent content IDs through W03. Publication may change after W03 validates a comment-list GET and before W05 reads comments; the next GET revalidates canonical publication through W03.",
       "Canonical publication can change after W03 validates a comment edit/delete because the Workers cannot share a transaction; W05 mutation guards remain local to social_comments and subsequent reads revalidate current published visibility.",
+      "For comment-like writes, W05 obtains parent publication state and owner from W03 before inserting only W05-owned interaction rows; because W03 and W05 cannot share a transaction, a publication change after the W03 response can race with the final write, and subsequent status/read paths revalidate visibility through W03.",
       "Comment creation's atomic policy/publication recheck and the content-like final INSERT retain their existing direct canonical reads for race protection."
     ]
   },
