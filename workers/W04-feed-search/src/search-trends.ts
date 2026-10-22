@@ -11,7 +11,7 @@ type SearchTrendState = {
 
 type SearchTrendCache = Pick<Cache, 'match' | 'put'>
 
-const CACHE_TTL_SECONDS = 60 * 60
+const CACHE_TTL_SECONDS = 24 * 60 * 60
 const RETENTION_MS = 24 * 60 * 60 * 1000
 const MAX_TERMS = 50
 const MIN_PUBLIC_TREND_COUNT = 3
