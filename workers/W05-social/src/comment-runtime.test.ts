@@ -2,7 +2,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createComment, deleteComment, listComments, parseCommentLimit, updateComment } from './comment-runtime.js'
 import { replyAudienceAllowedSql } from './reply-audience-runtime.js'
-import type { PublishedContentSocialContext } from './w03-content-context-client.js'
+import type { PublishedContentSocialContext, W03ContentBinding } from './w03-content-context-client.js'
 
 const db = (firstResults: unknown[] = [], allResults: unknown[] = []) => {
   let firstIndex = 0
@@ -22,6 +22,14 @@ const publishedContext = (contentId = 'content-1'): PublishedContentSocialContex
   contentType: 'post',
   state: 'PUBLISHED',
   updatedAt: '2026-10-17T04:00:00.000Z',
+})
+
+const publishedBinding = (): W03ContentBinding => ({
+  fetch: vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const request = input instanceof Request ? input : new Request(input, init)
+    const contentId = decodeURIComponent(new URL(request.url).pathname.split('/').filter(Boolean).at(-2) ?? '')
+    return Response.json({ data: publishedContext(contentId) })
+  }),
 })
 
 describe('comment runtime', () => {
@@ -151,7 +159,7 @@ describe('comment runtime', () => {
       has_replies: 0,
     }])
 
-    await expect(deleteComment(d, 'user-1', 'c-deleted')).resolves.toBe('content-1')
+    await expect(deleteComment(d, undefined, 'user-1', 'c-deleted', 'comment-test')).resolves.toBe('content-1')
     expect(d.prepare).toHaveBeenCalledTimes(1)
   })
 
@@ -388,13 +396,13 @@ describe('comment runtime', () => {
       })),
     }))
 
-    await expect(deleteComment(d, 'user-1', 'c1')).resolves.toBe('content-1')
+    await expect(deleteComment(d, publishedBinding(), 'user-1', 'c1', 'comment-test')).resolves.toBe('content-1')
     expect(prepare).toHaveBeenCalledTimes(3)
   })
 
   it('keeps comment deletion atomic against a concurrent reply', async () => {
     const d = db([
-      { id: 'c1', author_user_id: 'user-1', state: 'PUBLISHED', has_replies: 0 },
+      { id: 'c1', content_id: 'content-1', author_user_id: 'user-1', state: 'PUBLISHED', has_replies: 0 },
     ])
     const prepare = (d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare
     prepare.mockImplementationOnce(() => ({
@@ -414,18 +422,30 @@ describe('comment runtime', () => {
       })),
     }))
 
-    await expect(deleteComment(d, 'user-1', 'c1')).rejects.toMatchObject({
+    await expect(deleteComment(d, publishedBinding(), 'user-1', 'c1', 'comment-test')).rejects.toMatchObject({
       code: 'CONFLICT',
       status: 409,
     })
   })
 
   it('deletes an owned leaf comment', async () => {
+    const binding = publishedBinding()
     const d = db([
       { id: 'c1', content_id: 'content-1', author_user_id: 'user-1', state: 'PUBLISHED', has_replies: 0 },
     ])
-    await expect(deleteComment(d, 'user-1', 'c1')).resolves.toBe('content-1')
+    await expect(deleteComment(d, binding, 'user-1', 'c1', 'comment-test')).resolves.toBe('content-1')
     expect(d.prepare).toHaveBeenCalledTimes(2)
+    expect(binding.fetch).toHaveBeenCalledTimes(1)
+    const queries = (d.prepare as unknown as ReturnType<typeof vi.fn>).mock.calls.map(([sql]) => String(sql))
+    expect(queries.every(sql => !sql.toLowerCase().includes('contents'))).toBe(true)
+  })
+
+  it('fails closed before deleting when W03 publication context is unavailable', async () => {
+    const d = db([{ id: 'c1', content_id: 'content-1', author_user_id: 'user-1', state: 'PUBLISHED', has_replies: 0 }])
+    await expect(deleteComment(d, undefined, 'user-1', 'c1', 'comment-test')).rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE', status: 503 })
+    const queries = (d.prepare as unknown as ReturnType<typeof vi.fn>).mock.calls.map(([sql]) => String(sql))
+    expect(queries).toHaveLength(1)
+    expect(queries[0].toLowerCase()).not.toContain('contents')
   })
 
   it('keeps author deletion idempotent for an existing tombstone', async () => {
@@ -433,7 +453,7 @@ describe('comment runtime', () => {
       { id: 'c1', content_id: 'content-1', author_user_id: 'user-1', state: 'AUTHOR_DELETED', has_replies: 0 },
     ])
 
-    await expect(deleteComment(d, 'user-1', 'c1')).resolves.toBe('content-1')
+    await expect(deleteComment(d, publishedBinding(), 'user-1', 'c1', 'comment-test')).resolves.toBe('content-1')
     expect(d.prepare).toHaveBeenCalledTimes(1)
   })
 
@@ -441,7 +461,7 @@ describe('comment runtime', () => {
     const d = db([
       { id: 'c1', author_user_id: 'user-2', state: 'PUBLISHED', has_replies: 0 },
     ])
-    await expect(deleteComment(d, 'user-1', 'c1')).rejects.toMatchObject({
+    await expect(deleteComment(d, publishedBinding(), 'user-1', 'c1', 'comment-test')).rejects.toMatchObject({
       code: 'PERMISSION_DENIED',
       status: 403,
     })
@@ -449,15 +469,16 @@ describe('comment runtime', () => {
 
   it('rejects deleting comments that have replies', async () => {
     const d = db([
-      { id: 'c1', author_user_id: 'user-1', state: 'PUBLISHED', has_replies: 1 },
+      { id: 'c1', content_id: 'content-1', author_user_id: 'user-1', state: 'PUBLISHED', has_replies: 1 },
     ])
-    await expect(deleteComment(d, 'user-1', 'c1')).rejects.toMatchObject({
+    await expect(deleteComment(d, publishedBinding(), 'user-1', 'c1', 'comment-test')).rejects.toMatchObject({
       code: 'CONFLICT',
       status: 409,
     })
   })
 
   it('updates an owned published comment with the matching version', async () => {
+    const binding = publishedBinding()
     const d = db([
       {
         id: 'c1',
@@ -484,14 +505,29 @@ describe('comment runtime', () => {
       },
     ])
 
-    await expect(updateComment(d, 'user-1', 'c1', {
+    await expect(updateComment(d, binding, 'user-1', 'c1', {
       body: '修改后',
       ifMatch: '"2026-10-02T00:01:00.000Z"',
-    })).resolves.toMatchObject({
+    }, 'comment-test')).resolves.toMatchObject({
       item: { id: 'c1', body: '修改后' },
       etag: '"2026-10-02T00:02:00.000Z"',
     })
     expect(d.prepare).toHaveBeenCalledTimes(2)
+    expect(binding.fetch).toHaveBeenCalledTimes(1)
+    const queries = (d.prepare as unknown as ReturnType<typeof vi.fn>).mock.calls.map(([sql]) => String(sql))
+    expect(queries.every(sql => !sql.toLowerCase().includes('contents'))).toBe(true)
+  })
+
+  it('fails closed before updating when W03 publication context is unavailable', async () => {
+    const d = db([{
+      id: 'c1', content_id: 'content-1', author_user_id: 'user-1', parent_id: null,
+      body: '原文', state: 'PUBLISHED', depth: 0,
+      created_at: '2026-10-02T00:00:00.000Z', updated_at: '2026-10-02T00:01:00.000Z',
+    }])
+    await expect(updateComment(d, undefined, 'user-1', 'c1', {
+      body: '修改', ifMatch: '"2026-10-02T00:01:00.000Z"',
+    }, 'comment-test')).rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE', status: 503 })
+    expect(d.prepare).toHaveBeenCalledTimes(1)
   })
 
   it('rejects an update from another author', async () => {
@@ -508,10 +544,10 @@ describe('comment runtime', () => {
       content_state: 'PUBLISHED',
     }])
 
-    await expect(updateComment(d, 'user-1', 'c1', {
+    await expect(updateComment(d, publishedBinding(), 'user-1', 'c1', {
       body: '越权修改',
       ifMatch: '"2026-10-02T00:01:00.000Z"',
-    })).rejects.toMatchObject({
+    }, 'comment-test')).rejects.toMatchObject({
       code: 'PERMISSION_DENIED',
       status: 403,
     })
@@ -531,10 +567,10 @@ describe('comment runtime', () => {
       content_state: 'PUBLISHED',
     }])
 
-    await expect(updateComment(d, 'user-1', 'c1', {
+    await expect(updateComment(d, publishedBinding(), 'user-1', 'c1', {
       body: '旧版本修改',
       ifMatch: '"2026-10-02T00:01:00.000Z"',
-    })).rejects.toMatchObject({
+    }, 'comment-test')).rejects.toMatchObject({
       code: 'PRECONDITION_FAILED',
       status: 412,
     })
@@ -542,10 +578,10 @@ describe('comment runtime', () => {
 
   it('requires a valid If-Match header value', async () => {
     const d = db()
-    await expect(updateComment(d, 'user-1', 'c1', {
+    await expect(updateComment(d, publishedBinding(), 'user-1', 'c1', {
       body: '修改',
       ifMatch: '',
-    })).rejects.toMatchObject({
+    }, 'comment-test')).rejects.toMatchObject({
       code: 'PRECONDITION_REQUIRED',
       status: 428,
     })

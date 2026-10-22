@@ -1164,6 +1164,7 @@ describe('W05 social comment transport', () => {
   })
 
   it('updates an owned comment with a conditional version', async () => {
+    const binding = publishedContextBinding()
     const response = await worker.fetch(
       new Request('https://luckread-w05.internal/internal/social/comments/comment-1', {
         method: 'PATCH',
@@ -1205,12 +1206,18 @@ describe('W05 social comment transport', () => {
             updated_at: '2026-10-02T00:02:00.000Z',
           },
         ]),
+        W03_CONTENT: binding,
       },
     )
 
     expect(response.status).toBe(200)
     expect(response.headers.get('etag')).toBe('"2026-10-02T00:02:00.000Z"')
     expect(response.headers.get('X-LuckRead-Content-Id')).toBe('content-1')
+    expect(binding.fetch).toHaveBeenCalledTimes(1)
+    const forwarded = binding.fetch.mock.calls[0]?.[0] as Request
+    expect(forwarded.headers.get('X-LuckRead-Caller')).toBe('W05')
+    expect(forwarded.headers.has('Authorization')).toBe(false)
+    expect(forwarded.headers.has('Cookie')).toBe(false)
   })
 
   it('requires If-Match for comment updates', async () => {
@@ -1231,6 +1238,7 @@ describe('W05 social comment transport', () => {
   })
 
   it('deletes an owned leaf comment through the internal transport', async () => {
+    const binding = publishedContextBinding()
     const response = await worker.fetch(
       new Request('https://luckread-w05.internal/internal/social/comments/comment-1', {
         method: 'DELETE',
@@ -1245,10 +1253,15 @@ describe('W05 social comment transport', () => {
         DB: dbFor([
           { id: 'comment-1', content_id: 'content-1', author_user_id: 'viewer-1', state: 'PUBLISHED', has_replies: 0 },
         ]),
+        W03_CONTENT: binding,
       },
     )
     expect(response.status).toBe(204)
     expect(response.headers.get('X-LuckRead-Content-Id')).toBe('content-1')
+    expect(binding.fetch).toHaveBeenCalledTimes(1)
+    const forwarded = binding.fetch.mock.calls[0]?.[0] as Request
+    expect(forwarded.headers.has('Authorization')).toBe(false)
+    expect(forwarded.headers.has('Cookie')).toBe(false)
   })
 
   it('requires an idempotency key for comment deletion', async () => {
