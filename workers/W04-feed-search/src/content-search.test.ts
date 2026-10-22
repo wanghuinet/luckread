@@ -65,6 +65,94 @@ describe('W04 public content search route', () => {
     expect(contentFetch).not.toHaveBeenCalled()
   })
 
+  it('records successful first-page searches with results into the edge cache only', async () => {
+    let cached: unknown = null
+    const cache = {
+      match: vi.fn(async () => cached === null ? undefined : Response.json(cached)),
+      put: vi.fn(async (_key: RequestInfo | URL, response: Response) => { cached = await response.clone().json() }),
+    }
+    vi.stubGlobal('caches', { default: cache })
+    const contentFetch = vi.fn(async (input: RequestInfo | URL) => {
+      const request = input instanceof Request ? input : new Request(input)
+      const body = await request.json() as { q: string; cursor: string | null }
+      return Response.json({
+        data: { items: body.q === 'empty' ? [] : [{ id: 'content-1', title: 'Public result' }], nextCursor: null, hasMore: false },
+        requestId: 'req_search_trend_test',
+      })
+    })
+    const env = { W03_CONTENT: { fetch: contentFetch } }
+    try {
+      const first = await worker.fetch(
+        new Request('https://luckread-w04.internal/internal/search/contents?q=LuckRead&limit=10', { headers }),
+        env,
+      )
+      expect(first.status).toBe(200)
+      expect((cached as { items: Array<{ term: string; count: number }> }).items)
+        .toMatchObject([{ term: 'luckread', count: 1 }])
+
+      const nextPage = await worker.fetch(
+        new Request('https://luckread-w04.internal/internal/search/contents?q=LuckRead&limit=10&cursor=cursor_1', { headers }),
+        env,
+      )
+      expect(nextPage.status).toBe(200)
+      expect((cached as { items: Array<{ term: string; count: number }> }).items)
+        .toMatchObject([{ term: 'luckread', count: 1 }])
+
+      const empty = await worker.fetch(
+        new Request('https://luckread-w04.internal/internal/search/contents?q=empty&limit=10', { headers }),
+        env,
+      )
+      expect(empty.status).toBe(200)
+      expect((cached as { items: Array<{ term: string; count: number }> }).items)
+        .toMatchObject([{ term: 'luckread', count: 1 }])
+      expect(cache.put).toHaveBeenCalledTimes(1)
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('serves recent trending terms only through trusted W01 transport', async () => {
+    let cached: unknown = {
+      version: 1,
+      items: [
+        { term: 'luckread', count: 9, lastSeenAt: new Date().toISOString() },
+        { term: 'reading', count: 4, lastSeenAt: new Date().toISOString() },
+      ],
+    }
+    const cache = {
+      match: vi.fn(async () => cached === null ? undefined : Response.json(cached)),
+      put: vi.fn(async (_key: RequestInfo | URL, response: Response) => { cached = await response.clone().json() }),
+    }
+    vi.stubGlobal('caches', { default: cache })
+    try {
+      const response = await worker.fetch(
+        new Request('https://luckread-w04.internal/internal/search/trending?limit=1', { headers }),
+        {},
+      )
+      expect(response.status).toBe(200)
+      await expect(response.json()).resolves.toMatchObject({
+        data: { items: [{ term: 'luckread', count: 9 }] },
+      })
+
+      const denied = await worker.fetch(
+        new Request('https://luckread-w04.internal/internal/search/trending?limit=1', {
+          headers: { ...headers, 'X-LuckRead-Caller': 'browser' },
+        }),
+        {},
+      )
+      expect(denied.status).toBe(403)
+
+      const invalid = await worker.fetch(
+        new Request('https://luckread-w04.internal/internal/search/trending?limit=21', { headers }),
+        {},
+      )
+      expect(invalid.status).toBe(422)
+      expect(cache.match).toHaveBeenCalledTimes(1)
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
   it('fails closed when W03 is not bound and rejects non-GET methods', async () => {
     const missing = await worker.fetch(
       new Request('https://luckread-w04.internal/internal/search/contents?q=hello', { headers }),
