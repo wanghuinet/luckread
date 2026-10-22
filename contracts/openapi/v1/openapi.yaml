@@ -887,7 +887,6 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ListResponse' }
         '4XX': { $ref: '#/components/responses/ClientError' }
-
   /notifications:
     get:
       tags: [Notifications]
@@ -2605,13 +2604,50 @@ paths:
   /search/trending:
     get:
       tags: [Search]
-      summary: Discovery draft for GET undefined
+      summary: List recent popular public search terms
+      description: >-
+        Returns a bounded, approximate edge-cache projection derived only from
+        successful public searches with results. A term is only surfaced after three
+        successful searches in the local edge-cache region. Counts are approximate,
+        may be regional, and never include viewer identifiers.
       operationId: getSearchTrending
-      x-luckread-contract-status: DISCOVERY_DRAFT
-      x-luckread-source: contracts/api/api-inventory.v1.json
+      security: []
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 20, default: 10 }
       responses:
-        default:
-          description: Discovery-only operation; detailed response contract remains to be closed.
+        '200':
+          description: Recent popular search terms.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, requestId]
+                additionalProperties: false
+                properties:
+                  data:
+                    type: object
+                    required: [items, nextCursor, hasMore]
+                    additionalProperties: false
+                    properties:
+                      items:
+                        type: array
+                        maxItems: 20
+                        items:
+                          type: object
+                          required: [term, count, lastSeenAt]
+                          additionalProperties: false
+                          properties:
+                            term: { type: string, minLength: 2, maxLength: 64 }
+                            count: { type: integer, minimum: 1, maximum: 1000000 }
+                            lastSeenAt: { type: string, format: date-time }
+                      nextCursor: { type: [string, 'null'], const: null }
+                      hasMore: { type: boolean, const: false }
+                  requestId: { type: string }
+                  traceId: { type: string }
+        '4XX': { $ref: '#/components/responses/ClientError' }
 
   /subscriptions:
     get:

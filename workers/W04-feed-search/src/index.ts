@@ -12,6 +12,7 @@
 // Node runtime evidence script.
 // KV propagation-aware final gate.
 import { applyAccountStateProjection, parseAccountStateChanged, type ProjectionRecord } from './auth-013-projection.js'
+import { listTrendingSearches, recordSearchTrend } from './search-trends.js'
 
 interface ProjectionKV {
   get(key: string, type: 'json'): Promise<unknown>
@@ -64,6 +65,39 @@ const json = (body: unknown, status = 200) =>
 export default {
   async fetch(request: Request, env?: Env): Promise<Response> {
     const url = new URL(request.url)
+    if (url.pathname === '/internal/search/trending') {
+      if (request.method !== 'GET') return new Response(null, { status: 405, headers: { Allow: 'GET' } })
+      if (
+        request.headers.get('X-LuckRead-Caller') !== 'W01' ||
+        request.headers.get('X-LuckRead-Transport-Version') !== '1.0' ||
+        !request.headers.get('X-LuckRead-Correlation-Id')?.trim() ||
+        request.headers.has('Authorization') ||
+        request.headers.has('Cookie') ||
+        request.headers.has('X-LuckRead-Principal-User-Id')
+      ) {
+        return json({ error: { code: 'PERMISSION_DENIED', message: 'PERMISSION_DENIED', details: {} } }, 403)
+      }
+
+      const allowed = new Set(['limit'])
+      let invalidQuery = url.search.length > 256
+      url.searchParams.forEach((_value, key) => {
+        if (!allowed.has(key)) invalidQuery = true
+      })
+      const limitValues = url.searchParams.getAll('limit')
+      const limit = limitValues[0]?.trim() ?? '10'
+      if (invalidQuery || limitValues.length > 1 || !/^(?:[1-9]|1[0-9]|20)$/.test(limit)) {
+        return json({ error: { code: 'VALIDATION_FAILED', message: 'Invalid trending search limit', details: {} } }, 422)
+      }
+
+      const items = await listTrendingSearches(Number(limit))
+      const requestId = 'req_' + crypto.randomUUID()
+      return json({
+        data: { items, nextCursor: null, hasMore: false },
+        requestId,
+        traceId: request.headers.get('X-LuckRead-Correlation-Id')!.trim(),
+      })
+    }
+
     if (url.pathname === '/internal/search/contents') {
       if (request.method !== 'GET') return new Response(null, { status: 405, headers: { Allow: 'GET' } })
       if (
@@ -143,6 +177,9 @@ export default {
           (payload.data.nextCursor !== null && typeof payload.data.nextCursor !== 'string')
         ) {
           return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Content service returned invalid search data', details: {} } }, 503)
+        }
+        if (!cursor && payload.data.items.length > 0) {
+          await recordSearchTrend(query)
         }
         return json(payload)
       } catch {

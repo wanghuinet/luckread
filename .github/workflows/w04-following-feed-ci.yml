@@ -4,12 +4,22 @@ on:
   pull_request:
     paths:
       - "workers/W04-feed-search/**"
+      - "workers/W01-payload/src/feed/w04-feed-client.ts"
+      - "workers/W01-payload/src/app/api/v1/search/trending/**"
+      - "workers/W01-payload/tests/int/search-v1-adapter.int.spec.ts"
+      - "workers/W01-payload/src/app/(twitter-clone)/search/**"
+      - "workers/W01-payload/src/app/(twitter-clone)/TwitterCloneSecondaryPageLayout.tsx"
+      - "contracts/openapi/v1/openapi.yaml"
       - "workers/W01-payload/tests/int/following-feed-v1-adapter.int.spec.ts"
       - ".github/workflows/w04-following-feed-ci.yml"
   push:
     branches: ["main"]
     paths:
       - "workers/W04-feed-search/**"
+      - "workers/W01-payload/src/feed/w04-feed-client.ts"
+      - "workers/W01-payload/src/app/api/v1/search/trending/**"
+      - "workers/W01-payload/tests/int/search-v1-adapter.int.spec.ts"
+      - "contracts/openapi/v1/openapi.yaml"
       - ".github/workflows/w04-following-feed-ci.yml"
 
 permissions:
@@ -36,6 +46,7 @@ jobs:
           npx --no-install vitest run
           workers/W04-feed-search/src/auth-013-projection.test.ts
           workers/W04-feed-search/src/following-feed.test.ts workers/W04-feed-search/src/content-search.test.ts
+          workers/W04-feed-search/src/search-trends.test.ts
 
       - name: Typecheck W04 feed runtime
         run: >-
@@ -44,3 +55,14 @@ jobs:
           --lib ES2022,DOM,DOM.Iterable --types @cloudflare/workers-types
           workers/W04-feed-search/src/auth-013-projection.ts
           workers/W04-feed-search/src/index.ts
+          workers/W04-feed-search/src/search-trends.ts
+
+      - name: Install locked W01 adapter test dependencies
+        working-directory: workers/W01-payload
+        run: |
+          corepack enable
+          pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Run W01 public search adapter tests
+        working-directory: workers/W01-payload
+        run: pnpm exec vitest run --config ./vitest.config.mts tests/int/search-v1-adapter.int.spec.ts
