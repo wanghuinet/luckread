@@ -543,19 +543,24 @@ export async function listDiscoveryTopics(
 
   while (true) {
     const cursorClause: string = relationCursor
-      ? 'AND (t.topic_id > ? OR (t.topic_id = ? AND st.target_id > ?))'
+      ? 'AND (st.topic_id, st.target_id) > (?, ?)'
       : ''
     const cursorBindings: string[] = relationCursor
-      ? [relationCursor.topicId, relationCursor.topicId, relationCursor.targetId]
+      ? [relationCursor.topicId, relationCursor.targetId]
       : []
+    // The partial covering index returns only content edges in ranking order.
+    // CROSS JOIN fixes the loop order; the tuple cursor lets SQLite seek into
+    // the composite index without DISTINCT or a temporary ORDER BY b-tree.
     const result: { results?: DiscoveryTopicRelation[] | null } = await db.prepare(`
-      SELECT DISTINCT t.topic_id, t.normalized_name, t.display_name, st.target_id
-        FROM social_topics t
-        JOIN social_target_topics st
-          ON st.topic_id = t.topic_id AND st.target_type = 'content'
-       WHERE t.status = 'ACTIVE'
+      SELECT t.topic_id, t.normalized_name, t.display_name, st.target_id
+        FROM social_target_topics st
+          INDEXED BY ix_social_target_topics_content_topic_target
+        CROSS JOIN social_topics t
+       WHERE st.target_type = 'content'
+         AND t.topic_id = st.topic_id
+         AND t.status = 'ACTIVE'
          ${cursorClause}
-       ORDER BY t.topic_id ASC, st.target_id ASC
+       ORDER BY st.topic_id ASC, st.target_id ASC
        LIMIT ?
     `).bind(...cursorBindings, relationBatchSize).all<DiscoveryTopicRelation>()
     const edges: DiscoveryTopicRelation[] = result.results ?? []
