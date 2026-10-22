@@ -14,6 +14,7 @@ type SearchTrendCache = Pick<Cache, 'match' | 'put'>
 const CACHE_TTL_SECONDS = 60 * 60
 const RETENTION_MS = 24 * 60 * 60 * 1000
 const MAX_TERMS = 50
+const MIN_PUBLIC_TREND_COUNT = 3
 const MAX_COUNT = 1_000_000
 
 const cacheKey = () => new Request(
@@ -126,5 +127,5 @@ export async function listTrendingSearches(
 ): Promise<SearchTrend[]> {
   if (!Number.isInteger(limit) || limit < 1 || limit > 20 || !cache) return []
   const items = await readState(cache)
-  return sortTrends(items).slice(0, limit)
+  return sortTrends(items).filter((item) => item.count >= MIN_PUBLIC_TREND_COUNT).slice(0, limit)
 }
