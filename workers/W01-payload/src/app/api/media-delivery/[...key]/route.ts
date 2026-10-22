@@ -17,8 +17,7 @@ const privateError = (status: number, code: string): Response => Response.json({
 }, { status, headers: { 'cache-control': 'private, no-store' } })
 
 const safeHost = (request: Request): string => {
-  const forwarded = request.headers.get('x-forwarded-host')?.split(',')[0]?.trim()
-  const host = forwarded || request.headers.get('host') || new URL(request.url).host
+  const host = request.headers.get('host') || new URL(request.url).host
   try {
     return new URL('https://' + host).hostname.toLowerCase()
   } catch {
@@ -93,37 +92,36 @@ async function deliver(request: Request, context: { params: Promise<{ key: strin
   }
   if (!bucket) return privateError(503, 'SERVICE_UNAVAILABLE')
 
-  let object: R2ObjectBody | null
+  let metadata: R2Object | null
   try {
-    object = await bucket.get(key)
+    metadata = await bucket.head(key)
   } catch {
     return privateError(503, 'SERVICE_UNAVAILABLE')
   }
-  if (!object) return privateError(404, 'NOT_FOUND')
+  if (!metadata) return privateError(404, 'NOT_FOUND')
 
-  const contentType = object.httpMetadata?.contentType ?? null
+  const contentType = metadata.httpMetadata?.contentType ?? null
   if (!mediaTypeAllowed(hostKind, key, contentType)) return privateError(404, 'NOT_FOUND')
 
-  const range = parseMediaByteRange(request.headers.get('range'), object.size)
+  const range = parseMediaByteRange(request.headers.get('range'), metadata.size)
   if (range === 'invalid') {
     return new Response(null, {
       status: 416,
       headers: {
-        'content-range': 'bytes */' + object.size,
+        'content-range': 'bytes */' + metadata.size,
         'accept-ranges': 'bytes',
         'cache-control': 'private, no-store',
       },
     })
   }
-  if (range) {
-    try {
-      const ranged = await bucket.get(key, { range: { offset: range.offset, length: range.length } })
-      if (!ranged) return privateError(404, 'NOT_FOUND')
-      object = ranged
-    } catch {
-      return privateError(503, 'SERVICE_UNAVAILABLE')
-    }
+
+  let object: R2ObjectBody | null
+  try {
+    object = await bucket.get(key, range ? { range: { offset: range.offset, length: range.length } } : undefined)
+  } catch {
+    return privateError(503, 'SERVICE_UNAVAILABLE')
   }
+  if (!object) return privateError(404, 'NOT_FOUND')
 
   const headers = new Headers()
   object.writeHttpMetadata(headers)
@@ -134,11 +132,11 @@ async function deliver(request: Request, context: { params: Promise<{ key: strin
   // implemented; do not let an unpublished post leave a long-lived public copy.
   headers.set('cache-control', 'public, max-age=0, must-revalidate')
   headers.set('cdn-cache-control', 'no-store')
-  headers.set('content-length', String(range?.length ?? object.size))
+  headers.set('content-length', String(range?.length ?? metadata.size))
   if (object.httpEtag) headers.set('etag', object.httpEtag)
   if (object.uploaded) headers.set('last-modified', object.uploaded.toUTCString())
   if (range) {
-    headers.set('content-range', 'bytes ' + range.offset + '-' + (range.offset + range.length - 1) + '/' + object.size)
+    headers.set('content-range', 'bytes ' + range.offset + '-' + (range.offset + range.length - 1) + '/' + metadata.size)
   }
 
   if (request.headers.get('if-none-match') && object.httpEtag && request.headers.get('if-none-match') === object.httpEtag && !range) {
