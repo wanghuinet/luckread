@@ -19,7 +19,7 @@ export default async function SearchPage({
 
   return (
     <TwitterCloneSecondaryPageLayout locale={locale} title={title} active="search">
-      <SearchDiscoveryClient locale={locale} initialQuery={initialQuery} />
+      <SearchDiscoveryClient key={initialQuery} locale={locale} initialQuery={initialQuery} />
     </TwitterCloneSecondaryPageLayout>
   )
 }
