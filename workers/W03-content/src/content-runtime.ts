@@ -237,8 +237,8 @@ const normalizePublicPostMediaUrl = (value: string): string | null => {
       segment === '.' ||
       segment === '..' ||
       segment.includes('/') ||
-      segment.includes('\\\\') ||
-      /[\\u0000-\\u001f\\u007f]/.test(segment)
+      segment.includes('\\') ||
+      /[\u0000-\u001f\u007f]/.test(segment)
     )) return null
 
     return url.origin + '/media/' + decodedSegments.map(encodeURIComponent).join('/')
