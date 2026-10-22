@@ -75,9 +75,6 @@ beforeEach(() => {
   )
 })
 
-const read = (relativePath: string) =>
-  readFileSync(resolve(process.cwd(), relativePath), 'utf8')
-
 describe('W01 analytics event route integration', () => {
   it('rate-limits then forwards allowed events and trusted W02 identity without user credentials', async () => {
     mocks.resolvePrincipal.mockResolvedValue({
