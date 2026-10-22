@@ -56,7 +56,7 @@ const createLog =
 const cloudflareLogger = {
   level: process.env.PAYLOAD_LOG_LEVEL || 'info',
   trace: createLog('trace', console.debug),
-  debug: createLog('debug', console.log),
+  debug: createLog('debug', console.debug),
   info: createLog('info', console.log),
   warn: createLog('warn', console.warn),
   error: createLog('error', console.error),
