@@ -7,6 +7,8 @@ on:
       - "workers/W01-payload/src/feed/w04-feed-client.ts"
       - "workers/W01-payload/src/app/api/v1/search/trending/**"
       - "workers/W01-payload/tests/int/search-v1-adapter.int.spec.ts"
+      - "workers/W01-payload/src/app/(twitter-clone)/search/**"
+      - "workers/W01-payload/src/app/(twitter-clone)/TwitterCloneSecondaryPageLayout.tsx"
       - "contracts/openapi/v1/openapi.yaml"
       - "workers/W01-payload/tests/int/following-feed-v1-adapter.int.spec.ts"
       - ".github/workflows/w04-following-feed-ci.yml"
