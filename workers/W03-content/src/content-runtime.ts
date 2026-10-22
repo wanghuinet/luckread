@@ -213,8 +213,8 @@ export const publicContent = (content: ContentRecord) => ({
   coverRef: content.coverRef,
 })
 
-const normalizePublicPostMediaUrl = (value: string): string | null => {
-  if (value.length === 0 || value.length > 2048) return null
+const publicPostMediaReferenceCandidates = (value: string): string[] => {
+  if (value.length === 0 || value.length > 2048) return []
   try {
     const url = new URL(value)
     if (
@@ -224,11 +224,11 @@ const normalizePublicPostMediaUrl = (value: string): string | null => {
       url.password ||
       url.search ||
       url.hash ||
+      url.port ||
       !url.pathname.startsWith('/media/')
-    ) return null
+    ) return []
 
     const encodedSegments = url.pathname.slice('/media/'.length).split('/')
-    if (encodedSegments.length === 0) return null
     const decodedSegments = encodedSegments.map((segment) => {
       try { return decodeURIComponent(segment) } catch { return '' }
     })
@@ -239,11 +239,30 @@ const normalizePublicPostMediaUrl = (value: string): string | null => {
       segment.includes('/') ||
       segment.includes('\\') ||
       /[\u0000-\u001f\u007f]/.test(segment)
-    )) return null
+    )) return []
 
-    return url.origin + '/media/' + decodedSegments.map(encodeURIComponent).join('/')
+    const objectKey = decodedSegments.map(encodeURIComponent).join('/')
+    const canonical = url.origin + '/media/' + objectKey
+    const candidates = new Set<string>([
+      canonical,
+      // Historical published content can still hold direct CDN URLs. The
+      // gateway URL includes an extra /media/ route prefix, so derive the
+      // old public R2 URL from the exact object key, never a wildcard match.
+      'https://cdn.luckread.com/' + objectKey,
+    ])
+
+    if (decodedSegments.length === 1) {
+      const filename = encodeURIComponent(decodedSegments[0]!)
+      const payloadPath = '/api/media/file/' + filename
+      candidates.add(payloadPath)
+      candidates.add('https://api.luckread.com' + payloadPath)
+      candidates.add('https://luckread.com' + payloadPath)
+      candidates.add('https://www.luckread.com' + payloadPath)
+      candidates.add('https://mp.luckread.com' + payloadPath)
+    }
+    return [...candidates]
   } catch {
-    return null
+    return []
   }
 }
 
@@ -257,25 +276,26 @@ export async function isPublishedPublicPostMediaReference(
   db: ContentD1,
   mediaUrlValue: string,
 ): Promise<boolean> {
-  const mediaUrl = normalizePublicPostMediaUrl(mediaUrlValue)
-  if (!mediaUrl) return false
+  const candidates = publicPostMediaReferenceCandidates(mediaUrlValue)
+  if (candidates.length === 0) return false
 
+  const placeholders = candidates.map(() => '?').join(', ')
   const row = await db.prepare(
-    `SELECT id
+    \`SELECT id
        FROM contents
       WHERE state = 'PUBLISHED'
         AND content_type = 'post'
         AND (
-          body_ref = ?
-          OR cover_ref = ?
+          body_ref IN (\${placeholders})
+          OR cover_ref IN (\${placeholders})
           OR EXISTS (
             SELECT 1
               FROM json_each(contents.media_refs_json) AS media_ref
-             WHERE media_ref.value = ?
+             WHERE media_ref.value IN (\${placeholders})
           )
         )
-      LIMIT 1`,
-  ).bind(mediaUrl, mediaUrl, mediaUrl).first<{ id: string }>()
+      LIMIT 1\`,
+  ).bind(...candidates, ...candidates, ...candidates).first<{ id: string }>()
   return typeof row?.id === 'string' && row.id.length > 0
 }
 
