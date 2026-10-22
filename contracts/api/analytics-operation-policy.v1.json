@@ -85,7 +85,7 @@
         "resource": "PASS",
         "cache": "PASS",
         "antiAbuse": "PASS",
-        "integration": "MISSING",
+        "integration": "PASS",
         "securityE2E": "MISSING"
       },
       "transportContract": "contracts/transport/W01-W11-analytics-event-ingress.v1.json"
