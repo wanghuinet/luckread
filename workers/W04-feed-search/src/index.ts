@@ -90,7 +90,12 @@ export default {
       }
 
       const items = await listTrendingSearches(Number(limit))
-      return json({ data: { items }, requestId: 'req_' + crypto.randomUUID() })
+      const requestId = 'req_' + crypto.randomUUID()
+      return json({
+        data: { items, nextCursor: null, hasMore: false },
+        requestId,
+        traceId: request.headers.get('X-LuckRead-Correlation-Id')!.trim(),
+      })
     }
 
     if (url.pathname === '/internal/search/contents') {
