@@ -76,6 +76,19 @@
           "type": "text",
           "sourceRef": "workers/W01-payload/src/collections/Media.ts:field:ownerUserId",
           "classification": "PAYLOAD_CONFIG_DISCOVERED"
+        },
+        {
+          "name": "uploadIdempotencyKey",
+          "type": "text",
+          "sourceRef": "workers/W01-payload/src/collections/Media.ts:field:uploadIdempotencyKey",
+          "classification": "PAYLOAD_CONFIG_DISCOVERED",
+          "unique": true
+        },
+        {
+          "name": "uploadFingerprint",
+          "type": "text",
+          "sourceRef": "workers/W01-payload/src/collections/Media.ts:field:uploadFingerprint",
+          "classification": "PAYLOAD_CONFIG_DISCOVERED"
         }
       ]
     }
