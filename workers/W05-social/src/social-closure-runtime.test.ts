@@ -194,7 +194,6 @@ describe('W05 unified social closure', () => {
     expect(queries[0]).toContain('ix_social_target_topics_content_topic_target')
     expect(queries[0]).toContain('CROSS JOIN social_topics')
     expect(queries[0]).not.toContain('SELECT DISTINCT')
-    expect(queries[0]).toContain('(st.topic_id, st.target_id) > (?, ?)')
 
     const secondPage = await listDiscoveryTopics(db, binding, 'discovery-test', '1', firstPage.nextCursor)
     expect(secondPage.items).toMatchObject([
@@ -202,6 +201,7 @@ describe('W05 unified social closure', () => {
     ])
     expect(secondPage.hasMore).toBe(true)
     expect(secondPage.nextCursor).toEqual(expect.any(String))
+    expect(queries[1]).toContain('(st.topic_id, st.target_id) > (?, ?)')
 
     const thirdPage = await listDiscoveryTopics(db, binding, 'discovery-test', '1', secondPage.nextCursor)
     expect(thirdPage.items).toMatchObject([
