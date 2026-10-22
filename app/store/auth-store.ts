@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-import { apiRequest, getApiErrorMessage } from '../lib/api-client';
+import { apiRequest, clearPendingMutationKeys, getApiErrorMessage } from '../lib/api-client';
 import {
   clearStoredSession,
   readCachedUser,
@@ -79,6 +79,7 @@ export const useAuthStore = create<AuthStore>((set) => ({
       return;
     }
     if (!token) {
+      clearPendingMutationKeys();
       set({ status: 'anonymous', user: null });
       return;
     }
@@ -91,6 +92,7 @@ export const useAuthStore = create<AuthStore>((set) => ({
       const { response, data } = await apiRequest<SessionPayload>('/auth/session', { method: 'GET' });
       if (response.status === 401) {
         await clearStoredSession();
+        clearPendingMutationKeys();
         set({ status: 'anonymous', user: null });
         return;
       }
@@ -138,6 +140,9 @@ export const useAuthStore = create<AuthStore>((set) => ({
       throw new Error('Sign-in succeeded without a native session credential.');
     }
     await saveCachedUser(user);
+    // A new login may switch users even if the old session wasn't explicitly
+    // logged out first; pending retry keys must never cross that boundary.
+    clearPendingMutationKeys();
     set({ status: 'authenticated', user });
   },
 
@@ -149,12 +154,14 @@ export const useAuthStore = create<AuthStore>((set) => ({
       }
     } finally {
       await clearStoredSession();
+      clearPendingMutationKeys();
       set({ status: 'anonymous', user: null });
     }
   },
 
   invalidateSession: async () => {
     await clearStoredSession();
+    clearPendingMutationKeys();
     set({ status: 'anonymous', user: null });
   },
 }));
