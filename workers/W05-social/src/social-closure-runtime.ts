@@ -432,16 +432,17 @@ export async function listDiscoveryTopics(
     contentCount: number
     latestContentAt: string
   }>()
+  type DiscoveryTopicRelation = { topic_id: string; normalized_name: string; display_name: string; target_id: string }
   let relationCursor: { topicId: string; targetId: string } | null = null
 
   while (true) {
-    const cursorClause = relationCursor
+    const cursorClause: string = relationCursor
       ? 'AND (t.topic_id > ? OR (t.topic_id = ? AND st.target_id > ?))'
       : ''
-    const cursorBindings: unknown[] = relationCursor
+    const cursorBindings: string[] = relationCursor
       ? [relationCursor.topicId, relationCursor.topicId, relationCursor.targetId]
       : []
-    const result = await db.prepare(`
+    const result: { results?: DiscoveryTopicRelation[] | null } = await db.prepare(`
       SELECT DISTINCT t.topic_id, t.normalized_name, t.display_name, st.target_id
         FROM social_topics t
         JOIN social_target_topics st
@@ -450,21 +451,16 @@ export async function listDiscoveryTopics(
          ${cursorClause}
        ORDER BY t.topic_id ASC, st.target_id ASC
        LIMIT ?
-    `).bind(...cursorBindings, relationBatchSize).all<{
-      topic_id: string
-      normalized_name: string
-      display_name: string
-      target_id: string
-    }>()
-    const edges = result.results ?? []
+    `).bind(...cursorBindings, relationBatchSize).all<DiscoveryTopicRelation>()
+    const edges: DiscoveryTopicRelation[] = result.results ?? []
     if (edges.length === 0) break
 
-    const last = edges.at(-1)!
+    const last: DiscoveryTopicRelation = edges[edges.length - 1]!
     relationCursor = { topicId: last.topic_id, targetId: last.target_id }
 
-    const unresolved = [...new Set(edges
-      .map(edge => edge.target_id)
-      .filter(contentId => !contextCache.has(contentId)))]
+    const unresolved: string[] = Array.from(new Set<string>(edges
+      .map((edge: DiscoveryTopicRelation) => edge.target_id)
+      .filter((contentId: string) => !contextCache.has(contentId))))
 
     for (let offset = 0; offset < unresolved.length; offset += 50) {
       const contentIds = unresolved.slice(offset, offset + 50)
