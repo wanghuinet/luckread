@@ -14,12 +14,12 @@ permissions:
 
 jobs:
   bind-cdn-domain:
-    if: \${{ inputs.confirm == 'ATTACH_CDN_DOMAIN' }}
+    if: ${{ inputs.confirm == 'ATTACH_CDN_DOMAIN' }}
     runs-on: ubuntu-latest
     timeout-minutes: 12
     env:
-      CLOUDFLARE_ACCOUNT_ID: \${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      CLOUDFLARE_API_TOKEN: \${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       WORKER_NAME: luckread-w01-payload
       CDN_HOSTNAME: cdn.luckread.com
       ZONE_NAME: luckread.com
