@@ -398,6 +398,41 @@ describe('W05 unified social closure', () => {
   })
 
 
+  it('retries transient inbox persistence with a stable notification ID and dedupe key', async () => {
+    const insertBindings: unknown[][] = []
+    let insertAttempts = 0
+    const db = {
+      prepare: (sql: string) => ({
+        bind: (...values: unknown[]) => ({
+          first: async () => null,
+          run: async () => {
+            if (sql.includes('INSERT OR IGNORE INTO social_notifications')) {
+              insertAttempts += 1
+              insertBindings.push(values)
+              if (insertAttempts === 1) throw new Error('temporary D1 write failure')
+            }
+            return { success: true, meta: { changes: 1 } }
+          },
+        }),
+      }),
+    } as unknown as D1Database
+
+    await expect(enqueueNotification(db, {
+      recipientUserId: 'recipient-1',
+      actorUserId: 'actor-1',
+      type: 'COMMENT',
+      targetType: 'content',
+      targetId: 'content-1',
+      payload: { eventId: 'event-1' },
+    })).resolves.toBeUndefined()
+
+    expect(insertAttempts).toBe(2)
+    expect(insertBindings).toHaveLength(2)
+    expect(insertBindings[1]).toEqual(insertBindings[0])
+    expect(insertBindings[0]?.[0]).toEqual(expect.any(String))
+    expect(insertBindings[0]?.[6]).toBe('COMMENT:recipient-1:actor-1:content:content-1')
+  })
+
   it('logs notification write failures without exposing identifiers or database details', async () => {
     const db = {
       prepare: (sql: string) => ({
