@@ -22,6 +22,8 @@ describe('v1 comment adapters', () => {
     expect(route).toContain('/comments')
     expect(route).toContain("Idempotency-Key")
     expect(route).toContain('invalidatePublicContentComments')
+    expect(route).toContain("url.searchParams.getAll('sort')")
+    expect(route).toContain("query.set('sort', sort)")
     expect(route).not.toContain('getPayload(')
     expect(route).not.toContain('social_comments')
   })

@@ -37,8 +37,12 @@ export async function GET(
     const query = new URLSearchParams()
     const cursor = url.searchParams.get('cursor')
     const limit = url.searchParams.get('limit')
+    const sortValues = url.searchParams.getAll('sort')
+    if (sortValues.length > 1) throw new W05SocialClientError(400, 'VALIDATION_FAILED', 'Invalid comment sort')
+    const sort = sortValues[0]
     if (cursor) query.set('cursor', cursor)
     if (limit) query.set('limit', limit)
+    if (sort) query.set('sort', sort)
     const suffix = query.toString() ? '?' + query.toString() : ''
 
     const viewer = await resolveOptionalCookieSocialPrincipal(request)

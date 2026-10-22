@@ -115,31 +115,12 @@ export const MoreContextIcons = ({
                         <DropdownMenu.ItemIcon
                             ios={{ name: 'flag' }}
                         />
-                    </DropdownMenu.Item>
-                    <DropdownMenu.Item key="community-note">
-                        <DropdownMenu.ItemTitle>Request community note</DropdownMenu.ItemTitle>
-                        <DropdownMenu.ItemIcon
-                            ios={{ name: 'note.text' }}
-                        />
-                    </DropdownMenu.Item>
-                    <DropdownMenu.Item key="offline">
-                        <DropdownMenu.ItemTitle>Add to offline</DropdownMenu.ItemTitle>
-                        <DropdownMenu.ItemIcon
-                            ios={{ name: 'arrow.down.circle' }}
-                        />
-                    </DropdownMenu.Item>
-
-                    <DropdownMenu.Sub>
+                    </DropdownMenu.Item><DropdownMenu.Sub>
                         <DropdownMenu.SubTrigger key="user-actions">
                             <DropdownMenu.ItemTitle>@{username}</DropdownMenu.ItemTitle>
                             
                         </DropdownMenu.SubTrigger>
-                        <DropdownMenu.SubContent>
-                            <DropdownMenu.Item key="add-remove">
-                                <DropdownMenu.ItemTitle>Add/remove to list</DropdownMenu.ItemTitle>
-                                <DropdownMenu.ItemIcon ios={{ name: 'list.bullet' }} />
-                            </DropdownMenu.Item>
-                            <DropdownMenu.Item key="mute" onSelect={muteTarget} disabled={!targetUserId || isOwnTarget}>
+                        <DropdownMenu.SubContent><DropdownMenu.Item key="mute" onSelect={muteTarget} disabled={!targetUserId || isOwnTarget}>
                                 <DropdownMenu.ItemTitle>Mute @{username}</DropdownMenu.ItemTitle>
                                 <DropdownMenu.ItemIcon ios={{ name: 'speaker.slash' }} />
                             </DropdownMenu.Item>
@@ -218,13 +199,7 @@ export default function PostDetailScreen() {
 
     const handleScrollToComments = useCallback(() => {
         scrollViewRef.current?.scrollTo({ y: commentsOffsetRef.current, animated: true });
-    }, []);
-
-    const handleSheetChanges = useCallback((_index: number) => {
-        // Sort selection is local presentation state; W05 remains authoritative for reply ordering.
-    }, []);
-
-    const handleSelectSort = useCallback((sortType: SortType) => {
+    }, []);const handleSelectSort = useCallback((sortType: SortType) => {
         setSelectedSort(sortType);
         bottomSheetModalRef.current?.dismiss();
     }, []);
@@ -359,16 +334,14 @@ export default function PostDetailScreen() {
                         </Text>
                         <Feather name="chevron-down" size={18} color={'#536471'} />
                     </TouchableOpacity>
-                    <Comments contentId={postId} />
+                    <Comments contentId={postId} sort={selectedSort} />
                 </View>
             </ScrollView>
 
             <BottomSheetModal
                 ref={bottomSheetModalRef}
                 index={1}
-                snapPoints={snapPoints}
-                onChange={handleSheetChanges}
-                backdropComponent={props => (
+                snapPoints={snapPoints}backdropComponent={props => (
                     <BottomSheetBackdrop
                         {...props}
                         appearsOnIndex={0}

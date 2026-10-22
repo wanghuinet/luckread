@@ -59,21 +59,59 @@ export const parseCommentLimit = (value: string | null): number => {
   return Math.min(Number(normalized), MAX_LIMIT)
 }
 
-type Cursor = {
-  version: 1
-  contentId: string
-  viewerUserId: string | null
-  createdAt: string
-  id: string
+export type CommentSort = 'relevant' | 'recent' | 'liked'
+
+export const parseCommentSort = (value: string | null): CommentSort => {
+  const normalized = value?.trim() || 'relevant'
+  if (normalized === 'relevant' || normalized === 'recent' || normalized === 'liked') {
+    return normalized
+  }
+  throw new CommentRuntimeError('VALIDATION_FAILED', 400)
 }
 
-const encodeCursor = (cursor: Cursor): string =>
-  btoa(JSON.stringify(cursor))
+type Cursor = {
+  contentId: string
+  viewerUserId: string | null
+  sort: CommentSort
+  createdAt: string
+  id: string
+  threadCreatedAt?: string
+  threadId?: string
+  threadLikeCount?: number
+}
+
+const encodeCursor = (cursor: Cursor): string => {
+  const value = cursor.sort === 'relevant'
+    ? {
+        version: 1,
+        contentId: cursor.contentId,
+        viewerUserId: cursor.viewerUserId,
+        createdAt: cursor.createdAt,
+        id: cursor.id,
+      }
+    : {
+        version: 2,
+        contentId: cursor.contentId,
+        viewerUserId: cursor.viewerUserId,
+        sort: cursor.sort,
+        threadCreatedAt: cursor.threadCreatedAt,
+        threadId: cursor.threadId,
+        createdAt: cursor.createdAt,
+        id: cursor.id,
+        ...(cursor.sort === 'liked' ? { threadLikeCount: cursor.threadLikeCount } : {}),
+      }
+  return btoa(JSON.stringify(value))
     .replace(/\+/g, '-')
     .replace(/\//g, '_')
     .replace(/=+$/g, '')
+}
 
-const decodeCursor = (value: string | null, contentId: string, viewerUserId: string | null): Cursor | null => {
+const decodeCursor = (
+  value: string | null,
+  contentId: string,
+  viewerUserId: string | null,
+  sort: CommentSort,
+): Cursor | null => {
   if (!value) return null
   const normalized = value.trim()
   if (!normalized || normalized.length > MAX_CURSOR) {
@@ -83,9 +121,21 @@ const decodeCursor = (value: string | null, contentId: string, viewerUserId: str
     const padded =
       normalized.replace(/-/g, '+').replace(/_/g, '/') +
       '='.repeat((4 - normalized.length % 4) % 4)
-    const parsed = JSON.parse(atob(padded)) as Partial<Cursor>
+    const parsed = JSON.parse(atob(padded)) as {
+      version?: unknown
+      contentId?: unknown
+      viewerUserId?: unknown
+      sort?: unknown
+      createdAt?: unknown
+      id?: unknown
+      threadCreatedAt?: unknown
+      threadId?: unknown
+      threadLikeCount?: unknown
+    }
+    const legacyRelevantCursor = parsed.version === 1 && sort === 'relevant' && parsed.sort === undefined
+    const currentSortCursor = parsed.version === 2 && parsed.sort === sort && sort !== 'relevant'
     if (
-      parsed.version !== 1 ||
+      (!legacyRelevantCursor && !currentSortCursor) ||
       parsed.contentId !== contentId ||
       parsed.viewerUserId !== viewerUserId ||
       typeof parsed.createdAt !== 'string' ||
@@ -98,7 +148,33 @@ const decodeCursor = (value: string | null, contentId: string, viewerUserId: str
     if (!Number.isFinite(Date.parse(parsed.createdAt)) || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(parsed.id)) {
       throw new Error('invalid cursor')
     }
-    return { version: 1, contentId, viewerUserId, createdAt: parsed.createdAt, id: parsed.id }
+    if (currentSortCursor && (
+      typeof parsed.threadCreatedAt !== 'string' ||
+      !Number.isFinite(Date.parse(parsed.threadCreatedAt)) ||
+      typeof parsed.threadId !== 'string' ||
+      !/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(parsed.threadId)
+    )) {
+      throw new Error('invalid cursor')
+    }
+    if (sort === 'liked' && (
+      typeof parsed.threadLikeCount !== 'number' ||
+      !Number.isSafeInteger(parsed.threadLikeCount) ||
+      parsed.threadLikeCount < 0
+    )) {
+      throw new Error('invalid cursor')
+    }
+    return {
+      contentId,
+      viewerUserId,
+      sort,
+      createdAt: parsed.createdAt,
+      id: parsed.id,
+      ...(currentSortCursor ? {
+        threadCreatedAt: parsed.threadCreatedAt as string,
+        threadId: parsed.threadId as string,
+      } : {}),
+      ...(sort === 'liked' ? { threadLikeCount: parsed.threadLikeCount as number } : {}),
+    }
   } catch {
     throw new CommentRuntimeError('INVALID_CURSOR', 400)
   }
@@ -580,17 +656,31 @@ export async function listComments(
   limit: number,
   contentContext: PublishedContentSocialContext,
   viewerUserIdValue: string | null = null,
+  sortValue: CommentSort = 'relevant',
 ): Promise<CommentPage> {
   const contentId = validateId(contentIdValue)
   if (!contentContext || contentContext.contentId !== contentId || contentContext.state !== 'PUBLISHED') {
     throw new CommentRuntimeError('NOT_FOUND', 404)
   }
   const viewerUserId = viewerUserIdValue ? validateId(viewerUserIdValue, 'UNAUTHENTICATED') : null
-  const cursor = decodeCursor(cursorValue, contentId, viewerUserId)
+  const sort = parseCommentSort(sortValue)
+  const cursor = decodeCursor(cursorValue, contentId, viewerUserId, sort)
 
+  // Keep every reply beneath its root comment. Recent/liked modes rank threads,
+  // then preserve chronological order within each thread to avoid orphan-looking replies.
   const whereCursor = cursor
-    ? 'AND (c.created_at > ? OR (c.created_at = ? AND c.id > ?))'
+    ? sort === 'liked'
+      ? 'AND (c.thread_like_count < ? OR (c.thread_like_count = ? AND (c.thread_created_at < ? OR (c.thread_created_at = ? AND c.thread_id < ?))) OR (c.thread_like_count = ? AND c.thread_created_at = ? AND c.thread_id = ? AND (c.created_at > ? OR (c.created_at = ? AND c.id > ?))))'
+      : sort === 'recent'
+        ? 'AND ((c.thread_created_at < ? OR (c.thread_created_at = ? AND c.thread_id < ?)) OR (c.thread_created_at = ? AND c.thread_id = ? AND (c.created_at > ? OR (c.created_at = ? AND c.id > ?))))'
+        : 'AND (c.created_at > ? OR (c.created_at = ? AND c.id > ?))'
     : ''
+
+  const orderBy = sort === 'liked'
+    ? 'c.thread_like_count DESC, c.thread_created_at DESC, c.thread_id DESC, c.created_at ASC, c.id ASC'
+    : sort === 'recent'
+      ? 'c.thread_created_at DESC, c.thread_id DESC, c.created_at ASC, c.id ASC'
+      : 'c.created_at ASC, c.id ASC'
 
   const visibilitySql = viewerUserId
     ? `AND NOT EXISTS (
@@ -630,13 +720,31 @@ export async function listComments(
             AND mute.target_user_id = child.author_user_id
        )`
     : ''
-  const params = [viewerUserId, ...(cursor
-    ? viewerUserId
-      ? [contentId, viewerUserId, viewerUserId, viewerUserId, viewerUserId, viewerUserId, viewerUserId, contentId, cursor.createdAt, cursor.createdAt, cursor.id, limit + 1]
-      : [contentId, contentId, cursor.createdAt, cursor.createdAt, cursor.id, limit + 1]
-    : viewerUserId
-      ? [contentId, viewerUserId, viewerUserId, viewerUserId, viewerUserId, viewerUserId, viewerUserId, contentId, limit + 1]
-      : [contentId, contentId, limit + 1])]
+
+  const visibilityParams = viewerUserId
+    ? [viewerUserId, viewerUserId, viewerUserId, viewerUserId, viewerUserId, viewerUserId]
+    : []
+  const cursorParams = !cursor
+    ? []
+    : sort === 'liked'
+      ? [
+          cursor.threadLikeCount ?? 0, cursor.threadLikeCount ?? 0,
+          cursor.threadCreatedAt ?? cursor.createdAt, cursor.threadCreatedAt ?? cursor.createdAt,
+          cursor.threadId ?? cursor.id, cursor.threadLikeCount ?? 0,
+          cursor.threadCreatedAt ?? cursor.createdAt, cursor.threadId ?? cursor.id,
+          cursor.createdAt, cursor.createdAt, cursor.id,
+        ]
+      : sort === 'recent'
+        ? [
+            cursor.threadCreatedAt ?? cursor.createdAt, cursor.threadCreatedAt ?? cursor.createdAt,
+            cursor.threadId ?? cursor.id, cursor.threadCreatedAt ?? cursor.createdAt,
+            cursor.threadId ?? cursor.id, cursor.createdAt, cursor.createdAt, cursor.id,
+          ]
+        : [cursor.createdAt, cursor.createdAt, cursor.id]
+  const params = [viewerUserId, contentId, ...visibilityParams, contentId, ...cursorParams, limit + 1]
+  const threadLikeCountSql = sort === 'liked'
+    ? `(SELECT COUNT(*) FROM interaction_likes thread_likes WHERE thread_likes.target_type = 'comment' AND thread_likes.target_id = c.thread_id) AS thread_like_count`
+    : '0 AS thread_like_count'
 
   const result = await db.prepare(
     `WITH RECURSIVE viewer AS (SELECT ? AS user_id), public_comments AS (
@@ -649,7 +757,9 @@ export async function listComments(
          c.state,
          c.depth,
          c.created_at,
-         c.updated_at
+         c.updated_at,
+         c.created_at AS thread_created_at,
+         c.id AS thread_id
        FROM social_comments c
        WHERE c.content_id = ?
          AND c.state = 'PUBLISHED'
@@ -667,12 +777,27 @@ export async function listComments(
          child.state,
          child.depth,
          child.created_at,
-         child.updated_at
+         child.updated_at,
+         parent.thread_created_at,
+         parent.thread_id
        FROM social_comments child
        JOIN public_comments parent ON parent.id = child.parent_id
        WHERE child.state = 'PUBLISHED'
          AND parent.depth < 3
          ${childVisibilitySql}
+     ), ranked_comments AS (
+       SELECT
+         c.*,
+         ${threadLikeCountSql},
+         EXISTS (
+           SELECT 1
+             FROM interaction_likes liked
+             JOIN viewer v ON v.user_id = liked.actor_user_id
+            WHERE liked.target_type = 'comment'
+              AND liked.target_id = c.id
+         ) AS liked_by_viewer
+       FROM public_comments c
+       WHERE c.content_id = ?
      )
      SELECT
        c.id,
@@ -684,17 +809,14 @@ export async function listComments(
        c.depth,
        c.created_at,
        c.updated_at,
-       EXISTS (
-          SELECT 1
-            FROM interaction_likes liked
-            JOIN viewer v ON v.user_id = liked.actor_user_id
-           WHERE liked.target_type = 'comment'
-             AND liked.target_id = c.id
-        ) AS liked_by_viewer
-     FROM public_comments c
-     WHERE c.content_id = ?
+       c.liked_by_viewer,
+       c.thread_created_at,
+       c.thread_id,
+       c.thread_like_count
+     FROM ranked_comments c
+     WHERE 1 = 1
        ${whereCursor}
-     ORDER BY c.created_at ASC, c.id ASC
+     ORDER BY ${orderBy}
      LIMIT ?`,
   ).bind(...params).all<{
     id: string
@@ -707,6 +829,9 @@ export async function listComments(
     created_at: string
     updated_at: string
     liked_by_viewer: number
+    thread_created_at: string
+    thread_id: string
+    thread_like_count: number
   }>()
 
   const rows = result.results ?? []
@@ -722,7 +847,18 @@ export async function listComments(
     hasMore,
     nextCursor:
       hasMore && last
-        ? encodeCursor({ version: 1, contentId, viewerUserId, createdAt: last.created_at, id: last.id })
+        ? encodeCursor({
+            contentId,
+            viewerUserId,
+            sort,
+            createdAt: last.created_at,
+            id: last.id,
+            ...(sort !== 'relevant' ? {
+              threadCreatedAt: last.thread_created_at,
+              threadId: last.thread_id,
+            } : {}),
+            ...(sort === 'liked' ? { threadLikeCount: Number(last.thread_like_count) || 0 } : {}),
+          })
         : null,
   }
 }

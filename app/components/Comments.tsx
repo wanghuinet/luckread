@@ -59,8 +59,11 @@ type PublicUserResponse = PublicUser & {
   error?: { message?: string };
 };
 
+export type CommentSort = 'relevant' | 'recent' | 'liked';
+
 type CommentsProps = {
   contentId: string;
+  sort?: CommentSort;
 };
 
 const createIdempotencyKey = (contentId: string) =>
@@ -78,7 +81,7 @@ const formatDate = (value: string): string => {
     : '';
 };
 
-export default function Comments({ contentId }: CommentsProps) {
+export default function Comments({ contentId, sort = 'relevant' }: CommentsProps) {
   const router = useRouter();
   const currentUserId = useAuthStore((state) => state.user?.id ?? null);
   const viewer = useAuthStore((state) => state.user);
@@ -114,6 +117,7 @@ export default function Comments({ contentId }: CommentsProps) {
 
     try {
       const params = new URLSearchParams({ limit: '50' });
+      params.set('sort', sort);
       if (nextCursor) params.set('cursor', nextCursor);
       const { response, data } = await apiRequest<CommentPageResponse>(
         '/contents/' + encodeURIComponent(contentId) + '/comments?' + params.toString(),
@@ -146,7 +150,7 @@ export default function Comments({ contentId }: CommentsProps) {
         setRefreshing(false);
       }
     }
-  }, [contentId]);
+  }, [contentId, sort]);
 
   useEffect(() => {
     void loadComments();
