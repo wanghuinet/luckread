@@ -538,6 +538,12 @@ export async function updateComment(
   }
 
   if (current.updated_at !== expectedUpdatedAt) {
+    // If the previous PATCH committed but its response was lost, the same
+    // body with the old If-Match is a safe replay. Return the canonical current
+    // result instead of making the client treat its successful edit as a conflict.
+    if (current.body === body) {
+      return { item: toCommentItem(current), etag: commentEtag(current.updated_at) }
+    }
     throw new CommentRuntimeError('PRECONDITION_FAILED', 412)
   }
 

@@ -15,6 +15,7 @@ mock.module('../lib/secure-session.ts', () => ({
 
 const {
   apiRequest,
+  clearPendingMutationKeys,
   createIdempotencyKey,
   fetchContentBodyReference,
   LuckReadNetworkError,
@@ -935,4 +936,179 @@ test('rejects untrusted body-reference origins before making a network request',
   await expect(fetchContentBodyReference('https://untrusted.example/body.txt')).rejects.toThrow('Unsupported LuckRead content body reference');
   await expect(fetchContentBodyReference('https://luckread.com@untrusted.example/body.txt')).rejects.toThrow('Unsupported LuckRead content body reference');
   expect(requestCount).toBe(0);
+});
+
+
+test('reuses the same generated key after a transport failure, even if the caller creates a fresh key', async () => {
+  const seenKeys = [];
+  const body = JSON.stringify({ body: 'single logical post' });
+  pendingFetch = async (_input, init) => {
+    seenKeys.push(new Headers(init.headers).get('Idempotency-Key'));
+    throw new TypeError('socket closed after request dispatch');
+  };
+
+  await expect(apiRequest('/retry-key-network-20261022', {
+    method: 'POST',
+    body,
+    idempotencyKey: createIdempotencyKey(),
+  })).rejects.toBeInstanceOf(LuckReadNetworkError);
+
+  pendingFetch = async (_input, init) => {
+    seenKeys.push(new Headers(init.headers).get('Idempotency-Key'));
+    return new Response(JSON.stringify({ data: { id: 'created-once' } }), { status: 201 });
+  };
+  const retry = await apiRequest('/retry-key-network-20261022', {
+    method: 'POST',
+    body,
+    // Callers that regenerate a key on re-entry still use the pending retry key.
+    idempotencyKey: createIdempotencyKey(),
+  });
+
+  expect(retry.response.status).toBe(201);
+  expect(seenKeys).toHaveLength(2);
+  expect(seenKeys[1]).toBe(seenKeys[0]);
+});
+
+test('reuses keys after ambiguous 503s, then releases the key once a retry succeeds', async () => {
+  const seenKeys = [];
+  const body = JSON.stringify({ title: 'retry this content mutation' });
+  pendingFetch = async (_input, init) => {
+    seenKeys.push(new Headers(init.headers).get('Idempotency-Key'));
+    return new Response(JSON.stringify({ error: { code: 'SERVICE_UNAVAILABLE' } }), { status: 503 });
+  };
+
+  const first = await apiRequest('/retry-key-http-503-20261022', {
+    method: 'POST',
+    body,
+    idempotencyKey: createIdempotencyKey(),
+  });
+  expect(first.response.status).toBe(503);
+
+  pendingFetch = async (_input, init) => {
+    seenKeys.push(new Headers(init.headers).get('Idempotency-Key'));
+    return new Response(JSON.stringify({ data: { id: 'content-1' } }), { status: 201 });
+  };
+  await apiRequest('/retry-key-http-503-20261022', {
+    method: 'POST',
+    body,
+    idempotencyKey: createIdempotencyKey(),
+  });
+  await apiRequest('/retry-key-http-503-20261022', {
+    method: 'POST',
+    body,
+    idempotencyKey: createIdempotencyKey(),
+  });
+
+  expect(seenKeys[1]).toBe(seenKeys[0]);
+  expect(seenKeys[2]).not.toBe(seenKeys[1]);
+});
+
+test('does not reuse a failed mutation key for a different payload', async () => {
+  const seenKeys = [];
+  pendingFetch = async (_input, init) => {
+    seenKeys.push(new Headers(init.headers).get('Idempotency-Key'));
+    return new Response(JSON.stringify({ error: { code: 'SERVICE_UNAVAILABLE' } }), { status: 503 });
+  };
+
+  await apiRequest('/retry-key-body-change-20261022', {
+    method: 'POST',
+    body: JSON.stringify({ title: 'first payload' }),
+  });
+  await apiRequest('/retry-key-body-change-20261022', {
+    method: 'POST',
+    body: JSON.stringify({ title: 'different payload' }),
+  });
+
+  expect(seenKeys).toHaveLength(2);
+  expect(seenKeys[1]).not.toBe(seenKeys[0]);
+});
+
+test('does not keep a key after a definitive validation response', async () => {
+  const seenKeys = [];
+  pendingFetch = async (_input, init) => {
+    seenKeys.push(new Headers(init.headers).get('Idempotency-Key'));
+    return new Response(JSON.stringify({ error: { code: 'VALIDATION_FAILED' } }), { status: 422 });
+  };
+
+  await apiRequest('/retry-key-validation-20261022', {
+    method: 'POST',
+    body: JSON.stringify({ title: 'invalid but identical' }),
+  });
+  await apiRequest('/retry-key-validation-20261022', {
+    method: 'POST',
+    body: JSON.stringify({ title: 'invalid but identical' }),
+  });
+
+  expect(seenKeys[1]).not.toBe(seenKeys[0]);
+});
+
+
+test('reuses a media upload key for a repeated multipart request with the same upload fingerprint', async () => {
+  const seenKeys = [];
+  const seenFingerprints = [];
+  const fingerprint = 'lr-up1-0123456789abcdef';
+  let attempts = 0;
+  pendingFetch = async (_input, init) => {
+    seenKeys.push(new Headers(init.headers).get('Idempotency-Key'));
+    seenFingerprints.push(new Headers(init.headers).get('X-LuckRead-Upload-Fingerprint'));
+    attempts += 1;
+    if (attempts === 1) throw new TypeError('upload response lost');
+    return new Response(JSON.stringify({ doc: { id: 'media-replayed' } }), { status: 201 });
+  };
+
+  const makeForm = () => {
+    const form = new FormData();
+    form.append('_payload', JSON.stringify({ alt: 'photo.png' }));
+    form.append('file', new Blob(['same-media']), 'photo.png');
+    return form;
+  };
+
+  await expect(apiRequest('/media', {
+    method: 'POST',
+    body: makeForm(),
+    idempotencyKey: createIdempotencyKey(),
+    headers: { 'X-LuckRead-Upload-Fingerprint': fingerprint },
+  })).rejects.toBeInstanceOf(LuckReadNetworkError);
+
+  const result = await apiRequest('/media', {
+    method: 'POST',
+    body: makeForm(),
+    idempotencyKey: createIdempotencyKey(),
+    headers: { 'X-LuckRead-Upload-Fingerprint': fingerprint },
+  });
+
+  expect(result.response.status).toBe(201);
+  expect(seenFingerprints).toEqual([fingerprint, fingerprint]);
+  expect(seenKeys[1]).toBe(seenKeys[0]);
+});
+
+
+test('clears pending mutation keys when the authenticated identity changes', async () => {
+  const seenKeys = [];
+  const url = '/retry-key-session-boundary-20261022';
+  const body = JSON.stringify({ title: 'same request after account switch' });
+  pendingFetch = async (_input, init) => {
+    seenKeys.push(new Headers(init.headers).get('Idempotency-Key'));
+    throw new TypeError('connection interrupted');
+  };
+
+  await expect(apiRequest(url, {
+    method: 'POST',
+    body,
+    idempotencyKey: createIdempotencyKey(),
+  })).rejects.toBeInstanceOf(LuckReadNetworkError);
+
+  clearPendingMutationKeys();
+
+  pendingFetch = async (_input, init) => {
+    seenKeys.push(new Headers(init.headers).get('Idempotency-Key'));
+    return new Response(JSON.stringify({ data: { ok: true } }), { status: 201 });
+  };
+  await apiRequest(url, {
+    method: 'POST',
+    body,
+    idempotencyKey: createIdempotencyKey(),
+  });
+
+  expect(seenKeys[1]).not.toBe(seenKeys[0]);
 });

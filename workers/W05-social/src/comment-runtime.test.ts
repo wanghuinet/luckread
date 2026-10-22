@@ -576,6 +576,31 @@ describe('comment runtime', () => {
     })
   })
 
+  it('replays a comment edit after the server committed but its response was lost', async () => {
+    const d = db([{
+      id: 'c1',
+      content_id: 'content-1',
+      author_user_id: 'user-1',
+      body: 'already saved',
+      state: 'PUBLISHED',
+      depth: 0,
+      parent_id: null,
+      created_at: '2026-10-02T00:00:00.000Z',
+      updated_at: '2026-10-02T00:02:00.000Z',
+      content_state: 'PUBLISHED',
+    }])
+
+    await expect(updateComment(d, publishedBinding(), 'user-1', 'c1', {
+      body: 'already saved',
+      ifMatch: '"2026-10-02T00:01:00.000Z"',
+    }, 'comment-retry')).resolves.toMatchObject({
+      item: { id: 'c1', body: 'already saved', updatedAt: '2026-10-02T00:02:00.000Z' },
+      etag: '"2026-10-02T00:02:00.000Z"',
+    })
+    // Replay reads the canonical record but does not issue a second UPDATE.
+    expect(d.prepare).toHaveBeenCalledTimes(1)
+  })
+
   it('requires a valid If-Match header value', async () => {
     const d = db()
     await expect(updateComment(d, publishedBinding(), 'user-1', 'c1', {

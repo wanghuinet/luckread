@@ -181,6 +181,178 @@ export function classifyApiFailure(response: Response, data: unknown): ApiFailur
   };
 }
 
+type MutationOutcome = 'success' | 'definitive' | 'transient';
+
+type PendingMutationEntry = {
+  key: string;
+  expiresAt: number;
+  inFlight: number;
+  retryable: boolean;
+};
+
+type PendingMutationLease = {
+  signature: string;
+  entry: PendingMutationEntry;
+};
+
+const pendingMutationKeys = new Map<string, PendingMutationEntry>();
+const PENDING_MUTATION_TTL_MS = 15 * 60 * 1000;
+const MAX_PENDING_MUTATION_KEYS = 512;
+
+/** Prevent a pending key from crossing sign-in/account boundaries. */
+export function clearPendingMutationKeys(): void {
+  pendingMutationKeys.clear();
+}
+
+function stableSerialize(value: unknown): string {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value) ?? 'undefined';
+  if (Array.isArray(value)) return '[' + value.map(stableSerialize).join(',') + ']';
+  const record = value as Record<string, unknown>;
+  return '{' + Object.keys(record).sort().map((key) =>
+    JSON.stringify(key) + ':' + stableSerialize(record[key]),
+  ).join(',') + '}';
+}
+
+/** Short non-secret fingerprint: request bodies (which may contain private text) aren't retained as Map keys. */
+function fingerprintText(value: string): string {
+  let first = 0x811c9dc5;
+  let second = 0x9e3779b9;
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    first = Math.imul(first ^ code, 0x01000193);
+    second = Math.imul(second ^ (code + index), 0x85ebca6b);
+  }
+  return (first >>> 0).toString(16).padStart(8, '0') +
+    (second >>> 0).toString(16).padStart(8, '0');
+}
+
+function formDataValueForFingerprint(value: unknown): unknown {
+  if (typeof value === 'string') return ['text', value];
+  if (!value || typeof value !== 'object') return [typeof value];
+  const record = value as Record<string, unknown>;
+  if (typeof record.uri === 'string') {
+    return [
+      'native-file',
+      record.uri,
+      typeof record.name === 'string' ? record.name : '',
+      typeof record.type === 'string' ? record.type : '',
+      typeof record.size === 'number' ? record.size : null,
+    ];
+  }
+  if (typeof Blob !== 'undefined' && value instanceof Blob) {
+    const file = value as Blob & { name?: string; lastModified?: number };
+    return ['blob', file.type, file.size, file.name ?? '', file.lastModified ?? null];
+  }
+  return ['object', stableSerialize(value)];
+}
+
+/**
+ * Derive a stable request signature so a later call that retries the exact same
+ * mutation reuses its prior key after an ambiguous transport/5xx failure.
+ * Explicitly provided keys are still honored for the first attempt.
+ */
+function mutationSignature(
+  method: string,
+  url: string,
+  body: BodyInit | null | undefined,
+  ifMatch: string | null,
+  uploadFingerprint: string | null,
+): string | null {
+  let bodyShape: string;
+  if (body === undefined || body === null) {
+    bodyShape = 'none';
+  } else if (typeof body === 'string') {
+    try {
+      bodyShape = stableSerialize(JSON.parse(body));
+    } catch {
+      bodyShape = body;
+    }
+  } else if (typeof URLSearchParams !== 'undefined' && body instanceof URLSearchParams) {
+    bodyShape = body.toString();
+  } else if (isFormDataBody(body) && uploadFingerprint) {
+    // For file streams, the caller-provided fingerprint is the stable semantic
+    // identity; multipart boundaries and native File wrapper timestamps vary
+    // between attempts and must not generate a new key.
+    bodyShape = 'upload:' + uploadFingerprint;
+  } else if (isFormDataBody(body)) {
+    const entries: unknown[] = [];
+    try {
+      body.forEach((value, key) => entries.push([key, formDataValueForFingerprint(value)]));
+      bodyShape = stableSerialize(entries);
+    } catch {
+      return null;
+    }
+  } else if (typeof Blob !== 'undefined' && body instanceof Blob) {
+    bodyShape = stableSerialize(formDataValueForFingerprint(body));
+  } else {
+    return null;
+  }
+  return fingerprintText([method, url, ifMatch ?? '', uploadFingerprint ?? '', bodyShape].join('\\0'));
+}
+
+function acquireMutationKey(
+  signature: string,
+  preferredKey?: string,
+): PendingMutationLease {
+  const now = Date.now();
+  for (const [key, value] of pendingMutationKeys) {
+    if (value.inFlight === 0 && value.expiresAt <= now) pendingMutationKeys.delete(key);
+  }
+
+  const current = pendingMutationKeys.get(signature);
+  if (current && (current.expiresAt > now || current.inFlight > 0)) {
+    current.inFlight += 1;
+    current.expiresAt = now + PENDING_MUTATION_TTL_MS;
+    pendingMutationKeys.delete(signature);
+    pendingMutationKeys.set(signature, current);
+    return { signature, entry: current };
+  }
+
+  if (current) pendingMutationKeys.delete(signature);
+  while (pendingMutationKeys.size >= MAX_PENDING_MUTATION_KEYS) {
+    const oldest = pendingMutationKeys.keys().next();
+    if (oldest.done) break;
+    const entry = pendingMutationKeys.get(oldest.value);
+    if (entry?.inFlight) {
+      pendingMutationKeys.delete(oldest.value);
+      pendingMutationKeys.set(oldest.value, entry);
+      if ([...pendingMutationKeys.values()].every((candidate) => candidate.inFlight > 0)) break;
+      continue;
+    }
+    pendingMutationKeys.delete(oldest.value);
+  }
+
+  const entry: PendingMutationEntry = {
+    key: preferredKey || createIdempotencyKey(),
+    expiresAt: now + PENDING_MUTATION_TTL_MS,
+    inFlight: 1,
+    retryable: false,
+  };
+  pendingMutationKeys.set(signature, entry);
+  return { signature, entry };
+}
+
+function releaseMutationKey(lease: PendingMutationLease | null, outcome: MutationOutcome): void {
+  if (!lease || pendingMutationKeys.get(lease.signature) !== lease.entry) return;
+  const entry = lease.entry;
+  entry.inFlight = Math.max(0, entry.inFlight - 1);
+  if (outcome === 'transient') {
+    entry.retryable = true;
+    entry.expiresAt = Date.now() + PENDING_MUTATION_TTL_MS;
+  } else if (entry.inFlight === 0) {
+    entry.retryable = false;
+    pendingMutationKeys.delete(lease.signature);
+    return;
+  } else {
+    entry.retryable = false;
+  }
+  pendingMutationKeys.delete(lease.signature);
+  pendingMutationKeys.set(lease.signature, entry);
+}
+
+const isAmbiguousMutationStatus = (status: number): boolean =>
+  status === 408 || status === 429 || status >= 500;
+
 /**
  * All native API calls go through this function so auth, content headers,
  * idempotency, no-store caching, renewed session credentials, and errors stay
@@ -218,15 +390,34 @@ export async function apiRequest<T>(
     }
   }
 
-  // Writes get a key by default. Callers can provide a stable key for retries
-  // of the same logical operation, or opt out for endpoints whose contract
-  // explicitly does not use idempotency (for example login).
-  if (MUTATING_METHODS.has(method)) {
-    if (typeof idempotencyKey === 'string' && idempotencyKey.trim()) {
-      headers.set('Idempotency-Key', idempotencyKey.trim());
-    } else if (idempotencyKey !== false && !headers.has('Idempotency-Key')) {
+  const normalizedPath = path.startsWith('/') ? path : '/' + path;
+  const requestUrl = getApiBaseUrl() + '/api/v1' + normalizedPath;
+  let mutationLease: PendingMutationLease | null = null;
+
+  // Retry the exact same mutation with the same key after a network error,
+  // timeout, rate limit, or 5xx response—even when a caller generated a fresh
+  // explicit key on re-entry. Successful/definitive responses release the key.
+  if (MUTATING_METHODS.has(method) && idempotencyKey !== false) {
+    const signature = mutationSignature(
+      method,
+      requestUrl,
+      init.body,
+      headers.get('If-Match'),
+      headers.get('X-LuckRead-Upload-Fingerprint'),
+    );
+    const explicitKey = typeof idempotencyKey === 'string' && idempotencyKey.trim()
+      ? idempotencyKey.trim()
+      : headers.get('Idempotency-Key')?.trim() || undefined;
+    if (signature) {
+      mutationLease = acquireMutationKey(signature, explicitKey);
+      headers.set('Idempotency-Key', mutationLease.entry.key);
+    } else if (explicitKey) {
+      headers.set('Idempotency-Key', explicitKey);
+    } else if (!headers.has('Idempotency-Key')) {
       headers.set('Idempotency-Key', createIdempotencyKey());
     }
+  } else if (idempotencyKey === false) {
+    headers.delete('Idempotency-Key');
   }
 
   if (auth) {
@@ -234,35 +425,46 @@ export async function apiRequest<T>(
     if (token) headers.set('Authorization', 'Bearer ' + token);
   }
 
-  const normalizedPath = path.startsWith('/') ? path : '/' + path;
   let response: Response;
   try {
-    response = await fetch(getApiBaseUrl() + '/api/v1' + normalizedPath, {
+    response = await fetch(requestUrl, {
       ...init,
       method,
       headers,
       cache: 'no-store',
     });
   } catch {
+    releaseMutationKey(mutationLease, 'transient');
     // Do not surface transport internals (which may include request details).
     throw new LuckReadNetworkError();
   }
 
-  const renewedCredential = response.headers.get('X-LuckRead-Session-Token');
-  if (renewedCredential) await saveSessionToken(renewedCredential);
-
-  let data: T | ApiErrorBody | null = null;
+  let outcome: MutationOutcome = 'transient';
   try {
-    data = (await response.json()) as T | ApiErrorBody;
-  } catch {
-    // Logout and other no-content responses intentionally have no JSON body.
-  }
+    const renewedCredential = response.headers.get('X-LuckRead-Session-Token');
+    if (renewedCredential) await saveSessionToken(renewedCredential);
 
-  return {
-    response,
-    data,
-    error: response.ok ? null : classifyApiFailure(response, data),
-  };
+    let data: T | ApiErrorBody | null = null;
+    try {
+      data = (await response.json()) as T | ApiErrorBody;
+    } catch {
+      // Logout and other no-content responses intentionally have no JSON body.
+    }
+
+    outcome = isAmbiguousMutationStatus(response.status)
+      ? 'transient'
+      : response.ok
+        ? 'success'
+        : 'definitive';
+
+    return {
+      response,
+      data,
+      error: response.ok ? null : classifyApiFailure(response, data),
+    };
+  } finally {
+    releaseMutationKey(mutationLease, outcome);
+  }
 }
 
 

@@ -45,6 +45,21 @@ function unwrapMedia(value: unknown): Record<string, unknown> | null {
   return doc ?? data ?? root;
 }
 
+/** Stable, non-secret fingerprint for one upload attempt (never sends a local URI). */
+function uploadFingerprint(parts: Array<string | number | null>): string {
+  const value = JSON.stringify(parts);
+  let first = 0x811c9dc5;
+  let second = 0x9e3779b9;
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    first = Math.imul(first ^ code, 0x01000193);
+    second = Math.imul(second ^ (code + index), 0x85ebca6b);
+  }
+  return 'lr-up1-' +
+    (first >>> 0).toString(16).padStart(8, '0') +
+    (second >>> 0).toString(16).padStart(8, '0');
+}
+
 function toServerUrl(value: unknown): string | null {
   if (typeof value !== 'string' || !value.trim()) return null;
   try {
@@ -101,6 +116,15 @@ export async function uploadMediaFile(
     method: 'POST',
     body: form,
     idempotencyKey,
+    headers: {
+      'X-LuckRead-Upload-Fingerprint': uploadFingerprint([
+        'file',
+        file.uri,
+        file.name,
+        file.mimeType,
+        file.size ?? null,
+      ]),
+    },
   });
   if (!result.response.ok) {
     throw new Error(getApiErrorMessage(result.data, 'Media upload failed. Please retry.', result.response.status));
@@ -127,6 +151,14 @@ export async function uploadTextBody(
     method: 'POST',
     body: form,
     idempotencyKey,
+    headers: {
+      'X-LuckRead-Upload-Fingerprint': uploadFingerprint([
+        'text',
+        fileName,
+        'text/plain;charset=utf-8',
+        text,
+      ]),
+    },
   });
   if (!result.response.ok) {
     throw new Error(getApiErrorMessage(result.data, 'Post body upload failed. Please retry.', result.response.status));
