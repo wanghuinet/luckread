@@ -557,9 +557,17 @@ export async function listDiscoveryTopics(
     const last: DiscoveryTopicRelation = edges[edges.length - 1]!
     relationCursor = { topicId: last.topic_id, targetId: last.target_id }
 
+    // Keep this bounded relation batch's resolved context separate from the
+    // global LRU: adding new entries may evict an older context also referenced
+    // by this same batch before the aggregation loop reads it.
+    const batchContexts = new Map<string, PublishedContentSocialContext | null>()
+    for (const contentId of new Set(edges.map(edge => edge.target_id))) {
+      const remembered = getRememberedContext(contentId)
+      if (remembered !== undefined) batchContexts.set(contentId, remembered)
+    }
     const unresolved: string[] = Array.from(new Set<string>(edges
       .map((edge: DiscoveryTopicRelation) => edge.target_id)
-      .filter((contentId: string) => !contextCache.has(contentId))))
+      .filter((contentId: string) => !batchContexts.has(contentId))))
 
     for (let offset = 0; offset < unresolved.length; offset += 50) {
       const contentIds = unresolved.slice(offset, offset + 50)
@@ -568,12 +576,14 @@ export async function listDiscoveryTopics(
         correlationId,
       })
       for (const contentId of contentIds) {
-        rememberContext(contentId, contexts.get(contentId) ?? null)
+        const context = contexts.get(contentId) ?? null
+        batchContexts.set(contentId, context)
+        rememberContext(contentId, context)
       }
     }
 
     for (const edge of edges) {
-      const context = getRememberedContext(edge.target_id)
+      const context = batchContexts.get(edge.target_id)
       if (!context) continue
       const updatedAtMs = Date.parse(context.updatedAt)
       // SQLite julianday(..., '-7 days') excludes unparseable timestamps.
