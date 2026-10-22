@@ -46,7 +46,7 @@ describe('Media upload access', () => {
     expect(config).toContain("r2Storage({")
     expect(config).toContain('collections: { media: { generateFileURL: createPublicMediaUrl } }')
     expect(config).not.toContain('disablePayloadAccessControl')
-    expect(config).not.toContain('generateFileURL: createPublicMediaUrl')
+    expect(config).toContain('generateFileURL: createPublicMediaUrl')
     expect(publisher).toContain('authorizedFetch<{')
     expect(publisher).toContain("'/api/v1/media'")
     expect(publisher).toContain("headers: { 'Idempotency-Key': 'media-upload:' + crypto.randomUUID() }")
@@ -61,7 +61,7 @@ describe('Media upload access', () => {
     const media = read('src/collections/Media.ts')
     const directBindingWorkflow = resolve(process.cwd(), '../../.github/workflows/w01-r2-cdn-domain-binding.yml')
 
-    expect(config).toContain('collections: { media: true }')
+    expect(config).toContain('collections: { media: { generateFileURL: createPublicMediaUrl } }')
     expect(config).not.toContain('disablePayloadAccessControl')
     expect(media).toContain("return { ownerUserId: { equals: String(req.user.id) } }")
     expect(existsSync(directBindingWorkflow)).toBe(false)
