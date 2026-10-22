@@ -48,6 +48,7 @@ test('uploads a selected file as multipart and reuses its supplied idempotency k
   expect(calls[0].path).toBe('/media');
   expect(calls[0].options.method).toBe('POST');
   expect(calls[0].options.idempotencyKey).toBe('upload-retry-key');
+  expect(calls[0].options.headers['X-LuckRead-Upload-Fingerprint']).toMatch(/^lr-up1-[a-f0-9]{16}$/);
   expect(calls[0].options.body instanceof FormData).toBe(true);
   expect(calls[0].options.body.get('_payload')).toContain('photo.png');
   expect(calls[0].options.body.get('file')).toBeTruthy();
@@ -68,6 +69,7 @@ test('uploads text body through Payload media so content receives a permanent bo
   expect(result.url).toBe('https://assets.luckread.com/media-1.png');
   expect(calls[0].path).toBe('/media');
   expect(calls[0].options.idempotencyKey).toBe('body-retry-key');
+  expect(calls[0].options.headers['X-LuckRead-Upload-Fingerprint']).toMatch(/^lr-up1-[a-f0-9]{16}$/);
   expect(calls[0].options.body.get('_payload')).toContain('.txt');
   expect(calls[0].options.body.get('file')).toBeInstanceOf(Blob);
 });
@@ -97,4 +99,25 @@ test('surfaces upload errors without pretending the media was saved', async () =
     name: 'photo.png',
     mimeType: 'image/png',
   }, 'retry-key')).rejects.toThrow('Media upload failed. Please retry.');
+});
+
+
+test('uses the same upload fingerprint for the same file retry and a different fingerprint for changed metadata', async () => {
+  const file = {
+    uri: 'content://device/cache/retry-photo.png',
+    name: 'retry-photo.png',
+    mimeType: 'image/png',
+    size: 42,
+  };
+  await uploadMediaFile(file, 'same-upload-key');
+  const first = calls[0].options.headers['X-LuckRead-Upload-Fingerprint'];
+
+  await uploadMediaFile(file, 'same-upload-key');
+  const replay = calls[1].options.headers['X-LuckRead-Upload-Fingerprint'];
+
+  await uploadMediaFile({ ...file, size: 43 }, 'same-upload-key');
+  const changed = calls[2].options.headers['X-LuckRead-Upload-Fingerprint'];
+
+  expect(first).toBe(replay);
+  expect(changed).not.toBe(first);
 });
