@@ -10,6 +10,12 @@ const nextConfig: NextConfig = {
   images: {
     localPatterns: [{ pathname: '/api/media/file/**' }],
   },
+  async rewrites() {
+    return [
+      { source: '/:path*', has: [{ type: 'host', value: 'img.luckread.com' }], destination: '/api/media-delivery/:path*' },
+      { source: '/:path*', has: [{ type: 'host', value: 'video.luckread.com' }], destination: '/api/media-delivery/:path*' },
+    ]
+  },
   serverExternalPackages: ['jose', 'pg-cloudflare'],
   webpack: (webpackConfig) => {
     webpackConfig.resolve.extensionAlias = {
