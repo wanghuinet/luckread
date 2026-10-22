@@ -1,0 +1,74 @@
+name: Analytics Events Live Negative Security E2E
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/analytics-events-live-security-e2e.mjs'
+      - '.github/workflows/analytics-events-live-security-e2e.yml'
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: Run read-only/negative validation probes against an already deployed LuckRead endpoint
+        required: true
+        type: choice
+        options:
+          - CANCEL
+          - RUN_NEGATIVE_ONLY
+        default: CANCEL
+      base_url:
+        description: HTTPS LuckRead origin to probe; this workflow never sends an accepted event batch
+        required: true
+        type: string
+        default: https://luckread.com
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    if: ${{ github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Syntax-check negative security probe
+        run: node --check scripts/analytics-events-live-security-e2e.mjs
+
+  live-negative-probes:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.confirm == 'RUN_NEGATIVE_ONLY' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      LUCKREAD_API_BASE_URL: ${{ inputs.base_url }}
+    steps:
+      - name: Require the merged main revision
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = "refs/heads/main" || {
+            echo "Live probes may only be dispatched from main after a controlled deployment."
+            exit 1
+          }
+      - name: Checkout main
+        uses: actions/checkout@v4
+      - name: Setup Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Syntax-check and run negative-only HTTP probes
+        run: |
+          set -euo pipefail
+          node --check scripts/analytics-events-live-security-e2e.mjs
+          node scripts/analytics-events-live-security-e2e.mjs
+      - name: Upload sanitized security evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: analytics-events-live-negative-security-e2e-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/analytics-events-live-security-e2e/*.json
+          if-no-files-found: error
+          retention-days: 30
