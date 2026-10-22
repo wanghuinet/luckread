@@ -70,7 +70,7 @@ describe('Media upload access', () => {
     expect(delivery).toContain('privateOwnerDelivery(request, key, headOnly)')
     expect(delivery).toContain('cdn-cache-control')
     expect(delivery).toContain('parseMediaByteRange')
-    const nextConfig = read('../next.config.ts')
+    const nextConfig = read('next.config.ts')
     expect(nextConfig).toContain("value: 'img.luckread.com'")
     expect(nextConfig).toContain("value: 'video.luckread.com'")
   })
