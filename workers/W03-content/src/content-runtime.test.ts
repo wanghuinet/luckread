@@ -2,10 +2,82 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-import { canTransitionContentState, ContentRuntimeError, createContent, createRequestId, deleteContent, decodeContentListCursor, decodeCursor, decodeScopedCursor, encodeContentListCursor, encodeCursor, encodeScopedCursor, isState, listContents, listPublishedContentsByIds, listContentRevisions, listCreatorContents, publishDueScheduledContent, toErrorResponse, transitionContentState, updateContent, validateInput, validateListFilters } from './content-runtime.js'
+import { canTransitionContentState, ContentRuntimeError, isPublishedPublicPostMediaReference, createContent, createRequestId, deleteContent, decodeContentListCursor, decodeCursor, decodeScopedCursor, encodeContentListCursor, encodeCursor, encodeScopedCursor, isState, listContents, listPublishedContentsByIds, listContentRevisions, listCreatorContents, publishDueScheduledContent, toErrorResponse, transitionContentState, updateContent, validateInput, validateListFilters } from './content-runtime.js'
 import w03Worker, { hasCreatorContentPermission, hasSocialPostPermission, parseListLimit } from './index.js'
 
 describe('W03 content contract core', () => {
+
+  it('checks public media only when an exact reference belongs to a published social post', async () => {
+    const publicUrl = 'https://img.luckread.com/media/photo%20(1).png'
+    let query = ''
+    let bindings: unknown[] = []
+    const env = {
+      D1_02: {
+        prepare(sql: string) {
+          query = sql
+          return {
+            bind(...values: unknown[]) {
+              bindings = values
+              return {
+                first: async () => values[0] === publicUrl ? { id: 'post_public_1' } : null,
+              }
+            },
+          }
+        },
+      },
+    } as never
+    const request = (
+      mediaUrl: string,
+      caller = 'W01',
+      extraHeaders: Record<string, string> = {},
+    ) => new Request(
+      'https://luckread-w03.internal/internal/content/public-media-reference?url=' + encodeURIComponent(mediaUrl),
+      {
+        headers: {
+          'X-LuckRead-Caller': caller,
+          'X-LuckRead-Transport-Version': '1.0',
+          'X-LuckRead-Correlation-Id': 'public-media-reference-test',
+          ...extraHeaders,
+        },
+      },
+    )
+
+    const publicResponse = await w03Worker.fetch(request(publicUrl), env, {} as never)
+    expect(publicResponse.status).toBe(200)
+    await expect(publicResponse.json()).resolves.toMatchObject({ data: { isPublic: true } })
+    expect(query).toContain("state = 'PUBLISHED'")
+    expect(query).toContain("content_type = 'post'")
+    expect(query).toContain('body_ref = ?')
+    expect(query).toContain('cover_ref = ?')
+    expect(query).toContain('json_each(contents.media_refs_json)')
+    expect(bindings).toEqual([publicUrl, publicUrl, publicUrl])
+
+    const unpublishedResponse = await w03Worker.fetch(
+      request('https://img.luckread.com/media/draft-only.png'),
+      env,
+      {} as never,
+    )
+    expect(unpublishedResponse.status).toBe(200)
+    await expect(unpublishedResponse.json()).resolves.toMatchObject({ data: { isPublic: false } })
+
+    const unsupportedHostResponse = await w03Worker.fetch(
+      request('https://attacker.example/media/photo.png'),
+      env,
+      {} as never,
+    )
+    expect(unsupportedHostResponse.status).toBe(200)
+    await expect(unsupportedHostResponse.json()).resolves.toMatchObject({ data: { isPublic: false } })
+
+    const untrustedCaller = await w03Worker.fetch(request(publicUrl, 'W04'), env, {} as never)
+    expect(untrustedCaller.status).toBe(403)
+
+    const forwardedCredential = await w03Worker.fetch(
+      request(publicUrl, 'W01', { Cookie: 'session=must-not-cross-service-boundary' }),
+      env,
+      {} as never,
+    )
+    expect(forwardedCredential.status).toBe(403)
+  })
 
   it('serves bookmarked contents only through authenticated W01 transport', async () => {
     const row = {
