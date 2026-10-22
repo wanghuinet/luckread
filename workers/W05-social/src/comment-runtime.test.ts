@@ -402,7 +402,7 @@ describe('comment runtime', () => {
 
   it('keeps comment deletion atomic against a concurrent reply', async () => {
     const d = db([
-      { id: 'c1', author_user_id: 'user-1', state: 'PUBLISHED', has_replies: 0 },
+      { id: 'c1', content_id: 'content-1', author_user_id: 'user-1', state: 'PUBLISHED', has_replies: 0 },
     ])
     const prepare = (d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare
     prepare.mockImplementationOnce(() => ({
