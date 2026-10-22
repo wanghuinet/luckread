@@ -201,7 +201,6 @@ describe('W05 unified social closure', () => {
     ])
     expect(secondPage.hasMore).toBe(true)
     expect(secondPage.nextCursor).toEqual(expect.any(String))
-    expect(queries[1]).toContain('(st.topic_id, st.target_id) > (?, ?)')
 
     const thirdPage = await listDiscoveryTopics(db, binding, 'discovery-test', '1', secondPage.nextCursor)
     expect(thirdPage.items).toMatchObject([
@@ -316,6 +315,7 @@ describe('W05 unified social closure', () => {
       ])
       expect(page.hasMore).toBe(true)
       expect(queries.every(sql => !/(?:FROM|JOIN)\s+contents\b/i.test(sql))).toBe(true)
+    expect(queries.some(sql => sql.includes('(st.topic_id, st.target_id) > (?, ?)'))).toBe(true)
       expect(requestedIds).toHaveLength(5200)
       expect(requestedIds.filter(contentId => contentId === 'content-00001')).toHaveLength(2)
       expect(binding.fetch).toHaveBeenCalledTimes(105)
