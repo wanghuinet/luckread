@@ -7,9 +7,12 @@ const origin = 'https://api.luckread.com'
 const post = (overrides: Record<string, unknown> = {}) => ({
   contentType: 'post',
   title: 'My post',
-  bodyRef: 'https://cdn.luckread.com/media/body.txt',
-  mediaRefs: ['https://cdn.luckread.com/media/photo.png'],
-  coverRef: 'https://cdn.luckread.com/media/photo.png',
+  bodyRef: 'https://img.luckread.com/media/body.txt',
+  mediaRefs: [
+    'https://img.luckread.com/media/photo.png',
+    'https://video.luckread.com/videos/clip.mp4',
+  ],
+  coverRef: 'https://img.luckread.com/media/photo.png',
   ...overrides,
 })
 
@@ -37,8 +40,9 @@ describe('W01/W03 social post media-reference authority boundary', () => {
     const payload = payloadFor(
       { id: 'payload-user-7' },
       [
-        { id: 'body-1', ownerUserId: 'payload-user-7', url: 'https://cdn.luckread.com/media/body.txt' },
-        { id: 'photo-1', ownerUserId: 'payload-user-7', url: 'https://cdn.luckread.com/media/photo.png' },
+        { id: 'body-1', ownerUserId: 'payload-user-7', url: 'https://img.luckread.com/media/body.txt' },
+        { id: 'photo-1', ownerUserId: 'payload-user-7', url: 'https://img.luckread.com/media/photo.png' },
+        { id: 'video-1', ownerUserId: 'payload-user-7', url: 'https://video.luckread.com/videos/clip.mp4' },
       ],
     )
 
@@ -61,8 +65,9 @@ describe('W01/W03 social post media-reference authority boundary', () => {
         and: [
           { ownerUserId: { equals: 'payload-user-7' } },
           { url: { in: expect.arrayContaining([
-            'https://cdn.luckread.com/media/body.txt',
-            'https://cdn.luckread.com/media/photo.png',
+            'https://img.luckread.com/media/body.txt',
+            'https://img.luckread.com/media/photo.png',
+            'https://video.luckread.com/videos/clip.mp4',
           ]) } },
         ],
       },
@@ -74,8 +79,9 @@ describe('W01/W03 social post media-reference authority boundary', () => {
     const payload = payloadFor(
       { id: 'payload-user-7' },
       [
-        { id: 'photo-from-other-user', ownerUserId: 'payload-user-8', url: 'https://cdn.luckread.com/media/photo.png' },
-        { id: 'body-1', ownerUserId: 'payload-user-7', url: 'https://cdn.luckread.com/media/body.txt' },
+        { id: 'photo-from-other-user', ownerUserId: 'payload-user-8', url: 'https://img.luckread.com/media/photo.png' },
+        { id: 'body-1', ownerUserId: 'payload-user-7', url: 'https://img.luckread.com/media/body.txt' },
+        { id: 'video-1', ownerUserId: 'payload-user-7', url: 'https://video.luckread.com/videos/clip.mp4' },
       ],
     )
 
@@ -125,7 +131,7 @@ describe('W01/W03 social post media-reference authority boundary', () => {
     const payload = payloadFor(
       { id: 'payload-user-7' },
       [
-        { id: 'body-1', ownerUserId: 'payload-user-7', url: 'https://cdn.luckread.com/media/body.txt' },
+        { id: 'body-1', ownerUserId: 'payload-user-7', url: 'https://img.luckread.com/media/body.txt' },
         { id: 'photo-relative', ownerUserId: 'payload-user-7', url: '/media/photo.png' },
       ],
     )
