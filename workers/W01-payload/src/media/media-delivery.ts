@@ -49,6 +49,7 @@ export function mediaTypeAllowed(hostKind: MediaHostKind, key: string, contentTy
   if (!contentType) return false
   const mime = contentType.split(';', 1)[0]!.trim().toLowerCase()
   if (hostKind === 'image') return mime.startsWith('image/') && !isVideoMediaKey(key)
+  if (!isVideoMediaKey(key)) return false
   if (mime.startsWith('video/') || mime.startsWith('audio/')) return true
   const ext = key.slice(key.lastIndexOf('/') + 1).split('.').pop()?.toLowerCase() ?? ''
   if (ext === 'm3u8') return ['application/vnd.apple.mpegurl', 'application/x-mpegurl', 'audio/mpegurl'].includes(mime)
