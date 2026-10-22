@@ -35,8 +35,10 @@ describe('article summary card preview', () => {
   it('allows only same-origin or LuckRead-hosted public body files', () => {
     expect(resolvePublicArticleBodyUrl('/api/v1/media/file/article.json', 'https://luckread.com'))
       .toBe('https://luckread.com/api/v1/media/file/article.json')
-    expect(resolvePublicArticleBodyUrl('https://cdn.luckread.com/media/article.json', 'https://luckread.com'))
-      .toBe('https://cdn.luckread.com/media/article.json')
+    expect(resolvePublicArticleBodyUrl('https://img.luckread.com/media/article.json', 'https://luckread.com'))
+      .toBe('https://img.luckread.com/media/article.json')
+    expect(resolvePublicArticleBodyUrl('https://video.luckread.com/media/article-body.mp4', 'https://luckread.com'))
+      .toBe('https://video.luckread.com/media/article-body.mp4')
     expect(resolvePublicArticleBodyUrl('https://untrusted.example/article.json', 'https://luckread.com')).toBeNull()
     expect(resolvePublicArticleBodyUrl('javascript:alert(1)', 'https://luckread.com')).toBeNull()
     expect(resolvePublicArticleBodyUrl('https://user:secret@luckread.com/article.json', 'https://luckread.com')).toBeNull()
