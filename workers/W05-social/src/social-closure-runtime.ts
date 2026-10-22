@@ -405,6 +405,8 @@ const decodeDiscoveryTopicCursor = (value: string | null): DiscoveryTopicCursor 
  */
 export async function listDiscoveryTopics(
   db: D1Database,
+  w03Content: W03ContentBinding | undefined,
+  correlationId: string,
   limitValue: string | null,
   cursorValue: string | null,
 ): Promise<{
@@ -414,55 +416,119 @@ export async function listDiscoveryTopics(
 }> {
   const limit = parseLimit(limitValue)
   const cursor = decodeDiscoveryTopicCursor(cursorValue)
-  const cursorClause = cursor
-    ? 'WHERE (content_count < ? OR (content_count = ? AND (latest_content_at < ? OR (latest_content_at = ? AND topic_id > ?))))'
-    : ''
-  const cursorBindings: unknown[] = cursor
-    ? [cursor.contentCount, cursor.contentCount, cursor.latestContentAt, cursor.latestContentAt, cursor.topicId]
-    : []
-  const rows = await db.prepare(`
-    WITH ranked_topics AS (
-      SELECT t.topic_id, t.normalized_name, t.display_name,
-             COUNT(DISTINCT c.id) AS content_count,
-             MAX(c.updated_at) AS latest_content_at
-        FROM social_topics t
-        JOIN social_target_topics st ON st.topic_id = t.topic_id AND st.target_type = 'content'
-        JOIN contents c ON c.id = st.target_id
-       WHERE t.status = 'ACTIVE'
-         AND c.state = 'PUBLISHED'
-         AND julianday(c.updated_at) >= julianday('now', '-7 days')
-       GROUP BY t.topic_id, t.normalized_name, t.display_name
-    )
-    SELECT topic_id, normalized_name, display_name, content_count, latest_content_at
-      FROM ranked_topics
-      ${cursorClause}
-     ORDER BY content_count DESC, latest_content_at DESC, topic_id ASC
-     LIMIT ?
-  `).bind(...cursorBindings, limit + 1).all<{
-    topic_id: string
-    normalized_name: string
-    display_name: string
-    content_count: number
-    latest_content_at: string
+  if (!correlationId.trim()) throw new SocialClosureRuntimeError('VALIDATION_FAILED', 400)
+
+  // W05 owns topic relations, but W03 owns publication status and updatedAt.
+  // Enumerate W05-owned topic/content edges in bounded keyset pages, resolve
+  // their canonical content context in batches of at most 50, and aggregate
+  // only W03-confirmed published content inside the original seven-day window.
+  const relationBatchSize = 200
+  const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000
+  const contextCache = new Map<string, PublishedContentSocialContext | null>()
+  const stats = new Map<string, {
+    topicId: string
+    name: string
+    displayName: string
+    contentCount: number
+    latestContentAt: string
   }>()
-  const source = rows.results ?? []
-  const visible = source.slice(0, limit)
-  const last = visible.at(-1)
+  let relationCursor: { topicId: string; targetId: string } | null = null
+
+  while (true) {
+    const cursorClause = relationCursor
+      ? 'AND (t.topic_id > ? OR (t.topic_id = ? AND st.target_id > ?))'
+      : ''
+    const cursorBindings: unknown[] = relationCursor
+      ? [relationCursor.topicId, relationCursor.topicId, relationCursor.targetId]
+      : []
+    const result = await db.prepare(\`
+      SELECT DISTINCT t.topic_id, t.normalized_name, t.display_name, st.target_id
+        FROM social_topics t
+        JOIN social_target_topics st
+          ON st.topic_id = t.topic_id AND st.target_type = 'content'
+       WHERE t.status = 'ACTIVE'
+         \${cursorClause}
+       ORDER BY t.topic_id ASC, st.target_id ASC
+       LIMIT ?
+    \`).bind(...cursorBindings, relationBatchSize).all<{
+      topic_id: string
+      normalized_name: string
+      display_name: string
+      target_id: string
+    }>()
+    const edges = result.results ?? []
+    if (edges.length === 0) break
+
+    const last = edges.at(-1)!
+    relationCursor = { topicId: last.topic_id, targetId: last.target_id }
+
+    const unresolved = [...new Set(edges
+      .map(edge => edge.target_id)
+      .filter(contentId => !contextCache.has(contentId)))]
+
+    for (let offset = 0; offset < unresolved.length; offset += 50) {
+      const contentIds = unresolved.slice(offset, offset + 50)
+      const contexts = await fetchPublishedContentSocialContexts(w03Content, {
+        contentIds,
+        correlationId,
+      })
+      for (const contentId of contentIds) {
+        contextCache.set(contentId, contexts.get(contentId) ?? null)
+      }
+    }
+
+    for (const edge of edges) {
+      const context = contextCache.get(edge.target_id)
+      if (!context) continue
+      const updatedAtMs = Date.parse(context.updatedAt)
+      // SQLite julianday(..., '-7 days') excludes unparseable timestamps.
+      if (!Number.isFinite(updatedAtMs) || updatedAtMs < cutoff) continue
+
+      const current = stats.get(edge.topic_id)
+      if (!current) {
+        stats.set(edge.topic_id, {
+          topicId: edge.topic_id,
+          name: edge.normalized_name,
+          displayName: edge.display_name,
+          contentCount: 1,
+          latestContentAt: context.updatedAt,
+        })
+      } else {
+        current.contentCount += 1
+        // Match SQLite MAX(text) and the established lexical sort contract.
+        if (context.updatedAt > current.latestContentAt) current.latestContentAt = context.updatedAt
+      }
+    }
+
+    if (edges.length < relationBatchSize) break
+  }
+
+  const ranked = [...stats.values()].sort((a, b) =>
+    b.contentCount - a.contentCount ||
+    b.latestContentAt.localeCompare(a.latestContentAt) ||
+    a.topicId.localeCompare(b.topicId),
+  )
+  const afterCursor = cursor
+    ? ranked.filter(item =>
+        item.contentCount < cursor.contentCount ||
+        (item.contentCount === cursor.contentCount && (
+          item.latestContentAt < cursor.latestContentAt ||
+          (item.latestContentAt === cursor.latestContentAt && item.topicId > cursor.topicId)
+        )),
+      )
+    : ranked
+  const visible = afterCursor.slice(0, limit)
+  const lastVisible = visible.at(-1)
+  const hasMore = afterCursor.length > limit
   return {
-    items: visible.map((row) => ({
-      topicId: row.topic_id,
-      name: row.normalized_name,
-      displayName: row.display_name,
-      contentCount: Number(row.content_count),
-      latestContentAt: row.latest_content_at,
-    })),
-    hasMore: source.length > limit,
-    nextCursor: source.length > limit && last
+    items: visible,
+    hasMore,
+    nextCursor: hasMore && lastVisible
       ? encodeDiscoveryTopicCursor({
           version: 1,
-          contentCount: Number(last.content_count),
-          latestContentAt: last.latest_content_at,
-          topicId: last.topic_id,
+          contentCount: lastVisible.contentCount,
+          latestContentAt: lastVisible.latestContentAt,
+          topicId: lastVisible.topicId,
         })
       : null,
   }
