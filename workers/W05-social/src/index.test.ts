@@ -32,7 +32,7 @@ const transportHeaders = {
 const publishedContextsBatchBinding = () => ({
   fetch: vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const request = input instanceof Request ? input : new Request(input, init)
-    const body = await request.json() as { contentIds: string[] }
+    const body = await request.clone().json() as { contentIds: string[] }
     return Response.json({ data: { items: body.contentIds.map(contentId => ({
       contentId, ownerUserId: 'owner-1', contentType: 'post', state: 'PUBLISHED',
       updatedAt: '2026-10-17T04:00:00.000Z',
