@@ -225,6 +225,8 @@ def main() -> None:
         raise AssertionError("Projection rebuild state migration is missing")
     if not any(path.name == "0003_analytics_late_event_replay.sql" for path in migration_files):
         raise AssertionError("Durable late-event replay migration is missing")
+    if not any(path.name == "0004_analytics_w01_client_telemetry.sql" for path in migration_files):
+        raise AssertionError("W01 client telemetry source admission migration is missing")
     migrations_by_name = {path.name: path for path in migration_files}
     store_source = STORE.read_text(encoding="utf-8")
     read_model_source = READ_MODEL.read_text(encoding="utf-8")
@@ -275,6 +277,9 @@ def main() -> None:
     db.executescript(
         migrations_by_name["0003_analytics_late_event_replay.sql"].read_text(encoding="utf-8")
     )
+    db.executescript(
+        migrations_by_name["0004_analytics_w01_client_telemetry.sql"].read_text(encoding="utf-8")
+    )
 
     preserved_legacy_row = db.execute(
         "SELECT event_id, dedupe_key, projection_status FROM analytics_event_dedupe "
@@ -284,7 +289,13 @@ def main() -> None:
         "evt_migration_legacy_0001",
         "dedupe_migration_legacy_0001",
         "APPLIED",
-    ), f"migration 0003 must preserve existing event rows: {preserved_legacy_row}"
+    ), f"migration 0004 must preserve existing event rows: {preserved_legacy_row}"
+    ledger_definition = db.execute(
+        "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'analytics_event_dedupe'"
+    ).fetchone()[0]
+    assert "'W01'" in ledger_definition and "'W03'" in ledger_definition and "'W05'" in ledger_definition, (
+        f"migration 0004 must admit W01 telemetry and preserve W03/W05 sources: {ledger_definition}"
+    )
     recreated_indexes = {
         row[0] for row in db.execute(
             "SELECT name FROM sqlite_master WHERE type = 'index' "
@@ -317,6 +328,29 @@ def main() -> None:
     assert not {"actor_id", "visitor_id", "session_id"}.intersection(columns), (
         "D1-05 event rows must not persist direct identity/session fields"
     )
+
+    client_telemetry = list(event(
+        "evt_migration_w01_telemetry",
+        "dedupe_migration_w01_telemetry",
+        "content_open",
+        "W01",
+        content_id="w01_telemetry_content",
+    ))
+    # Test the new source constraint without projecting this fixture into the
+    # same UTC bucket used by the later aggregate/reconciliation assertions.
+    client_telemetry[5] = "2026-10-12T00:12:34.000Z"
+    client_telemetry[6] = "2026-10-12T00:12:34.000Z"
+    client_telemetry[7] = "2026-10-12T00:00:00.000Z"
+    client_telemetry[-1] = "APPLIED"
+    client_placeholders = "(" + ", ".join("?" for _ in client_telemetry) + ")"
+    db.execute(
+        f"INSERT INTO analytics_event_dedupe ({SQL_COLUMNS}) VALUES {client_placeholders}",
+        tuple(client_telemetry),
+    )
+    db.commit()
+    assert db.execute(
+        "SELECT source_worker FROM analytics_event_dedupe WHERE event_id = 'evt_migration_w01_telemetry'"
+    ).fetchone() == ("W01",), "migration 0004 must persist admitted W01 telemetry"
 
     first_batch = [
         event("evt_schema_0001", "dedupe_schema_0001", "content_open"),
@@ -504,6 +538,19 @@ def main() -> None:
         raise AssertionError("schema must reject a W05 content_open event")
     assert db.execute(
         "SELECT COUNT(*) FROM analytics_event_dedupe WHERE event_id = 'evt_schema_bad'"
+    ).fetchone()[0] == 0
+
+    bad_social_source = [
+        event("evt_schema_bad_w01_social", "dedupe_schema_bad_w01_social", "like_created", "W01")
+    ]
+    try:
+        apply_batch(db, bad_social_source, content_sql, creator_sql, mark_applied_sql)
+    except sqlite3.IntegrityError:
+        pass
+    else:
+        raise AssertionError("schema must reject W01 as an authoritative social-event source")
+    assert db.execute(
+        "SELECT COUNT(*) FROM analytics_event_dedupe WHERE event_id = 'evt_schema_bad_w01_social'"
     ).fetchone()[0] == 0
 
     # A duration-bearing event must have a positive duration at the SQL boundary,

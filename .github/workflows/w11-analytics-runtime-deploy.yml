@@ -73,6 +73,7 @@ jobs:
             '0001_analytics_projection.sql',
             '0002_analytics_projection_rebuild_state.sql',
             '0003_analytics_late_event_replay.sql',
+            '0004_analytics_w01_client_telemetry.sql',
           ]) {
             if (!fs.existsSync(`workers/W11-growth-campaign-analytics-operations/migrations/${name}`)) {
               throw new Error('Required migration missing: ' + name);
@@ -169,7 +170,7 @@ jobs:
           npx --yes wrangler@4.116.0 d1 migrations list allluck --remote --config wrangler.jsonc
           npx --yes wrangler@4.116.0 d1 migrations apply allluck --remote --config wrangler.jsonc
 
-      - name: Verify remote schema supports late-event replay
+      - name: Verify remote schema admits W01 telemetry and late-event replay
         working-directory: workers/W11-growth-campaign-analytics-operations
         run: |
           set -euo pipefail
@@ -177,6 +178,7 @@ jobs:
             --command "SELECT sql FROM sqlite_master WHERE type='table' AND name='analytics_event_dedupe'" \
             --json > /tmp/w11-analytics-event-ledger-schema.json
           grep -q "'LATE'" /tmp/w11-analytics-event-ledger-schema.json
+          grep -q "'W01'" /tmp/w11-analytics-event-ledger-schema.json
           echo W11_REMOTE_D1_05_SCHEMA=PASS
 
       - name: Upload W11 runtime version without enabling traffic routes

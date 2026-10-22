@@ -38,7 +38,7 @@ export const ANALYTICS_EVENT_NAMES = [
 
 export type AnalyticsEventName = (typeof ANALYTICS_EVENT_NAMES)[number]
 export type AnalyticsContentType = 'article' | 'post' | 'video'
-export type AnalyticsSourceWorker = 'W03' | 'W05'
+export type AnalyticsSourceWorker = 'W01' | 'W03' | 'W05'
 export type AnalyticsActorType = 'user' | 'visitor'
 export type AnalyticsEventQuality =
   | 'VALID'
@@ -292,7 +292,11 @@ export function validateAnalyticsEvent(
 
   const eventName = value.eventName as AnalyticsEventName
   const isSocialEvent = SOCIAL_EVENT_NAMES.has(eventName)
-  const expectedSourceWorker: AnalyticsSourceWorker = isSocialEvent ? 'W05' : 'W03'
+  const expectedSourceWorker: AnalyticsSourceWorker = isSocialEvent
+    ? 'W05'
+    : value.sourceWorker === 'W01'
+      ? 'W01'
+      : 'W03'
   if (value.sourceWorker !== expectedSourceWorker) {
     return outcome(
       'REJECTED',

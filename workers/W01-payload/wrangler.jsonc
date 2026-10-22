@@ -40,6 +40,10 @@
     {
       "binding": "W08_CREATOR",
       "service": "luckread-w08-creator"
+    },
+    {
+      "binding": "W11_ANALYTICS",
+      "service": "luckread-w11"
     }
   ],
   "d1_databases": [
