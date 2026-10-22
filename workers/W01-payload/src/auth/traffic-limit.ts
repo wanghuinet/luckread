@@ -20,7 +20,7 @@ export async function enforceAuthRateLimit(
     const context = await getCloudflareContext({ async: true })
     env = context.env as unknown as Record<string, unknown>
   } catch {
-    return
+    throw new Error('RATE_LIMIT_CONTEXT_UNAVAILABLE:' + bindingName)
   }
   const globalLimiter = env.AUTH_ORIGIN_GLOBAL_LIMITER as RateLimitBinding | undefined
   if (globalLimiter) {
