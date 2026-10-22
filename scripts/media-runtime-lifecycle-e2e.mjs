@@ -61,7 +61,8 @@ assert(playback.response.ok, 'Playback endpoint failed: HTTP ' + playback.respon
 assert(String(playback.data?.id ?? '') === mediaId, 'Playback media id did not match the uploaded asset')
 assert(playback.data?.status === 'READY', 'Playback endpoint did not report READY')
 assert(typeof playback.data?.url === 'string' && playback.data.url.trim() === playback.data.url && playback.data.url.length > 0, 'Playback URL was missing or malformed')
-const deliveryUrl = new URL(playback.data.url)
+// Payload/R2 adapters can return an absolute CDN URL or a path relative to the W01 API origin.
+const deliveryUrl = new URL(playback.data.url, baseUrl)
 assert(['https:', 'http:'].includes(deliveryUrl.protocol), 'Playback URL used an unsupported protocol')
 const delivery = await fetch(deliveryUrl)
 assert(delivery.ok, 'Media delivery URL failed: HTTP ' + delivery.status)
