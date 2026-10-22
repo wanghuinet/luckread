@@ -95,7 +95,7 @@ async function deliver(request: Request, context: { params: Promise<{ key: strin
 
   if (data?.isPublic !== true) return privateOwnerDelivery(request, key, headOnly)
 
-  let bucket: R2Bucket | undefined
+  let bucket: R2MediaBucket | undefined
   try {
     const cloudflare = await getCloudflareContext({ async: true })
     bucket = (cloudflare.env as unknown as R2MediaEnvironment).R2
