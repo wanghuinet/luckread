@@ -11,7 +11,8 @@ export type PublicAuthorProjection = {
   avatar: string | null
 }
 
-const MAX_AUTHOR_IDS = 100
+const MAX_AUTHOR_IDS_PER_PAGE = 200
+const MAX_AUTHOR_IDS_PER_QUERY = 50
 
 const asRecord = (value: unknown): JsonRecord | null =>
   value && typeof value === 'object' && !Array.isArray(value)
@@ -51,38 +52,44 @@ const looksHydrated = (value: unknown): boolean => {
 }
 
 async function loadPublicAuthors(ids: string[]): Promise<Map<string, PublicAuthorProjection>> {
-  const uniqueIds = Array.from(new Set(ids.map((id) => id.trim()).filter(Boolean))).slice(0, MAX_AUTHOR_IDS)
+  const uniqueIds = Array.from(new Set(ids.map((id) => id.trim()).filter(Boolean)))
+    .slice(0, MAX_AUTHOR_IDS_PER_PAGE)
   const byLookupId = new Map<string, PublicAuthorProjection>()
   if (!uniqueIds.length) return byLookupId
 
   const payload = await getPayload({ config })
-  const result = await payload.find({
-    collection: 'users',
-    where: {
-      or: [
-        { id: { in: uniqueIds } },
-        { identityId: { in: uniqueIds } },
-      ],
-    },
-    depth: 0,
-    limit: uniqueIds.length,
-    overrideAccess: true,
-    select: {
-      id: true,
-      identityId: true,
-      username: true,
-      displayName: true,
-      avatar: true,
-    } as any,
-  })
+  // Each ID appears in both the id and identityId IN clauses. Keep each query
+  // bounded to 50 IDs so it does not exceed D1's bind-parameter budget.
+  for (let offset = 0; offset < uniqueIds.length; offset += MAX_AUTHOR_IDS_PER_QUERY) {
+    const batch = uniqueIds.slice(offset, offset + MAX_AUTHOR_IDS_PER_QUERY)
+    const result = await payload.find({
+      collection: 'users',
+      where: {
+        or: [
+          { id: { in: batch } },
+          { identityId: { in: batch } },
+        ],
+      },
+      depth: 0,
+      limit: batch.length,
+      overrideAccess: true,
+      select: {
+        id: true,
+        identityId: true,
+        username: true,
+        displayName: true,
+        avatar: true,
+      } as any,
+    })
 
-  for (const doc of result.docs) {
-    const record = doc as unknown as JsonRecord
-    const author = authorProjection(record)
-    if (!author) continue
-    byLookupId.set(author.id, author)
-    const identityId = normalizedId(record.identityId)
-    if (identityId) byLookupId.set(identityId, author)
+    for (const doc of result.docs) {
+      const record = doc as unknown as JsonRecord
+      const author = authorProjection(record)
+      if (!author) continue
+      byLookupId.set(author.id, author)
+      const identityId = normalizedId(record.identityId)
+      if (identityId) byLookupId.set(identityId, author)
+    }
   }
 
   return byLookupId
