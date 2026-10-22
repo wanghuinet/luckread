@@ -53,12 +53,13 @@ const validEvent = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 })
 
-const requestFor = (events: unknown[]) =>
+const requestFor = (events: unknown[], extraHeaders: Record<string, string> = {}) =>
   new Request('https://www.luckread.com/api/v1/analytics/events', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'X-LuckRead-Correlation-Id': 'corr_route_000001',
+      ...extraHeaders,
     },
     body: JSON.stringify({ events }),
   })
@@ -134,7 +135,10 @@ describe('W01 analytics event route integration', () => {
       return await w11Worker.fetch(input, env)
     })
 
-    const response = await POST(requestFor([validEvent()]))
+    const response = await POST(requestFor([validEvent()], {
+      Authorization: 'Bearer inbound-secret-token',
+      Cookie: 'better-auth.session_token=inbound-secret-cookie',
+    }))
 
     expect(response.status).toBe(200)
     const body = await response.json() as {
@@ -147,9 +151,17 @@ describe('W01 analytics event route integration', () => {
     expect(body.requestId).toBe('corr_route_000001')
     expect(mocks.enforceLimit).toHaveBeenCalledTimes(1)
     expect(database.batch).toHaveBeenCalledTimes(1)
+    const forwardedInput = mocks.w11Fetch.mock.calls[0]?.[0]
+    expect(forwardedInput).toBeInstanceOf(Request)
+    const forwarded = forwardedInput as Request
+    expect(forwarded.headers.has('Authorization')).toBe(false)
+    expect(forwarded.headers.has('Cookie')).toBe(false)
+    expect(forwarded.headers.get('X-LuckRead-Principal-User-Id')).toBe('user_test_01')
     const serializedBindings = JSON.stringify(persistedBindings)
     expect(serializedBindings).not.toContain('user_test_01')
     expect(serializedBindings).not.toContain('session_test_01')
+    expect(serializedBindings).not.toContain('inbound-secret-token')
+    expect(serializedBindings).not.toContain('inbound-secret-cookie')
   })
 
   it('rejects social business events before calling W11', async () => {
@@ -184,6 +196,7 @@ describe('W01 to W11 analytics event ingress contract', () => {
     const client = read('src/analytics/w11-analytics-client.ts')
     const bindings = read('wrangler.jsonc')
     const w11 = read('../W11-growth-campaign-analytics-operations/src/worker.ts')
+    const w11Config = read('../W11-growth-campaign-analytics-operations/wrangler.jsonc')
     const transport = JSON.parse(read('../../contracts/transport/W01-W11-analytics-event-ingress.v1.json'))
 
     expect(route).toContain('enforceW01WriteRateLimit(request)')
@@ -197,6 +210,8 @@ describe('W01 to W11 analytics event ingress contract', () => {
     expect(bindings).toContain('"binding": "W11_ANALYTICS"')
     expect(w11).toContain("url.pathname === '/internal/analytics/events'")
     expect(w11).toContain("request.headers.get('X-LuckRead-Caller') !== 'W01'")
+    expect(w11Config).toContain('"workers_dev": false')
+    expect(w11Config).not.toContain('"routes"')
     expect(transport.transport.newQueue).toBe(false)
     expect(transport.persistence.actorVisitorSessionIdsPersisted).toBe(false)
     expect(transport.payload.maximumEventsPerRequest).toBe(90)
