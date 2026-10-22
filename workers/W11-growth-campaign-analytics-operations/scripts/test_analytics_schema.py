@@ -329,15 +329,28 @@ def main() -> None:
         "D1-05 event rows must not persist direct identity/session fields"
     )
 
-    client_telemetry = event(
+    client_telemetry = list(event(
         "evt_migration_w01_telemetry",
         "dedupe_migration_w01_telemetry",
         "content_open",
         "W01",
         content_id="w01_telemetry_content",
+    ))
+    # Test the new source constraint without projecting this fixture into the
+    # same UTC bucket used by the later aggregate/reconciliation assertions.
+    client_telemetry[5] = "2026-10-12T00:12:34.000Z"
+    client_telemetry[6] = "2026-10-12T00:12:34.000Z"
+    client_telemetry[7] = "2026-10-12T00:00:00.000Z"
+    client_telemetry[-1] = "APPLIED"
+    client_placeholders = "(" + ", ".join("?" for _ in client_telemetry) + ")"
+    db.execute(
+        f"INSERT INTO analytics_event_dedupe ({SQL_COLUMNS}) VALUES {client_placeholders}",
+        tuple(client_telemetry),
     )
-    w01_inserted = apply_batch(db, [client_telemetry], content_sql, creator_sql, mark_applied_sql)
-    assert w01_inserted == 1, f"expected admitted W01 telemetry row, got {w01_inserted}"
+    db.commit()
+    assert db.execute(
+        "SELECT source_worker FROM analytics_event_dedupe WHERE event_id = 'evt_migration_w01_telemetry'"
+    ).fetchone() == ("W01",), "migration 0004 must persist admitted W01 telemetry"
 
     first_batch = [
         event("evt_schema_0001", "dedupe_schema_0001", "content_open"),
