@@ -133,6 +133,8 @@ describe('W05 unified social closure', () => {
       { topic_id: 'topic-3', normalized_name: 'writing', display_name: 'Writing', target_id: 'content-4' },
       { topic_id: 'topic_日本', normalized_name: '日本', display_name: '日本', target_id: 'content-4' },
       { topic_id: 'topic_日本語', normalized_name: '日本語', display_name: '日本語', target_id: 'content-5' },
+      { topic_id: 'topic_\uE000', normalized_name: 'private-use', display_name: 'Private Use', target_id: 'content-6' },
+      { topic_id: 'topic_𐐀', normalized_name: 'deseret', display_name: 'Deseret', target_id: 'content-7' },
     ]
     const queries: string[] = []
     const db = {
@@ -159,6 +161,8 @@ describe('W05 unified social closure', () => {
       ['content-3', { contentId: 'content-3', ownerUserId: 'owner-3', contentType: 'video', state: 'PUBLISHED', updatedAt: recent(3) }],
       ['content-4', { contentId: 'content-4', ownerUserId: 'owner-4', contentType: 'post', state: 'PUBLISHED', updatedAt: recent(4) }],
       ['content-5', { contentId: 'content-5', ownerUserId: 'owner-5', contentType: 'post', state: 'PUBLISHED', updatedAt: recent(5) }],
+      ['content-6', { contentId: 'content-6', ownerUserId: 'owner-6', contentType: 'post', state: 'PUBLISHED', updatedAt: recent(5) }],
+      ['content-7', { contentId: 'content-7', ownerUserId: 'owner-7', contentType: 'post', state: 'PUBLISHED', updatedAt: recent(5) }],
       ['content-old', { contentId: 'content-old', ownerUserId: 'owner-5', contentType: 'post', state: 'PUBLISHED', updatedAt: old }],
     ])
     const binding = {
@@ -206,8 +210,22 @@ describe('W05 unified social closure', () => {
     expect(fourthPage.items).toMatchObject([
       { topicId: 'topic_日本語', name: '日本語', displayName: '日本語', contentCount: 1 },
     ])
-    expect(fourthPage.hasMore).toBe(false)
-    expect(fourthPage.nextCursor).toBeNull()
+    expect(fourthPage.hasMore).toBe(true)
+    expect(fourthPage.nextCursor).toEqual(expect.any(String))
+
+    const fifthPage = await listDiscoveryTopics(db, binding, 'discovery-test', '1', fourthPage.nextCursor)
+    expect(fifthPage.items).toMatchObject([
+      { topicId: 'topic_\uE000', name: 'private-use', displayName: 'Private Use', contentCount: 1 },
+    ])
+    expect(fifthPage.hasMore).toBe(true)
+    expect(fifthPage.nextCursor).toEqual(expect.any(String))
+
+    const sixthPage = await listDiscoveryTopics(db, binding, 'discovery-test', '1', fifthPage.nextCursor)
+    expect(sixthPage.items).toMatchObject([
+      { topicId: 'topic_𐐀', name: 'deseret', displayName: 'Deseret', contentCount: 1 },
+    ])
+    expect(sixthPage.hasMore).toBe(false)
+    expect(sixthPage.nextCursor).toBeNull()
   })
 
 
