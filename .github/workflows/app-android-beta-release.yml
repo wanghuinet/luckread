@@ -9,6 +9,13 @@ on:
     paths:
       - ".github/workflows/app-android-beta-release.yml"
       - "app/**"
+  # Build a standalone APK for review before merge so the exact PR source has a testable artifact.
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/app-android-beta-release.yml"
+      - "app/**"
   workflow_dispatch:
     inputs:
       version_name:
@@ -61,7 +68,7 @@ jobs:
         run: |
           SIGNING_DIR="${RUNNER_TEMP}/luckread-android-signing"
           mkdir -p "$SIGNING_DIR"
-          if [ -n "$ANDROID_KEYSTORE_BASE64" ] && [ -n "$ANDROID_KEYSTORE_PASSWORD_SECRET" ] && [ -n "$ANDROID_KEY_ALIAS_SECRET" ] && [ -n "$ANDROID_KEY_PASSWORD_SECRET" ]; then
+          if [ "$PUBLISH_RELEASE" = "true" ] && [ -n "$ANDROID_KEYSTORE_BASE64" ] && [ -n "$ANDROID_KEYSTORE_PASSWORD_SECRET" ] && [ -n "$ANDROID_KEY_ALIAS_SECRET" ] && [ -n "$ANDROID_KEY_PASSWORD_SECRET" ]; then
             printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$SIGNING_DIR/luckread-release.keystore"
             chmod 600 "$SIGNING_DIR/luckread-release.keystore"
             {
