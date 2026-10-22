@@ -58,14 +58,14 @@ describe('W04 edge-cache search trend projection', () => {
       version: 1,
       items: [
         { term: 'old term', count: 99, lastSeenAt: old },
-        { term: 'new term', count: 1, lastSeenAt: fresh },
+        { term: 'new term', count: 3, lastSeenAt: fresh },
       ],
     }
     const cacheWithSeed = {
       match: vi.fn(async () => Response.json(seeded)),
       put: vi.fn(async () => undefined),
     } as unknown as Pick<Cache, 'match' | 'put'>
-    await expect(listTrendingSearches(10, cacheWithSeed)).resolves.toMatchObject([{ term: 'new term', count: 1 }])
+    await expect(listTrendingSearches(10, cacheWithSeed)).resolves.toMatchObject([{ term: 'new term', count: 3 }])
   })
 
   it('treats cache failures as optional and never throws into the search path', async () => {
