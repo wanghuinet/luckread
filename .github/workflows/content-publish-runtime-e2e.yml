@@ -276,6 +276,23 @@ jobs:
           console.log(JSON.stringify({ bodyAssetUploaded: true, mediaIdPresent: true, publicUrlPresent: true }));
           NODE
 
+      - name: Upload authoritative social post attachment asset
+        run: |
+          set -euo pipefail
+          printf '%s' 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=' | base64 -d > /tmp/social-post-attachment.png
+          curl --silent --show-error --fail-with-body -X POST -H "Authorization: Bearer $CREATOR_TOKEN" -H "Idempotency-Key: CONTENT-E2E-$GITHUB_RUN_ID-POST-ATTACHMENT-UPLOAD" -F '_payload={"alt":"social post attachment E2E"}' -F "file=@/tmp/social-post-attachment.png;type=image/png" "$CONTENT_API_BASE_URL/api/v1/media" > /tmp/social-post-attachment-upload.json
+          node <<'NODE'
+          const fs = require('node:fs');
+          const envelope = JSON.parse(fs.readFileSync('/tmp/social-post-attachment-upload.json', 'utf8'));
+          const doc = envelope?.doc ?? envelope;
+          if (!doc?.id || typeof doc.url !== 'string' || !doc.url.trim()) {
+            throw new Error('social post attachment upload did not return a delivery-ready media id/url: ' + JSON.stringify(envelope));
+          }
+          fs.appendFileSync(process.env.GITHUB_ENV, 'POST_ATTACHMENT_MEDIA_ID=' + String(doc.id) + '\n');
+          fs.appendFileSync(process.env.GITHUB_ENV, 'POST_ATTACHMENT_REF=' + doc.url.trim() + '\n');
+          console.log(JSON.stringify({ attachmentAssetUploaded: true, mediaIdPresent: true, publicUrlPresent: true }));
+          NODE
+
       - name: Create article through public API
         run: |
           set -euo pipefail
@@ -318,10 +335,10 @@ jobs:
             contentType: 'post',
             title: body.trim().slice(0, 500),
             bodyRef: process.env.POST_BODY_REF,
-            mediaRefs: [],
-            coverRef: null,
+            mediaRefs: [process.env.POST_ATTACHMENT_REF],
+            coverRef: process.env.POST_ATTACHMENT_REF,
           };
-          if (!body.trim() || !value.bodyRef) throw new Error('social post authoritative body fixture is missing');
+          if (!body.trim() || !value.bodyRef || !value.mediaRefs[0] || !value.coverRef) throw new Error('social post body/attachment media fixtures are missing');
           fs.writeFileSync('/tmp/social-post-create-request.json', JSON.stringify(value));
           NODE
 
@@ -355,8 +372,8 @@ jobs:
             contentType: 'post',
             title: body.trim().slice(0, 500),
             body,
-            mediaRefs: [],
-            coverRef: null,
+            mediaRefs: [process.env.POST_ATTACHMENT_REF],
+            coverRef: process.env.POST_ATTACHMENT_REF,
             aiMode: 'outline',
             humanContribution: 'substantial',
           };
@@ -545,6 +562,12 @@ jobs:
           if(socialPostPublic.contentType!=='post'||socialPostPublic.state!=='PUBLISHED'||Number(socialPostPublic.version)!==2) {
             throw new Error('social post public visibility failed: '+JSON.stringify(socialPostPublic));
           }
+          const expectedAttachmentRef = process.env.POST_ATTACHMENT_REF;
+          if (!expectedAttachmentRef || !Array.isArray(socialPostPublic.mediaRefs) || socialPostPublic.mediaRefs.length !== 1 ||
+              socialPostPublic.mediaRefs[0] !== expectedAttachmentRef || socialPostPublic.coverRef !== expectedAttachmentRef) {
+            throw new Error('W01/W03 public social-post mediaRefs/coverRef relation was not preserved: ' +
+              JSON.stringify({ expectedAttachmentRef, mediaRefs: socialPostPublic.mediaRefs, coverRef: socialPostPublic.coverRef }));
+          }
           const content=JSON.parse(fs.readFileSync('artifacts/mapping-0/content-publish-runtime-e2e/content-state.json'))?.[0]?.results??[];
           if(content.length!==3) throw new Error('W03 remote content evidence missing records: '+JSON.stringify(content));
           for (const [id,kind,version] of [[process.env.ARTICLE_ID,'article',4],[process.env.VIDEO_ID,'video',4],[process.env.SOCIAL_POST_ID,'post',2]]) {
@@ -553,6 +576,22 @@ jobs:
               throw new Error('W03 remote '+kind+' state evidence invalid: '+JSON.stringify(row));
             }
           }
+          const storedPost = content.find(x=>x.id===process.env.SOCIAL_POST_ID);
+          let storedPostMediaRefs = null;
+          try { storedPostMediaRefs = JSON.parse(storedPost?.media_refs_json ?? 'null'); } catch {}
+          if (!Array.isArray(storedPostMediaRefs) || storedPostMediaRefs.length !== 1 ||
+              storedPostMediaRefs[0] !== expectedAttachmentRef || storedPost?.cover_ref !== expectedAttachmentRef) {
+            throw new Error('W03 D1 media_refs_json/cover_ref did not persist the uploaded attachment: ' +
+              JSON.stringify({ storedPostMediaRefs, storedCoverRef: storedPost?.cover_ref, expectedAttachmentRef }));
+          }
+          fs.writeFileSync('artifacts/mapping-0/content-publish-runtime-e2e/social-post-media-refs.json', JSON.stringify({
+            status: 'PASS',
+            mediaReferenceCount: storedPostMediaRefs.length,
+            publicMediaRefs: socialPostPublic.mediaRefs,
+            publicCoverRef: socialPostPublic.coverRef,
+            storedMediaRefs: storedPostMediaRefs,
+            storedCoverRef: storedPost.cover_ref,
+          }, null, 2) + String.fromCharCode(10));
           const decisions=JSON.parse(fs.readFileSync('artifacts/mapping-0/content-publish-runtime-e2e/moderation-decisions.json'))?.[0]?.results??[];
           if(decisions.length!==2||decisions.some(x=>x.outcome!=='APPROVED'||x.reviewer_id===null||x.reviewer_layer!=='L6')) throw new Error('W06 decision evidence invalid: '+JSON.stringify(decisions));
           const postCases=JSON.parse(fs.readFileSync('artifacts/mapping-0/content-publish-runtime-e2e/social-post-moderation-cases.json'))?.[0]?.results??[];
@@ -596,6 +635,13 @@ jobs:
               echo "Social post body asset cleanup: PASS"
             else
               echo "::warning::Social post body asset cleanup failed for the controlled E2E fixture"
+            fi
+          fi
+          if printenv POST_ATTACHMENT_MEDIA_ID >/dev/null 2>&1 && printenv CREATOR_TOKEN >/dev/null 2>&1; then
+            if curl --silent --show-error --fail-with-body -X DELETE -H "Authorization: Bearer $CREATOR_TOKEN" -H "Idempotency-Key: CONTENT-E2E-$GITHUB_RUN_ID-POST-ATTACHMENT-CLEANUP" "$CONTENT_API_BASE_URL/api/v1/media/$POST_ATTACHMENT_MEDIA_ID"; then
+              echo "Social post attachment asset cleanup: PASS"
+            else
+              echo "::warning::Social post attachment asset cleanup failed for the controlled E2E fixture"
             fi
           fi
           npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME_W06" --remote --yes --config workers/W06-governance/wrangler.jsonc             --command "DELETE FROM moderation_enforcement_outbox WHERE decision_id IN (SELECT decision_id FROM moderation_decisions WHERE case_id LIKE 'content-e2e-%'); DELETE FROM moderation_decision_idempotency WHERE case_id LIKE 'content-e2e-%'; DELETE FROM moderation_decisions WHERE case_id LIKE 'content-e2e-%'; DELETE FROM moderation_cases WHERE case_id LIKE 'content-e2e-%';"
