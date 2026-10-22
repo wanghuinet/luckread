@@ -225,10 +225,10 @@ const publicPostMediaReferenceCandidates = (value: string): string[] => {
       url.search ||
       url.hash ||
       url.port ||
-      !url.pathname.startsWith('/media/')
+      url.pathname === '/'
     ) return []
 
-    const encodedSegments = url.pathname.slice('/media/'.length).split('/')
+    const encodedSegments = url.pathname.slice(1).split('/')
     const decodedSegments = encodedSegments.map((segment) => {
       try { return decodeURIComponent(segment) } catch { return '' }
     })
@@ -242,18 +242,15 @@ const publicPostMediaReferenceCandidates = (value: string): string[] => {
     )) return []
 
     const objectKey = decodedSegments.map(encodeURIComponent).join('/')
-    const canonical = url.origin + '/media/' + objectKey
     const candidates = new Set<string>([
-      canonical,
-      // Historical published content can still hold direct CDN URLs. The
-      // gateway URL includes an extra /media/ route prefix, so derive the
-      // old public R2 URL from the exact object key, never a wildcard match.
+      url.origin + '/' + objectKey,
       'https://cdn.luckread.com/' + objectKey,
     ])
 
+    // Historical Payload Media URLs for a single filename may still be stored
+    // as API file routes. Include exact known origin forms, never arbitrary hosts.
     if (decodedSegments.length === 1) {
-      const filename = encodeURIComponent(decodedSegments[0]!)
-      const payloadPath = '/api/media/file/' + filename
+      const payloadPath = '/api/media/file/' + encodeURIComponent(decodedSegments[0]!)
       candidates.add(payloadPath)
       candidates.add('https://api.luckread.com' + payloadPath)
       candidates.add('https://luckread.com' + payloadPath)
@@ -280,22 +277,25 @@ export async function isPublishedPublicPostMediaReference(
   if (candidates.length === 0) return false
 
   const placeholders = candidates.map(() => '?').join(', ')
-  const row = await db.prepare(
-    \`SELECT id
-       FROM contents
-      WHERE state = 'PUBLISHED'
-        AND content_type = 'post'
-        AND (
-          body_ref IN (\${placeholders})
-          OR cover_ref IN (\${placeholders})
-          OR EXISTS (
-            SELECT 1
-              FROM json_each(contents.media_refs_json) AS media_ref
-             WHERE media_ref.value IN (\${placeholders})
-          )
-        )
-      LIMIT 1\`,
-  ).bind(...candidates, ...candidates, ...candidates).first<{ id: string }>()
+  const sql = [
+    'SELECT id',
+    'FROM contents',
+    "WHERE state = 'PUBLISHED'",
+    "  AND content_type = 'post'",
+    '  AND (',
+    '    body_ref IN (' + placeholders + ')',
+    '    OR cover_ref IN (' + placeholders + ')',
+    '    OR EXISTS (',
+    '      SELECT 1',
+    '      FROM json_each(contents.media_refs_json) AS media_ref',
+    '      WHERE media_ref.value IN (' + placeholders + ')',
+    '    )',
+    '  )',
+    'LIMIT 1',
+  ].join('\n')
+  const row = await db.prepare(sql)
+    .bind(...candidates, ...candidates, ...candidates)
+    .first<{ id: string }>()
   return typeof row?.id === 'string' && row.id.length > 0
 }
 
