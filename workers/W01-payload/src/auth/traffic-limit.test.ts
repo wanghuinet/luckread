@@ -9,6 +9,7 @@ import {
   enforceAuthRateLimit,
   enforcePublicReadRateLimit,
   enforceW01WriteRateLimit,
+  enforceW01WriteAccountRateLimit,
   rateLimitResponse,
   TrafficLimitError,
 } from './traffic-limit.js'
@@ -128,6 +129,33 @@ describe('traffic limits', () => {
       enforceW01WriteRateLimit(new Request('https://luckread.com/api/v1/media')),
     ).rejects.toBeInstanceOf(TrafficLimitError)
     expect(writeLimiter.limit).not.toHaveBeenCalled()
+  })
+
+
+  it('checks the authenticated account bucket for W01 writes', async () => {
+    const calls: string[] = []
+    const writeLimiter = { limit: vi.fn(async ({ key }: { key: string }) => { calls.push(key); return { success: true } }) }
+    contextMock.mockResolvedValue({ env: { W01_WRITE_LIMITER: writeLimiter } } as never)
+
+    await expect(enforceW01WriteAccountRateLimit('operator-42')).resolves.toBeUndefined()
+
+    expect(calls).toEqual(['w01-write:account:operator-42'])
+  })
+
+  it('rejects an exhausted W01 account bucket', async () => {
+    const writeLimiter = { limit: vi.fn(async () => ({ success: false })) }
+    contextMock.mockResolvedValue({ env: { W01_WRITE_LIMITER: writeLimiter } } as never)
+
+    await expect(enforceW01WriteAccountRateLimit('operator-42')).rejects.toBeInstanceOf(TrafficLimitError)
+    expect(writeLimiter.limit).toHaveBeenCalledWith({ key: 'w01-write:account:operator-42' })
+  })
+
+  it('fails closed when the W01 account limiter binding is missing', async () => {
+    contextMock.mockResolvedValue({ env: {} } as never)
+
+    await expect(enforceW01WriteAccountRateLimit('operator-42')).rejects.toThrow(
+      'RATE_LIMIT_BINDING_UNAVAILABLE:W01_WRITE_LIMITER',
+    )
   })
 
 })
