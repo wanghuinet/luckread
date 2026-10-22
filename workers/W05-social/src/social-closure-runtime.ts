@@ -668,7 +668,7 @@ const NOTIFICATION_DB_RETRY_DELAYS_MS = [25, 75] as const
  */
 const isTransientNotificationDbError = (error: unknown): boolean => {
   const message = error instanceof Error ? error.message : String(error ?? '')
-  return /\\b(?:SQLITE_BUSY|SQLITE_LOCKED|database is locked|temporar(?:y|ily)|timed?\\s*out|timeout|connection (?:reset|closed|lost)|network (?:error|failure)|fetch failed|service unavailable|upstream unavailable)\\b/i.test(message)
+  return /\b(?:SQLITE_BUSY|SQLITE_LOCKED|database is locked|temporar(?:y|ily)|timed?\s*out|timeout|connection (?:reset|closed|lost)|network (?:error|failure)|fetch failed|service unavailable|upstream unavailable)\b/i.test(message)
 }
 
 /**
