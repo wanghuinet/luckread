@@ -428,9 +428,11 @@ describe('AUTH-013 account-state transition kernel', () => {
 function authorizationDb(
   state: string,
   roles: Array<{ roleId: string; scopeType: string }> = [],
+  preparedSql: string[] = [],
 ) {
   return {
     prepare(sql: string) {
+      preparedSql.push(sql)
       return {
         bind() {
           return {
@@ -449,6 +451,19 @@ function authorizationDb(
 }
 
 describe('AUTH-013 trusted-principal authorization boundary', () => {
+  it('bounds authorization role reads to fit the canonical 64-row transition budget', async () => {
+    const preparedSql: string[] = []
+    await authorizeAccountStateTransition(
+      authorizationDb('ACTIVE', [{ roleId: 'operator', scopeType: 'global' }], preparedSql),
+      { subjectId: 'operator-1', targetUserId: '42', to: 'RESTRICTED', now: '2026-09-28T12:00:00.000Z' },
+    )
+
+    expect(preparedSql.find((sql) => sql.includes('FROM role_assignments'))).toContain(
+      'ORDER BY role_id ASC',
+    )
+    expect(preparedSql.find((sql) => sql.includes('FROM role_assignments'))).toContain('LIMIT 62')
+  })
+
   it('derives operator permission and actor class from canonical role layer', async () => {
     const result = await authorizeAccountStateTransition(
       authorizationDb('ACTIVE', [{ roleId: 'operator', scopeType: 'global' }]),
