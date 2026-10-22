@@ -27,7 +27,8 @@
     "auth:session:migration:admission": "node scripts/auth-002-migration-generation-admission.mjs",
     "feature:inventory": "node scripts/build-feature-inventory.mjs",
     "feature:inventory:verify": "node scripts/build-feature-inventory.mjs && git diff --exit-code -- contracts/alignment/feature-inventory.v1.json",
-    "upstream:immutability:ci": "node scripts/upstream-product-immutability-check.mjs"
+    "upstream:immutability:ci": "node scripts/upstream-product-immutability-check.mjs",
+    "data:authority:ci": "node scripts/verify-logical-data-authority.mjs"
   },
   "dependencies": {
     "@payloadcms/db-d1-sqlite": "3.90.2",
