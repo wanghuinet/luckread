@@ -14,7 +14,26 @@ const unauthorized = () => apiErrorResponse(401, 'UNAUTHENTICATED', 'Authenticat
 async function authenticate(request: Request) {
   const principal = await getBetterAuthPrincipal(request)
   const payload = await getPayload({ config })
-  return { payload, userId: principal.userId }
+  return { payload, identityId: principal.userId }
+}
+
+async function resolvePayloadOwnerUserId(
+  payload: Awaited<ReturnType<typeof getPayload>>,
+  identityId: string,
+): Promise<string | null> {
+  const profileResult = await payload.find({
+    collection: 'users',
+    where: { identityId: { equals: identityId } },
+    limit: 1,
+    page: 1,
+    depth: 0,
+    overrideAccess: true,
+    select: { id: true } as any,
+  })
+  const profileId = profileResult.docs[0]?.id
+  if (profileId === undefined || profileId === null) return null
+  const normalizedId = String(profileId).trim()
+  return normalizedId || null
 }
 
 const authenticateErrorResponse = (error: unknown): Response => {
@@ -43,9 +62,14 @@ export async function GET(request: Request): Promise<Response> {
   const page = Number.isFinite(requestedPage) ? Math.max(requestedPage, 1) : 1
 
   try {
+    const payloadUserId = await resolvePayloadOwnerUserId(authenticated.payload, authenticated.identityId)
+    if (!payloadUserId) {
+      return apiErrorResponse(401, 'UNAUTHENTICATED', 'Account profile is not available')
+    }
+
     const result = await authenticated.payload.find({
       collection: 'media',
-      where: { ownerUserId: { equals: authenticated.userId } },
+      where: { ownerUserId: { equals: payloadUserId } },
       sort: '-createdAt',
       limit,
       page,
@@ -172,22 +196,14 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   try {
-    const profileResult = await authenticated.payload.find({
-      collection: 'users',
-      where: { identityId: { equals: authenticated.userId } },
-      limit: 1,
-      depth: 0,
-      overrideAccess: true,
-      select: { id: true } as any,
-    })
-    const payloadUserId = profileResult.docs[0]?.id
-    if (payloadUserId === undefined || payloadUserId === null) {
+    const payloadUserId = await resolvePayloadOwnerUserId(authenticated.payload, authenticated.identityId)
+    if (!payloadUserId) {
       return apiErrorResponse(401, 'UNAUTHENTICATED', 'Account profile is not available')
     }
 
     const previous = await resolvePreviousUpload(
       authenticated.payload,
-      String(payloadUserId),
+      payloadUserId,
       idempotencyKey,
       uploadFingerprint,
     )
@@ -205,7 +221,7 @@ export async function POST(request: Request): Promise<Response> {
     // canonical media record instead of surfacing a duplicate-key server error.
     const afterWrite = await resolvePreviousUpload(
       authenticated.payload,
-      String(payloadUserId),
+      payloadUserId,
       idempotencyKey,
       uploadFingerprint,
     )
