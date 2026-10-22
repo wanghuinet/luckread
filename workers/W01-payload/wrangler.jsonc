@@ -139,6 +139,14 @@
     {
       "pattern": "mp.luckread.com",
       "custom_domain": true
+    },
+    {
+      "pattern": "img.luckread.com",
+      "custom_domain": true
+    },
+    {
+      "pattern": "video.luckread.com",
+      "custom_domain": true
     }
   ],
   "r2_buckets": [
