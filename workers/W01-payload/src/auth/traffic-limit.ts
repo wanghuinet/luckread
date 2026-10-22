@@ -91,10 +91,9 @@ export async function enforceW01WriteRateLimit(request: Request): Promise<void> 
   }
 
   const globalLimiter = env.W01_WRITE_ORIGIN_GLOBAL_LIMITER as RateLimitBinding | undefined
-  if (globalLimiter) {
-    const result = await globalLimiter.limit({ key: 'w01-write:origin' })
-    if (!result.success) throw new TrafficLimitError()
-  }
+  if (!globalLimiter) throw new Error('RATE_LIMIT_BINDING_UNAVAILABLE:W01_WRITE_ORIGIN_GLOBAL_LIMITER')
+  const globalResult = await globalLimiter.limit({ key: 'w01-write:origin' })
+  if (!globalResult.success) throw new TrafficLimitError()
 
   const limiter = env.W01_WRITE_LIMITER as RateLimitBinding | undefined
   if (!limiter) throw new Error('RATE_LIMIT_BINDING_UNAVAILABLE:W01_WRITE_LIMITER')
