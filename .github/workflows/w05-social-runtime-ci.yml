@@ -441,6 +441,10 @@ jobs:
           print('SOCIAL_CLOSURE_V1_MIGRATION_STATIC=PASS')
           PY
 
-      - name: Run unified social closure runtime and adapter tests
+      - name: Run W05 unified social closure runtime tests
         working-directory: workers/W01-payload
-        run: pnpm exec vitest run --config ./vitest.config.mts ../../workers/W05-social/src/poll-runtime.test.ts ../../workers/W05-social/src/index.test.ts ../../workers/W05-social/src/social-closure-runtime.test.ts tests/int/social-closure-v1-adapter.int.spec.ts
+        run: pnpm exec vitest run --config ./vitest.w05-social-closure.config.mts
+
+      - name: Run W01 social closure adapter integration tests
+        working-directory: workers/W01-payload
+        run: pnpm exec vitest run --config ./vitest.config.mts tests/int/social-closure-v1-adapter.int.spec.ts
