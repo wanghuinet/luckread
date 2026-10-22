@@ -55,7 +55,10 @@ describe('unified W05 social closure adapters', () => {
     expect(shell).toContain("{ key: 'trends', href: '/trends', icon: 'trending' }")
     expect(worker).toContain("url.pathname === '/internal/social/discovery/topics'")
     expect(runtime).toContain('listDiscoveryTopics')
-    expect(runtime).toContain("julianday(c.updated_at) >= julianday('now', '-7 days')")
+    const discoveryRuntime = runtime.slice(runtime.indexOf('export async function listDiscoveryTopics'), runtime.indexOf('export async function enqueueNotification'))
+    expect(discoveryRuntime).toContain('fetchPublishedContentSocialContexts')
+    expect(discoveryRuntime).toContain("t.status = 'ACTIVE'")
+    expect(discoveryRuntime).not.toMatch(/(?:FROM|JOIN)\s+contents\b/i)
   })
 
   it('wires poll draft setup, published voting, live results and X-style cards to W05 authority', () => {
