@@ -1,0 +1,183 @@
+name: W01 R2 CDN Domain Binding
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: Type ATTACH_CDN_DOMAIN to bind cdn.luckread.com to the live W01 R2 bucket
+        required: true
+        default: NO
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  bind-cdn-domain:
+    if: \${{ inputs.confirm == 'ATTACH_CDN_DOMAIN' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      CLOUDFLARE_ACCOUNT_ID: \${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: \${{ secrets.CLOUDFLARE_API_TOKEN }}
+      WORKER_NAME: luckread-w01-payload
+      CDN_HOSTNAME: cdn.luckread.com
+      ZONE_NAME: luckread.com
+    steps:
+      - name: Validate credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          test -n "$CLOUDFLARE_API_TOKEN"
+
+      - name: Bind CDN hostname to the live W01 R2 bucket
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          const accountId = process.env.CLOUDFLARE_ACCOUNT_ID
+          const token = process.env.CLOUDFLARE_API_TOKEN
+          const workerName = process.env.WORKER_NAME
+          const hostname = process.env.CDN_HOSTNAME
+          const zoneName = process.env.ZONE_NAME
+          const apiBase = 'https://api.cloudflare.com/client/v4'
+
+          async function api(method, path, body) {
+            const response = await fetch(apiBase + path, {
+              method,
+              headers: {
+                authorization: 'Bearer ' + token,
+                'content-type': 'application/json',
+              },
+              ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+            })
+            const raw = await response.text()
+            let parsed
+            try {
+              parsed = raw ? JSON.parse(raw) : {}
+            } catch {
+              throw new Error(method + ' ' + path + ' returned invalid JSON (HTTP ' + response.status + ')')
+            }
+            if (!response.ok || parsed.success !== true) {
+              throw new Error(method + ' ' + path + ' failed (HTTP ' + response.status + '): ' +
+                JSON.stringify(parsed.errors ?? parsed.messages ?? []))
+            }
+            return parsed.result
+          }
+
+          const asItems = (value) => {
+            if (Array.isArray(value)) return value
+            if (Array.isArray(value?.domains)) return value.domains
+            if (Array.isArray(value?.result)) return value.result
+            return []
+          }
+
+          // Discover the live binding instead of guessing from the repository's
+          // placeholder bucket name. Do not create or reassign unknown resources.
+          const settings = await api(
+            'GET',
+            '/accounts/' + encodeURIComponent(accountId) + '/workers/scripts/' + encodeURIComponent(workerName) + '/settings',
+          )
+          const r2Bindings = (settings.bindings ?? []).filter(
+            (binding) => binding.type === 'r2_bucket' && binding.name === 'R2',
+          )
+          if (r2Bindings.length !== 1 || typeof r2Bindings[0].bucket_name !== 'string') {
+            throw new Error('Expected exactly one live W01 R2 binding named R2; refusing to guess a bucket')
+          }
+          const bucketName = r2Bindings[0].bucket_name
+          if (!bucketName.trim() || /placeholder/i.test(bucketName)) {
+            throw new Error('Live W01 R2 binding is missing or still uses a placeholder bucket name; refusing to bind CDN')
+          }
+
+          const bucketsResult = await api(
+            'GET',
+            '/accounts/' + encodeURIComponent(accountId) + '/r2/buckets?direction=asc',
+          )
+          const buckets = asItems(bucketsResult)
+          if (!buckets.some((bucket) => bucket.name === bucketName)) {
+            throw new Error('The live W01 R2 bucket was not present in the account bucket inventory')
+          }
+
+          const zonesResult = await api(
+            'GET',
+            '/zones?name=' + encodeURIComponent(zoneName) + '&status=active',
+          )
+          const zones = asItems(zonesResult).filter((zone) => zone.name === zoneName && zone.status === 'active')
+          if (zones.length !== 1 || typeof zones[0].id !== 'string') {
+            throw new Error('Expected exactly one active Cloudflare zone for ' + zoneName)
+          }
+          const zoneId = zones[0].id
+
+          const workerDomainsResult = await api(
+            'GET',
+            '/accounts/' + encodeURIComponent(accountId) + '/workers/domains?hostname=' + encodeURIComponent(hostname),
+          )
+          if (asItems(workerDomainsResult).some((domain) => domain.hostname === hostname)) {
+            throw new Error(hostname + ' is already registered as a Workers custom domain; refusing to conflict with R2')
+          }
+
+          const existingAssignments = []
+          for (const bucket of buckets) {
+            const result = await api(
+              'GET',
+              '/accounts/' + encodeURIComponent(accountId) + '/r2/buckets/' + encodeURIComponent(bucket.name) + '/domains/custom',
+            )
+            for (const item of asItems(result).filter((domain) => domain.domain === hostname)) {
+              existingAssignments.push({ bucketName: bucket.name, domain: item })
+            }
+          }
+
+          if (existingAssignments.some((item) => item.bucketName !== bucketName)) {
+            throw new Error(hostname + ' is already attached to another R2 bucket; refusing reassignment')
+          }
+
+          const targetDomainPath =
+            '/accounts/' + encodeURIComponent(accountId) +
+            '/r2/buckets/' + encodeURIComponent(bucketName) +
+            '/domains/custom/' + encodeURIComponent(hostname)
+
+          if (existingAssignments.length === 0) {
+            await api(
+              'POST',
+              '/accounts/' + encodeURIComponent(accountId) + '/r2/buckets/' + encodeURIComponent(bucketName) + '/domains/custom',
+              { domain: hostname, enabled: true, zoneId },
+            )
+            console.log('R2 custom domain registration requested for ' + hostname + ' on the live W01 bucket')
+          } else if (existingAssignments[0].domain.enabled !== true) {
+            await api('PUT', targetDomainPath, { enabled: true })
+            console.log('Existing R2 custom domain access enabled for ' + hostname)
+          } else {
+            console.log(hostname + ' is already enabled on the live W01 R2 bucket')
+          }
+
+          let lastStatus = null
+          for (let attempt = 1; attempt <= 36; attempt += 1) {
+            const result = await api(
+              'GET',
+              '/accounts/' + encodeURIComponent(accountId) + '/r2/buckets/' + encodeURIComponent(bucketName) + '/domains/custom',
+            )
+            const domain = asItems(result).find((item) => item.domain === hostname)
+            const status = domain?.status ?? {}
+            const ownership = typeof status.ownership === 'string'
+              ? status.ownership
+              : status.ownership?.status
+            const ssl = typeof status.ssl === 'string' ? status.ssl : status.ssl?.status
+            lastStatus = { enabled: domain?.enabled ?? false, ownership: ownership ?? 'unknown', ssl: ssl ?? 'unknown' }
+            if (domain?.enabled === true && ownership === 'active' && ssl === 'active') {
+              console.log(JSON.stringify({
+                status: 'PASS',
+                worker: workerName,
+                bucketName,
+                hostname,
+                enabled: true,
+                ownership,
+                ssl,
+              }))
+              process.exit(0)
+            }
+            await new Promise((resolve) => setTimeout(resolve, 10_000))
+          }
+
+          throw new Error('R2 CDN domain did not become active within six minutes: ' + JSON.stringify(lastStatus))
+          NODE
