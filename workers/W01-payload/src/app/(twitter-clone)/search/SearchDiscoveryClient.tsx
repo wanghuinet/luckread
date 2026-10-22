@@ -39,6 +39,7 @@ const copy = (locale: PublicLocale) => locale === 'en'
       loadMore: 'Load more results',
       loadingMore: 'Loading more…',
       loadMoreError: 'Could not load more results. Please try again.',
+      retry: 'Retry',
     }
   : locale === 'tw'
     ? {
@@ -62,6 +63,7 @@ const copy = (locale: PublicLocale) => locale === 'en'
         loadMore: '載入更多結果',
         loadingMore: '正在載入更多…',
         loadMoreError: '無法載入更多結果，請重試。',
+        retry: '重試',
       }
     : {
         title: '你在寻找什么？',
@@ -84,6 +86,7 @@ const copy = (locale: PublicLocale) => locale === 'en'
         loadMore: '加载更多结果',
         loadingMore: '正在加载更多…',
         loadMoreError: '无法加载更多结果，请重试。',
+        retry: '重试',
       }
 
 export default function SearchDiscoveryClient({
