@@ -386,7 +386,8 @@ describe('W05 unified social closure', () => {
 
   it('rejects malformed discovery topic cursors', async () => {
     const db = { prepare: () => { throw new Error('database must not be queried for an invalid cursor') } } as unknown as D1Database
-    await expect(listDiscoveryTopics(db, '20', 'not-a-cursor')).rejects.toMatchObject({ code: 'INVALID_CURSOR', status: 400 })
+    await expect(listDiscoveryTopics(db, undefined, 'invalid-cursor-test', '20', 'not-a-cursor'))
+      .rejects.toMatchObject({ code: 'INVALID_CURSOR', status: 400 })
   })
 
 
