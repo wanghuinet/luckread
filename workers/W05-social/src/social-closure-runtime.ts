@@ -21,6 +21,8 @@ const DEFAULT_LIMIT = 20
 const MAX_CURSOR = 2048
 
 const DISCOVERY_TOPIC_RANKING_CACHE_TTL_SECONDS = 15
+// Bound cold-cache memory while retaining recently reused content contexts.
+const DISCOVERY_TOPIC_CONTEXT_CACHE_MAX_ENTRIES = 5000
 type RankedDiscoveryTopic = {
   topicId: string
   name: string
@@ -511,6 +513,23 @@ export async function listDiscoveryTopics(
   const relationBatchSize = 200
   const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000
   const contextCache = new Map<string, PublishedContentSocialContext | null>()
+  const rememberContext = (contentId: string, context: PublishedContentSocialContext | null) => {
+    contextCache.delete(contentId)
+    contextCache.set(contentId, context)
+    while (contextCache.size > DISCOVERY_TOPIC_CONTEXT_CACHE_MAX_ENTRIES) {
+      const oldestContentId = contextCache.keys().next().value
+      if (oldestContentId === undefined) break
+      contextCache.delete(oldestContentId)
+    }
+  }
+  const getRememberedContext = (contentId: string): PublishedContentSocialContext | null | undefined => {
+    if (!contextCache.has(contentId)) return undefined
+    const context = contextCache.get(contentId) ?? null
+    // Map insertion order is used as an inexpensive LRU recency queue.
+    contextCache.delete(contentId)
+    contextCache.set(contentId, context)
+    return context
+  }
   const stats = new Map<string, RankedDiscoveryTopic>()
   type DiscoveryTopicRelation = { topic_id: string; normalized_name: string; display_name: string; target_id: string }
   let relationCursor: { topicId: string; targetId: string } | null = null
@@ -549,12 +568,12 @@ export async function listDiscoveryTopics(
         correlationId,
       })
       for (const contentId of contentIds) {
-        contextCache.set(contentId, contexts.get(contentId) ?? null)
+        rememberContext(contentId, contexts.get(contentId) ?? null)
       }
     }
 
     for (const edge of edges) {
-      const context = contextCache.get(edge.target_id)
+      const context = getRememberedContext(edge.target_id)
       if (!context) continue
       const updatedAtMs = Date.parse(context.updatedAt)
       // SQLite julianday(..., '-7 days') excludes unparseable timestamps.
