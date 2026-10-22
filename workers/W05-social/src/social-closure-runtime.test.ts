@@ -143,8 +143,8 @@ describe('W05 unified social closure', () => {
         return {
           bind: (...values: unknown[]) => ({
             all: async () => {
-              const afterTopic = values.length === 4 ? String(values[0]) : null
-              const afterTarget = values.length === 4 ? String(values[2]) : null
+              const afterTopic = values.length === 3 ? String(values[0]) : null
+              const afterTarget = values.length === 3 ? String(values[1]) : null
               const ordered = [...edges]
                 .filter(edge => !afterTopic || edge.topic_id > afterTopic ||
                   (edge.topic_id === afterTopic && edge.target_id > afterTarget!))
@@ -191,6 +191,10 @@ describe('W05 unified social closure', () => {
     expect(firstPage.nextCursor).toEqual(expect.any(String))
     expect(binding.fetch).toHaveBeenCalled()
     expect(queries.every(sql => !/(?:FROM|JOIN)\s+contents\b/i.test(sql))).toBe(true)
+    expect(queries[0]).toContain('ix_social_target_topics_content_topic_target')
+    expect(queries[0]).toContain('CROSS JOIN social_topics')
+    expect(queries[0]).not.toContain('SELECT DISTINCT')
+    expect(queries[0]).toContain('(st.topic_id, st.target_id) > (?, ?)')
 
     const secondPage = await listDiscoveryTopics(db, binding, 'discovery-test', '1', firstPage.nextCursor)
     expect(secondPage.items).toMatchObject([
@@ -271,8 +275,8 @@ describe('W05 unified social closure', () => {
         return {
           bind: (...values: unknown[]) => ({
             all: async () => {
-              const afterTopic = values.length === 4 ? String(values[0]) : null
-              const afterTarget = values.length === 4 ? String(values[2]) : null
+              const afterTopic = values.length === 3 ? String(values[0]) : null
+              const afterTarget = values.length === 3 ? String(values[1]) : null
               const ordered = edges
                 .filter(edge => !afterTopic || edge.topic_id > afterTopic ||
                   (edge.topic_id === afterTopic && edge.target_id > afterTarget!))
