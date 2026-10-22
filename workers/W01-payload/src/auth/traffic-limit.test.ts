@@ -99,6 +99,14 @@ describe('traffic limits', () => {
     expect(calls).toEqual(['public-read:origin', 'public-read:ip:203.0.113.10'])
   })
 
+  it('fails closed when the public-read limiter Cloudflare context is unavailable', async () => {
+    contextMock.mockRejectedValue(new Error('Cloudflare context unavailable'))
+
+    await expect(
+      enforcePublicReadRateLimit(new Request('https://luckread.com/api/v1/users/u1')),
+    ).rejects.toThrow('RATE_LIMIT_CONTEXT_UNAVAILABLE:PUBLIC_READ_LIMITER')
+  })
+
   it('returns stable 429 semantics', async () => {
     const response = rateLimitResponse(new Request('https://luckread.com/auth/login'))
     expect(response.status).toBe(429)
