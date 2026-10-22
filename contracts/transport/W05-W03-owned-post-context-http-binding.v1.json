@@ -79,7 +79,7 @@
       "W05 poll result GET validates canonical published post context through W03_CONTENT before reading W05 poll tables; if public lookup returns 404, an authenticated owner may use the existing owner-scoped context to preview their draft poll.",
       "W05 like creation and status validate content publication through the existing W03 published-social context before non-atomic preflight, block checks or cache use; comment likes obtain author/parent IDs from social_comments and parent publication/owner from W03.",
       "W05 content-liker list GET validates the target's canonical published state/owner through W03_CONTENT, then reads only W05 interaction_likes and social_user_interactions for paging and Block filtering.",
-      "W05 profile-replies collects bounded candidate comment IDs from social_comments, resolves their currently published parent-content owner/state in one W03_CONTENT batch, and retains W05-owned Block/Mute filtering and cursor pagination without joining canonical contents. W05 profile-liked-content lists collect bounded target IDs from interaction_likes, resolve published owner/state in one W03_CONTENT batch, and apply W05-owned Block/Mute filtering without joining canonical contents."
+      "W05 profile-replies collects bounded candidate comment IDs from social_comments, resolves their currently published parent-content owner/state in one W03_CONTENT batch, and retains W05-owned Block/Mute filtering and cursor pagination without joining canonical contents. W05 profile-liked-content lists collect bounded target IDs from interaction_likes, resolve published owner/state in one W03_CONTENT batch, and apply W05-owned Block/Mute filtering without joining canonical contents. W05 comment-list GET validates the target's currently published state through the existing W03 published-social-context binding before reading W05-owned social_comments, likes and block/mute relations; the list SQL does not join canonical contents."
     ],
     "outOfScope": [
       "Comment insertion's atomic content-state/policy recheck remains unchanged.",
@@ -91,7 +91,7 @@
       "Publication can change after W03 validates a poll read or vote attempt but before W05 completes its mutation; W03 and W05 cannot share a transaction, so the final vote INSERT cannot atomically recheck canonical publication state. Each public poll read and vote attempt revalidates through W03, but a narrow unpublish race can still permit a vote write against stale W05 poll metadata.",
       "The final W05 like INSERT retains its existing single-statement canonical content publication and block rechecks for race safety; W03 and W05 cannot share a transaction across Workers.",
       "The publication state may change after W03 validates a content-liker list request because W03 and W05 cannot share a read transaction; the next request revalidates through W03.",
-      "Publication may change after W03 returns a profile-replies batch because W03 and W05 cannot share a read transaction; every profile-replies page revalidates parent content IDs through W03."
+      "Publication may change after W03 returns a profile-replies batch because W03 and W05 cannot share a read transaction; every profile-replies page revalidates parent content IDs through W03. Publication may change after W03 validates a comment-list GET and before W05 reads comments; the next GET revalidates canonical publication through W03."
     ]
   },
   "evidenceRequired": [
@@ -120,7 +120,7 @@
     "W05 poll result GET validates published visibility through W03, preserves owner-only draft preview fallback, fails closed on missing binding, and performs no direct canonical contents read.",
     "W05 like POST/GET use W03 published-social context without forwarding Authorization/Cookie; status cache is consulted only after canonical visibility and W05 block checks; content status reads only W05 interaction_likes; comment status reads W05 social_comments then W03 parent context.",
     "W05 content-liker list uses W03 published-social-context without Authorization/Cookie forwarding and performs no direct canonical contents query in its W05 list SQL.",
-    "W05 profile-replies batch call carries only W05 caller/version/correlation headers, contains at most 50 IDs, does not forward Authorization/Cookie, filters missing/unpublished parents, preserves W05 Block/Mute rules, and performs no direct canonical contents query. W05 profile-liked-content list batches at most 50 liked content IDs through W03, filters missing/unpublished targets and owner Block/Mute relations in W05, preserves cursor scoping, and performs no direct canonical contents query."
+    "W05 profile-replies batch call carries only W05 caller/version/correlation headers, contains at most 50 IDs, does not forward Authorization/Cookie, filters missing/unpublished parents, preserves W05 Block/Mute rules, and performs no direct canonical contents query. W05 profile-liked-content list batches at most 50 liked content IDs through W03, filters missing/unpublished targets and owner Block/Mute relations in W05, preserves cursor scoping, and performs no direct canonical contents query. W05 comment-list GET calls W03 published-social-context before D1, forwards only W05 caller/version/correlation metadata without Authorization/Cookie, fails closed when W03 is missing or content is unpublished, preserves recursive comment order/cursors and viewer Block/Mute filtering, and performs no canonical contents query."
   ],
   "operations": [
     {
@@ -298,7 +298,7 @@
         "w05ServiceBindingCallsMax": 1
       },
       "consumers": [
-        "profile replies parent-content visibility and owner Block filtering; profile liked-content visibility and owner Block/Mute filtering"
+        "profile replies parent-content visibility and owner Block filtering; profile liked-content visibility and owner Block/Mute filtering; public comment list publication validation"
       ]
     }
   ]
