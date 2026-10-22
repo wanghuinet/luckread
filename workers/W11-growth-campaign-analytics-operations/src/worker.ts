@@ -1,7 +1,7 @@
 import { ingestAnalyticsBatch } from './analytics-ingest'
 import type {
-  AnalyticsD1Database,
   AnalyticsD1PreparedStatement,
+  AnalyticsD1Result,
 } from './analytics-d1-store'
 
 interface AnalyticsSchemaObject {
@@ -15,8 +15,9 @@ interface AnalyticsHealthStatement extends AnalyticsD1PreparedStatement {
   all(): Promise<{ results?: AnalyticsSchemaObject[] }>
 }
 
-type W11AnalyticsDatabase = AnalyticsD1Database & {
+interface W11AnalyticsDatabase {
   prepare(query: string): AnalyticsHealthStatement
+  batch(statements: AnalyticsD1PreparedStatement[]): Promise<AnalyticsD1Result[]>
 }
 
 export interface W11Env {
@@ -132,7 +133,7 @@ const errorResponse = (
   status: number,
   code: string,
   message: string,
-  requestId = crypto.randomUUID(),
+  requestId: string = crypto.randomUUID(),
 ): Response => jsonResponse({
   error: { code, message, details: {} },
   requestId,
