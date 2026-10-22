@@ -199,6 +199,11 @@ const pendingMutationKeys = new Map<string, PendingMutationEntry>();
 const PENDING_MUTATION_TTL_MS = 15 * 60 * 1000;
 const MAX_PENDING_MUTATION_KEYS = 512;
 
+/** Prevent a pending key from crossing sign-in/account boundaries. */
+export function clearPendingMutationKeys(): void {
+  pendingMutationKeys.clear();
+}
+
 function stableSerialize(value: unknown): string {
   if (value === null || typeof value !== 'object') return JSON.stringify(value) ?? 'undefined';
   if (Array.isArray(value)) return '[' + value.map(stableSerialize).join(',') + ']';
