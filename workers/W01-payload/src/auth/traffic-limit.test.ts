@@ -10,6 +10,7 @@ import {
   enforcePublicReadRateLimit,
   enforceW01WriteRateLimit,
   enforceW01WriteAccountRateLimit,
+  enforceW01WriteEndpointRateLimit,
   rateLimitResponse,
   TrafficLimitError,
 } from './traffic-limit.js'
@@ -158,4 +159,33 @@ describe('traffic limits', () => {
     )
   })
 
+
+  it('checks the fixed W01 endpoint bucket', async () => {
+    const writeLimiter = { limit: vi.fn(async ({ key }: { key: string }) => ({ success: true })) }
+    contextMock.mockResolvedValue({ env: { W01_WRITE_LIMITER: writeLimiter } } as never)
+
+    await expect(enforceW01WriteEndpointRateLimit('transitionAccountState')).resolves.toBeUndefined()
+
+    expect(writeLimiter.limit).toHaveBeenCalledWith({ key: 'w01-write:endpoint:transitionAccountState' })
+  })
+
+  it('rejects an exhausted W01 endpoint bucket', async () => {
+    const writeLimiter = { limit: vi.fn(async () => ({ success: false })) }
+    contextMock.mockResolvedValue({ env: { W01_WRITE_LIMITER: writeLimiter } } as never)
+
+    await expect(enforceW01WriteEndpointRateLimit('transitionAccountState')).rejects.toBeInstanceOf(TrafficLimitError)
+  })
+
+  it('fails closed when the W01 endpoint limiter binding is missing', async () => {
+    contextMock.mockResolvedValue({ env: {} } as never)
+
+    await expect(enforceW01WriteEndpointRateLimit('transitionAccountState')).rejects.toThrow(
+      'RATE_LIMIT_BINDING_UNAVAILABLE:W01_WRITE_LIMITER',
+    )
+  })
+
+  it('rejects unbounded or user-controlled endpoint identifiers', async () => {
+    await expect(enforceW01WriteEndpointRateLimit('/users/42/account-state')).rejects.toThrow('RATE_LIMIT_ENDPOINT_INVALID')
+    expect(contextMock).not.toHaveBeenCalled()
+  })
 })
