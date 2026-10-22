@@ -133,6 +133,17 @@ describe('traffic limits', () => {
   })
 
 
+  it('fails closed when the W01 global write limiter binding is missing', async () => {
+    const writeLimiter = { limit: vi.fn(async () => ({ success: true })) }
+    contextMock.mockResolvedValue({ env: { W01_WRITE_LIMITER: writeLimiter } } as never)
+
+    await expect(
+      enforceW01WriteRateLimit(new Request('https://luckread.com/api/v1/media')),
+    ).rejects.toThrow('RATE_LIMIT_BINDING_UNAVAILABLE:W01_WRITE_ORIGIN_GLOBAL_LIMITER')
+
+    expect(writeLimiter.limit).not.toHaveBeenCalled()
+  })
+
   it('checks the authenticated account bucket for W01 writes', async () => {
     const calls: string[] = []
     const writeLimiter = { limit: vi.fn(async ({ key }: { key: string }) => { calls.push(key); return { success: true } }) }
