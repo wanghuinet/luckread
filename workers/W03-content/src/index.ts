@@ -548,7 +548,7 @@ const worker = {
         if (
           request.headers.has('Authorization') ||
           request.headers.has('Cookie') ||
-          url.searchParams.size !== 1 ||
+          [...url.searchParams.keys()].length !== 1 ||
           !url.searchParams.has('url')
         ) {
           throw new ContentRuntimeError('PERMISSION_DENIED', 403)
