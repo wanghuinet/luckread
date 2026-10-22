@@ -209,6 +209,15 @@ jobs:
           anon="$(curl --silent --show-error -o /tmp/media-anon.json -w '%{http_code}' "$W01_BASE_URL/api/v1/media/$MEDIA_ID")"
           node --input-type=module -e "import {writeFileSync} from 'node:fs';const other=Number(process.argv[1]);const anon=Number(process.argv[2]);if(![401,403,404].includes(other))throw new Error('non-owner access not denied: '+other);if(![401,403,404].includes(anon))throw new Error('anonymous access not denied: '+anon);writeFileSync('artifacts/mapping-0/media-runtime-e2e/access.json',JSON.stringify({status:'PASS',nonOwnerHttpStatus:other,anonymousHttpStatus:anon},null,2)+'\\n')" "$other" "$anon"
 
+      - name: Checkout media lifecycle test harness
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          path: runtime-harness
+          fetch-depth: 1
+
+      - name: Verify creator media library, playback delivery, and delete lifecycle
+        run: node runtime-harness/scripts/media-runtime-lifecycle-e2e.mjs
       - name: Cleanup media and account fixtures
         if: always()
         env:
