@@ -126,3 +126,28 @@ export async function enforceW01WriteAccountRateLimit(accountId: string): Promis
   const result = await limiter.limit({ key: 'w01-write:account:' + encodeURIComponent(subject) })
   if (!result.success) throw new TrafficLimitError()
 }
+
+
+/**
+ * Apply the per-operation bucket for a fixed W01 route. The endpoint identifier
+ * must be a stable operation name, never a user-controlled URL or path.
+ */
+export async function enforceW01WriteEndpointRateLimit(endpoint: string): Promise<void> {
+  const operation = endpoint.trim()
+  if (!/^[A-Za-z][A-Za-z0-9._-]{0,127}$/.test(operation)) {
+    throw new Error('RATE_LIMIT_ENDPOINT_INVALID')
+  }
+
+  let env: Record<string, unknown>
+  try {
+    const context = await getCloudflareContext({ async: true })
+    env = context.env as unknown as Record<string, unknown>
+  } catch {
+    return
+  }
+
+  const limiter = env.W01_WRITE_LIMITER as RateLimitBinding | undefined
+  if (!limiter) throw new Error('RATE_LIMIT_BINDING_UNAVAILABLE:W01_WRITE_LIMITER')
+  const result = await limiter.limit({ key: 'w01-write:endpoint:' + encodeURIComponent(operation) })
+  if (!result.success) throw new TrafficLimitError()
+}
