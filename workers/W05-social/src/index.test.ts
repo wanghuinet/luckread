@@ -35,6 +35,7 @@ const publishedContextsBatchBinding = () => ({
     const body = await request.clone().json() as { contentIds: string[] }
     return Response.json({ data: { items: body.contentIds.map(contentId => ({
       contentId, ownerUserId: 'owner-1', contentType: 'post', state: 'PUBLISHED',
+      title: 'Title ' + contentId,
       updatedAt: '2026-10-17T04:00:00.000Z',
     })) } })
   }),
@@ -49,6 +50,89 @@ const publishedContextBinding = () => ({
       data: { contentId, ownerUserId: 'owner-1', contentType: 'post', state: 'PUBLISHED', updatedAt: '2026-10-17T04:00:00.000Z' },
     })
   }),
+})
+
+describe('W05 topic page transport', () => {
+  it('loads topic IDs from W05 and resolves published cards through the bounded W03 batch', async () => {
+    const queries: string[] = []
+    const candidateRows = [
+      { target_id: 'content-1', created_at: '2026-10-20T00:00:00.000Z' },
+      { target_id: 'content-2', created_at: '2026-10-19T00:00:00.000Z' },
+    ]
+    const d = {
+      prepare: vi.fn((sql: string) => {
+        queries.push(sql)
+        return {
+          bind: vi.fn(() => ({
+            first: async () => ({
+              topic_id: 'topic-reading', normalized_name: 'reading', display_name: 'Reading', status: 'ACTIVE',
+            }),
+            all: async () => ({ results: candidateRows }),
+          })),
+        }
+      }),
+    } as unknown as D1Database
+    const binding = {
+      fetch: vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const forwarded = input instanceof Request ? input : new Request(input, init)
+        const body = await forwarded.clone().json() as { contentIds: string[] }
+        return Response.json({ data: { items: body.contentIds.filter(id => id === 'content-1').map(contentId => ({
+          contentId, ownerUserId: 'owner-1', contentType: 'post', state: 'PUBLISHED',
+          title: 'Title from W03', updatedAt: '2026-10-17T04:00:00.000Z',
+        })) } })
+      }),
+    }
+    const response = await worker.fetch(
+      request('/internal/social/topics/reading?limit=2', {
+        'X-LuckRead-Caller': 'W01',
+        'X-LuckRead-Transport-Version': '1.0',
+        'X-LuckRead-Correlation-Id': 'topic-page-read',
+      }),
+      { DB: d, W03_CONTENT: binding },
+    )
+
+    expect(response.status).toBe(200)
+    expect(binding.fetch).toHaveBeenCalledTimes(1)
+    const forwarded = binding.fetch.mock.calls[0]?.[0] as Request
+    expect(forwarded.url).toContain('/internal/content/published-social-context-batch')
+    expect(forwarded.headers.get('X-LuckRead-Caller')).toBe('W05')
+    expect(forwarded.headers.get('X-LuckRead-Correlation-Id')).toBe('topic-page-read')
+    expect(forwarded.headers.has('Authorization')).toBe(false)
+    expect(forwarded.headers.has('Cookie')).toBe(false)
+    await expect(forwarded.json()).resolves.toEqual({ contentIds: ['content-1', 'content-2'] })
+    expect(queries.every(sql => !/\b(?:FROM|JOIN)\s+contents\b/i.test(sql))).toBe(true)
+    await expect(response.json()).resolves.toMatchObject({
+      data: {
+        topic: { topicId: 'topic-reading', name: 'reading', displayName: 'Reading', status: 'ACTIVE' },
+        contents: [
+          { id: 'content-1', contentType: 'post', title: 'Title from W03', updatedAt: '2026-10-17T04:00:00.000Z' },
+        ],
+        hasMore: false,
+        nextCursor: null,
+      },
+    })
+  })
+
+  it('fails closed if W03 batch context is unavailable for a public topic page', async () => {
+    const d = {
+      prepare: vi.fn(() => ({
+        bind: vi.fn(() => ({
+          first: async () => ({ topic_id: 'topic-reading', normalized_name: 'reading', display_name: 'Reading', status: 'ACTIVE' }),
+          all: async () => ({ results: [{ target_id: 'content-1', created_at: '2026-10-20T00:00:00.000Z' }] }),
+        })),
+      })),
+    } as unknown as D1Database
+    const response = await worker.fetch(
+      request('/internal/social/topics/reading?limit=2', {
+        'X-LuckRead-Caller': 'W01',
+        'X-LuckRead-Transport-Version': '1.0',
+        'X-LuckRead-Correlation-Id': 'topic-page-no-w03',
+      }),
+      { DB: d },
+    )
+    expect(response.status).toBe(503)
+    expect((d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).toHaveBeenCalledTimes(2)
+  })
 })
 
 describe('W05 social query transport', () => {
