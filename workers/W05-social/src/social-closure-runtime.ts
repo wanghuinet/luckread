@@ -383,7 +383,7 @@ const decodeDiscoveryTopicCursor = (value: string | null): DiscoveryTopicCursor 
       typeof parsed.latestContentAt !== 'string' ||
       !Number.isFinite(Date.parse(parsed.latestContentAt)) ||
       typeof parsed.topicId !== 'string' ||
-      !/^[A-Za-z0-9][\\p{L}\\p{N}_-]{0,127}$/u.test(parsed.topicId)
+      !/^[A-Za-z0-9][\p{L}\p{N}_-]{0,127}$/u.test(parsed.topicId)
     ) {
       throw new Error('invalid discovery topic cursor')
     }
