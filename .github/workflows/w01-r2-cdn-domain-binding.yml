@@ -69,6 +69,7 @@ jobs:
           const asItems = (value) => {
             if (Array.isArray(value)) return value
             if (Array.isArray(value?.domains)) return value.domains
+            if (Array.isArray(value?.buckets)) return value.buckets
             if (Array.isArray(value?.result)) return value.result
             return []
           }
