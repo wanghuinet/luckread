@@ -5,9 +5,10 @@ export const PUBLIC_VIDEO_MEDIA_ORIGIN = 'https://video.luckread.com'
 // MIME type, so choose the video host from the file extension. Keep common
 // source-video and adaptive-streaming playlist/segment formats on video.
 const VIDEO_EXTENSIONS = new Set([
-  '3g2', '3gp', 'avi', 'aac', 'm2ts', 'm2v', 'm4a', 'm4s', 'm4p',
-  'mkv', 'mov', 'mp2', 'mp4', 'mp4a', 'mpe', 'mpeg', 'mpg', 'mpg4',
-  'mpd', 'm3u8', 'mts', 'ogg', 'ogv', 'qt', 'ts', 'vtt', 'webm', 'wmv',
+  '3g2', '3gp', 'aac', 'asf', 'avi', 'f4v', 'flv', 'm2ts', 'm2v', 'm4a',
+  'm4s', 'm4v', 'm4p', 'mkv', 'mov', 'mp2', 'mp4', 'mp4a', 'mpe', 'mpeg',
+  'mpg', 'mpg4', 'mpd', 'm3u8', 'mts', 'ogg', 'ogv', 'qt', 'rm', 'rmvb',
+  'ts', 'vtt', 'webm', 'wmv',
 ])
 
 export interface PublicMediaUrlInput {
