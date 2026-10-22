@@ -543,7 +543,7 @@ export default {
           throw new SocialClosureRuntimeError('VALIDATION_FAILED', 400)
         }
         return json({
-          data: await listDiscoveryTopics(env.DB, discoveryUrl.searchParams.get('limit'), discoveryUrl.searchParams.get('cursor')),
+          data: await listDiscoveryTopics(env.DB, env.W03_CONTENT, request.headers.get('X-LuckRead-Correlation-Id') ?? '', discoveryUrl.searchParams.get('limit'), discoveryUrl.searchParams.get('cursor')),
           requestId: createRequestId(),
         })
       }
