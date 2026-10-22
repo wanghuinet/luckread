@@ -7,15 +7,18 @@ import {
 
 const fakeCache = () => {
   let value: unknown = null
+  let lastCacheControl: string | null = null
   const match = vi.fn(async () => value === null ? undefined : Response.json(value))
   const put = vi.fn(async (_request: RequestInfo | URL, response: Response) => {
     value = await response.clone().json()
+    lastCacheControl = response.headers.get('cache-control')
   })
   return {
     cache: { match, put } as unknown as Pick<Cache, 'match' | 'put'>,
     match,
     put,
     read: () => value,
+    lastCacheControl: () => lastCacheControl,
   }
 }
 
@@ -46,6 +49,13 @@ describe('W04 edge-cache search trend projection', () => {
     const stored = fake.read() as { items: Array<Record<string, unknown>> }
     expect(stored.items.every((item) => !('userId' in item) && !('actorUserId' in item))).toBe(true)
     expect(fake.put).toHaveBeenCalledTimes(7)
+  })
+
+  it('sets the edge-cache TTL to the full 24-hour trend retention window', async () => {
+    const fake = fakeCache()
+    await recordSearchTrend('luckread', fake.cache)
+
+    expect(fake.lastCacheControl()).toBe('public, max-age=86400')
   })
 
   it('keeps only terms seen within the retention window', async () => {
