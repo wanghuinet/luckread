@@ -296,7 +296,7 @@ describe('W05 unified social closure', () => {
         { topicId: 'topic-00000', contentCount: 1 },
       ])
       expect(page.hasMore).toBe(true)
-      expect(queries.every(sql => !/(?:FROM|JOIN)\\s+contents\\b/i.test(sql))).toBe(true)
+      expect(queries.every(sql => !/(?:FROM|JOIN)\s+contents\b/i.test(sql))).toBe(true)
       expect(requestedIds).toHaveLength(5201)
       expect(requestedIds.filter(contentId => contentId === 'content-00000')).toHaveLength(2)
       expect(binding.fetch).toHaveBeenCalledTimes(105)
