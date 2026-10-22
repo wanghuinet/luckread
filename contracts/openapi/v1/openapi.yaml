@@ -895,7 +895,7 @@ paths:
         Returns a bounded, approximate edge-cache projection derived only from
         successful public searches with results. Counts are not authoritative analytics,
         may be regional/approximate, and never include viewer identifiers.
-      operationId: listTrendingSearchTerms
+      operationId: getSearchTrending
       security: []
       parameters:
         - name: limit
