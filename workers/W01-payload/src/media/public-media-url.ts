@@ -12,11 +12,13 @@ export interface PublicMediaUrlInput {
  */
 export function createPublicMediaUrl({ filename, prefix = '' }: PublicMediaUrlInput): string {
   const segments = [...prefix.split('/'), filename].filter(Boolean)
+  const hasPathSeparator = filename.includes('/') || filename.includes('\\')
+  const hasTraversalSegment = segments.some((segment) => segment === '.' || segment === '..')
 
-  if (!filename.trim() || filename.includes('/') || filename.includes('\\\\') || segments.some((segment) => segment === '.' || segment === '..')) {
+  if (!filename.trim() || hasPathSeparator || hasTraversalSegment) {
     throw new Error('Invalid R2 media object key')
   }
 
   const encodedKey = segments.map((segment) => encodeURIComponent(segment)).join('/')
-  return `${PUBLIC_MEDIA_ORIGIN}/${encodedKey}`
+  return PUBLIC_MEDIA_ORIGIN + '/' + encodedKey
 }
