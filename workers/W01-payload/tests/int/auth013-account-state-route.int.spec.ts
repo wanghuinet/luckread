@@ -20,6 +20,7 @@ const mocks = vi.hoisted(() => {
     getBetterAuthPrincipal: vi.fn(),
     transitionAccountState: vi.fn(),
     enforceW01WriteRateLimit: vi.fn(),
+    enforceW01WriteAccountRateLimit: vi.fn(),
     rateLimitResponse: vi.fn(),
     MockW02AuthClientError,
     MockTrafficLimitError,
@@ -35,6 +36,7 @@ vi.mock('../../src/auth/w02-session-client.js', () => ({
 vi.mock('../../src/auth/traffic-limit.js', () => ({
   TrafficLimitError: mocks.MockTrafficLimitError,
   enforceW01WriteRateLimit: mocks.enforceW01WriteRateLimit,
+  enforceW01WriteAccountRateLimit: mocks.enforceW01WriteAccountRateLimit,
   rateLimitResponse: mocks.rateLimitResponse,
 }))
 
@@ -45,6 +47,7 @@ describe('AUTH-013 W01 public account-state route', () => {
     vi.clearAllMocks()
 
     mocks.enforceW01WriteRateLimit.mockResolvedValue(undefined)
+    mocks.enforceW01WriteAccountRateLimit.mockResolvedValue(undefined)
     mocks.rateLimitResponse.mockImplementation(() => Response.json({
       error: { code: 'RATE_LIMITED', message: 'Too many requests', details: { retryAfter: 60 } },
       requestId: 'req_rate_limited',
@@ -88,6 +91,56 @@ describe('AUTH-013 W01 public account-state route', () => {
       error: { code: 'SERVICE_UNAVAILABLE' },
     })
     expect(mocks.getBetterAuthPrincipal).not.toHaveBeenCalled()
+    expect(mocks.transitionAccountState).not.toHaveBeenCalled()
+  })
+
+  it('rate limits an authenticated operator account before mutating state', async () => {
+    mocks.enforceW01WriteAccountRateLimit.mockRejectedValueOnce(new mocks.MockTrafficLimitError())
+
+    const response = await POST(
+      new Request('https://luckread.test/v1/users/42/account-state', {
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer verified',
+          'If-Match': '"7"',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ to: 'RESTRICTED', reason: 'moderation action' }),
+      }),
+      { params: Promise.resolve({ userId: '42' }) },
+    )
+
+    expect(response.status).toBe(429)
+    await expect(response.json()).resolves.toMatchObject({
+      error: { code: 'RATE_LIMITED' },
+    })
+    expect(mocks.getBetterAuthPrincipal).toHaveBeenCalledTimes(1)
+    expect(mocks.enforceW01WriteAccountRateLimit).toHaveBeenCalledWith('7')
+    expect(mocks.transitionAccountState).not.toHaveBeenCalled()
+  })
+
+  it('fails closed when the authenticated account limiter is unavailable', async () => {
+    mocks.enforceW01WriteAccountRateLimit.mockRejectedValueOnce(
+      new Error('RATE_LIMIT_BINDING_UNAVAILABLE:W01_WRITE_LIMITER'),
+    )
+
+    const response = await POST(
+      new Request('https://luckread.test/v1/users/42/account-state', {
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer verified',
+          'If-Match': '"7"',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ to: 'RESTRICTED', reason: 'moderation action' }),
+      }),
+      { params: Promise.resolve({ userId: '42' }) },
+    )
+
+    expect(response.status).toBe(503)
+    await expect(response.json()).resolves.toMatchObject({
+      error: { code: 'SERVICE_UNAVAILABLE' },
+    })
     expect(mocks.transitionAccountState).not.toHaveBeenCalled()
   })
 
