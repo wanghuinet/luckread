@@ -1,6 +1,3 @@
-import { getPayload } from 'payload'
-
-import config from '@payload-config'
 import { resolvePublicArticleBodyUrl } from '../lib/article-summary-preview.js'
 
 type JsonRecord = Record<string, unknown>
@@ -172,6 +169,13 @@ export async function validateOwnedPostMediaReferences(
 ): Promise<PostMediaReferenceValidation> {
   const record = asRecord(input)
   if (!record || record.contentType !== 'post') return { valid: true }
+  // Keep the pure reference validator safe to import in unit tests and
+  // lightweight routes. Load Payload only when a social-post write actually
+  // needs the authoritative media-record lookup.
+  const [{ getPayload }, { default: config }] = await Promise.all([
+    import('payload'),
+    import('@payload-config'),
+  ])
   const payload = await getPayload({ config })
   return validateOwnedPostMediaReferencesWithPayload(
     payload as unknown as PayloadReadPort,
