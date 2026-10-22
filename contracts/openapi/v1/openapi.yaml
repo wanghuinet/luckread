@@ -2607,8 +2607,9 @@ paths:
       summary: List recent popular public search terms
       description: >-
         Returns a bounded, approximate edge-cache projection derived only from
-        successful public searches with results. Counts are not authoritative analytics,
-        may be regional/approximate, and never include viewer identifiers.
+        successful public searches with results. A term is only surfaced after three
+        successful searches in the local edge-cache region. Counts are approximate,
+        may be regional, and never include viewer identifiers.
       operationId: getSearchTrending
       security: []
       parameters:
