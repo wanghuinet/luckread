@@ -156,6 +156,8 @@ const validateActor = (actorUserId: string): string => {
 
 type LikeTargetContext = {
   relatedUserIds: string[]
+  /** W03-authoritative parent owner captured before the W05-owned comment-like write. */
+  parentOwnerUserId?: string | null
 }
 
 const resolvePublishedContext = async (
@@ -212,6 +214,7 @@ const resolveLikeTargetContext = async (
   return {
     relatedUserIds: [comment.author_user_id, parentContext.ownerUserId]
       .filter((userId): userId is string => typeof userId === 'string' && userId.length > 0),
+    parentOwnerUserId: parentContext.ownerUserId,
   }
 }
 
@@ -286,10 +289,8 @@ export async function like(
         (relationship_id, actor_user_id, target_type, target_id, created_at)
        SELECT ?, ?, 'comment', c.id, ?
          FROM social_comments c
-         JOIN contents content ON content.id = c.content_id
         WHERE c.id = ?
           AND c.state = 'PUBLISHED'
-          AND content.state = 'PUBLISHED'
           AND NOT EXISTS (
             SELECT 1
               FROM social_user_interactions block
@@ -299,9 +300,9 @@ export async function like(
                  OR
                  (block.actor_user_id = c.author_user_id AND block.target_user_id = ?)
                  OR
-                 (block.actor_user_id = ? AND block.target_user_id = content.owner_user_id)
+                 (block.actor_user_id = ? AND block.target_user_id = ?)
                  OR
-                 (block.actor_user_id = content.owner_user_id AND block.target_user_id = ?)
+                 (block.actor_user_id = ? AND block.target_user_id = ?)
                )
           )
        ON CONFLICT(actor_user_id, target_type, target_id)
@@ -316,7 +317,7 @@ export async function like(
       targetId,
       ...(targetType === 'content'
         ? [actor, actor]
-        : [actor, actor, actor, actor]),
+        : [actor, actor, actor, targetContext.parentOwnerUserId ?? null, targetContext.parentOwnerUserId ?? null, actor]),
     )
     .first<{ relationship_id: string; actor_user_id: string; target_type: 'content' | 'comment'; target_id: string; created_at: string }>()
 
