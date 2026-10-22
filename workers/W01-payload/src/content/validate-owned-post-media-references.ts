@@ -151,7 +151,7 @@ export async function validateOwnedPostMediaReferencesWithPayload(
   }
 
   // A path-only match would incorrectly equate distinct hosts, for example
-  // https://api.luckread.com/media/a.png and https://cdn.luckread.com/media/a.png.
+  // https://api.luckread.com/media/a.png and https://img.luckread.com/media/a.png.
   // Relative URLs are normalized against the API origin above, then compared
   // as full canonical URLs just like absolute references.
   for (const ref of refs) {

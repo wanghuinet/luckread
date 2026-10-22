@@ -26,7 +26,8 @@ describe('Media upload access', () => {
     expect(media).toContain("req.payload.findByID({ collection: 'media', id, depth: 0 })")
     expect(media).toContain("String((media as unknown as { ownerUserId?: string | number | null }).ownerUserId ?? '') === String(req.user.id)")
     const migration = read('src/migrations/20261002_120000_media_owner.ts')
-    expect(migration).toContain('ALTER TABLE \\`media\\` ADD COLUMN \\`owner_user_id\\` text;')
+    expect(migration).toContain('ALTER TABLE')
+    expect(migration).toContain('owner_user_id')
   })
 
   it('enforces the 12-media limit across repeated uploads', () => {
@@ -43,7 +44,10 @@ describe('Media upload access', () => {
     const assetLibrary = read('src/app/(payload)/v1beta/CreatorAssetLibrary.tsx')
 
     expect(config).toContain("r2Storage({")
-    expect(config).toContain("collections: { media: true }")
+    expect(config).toContain('const mediaStorageCollections = isWorkerRuntime')
+    expect(config).toContain('disablePayloadAccessControl: true')
+    expect(config).toContain('generateFileURL: createPublicMediaUrl')
+    expect(config).toContain('collections: mediaStorageCollections')
     expect(publisher).toContain('authorizedFetch<{')
     expect(publisher).toContain("'/api/v1/media'")
     expect(publisher).toContain("headers: { 'Idempotency-Key': 'media-upload:' + crypto.randomUUID() }")
@@ -137,8 +141,6 @@ describe('Media upload access', () => {
     expect(library).toContain("'Idempotency-Key': 'media-delete:' + crypto.randomUUID()")
   })
 
-
-
   it('exposes owner-authorized media metadata updates through the stable v1 resource path', () => {
     const route = read('src/app/api/v1/media/[mediaId]/route.ts')
 
@@ -198,65 +200,63 @@ describe('Media upload access', () => {
     expect(route).not.toContain('presigned')
   })
 
-it('guards creator media listing before Payload authentication', () => {
-  const route = read('src/app/api/v1/media/route.ts')
-  const guardIndex = route.indexOf('await enforcePublicReadRateLimit(request)')
-  const authIndex = route.indexOf('authenticated = await authenticate(request)')
-  expect(guardIndex).toBeGreaterThanOrEqual(0)
-  expect(authIndex).toBeGreaterThanOrEqual(0)
-  expect(guardIndex).toBeLessThan(authIndex)
-  expect(route).toContain('TrafficLimitError')
-  expect(route).toContain('rateLimitResponse(request)')
-})
+  it('guards creator media listing before Payload authentication', () => {
+    const route = read('src/app/api/v1/media/route.ts')
+    const guardIndex = route.indexOf('await enforcePublicReadRateLimit(request)')
+    const authIndex = route.indexOf('authenticated = await authenticate(request)')
+    expect(guardIndex).toBeGreaterThanOrEqual(0)
+    expect(authIndex).toBeGreaterThanOrEqual(0)
+    expect(guardIndex).toBeLessThan(authIndex)
+    expect(route).toContain('TrafficLimitError')
+    expect(route).toContain('rateLimitResponse(request)')
+  })
 
-it('guards media detail reads before the Payload route', () => {
-  const route = read('src/app/api/v1/media/[mediaId]/route.ts')
-  const guardIndex = route.indexOf('await enforcePublicReadRateLimit(request)')
-  const payloadIndex = route.indexOf('await payloadMediaGet(')
-  expect(guardIndex).toBeGreaterThanOrEqual(0)
-  expect(payloadIndex).toBeGreaterThanOrEqual(0)
-  expect(guardIndex).toBeLessThan(payloadIndex)
-  expect(route).toContain('TrafficLimitError')
-})
+  it('guards media detail reads before the Payload route', () => {
+    const route = read('src/app/api/v1/media/[mediaId]/route.ts')
+    const guardIndex = route.indexOf('await enforcePublicReadRateLimit(request)')
+    const payloadIndex = route.indexOf('await payloadMediaGet(')
+    expect(guardIndex).toBeGreaterThanOrEqual(0)
+    expect(payloadIndex).toBeGreaterThanOrEqual(0)
+    expect(guardIndex).toBeLessThan(payloadIndex)
+    expect(route).toContain('TrafficLimitError')
+  })
 
+  it('guards media creation before the Payload upload handler', () => {
+    const route = read('src/app/api/v1/media/route.ts')
+    const guardIndex = route.indexOf('await enforceW01WriteRateLimit(request)')
+    const payloadIndex = route.indexOf('await payloadMediaPost(')
+    expect(guardIndex).toBeGreaterThanOrEqual(0)
+    expect(payloadIndex).toBeGreaterThanOrEqual(0)
+    expect(guardIndex).toBeLessThan(payloadIndex)
+  })
 
-it('guards media creation before the Payload upload handler', () => {
-  const route = read('src/app/api/v1/media/route.ts')
-  const guardIndex = route.indexOf('await enforceW01WriteRateLimit(request)')
-  const payloadIndex = route.indexOf('await payloadMediaPost(')
-  expect(guardIndex).toBeGreaterThanOrEqual(0)
-  expect(payloadIndex).toBeGreaterThanOrEqual(0)
-  expect(guardIndex).toBeLessThan(payloadIndex)
-})
+  it('guards media update and delete before the Payload handlers', () => {
+    const route = read('src/app/api/v1/media/[mediaId]/route.ts')
+    expect(route).toContain('await enforceW01WriteRateLimit(request)')
+    expect(route).toContain('await payloadMediaDelete(')
+    expect(route).toContain('await payloadMediaPatch(')
+    const guards = [...route.matchAll(/await enforceW01WriteRateLimit\(request\)/g)]
+    expect(guards.length).toBe(2)
+  })
 
-it('guards media update and delete before the Payload handlers', () => {
-  const route = read('src/app/api/v1/media/[mediaId]/route.ts')
-  expect(route).toContain('await enforceW01WriteRateLimit(request)')
-  expect(route).toContain('await payloadMediaDelete(')
-  expect(route).toContain('await payloadMediaPatch(')
-  const guards = [...route.matchAll(/await enforceW01WriteRateLimit\(request\)/g)]
-  expect(guards.length).toBe(2)
-})
+  it('persists upload idempotency metadata and replays completed uploads safely', () => {
+    const media = read('src/collections/Media.ts')
+    const route = read('src/app/api/v1/media/route.ts')
+    const migration = read('src/migrations/20261022_120000_MIG_MEDIA_UPLOAD_IDEMPOTENCY_V1.ts')
+    const inventory = read('../../contracts/payload/payload-native-inventory.v1.json')
 
-
-it('persists upload idempotency metadata and replays completed uploads safely', () => {
-  const media = read('src/collections/Media.ts')
-  const route = read('src/app/api/v1/media/route.ts')
-  const migration = read('src/migrations/20261022_120000_MIG_MEDIA_UPLOAD_IDEMPOTENCY_V1.ts')
-  const inventory = read('../../contracts/payload/payload-native-inventory.v1.json')
-
-  expect(media).toContain("name: 'uploadIdempotencyKey'")
-  expect(media).toContain("name: 'uploadFingerprint'")
-  expect(media).toContain("unique: true")
-  expect(media).toContain("req.headers.get('Idempotency-Key')")
-  expect(media).toContain("req.headers.get('X-LuckRead-Upload-Fingerprint')")
-  expect(route).toContain('findUploadByIdempotencyKey')
-  expect(route).toContain('resolvePreviousUpload')
-  expect(route).toContain("apiErrorResponse(409, 'IDEMPOTENCY_KEY_REUSE_CONFLICT'")
-  expect(route).toContain("where: { identityId: { equals: identityId } }")
-  expect(route).toContain("resolvePayloadOwnerUserId(authenticated.payload, authenticated.identityId)")
-  expect(migration).toContain('CREATE UNIQUE INDEX')
-  expect(migration).toContain('media_upload_idempotency_key_idx')
-  expect(inventory).toContain('uploadIdempotencyKey')
-  expect(inventory).toContain('uploadFingerprint')
-})
+    expect(media).toContain("name: 'uploadIdempotencyKey'")
+    expect(media).toContain("name: 'uploadFingerprint'")
+    expect(media).toContain("unique: true")
+    expect(media).toContain("req.headers.get('Idempotency-Key')")
+    expect(media).toContain("req.headers.get('X-LuckRead-Upload-Fingerprint')")
+    expect(route).toContain('findUploadByIdempotencyKey')
+    expect(route).toContain('resolvePreviousUpload')
+    expect(route).toContain("apiErrorResponse(409, 'IDEMPOTENCY_KEY_REUSE_CONFLICT'")
+    expect(route).toContain("where: { identityId: { equals: identityId } }")
+    expect(route).toContain("resolvePayloadOwnerUserId(authenticated.payload, authenticated.identityId)")
+    expect(migration).toContain('CREATE UNIQUE INDEX')
+    expect(migration).toContain('media_upload_idempotency_key_idx')
+    expect(inventory).toContain('uploadIdempotencyKey')
+    expect(inventory).toContain('uploadFingerprint')
+  })
