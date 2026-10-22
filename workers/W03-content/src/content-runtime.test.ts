@@ -7,8 +7,9 @@ import w03Worker, { hasCreatorContentPermission, hasSocialPostPermission, parseL
 
 describe('W03 content contract core', () => {
 
-  it('checks public media only when an exact reference belongs to a published social post', async () => {
+  it('checks public media only when a known URL for it is referenced by a published social post', async () => {
     const publicUrl = 'https://img.luckread.com/media/photo%20(1).png'
+    const historicalUrl = 'https://cdn.luckread.com/media/photo%20(1).png'
     let query = ''
     let bindings: unknown[] = []
     const env = {
@@ -19,7 +20,7 @@ describe('W03 content contract core', () => {
             bind(...values: unknown[]) {
               bindings = values
               return {
-                first: async () => values[0] === publicUrl ? { id: 'post_public_1' } : null,
+                first: async () => values.includes(historicalUrl) ? { id: 'post_public_1' } : null,
               }
             },
           }
@@ -47,10 +48,17 @@ describe('W03 content contract core', () => {
     await expect(publicResponse.json()).resolves.toMatchObject({ data: { isPublic: true } })
     expect(query).toContain("state = 'PUBLISHED'")
     expect(query).toContain("content_type = 'post'")
-    expect(query).toContain('body_ref = ?')
-    expect(query).toContain('cover_ref = ?')
+    expect(query).toContain('body_ref IN (')
+    expect(query).toContain('cover_ref IN (')
     expect(query).toContain('json_each(contents.media_refs_json)')
-    expect(bindings).toEqual([publicUrl, publicUrl, publicUrl])
+    expect(query).toContain('media_ref.value IN (')
+    const candidatesPerColumn = (query.match(/\?/g) ?? []).length / 3
+    expect(candidatesPerColumn).toBeGreaterThanOrEqual(2)
+    expect(bindings.length).toBe(candidatesPerColumn * 3)
+    expect(bindings[0]).toBe(publicUrl)
+    expect(bindings[candidatesPerColumn]).toBe(publicUrl)
+    expect(bindings[candidatesPerColumn * 2]).toBe(publicUrl)
+    expect(bindings).toContain(historicalUrl)
 
     const unpublishedResponse = await w03Worker.fetch(
       request('https://img.luckread.com/media/draft-only.png'),
@@ -78,7 +86,6 @@ describe('W03 content contract core', () => {
     )
     expect(forwardedCredential.status).toBe(403)
   })
-
   it('serves bookmarked contents only through authenticated W01 transport', async () => {
     const row = {
       id: 'content_1', content_type: 'post', owner_user_id: 'user_1', creator_id: 'user_1',
