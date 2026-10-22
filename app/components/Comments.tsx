@@ -31,6 +31,8 @@ type ApiComment = {
   createdAt: string;
   updatedAt?: string;
   likedByViewer?: boolean;
+  /** Batched, public author projection hydrated by W01 with the comment page. */
+  author?: PublicUser | null;
 };
 
 type CommentPage = {
@@ -155,11 +157,45 @@ export default function Comments({ contentId }: CommentsProps) {
 
   useEffect(() => {
     let active = true;
-    const authorIds = Array.from(new Set(comments.map((comment) => comment.authorUserId).filter(Boolean)));
-    if (authorIds.length === 0) return () => { active = false; };
+    const hasEmbeddedProfile = (comment: ApiComment) => Boolean(
+      comment.author &&
+      ['username', 'displayName', 'avatar'].every((key) =>
+        Object.prototype.hasOwnProperty.call(comment.author, key),
+      ),
+    );
+    const embeddedComments = comments.filter(hasEmbeddedProfile);
+    const authorIds = Array.from(new Set(
+      comments
+        .filter((comment) => !hasEmbeddedProfile(comment))
+        .map((comment) => comment.authorUserId)
+        .filter(Boolean),
+    ));
+    if (embeddedComments.length === 0 && authorIds.length === 0) {
+      return () => { active = false; };
+    }
 
     void (async () => {
       const sessionToken = await readSessionToken().catch(() => null);
+      const next: Record<string, PublicUser> = {};
+
+      // W01 returns author projections in the same comments page. Hydrate media
+      // sources locally and avoid a separate profile request per comment author.
+      for (const comment of embeddedComments) {
+        const profile = comment.author;
+        if (!profile) continue;
+        const avatar = resolveNativeMediaSource(profile.avatar, sessionToken);
+        next[comment.authorUserId] = {
+          ...profile,
+          avatar: avatar?.uri ?? null,
+          avatarHeaders: avatar?.headers,
+        };
+      }
+
+      if (Object.keys(next).length > 0) {
+        setProfiles((current) => ({ ...current, ...next }));
+      }
+      if (authorIds.length === 0) return;
+
       const results = await Promise.all(authorIds.map(async (authorId) => {
         try {
           const { response, data } = await apiRequest<PublicUserResponse>(
@@ -178,12 +214,15 @@ export default function Comments({ contentId }: CommentsProps) {
           return null;
         }
       }));
+
       if (!active) return;
-      const next: Record<string, PublicUser> = {};
+      const fallbackProfiles: Record<string, PublicUser> = {};
       for (const result of results) {
-        if (result) next[result[0]] = result[1];
+        if (result) fallbackProfiles[result[0]] = result[1];
       }
-      if (Object.keys(next).length > 0) setProfiles((current) => ({ ...current, ...next }));
+      if (Object.keys(fallbackProfiles).length > 0) {
+        setProfiles((current) => ({ ...current, ...fallbackProfiles }));
+      }
     })();
 
     return () => { active = false; };
@@ -390,7 +429,7 @@ export default function Comments({ contentId }: CommentsProps) {
       ) : null}
 
       {comments.map((comment) => {
-        const author = profiles[comment.authorUserId];
+        const author = profiles[comment.authorUserId] ?? comment.author ?? undefined;
         const authorName = author?.displayName?.trim() || author?.username || 'LuckRead member';
         const authorHandle = author?.username || comment.authorUserId;
         const createdAt = formatDate(comment.createdAt);

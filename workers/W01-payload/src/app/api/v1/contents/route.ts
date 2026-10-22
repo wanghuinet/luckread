@@ -1,4 +1,5 @@
 import { cachedPublicGet } from '../../../../lib/public-response-cache.js'
+import { enrichContentListAuthors } from '../../../../lib/enrich-public-authors.js'
 import {
   ContentListQueryError,
   hasAuthenticatedSessionCredential,
@@ -29,23 +30,24 @@ export async function GET(request: Request): Promise<Response> {
     if (hasAuthenticatedSessionCredential(request)) {
       const principal = await resolveCookieContentPrincipal(request)
       if (principal instanceof Response) return principal
-      return await callW03Content({
+      const response = await callW03Content({
         request,
         pathname: `/internal/content/contents${suffix}`,
         method: 'GET',
         principal,
       })
+      return await enrichContentListAuthors(response)
     }
 
     await enforcePublicReadRateLimit(request)
     return await cachedPublicGet(
       request,
       'content-list',
-      () => callW03Content({
+      async () => enrichContentListAuthors(await callW03Content({
         request,
         pathname: `/internal/content/contents${suffix}`,
         method: 'GET',
-      }),
+      })),
       30,
     )
   } catch (error) {

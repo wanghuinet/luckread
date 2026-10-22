@@ -11,6 +11,7 @@ import {
   W05SocialClientError,
 } from '../../../../../../social/w05-social-client.js'
 import { invalidatePublicContentComments } from '../../../../../../lib/public-response-cache.js'
+import { enrichCommentListAuthors } from '../../../../../../lib/enrich-public-authors.js'
 
 const errorResponse = (status: number, code: string, message: string) =>
   Response.json(
@@ -48,21 +49,22 @@ export async function GET(
       return await cachedPublicGet(
         request,
         'content-comments',
-        () => callW05SocialPublic({
+        async () => enrichCommentListAuthors(await callW05SocialPublic({
           request,
           pathname: '/internal/social/contents/' + encodeURIComponent(contentId) + '/comments' + suffix,
           method: 'GET',
-        }),
+        })),
         10,
       )
     }
 
-    return await callW05SocialPublic({
+    const response = await callW05SocialPublic({
       request,
       pathname: '/internal/social/contents/' + encodeURIComponent(contentId) + '/comments' + suffix,
       method: 'GET',
       principal: viewer,
     })
+    return await enrichCommentListAuthors(response)
   } catch (error) {
     if (error instanceof TrafficLimitError) return rateLimitResponse(request)
     if (error instanceof W05SocialClientError) {

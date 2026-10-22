@@ -235,7 +235,15 @@ const publicAuthorReads = new Map<string, Promise<ApiAuthor | null>>();
 
 export async function readContentAuthor(item: ApiContentRecord): Promise<ApiAuthor | null> {
   const embedded = item.creator || item.author;
-  if (embedded && (embedded.username || embedded.displayName || embedded.avatar)) return embedded;
+  // W01 list responses include the complete public projection when available.
+  // Treat explicit empty fields as a resolved profile too, so an unknown or
+  // avatar-less account does not trigger another request for every feed item.
+  if (
+    embedded &&
+    ['username', 'displayName', 'avatar'].every((key) =>
+      Object.prototype.hasOwnProperty.call(embedded, key),
+    )
+  ) return embedded;
 
   const authorId = item.creatorId || item.ownerUserId || embedded?.id || embedded?.userId;
   if (!authorId) return null;
