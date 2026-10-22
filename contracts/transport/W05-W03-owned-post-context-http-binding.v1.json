@@ -80,11 +80,11 @@
       "W05 like creation and status validate content publication through the existing W03 published-social context before non-atomic preflight, block checks or cache use; comment likes obtain author/parent IDs from social_comments and parent publication/owner from W03.",
       "W05 content-liker list GET validates the target's canonical published state/owner through W03_CONTENT, then reads only W05 interaction_likes and social_user_interactions for paging and Block filtering.",
       "W05 profile-replies collects bounded candidate comment IDs from social_comments, resolves their currently published parent-content owner/state in one W03_CONTENT batch, and retains W05-owned Block/Mute filtering and cursor pagination without joining canonical contents. W05 profile-liked-content lists collect bounded target IDs from interaction_likes, resolve published owner/state in one W03_CONTENT batch, and apply W05-owned Block/Mute filtering without joining canonical contents. W05 comment-list GET validates the target's currently published state through the existing W03 published-social-context binding before reading W05-owned social_comments, likes and block/mute relations; the list SQL does not join canonical contents.",
-      "W05 comment PATCH and DELETE load comment-owned metadata from social_comments, validate the parent content's current PUBLISHED state through getPublishedContentSocialContext, and keep author/state/version/leaf-reply guards in W05 without querying canonical contents; an existing author-deleted tombstone remains an idempotent delete success without requiring current publication context."
+      "W05 comment PATCH and DELETE load comment-owned metadata from social_comments, validate the parent content's current PUBLISHED state through getPublishedContentSocialContext, and keep author/state/version/leaf-reply guards in W05 without querying canonical contents; an existing author-deleted tombstone remains an idempotent delete success without requiring current publication context.",
+      "W05 topic-page reads page only W05-owned social_target_topics IDs and resolves currently published state, type, title and updatedAt for each bounded batch through W03_CONTENT; W05 issues no canonical contents JOIN and skips stale/unpublished topic edges."
     ],
     "outOfScope": [
       "Comment insertion's atomic content-state/policy recheck remains unchanged.",
-      "Other W05 reads from the contents table are not claimed as fixed.",
       "Comment insertion's atomic W05 policy, block and publication rechecks still query canonical content state within the existing transaction.",
       "Cross-Worker publication changes cannot be transactionally locked with a W05 share-link write; every share resolution revalidates through W03 and denies unpublished or missing content.",
       "A W03 publication change cannot be transactionally locked with a W05 repost insert; feed/read paths must independently revalidate canonical visibility before disclosing repost targets.",
@@ -93,7 +93,8 @@
       "The final W05 like INSERT retains its existing single-statement canonical content publication and block rechecks for race safety; W03 and W05 cannot share a transaction across Workers.",
       "The publication state may change after W03 validates a content-liker list request because W03 and W05 cannot share a read transaction; the next request revalidates through W03.",
       "Publication may change after W03 returns a profile-replies batch because W03 and W05 cannot share a read transaction; every profile-replies page revalidates parent content IDs through W03. Publication may change after W03 validates a comment-list GET and before W05 reads comments; the next GET revalidates canonical publication through W03.",
-      "Canonical publication can change after W03 validates a comment edit/delete because the Workers cannot share a transaction; W05 mutation guards remain local to social_comments and subsequent reads revalidate current published visibility."
+      "Canonical publication can change after W03 validates a comment edit/delete because the Workers cannot share a transaction; W05 mutation guards remain local to social_comments and subsequent reads revalidate current published visibility.",
+      "W05 trending discovery-topic aggregation (`listDiscoveryTopics`) remains a separate read-model slice and is not changed by this topic-page closure. Comment creation's atomic policy/publication recheck and the content-like final INSERT retain their existing direct canonical reads for race protection."
     ]
   },
   "evidenceRequired": [
@@ -123,7 +124,8 @@
     "W05 like POST/GET use W03 published-social context without forwarding Authorization/Cookie; status cache is consulted only after canonical visibility and W05 block checks; content status reads only W05 interaction_likes; comment status reads W05 social_comments then W03 parent context.",
     "W05 content-liker list uses W03 published-social-context without Authorization/Cookie forwarding and performs no direct canonical contents query in its W05 list SQL.",
     "W05 profile-replies batch call carries only W05 caller/version/correlation headers, contains at most 50 IDs, does not forward Authorization/Cookie, filters missing/unpublished parents, preserves W05 Block/Mute rules, and performs no direct canonical contents query. W05 profile-liked-content list batches at most 50 liked content IDs through W03, filters missing/unpublished targets and owner Block/Mute relations in W05, preserves cursor scoping, and performs no direct canonical contents query. W05 comment-list GET calls W03 published-social-context before D1, forwards only W05 caller/version/correlation metadata without Authorization/Cookie, fails closed when W03 is missing or content is unpublished, preserves recursive comment order/cursors and viewer Block/Mute filtering, and performs no canonical contents query.",
-    "W05 comment PATCH/DELETE use getPublishedContentSocialContext through W03_CONTENT without Authorization/Cookie forwarding, fail closed when the binding is missing or content is unpublished, preserve author/version/leaf-reply/tombstone behavior, and perform no direct canonical contents-table query."
+    "W05 comment PATCH/DELETE use getPublishedContentSocialContext through W03_CONTENT without Authorization/Cookie forwarding, fail closed when the binding is missing or content is unpublished, preserve author/version/leaf-reply/tombstone behavior, and perform no direct canonical contents-table query.",
+    "W05 topic-page read takes a bounded W05 topic-edge batch, calls the existing W03 published-social-context-batch without forwarding credentials, renders canonical titles/types/timestamps from W03, filters unpublished/missing content, uses an opaque W05 topic-edge cursor, fails closed when W03 is missing, and issues no canonical contents SQL."
   ],
   "operations": [
     {
@@ -275,7 +277,7 @@
       "principalRequired": false,
       "caller": "W05 only through W03_CONTENT Service Binding",
       "publicExposure": false,
-      "purpose": "Resolve a bounded set of content publication/type/owner contexts for social profile reply visibility without one W03 round trip per reply.",
+      "purpose": "Resolve a bounded set of content publication/type/owner contexts for social profile reply visibility without one W03 round trip per reply. The batch also returns the public title field needed to render topic-page content cards without a W05 direct contents join.",
       "requestFields": {
         "contentIds": "Array of 0 to 50 canonical content IDs; duplicates are de-duplicated"
       },
@@ -292,7 +294,8 @@
         "items.ownerUserId",
         "items.contentType",
         "items.state",
-        "items.updatedAt"
+        "items.updatedAt",
+        "items.title"
       ],
       "ownerUserIdNullable": true,
       "cache": "NO_STORE",
@@ -303,7 +306,8 @@
         "w05ServiceBindingCallsMax": 1
       },
       "consumers": [
-        "profile replies parent-content visibility and owner Block filtering; profile liked-content visibility and owner Block/Mute filtering; public comment list publication validation"
+        "profile replies parent-content visibility and owner Block filtering; profile liked-content visibility and owner Block/Mute filtering; public comment list publication validation",
+        "public topic-page content card visibility/title resolution"
       ]
     }
   ]

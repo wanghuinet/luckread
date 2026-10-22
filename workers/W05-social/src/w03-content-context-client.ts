@@ -181,6 +181,8 @@ export type PublishedContentSocialContext = {
   contentType: 'article' | 'post' | 'video'
   state: 'PUBLISHED'
   updatedAt: string
+  /** Present on bounded published-content batch responses used for public cards. */
+  title?: string
 }
 
 type PublishedContentSocialContextInput = {
@@ -333,6 +335,7 @@ export async function fetchPublishedContentSocialContexts(
       contentType: context.contentType as PublishedContentSocialContext['contentType'],
       state: 'PUBLISHED',
       updatedAt: context.updatedAt,
+      ...(typeof context.title === 'string' ? { title: context.title } : {}),
     })
   }
   return contexts

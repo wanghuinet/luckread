@@ -557,7 +557,14 @@ export default {
         if (topicName === null) throw new SocialClosureRuntimeError('VALIDATION_FAILED', 400)
         const topicUrl = new URL(request.url)
         return json({
-          data: await getTopicPage(env.DB, topicName, topicUrl.searchParams.get('limit'), topicUrl.searchParams.get('cursor')),
+          data: await getTopicPage(
+            env.DB,
+            env.W03_CONTENT,
+            topicName,
+            topicUrl.searchParams.get('limit'),
+            topicUrl.searchParams.get('cursor'),
+            request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? '',
+          ),
           requestId: crypto.randomUUID(),
         })
       }

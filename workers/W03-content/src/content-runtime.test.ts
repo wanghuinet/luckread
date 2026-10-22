@@ -218,8 +218,8 @@ describe('W03 content contract core', () => {
 
   it('serves a bounded batch of published social contexts only through the W05 internal transport', async () => {
     const rows = [
-      { id: 'content_1', owner_user_id: 'owner_1', content_type: 'post', updated_at: '2026-10-17T04:00:00.000Z' },
-      { id: 'content_2', owner_user_id: 'owner_2', content_type: 'article', updated_at: '2026-10-18T04:00:00.000Z' },
+      { id: 'content_1', owner_user_id: 'owner_1', content_type: 'post', title: '第一篇', updated_at: '2026-10-17T04:00:00.000Z' },
+      { id: 'content_2', owner_user_id: 'owner_2', content_type: 'article', title: '第二篇', updated_at: '2026-10-18T04:00:00.000Z' },
     ]
     let query = ''
     let bindings: unknown[] = []
@@ -254,12 +254,13 @@ describe('W03 content contract core', () => {
     expect(response.status).toBe(200)
     await expect(response.json()).resolves.toMatchObject({
       data: { items: [
-        { contentId: 'content_1', ownerUserId: 'owner_1', contentType: 'post', state: 'PUBLISHED', updatedAt: '2026-10-17T04:00:00.000Z' },
-        { contentId: 'content_2', ownerUserId: 'owner_2', contentType: 'article', state: 'PUBLISHED', updatedAt: '2026-10-18T04:00:00.000Z' },
+        { contentId: 'content_1', ownerUserId: 'owner_1', contentType: 'post', state: 'PUBLISHED', title: '第一篇', updatedAt: '2026-10-17T04:00:00.000Z' },
+        { contentId: 'content_2', ownerUserId: 'owner_2', contentType: 'article', state: 'PUBLISHED', title: '第二篇', updatedAt: '2026-10-18T04:00:00.000Z' },
       ] },
     })
     expect(query).toContain("state = 'PUBLISHED'")
     expect(query).toContain('id IN (?, ?)')
+    expect(query).toContain('title')
     expect(bindings).toEqual(['content_1', 'content_2'])
     expect((await w03Worker.fetch(request('W01'), env, {} as never)).status).toBe(403)
     expect((await w03Worker.fetch(request('W05', { Cookie: 'must-not-be-forwarded' }), env, {} as never)).status).toBe(403)

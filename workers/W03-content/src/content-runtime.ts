@@ -590,10 +590,12 @@ export async function getPublishedContentSocialContext(
   }
 }
 
+export type PublishedContentSocialSummaryContext = PublishedContentSocialContext & { title: string }
+
 export async function getPublishedContentSocialContexts(
   db: ContentD1,
   contentIdsValue: string[],
-): Promise<PublishedContentSocialContext[]> {
+): Promise<PublishedContentSocialSummaryContext[]> {
   if (!Array.isArray(contentIdsValue) || contentIdsValue.length > 50) {
     throw new ContentRuntimeError('VALIDATION_FAILED', 400)
   }
@@ -606,7 +608,7 @@ export async function getPublishedContentSocialContexts(
 
   const placeholders = uniqueContentIds.map(() => '?').join(', ')
   const rows = await db.prepare(
-    `SELECT id, owner_user_id, content_type, updated_at
+    `SELECT id, owner_user_id, content_type, title, updated_at
        FROM contents
       WHERE state = 'PUBLISHED'
         AND id IN (${placeholders})`,
@@ -614,9 +616,10 @@ export async function getPublishedContentSocialContexts(
     id: string
     owner_user_id: string | null
     content_type: string
+    title: string
     updated_at: string
   }>()
-  const byId = new Map<string, PublishedContentSocialContext>()
+  const byId = new Map<string, PublishedContentSocialSummaryContext>()
   for (const row of rows.results ?? []) {
     if (!uniqueContentIds.includes(row.id)) throw new ContentRuntimeError('INTERNAL_ERROR', 500)
     if (!['article', 'post', 'video'].includes(row.content_type)) {
@@ -627,6 +630,7 @@ export async function getPublishedContentSocialContexts(
       ownerUserId: row.owner_user_id,
       contentType: row.content_type as ContentType,
       state: 'PUBLISHED',
+      title: row.title,
       updatedAt: row.updated_at,
     })
   }
