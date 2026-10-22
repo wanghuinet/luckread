@@ -139,7 +139,10 @@ describe('W01/W03 social post media-reference authority boundary', () => {
     await expect(validateOwnedPostMediaReferencesWithPayload(
       payload,
       'better-auth-user-7',
-      post(),
+      post({
+        mediaRefs: ['https://img.luckread.com/media/photo.png'],
+        coverRef: 'https://img.luckread.com/media/photo.png',
+      }),
       origin,
     )).resolves.toMatchObject({ valid: false, status: 422, code: 'VALIDATION_FAILED' })
   })
