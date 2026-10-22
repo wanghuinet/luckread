@@ -159,7 +159,9 @@ export default function Comments({ contentId }: CommentsProps) {
     let active = true;
     const hasEmbeddedProfile = (comment: ApiComment) => Boolean(
       comment.author &&
-      (comment.author.username || comment.author.displayName || comment.author.avatar),
+      ['username', 'displayName', 'avatar'].every((key) =>
+        Object.prototype.hasOwnProperty.call(comment.author, key),
+      ),
     );
     const embeddedComments = comments.filter(hasEmbeddedProfile);
     const authorIds = Array.from(new Set(
