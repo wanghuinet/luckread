@@ -334,6 +334,16 @@ export async function getTopicPage(
     throw new SocialClosureRuntimeError('VALIDATION_FAILED', 400)
   }
   if (!correlationId.trim()) throw new SocialClosureRuntimeError('VALIDATION_FAILED', 400)
+
+  const compareText = (left: string, right: string): number => {
+    const leftPoints = Array.from(left, character => character.codePointAt(0)!)
+    const rightPoints = Array.from(right, character => character.codePointAt(0)!)
+    const length = Math.min(leftPoints.length, rightPoints.length)
+    for (let index = 0; index < length; index += 1) {
+      if (leftPoints[index] !== rightPoints[index]) return leftPoints[index]! - rightPoints[index]!
+    }
+    return leftPoints.length - rightPoints.length
+  }
   const limit = parseLimit(limitValue)
   const cursor = cursorValue ? decodeCursor(cursorValue) : null
   const topic = await db.prepare(
@@ -570,15 +580,6 @@ export async function listDiscoveryTopics(
   // Match SQLite's BINARY text ordering for Unicode topic IDs. JavaScript's
   // default string comparison orders UTF-16 code units, which differs for
   // supplementary-plane letters that valid hashtag tokens can contain.
-  const compareText = (left: string, right: string): number => {
-    const leftPoints = Array.from(left, character => character.codePointAt(0)!)
-    const rightPoints = Array.from(right, character => character.codePointAt(0)!)
-    const length = Math.min(leftPoints.length, rightPoints.length)
-    for (let index = 0; index < length; index += 1) {
-      if (leftPoints[index] !== rightPoints[index]) return leftPoints[index]! - rightPoints[index]!
-    }
-    return leftPoints.length - rightPoints.length
-  }
   ranked = [...stats.values()].sort((a, b) =>
     b.contentCount - a.contentCount ||
     compareText(b.latestContentAt, a.latestContentAt) ||
