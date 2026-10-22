@@ -247,16 +247,15 @@ const publicPostMediaReferenceCandidates = (value: string): string[] => {
       'https://cdn.luckread.com/' + objectKey,
     ])
 
-    // Historical Payload Media URLs for a single filename may still be stored
-    // as API file routes. Include exact known origin forms, never arbitrary hosts.
-    if (decodedSegments.length === 1) {
-      const payloadPath = '/api/media/file/' + encodeURIComponent(decodedSegments[0]!)
-      candidates.add(payloadPath)
-      candidates.add('https://api.luckread.com' + payloadPath)
-      candidates.add('https://luckread.com' + payloadPath)
-      candidates.add('https://www.luckread.com' + payloadPath)
-      candidates.add('https://mp.luckread.com' + payloadPath)
-    }
+    // Payload's media file endpoint resolves the stored Media document by filename,
+    // even when the configured R2 key has a collection/prefix path.
+    const filename = decodedSegments[decodedSegments.length - 1]!
+    const payloadPath = '/api/media/file/' + encodeURIComponent(filename)
+    candidates.add(payloadPath)
+    candidates.add('https://api.luckread.com' + payloadPath)
+    candidates.add('https://luckread.com' + payloadPath)
+    candidates.add('https://www.luckread.com' + payloadPath)
+    candidates.add('https://mp.luckread.com' + payloadPath)
     return [...candidates]
   } catch {
     return []
