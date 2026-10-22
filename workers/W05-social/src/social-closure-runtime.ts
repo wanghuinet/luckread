@@ -1,5 +1,5 @@
 /// <reference types="@cloudflare/workers-types" />
-import type { PublishedContentSocialContext } from './w03-content-context-client.js'
+import { fetchPublishedContentSocialContexts, type PublishedContentSocialContext, type W03ContentBinding } from './w03-content-context-client.js'
 
 export class SocialClosureRuntimeError extends Error {
   constructor(readonly code: string, readonly status: number) { super(code) }
@@ -246,9 +246,11 @@ export async function getSocialTargets(
 
 export async function getTopicPage(
   db: D1Database,
+  w03Content: W03ContentBinding | undefined,
   topicNameValue: string,
   limitValue: string | null,
   cursorValue: string | null = null,
+  correlationId = '',
 ): Promise<{
   topic: { topicId: string; name: string; displayName: string; status: string }
   contents: Array<{ id: string; contentType: string; title: string; updatedAt: string }>
@@ -259,36 +261,87 @@ export async function getTopicPage(
   if (!normalizedName || normalizedName.length > 64) {
     throw new SocialClosureRuntimeError('VALIDATION_FAILED', 400)
   }
+  if (!correlationId.trim()) throw new SocialClosureRuntimeError('VALIDATION_FAILED', 400)
   const limit = parseLimit(limitValue)
-  const cursor = cursorValue
-    ? decodeCursor(cursorValue)
-    : null
+  const cursor = cursorValue ? decodeCursor(cursorValue) : null
   const topic = await db.prepare(
     'SELECT topic_id, normalized_name, display_name, status FROM social_topics WHERE normalized_name = ? LIMIT 1',
   ).bind(normalizedName).first<{ topic_id: string; normalized_name: string; display_name: string; status: string }>()
   if (!topic || topic.status !== 'ACTIVE') throw new SocialClosureRuntimeError('NOT_FOUND', 404)
 
-  const where = cursor
-    ? ' AND (c.updated_at < ? OR (c.updated_at = ? AND c.id < ?))'
-    : ''
-  const binds = cursor
-    ? [topic.topic_id, cursor.createdAt, cursor.createdAt, cursor.notificationId, limit + 1]
-    : [topic.topic_id, limit + 1]
+  // W05 pages its own topic edges in bounded batches. W03 remains authoritative
+  // for published state, type, title and update time; stale edges never leak.
+  const batchSize = 50
+  const maxBatches = 4
+  let scanCursor = cursor ? { createdAt: cursor.createdAt, targetId: cursor.notificationId } : null
+  let lastScanned: { createdAt: string; targetId: string } | null = null
+  let sourceExhausted = false
+  let batchesScanned = 0
+  const visible: Array<{
+    id: string
+    contentType: string
+    title: string
+    updatedAt: string
+    topicCreatedAt: string
+  }> = []
 
-  const rows = await db.prepare(
-    `SELECT c.id, c.content_type, c.title, c.updated_at
-       FROM social_target_topics st
-       JOIN contents c ON c.id = st.target_id
-      WHERE st.target_type = 'content'
-        AND st.topic_id = ?
-        AND c.state = 'PUBLISHED'${where}
-      ORDER BY c.updated_at DESC, c.id DESC
-      LIMIT ?`,
-  ).bind(...binds).all<{ id: string; content_type: string; title: string; updated_at: string }>()
+  while (batchesScanned < maxBatches && visible.length <= limit && !sourceExhausted) {
+    const where = scanCursor
+      ? ' AND (st.created_at < ? OR (st.created_at = ? AND st.target_id < ?))'
+      : ''
+    const binds = scanCursor
+      ? [topic.topic_id, scanCursor.createdAt, scanCursor.createdAt, scanCursor.targetId, batchSize]
+      : [topic.topic_id, batchSize]
+    const candidates = await db.prepare(
+      `SELECT st.target_id, st.created_at
+         FROM social_target_topics st
+        WHERE st.target_type = 'content'
+          AND st.topic_id = ?${where}
+        ORDER BY st.created_at DESC, st.target_id DESC
+        LIMIT ?`,
+    ).bind(...binds).all<{ target_id: string; created_at: string }>()
+    const rows = candidates.results ?? []
+    batchesScanned += 1
+    if (rows.length === 0) {
+      sourceExhausted = true
+      break
+    }
 
-  const items = rows.results ?? []
-  const visible = items.slice(0, limit)
-  const last = visible.at(-1)
+    const last = rows.at(-1)!
+    lastScanned = { createdAt: last.created_at, targetId: last.target_id }
+    scanCursor = lastScanned
+    if (rows.length < batchSize) sourceExhausted = true
+
+    const contexts = await fetchPublishedContentSocialContexts(w03Content, {
+      contentIds: rows.map(row => row.target_id),
+      correlationId,
+    })
+    for (const row of rows) {
+      const context = contexts.get(row.target_id)
+      if (!context) continue
+      if (typeof context.title !== 'string') {
+        throw new SocialClosureRuntimeError('SERVICE_UNAVAILABLE', 503)
+      }
+      visible.push({
+        id: context.contentId,
+        contentType: context.contentType,
+        title: context.title,
+        updatedAt: context.updatedAt,
+        topicCreatedAt: row.created_at,
+      })
+    }
+  }
+
+  const hasExtra = visible.length > limit
+  const page = visible.slice(0, limit)
+  const lastVisible = page.at(-1)
+  const hasMore = hasExtra || (!sourceExhausted && batchesScanned >= maxBatches && lastScanned !== null)
+  const cursorAnchor = hasExtra
+    ? lastVisible
+    : hasMore && lastScanned
+      ? { topicCreatedAt: lastScanned.createdAt, id: lastScanned.targetId }
+      : null
+
   return {
     topic: {
       topicId: topic.topic_id,
@@ -296,14 +349,9 @@ export async function getTopicPage(
       displayName: topic.display_name,
       status: topic.status,
     },
-    contents: visible.map((row) => ({
-      id: row.id,
-      contentType: row.content_type,
-      title: row.title,
-      updatedAt: row.updated_at,
-    })),
-    hasMore: items.length > limit,
-    nextCursor: items.length > limit && last ? encodeCursor(last.updated_at, last.id) : null,
+    contents: page.map(({ topicCreatedAt: _topicCreatedAt, ...content }) => content),
+    hasMore,
+    nextCursor: cursorAnchor ? encodeCursor(cursorAnchor.topicCreatedAt, cursorAnchor.id) : null,
   }
 }
 
