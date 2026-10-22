@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { POST } from '../../src/app/api/v1/analytics/events/route.js'
+import { TrafficLimitError } from '../../src/auth/traffic-limit.js'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import w11Worker, { type W11Env } from '../../../W11-growth-campaign-analytics-operations/src/worker.js'
@@ -186,6 +187,66 @@ describe('W01 analytics event route integration', () => {
     const response = await POST(requestFor([validEvent()]))
 
     expect(response.status).toBe(401)
+    expect(mocks.w11Fetch).not.toHaveBeenCalled()
+  })
+
+  it('returns the existing rate-limit response before resolving identity or calling W11', async () => {
+    mocks.enforceLimit.mockRejectedValue(new TrafficLimitError())
+
+    const response = await POST(requestFor([validEvent()]))
+
+    expect(response.status).toBe(429)
+    expect(mocks.rateLimitResponse).toHaveBeenCalledTimes(1)
+    expect(mocks.resolvePrincipal).not.toHaveBeenCalled()
+    expect(mocks.w11Fetch).not.toHaveBeenCalled()
+  })
+
+  it('rejects non-JSON media types before identity resolution or W11', async () => {
+    const response = await POST(requestFor([validEvent()], { 'Content-Type': 'text/plain' }))
+
+    expect(response.status).toBe(415)
+    expect(mocks.resolvePrincipal).not.toHaveBeenCalled()
+    expect(mocks.w11Fetch).not.toHaveBeenCalled()
+  })
+
+  it('rejects malformed JSON before identity resolution or W11', async () => {
+    const request = new Request('https://www.luckread.com/api/v1/analytics/events', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{"events":[',
+    })
+
+    const response = await POST(request)
+
+    expect(response.status).toBe(422)
+    expect(mocks.resolvePrincipal).not.toHaveBeenCalled()
+    expect(mocks.w11Fetch).not.toHaveBeenCalled()
+  })
+
+  it('rejects request bodies over 64 KiB before JSON parsing or W11', async () => {
+    const request = new Request('https://www.luckread.com/api/v1/analytics/events', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: ' '.repeat(64 * 1024 + 1),
+    })
+
+    const response = await POST(request)
+
+    expect(response.status).toBe(413)
+    expect(mocks.resolvePrincipal).not.toHaveBeenCalled()
+    expect(mocks.w11Fetch).not.toHaveBeenCalled()
+  })
+
+  it('rejects batches over 90 events before identity resolution or W11', async () => {
+    const events = Array.from({ length: 91 }, (_, index) => {
+      const suffix = String(index).padStart(4, '0')
+      return validEvent({ eventId: `evt_valid_${suffix}`, dedupeKey: `dedupe_valid_${suffix}` })
+    })
+
+    const response = await POST(requestFor(events))
+
+    expect(response.status).toBe(422)
+    expect(mocks.resolvePrincipal).not.toHaveBeenCalled()
     expect(mocks.w11Fetch).not.toHaveBeenCalled()
   })
 })
