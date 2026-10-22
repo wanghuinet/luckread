@@ -7,6 +7,97 @@ import w03Worker, { hasCreatorContentPermission, hasSocialPostPermission, parseL
 
 describe('W03 content contract core', () => {
 
+  it('checks public media only when a known URL for it is referenced by a published social post', async () => {
+    const publicUrl = 'https://img.luckread.com/media/photo%20(1).png'
+    const historicalUrl = 'https://cdn.luckread.com/media/photo%20(1).png'
+    let query = ''
+    let bindings: unknown[] = []
+    const env = {
+      D1_02: {
+        prepare(sql: string) {
+          query = sql
+          return {
+            bind(...values: unknown[]) {
+              bindings = values
+              return {
+                first: async () => values.includes(historicalUrl) ? { id: 'post_public_1' } : null,
+              }
+            },
+          }
+        },
+      },
+    } as never
+    const request = (
+      mediaUrl: string,
+      caller = 'W01',
+      extraHeaders: Record<string, string> = {},
+    ) => new Request(
+      'https://luckread-w03.internal/internal/content/public-media-reference?url=' + encodeURIComponent(mediaUrl),
+      {
+        headers: {
+          'X-LuckRead-Caller': caller,
+          'X-LuckRead-Transport-Version': '1.0',
+          'X-LuckRead-Correlation-Id': 'public-media-reference-test',
+          ...extraHeaders,
+        },
+      },
+    )
+
+    const publicResponse = await w03Worker.fetch(request(publicUrl), env, {} as never)
+    expect(publicResponse.status).toBe(200)
+    await expect(publicResponse.json()).resolves.toMatchObject({ data: { isPublic: true } })
+    expect(query).toContain("state = 'PUBLISHED'")
+    expect(query).toContain("content_type = 'post'")
+    expect(query).toContain('body_ref IN (')
+    expect(query).toContain('cover_ref IN (')
+    expect(query).toContain('json_each(contents.media_refs_json)')
+    expect(query).toContain('media_ref.value IN (')
+    const candidatesPerColumn = (query.match(/\?/g) ?? []).length / 3
+    expect(candidatesPerColumn).toBeGreaterThanOrEqual(2)
+    expect(bindings.length).toBe(candidatesPerColumn * 3)
+    expect(bindings[0]).toBe(publicUrl)
+    expect(bindings[candidatesPerColumn]).toBe(publicUrl)
+    expect(bindings[candidatesPerColumn * 2]).toBe(publicUrl)
+    expect(bindings).toContain(historicalUrl)
+    expect(bindings.some((value) => typeof value === 'string' && value.startsWith('/api/media/file/'))).toBe(false)
+
+    // A published URL must not authorize a different object with the same
+    // filename under a private prefix.
+    const collisionResponse = await w03Worker.fetch(
+      request('https://img.luckread.com/private-prefix/photo%20(1).png'),
+      env,
+      {} as never,
+    )
+    expect(collisionResponse.status).toBe(200)
+    await expect(collisionResponse.json()).resolves.toMatchObject({ data: { isPublic: false } })
+    expect(bindings.some((value) => typeof value === 'string' && value.startsWith('/api/media/file/'))).toBe(false)
+
+    const unpublishedResponse = await w03Worker.fetch(
+      request('https://img.luckread.com/media/draft-only.png'),
+      env,
+      {} as never,
+    )
+    expect(unpublishedResponse.status).toBe(200)
+    await expect(unpublishedResponse.json()).resolves.toMatchObject({ data: { isPublic: false } })
+
+    const unsupportedHostResponse = await w03Worker.fetch(
+      request('https://attacker.example/media/photo.png'),
+      env,
+      {} as never,
+    )
+    expect(unsupportedHostResponse.status).toBe(200)
+    await expect(unsupportedHostResponse.json()).resolves.toMatchObject({ data: { isPublic: false } })
+
+    const untrustedCaller = await w03Worker.fetch(request(publicUrl, 'W04'), env, {} as never)
+    expect(untrustedCaller.status).toBe(403)
+
+    const forwardedCredential = await w03Worker.fetch(
+      request(publicUrl, 'W01', { Cookie: 'session=must-not-cross-service-boundary' }),
+      env,
+      {} as never,
+    )
+    expect(forwardedCredential.status).toBe(403)
+  })
   it('serves bookmarked contents only through authenticated W01 transport', async () => {
     const row = {
       id: 'content_1', content_type: 'post', owner_user_id: 'user_1', creator_id: 'user_1',
