@@ -441,6 +441,47 @@ jobs:
           print('SOCIAL_CLOSURE_V1_MIGRATION_STATIC=PASS')
           PY
 
+      - name: Verify W05 discovery ranking scan index and query plan
+        run: |
+          python - <<'PY'
+          import sqlite3
+          from pathlib import Path
+
+          db = sqlite3.connect(':memory:')
+          db.executescript(Path('workers/W05-social/migrations/20261002_002_social_003_like_v1.sql').read_text())
+          db.executescript(Path('workers/W05-social/migrations/20261002_005_social_005_comment_likes_v1.sql').read_text())
+          db.executescript(Path('workers/W05-social/migrations/20261008_011_social_closure_v1.sql').read_text())
+          db.executescript(Path('workers/W05-social/migrations/20261022_016_social_discovery_scan_idx.sql').read_text())
+
+          columns = [row[2] for row in db.execute(
+              "PRAGMA index_info('ix_social_target_topics_content_topic_target')"
+          ).fetchall()]
+          if columns != ['topic_id', 'target_id']:
+              raise SystemExit(f'unexpected discovery scan index columns: {columns}')
+
+          query = """
+            SELECT t.topic_id, t.normalized_name, t.display_name, st.target_id
+              FROM social_target_topics st
+                INDEXED BY ix_social_target_topics_content_topic_target
+              CROSS JOIN social_topics t
+             WHERE st.target_type = 'content'
+               AND t.topic_id = st.topic_id
+               AND t.status = 'ACTIVE'
+               AND (st.topic_id, st.target_id) > (?, ?)
+             ORDER BY st.topic_id ASC, st.target_id ASC
+             LIMIT ?
+          """
+          plan = [row[3] for row in db.execute(
+              'EXPLAIN QUERY PLAN ' + query, ('topic-1', 'content-1', 200)
+          ).fetchall()]
+          details = ' | '.join(plan)
+          if not any('ix_social_target_topics_content_topic_target' in row for row in plan):
+              raise SystemExit(f'discovery ranking scan did not use its covering index: {details}')
+          if any('USE TEMP B-TREE' in row for row in plan):
+              raise SystemExit(f'discovery ranking scan requires a temporary sort: {details}')
+          print('SOCIAL_DISCOVERY_SCAN_QUERY_PLAN=PASS')
+          PY
+
       - name: Run W05 unified social closure runtime tests
         working-directory: workers/W01-payload
         run: pnpm exec vitest run --config ./vitest.w05-social-closure.config.mts
