@@ -261,7 +261,7 @@ describe('W05 unified social closure', () => {
       topic_id: 'topic-99999',
       normalized_name: 'topic-99999',
       display_name: 'Topic 99999',
-      target_id: 'content-00000',
+      target_id: 'content-00001',
     })
 
     const queries: string[] = []
@@ -313,7 +313,7 @@ describe('W05 unified social closure', () => {
       expect(page.hasMore).toBe(true)
       expect(queries.every(sql => !/(?:FROM|JOIN)\\s+contents\\b/i.test(sql))).toBe(true)
       expect(requestedIds).toHaveLength(5200)
-      expect(requestedIds.filter(contentId => contentId === 'content-00000')).toHaveLength(2)
+      expect(requestedIds.filter(contentId => contentId === 'content-00001')).toHaveLength(2)
       expect(binding.fetch).toHaveBeenCalledTimes(105)
     } finally {
       vi.unstubAllGlobals()
