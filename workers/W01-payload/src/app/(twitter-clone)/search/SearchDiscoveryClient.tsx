@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { FormEvent, useEffect, useState } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import type { PublicLocale } from '../../(frontend)/i18n/public-locale'
 
 type SearchTrend = { term: string; count: number; lastSeenAt: string }
