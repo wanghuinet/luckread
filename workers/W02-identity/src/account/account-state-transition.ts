@@ -144,12 +144,19 @@ for (const layer of layers['x-layers']) {
   for (const role of layer.roles ?? []) roleToLayer.set(role, Number(layer.id.slice(1)))
 }
 
+// The canonical transition budget allows 64 D1 rows across three reads:
+// target User during authorization (1), effective role assignments (62),
+// and target User during the compare-and-set transition (1).
+const MAX_AUTHORIZATION_ROLE_ASSIGNMENT_ROWS = 62
+
 async function resolveSubjectLayer(db: D1Database, subjectId: string, now: string): Promise<number> {
   const rows = await db.prepare(
     `SELECT role_id AS roleId, scope_type AS scopeType, status, valid_from AS validFrom, valid_until AS validUntil
      FROM role_assignments
      WHERE subject_id = ? AND status = 'ACTIVE' AND valid_from <= ?
-       AND (valid_until IS NULL OR ? < valid_until)`,
+       AND (valid_until IS NULL OR ? < valid_until)
+     ORDER BY role_id ASC
+     LIMIT ${MAX_AUTHORIZATION_ROLE_ASSIGNMENT_ROWS}`,
   ).bind(subjectId, now, now).all<{ roleId: string; scopeType: string; status: string; validFrom: string; validUntil: string | null }>()
 
   let maxLayer = 0
