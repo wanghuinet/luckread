@@ -17,6 +17,12 @@ describe('v1 content adapter', () => {
     expect(route).not.toContain('prepare(')
     expect(route).not.toContain('INSERT INTO')
     expect(route).not.toContain('UPDATE ')
+    expect(route).toContain('validateOwnedPostMediaReferences')
+    const createRoute = readFileSync(
+      resolve(process.cwd(), 'src/app/api/v1/contents/route.ts'),
+      'utf8',
+    )
+    expect(createRoute).toContain('validateOwnedPostMediaReferences')
   })
 
   it('returns canonical request IDs and precise invalid-query errors', () => {
