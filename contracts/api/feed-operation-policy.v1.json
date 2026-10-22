@@ -24,7 +24,7 @@
       "path":"/feed/home",
       "visibility":"public_or_authenticated",
       "capability":"home_feed",
-      "status":"CONTRACTED_PARTIAL",
+      "status":"DEPRECATED","deprecationReason":"No W01 route currently exposes GET /feed/home. The canonical OpenAPI reference is GET /feed (operationId getFeed); this is a contract-level reference only and does not assert runtime availability.","canonicalReference":{"operationId":"getFeed","method":"GET","path":"/feed"},
       "authorization":{"required":false,"permission":"feed.read","scope":"representation_and_policy"},
       "resource":{"class":"CACHE_FIRST_BOUNDED_READ","d1ReadMax":1,"d1WriteMax":0,"d1ReadRowsMax":200,"d1WriteRowsMax":0,"rpcMax":2,"responseItemsMax":50,"candidateItemsMax":500,"cpuMsBudget":50},
       "pagination":{"style":"OPAQUE_CURSOR","pageSizeMax":50,"cursorTtlSeconds":86400,"stableSortRequired":true},
@@ -37,7 +37,7 @@
       "eligibility":["content_published","content_not_deleted","audience_policy","region_policy","age_policy","account_state","block_mute_policy"],
       "idempotency":{"required":false},
       "security":["server_owned_user_context","no_client_rank_override","no_private_data_in_shared_cache"],
-      "evidence":{"openapi":"PASS","permission":"PASS","state":"PASS","resource":"MISSING","cache":"MISSING","antiAbuse":"MISSING","integration":"MISSING","securityE2E":"MISSING"}
+      "evidence":{"openapi":"MISSING","permission":"PASS","state":"PASS","resource":"MISSING","cache":"MISSING","antiAbuse":"MISSING","integration":"MISSING","securityE2E":"MISSING"}
     },
     {
       "operationId":"getFollowingFeed",
