@@ -472,7 +472,7 @@ describe('W05 unified social closure', () => {
             if (sql.includes('INSERT OR IGNORE INTO social_notifications')) {
               insertAttempts += 1
               insertBindings.push(values)
-              throw new Error('private database detail that must not be logged')
+              throw new Error('D1_ERROR: SQLITE_BUSY: database is locked; private database detail that must not be logged')
             }
             return { success: true, meta: { changes: 1 } }
           },
