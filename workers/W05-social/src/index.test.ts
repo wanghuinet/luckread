@@ -223,16 +223,27 @@ describe('W05 social query transport', () => {
     })
   })
 
-  it('serves liked content identifiers through a bounded public GET route', async () => {
+  it('serves liked content identifiers through W03 batch visibility context without direct canonical reads', async () => {
+    const binding = publishedContextsBatchBinding()
+    const d = dbFor([{ relationship_id: 'like-1', target_id: 'content-1', created_at: '2026-10-15T10:00:00.000Z' }])
     const response = await worker.fetch(
       request('/internal/social/users/user-1/likes?limit=6', {
         'X-LuckRead-Caller': 'W01',
         'X-LuckRead-Transport-Version': '1.0',
         'X-LuckRead-Correlation-Id': 'profile-likes',
       }),
-      { DB: dbFor([{ relationship_id: 'like-1', target_id: 'content-1', created_at: '2026-10-15T10:00:00.000Z' }]) },
+      { DB: d, W03_CONTENT: binding },
     )
     expect(response.status).toBe(200)
+    expect(binding.fetch).toHaveBeenCalledTimes(1)
+    const forwarded = binding.fetch.mock.calls[0]?.[0] as Request
+    expect(forwarded.url).toContain('/internal/content/published-social-context-batch')
+    expect(forwarded.headers.get('X-LuckRead-Caller')).toBe('W05')
+    expect(forwarded.headers.has('Authorization')).toBe(false)
+    expect(forwarded.headers.has('Cookie')).toBe(false)
+    const queries = (d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare.mock.calls.map(([sql]) => String(sql))
+    expect(queries.every(sql => !sql.toLowerCase().includes('join contents') && !sql.toLowerCase().includes('from contents'))).toBe(true)
+    await expect(forwarded.json()).resolves.toEqual({ contentIds: ['content-1'] })
     await expect(response.json()).resolves.toMatchObject({
       data: { items: [{ contentId: 'content-1', likedAt: '2026-10-15T10:00:00.000Z' }], hasMore: false, nextCursor: null },
     })
