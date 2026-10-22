@@ -119,7 +119,6 @@ async function findUploadByIdempotencyKey(
 }
 
 async function resolvePreviousUpload(
-  request: Request,
   payload: Awaited<ReturnType<typeof getPayload>>,
   payloadUserId: string,
   idempotencyKey: string,
@@ -187,7 +186,6 @@ export async function POST(request: Request): Promise<Response> {
     }
 
     const previous = await resolvePreviousUpload(
-      request,
       authenticated.payload,
       String(payloadUserId),
       idempotencyKey,
