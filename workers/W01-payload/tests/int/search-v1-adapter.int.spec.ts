@@ -59,6 +59,21 @@ describe('public search v1 adapter', () => {
     expect(trends).toContain('never analytics evidence or business state')
   })
 
+  it('connects the X-style search navigation to public trending terms and query results', () => {
+    const page = read('src/app/(twitter-clone)/search/page.tsx')
+    const client = read('src/app/(twitter-clone)/search/SearchDiscoveryClient.tsx')
+    const shell = read('src/app/(twitter-clone)/TwitterCloneSecondaryPageLayout.tsx')
+    expect(shell).toContain("{ key: 'search', href: '/search', icon: 'search' }")
+    expect(shell).toContain('href="/search"><SidebarIcon name="search" />')
+    expect(page).toContain('<SearchDiscoveryClient locale={locale} initialQuery={initialQuery} />')
+    expect(client).toContain("fetch('/api/v1/search/trending?limit=10'")
+    expect(client).toContain("fetch('/api/v1/search?' + new URLSearchParams({ q: normalized, limit: '20' }).toString()")
+    expect(client).toContain("router.push('/search?q=' + encodeURIComponent(term))")
+    expect(client).toContain("href={'/content/' + encodeURIComponent(result.slug || result.id)}")
+    expect(client).toContain("trendingStatus === 'error' ? labels.trendUnavailable : labels.noTrends")
+    expect(client).toContain("resultStatus === 'error'")
+  })
+
   it('limits public search to published title/slug metadata and preserves no-store responses', () => {
     const w03Runtime = read('../W03-content/src/content-runtime.ts')
     const w01Client = read('src/feed/w04-feed-client.ts')
