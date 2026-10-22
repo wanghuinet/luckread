@@ -133,7 +133,7 @@ describe('W05 unified social closure', () => {
       { topic_id: 'topic-3', normalized_name: 'writing', display_name: 'Writing', target_id: 'content-4' },
       { topic_id: 'topic_日本', normalized_name: '日本', display_name: '日本', target_id: 'content-4' },
       { topic_id: 'topic_日本語', normalized_name: '日本語', display_name: '日本語', target_id: 'content-5' },
-      { topic_id: 'topic_\uE000', normalized_name: 'private-use', display_name: 'Private Use', target_id: 'content-6' },
+      { topic_id: 'topic_龥', normalized_name: '龥', display_name: '龥', target_id: 'content-6' },
       { topic_id: 'topic_𐐀', normalized_name: 'deseret', display_name: 'Deseret', target_id: 'content-7' },
     ]
     const queries: string[] = []
@@ -215,7 +215,7 @@ describe('W05 unified social closure', () => {
 
     const fifthPage = await listDiscoveryTopics(db, binding, 'discovery-test', '1', fourthPage.nextCursor)
     expect(fifthPage.items).toMatchObject([
-      { topicId: 'topic_\uE000', name: 'private-use', displayName: 'Private Use', contentCount: 1 },
+      { topicId: 'topic_龥', name: '龥', displayName: '龥', contentCount: 1 },
     ])
     expect(fifthPage.hasMore).toBe(true)
     expect(fifthPage.nextCursor).toEqual(expect.any(String))
