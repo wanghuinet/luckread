@@ -3419,6 +3419,17 @@ components:
         state: { $ref: '#/components/schemas/ContentState' }
         version: { type: integer, minimum: 1 }
         etag: { $ref: '#/components/schemas/ETag' }
+        creator:
+          description: Optional public author projection included by list endpoints to avoid per-item profile requests.
+          $ref: '#/components/schemas/PublicAuthor'
+    PublicAuthor:
+      type: object
+      required: [id, username, displayName, avatar]
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        username: { type: string }
+        displayName: { type: [string, 'null'] }
+        avatar: { type: [string, 'null'] }
     ContentInput:
       type: object
       required: [title, bodyRef]
@@ -3441,6 +3452,9 @@ components:
         id: { $ref: '#/components/schemas/ResourceId' }
         body: { type: string }
         state: { enum: [PENDING, PUBLISHED, REJECTED] }
+        author:
+          description: Optional public author projection included by list endpoints to avoid per-comment profile requests.
+          $ref: '#/components/schemas/PublicAuthor'
     InteractionTarget:
       type: object
       required: [targetType, targetId]
