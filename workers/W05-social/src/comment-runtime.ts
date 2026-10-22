@@ -1,5 +1,5 @@
 /// <reference types="@cloudflare/workers-types" />
-import type { PublishedContentSocialContext } from './w03-content-context-client.js'
+import { fetchPublishedContentSocialContext, type PublishedContentSocialContext, type W03ContentBinding } from './w03-content-context-client.js'
 
 import { replyAudienceAllowedParams, replyAudienceAllowedSql } from './reply-audience-runtime.js'
 
@@ -408,8 +408,10 @@ export type CommentUpdateInput = {
 
 export async function deleteComment(
   db: D1Database,
+  w03Content: W03ContentBinding | undefined,
   actorUserIdValue: string,
   commentIdValue: string,
+  correlationId: string,
 ): Promise<string> {
   const actorUserId = validateId(actorUserIdValue, 'UNAUTHENTICATED')
   const commentId = validateId(commentIdValue)
@@ -420,14 +422,12 @@ export async function deleteComment(
        c.content_id,
        c.author_user_id,
        c.state,
-       content.state AS content_state,
        EXISTS (
          SELECT 1
          FROM social_comments child
          WHERE child.parent_id = c.id
        ) AS has_replies
      FROM social_comments c
-     LEFT JOIN contents content ON content.id = c.content_id
      WHERE c.id = ?
      LIMIT 1`,
   ).bind(commentId).first<{
@@ -435,7 +435,6 @@ export async function deleteComment(
     content_id: string
     author_user_id: string
     state: 'PENDING' | 'PUBLISHED' | 'REJECTED' | 'AUTHOR_DELETED'
-    content_state: string | null
     has_replies: number
   }>()
 
@@ -444,9 +443,10 @@ export async function deleteComment(
     throw new CommentRuntimeError('PERMISSION_DENIED', 403)
   }
   if (row.state === 'AUTHOR_DELETED') return row.content_id
-  if (row.content_state !== 'PUBLISHED') {
-    throw new CommentRuntimeError('NOT_FOUND', 404)
-  }
+  await fetchPublishedContentSocialContext(w03Content, {
+    contentId: row.content_id,
+    correlationId,
+  })
   if (row.state !== 'PUBLISHED') {
     throw new CommentRuntimeError('INVALID_STATE', 409)
   }
@@ -484,9 +484,11 @@ export async function deleteComment(
 
 export async function updateComment(
   db: D1Database,
+  w03Content: W03ContentBinding | undefined,
   actorUserIdValue: string,
   commentIdValue: string,
   input: CommentUpdateInput,
+  correlationId: string,
 ): Promise<{ item: CommentItem; etag: string }> {
   const actorUserId = validateId(actorUserIdValue, 'UNAUTHENTICATED')
   const commentId = validateId(commentIdValue)
@@ -507,10 +509,8 @@ export async function updateComment(
        c.state,
        c.depth,
        c.created_at,
-       c.updated_at,
-       content.state AS content_state
+       c.updated_at
      FROM social_comments c
-     JOIN contents content ON content.id = c.content_id
      WHERE c.id = ?
      LIMIT 1`,
   ).bind(commentId).first<{
@@ -523,12 +523,13 @@ export async function updateComment(
     depth: number
     created_at: string
     updated_at: string
-    content_state: string
   }>()
 
-  if (!current || current.content_state !== 'PUBLISHED') {
-    throw new CommentRuntimeError('NOT_FOUND', 404)
-  }
+  if (!current) throw new CommentRuntimeError('NOT_FOUND', 404)
+  await fetchPublishedContentSocialContext(w03Content, {
+    contentId: current.content_id,
+    correlationId,
+  })
   if (current.author_user_id !== actorUserId) {
     throw new CommentRuntimeError('PERMISSION_DENIED', 403)
   }
