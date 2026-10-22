@@ -1,5 +1,6 @@
 import { cachedPublicGet } from '../../../../lib/public-response-cache.js'
 import { enrichContentListAuthors } from '../../../../lib/enrich-public-authors.js'
+import { mediaReferenceValidationResponse, validateOwnedPostMediaReferences } from '../../../../content/validate-owned-post-media-references.js'
 import {
   ContentListQueryError,
   hasAuthenticatedSessionCredential,
@@ -88,6 +89,9 @@ export async function POST(request: Request): Promise<Response> {
         { status: 422 },
       )
     }
+
+    const mediaValidation = await validateOwnedPostMediaReferences(principal.userId, body, new URL(request.url).origin)
+    if (!mediaValidation.valid) return mediaReferenceValidationResponse(mediaValidation)
 
     const response = await callW03Content({
       request,

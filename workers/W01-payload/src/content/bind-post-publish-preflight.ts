@@ -1,4 +1,5 @@
 import { resolvePublicArticleBodyUrl } from '../lib/article-summary-preview.js'
+import { validateOwnedPostMediaReferences } from './validate-owned-post-media-references.js'
 import { callW03Content, type ContentPrincipal } from './w03-content-client.js'
 
 type ContentForPublishCheck = {
@@ -73,6 +74,11 @@ export async function bindPreflightToStoredPost(
   }
 
   const requestUrl = new URL(request.url)
+  const mediaValidation = await validateOwnedPostMediaReferences(principal.userId, content, requestUrl.origin)
+  if (!mediaValidation.valid) {
+    return makeErrorResponse(mediaValidation.status, mediaValidation.code, mediaValidation.message)
+  }
+
   const bodyUrl = resolvePublicArticleBodyUrl(content.bodyRef, requestUrl.origin)
   if (!bodyUrl) {
     return makeErrorResponse(422, 'VALIDATION_FAILED', 'Stored post body reference is not a trusted LuckRead asset')

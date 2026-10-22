@@ -2,12 +2,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { bindPreflightToStoredPost } from '../../src/content/bind-post-publish-preflight.js'
 import { callW03Content } from '../../src/content/w03-content-client.js'
+import { validateOwnedPostMediaReferences } from '../../src/content/validate-owned-post-media-references.js'
+
+vi.mock('../../src/content/validate-owned-post-media-references.js', () => ({
+  validateOwnedPostMediaReferences: vi.fn(),
+}))
 
 vi.mock('../../src/content/w03-content-client.js', () => ({
   callW03Content: vi.fn(),
 }))
 
 const callW03ContentMock = vi.mocked(callW03Content)
+const validateMediaReferencesMock = vi.mocked(validateOwnedPostMediaReferences)
 
 const makeErrorResponse = (status: number, code: string, message: string): Response =>
   Response.json({ error: { code, message } }, { status })
@@ -44,6 +50,8 @@ const storedPost = (overrides: Record<string, unknown> = {}) => ({
 describe('bind direct social post publishing to the stored body asset', () => {
   beforeEach(() => {
     callW03ContentMock.mockReset()
+    validateMediaReferencesMock.mockReset()
+    validateMediaReferencesMock.mockResolvedValue({ valid: true })
   })
 
   afterEach(() => {
@@ -82,6 +90,32 @@ describe('bind direct social post publishing to the stored body asset', () => {
     expect(result.preflight.mediaRefs).toEqual(['https://cdn.luckread.com/media/photo.png'])
     expect(result.preflight.coverRef).toBeNull()
     expect(result.preflight.body).not.toBe(submitted.preflight.body)
+  })
+
+  it('rejects stored media references that no longer resolve to media owned by the author', async () => {
+    callW03ContentMock.mockResolvedValue(new Response(JSON.stringify(storedPost()), { status: 200 }))
+    validateMediaReferencesMock.mockResolvedValue({
+      valid: false,
+      status: 422,
+      code: 'VALIDATION_FAILED',
+      message: 'Post media references must point to existing media owned by the current account',
+    })
+    const fetchMock = vi.spyOn(globalThis, 'fetch')
+
+    const result = await bindPreflightToStoredPost(
+      makeRequest(),
+      'post-1',
+      principal,
+      submitted,
+      makeErrorResponse,
+    )
+
+    expect(result).toBeInstanceOf(Response)
+    expect((result as Response).status).toBe(422)
+    expect(await (result as Response).json()).toMatchObject({
+      error: { code: 'VALIDATION_FAILED' },
+    })
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 
   it('forwards owner credentials for same-origin private Payload media reads', async () => {
