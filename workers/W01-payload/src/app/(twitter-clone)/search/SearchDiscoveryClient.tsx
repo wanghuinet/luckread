@@ -95,7 +95,6 @@ export default function SearchDiscoveryClient({
 
   useEffect(() => {
     const controller = new AbortController()
-    setTrendingStatus('loading')
     fetch('/api/v1/search/trending?limit=10', {
       method: 'GET',
       cache: 'no-store',
@@ -126,14 +125,8 @@ export default function SearchDiscoveryClient({
 
   useEffect(() => {
     const normalized = initialQuery.normalize('NFKC').trim()
-    setQuery(normalized)
-    if (!normalized) {
-      setResults([])
-      setResultStatus('idle')
-      return
-    }
+    if (!normalized) return
     const controller = new AbortController()
-    setResultStatus('loading')
     fetch('/api/v1/search?' + new URLSearchParams({ q: normalized, limit: '20' }).toString(), {
       method: 'GET',
       cache: 'no-store',
@@ -162,6 +155,7 @@ export default function SearchDiscoveryClient({
     const normalized = query.normalize('NFKC').trim()
     if (!normalized || normalized.length > 256) return
     if (normalized === initialQuery) {
+      setResultStatus('loading')
       setSearchRetryToken((token) => token + 1)
       return
     }
