@@ -85,7 +85,7 @@ describe('W05 unified social closure', () => {
     const db = {
       prepare: (sql: string) => {
         queries.push(sql)
-        return { bind: (..._values: unknown[]) => ({ run: async () => ({ success: true, meta: { changes: 1 } } }) }
+        return { bind: (..._values: unknown[]) => ({ run: async () => ({ success: true, meta: { changes: 1 } }) }) }
       },
       batch,
     } as unknown as D1Database
@@ -133,7 +133,7 @@ describe('W05 unified social closure', () => {
       { topic_id: 'topic-3', normalized_name: 'writing', display_name: 'Writing', target_id: 'content-4' },
       { topic_id: 'topic_日本', normalized_name: '日本', display_name: '日本', target_id: 'content-4' },
       { topic_id: 'topic_日本語', normalized_name: '日本語', display_name: '日本語', target_id: 'content-5' },
-      { topic_id: 'topic_\uE000', normalized_name: 'private-use', display_name: 'Private Use', target_id: 'content-6' },
+      { topic_id: 'topic_龥', normalized_name: '龥', display_name: '龥', target_id: 'content-6' },
       { topic_id: 'topic_𐐀', normalized_name: 'deseret', display_name: 'Deseret', target_id: 'content-7' },
     ]
     const queries: string[] = []
@@ -215,7 +215,7 @@ describe('W05 unified social closure', () => {
 
     const fifthPage = await listDiscoveryTopics(db, binding, 'discovery-test', '1', fourthPage.nextCursor)
     expect(fifthPage.items).toMatchObject([
-      { topicId: 'topic_\uE000', name: 'private-use', displayName: 'Private Use', contentCount: 1 },
+      { topicId: 'topic_龥', name: '龥', displayName: '龥', contentCount: 1 },
     ])
     expect(fifthPage.hasMore).toBe(true)
     expect(fifthPage.nextCursor).toEqual(expect.any(String))
@@ -226,6 +226,98 @@ describe('W05 unified social closure', () => {
     ])
     expect(sixthPage.hasMore).toBe(false)
     expect(sixthPage.nextCursor).toBeNull()
+  })
+
+
+  it('bounds W03 context retention and preserves contexts referenced by the current LRU batch', async () => {
+    vi.stubGlobal('caches', undefined)
+    const now = new Date().toISOString()
+    const edges = Array.from({ length: 5000 }, (_, index) => {
+      const suffix = String(index).padStart(5, '0')
+      return {
+        topic_id: 'topic-' + suffix,
+        normalized_name: 'topic-' + suffix,
+        display_name: 'Topic ' + suffix,
+        target_id: 'content-' + suffix,
+      }
+    })
+    // The first row reuses the oldest cached content in the same batch as 199
+    // newly fetched contexts. The LRU must not evict it before aggregation.
+    edges.push(
+      { topic_id: 'topic-05000', normalized_name: 'topic-05000', display_name: 'Topic 05000', target_id: 'content-00000' },
+      { topic_id: 'topic-05000', normalized_name: 'topic-05000', display_name: 'Topic 05000', target_id: 'content-05000' },
+    )
+    for (let index = 1; index <= 198; index += 1) {
+      const suffix = String(5000 + index).padStart(5, '0')
+      edges.push({
+        topic_id: 'topic-' + suffix,
+        normalized_name: 'topic-' + suffix,
+        display_name: 'Topic ' + suffix,
+        target_id: 'content-' + suffix,
+      })
+    }
+    // This later reference confirms an evicted context is re-fetched safely.
+    edges.push({
+      topic_id: 'topic-99999',
+      normalized_name: 'topic-99999',
+      display_name: 'Topic 99999',
+      target_id: 'content-00001',
+    })
+
+    const queries: string[] = []
+    const db = {
+      prepare: (sql: string) => {
+        queries.push(sql)
+        return {
+          bind: (...values: unknown[]) => ({
+            all: async () => {
+              const afterTopic = values.length === 4 ? String(values[0]) : null
+              const afterTarget = values.length === 4 ? String(values[2]) : null
+              const ordered = edges
+                .filter(edge => !afterTopic || edge.topic_id > afterTopic ||
+                  (edge.topic_id === afterTopic && edge.target_id > afterTarget!))
+                .sort((a, b) => a.topic_id < b.topic_id ? -1 : a.topic_id > b.topic_id ? 1 :
+                  a.target_id < b.target_id ? -1 : a.target_id > b.target_id ? 1 : 0)
+              return { results: ordered.slice(0, 200) }
+            },
+          }),
+        }
+      },
+    } as unknown as D1Database
+
+    const requestedIds: string[] = []
+    const binding = {
+      fetch: vi.fn(async (input: RequestInfo | URL) => {
+        const request = input instanceof Request ? input : new Request(input)
+        const body = await request.json() as { contentIds: string[] }
+        requestedIds.push(...body.contentIds)
+        return Response.json({
+          data: {
+            items: body.contentIds.map(contentId => ({
+              contentId,
+              ownerUserId: 'owner-1',
+              contentType: 'post',
+              state: 'PUBLISHED',
+              updatedAt: now,
+            })),
+          },
+        })
+      }),
+    }
+
+    try {
+      const page = await listDiscoveryTopics(db, binding, 'bounded-context-cache-test', '1', null)
+      expect(page.items).toMatchObject([
+        { topicId: 'topic-05000', contentCount: 2 },
+      ])
+      expect(page.hasMore).toBe(true)
+      expect(queries.every(sql => !/(?:FROM|JOIN)\s+contents\b/i.test(sql))).toBe(true)
+      expect(requestedIds).toHaveLength(5200)
+      expect(requestedIds.filter(contentId => contentId === 'content-00001')).toHaveLength(2)
+      expect(binding.fetch).toHaveBeenCalledTimes(105)
+    } finally {
+      vi.unstubAllGlobals()
+    }
   })
 
 
@@ -294,7 +386,8 @@ describe('W05 unified social closure', () => {
 
   it('rejects malformed discovery topic cursors', async () => {
     const db = { prepare: () => { throw new Error('database must not be queried for an invalid cursor') } } as unknown as D1Database
-    await expect(listDiscoveryTopics(db, '20', 'not-a-cursor')).rejects.toMatchObject({ code: 'INVALID_CURSOR', status: 400 })
+    await expect(listDiscoveryTopics(db, undefined, 'invalid-cursor-test', '20', 'not-a-cursor'))
+      .rejects.toMatchObject({ code: 'INVALID_CURSOR', status: 400 })
   })
 
 

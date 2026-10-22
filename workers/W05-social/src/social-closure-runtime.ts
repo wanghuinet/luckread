@@ -21,6 +21,8 @@ const DEFAULT_LIMIT = 20
 const MAX_CURSOR = 2048
 
 const DISCOVERY_TOPIC_RANKING_CACHE_TTL_SECONDS = 15
+// Bound cold-cache memory while retaining recently reused content contexts.
+const DISCOVERY_TOPIC_CONTEXT_CACHE_MAX_ENTRIES = 5000
 type RankedDiscoveryTopic = {
   topicId: string
   name: string
@@ -447,8 +449,13 @@ type DiscoveryTopicCursor = {
   topicId: string
 }
 
-const encodeDiscoveryTopicCursor = (cursor: DiscoveryTopicCursor): string =>
-  btoa(JSON.stringify(cursor)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '')
+const encodeDiscoveryTopicCursor = (cursor: DiscoveryTopicCursor): string => {
+  // btoa accepts a binary string, not arbitrary Unicode JSON. Encode UTF-8
+  // bytes first so international topic IDs remain valid in opaque cursors.
+  const bytes = new TextEncoder().encode(JSON.stringify(cursor))
+  const binary = Array.from(bytes, byte => String.fromCharCode(byte)).join('')
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '')
+}
 
 const decodeDiscoveryTopicCursor = (value: string | null): DiscoveryTopicCursor | null => {
   if (!value) return null
@@ -458,7 +465,9 @@ const decodeDiscoveryTopicCursor = (value: string | null): DiscoveryTopicCursor 
   }
   try {
     const padded = normalized.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - normalized.length % 4) % 4)
-    const parsed = JSON.parse(atob(padded)) as Partial<DiscoveryTopicCursor>
+    const binary = atob(padded)
+    const bytes = Uint8Array.from(binary, character => character.charCodeAt(0))
+    const parsed = JSON.parse(new TextDecoder().decode(bytes)) as Partial<DiscoveryTopicCursor>
     if (
       parsed.version !== 1 ||
       typeof parsed.contentCount !== 'number' ||
@@ -511,6 +520,23 @@ export async function listDiscoveryTopics(
   const relationBatchSize = 200
   const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000
   const contextCache = new Map<string, PublishedContentSocialContext | null>()
+  const rememberContext = (contentId: string, context: PublishedContentSocialContext | null) => {
+    contextCache.delete(contentId)
+    contextCache.set(contentId, context)
+    while (contextCache.size > DISCOVERY_TOPIC_CONTEXT_CACHE_MAX_ENTRIES) {
+      const oldestContentId = contextCache.keys().next().value
+      if (oldestContentId === undefined) break
+      contextCache.delete(oldestContentId)
+    }
+  }
+  const getRememberedContext = (contentId: string): PublishedContentSocialContext | null | undefined => {
+    if (!contextCache.has(contentId)) return undefined
+    const context = contextCache.get(contentId) ?? null
+    // Map insertion order is used as an inexpensive LRU recency queue.
+    contextCache.delete(contentId)
+    contextCache.set(contentId, context)
+    return context
+  }
   const stats = new Map<string, RankedDiscoveryTopic>()
   type DiscoveryTopicRelation = { topic_id: string; normalized_name: string; display_name: string; target_id: string }
   let relationCursor: { topicId: string; targetId: string } | null = null
@@ -538,9 +564,17 @@ export async function listDiscoveryTopics(
     const last: DiscoveryTopicRelation = edges[edges.length - 1]!
     relationCursor = { topicId: last.topic_id, targetId: last.target_id }
 
+    // Keep this bounded relation batch's resolved context separate from the
+    // global LRU: adding new entries may evict an older context also referenced
+    // by this same batch before the aggregation loop reads it.
+    const batchContexts = new Map<string, PublishedContentSocialContext | null>()
+    for (const contentId of new Set(edges.map(edge => edge.target_id))) {
+      const remembered = getRememberedContext(contentId)
+      if (remembered !== undefined) batchContexts.set(contentId, remembered)
+    }
     const unresolved: string[] = Array.from(new Set<string>(edges
       .map((edge: DiscoveryTopicRelation) => edge.target_id)
-      .filter((contentId: string) => !contextCache.has(contentId))))
+      .filter((contentId: string) => !batchContexts.has(contentId))))
 
     for (let offset = 0; offset < unresolved.length; offset += 50) {
       const contentIds = unresolved.slice(offset, offset + 50)
@@ -549,12 +583,14 @@ export async function listDiscoveryTopics(
         correlationId,
       })
       for (const contentId of contentIds) {
-        contextCache.set(contentId, contexts.get(contentId) ?? null)
+        const context = contexts.get(contentId) ?? null
+        batchContexts.set(contentId, context)
+        rememberContext(contentId, context)
       }
     }
 
     for (const edge of edges) {
-      const context = contextCache.get(edge.target_id)
+      const context = batchContexts.get(edge.target_id)
       if (!context) continue
       const updatedAtMs = Date.parse(context.updatedAt)
       // SQLite julianday(..., '-7 days') excludes unparseable timestamps.
