@@ -409,7 +409,7 @@ describe('W05 unified social closure', () => {
             if (sql.includes('INSERT OR IGNORE INTO social_notifications')) {
               insertAttempts += 1
               insertBindings.push(values)
-              if (insertAttempts === 1) throw new Error('temporary D1 write failure')
+              if (insertAttempts === 1) throw new Error('D1_ERROR: SQLITE_BUSY: database is locked')
             }
             return { success: true, meta: { changes: 1 } }
           },
