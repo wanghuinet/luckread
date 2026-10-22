@@ -247,15 +247,6 @@ const publicPostMediaReferenceCandidates = (value: string): string[] => {
       'https://cdn.luckread.com/' + objectKey,
     ])
 
-    // Payload's media file endpoint resolves the stored Media document by filename,
-    // even when the configured R2 key has a collection/prefix path.
-    const filename = decodedSegments[decodedSegments.length - 1]!
-    const payloadPath = '/api/media/file/' + encodeURIComponent(filename)
-    candidates.add(payloadPath)
-    candidates.add('https://api.luckread.com' + payloadPath)
-    candidates.add('https://luckread.com' + payloadPath)
-    candidates.add('https://www.luckread.com' + payloadPath)
-    candidates.add('https://mp.luckread.com' + payloadPath)
     return [...candidates]
   } catch {
     return []
