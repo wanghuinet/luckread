@@ -220,4 +220,33 @@ describe('W05 to W03 owned-post context binding', () => {
     }
   })
 
+  it.each([
+    { status: 403, code: 'PERMISSION_DENIED' },
+    { status: 429, code: 'RATE_LIMITED' },
+    { status: 500, code: 'SERVICE_UNAVAILABLE' },
+  ])('maps W03 HTTP $status failures to safe runtime errors', async ({ status, code }) => {
+    const input = { contentId: 'content-1', correlationId: `w03-http-${status}` }
+    const binding = {
+      fetch: async () => Response.json({
+        error: { code: 'PROVIDER_INTERNAL_DETAIL', message: 'private provider detail' },
+      }, { status }),
+    }
+
+    await expect(fetchPublishedContentSocialContext(binding, input))
+      .rejects.toMatchObject({ code, status })
+  })
+
+  it('fails closed when W03 transport throws or returns a malformed response envelope', async () => {
+    const input = { contentId: 'content-1', correlationId: 'w03-transport-failure' }
+    const bindings = [
+      { fetch: async () => { throw new Error('private network detail') } },
+      { fetch: async () => new Response('not-json', { status: 200 }) },
+    ]
+
+    for (const binding of bindings) {
+      await expect(fetchPublishedContentSocialContext(binding, input))
+        .rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE', status: 503 })
+    }
+  })
+
 })
