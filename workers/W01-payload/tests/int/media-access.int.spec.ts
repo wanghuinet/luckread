@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 const read = (relativePath: string) => readFileSync(resolve(process.cwd(), relativePath), 'utf8')
@@ -44,10 +44,9 @@ describe('Media upload access', () => {
     const assetLibrary = read('src/app/(payload)/v1beta/CreatorAssetLibrary.tsx')
 
     expect(config).toContain("r2Storage({")
-    expect(config).toContain('const mediaStorageCollections = isWorkerRuntime')
-    expect(config).toContain('disablePayloadAccessControl: true')
-    expect(config).toContain('generateFileURL: createPublicMediaUrl')
-    expect(config).toContain('collections: mediaStorageCollections')
+    expect(config).toContain('collections: { media: true }')
+    expect(config).not.toContain('disablePayloadAccessControl')
+    expect(config).not.toContain('generateFileURL: createPublicMediaUrl')
     expect(publisher).toContain('authorizedFetch<{')
     expect(publisher).toContain("'/api/v1/media'")
     expect(publisher).toContain("headers: { 'Idempotency-Key': 'media-upload:' + crypto.randomUUID() }")
@@ -56,6 +55,18 @@ describe('Media upload access', () => {
     expect(assetLibrary).toContain("form.append('_payload', JSON.stringify({ alt: file.name }))")
     expect(assetLibrary).not.toContain("form.append('alt', file.name)")
   })
+
+  it('keeps direct R2 public-domain binding disabled while media reads are owner-scoped', () => {
+    const config = read('src/payload.config.ts')
+    const media = read('src/collections/Media.ts')
+    const directBindingWorkflow = resolve(process.cwd(), '../../.github/workflows/w01-r2-cdn-domain-binding.yml')
+
+    expect(config).toContain('collections: { media: true }')
+    expect(config).not.toContain('disablePayloadAccessControl')
+    expect(media).toContain("return { ownerUserId: { equals: String(req.user.id) } }")
+    expect(existsSync(directBindingWorkflow)).toBe(false)
+  })
+
 })
 
 
