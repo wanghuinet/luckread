@@ -6,7 +6,7 @@ import type { W03ContentBinding } from './w03-content-context-client.js'
 const publishedContextsBinding = (): W03ContentBinding & { fetch: ReturnType<typeof vi.fn> } => ({
   fetch: vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const request = input instanceof Request ? input : new Request(input, init)
-    const body = await request.json() as { contentIds: string[] }
+    const body = await request.clone().json() as { contentIds: string[] }
     return Response.json({ data: { items: body.contentIds.map(contentId => ({
       contentId, ownerUserId: 'owner-2', contentType: 'post', state: 'PUBLISHED',
       updatedAt: '2026-10-17T04:00:00.000Z',
