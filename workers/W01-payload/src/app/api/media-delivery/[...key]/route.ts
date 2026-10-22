@@ -50,7 +50,7 @@ async function privateOwnerDelivery(request: Request, key: string, headOnly: boo
   const context: PayloadRouteContext = {
     params: Promise.resolve({ slug: ['media', 'file', filename] }),
   }
-  const response = await payloadMediaGet(new Request(target, request.clone()), context)
+  const response = await payloadMediaGet(new Request(target, { method: 'GET', headers: request.headers }), context)
   const safe = withNoStore(response)
   if (!headOnly) return safe
   return new Response(null, { status: safe.status, statusText: safe.statusText, headers: safe.headers })
