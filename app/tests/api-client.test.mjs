@@ -1040,3 +1040,43 @@ test('does not keep a key after a definitive validation response', async () => {
 
   expect(seenKeys[1]).not.toBe(seenKeys[0]);
 });
+
+
+test('reuses a media upload key for a repeated multipart request with the same upload fingerprint', async () => {
+  const seenKeys = [];
+  const seenFingerprints = [];
+  const fingerprint = 'lr-up1-0123456789abcdef';
+  let attempts = 0;
+  pendingFetch = async (_input, init) => {
+    seenKeys.push(new Headers(init.headers).get('Idempotency-Key'));
+    seenFingerprints.push(new Headers(init.headers).get('X-LuckRead-Upload-Fingerprint'));
+    attempts += 1;
+    if (attempts === 1) throw new TypeError('upload response lost');
+    return new Response(JSON.stringify({ doc: { id: 'media-replayed' } }), { status: 201 });
+  };
+
+  const makeForm = () => {
+    const form = new FormData();
+    form.append('_payload', JSON.stringify({ alt: 'photo.png' }));
+    form.append('file', new Blob(['same-media']), 'photo.png');
+    return form;
+  };
+
+  await expect(apiRequest('/media', {
+    method: 'POST',
+    body: makeForm(),
+    idempotencyKey: createIdempotencyKey(),
+    headers: { 'X-LuckRead-Upload-Fingerprint': fingerprint },
+  })).rejects.toBeInstanceOf(LuckReadNetworkError);
+
+  const result = await apiRequest('/media', {
+    method: 'POST',
+    body: makeForm(),
+    idempotencyKey: createIdempotencyKey(),
+    headers: { 'X-LuckRead-Upload-Fingerprint': fingerprint },
+  });
+
+  expect(result.response.status).toBe(201);
+  expect(seenFingerprints).toEqual([fingerprint, fingerprint]);
+  expect(seenKeys[1]).toBe(seenKeys[0]);
+});
