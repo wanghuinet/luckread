@@ -1128,16 +1128,39 @@ describe('W05 social comment transport', () => {
     'X-LuckRead-Correlation-Id': 'comment-test',
   }
 
-  it('serves public comments without a principal header', async () => {
+  it('serves public comments after W03 validates publication, without direct canonical SQL', async () => {
+    const binding = publishedContextBinding()
+    const d = dbFor([])
     const response = await worker.fetch(
       new Request('https://luckread-w05.internal/internal/social/contents/content-1/comments?limit=20', {
         headers: commentHeaders,
       }),
       {
-        DB: dbFor([]),
+        DB: d,
+        W03_CONTENT: binding,
       },
     )
     expect(response.status).toBe(200)
+    expect(binding.fetch).toHaveBeenCalledTimes(1)
+    const forwarded = binding.fetch.mock.calls[0]?.[0] as Request
+    expect(forwarded.url).toContain('/internal/content/contents/content-1/published-social-context')
+    expect(forwarded.headers.get('X-LuckRead-Caller')).toBe('W05')
+    expect(forwarded.headers.has('Authorization')).toBe(false)
+    expect(forwarded.headers.has('Cookie')).toBe(false)
+    const queries = (d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare.mock.calls.map(([sql]) => String(sql))
+    expect(queries.every(sql => !sql.toLowerCase().includes('join contents') && !sql.toLowerCase().includes('from contents'))).toBe(true)
+  })
+
+  it('fails closed before W05 D1 access when W03 cannot validate comment-list publication', async () => {
+    const d = dbFor([])
+    const response = await worker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/contents/content-1/comments?limit=20', {
+        headers: commentHeaders,
+      }),
+      { DB: d },
+    )
+    expect(response.status).toBe(503)
+    expect((d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).not.toHaveBeenCalled()
   })
 
   it('updates an owned comment with a conditional version', async () => {
