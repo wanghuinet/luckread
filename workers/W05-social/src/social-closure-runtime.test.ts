@@ -229,10 +229,10 @@ describe('W05 unified social closure', () => {
   })
 
 
-  it('bounds W03 context retention while aggregating a cold discovery ranking', async () => {
+  it('bounds W03 context retention and preserves contexts referenced by the current LRU batch', async () => {
     vi.stubGlobal('caches', undefined)
     const now = new Date().toISOString()
-    const edges = Array.from({ length: 5200 }, (_, index) => {
+    const edges = Array.from({ length: 5000 }, (_, index) => {
       const suffix = String(index).padStart(5, '0')
       return {
         topic_id: 'topic-' + suffix,
@@ -241,7 +241,22 @@ describe('W05 unified social closure', () => {
         target_id: 'content-' + suffix,
       }
     })
-    // Reuse an early content ID after the 5,000-entry LRU should have evicted it.
+    // The first row reuses the oldest cached content in the same batch as 199
+    // newly fetched contexts. The LRU must not evict it before aggregation.
+    edges.push(
+      { topic_id: 'topic-05000', normalized_name: 'topic-05000', display_name: 'Topic 05000', target_id: 'content-00000' },
+      { topic_id: 'topic-05000', normalized_name: 'topic-05000', display_name: 'Topic 05000', target_id: 'content-05000' },
+    )
+    for (let index = 1; index <= 198; index += 1) {
+      const suffix = String(5000 + index).padStart(5, '0')
+      edges.push({
+        topic_id: 'topic-' + suffix,
+        normalized_name: 'topic-' + suffix,
+        display_name: 'Topic ' + suffix,
+        target_id: 'content-' + suffix,
+      })
+    }
+    // This later reference confirms an evicted context is re-fetched safely.
     edges.push({
       topic_id: 'topic-99999',
       normalized_name: 'topic-99999',
@@ -293,17 +308,18 @@ describe('W05 unified social closure', () => {
     try {
       const page = await listDiscoveryTopics(db, binding, 'bounded-context-cache-test', '1', null)
       expect(page.items).toMatchObject([
-        { topicId: 'topic-00000', contentCount: 1 },
+        { topicId: 'topic-05000', contentCount: 2 },
       ])
       expect(page.hasMore).toBe(true)
-      expect(queries.every(sql => !/(?:FROM|JOIN)\s+contents\b/i.test(sql))).toBe(true)
-      expect(requestedIds).toHaveLength(5201)
+      expect(queries.every(sql => !/(?:FROM|JOIN)\\s+contents\\b/i.test(sql))).toBe(true)
+      expect(requestedIds).toHaveLength(5200)
       expect(requestedIds.filter(contentId => contentId === 'content-00000')).toHaveLength(2)
       expect(binding.fetch).toHaveBeenCalledTimes(105)
     } finally {
       vi.unstubAllGlobals()
     }
   })
+
 
   it('reuses the ranked discovery snapshot across cursor pages', async () => {
     const cacheEntries = new Map<string, Response>()
