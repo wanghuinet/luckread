@@ -567,7 +567,18 @@ export async function listDiscoveryTopics(
     if (edges.length < relationBatchSize) break
   }
 
-  const compareText = (left: string, right: string) => left < right ? -1 : left > right ? 1 : 0
+  // Match SQLite's BINARY text ordering for Unicode topic IDs. JavaScript's
+  // default string comparison orders UTF-16 code units, which differs for
+  // supplementary-plane letters that valid hashtag tokens can contain.
+  const compareText = (left: string, right: string): number => {
+    const leftPoints = Array.from(left, character => character.codePointAt(0)!)
+    const rightPoints = Array.from(right, character => character.codePointAt(0)!)
+    const length = Math.min(leftPoints.length, rightPoints.length)
+    for (let index = 0; index < length; index += 1) {
+      if (leftPoints[index] !== rightPoints[index]) return leftPoints[index]! - rightPoints[index]!
+    }
+    return leftPoints.length - rightPoints.length
+  }
   ranked = [...stats.values()].sort((a, b) =>
     b.contentCount - a.contentCount ||
     compareText(b.latestContentAt, a.latestContentAt) ||
@@ -580,8 +591,8 @@ export async function listDiscoveryTopics(
     ? rankedItems.filter(item =>
         item.contentCount < cursor.contentCount ||
         (item.contentCount === cursor.contentCount && (
-          item.latestContentAt < cursor.latestContentAt ||
-          (item.latestContentAt === cursor.latestContentAt && item.topicId > cursor.topicId)
+          compareText(item.latestContentAt, cursor.latestContentAt) < 0 ||
+          (compareText(item.latestContentAt, cursor.latestContentAt) === 0 && compareText(item.topicId, cursor.topicId) > 0)
         )),
       )
     : rankedItems
