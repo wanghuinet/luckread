@@ -232,3 +232,25 @@ it('guards media update and delete before the Payload handlers', () => {
   const guards = [...route.matchAll(/await enforceW01WriteRateLimit\(request\)/g)]
   expect(guards.length).toBe(2)
 })
+
+
+it('persists upload idempotency metadata and replays completed uploads safely', () => {
+  const media = read('src/collections/Media.ts')
+  const route = read('src/app/api/v1/media/route.ts')
+  const migration = read('src/migrations/20261022_120000_MIG_MEDIA_UPLOAD_IDEMPOTENCY_V1.ts')
+  const inventory = read('../../contracts/payload/payload-native-inventory.v1.json')
+
+  expect(media).toContain("name: 'uploadIdempotencyKey'")
+  expect(media).toContain("name: 'uploadFingerprint'")
+  expect(media).toContain("unique: true")
+  expect(media).toContain("req.headers.get('Idempotency-Key')")
+  expect(media).toContain("req.headers.get('X-LuckRead-Upload-Fingerprint')")
+  expect(route).toContain('findUploadByIdempotencyKey')
+  expect(route).toContain('resolvePreviousUpload')
+  expect(route).toContain("apiErrorResponse(409, 'IDEMPOTENCY_KEY_REUSE_CONFLICT'")
+  expect(route).toContain("where: { identityId: { equals: authenticated.userId } }")
+  expect(migration).toContain('CREATE UNIQUE INDEX')
+  expect(migration).toContain('media_upload_idempotency_key_idx')
+  expect(inventory).toContain('uploadIdempotencyKey')
+  expect(inventory).toContain('uploadFingerprint')
+})
