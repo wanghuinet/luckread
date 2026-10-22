@@ -59,6 +59,18 @@ describe('W03 content contract core', () => {
     expect(bindings[candidatesPerColumn]).toBe(publicUrl)
     expect(bindings[candidatesPerColumn * 2]).toBe(publicUrl)
     expect(bindings).toContain(historicalUrl)
+    expect(bindings.some((value) => typeof value === 'string' && value.startsWith('/api/media/file/'))).toBe(false)
+
+    // A published URL must not authorize a different object with the same
+    // filename under a private prefix.
+    const collisionResponse = await w03Worker.fetch(
+      request('https://img.luckread.com/private-prefix/photo%20(1).png'),
+      env,
+      {} as never,
+    )
+    expect(collisionResponse.status).toBe(200)
+    await expect(collisionResponse.json()).resolves.toMatchObject({ data: { isPublic: false } })
+    expect(bindings.some((value) => typeof value === 'string' && value.startsWith('/api/media/file/'))).toBe(false)
 
     const unpublishedResponse = await w03Worker.fetch(
       request('https://img.luckread.com/media/draft-only.png'),
