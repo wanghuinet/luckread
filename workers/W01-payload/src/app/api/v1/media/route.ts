@@ -204,7 +204,6 @@ export async function POST(request: Request): Promise<Response> {
     // Recheck after the Payload write so the losing request can replay the
     // canonical media record instead of surfacing a duplicate-key server error.
     const afterWrite = await resolvePreviousUpload(
-      request,
       authenticated.payload,
       String(payloadUserId),
       idempotencyKey,
