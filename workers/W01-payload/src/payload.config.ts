@@ -11,6 +11,7 @@ import { r2Storage } from '@payloadcms/storage-r2'
 
 import { Users } from './collections/Users'
 import { Media } from './collections/Media'
+import { createPublicMediaUrl } from './media/public-media-url'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -31,6 +32,18 @@ const isExplicitRemoteMigration = process.env.PAYLOAD_MIGRATION_REMOTE === 'true
 const isWorkerRuntime =
   typeof navigator !== 'undefined' && navigator.userAgent === 'Cloudflare-Workers'
 
+// Direct CDN URLs are enabled only inside the deployed Worker runtime. Local
+// development keeps Payload's file proxy so it never depends on production DNS
+// or exposes files from a local R2 emulator through the public CDN.
+const mediaStorageCollections = isWorkerRuntime
+  ? {
+      media: {
+        disablePayloadAccessControl: true as const,
+        generateFileURL: createPublicMediaUrl,
+      },
+    }
+  : { media: true as const }
+
 const createLog =
   (level: string, fn: typeof console.log) => (objOrMsg: object | string, msg?: string) => {
     if (typeof objOrMsg === 'string') {
@@ -43,7 +56,7 @@ const createLog =
 const cloudflareLogger = {
   level: process.env.PAYLOAD_LOG_LEVEL || 'info',
   trace: createLog('trace', console.debug),
-  debug: createLog('debug', console.debug),
+  debug: createLog('debug', console.log),
   info: createLog('info', console.log),
   warn: createLog('warn', console.warn),
   error: createLog('error', console.error),
@@ -97,7 +110,7 @@ export default buildConfig({
   plugins: [
     r2Storage({
       bucket: cloudflare.env.R2,
-      collections: { media: true },
+      collections: mediaStorageCollections,
     }),
   ],
 })
