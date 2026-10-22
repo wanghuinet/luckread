@@ -433,13 +433,17 @@ describe('W05 unified social closure', () => {
     expect(insertBindings[0]?.[6]).toBe('COMMENT:recipient-1:actor-1:content:content-1')
   })
 
-  it('logs notification write failures without exposing identifiers or database details', async () => {
+  it('bounds exhausted inbox persistence retries and logs failures without leaking details', async () => {
+    let insertAttempts = 0
+    const insertBindings: unknown[][] = []
     const db = {
       prepare: (sql: string) => ({
-        bind: (..._values: unknown[]) => ({
+        bind: (...values: unknown[]) => ({
           first: async () => null,
           run: async () => {
             if (sql.includes('INSERT OR IGNORE INTO social_notifications')) {
+              insertAttempts += 1
+              insertBindings.push(values)
               throw new Error('private database detail that must not be logged')
             }
             return { success: true, meta: { changes: 1 } }
@@ -458,6 +462,10 @@ describe('W05 unified social closure', () => {
         targetId: 'content-1',
       })).resolves.toBeUndefined()
 
+      expect(insertAttempts).toBe(3)
+      expect(insertBindings).toHaveLength(3)
+      expect(insertBindings[1]).toEqual(insertBindings[0])
+      expect(insertBindings[2]).toEqual(insertBindings[0])
       expect(warning).toHaveBeenCalledWith('W05_SOCIAL_NOTIFICATION_WRITE_FAILED', {
         type: 'COMMENT',
         targetType: 'content',
