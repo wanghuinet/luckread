@@ -119,33 +119,95 @@ describe('W05 unified social closure', () => {
     expect(prepare).not.toHaveBeenCalled()
   })
 
-  it('returns recent active discovery topics with bounded pagination', async () => {
-    const rows = [
-      { topic_id: 'topic-1', normalized_name: 'reading', display_name: 'Reading', content_count: 8, latest_content_at: '2026-10-17T03:00:00.000Z' },
-      { topic_id: 'topic-2', normalized_name: 'books', display_name: 'Books', content_count: 4, latest_content_at: '2026-10-17T02:00:00.000Z' },
-      { topic_id: 'topic-3', normalized_name: 'writing', display_name: 'Writing', content_count: 2, latest_content_at: '2026-10-17T01:00:00.000Z' },
+  it('ranks active discovery topics using W03-published contexts without querying canonical contents', async () => {
+    const now = Date.now()
+    const recent = (hoursAgo: number) => new Date(now - hoursAgo * 60 * 60 * 1000).toISOString()
+    const old = new Date(now - 8 * 24 * 60 * 60 * 1000).toISOString()
+    const edges = [
+      { topic_id: 'topic-1', normalized_name: 'reading', display_name: 'Reading', target_id: 'content-1' },
+      { topic_id: 'topic-1', normalized_name: 'reading', display_name: 'Reading', target_id: 'content-2' },
+      { topic_id: 'topic-1', normalized_name: 'reading', display_name: 'Reading', target_id: 'content-old' },
+      { topic_id: 'topic-1', normalized_name: 'reading', display_name: 'Reading', target_id: 'content-unpublished' },
+      { topic_id: 'topic-2', normalized_name: 'books', display_name: 'Books', target_id: 'content-1' },
+      { topic_id: 'topic-2', normalized_name: 'books', display_name: 'Books', target_id: 'content-3' },
+      { topic_id: 'topic-3', normalized_name: 'writing', display_name: 'Writing', target_id: 'content-4' },
+      { topic_id: 'topic_日本', normalized_name: '日本', display_name: '日本', target_id: 'content-4' },
+      { topic_id: 'topic_日本語', normalized_name: '日本語', display_name: '日本語', target_id: 'content-5' },
     ]
+    const queries: string[] = []
     const db = {
       prepare: (sql: string) => {
-        expect(sql).toContain("julianday(c.updated_at) >= julianday('now', '-7 days')")
-        expect(sql).toContain("t.status = 'ACTIVE'")
+        queries.push(sql)
         return {
-          bind: (...values: unknown[]) => {
-            expect(values).toEqual([3])
-            return { all: async () => ({ results: rows }) }
-          },
+          bind: (...values: unknown[]) => ({
+            all: async () => {
+              const afterTopic = values.length === 4 ? String(values[0]) : null
+              const afterTarget = values.length === 4 ? String(values[2]) : null
+              const ordered = [...edges]
+                .filter(edge => !afterTopic || edge.topic_id > afterTopic ||
+                  (edge.topic_id === afterTopic && edge.target_id > afterTarget!))
+                .sort((a, b) => a.topic_id.localeCompare(b.topic_id) || a.target_id.localeCompare(b.target_id))
+              return { results: ordered.slice(0, 200) }
+            },
+          }),
         }
       },
     } as unknown as D1Database
+    const contextById = new Map([
+      ['content-1', { contentId: 'content-1', ownerUserId: 'owner-1', contentType: 'post', state: 'PUBLISHED', updatedAt: recent(1) }],
+      ['content-2', { contentId: 'content-2', ownerUserId: 'owner-2', contentType: 'article', state: 'PUBLISHED', updatedAt: recent(2) }],
+      ['content-3', { contentId: 'content-3', ownerUserId: 'owner-3', contentType: 'video', state: 'PUBLISHED', updatedAt: recent(3) }],
+      ['content-4', { contentId: 'content-4', ownerUserId: 'owner-4', contentType: 'post', state: 'PUBLISHED', updatedAt: recent(4) }],
+      ['content-5', { contentId: 'content-5', ownerUserId: 'owner-5', contentType: 'post', state: 'PUBLISHED', updatedAt: recent(5) }],
+      ['content-old', { contentId: 'content-old', ownerUserId: 'owner-5', contentType: 'post', state: 'PUBLISHED', updatedAt: old }],
+    ])
+    const binding = {
+      fetch: vi.fn(async (input: RequestInfo | URL) => {
+        const request = input instanceof Request ? input : new Request(input)
+        expect(request.url).toContain('/internal/content/published-social-context-batch')
+        expect(request.headers.get('X-LuckRead-Caller')).toBe('W05')
+        expect(request.headers.get('X-LuckRead-Correlation-Id')).toBe('discovery-test')
+        expect(request.headers.has('Authorization')).toBe(false)
+        expect(request.headers.has('Cookie')).toBe(false)
+        const body = await request.json() as { contentIds: string[] }
+        const items = body.contentIds.flatMap(id => {
+          const context = contextById.get(id)
+          return context ? [context] : []
+        })
+        return Response.json({ data: { items } })
+      }),
+    }
 
-    await expect(listDiscoveryTopics(db, '2', null)).resolves.toMatchObject({
-      items: [
-        { topicId: 'topic-1', name: 'reading', displayName: 'Reading', contentCount: 8 },
-        { topicId: 'topic-2', name: 'books', displayName: 'Books', contentCount: 4 },
-      ],
-      hasMore: true,
-      nextCursor: expect.any(String),
-    })
+    const firstPage = await listDiscoveryTopics(db, binding, 'discovery-test', '2', null)
+    expect(firstPage.items).toMatchObject([
+      { topicId: 'topic-1', name: 'reading', displayName: 'Reading', contentCount: 2 },
+      { topicId: 'topic-2', name: 'books', displayName: 'Books', contentCount: 2 },
+    ])
+    expect(firstPage.hasMore).toBe(true)
+    expect(firstPage.nextCursor).toEqual(expect.any(String))
+    expect(binding.fetch).toHaveBeenCalled()
+    expect(queries.every(sql => !/(?:FROM|JOIN)\s+contents\b/i.test(sql))).toBe(true)
+
+    const secondPage = await listDiscoveryTopics(db, binding, 'discovery-test', '1', firstPage.nextCursor)
+    expect(secondPage.items).toMatchObject([
+      { topicId: 'topic-3', name: 'writing', displayName: 'Writing', contentCount: 1 },
+    ])
+    expect(secondPage.hasMore).toBe(true)
+    expect(secondPage.nextCursor).toEqual(expect.any(String))
+
+    const thirdPage = await listDiscoveryTopics(db, binding, 'discovery-test', '1', secondPage.nextCursor)
+    expect(thirdPage.items).toMatchObject([
+      { topicId: 'topic_日本', name: '日本', displayName: '日本', contentCount: 1 },
+    ])
+    expect(thirdPage.hasMore).toBe(true)
+    expect(thirdPage.nextCursor).toEqual(expect.any(String))
+
+    const fourthPage = await listDiscoveryTopics(db, binding, 'discovery-test', '1', thirdPage.nextCursor)
+    expect(fourthPage.items).toMatchObject([
+      { topicId: 'topic_日本語', name: '日本語', displayName: '日本語', contentCount: 1 },
+    ])
+    expect(fourthPage.hasMore).toBe(false)
+    expect(fourthPage.nextCursor).toBeNull()
   })
 
   it('rejects malformed discovery topic cursors', async () => {
