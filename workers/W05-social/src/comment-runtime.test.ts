@@ -2,6 +2,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createComment, deleteComment, listComments, parseCommentLimit, updateComment } from './comment-runtime.js'
 import { replyAudienceAllowedSql } from './reply-audience-runtime.js'
+import type { PublishedContentSocialContext } from './w03-content-context-client.js'
 
 const db = (firstResults: unknown[] = [], allResults: unknown[] = []) => {
   let firstIndex = 0
@@ -14,6 +15,14 @@ const db = (firstResults: unknown[] = [], allResults: unknown[] = []) => {
   }))
   return { prepare } as unknown as D1Database
 }
+
+const publishedContext = (contentId = 'content-1'): PublishedContentSocialContext => ({
+  contentId,
+  ownerUserId: 'owner-1',
+  contentType: 'post',
+  state: 'PUBLISHED',
+  updatedAt: '2026-10-17T04:00:00.000Z',
+})
 
 describe('comment runtime', () => {
   it('creates a published root comment after one validation read', async () => {
@@ -578,7 +587,7 @@ describe('comment runtime', () => {
         updated_at: '2026-10-02T00:02:00.000Z',
       },
     ])
-    const page = await listComments(d, 'content-1', null, 2)
+    const page = await listComments(d, 'content-1', null, 2, publishedContext())
     expect(page.items).toHaveLength(2)
     expect(page.items[0].id).toBe('c1')
     expect(page.items[0].authorUserId).toBe('user-1')
@@ -586,6 +595,8 @@ describe('comment runtime', () => {
     expect(page.items[1].authorUserId).toBe('user-2')
     expect(page.hasMore).toBe(true)
     expect(page.nextCursor).toEqual(expect.any(String))
+    const queries = (d.prepare as unknown as ReturnType<typeof vi.fn>).mock.calls.map(([sql]) => String(sql))
+    expect(queries.every(sql => !sql.toLowerCase().includes('join contents') && !sql.toLowerCase().includes('from contents'))).toBe(true)
   })
 
   it('returns the authenticated viewer like state in the same bounded comment list query', async () => {
@@ -602,7 +613,7 @@ describe('comment runtime', () => {
       liked_by_viewer: 1,
     }])
 
-    await expect(listComments(d, 'content-1', null, 20, 'viewer-1')).resolves.toMatchObject({
+    await expect(listComments(d, 'content-1', null, 20, publishedContext(), 'viewer-1')).resolves.toMatchObject({
       items: [{ id: 'c-liked', likedByViewer: true }],
       hasMore: false,
     })
@@ -620,10 +631,10 @@ describe('comment runtime', () => {
       { id: 'c1', content_id: 'content-1', author_user_id: 'user-1', parent_id: null, body: 'one', state: 'PUBLISHED', depth: 0, created_at: '2026-10-02T00:00:00.000Z', updated_at: '2026-10-02T00:00:00.000Z' },
       { id: 'c2', content_id: 'content-1', author_user_id: 'user-2', parent_id: null, body: 'two', state: 'PUBLISHED', depth: 0, created_at: '2026-10-02T00:01:00.000Z', updated_at: '2026-10-02T00:01:00.000Z' },
     ])
-    const first = await listComments(d, 'content-1', null, 1)
+    const first = await listComments(d, 'content-1', null, 1, publishedContext())
     expect(first.nextCursor).toEqual(expect.any(String))
     const before = (d.prepare as unknown as ReturnType<typeof vi.fn>).mock.calls.length
-    await expect(listComments(d, 'content-2', first.nextCursor, 20)).rejects.toMatchObject({
+    await expect(listComments(d, 'content-2', first.nextCursor, 20, publishedContext('content-2'))).rejects.toMatchObject({
       code: 'INVALID_CURSOR',
       status: 400,
     })
@@ -635,10 +646,10 @@ describe('comment runtime', () => {
       { id: 'c1', content_id: 'content-1', author_user_id: 'user-1', parent_id: null, body: 'one', state: 'PUBLISHED', depth: 0, created_at: '2026-10-02T00:00:00.000Z', updated_at: '2026-10-02T00:00:00.000Z' },
       { id: 'c2', content_id: 'content-1', author_user_id: 'user-2', parent_id: null, body: 'two', state: 'PUBLISHED', depth: 0, created_at: '2026-10-02T00:01:00.000Z', updated_at: '2026-10-02T00:01:00.000Z' },
     ])
-    const first = await listComments(d, 'content-1', null, 1, 'viewer-1')
+    const first = await listComments(d, 'content-1', null, 1, publishedContext(), 'viewer-1')
     expect(first.nextCursor).toEqual(expect.any(String))
     const before = (d.prepare as unknown as ReturnType<typeof vi.fn>).mock.calls.length
-    await expect(listComments(d, 'content-1', first.nextCursor, 20, 'viewer-2')).rejects.toMatchObject({
+    await expect(listComments(d, 'content-1', first.nextCursor, 20, publishedContext(), 'viewer-2')).rejects.toMatchObject({
       code: 'INVALID_CURSOR',
       status: 400,
     })
@@ -660,7 +671,7 @@ describe('comment runtime', () => {
       }],
     }])
 
-    await expect(listComments(d, 'content-1', null, 20, 'viewer-1')).resolves.toMatchObject({
+    await expect(listComments(d, 'content-1', null, 20, publishedContext(), 'viewer-1')).resolves.toMatchObject({
       items: [{ id: 'c1' }],
     })
 
@@ -672,6 +683,19 @@ describe('comment runtime', () => {
     expect(sql).toContain('mute.actor_user_id = ?')
     expect(sql).toContain('mute.target_user_id = c.author_user_id')
     expect(sql).toContain("child.author_user_id")
+  })
+
+  it('rejects mismatched or unpublished canonical context before querying W05', async () => {
+    const d = db([], [])
+    await expect(listComments(d, 'content-1', null, 20, {
+      ...publishedContext(),
+      contentId: 'another-content',
+    })).rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 })
+    await expect(listComments(d, 'content-1', null, 20, {
+      ...publishedContext(),
+      state: 'UNPUBLISHED',
+    } as unknown as PublishedContentSocialContext)).rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 })
+    expect(d.prepare).not.toHaveBeenCalled()
   })
 
   it('validates comment page limits', () => {

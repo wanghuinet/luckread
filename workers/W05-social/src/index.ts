@@ -748,7 +748,11 @@ export default {
             throw new CommentRuntimeError('INVALID_CURSOR', 400)
           }
           const viewerUserId = request.headers.get('X-LuckRead-Principal-User-Id')?.trim() || null
-          const page = await listComments(env.DB, commentContentId, cursor, limit, viewerUserId)
+          const contentContext = await fetchPublishedContentSocialContext(env.W03_CONTENT, {
+            contentId: commentContentId,
+            correlationId: request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? '',
+          })
+          const page = await listComments(env.DB, commentContentId, cursor, limit, contentContext, viewerUserId)
           return json({ data: page, requestId: createRequestId() })
         }
 
