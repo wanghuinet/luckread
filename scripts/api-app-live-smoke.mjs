@@ -2,7 +2,7 @@ import { mkdir, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { randomUUID } from 'node:crypto'
 
-const baseUrl = 'https://luckread.com'
+const baseUrl = 'https://api.luckread.com'
 const runId = process.env.GITHUB_RUN_ID || 'local'
 const runAttempt = process.env.GITHUB_RUN_ATTEMPT || '1'
 const sourceSha = process.env.GITHUB_SHA || 'unknown'
@@ -156,7 +156,7 @@ results.push(await probe({
   path: '/api/v1/auth/login',
   headers: headers(),
   body: JSON.stringify({ identity: 'not-an-email', credential: 'probe-only' }),
-  accepts: [400],
+  accepts: [422],
   expectedErrorCode: 'EMAIL_INVALID',
 }))
 
@@ -206,7 +206,7 @@ results.push(await probe({
   method: 'GET',
   path: `/api/v1/users/by-username/api-smoke-no-user-${requestSuffix}`,
   accepts: [404],
-  expectedErrorCode: 'RESOURCE_NOT_FOUND',
+  expectedErrorCode: 'NOT_FOUND',
 }))
 
 const failed = results.filter((item) => !item.pass)
