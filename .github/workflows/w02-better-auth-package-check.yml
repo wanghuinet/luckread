@@ -1,9 +1,6 @@
 name: W02 Better Auth Package Check
 
 on:
-  push:
-    branches:
-      - migration/better-auth-w02-20261005
   pull_request:
     paths:
       - 'workers/W02-identity/**'
