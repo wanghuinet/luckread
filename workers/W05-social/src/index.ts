@@ -1,7 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 import { listContentLikers } from './like-list-runtime.js'
 import { getLikeStatus, like, LikeRuntimeError, unlike } from './like-runtime.js'
-import { CommentRuntimeError, createComment, deleteComment, listComments, parseCommentLimit, updateComment } from './comment-runtime.js'
+import { CommentRuntimeError, createComment, deleteComment, listComments, parseCommentLimit, parseCommentSort, updateComment } from './comment-runtime.js'
 import { listProfileLikedContents, listProfileReplies, ProfileChannelRuntimeError } from './profile-channel-runtime.js'
 import { getContentReplyAudience, ReplyAudienceRuntimeError, setContentReplyAudience } from './reply-audience-runtime.js'
 import { fetchOwnedPostContext, fetchPublishedContentSocialContext, fetchPublishedOwnerPostContext, type W03ContentBinding } from './w03-content-context-client.js'
@@ -757,6 +757,9 @@ export default {
           requireTransport(request)
           const limit = parseCommentLimit(url.searchParams.get('limit'))
           const cursor = url.searchParams.get('cursor')
+          const sortValues = url.searchParams.getAll('sort')
+          if (sortValues.length > 1) throw new CommentRuntimeError('VALIDATION_FAILED', 400)
+          const sort = parseCommentSort(sortValues[0] ?? null)
           if (cursor && cursor.length > 2048) {
             throw new CommentRuntimeError('INVALID_CURSOR', 400)
           }
@@ -765,7 +768,7 @@ export default {
             contentId: commentContentId,
             correlationId: request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? '',
           })
-          const page = await listComments(env.DB, commentContentId, cursor, limit, contentContext, viewerUserId)
+          const page = await listComments(env.DB, commentContentId, cursor, limit, contentContext, viewerUserId, sort)
           return json({ data: page, requestId: createRequestId() })
         }
 

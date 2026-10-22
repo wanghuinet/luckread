@@ -1,6 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 import { describe, expect, it, vi } from 'vitest'
-import { createComment, deleteComment, listComments, parseCommentLimit, updateComment } from './comment-runtime.js'
+import { createComment, deleteComment, listComments, parseCommentLimit, parseCommentSort, updateComment } from './comment-runtime.js'
 import { replyAudienceAllowedSql } from './reply-audience-runtime.js'
 import type { PublishedContentSocialContext, W03ContentBinding } from './w03-content-context-client.js'
 
@@ -757,6 +757,80 @@ describe('comment runtime', () => {
       state: 'UNPUBLISHED',
     } as unknown as PublishedContentSocialContext)).rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 })
     expect(d.prepare).not.toHaveBeenCalled()
+  })
+
+  it('parses the supported comment sort modes and rejects unknown values', () => {
+    expect(parseCommentSort(null)).toBe('relevant')
+    expect(parseCommentSort('recent')).toBe('recent')
+    expect(parseCommentSort('liked')).toBe('liked')
+    let invalidSortError: unknown
+    try {
+      parseCommentSort('random')
+    } catch (error) {
+      invalidSortError = error
+    }
+    expect(invalidSortError).toMatchObject({ code: 'VALIDATION_FAILED', status: 400 })
+  })
+
+  it('applies the recent and liked sort at the W05 query boundary', async () => {
+    const recentDb = db([], [])
+    await listComments(recentDb, 'content-1', null, 20, publishedContext(), null, 'recent')
+    const recentSql = String((recentDb.prepare as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[0])
+    expect(recentSql).toContain('ORDER BY c.thread_created_at DESC, c.thread_id DESC, c.created_at ASC, c.id ASC')
+
+    const likedDb = db([], [])
+    await listComments(likedDb, 'content-1', null, 20, publishedContext(), null, 'liked')
+    const likedSql = String((likedDb.prepare as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[0])
+    expect(likedSql).toContain('ORDER BY c.thread_like_count DESC, c.thread_created_at DESC, c.thread_id DESC, c.created_at ASC, c.id ASC')
+    expect(likedSql).toContain('AS thread_like_count')
+  })
+
+  it('binds viewer visibility placeholders without extra parameters when sorted', async () => {
+    const d = db([], [])
+    await listComments(d, 'content-1', null, 20, publishedContext(), 'viewer-1', 'recent')
+    const prepared = (d.prepare as unknown as ReturnType<typeof vi.fn>).mock.results[0]?.value
+    const bound = prepared?.bind as ReturnType<typeof vi.fn>
+    expect(bound).toHaveBeenCalledTimes(1)
+    const sql = String((d.prepare as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[0])
+    const placeholderCount = (sql.match(/\?/g) ?? []).length
+    const boundCount = bound.mock.calls[0]?.length ?? 0
+    expect(boundCount).toBe(placeholderCount)
+  })
+
+  it('keeps liked-sort cursors stable and bound to the selected sort', async () => {
+    const row = (id: string, likeCount: number, createdAt: string) => ({
+      id,
+      content_id: 'content-1',
+      author_user_id: 'author-1',
+      parent_id: null,
+      body: 'comment',
+      state: 'PUBLISHED' as const,
+      depth: 0,
+      created_at: createdAt,
+      updated_at: createdAt,
+      like_count: likeCount,
+      liked_by_viewer: 0,
+      thread_created_at: createdAt,
+      thread_id: id,
+      thread_like_count: likeCount,
+    })
+    const first = db([], [
+      row('comment-a', 7, '2026-10-03T00:00:00.000Z'),
+      row('comment-b', 3, '2026-10-02T00:00:00.000Z'),
+    ])
+    const page = await listComments(first, 'content-1', null, 1, publishedContext(), null, 'liked')
+    expect(page.items.map((item) => item.id)).toEqual(['comment-a'])
+    expect(page.hasMore).toBe(true)
+    expect(page.nextCursor).toBeTruthy()
+
+    const next = db([], [])
+    await listComments(next, 'content-1', page.nextCursor, 1, publishedContext(), null, 'liked')
+    const nextSql = String((next.prepare as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[0])
+    expect(nextSql).toContain('c.thread_like_count < ?')
+    expect(nextSql).toContain('c.thread_like_count = ?')
+    await expect(
+      listComments(next, 'content-1', page.nextCursor, 1, publishedContext(), null, 'recent'),
+    ).rejects.toMatchObject({ code: 'INVALID_CURSOR', status: 400 })
   })
 
   it('validates comment page limits', () => {

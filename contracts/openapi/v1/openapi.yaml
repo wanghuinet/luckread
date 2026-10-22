@@ -753,6 +753,14 @@ paths:
       parameters:
         - $ref: '#/components/parameters/Cursor'
         - $ref: '#/components/parameters/Limit'
+        - name: sort
+          in: query
+          required: false
+          description: Stable comment order. relevant preserves the default order; recent sorts newest first; liked sorts by comment-like count then newest.
+          schema:
+            type: string
+            enum: [relevant, recent, liked]
+            default: relevant
       responses:
         '200':
           description: Comment thread (cursor paginated, depth-limited).

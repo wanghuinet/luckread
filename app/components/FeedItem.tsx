@@ -523,31 +523,12 @@ export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailVie
                                                 <DropdownMenu.ItemIcon
                                                     ios={{ name: 'flag' }}
                                                 />
-                                            </DropdownMenu.Item>
-                                            <DropdownMenu.Item key="community-note">
-                                                <DropdownMenu.ItemTitle>Request community note</DropdownMenu.ItemTitle>
-                                                <DropdownMenu.ItemIcon
-                                                    ios={{ name: 'note.text' }}
-                                                />
-                                            </DropdownMenu.Item>
-                                            <DropdownMenu.Item key="offline">
-                                                <DropdownMenu.ItemTitle>Add to offline</DropdownMenu.ItemTitle>
-                                                <DropdownMenu.ItemIcon
-                                                    ios={{ name: 'arrow.down.circle' }}
-                                                />
-                                            </DropdownMenu.Item>
-
-                                            <DropdownMenu.Sub>
+                                            </DropdownMenu.Item><DropdownMenu.Sub>
                                                 <DropdownMenu.SubTrigger key="user-actions">
                                                     <DropdownMenu.ItemTitle>@{authorHandle}</DropdownMenu.ItemTitle>
 
                                                 </DropdownMenu.SubTrigger>
-                                                <DropdownMenu.SubContent>
-                                                    <DropdownMenu.Item key="add-remove">
-                                                        <DropdownMenu.ItemTitle>Add/remove @{authorHandle} from list</DropdownMenu.ItemTitle>
-                                                        <DropdownMenu.ItemIcon ios={{ name: 'list.bullet' }} />
-                                                    </DropdownMenu.Item>
-                                                    <DropdownMenu.Item key="mute" onSelect={muteAuthor} disabled={!targetUserId || isOwnPost}>
+                                                <DropdownMenu.SubContent><DropdownMenu.Item key="mute" onSelect={muteAuthor} disabled={!targetUserId || isOwnPost}>
                                                         <DropdownMenu.ItemTitle>Mute @{authorHandle}</DropdownMenu.ItemTitle>
                                                         <DropdownMenu.ItemIcon ios={{ name: 'speaker.slash' }} />
                                                     </DropdownMenu.Item>

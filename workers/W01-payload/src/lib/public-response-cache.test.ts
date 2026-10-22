@@ -12,6 +12,28 @@ import {
 } from './public-response-cache.js'
 
 describe('public response cache', () => {
+  it('uses separate public cache keys for each comment sort mode', () => {
+    const recent = publicCacheKey(
+      new Request('https://luckread.com/api/v1/contents/content-1/comments?limit=20&sort=recent'),
+      'content-comments',
+      'g0',
+    ).url
+    const liked = publicCacheKey(
+      new Request('https://luckread.com/api/v1/contents/content-1/comments?limit=20&sort=liked'),
+      'content-comments',
+      'g0',
+    ).url
+    const relevant = publicCacheKey(
+      new Request('https://luckread.com/api/v1/contents/content-1/comments?limit=20'),
+      'content-comments',
+      'g0',
+    ).url
+
+    expect(recent).not.toBe(liked)
+    expect(recent).not.toBe(relevant)
+    expect(liked).not.toBe(relevant)
+  })
+
   it('bypasses shared cache for an unregistered namespace', async () => {
     const loader = vi.fn(async () => new Response(JSON.stringify({ data: 'origin' }), { status: 200 }))
     const response = await cachedPublicGet(

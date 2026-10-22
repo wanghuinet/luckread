@@ -7,6 +7,7 @@ const read = (path) => readFileSync(resolve(process.cwd(), path), 'utf8');
 const actions = read('components/EngagementActions.tsx');
 const feedItem = read('components/FeedItem.tsx');
 const postDetail = read('app/(drawer)/(tabs)/(index,search,messages,grok,video,notifications)/post/[id].tsx');
+const comments = read('components/Comments.tsx');
 const contentAdapter = read('lib/content-adapter.ts');
 
 test('feed comment action has an accessible, enabled press handler and opens the canonical post route', () => {
@@ -42,4 +43,18 @@ test('comment author cards use W01 batched author projections and only look up u
 test('feed reuses complete author projections instead of issuing per-item profile requests', () => {
   expect(contentAdapter).toContain("['username', 'displayName', 'avatar'].every");
   expect(contentAdapter).toContain("Object.prototype.hasOwnProperty.call(embedded, key)");
+});
+
+test('reply sort selection is forwarded to the real paginated API request', () => {
+  expect(postDetail).toContain('<Comments contentId={postId} sort={selectedSort} />');
+  expect(comments).toContain("params.set('sort', sort)");
+  expect(comments).toContain('}, [contentId, sort]);');
+});
+
+test('post menus do not advertise unfinished community note, offline, or list actions', () => {
+  for (const source of [feedItem, postDetail]) {
+    expect(source).not.toContain('key="community-note"');
+    expect(source).not.toContain('key="offline"');
+    expect(source).not.toContain('key="add-remove"');
+  }
 });
