@@ -997,7 +997,7 @@ export default {
         const viewerUserId = request.headers.get('X-LuckRead-Principal-User-Id')?.trim() || null
         const data = profileChannel.kind === 'replies'
           ? await listProfileReplies(env.DB, env.W03_CONTENT, profileChannel.userId, cursor, limit, viewerUserId, request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? '')
-          : await listProfileLikedContents(env.DB, profileChannel.userId, cursor, limit, viewerUserId)
+          : await listProfileLikedContents(env.DB, env.W03_CONTENT, profileChannel.userId, cursor, limit, viewerUserId, request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? '')
         return json({ data, requestId: createRequestId() })
       }
 
