@@ -27,3 +27,12 @@ test('post detail comment action scrolls to the real comments section instead of
   expect(postDetail).toContain('onCommentPress={handleScrollToComments}');
   expect(postDetail).toContain('commentsOffsetRef.current = event.nativeEvent.layout.y');
 });
+
+
+test('comment author cards use W01 batched author projections and only look up unhydrated authors', () => {
+  const comments = read('components/Comments.tsx');
+  expect(comments).toContain('author?: PublicUser | null');
+  expect(comments).toContain('const embeddedComments = comments.filter(hasEmbeddedProfile)');
+  expect(comments).toContain('.filter((comment) => !hasEmbeddedProfile(comment))');
+  expect(comments).toContain('profiles[comment.authorUserId] ?? comment.author ?? undefined');
+});
