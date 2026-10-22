@@ -429,12 +429,14 @@ function authorizationDb(
   state: string,
   roles: Array<{ roleId: string; scopeType: string }> = [],
   preparedSql: string[] = [],
+  preparedBindings: Array<{ sql: string; args: unknown[] }> = [],
 ) {
   return {
     prepare(sql: string) {
       preparedSql.push(sql)
       return {
-        bind() {
+        bind(...args: unknown[]) {
+          preparedBindings.push({ sql, args })
           return {
             first: async <T>() => {
               if (sql.includes('FROM "user"')) {
@@ -451,17 +453,27 @@ function authorizationDb(
 }
 
 describe('AUTH-013 trusted-principal authorization boundary', () => {
-  it('bounds authorization role reads to fit the canonical 64-row transition budget', async () => {
+  it('bounds role reads and prioritizes the highest canonical layer inside the row cap', async () => {
     const preparedSql: string[] = []
+    const preparedBindings: Array<{ sql: string; args: unknown[] }> = []
     await authorizeAccountStateTransition(
-      authorizationDb('ACTIVE', [{ roleId: 'operator', scopeType: 'global' }], preparedSql),
+      authorizationDb(
+        'ACTIVE',
+        [{ roleId: 'operator', scopeType: 'global' }],
+        preparedSql,
+        preparedBindings,
+      ),
       { subjectId: 'operator-1', targetUserId: '42', to: 'RESTRICTED', now: '2026-09-28T12:00:00.000Z' },
     )
 
-    expect(preparedSql.find((sql) => sql.includes('FROM role_assignments'))).toContain(
-      'ORDER BY role_id ASC',
-    )
-    expect(preparedSql.find((sql) => sql.includes('FROM role_assignments'))).toContain('LIMIT 62')
+    const roleQuery = preparedSql.find((sql) => sql.includes('FROM role_assignments'))
+    expect(roleQuery).toContain('SELECT DISTINCT role_id AS roleId')
+    expect(roleQuery).toContain("scope_type = 'global'")
+    expect(roleQuery).toContain('ORDER BY CASE role_id WHEN ? THEN ?')
+    expect(roleQuery).toContain('LIMIT 62')
+
+    const roleBindings = preparedBindings.find((query) => query.sql.includes('FROM role_assignments'))
+    expect(roleBindings?.args.slice(3, 5)).toEqual(['super_admin', 8])
   })
 
   it('derives operator permission and actor class from canonical role layer', async () => {
