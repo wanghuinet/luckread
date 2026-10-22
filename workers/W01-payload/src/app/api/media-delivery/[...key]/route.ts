@@ -9,7 +9,19 @@ import {
 } from '../../../../media/media-delivery'
 
 type PayloadRouteContext = Parameters<typeof payloadMediaGet>[1]
-type R2MediaEnvironment = { R2?: R2Bucket }
+type R2MediaObject = {
+  size: number
+  httpMetadata?: { contentType?: string }
+  httpEtag?: string
+  uploaded?: Date
+  writeHttpMetadata: (headers: Headers) => void
+}
+type R2MediaObjectBody = R2MediaObject & { body: ReadableStream<Uint8Array> }
+type R2MediaBucket = {
+  head: (key: string) => Promise<R2MediaObject | null>
+  get: (key: string, options?: { range?: { offset: number; length: number } }) => Promise<R2MediaObjectBody | null>
+}
+type R2MediaEnvironment = { R2?: R2MediaBucket }
 
 const privateError = (status: number, code: string): Response => Response.json({
   error: { code, message: 'Media unavailable', details: {} },
@@ -92,7 +104,7 @@ async function deliver(request: Request, context: { params: Promise<{ key: strin
   }
   if (!bucket) return privateError(503, 'SERVICE_UNAVAILABLE')
 
-  let metadata: R2Object | null
+  let metadata: R2MediaObject | null
   try {
     metadata = await bucket.head(key)
   } catch {
@@ -115,7 +127,7 @@ async function deliver(request: Request, context: { params: Promise<{ key: strin
     })
   }
 
-  let object: R2ObjectBody | null
+  let object: R2MediaObjectBody | null
   try {
     object = await bucket.get(key, range ? { range: { offset: range.offset, length: range.length } } : undefined)
   } catch {
