@@ -27,6 +27,7 @@ describe('authorized media CDN delivery primitives', () => {
     expect(mediaTypeAllowed('video', 'folder/clip.mp4', 'video/mp4')).toBe(true)
     expect(mediaTypeAllowed('video', 'folder/clip.m3u8', 'application/vnd.apple.mpegurl')).toBe(true)
     expect(mediaTypeAllowed('video', 'folder/picture.webp', 'image/webp')).toBe(false)
+    expect(mediaTypeAllowed('video', 'folder/picture.webp', 'video/webm')).toBe(false)
     expect(mediaTypeAllowed('image', 'picture.webp', null)).toBe(false)
   })
 
