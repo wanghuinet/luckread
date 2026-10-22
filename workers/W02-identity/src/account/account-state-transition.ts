@@ -149,15 +149,22 @@ for (const layer of layers['x-layers']) {
 // and target User during the compare-and-set transition (1).
 const MAX_AUTHORIZATION_ROLE_ASSIGNMENT_ROWS = 62
 
+const roleLayerPriority = [...roleToLayer.entries()].sort(([roleA, layerA], [roleB, layerB]) =>
+  layerB - layerA || (roleA < roleB ? -1 : roleA > roleB ? 1 : 0),
+)
+
 async function resolveSubjectLayer(db: D1Database, subjectId: string, now: string): Promise<number> {
+  const layerCase = roleLayerPriority.map(() => 'WHEN ? THEN ?').join(' ')
+  const roleLayerBindings = roleLayerPriority.flatMap(([roleId, layer]) => [roleId, layer])
   const rows = await db.prepare(
-    `SELECT role_id AS roleId, scope_type AS scopeType, status, valid_from AS validFrom, valid_until AS validUntil
+    `SELECT DISTINCT role_id AS roleId, scope_type AS scopeType
      FROM role_assignments
      WHERE subject_id = ? AND status = 'ACTIVE' AND valid_from <= ?
        AND (valid_until IS NULL OR ? < valid_until)
-     ORDER BY role_id ASC
+       AND scope_type = 'global'
+     ORDER BY CASE role_id ${layerCase} ELSE -1 END DESC, role_id ASC
      LIMIT ${MAX_AUTHORIZATION_ROLE_ASSIGNMENT_ROWS}`,
-  ).bind(subjectId, now, now).all<{ roleId: string; scopeType: string; status: string; validFrom: string; validUntil: string | null }>()
+  ).bind(subjectId, now, now, ...roleLayerBindings).all<{ roleId: string; scopeType: string }>()
 
   let maxLayer = 0
   for (const row of rows.results) {
