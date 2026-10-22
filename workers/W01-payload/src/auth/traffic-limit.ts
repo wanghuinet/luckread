@@ -87,7 +87,7 @@ export async function enforceW01WriteRateLimit(request: Request): Promise<void> 
     const context = await getCloudflareContext({ async: true })
     env = context.env as unknown as Record<string, unknown>
   } catch {
-    return
+    throw new Error('RATE_LIMIT_CONTEXT_UNAVAILABLE:W01_WRITE_LIMITER')
   }
 
   const globalLimiter = env.W01_WRITE_ORIGIN_GLOBAL_LIMITER as RateLimitBinding | undefined
@@ -117,7 +117,7 @@ export async function enforceW01WriteAccountRateLimit(accountId: string): Promis
     const context = await getCloudflareContext({ async: true })
     env = context.env as unknown as Record<string, unknown>
   } catch {
-    return
+    throw new Error('RATE_LIMIT_CONTEXT_UNAVAILABLE:W01_WRITE_LIMITER')
   }
 
   const limiter = env.W01_WRITE_LIMITER as RateLimitBinding | undefined
@@ -142,7 +142,7 @@ export async function enforceW01WriteEndpointRateLimit(endpoint: string): Promis
     const context = await getCloudflareContext({ async: true })
     env = context.env as unknown as Record<string, unknown>
   } catch {
-    return
+    throw new Error('RATE_LIMIT_CONTEXT_UNAVAILABLE:W01_WRITE_LIMITER')
   }
 
   const limiter = env.W01_WRITE_LIMITER as RateLimitBinding | undefined
