@@ -140,7 +140,6 @@ export async function validateOwnedPostMediaReferencesWithPayload(
   })
 
   const ownedCanonicalUrls = new Set<string>()
-  const ownedRelativePaths = new Set<string>()
   for (const value of mediaResult.docs) {
     const media = asRecord(value)
     if (
@@ -152,18 +151,15 @@ export async function validateOwnedPostMediaReferencesWithPayload(
 
     const canonical = normalizedTrustedUrl(media.url, currentOrigin)
     if (canonical) ownedCanonicalUrls.add(canonical)
-    if (media.url.trim().startsWith('/')) {
-      const key = pathKey(media.url, currentOrigin)
-      if (key) ownedRelativePaths.add(key)
-    }
   }
 
+  // A path-only match would incorrectly equate distinct hosts, for example
+  // https://api.luckread.com/media/a.png and https://cdn.luckread.com/media/a.png.
+  // Relative URLs are normalized against the API origin above, then compared
+  // as full canonical URLs just like absolute references.
   for (const ref of refs) {
     const canonical = normalized.get(ref)
-    const key = pathKey(ref, currentOrigin)
-    if (!canonical || (!ownedCanonicalUrls.has(canonical) && !(key && ownedRelativePaths.has(key)))) {
-      return invalidReference()
-    }
+    if (!canonical || !ownedCanonicalUrls.has(canonical)) return invalidReference()
   }
 
   return { valid: true }

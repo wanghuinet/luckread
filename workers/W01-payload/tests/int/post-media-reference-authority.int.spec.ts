@@ -120,3 +120,20 @@ describe('W01/W03 social post media-reference authority boundary', () => {
     expect(payload.find).not.toHaveBeenCalled()
   })
 })
+
+  it('does not equate a relative same-path media record with an attachment on a different host', async () => {
+    const payload = payloadFor(
+      { id: 'payload-user-7' },
+      [
+        { id: 'body-1', ownerUserId: 'payload-user-7', url: 'https://cdn.luckread.com/media/body.txt' },
+        { id: 'photo-relative', ownerUserId: 'payload-user-7', url: '/media/photo.png' },
+      ],
+    )
+
+    await expect(validateOwnedPostMediaReferencesWithPayload(
+      payload,
+      'better-auth-user-7',
+      post(),
+      origin,
+    )).resolves.toMatchObject({ valid: false, status: 422, code: 'VALIDATION_FAILED' })
+  })
