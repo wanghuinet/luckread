@@ -662,6 +662,16 @@ export async function listDiscoveryTopics(
 const NOTIFICATION_DB_RETRY_DELAYS_MS = [25, 75] as const
 
 /**
+ * Retry only errors that indicate temporary contention or transport failure.
+ * Permanent SQL/schema/constraint failures are not made more expensive by
+ * repeating the whole notification attempt.
+ */
+const isTransientNotificationDbError = (error: unknown): boolean => {
+  const message = error instanceof Error ? error.message : String(error ?? '')
+  return /\\b(?:SQLITE_BUSY|SQLITE_LOCKED|database is locked|temporar(?:y|ily)|timed?\\s*out|timeout|connection (?:reset|closed|lost)|network (?:error|failure)|fetch failed|service unavailable|upstream unavailable)\\b/i.test(message)
+}
+
+/**
  * Retry the complete inbox-write attempt for transient D1 errors. The operation
  * reuses one notification ID and one unique dedupe key across attempts, so an
  * ambiguous first-write result cannot create duplicate inbox notifications.
@@ -673,6 +683,7 @@ const withNotificationDbRetry = async <T>(operation: () => Promise<T>): Promise<
     try {
       return await operation()
     } catch (error) {
+      if (!isTransientNotificationDbError(error)) throw error
       lastError = error
       const delay = NOTIFICATION_DB_RETRY_DELAYS_MS[attempt]
       if (delay !== undefined) {
