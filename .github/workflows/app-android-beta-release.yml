@@ -38,8 +38,10 @@ permissions:
   contents: write
 
 concurrency:
-  group: luckread-android-beta-release
-  cancel-in-progress: false
+  # PR builds are keyed by PR number and superseded commits are cancelled.
+  # Main/manual release builds stay serialized on their ref.
+  group: luckread-android-beta-release-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   EXPO_NO_TELEMETRY: "1"
