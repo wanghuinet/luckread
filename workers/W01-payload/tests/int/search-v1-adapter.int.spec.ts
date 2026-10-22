@@ -72,6 +72,12 @@ describe('public search v1 adapter', () => {
     expect(client).toContain("href={'/content/' + encodeURIComponent(result.slug || result.id)}")
     expect(client).toContain("trendingStatus === 'error' ? labels.trendUnavailable : labels.noTrends")
     expect(client).toContain("resultStatus === 'error'")
+    expect(client).toContain("new URLSearchParams({ q: initialQuery, limit: '20', cursor: nextCursor })")
+    expect(client).toContain("setResults((current) => {")
+    expect(client).toContain("return [...current, ...validItems.filter((item) => !seen.has(item.id))]")
+    expect(client).toContain("hasMore && nextCursor")
+    expect(client).toContain("labels.loadMoreError")
+    expect(client).toContain("disabled={loadingMore}")
   })
 
   it('limits public search to published title/slug metadata and preserves no-store responses', () => {
