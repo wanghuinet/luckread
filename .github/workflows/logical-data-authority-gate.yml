@@ -1,0 +1,35 @@
+name: Logical Data Authority Gate
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'workers/**/src/**'
+      - 'contracts/transport/logical-data-authority.v1.json'
+      - 'scripts/verify-logical-data-authority.mjs'
+      - '.github/workflows/logical-data-authority-gate.yml'
+  pull_request:
+    paths:
+      - 'workers/**/src/**'
+      - 'contracts/transport/logical-data-authority.v1.json'
+      - 'scripts/verify-logical-data-authority.mjs'
+      - '.github/workflows/logical-data-authority-gate.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify logical table ownership
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Verify logical data authority
+        run: node scripts/verify-logical-data-authority.mjs

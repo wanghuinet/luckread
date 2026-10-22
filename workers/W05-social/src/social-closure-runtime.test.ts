@@ -398,14 +398,81 @@ describe('W05 unified social closure', () => {
   })
 
 
-  it('logs notification write failures without exposing identifiers or database details', async () => {
+  it('retries transient inbox persistence with a stable notification ID and dedupe key', async () => {
+    const insertBindings: unknown[][] = []
+    let insertAttempts = 0
+    const db = {
+      prepare: (sql: string) => ({
+        bind: (...values: unknown[]) => ({
+          first: async () => null,
+          run: async () => {
+            if (sql.includes('INSERT OR IGNORE INTO social_notifications')) {
+              insertAttempts += 1
+              insertBindings.push(values)
+              if (insertAttempts === 1) throw new Error('D1_ERROR: SQLITE_BUSY: database is locked')
+            }
+            return { success: true, meta: { changes: 1 } }
+          },
+        }),
+      }),
+    } as unknown as D1Database
+
+    await expect(enqueueNotification(db, {
+      recipientUserId: 'recipient-1',
+      actorUserId: 'actor-1',
+      type: 'COMMENT',
+      targetType: 'content',
+      targetId: 'content-1',
+      payload: { eventId: 'event-1' },
+    })).resolves.toBeUndefined()
+
+    expect(insertAttempts).toBe(2)
+    expect(insertBindings).toHaveLength(2)
+    expect(insertBindings[1]).toEqual(insertBindings[0])
+    expect(insertBindings[0]?.[0]).toEqual(expect.any(String))
+    expect(insertBindings[0]?.[6]).toBe('COMMENT:recipient-1:actor-1:content:content-1')
+  })
+
+  it('does not retry permanent notification SQL failures', async () => {
+    let insertAttempts = 0
     const db = {
       prepare: (sql: string) => ({
         bind: (..._values: unknown[]) => ({
           first: async () => null,
           run: async () => {
             if (sql.includes('INSERT OR IGNORE INTO social_notifications')) {
-              throw new Error('private database detail that must not be logged')
+              insertAttempts += 1
+              throw new Error('D1_ERROR: no such table: social_notifications')
+            }
+            return { success: true, meta: { changes: 1 } }
+          },
+        }),
+      }),
+    } as unknown as D1Database
+
+    await expect(enqueueNotification(db, {
+      recipientUserId: 'recipient-1',
+      actorUserId: 'actor-1',
+      type: 'COMMENT',
+      targetType: 'content',
+      targetId: 'content-1',
+    })).resolves.toBeUndefined()
+
+    expect(insertAttempts).toBe(1)
+  })
+
+  it('bounds exhausted inbox persistence retries and logs failures without leaking details', async () => {
+    let insertAttempts = 0
+    const insertBindings: unknown[][] = []
+    const db = {
+      prepare: (sql: string) => ({
+        bind: (...values: unknown[]) => ({
+          first: async () => null,
+          run: async () => {
+            if (sql.includes('INSERT OR IGNORE INTO social_notifications')) {
+              insertAttempts += 1
+              insertBindings.push(values)
+              throw new Error('D1_ERROR: SQLITE_BUSY: database is locked; private database detail that must not be logged')
             }
             return { success: true, meta: { changes: 1 } }
           },
@@ -423,6 +490,10 @@ describe('W05 unified social closure', () => {
         targetId: 'content-1',
       })).resolves.toBeUndefined()
 
+      expect(insertAttempts).toBe(3)
+      expect(insertBindings).toHaveLength(3)
+      expect(insertBindings[1]).toEqual(insertBindings[0])
+      expect(insertBindings[2]).toEqual(insertBindings[0])
       expect(warning).toHaveBeenCalledWith('W05_SOCIAL_NOTIFICATION_WRITE_FAILED', {
         type: 'COMMENT',
         targetType: 'content',
