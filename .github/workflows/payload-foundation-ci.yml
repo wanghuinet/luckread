@@ -33,8 +33,11 @@ jobs:
         with:
           node-version: 24
 
-      - name: Enable Corepack
-        run: corepack enable
+      - name: Setup pnpm 11 for the committed W01 lockfile
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11
+          run_install: false
 
       - name: Install W01 dependencies from committed lockfile
         working-directory: workers/W01-payload
