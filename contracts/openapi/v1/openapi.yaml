@@ -1760,14 +1760,145 @@ paths:
   /analytics/events:
     post:
       tags: [Analytics]
-      summary: Discovery draft for POST undefined
+      summary: Submit bounded client content telemetry
+      description: |
+        Accepts only allow-listed impression, reading and video measurement events.
+        Social mutations such as likes, comments, shares and follows are not accepted
+        here because their business facts remain authoritative in W05. Optional
+        session authentication is resolved by W01; client-supplied actor identities
+        are never trusted. This operation is rate-limited, bounded to 64 KiB and
+        90 events, and is never served from a shared cache.
       operationId: postAnalyticsEvents
-      x-luckread-contract-status: DISCOVERY_DRAFT
-      x-luckread-source: contracts/api/api-inventory.v1.json
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [events]
+              properties:
+                events:
+                  type: array
+                  minItems: 1
+                  maxItems: 90
+                  items:
+                    type: object
+                    additionalProperties: false
+                    required: [eventId, dedupeKey, eventName, occurredAt, sessionId, contentId, contentType]
+                    properties:
+                      eventId:
+                        type: string
+                        minLength: 8
+                        maxLength: 160
+                        pattern: '^[A-Za-z0-9][A-Za-z0-9:_-]{7,159}$'
+                      dedupeKey:
+                        type: string
+                        minLength: 8
+                        maxLength: 160
+                        pattern: '^[A-Za-z0-9][A-Za-z0-9:_-]{7,159}$'
+                      eventName:
+                        type: string
+                        enum:
+                          - content_impression
+                          - content_open
+                          - read_start
+                          - read_progress_25
+                          - read_progress_50
+                          - read_progress_75
+                          - read_complete
+                          - read_dwell
+                          - dwell
+                          - complete_view
+                          - video_impression
+                          - video_play_request
+                          - video_play_success
+                          - video_progress_25
+                          - video_progress_50
+                          - video_progress_75
+                          - video_progress_90
+                          - video_complete
+                          - video_replay
+                          - video_watch
+                      occurredAt:
+                        type: string
+                        format: date-time
+                      sessionId:
+                        type: string
+                        minLength: 1
+                        maxLength: 128
+                        pattern: '^[A-Za-z0-9][A-Za-z0-9:_-]{0,127}$'
+                      contentId:
+                        type: string
+                        minLength: 1
+                        maxLength: 128
+                        pattern: '^[A-Za-z0-9][A-Za-z0-9:_-]{0,127}$'
+                      contentType:
+                        type: string
+                        enum: [article, post, video]
+                      durationMs:
+                        type: integer
+                        minimum: 1
+                        maximum: 86400000
+                      position:
+                        type: number
+                        minimum: 0
+                        maximum: 100
       responses:
-        default:
-          description: Discovery-only operation; detailed response contract remains to be closed.
-
+        '200':
+          description: Batch classified and deduplicated by W11. Invalid or late measurements are represented only in aggregate quality counts.
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                const: no-store
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, requestId]
+                properties:
+                  data:
+                    type: object
+                    required: [received, qualityCounts, persistence]
+                    properties:
+                      received:
+                        type: integer
+                        minimum: 0
+                        maximum: 90
+                      qualityCounts:
+                        type: object
+                        required: [VALID, SUSPECT, INVALID, DUPLICATE, LATE, REJECTED]
+                        properties:
+                          VALID: { type: integer, minimum: 0 }
+                          SUSPECT: { type: integer, minimum: 0 }
+                          INVALID: { type: integer, minimum: 0 }
+                          DUPLICATE: { type: integer, minimum: 0 }
+                          LATE: { type: integer, minimum: 0 }
+                          REJECTED: { type: integer, minimum: 0 }
+                      persistence:
+                        type: object
+                        required: [attempted, inserted, duplicates, lateAttempted, lateInserted, lateDuplicates]
+                        properties:
+                          attempted: { type: integer, minimum: 0, maximum: 90 }
+                          inserted: { type: integer, minimum: 0, maximum: 90 }
+                          duplicates: { type: integer, minimum: 0, maximum: 90 }
+                          lateAttempted: { type: integer, minimum: 0, maximum: 90 }
+                          lateInserted: { type: integer, minimum: 0, maximum: 90 }
+                          lateDuplicates: { type: integer, minimum: 0, maximum: 90 }
+                  requestId:
+                    type: string
+        '413':
+          description: Request body is larger than 64 KiB.
+        '415':
+          description: Request Content-Type must be application/json.
+        '422':
+          description: Invalid request fields, forbidden event names, or batch size.
+        '429':
+          description: W01 rate limit exceeded.
+        '503':
+          description: Authentication, Service Binding or analytics storage is unavailable.
   /articles:
     post:
       tags: [Contents]
