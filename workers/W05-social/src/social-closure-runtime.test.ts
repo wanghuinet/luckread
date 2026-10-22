@@ -229,6 +229,82 @@ describe('W05 unified social closure', () => {
   })
 
 
+  it('bounds W03 context retention while aggregating a cold discovery ranking', async () => {
+    vi.stubGlobal('caches', undefined)
+    const now = new Date().toISOString()
+    const edges = Array.from({ length: 5200 }, (_, index) => {
+      const suffix = String(index).padStart(5, '0')
+      return {
+        topic_id: 'topic-' + suffix,
+        normalized_name: 'topic-' + suffix,
+        display_name: 'Topic ' + suffix,
+        target_id: 'content-' + suffix,
+      }
+    })
+    // Reuse an early content ID after the 5,000-entry LRU should have evicted it.
+    edges.push({
+      topic_id: 'topic-99999',
+      normalized_name: 'topic-99999',
+      display_name: 'Topic 99999',
+      target_id: 'content-00000',
+    })
+
+    const queries: string[] = []
+    const db = {
+      prepare: (sql: string) => {
+        queries.push(sql)
+        return {
+          bind: (...values: unknown[]) => ({
+            all: async () => {
+              const afterTopic = values.length === 4 ? String(values[0]) : null
+              const afterTarget = values.length === 4 ? String(values[2]) : null
+              const ordered = edges
+                .filter(edge => !afterTopic || edge.topic_id > afterTopic ||
+                  (edge.topic_id === afterTopic && edge.target_id > afterTarget!))
+                .sort((a, b) => a.topic_id < b.topic_id ? -1 : a.topic_id > b.topic_id ? 1 :
+                  a.target_id < b.target_id ? -1 : a.target_id > b.target_id ? 1 : 0)
+              return { results: ordered.slice(0, 200) }
+            },
+          }),
+        }
+      },
+    } as unknown as D1Database
+
+    const requestedIds: string[] = []
+    const binding = {
+      fetch: vi.fn(async (input: RequestInfo | URL) => {
+        const request = input instanceof Request ? input : new Request(input)
+        const body = await request.json() as { contentIds: string[] }
+        requestedIds.push(...body.contentIds)
+        return Response.json({
+          data: {
+            items: body.contentIds.map(contentId => ({
+              contentId,
+              ownerUserId: 'owner-1',
+              contentType: 'post',
+              state: 'PUBLISHED',
+              updatedAt: now,
+            })),
+          },
+        })
+      }),
+    }
+
+    try {
+      const page = await listDiscoveryTopics(db, binding, 'bounded-context-cache-test', '1', null)
+      expect(page.items).toMatchObject([
+        { topicId: 'topic-00000', contentCount: 1 },
+      ])
+      expect(page.hasMore).toBe(true)
+      expect(queries.every(sql => !/(?:FROM|JOIN)\\s+contents\\b/i.test(sql))).toBe(true)
+      expect(requestedIds).toHaveLength(5201)
+      expect(requestedIds.filter(contentId => contentId === 'content-00000')).toHaveLength(2)
+      expect(binding.fetch).toHaveBeenCalledTimes(105)
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
   it('reuses the ranked discovery snapshot across cursor pages', async () => {
     const cacheEntries = new Map<string, Response>()
     const cache = {
