@@ -10,6 +10,7 @@ import {
   getPublishedOwnerPostContext,
   getPublishedContentSocialContext,
   getPublishedContentSocialContexts,
+  isPublishedPublicPostMediaReference,
   listContents,
   searchPublishedContents,
   listFollowingOwnerContents,
@@ -540,6 +541,27 @@ const worker = {
 
 
       requireTransport(request)
+      if (url.pathname === '/internal/content/public-media-reference') {
+        if (request.method !== 'GET') {
+          return new Response(null, { status: 405, headers: { Allow: 'GET' } })
+        }
+        if (
+          request.headers.has('Authorization') ||
+          request.headers.has('Cookie') ||
+          url.search.slice(1).split('&').length !== 1 ||
+          !url.search.slice(1).startsWith('url=') ||
+          !url.searchParams.has('url')
+        ) {
+          throw new ContentRuntimeError('PERMISSION_DENIED', 403)
+        }
+        const mediaUrl = url.searchParams.get('url') ?? ''
+        if (!mediaUrl || mediaUrl.length > 2048) {
+          throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+        }
+        const isPublic = await isPublishedPublicPostMediaReference(env.D1_02, mediaUrl)
+        return json({ data: { isPublic }, requestId: createRequestId() })
+      }
+
       if (url.pathname === '/internal/content/bookmarked-items') {
         if (request.method !== 'POST') return new Response(null, { status: 405, headers: { Allow: 'POST' } })
         requiredPrincipal(request)
