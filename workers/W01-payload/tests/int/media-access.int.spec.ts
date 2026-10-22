@@ -259,4 +259,3 @@ describe('Media upload access', () => {
     expect(inventory).toContain('uploadIdempotencyKey')
     expect(inventory).toContain('uploadFingerprint')
   })
-}
