@@ -40,6 +40,32 @@ function isDiscoveryDraftCanonicalPolicy(op) {
   return op?.['x-luckread-contract-status'] === 'DISCOVERY_DRAFT';
 }
 
+function reportDeprecatedDetailedPolicy(op, operationId) {
+  const reference = op?.canonicalReference;
+  const canonical = reference?.operationId ? openapiOps.get(reference.operationId) : null;
+  const hasReason = typeof op?.deprecationReason === 'string' && op.deprecationReason.trim().length > 0;
+  const matchesCanonical = Boolean(
+    canonical &&
+    String(reference.method ?? '').toUpperCase() === canonical.method &&
+    canonicalApiPath(reference.path) === canonical.path
+  );
+
+  if (!hasReason || !matchesCanonical) {
+    finding(
+      'INVALID_DEPRECATED_POLICY_OPERATION',
+      operationId,
+      'deprecated policy operation must include a reason and a canonical OpenAPI reference that matches method/path',
+    );
+    return;
+  }
+
+  finding(
+    'DEPRECATED_POLICY_OPERATION',
+    operationId,
+    `${String(op.method).toUpperCase()} ${op.path} is explicitly deprecated; canonical reference is ${canonical.method} ${canonical.path} (${canonical.operationId}); the reference does not assert runtime availability`,
+  );
+}
+
 function collectAlternateOperationSources(directory) {
   const sources = new Map();
 
@@ -282,7 +308,12 @@ for (const [id] of openapiOps) {
 }
 
 for (const [id, op] of policyInventory) {
-  if (effectiveDetailedPolicyStatus(op) === 'MISSING') continue;
+  const status = effectiveDetailedPolicyStatus(op);
+  if (status === 'MISSING') continue;
+  if (status === 'DEPRECATED') {
+    reportDeprecatedDetailedPolicy(op, id);
+    continue;
+  }
 
   const openapi = openapiOps.get(id);
   if (!openapi) {
@@ -348,7 +379,8 @@ for (const [id] of policyOps) {
 const criticalEvidence = ['openapi','permission','state','resource','cache','antiAbuse','integration','securityE2E'];
 const allowedEvidence = new Set(['PASS', 'N/A']);
 for (const [id, op] of policyInventory) {
-  if (effectiveDetailedPolicyStatus(op) === 'MISSING') continue;
+  const status = effectiveDetailedPolicyStatus(op);
+  if (status === 'MISSING' || status === 'DEPRECATED') continue;
 
   if (!op.evidence) {
     finding('EVIDENCE_MISSING', id, 'evidence object absent');
@@ -375,6 +407,7 @@ const conflictCodes = new Set([
   'METHOD_CONFLICT',
   'PATH_CONFLICT',
   'POLICY_SOURCE_NORMALIZATION_CONFLICT',
+  'INVALID_DEPRECATED_POLICY_OPERATION',
 ]);
 const incompleteCodes = new Set([
   'MISSING_API_INVENTORY_DIRECTORY',
@@ -431,7 +464,7 @@ const report = {
     .map(([operationId, sources]) => ({ operationId, sources }))
     .sort((a, b) => a.operationId.localeCompare(b.operationId)),
   evidenceSemantics: { pass: ['PASS','N/A'], incomplete: ['MISSING','ABSENT'], invalid: ['unknown_or_unsupported'] },
-  rule: 'PASS requires zero structural conflicts, zero unresolved required inventory/OpenAPI/policy membership, zero missing required detailed policy coverage, zero alternate-policy normalization gaps, and zero incomplete/invalid evidence. alternatePolicySources is informational authority-trace evidence only; it does not promote an operation to Green. Explicit DISCOVERY_DRAFT and MISSING operation-policy statuses remain pending and do not silently become contract evidence. N/A is valid only when explicitly declared by the operation contract.',
+  rule: 'PASS requires zero structural conflicts, zero unresolved required inventory/OpenAPI/policy membership, zero missing required detailed policy coverage, zero alternate-policy normalization gaps, and zero incomplete/invalid evidence. alternatePolicySources is informational authority-trace evidence only; it does not promote an operation to Green. Explicit DISCOVERY_DRAFT, MISSING, and DEPRECATED operation-policy statuses do not silently become active contract evidence; deprecated records require a reason and canonical OpenAPI reference and are reported as informational findings. N/A is valid only when explicitly declared by the operation contract.',
 };
 const evidenceDir = path.join(root, 'artifacts', 'api-inventory');
 fs.mkdirSync(evidenceDir, { recursive: true });
