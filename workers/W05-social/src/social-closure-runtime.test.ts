@@ -126,11 +126,13 @@ describe('W05 unified social closure', () => {
     const edges = [
       { topic_id: 'topic-1', normalized_name: 'reading', display_name: 'Reading', target_id: 'content-1' },
       { topic_id: 'topic-1', normalized_name: 'reading', display_name: 'Reading', target_id: 'content-2' },
-      { topic_id: 'topic-1', normalized_name: 'reading', display_name: 'Reading', target_name: 'Reading', target_id: 'content-old' },
+      { topic_id: 'topic-1', normalized_name: 'reading', display_name: 'Reading', target_id: 'content-old' },
       { topic_id: 'topic-1', normalized_name: 'reading', display_name: 'Reading', target_id: 'content-unpublished' },
       { topic_id: 'topic-2', normalized_name: 'books', display_name: 'Books', target_id: 'content-1' },
       { topic_id: 'topic-2', normalized_name: 'books', display_name: 'Books', target_id: 'content-3' },
       { topic_id: 'topic-3', normalized_name: 'writing', display_name: 'Writing', target_id: 'content-4' },
+      { topic_id: 'topic_日本', normalized_name: '日本', display_name: '日本', target_id: 'content-4' },
+      { topic_id: 'topic_日本語', normalized_name: '日本語', display_name: '日本語', target_id: 'content-5' },
     ]
     const queries: string[] = []
     const db = {
@@ -156,6 +158,7 @@ describe('W05 unified social closure', () => {
       ['content-2', { contentId: 'content-2', ownerUserId: 'owner-2', contentType: 'article', state: 'PUBLISHED', updatedAt: recent(2) }],
       ['content-3', { contentId: 'content-3', ownerUserId: 'owner-3', contentType: 'video', state: 'PUBLISHED', updatedAt: recent(3) }],
       ['content-4', { contentId: 'content-4', ownerUserId: 'owner-4', contentType: 'post', state: 'PUBLISHED', updatedAt: recent(4) }],
+      ['content-5', { contentId: 'content-5', ownerUserId: 'owner-5', contentType: 'post', state: 'PUBLISHED', updatedAt: recent(5) }],
       ['content-old', { contentId: 'content-old', ownerUserId: 'owner-5', contentType: 'post', state: 'PUBLISHED', updatedAt: old }],
     ])
     const binding = {
@@ -185,12 +188,26 @@ describe('W05 unified social closure', () => {
     expect(binding.fetch).toHaveBeenCalled()
     expect(queries.every(sql => !/(?:FROM|JOIN)\s+contents\b/i.test(sql))).toBe(true)
 
-    const secondPage = await listDiscoveryTopics(db, binding, 'discovery-test', '2', firstPage.nextCursor)
+    const secondPage = await listDiscoveryTopics(db, binding, 'discovery-test', '1', firstPage.nextCursor)
     expect(secondPage.items).toMatchObject([
       { topicId: 'topic-3', name: 'writing', displayName: 'Writing', contentCount: 1 },
     ])
-    expect(secondPage.hasMore).toBe(false)
-    expect(secondPage.nextCursor).toBeNull()
+    expect(secondPage.hasMore).toBe(true)
+    expect(secondPage.nextCursor).toEqual(expect.any(String))
+
+    const thirdPage = await listDiscoveryTopics(db, binding, 'discovery-test', '1', secondPage.nextCursor)
+    expect(thirdPage.items).toMatchObject([
+      { topicId: 'topic_日本', name: '日本', displayName: '日本', contentCount: 1 },
+    ])
+    expect(thirdPage.hasMore).toBe(true)
+    expect(thirdPage.nextCursor).toEqual(expect.any(String))
+
+    const fourthPage = await listDiscoveryTopics(db, binding, 'discovery-test', '1', thirdPage.nextCursor)
+    expect(fourthPage.items).toMatchObject([
+      { topicId: 'topic_日本語', name: '日本語', displayName: '日本語', contentCount: 1 },
+    ])
+    expect(fourthPage.hasMore).toBe(false)
+    expect(fourthPage.nextCursor).toBeNull()
   })
 
   it('rejects malformed discovery topic cursors', async () => {
