@@ -51,7 +51,7 @@ const readCachedDiscoveryTopicRanking = async (): Promise<RankedDiscoveryTopic[]
       const row = item as Partial<RankedDiscoveryTopic>
       if (
         typeof row.topicId !== 'string' ||
-        !/^[A-Za-z0-9][\\p{L}\\p{N}_-]{0,127}$/u.test(row.topicId) ||
+        !/^[A-Za-z0-9][\p{L}\p{N}_-]{0,127}$/u.test(row.topicId) ||
         typeof row.name !== 'string' ||
         typeof row.displayName !== 'string' ||
         typeof row.contentCount !== 'number' ||
