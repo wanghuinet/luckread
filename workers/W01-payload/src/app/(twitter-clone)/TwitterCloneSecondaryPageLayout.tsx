@@ -8,7 +8,7 @@ import TwitterCloneSidebarProfile from './TwitterCloneSidebarProfile'
 import TwitterCloneSidebarPublicProfileLink from './TwitterCloneSidebarPublicProfileLink'
 import { TwitterLogo } from './TwitterCloneLanding'
 
-type PageNavKey = 'home' | 'explore' | 'trends' | 'notifications' | 'connections' | 'following' | 'bookmarks' | 'videos' | 'profile'
+type PageNavKey = 'home' | 'search' | 'explore' | 'trends' | 'notifications' | 'connections' | 'following' | 'bookmarks' | 'videos' | 'profile'
 
 type Props = {
   locale: PublicLocale
@@ -57,6 +57,7 @@ export default function TwitterCloneSecondaryPageLayout({ locale, title, active,
   const copy = labels(locale)
   const links: Array<{ key: PageNavKey; href: string; icon: Parameters<typeof SidebarIcon>[0]['name'] }> = [
     { key: 'home', href: '/home', icon: 'home' },
+    { key: 'search', href: '/search', icon: 'search' },
     { key: 'explore', href: '/content', icon: 'search' },
     { key: 'trends', href: '/trends', icon: 'trending' },
     { key: 'notifications', href: '/notifications', icon: 'bell' },
@@ -97,7 +98,7 @@ export default function TwitterCloneSecondaryPageLayout({ locale, title, active,
           {children}
         </main>
         <aside className="hidden w-96 shrink-0 flex-col gap-4 px-4 py-3 pt-1 lg:flex">
-          <Link className="flex items-center gap-3 rounded-full bg-main-search-background px-4 py-3 text-light-secondary hover:ring-1 hover:ring-main-accent dark:text-dark-secondary" href="/content"><SidebarIcon name="search" /><span>{copy.search}</span></Link>
+          <Link className="flex items-center gap-3 rounded-full bg-main-search-background px-4 py-3 text-light-secondary hover:ring-1 hover:ring-main-accent dark:text-dark-secondary" href="/search"><SidebarIcon name="search" /><span>{copy.search}</span></Link>
           <section className="rounded-2xl bg-main-sidebar-background p-4">
             <h2 className="mb-4 text-xl font-bold">{locale === 'en' ? 'What to explore' : locale === 'tw' ? '探索內容' : '探索内容'}</h2>
             <Link className="flex justify-between border-b border-light-border py-3 text-sm dark:border-dark-border" href="/trends">{copy.trends}<span>›</span></Link>
