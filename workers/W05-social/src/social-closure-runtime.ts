@@ -449,8 +449,13 @@ type DiscoveryTopicCursor = {
   topicId: string
 }
 
-const encodeDiscoveryTopicCursor = (cursor: DiscoveryTopicCursor): string =>
-  btoa(JSON.stringify(cursor)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '')
+const encodeDiscoveryTopicCursor = (cursor: DiscoveryTopicCursor): string => {
+  // btoa accepts a binary string, not arbitrary Unicode JSON. Encode UTF-8
+  // bytes first so international topic IDs remain valid in opaque cursors.
+  const bytes = new TextEncoder().encode(JSON.stringify(cursor))
+  const binary = Array.from(bytes, byte => String.fromCharCode(byte)).join('')
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '')
+}
 
 const decodeDiscoveryTopicCursor = (value: string | null): DiscoveryTopicCursor | null => {
   if (!value) return null
@@ -460,7 +465,9 @@ const decodeDiscoveryTopicCursor = (value: string | null): DiscoveryTopicCursor 
   }
   try {
     const padded = normalized.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - normalized.length % 4) % 4)
-    const parsed = JSON.parse(atob(padded)) as Partial<DiscoveryTopicCursor>
+    const binary = atob(padded)
+    const bytes = Uint8Array.from(binary, character => character.charCodeAt(0))
+    const parsed = JSON.parse(new TextDecoder().decode(bytes)) as Partial<DiscoveryTopicCursor>
     if (
       parsed.version !== 1 ||
       typeof parsed.contentCount !== 'number' ||
