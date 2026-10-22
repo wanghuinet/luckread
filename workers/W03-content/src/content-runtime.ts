@@ -213,6 +213,72 @@ export const publicContent = (content: ContentRecord) => ({
   coverRef: content.coverRef,
 })
 
+const normalizePublicPostMediaUrl = (value: string): string | null => {
+  if (value.length === 0 || value.length > 2048) return null
+  try {
+    const url = new URL(value)
+    if (
+      url.protocol !== 'https:' ||
+      !['img.luckread.com', 'video.luckread.com'].includes(url.hostname) ||
+      url.username ||
+      url.password ||
+      url.search ||
+      url.hash ||
+      !url.pathname.startsWith('/media/')
+    ) return null
+
+    const encodedSegments = url.pathname.slice('/media/'.length).split('/')
+    if (encodedSegments.length === 0) return null
+    const decodedSegments = encodedSegments.map((segment) => {
+      try { return decodeURIComponent(segment) } catch { return '' }
+    })
+    if (decodedSegments.some((segment) =>
+      !segment ||
+      segment === '.' ||
+      segment === '..' ||
+      segment.includes('/') ||
+      segment.includes('\\\\') ||
+      /[\\u0000-\\u001f\\u007f]/.test(segment)
+    )) return null
+
+    return url.origin + '/media/' + decodedSegments.map(encodeURIComponent).join('/')
+  } catch {
+    return null
+  }
+}
+
+/**
+ * A media URL is public only while it is referenced by published social-post
+ * content. Article/video entitlement rules are not represented by this W03
+ * record yet, so the public resolver deliberately fails closed for those types.
+ * W03 remains the authority for the live publication state.
+ */
+export async function isPublishedPublicPostMediaReference(
+  db: ContentD1,
+  mediaUrlValue: string,
+): Promise<boolean> {
+  const mediaUrl = normalizePublicPostMediaUrl(mediaUrlValue)
+  if (!mediaUrl) return false
+
+  const row = await db.prepare(
+    `SELECT id
+       FROM contents
+      WHERE state = 'PUBLISHED'
+        AND content_type = 'post'
+        AND (
+          body_ref = ?
+          OR cover_ref = ?
+          OR EXISTS (
+            SELECT 1
+              FROM json_each(contents.media_refs_json) AS media_ref
+             WHERE media_ref.value = ?
+          )
+        )
+      LIMIT 1`,
+  ).bind(mediaUrl, mediaUrl, mediaUrl).first<{ id: string }>()
+  return typeof row?.id === 'string' && row.id.length > 0
+}
+
 const normalizeEtag = (value: string): string => {
   let result = value.trim()
   if (result.startsWith('W/')) result = result.slice(2)
