@@ -42,6 +42,23 @@ describe('public search v1 adapter', () => {
     expect(searchHandler).not.toContain('coverRef: item.coverRef')
   })
 
+  it('exposes bounded public trending terms through W04 cache projection', () => {
+    const route = read('src/app/api/v1/search/trending/route.ts')
+    const client = read('src/feed/w04-feed-client.ts')
+    const w04 = read('../W04-feed-search/src/index.ts')
+    const trends = read('../W04-feed-search/src/search-trends.ts')
+    expect(route).toContain('callW04TrendingSearches')
+    expect(route).toContain('enforcePublicReadRateLimit(request)')
+    expect(route).toContain("'/internal/search/trending?'")
+    expect(client).toContain('export async function callW04TrendingSearches')
+    expect(client).toContain("'X-LuckRead-Rate-Key'")
+    expect(w04).toContain("url.pathname === '/internal/search/trending'")
+    expect(w04).toContain('recordSearchTrend(query)')
+    expect(w04).toContain('!cursor && payload.data.items.length > 0')
+    expect(trends).toContain('Cache API read/modify/write is not')
+    expect(trends).toContain('never analytics evidence or business state')
+  })
+
   it('limits public search to published title/slug metadata and preserves no-store responses', () => {
     const w03Runtime = read('../W03-content/src/content-runtime.ts')
     const w01Client = read('src/feed/w04-feed-client.ts')
