@@ -213,6 +213,82 @@ export const publicContent = (content: ContentRecord) => ({
   coverRef: content.coverRef,
 })
 
+const publicPostMediaReferenceCandidates = (value: string): string[] => {
+  if (value.length === 0 || value.length > 2048) return []
+  try {
+    const url = new URL(value)
+    if (
+      url.protocol !== 'https:' ||
+      !['img.luckread.com', 'video.luckread.com'].includes(url.hostname) ||
+      url.username ||
+      url.password ||
+      url.search ||
+      url.hash ||
+      url.port ||
+      url.pathname === '/'
+    ) return []
+
+    const encodedSegments = url.pathname.slice(1).split('/')
+    const decodedSegments = encodedSegments.map((segment) => {
+      try { return decodeURIComponent(segment) } catch { return '' }
+    })
+    if (decodedSegments.some((segment) =>
+      !segment ||
+      segment === '.' ||
+      segment === '..' ||
+      segment.includes('/') ||
+      segment.includes('\\') ||
+      /[\u0000-\u001f\u007f]/.test(segment)
+    )) return []
+
+    const objectKey = decodedSegments.map(encodeURIComponent).join('/')
+    const candidates = new Set<string>([
+      url.origin + '/' + objectKey,
+      'https://cdn.luckread.com/' + objectKey,
+    ])
+
+    return [...candidates]
+  } catch {
+    return []
+  }
+}
+
+/**
+ * A media URL is public only while it is referenced by published social-post
+ * content. Article/video entitlement rules are not represented by this W03
+ * record yet, so the public resolver deliberately fails closed for those types.
+ * W03 remains the authority for the live publication state.
+ */
+export async function isPublishedPublicPostMediaReference(
+  db: ContentD1,
+  mediaUrlValue: string,
+): Promise<boolean> {
+  const candidates = publicPostMediaReferenceCandidates(mediaUrlValue)
+  if (candidates.length === 0) return false
+
+  const placeholders = candidates.map(() => '?').join(', ')
+  const sql = [
+    'SELECT id',
+    'FROM contents',
+    "WHERE state = 'PUBLISHED'",
+    "  AND content_type = 'post'",
+    '  AND (',
+    '    body_ref IN (' + placeholders + ')',
+    '    OR cover_ref IN (' + placeholders + ')',
+    '    OR EXISTS (',
+    '      SELECT 1',
+    '      FROM json_each(contents.media_refs_json) AS media_ref',
+    '      WHERE media_ref.value IN (' + placeholders + ')',
+    '    )',
+    '  )',
+    'LIMIT 1',
+  ].join('\n')
+  const row = await db.prepare(sql)
+    .bind(...candidates, ...candidates, ...candidates)
+    .first<{ id: string }>()
+  return typeof row?.id === 'string' && row.id.length > 0
+}
+
 const normalizeEtag = (value: string): string => {
   let result = value.trim()
   if (result.startsWith('W/')) result = result.slice(2)
