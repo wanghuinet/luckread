@@ -91,7 +91,7 @@ export async function POST(request: Request): Promise<Response> {
     }
 
     const mediaValidation = await validateOwnedPostMediaReferences(principal.userId, body, new URL(request.url).origin)
-    if (!mediaValidation.valid) return mediaReferenceValidationResponse(mediaValidation)
+    if ('status' in mediaValidation) return mediaReferenceValidationResponse(mediaValidation)
 
     const response = await callW03Content({
       request,

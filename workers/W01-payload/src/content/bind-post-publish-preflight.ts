@@ -75,7 +75,7 @@ export async function bindPreflightToStoredPost(
 
   const requestUrl = new URL(request.url)
   const mediaValidation = await validateOwnedPostMediaReferences(principal.userId, content, requestUrl.origin)
-  if (!mediaValidation.valid) {
+  if ('status' in mediaValidation) {
     return makeErrorResponse(mediaValidation.status, mediaValidation.code, mediaValidation.message)
   }
 

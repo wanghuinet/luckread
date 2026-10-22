@@ -89,7 +89,7 @@ export async function PATCH(
     if (mutationError) return mutationError
     const body: unknown = await request.json()
     const mediaValidation = await validateOwnedPostMediaReferences(principal.userId, body, new URL(request.url).origin)
-    if (!mediaValidation.valid) return mediaReferenceValidationResponse(mediaValidation)
+    if ('status' in mediaValidation) return mediaReferenceValidationResponse(mediaValidation)
 
     const response = await callW03Content({
       request,
