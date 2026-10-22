@@ -439,10 +439,10 @@ export default {
             throw new CommentRuntimeError('VALIDATION_FAILED', 400)
           }
 
-          const result = await updateComment(env.DB, actorUserId, commentId, {
+          const result = await updateComment(env.DB, env.W03_CONTENT, actorUserId, commentId, {
             body: bodyValue,
             ifMatch,
-          })
+          }, request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? '')
           return Response.json(
             { data: result.item, requestId: createRequestId() },
             {
@@ -458,7 +458,13 @@ export default {
         }
 
         if (request.method === 'DELETE') {
-          const contentId = await deleteComment(env.DB, actorUserId, commentId)
+          const contentId = await deleteComment(
+            env.DB,
+            env.W03_CONTENT,
+            actorUserId,
+            commentId,
+            request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? '',
+          )
           return new Response(null, {
             status: 204,
             headers: { 'X-LuckRead-Content-Id': contentId },
