@@ -936,7 +936,7 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/InvalidState' }
         '422': { $ref: '#/components/responses/ValidationFailed' }
-        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '428': { $ref: '#/components/responses/IdempotencyKeyRequired' }
         '503':
           description: Social poll service unavailable.
           content:
@@ -958,7 +958,7 @@ paths:
         '403': { $ref: '#/components/responses/PermissionDenied' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/InvalidState' }
-        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '428': { $ref: '#/components/responses/IdempotencyKeyRequired' }
         '503':
           description: Social poll service unavailable.
           content:
@@ -1013,7 +1013,7 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/InvalidState' }
         '422': { $ref: '#/components/responses/ValidationFailed' }
-        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '428': { $ref: '#/components/responses/IdempotencyKeyRequired' }
         '429': { $ref: '#/components/responses/RateLimited' }
         '503':
           description: Social poll service unavailable.
@@ -3745,6 +3745,11 @@ components:
           schema: { $ref: '#/components/schemas/ErrorResponse' }
     PreconditionRequired:
       description: If-Match is required for this operation.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    IdempotencyKeyRequired:
+      description: Idempotency-Key is required for this mutation.
       content:
         application/json:
           schema: { $ref: '#/components/schemas/ErrorResponse' }
