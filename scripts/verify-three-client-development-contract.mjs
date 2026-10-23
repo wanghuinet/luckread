@@ -133,7 +133,7 @@ const forbidden = [
   },
   {
     label: 'private domain Worker client imported directly from UI instead of the W01 public API',
-    pattern: /\bfrom\s*['"][^'"]*\/(?:w02-session-client|w04-feed-client|w05-social-client|w06-moderation-client|w07-subscription-client|w08-creator-client)(?:\.js)?['"]/g,
+    pattern: /\bfrom\s*['"][^'"]*\/(?:w02-session-client|w04-feed-client|w05-social-client|w06-moderation-client|w07-subscription-client|w08-creator-client|w11-analytics-client)(?:\.js)?['"]/g,
   },
   {
     label: 'private Worker internal URL referenced from UI code',

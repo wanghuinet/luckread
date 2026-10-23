@@ -85,6 +85,14 @@ describe('canonical public API domain routing', () => {
     }
   })
 
+  it('blocks private domain Worker client imports from UI code, including W11 analytics', () => {
+    const scanner = read('../../scripts/verify-three-client-development-contract.mjs')
+    expect(scanner).toContain('private domain Worker client imported directly from UI')
+    expect(scanner).toContain('w11-analytics-client')
+    expect(scanner).toContain('w02-session-client')
+    expect(scanner).toContain('w08-creator-client')
+  })
+
   it('keeps generated share links on the public website, not on the API hostname', () => {
     const share = read('../../app/lib/content-share.ts')
     expect(share).toContain("const PUBLIC_SHARE_ORIGIN = 'https://luckread.com'")
