@@ -12,6 +12,8 @@ describe('v1 follow mutation adapter', () => {
     expect(route).toContain('resolveSocialPrincipal')
     expect(route).toContain('callW05Social')
     expect(route).toContain('/internal/social/follows/')
+    expect(route).toContain("invalidatePublicFollowList('following',resolvedPrincipal?.payloadProfileId")
+    expect(route).toContain("invalidatePublicFollowList('followers',resolvedTarget.payloadProfileId)")
     expect(route).not.toContain('social_follow_relationships')
   })
 
@@ -22,7 +24,7 @@ describe('v1 follow mutation adapter', () => {
     expect(route.indexOf("if(method!=='GET') await enforceW01WriteRateLimit(request)"))
       .toBeLessThan(route.indexOf('await resolveSocialPrincipal(request)'))
     expect(route.indexOf('await enforceW01WriteRateLimit(request)'))
-      .toBeLessThan(route.indexOf('await assertSocialTargetUserExists(targetUserId)'))
+      .toBeLessThan(route.indexOf('resolveSocialProfileIdentity(rawTargetUserId)'))
   })
 
   it('enforces Idempotency-Key on follow and unfollow mutations', () => {
@@ -37,13 +39,13 @@ describe('v1 follow mutation adapter', () => {
       resolve(process.cwd(), 'src/social/w05-social-client.ts'),
       'utf8',
     )
-    expect(client).toContain('details?.status === 404')
-    expect(client).toContain('details?.statusCode === 404')
+    expect(client).toContain('const isPayloadNotFound = (error: unknown)')
+    expect(client).toContain("return details.status === 404 || details.statusCode === 404 || details.code === 'NOT_FOUND'")
     expect(client).toContain("new W05SocialClientError(404, 'NOT_FOUND', 'Target user not found')")
-    expect(client).toContain('    throw error\n  }\n  if (!user)')
+    expect(client).toContain('if (!isPayloadNotFound(error)) throw error')
   })
 
   it('keeps target existence validation on follow creation', () => {
-    expect(route).toContain("if(method==='POST') await assertSocialTargetUserExists(targetUserId)")
+    expect(route).toContain('resolveSocialProfileIdentity(rawTargetUserId)')
   })
 })

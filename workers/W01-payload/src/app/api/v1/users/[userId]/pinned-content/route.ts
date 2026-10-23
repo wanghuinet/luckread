@@ -1,5 +1,5 @@
 import { TrafficLimitError, enforcePublicReadRateLimit, rateLimitResponse } from '../../../../../../auth/traffic-limit.js'
-import { callW05SocialPublic, W05SocialClientError } from '../../../../../../social/w05-social-client.js'
+import { callW05SocialPublic, resolveSocialProfileIdentityId, W05SocialClientError } from '../../../../../../social/w05-social-client.js'
 
 const errorResponse = (status: number, code: string, message: string) => Response.json(
   { error: { code, message, details: {} }, requestId: `req_${crypto.randomUUID()}` },
@@ -14,9 +14,10 @@ export async function GET(
     const { userId } = await context.params
     if (!userId.trim()) return errorResponse(422, 'VALIDATION_FAILED', 'Invalid user id')
     await enforcePublicReadRateLimit(request)
+    const socialUserId = await resolveSocialProfileIdentityId(userId)
     return await callW05SocialPublic({
       request,
-      pathname: '/internal/social/users/' + encodeURIComponent(userId) + '/pinned-content',
+      pathname: '/internal/social/users/' + encodeURIComponent(socialUserId) + '/pinned-content',
       method: 'GET',
     })
   } catch (error) {

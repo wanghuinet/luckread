@@ -12,6 +12,7 @@ describe('public username routes', () => {
     expect(route).toContain("collection: 'users'")
     expect(route).toContain("where: { username: { equals: username } }")
     expect(route).toContain('overrideAccess: true')
+    expect(route).toContain("identityId: typeof publicUser.identityId === 'string' ? publicUser.identityId : null")
     expect(route).toContain('cachedPublicGet')
     expect(route).toContain('enforcePublicReadRateLimit')
     expect(profile).toContain("fetchJson<PublicUserLookup>('/api/v1/users/by-username/")

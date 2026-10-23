@@ -23,31 +23,43 @@ export async function GET(
       'user-profile',
       async () => {
         const payload = await getPayload({ config })
-        let user: unknown
-        try {
-          user = await payload.findByID({
+        let user: unknown = null
+        // Public profile URLs can carry either the legacy Payload row ID or
+        // the canonical W02 identity ID emitted by W05 relationship pages.
+        if (!/^[0-9]+$/.test(userId)) {
+          const byIdentity = await payload.find({
             collection: 'users',
-            id: userId,
+            where: { identityId: { equals: userId } },
             depth: 0,
+            limit: 1,
             overrideAccess: true,
           })
-        } catch (error) {
-          // Payload's findByID throws for missing IDs. Translate only explicit
-          // not-found errors; database/configuration faults must remain 503.
-          const details = error && typeof error === 'object'
-            ? error as { status?: unknown; statusCode?: unknown; code?: unknown }
-            : null
-          if (
-            details?.status === 404 ||
-            details?.statusCode === 404 ||
-            details?.code === 'NOT_FOUND'
-          ) {
-            return Response.json(
-              { error: { code: 'NOT_FOUND', message: 'User not found', details: {} }, requestId: `req_${crypto.randomUUID()}` },
-              { status: 404, headers: { 'cache-control': 'no-store' } },
-            )
+          user = byIdentity.docs[0] ?? null
+        }
+        if (!user) {
+          try {
+            user = await payload.findByID({
+              collection: 'users',
+              id: userId,
+              depth: 0,
+              overrideAccess: true,
+            })
+          } catch (error) {
+            // Payload's findByID throws for missing IDs. Translate only explicit
+            // not-found errors; database/configuration faults must remain 503.
+            const details = error && typeof error === 'object'
+              ? error as { status?: unknown; statusCode?: unknown; code?: unknown }
+              : null
+            if (
+              details?.status === 404 ||
+              details?.statusCode === 404 ||
+              details?.code === 'NOT_FOUND'
+            ) {
+              user = null
+            } else {
+              throw error
+            }
           }
-          throw error
         }
 
         if (!user) {
@@ -60,6 +72,7 @@ export async function GET(
         const publicUser = user as unknown as Record<string, unknown>
         return Response.json({
           id: String(publicUser.id ?? ''),
+          identityId: typeof publicUser.identityId === 'string' ? publicUser.identityId : null,
           username: typeof publicUser.username === 'string' ? publicUser.username : '',
           displayName: typeof publicUser.displayName === 'string' ? publicUser.displayName : null,
           bio: typeof publicUser.bio === 'string' ? publicUser.bio : null,

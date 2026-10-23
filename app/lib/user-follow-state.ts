@@ -81,7 +81,7 @@ export async function resolveUserProfileId(
   if (!handle) return { id: null, message: 'This profile is missing its LuckRead username.' };
 
   try {
-    const result = await apiRequest<{ id?: unknown }>(
+    const result = await apiRequest<{ id?: unknown; identityId?: unknown }>(
       '/users/by-username/' + encodeURIComponent(handle),
       { method: 'GET', auth: false },
     );
@@ -92,11 +92,16 @@ export async function resolveUserProfileId(
         message: result.error?.message ?? 'Could not resolve this LuckRead profile.',
       };
     }
-    const profileData = result.data as { id?: unknown } | null;
-    if (typeof profileData?.id !== 'string' || !profileData.id.trim()) {
+    const profileData = result.data as { id?: unknown; identityId?: unknown } | null;
+    const canonicalId = typeof profileData?.identityId === 'string' && profileData.identityId.trim()
+      ? profileData.identityId.trim()
+      : typeof profileData?.id === 'string' && profileData.id.trim()
+        ? profileData.id.trim()
+        : null;
+    if (!canonicalId) {
       return { id: null, status: result.response.status, message: 'LuckRead returned an invalid profile ID.' };
     }
-    return { id: profileData.id.trim() };
+    return { id: canonicalId };
   } catch (cause) {
     return { id: null, message: failureMessage(cause) };
   }

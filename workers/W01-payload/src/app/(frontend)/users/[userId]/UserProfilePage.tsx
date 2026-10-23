@@ -13,6 +13,7 @@ import LuckReadSocialPostCard from '../../components/reuse/LuckReadSocialPostCar
 
 type PublicProfile = {
   id: string
+  identityId?: string | null
   username: string
   displayName: string | null
   bio: string | null
@@ -197,7 +198,7 @@ export default function PublicProfilePage({
             cache: 'no-store',
             signal: controller.signal,
           }),
-          fetchJson<{ id?: string }>('/api/v1/users/me', {
+          fetchJson<{ id?: string; identityId?: string | null }>('/api/v1/users/me', {
             credentials: 'include',
             headers: { accept: 'application/json' },
             cache: 'no-store',
@@ -235,7 +236,7 @@ export default function PublicProfilePage({
         if (!cancelled) {
           setFollowers(typeof followerData?.data?.totalCount === 'number' ? followerData.data.totalCount : 0)
           setFollowing(typeof followingData?.data?.totalCount === 'number' ? followingData.data.totalCount : 0)
-          setViewerUserId(typeof viewerData?.id === 'string' ? viewerData.id : null)
+          setViewerUserId(typeof viewerData?.identityId === 'string' ? viewerData.identityId : typeof viewerData?.id === 'string' ? viewerData.id : null)
           setIsFollowing(followData?.data?.following === true)
           setMutualFollow(followData?.data?.relationship?.mutualFollow === true)
           setBlocked(followData?.data?.relationship?.blocked === true)
@@ -313,7 +314,7 @@ export default function PublicProfilePage({
     try {
       if (nextFilter === 'replies') {
         const { response, data } = await fetchJson<ProfileReplyListResponse & { error?: { message?: string } }>(
-          '/api/v1/users/' + encodeURIComponent(profile.id) + '/replies?limit=6',
+          '/api/v1/users/' + encodeURIComponent(profile.identityId || profile.id) + '/replies?limit=6',
           { headers: { accept: 'application/json' }, credentials: 'include', cache: 'no-store', signal: controller.signal },
         )
         if (!response.ok || !Array.isArray(data?.data?.items)) throw new Error('PROFILE_REPLIES_FAILED')
@@ -326,7 +327,7 @@ export default function PublicProfilePage({
 
       if (nextFilter === 'likes') {
         const { response, data } = await fetchJson<ProfileLikedContentListResponse & { error?: { message?: string } }>(
-          '/api/v1/users/' + encodeURIComponent(profile.id) + '/likes?limit=6',
+          '/api/v1/users/' + encodeURIComponent(profile.identityId || profile.id) + '/likes?limit=6',
           { headers: { accept: 'application/json' }, credentials: 'include', cache: 'no-store', signal: controller.signal },
         )
         if (!response.ok || !Array.isArray(data?.data?.items)) throw new Error('PROFILE_LIKES_FAILED')
@@ -380,7 +381,7 @@ export default function PublicProfilePage({
       if (filter === 'replies') {
         const query = new URLSearchParams({ limit: '6', cursor: contentCursor })
         const { response, data } = await fetchJson<ProfileReplyListResponse & { error?: { message?: string } }>(
-          '/api/v1/users/' + encodeURIComponent(profile.id) + '/replies?' + query.toString(),
+          '/api/v1/users/' + encodeURIComponent(profile.identityId || profile.id) + '/replies?' + query.toString(),
           { headers: { accept: 'application/json' }, credentials: 'include', cache: 'no-store', signal: controller.signal },
         )
         if (!response.ok || !Array.isArray(data?.data?.items)) throw new Error('PROFILE_REPLIES_FAILED')
@@ -394,7 +395,7 @@ export default function PublicProfilePage({
       if (filter === 'likes') {
         const query = new URLSearchParams({ limit: '6', cursor: contentCursor })
         const { response, data } = await fetchJson<ProfileLikedContentListResponse & { error?: { message?: string } }>(
-          '/api/v1/users/' + encodeURIComponent(profile.id) + '/likes?' + query.toString(),
+          '/api/v1/users/' + encodeURIComponent(profile.identityId || profile.id) + '/likes?' + query.toString(),
           { headers: { accept: 'application/json' }, credentials: 'include', cache: 'no-store', signal: controller.signal },
         )
         if (!response.ok || !Array.isArray(data?.data?.items)) throw new Error('PROFILE_LIKES_FAILED')
@@ -440,7 +441,7 @@ export default function PublicProfilePage({
     setError('')
 
     try {
-      const { response, data } = await fetchJson<{ data?: { following?: boolean }; error?: { message?: string } }>('/api/v1/social/follows/' + encodeURIComponent(profile.id), {
+      const { response, data } = await fetchJson<{ data?: { following?: boolean }; error?: { message?: string } }>('/api/v1/social/follows/' + encodeURIComponent(profile.identityId || profile.id), {
         method: isFollowing ? 'DELETE' : 'POST',
         credentials: 'include',
         headers: {
@@ -490,9 +491,9 @@ export default function PublicProfilePage({
         headers: {
           accept: 'application/json',
           'content-type': 'application/json',
-          'Idempotency-Key': 'report:profile:' + profile.id + ':' + crypto.randomUUID(),
+          'Idempotency-Key': 'report:profile:' + (profile.identityId || profile.id) + ':' + crypto.randomUUID(),
         },
-        body: JSON.stringify({ targetType: 'profile', targetId: profile.id, reasonCode: reportReasonCode }),
+        body: JSON.stringify({ targetType: 'profile', targetId: profile.identityId || profile.id, reasonCode: reportReasonCode }),
       })
       if (response.status === 401) {
         const returnTo = window.location.pathname + window.location.search + window.location.hash
@@ -522,7 +523,7 @@ export default function PublicProfilePage({
 
     try {
       const relationPath = action === 'block' ? 'blocks' : 'mutes'
-      const { response } = await fetchJson('/api/v1/interactions/' + relationPath + (active ? '/' + encodeURIComponent(profile.id) : ''), {
+      const { response } = await fetchJson('/api/v1/interactions/' + relationPath + (active ? '/' + encodeURIComponent(profile.identityId || profile.id) : ''), {
         method: active ? 'DELETE' : 'POST',
         credentials: 'include',
         headers: {
@@ -530,7 +531,7 @@ export default function PublicProfilePage({
           'Idempotency-Key': 'social-' + action + ':' + (active ? 'remove:' : 'set:') + crypto.randomUUID(),
           ...(active ? {} : { 'content-type': 'application/json' }),
         },
-        ...(active ? {} : { body: JSON.stringify({ targetUserId: profile.id }) }),
+        ...(active ? {} : { body: JSON.stringify({ targetUserId: profile.identityId || profile.id }) }),
       })
 
       if (response.status === 401) {
@@ -637,11 +638,11 @@ export default function PublicProfilePage({
           followers={followers}
           locale={locale}
           workCount={contents.length}
-          statusMessage={viewerUserId !== profile.id ? safetyMessage : undefined}
+          statusMessage={viewerUserId !== (profile.identityId || profile.id) ? safetyMessage : undefined}
           actions={
             <>
           <div className="flex items-center justify-end gap-2" aria-label="快捷操作">
-            {viewerUserId !== profile.id ? (
+            {viewerUserId !== (profile.identityId || profile.id) ? (
               <button
                 className="main-tab grid h-10 w-10 place-items-center rounded-full border border-light-border hover:bg-light-primary/10 dark:border-dark-border dark:hover:bg-dark-primary/10"
                 type="button"
@@ -675,7 +676,7 @@ export default function PublicProfilePage({
                   >
                     分享
                   </button>
-                  {viewerUserId !== profile.id ? (
+                  {viewerUserId !== (profile.identityId || profile.id) ? (
                     <>
                       <button
                         className="block min-h-10 w-full rounded-lg px-3 text-left text-sm font-medium hover:bg-light-primary/10 disabled:cursor-wait disabled:opacity-50 dark:hover:bg-dark-primary/10"
@@ -722,7 +723,7 @@ export default function PublicProfilePage({
           </div>
 
           <div className="flex flex-wrap items-center justify-end gap-2">
-            {viewerUserId === profile.id ? (
+            {viewerUserId === (profile.identityId || profile.id) ? (
               <Link className="rounded-full bg-main-accent px-4 py-2 text-sm font-bold text-white hover:brightness-90 disabled:opacity-50" href="/me/profile">
                 {locale === 'en' ? 'Edit profile' : locale === 'tw' ? '編輯個人資料' : '编辑资料'}
               </Link>
@@ -736,7 +737,7 @@ export default function PublicProfilePage({
                 {followBusy ? '处理中…' : isFollowing ? '已关注' : '关注'}
               </button>
             ) : null}
-            {viewerUserId !== profile.id ? (
+            {viewerUserId !== (profile.identityId || profile.id) ? (
               <button
                 className="main-tab rounded-full border border-light-border px-4 py-2 text-sm font-bold hover:bg-light-primary/10 dark:border-dark-border dark:hover:bg-dark-primary/10"
                 type="button"

@@ -1,5 +1,5 @@
 import {
-  assertSocialTargetUserExists,
+  resolveSocialProfileIdentityId,
   callW05Social,
   resolveCookieSocialPrincipal,
   W05SocialClientError,
@@ -72,13 +72,13 @@ export async function POST(request: Request): Promise<Response> {
     if (typeof targetUserId !== 'string' || !targetUserId.trim()) {
       return errorResponse(422, 'VALIDATION_FAILED', 'targetUserId is required')
     }
-    await assertSocialTargetUserExists(targetUserId)
+    const socialTargetUserId = await resolveSocialProfileIdentityId(targetUserId)
     return await callW05Social({
       request,
       pathname: '/internal/social/interactions/mutes',
       method: 'POST',
       principal,
-      body: { targetUserId },
+      body: { targetUserId: socialTargetUserId },
     })
   } catch (error) {
     if (error instanceof TrafficLimitError) return rateLimitResponse(request)
