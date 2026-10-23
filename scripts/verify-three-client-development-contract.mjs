@@ -136,6 +136,18 @@ const forbidden = [
     pattern: /\bfrom\s*['"][^'"]*\/(?:w02-session-client|w04-feed-client|w05-social-client|w06-moderation-client|w07-subscription-client|w08-creator-client|w11-analytics-client)(?:\.js)?['"]/g,
   },
   {
+    label: 'direct fetch() transport in UI code instead of the shared W01 API client',
+    pattern: /\bfetch\s*\(/g,
+  },
+  {
+    label: 'Axios request transport in UI code instead of the shared W01 API client',
+    pattern: /\baxios\s*\.\s*(?:request|get|post|put|patch|delete)\s*\(/gi,
+  },
+  {
+    label: 'XMLHttpRequest transport in UI code instead of the shared W01 API client',
+    pattern: /\bnew\s+XMLHttpRequest\s*\(/g,
+  },
+  {
     label: 'private Worker internal URL referenced from UI code',
     pattern: /https?:\/\/[A-Za-z0-9.-]+\.internal(?:\/|['"])/g,
   },
@@ -161,8 +173,8 @@ for (const file of sourceFiles) {
 }
 
 info.push('W01_UI_FILES_SCANNED=' + sourceFiles.length);
-info.push('UI_DATABASE_BOUNDARY_RULES=' + forbidden.length);
-info.push('CONTRACT_STATIC_GUARD_SCOPE=APP transport + W01 UI database/Local-API/direct-route/private-Worker boundary');
+info.push('UI_BOUNDARY_RULES=' + forbidden.length);
+info.push('CONTRACT_STATIC_GUARD_SCOPE=APP shared transport + W01 UI shared transport/database/Local-API/direct-route/private-Worker boundary');
 for (const line of info) console.log(line);
 
 if (errors.length) {
