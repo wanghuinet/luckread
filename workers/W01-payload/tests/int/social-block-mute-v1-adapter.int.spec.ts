@@ -11,7 +11,7 @@ describe('v1 block/mute adapters', () => {
       const route = readFileSync(resolve(process.cwd(), path), 'utf8')
       expect(route).toContain('resolveCookieSocialPrincipal')
       expect(route).toContain('callW05Social')
-      expect(route).toContain('resolveSocialProfileIdentity(')
+      expect(route).toContain('resolveSocialProfileIdentity')
       expect(route).toContain('Idempotency-Key')
       expect(route).not.toContain('getPayload(')
       expect(route).not.toContain('social_user_interactions')
@@ -48,7 +48,7 @@ describe('v1 block/mute adapters', () => {
       expect(postRoute.indexOf('await enforceW01WriteRateLimit(request)'))
         .toBeLessThan(postRoute.indexOf('await resolveCookieSocialPrincipal(request)'))
       expect(postRoute.indexOf('await enforceW01WriteRateLimit(request)'))
-        .toBeLessThan(postRoute.indexOf('await resolveSocialProfileIdentity(targetUserId)'))
+        .toBeLessThan(postRoute.indexOf('await resolveSocialProfileIdentity'))
     }
   })
 
