@@ -134,17 +134,30 @@ function resolveMediaUrl(value: unknown): string | null {
   if (typeof value !== 'string' || !value.trim()) return null;
   const reference = value.trim();
 
-  // W03 media references can be absolute URLs or same-origin paths returned by
-  // the existing Payload/R2 delivery path. React Native Image/Video requires an
-  // absolute URL, so resolve only root-relative paths against the configured
-  // LuckRead API origin. Do not guess URLs for logical storage schemes (e.g. r2://).
-  if (/^https?:\/\//i.test(reference)) return reference;
-  if (!reference.startsWith('/') || reference.startsWith('//')) return null;
+  // Media references may use the configured W01 API origin or the two approved
+  // delivery hosts. Never let an arbitrary absolute URL turn W03 metadata into
+  // a client-side delivery path that bypasses the LuckRead media domain policy.
+  if (!reference.startsWith('/') && !/^https?:\/\//i.test(reference)) return null;
+  if (reference.startsWith('//')) return null;
 
   try {
     const base = new URL(getApiBaseUrl());
     const resolved = new URL(reference, base);
-    return resolved.origin === base.origin ? resolved.toString() : null;
+    const localDevelopmentHost = ['localhost', '127.0.0.1', '[::1]'].includes(base.hostname);
+    const protocolAllowed = resolved.protocol === 'https:' ||
+      (localDevelopmentHost && resolved.origin === base.origin && resolved.protocol === 'http:');
+    const approvedDeliveryHost = resolved.protocol === 'https:' &&
+      ['img.luckread.com', 'video.luckread.com'].includes(resolved.hostname);
+
+    if (
+      !protocolAllowed ||
+      resolved.username ||
+      resolved.password ||
+      resolved.hash ||
+      (resolved.origin !== base.origin && !approvedDeliveryHost)
+    ) return null;
+
+    return resolved.toString();
   } catch {
     return null;
   }
