@@ -3409,6 +3409,17 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ErrorResponse' }
 
+  /users/by-username/{username}:
+    get:
+      tags: [Users]
+      summary: Discovery draft for GET undefined
+      operationId: getUsersByUsernameUsername
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
 components:
   securitySchemes:
     bearerAuth:
