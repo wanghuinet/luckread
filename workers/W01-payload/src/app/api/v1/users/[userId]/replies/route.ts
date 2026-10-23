@@ -2,6 +2,7 @@ import { TrafficLimitError, enforcePublicReadRateLimit, rateLimitResponse } from
 import {
   callW05SocialPublic,
   resolveOptionalCookieSocialPrincipal,
+  resolveSocialProfileIdentityId,
   W05SocialClientError,
 } from '../../../../../../social/w05-social-client.js'
 
@@ -45,12 +46,13 @@ export async function GET(
     }
 
     await enforcePublicReadRateLimit(request)
+    const socialUserId = await resolveSocialProfileIdentityId(userId)
     const viewer = await resolveOptionalCookieSocialPrincipal(request)
     if (viewer instanceof Response) return viewer
     const suffix = query.toString() ? '?' + query.toString() : ''
     return await callW05SocialPublic({
       request,
-      pathname: '/internal/social/users/' + encodeURIComponent(userId) + '/replies' + suffix,
+      pathname: '/internal/social/users/' + encodeURIComponent(socialUserId) + '/replies' + suffix,
       method: 'GET',
       principal: viewer,
     })
