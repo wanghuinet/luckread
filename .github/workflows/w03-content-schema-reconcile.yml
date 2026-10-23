@@ -245,12 +245,33 @@ jobs:
             if (missing.length) throw new Error('All migrations are recorded but the live schema is still inconsistent: ' + JSON.stringify(missing));
             fs.appendFileSync(process.env.GITHUB_ENV, 'W03_MIGRATION_ACTION=none\n');
             fs.appendFileSync(process.env.GITHUB_OUTPUT, 'action=none\n');
+          } else if (applied.length === 11) {
+            // Production D1-02 already has W03 migrations 0001-0011. Admit only
+            // migration 0012, and only when the schema exactly meets the reviewed
+            // post-0011 requirements and the allocator table is not unledgered.
+            const needed = {
+              contents: ['id','content_type','owner_user_id','creator_id','state','version','revision','slug','scheduled_at','title','body_ref','media_refs_json','etag','created_at','updated_at'],
+              content_revisions: ['id','content_id','revision','content_version','actor_user_id','operation','state','slug','title','body_ref','media_refs_json','etag','correlation_id','created_at'],
+              content_relationships: ['relationship_id','source_id','target_id','relation_type','position','status'],
+              content_series: ['id','owner_user_id','creator_id','state'],
+              content_collections: ['id','owner_user_id','creator_id','state'],
+            };
+            const missing = Object.entries(needed).flatMap(([table, names]) =>
+              !tables.has(table) ? [table + ' table'] : names.filter((name) => !columns(table).has(name)).map((name) => table + '.' + name));
+            const missingBaselineTables = ['contents','content_mutation_idempotency','content_outbox_events','content_txn_guard'].filter((table) => !tables.has(table));
+            const missingBaselineTriggers = ['contents_after_insert_outbox','contents_after_update_outbox'].filter((trigger) => !triggers.has(trigger));
+            if (missing.length || missingBaselineTables.length || missingBaselineTriggers.length || tables.has('content_id_snowflake_state')) {
+              throw new Error('Refusing remote mutation because live schema does not match the reviewed post-0011 state: ' +
+                JSON.stringify({missing,missingBaselineTables,missingBaselineTriggers,unrecordedAllocatorTable:tables.has('content_id_snowflake_state')}));
+            }
+            fs.appendFileSync(process.env.GITHUB_ENV, 'W03_MIGRATION_ACTION=apply\n');
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, 'action=apply\n');
           } else {
-            // Admit only the two known pre-0004 states: W03 migrations 0001-0002
-            // (0003 pagination index still pending), or 0001-0003 complete.
-            // Any partial/out-of-order history fails closed.
+            // Retain the previously reviewed pre-0004 states for environments
+            // whose W03 migration history is 0001-0002 or 0001-0003 only.
+            // Any other partial/out-of-order history fails closed.
             if (![2, 3].includes(applied.length)) {
-              throw new Error('Refusing remote mutation: only W03 migrations 0001-0002 or 0001-0003 with 0004-0012 pending are admitted; current W03 history=' + JSON.stringify(applied));
+              throw new Error('Refusing remote mutation: only W03 migrations 0001-0002, 0001-0003, or verified 0001-0011 with 0012 pending are admitted; current W03 history=' + JSON.stringify(applied));
             }
             const missingTables = ['content_revisions','content_relationships','content_series','content_collections','content_id_snowflake_state'].filter((table) => tables.has(table));
             const contentCols = columns('contents');
