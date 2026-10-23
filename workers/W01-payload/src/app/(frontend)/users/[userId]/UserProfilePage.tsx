@@ -340,7 +340,7 @@ export default function PublicProfilePage({
       }
 
       const queryParts = [
-        'creatorId=' + encodeURIComponent(profile.id),
+        'creatorId=' + encodeURIComponent(profile.identityId || profile.id),
         'limit=6',
       ]
       if (nextFilter === 'posts') queryParts.push('type=post')
@@ -408,7 +408,7 @@ export default function PublicProfilePage({
       }
 
       const query = new URLSearchParams({
-        creatorId: profile.id,
+        creatorId: profile.identityId || profile.id,
         limit: '6',
         cursor: contentCursor,
       })
@@ -820,7 +820,7 @@ export default function PublicProfilePage({
                       contentId={item.id}
                       slug={item.slug}
                       title={item.title}
-                      creatorId={item.creatorId ?? profile?.id}
+                      creatorId={item.creatorId ?? (profile?.identityId || profile?.id)}
                       presentation="x-timeline"
                       coverRef={item.coverRef}
                       mediaRefs={item.mediaRefs}
