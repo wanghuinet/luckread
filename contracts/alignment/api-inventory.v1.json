@@ -171,6 +171,21 @@
       ]
     },
     {
+      "operationId": "deleteContentsContentIdPoll",
+      "method": "DELETE",
+      "path": "/v1/contents/{contentId}/poll",
+      "openapiPath": "/contents/{contentId}/poll",
+      "domain": "interaction",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#delete:/contents/{contentId}/poll",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
       "operationId": "deleteDeveloperApiKeysKeyId",
       "method": "DELETE",
       "path": "/v1/developer/api-keys/{keyId}",
@@ -630,6 +645,21 @@
       "featureIds": [],
       "schemaRef": "",
       "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/contents/{contentId}/comments",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "getContentsContentIdPoll",
+      "method": "GET",
+      "path": "/v1/contents/{contentId}/poll",
+      "openapiPath": "/contents/{contentId}/poll",
+      "domain": "interaction",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/contents/{contentId}/poll",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
         "contracts/api/api-inventory.v1.json"
@@ -2115,6 +2145,36 @@
       "featureIds": [],
       "schemaRef": "",
       "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/contents/{contentId}/comments",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "postContentsContentIdPoll",
+      "method": "POST",
+      "path": "/v1/contents/{contentId}/poll",
+      "openapiPath": "/contents/{contentId}/poll",
+      "domain": "interaction",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/contents/{contentId}/poll",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "postContentsContentIdPollVotes",
+      "method": "POST",
+      "path": "/v1/contents/{contentId}/poll/votes",
+      "openapiPath": "/contents/{contentId}/poll/votes",
+      "domain": "interaction",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/contents/{contentId}/poll/votes",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
         "contracts/api/api-inventory.v1.json"
