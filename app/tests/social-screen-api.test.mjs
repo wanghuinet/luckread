@@ -129,6 +129,20 @@ test('rejects a missing profile ID before requesting its Likes page', () => {
   expect(calls).toHaveLength(0);
 });
 
+test('uses canonical identity IDs for native profile content, ownership checks, and self detection', () => {
+  expect(profileScreenSource).toContain('identityId?: string | null; username?: string;');
+  expect(profileScreenSource).toContain('const canonicalProfileId = typeof profile.identityId === \'string\' && profile.identityId.trim()');
+  expect(profileScreenSource).toContain('new URLSearchParams({ creatorId: canonicalProfileId, type: \'post\', limit: \'20\' })');
+  expect(profileScreenSource).toContain("'/users/' + encodeURIComponent(canonicalProfileId) + '/pinned-content'");
+  expect(profileScreenSource).toContain('pinnedRecord.ownerUserId === canonicalProfileId');
+  expect(profileScreenSource).toContain('pinnedRecord.creatorId === canonicalProfileId');
+  expect(profileScreenSource).toContain("'/users/' + encodeURIComponent(canonicalProfileId) + '/followers?limit=1'");
+  expect(profileScreenSource).toContain("'/users/' + encodeURIComponent(canonicalProfileId) + '/following?limit=1'");
+  expect(profileScreenSource).toContain('id: canonicalProfileId,');
+  expect(profileScreenSource).not.toContain("new URLSearchParams({ creatorId: profile.id, type: 'post', limit: '20' })");
+  expect(profileScreenSource).not.toContain('pinnedRecord.ownerUserId === profile.id');
+});
+
 test('wires public profile Replies and Media plus own-profile Likes to real channel endpoints', () => {
   expect(profileScreenSource).toContain("const profileTabs = isOwnProfile\n    ? ['Posts', 'Replies', 'Media', 'Likes']\n    : ['Posts', 'Replies', 'Media'];");
   expect(profileScreenSource).toContain("title: showingReplies ? 'Replies' : showingMedia ? 'Media' : showingLikes ? 'Likes' : 'Feed'");

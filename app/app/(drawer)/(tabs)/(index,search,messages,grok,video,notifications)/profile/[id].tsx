@@ -596,13 +596,13 @@ export default function UserProfileScreen() {
     try {
       const profilePath = '/users/by-username/' + encodeURIComponent(userHandle);
       let profileResult = await apiRequest<{
-        id?: string; username?: string; displayName?: string | null; bio?: string | null; avatar?: string | null;
+        id?: string; identityId?: string | null; username?: string; displayName?: string | null; bio?: string | null; avatar?: string | null;
         website?: string | null; category?: string | null; createdAt?: string; followerCount?: number; followingCount?: number;
         coverImage?: string | null; headerImage?: string | null; isVerified?: boolean; verifiedBadge?: string | null;
         isOrganization?: boolean; error?: { message?: string };
       }>(profilePath, { method: 'GET', signal: controller.signal });
       let profile = profileResult.response.ok ? unwrapApiData<{
-        id?: string; username?: string; displayName?: string | null; bio?: string | null; avatar?: string | null;
+        id?: string; identityId?: string | null; username?: string; displayName?: string | null; bio?: string | null; avatar?: string | null;
         website?: string | null; category?: string | null; createdAt?: string; followerCount?: number; followingCount?: number;
         coverImage?: string | null; headerImage?: string | null; isVerified?: boolean; verifiedBadge?: string | null;
         isOrganization?: boolean;
@@ -616,6 +616,9 @@ export default function UserProfileScreen() {
       if (!profile?.id) {
         throw new Error(getApiErrorMessage(profileResult.data, 'Could not load this profile.', profileResult.response.status));
       }
+      const canonicalProfileId = typeof profile.identityId === 'string' && profile.identityId.trim()
+        ? profile.identityId.trim()
+        : profile.id;
       if (controller.signal.aborted) return;
 
       const sessionToken = await readSessionToken().catch(() => null);
@@ -624,10 +627,10 @@ export default function UserProfileScreen() {
       let posts: FeedContent[] = [];
       let hasMorePosts = false;
       const pinResultPromise = apiRequest<unknown>(
-        '/users/' + encodeURIComponent(profile.id) + '/pinned-content',
+        '/users/' + encodeURIComponent(canonicalProfileId) + '/pinned-content',
         { method: 'GET', auth: false, signal: controller.signal },
       ).catch(() => null);
-      const contentParams = new URLSearchParams({ creatorId: profile.id, type: 'post', limit: '20' });
+      const contentParams = new URLSearchParams({ creatorId: canonicalProfileId, type: 'post', limit: '20' });
       const feedResult = await apiRequest<{ data?: ApiContentPage; error?: { message?: string } }>(
         '/contents?' + contentParams.toString(),
         { method: 'GET', signal: controller.signal },
@@ -676,8 +679,8 @@ export default function UserProfileScreen() {
             ? unwrapApiData<ApiContentRecord>(pinnedResult.data)
             : null;
           const ownerMatches = pinnedRecord && (
-            pinnedRecord.ownerUserId === profile.id ||
-            pinnedRecord.creatorId === profile.id
+            pinnedRecord.ownerUserId === canonicalProfileId ||
+            pinnedRecord.creatorId === canonicalProfileId
           );
           if (
             pinnedRecord?.id === pinnedContentId &&
@@ -715,11 +718,11 @@ export default function UserProfileScreen() {
 
       const [followersResult, followingResult] = await Promise.all([
         apiRequest<unknown>(
-          '/users/' + encodeURIComponent(profile.id) + '/followers?limit=1',
+          '/users/' + encodeURIComponent(canonicalProfileId) + '/followers?limit=1',
           { method: 'GET', signal: controller.signal },
         ).catch(() => null),
         apiRequest<unknown>(
-          '/users/' + encodeURIComponent(profile.id) + '/following?limit=1',
+          '/users/' + encodeURIComponent(canonicalProfileId) + '/following?limit=1',
           { method: 'GET', signal: controller.signal },
         ).catch(() => null),
       ]);
@@ -735,9 +738,9 @@ export default function UserProfileScreen() {
       const profileHeaderSource = resolveNativeMediaSource(profile.headerImage || profile.coverImage, sessionToken);
 
       setUser({
-        id: profile.id,
+        id: canonicalProfileId,
         name: profile.displayName?.trim() || profile.username || 'LuckRead member',
-        handle: profile.username || userHandle || profile.id,
+        handle: profile.username || userHandle || canonicalProfileId,
         bio: profile.bio || '',
         url: profile.website || '',
         followed_by: typeof followersPage?.totalCount === 'number'
