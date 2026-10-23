@@ -62,6 +62,20 @@ export async function GET(
           }
         }
 
+        // Match the social identity resolver: numeric IDs are treated as legacy
+        // Payload row IDs first, but may also be canonical identity IDs. Only
+        // fall back to identity lookup after a missing Payload row is confirmed.
+        if (!user && /^[0-9]+$/.test(userId)) {
+          const byIdentity = await payload.find({
+            collection: 'users',
+            where: { identityId: { equals: userId } },
+            depth: 0,
+            limit: 1,
+            overrideAccess: true,
+          })
+          user = byIdentity.docs[0] ?? null
+        }
+
         if (!user) {
           return Response.json(
             { error: { code: 'NOT_FOUND', message: 'User not found', details: {} }, requestId: `req_${crypto.randomUUID()}` },
