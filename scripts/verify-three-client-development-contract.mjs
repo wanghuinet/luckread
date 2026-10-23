@@ -66,6 +66,7 @@ try {
 const uiRoots = [
   'workers/W01-payload/src/app/(frontend)',
   'workers/W01-payload/src/app/(twitter-clone)',
+  'workers/W01-payload/src/app/(payload)',
 ];
 const extensions = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs']);
 const skipDirs = new Set(['node_modules', '.next', '.open-next', 'coverage', '__tests__', 'fixtures']);
@@ -89,12 +90,12 @@ for (const relativeRoot of uiRoots) {
   const absoluteRoot = path.join(root, relativeRoot);
   try {
     if (!(await stat(absoluteRoot)).isDirectory()) {
-      fail('Expected PC/H5 UI source directory is not a directory: ' + relativeRoot);
+      fail('Expected W01 UI source directory is not a directory: ' + relativeRoot);
       continue;
     }
     await walk(absoluteRoot);
   } catch (error) {
-    fail('Cannot scan PC/H5 UI source directory ' + relativeRoot + ': ' + error.message);
+    fail('Cannot scan W01 UI source directory ' + relativeRoot + ': ' + error.message);
   }
 }
 
@@ -114,6 +115,14 @@ const forbidden = [
   {
     label: 'Payload Local API invoked directly from UI code',
     pattern: /\bgetPayload\s*\(|\bpayload\.(?:find|findByID|findGlobal|create|update|delete|count)\s*\(/g,
+  },
+  {
+    label: 'W01 API route handler imported directly into UI instead of the public API client',
+    pattern: /\bimport\s*\{[^}]*\b(?:GET|POST|PUT|PATCH|DELETE)\b[^}]*\}\s*from\s*['"][^'"]*\/api\/v1\/[^'"]*\/route(?:\.[^'"]+)?['"]/g,
+  },
+  {
+    label: 'private Worker internal URL referenced from UI code',
+    pattern: /https?:\/\/[A-Za-z0-9.-]+\.internal(?:\/|['"])/g,
   },
 ];
 
@@ -136,9 +145,9 @@ for (const file of sourceFiles) {
   }
 }
 
-info.push('PC_H5_UI_FILES_SCANNED=' + sourceFiles.length);
+info.push('W01_UI_FILES_SCANNED=' + sourceFiles.length);
 info.push('UI_DATABASE_BOUNDARY_RULES=' + forbidden.length);
-info.push('CONTRACT_STATIC_GUARD_SCOPE=APP transport + PC/H5 direct database/Local-API boundary');
+info.push('CONTRACT_STATIC_GUARD_SCOPE=APP transport + W01 UI database/Local-API/direct-route/private-Worker boundary');
 for (const line of info) console.log(line);
 
 if (errors.length) {
