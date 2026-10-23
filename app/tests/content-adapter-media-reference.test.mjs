@@ -28,6 +28,7 @@ test('accepts only the approved image and video delivery hosts for off-origin me
 test('does not resolve arbitrary external, lookalike, or protocol-relative media URLs', () => {
   expect(resolveNativeMediaSource('https://cdn.example.org/photo.webp')).toBeNull();
   expect(resolveNativeMediaSource('https://img.luckread.com.example.org/photo.webp')).toBeNull();
+  expect(resolveNativeMediaSource('https://video.luckread.com:8443/clip.mp4')).toBeNull();
   expect(resolveNativeMediaSource('http://img.luckread.com/photo.webp')).toBeNull();
   expect(resolveNativeMediaSource('//img.luckread.com/photo.webp')).toBeNull();
   expect(resolveNativeMediaSource('r2://private-bucket/photo.webp')).toBeNull();
