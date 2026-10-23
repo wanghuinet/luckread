@@ -16,6 +16,7 @@ const profileResponse = async (user: Record<string, unknown>, status = 200) => {
   const etag = await etagForUserProfile(user)
   return new Response(JSON.stringify({
     id: String(user.id ?? ''),
+    identityId: typeof user.identityId === 'string' ? user.identityId : null,
     email: typeof user.email === 'string' ? user.email : '',
     ...pickUserProfileSnapshot(user),
     requestId: `req_${crypto.randomUUID()}`,
