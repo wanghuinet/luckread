@@ -24,9 +24,9 @@ describe('user profile page', () => {
   it('loads the viewer profile and hides self-follow on the public profile', () => {
     const page = read('src/app/(frontend)/users/[userId]/UserProfilePage.tsx')
     expect(page).toContain("fetchJson<{ id?: string; identityId?: string | null }>('/api/v1/users/me'")
-    expect(page).toContain('setViewerUserId(typeof viewerData?.id === \'string\' ? viewerData.id : null)')
-    expect(page).toContain('viewerUserId !== profile.id')
-    expect(page).toContain('viewerUserId !== profile.id')
+    expect(page).toContain('setViewerUserId(typeof viewerData?.identityId === \'string\' ? viewerData.identityId : typeof viewerData?.id === \'string\' ? viewerData.id : null)')
+    expect(page).toContain('viewerUserId !== (profile.identityId || profile.id)')
+    expect(page).toContain('viewerUserId !== (profile.identityId || profile.id)')
   })
 
   it('uses the existing authenticated logout API and returns to the public homepage', () => {
