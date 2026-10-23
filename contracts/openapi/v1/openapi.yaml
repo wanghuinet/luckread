@@ -11,8 +11,8 @@ info:
     name: Proprietary
     identifier: proprietary
 servers:
-  - url: /api/v1
-    description: API v1
+  - url: https://api.luckread.com/v1
+    description: Canonical public API v1
 security:
   - bearerAuth: []
 tags:
