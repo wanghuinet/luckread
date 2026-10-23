@@ -19,7 +19,7 @@ on:
         description: HTTPS LuckRead origin to probe; this workflow never sends an accepted event batch
         required: true
         type: string
-        default: https://luckread.com
+        default: https://api.luckread.com
 
 permissions:
   contents: read
