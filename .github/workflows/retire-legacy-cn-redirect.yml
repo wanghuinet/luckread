@@ -52,7 +52,7 @@ jobs:
           existing_id="$(printf '%s' "${current}" | jq -r --arg ref "${RULE_REF}" '.result.rules[]? | select(.ref == $ref) | .id' | head -n 1)"
 
           if [ -n "${existing_id}" ]; then
-            delete_response="$(api --request DELETE "${endpoint%/phases/*}/rulesets/${ruleset_id}/rules/${existing_id}")"
+            delete_response="$(api --request DELETE "https://api.cloudflare.com/client/v4/zones/${zone_id}/rulesets/${ruleset_id}/rules/${existing_id}")"
             printf '%s' "${delete_response}" | jq -e '.success == true' >/dev/null
             echo "REMOVED_LEGACY_REDIRECT_RULE ${RULE_REF}"
           else
