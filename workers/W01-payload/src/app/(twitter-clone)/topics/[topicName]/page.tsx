@@ -1,13 +1,12 @@
 import type { Metadata } from 'next'
 import { cookies, headers } from 'next/headers'
 import Link from 'next/link'
-import { cachedPublicGet } from '../../../../lib/public-response-cache.js'
-import { enforcePublicReadRateLimit } from '../../../../auth/traffic-limit.js'
-import { callW05SocialPublic, W05SocialClientError } from '../../../../social/w05-social-client.js'
+import { fetchJson } from '../../../../lib/client-api.js'
 import { normalizePublicLocale, type PublicLocale } from '../../../(frontend)/i18n/public-locale'
 import TwitterCloneSecondaryPageLayout from '../../TwitterCloneSecondaryPageLayout'
 
-const PUBLIC_ORIGIN = 'https://luckread.com'
+const PUBLIC_WEB_ORIGIN = 'https://luckread.com'
+const PUBLIC_API_ORIGIN = 'https://api.luckread.com'
 
 type TopicPageData = {
   topic: {
@@ -35,7 +34,7 @@ async function getTopicPage(
   if (cursor) query.set('cursor', cursor)
 
   const request = new Request(
-    PUBLIC_ORIGIN + '/api/v1/topics/' + encodeURIComponent(topicName) + '?' + query.toString(),
+    PUBLIC_API_ORIGIN + '/v1/topics/' + encodeURIComponent(topicName) + '?' + query.toString(),
     {
       method: 'GET',
       headers: {
@@ -43,29 +42,13 @@ async function getTopicPage(
         ...(incoming.get('cf-connecting-ip') ? { 'cf-connecting-ip': incoming.get('cf-connecting-ip')! } : {}),
         ...(incoming.get('accept-language') ? { 'accept-language': incoming.get('accept-language')! } : {}),
       },
+      cache: 'no-store',
     },
   )
 
-  await enforcePublicReadRateLimit(request)
-
-  try {
-    const response = await cachedPublicGet(
-      request,
-      'social-topic-page',
-      () => callW05SocialPublic({
-        request,
-        pathname: '/internal/social/topics/' + encodeURIComponent(topicName) + '?' + query.toString(),
-        method: 'GET',
-      }),
-      30,
-    )
-    if (!response.ok) return null
-    const payload = await response.json() as { data?: TopicPageData }
-    return payload.data ?? null
-  } catch (error) {
-    if (error instanceof W05SocialClientError) return null
-    throw error
-  }
+  const { response, data } = await fetchJson<{ data?: TopicPageData }>(request)
+  if (!response.ok) return null
+  return data?.data ?? null
 }
 
 export async function generateMetadata({
@@ -85,7 +68,7 @@ export async function generateMetadata({
     title: '#' + topic.topic.displayName + ' · LuckRead',
     description: 'LuckRead 话题：#' + topic.topic.displayName,
     alternates: {
-      canonical: PUBLIC_ORIGIN + '/topics/' + encodeURIComponent(topic.topic.name),
+      canonical: PUBLIC_WEB_ORIGIN + '/topics/' + encodeURIComponent(topic.topic.name),
     },
   }
 }
