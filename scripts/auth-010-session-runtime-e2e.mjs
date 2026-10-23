@@ -54,7 +54,7 @@ async function parseJson(response, stage) {
 }
 
 async function login(email, password, label) {
-  const response = await fetch(baseUrl + '/api/v1/auth/login', {
+  const response = await fetch(baseUrl + '/v1/auth/login', {
     method: 'POST',
     headers: requestHeaders({ 'content-type': 'application/json' }),
     body: JSON.stringify({ identity: email, credential: password }),
@@ -72,7 +72,7 @@ async function login(email, password, label) {
 async function listSessions(cookie, label, cursor) {
   const params = new URLSearchParams({ limit: '100' })
   if (cursor !== undefined) params.set('cursor', cursor)
-  const response = await fetch(baseUrl + '/api/v1/auth/sessions?' + params.toString(), {
+  const response = await fetch(baseUrl + '/v1/auth/sessions?' + params.toString(), {
     method: 'GET',
     headers: requestHeaders(cookie ? { cookie } : {}),
     cache: 'no-store',
@@ -83,7 +83,7 @@ async function listSessions(cookie, label, cursor) {
 }
 
 async function revokeSession(cookie, sessionId, idempotencyKey, label) {
-  const response = await fetch(baseUrl + '/api/v1/auth/sessions/' + encodeURIComponent(sessionId), {
+  const response = await fetch(baseUrl + '/v1/auth/sessions/' + encodeURIComponent(sessionId), {
     method: 'DELETE',
     headers: requestHeaders({ cookie, 'Idempotency-Key': idempotencyKey }),
     cache: 'no-store',
@@ -144,7 +144,7 @@ async function cleanupOne(label, cookie, sessionId, fallbackCookie = null) {
 
 async function runAssertions() {
   assertCheck('ExplicitRunConfirmation', runConfirmation === 'RUN_AUTH010_REMOTE_E2E', 'CONFIRMATION_REQUIRED')
-  assertCheck('FixedProductionTarget', baseUrl === 'https://luckread.com', 'TARGET_NOT_ALLOWLISTED')
+  assertCheck('FixedProductionTarget', baseUrl === 'https://api.luckread.com', 'TARGET_NOT_ALLOWLISTED')
   assertCheck('ExpectedSourceShaFormat', /^[0-9a-f]{40}$/.test(expectedSourceSha), 'EXPECTED_SHA_INVALID')
   sourceSha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()
   assertCheck('CheckedOutExactSourceSha', sourceSha === expectedSourceSha, 'CHECKED_OUT_SHA_MISMATCH')
