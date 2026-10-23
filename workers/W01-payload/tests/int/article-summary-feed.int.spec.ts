@@ -24,14 +24,14 @@ describe('article summary card preview', () => {
     })
 
     expect(extractArticleSummary(structured)).toBe('A useful heading The first paragraph of the article.')
-    expect(extractArticleSummary('Legacy first paragraph.\\n\\nLegacy second paragraph.')).toBe(
+    expect(extractArticleSummary('Legacy first paragraph.\n\nLegacy second paragraph.')).toBe(
       'Legacy first paragraph. Legacy second paragraph.',
     )
     const longText = 'a'.repeat(ARTICLE_SUMMARY_MAX_CHARS + 30)
     const excerpt = extractArticleSummary(longText)
     expect(excerpt).toHaveLength(ARTICLE_SUMMARY_MAX_CHARS)
     expect(excerpt?.endsWith('…')).toBe(true)
-    expect(extractArticleSummary('  \\n  ')).toBeNull()
+    expect(extractArticleSummary('  \n  ')).toBeNull()
   })
 
   it('allows only same-origin or LuckRead-hosted public body files', () => {
