@@ -12,6 +12,8 @@ describe('v1 follow mutation adapter', () => {
     expect(route).toContain('resolveSocialPrincipal')
     expect(route).toContain('callW05Social')
     expect(route).toContain('/internal/social/follows/')
+    expect(route).toContain("invalidatePublicFollowList('following',resolvedPrincipal.payloadProfileId)")
+    expect(route).toContain("invalidatePublicFollowList('followers',resolvedTarget.payloadProfileId)")
     expect(route).not.toContain('social_follow_relationships')
   })
 
@@ -22,7 +24,7 @@ describe('v1 follow mutation adapter', () => {
     expect(route.indexOf("if(method!=='GET') await enforceW01WriteRateLimit(request)"))
       .toBeLessThan(route.indexOf('await resolveSocialPrincipal(request)'))
     expect(route.indexOf('await enforceW01WriteRateLimit(request)'))
-      .toBeLessThan(route.indexOf('resolveSocialProfileIdentityId(rawTargetUserId)'))
+      .toBeLessThan(route.indexOf('resolveSocialProfileIdentity(rawTargetUserId)'))
   })
 
   it('enforces Idempotency-Key on follow and unfollow mutations', () => {
@@ -44,6 +46,6 @@ describe('v1 follow mutation adapter', () => {
   })
 
   it('keeps target existence validation on follow creation', () => {
-    expect(route).toContain('resolveSocialProfileIdentityId(rawTargetUserId)')
+    expect(route).toContain('resolveSocialProfileIdentity(rawTargetUserId)')
   })
 })
