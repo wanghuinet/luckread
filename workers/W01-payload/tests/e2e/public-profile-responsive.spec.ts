@@ -1,8 +1,9 @@
 import { expect, test } from '@playwright/test'
 
 test('keeps the public profile and timeline inside the responsive X-style center column', async ({ page }) => {
-  const profile: { id: string; username: string; displayName: string; bio: string; avatar: string | null } = {
+  const profile: { id: string; identityId: string; username: string; displayName: string; bio: string; avatar: string | null } = {
     id: 'profile-id',
+    identityId: 'canonical-identity-id',
     username: 'wanghui',
     displayName: 'Wang Hui',
     bio: 'Responsive profile layout test',
@@ -11,7 +12,7 @@ test('keeps the public profile and timeline inside the responsive X-style center
   const post: { id: string; slug: string; creatorId: string; contentType: 'post'; title: string; mediaRefs: string[]; coverRef: string | null; createdAt: string; updatedAt: string } = {
     id: 'post-1',
     slug: 'responsive-layout-test-post',
-    creatorId: profile.id,
+    creatorId: profile.identityId,
     contentType: 'post',
     title: 'A public profile post that should remain aligned within the center timeline',
     mediaRefs: [],
@@ -20,6 +21,7 @@ test('keeps the public profile and timeline inside the responsive X-style center
     updatedAt: '2026-10-18T00:00:00.000Z',
   }
 
+  let requestedCreatorId: string | null = null
   await page.route('**/api/v1/**', async (route) => {
     const url = new URL(route.request().url())
     const path = url.pathname
@@ -36,6 +38,7 @@ test('keeps the public profile and timeline inside the responsive X-style center
     } else if (path === '/api/v1/social/follows/profile-id') {
       body = { data: { following: false, relationship: { mutualFollow: false, blocked: false, blockedBy: false, muted: false } } }
     } else if (path === '/api/v1/contents') {
+      requestedCreatorId = url.searchParams.get('creatorId')
       body = { data: { items: [post], nextCursor: null, hasMore: false } }
     } else if (path === '/api/v1/contents/post-1/social') {
       body = { data: { viewer: { liked: false, favorited: false, reposted: false }, counts: { likes: 0, reposts: 0, comments: 0 }, pinned: false } }
@@ -58,6 +61,7 @@ test('keeps the public profile and timeline inside the responsive X-style center
   expect(xShellStyles.bodyFontFamily).toContain('TwitterChirp')
   expect(xShellStyles.bodyBackgroundImage).toBe('none')
   await expect(page.getByTestId('luckread-social-post-card')).toBeVisible()
+  expect(requestedCreatorId).toBe('canonical-identity-id')
   await expect(page.getByTestId('luckread-social-post-card')).toHaveClass(/border-b/)
   await expect(page.getByTestId('luckread-social-post-card')).not.toHaveClass(/content-feed-card/)
 
