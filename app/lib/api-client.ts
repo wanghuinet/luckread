@@ -1,6 +1,6 @@
 import { readSessionToken, saveSessionToken } from './secure-session';
 
-const DEFAULT_API_BASE_URL = 'https://luckread.com';
+const DEFAULT_API_BASE_URL = 'https://api.luckread.com';
 const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
 export type ApiErrorBody = {
@@ -391,7 +391,7 @@ export async function apiRequest<T>(
   }
 
   const normalizedPath = path.startsWith('/') ? path : '/' + path;
-  const requestUrl = getApiBaseUrl() + '/api/v1' + normalizedPath;
+  const requestUrl = getApiBaseUrl() + '/v1' + normalizedPath;
   let mutationLease: PendingMutationLease | null = null;
 
   // Retry the exact same mutation with the same key after a network error,
