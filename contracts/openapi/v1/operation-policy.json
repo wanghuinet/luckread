@@ -801,19 +801,6 @@
       "x-luckread-source": "contracts/api/api-inventory.v1.json"
     },
     {
-      "operationId": "getTopicsTopicName",
-      "auth": {
-        "mode": "public"
-      },
-      "permissions": [],
-      "auditRequired": false,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": false,
-      "stateMachine": "none",
-      "x-luckread-contract-status": "DISCOVERY_DRAFT",
-      "x-luckread-source": "contracts/api/api-inventory.v1.json"
-    },
-    {
       "operationId": "listEntitlements",
       "auth": {
         "mode": "permission"
@@ -1235,6 +1222,19 @@
       "operationId": "getSubscriptions",
       "auth": {
         "mode": "permission"
+      },
+      "permissions": [],
+      "auditRequired": false,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none",
+      "x-luckread-contract-status": "DISCOVERY_DRAFT",
+      "x-luckread-source": "contracts/api/api-inventory.v1.json"
+    },
+    {
+      "operationId": "getTopicsTopicName",
+      "auth": {
+        "mode": "public"
       },
       "permissions": [],
       "auditRequired": false,

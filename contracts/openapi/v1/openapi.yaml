@@ -3281,6 +3281,17 @@ paths:
       responses:
         '200': { description: Pinned-content reference, or null when no public pin exists. }
         '4XX': { $ref: '#/components/responses/ClientError' }
+  /topics/{topicName}:
+    get:
+      tags: [Search]
+      summary: Discovery draft for GET undefined
+      operationId: getTopicsTopicName
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
 components:
   securitySchemes:
     bearerAuth:
