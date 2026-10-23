@@ -158,12 +158,24 @@ export default function PublicProfilePage({
     void (async () => {
       try {
         const { userId } = await params
-        const [profileResponse, followersResponse, followingResponse, followResponse, contentResponse, viewerResponse, pinResponse] = await Promise.all([
-          fetchJson<PublicProfile | { error?: { message?: string } }>('/api/v1/users/' + encodeURIComponent(userId), {
-            headers: { accept: 'application/json' },
-            cache: 'no-store',
-            signal: controller.signal,
-          }),
+        const profileResult = await fetchJson<PublicProfile | { error?: { message?: string } }>('/api/v1/users/' + encodeURIComponent(userId), {
+          headers: { accept: 'application/json' },
+          cache: 'no-store',
+          signal: controller.signal,
+        })
+        const data = profileResult.data
+        if (profileResult.response.status === 404) throw new Error('USER_NOT_FOUND')
+        if (!profileResult.response.ok || !data || !('id' in data)) {
+          throw new Error(getApiErrorMessage(data, '资料加载失败'))
+        }
+
+        if (cancelled) return
+        setProfile(data)
+        const canonicalProfileId = typeof data.identityId === 'string' && data.identityId.trim()
+          ? data.identityId.trim()
+          : data.id
+
+        const [followerResult, followingResult, followResult, contentResult, viewerResult, pinResult] = await Promise.all([
           fetchJson<CountResponse>('/api/v1/users/' + encodeURIComponent(userId) + '/followers?limit=1', {
             headers: { accept: 'application/json' },
             cache: 'no-store',
@@ -192,7 +204,7 @@ export default function PublicProfilePage({
             cache: 'no-store',
             signal: controller.signal,
           }),
-          fetchJson<ContentListResponse>('/api/v1/contents?creatorId=' + encodeURIComponent(userId) + '&limit=6&type=post', {
+          fetchJson<ContentListResponse>('/api/v1/contents?creatorId=' + encodeURIComponent(canonicalProfileId) + '&limit=6&type=post', {
             headers: { accept: 'application/json' },
             credentials: 'omit',
             cache: 'no-store',
@@ -210,22 +222,6 @@ export default function PublicProfilePage({
             signal: controller.signal,
           }),
         ])
-
-        const profileResult = profileResponse
-        const followerResult = followersResponse
-        const followingResult = followingResponse
-        const followResult = followResponse
-        const contentResult = contentResponse
-        const viewerResult = viewerResponse
-        const pinResult = pinResponse
-        const data = profileResult.data
-        if (profileResult.response.status === 404) throw new Error('USER_NOT_FOUND')
-        if (!profileResult.response.ok || !data || !('id' in data)) {
-          throw new Error(getApiErrorMessage(data, '资料加载失败'))
-        }
-
-        if (cancelled) return
-        setProfile(data)
 
         const followerData = followerResult.data
         const followingData = followingResult.data
