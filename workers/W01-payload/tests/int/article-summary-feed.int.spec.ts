@@ -54,6 +54,7 @@ describe('article summary card preview', () => {
     const api = read('src/app/api/v1/contents/route.ts')
     const w03 = read('../W03-content/src/index.ts')
     const component = read('src/components/ArticleSummaryPreview.tsx')
+    const detailClient = read('src/app/(frontend)/content/[contentId]/ContentDetailClient.tsx')
 
     expect(home).toContain("import ArticleSummaryPreview from '../../components/ArticleSummaryPreview.js'")
     expect(home).toContain("item.contentType === 'article'")
@@ -68,6 +69,8 @@ describe('article summary card preview', () => {
     expect(component).toContain("credentials: 'omit'")
     expect(component).toContain("referrerPolicy: 'no-referrer'")
     expect(component).toContain('resolvePublicArticleBodyUrl(bodyRef, window.location.origin)')
+    expect(component).toContain('apiFetch(url, {')
+    expect(detailClient).toContain('apiFetch(resolved.bodyRef, {')
     expect(component).toContain('className="content-feed-meta"')
     expect(component).toContain('className="content-detail-action-status"')
     expect(component).toContain('content-feed-skeleton-line')

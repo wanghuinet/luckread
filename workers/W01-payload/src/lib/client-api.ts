@@ -36,7 +36,9 @@ export function resolvePublicApiRequestUrl(input: RequestInfo | URL): RequestInf
   }
 
   if (
-    target.origin !== window.location.origin ||
+    !CANONICAL_WEB_HOSTS.has(target.hostname) ||
+    target.protocol !== 'https:' ||
+    target.port !== '' ||
     !/^\/api\/v1(?:\/|$)/.test(target.pathname)
   ) return input
 
