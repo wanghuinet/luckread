@@ -2,7 +2,7 @@ import { mkdir, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { randomUUID } from 'node:crypto'
 
-const configuredBaseUrl = process.env.LUCKREAD_API_BASE_URL || 'https://luckread.com'
+const configuredBaseUrl = process.env.LUCKREAD_API_BASE_URL || 'https://api.luckread.com'
 const runId = process.env.GITHUB_RUN_ID || 'local'
 const runAttempt = process.env.GITHUB_RUN_ATTEMPT || '1'
 const sourceSha = process.env.GITHUB_SHA || 'unknown'
@@ -26,12 +26,12 @@ function validateBaseUrl(value) {
 }
 
 const baseUrl = validateBaseUrl(configuredBaseUrl)
-const endpoint = baseUrl + '/api/v1/analytics/events'
+const endpoint = baseUrl + '/v1/analytics/events'
 const evidence = {
   evidenceType: 'LUCKREAD_ANALYTICS_EVENTS_LIVE_NEGATIVE_SECURITY_E2E',
   timestamp: new Date().toISOString(),
   baseUrl,
-  endpointPath: '/api/v1/analytics/events',
+  endpointPath: '/v1/analytics/events',
   workflowRunId: runId,
   workflowRunAttempt: runAttempt,
   sourceSha,
