@@ -192,6 +192,19 @@ describe('Media upload access', () => {
   })
 
 
+  it('correlates media upload 503 telemetry without logging sensitive exception details', () => {
+    const route = read('src/app/api/v1/media/route.ts')
+
+    expect(route).toContain("event: 'w01.media.upload_failure'")
+    expect(route).toContain('requestId:')
+    expect(route).toContain('upstreamStatus:')
+    expect(route).toContain("'payload_media_create'")
+    expect(route).toContain("'idempotency_lookup_after_upload'")
+    expect(route).not.toContain('console.error(error)')
+    expect(route).not.toContain('details.error.message')
+    expect(route).not.toContain('details.error.stack')
+  })
+
   it('distinguishes unauthenticated requests from W02 authentication-service failures', () => {
     const route = read('src/app/api/v1/media/route.ts')
     expect(route).toContain("import { getBetterAuthPrincipal, W02AuthClientError }")
