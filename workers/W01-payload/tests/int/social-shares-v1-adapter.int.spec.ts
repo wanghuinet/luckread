@@ -22,6 +22,12 @@ describe('v1 share adapters', () => {
     expect(route).toContain('/internal/social/content/')
     expect(route).toContain('/shares')
     expect(route).toContain('Idempotency-Key')
+    expect(route).toContain('enforceW01WriteRateLimit(request)')
+    expect(route).toContain('TrafficLimitError')
+    expect(route).toContain('rateLimitResponse(request)')
+    expect(route.indexOf('await enforceW01WriteRateLimit(request)')).toBeLessThan(
+      route.indexOf('await resolveCookieSocialPrincipal(request)'),
+    )
     expect(route).not.toContain('getPayload(')
     expect(route).not.toContain('social_share_links')
   })
