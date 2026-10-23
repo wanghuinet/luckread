@@ -241,6 +241,19 @@
       "stateMachine": "none"
     },
     {
+      "operationId": "deleteContentsContentIdPoll",
+      "auth": {
+        "mode": "authenticated"
+      },
+      "permissions": [],
+      "auditRequired": false,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": true,
+      "stateMachine": "none",
+      "x-luckread-contract-status": "DISCOVERY_DRAFT",
+      "x-luckread-source": "contracts/api/api-inventory.v1.json"
+    },
+    {
       "operationId": "deleteDeveloperApiKeysKeyId",
       "auth": {
         "mode": "permission"
@@ -654,6 +667,19 @@
       "optimisticLockRequired": false,
       "idempotencyRequired": false,
       "stateMachine": "none"
+    },
+    {
+      "operationId": "getContentsContentIdPoll",
+      "auth": {
+        "mode": "public"
+      },
+      "permissions": [],
+      "auditRequired": false,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none",
+      "x-luckread-contract-status": "DISCOVERY_DRAFT",
+      "x-luckread-source": "contracts/api/api-inventory.v1.json"
     },
     {
       "operationId": "listContentRevisions",
@@ -1227,58 +1253,6 @@
       "auditRequired": false,
       "optimisticLockRequired": false,
       "idempotencyRequired": false,
-      "stateMachine": "none",
-      "x-luckread-contract-status": "DISCOVERY_DRAFT",
-      "x-luckread-source": "contracts/api/api-inventory.v1.json"
-    },
-    {
-      "operationId": "getContentsContentIdPoll",
-      "auth": {
-        "mode": "public"
-      },
-      "permissions": [],
-      "auditRequired": false,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": false,
-      "stateMachine": "none",
-      "x-luckread-contract-status": "DISCOVERY_DRAFT",
-      "x-luckread-source": "contracts/api/api-inventory.v1.json"
-    },
-    {
-      "operationId": "postContentsContentIdPoll",
-      "auth": {
-        "mode": "authenticated"
-      },
-      "permissions": [],
-      "auditRequired": false,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": true,
-      "stateMachine": "none",
-      "x-luckread-contract-status": "DISCOVERY_DRAFT",
-      "x-luckread-source": "contracts/api/api-inventory.v1.json"
-    },
-    {
-      "operationId": "deleteContentsContentIdPoll",
-      "auth": {
-        "mode": "authenticated"
-      },
-      "permissions": [],
-      "auditRequired": false,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": true,
-      "stateMachine": "none",
-      "x-luckread-contract-status": "DISCOVERY_DRAFT",
-      "x-luckread-source": "contracts/api/api-inventory.v1.json"
-    },
-    {
-      "operationId": "postContentsContentIdPollVotes",
-      "auth": {
-        "mode": "authenticated"
-      },
-      "permissions": [],
-      "auditRequired": false,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": true,
       "stateMachine": "none",
       "x-luckread-contract-status": "DISCOVERY_DRAFT",
       "x-luckread-source": "contracts/api/api-inventory.v1.json"
@@ -2004,6 +1978,32 @@
       "optimisticLockRequired": false,
       "idempotencyRequired": false,
       "stateMachine": "none"
+    },
+    {
+      "operationId": "postContentsContentIdPoll",
+      "auth": {
+        "mode": "authenticated"
+      },
+      "permissions": [],
+      "auditRequired": false,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": true,
+      "stateMachine": "none",
+      "x-luckread-contract-status": "DISCOVERY_DRAFT",
+      "x-luckread-source": "contracts/api/api-inventory.v1.json"
+    },
+    {
+      "operationId": "postContentsContentIdPollVotes",
+      "auth": {
+        "mode": "authenticated"
+      },
+      "permissions": [],
+      "auditRequired": false,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": true,
+      "stateMachine": "none",
+      "x-luckread-contract-status": "DISCOVERY_DRAFT",
+      "x-luckread-source": "contracts/api/api-inventory.v1.json"
     },
     {
       "operationId": "rollbackContentRevision",
