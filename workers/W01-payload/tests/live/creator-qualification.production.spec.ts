@@ -145,7 +145,7 @@ async function login(page: Page, roleName: string, email: string, password: stri
 }
 
 async function nativeGet(path: string, sessionToken: string): Promise<{ response: Response; payload: CreatorApiPayload | null }> {
-  const response = await fetch(baseURL + path, {
+  const response = await fetch(apiBaseURL + path, {
     method: 'GET',
     headers: {
       accept: 'application/json',
