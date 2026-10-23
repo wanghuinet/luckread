@@ -2,7 +2,7 @@
 
 import { useRef, useState } from 'react'
 
-import { fetchJson, getApiErrorMessage } from '../lib/client-api.js'
+import { apiFetch, fetchJson, getApiErrorMessage } from '../lib/client-api.js'
 
 import type { ArticleDocument } from '../lib/article-document.js'
 import { collectImportedImages } from '../features/word-import/collect-images.js'
@@ -65,7 +65,7 @@ async function uploadImage(
 async function cleanupUploadedMedia(mediaIds: string[], importScope: string): Promise<void> {
   await Promise.allSettled(
     mediaIds.map((mediaId) =>
-      fetch('/api/v1/media/' + encodeURIComponent(mediaId), {
+      apiFetch('/api/v1/media/' + encodeURIComponent(mediaId), {
         method: 'DELETE',
         credentials: 'include',
         headers: {
