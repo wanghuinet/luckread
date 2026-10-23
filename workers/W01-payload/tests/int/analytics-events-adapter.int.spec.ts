@@ -43,11 +43,13 @@ vi.mock('../../src/content/w03-content-client.js', () => ({
 const read = (relativePath: string) =>
   readFileSync(resolve(process.cwd(), relativePath), 'utf8')
 
+const liveEventOccurredAt = new Date(Date.now() - 60_000).toISOString()
+
 const validEvent = (overrides: Record<string, unknown> = {}) => ({
   eventId: 'evt_valid_0001',
   dedupeKey: 'dedupe_valid_0001',
   eventName: 'content_open',
-  occurredAt: '2026-10-22T06:00:00.000Z',
+  occurredAt: liveEventOccurredAt,
   sessionId: 'session_test_01',
   contentId: 'content_test_01',
   contentType: 'article',
@@ -144,12 +146,14 @@ describe('W01 analytics event route integration', () => {
 
     expect(response.status).toBe(200)
     const body = await response.json() as {
-      data: { received: number; qualityCounts: { VALID: number }; persistence: { inserted: number } }
+      data: { received: number; qualityCounts: { VALID: number; LATE: number }; persistence: { inserted: number; lateInserted: number } }
       requestId: string
     }
     expect(body.data.received).toBe(1)
     expect(body.data.qualityCounts.VALID).toBe(1)
+    expect(body.data.qualityCounts.LATE).toBe(0)
     expect(body.data.persistence.inserted).toBe(1)
+    expect(body.data.persistence.lateInserted).toBe(0)
     expect(body.requestId).toBe('corr_route_000001')
     expect(mocks.enforceLimit).toHaveBeenCalledTimes(1)
     expect(database.batch).toHaveBeenCalledTimes(1)
