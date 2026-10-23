@@ -94,7 +94,9 @@ const canonicalIdentityId = (user: unknown): string | null => {
  * Accept either a legacy Payload profile-row ID or a canonical W02 identity ID,
  * but only ever return the identity ID used by W05's social relation tables.
  */
-export async function resolveSocialProfileIdentityId(profileIdValue: string): Promise<string> {
+export async function resolveSocialProfileIdentity(
+  profileIdValue: string,
+): Promise<{ identityId: string; payloadProfileId: string }> {
   const normalized = typeof profileIdValue === 'string' ? profileIdValue.trim() : ''
   if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(normalized)) {
     throw new W05SocialClientError(400, 'VALIDATION_FAILED', 'Invalid target user id')
@@ -113,7 +115,7 @@ export async function resolveSocialProfileIdentityId(profileIdValue: string): Pr
       depth: 0,
       limit: 1,
       overrideAccess: true,
-      select: { identityId: true } as any,
+      select: { id: true, identityId: true } as any,
     })
     user = byIdentity.docs[0] ?? null
   }
@@ -140,19 +142,30 @@ export async function resolveSocialProfileIdentityId(profileIdValue: string): Pr
       depth: 0,
       limit: 1,
       overrideAccess: true,
-      select: { identityId: true } as any,
+      select: { id: true, identityId: true } as any,
     })
     user = byIdentity.docs[0] ?? null
   }
 
   if (!user) throw new W05SocialClientError(404, 'NOT_FOUND', 'Target user not found')
+  const record = user as { id?: unknown; identityId?: unknown }
   const identityId = canonicalIdentityId(user)
   if (!identityId) {
     // Missing identity mappings must fail closed rather than create W05 rows
     // in the wrong ID namespace.
     throw new W05SocialClientError(503, 'SERVICE_UNAVAILABLE', 'Profile identity mapping unavailable')
   }
-  return identityId
+  const rawPayloadId = typeof record.id === 'number' || typeof record.id === 'string'
+    ? String(record.id).trim()
+    : ''
+  const payloadProfileId = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(rawPayloadId)
+    ? rawPayloadId
+    : normalized
+  return { identityId, payloadProfileId }
+}
+
+export async function resolveSocialProfileIdentityId(profileIdValue: string): Promise<string> {
+  return (await resolveSocialProfileIdentity(profileIdValue)).identityId
 }
 
 /** Backwards-compatible existence assertion for callers that only need validation. */
