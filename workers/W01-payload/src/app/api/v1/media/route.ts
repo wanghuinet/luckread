@@ -63,7 +63,7 @@ const mediaErrorType = (error: unknown): string => {
 }
 
 async function readUpstreamErrorCode(response: Response): Promise<string | null> {
-  const value: unknown = await response.clone().json().catch(() => null)
+  const value: unknown = await response.clone().json().catch((): null => null)
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null
   const record = value as { error?: unknown; code?: unknown }
   const nested = record.error
@@ -83,7 +83,7 @@ async function logMediaUploadFailure(
   details: MediaFailureDetails = {},
 ): Promise<Response> {
   try {
-    const value: unknown = await response.clone().json().catch(() => null)
+    const value: unknown = await response.clone().json().catch((): null => null)
     const requestId = value && typeof value === 'object' && !Array.isArray(value)
       ? (value as { requestId?: unknown }).requestId
       : null
