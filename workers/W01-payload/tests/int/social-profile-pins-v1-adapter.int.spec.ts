@@ -10,6 +10,12 @@ describe('v1 profile pin adapters', () => {
     expect(route).toContain("'/pin'")
     expect(route).toContain("method: request.method")
     expect(route).toContain('Idempotency-Key')
+    expect(route).toContain('enforceW01WriteRateLimit(request)')
+    expect(route).toContain('TrafficLimitError')
+    expect(route).toContain('rateLimitResponse(request)')
+    expect(route.indexOf('await enforceW01WriteRateLimit(request)')).toBeLessThan(
+      route.indexOf('await resolveCookieSocialPrincipal(request)'),
+    )
     expect(route).not.toContain('getPayload(')
     expect(route).not.toContain('social_profile_pins')
   })

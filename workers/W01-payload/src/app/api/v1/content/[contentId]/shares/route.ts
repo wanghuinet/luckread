@@ -3,6 +3,11 @@ import {
   resolveCookieSocialPrincipal,
   W05SocialClientError,
 } from '../../../../../../social/w05-social-client.js'
+import {
+  TrafficLimitError,
+  enforceW01WriteRateLimit,
+  rateLimitResponse,
+} from '../../../../../../auth/traffic-limit.js'
 import { rememberPublicShareContentId } from '../../../../../../lib/public-response-cache.js'
 
 const errorResponse = (status: number, code: string, message: string) =>
@@ -16,6 +21,7 @@ export async function POST(
   context: { params: Promise<{ contentId: string }> },
 ): Promise<Response> {
   try {
+    await enforceW01WriteRateLimit(request)
     const principal = await resolveCookieSocialPrincipal(request)
     if (principal instanceof Response) return principal
 
@@ -47,6 +53,7 @@ export async function POST(
     }
     return response
   } catch (error) {
+    if (error instanceof TrafficLimitError) return rateLimitResponse(request)
     if (error instanceof W05SocialClientError) {
       return errorResponse(error.status, error.code, error.message)
     }
