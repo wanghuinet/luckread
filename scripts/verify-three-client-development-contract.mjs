@@ -132,6 +132,10 @@ const forbidden = [
     pattern: /\bcallW03Content\s*\(|\bfrom\s*['"][^'"]*\/content\/w03-content-client(?:\.js)?['"]/g,
   },
   {
+    label: 'private domain Worker client imported directly from UI instead of the W01 public API',
+    pattern: /\bfrom\s*['"][^'"]*\/(?:w02-session-client|w04-feed-client|w05-social-client|w06-moderation-client|w07-subscription-client|w08-creator-client)(?:\.js)?['"]/g,
+  },
+  {
     label: 'private Worker internal URL referenced from UI code',
     pattern: /https?:\/\/[A-Za-z0-9.-]+\.internal(?:\/|['"])/g,
   },
