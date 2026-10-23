@@ -171,15 +171,23 @@ it('keeps arbitrary cookies from bypassing the public content cache', () => {
 })
 
 
-it('uses a server-side canonical metadata wrapper for public content', () => {
+it('uses the canonical public W01 API for server-rendered content detail and metadata', () => {
   const page = read('src/app/(twitter-clone)/content/[contentId]/page.tsx')
   expect(page).toContain('generateMetadata')
   expect(page).toContain('alternates:')
-  expect(page).toContain('cachedPublicGet')
   expect(page).toContain('permanentRedirect')
   expect(page).toContain('<TwitterCloneSecondaryPageLayout locale={locale} title={pageTitle} active="explore">')
   expect(page).toContain('showLanguageToggle={false}')
   expect(page).toContain("PUBLIC_ORIGIN = 'https://luckread.com'")
+  expect(page).toContain("import { fetchJson } from '../../../../lib/client-api.js'")
+  expect(page).toContain("'https://api.luckread.com/v1/contents/' + encodeURIComponent(contentId)")
+  expect(page).toContain('fetchJson<PublicContent>(request)')
+  expect(page).toContain("cache: 'no-store'")
+  expect(page).not.toContain('callW03Content')
+  expect(page).not.toContain('w03-content-client')
+  expect(page).not.toContain('cachedPublicGet')
+  expect(page).not.toContain('enforcePublicReadRateLimit')
+  expect(page).not.toContain('/internal/content/contents/')
 })
 
 it('keeps interactive content requests anonymous so signed-in browsers can use the shared cache', () => {
