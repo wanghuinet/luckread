@@ -4,6 +4,7 @@ import { hasAuthenticatedSessionCredential } from '../../../../../../lib/content
 
 import {
   callW05SocialPublic,
+  resolveSocialProfileIdentityId,
   W05SocialClientError,
 } from '../../../../../../social/w05-social-client.js'
 
@@ -30,10 +31,11 @@ export async function GET(
 
     const suffix = query.toString() ? `?${query.toString()}` : ''
     await enforcePublicReadRateLimit(request)
+    const socialUserId = await resolveSocialProfileIdentityId(userId)
     if (hasAuthenticatedSessionCredential(request)) {
       return await callW05SocialPublic({
         request,
-        pathname: `/internal/social/users/${encodeURIComponent(userId)}/following${suffix}`,
+        pathname: `/internal/social/users/${encodeURIComponent(socialUserId)}/following${suffix}`,
         method: 'GET',
       })
     }
