@@ -264,8 +264,8 @@ jobs:
               throw new Error('Refusing remote mutation because live schema does not match the reviewed post-0011 state: ' +
                 JSON.stringify({missing,missingBaselineTables,missingBaselineTriggers,unrecordedAllocatorTable:tables.has('content_id_snowflake_state')}));
             }
-            fs.appendFileSync(process.env.GITHUB_ENV, 'W03_MIGRATION_ACTION=apply\\n');
-            fs.appendFileSync(process.env.GITHUB_OUTPUT, 'action=apply\\n');
+            fs.appendFileSync(process.env.GITHUB_ENV, 'W03_MIGRATION_ACTION=apply\n');
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, 'action=apply\n');
           } else {
             // Retain the previously reviewed pre-0004 states for environments
             // whose W03 migration history is 0001-0002 or 0001-0003 only.
