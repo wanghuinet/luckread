@@ -161,7 +161,7 @@ describe('W03 Snowflake article/video content IDs', () => {
     const articleInsert = articleFake.batches.flat().find((statement) => statement.query.includes('INSERT INTO contents'))
     expect(article.id).toBe(encodeContentSnowflakeId(nowMs, 0))
     expect(articleInsert?.values[0]).toBe(article.id)
-    expect(articleFake.allocator.allocationCount()).toBe(1)
+    expect(articleFake.allocationCount()).toBe(1)
 
     const videoFake = makeCreateContentDb()
     const video = await createContent(
@@ -173,7 +173,7 @@ describe('W03 Snowflake article/video content IDs', () => {
       'snowflake-video-test',
     )
     expect(video.id).toBe(encodeContentSnowflakeId(nowMs, 0))
-    expect(videoFake.allocator.allocationCount()).toBe(1)
+    expect(videoFake.allocationCount()).toBe(1)
 
     const postFake = makeCreateContentDb()
     const post = await createContent(
@@ -185,7 +185,7 @@ describe('W03 Snowflake article/video content IDs', () => {
       'snowflake-post-test',
     )
     expect(post.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i)
-    expect(postFake.allocator.allocationCount()).toBe(0)
+    expect(postFake.allocationCount()).toBe(0)
   })
 
   it('defines the D1-02 single-row allocator table without rewriting legacy IDs', () => {
