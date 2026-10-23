@@ -7,7 +7,7 @@ const read = (relativePath: string) => readFileSync(resolve(process.cwd(), relat
 describe('v1 user profile social channels', () => {
   it('routes profile replies through the W05 public read adapter with validated pagination', () => {
     const route = read('src/app/api/v1/users/[userId]/replies/route.ts')
-    expect(route).toContain("'/internal/social/users/' + encodeURIComponent(userId) + '/replies' + suffix")
+    expect(route).toContain("'/internal/social/users/' + encodeURIComponent(socialUserId) + '/replies' + suffix")
     expect(route).toContain('callW05SocialPublic')
     expect(route).toContain('resolveOptionalCookieSocialPrincipal')
     expect(route).toContain('enforcePublicReadRateLimit')
@@ -20,7 +20,7 @@ describe('v1 user profile social channels', () => {
 
   it('routes profile liked-content reads through W05 instead of querying D1 from W01', () => {
     const route = read('src/app/api/v1/users/[userId]/likes/route.ts')
-    expect(route).toContain("'/internal/social/users/' + encodeURIComponent(userId) + '/likes' + suffix")
+    expect(route).toContain("'/internal/social/users/' + encodeURIComponent(socialUserId) + '/likes' + suffix")
     expect(route).toContain('callW05SocialPublic')
     expect(route).toContain('resolveOptionalCookieSocialPrincipal')
     expect(route).toContain('enforcePublicReadRateLimit')
@@ -33,8 +33,8 @@ describe('v1 user profile social channels', () => {
 
   it('keeps the frontend channels connected to the author-scoped read APIs', () => {
     const page = read('src/app/(frontend)/users/[userId]/UserProfilePage.tsx')
-    expect(page).toContain("'/api/v1/users/' + encodeURIComponent(profile.id) + '/replies?limit=6'")
-    expect(page).toContain("'/api/v1/users/' + encodeURIComponent(profile.id) + '/likes?limit=6'")
+    expect(page).toContain("'/api/v1/users/' + encodeURIComponent(profile.identityId || profile.id) + '/replies?limit=6'")
+    expect(page).toContain("'/api/v1/users/' + encodeURIComponent(profile.identityId || profile.id) + '/likes?limit=6'")
     expect(page).toContain('loadLikedContentDetails')
     expect(page).toContain('setReplies((current) => [...current, ...data.data.items])')
     expect(page).toContain("href={'/content/' + encodeURIComponent(reply.contentId)}")
