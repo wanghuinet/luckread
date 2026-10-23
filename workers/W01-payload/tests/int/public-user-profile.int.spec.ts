@@ -225,6 +225,37 @@ it('resolves public profile projections by Better Auth identity id without expos
 })
 
 
+
+describe('username-resolved public profile API contract', () => {
+  it('declares the existing anonymous lookup route across API sources and generated alignment', () => {
+    const route = read('src/app/api/v1/users/by-username/[username]/route.ts')
+    const page = read('src/app/(twitter-clone)/[username]/page.tsx')
+    const openapi = read('../../contracts/openapi/v1/openapi.yaml')
+    const inventory = JSON.parse(read('../../contracts/api/api-inventory.v1.json')) as { domains: Record<string, { endpoint_groups: string[] }> }
+    const alignment = JSON.parse(read('../../contracts/alignment/api-inventory.v1.json')) as { records: Array<{ operationId: string; method: string; path: string; status: string }> }
+    const operationPolicy = JSON.parse(read('../../contracts/openapi/v1/operation-policy.json')) as { operations: Array<{ operationId: string; auth: { mode: string }; permissions: string[] }> }
+
+    expect(route).toContain('const usernamePattern = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/')
+    expect(route).toContain("cache-control': 'public, max-age=30, stale-while-revalidate=120'")
+    expect(route).toContain("bio: typeof publicUser.bio === 'string' ? publicUser.bio : null")
+    expect(route).not.toContain('email: true')
+    expect(page).toContain("fetchJson<PublicUserLookup>('/api/v1/users/by-username/' + encodeURIComponent(username)")
+    expect(openapi).toContain('  /users/by-username/{username}:')
+    expect(openapi).toContain('operationId: getUsersByUsernameUsername')
+    expect(openapi).toContain('public, max-age=30, stale-while-revalidate=120')
+    expect(openapi).toContain("displayName: { type: [string, 'null'] }")
+    expect(openapi).toContain("avatar: { type: [string, 'null'] }")
+    expect(inventory.domains.users_accounts.endpoint_groups).toContain('GET /v1/users/by-username/{username}')
+    expect(alignment.records.some((record) => record.operationId === 'getUsersByUsernameUsername' && record.method === 'GET' && record.path === '/v1/users/by-username/{username}')).toBe(true)
+    expect(alignment.records.find((record) => record.operationId === 'getUsersByUsernameUsername')?.status).toBe('DISCOVERED')
+    expect(operationPolicy.operations.find((operation) => operation.operationId === 'getUsersByUsernameUsername')).toMatchObject({
+      auth: { mode: 'public' },
+      permissions: ['user.read.public'],
+    })
+  })
+})
+
+
 it('keeps public-profile posts and replies in full-width vertical lists', () => {
   const page = read('src/app/(frontend)/users/[userId]/UserProfilePage.tsx')
   const styles = read('src/app/(frontend)/styles.css')
