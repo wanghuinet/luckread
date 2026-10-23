@@ -18,15 +18,6 @@ const workflowPath = '.github/workflows/admin-account-bootstrap.yml'
 const workflow = read(workflowPath)
 const w02Index = read('workers/W02-identity/src/index.ts')
 const reconciliation = read('contracts/alignment/mapping-batches/AUTH-007-real-evidence-reconciliation.v1.md')
-const w02SourceFiles = walk('workers/W02-identity/src')
-const w02Production = w02SourceFiles
-  .filter((file) => !file.endsWith('.test.ts'))
-  .map(read)
-  .join('\n')
-const w02Tests = w02SourceFiles
-  .filter((file) => file.endsWith('.test.ts'))
-  .map(read)
-  .join('\n')
 
 // Only W02's authoritative identity/RoleAssignment code can prove bootstrap
 // readiness. A similarly named helper or test in W08 cannot satisfy this gate.
@@ -108,7 +99,7 @@ const report = {
   productionMutationPerformed: false,
   checks: {
     workflowIsReadOnly: assertReadOnlyWorkflow,
-    dedicatedW02L8Bootstrap,
+    dedicatedW02L8Bootstrap: hasDedicatedW02L8Bootstrap,
     mfaCodeAndTestEvidence: hasMfaEnforcement && !/Status:\s*`BLOCKED_NOT_GREEN`/.test(reconciliation),
     targetBoundDualApprovalCodeAndTestEvidence: hasTargetBoundDualApproval,
     oneTimeAndFourHourGrant: hasOneTimeAndBoundedGrant,
