@@ -1,0 +1,68 @@
+name: Retire legacy LuckRead CN redirect
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/retire-legacy-cn-redirect.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  remove-legacy-redirect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Remove and verify the legacy CN redirect rule
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          ZONE_NAME: luckread.cn
+          RULE_REF: luckread-cn-to-com
+        run: |
+          set -euo pipefail
+
+          test -n "${CLOUDFLARE_API_TOKEN}"
+
+          api() {
+            curl --fail-with-body --silent --show-error \
+              -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+              -H "Content-Type: application/json" \
+              "$@"
+          }
+
+          zone_response="$(api --get "https://api.cloudflare.com/client/v4/zones" \
+            --data-urlencode "name=${ZONE_NAME}" \
+            --data-urlencode "status=active" \
+            --data-urlencode "per_page=10")"
+
+          zone_id="$(printf '%s' "${zone_response}" | jq -r '.result[0].id // empty')"
+          test -n "${zone_id}" || {
+            echo "Cloudflare zone not found: ${ZONE_NAME}"
+            exit 1
+          }
+
+          endpoint="https://api.cloudflare.com/client/v4/zones/${zone_id}/rulesets/phases/http_request_dynamic_redirect/entrypoint"
+          current="$(api --request GET "${endpoint}")"
+          printf '%s' "${current}" | jq -e '.success == true and .result.id != null' >/dev/null
+
+          ruleset_id="$(printf '%s' "${current}" | jq -r '.result.id')"
+          existing_id="$(printf '%s' "${current}" | jq -r --arg ref "${RULE_REF}" '.result.rules[]? | select(.ref == $ref) | .id' | head -n 1)"
+
+          if [ -n "${existing_id}" ]; then
+            delete_response="$(api --request DELETE "${endpoint%/phases/*}/rulesets/${ruleset_id}/rules/${existing_id}")"
+            printf '%s' "${delete_response}" | jq -e '.success == true' >/dev/null
+            echo "REMOVED_LEGACY_REDIRECT_RULE ${RULE_REF}"
+          else
+            echo "LEGACY_REDIRECT_RULE_ALREADY_ABSENT ${RULE_REF}"
+          fi
+
+          verified="$(api --request GET "${endpoint}")"
+          printf '%s' "${verified}" | jq -e --arg ref "${RULE_REF}" '
+            .success == true
+            and ([.result.rules[]? | select(.ref == $ref)] | length) == 0
+          ' >/dev/null
+
+          echo "LEGACY_CN_REDIRECT_REMOVED=PASS"
