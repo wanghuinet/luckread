@@ -11,6 +11,7 @@ describe('v1 following feed adapter and home timeline', () => {
     const route = read('src/app/api/v1/feed/following/route.ts')
     expect(route).toContain('resolveSocialPrincipal(request)')
     expect(route).toContain('callW04FollowingFeed')
+    expect(route).toContain('enrichContentListAuthors(response)')
     expect(route).toContain("'/internal/feed/following?'")
     expect(route).toContain("'cache-control': 'no-store'")
     expect(route).not.toContain('cachedPublicGet')
