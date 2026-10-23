@@ -23,12 +23,32 @@ export async function GET(
       'user-profile',
       async () => {
         const payload = await getPayload({ config })
-        const user = await payload.findByID({
-          collection: 'users',
-          id: userId,
-          depth: 0,
-          overrideAccess: true,
-        })
+        let user: unknown
+        try {
+          user = await payload.findByID({
+            collection: 'users',
+            id: userId,
+            depth: 0,
+            overrideAccess: true,
+          })
+        } catch (error) {
+          // Payload's findByID throws for missing IDs. Translate only explicit
+          // not-found errors; database/configuration faults must remain 503.
+          const details = error && typeof error === 'object'
+            ? error as { status?: unknown; statusCode?: unknown; code?: unknown }
+            : null
+          if (
+            details?.status === 404 ||
+            details?.statusCode === 404 ||
+            details?.code === 'NOT_FOUND'
+          ) {
+            return Response.json(
+              { error: { code: 'NOT_FOUND', message: 'User not found', details: {} }, requestId: `req_${crypto.randomUUID()}` },
+              { status: 404, headers: { 'cache-control': 'no-store' } },
+            )
+          }
+          throw error
+        }
 
         if (!user) {
           return Response.json(
