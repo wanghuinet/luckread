@@ -212,7 +212,7 @@ jobs:
           appendFileSync(process.env.GITHUB_ENV, 'CREATOR_ROLE_ID=' + roleId + '\n');
           appendFileSync(process.env.GITHUB_ENV, 'CREATOR_REGISTRATION_KEY=' + registerKey + '\n');
 
-          const login = await post('/api/v1/auth/login', {
+          const login = await post('/v1/auth/login', {
             identity: email,
             credential: password,
           });
@@ -239,7 +239,7 @@ jobs:
         run: |
           set -euo pipefail
           set +e
-          status="$(curl --silent --show-error --output /tmp/w03-content-probe.json --write-out '%{http_code}' -H "Authorization: Bearer $CREATOR_TOKEN" "$CONTENT_API_BASE_URL/api/v1/contents")"
+          status="$(curl --silent --show-error --output /tmp/w03-content-probe.json --write-out '%{http_code}' -H "Authorization: Bearer $CREATOR_TOKEN" "$CONTENT_API_BASE_URL/v1/contents")"
           curl_exit=$?
           set -e
           if [ "$curl_exit" -ne 0 ] || [ "$status" != "200" ]; then
@@ -262,7 +262,7 @@ jobs:
             -H "Idempotency-Key: CONTENT-E2E-$GITHUB_RUN_ID-POST-BODY-UPLOAD" \
             -F "_payload={\"alt\":\"content-e2e-social-post-$GITHUB_RUN_ID.txt\"}" \
             -F "file=@/tmp/social-post-body.txt;type=text/plain" \
-            "$CONTENT_API_BASE_URL/api/v1/media" > /tmp/social-post-body-upload.json
+            "$CONTENT_API_BASE_URL/v1/media" > /tmp/social-post-body-upload.json
 
           node <<'NODE'
           const fs = require('node:fs');
@@ -280,7 +280,7 @@ jobs:
         run: |
           set -euo pipefail
           printf '%s' 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=' | base64 -d > /tmp/social-post-attachment.png
-          curl --silent --show-error --fail-with-body -X POST -H "Authorization: Bearer $CREATOR_TOKEN" -H "Idempotency-Key: CONTENT-E2E-$GITHUB_RUN_ID-POST-ATTACHMENT-UPLOAD" -F '_payload={"alt":"social post attachment E2E"}' -F "file=@/tmp/social-post-attachment.png;type=image/png" "$CONTENT_API_BASE_URL/api/v1/media" > /tmp/social-post-attachment-upload.json
+          curl --silent --show-error --fail-with-body -X POST -H "Authorization: Bearer $CREATOR_TOKEN" -H "Idempotency-Key: CONTENT-E2E-$GITHUB_RUN_ID-POST-ATTACHMENT-UPLOAD" -F '_payload={"alt":"social post attachment E2E"}' -F "file=@/tmp/social-post-attachment.png;type=image/png" "$CONTENT_API_BASE_URL/v1/media" > /tmp/social-post-attachment-upload.json
           node <<'NODE'
           const fs = require('node:fs');
           const envelope = JSON.parse(fs.readFileSync('/tmp/social-post-attachment-upload.json', 'utf8'));
@@ -297,7 +297,7 @@ jobs:
         run: |
           set -euo pipefail
           set +e
-          article_status="$(curl --silent --show-error --output /tmp/article-create.json --write-out '%{http_code}'             -X POST             -H "Authorization: Bearer $CREATOR_TOKEN"             -H "Content-Type: application/json"             -H "Idempotency-Key: CONTENT-E2E-$GITHUB_RUN_ID-ARTICLE-CREATE"             --data '{"contentType":"article","title":"Content E2E Article","bodyRef":"r2://content-e2e/'"$GITHUB_RUN_ID"'/article","mediaRefs":[],"coverRef":null}'             "$CONTENT_API_BASE_URL/api/v1/contents")"
+          article_status="$(curl --silent --show-error --output /tmp/article-create.json --write-out '%{http_code}'             -X POST             -H "Authorization: Bearer $CREATOR_TOKEN"             -H "Content-Type: application/json"             -H "Idempotency-Key: CONTENT-E2E-$GITHUB_RUN_ID-ARTICLE-CREATE"             --data '{"contentType":"article","title":"Content E2E Article","bodyRef":"r2://content-e2e/'"$GITHUB_RUN_ID"'/article","mediaRefs":[],"coverRef":null}'             "$CONTENT_API_BASE_URL/v1/contents")"
           article_curl_exit=$?
           set -e
           if [ "$article_curl_exit" -ne 0 ] || [ "$article_status" != "201" ]; then
@@ -316,7 +316,7 @@ jobs:
       - name: Create video through public API
         run: |
           set -euo pipefail
-          curl --silent --show-error --fail-with-body             -X POST             -H "Authorization: Bearer $CREATOR_TOKEN"             -H "Content-Type: application/json"             -H "Idempotency-Key: CONTENT-E2E-$GITHUB_RUN_ID-VIDEO-CREATE"             --data '{"contentType":"video","title":"Content E2E Video","bodyRef":"r2://content-e2e/'"$GITHUB_RUN_ID"'/video","mediaRefs":["r2://content-e2e/'"$GITHUB_RUN_ID"'/video.mp4"],"coverRef":"r2://content-e2e/'"$GITHUB_RUN_ID"'/video-cover.jpg"}'             "$CONTENT_API_BASE_URL/api/v1/contents" > /tmp/video-create.json
+          curl --silent --show-error --fail-with-body             -X POST             -H "Authorization: Bearer $CREATOR_TOKEN"             -H "Content-Type: application/json"             -H "Idempotency-Key: CONTENT-E2E-$GITHUB_RUN_ID-VIDEO-CREATE"             --data '{"contentType":"video","title":"Content E2E Video","bodyRef":"r2://content-e2e/'"$GITHUB_RUN_ID"'/video","mediaRefs":["r2://content-e2e/'"$GITHUB_RUN_ID"'/video.mp4"],"coverRef":"r2://content-e2e/'"$GITHUB_RUN_ID"'/video-cover.jpg"}'             "$CONTENT_API_BASE_URL/v1/contents" > /tmp/video-create.json
 
           node <<'NODE'
           const fs = require('node:fs');
@@ -348,7 +348,7 @@ jobs:
             -H "Content-Type: application/json" \
             -H "Idempotency-Key: CONTENT-E2E-$GITHUB_RUN_ID-POST-CREATE" \
             --data @/tmp/social-post-create-request.json \
-            "$CONTENT_API_BASE_URL/api/v1/contents" > /tmp/social-post-create.json
+            "$CONTENT_API_BASE_URL/v1/contents" > /tmp/social-post-create.json
 
           node <<'NODE'
           const fs = require('node:fs');
@@ -404,14 +404,14 @@ jobs:
         run: |
           set -euo pipefail
           node -e "const fs=require('fs'); const p={contentType:'article',title:'Content E2E Article',body:'我实测这条受控文章发布链，记录创建、审核和公开展示结果。这里包含真实测试过程、版本、时间、数据和结论，作为创作者本人完成实质补充与核验的测试正文。结果将由生产 API 和远程 D1 再次确认。',mediaRefs:[],coverRef:null,aiMode:'outline',humanContribution:'substantial'}; fs.writeFileSync('/tmp/article-review-request.json', JSON.stringify({to:'PENDING_REVIEW',preflight:p}));"
-          curl --silent --show-error --fail-with-body             -X POST             -H "Authorization: Bearer $CREATOR_TOKEN"             -H "Content-Type: application/json"             -H "Idempotency-Key: CONTENT-E2E-$GITHUB_RUN_ID-ARTICLE-REVIEW"             -H "If-Match: $ARTICLE_ETAG"             --data @/tmp/article-review-request.json             "$CONTENT_API_BASE_URL/api/v1/contents/$ARTICLE_ID/state" > /tmp/article-review.json
+          curl --silent --show-error --fail-with-body             -X POST             -H "Authorization: Bearer $CREATOR_TOKEN"             -H "Content-Type: application/json"             -H "Idempotency-Key: CONTENT-E2E-$GITHUB_RUN_ID-ARTICLE-REVIEW"             -H "If-Match: $ARTICLE_ETAG"             --data @/tmp/article-review-request.json             "$CONTENT_API_BASE_URL/v1/contents/$ARTICLE_ID/state" > /tmp/article-review.json
           node -e "const v=require('/tmp/article-review.json'); if(v.from!=='DRAFT'||v.to!=='PENDING_REVIEW'||Number(v.version)!==2) throw new Error('article review transition failed: '+JSON.stringify(v));"
 
       - name: Submit video for review
         run: |
           set -euo pipefail
           node -e "const fs=require('fs'); const runId=process.env.GITHUB_RUN_ID; const p={contentType:'video',title:'Content E2E Video',body:'这是一条受控视频发布链测试，记录创建、审核、发布和公开访问结果。',mediaRefs:['r2://content-e2e/'+runId+'/video.mp4'],coverRef:'r2://content-e2e/'+runId+'/video-cover.jpg',aiMode:'outline',humanContribution:'substantial'}; fs.writeFileSync('/tmp/video-review-request.json', JSON.stringify({to:'PENDING_REVIEW',preflight:p}));"
-          curl --silent --show-error --fail-with-body             -X POST             -H "Authorization: Bearer $CREATOR_TOKEN"             -H "Content-Type: application/json"             -H "Idempotency-Key: CONTENT-E2E-$GITHUB_RUN_ID-VIDEO-REVIEW"             -H "If-Match: $VIDEO_ETAG"             --data @/tmp/video-review-request.json             "$CONTENT_API_BASE_URL/api/v1/contents/$VIDEO_ID/state" > /tmp/video-review.json
+          curl --silent --show-error --fail-with-body             -X POST             -H "Authorization: Bearer $CREATOR_TOKEN"             -H "Content-Type: application/json"             -H "Idempotency-Key: CONTENT-E2E-$GITHUB_RUN_ID-VIDEO-REVIEW"             -H "If-Match: $VIDEO_ETAG"             --data @/tmp/video-review-request.json             "$CONTENT_API_BASE_URL/v1/contents/$VIDEO_ID/state" > /tmp/video-review.json
           node -e "const v=require('/tmp/video-review.json'); if(v.from!=='DRAFT'||v.to!=='PENDING_REVIEW'||Number(v.version)!==2) throw new Error('video review transition failed: '+JSON.stringify(v));"
 
       - name: Publish social post directly after W03 preflight
@@ -439,7 +439,7 @@ jobs:
             -H "Idempotency-Key: CONTENT-E2E-$GITHUB_RUN_ID-POST-PUBLISH" \
             -H "If-Match: $SOCIAL_POST_ETAG" \
             --data @/tmp/social-post-publish-request.json \
-            "$CONTENT_API_BASE_URL/api/v1/contents/$SOCIAL_POST_ID/state")"
+            "$CONTENT_API_BASE_URL/v1/contents/$SOCIAL_POST_ID/state")"
           CURL_STATUS=$?
           set -e
           if [ "$CURL_STATUS" -ne 0 ] || [[ ! "$HTTP_STATUS" =~ ^2[0-9][0-9]$ ]]; then
@@ -496,7 +496,7 @@ jobs:
             local etag_var="$4"
 
             for attempt in $(seq 1 20); do
-              curl --silent --show-error --fail-with-body                 -H "Authorization: Bearer $CREATOR_TOKEN"                 "$CONTENT_API_BASE_URL/api/v1/contents/$content_id" > "$output_file"
+              curl --silent --show-error --fail-with-body                 -H "Authorization: Bearer $CREATOR_TOKEN"                 "$CONTENT_API_BASE_URL/v1/contents/$content_id" > "$output_file"
 
               state="$(node -e "const v=require(process.argv[1]); process.stdout.write(String(v.state||''))" "$output_file")"
               etag="$(node -e "const v=require(process.argv[1]); process.stdout.write(String(v.etag||''))" "$output_file")"
@@ -526,9 +526,9 @@ jobs:
       - name: Publish article and video
         run: |
           set -euo pipefail
-          curl --silent --show-error --fail-with-body             -X POST             -H "Authorization: Bearer $CREATOR_TOKEN"             -H "Content-Type: application/json"             -H "Idempotency-Key: CONTENT-E2E-$GITHUB_RUN_ID-ARTICLE-PUBLISH"             -H "If-Match: $ARTICLE_PUBLISH_ETAG"             --data '{"to":"PUBLISHED"}'             "$CONTENT_API_BASE_URL/api/v1/contents/$ARTICLE_ID/state" > /tmp/article-publish.json
+          curl --silent --show-error --fail-with-body             -X POST             -H "Authorization: Bearer $CREATOR_TOKEN"             -H "Content-Type: application/json"             -H "Idempotency-Key: CONTENT-E2E-$GITHUB_RUN_ID-ARTICLE-PUBLISH"             -H "If-Match: $ARTICLE_PUBLISH_ETAG"             --data '{"to":"PUBLISHED"}'             "$CONTENT_API_BASE_URL/v1/contents/$ARTICLE_ID/state" > /tmp/article-publish.json
 
-          curl --silent --show-error --fail-with-body             -X POST             -H "Authorization: Bearer $CREATOR_TOKEN"             -H "Content-Type: application/json"             -H "Idempotency-Key: CONTENT-E2E-$GITHUB_RUN_ID-VIDEO-PUBLISH"             -H "If-Match: $VIDEO_PUBLISH_ETAG"             --data '{"to":"PUBLISHED"}'             "$CONTENT_API_BASE_URL/api/v1/contents/$VIDEO_ID/state" > /tmp/video-publish.json
+          curl --silent --show-error --fail-with-body             -X POST             -H "Authorization: Bearer $CREATOR_TOKEN"             -H "Content-Type: application/json"             -H "Idempotency-Key: CONTENT-E2E-$GITHUB_RUN_ID-VIDEO-PUBLISH"             -H "If-Match: $VIDEO_PUBLISH_ETAG"             --data '{"to":"PUBLISHED"}'             "$CONTENT_API_BASE_URL/v1/contents/$VIDEO_ID/state" > /tmp/video-publish.json
 
           node <<'NODE'
           const fs=require('node:fs');
@@ -545,9 +545,9 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p artifacts/mapping-0/content-publish-runtime-e2e
-          curl --silent --show-error --fail-with-body "$CONTENT_API_BASE_URL/api/v1/contents/$ARTICLE_ID" > artifacts/mapping-0/content-publish-runtime-e2e/article-public.json
-          curl --silent --show-error --fail-with-body "$CONTENT_API_BASE_URL/api/v1/contents/$VIDEO_ID" > artifacts/mapping-0/content-publish-runtime-e2e/video-public.json
-          curl --silent --show-error --fail-with-body -H "Authorization: Bearer $CREATOR_TOKEN" "$CONTENT_API_BASE_URL/api/v1/contents/$SOCIAL_POST_ID" > artifacts/mapping-0/content-publish-runtime-e2e/social-post-public.json
+          curl --silent --show-error --fail-with-body "$CONTENT_API_BASE_URL/v1/contents/$ARTICLE_ID" > artifacts/mapping-0/content-publish-runtime-e2e/article-public.json
+          curl --silent --show-error --fail-with-body "$CONTENT_API_BASE_URL/v1/contents/$VIDEO_ID" > artifacts/mapping-0/content-publish-runtime-e2e/video-public.json
+          curl --silent --show-error --fail-with-body -H "Authorization: Bearer $CREATOR_TOKEN" "$CONTENT_API_BASE_URL/v1/contents/$SOCIAL_POST_ID" > artifacts/mapping-0/content-publish-runtime-e2e/social-post-public.json
           npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME_W03" --remote --json --config workers/W03-content/wrangler.jsonc             --command "SELECT id,content_type,owner_user_id,state,version,revision,title,body_ref,media_refs_json,cover_ref,etag FROM contents WHERE id IN ('$ARTICLE_ID','$VIDEO_ID','$SOCIAL_POST_ID') ORDER BY id;"             > artifacts/mapping-0/content-publish-runtime-e2e/content-state.json
           npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME_W06" --remote --json --config workers/W06-governance/wrangler.jsonc             --command "SELECT case_id,state,version,current_decision_id FROM moderation_cases WHERE case_id IN ('$CASE_ARTICLE_ID','$CASE_VIDEO_ID') ORDER BY case_id;"             > artifacts/mapping-0/content-publish-runtime-e2e/moderation-cases.json
           npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME_W06" --remote --json --config workers/W06-governance/wrangler.jsonc             --command "SELECT case_id,state,target_id FROM moderation_cases WHERE target_type='content' AND target_id='$SOCIAL_POST_ID' ORDER BY case_id;"             > artifacts/mapping-0/content-publish-runtime-e2e/social-post-moderation-cases.json
@@ -631,14 +631,14 @@ jobs:
               -X DELETE \
               -H "Authorization: Bearer $CREATOR_TOKEN" \
               -H "Idempotency-Key: CONTENT-E2E-$GITHUB_RUN_ID-POST-BODY-CLEANUP" \
-              "$CONTENT_API_BASE_URL/api/v1/media/$POST_BODY_MEDIA_ID"; then
+              "$CONTENT_API_BASE_URL/v1/media/$POST_BODY_MEDIA_ID"; then
               echo "Social post body asset cleanup: PASS"
             else
               echo "::warning::Social post body asset cleanup failed for the controlled E2E fixture"
             fi
           fi
           if printenv POST_ATTACHMENT_MEDIA_ID >/dev/null 2>&1 && printenv CREATOR_TOKEN >/dev/null 2>&1; then
-            if curl --silent --show-error --fail-with-body -X DELETE -H "Authorization: Bearer $CREATOR_TOKEN" -H "Idempotency-Key: CONTENT-E2E-$GITHUB_RUN_ID-POST-ATTACHMENT-CLEANUP" "$CONTENT_API_BASE_URL/api/v1/media/$POST_ATTACHMENT_MEDIA_ID"; then
+            if curl --silent --show-error --fail-with-body -X DELETE -H "Authorization: Bearer $CREATOR_TOKEN" -H "Idempotency-Key: CONTENT-E2E-$GITHUB_RUN_ID-POST-ATTACHMENT-CLEANUP" "$CONTENT_API_BASE_URL/v1/media/$POST_ATTACHMENT_MEDIA_ID"; then
               echo "Social post attachment asset cleanup: PASS"
             else
               echo "::warning::Social post attachment asset cleanup failed for the controlled E2E fixture"
