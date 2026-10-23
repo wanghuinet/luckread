@@ -4,6 +4,7 @@
 - Scope: public login, current-session validation, and logout only.
 - Identity/session authority: W02 / Better Auth.
 - Public API boundary: W01.
+- Public base URL: `https://api.luckread.com/v1`; W01 maps this public prefix onto its existing internal `/api/v1` route handlers.
 - No new Worker, D1, Queue, Payload Core extension, or independent session store is introduced.
 - This contract does not close or implement the separate L1→L2 role grant or true refresh-token rotation.
 
@@ -23,10 +24,10 @@ The public response header is owned by W01. W01 adapts Better Auth's current `se
 
 ### Request
 
-`POST /api/v1/auth/login`
+`POST /v1/auth/login`
 
 ```http
-POST /api/v1/auth/login HTTP/1.1
+POST /v1/auth/login HTTP/1.1
 Content-Type: application/json
 Accept: application/json
 ```
@@ -81,7 +82,7 @@ The opaque token is not included in the body. User identifiers and the request I
 
 ### Request
 
-`GET /api/v1/auth/session`
+`GET /v1/auth/session`
 
 Send either the browser cookie or `Authorization: Bearer <session-token>`. Use only one canonical carrier per request.
 
@@ -114,19 +115,19 @@ No valid session returns HTTP `401 UNAUTHENTICATED`. A session read response is 
 
 ## 4. Logout
 
-`POST /api/v1/auth/logout`
+`POST /v1/auth/logout`
 
 Send the current cookie or Bearer session token. Success returns HTTP `204` with no body. Cookie clients receive the session cookie clearing response where applicable. W01 never echoes the revoked session token. The old credential must fail subsequent session validation regardless of which transport carrier is used.
 
 ## 5. Legacy refresh path
 
-`POST /api/v1/auth/refresh` is deprecated and is retained temporarily as a compatibility alias for current-session lookup only. It does **not** rotate refresh tokens and must not be used as the native APP refresh contract. New clients use `GET /api/v1/auth/session`.
+`POST /v1/auth/refresh` is deprecated and is retained temporarily as a compatibility alias for current-session lookup only. It does **not** rotate refresh tokens and must not be used as the native APP refresh contract. New clients use `GET /v1/auth/session`.
 
 True refresh-token rotation, expiry/reuse detection, and rotation lineage remain outside this contract and are not claimed as implemented. They require their own accepted operation and runtime evidence before any client should depend on them.
 
 ## 6. Real runtime acceptance
 
-The existing [W01/W02 binding deployment workflow](../../.github/workflows/w01-w02-binding-deploy.yml) now enforces the live session acceptance **after both Workers deploy**. It checks that the two QA repository secrets exist before making any production deployment, then runs the session test against `https://luckread.com`, bound to the exact `source_sha` being deployed. A deployment run cannot report overall success unless the session E2E passes.
+The existing [W01/W02 binding deployment workflow](../../.github/workflows/w01-w02-binding-deploy.yml) now enforces the live session acceptance **after both Workers deploy**. It checks that the two QA repository secrets exist before making any production deployment, then runs the session test against `https://api.luckread.com`, bound to the exact `source_sha` being deployed. A deployment run cannot report overall success unless the session E2E passes.
 
 For an explicit rerun after deployment, use the [APP Auth Session Live E2E workflow](../../.github/workflows/app-auth-session-live-e2e.yml).
 
