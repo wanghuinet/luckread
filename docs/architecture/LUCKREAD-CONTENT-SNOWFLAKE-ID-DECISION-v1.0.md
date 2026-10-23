@@ -1,6 +1,6 @@
 # LuckRead Article/Video Snowflake ID Decision v1.0
 
-- Status: **DECISION RECORDED / IMPLEMENTATION PENDING**
+- Status: **IMPLEMENTATION IN REVIEW / DEPLOYMENT PENDING**
 - Date: 2026-10-23
 - Scope: IDs for article and video content only
 - Selected reference implementation: [dustinrouillard/snowflake-id](https://github.com/dustinrouillard/snowflake-id)
@@ -9,7 +9,9 @@
 
 ## 1. Decision
 
-LuckRead will use the `dustinrouillard/snowflake-id` project as the selected implementation/reference for a Snowflake-style content ID generator, subject to the production-safety gates in this document.
+LuckRead adopts the 42/10/12 layout documented by `dustinrouillard/snowflake-id` as the reference format. The upstream package is not imported as the W03 runtime dependency: its process-local sequence and configured `mid` do not themselves coordinate across independently created Cloudflare Worker isolates.
+
+The current implementation in review allocates timestamp/sequence through one atomic state row in the existing authoritative D1-02, shared by W03 isolates. This keeps the chosen layout and decimal-string representation while avoiding a fixed in-memory `mid` as the uniqueness boundary. Any future independent content-ID producer must be explicitly designed and collision-tested before it may generate in-scope IDs.
 
 The scope is limited to:
 - articles;
