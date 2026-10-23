@@ -4,7 +4,7 @@ import {
   resolveCookieContentPrincipal,
   W03ContentClientError,
 } from '../../../../content/w03-content-client.js'
-import { assertSocialTargetUserExists } from '../../../../social/w05-social-client.js'
+import { resolveSocialProfileIdentity } from '../../../../social/w05-social-client.js'
 
 const errorResponse = (status: number, code: string, message: string) =>
   Response.json(
@@ -59,9 +59,10 @@ export async function POST(request: Request): Promise<Response> {
     if (!idempotencyKey) return errorResponse(428, 'PRECONDITION_REQUIRED', 'Idempotency-Key is required')
     if (idempotencyKey.length > 256) return errorResponse(422, 'VALIDATION_FAILED', 'Invalid Idempotency-Key header')
 
+    let normalizedTargetId = targetId as string
     if (targetType === 'creator' || targetType === 'profile') {
       try {
-        await assertSocialTargetUserExists(targetId as string)
+        normalizedTargetId = (await resolveSocialProfileIdentity(targetId as string)).identityId
       } catch (error) {
         if (error instanceof W03ContentClientError) throw error
         if (error instanceof Error && 'status' in error && 'code' in error) {
@@ -99,7 +100,7 @@ export async function POST(request: Request): Promise<Response> {
       principal,
       body: {
         targetType,
-        targetId,
+        targetId: normalizedTargetId,
         reasonCode,
         ...(description !== undefined ? { description } : {}),
         ...(evidenceRefs !== undefined ? { evidenceRefs } : {}),
