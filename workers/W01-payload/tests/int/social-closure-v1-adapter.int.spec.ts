@@ -30,9 +30,14 @@ describe('unified W05 social closure adapters', () => {
   })
 
 
-  it('loads topic SSR data through W01 public API while W01 owns the W05 binding', () => {
+  it('loads topic SSR data through the contracted W01 public API while W01 owns the W05 binding', () => {
     const page = read('src/app/(twitter-clone)/topics/[topicName]/page.tsx')
     const route = read('src/app/api/v1/topics/[topicName]/route.ts')
+    const openapi = read('../../contracts/openapi/v1/openapi.yaml')
+    const apiInventory = JSON.parse(read('../../contracts/api/api-inventory.v1.json')) as { domains: Record<string, { endpoint_groups: string[] }> }
+    const alignment = JSON.parse(read('../../contracts/alignment/api-inventory.v1.json')) as { records: Array<{ operationId: string; method: string; path: string; status: string }> }
+    const operationPolicy = JSON.parse(read('../../contracts/openapi/v1/operation-policy.json')) as { operations: Array<{ operationId: string; auth: { mode: string } }> }
+
     expect(page).toContain("PUBLIC_API_ORIGIN + '/v1/topics/'")
     expect(page).toContain('fetchJson<{ data?: TopicPageData }>(request)')
     expect(page).toContain('nextCursor')
@@ -44,6 +49,16 @@ describe('unified W05 social closure adapters', () => {
     expect(page).not.toContain('/internal/social/topics/')
     expect(route).toContain('callW05SocialPublic')
     expect(route).toContain('/internal/social/topics/')
+
+    expect(openapi).toContain('  /topics/{topicName}:')
+    expect(openapi).toContain('operationId: getTopicsTopicName')
+    expect(openapi).toContain('Maximum number of visible published content items returned. Defaults to 20.')
+    expect(openapi).toContain("contentType: { type: string, enum: [article, post, video] }")
+    expect(openapi).toContain("nextCursor: { type: [string, 'null'], maxLength: 2048 }")
+    expect(apiInventory.domains.search_discovery.endpoint_groups).toContain('GET /v1/topics/{topicName}')
+    expect(alignment.records.some((record) => record.operationId === 'getTopicsTopicName' && record.method === 'GET' && record.path === '/v1/topics/{topicName}')).toBe(true)
+    expect(alignment.records.find((record) => record.operationId === 'getTopicsTopicName')?.status).toBe('DISCOVERED')
+    expect(operationPolicy.operations.find((operation) => operation.operationId === 'getTopicsTopicName')?.auth.mode).toBe('public')
   })
 
   it('exposes real recent-topic discovery and a shared-shell trends page', () => {
