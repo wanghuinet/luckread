@@ -61,14 +61,17 @@ export async function resolveSocialMentionTargets(body: string): Promise<Resolve
     depth: 0,
     limit: unique.length,
     overrideAccess: true,
-    select: { id: true, username: true } as any,
+    select: { identityId: true, username: true } as any,
   })
 
   return result.docs
     .map((user) => {
+      const identityId = typeof user.identityId === 'string' ? user.identityId.trim() : ''
       const username = typeof user.username === 'string' ? user.username.trim() : ''
-      if (!username) return null
-      return { userId: String(user.id), handle: username }
+      // W05 compares mention targets with the W02 principal ID. Payload's own
+      // numeric profile ID belongs to a different identity namespace.
+      if (!identityId || !username) return null
+      return { userId: identityId, handle: username }
     })
     .filter((value): value is ResolvedSocialMention => Boolean(value))
 }
