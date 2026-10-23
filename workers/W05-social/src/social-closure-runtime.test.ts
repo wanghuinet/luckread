@@ -104,6 +104,44 @@ describe('W05 unified social closure', () => {
     expect(queries.every(sql => !/\b(?:FROM|JOIN)\s+contents\b/i.test(sql))).toBe(true)
   })
 
+  it('resolves Unicode-equivalent mention handles with the same NFKC and lowercase rules as parsed tokens', async () => {
+    const inserts: Array<{ sql: string; values: unknown[] }> = []
+    const db = {
+      prepare: (sql: string) => ({
+        bind: (...values: unknown[]) => ({
+          first: async () => null,
+          all: async () => ({ results: [] }),
+          run: async () => {
+            inserts.push({ sql, values })
+            return { success: true, meta: { changes: 1 } }
+          },
+        }),
+      }),
+      batch: async () => [],
+    } as unknown as D1Database
+    const contentContext = {
+      contentId: 'content-1',
+      ownerUserId: 'owner-1',
+      contentType: 'post',
+      state: 'PUBLISHED',
+      updatedAt: '2026-10-17T04:00:00.000Z',
+    } as const
+
+    await expect(syncSocialTokens(
+      db,
+      'owner-1',
+      'content',
+      'content-1',
+      'Thanks @alice',
+      [{ userId: 'mentioned-user', handle: 'ＡＬＩＣＥ' }],
+      contentContext,
+    )).resolves.toEqual({ topics: 0, mentions: 1 })
+
+    const mentionInsert = inserts.find(({ sql }) => sql.includes('INSERT OR IGNORE INTO social_mentions'))
+    expect(mentionInsert?.values[4]).toBe('mentioned-user')
+    expect(inserts.some(({ sql }) => sql.includes('INSERT OR IGNORE INTO social_notifications'))).toBe(true)
+  })
+
   it('fails closed for content token sync without W03 context or when the actor is not the owner', async () => {
     const prepare = vi.fn()
     const db = { prepare } as unknown as D1Database

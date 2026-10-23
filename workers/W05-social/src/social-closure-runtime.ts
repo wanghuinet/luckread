@@ -252,7 +252,9 @@ export async function syncSocialTokens(
   for (const entry of mentions) {
     const handle = entry.handle.trim().replace(/^@/, '')
     if (!handle) continue
-    resolved.set(handle.toLocaleLowerCase(), { userId: id(entry.userId), handle })
+    // Match the same NFKC + en-US lowercase normalization used by extracted tokens.
+    const normalizedHandle = handle.normalize('NFKC').toLocaleLowerCase('en-US')
+    resolved.set(normalizedHandle, { userId: id(entry.userId), handle })
   }
 
   let mentionCount = 0
