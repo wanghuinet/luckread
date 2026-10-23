@@ -89,7 +89,6 @@ describe('v1 repost adapter', () => {
       ['POST', POST],
       ['DELETE', DELETE],
     ] as const) {
-      beforeEach // retain no implicit state between methods
       mocks.enforceWriteRateLimit.mockRejectedValueOnce(new mocks.MockTrafficLimitError())
       const request = requestFor(method)
       const response = await handler(request, context)
