@@ -18,6 +18,7 @@ describe('v1 follower relationship adapters', () => {
     expect(route).toContain('const socialUserId = await resolveSocialProfileIdentityId(userId)')
     expect(route).toContain('encodeURIComponent(socialUserId)')
     expect(route).toContain('pathname: `/internal/social/users/${encodeURIComponent(socialUserId)}/')
+    expect(route).not.toContain('encodeURIComponent(userId)')
     expect(route).toContain(`/${pathPart}`)
     expect(route).not.toContain('getPayload(')
     expect(route).not.toContain('social_follow_relationships')
