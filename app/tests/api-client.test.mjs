@@ -201,7 +201,7 @@ test('loads authoritative content like state and aggregate count from W01/W05', 
 
   await refreshContentLikeStatus(contentId);
 
-  expect(capturedUrl.pathname).toBe('/api/v1/interactions/likes');
+  expect(capturedUrl.pathname).toBe('/v1/interactions/likes');
   expect(capturedUrl.searchParams.get('targetType')).toBe('content');
   expect(capturedUrl.searchParams.get('targetId')).toBe(contentId);
   expect(capturedHeaders.get('Authorization')).toBe('Bearer secure-test-token');
@@ -352,7 +352,7 @@ test('loads authoritative repost state and aggregate count from the W01 content 
 
   await refreshContentRepostStatus(contentId);
 
-  expect(capturedUrl.pathname).toBe('/api/v1/contents/' + contentId + '/social');
+  expect(capturedUrl.pathname).toBe('/v1/contents/' + contentId + '/social');
   expect(capturedHeaders.get('Authorization')).toBe('Bearer secure-test-token');
   expect(getContentRepostSnapshot(contentId)).toMatchObject({
     reposted: true,
@@ -384,7 +384,7 @@ test('reposts the original content through POST and reconciles the real aggregat
 
   const headers = new Headers(mutationRequest.init.headers);
   expect(outcome.ok).toBe(true);
-  expect(mutationRequest.url.pathname).toBe('/api/v1/content/' + contentId + '/reposts');
+  expect(mutationRequest.url.pathname).toBe('/v1/content/' + contentId + '/reposts');
   expect(String(mutationRequest.init.method).toUpperCase()).toBe('POST');
   expect(headers.get('Authorization')).toBe('Bearer secure-test-token');
   expect(headers.get('Idempotency-Key')).toBeTruthy();
@@ -420,7 +420,7 @@ test('undoes a repost through DELETE and accepts the contract 204 response', asy
 
   const headers = new Headers(mutationRequest.init.headers);
   expect(outcome.ok).toBe(true);
-  expect(mutationRequest.url.pathname).toBe('/api/v1/content/' + contentId + '/reposts');
+  expect(mutationRequest.url.pathname).toBe('/v1/content/' + contentId + '/reposts');
   expect(String(mutationRequest.init.method).toUpperCase()).toBe('DELETE');
   expect(headers.get('Idempotency-Key')).toBeTruthy();
   expect(getContentRepostSnapshot(contentId)).toMatchObject({
@@ -509,7 +509,7 @@ test('loads authoritative follow state from the existing W01/W05 relationship ro
 
   await refreshUserFollowStatus(targetUserId);
 
-  expect(capturedUrl.pathname).toBe('/api/v1/social/follows/' + targetUserId);
+  expect(capturedUrl.pathname).toBe('/v1/social/follows/' + targetUserId);
   expect(capturedHeaders.get('Authorization')).toBe('Bearer secure-test-token');
   expect(getUserFollowSnapshot(targetUserId)).toMatchObject({
     following: true,
@@ -544,7 +544,7 @@ test('follows through POST with an idempotency key and reconciles server state',
 
   const headers = new Headers(mutationRequest.init.headers);
   expect(outcome.ok).toBe(true);
-  expect(mutationRequest.url.pathname).toBe('/api/v1/social/follows/' + targetUserId);
+  expect(mutationRequest.url.pathname).toBe('/v1/social/follows/' + targetUserId);
   expect(String(mutationRequest.init.method).toUpperCase()).toBe('POST');
   expect(headers.get('Authorization')).toBe('Bearer secure-test-token');
   expect(headers.get('Idempotency-Key')).toBeTruthy();
@@ -669,7 +669,7 @@ test('resolves a public username to the canonical W01 user ID without forwarding
   const result = await resolveUserProfileId('@official_handle');
 
   expect(result).toEqual({ id: 'canonical-user-uuid' });
-  expect(capturedUrl.pathname).toBe('/api/v1/users/by-username/official_handle');
+  expect(capturedUrl.pathname).toBe('/v1/users/by-username/official_handle');
   expect(capturedHeaders.has('Authorization')).toBe(false);
 });
 
@@ -703,7 +703,7 @@ test('loads authoritative bookmark state from the existing W01/W05 endpoint', as
 
   await refreshContentBookmarkStatus(contentId);
 
-  expect(capturedUrl.pathname).toBe('/api/v1/interactions/bookmarks');
+  expect(capturedUrl.pathname).toBe('/v1/interactions/bookmarks');
   expect(capturedUrl.searchParams.get('targetType')).toBe('content');
   expect(capturedUrl.searchParams.get('targetId')).toBe(contentId);
   expect(capturedHeaders.get('Authorization')).toBe('Bearer secure-test-token');
@@ -740,7 +740,7 @@ test('creates a bookmark through POST and reconciles the current viewer state', 
 
   const headers = new Headers(mutationRequest.init.headers);
   expect(outcome.ok).toBe(true);
-  expect(mutationRequest.url.pathname).toBe('/api/v1/interactions/bookmarks');
+  expect(mutationRequest.url.pathname).toBe('/v1/interactions/bookmarks');
   expect(String(mutationRequest.init.method).toUpperCase()).toBe('POST');
   expect(JSON.parse(String(mutationRequest.init.body))).toEqual({ targetType: 'content', targetId: contentId });
   expect(headers.get('Authorization')).toBe('Bearer secure-test-token');
@@ -871,7 +871,7 @@ test('creates a public share URL through the existing W01/W05 shares endpoint', 
     ok: true,
     url: 'https://luckread.com/s/share%20id%2Fone',
   });
-  expect(capturedRequest.url.pathname).toBe('/api/v1/content/stage3-share-content/shares');
+  expect(capturedRequest.url.pathname).toBe('/v1/content/stage3-share-content/shares');
   expect(String(capturedRequest.init.method).toUpperCase()).toBe('POST');
   expect(JSON.parse(String(capturedRequest.init.body))).toEqual({ contentId });
   const headers = new Headers(capturedRequest.init.headers);
