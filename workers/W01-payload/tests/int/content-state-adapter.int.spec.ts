@@ -167,7 +167,11 @@ describe('1.1 content lifecycle closeout', () => {
     expect(creatorList).toContain("window.addEventListener('luckread:content-mutated'")
 
     expect(publicDetail).toContain("state !== 'PUBLISHED'")
-    expect(publicDetail).toContain("cachedPublicGet")
+    expect(publicDetail).toContain("import { fetchJson } from '../../../../lib/client-api.js'")
+    expect(publicDetail).toContain("'https://api.luckread.com/v1/contents/' + encodeURIComponent(contentId)")
+    expect(publicDetail).toContain("fetchJson<PublicContent>(request)")
+    expect(publicDetail).not.toContain("cachedPublicGet")
+    expect(publicDetail).not.toContain("callW03Content")
     expect(publicDetail).toContain("permanentRedirect('/content/' + encodeURIComponent(content.slug))")
     expect(publicDetailClient).toContain("apiFetch(resolved.bodyRef")
     expect(publicDetailClient).toContain("<ArticleStructuredRenderer document={structuredArticle} />")
