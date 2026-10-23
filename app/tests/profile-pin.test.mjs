@@ -89,7 +89,7 @@ test('native profile and post menus expose the pin state and use the shared boun
   expect(feedItem).toContain('Unpin from profile');
   expect(feedItem).toContain('setProfilePin(');
   expect(feedItem).toContain('isProfilePinned');
-  expect(profile).toContain("'/users/' + encodeURIComponent(profile.id) + '/pinned-content'");
+  expect(profile).toContain("'/users/' + encodeURIComponent(canonicalProfileId) + '/pinned-content'");
   expect(profile).toContain('isProfilePinned: true');
   expect(profile).toContain('pinnedPost');
   expect(pinState).not.toMatch(/\bfetch\s*\(/);
