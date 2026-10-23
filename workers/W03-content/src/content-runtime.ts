@@ -244,7 +244,6 @@ const publicPostMediaReferenceCandidates = (value: string): string[] => {
     const objectKey = decodedSegments.map(encodeURIComponent).join('/')
     const candidates = new Set<string>([
       url.origin + '/' + objectKey,
-      'https://cdn.luckread.com/' + objectKey,
     ])
 
     return [...candidates]

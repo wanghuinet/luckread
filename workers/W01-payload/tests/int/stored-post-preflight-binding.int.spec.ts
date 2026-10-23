@@ -41,8 +41,8 @@ const storedPost = (overrides: Record<string, unknown> = {}) => ({
   contentType: 'post',
   state: 'DRAFT',
   title: 'authoritative stored title',
-  bodyRef: 'https://cdn.luckread.com/media/post-body.txt',
-  mediaRefs: ['https://cdn.luckread.com/media/photo.png'],
+  bodyRef: 'https://img.luckread.com/media/post-body.txt',
+  mediaRefs: ['https://img.luckread.com/media/photo.png'],
   coverRef: null as string | null,
   ...overrides,
 })
@@ -81,13 +81,13 @@ describe('bind direct social post publishing to the stored body asset', () => {
       principal,
     }))
     expect(fetchMock).toHaveBeenCalledWith(
-      'https://cdn.luckread.com/media/post-body.txt',
+      'https://img.luckread.com/media/post-body.txt',
       expect.objectContaining({ method: 'GET', redirect: 'manual' }),
     )
     expect(result.to).toBe('PUBLISHED')
     expect(result.preflight.title).toBe('authoritative stored title')
     expect(result.preflight.body).toBe('authoritative body stored in LuckRead media')
-    expect(result.preflight.mediaRefs).toEqual(['https://cdn.luckread.com/media/photo.png'])
+    expect(result.preflight.mediaRefs).toEqual(['https://img.luckread.com/media/photo.png'])
     expect(result.preflight.coverRef).toBeNull()
     expect(result.preflight.body).not.toBe(submitted.preflight.body)
   })
