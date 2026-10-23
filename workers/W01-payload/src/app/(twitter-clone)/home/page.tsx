@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { cookies, headers } from 'next/headers'
-import { fetchJson } from '../../lib/client-api.js'
+import { fetchJson } from '../../../lib/client-api.js'
 import TwitterCloneHomeFeed, { type HomeContentPage, type HomeFeedMode } from '../TwitterCloneHomeFeed'
 import TwitterCloneSecondaryPageLayout from '../TwitterCloneSecondaryPageLayout'
 import { TwitterClonePostComposerTrigger } from '../TwitterClonePostComposerModal'
