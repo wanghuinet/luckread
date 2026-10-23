@@ -537,13 +537,11 @@
       "x-luckread-source": "contracts/api/api-inventory.v1.json"
     },
     {
-      "operationId": "authSessionGet",
+      "operationId": "authPrincipalGet",
       "auth": {
-        "mode": "permission"
+        "mode": "authenticated"
       },
-      "permissions": [
-        "user.session.read"
-      ],
+      "permissions": [],
       "auditRequired": false,
       "optimisticLockRequired": false,
       "idempotencyRequired": false,
@@ -552,11 +550,13 @@
       "x-luckread-source": "contracts/api/auth-operation-policy.v1.json"
     },
     {
-      "operationId": "authPrincipalGet",
+      "operationId": "authSessionGet",
       "auth": {
-        "mode": "authenticated"
+        "mode": "permission"
       },
-      "permissions": [],
+      "permissions": [
+        "user.session.read"
+      ],
       "auditRequired": false,
       "optimisticLockRequired": false,
       "idempotencyRequired": false,
