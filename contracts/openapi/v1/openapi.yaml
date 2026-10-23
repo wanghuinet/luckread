@@ -151,6 +151,50 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ErrorResponse' }
 
+  /auth/principal:
+    get:
+      tags: [Auth]
+      summary: Read the authenticated identity and authorization layer through W01
+      description: >-
+        Returns the minimal active W02 principal fields needed by server-rendered
+        W01 pages. The endpoint never exposes session tokens or role-assignment records.
+        Successful responses are never cached.
+      operationId: authPrincipalGet
+      security:
+        - sessionCookieAuth: []
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Authenticated principal.
+          headers:
+            Cache-Control:
+              schema: { type: string, const: no-store }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, requestId]
+                additionalProperties: false
+                properties:
+                  data:
+                    type: object
+                    required: [active, userId, email, username, layer]
+                    additionalProperties: false
+                    properties:
+                      active: { type: boolean }
+                      userId: { type: string, minLength: 1 }
+                      email: { type: string, format: email }
+                      username: { type: string, nullable: true }
+                      layer: { type: string, nullable: true }
+                  requestId: { type: string }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503':
+          description: Authentication service unavailable.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
   /auth/session:
     get:
       tags: [Auth]
