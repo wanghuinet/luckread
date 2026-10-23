@@ -8,9 +8,9 @@
  *   L3 contracts/openapi/v1/openapi.yaml (canonical HTTP surface)
  *
  * This checker derives a three-way endpoint registry. It never promotes a
- * missing mapping to PASS and never mutates contracts. Inventory paths use
- * /v1 while canonical OpenAPI uses /api/v1 as its server prefix, so path
- * comparison is normalized before comparison.
+ * missing mapping to PASS and never mutates contracts. Public inventory/OpenAPI
+ * URLs use https://api.luckread.com/v1; W01's existing Next route tree is mounted
+ * under /api/v1, so path comparison is normalized to the implementation prefix.
  */
 import fs from 'node:fs';
 import path from 'node:path';
