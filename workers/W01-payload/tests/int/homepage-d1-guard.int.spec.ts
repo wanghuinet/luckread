@@ -3,10 +3,14 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 describe('Twitter-clone homepage D1 guard', () => {
-  it('uses the W02 principal and public-read guard for the public root route', () => {
+  it('uses the W01 public principal endpoint for the public root route without direct worker calls', () => {
     const page = readFileSync(resolve(process.cwd(), 'src/app/(twitter-clone)/page.tsx'), 'utf8')
-    expect(page).toContain('getBetterAuthPrincipal')
-    expect(page).toContain('enforcePublicReadRateLimit')
+    expect(page).toContain("PUBLIC_API_ORIGIN + '/v1/auth/principal'")
+    expect(page).toContain('fetchJson<AuthPrincipalResponse>(request)')
+    expect(page).toContain("if (principal?.active) redirect('/home')")
+    expect(page).not.toContain('getBetterAuthPrincipal')
+    expect(page).not.toContain('w02-session-client')
+    expect(page).not.toContain('enforcePublicReadRateLimit')
     expect(page).not.toContain('payload.auth(')
     expect(page).not.toContain('payload-token')
     expect(page).not.toContain('readVerifiedPayloadTokenVersion')

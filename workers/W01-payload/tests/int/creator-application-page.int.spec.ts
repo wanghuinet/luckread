@@ -8,12 +8,16 @@ const workerRoot = existsSync(resolve(process.cwd(), 'src/app/(twitter-clone)/cr
 const read = (path: string) => readFileSync(resolve(workerRoot, path), 'utf8')
 
 describe('creator qualification application page', () => {
-  it('uses W02 authenticated principal and redirects expired sessions to login', () => {
+  it('loads the authenticated principal through the W01 public API and redirects expired sessions to login', () => {
     const page = read('src/app/(twitter-clone)/creator-application/page.tsx')
-    expect(page).toContain('getBetterAuthPrincipal')
-    expect(page).toContain('W02AuthClientError')
-    expect(page).toContain("redirect('/login?returnTo=%2Fcreator-application')")
+    expect(page).toContain("PUBLIC_API_ORIGIN + '/v1/auth/principal'")
+    expect(page).toContain('fetchJson<AuthPrincipalResponse>(request)')
+    expect(page).toContain("if (response.status === 401) redirect('/login?returnTo=%2Fcreator-application')")
+    expect(page).toContain("if (!principal.active) redirect('/login?returnTo=%2Fcreator-application')")
     expect(page).toContain("layer={principal.layer ?? 'L1'}")
+    expect(page).not.toContain('getBetterAuthPrincipal')
+    expect(page).not.toContain('W02AuthClientError')
+    expect(page).not.toContain('w02-session-client')
   })
 
   it('reads and submits the applicant-owned application through W01 API', () => {

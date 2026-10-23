@@ -30,13 +30,20 @@ describe('unified W05 social closure adapters', () => {
   })
 
 
-  it('exposes a public topic page backed by W05 topic data', () => {
+  it('loads topic SSR data through W01 public API while W01 owns the W05 binding', () => {
     const page = read('src/app/(twitter-clone)/topics/[topicName]/page.tsx')
-    expect(page).toContain('callW05SocialPublic')
-    expect(page).toContain('/internal/social/topics/')
+    const route = read('src/app/api/v1/topics/[topicName]/route.ts')
+    expect(page).toContain("PUBLIC_API_ORIGIN + '/v1/topics/'")
+    expect(page).toContain('fetchJson<{ data?: TopicPageData }>(request)')
     expect(page).toContain('nextCursor')
     expect(page).toContain('<TwitterCloneSecondaryPageLayout locale={locale} title={title} active="explore">')
-    expect(page).toContain("'/topics/' + encodeURIComponent(topic.topic.name)")
+    expect(page).toContain("PUBLIC_WEB_ORIGIN + '/topics/' + encodeURIComponent(topic.topic.name)")
+    expect(page).not.toContain('callW05SocialPublic')
+    expect(page).not.toContain('w05-social-client')
+    expect(page).not.toContain('cachedPublicGet')
+    expect(page).not.toContain('/internal/social/topics/')
+    expect(route).toContain('callW05SocialPublic')
+    expect(route).toContain('/internal/social/topics/')
   })
 
   it('exposes real recent-topic discovery and a shared-shell trends page', () => {
