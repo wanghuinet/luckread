@@ -1,5 +1,6 @@
 import {
   callW05Social,
+  resolveSocialProfileIdentityId,
   resolveCookieSocialPrincipal,
   W05SocialClientError,
 } from '../../../../../../social/w05-social-client.js'
@@ -24,13 +25,14 @@ export async function DELETE(
     const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
     if (!idempotencyKey) return errorResponse(428, 'PRECONDITION_REQUIRED', 'Idempotency-Key is required')
     if (idempotencyKey.length > 256) return errorResponse(422, 'VALIDATION_FAILED', 'Invalid Idempotency-Key header')
+    const socialTargetUserId = await resolveSocialProfileIdentityId(targetUserId)
     const response = await callW05Social({
       request,
-      pathname: '/internal/social/interactions/blocks/' + encodeURIComponent(targetUserId),
+      pathname: '/internal/social/interactions/blocks/' + encodeURIComponent(socialTargetUserId),
       method: 'DELETE',
       principal,
     })
-    if (response.ok) await invalidatePublicFollowListsForUsers(principal.userId, targetUserId)
+    if (response.ok) await invalidatePublicFollowListsForUsers(principal.userId, socialTargetUserId)
     return response
   } catch (error) {
     if (error instanceof TrafficLimitError) return rateLimitResponse(request)
