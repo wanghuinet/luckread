@@ -1,5 +1,5 @@
 import {
-  resolveSocialProfileIdentityId,
+  resolveSocialProfileIdentity,
   callW05Social,
   resolveCookieSocialPrincipal,
   W05SocialClientError,
@@ -73,15 +73,16 @@ export async function POST(request: Request): Promise<Response> {
     if (typeof targetUserId !== 'string' || !targetUserId.trim()) {
       return errorResponse(422, 'VALIDATION_FAILED', 'targetUserId is required')
     }
-    const socialTargetUserId = await resolveSocialProfileIdentityId(targetUserId)
+    const socialTarget = await resolveSocialProfileIdentity(targetUserId)
+    const socialPrincipal = await resolveSocialProfileIdentity(principal.userId)
     const response = await callW05Social({
       request,
       pathname: '/internal/social/interactions/blocks',
       method: 'POST',
       principal,
-      body: { targetUserId: socialTargetUserId },
+      body: { targetUserId: socialTarget.identityId },
     })
-    if (response.ok) await invalidatePublicFollowListsForUsers(principal.userId, socialTargetUserId)
+    if (response.ok) await invalidatePublicFollowListsForUsers(principal.userId, socialPrincipal.payloadProfileId, socialTarget.identityId, socialTarget.payloadProfileId)
     return response
   } catch (error) {
     if (error instanceof TrafficLimitError) return rateLimitResponse(request)
