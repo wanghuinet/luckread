@@ -10,6 +10,7 @@ import {
   W05SocialClientError,
 } from '../../../../../../social/w05-social-client.js'
 import { callW03Content } from '../../../../../../content/w03-content-client.js'
+import { readTrustedArticleBodyForSocialTokens } from '../../../../../../lib/article-summary-preview.js'
 
 const errorResponse = (status: number, code: string, message: string) =>
   Response.json({ error: { code, message, details: {} }, requestId: crypto.randomUUID() }, { status })
@@ -82,9 +83,12 @@ export async function POST(
       if (typeof record.bodyRef !== 'string' || !record.bodyRef.trim()) {
         return errorResponse(409, 'CONTENT_BODY_UNAVAILABLE', 'Content body is unavailable')
       }
-      const bodyResponse = await fetch(record.bodyRef, { method: 'GET' })
-      if (!bodyResponse.ok) return errorResponse(409, 'CONTENT_BODY_UNAVAILABLE', 'Content body is unavailable')
-      text = await bodyResponse.text()
+
+      const storedBody = await readTrustedArticleBodyForSocialTokens(record.bodyRef, new URL(request.url).origin)
+      if (storedBody === null) {
+        return errorResponse(409, 'CONTENT_BODY_UNAVAILABLE', 'Content body is unavailable')
+      }
+      text = storedBody
     }
     if (typeof text !== 'string' || text.length > 10000) {
       return errorResponse(400, 'VALIDATION_FAILED', 'Invalid social metadata text')
