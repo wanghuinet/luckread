@@ -17,6 +17,14 @@ describe('v1 like adapters', () => {
     expect(route).not.toContain('interaction_likes')
   })
 
+  it('rate limits like/unlike before identity resolution while leaving GET reads unchanged', () => {
+    expect(route).toContain("if (method !== 'GET') await enforceW01WriteRateLimit(request)")
+    expect(route).toContain('TrafficLimitError')
+    expect(route).toContain('rateLimitResponse(request)')
+    expect(route.indexOf("if (method !== 'GET') await enforceW01WriteRateLimit(request)"))
+      .toBeLessThan(route.indexOf('await resolveCookieSocialPrincipal(request)'))
+  })
+
   it('enforces Idempotency-Key on like mutations', () => {
     expect(route).toContain("method !== 'GET'")
     expect(route).toContain("request.headers.get('Idempotency-Key')")
