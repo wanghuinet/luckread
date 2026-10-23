@@ -285,8 +285,8 @@ jobs:
                   missingBaselineTriggers:['contents_after_insert_outbox','contents_after_update_outbox'].filter((trigger) => !triggers.has(trigger)),
                   unexpectedlyPresentTables:missingTables, unexpectedlyPresentColumns:unexpectedColumns}));
             }
-            fs.appendFileSync(process.env.GITHUB_ENV, 'W03_MIGRATION_ACTION=apply\\n');
-            fs.appendFileSync(process.env.GITHUB_OUTPUT, 'action=apply\\n');
+            fs.appendFileSync(process.env.GITHUB_ENV, 'W03_MIGRATION_ACTION=apply\n');
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, 'action=apply\n');
           }
           console.log(JSON.stringify({
             sourceSha: process.env.SOURCE_SHA,
