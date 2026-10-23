@@ -2386,13 +2386,65 @@ paths:
   /discovery/topics:
     get:
       tags: [Search]
-      summary: Discovery draft for GET undefined
+      summary: List trending public topics with recently published content
+      description: >-
+        Returns ACTIVE topics ranked by the count of published content updated
+        within the preceding seven days, then latest content update and topic ID.
+        W01 validates query parameters, rate-limits public reads, and applies a
+        30-second public response cache. W05 owns topic/content relationships;
+        W03 remains authoritative for publication state and update timestamps.
+        No authenticated session is required. Cursor values are opaque.
       operationId: getDiscoveryTopics
-      x-luckread-contract-status: DISCOVERY_DRAFT
-      x-luckread-source: contracts/api/api-inventory.v1.json
+      security: []
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          description: Maximum topics returned. Defaults to 20.
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+        - name: cursor
+          in: query
+          required: false
+          description: Opaque ranking cursor from the previous response.
+          schema: { type: string, minLength: 1, maxLength: 2048 }
       responses:
-        default:
-          description: Discovery-only operation; detailed response contract remains to be closed.
+        '200':
+          description: Ranked public topics and a continuation cursor.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, requestId]
+                additionalProperties: false
+                properties:
+                  data:
+                    type: object
+                    required: [items, hasMore, nextCursor]
+                    additionalProperties: false
+                    properties:
+                      items:
+                        type: array
+                        maxItems: 50
+                        items:
+                          type: object
+                          required: [topicId, name, displayName, contentCount, latestContentAt]
+                          additionalProperties: false
+                          properties:
+                            topicId: { $ref: '#/components/schemas/ResourceId' }
+                            name: { type: string, minLength: 1, maxLength: 64 }
+                            displayName: { type: string, minLength: 1, maxLength: 64 }
+                            contentCount: { type: integer, minimum: 1 }
+                            latestContentAt: { type: string, format: date-time }
+                      hasMore: { type: boolean }
+                      nextCursor: { type: [string, 'null'], maxLength: 2048 }
+                  requestId: { type: string, minLength: 1 }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503':
+          description: Discovery or W03 published-content service unavailable.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
 
   /entitlements:
     get:
