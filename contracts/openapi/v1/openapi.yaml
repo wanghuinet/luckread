@@ -3284,13 +3284,78 @@ paths:
   /topics/{topicName}:
     get:
       tags: [Search]
-      summary: Discovery draft for GET undefined
+      summary: Read an active public topic and its paginated published content
+      description: >-
+        Normalizes the topic name using Unicode NFKC and case-insensitive matching.
+        Only ACTIVE topics are visible. W01 applies public-read rate limiting and
+        a short-lived public response cache; W05 owns topic relationships, while
+        W03 remains authoritative for published content fields. No session is
+        required. Cursor values are opaque and must be returned unchanged.
       operationId: getTopicsTopicName
-      x-luckread-contract-status: DISCOVERY_DRAFT
-      x-luckread-source: contracts/api/api-inventory.v1.json
+      security: []
+      parameters:
+        - name: topicName
+          in: path
+          required: true
+          description: Topic display name or normalized name; an optional leading # is ignored.
+          schema: { type: string, minLength: 1, maxLength: 64 }
+        - name: limit
+          in: query
+          required: false
+          description: Maximum number of visible published content items returned. Defaults to 20.
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+        - name: cursor
+          in: query
+          required: false
+          description: Opaque continuation cursor returned by a previous page.
+          schema: { type: string, minLength: 1, maxLength: 2048 }
       responses:
-        default:
-          description: Discovery-only operation; detailed response contract remains to be closed.
+        '200':
+          description: Active topic and a bounded page of currently published content.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, requestId]
+                additionalProperties: false
+                properties:
+                  data:
+                    type: object
+                    required: [topic, contents, hasMore, nextCursor]
+                    additionalProperties: false
+                    properties:
+                      topic:
+                        type: object
+                        required: [topicId, name, displayName, status]
+                        additionalProperties: false
+                        properties:
+                          topicId: { $ref: '#/components/schemas/ResourceId' }
+                          name: { type: string, minLength: 1, maxLength: 64 }
+                          displayName: { type: string, minLength: 1, maxLength: 64 }
+                          status: { type: string, enum: [ACTIVE] }
+                      contents:
+                        type: array
+                        maxItems: 50
+                        items:
+                          type: object
+                          required: [id, contentType, title, updatedAt]
+                          additionalProperties: false
+                          properties:
+                            id: { $ref: '#/components/schemas/ResourceId' }
+                            contentType: { type: string, enum: [article, post, video] }
+                            title: { type: string }
+                            updatedAt: { type: string, format: date-time }
+                      hasMore: { type: boolean }
+                      nextCursor: { type: [string, 'null'], maxLength: 2048 }
+                  requestId: { type: string, minLength: 1 }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503':
+          description: Social topic or W03 published-content service unavailable.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
 
 components:
   securitySchemes:
