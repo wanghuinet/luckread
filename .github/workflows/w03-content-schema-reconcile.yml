@@ -115,13 +115,17 @@ jobs:
               'content_relationships': {'relationship_id', 'relation_type', 'position'},
               'content_series': {'id', 'owner_user_id', 'state'},
               'content_collections': {'id', 'owner_user_id', 'state'},
+              'content_id_snowflake_state': {'id', 'last_timestamp_ms', 'sequence'},
           }
           for table, columns in required.items():
               present = {row[1] for row in db.execute(f'PRAGMA table_info("{table}")')}
               missing = columns - present
               if missing:
                   raise SystemExit(f'{table} missing columns after full migration chain: {sorted(missing)}')
-          print('W03_MIGRATIONS_0001_0011_STATIC=PASS')
+          allocator = db.execute('SELECT id, last_timestamp_ms, sequence FROM content_id_snowflake_state').fetchall()
+          if allocator != [(1, -1, 4095)]:
+              raise SystemExit(f'unexpected initial Snowflake allocator state: {allocator!r}')
+          print('W03_MIGRATIONS_0001_0012_STATIC=PASS')
           PY
 
       - name: Capture remote migration history and schema
