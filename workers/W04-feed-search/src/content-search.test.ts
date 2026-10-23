@@ -81,18 +81,23 @@ describe('W04 public content search route', () => {
       })
     })
     const env = { W03_CONTENT: { fetch: contentFetch } }
+    const backgroundTasks: Promise<unknown>[] = []
+    const ctx = { waitUntil: (promise: Promise<unknown>) => { backgroundTasks.push(promise) } }
     try {
       const first = await worker.fetch(
         new Request('https://luckread-w04.internal/internal/search/contents?q=LuckRead&limit=10', { headers }),
         env,
+        ctx,
       )
       expect(first.status).toBe(200)
+      await Promise.all(backgroundTasks.splice(0))
       expect((cached as { items: Array<{ term: string; count: number }> }).items)
         .toMatchObject([{ term: 'luckread', count: 1 }])
 
       const nextPage = await worker.fetch(
         new Request('https://luckread-w04.internal/internal/search/contents?q=LuckRead&limit=10&cursor=cursor_1', { headers }),
         env,
+        ctx,
       )
       expect(nextPage.status).toBe(200)
       expect((cached as { items: Array<{ term: string; count: number }> }).items)
@@ -101,12 +106,50 @@ describe('W04 public content search route', () => {
       const empty = await worker.fetch(
         new Request('https://luckread-w04.internal/internal/search/contents?q=empty&limit=10', { headers }),
         env,
+        ctx,
       )
       expect(empty.status).toBe(200)
       expect((cached as { items: Array<{ term: string; count: number }> }).items)
         .toMatchObject([{ term: 'luckread', count: 1 }])
       expect(cache.put).toHaveBeenCalledTimes(1)
     } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('does not wait for the cache-only trend write before returning search results', async () => {
+    let releaseCacheRead: (() => void) | undefined
+    const cache = {
+      match: vi.fn(() => new Promise<Response | undefined>((resolve) => {
+        releaseCacheRead = () => resolve(undefined)
+      })),
+      put: vi.fn(async () => undefined),
+    }
+    vi.stubGlobal('caches', { default: cache })
+    const contentFetch = vi.fn(async () => Response.json({
+      data: { items: [{ id: 'content-1', title: 'Public result' }], nextCursor: null, hasMore: false },
+      requestId: 'req_search_background_test',
+    }))
+    const backgroundTasks: Promise<unknown>[] = []
+    const ctx = { waitUntil: (promise: Promise<unknown>) => { backgroundTasks.push(promise) } }
+    try {
+      const response = await worker.fetch(
+        new Request('https://luckread-w04.internal/internal/search/contents?q=LuckRead&limit=10', { headers }),
+        { W03_CONTENT: { fetch: contentFetch } },
+        ctx,
+      )
+
+      expect(response.status).toBe(200)
+      await expect(response.json()).resolves.toMatchObject({
+        data: { items: [{ id: 'content-1' }], nextCursor: null, hasMore: false },
+      })
+      expect(ctx.waitUntil).toBeTypeOf('function')
+      expect(backgroundTasks).toHaveLength(1)
+      expect(cache.match).toHaveBeenCalledTimes(1)
+      releaseCacheRead?.()
+      await Promise.all(backgroundTasks)
+    } finally {
+      releaseCacheRead?.()
       vi.unstubAllGlobals()
     }
   })

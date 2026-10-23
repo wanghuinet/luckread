@@ -24,6 +24,7 @@ interface SocialFeedService {
   fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response>
 }
 interface ContentFeedService { fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> }
+interface BackgroundTaskContext { waitUntil(promise: Promise<unknown>): void }
 interface Env {
   AUTH013_W04_DERIVED_PROJECTION: ProjectionKV
   W05_SOCIAL: SocialFeedService
@@ -63,7 +64,7 @@ const json = (body: unknown, status = 200) =>
   })
 
 export default {
-  async fetch(request: Request, env?: Env): Promise<Response> {
+  async fetch(request: Request, env?: Env, ctx?: BackgroundTaskContext): Promise<Response> {
     const url = new URL(request.url)
     if (url.pathname === '/internal/search/trending') {
       if (request.method !== 'GET') return new Response(null, { status: 405, headers: { Allow: 'GET' } })
@@ -179,7 +180,9 @@ export default {
           return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Content service returned invalid search data', details: {} } }, 503)
         }
         if (!cursor && payload.data.items.length > 0) {
-          await recordSearchTrend(query)
+          const trendUpdate = recordSearchTrend(query)
+          if (ctx) ctx.waitUntil(trendUpdate)
+          else void trendUpdate
         }
         return json(payload)
       } catch {

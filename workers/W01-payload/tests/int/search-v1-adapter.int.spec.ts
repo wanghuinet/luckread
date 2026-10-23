@@ -54,6 +54,7 @@ describe('public search v1 adapter', () => {
     expect(client).toContain("'X-LuckRead-Rate-Key'")
     expect(w04).toContain("url.pathname === '/internal/search/trending'")
     expect(w04).toContain('recordSearchTrend(query)')
+    expect(w04).toContain('ctx.waitUntil(trendUpdate)')
     expect(w04).toContain('!cursor && payload.data.items.length > 0')
     expect(trends).toContain('Cache API read/modify/write is not')
     expect(trends).toContain('never analytics evidence or business state')
