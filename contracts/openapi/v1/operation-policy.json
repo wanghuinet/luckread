@@ -1232,6 +1232,58 @@
       "x-luckread-source": "contracts/api/api-inventory.v1.json"
     },
     {
+      "operationId": "getContentsContentIdPoll",
+      "auth": {
+        "mode": "public"
+      },
+      "permissions": [],
+      "auditRequired": false,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none",
+      "x-luckread-contract-status": "DISCOVERY_DRAFT",
+      "x-luckread-source": "contracts/api/api-inventory.v1.json"
+    },
+    {
+      "operationId": "postContentsContentIdPoll",
+      "auth": {
+        "mode": "authenticated"
+      },
+      "permissions": [],
+      "auditRequired": false,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": true,
+      "stateMachine": "none",
+      "x-luckread-contract-status": "DISCOVERY_DRAFT",
+      "x-luckread-source": "contracts/api/api-inventory.v1.json"
+    },
+    {
+      "operationId": "deleteContentsContentIdPoll",
+      "auth": {
+        "mode": "authenticated"
+      },
+      "permissions": [],
+      "auditRequired": false,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": true,
+      "stateMachine": "none",
+      "x-luckread-contract-status": "DISCOVERY_DRAFT",
+      "x-luckread-source": "contracts/api/api-inventory.v1.json"
+    },
+    {
+      "operationId": "postContentsContentIdPollVotes",
+      "auth": {
+        "mode": "authenticated"
+      },
+      "permissions": [],
+      "auditRequired": false,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": true,
+      "stateMachine": "none",
+      "x-luckread-contract-status": "DISCOVERY_DRAFT",
+      "x-luckread-source": "contracts/api/api-inventory.v1.json"
+    },
+    {
       "operationId": "getTopicsTopicName",
       "auth": {
         "mode": "public"
