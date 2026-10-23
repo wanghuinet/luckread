@@ -1386,6 +1386,21 @@
       ]
     },
     {
+      "operationId": "getUsersByUsernameUsername",
+      "method": "GET",
+      "path": "/v1/users/by-username/{username}",
+      "openapiPath": "/users/by-username/{username}",
+      "domain": "users_accounts",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/users/by-username/{username}",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
       "operationId": "getMe",
       "method": "GET",
       "path": "/v1/users/me",

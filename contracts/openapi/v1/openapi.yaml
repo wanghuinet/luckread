@@ -3409,6 +3409,57 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ErrorResponse' }
 
+  /users/by-username/{username}:
+    get:
+      tags: [Users]
+      summary: Get a public user profile by username
+      description: >-
+        Returns the minimal public profile projection used to resolve a username
+        to its canonical user ID. Email, locale, timezone, Better Auth identity
+        identifiers and other private account fields are never included. This
+        route is public, applies W01 public-read rate limiting, and caches the
+        projection for 30 seconds with stale-while-revalidate support.
+      operationId: getUsersByUsernameUsername
+      security: []
+      parameters:
+        - name: username
+          in: path
+          required: true
+          description: Username matching the canonical ASCII username format.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 128
+            pattern: '^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$'
+      responses:
+        '200':
+          description: Public profile projection for the requested username.
+          headers:
+            Cache-Control:
+              description: Public cache lifetime with bounded stale-while-revalidate.
+              schema: { type: string, const: 'public, max-age=30, stale-while-revalidate=120' }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, username, displayName, bio, avatar, requestId]
+                additionalProperties: false
+                properties:
+                  id: { $ref: '#/components/schemas/ResourceId' }
+                  username: { type: string, maxLength: 128 }
+                  displayName: { type: [string, 'null'] }
+                  bio: { type: [string, 'null'] }
+                  avatar: { type: [string, 'null'] }
+                  requestId: { type: string, minLength: 1 }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503':
+          description: Public profile service unavailable.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
 components:
   securitySchemes:
     bearerAuth:
