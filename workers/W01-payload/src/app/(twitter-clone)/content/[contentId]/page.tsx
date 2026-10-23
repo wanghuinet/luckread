@@ -3,12 +3,10 @@ import { cookies, headers } from 'next/headers'
 import { notFound, permanentRedirect } from 'next/navigation'
 import { cache } from 'react'
 
-import { enforcePublicReadRateLimit } from '../../../../auth/traffic-limit.js'
-import { callW03Content, W03ContentClientError } from '../../../../content/w03-content-client.js'
-import { cachedPublicGet } from '../../../../lib/public-response-cache.js'
+import { fetchJson } from '../../../../lib/client-api.js'
 
 import ContentDetailClient from '../../../(frontend)/content/[contentId]/ContentDetailClient'
-import { normalizePublicLocale, type PublicLocale } from '../../../(frontend)/i18n/public-locale'
+import { normalizePublicLocale } from '../../../(frontend)/i18n/public-locale'
 import TwitterCloneSecondaryPageLayout from '../../TwitterCloneSecondaryPageLayout'
 
 type ContentType = 'article' | 'post' | 'video'
@@ -39,29 +37,18 @@ const getPublicContent = cache(async (contentId: string): Promise<PublicContent 
   if (language) requestHeaders.set('accept-language', language)
 
   const request = new Request(
-    PUBLIC_ORIGIN + '/api/v1/contents/' + encodeURIComponent(contentId),
-    { method: 'GET', headers: requestHeaders },
+    'https://api.luckread.com/v1/contents/' + encodeURIComponent(contentId),
+    { method: 'GET', headers: requestHeaders, cache: 'no-store' },
   )
 
-  await enforcePublicReadRateLimit(request)
-
   try {
-    const response = await cachedPublicGet(
-      request,
-      'content-detail',
-      () => callW03Content({
-        request,
-        pathname: '/internal/content/contents/' + encodeURIComponent(contentId),
-        method: 'GET',
-      }),
-      30,
-    )
-
-    if (!response.ok) return null
-    return await response.json() as PublicContent
-  } catch (error) {
-    if (error instanceof W03ContentClientError) return null
-    throw error
+    // Route through the canonical public W01 API. Rate limiting and shared
+    // public caching stay owned by that API endpoint, not this page render.
+    const { response, data } = await fetchJson<PublicContent>(request)
+    if (!response.ok || !data || typeof data.id !== 'string') return null
+    return data
+  } catch {
+    return null
   }
 })
 

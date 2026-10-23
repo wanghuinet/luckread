@@ -128,6 +128,10 @@ const forbidden = [
     pattern: /\bimport\s*\{[^}]*\b(?:GET|POST|PUT|PATCH|DELETE)\b[^}]*\}\s*from\s*['"][^'"]*\/api\/v1\/[^'"]*\/route(?:\.[^'"]+)?['"]/g,
   },
   {
+    label: 'W03 content service invoked directly from UI instead of the public W01 API',
+    pattern: /\bcallW03Content\s*\(|\bfrom\s*['"][^'"]*\/content\/w03-content-client(?:\.js)?['"]/g,
+  },
+  {
     label: 'private Worker internal URL referenced from UI code',
     pattern: /https?:\/\/[A-Za-z0-9.-]+\.internal(?:\/|['"])/g,
   },
