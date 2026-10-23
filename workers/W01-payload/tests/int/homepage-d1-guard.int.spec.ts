@@ -15,7 +15,7 @@ describe('Twitter-clone homepage D1 guard', () => {
 
   it('uses the public W01 API client for the initial feed without duplicating rate limiting', () => {
     const home = readFileSync(resolve(process.cwd(), 'src/app/(twitter-clone)/home/page.tsx'), 'utf8')
-    expect(home).toContain("import { fetchJson } from '../../lib/client-api.js'")
+    expect(home).toContain("import { fetchJson } from '../../../lib/client-api.js'")
     expect(home).toContain("new Request('https://api.luckread.com/v1/contents?limit=20'")
     expect(home).toContain('fetchJson<{ data?: HomeContentPage }>(request)')
     expect(home).toContain('The contents API owns anonymous read rate limiting for this request.')
