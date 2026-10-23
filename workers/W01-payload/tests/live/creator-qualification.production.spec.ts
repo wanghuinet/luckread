@@ -51,6 +51,7 @@ type AcceptanceEvidence = {
 }
 
 const baseURL = 'https://mp.luckread.com'
+const apiBaseURL = 'https://api.luckread.com'
 const applicantEmail = process.env.LUCKREAD_CREATOR_E2E_APPLICANT_EMAIL?.trim() ?? ''
 const applicantPassword = process.env.LUCKREAD_CREATOR_E2E_APPLICANT_PASSWORD ?? ''
 const reviewerEmail = process.env.LUCKREAD_CREATOR_E2E_REVIEWER_EMAIL?.trim() ?? ''
@@ -106,7 +107,7 @@ async function login(page: Page, roleName: string, email: string, password: stri
   const loginResponsePromise = page.waitForResponse(
     (response) => {
       try {
-        return new URL(response.url()).pathname === '/api/v1/auth/login' &&
+        return new URL(response.url()).hostname === 'api.luckread.com' && new URL(response.url()).pathname === '/v1/auth/login' &&
           response.request().method() === 'POST'
       } catch {
         return false
@@ -144,7 +145,7 @@ async function login(page: Page, roleName: string, email: string, password: stri
 }
 
 async function nativeGet(path: string, sessionToken: string): Promise<{ response: Response; payload: CreatorApiPayload | null }> {
-  const response = await fetch(baseURL + path, {
+  const response = await fetch(apiBaseURL + path, {
     method: 'GET',
     headers: {
       accept: 'application/json',
@@ -201,7 +202,7 @@ test('L2 applicant submits, L7/L8 reviewer grants L3, and creator center accepts
     })
 
     stage = 'applicant_application_preflight'
-    const cookieBefore = await applicantContext.request.get(baseURL + '/api/v1/creator-applications', {
+    const cookieBefore = await applicantContext.request.get(apiBaseURL + '/v1/creator-applications', {
       headers: { accept: 'application/json', 'cache-control': 'no-store' },
       timeout: 15_000,
     })
@@ -212,7 +213,7 @@ test('L2 applicant submits, L7/L8 reviewer grants L3, and creator center accepts
       applicationPresent: !cookieHasNoApplication,
     })
 
-    const bearerBefore = await nativeGet('/api/v1/creator-applications', applicantToken)
+    const bearerBefore = await nativeGet('/v1/creator-applications', applicantToken)
     const bearerHasNoApplication = bearerBefore.payload?.data?.application === null
     record('native_bearer_session_reads_own_application_without_cookie', bearerBefore.response.status === 200 &&
       bearerHasNoApplication, {
@@ -243,7 +244,7 @@ test('L2 applicant submits, L7/L8 reviewer grants L3, and creator center accepts
     const submitResponsePromise = applicantPage.waitForResponse(
       (response) => {
         try {
-          return new URL(response.url()).pathname === '/api/v1/creator-applications' &&
+          return new URL(response.url()).hostname === 'api.luckread.com' && new URL(response.url()).pathname === '/v1/creator-applications' &&
             response.request().method() === 'POST'
         } catch {
           return false
@@ -292,7 +293,7 @@ test('L2 applicant submits, L7/L8 reviewer grants L3, and creator center accepts
     const decisionResponsePromise = reviewerPage.waitForResponse(
       (response) => {
         try {
-          return new URL(response.url()).pathname === '/api/v1/admin/creator-applications' &&
+          return new URL(response.url()).hostname === 'api.luckread.com' && new URL(response.url()).pathname === '/v1/admin/creator-applications' &&
             response.request().method() === 'POST'
         } catch {
           return false
@@ -313,7 +314,7 @@ test('L2 applicant submits, L7/L8 reviewer grants L3, and creator center accepts
     })
 
     stage = 'native_bearer_post_grant_verification'
-    const bearerAfter = await nativeGet('/api/v1/creator-applications', applicantToken)
+    const bearerAfter = await nativeGet('/v1/creator-applications', applicantToken)
     const promotedApplication = bearerAfter.payload?.data?.application
     const bearerSeesGrant = bearerAfter.response.status === 200 &&
       promotedApplication?.status === 'APPROVED' &&

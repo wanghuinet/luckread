@@ -143,7 +143,7 @@ jobs:
             return { status: r.status, data, headers: r.headers }
           }
 
-          const reg = await post('/api/v1/auth/register', {
+          const reg = await post('/v1/auth/register', {
             identityType: 'email',
             identity: email,
             credential: password,
@@ -177,7 +177,7 @@ jobs:
             'INSERT INTO role_assignments (id,subject_id,role_id,scope_type,scope_id,status,valid_from,valid_until,created_at,updated_at) VALUES (' +
             [roleId,userId,'creator','global',null,'ACTIVE',now,null,now,now].map((v,i)=>i === 4 ? 'NULL' : q(v)).join(',') + ')')
 
-          const login = await post('/api/v1/auth/login', {
+          const login = await post('/v1/auth/login', {
             identity: email,
             credential: password,
           })
@@ -228,7 +228,7 @@ jobs:
         run: |
           set -euo pipefail
           filter="?creatorId=$CACHE_TEST_USER_ID&type=article&limit=10"
-          status="$(curl --silent --show-error -o /tmp/cache-list-miss.json -D /tmp/cache-list-miss.headers -w '%{http_code}' "$CONTENT_API_BASE_URL/api/v1/contents$filter")"
+          status="$(curl --silent --show-error -o /tmp/cache-list-miss.json -D /tmp/cache-list-miss.headers -w '%{http_code}' "$CONTENT_API_BASE_URL/v1/contents$filter")"
           echo "HTTP status: $status"
           cat /tmp/cache-list-miss.json
           test "$status" = "200"
@@ -250,7 +250,7 @@ jobs:
         run: |
           set -euo pipefail
           filter="?creatorId=$CACHE_TEST_USER_ID&type=article&limit=10"
-          status="$(curl --silent --show-error -o /tmp/cache-list-hit.json -D /tmp/cache-list-hit.headers -w '%{http_code}' "$CONTENT_API_BASE_URL/api/v1/contents$filter")"
+          status="$(curl --silent --show-error -o /tmp/cache-list-hit.json -D /tmp/cache-list-hit.headers -w '%{http_code}' "$CONTENT_API_BASE_URL/v1/contents$filter")"
           echo "HTTP status: $status"
           test "$status" = "200"
           node --input-type=module <<'NODE'
@@ -271,7 +271,7 @@ jobs:
         run: |
           set -euo pipefail
           filter="?creatorId=$CACHE_TEST_USER_ID&type=article&limit=10"
-          status="$(curl --silent --show-error -o /tmp/cache-list-auth.json -D /tmp/cache-list-auth.headers -w '%{http_code}' -H "Authorization: Bearer $CACHE_TEST_TOKEN" "$CONTENT_API_BASE_URL/api/v1/contents$filter")"
+          status="$(curl --silent --show-error -o /tmp/cache-list-auth.json -D /tmp/cache-list-auth.headers -w '%{http_code}' -H "Authorization: Bearer $CACHE_TEST_TOKEN" "$CONTENT_API_BASE_URL/v1/contents$filter")"
           echo "HTTP status: $status"
           test "$status" = "200"
           node --input-type=module <<'NODE'
@@ -290,7 +290,7 @@ jobs:
       - name: Unpublish fixture through public mutation boundary
         run: |
           set -euo pipefail
-          curl --silent --show-error --fail-with-body             -X POST             -H "Authorization: Bearer $CACHE_TEST_TOKEN"             -H "Content-Type: application/json"             -H "Idempotency-Key: CONTENT-CACHE-E2E-$GITHUB_RUN_ID-UNPUBLISH"             -H 'If-Match: W/"1"'             --data '{"to":"UNPUBLISHED"}'             "$CONTENT_API_BASE_URL/api/v1/contents/$CACHE_TEST_CONTENT_ID/state" > /tmp/cache-unpublish.json
+          curl --silent --show-error --fail-with-body             -X POST             -H "Authorization: Bearer $CACHE_TEST_TOKEN"             -H "Content-Type: application/json"             -H "Idempotency-Key: CONTENT-CACHE-E2E-$GITHUB_RUN_ID-UNPUBLISH"             -H 'If-Match: W/"1"'             --data '{"to":"UNPUBLISHED"}'             "$CONTENT_API_BASE_URL/v1/contents/$CACHE_TEST_CONTENT_ID/state" > /tmp/cache-unpublish.json
           node --input-type=module <<'NODE'
           import { readFileSync } from 'node:fs'
           const value = JSON.parse(readFileSync('/tmp/cache-unpublish.json','utf8'))
@@ -303,7 +303,7 @@ jobs:
         run: |
           set -euo pipefail
           filter="?creatorId=$CACHE_TEST_USER_ID&type=article&limit=10"
-          status="$(curl --silent --show-error -o /tmp/cache-list-after.json -D /tmp/cache-list-after.headers -w '%{http_code}' "$CONTENT_API_BASE_URL/api/v1/contents$filter")"
+          status="$(curl --silent --show-error -o /tmp/cache-list-after.json -D /tmp/cache-list-after.headers -w '%{http_code}' "$CONTENT_API_BASE_URL/v1/contents$filter")"
           echo "HTTP status: $status"
           test "$status" = "200"
           node --input-type=module <<'NODE'
@@ -381,7 +381,7 @@ jobs:
             testedSourceSha: process.env.TESTED_COMMIT || null,
             deploymentRunId: process.env.DEPLOYMENT_RUN_ID || null,
             worker: 'luckread-w01-payload',
-            publicPath: '/api/v1/contents',
+            publicPath: '/v1/contents',
             cacheNamespace: 'content-list',
             filteredVariant: 'creatorId,type,limit',
             anonymousMiss: checks.anonymousMiss.pass,

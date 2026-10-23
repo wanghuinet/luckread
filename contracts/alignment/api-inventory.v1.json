@@ -3,7 +3,7 @@
   "status": "DISCOVERED",
   "sourceOfTruth": "contracts/openapi/v1/openapi.yaml + contracts/api/api-inventory.v1.json",
   "generatedBy": "scripts/build-api-alignment-inventory.mjs",
-  "serverPrefix": "/api/v1",
+  "serverPrefix": "https://api.luckread.com/v1",
   "records": [
     {
       "operationId": "deleteAccountSessionsSessionId",

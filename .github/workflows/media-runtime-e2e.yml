@@ -145,7 +145,7 @@ jobs:
             d1("UPDATE \"user\" SET email_verified=1, account_state='ACTIVE', account_state_version=account_state_version+1 WHERE id="+q(userId))
             d1("INSERT INTO role_assignments (id,subject_id,role_id,scope_type,scope_id,status,valid_from,valid_until,created_at,updated_at) VALUES ("+
               [roleId,userId,'creator','global',null,'ACTIVE',now,null,now,now].map((v,i)=>i===4?'NULL':q(v)).join(',')+")")
-            const login=await post('/api/v1/auth/login',{identity:email,credential:password})
+            const login=await post('/v1/auth/login',{identity:email,credential:password})
             const user=login.data?.data?.user
             const accessToken=login.headers.get('x-luckread-session-token')
             if(login.status!==200||!accessToken||String(user?.id)!==userId||user?.emailVerified!==true) {
@@ -162,7 +162,7 @@ jobs:
         run: |
           set -euo pipefail
           printf '%s' 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=' | base64 -d > /tmp/media-e2e.png
-          status="$(curl --silent --show-error -o /tmp/media-upload.json -w '%{http_code}'             -X POST             -H "Authorization: Bearer $MEDIA_OWNER_TOKEN"             -H "Idempotency-Key: MEDIA-E2E-$GITHUB_RUN_ID-UPLOAD"             -F "file=@/tmp/media-e2e.png;type=image/png"             -F '_payload={"alt":"Media runtime E2E synthetic fixture"}'             "$W01_BASE_URL/api/v1/media")"
+          status="$(curl --silent --show-error -o /tmp/media-upload.json -w '%{http_code}'             -X POST             -H "Authorization: Bearer $MEDIA_OWNER_TOKEN"             -H "Idempotency-Key: MEDIA-E2E-$GITHUB_RUN_ID-UPLOAD"             -F "file=@/tmp/media-e2e.png;type=image/png"             -F '_payload={"alt":"Media runtime E2E synthetic fixture"}'             "$W01_BASE_URL/v1/media")"
           echo "Media upload HTTP status: $status"
           cat /tmp/media-upload.json
           case "$status" in 2*) ;; *) echo "Media upload failed: HTTP $status"; exit 1;; esac
@@ -179,7 +179,7 @@ jobs:
       - name: Verify owner private metadata boundary
         run: |
           set -euo pipefail
-          curl --silent --show-error --fail-with-body             -D /tmp/media-owner-headers.txt             -H "Authorization: Bearer $MEDIA_OWNER_TOKEN"             "$W01_BASE_URL/api/v1/media/$MEDIA_ID" > /tmp/media-owner.json
+          curl --silent --show-error --fail-with-body             -D /tmp/media-owner-headers.txt             -H "Authorization: Bearer $MEDIA_OWNER_TOKEN"             "$W01_BASE_URL/v1/media/$MEDIA_ID" > /tmp/media-owner.json
           node --input-type=module <<'NODE'
           import {readFileSync,mkdirSync,writeFileSync} from 'node:fs'
           const body=readFileSync('/tmp/media-owner.json','utf8')
@@ -205,8 +205,8 @@ jobs:
       - name: Verify non-owner and anonymous denial
         run: |
           set -euo pipefail
-          other="$(curl --silent --show-error -o /tmp/media-other.json -w '%{http_code}' -H "Authorization: Bearer $MEDIA_OTHER_TOKEN" "$W01_BASE_URL/api/v1/media/$MEDIA_ID")"
-          anon="$(curl --silent --show-error -o /tmp/media-anon.json -w '%{http_code}' "$W01_BASE_URL/api/v1/media/$MEDIA_ID")"
+          other="$(curl --silent --show-error -o /tmp/media-other.json -w '%{http_code}' -H "Authorization: Bearer $MEDIA_OTHER_TOKEN" "$W01_BASE_URL/v1/media/$MEDIA_ID")"
+          anon="$(curl --silent --show-error -o /tmp/media-anon.json -w '%{http_code}' "$W01_BASE_URL/v1/media/$MEDIA_ID")"
           node --input-type=module -e "import {writeFileSync} from 'node:fs';const other=Number(process.argv[1]);const anon=Number(process.argv[2]);if(![401,403,404].includes(other))throw new Error('non-owner access not denied: '+other);if(![401,403,404].includes(anon))throw new Error('anonymous access not denied: '+anon);writeFileSync('artifacts/mapping-0/media-runtime-e2e/access.json',JSON.stringify({status:'PASS',nonOwnerHttpStatus:other,anonymousHttpStatus:anon},null,2)+'\\n')" "$other" "$anon"
 
       - name: Checkout media lifecycle test harness
@@ -232,12 +232,12 @@ jobs:
           : "${MEDIA_OWNER_REGISTER_KEY:=__none__}"
           : "${MEDIA_OTHER_REGISTER_KEY:=__none__}"
           if [ -n "${MEDIA_ID:-}" ] && [ -n "${MEDIA_OWNER_TOKEN:-}" ]; then
-            status="$(curl --silent --show-error -o /tmp/media-delete.json -w '%{http_code}' -X DELETE -H "Authorization: Bearer $MEDIA_OWNER_TOKEN" -H "Idempotency-Key: MEDIA-E2E-$GITHUB_RUN_ID-DELETE" "$W01_BASE_URL/api/v1/media/$MEDIA_ID" || true)"
+            status="$(curl --silent --show-error -o /tmp/media-delete.json -w '%{http_code}' -X DELETE -H "Authorization: Bearer $MEDIA_OWNER_TOKEN" -H "Idempotency-Key: MEDIA-E2E-$GITHUB_RUN_ID-DELETE" "$W01_BASE_URL/v1/media/$MEDIA_ID" || true)"
             case "$status" in 2*|404) ;; *) echo "WARNING: media API delete returned HTTP $status; continuing with D1 cleanup";; esac
           fi
           for token in "${MEDIA_OWNER_TOKEN:-}" "${MEDIA_OTHER_TOKEN:-}"; do
             if [ -n "$token" ]; then
-              status="$(curl --silent --show-error -o /dev/null -w '%{http_code}' -X POST -H "Authorization: Bearer $token" "$W01_BASE_URL/api/v1/auth/logout" || true)"
+              status="$(curl --silent --show-error -o /dev/null -w '%{http_code}' -X POST -H "Authorization: Bearer $token" "$W01_BASE_URL/v1/auth/logout" || true)"
               if [ "$status" != "204" ]; then echo "WARNING: fixture logout returned HTTP $status; continuing D1 cleanup"; fi
             fi
           done
@@ -273,7 +273,7 @@ jobs:
             "testedSourceSha": "$TESTED_COMMIT",
             "deploymentRunId": "$DEPLOYMENT_RUN_ID",
             "worker": "luckread-w01-payload",
-            "publicPath": "/api/v1/media/{mediaId}",
+            "publicPath": "/v1/media/{mediaId}",
             "ownerScope": true,
             "cacheControl": "private, no-store",
             "sharedCache": false,

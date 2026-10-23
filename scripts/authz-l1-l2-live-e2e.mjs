@@ -3,7 +3,7 @@ import { mkdir, writeFile } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
 import { resolve } from 'node:path'
 
-const baseUrl = (process.env.LUCKREAD_API_BASE_URL || 'https://luckread.com').replace(/\/$/, '')
+const baseUrl = (process.env.LUCKREAD_API_BASE_URL || 'https://api.luckread.com').replace(/\/$/, '')
 const email = process.env.LUCKREAD_APP_AUTH_SMOKE_EMAIL || ''
 const password = process.env.LUCKREAD_APP_AUTH_SMOKE_PASSWORD || ''
 const accountId = process.env.CLOUDFLARE_ACCOUNT_ID || ''
@@ -178,12 +178,12 @@ if (!email || !password || !accountId || !apiToken) {
   await finish()
 } else {
   try {
-    const loginResponse = await fetch(baseUrl + '/api/v1/auth/login', {
+    const loginResponse = await fetch(baseUrl + '/v1/auth/login', {
       method: 'POST',
       headers: {
         accept: 'application/json',
         'content-type': 'application/json',
-        origin: new URL(baseUrl).origin,
+        origin: 'https://luckread.com',
       },
       body: JSON.stringify({ identity: email, credential: password }),
       redirect: 'manual',
@@ -284,12 +284,12 @@ if (!email || !password || !accountId || !apiToken) {
         })
 
         const targetId = 'authz-l12-probe-' + runId + '-' + randomUUID()
-        const probeResponse = await fetch(baseUrl + '/api/v1/interactions/likes', {
+        const probeResponse = await fetch(baseUrl + '/v1/interactions/likes', {
           method: 'POST',
           headers: {
             accept: 'application/json',
             'content-type': 'application/json',
-            origin: new URL(baseUrl).origin,
+            origin: 'https://luckread.com',
             cookie: cookieHeader,
             'Idempotency-Key': 'authz-l12-live-' + runId + '-' + randomUUID(),
           },
@@ -310,13 +310,13 @@ if (!email || !password || !accountId || !apiToken) {
         // Read-only social negative probes: both requests use a guaranteed-random
         // missing target, so neither can create a follow relation.
         const missingTargetId = 'authz-follow-missing-' + runId + '-' + randomUUID()
-        const followUrl = baseUrl + '/api/v1/social/follows/' + encodeURIComponent(missingTargetId)
+        const followUrl = baseUrl + '/v1/social/follows/' + encodeURIComponent(missingTargetId)
         const missingKeyResponse = await fetch(followUrl, {
           method: 'POST',
           headers: {
             accept: 'application/json',
             'content-type': 'application/json',
-            origin: new URL(baseUrl).origin,
+            origin: 'https://luckread.com',
             cookie: cookieHeader,
           },
           body: JSON.stringify({}),
@@ -340,7 +340,7 @@ if (!email || !password || !accountId || !apiToken) {
           headers: {
             accept: 'application/json',
             'content-type': 'application/json',
-            origin: new URL(baseUrl).origin,
+            origin: 'https://luckread.com',
             cookie: cookieHeader,
             'Idempotency-Key': 'authz-follow-missing-' + runId + '-' + randomUUID(),
           },

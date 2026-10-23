@@ -8,9 +8,9 @@
  *   L3 contracts/openapi/v1/openapi.yaml (canonical HTTP surface)
  *
  * This checker derives a three-way endpoint registry. It never promotes a
- * missing mapping to PASS and never mutates contracts. Inventory paths use
- * /v1 while canonical OpenAPI uses /api/v1 as its server prefix, so path
- * comparison is normalized before comparison.
+ * missing mapping to PASS and never mutates contracts. The public API base is
+ * https://api.luckread.com/v1, while public inventory/domain paths are normalized
+ * to W01's existing internal /api/v1 route tree for implementation comparison.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -163,11 +163,12 @@ const report = {
   failures,
   findings,
   normalization: {
-    inventoryPrefix: '/v1',
-    domainPrefix: '/',
-    canonicalServerPrefix: '/api/v1',
+    inventoryPublicPrefix: '/v1',
+    domainPublicPrefix: '/',
+    canonicalPublicApiBase: 'https://api.luckread.com/v1',
+    implementationRoutePrefix: '/api/v1',
     normalizedPrefix: '/api/v1',
-    rule: 'Inventory /v1/* and domain /* are normalized to canonical /api/v1/* before comparison.'
+    rule: 'Public /v1/* inventory and domain /* operations are normalized to the existing W01 /api/v1 route tree before comparison.'
   },
   rule: 'PASS requires zero structural conflicts and zero unresolved three-way endpoint mappings. This report is derived evidence and is not a source of truth.'
 };

@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     env:
-      LUCKREAD_API_BASE_URL: https://luckread.com
+      LUCKREAD_API_BASE_URL: https://api.luckread.com
       LUCKREAD_APP_AUTH_SMOKE_EMAIL: ${{ secrets.LUCKREAD_APP_AUTH_SMOKE_EMAIL }}
       LUCKREAD_APP_AUTH_SMOKE_PASSWORD: ${{ secrets.LUCKREAD_APP_AUTH_SMOKE_PASSWORD }}
     steps:

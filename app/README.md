@@ -26,7 +26,7 @@ The GitHub Actions workflow `.github/workflows/app-mobile-ci.yml` installs depen
 
 ## API configuration
 
-The default API base is `https://luckread.com`. Override it for staging with:
+The default API base is `https://api.luckread.com`. Override it for staging with:
 
 ```sh
 EXPO_PUBLIC_API_BASE_URL=https://your-staging-host.example bun start
@@ -34,11 +34,11 @@ EXPO_PUBLIC_API_BASE_URL=https://your-staging-host.example bun start
 
 The client uses these existing W01 public routes:
 
-- `POST /api/v1/auth/login`
-- `GET /api/v1/auth/session`
-- `POST /api/v1/auth/logout`
-- `GET /api/v1/contents?type=post&limit=20`
-- `GET /api/v1/feed/following?limit=20`
+- `POST /v1/auth/login`
+- `GET /v1/auth/session`
+- `POST /v1/auth/logout`
+- `GET /v1/contents?type=post&limit=20`
+- `GET /v1/feed/following?limit=20`
 
 The native session credential is accepted from the `X-LuckRead-Session-Token` response header and stored using `expo-secure-store` (iOS Keychain / Android Keystore-backed storage). Authenticated requests use `Authorization: Bearer <session-token>`. The token is never stored in plain AsyncStorage or included in a request/response JSON body.
 

@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import type { PublicLocale } from '../../(frontend)/i18n/public-locale'
+import { apiFetch } from '../../../lib/client-api.js'
 import { appendUniqueSearchResults } from './search-results.js'
 
 type SearchTrend = { term: string; count: number; lastSeenAt: string }
@@ -113,7 +114,7 @@ export default function SearchDiscoveryClient({
 
   useEffect(() => {
     const controller = new AbortController()
-    fetch('/api/v1/search/trending?limit=10', {
+    apiFetch('/api/v1/search/trending?limit=10', {
       method: 'GET',
       cache: 'no-store',
       credentials: 'same-origin',
@@ -145,7 +146,7 @@ export default function SearchDiscoveryClient({
     const normalized = initialQuery.normalize('NFKC').trim()
     if (!normalized) return
     const controller = new AbortController()
-    fetch('/api/v1/search?' + new URLSearchParams({ q: normalized, limit: '20' }).toString(), {
+    apiFetch('/api/v1/search?' + new URLSearchParams({ q: normalized, limit: '20' }).toString(), {
       method: 'GET',
       cache: 'no-store',
       credentials: 'same-origin',
@@ -195,7 +196,7 @@ export default function SearchDiscoveryClient({
 
     try {
       const params = new URLSearchParams({ q: initialQuery, limit: '20', cursor: nextCursor })
-      const response = await fetch('/api/v1/search?' + params.toString(), {
+      const response = await apiFetch('/api/v1/search?' + params.toString(), {
         method: 'GET',
         cache: 'no-store',
         credentials: 'same-origin',

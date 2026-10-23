@@ -114,7 +114,7 @@ if (
   throw new Error('native reviewer moderator assignment was not established')
 }
 
-const login = await post('/api/v1/auth/login', {
+const login = await post('/v1/auth/login', {
   identity: email,
   credential: password,
 })

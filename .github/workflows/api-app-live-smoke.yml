@@ -2,12 +2,23 @@ name: APP API live HTTP smoke evidence
 
 on:
   workflow_dispatch:
+    inputs:
+      confirm:
+        description: Run real public HTTP probes only after W01 /v1 routing has been deployed
+        required: true
+        type: choice
+        options:
+          - CANCEL
+          - RUN_LIVE_SMOKE
+        default: CANCEL
   pull_request:
     branches:
       - main
     paths:
       - '.github/workflows/api-app-live-smoke.yml'
       - 'scripts/api-app-live-smoke.mjs'
+      - 'workers/W01-payload/next.config.ts'
+      - 'workers/W01-payload/src/lib/client-api.ts'
       - 'workers/W01-payload/src/lib/public-response-cache.ts'
       - 'workers/W01-payload/src/app/api/v1/contents/route.ts'
   push:
@@ -17,6 +28,8 @@ on:
     paths:
       - '.github/workflows/api-app-live-smoke.yml'
       - 'scripts/api-app-live-smoke.mjs'
+      - 'workers/W01-payload/next.config.ts'
+      - 'workers/W01-payload/src/lib/client-api.ts'
       - 'workers/W01-payload/src/lib/public-response-cache.ts'
       - 'workers/W01-payload/src/app/api/v1/contents/route.ts'
 
@@ -29,7 +42,7 @@ concurrency:
 
 jobs:
   validate:
-    if: ${{ github.event_name == 'pull_request' }}
+    if: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
     name: Validate public smoke harness
     runs-on: ubuntu-latest
     steps:
@@ -43,10 +56,19 @@ jobs:
         run: node --check scripts/api-app-live-smoke.mjs
 
   smoke:
-    name: Safe public and unauthenticated API probes
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.confirm == 'RUN_LIVE_SMOKE' }}
+    name: Safe public and unauthenticated API probes (post-deployment only)
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
+      - name: Require main after W01 API routing deployment
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = "refs/heads/main" || {
+            echo "::error::Live API smoke may only run from main after the W01 /v1 rewrite is deployed."
+            exit 1
+          }
+
       - name: Checkout selected revision
         uses: actions/checkout@v4
 

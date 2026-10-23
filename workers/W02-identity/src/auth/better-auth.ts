@@ -231,6 +231,11 @@ const buildLuckReadAuth = (env: BetterAuthEnv) => {
     },
     plugins: [bearer()],
     advanced: {
+      // H5/PC and the canonical API hostname must share the same W02 session.
+      crossSubDomainCookies: {
+        enabled: true,
+        domain: '.luckread.com',
+      },
       database: {
         // Fail closed and log actionable schema drift before it degrades
         // a registration/login request into an opaque database error.

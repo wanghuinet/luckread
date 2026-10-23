@@ -261,7 +261,7 @@ jobs:
 
       - name: Verify real APP login and session behavior after deployment
         env:
-          LUCKREAD_API_BASE_URL: https://luckread.com
+          LUCKREAD_API_BASE_URL: https://api.luckread.com
           LUCKREAD_SOURCE_SHA: ${{ inputs.source_sha }}
           LUCKREAD_APP_AUTH_SMOKE_EMAIL: ${{ secrets.LUCKREAD_APP_AUTH_SMOKE_EMAIL }}
           LUCKREAD_APP_AUTH_SMOKE_PASSWORD: ${{ secrets.LUCKREAD_APP_AUTH_SMOKE_PASSWORD }}

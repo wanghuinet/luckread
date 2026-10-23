@@ -2,7 +2,7 @@
 
 import { ChangeEvent, useEffect, useRef, useState } from 'react'
 import { computeAutoSaveDelay } from '../../../lib/content-autosave.js'
-import { fetchJson, getApiErrorMessage } from '../../../lib/client-api.js'
+import { apiFetch, fetchJson, getApiErrorMessage } from '../../../lib/client-api.js'
 import { articleDocumentFromBody, plainTextFromArticleDocument, mediaRefsFromArticleDocument, removeMediaRefFromArticleDocument, serializeArticleDocument, createArticleDocument, tryDeserializeArticleDocument, type ArticleDocument } from '../../../lib/article-document.js'
 import ArticleStructuredEditor from '../../../components/ArticleStructuredEditor.js'
 import ArticleStructuredRenderer from '../../../components/ArticleStructuredRenderer.js'
@@ -241,7 +241,7 @@ export default function PublishComposer({
         }
         let recoveredBody = ''
         if (recovered.bodyRef) {
-          const bodyResponse = await fetch(recovered.bodyRef, {
+          const bodyResponse = await apiFetch(recovered.bodyRef, {
             method: 'GET',
             credentials: 'same-origin',
             signal: controller.signal,
@@ -318,7 +318,7 @@ export default function PublishComposer({
 
   
 async function cleanupUploadedBodyAsset(mediaId: string): Promise<void> {
-  await fetch('/api/v1/media/' + encodeURIComponent(mediaId), {
+  await apiFetch('/api/v1/media/' + encodeURIComponent(mediaId), {
     method: 'DELETE',
     credentials: 'include',
     headers: { 'Idempotency-Key': 'content-body-cleanup:' + mediaId + ':' + crypto.randomUUID() },
