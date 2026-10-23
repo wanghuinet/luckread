@@ -12,7 +12,7 @@ describe('v1 follow mutation adapter', () => {
     expect(route).toContain('resolveSocialPrincipal')
     expect(route).toContain('callW05Social')
     expect(route).toContain('/internal/social/follows/')
-    expect(route).toContain("invalidatePublicFollowList('following',resolvedPrincipal.payloadProfileId)")
+    expect(route).toContain("invalidatePublicFollowList('following',resolvedPrincipal?.payloadProfileId")
     expect(route).toContain("invalidatePublicFollowList('followers',resolvedTarget.payloadProfileId)")
     expect(route).not.toContain('social_follow_relationships')
   })
