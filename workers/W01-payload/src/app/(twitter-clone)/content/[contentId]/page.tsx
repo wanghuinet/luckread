@@ -26,6 +26,26 @@ type PublicContent = {
 
 const PUBLIC_ORIGIN = 'https://luckread.com'
 
+const uuidFromStableContentSlug = (slug: string): string | null => {
+  const compactUuid = /-([0-9a-f]{32})$/i.exec(slug)?.[1]
+  if (
+    !compactUuid ||
+    !/^[0-9a-f]{8}[0-9a-f]{4}[1-8][0-9a-f]{3}[89ab][0-9a-f]{3}[0-9a-f]{12}$/i.test(compactUuid)
+  ) {
+    return null
+  }
+
+  return compactUuid.replace(/^(.{8})(.{4})(.{4})(.{4})(.{12})$/, '$1-$2-$3-$4-$5')
+}
+
+const fetchPublicContent = async (contentId: string, requestHeaders: Headers) => {
+  const request = new Request(
+    'https://api.luckread.com/v1/contents/' + encodeURIComponent(contentId),
+    { method: 'GET', headers: requestHeaders, cache: 'no-store' },
+  )
+  return fetchJson<PublicContent>(request)
+}
+
 const getPublicContent = cache(async (contentId: string): Promise<PublicContent | null> => {
   const incoming = await headers()
   const requestHeaders = new Headers({
@@ -36,17 +56,23 @@ const getPublicContent = cache(async (contentId: string): Promise<PublicContent 
   if (clientIp) requestHeaders.set('cf-connecting-ip', clientIp)
   if (language) requestHeaders.set('accept-language', language)
 
-  const request = new Request(
-    'https://api.luckread.com/v1/contents/' + encodeURIComponent(contentId),
-    { method: 'GET', headers: requestHeaders, cache: 'no-store' },
-  )
-
   try {
     // Route through the canonical public W01 API. Rate limiting and shared
     // public caching stay owned by that API endpoint, not this page render.
-    const { response, data } = await fetchJson<PublicContent>(request)
-    if (!response.ok || !data || typeof data.id !== 'string') return null
-    return data
+    let result = await fetchPublicContent(contentId, requestHeaders)
+
+    // Older UUID-backed records may have a valid ID suffix in their public
+    // slug while their stored slug index is out of sync. Retry only a 404 by
+    // the encoded UUID; W03 still applies its normal public-visibility checks.
+    if (result.response.status === 404) {
+      const fallbackId = uuidFromStableContentSlug(contentId)
+      if (fallbackId) {
+        result = await fetchPublicContent(fallbackId, requestHeaders)
+      }
+    }
+
+    if (!result.response.ok || !result.data || typeof result.data.id !== 'string') return null
+    return result.data
   } catch {
     return null
   }
