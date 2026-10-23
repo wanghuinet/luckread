@@ -19,7 +19,7 @@ const makeErrorResponse = (status: number, code: string, message: string): Respo
   Response.json({ error: { code, message } }, { status })
 
 const makeRequest = (headers?: HeadersInit) =>
-  new Request('https://api.luckread.com/api/v1/contents/post-1/state', { method: 'POST', headers })
+  new Request('https://api.luckread.com/v1/contents/post-1/state', { method: 'POST', headers })
 
 const principal = { userId: 'author-1', layer: 'L3' }
 
