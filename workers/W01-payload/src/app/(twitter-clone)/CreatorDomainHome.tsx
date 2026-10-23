@@ -1,9 +1,20 @@
 import Link from 'next/link'
 import { cookies, headers } from 'next/headers'
-import { enforcePublicReadRateLimit } from '@/auth/traffic-limit'
-import { getBetterAuthPrincipal } from '@/auth/w02-session-client'
+import { fetchJson } from '../../lib/client-api.js'
 import CreatorLanguageToggle from '../(frontend)/creator-center/CreatorLanguageToggle'
 import { CreatorStudio } from '../(frontend)/creator-center/CreatorStudio'
+
+const PUBLIC_API_ORIGIN = 'https://api.luckread.com'
+
+type AuthPrincipal = {
+  active: boolean
+  userId: string
+  email: string
+  username: string | null
+  layer: string | null
+}
+
+type AuthPrincipalResponse = { data?: AuthPrincipal }
 
 type StudioLocale = 'zh-CN' | 'en-US'
 
@@ -11,9 +22,22 @@ export default async function CreatorDomainHome() {
   const requestHeaders = await headers()
   const localeCookie = (await cookies()).get('luckread-ui-locale')?.value
   const locale: StudioLocale = localeCookie === 'en-US' ? 'en-US' : 'zh-CN'
-  const request = new Request('https://mp.luckread.com/', { headers: requestHeaders })
-  let principal: Awaited<ReturnType<typeof getBetterAuthPrincipal>> | null = null
-  try { await enforcePublicReadRateLimit(request); principal = await getBetterAuthPrincipal(request) } catch {}
+  const forwardedHeaders = new Headers({ accept: 'application/json' })
+  for (const name of ['cookie', 'authorization', 'cf-connecting-ip', 'accept-language', 'x-luckread-session-token']) {
+    const value = requestHeaders.get(name)
+    if (value) forwardedHeaders.set(name, value)
+  }
+
+  let principal: AuthPrincipal | null = null
+  try {
+    const request = new Request(PUBLIC_API_ORIGIN + '/v1/auth/principal', {
+      method: 'GET',
+      headers: forwardedHeaders,
+      cache: 'no-store',
+    })
+    const { response, data } = await fetchJson<AuthPrincipalResponse>(request)
+    if (response.ok && data?.data?.active === true) principal = data.data
+  } catch {}
   if (principal?.active) {
     const displayName = typeof principal.username === 'string' && principal.username.trim() ? principal.username : principal.email
     return <CreatorStudio displayName={displayName} userId={principal.userId} locale={locale} />
