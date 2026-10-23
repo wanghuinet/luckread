@@ -34,6 +34,38 @@ describe('v1 block/mute adapters', () => {
     }
   })
 
+  it('rate limits block/mute creation before identity and target lookup', () => {
+    for (const path of [
+      'src/app/api/v1/interactions/blocks/route.ts',
+      'src/app/api/v1/interactions/mutes/route.ts',
+    ]) {
+      const route = readFileSync(resolve(process.cwd(), path), 'utf8')
+      const postStart = route.indexOf('export async function POST')
+      const postRoute = route.slice(postStart)
+      expect(postRoute).toContain('await enforceW01WriteRateLimit(request)')
+      expect(postRoute).toContain('TrafficLimitError')
+      expect(postRoute).toContain('rateLimitResponse(request)')
+      expect(postRoute.indexOf('await enforceW01WriteRateLimit(request)'))
+        .toBeLessThan(postRoute.indexOf('await resolveCookieSocialPrincipal(request)'))
+      expect(postRoute.indexOf('await enforceW01WriteRateLimit(request)'))
+        .toBeLessThan(postRoute.indexOf('await assertSocialTargetUserExists(targetUserId)'))
+    }
+  })
+
+  it('rate limits unblock and unmute before identity resolution', () => {
+    for (const path of [
+      'src/app/api/v1/interactions/blocks/[targetUserId]/route.ts',
+      'src/app/api/v1/interactions/mutes/[targetUserId]/route.ts',
+    ]) {
+      const route = readFileSync(resolve(process.cwd(), path), 'utf8')
+      expect(route).toContain('await enforceW01WriteRateLimit(request)')
+      expect(route).toContain('TrafficLimitError')
+      expect(route).toContain('rateLimitResponse(request)')
+      expect(route.indexOf('await enforceW01WriteRateLimit(request)'))
+        .toBeLessThan(route.indexOf('await resolveCookieSocialPrincipal(request)'))
+    }
+  })
+
   it('enforces idempotency preconditions on unblock and unmute', () => {
     for (const path of [
       'src/app/api/v1/interactions/blocks/[targetUserId]/route.ts',
