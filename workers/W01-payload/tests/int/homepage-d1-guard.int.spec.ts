@@ -13,11 +13,13 @@ describe('Twitter-clone homepage D1 guard', () => {
     expect(page).not.toContain('validateSession(')
   })
 
-  it('delegates feed rate limiting to the contents API instead of counting the same request twice', () => {
+  it('uses the public W01 API client for the initial feed without duplicating rate limiting', () => {
     const home = readFileSync(resolve(process.cwd(), 'src/app/(twitter-clone)/home/page.tsx'), 'utf8')
-    expect(home).toContain("import { GET as getPublicContents } from '../../api/v1/contents/route'")
-    expect(home).toContain('const response = await getPublicContents(request)')
-    expect(home).toContain('The contents route owns anonymous read rate limiting; do not count this request twice.')
+    expect(home).toContain("import { fetchJson } from '../../lib/client-api.js'")
+    expect(home).toContain("new Request('https://api.luckread.com/v1/contents?limit=20'")
+    expect(home).toContain('fetchJson<{ data?: HomeContentPage }>(request)')
+    expect(home).toContain('The contents API owns anonymous read rate limiting for this request.')
+    expect(home).not.toContain("from '../../api/v1/contents/route'")
     expect(home).not.toContain('enforcePublicReadRateLimit')
     expect(home).not.toContain('payload.auth(')
     expect(home).not.toContain('payload-token')
