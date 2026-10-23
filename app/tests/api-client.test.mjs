@@ -921,7 +921,7 @@ test('fetches trusted W03 body references through the shared client with same-or
 
   expect(response.status).toBe(200);
   expect(await response.text()).toBe('The full content body');
-  expect(capturedRequest.url.origin).toBe('https://luckread.com');
+  expect(capturedRequest.url.origin).toBe('https://api.luckread.com');
   expect(capturedRequest.url.pathname).toBe('/content-bodies/body-1.txt');
   const headers = new Headers(capturedRequest.init.headers);
   expect(headers.get('Authorization')).toBe('Bearer secure-test-token');
