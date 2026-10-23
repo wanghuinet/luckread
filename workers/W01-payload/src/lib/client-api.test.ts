@@ -5,8 +5,8 @@ describe('client API primitives', () => {
   it('routes same-origin API paths through the canonical API host without rewriting media hosts', () => {
     vi.stubGlobal('window', {
       location: {
-        hostname: 'luckread.com',
-        origin: 'https://luckread.com',
+        hostname: 'mp.luckread.com',
+        origin: 'https://mp.luckread.com',
       },
     })
 
@@ -14,6 +14,8 @@ describe('client API primitives', () => {
       expect(resolvePublicApiRequestUrl('/api/v1/media/file/article.json'))
         .toBe('https://api.luckread.com/v1/media/file/article.json')
       expect(resolvePublicApiRequestUrl('https://luckread.com/api/v1/media/file/article.json'))
+        .toBe('https://api.luckread.com/v1/media/file/article.json')
+      expect(resolvePublicApiRequestUrl('https://www.luckread.com/api/v1/media/file/article.json'))
         .toBe('https://api.luckread.com/v1/media/file/article.json')
       expect(resolvePublicApiRequestUrl('https://img.luckread.com/media/article.json'))
         .toBe('https://img.luckread.com/media/article.json')
