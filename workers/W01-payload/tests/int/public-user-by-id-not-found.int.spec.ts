@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { findByID } = vi.hoisted(() => ({ findByID: vi.fn() }))
+const { findByID, find } = vi.hoisted(() => ({ findByID: vi.fn(), find: vi.fn() }))
 
 vi.mock('payload', () => ({
-  getPayload: vi.fn(async () => ({ findByID })),
+  getPayload: vi.fn(async () => ({ findByID, find })),
 }))
 vi.mock('@payload-config', () => ({ default: {} }))
 vi.mock('../../src/auth/traffic-limit.js', () => ({
@@ -24,6 +24,7 @@ import { GET } from '../../src/app/api/v1/users/[userId]/route.js'
 describe('public profile lookup by Payload user ID', () => {
   beforeEach(() => {
     findByID.mockReset()
+    find.mockReset().mockResolvedValue({ docs: [] })
   })
 
   it('returns the documented 404 for a Payload not-found exception', async () => {
@@ -37,6 +38,30 @@ describe('public profile lookup by Payload user ID', () => {
     expect(response.status).toBe(404)
     await expect(response.json()).resolves.toMatchObject({
       error: { code: 'NOT_FOUND', message: 'User not found' },
+    })
+  })
+
+  it('falls back to canonical identity lookup for numeric IDs when no Payload row exists', async () => {
+    findByID.mockRejectedValueOnce(Object.assign(new Error('User not found'), { status: 404 }))
+    find.mockResolvedValueOnce({
+      docs: [{ id: 42, identityId: '999999', username: 'numeric-identity' }],
+    })
+
+    const response = await GET(
+      new Request('https://api.luckread.com/v1/users/999999'),
+      { params: Promise.resolve({ userId: '999999' }) },
+    )
+
+    expect(find).toHaveBeenCalledWith(expect.objectContaining({
+      collection: 'users',
+      where: { identityId: { equals: '999999' } },
+      limit: 1,
+    }))
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({
+      id: '42',
+      identityId: '999999',
+      username: 'numeric-identity',
     })
   })
 
