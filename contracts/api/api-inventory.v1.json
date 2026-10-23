@@ -182,7 +182,8 @@
         "GET /v1/discovery/topics",
         "GET /v1/search",
         "GET /v1/search/suggestions",
-        "GET /v1/search/trending"
+        "GET /v1/search/trending",
+        "GET /v1/topics/{topicName}"
       ]
     },
     "creator_ip_mcn": {
