@@ -7,7 +7,7 @@ import ArticleStructuredRenderer from '../../../../components/ArticleStructuredR
 import { tryDeserializeArticleDocument } from '../../../../lib/article-document.js'
 import { useEffect, useMemo, useState } from 'react'
 
-import { fetchJson, getApiErrorMessage } from '../../../../lib/client-api.js'
+import { apiFetch, fetchJson, getApiErrorMessage } from '../../../../lib/client-api.js'
 import PublicLanguageToggle, { usePublicLocale } from '../../i18n/PublicLanguageToggle'
 import { getPublicCopy, type PublicLocale } from '../../i18n/public-locale'
 
@@ -171,7 +171,7 @@ export default function ContentDetailPage({
           }
           if (resolved.bodyRef) {
             try {
-              const bodyResponse = await fetch(resolved.bodyRef, { cache: 'no-store', signal: controller.signal })
+              const bodyResponse = await apiFetch(resolved.bodyRef, { cache: 'no-store', signal: controller.signal })
               if (bodyResponse.ok && !cancelled) setBody(await bodyResponse.text())
             } catch {
               // Body media is optional; metadata/media should still render.
