@@ -72,11 +72,18 @@ const extensions = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs']);
 const skipDirs = new Set(['node_modules', '.next', '.open-next', 'coverage', '__tests__', 'fixtures']);
 const sourceFiles = [];
 
+const nonUiRouteRoots = new Set([
+  'workers/W01-payload/src/app/(payload)/api',
+]);
+
 async function walk(directory) {
   const entries = await readdir(directory, { withFileTypes: true });
   for (const entry of entries) {
-    if (entry.isDirectory() && skipDirs.has(entry.name)) continue;
     const absolute = path.join(directory, entry.name);
+    const relative = path.relative(root, absolute).split(path.sep).join('/');
+    // Route handlers under this App Router group are server-side API entrypoints,
+    // not page/component code. Keep them outside the UI-only boundary scan.
+    if (entry.isDirectory() && (skipDirs.has(entry.name) || nonUiRouteRoots.has(relative))) continue;
     if (entry.isDirectory()) {
       await walk(absolute);
     } else if (entry.isFile() && extensions.has(path.extname(entry.name)) &&
