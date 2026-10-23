@@ -11,12 +11,18 @@ describe('canonical public API domain routing', () => {
   it('maps the public /v1 surface onto W01 existing /api/v1 route handlers', () => {
     const config = read('next.config.ts')
     const openapi = read('../../contracts/openapi/v1/openapi.yaml')
+    const inventory = read('../../contracts/alignment/api-inventory.v1.json')
+    const authContract = read('../../docs/api/APP-AUTH-01-session-contract-v1.0.md')
     const appClient = read('../../app/lib/api-client.ts')
 
     expect(config).toContain("source: '/v1/:path*'")
     expect(config).toContain("value: 'api.luckread.com'")
     expect(config).toContain("destination: '/api/v1/:path*'")
     expect(openapi).toContain('url: https://api.luckread.com/v1')
+    expect(inventory).toContain('"serverPrefix": "https://api.luckread.com/v1"')
+    expect(authContract).toContain('POST /v1/auth/login')
+    expect(authContract).toContain('GET /v1/auth/session')
+    expect(authContract).not.toContain('POST /api/v1/auth/login')
     expect(appClient).toContain("const DEFAULT_API_BASE_URL = 'https://api.luckread.com'")
     expect(appClient).toContain("getApiBaseUrl() + '/v1' + normalizedPath")
   })
