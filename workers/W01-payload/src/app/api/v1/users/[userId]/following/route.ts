@@ -45,7 +45,7 @@ export async function GET(
       'following',
       () => callW05SocialPublic({
         request,
-        pathname: `/internal/social/users/${encodeURIComponent(userId)}/following${suffix}`,
+        pathname: `/internal/social/users/${encodeURIComponent(socialUserId)}/following${suffix}`,
         method: 'GET',
       }),
       15,
