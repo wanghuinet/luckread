@@ -22,7 +22,7 @@ on:
         description: W01 public moderation API base URL
         required: true
         type: string
-        default: https://luckread.com
+        default: https://api.luckread.com
       confirm:
         description: Type RUN_CONTENT_PUBLISH_E2E to permit controlled remote fixture/test mutations
         required: true
@@ -476,13 +476,13 @@ jobs:
       - name: Approve article through moderation boundary
         run: |
           set -euo pipefail
-          curl --silent --show-error --fail-with-body             -X POST             -H "Authorization: Bearer $MODERATION_TOKEN"             -H "Content-Type: application/json"             -H "Idempotency-Key: CONTENT-E2E-$GITHUB_RUN_ID-ARTICLE-APPROVE"             -H "If-Match: v1"             --data '{"expectedVersion":1,"decision":"APPROVED","policyVersion":"moderation-v1.0","reasonCode":"CONTENT_PUBLISH_E2E","severity":"medium","scope":"content","effectiveAt":"'"$(date -u +%Y-%m-%dT%H:%M:%S.000Z)"'","expiresAt":null}'             "$MODERATION_BASE_URL/api/v1/admin/moderation/cases/$CASE_ARTICLE_ID/decision" > /tmp/article-approve.json
+          curl --silent --show-error --fail-with-body             -X POST             -H "Authorization: Bearer $MODERATION_TOKEN"             -H "Content-Type: application/json"             -H "Idempotency-Key: CONTENT-E2E-$GITHUB_RUN_ID-ARTICLE-APPROVE"             -H "If-Match: v1"             --data '{"expectedVersion":1,"decision":"APPROVED","policyVersion":"moderation-v1.0","reasonCode":"CONTENT_PUBLISH_E2E","severity":"medium","scope":"content","effectiveAt":"'"$(date -u +%Y-%m-%dT%H:%M:%S.000Z)"'","expiresAt":null}'             "$MODERATION_BASE_URL/v1/admin/moderation/cases/$CASE_ARTICLE_ID/decision" > /tmp/article-approve.json
           node -e "const v=require('/tmp/article-approve.json'); if(v.outcome!=='APPROVED'||Number(v.version)!==2) throw new Error('article moderation approval failed: '+JSON.stringify(v));"
 
       - name: Approve video through moderation boundary
         run: |
           set -euo pipefail
-          curl --silent --show-error --fail-with-body             -X POST             -H "Authorization: Bearer $MODERATION_TOKEN"             -H "Content-Type: application/json"             -H "Idempotency-Key: CONTENT-E2E-$GITHUB_RUN_ID-VIDEO-APPROVE"             -H "If-Match: v1"             --data '{"expectedVersion":1,"decision":"APPROVED","policyVersion":"moderation-v1.0","reasonCode":"CONTENT_PUBLISH_E2E","severity":"medium","scope":"content","effectiveAt":"'"$(date -u +%Y-%m-%dT%H:%M:%S.000Z)"'","expiresAt":null}'             "$MODERATION_BASE_URL/api/v1/admin/moderation/cases/$CASE_VIDEO_ID/decision" > /tmp/video-approve.json
+          curl --silent --show-error --fail-with-body             -X POST             -H "Authorization: Bearer $MODERATION_TOKEN"             -H "Content-Type: application/json"             -H "Idempotency-Key: CONTENT-E2E-$GITHUB_RUN_ID-VIDEO-APPROVE"             -H "If-Match: v1"             --data '{"expectedVersion":1,"decision":"APPROVED","policyVersion":"moderation-v1.0","reasonCode":"CONTENT_PUBLISH_E2E","severity":"medium","scope":"content","effectiveAt":"'"$(date -u +%Y-%m-%dT%H:%M:%S.000Z)"'","expiresAt":null}'             "$MODERATION_BASE_URL/v1/admin/moderation/cases/$CASE_VIDEO_ID/decision" > /tmp/video-approve.json
           node -e "const v=require('/tmp/video-approve.json'); if(v.outcome!=='APPROVED'||Number(v.version)!==2) throw new Error('video moderation approval failed: '+JSON.stringify(v));"
 
       - name: Wait for W06 approval propagation
