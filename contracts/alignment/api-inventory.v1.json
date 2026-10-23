@@ -1296,6 +1296,21 @@
       ]
     },
     {
+      "operationId": "getTopicsTopicName",
+      "method": "GET",
+      "path": "/v1/topics/{topicName}",
+      "openapiPath": "/topics/{topicName}",
+      "domain": "search_discovery",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/topics/{topicName}",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
       "operationId": "getUserProfile",
       "method": "GET",
       "path": "/v1/users/{userId}",
