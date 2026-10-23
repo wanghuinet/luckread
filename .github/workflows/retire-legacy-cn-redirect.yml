@@ -1,15 +1,14 @@
 name: Retire legacy LuckRead CN redirect
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - .github/workflows/retire-legacy-cn-redirect.yml
   workflow_dispatch:
     inputs:
+      zone_id:
+        description: Cloudflare Zone ID for luckread.cn from the Cloudflare dashboard
+        required: true
+        type: string
       confirm:
-        description: Type RETIRE_LEGACY_CN_REDIRECT to manually remove the live legacy redirect
+        description: Type RETIRE_LEGACY_CN_REDIRECT to remove the live legacy redirect
         required: true
         default: NO
         type: string
@@ -19,19 +18,27 @@ permissions:
 
 jobs:
   remove-legacy-redirect:
-    if: ${{ github.event_name == 'push' || inputs.confirm == 'RETIRE_LEGACY_CN_REDIRECT' }}
+    if: ${{ inputs.confirm == 'RETIRE_LEGACY_CN_REDIRECT' && inputs.zone_id != '' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Remove and verify the legacy CN redirect rule
+      - name: Remove and verify the exact legacy CN redirect rule
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          ZONE_NAME: luckread.cn
+          ZONE_ID: ${{ inputs.zone_id }}
           RULE_REF: luckread-cn-to-com
         run: |
           set -euo pipefail
 
-          test -n "${CLOUDFLARE_API_TOKEN}"
+          test -n "${CLOUDFLARE_API_TOKEN}" || {
+            echo "::error::CLOUDFLARE_API_TOKEN is not configured"
+            exit 1
+          }
+
+          if [[ ! "${ZONE_ID}" =~ ^[[:xdigit:]]{32}$ ]]; then
+            echo "::error::zone_id must be a 32-character Cloudflare Zone ID"
+            exit 1
+          fi
 
           api() {
             curl --fail-with-body --silent --show-error \
@@ -40,31 +47,38 @@ jobs:
               "$@"
           }
 
-          zone_response="$(api --get "https://api.cloudflare.com/client/v4/zones" \
-            --data-urlencode "name=${ZONE_NAME}" \
-            --data-urlencode "status=active" \
-            --data-urlencode "per_page=10")"
+          endpoint="https://api.cloudflare.com/client/v4/zones/${ZONE_ID}/rulesets/phases/http_request_dynamic_redirect/entrypoint"
+          if ! current="$(api --request GET "${endpoint}")"; then
+            echo "::error::Cloudflare denied the zone Rulesets read request. Verify that this Zone ID belongs to luckread.cn and the token has Zone Rulesets Read/Edit access for that zone."
+            exit 1
+          fi
 
-          zone_id="$(printf '%s' "${zone_response}" | jq -r '.result[0].id // empty')"
-          test -n "${zone_id}" || {
-            echo "Cloudflare zone not found: ${ZONE_NAME}"
+          printf '%s' "${current}" | jq -e '.success == true and .result.id != null' >/dev/null
+          ruleset_id="$(printf '%s' "${current}" | jq -r '.result.id')"
+
+          ref_count="$(printf '%s' "${current}" | jq -r --arg ref "${RULE_REF}" '[.result.rules[]? | select(.ref == $ref)] | length')"
+          if [ "${ref_count}" != "1" ]; then
+            echo "::error::Expected exactly one rule with ref ${RULE_REF}; found ${ref_count}. Refusing destructive changes or claiming removal."
+            exit 1
+          fi
+
+          rule="$(printf '%s' "${current}" | jq -c --arg ref "${RULE_REF}" '.result.rules[] | select(.ref == $ref)')"
+          printf '%s' "${rule}" | jq -e '
+            .action == "redirect"
+            and .expression == "(http.host eq \"luckread.cn\")"
+            and .description == "Permanent canonical redirect from luckread.cn to luckread.com"
+            and .action_parameters.from_value.status_code == 301
+            and .action_parameters.from_value.preserve_query_string == true
+            and .action_parameters.from_value.target_url.expression == "concat(\"https://\", \"luckread.com\", http.request.uri.path)"
+          ' >/dev/null || {
+            echo "::error::The rule ref matched, but its complete expected legacy redirect shape did not. Refusing to delete it."
             exit 1
           }
 
-          endpoint="https://api.cloudflare.com/client/v4/zones/${zone_id}/rulesets/phases/http_request_dynamic_redirect/entrypoint"
-          current="$(api --request GET "${endpoint}")"
-          printf '%s' "${current}" | jq -e '.success == true and .result.id != null' >/dev/null
-
-          ruleset_id="$(printf '%s' "${current}" | jq -r '.result.id')"
-          existing_id="$(printf '%s' "${current}" | jq -r --arg ref "${RULE_REF}" '.result.rules[]? | select(.ref == $ref) | .id' | head -n 1)"
-
-          if [ -n "${existing_id}" ]; then
-            delete_response="$(api --request DELETE "https://api.cloudflare.com/client/v4/zones/${zone_id}/rulesets/${ruleset_id}/rules/${existing_id}")"
-            printf '%s' "${delete_response}" | jq -e '.success == true' >/dev/null
-            echo "REMOVED_LEGACY_REDIRECT_RULE ${RULE_REF}"
-          else
-            echo "LEGACY_REDIRECT_RULE_ALREADY_ABSENT ${RULE_REF}"
-          fi
+          rule_id="$(printf '%s' "${rule}" | jq -r '.id')"
+          delete_response="$(api --request DELETE "https://api.cloudflare.com/client/v4/zones/${ZONE_ID}/rulesets/${ruleset_id}/rules/${rule_id}")"
+          printf '%s' "${delete_response}" | jq -e '.success == true' >/dev/null
+          echo "REMOVED_LEGACY_REDIRECT_RULE ${RULE_REF}"
 
           verified="$(api --request GET "${endpoint}")"
           printf '%s' "${verified}" | jq -e --arg ref "${RULE_REF}" '
