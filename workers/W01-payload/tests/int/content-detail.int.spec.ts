@@ -225,3 +225,14 @@ it('handles the follow DELETE no-body response without attempting JSON parsing',
   expect(page).toContain('setFollowing(false)')
   expect(page).toContain("fetchJson<{ data?: { following?: boolean }; error?: { message?: string } }>")
 })
+
+
+it('retries a missing UUID-backed stable slug through the canonical public API by content ID', () => {
+  const page = read('src/app/(twitter-clone)/content/[contentId]/page.tsx')
+  expect(page).toContain('const uuidFromStableContentSlug = (slug: string): string | null =>')
+  expect(page).toContain("const compactUuid = /-([0-9a-f]{32})$/i.exec(slug)?.[1]")
+  expect(page).toContain('if (result.response.status === 404)')
+  expect(page).toContain('const fallbackId = uuidFromStableContentSlug(contentId)')
+  expect(page).toContain('result = await fetchPublicContent(fallbackId, requestHeaders)')
+  expect(page).toContain("'https://api.luckread.com/v1/contents/' + encodeURIComponent(contentId)")
+})
