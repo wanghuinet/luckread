@@ -10,7 +10,7 @@ mock.module('../lib/api-client.ts', () => ({
     return nextResult;
   },
   createIdempotencyKey: () => 'generated-idempotency-key',
-  getApiBaseUrl: () => 'https://luckread.com',
+  getApiBaseUrl: () => 'https://api.luckread.com',
   getApiErrorMessage: (_data, fallback) => fallback,
 }));
 
