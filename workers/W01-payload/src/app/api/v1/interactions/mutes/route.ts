@@ -4,6 +4,7 @@ import {
   resolveCookieSocialPrincipal,
   W05SocialClientError,
 } from '../../../../../social/w05-social-client.js'
+import { TrafficLimitError, enforceW01WriteRateLimit, rateLimitResponse } from '../../../../../auth/traffic-limit.js'
 
 const errorResponse = (status: number, code: string, message: string) =>
   Response.json(
@@ -54,6 +55,7 @@ export async function GET(request: Request): Promise<Response> {
 
 export async function POST(request: Request): Promise<Response> {
   try {
+    await enforceW01WriteRateLimit(request)
     const principal = await resolveCookieSocialPrincipal(request)
     if (principal instanceof Response) return principal
     const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
@@ -79,6 +81,7 @@ export async function POST(request: Request): Promise<Response> {
       body: { targetUserId },
     })
   } catch (error) {
+    if (error instanceof TrafficLimitError) return rateLimitResponse(request)
     if (error instanceof W05SocialClientError) return errorResponse(error.status, error.code, error.message)
     return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Social service unavailable')
   }
