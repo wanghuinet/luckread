@@ -1,6 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
 import { contentSlugFor, isContentSlug } from './content-slug.js'
+import { allocateContentSnowflakeId } from './content-snowflake-id.js'
 import { normalizePreflightInput, preflightContent } from './publish-preflight.js'
 
 export type ContentState =
@@ -1167,7 +1168,19 @@ export async function createContent(
     return parsed as ContentRecord
   }
 
-  const contentId = crypto.randomUUID()
+  let contentId: string
+  if (normalized.contentType === 'article' || normalized.contentType === 'video') {
+    try {
+      contentId = await allocateContentSnowflakeId(db, now.getTime())
+    } catch {
+      // Do not issue article/video IDs from an uncoordinated fallback generator:
+      // D1-02 is the shared uniqueness boundary across W03 isolates.
+      throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
+    }
+  } else {
+    // Social posts are deliberately outside the Snowflake rollout scope.
+    contentId = crypto.randomUUID()
+  }
   const slug = contentSlugFor(normalized.title, contentId)
   const createdAt = now.toISOString()
   const expiresAt = new Date(now.getTime() + IDEMPOTENCY_TTL_MS).toISOString()
