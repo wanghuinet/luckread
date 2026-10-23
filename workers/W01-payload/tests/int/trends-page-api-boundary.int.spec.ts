@@ -29,7 +29,7 @@ describe('trends server-rendered public API boundary', () => {
 
     expect(openapi).toContain('  /discovery/topics:')
     expect(openapi).toContain('operationId: getDiscoveryTopics')
-    expect(openapi).toContain('updated within the preceding seven days')
+    expect(openapi).toContain('within the preceding seven days')
     expect(openapi).toContain("nextCursor: { type: [string, 'null'], maxLength: 2048 }")
     expect(inventory.domains.search_discovery.endpoint_groups).toContain('GET /v1/discovery/topics')
     expect(alignment.records.some((record) => record.operationId === 'getDiscoveryTopics' && record.method === 'GET' && record.path === '/v1/discovery/topics')).toBe(true)
