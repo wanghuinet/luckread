@@ -20,7 +20,7 @@ describe('W03 content contract core', () => {
             bind(...values: unknown[]) {
               bindings = values
               return {
-                first: async () => values.includes(historicalUrl) ? { id: 'post_public_1' } : null,
+                first: async () => values.includes(publicUrl) ? { id: 'post_public_1' } : null,
               }
             },
           }
@@ -53,12 +53,12 @@ describe('W03 content contract core', () => {
     expect(query).toContain('json_each(contents.media_refs_json)')
     expect(query).toContain('media_ref.value IN (')
     const candidatesPerColumn = (query.match(/\?/g) ?? []).length / 3
-    expect(candidatesPerColumn).toBeGreaterThanOrEqual(2)
+    expect(candidatesPerColumn).toBe(1)
     expect(bindings.length).toBe(candidatesPerColumn * 3)
     expect(bindings[0]).toBe(publicUrl)
     expect(bindings[candidatesPerColumn]).toBe(publicUrl)
     expect(bindings[candidatesPerColumn * 2]).toBe(publicUrl)
-    expect(bindings).toContain(historicalUrl)
+    expect(bindings).not.toContain(historicalUrl)
     expect(bindings.some((value) => typeof value === 'string' && value.startsWith('/api/media/file/'))).toBe(false)
 
     // A published URL must not authorize a different object with the same
