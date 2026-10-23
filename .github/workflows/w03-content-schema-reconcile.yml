@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       source_sha:
-        description: Exact source commit containing W03 migrations 0001-0011 (leave blank to use this workflow revision)
+        description: Exact source commit containing W03 migrations 0001-0012 (leave blank to use this workflow revision)
         required: false
         default: ""
         type: string
@@ -74,6 +74,7 @@ jobs:
             '0009_content_collections.sql',
             '0010_collection_membership_ordering.sql',
             '0011_content_scheduled_publish.sql',
+            '0012_content_snowflake_id_allocator.sql',
           ];
           const actual = fs.readdirSync('workers/W03-content/migrations')
             .filter((name) => /^\d{4}_.+\.sql$/.test(name))
@@ -114,13 +115,17 @@ jobs:
               'content_relationships': {'relationship_id', 'relation_type', 'position'},
               'content_series': {'id', 'owner_user_id', 'state'},
               'content_collections': {'id', 'owner_user_id', 'state'},
+              'content_id_snowflake_state': {'id', 'last_timestamp_ms', 'sequence'},
           }
           for table, columns in required.items():
               present = {row[1] for row in db.execute(f'PRAGMA table_info("{table}")')}
               missing = columns - present
               if missing:
                   raise SystemExit(f'{table} missing columns after full migration chain: {sorted(missing)}')
-          print('W03_MIGRATIONS_0001_0011_STATIC=PASS')
+          allocator = db.execute('SELECT id, last_timestamp_ms, sequence FROM content_id_snowflake_state').fetchall()
+          if allocator != [(1, -1, 4095)]:
+              raise SystemExit(f'unexpected initial Snowflake allocator state: {allocator!r}')
+          print('W03_MIGRATIONS_0001_0012_STATIC=PASS')
           PY
 
       - name: Capture remote migration history and schema
@@ -160,7 +165,7 @@ jobs:
             "SELECT name FROM d1_migrations ORDER BY name;"
           # D1 rejects long compound SELECT statements. Read each table's columns
           # separately and capture object metadata with one non-compound query.
-          for table in contents content_revisions content_relationships content_series content_collections; do
+          for table in contents content_revisions content_relationships content_series content_collections content_id_snowflake_state; do
             run_d1_query "/tmp/w03-schema-before-${table}.json" "Inspect columns for ${table}" \
               "SELECT '${table}' AS table_name, name AS column_name FROM pragma_table_info('${table}');"
           done
@@ -168,7 +173,7 @@ jobs:
             "SELECT name AS table_name,
                     CASE WHEN type='table' THEN '__TABLE__' ELSE '__TRIGGER__' END AS column_name
              FROM sqlite_master
-             WHERE (type='table' AND name IN ('contents','content_revisions','content_relationships','content_series','content_collections','content_mutation_idempotency','content_outbox_events','content_txn_guard'))
+             WHERE (type='table' AND name IN ('contents','content_revisions','content_relationships','content_series','content_collections','content_mutation_idempotency','content_outbox_events','content_txn_guard','content_id_snowflake_state'))
                 OR (type='trigger' AND name IN ('contents_after_insert_outbox','contents_after_update_outbox'));"
 
       - name: Gate remote drift before any migration
@@ -191,6 +196,7 @@ jobs:
             '0009_content_collections.sql',
             '0010_collection_membership_ordering.sql',
             '0011_content_scheduled_publish.sql',
+            '0012_content_snowflake_id_allocator.sql',
           ];
           function rowsFrom(file) {
             const root = JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -218,7 +224,7 @@ jobs:
             throw new Error('W03 migration history is not a prefix of the reviewed chain: ' + JSON.stringify(applied));
           }
           const schemaRows = [
-            'contents', 'content_revisions', 'content_relationships', 'content_series', 'content_collections',
+            'contents', 'content_revisions', 'content_relationships', 'content_series', 'content_collections', 'content_id_snowflake_state',
           ].flatMap((table) => rowsFrom('/tmp/w03-schema-before-' + table + '.json'))
             .concat(rowsFrom('/tmp/w03-schema-before-objects.json'));
           const tables = new Set(schemaRows.filter((row) => row.column_name === '__TABLE__').map((row) => row.table_name));
@@ -232,6 +238,7 @@ jobs:
               content_relationships: ['relationship_id', 'relation_type', 'position'],
               content_series: ['id', 'owner_user_id'],
               content_collections: ['id', 'owner_user_id'],
+              content_id_snowflake_state: ['id', 'last_timestamp_ms', 'sequence'],
             };
             const missing = Object.entries(needed).flatMap(([table, names]) =>
               !tables.has(table) ? [table + ' table'] : names.filter((name) => !columns(table).has(name)).map((name) => table + '.' + name));
@@ -243,9 +250,9 @@ jobs:
             // (0003 pagination index still pending), or 0001-0003 complete.
             // Any partial/out-of-order history fails closed.
             if (![2, 3].includes(applied.length)) {
-              throw new Error('Refusing remote mutation: only W03 migrations 0001-0002 or 0001-0003 with 0004-0011 pending are admitted; current W03 history=' + JSON.stringify(applied));
+              throw new Error('Refusing remote mutation: only W03 migrations 0001-0002 or 0001-0003 with 0004-0012 pending are admitted; current W03 history=' + JSON.stringify(applied));
             }
-            const missingTables = ['content_revisions','content_relationships','content_series','content_collections'].filter((table) => tables.has(table));
+            const missingTables = ['content_revisions','content_relationships','content_series','content_collections','content_id_snowflake_state'].filter((table) => tables.has(table));
             const contentCols = columns('contents');
             const unexpectedColumns = ['slug','scheduled_at'].filter((name) => contentCols.has(name));
             if (!tables.has('contents') || !tables.has('content_mutation_idempotency') ||
@@ -292,21 +299,22 @@ jobs:
             --command "SELECT name FROM d1_migrations ORDER BY name;" > /tmp/w03-migration-history-after.json
           # Read each table's columns independently to stay within D1's
           # compound-SELECT limits and produce clear per-query failures.
-          for table in contents content_revisions content_relationships content_series content_collections; do
+          for table in contents content_revisions content_relationships content_series content_collections content_id_snowflake_state; do
             npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$EXPECTED_DB_NAME" --remote --json --config wrangler.jsonc \
               --command "SELECT '${table}' AS table_name, name AS column_name FROM pragma_table_info('${table}');" \
               > "/tmp/w03-schema-after-${table}.json"
           done
           npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$EXPECTED_DB_NAME" --remote --json --config wrangler.jsonc \
             --command "SELECT name AS table_name, '__TABLE__' AS column_name FROM sqlite_master
-              WHERE type='table' AND name IN ('contents','content_revisions','content_relationships','content_series','content_collections','content_mutation_idempotency','content_outbox_events','content_txn_guard');" \
+              WHERE type='table' AND name IN ('contents','content_revisions','content_relationships','content_series','content_collections','content_mutation_idempotency','content_outbox_events','content_txn_guard','content_id_snowflake_state');" \
             > /tmp/w03-schema-after-objects.json
           npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$EXPECTED_DB_NAME" --remote --json --config wrangler.jsonc \
             --command "SELECT
               (SELECT COUNT(*) FROM contents WHERE slug IS NULL OR slug = '') AS contents_without_slug,
               (SELECT COUNT(*) FROM contents c WHERE NOT EXISTS (
                 SELECT 1 FROM content_revisions r WHERE r.content_id = c.id AND r.revision = c.revision
-              )) AS contents_without_current_revision_snapshot;" > /tmp/w03-schema-integrity.json
+              )) AS contents_without_current_revision_snapshot,
+              (SELECT COUNT(*) FROM content_id_snowflake_state WHERE id = 1) AS snowflake_allocator_rows;" > /tmp/w03-schema-integrity.json
           node <<'NODE'
           const fs = require('node:fs');
           const expected = [
@@ -321,6 +329,7 @@ jobs:
             '0009_content_collections.sql',
             '0010_collection_membership_ordering.sql',
             '0011_content_scheduled_publish.sql',
+            '0012_content_snowflake_id_allocator.sql',
           ];
           function rowsFrom(file) {
             const root = JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -343,7 +352,7 @@ jobs:
             throw new Error('W03 migration ledger is not fully reconciled: ' + JSON.stringify(applied));
           }
           const rows = [
-            'contents', 'content_revisions', 'content_relationships', 'content_series', 'content_collections',
+            'contents', 'content_revisions', 'content_relationships', 'content_series', 'content_collections', 'content_id_snowflake_state',
           ].flatMap((table) => rowsFrom('/tmp/w03-schema-after-' + table + '.json'))
             .concat(rowsFrom('/tmp/w03-schema-after-objects.json'));
           const tables = new Set(rows.filter((row) => row.column_name === '__TABLE__').map((row) => row.table_name));
@@ -360,7 +369,7 @@ jobs:
           if (missing.length) throw new Error('W03 schema still missing expected structures: ' + JSON.stringify(missing));
           const integrityRows = rowsFrom('/tmp/w03-schema-integrity.json');
           const integrity = integrityRows.find((row) => row.contents_without_slug !== undefined);
-          if (!integrity || Number(integrity.contents_without_slug) !== 0 || Number(integrity.contents_without_current_revision_snapshot) !== 0) {
+          if (!integrity || Number(integrity.contents_without_slug) !== 0 || Number(integrity.contents_without_current_revision_snapshot) !== 0 || Number(integrity.snowflake_allocator_rows) !== 1) {
             throw new Error('W03 data backfill verification failed: ' + JSON.stringify(integrity ?? integrityRows));
           }
           console.log(JSON.stringify({
