@@ -147,6 +147,7 @@ function resolveMediaUrl(value: unknown): string | null {
     const protocolAllowed = resolved.protocol === 'https:' ||
       (localDevelopmentHost && resolved.origin === base.origin && resolved.protocol === 'http:');
     const approvedDeliveryHost = resolved.protocol === 'https:' &&
+      !resolved.port &&
       ['img.luckread.com', 'video.luckread.com'].includes(resolved.hostname);
 
     if (
