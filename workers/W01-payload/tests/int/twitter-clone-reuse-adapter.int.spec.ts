@@ -71,6 +71,7 @@ describe('Twitter Clone UI reuse through LuckRead API adapters', () => {
       expect(page).toContain("item.contentType === 'post'")
       expect(page).toContain('<LuckReadSocialPostCard')
       expect(page).toContain('creatorId={item.creatorId}')
+      expect(page).toContain('author={item.creator ?? item.author}')
       expect(page).toContain('mediaRefs={item.mediaRefs}')
       expect(page).toContain('locale={locale}')
     }
@@ -220,6 +221,7 @@ describe('Twitter Clone UI reuse through LuckRead API adapters', () => {
     const homeFeed = read('src/app/(twitter-clone)/TwitterCloneHomeFeed.tsx')
 
     expect(homeFeed).toContain('presentation="x-timeline"')
+    expect(homeFeed).toContain('author={item.creator ?? item.author}')
     expect(component).toContain("presentation?: 'content' | 'x-timeline'")
     expect(component).toContain("const profileName = profile?.displayName?.trim() || profile?.username || ''")
     expect(component).toContain("const username = profile?.username ? '@' + profile.username : ''")

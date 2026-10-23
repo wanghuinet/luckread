@@ -1,5 +1,6 @@
 import { callW04FollowingFeed, W04FeedClientError } from '../../../../../feed/w04-feed-client.js'
 import { resolveSocialPrincipal } from '../../../../../social/w05-social-client.js'
+import { enrichContentListAuthors } from '../../../../../lib/enrich-public-authors.js'
 
 const errorResponse = (status: number, code: string, message: string) =>
   Response.json(
@@ -37,11 +38,12 @@ export async function GET(request: Request): Promise<Response> {
 
     const query = new URLSearchParams({ limit })
     if (cursor) query.set('cursor', cursor)
-    return await callW04FollowingFeed({
+    const response = await callW04FollowingFeed({
       request,
       pathname: '/internal/feed/following?' + query.toString(),
       principal,
     })
+    return await enrichContentListAuthors(response)
   } catch (error) {
     if (error instanceof W04FeedClientError) {
       return errorResponse(error.status, error.code, error.message)

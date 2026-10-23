@@ -61,6 +61,8 @@ type Props = {
   slug?: string
   title: string
   creatorId?: string | null
+  /** Batched public author projection from the W01 content-list adapter. */
+  author?: PublicProfile | null
   coverRef?: string | null
   mediaRefs?: string[]
   createdAt?: string
@@ -76,6 +78,7 @@ export default function LuckReadSocialPostCard({
   slug,
   title,
   creatorId,
+  author,
   coverRef,
   mediaRefs,
   createdAt,
@@ -148,7 +151,7 @@ export default function LuckReadSocialPostCard({
       setFollowing(false)
       setFollowRestricted(false)
       setPostTimestamp(createdAt || updatedAt || '')
-      setProfile(null)
+      setProfile(author ?? null)
       setBookmarked(false)
       setReposted(false)
       setRepostCount(null)
@@ -252,7 +255,7 @@ export default function LuckReadSocialPostCard({
           : null)
       }
 
-      if (authorId) {
+      if (!author && authorId) {
         try {
           const authorProfile = await getCachedPublicProfile(authorId)
           if (!cancelled) setProfile(authorProfile)
@@ -271,7 +274,7 @@ export default function LuckReadSocialPostCard({
       cancelled = true
       controller.abort()
     }
-  }, [contentId, creatorId, createdAt, updatedAt, slug])
+  }, [contentId, creatorId, author, createdAt, updatedAt, slug])
 
   const requireLogin = () => {
     const returnTo = window.location.pathname + window.location.search + window.location.hash
