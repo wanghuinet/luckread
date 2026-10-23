@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react'
 
+import { apiFetch } from '../lib/client-api.js'
+
 import {
   extractArticleSummary,
   resolvePublicArticleBodyUrl,
@@ -42,7 +44,7 @@ export default function ArticleSummaryPreview({ bodyRef, label }: Props) {
 
       setLoading(true)
       try {
-        const response = await fetch(url, {
+        const response = await apiFetch(url, {
           method: 'GET',
           credentials: 'omit',
           cache: 'force-cache',
