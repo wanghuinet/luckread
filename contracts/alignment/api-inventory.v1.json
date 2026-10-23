@@ -126,6 +126,36 @@
       ]
     },
     {
+      "operationId": "deleteContentContentIdPin",
+      "method": "DELETE",
+      "path": "/v1/content/{contentId}/pin",
+      "openapiPath": "/content/{contentId}/pin",
+      "domain": "content",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#delete:/content/{contentId}/pin",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "deleteContentContentIdReposts",
+      "method": "DELETE",
+      "path": "/v1/content/{contentId}/reposts",
+      "openapiPath": "/content/{contentId}/reposts",
+      "domain": "interaction",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#delete:/content/{contentId}/reposts",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
       "operationId": "deleteContent",
       "method": "DELETE",
       "path": "/v1/contents/{contentId}",
@@ -465,6 +495,21 @@
       "featureIds": [],
       "schemaRef": "",
       "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/auth/credentials",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "authPrincipalGet",
+      "method": "GET",
+      "path": "/v1/auth/principal",
+      "openapiPath": "/auth/principal",
+      "domain": "auth_identity",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/auth/principal",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
         "contracts/api/api-inventory.v1.json"
@@ -855,6 +900,36 @@
       "featureIds": [],
       "schemaRef": "",
       "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/galleries/{galleryId}",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "listBlockedUsers",
+      "method": "GET",
+      "path": "/v1/interactions/blocks",
+      "openapiPath": "/interactions/blocks",
+      "domain": "interaction",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/interactions/blocks",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "listMutedUsers",
+      "method": "GET",
+      "path": "/v1/interactions/mutes",
+      "openapiPath": "/interactions/mutes",
+      "domain": "interaction",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/interactions/mutes",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
         "contracts/api/api-inventory.v1.json"
@@ -1260,6 +1335,21 @@
       "featureIds": [],
       "schemaRef": "",
       "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/users/{userId}/following",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "getUsersUserIdPinnedContent",
+      "method": "GET",
+      "path": "/v1/users/{userId}/pinned-content",
+      "openapiPath": "/users/{userId}/pinned-content",
+      "domain": "users_accounts",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/users/{userId}/pinned-content",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
         "contracts/api/api-inventory.v1.json"
@@ -1896,6 +1986,21 @@
       ]
     },
     {
+      "operationId": "postContentContentIdPin",
+      "method": "POST",
+      "path": "/v1/content/{contentId}/pin",
+      "openapiPath": "/content/{contentId}/pin",
+      "domain": "content",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/content/{contentId}/pin",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
       "operationId": "postContentContentIdPublish",
       "method": "POST",
       "path": "/v1/content/{contentId}/publish",
@@ -1905,6 +2010,21 @@
       "featureIds": [],
       "schemaRef": "",
       "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/content/{contentId}/publish",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "postContentContentIdReposts",
+      "method": "POST",
+      "path": "/v1/content/{contentId}/reposts",
+      "openapiPath": "/content/{contentId}/reposts",
+      "domain": "interaction",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/content/{contentId}/reposts",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
         "contracts/api/api-inventory.v1.json"
