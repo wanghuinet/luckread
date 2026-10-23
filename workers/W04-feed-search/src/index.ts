@@ -180,7 +180,7 @@ export default {
           return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Content service returned invalid search data', details: {} } }, 503)
         }
         if (!cursor && payload.data.items.length > 0) {
-          const trendUpdate = recordSearchTrend(query).catch(() => undefined)
+          const trendUpdate = recordSearchTrend(query)
           if (ctx) ctx.waitUntil(trendUpdate)
           else void trendUpdate
         }
