@@ -59,9 +59,11 @@ afterEach(() => {
   globalThis.fetch = originalFetch;
 });
 
-test('adds the secure bearer session and an idempotency key to JSON writes', async () => {
+test('adds the secure bearer session and an idempotency key to JSON writes at the canonical public API URL', async () => {
+  let capturedInput;
   let capturedInit;
-  pendingFetch = async (_input, init) => {
+  pendingFetch = async (input, init) => {
+    capturedInput = input;
     capturedInit = init;
     return new Response(JSON.stringify({ data: { id: 'created' } }), { status: 201 });
   };
@@ -71,6 +73,7 @@ test('adds the secure bearer session and an idempotency key to JSON writes', asy
     body: JSON.stringify({ title: 'A real post' }),
   });
 
+  expect(capturedInput).toBe('https://api.luckread.com/v1/contents');
   const headers = new Headers(capturedInit.headers);
   expect(headers.get('Authorization')).toBe('Bearer secure-test-token');
   expect(headers.get('Content-Type')).toBe('application/json');
