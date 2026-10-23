@@ -13,6 +13,7 @@ export type ApiAuthor = {
 
 export type ApiPublicProfile = {
   id: string;
+  identityId?: string | null;
   username?: string;
   displayName?: string | null;
   avatar?: string | null;
