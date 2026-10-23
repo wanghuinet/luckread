@@ -111,7 +111,7 @@ const results = []
 const publicCacheFirst = await probe({
   name: 'public_content_list_cache_contract_first_request',
   method: 'GET',
-  path: '/api/v1/contents?limit=1',
+  path: '/v1/contents?limit=1',
   accepts: [200],
   inspectPublicCache: true,
 })
@@ -120,7 +120,7 @@ results.push(publicCacheFirst)
 const publicCacheSecond = await probe({
   name: 'public_content_list_cache_contract_repeat_request',
   method: 'GET',
-  path: '/api/v1/contents?limit=1',
+  path: '/v1/contents?limit=1',
   accepts: [200],
   inspectPublicCache: true,
 })
@@ -134,7 +134,7 @@ const requestIdsAreFresh = (
 results.push({
   name: 'public_content_list_request_id_refresh',
   method: 'ASSERT',
-  path: '/api/v1/contents?limit=1 (two requests)',
+  path: '/v1/contents?limit=1 (two requests)',
   status: requestIdsAreFresh ? 200 : 500,
   acceptedStatuses: [200],
   expectedErrorCode: null,
@@ -146,14 +146,14 @@ results.push({
 results.push(await probe({
   name: 'anonymous_current_profile_denied',
   method: 'GET',
-  path: '/api/v1/users/me',
+  path: '/v1/users/me',
   accepts: [401],
 }))
 
 results.push(await probe({
   name: 'invalid_login_rejected_at_public_edge',
   method: 'POST',
-  path: '/api/v1/auth/login',
+  path: '/v1/auth/login',
   headers: headers(),
   body: JSON.stringify({ identity: 'not-an-email', credential: 'probe-only' }),
   accepts: [422],
@@ -163,7 +163,7 @@ results.push(await probe({
 results.push(await probe({
   name: 'invalid_verification_email_rejected_at_public_edge',
   method: 'POST',
-  path: '/api/v1/auth/verification/send',
+  path: '/v1/auth/verification/send',
   headers: headers(),
   body: JSON.stringify({ identity: 'not-an-email' }),
   accepts: [422],
@@ -173,7 +173,7 @@ results.push(await probe({
 results.push(await probe({
   name: 'registration_invalid_body_rejected_without_account_creation',
   method: 'POST',
-  path: '/api/v1/auth/register',
+  path: '/v1/auth/register',
   headers: headers({ 'Idempotency-Key': `api-smoke-invalid-${requestSuffix}` }),
   body: JSON.stringify({}),
   accepts: [422],
@@ -183,7 +183,7 @@ results.push(await probe({
 results.push(await probe({
   name: 'anonymous_content_create_denied_before_body_processing',
   method: 'POST',
-  path: '/api/v1/contents',
+  path: '/v1/contents',
   headers: headers({ 'Idempotency-Key': `api-smoke-unauth-content-${requestSuffix}` }),
   // Deliberately malformed JSON: if auth is accidentally bypassed, validation
   // still prevents a valid content mutation.
@@ -194,7 +194,7 @@ results.push(await probe({
 results.push(await probe({
   name: 'anonymous_like_mutation_denied',
   method: 'POST',
-  path: '/api/v1/interactions/likes',
+  path: '/v1/interactions/likes',
   headers: headers({ 'Idempotency-Key': `api-smoke-unauth-like-${requestSuffix}` }),
   // Deliberately malformed JSON; auth must reject before social write handling.
   body: '{ invalid-json',
