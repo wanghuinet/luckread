@@ -36,6 +36,91 @@ async function resolvePayloadOwnerUserId(
   return normalizedId || null
 }
 
+type MediaFailureStage =
+  | 'write_rate_limit'
+  | 'authentication'
+  | 'resolve_payload_owner'
+  | 'idempotency_lookup_before_upload'
+  | 'payload_media_create'
+  | 'idempotency_lookup_after_upload'
+  | 'payload_media_response'
+  | 'response_enrichment'
+
+type MediaFailureDetails = {
+  error?: unknown
+  upstreamStatus?: number
+  upstreamErrorCode?: string | null
+}
+
+const safeDiagnosticCode = (value: unknown): string | null =>
+  typeof value === 'string' && /^[A-Z0-9_]{1,64}$/.test(value) ? value : null
+
+const mediaErrorType = (error: unknown): string => {
+  if (error instanceof W02AuthClientError) return 'W02AuthClientError'
+  if (error instanceof TrafficLimitError) return 'TrafficLimitError'
+  if (error instanceof Error) return 'Error'
+  return error === undefined ? 'UpstreamHttpError' : typeof error
+}
+
+async function readUpstreamErrorCode(response: Response): Promise<string | null> {
+  const value: unknown = await response.clone().json().catch(() => null)
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+  const record = value as { error?: unknown; code?: unknown }
+  const nested = record.error
+  if (nested && typeof nested === 'object' && !Array.isArray(nested)) {
+    return safeDiagnosticCode((nested as { code?: unknown }).code)
+  }
+  return safeDiagnosticCode(record.code)
+}
+
+/**
+ * Correlate a client-visible request ID with safe stage diagnostics. Never log
+ * raw exceptions, request headers, credentials, file names, or upload bodies.
+ */
+async function logMediaUploadFailure(
+  response: Response,
+  stage: MediaFailureStage,
+  details: MediaFailureDetails = {},
+): Promise<Response> {
+  try {
+    const value: unknown = await response.clone().json().catch(() => null)
+    const requestId = value && typeof value === 'object' && !Array.isArray(value)
+      ? (value as { requestId?: unknown }).requestId
+      : null
+    console.error(JSON.stringify({
+      event: 'w01.media.upload_failure',
+      requestId: typeof requestId === 'string' && /^req_[A-Za-z0-9_-]{1,124}$/.test(requestId)
+        ? requestId
+        : null,
+      stage,
+      errorType: mediaErrorType(details.error),
+      authErrorCode: details.error instanceof W02AuthClientError
+        ? safeDiagnosticCode(details.error.code)
+        : null,
+      upstreamStatus: Number.isInteger(details.upstreamStatus) ? details.upstreamStatus : null,
+      upstreamErrorCode: safeDiagnosticCode(details.upstreamErrorCode),
+    }))
+  } catch {
+    // Diagnostics must never change the externally visible failure response.
+  }
+  return response
+}
+
+const mediaServiceUnavailable = async (
+  stage: MediaFailureStage,
+  error: unknown,
+  message = 'Media service unavailable',
+  details: Omit<MediaFailureDetails, 'error'> = {},
+): Promise<Response> => {
+  const response = apiErrorResponse(503, 'SERVICE_UNAVAILABLE', message)
+  return logMediaUploadFailure(response, stage, { ...details, error })
+}
+
+const authenticateUploadErrorResponse = async (error: unknown): Promise<Response> => {
+  if (error instanceof W02AuthClientError && error.status === 401) return unauthorized()
+  return mediaServiceUnavailable('authentication', error, 'Media authentication service unavailable')
+}
+
 const authenticateErrorResponse = (error: unknown): Response => {
   if (error instanceof W02AuthClientError && error.status === 401) return unauthorized()
   return apiErrorResponse(503, 'SERVICE_UNAVAILABLE', 'Media authentication service unavailable')
@@ -185,22 +270,25 @@ export async function POST(request: Request): Promise<Response> {
     await enforceW01WriteRateLimit(request)
   } catch (error) {
     if (error instanceof TrafficLimitError) return rateLimitResponse(request)
-    return apiErrorResponse(503, 'SERVICE_UNAVAILABLE', 'Media service unavailable')
+    return await mediaServiceUnavailable('write_rate_limit', error)
   }
 
   let authenticated: Awaited<ReturnType<typeof authenticate>>
   try {
     authenticated = await authenticate(request)
   } catch (error) {
-    return authenticateErrorResponse(error)
+    return await authenticateUploadErrorResponse(error)
   }
 
+  let failureStage: MediaFailureStage = 'resolve_payload_owner'
+  let upstreamStatus: number | undefined
   try {
     const payloadUserId = await resolvePayloadOwnerUserId(authenticated.payload, authenticated.identityId)
     if (!payloadUserId) {
       return apiErrorResponse(401, 'UNAUTHENTICATED', 'Account profile is not available')
     }
 
+    failureStage = 'idempotency_lookup_before_upload'
     const previous = await resolvePreviousUpload(
       authenticated.payload,
       payloadUserId,
@@ -213,12 +301,18 @@ export async function POST(request: Request): Promise<Response> {
     const context: PayloadRouteContext = {
       params: Promise.resolve({ slug: ['media'] }),
     }
+    failureStage = 'payload_media_create'
     const response = await payloadMediaPost(new Request(target, request.clone()), context)
-    if (response.ok) return appendRequestIdToJsonResponse(response)
+    if (response.ok) {
+      failureStage = 'response_enrichment'
+      return await appendRequestIdToJsonResponse(response)
+    }
 
+    upstreamStatus = response.status
     // A concurrent retry can pass the initial lookup before the winner commits.
     // Recheck after the Payload write so the losing request can replay the
     // canonical media record instead of surfacing a duplicate-key server error.
+    failureStage = 'idempotency_lookup_after_upload'
     const afterWrite = await resolvePreviousUpload(
       authenticated.payload,
       payloadUserId,
@@ -227,8 +321,16 @@ export async function POST(request: Request): Promise<Response> {
     )
     if (afterWrite) return afterWrite
 
-    return normalizeApiErrorResponse(response, 'Media service unavailable')
-  } catch {
-    return apiErrorResponse(503, 'SERVICE_UNAVAILABLE', 'Media service unavailable')
+    failureStage = 'payload_media_response'
+    const normalized = normalizeApiErrorResponse(response, 'Media service unavailable')
+    if (normalized.status !== 503) return normalized
+    return await logMediaUploadFailure(normalized, failureStage, {
+      upstreamStatus: response.status,
+      upstreamErrorCode: await readUpstreamErrorCode(response),
+    })
+  } catch (error) {
+    return await mediaServiceUnavailable(failureStage, error, 'Media service unavailable', {
+      upstreamStatus,
+    })
   }
 }
