@@ -552,6 +552,19 @@
       "x-luckread-source": "contracts/api/auth-operation-policy.v1.json"
     },
     {
+      "operationId": "authPrincipalGet",
+      "auth": {
+        "mode": "authenticated"
+      },
+      "permissions": [],
+      "auditRequired": false,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none",
+      "x-luckread-contract-status": "DISCOVERY_DRAFT",
+      "x-luckread-source": "contracts/api/auth-operation-policy.v1.json"
+    },
+    {
       "operationId": "authSessionList",
       "auth": {
         "mode": "authenticated"
