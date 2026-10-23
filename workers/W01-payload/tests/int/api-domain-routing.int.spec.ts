@@ -93,6 +93,14 @@ describe('canonical public API domain routing', () => {
     expect(scanner).toContain('w08-creator-client')
   })
 
+  it('blocks page-level network transports that bypass the shared W01 API client', () => {
+    const scanner = read('../../scripts/verify-three-client-development-contract.mjs')
+    expect(scanner).toContain('direct fetch() transport in UI code instead of the shared W01 API client')
+    expect(scanner).toContain('Axios request transport in UI code instead of the shared W01 API client')
+    expect(scanner).toContain('XMLHttpRequest transport in UI code instead of the shared W01 API client')
+    expect(scanner).toContain(String.raw`pattern: /\bfetch\s*\(/g`)
+  })
+
   it('keeps generated share links on the public website, not on the API hostname', () => {
     const share = read('../../app/lib/content-share.ts')
     expect(share).toContain("const PUBLIC_SHARE_ORIGIN = 'https://luckread.com'")
