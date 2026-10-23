@@ -204,7 +204,7 @@ results.push(await probe({
 results.push(await probe({
   name: 'unknown_public_username_returns_not_found',
   method: 'GET',
-  path: `/api/v1/users/by-username/api-smoke-no-user-${requestSuffix}`,
+  path: `/v1/users/by-username/api-smoke-no-user-${requestSuffix}`,
   accepts: [404],
   expectedErrorCode: 'NOT_FOUND',
 }))
