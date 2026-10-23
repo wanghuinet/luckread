@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       source_sha:
-        description: Exact source commit containing W03 migrations 0001-0011 (leave blank to use this workflow revision)
+        description: Exact source commit containing W03 migrations 0001-0012 (leave blank to use this workflow revision)
         required: false
         default: ""
         type: string
