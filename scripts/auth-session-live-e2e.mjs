@@ -1,7 +1,8 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 
-const baseUrl = (process.env.LUCKREAD_API_BASE_URL || 'https://luckread.com').replace(/\/$/, '')
+const baseUrl = (process.env.LUCKREAD_API_BASE_URL || 'https://api.luckread.com').replace(/\/$/, '')
+const browserOrigin = (process.env.LUCKREAD_BROWSER_ORIGIN || 'https://luckread.com').replace(/\/$/, '')
 const email = process.env.LUCKREAD_APP_AUTH_SMOKE_EMAIL || ''
 const password = process.env.LUCKREAD_APP_AUTH_SMOKE_PASSWORD || ''
 const runId = process.env.GITHUB_RUN_ID || 'local'
@@ -58,7 +59,7 @@ const request = async (name, method, path, { headers = {}, body } = {}) => {
         // Match browser same-origin mutation requests; Better Auth enforces trusted origins.
         ...(['GET', 'HEAD', 'OPTIONS'].includes(method.toUpperCase())
           ? {}
-          : { origin: new URL(baseUrl).origin }),
+          : { origin: browserOrigin }),
         ...headers,
       },
       ...(body === undefined ? {} : { body }),
@@ -172,7 +173,7 @@ if (!email || !password) {
   let staleCookieHeader = ''
 
   try {
-    const login = await request('login_success', 'POST', '/api/v1/auth/login', {
+    const login = await request('login_success', 'POST', '/v1/auth/login', {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ identity: email, credential: password }),
     })
@@ -214,7 +215,7 @@ if (!email || !password) {
         cookieNames: jar.names(),
       })
 
-      const cookieSession = await request('session_read_by_cookie', 'GET', '/api/v1/auth/session', {
+      const cookieSession = await request('session_read_by_cookie', 'GET', '/v1/auth/session', {
         headers: { cookie: staleCookieHeader },
       })
       jar.update(cookieSession.cookies)
@@ -232,7 +233,7 @@ if (!email || !password) {
       const cookieUpdatedToken = cookieSession.response?.headers.get('x-luckread-session-token')
       if (cookieUpdatedToken) sessionToken = cookieUpdatedToken
 
-      const bearerSession = await request('session_read_by_bearer', 'GET', '/api/v1/auth/session', {
+      const bearerSession = await request('session_read_by_bearer', 'GET', '/v1/auth/session', {
         headers: { authorization: `Bearer ${sessionToken}` },
       })
       const bearerSessionPass = bearerSession.facts.status === 200 &&
@@ -247,7 +248,7 @@ if (!email || !password) {
         sameSessionComparedInMemory: bearerSessionPass,
       })
 
-      const profileCookie = await request('protected_profile_by_cookie', 'GET', '/api/v1/users/me', {
+      const profileCookie = await request('protected_profile_by_cookie', 'GET', '/v1/users/me', {
         headers: { cookie: jar.header() || staleCookieHeader },
       })
       check('protected_profile_by_cookie', profileCookie.facts.status === 200 &&
@@ -256,7 +257,7 @@ if (!email || !password) {
         cfRay: profileCookie.facts.cfRay,
       })
 
-      const profileBearer = await request('protected_profile_by_bearer', 'GET', '/api/v1/users/me', {
+      const profileBearer = await request('protected_profile_by_bearer', 'GET', '/v1/users/me', {
         headers: { authorization: `Bearer ${sessionToken}` },
       })
       check('protected_profile_by_bearer', profileBearer.facts.status === 200 &&
@@ -267,7 +268,7 @@ if (!email || !password) {
 
       const revocationCookieHeader = jar.header() || staleCookieHeader
       const revokedBearerToken = sessionToken
-      const logout = await request('logout_revokes_current_session', 'POST', '/api/v1/auth/logout', {
+      const logout = await request('logout_revokes_current_session', 'POST', '/v1/auth/logout', {
         headers: { cookie: revocationCookieHeader },
       })
       jar.update(logout.cookies)
@@ -284,7 +285,7 @@ if (!email || !password) {
         setCookieCount: logout.cookies.length,
       })
 
-      const staleCookieSession = await request('revoked_cookie_session_denied', 'GET', '/api/v1/auth/session', {
+      const staleCookieSession = await request('revoked_cookie_session_denied', 'GET', '/v1/auth/session', {
         headers: { cookie: revocationCookieHeader },
       })
       check('revoked_cookie_session_denied', staleCookieSession.facts.status === 401, {
@@ -293,7 +294,7 @@ if (!email || !password) {
         errorCode: staleCookieSession.facts.errorCode,
       })
 
-      const staleBearerSession = await request('revoked_bearer_session_denied', 'GET', '/api/v1/auth/session', {
+      const staleBearerSession = await request('revoked_bearer_session_denied', 'GET', '/v1/auth/session', {
         headers: { authorization: `Bearer ${revokedBearerToken}` },
       })
       check('revoked_bearer_session_denied', staleBearerSession.facts.status === 401, {
