@@ -50,7 +50,8 @@ const makeAllocatorDb = (initial = { last_timestamp_ms: -1, sequence: 4095 }) =>
 }
 
 const makeCreateContentDb = () => {
-  const allocator = makeAllocatorDb()
+  const state = { last_timestamp_ms: -1, sequence: 4095 }
+  let allocationCount = 0
   const batches: Array<Array<{ query: string; values: unknown[] }>> = []
   const db = {
     prepare(query: string) {
@@ -65,9 +66,9 @@ const makeCreateContentDb = () => {
             first: async <T = unknown>() => {
               if (query.startsWith('SELECT id AS idem_id')) return null
               if (!query.includes('UPDATE content_id_snowflake_state')) return null
+              allocationCount += 1
               const requestedMs = values[0]
               if (typeof requestedMs !== 'number') return null
-              const state = allocator.state()
               if (requestedMs > state.last_timestamp_ms) {
                 state.last_timestamp_ms = requestedMs
                 state.sequence = 0
@@ -76,7 +77,7 @@ const makeCreateContentDb = () => {
               } else {
                 return null
               }
-              return state as T
+              return { ...state } as T
             },
           }
         },
@@ -87,7 +88,7 @@ const makeCreateContentDb = () => {
       return []
     },
   }
-  return { db: db as never, batches, allocator }
+  return { db: db as never, batches, allocationCount: () => allocationCount }
 }
 
 describe('W03 Snowflake article/video content IDs', () => {
