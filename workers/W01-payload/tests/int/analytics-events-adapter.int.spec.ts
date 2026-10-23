@@ -43,11 +43,13 @@ vi.mock('../../src/content/w03-content-client.js', () => ({
 const read = (relativePath: string) =>
   readFileSync(resolve(process.cwd(), relativePath), 'utf8')
 
+const liveEventOccurredAt = new Date(Date.now() - 60_000).toISOString()
+
 const validEvent = (overrides: Record<string, unknown> = {}) => ({
   eventId: 'evt_valid_0001',
   dedupeKey: 'dedupe_valid_0001',
   eventName: 'content_open',
-  occurredAt: '2026-10-22T06:00:00.000Z',
+  occurredAt: liveEventOccurredAt,
   sessionId: 'session_test_01',
   contentId: 'content_test_01',
   contentType: 'article',
