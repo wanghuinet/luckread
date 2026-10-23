@@ -46,6 +46,7 @@ export async function GET(
         const publicUser = user as unknown as Record<string, unknown>
         return Response.json({
           id: String(publicUser.id ?? ''),
+          identityId: typeof publicUser.identityId === 'string' ? publicUser.identityId : null,
           username: typeof publicUser.username === 'string' ? publicUser.username : '',
           displayName: typeof publicUser.displayName === 'string' ? publicUser.displayName : null,
           bio: typeof publicUser.bio === 'string' ? publicUser.bio : null,
