@@ -51,6 +51,7 @@ describe('public creator profile', () => {
     expect(route).toContain("collection: 'users'")
     expect(route).toContain('overrideAccess: true')
     expect(route).toContain("username: typeof publicUser.username === 'string' ? publicUser.username : ''")
+    expect(route).toContain("identityId: typeof publicUser.identityId === 'string' ? publicUser.identityId : null")
     expect(route).toContain("displayName: typeof publicUser.displayName === 'string' ? publicUser.displayName : null")
     expect(route).toContain("bio: typeof publicUser.bio === 'string' ? publicUser.bio : null")
     expect(route).toContain("avatar: typeof publicUser.avatar === 'string' ? publicUser.avatar : null")
@@ -71,6 +72,7 @@ describe('public creator profile', () => {
     const socialClient = read('src/social/w05-social-client.ts')
 
     expect(page).toContain('/api/v1/social/follows/')
+    expect(page).toContain('encodeURIComponent(profile.identityId || profile.id)')
     expect(page).toContain("method: isFollowing ? 'DELETE' : 'POST'")
     expect(page).toContain("'Idempotency-Key': 'social-follow:' + crypto.randomUUID()")
     expect(page).toContain('/followers?limit=1')
