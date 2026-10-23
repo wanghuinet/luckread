@@ -11,10 +11,19 @@ import { getPublicCopy, type PublicLocale } from '../i18n/public-locale'
 import TwitterCloneSecondaryPageLayout from '../../(twitter-clone)/TwitterCloneSecondaryPageLayout'
 
 type ContentType = 'article' | 'post' | 'video'
+type PublicAuthor = {
+  id: string
+  username?: string
+  displayName?: string | null
+  avatar?: string | null
+}
+
 type ContentItem = {
   id: string
   slug?: string
   creatorId?: string | null
+  creator?: PublicAuthor | null
+  author?: PublicAuthor | null
   createdAt?: string
   contentType: ContentType
   title: string
@@ -191,6 +200,7 @@ export default function ContentBrowsePage() {
                     slug={item.slug}
                     title={item.title}
                     creatorId={item.creatorId}
+                    author={item.creator ?? item.author}
                     coverRef={item.coverRef}
                     mediaRefs={item.mediaRefs}
                     createdAt={item.createdAt}
