@@ -85,6 +85,42 @@ describe('unified W05 social closure adapters', () => {
     expect(discoveryRuntime).not.toMatch(/(?:FROM|JOIN)\s+contents\b/i)
   })
 
+  it('contracts all public poll endpoints across inventory, OpenAPI, operation policy and alignment', () => {
+    const openapi = read('../../contracts/openapi/v1/openapi.yaml')
+    const inventory = JSON.parse(read('../../contracts/api/api-inventory.v1.json')) as {
+      domains: Record<string, { endpoint_groups: string[] }>
+    }
+    const alignment = JSON.parse(read('../../contracts/alignment/api-inventory.v1.json')) as {
+      records: Array<{ operationId: string; method: string; path: string; status: string }>
+    }
+    const policy = JSON.parse(read('../../contracts/openapi/v1/operation-policy.json')) as {
+      operations: Array<{ operationId: string; auth: { mode: string }; idempotencyRequired: boolean; 'x-luckread-contract-status'?: string }>
+    }
+    const endpoints = [
+      { method: 'GET', path: '/v1/contents/{contentId}/poll', operationId: 'getContentsContentIdPoll', idempotency: false },
+      { method: 'POST', path: '/v1/contents/{contentId}/poll', operationId: 'postContentsContentIdPoll', idempotency: true },
+      { method: 'DELETE', path: '/v1/contents/{contentId}/poll', operationId: 'deleteContentsContentIdPoll', idempotency: true },
+      { method: 'POST', path: '/v1/contents/{contentId}/poll/votes', operationId: 'postContentsContentIdPollVotes', idempotency: true },
+    ]
+
+    for (const endpoint of endpoints) {
+      expect(inventory.domains.interaction.endpoint_groups).toContain(endpoint.method + ' ' + endpoint.path)
+      expect(openapi).toContain('operationId: ' + endpoint.operationId)
+      expect(alignment.records.filter(record =>
+        record.method === endpoint.method && record.path === endpoint.path && record.operationId === endpoint.operationId
+      )).toHaveLength(1)
+      const policies = policy.operations.filter(operation => operation.operationId === endpoint.operationId)
+      expect(policies).toHaveLength(1)
+      expect(policies[0]?.idempotencyRequired).toBe(endpoint.idempotency)
+      expect(policies[0]?.['x-luckread-contract-status']).toBe('DISCOVERY_DRAFT')
+    }
+
+    expect(openapi).toContain('ContentPollOption:')
+    expect(openapi).toContain('ContentPoll:')
+    expect(openapi).toContain("enum: [24, 72, 168]")
+    expect(openapi).toContain("#/components/parameters/IdempotencyKeyRequired")
+  })
+
   it('wires poll draft setup, published voting, live results and X-style cards to W05 authority', () => {
     const pollRoute = read('src/app/api/v1/contents/[contentId]/poll/route.ts')
     const voteRoute = read('src/app/api/v1/contents/[contentId]/poll/votes/route.ts')

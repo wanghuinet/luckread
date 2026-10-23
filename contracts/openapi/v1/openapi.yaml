@@ -836,6 +836,191 @@ paths:
               schema: { $ref: '#/components/schemas/Comment' }
         '429': { $ref: '#/components/responses/RateLimited' }
 
+  /contents/{contentId}/poll:
+    parameters:
+      - $ref: '#/components/parameters/ContentId'
+    get:
+      tags: [Interactions]
+      summary: Read poll state for a published post
+      description: >-
+        Returns the active poll and aggregate vote counts. If a valid browser
+        session cookie is supplied, viewerOptionId identifies that viewer's vote.
+        Only published posts are public; an owner may read their own draft poll.
+        The response varies by viewer and must not be shared-cached.
+      operationId: getContentsContentIdPoll
+      security:
+        - sessionCookieAuth: []
+        - {}
+      responses:
+        '200':
+          description: Poll state, or null when the post has no poll.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, requestId]
+                additionalProperties: false
+                properties:
+                  data:
+                    type: object
+                    required: [poll]
+                    additionalProperties: false
+                    properties:
+                      poll:
+                        oneOf:
+                          - $ref: '#/components/schemas/ContentPoll'
+                          - type: 'null'
+                  requestId: { type: string, minLength: 1 }
+        '400': { $ref: '#/components/responses/ClientError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/PermissionDenied' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503':
+          description: Social poll service unavailable.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+    post:
+      tags: [Interactions]
+      summary: Configure a poll on an owned post
+      description: >-
+        Creates a poll while the post is a draft. Once published, repeating the
+        same configuration is allowed, but poll options and duration cannot be
+        changed. Option labels are normalized and case-insensitive duplicates
+        are rejected. Requires an authenticated eligible creator and Idempotency-Key.
+      operationId: postContentsContentIdPoll
+      security:
+        - sessionCookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [options]
+              additionalProperties: false
+              properties:
+                options:
+                  type: array
+                  minItems: 2
+                  maxItems: 4
+                  uniqueItems: true
+                  items: { type: string, minLength: 1, maxLength: 50 }
+                durationHours:
+                  type: integer
+                  enum: [24, 72, 168]
+                  default: 24
+      responses:
+        '200':
+          description: Current poll configuration and results.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, requestId]
+                additionalProperties: false
+                properties:
+                  data:
+                    type: object
+                    required: [poll]
+                    additionalProperties: false
+                    properties:
+                      poll: { $ref: '#/components/schemas/ContentPoll' }
+                  requestId: { type: string, minLength: 1 }
+        '400': { $ref: '#/components/responses/ClientError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/PermissionDenied' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/InvalidState' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+        '428': { $ref: '#/components/responses/IdempotencyKeyRequired' }
+        '503':
+          description: Social poll service unavailable.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+    delete:
+      tags: [Interactions]
+      summary: Delete a poll before the post has votes
+      description: Removing a poll is restricted by the W05 poll lifecycle and requires Idempotency-Key.
+      operationId: deleteContentsContentIdPoll
+      security:
+        - sessionCookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      responses:
+        '204': { description: Poll removed. No response body. }
+        '400': { $ref: '#/components/responses/ClientError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/PermissionDenied' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/InvalidState' }
+        '428': { $ref: '#/components/responses/IdempotencyKeyRequired' }
+        '503':
+          description: Social poll service unavailable.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /contents/{contentId}/poll/votes:
+    parameters:
+      - $ref: '#/components/parameters/ContentId'
+    post:
+      tags: [Interactions]
+      summary: Cast the current user's vote in a published post poll
+      description: >-
+        Each user may vote once. Requires an authenticated eligible interaction
+        layer and Idempotency-Key. W05 validates the poll and W03 revalidates
+        the published post owner and state before accepting the vote.
+      operationId: postContentsContentIdPollVotes
+      security:
+        - sessionCookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [optionId]
+              additionalProperties: false
+              properties:
+                optionId: { $ref: '#/components/schemas/ResourceId' }
+      responses:
+        '200':
+          description: Updated poll state after voting.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, requestId]
+                additionalProperties: false
+                properties:
+                  data:
+                    type: object
+                    required: [poll]
+                    additionalProperties: false
+                    properties:
+                      poll: { $ref: '#/components/schemas/ContentPoll' }
+                  requestId: { type: string, minLength: 1 }
+        '400': { $ref: '#/components/responses/ClientError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/PermissionDenied' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/InvalidState' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+        '428': { $ref: '#/components/responses/IdempotencyKeyRequired' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503':
+          description: Social poll service unavailable.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
   /interactions/likes:
     post:
       tags: [Interactions]
@@ -3563,6 +3748,11 @@ components:
       content:
         application/json:
           schema: { $ref: '#/components/schemas/ErrorResponse' }
+    IdempotencyKeyRequired:
+      description: Idempotency-Key is required for this mutation.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
     UnsupportedMediaType:
       description: Unsupported media type.
       content:
@@ -3687,6 +3877,32 @@ components:
         author:
           description: Optional public author projection included by list endpoints to avoid per-comment profile requests.
           $ref: '#/components/schemas/PublicAuthor'
+    ContentPollOption:
+      type: object
+      required: [optionId, text, position, votes]
+      additionalProperties: false
+      properties:
+        optionId: { $ref: '#/components/schemas/ResourceId' }
+        text: { type: string, minLength: 1, maxLength: 50 }
+        position: { type: integer, minimum: 0, maximum: 3 }
+        votes: { type: integer, minimum: 0 }
+    ContentPoll:
+      type: object
+      required: [pollId, contentId, options, durationHours, endsAt, totalVotes, viewerOptionId, closed]
+      additionalProperties: false
+      properties:
+        pollId: { $ref: '#/components/schemas/ResourceId' }
+        contentId: { $ref: '#/components/schemas/ResourceId' }
+        options:
+          type: array
+          minItems: 2
+          maxItems: 4
+          items: { $ref: '#/components/schemas/ContentPollOption' }
+        durationHours: { type: integer, enum: [24, 72, 168] }
+        endsAt: { type: [string, 'null'], format: date-time }
+        totalVotes: { type: integer, minimum: 0 }
+        viewerOptionId: { type: [string, 'null'], maxLength: 128 }
+        closed: { type: boolean }
     InteractionTarget:
       type: object
       required: [targetType, targetId]
