@@ -83,13 +83,13 @@ export async function readTrustedArticleBodyForSocialTokens(
   }
 
   if (!response.ok || response.status >= 300) {
-    await response.body?.cancel().catch(() => undefined)
+    await response.body?.cancel().catch((): undefined => undefined)
     return null
   }
 
   const contentLength = response.headers.get('content-length')
   if (contentLength && /^\d+$/.test(contentLength) && Number(contentLength) > ARTICLE_BODY_FETCH_MAX_BYTES) {
-    await response.body?.cancel().catch(() => undefined)
+    await response.body?.cancel().catch((): undefined => undefined)
     return null
   }
 
@@ -104,7 +104,7 @@ export async function readTrustedArticleBodyForSocialTokens(
       if (done) break
       totalBytes += value.byteLength
       if (totalBytes > ARTICLE_BODY_FETCH_MAX_BYTES) {
-        await reader.cancel().catch(() => undefined)
+        await reader.cancel().catch((): undefined => undefined)
         return null
       }
       chunks.push(value)
@@ -119,7 +119,7 @@ export async function readTrustedArticleBodyForSocialTokens(
     const text = new TextDecoder('utf-8', { fatal: true }).decode(bytes)
     return text.trim() ? text : null
   } catch {
-    await reader.cancel().catch(() => undefined)
+    await reader.cancel().catch((): undefined => undefined)
     return null
   } finally {
     reader.releaseLock()
