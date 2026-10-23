@@ -1,13 +1,11 @@
 import { cookies, headers } from 'next/headers'
 import Link from 'next/link'
 
-import { cachedPublicGet } from '../../../lib/public-response-cache.js'
-import { enforcePublicReadRateLimit } from '../../../auth/traffic-limit.js'
-import { callW05SocialPublic, W05SocialClientError } from '../../../social/w05-social-client.js'
+import { fetchJson } from '../../../lib/client-api.js'
 import { normalizePublicLocale, type PublicLocale } from '../../(frontend)/i18n/public-locale'
 import TwitterCloneSecondaryPageLayout from '../TwitterCloneSecondaryPageLayout'
 
-const PUBLIC_ORIGIN = 'https://luckread.com'
+const PUBLIC_API_ORIGIN = 'https://api.luckread.com'
 
 type DiscoveryTopicPageData = {
   items: Array<{
@@ -26,31 +24,21 @@ async function getDiscoveryTopics(cursor: string | null): Promise<DiscoveryTopic
   const query = new URLSearchParams({ limit: '20' })
   if (cursor) query.set('cursor', cursor)
 
-  const request = new Request(PUBLIC_ORIGIN + '/api/v1/discovery/topics?' + query.toString(), {
+  const request = new Request(PUBLIC_API_ORIGIN + '/v1/discovery/topics?' + query.toString(), {
     method: 'GET',
     headers: {
       accept: 'application/json',
       ...(incoming.get('cf-connecting-ip') ? { 'cf-connecting-ip': incoming.get('cf-connecting-ip')! } : {}),
       ...(incoming.get('accept-language') ? { 'accept-language': incoming.get('accept-language')! } : {}),
     },
+    cache: 'no-store',
   })
 
-  await enforcePublicReadRateLimit(request)
-
   try {
-    const response = await cachedPublicGet(
-      request,
-      'social-discovery-topics-page',
-      () => callW05SocialPublic({
-        request,
-        pathname: '/internal/social/discovery/topics?' + query.toString(),
-        method: 'GET',
-      }),
-      30,
-    )
+    // Let the canonical W01 public API own rate limiting and the shared cache.
+    const { response, data: payload } = await fetchJson<{ data?: DiscoveryTopicPageData }>(request)
     if (!response.ok) return null
-    const payload = await response.json() as { data?: DiscoveryTopicPageData }
-    const data = payload.data
+    const data = payload?.data
     if (
       !data ||
       !Array.isArray(data.items) ||
@@ -58,9 +46,8 @@ async function getDiscoveryTopics(cursor: string | null): Promise<DiscoveryTopic
       (data.nextCursor !== null && typeof data.nextCursor !== 'string')
     ) return null
     return data
-  } catch (error) {
-    if (error instanceof W05SocialClientError) return null
-    throw error
+  } catch {
+    return null
   }
 }
 

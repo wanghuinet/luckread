@@ -48,7 +48,9 @@ describe('unified W05 social closure adapters', () => {
 
     expect(route).toContain('/internal/social/discovery/topics')
     expect(route).toContain('enforcePublicReadRateLimit')
-    expect(page).toContain('/internal/social/discovery/topics?')
+    expect(page).toContain("PUBLIC_API_ORIGIN + '/v1/discovery/topics?'")
+    expect(page).toContain('fetchJson<{ data?: DiscoveryTopicPageData }>(request)')
+    expect(page).not.toContain('/internal/social/discovery/topics')
     expect(page).toContain('contentCount')
     expect(page).toContain('nextCursor')
     expect(page).toContain('active="trends"')
