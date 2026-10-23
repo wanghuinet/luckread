@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { cookies, headers } from 'next/headers'
-import { GET as getPublicContents } from '../../api/v1/contents/route'
+import { fetchJson } from '../../lib/client-api.js'
 import TwitterCloneHomeFeed, { type HomeContentPage, type HomeFeedMode } from '../TwitterCloneHomeFeed'
 import TwitterCloneSecondaryPageLayout from '../TwitterCloneSecondaryPageLayout'
 import { TwitterClonePostComposerTrigger } from '../TwitterClonePostComposerModal'
@@ -15,12 +15,12 @@ async function loadInitialContent(requestHeaders: Headers, locale: PublicLocale)
   const ip = requestHeaders.get('cf-connecting-ip')
   forwarded.set('accept-language', language)
   if (ip) forwarded.set('cf-connecting-ip', ip)
-  const request = new Request('https://luckread.com/api/v1/contents?limit=20', { headers: forwarded })
+  const request = new Request('https://api.luckread.com/v1/contents?limit=20', { headers: forwarded, cache: 'no-store' })
   try {
-    // The contents route owns anonymous read rate limiting; do not count this request twice.
-    const response = await getPublicContents(request)
+    // Use the same public W01 API entry and shared transport as browser clients.
+    // The contents API owns anonymous read rate limiting for this request.
+    const { response, data: payload } = await fetchJson<{ data?: HomeContentPage }>(request)
     if (!response.ok) return { items: [], nextCursor: null, hasMore: false }
-    const payload = await response.json() as { data?: HomeContentPage }
     const page = payload?.data
     return { items: Array.isArray(page?.items) ? page.items : [], nextCursor: page?.nextCursor ?? null, hasMore: page?.hasMore === true }
   } catch { return { items: [], nextCursor: null, hasMore: false } }
