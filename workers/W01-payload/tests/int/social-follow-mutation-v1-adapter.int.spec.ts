@@ -15,6 +15,16 @@ describe('v1 follow mutation adapter', () => {
     expect(route).not.toContain('social_follow_relationships')
   })
 
+  it('rate limits follow/unfollow before identity and target lookup', () => {
+    expect(route).toContain('enforceW01WriteRateLimit(request)')
+    expect(route).toContain('TrafficLimitError')
+    expect(route).toContain('rateLimitResponse(request)')
+    expect(route.indexOf("if(method!=='GET') await enforceW01WriteRateLimit(request)"))
+      .toBeLessThan(route.indexOf('await resolveSocialPrincipal(request)'))
+    expect(route.indexOf('await enforceW01WriteRateLimit(request)'))
+      .toBeLessThan(route.indexOf('await assertSocialTargetUserExists(targetUserId)'))
+  })
+
   it('enforces Idempotency-Key on follow and unfollow mutations', () => {
     expect(route).toContain("method!=='GET'")
     expect(route).toContain("request.headers.get('Idempotency-Key')")
