@@ -109,17 +109,24 @@ describe('creator qualification application page', () => {
     }
   })
 
-  it('restricts creator review to L7/L8 and uses authoritative review APIs', () => {
+  it('routes creator review identity through the W01 public API and restricts review to L7/L8', () => {
     const page = read('src/app/(frontend)/creator-review/page.tsx')
     const client = read('src/app/(frontend)/creator-review/CreatorReviewClient.tsx')
+    expect(page).toContain("'https://api.luckread.com'")
+    expect(page).toContain("'/v1/auth/principal'")
+    expect(page).toContain('fetchJson<AuthPrincipalResponse>')
+    expect(page).not.toContain('getBetterAuthPrincipal')
+    expect(page).not.toContain('W02AuthClientError')
+    expect(page).not.toContain('.internal')
     expect(page).toContain("principal.layer !== 'L7' && principal.layer !== 'L8'")
+    expect(page).toContain("redirect('/login?returnTo=%2Fcreator-review')")
     expect(client).toContain("'/api/v1/admin/creator-applications?limit=50'")
     expect(client).toContain("'/api/v1/admin/creator-applications'")
     expect(client).toContain("'If-Match'")
     expect(client).toContain("'Idempotency-Key'")
     expect(client).toContain('通过并授予 L3')
     expect(client).toContain('重试授权')
-    expect(client).toContain("onClick={() => void decide(application, 'APPROVED')}")
+    expect(client).toContain("onClick={() => void decide(application, 'APPROVED')")
     expect(client).not.toContain('document.getElementById')
   })
 
