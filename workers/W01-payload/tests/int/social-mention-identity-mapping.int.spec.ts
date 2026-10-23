@@ -16,20 +16,20 @@ describe('social mention identity mapping', () => {
     find.mockResolvedValue({
       docs: [
         { id: 17, identityId: 'w02-identity-alice', username: 'alice' },
-        { id: 18, identityId: null, username: 'legacy-profile' },
+        { id: 18, identityId: null, username: 'legacyprofile' },
       ],
     })
   })
 
   it('sends canonical W02 identity IDs to W05, not numeric Payload profile IDs', async () => {
-    await expect(resolveSocialMentionTargets('Hello @alice and @legacy-profile'))
+    await expect(resolveSocialMentionTargets('Hello @alice and @legacyprofile'))
       .resolves.toEqual([
         { userId: 'w02-identity-alice', handle: 'alice' },
       ])
 
     expect(find).toHaveBeenCalledWith(expect.objectContaining({
       collection: 'users',
-      where: { username: { in: ['alice', 'legacy-profile'] } },
+      where: { username: { in: ['alice', 'legacyprofile'] } },
       depth: 0,
       limit: 2,
       overrideAccess: true,
@@ -39,9 +39,9 @@ describe('social mention identity mapping', () => {
 
   it('does not emit a social target for a profile without a W02 identity mapping', async () => {
     find.mockResolvedValueOnce({
-      docs: [{ id: 18, identityId: null, username: 'legacy-profile' }],
+      docs: [{ id: 18, identityId: null, username: 'legacyprofile' }],
     })
 
-    await expect(resolveSocialMentionTargets('@legacy-profile')).resolves.toEqual([])
+    await expect(resolveSocialMentionTargets('@legacyprofile')).resolves.toEqual([])
   })
 })
