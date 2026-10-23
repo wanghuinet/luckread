@@ -107,7 +107,7 @@ jobs:
         env:
           AUTH010_REMOTE_E2E_CONFIRM: ${{ inputs.confirm }}
           AUTH010_EXPECTED_SOURCE_SHA: ${{ inputs.source_sha }}
-          AUTH010_REMOTE_BASE_URL: https://luckread.com
+          AUTH010_REMOTE_BASE_URL: https://api.luckread.com
           AUTH010_REMOTE_TEST_USER_A_EMAIL: ${{ secrets.AUTH010_REMOTE_TEST_USER_A_EMAIL }}
           AUTH010_REMOTE_TEST_USER_A_PASSWORD: ${{ secrets.AUTH010_REMOTE_TEST_USER_A_PASSWORD }}
           AUTH010_REMOTE_TEST_USER_B_EMAIL: ${{ secrets.AUTH010_REMOTE_TEST_USER_B_EMAIL }}
