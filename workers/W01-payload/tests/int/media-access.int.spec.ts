@@ -38,6 +38,19 @@ describe('Media upload access', () => {
     expect(publisher).toContain('已达到 12 个媒体文件上限，其余文件未上传。')
   })
 
+  it('preserves HTTP status, error code, and request ID for publish and media failures', () => {
+    const publisher = read('src/app/(frontend)/publish/PublishComposer.tsx')
+
+    expect(publisher).toContain('function getApiFailureDiagnostic(response: Response, data: unknown, fallback: string)')
+    expect(publisher).toContain("'HTTP ' + response.status")
+    expect(publisher).toContain("'请求 ID ' + requestId")
+    expect(publisher).toContain("getApiFailureDiagnostic(response, data, 'MEDIA_UPLOAD_FAILED')")
+    expect(publisher).toContain("getApiFailureDiagnostic(response, data, 'CONTENT_SAVE_FAILED')")
+    expect(publisher).toContain("getApiFailureDiagnostic(response, data, 'SUBMIT_FAILED')")
+    expect(publisher).toContain("setError(code || '媒体上传失败，请检查文件后重试。')")
+    expect(publisher).not.toContain("setError('媒体上传失败，请检查文件后重试。')")
+  })
+
   it('keeps the existing R2-backed Payload media collection and upload path', () => {
     const config = read('src/payload.config.ts')
     const publisher = read('src/app/(frontend)/publish/PublishComposer.tsx')

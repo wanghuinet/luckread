@@ -76,6 +76,37 @@ async function authorizedFetch<T = unknown>(
   return result
 }
 
+
+type ApiFailureEnvelope = {
+  requestId?: unknown
+  error?: { code?: unknown; message?: unknown }
+}
+
+function getApiFailureDiagnostic(response: Response, data: unknown, fallback: string): string {
+  const envelope = data && typeof data === 'object' && !Array.isArray(data)
+    ? data as ApiFailureEnvelope
+    : null
+  const code = typeof envelope?.error?.code === 'string' ? envelope.error.code : ''
+  const requestId = typeof envelope?.requestId === 'string' ? envelope.requestId : ''
+  const serverMessage = getApiErrorMessage(data, fallback)
+  const statusHint = response.status === 413
+    ? '请压缩文件或选择较小的文件'
+    : response.status === 415
+      ? '请确认文件格式受支持'
+      : response.status === 429
+        ? '请求过于频繁，请稍后重试'
+        : response.status >= 500
+          ? '服务暂时不可用，请稍后重试'
+          : ''
+  const message = statusHint ? serverMessage + '；' + statusHint : serverMessage
+  const diagnostics = [
+    'HTTP ' + response.status,
+    code || null,
+    requestId ? '请求 ID ' + requestId : null,
+  ].filter((part): part is string => Boolean(part))
+  return message + '（' + diagnostics.join('；') + '）'
+}
+
 const isVideoAsset = (asset: UploadedAsset): boolean => asset.mimeType.startsWith('video/')
 const isImageAsset = (asset: UploadedAsset): boolean => asset.mimeType.startsWith('image/')
 
@@ -341,8 +372,11 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
       headers: { 'Idempotency-Key': 'media-upload:' + crypto.randomUUID() },
     })
     const doc = data?.doc ?? data
-    if (!response.ok || !doc?.id || !doc?.url) {
-      throw new Error(getApiErrorMessage(data, 'MEDIA_UPLOAD_FAILED'))
+    if (!response.ok) {
+      throw new Error(getApiFailureDiagnostic(response, data, 'MEDIA_UPLOAD_FAILED'))
+    }
+    if (!doc?.id || !doc?.url) {
+      throw new Error(getApiFailureDiagnostic(response, data, '上传接口未返回完整的媒体信息'))
     }
     return {
       id: String(doc.id),
@@ -379,8 +413,16 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
       markDirty()
       setMessage(`已上传 ${uploaded.length} 个媒体文件`)
       if (selected.length > remainingSlots) setError('已达到 12 个媒体文件上限，其余文件未上传。')
-    } catch {
-      setError('媒体上传失败，请检查文件后重试。')
+    } catch (caught) {
+      const code = caught instanceof Error ? caught.message : ''
+      if (code === 'AUTH_REQUIRED') {
+        setError('登录已失效，请重新登录后再上传。')
+        const returnTo = window.location.pathname + window.location.search + window.location.hash
+        const loginPath = window.location.pathname.startsWith('/admin/') ? '/admin/login' : '/login'
+        router.replace(loginPath + '?returnTo=' + encodeURIComponent(returnTo))
+      } else {
+        setError(code || '媒体上传失败，请检查文件后重试。')
+      }
       setMessage('')
     } finally {
       event.target.value = ''
@@ -567,7 +609,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
       )
 
       if (!response.ok) {
-        throw new Error(getApiErrorMessage(data, 'CONTENT_SAVE_FAILED'))
+        throw new Error(getApiFailureDiagnostic(response, data, 'CONTENT_SAVE_FAILED'))
       }
 
       // Once the content write has returned success, the body asset is now an
@@ -815,7 +857,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
       },
     )
     if (!response.ok || !report || !('verdict' in report) || !report.verdict) {
-      throw new Error(getApiErrorMessage(report, '发布前检查失败，请稍后重试。'))
+      throw new Error(getApiFailureDiagnostic(response, report, '发布前检查失败，请稍后重试。'))
     }
     setPreflightReport(report)
     return { report, input, draft: savedDraft }
@@ -943,7 +985,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
           body: JSON.stringify({ to: type === 'post' ? 'PUBLISHED' : 'PENDING_REVIEW', preflight: input }),
         },
       )
-      if (!response.ok) throw new Error(getApiErrorMessage(data, 'SUBMIT_FAILED'))
+      if (!response.ok) throw new Error(getApiFailureDiagnostic(response, data, 'SUBMIT_FAILED'))
       const transition = data
       const currentDraft = latestDraftRef.current
       const transitionedDraft = currentDraft && transition.to && typeof transition.version === 'number' && transition.etag
