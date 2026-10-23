@@ -93,9 +93,10 @@ const makeCreateContentDb = () => {
 
 describe('W03 Snowflake article/video content IDs', () => {
   it('uses the 42-bit timestamp + 10-bit node + 12-bit sequence layout and exact decimal strings', () => {
-    const timestampMs = CONTENT_SNOWFLAKE_EPOCH_MS + 1234
+    const timestampDeltaMs = 500_000_000_000
+    const timestampMs = CONTENT_SNOWFLAKE_EPOCH_MS + timestampDeltaMs
     const id = encodeContentSnowflakeId(timestampMs, 7)
-    const expected = ((BigInt(1234) << BigInt(22)) | (BigInt(1) << BigInt(12)) | BigInt(7)).toString(10)
+    const expected = ((BigInt(timestampDeltaMs) << BigInt(22)) | (BigInt(1) << BigInt(12)) | BigInt(7)).toString(10)
 
     expect(id).toBe(expected)
     expect(id).toMatch(/^\d{18,20}$/)
