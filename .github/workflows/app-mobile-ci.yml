@@ -74,6 +74,8 @@ jobs:
         run: bun run typecheck
       - name: Test unified native API client rules
         run: bun run test:api-client
+      - name: Test native media reference host and credential boundaries
+        run: bun test tests/content-adapter-media-reference.test.mjs
       - name: Test native publishing and media upload contracts
         run: bun run test:publish-api
       - name: Test native publishing flow and owner-only post actions
