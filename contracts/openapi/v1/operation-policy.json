@@ -790,7 +790,7 @@
     {
       "operationId": "getDiscoveryTopics",
       "auth": {
-        "mode": "permission"
+        "mode": "public"
       },
       "permissions": [],
       "auditRequired": false,
