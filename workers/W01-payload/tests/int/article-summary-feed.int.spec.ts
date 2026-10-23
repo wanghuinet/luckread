@@ -104,6 +104,12 @@ describe('article summary card preview', () => {
     )).resolves.toBeNull()
   })
 
+  it('routes social-token body reads through the bounded trusted-reference reader', () => {
+    const route = read('src/app/api/v1/contents/[contentId]/social/route.ts')
+    expect(route).toContain('readTrustedArticleBodyForSocialTokens')
+    expect(route).not.toContain('fetch(record.bodyRef)')
+  })
+
   it('adds the summary component to both home and discovery cards without replacing the content API', () => {
     const home = read('src/app/(frontend)/HomeContentFeed.tsx')
     const discovery = read('src/app/(frontend)/content/ContentBrowsePage.tsx')
