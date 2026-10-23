@@ -6,7 +6,7 @@ vi.mock('@opennextjs/cloudflare', () => ({ getCloudflareContext: vi.fn() }))
 vi.mock('payload', () => ({ getPayload: mockGetPayload }))
 vi.mock('@payload-config', () => ({ default: {} }))
 
-import { resolveSocialProfileIdentityId } from '../../src/social/w05-social-client.js'
+import { resolveSocialProfileIdentity, resolveSocialProfileIdentityId } from '../../src/social/w05-social-client.js'
 
 describe('W01 social profile identity boundary', () => {
   beforeEach(() => mockGetPayload.mockReset())
@@ -16,7 +16,7 @@ describe('W01 social profile identity boundary', () => {
     const find = vi.fn()
     mockGetPayload.mockResolvedValue({ findByID, find })
 
-    await expect(resolveSocialProfileIdentityId('27')).resolves.toBe('w02-user-27')
+    await expect(resolveSocialProfileIdentity('27')).resolves.toEqual({ identityId: 'w02-user-27', payloadProfileId: '27' })
     expect(findByID).toHaveBeenCalledWith({
       collection: 'users',
       id: '27',
@@ -24,6 +24,16 @@ describe('W01 social profile identity boundary', () => {
       overrideAccess: true,
     })
     expect(find).not.toHaveBeenCalled()
+  })
+
+  it('invalidates a canonical identity and its legacy Payload ID as aliases', async () => {
+    const findByID = vi.fn().mockResolvedValue({ id: 27, identityId: 'w02-user-27' })
+    mockGetPayload.mockResolvedValue({ findByID, find: vi.fn() })
+
+    await expect(resolveSocialProfileIdentity('27')).resolves.toEqual({
+      identityId: 'w02-user-27',
+      payloadProfileId: '27',
+    })
   })
 
   it('accepts a canonical identity ID without treating it as a Payload row ID', async () => {
