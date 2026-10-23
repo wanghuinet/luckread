@@ -50,11 +50,13 @@ export function mediaTypeAllowed(hostKind: MediaHostKind, key: string, contentTy
   const mime = contentType.split(';', 1)[0]!.trim().toLowerCase()
   if (hostKind === 'image') return mime.startsWith('image/') && !isVideoMediaKey(key)
   if (!isVideoMediaKey(key)) return false
-  if (mime.startsWith('video/') || mime.startsWith('audio/')) return true
   const ext = key.slice(key.lastIndexOf('/') + 1).split('.').pop()?.toLowerCase() ?? ''
+  // Streaming manifests and subtitles have distinct MIME types. Validate them
+  // before the broader audio/video allowance so a wrong MIME cannot bypass it.
   if (ext === 'm3u8') return ['application/vnd.apple.mpegurl', 'application/x-mpegurl', 'audio/mpegurl'].includes(mime)
   if (ext === 'mpd') return mime === 'application/dash+xml'
   if (ext === 'vtt') return mime === 'text/vtt'
+  if (mime.startsWith('video/') || mime.startsWith('audio/')) return true
   return ['m4s', 'm2ts', 'ts', 'aac', 'm4a', 'mp4', 'm4v', 'webm', 'mov', 'mkv', 'avi', 'mpg', 'mpeg', 'ogv', '3gp', '3g2', 'asf', 'f4v', 'flv', 'wmv', 'rm', 'rmvb', 'mp2', 'mp4a', 'ogg'].includes(ext)
     && ['application/octet-stream', 'application/mp4', 'audio/mp4', 'audio/aac', 'video/mp2t', 'application/ogg'].includes(mime)
 }
