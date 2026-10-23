@@ -63,7 +63,7 @@ jobs:
       - name: Typecheck and unit-test W03
         run: |
           npx --no-install tsc --noEmit --strict --skipLibCheck             --target ES2022 --module ESNext --moduleResolution Bundler             --lib ES2022,DOM --types @cloudflare/workers-types             workers/W03-content/src/content-runtime.ts             workers/W03-content/src/publish-preflight.ts             workers/W03-content/src/index.ts
-          npx --yes vitest@3.2.4 run workers/W03-content/src/content-runtime.test.ts workers/W03-content/src/publish-preflight.test.ts
+          npx --yes vitest@3.2.4 run workers/W03-content/src/content-runtime.test.ts workers/W03-content/src/content-snowflake-id.test.ts workers/W03-content/src/publish-preflight.test.ts
 
       - name: Verify W03 traffic guard bindings
         working-directory: workers/W03-content
