@@ -7,12 +7,19 @@ on:
     paths:
       - .github/workflows/retire-legacy-cn-redirect.yml
   workflow_dispatch:
+    inputs:
+      confirm:
+        description: Type RETIRE_LEGACY_CN_REDIRECT to manually remove the live legacy redirect
+        required: true
+        default: NO
+        type: string
 
 permissions:
   contents: read
 
 jobs:
   remove-legacy-redirect:
+    if: ${{ github.event_name == 'push' || inputs.confirm == 'RETIRE_LEGACY_CN_REDIRECT' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
