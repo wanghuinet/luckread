@@ -10,6 +10,9 @@ on:
       - 'scripts/generate-role-assignment-migration.mjs'
       - 'scripts/generate-role-version-migration.mjs'
       - 'scripts/verify-role-version-mutation.mjs'
+      - 'scripts/verify-admin-account-bootstrap-readiness.mjs'
+      - 'scripts/l8-genesis-bootstrap-request.mjs'
+      - 'scripts/l8-genesis-bootstrap-request.test.mjs'
       - '.github/workflows/w02-role-assignment-verification.yml'
   pull_request:
     paths:
@@ -19,6 +22,9 @@ on:
       - 'scripts/generate-role-assignment-migration.mjs'
       - 'scripts/generate-role-version-migration.mjs'
       - 'scripts/verify-role-version-mutation.mjs'
+      - 'scripts/verify-admin-account-bootstrap-readiness.mjs'
+      - 'scripts/l8-genesis-bootstrap-request.mjs'
+      - 'scripts/l8-genesis-bootstrap-request.test.mjs'
       - '.github/workflows/w02-role-assignment-verification.yml'
   workflow_dispatch:
 
@@ -56,6 +62,10 @@ jobs:
         run: node scripts/verify-role-version-mutation.mjs
       - name: Check AUTH-007 rollout admission script syntax
         run: node --check scripts/verify-auth-007-rollout-admission.mjs
+      - name: Test L8 genesis request fail-closed validation
+        run: node --test scripts/l8-genesis-bootstrap-request.test.mjs
+      - name: Check L8 bootstrap readiness audit syntax
+        run: node --check scripts/verify-admin-account-bootstrap-readiness.mjs
       - name: Verify logical table authority boundary
         run: node scripts/verify-logical-data-authority.mjs
       - name: Execute AUTH-007 outbox migration static audit (local SQLite only)
