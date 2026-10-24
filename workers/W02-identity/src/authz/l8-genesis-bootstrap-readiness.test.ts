@@ -135,6 +135,18 @@ describe('read-only W02 L8 bootstrap readiness', () => {
       .rejects.toMatchObject({ code: 'MFA_REQUIRED' })
   })
 
+  it('blocks when MFA is enabled but TOTP has not been verified', async () => {
+    const db = new ReadinessD1({
+      targetMfa: {
+        twoFactorEnabled: 1,
+        mfaEnrolledAt: '2026-10-24T11:00:00.000Z',
+        totpVerified: 0,
+      },
+    }) as unknown as D1Database
+    await expect(checkL8BootstrapReadiness(db, approval(), NOW))
+      .rejects.toMatchObject({ code: 'MFA_REQUIRED' })
+  })
+
   it('blocks when the target has no effective L2 verified_user assignment', async () => {
     const db = new ReadinessD1({ hasL2: false }) as unknown as D1Database
     await expect(checkL8BootstrapReadiness(db, approval(), NOW))
