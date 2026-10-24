@@ -99,6 +99,22 @@ describe('W01 public MFA challenge verification', () => {
     expect(noChallenge.status).toBe(401)
     await expect(noChallenge.json()).resolves.toMatchObject({ error: { code: 'MFA_CHALLENGE_REQUIRED' } })
 
+    const bearerRequest = await POST(new Request(
+      'https://api.luckread.com/v1/auth/mfa/challenge/verify',
+      {
+        headers: {
+          cookie: 'two_factor=signed-challenge',
+          authorization: 'Bearer a-valid-session-token',
+          'Idempotency-Key': 'mfa-challenge-key-0001',
+          'content-type': 'application/json',
+          'cf-connecting-ip': '203.0.113.10',
+        },
+        method: 'POST',
+        body: JSON.stringify({ code: '123456', method: 'totp' }),
+      },
+    ))
+    expect(bearerRequest.status).toBe(401)
+
     const authenticatedRequest = await POST(new Request(
       'https://api.luckread.com/v1/auth/mfa/challenge/verify',
       {

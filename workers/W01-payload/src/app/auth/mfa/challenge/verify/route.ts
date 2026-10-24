@@ -55,7 +55,7 @@ export async function POST(request: Request): Promise<Response> {
   if (
     !hasChallengeCookie ||
     hasSessionCookie ||
-    /^Bearer\\s+\\S+/i.test(request.headers.get('authorization') ?? '')
+    /^Bearer\s+\S+/i.test(request.headers.get('authorization') ?? '')
   ) {
     return mfaError(401, 'MFA_CHALLENGE_REQUIRED', 'A valid MFA sign-in challenge is required')
   }
