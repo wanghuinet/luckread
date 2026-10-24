@@ -88,6 +88,7 @@ describe('W02 authoritative MFA status projection', () => {
       const db = makeDb(row)
       await expect(readAuthoritativeMfaStatus(db.db, 'user-1', NOW)).resolves.toMatchObject({
         enabled: false,
+        verified: false,
         enrolledAt: null,
       })
     }
