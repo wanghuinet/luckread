@@ -73,8 +73,12 @@ if (!hasEncryptedRecoveryCodes) {
   blockers.push('AUTH-007 recovery codes must use Better Auth encrypted-at-rest storage.')
 }
 
-if (!hasMfaEnforcement || /Status:\s*`BLOCKED_NOT_GREEN`/.test(reconciliation)) {
-  blockers.push('AUTH-007 MFA enforcement and executable test evidence are missing or still blocked.')
+const auth007Status = reconciliation.match(/^- Status:\s*`([^`]+)`/m)?.[1] ?? null
+const implementationAuthorization = reconciliation.match(/^- Implementation authorization:\s*`([^`]+)`/m)?.[1] ?? null
+const auth007PromotionVerified = auth007Status === 'GREEN' && implementationAuthorization === 'true'
+
+if (!hasMfaEnforcement || !auth007PromotionVerified) {
+  blockers.push('AUTH-007 must be GREEN with implementation authorization true before the L8 genesis grant is allowed.')
 }
 
 // Require a single, explicitly configured GitHub Environment reviewer, validated
@@ -133,7 +137,7 @@ const report = {
   checks: {
     workflowIsReadOnly: assertReadOnlyWorkflow,
     dedicatedW02L8Bootstrap: hasDedicatedW02L8Bootstrap,
-    mfaCodeAndTestEvidence: hasMfaEnforcement && !/Status:\s*`BLOCKED_NOT_GREEN`/.test(reconciliation),
+    mfaCodeAndTestEvidence: hasMfaEnforcement && auth007PromotionVerified,
     recoveryCodesEncryptedAtRest: hasEncryptedRecoveryCodes,
     totpReplayProtection: hasTotpReplayProtection,
     w02BootstrapApprovalCodeAndTestEvidence: hasTargetBoundSingleApproval,
