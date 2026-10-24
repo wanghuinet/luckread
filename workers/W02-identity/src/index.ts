@@ -261,7 +261,7 @@ export default {
         if (error instanceof L8BootstrapApprovalError) {
           const status =
             error.code === 'OIDC_FORBIDDEN' || error.code === 'DUAL_APPROVAL_REQUIRED' ? 403 :
-            error.code === 'PR_NOT_MERGED' || error.code === 'REQUEST_FILE_MISSING' ? 409 :
+            error.code === 'PR_NOT_MERGED' || error.code === 'REQUEST_FILE_MISSING' || error.code === 'REQUEST_PR_SCOPE_INVALID' ? 409 :
             error.code === 'REQUEST_EXPIRED_OR_INVALID' ? 412 :
             error.code === 'VALIDATION_FAILED' || error.code === 'OIDC_INVALID' ? 400 : 503
           return json({
@@ -344,7 +344,7 @@ export default {
         if (error instanceof L8BootstrapApprovalError) {
           const status =
             error.code === 'OIDC_FORBIDDEN' || error.code === 'DUAL_APPROVAL_REQUIRED' ? 403 :
-            error.code === 'PR_NOT_MERGED' || error.code === 'REQUEST_FILE_MISSING' ? 409 :
+            error.code === 'PR_NOT_MERGED' || error.code === 'REQUEST_FILE_MISSING' || error.code === 'REQUEST_PR_SCOPE_INVALID' ? 409 :
             error.code === 'REQUEST_EXPIRED_OR_INVALID' ? 412 :
             error.code === 'VALIDATION_FAILED' || error.code === 'OIDC_INVALID' ? 400 : 503
           return json({
