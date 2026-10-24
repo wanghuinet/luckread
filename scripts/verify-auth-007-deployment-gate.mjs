@@ -14,8 +14,8 @@ const reconciliationPath = 'contracts/alignment/mapping-batches/AUTH-007-real-ev
 // Using AND here would allow a partial/renamed implementation to skip it.
 const mfaDependentRuntimePresent =
   exists(mfaMigrationPath) ||
-  (exists(roleAssignmentPath) && /LEFT JOIN\\s+"twoFactor"/.test(read(roleAssignmentPath))) ||
-  (exists(betterAuthPath) && /twoFactor\\s*\\(/.test(read(betterAuthPath)))
+  (exists(roleAssignmentPath) && /LEFT JOIN\s+"twoFactor"/.test(read(roleAssignmentPath))) ||
+  (exists(betterAuthPath) && /twoFactor\s*\(/.test(read(betterAuthPath)))
 
 if (!mfaDependentRuntimePresent) {
   console.log(JSON.stringify({
