@@ -9,6 +9,12 @@ const workflowPaths = [
   '.github/workflows/w01-w02-binding-deploy.yml',
   '.github/workflows/w02-role-assignment-migration.yml',
 ]
+const protectedMutationWorkflowPaths = [
+  '.github/workflows/w02-deploy.yml',
+  '.github/workflows/w01-payload-app-deploy.yml',
+  '.github/workflows/w01-w02-binding-deploy.yml',
+  '.github/workflows/w02-role-assignment-migration.yml',
+]
 const verifier = readFileSync('scripts/verify-auth-007-rollout-admission.mjs', 'utf8')
 
 describe('AUTH-007 protected-ref admission contract', () => {
@@ -31,5 +37,17 @@ describe('AUTH-007 protected-ref admission contract', () => {
   it('includes every rollout call site in the verifier source checks', () => {
     for (const path of workflowPaths) assert.ok(verifier.includes(path), path + ' is not registered')
     assert.match(verifier, /allRolloutWorkflowCallSitesRequireProtectedMain:\s*protectedRefCallSitesConfigured/)
+    assert.match(verifier, /allMutationWorkflowJobsRequireProtectedMain:\s*protectedMutationWorkflowJobsConfigured/)
+  })
+
+  it('blocks every production deployment/migration job before Environment approval on an unprotected ref', () => {
+    for (const path of protectedMutationWorkflowPaths) {
+      const workflow = readFileSync(path, 'utf8')
+      assert.match(
+        workflow,
+        /^\s+if:\s*\$\{\{[^\n]*github\.ref_protected\s*==\s*true[^\n]*\}\}$/m,
+        path + ' must require protected main in the job-level condition',
+      )
+    }
   })
 })

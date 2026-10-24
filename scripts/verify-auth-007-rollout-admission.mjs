@@ -19,6 +19,12 @@ const protectedRefWorkflowPaths = [
   '.github/workflows/w01-w02-binding-deploy.yml',
   '.github/workflows/w02-role-assignment-migration.yml',
 ]
+const protectedMutationWorkflowPaths = [
+  '.github/workflows/w02-deploy.yml',
+  '.github/workflows/w01-payload-app-deploy.yml',
+  '.github/workflows/w01-w02-binding-deploy.yml',
+  '.github/workflows/w02-role-assignment-migration.yml',
+]
 
 function requireSource(condition, message) {
   if (!condition) blockers.push(message)
@@ -183,6 +189,9 @@ if (blockers.length === 0) {
   const readOnlyPreflightWorkflow = read('.github/workflows/auth-mfa-rollout-preflight.yml')
   const protectedRefCallSitesConfigured = protectedRefWorkflowPaths.every((file) =>
     /GITHUB_REF_PROTECTED:\s*\$\{\{\s*github\.ref_protected\s*\}\}/.test(read(file))
+  )
+  const protectedMutationWorkflowJobsConfigured = protectedMutationWorkflowPaths.every((file) =>
+    /^\s+if:\s*\$\{\{[^\n]*github\.ref_protected\s*==\s*true[^\n]*\}\}$/m.test(read(file))
   )
 
   const requiredMigrationTokens = [
@@ -353,6 +362,7 @@ if (blockers.length === 0) {
       standaloneW01Workflow.indexOf('verify-auth-007-rollout-admission.mjs') >= 0 &&
       standaloneW01Workflow.indexOf('verify-auth-007-rollout-admission.mjs') < standaloneW01Workflow.indexOf('run: pnpm run deploy:app'),
     allRolloutWorkflowCallSitesRequireProtectedMain: protectedRefCallSitesConfigured,
+    allMutationWorkflowJobsRequireProtectedMain: protectedMutationWorkflowJobsConfigured,
     readOnlyEnvironmentPreflightCannotMutateProduction:
       /workflow_dispatch:/.test(readOnlyPreflightWorkflow) &&
       /github\.ref == 'refs\/heads\/main'/.test(readOnlyPreflightWorkflow) &&
