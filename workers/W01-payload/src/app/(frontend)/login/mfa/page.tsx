@@ -3,7 +3,7 @@
 import { FormEvent, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { fetchJson, jsonHeaders } from '../../../lib/client-api.js'
+import { fetchJson, jsonHeaders } from '../../../../lib/client-api.js'
 
 type EnrollmentStartResponse = {
   data?: { totpUri?: string; recoveryCodes?: string[] }
