@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { verifyTargetBoundDualApproval } from './l8-genesis-bootstrap-approval.js'
+import { verifyTargetBoundSingleApproval } from './l8-genesis-bootstrap-approval.js'
 
 const encodeBase64Url = (value: string | Uint8Array): string => {
   const bytes = typeof value === 'string' ? new TextEncoder().encode(value) : value
@@ -44,12 +44,15 @@ async function issueTestOidcToken(now: Date) {
   return { token: unsigned + '.' + encodeBase64Url(new Uint8Array(signature)), jwk }
 }
 
+type EnvironmentPayload = Record<string, unknown>
+
 function githubFetcher(input: {
   now: Date
   jwk: JsonWebKey
-  reviews?: Array<Record<string, unknown>>
   permissions?: Record<string, string>
   files?: Array<Record<string, unknown>>
+  environment?: EnvironmentPayload
+  requestOverrides?: Record<string, unknown>
 }) {
   const nowMs = input.now.getTime()
   const headSha = 'a'.repeat(40)
@@ -65,6 +68,7 @@ function githubFetcher(input: {
     nonce: 'c'.repeat(64),
     createdAt: new Date(nowMs - 10 * 60_000).toISOString(),
     expiresAt: new Date(nowMs + 60 * 60_000).toISOString(),
+    ...(input.requestOverrides ?? {}),
   }
   const pull = {
     number: 77,
@@ -76,16 +80,32 @@ function githubFetcher(input: {
     head: { sha: headSha },
     user: { login: 'request-author' },
   }
-  const reviews = input.reviews ?? [
-    { state: 'APPROVED', submitted_at: new Date(nowMs - 4 * 60_000).toISOString(), commit_id: headSha, user: { login: 'maintainer-a', type: 'User' } },
-    { state: 'APPROVED', submitted_at: new Date(nowMs - 3 * 60_000).toISOString(), commit_id: headSha, user: { login: 'maintainer-b', type: 'User' } },
-  ]
-  const permissions = input.permissions ?? { 'maintainer-a': 'maintain', 'maintainer-b': 'write' }
+  const environment = input.environment ?? {
+    name: 'l8-genesis-bootstrap',
+    protection_rules: [{
+      type: 'required_reviewers',
+      prevent_self_review: false,
+      reviewers: [{
+        type: 'User',
+        reviewer: { id: 190754094, login: 'wanghuinet' },
+      }],
+    }],
+    deployment_branch_policy: { protected_branches: true, custom_branch_policies: false },
+  }
+  const permissions = input.permissions ?? { wanghuinet: 'admin' }
 
-  const fetcher: typeof fetch = async (requestUrl, init) => {
+  const fetcher: typeof fetch = async (requestUrl) => {
     const url = new URL(String(requestUrl))
     if (url.href === 'https://token.actions.githubusercontent.com/.well-known/jwks') {
       return Response.json({ keys: [input.jwk] })
+    }
+    if (url.pathname === '/repos/wanghuinet/luckread/environments/l8-genesis-bootstrap') {
+      return Response.json(environment)
+    }
+    if (url.pathname === '/repos/wanghuinet/luckread/collaborators/wanghuinet/permission') {
+      return permissions.wanghuinet
+        ? Response.json({ permission: permissions.wanghuinet })
+        : new Response('{}', { status: 404 })
     }
     if (url.pathname === '/repos/wanghuinet/luckread/pulls/77') return Response.json(pull)
     if (url.pathname === '/repos/wanghuinet/luckread/pulls/77/files') {
@@ -94,41 +114,104 @@ function githubFetcher(input: {
     if (url.pathname === '/repos/wanghuinet/luckread/contents/docs/change-control/l8-genesis-bootstrap-request.json') {
       return Response.json({ encoding: 'base64', content: btoa(JSON.stringify(request)) })
     }
-    if (url.pathname === '/repos/wanghuinet/luckread/pulls/77/reviews') return Response.json(reviews)
-    const permissionMatch = url.pathname.match(/^\/repos\/wanghuinet\/luckread\/collaborators\/([^/]+)\/permission$/)
-    if (permissionMatch) {
-      const login = decodeURIComponent(permissionMatch[1]).toLowerCase()
-      return permissions[login]
-        ? Response.json({ permission: permissions[login] })
-        : new Response('{}', { status: 404 })
-    }
     return new Response('unexpected test URL', { status: 500 })
   }
 
   return { fetcher, pull, request, headSha, mergeSha }
 }
 
-describe('W02 L8 target-bound dual-approval verifier', () => {
-  it('accepts a merged target-bound request with two distinct authorized approvals on the exact head SHA', async () => {
+const callVerifier = (token: string, fetcher: typeof fetch, now: Date) =>
+  verifyTargetBoundSingleApproval({
+    oidcToken: token,
+    githubToken: 'ghs_' + 'x'.repeat(40),
+    requestPrNumber: 77,
+    now,
+    fetcher,
+  })
+
+describe('W02 L8 target-bound single environment approval verifier', () => {
+  it('accepts one configured human admin approval on a protected GitHub environment', async () => {
     const now = new Date('2026-10-24T12:00:00.000Z')
     const signed = await issueTestOidcToken(now)
     const github = githubFetcher({ now, jwk: signed.jwk })
-    const result = await verifyTargetBoundDualApproval({
-      oidcToken: signed.token,
-      githubToken: 'ghs_' + 'x'.repeat(40),
-      requestPrNumber: 77,
-      now,
-      fetcher: github.fetcher,
-    })
+    const result = await callVerifier(signed.token, github.fetcher, now)
 
     expect(result).toMatchObject({
       request: { targetUserId: 'existing-user-123', roleId: 'super_admin', operation: 'INITIAL_L8_BOOTSTRAP' },
       requestPrNumber: 77,
       requestHeadSha: github.headSha,
       requestMergeSha: github.mergeSha,
-      approvedReviewers: ['maintainer-a', 'maintainer-b'],
+      approvedReviewers: ['wanghuinet'],
+      reviewerPermissions: { wanghuinet: 'admin' },
       workflowRunId: '12345678',
     })
+  })
+
+  it('fails closed when the GitHub environment does not require a human approval', async () => {
+    const now = new Date('2026-10-24T12:00:00.000Z')
+    const signed = await issueTestOidcToken(now)
+    const github = githubFetcher({
+      now,
+      jwk: signed.jwk,
+      environment: {
+        name: 'l8-genesis-bootstrap',
+        protection_rules: [],
+        deployment_branch_policy: { protected_branches: true, custom_branch_policies: false },
+      },
+    })
+    await expect(callVerifier(signed.token, github.fetcher, now))
+      .rejects.toMatchObject({ code: 'SINGLE_APPROVAL_ENVIRONMENT_NOT_CONFIGURED' })
+  })
+
+  it('rejects an environment with multiple required reviewers because the initial path is single-approver by design', async () => {
+    const now = new Date('2026-10-24T12:00:00.000Z')
+    const signed = await issueTestOidcToken(now)
+    const github = githubFetcher({
+      now,
+      jwk: signed.jwk,
+      environment: {
+        name: 'l8-genesis-bootstrap',
+        protection_rules: [{
+          type: 'required_reviewers',
+          prevent_self_review: false,
+          reviewers: [
+            { type: 'User', reviewer: { id: 190754094, login: 'wanghuinet' } },
+            { type: 'User', reviewer: { id: 987654321, login: 'another-user' } },
+          ],
+        }],
+        deployment_branch_policy: { protected_branches: true, custom_branch_policies: false },
+      },
+    })
+    await expect(callVerifier(signed.token, github.fetcher, now))
+      .rejects.toMatchObject({ code: 'SINGLE_APPROVAL_ENVIRONMENT_NOT_CONFIGURED' })
+  })
+
+  it('rejects an environment reviewer without admin or maintain permission', async () => {
+    const now = new Date('2026-10-24T12:00:00.000Z')
+    const signed = await issueTestOidcToken(now)
+    const github = githubFetcher({ now, jwk: signed.jwk, permissions: { wanghuinet: 'read' } })
+    await expect(callVerifier(signed.token, github.fetcher, now))
+      .rejects.toMatchObject({ code: 'SINGLE_APPROVAL_ENVIRONMENT_NOT_CONFIGURED' })
+  })
+
+  it('rejects unprotected deployment branches even when a reviewer is configured', async () => {
+    const now = new Date('2026-10-24T12:00:00.000Z')
+    const signed = await issueTestOidcToken(now)
+    const github = githubFetcher({
+      now,
+      jwk: signed.jwk,
+      environment: {
+        name: 'l8-genesis-bootstrap',
+        protection_rules: [{
+          type: 'required_reviewers',
+          prevent_self_review: false,
+          reviewers: [{ type: 'User', reviewer: { id: 190754094, login: 'wanghuinet' } }],
+        }],
+        deployment_branch_policy: { protected_branches: false, custom_branch_policies: true },
+      },
+    })
+    await expect(callVerifier(signed.token, github.fetcher, now))
+      .rejects.toMatchObject({ code: 'SINGLE_APPROVAL_ENVIRONMENT_NOT_CONFIGURED' })
   })
 
   it('rejects request PRs that bundle unrelated code changes with the bootstrap request', async () => {
@@ -142,76 +225,25 @@ describe('W02 L8 target-bound dual-approval verifier', () => {
         { filename: 'workers/W02-identity/src/index.ts' },
       ],
     })
-    await expect(verifyTargetBoundDualApproval({
-      oidcToken: signed.token,
-      githubToken: 'ghs_' + 'x'.repeat(40),
-      requestPrNumber: 77,
-      now,
-      fetcher: github.fetcher,
-    })).rejects.toMatchObject({ code: 'REQUEST_PR_SCOPE_INVALID' })
+    await expect(callVerifier(signed.token, github.fetcher, now))
+      .rejects.toMatchObject({ code: 'REQUEST_PR_SCOPE_INVALID' })
   })
 
-  it('rejects GitHub App/bot review identities even if their logins resemble maintainers', async () => {
-    const now = new Date('2026-10-24T12:00:00.000Z')
-    const signed = await issueTestOidcToken(now)
-    const github = githubFetcher({
-      now,
-      jwk: signed.jwk,
-      reviews: [
-        { state: 'APPROVED', submitted_at: new Date(now.getTime() - 4 * 60_000).toISOString(), commit_id: 'a'.repeat(40), user: { login: 'maintainer-a', type: 'Bot' } },
-        { state: 'APPROVED', submitted_at: new Date(now.getTime() - 3 * 60_000).toISOString(), commit_id: 'a'.repeat(40), user: { login: 'maintainer-b', type: 'Bot' } },
-      ],
-    })
-    await expect(verifyTargetBoundDualApproval({
-      oidcToken: signed.token,
-      githubToken: 'ghs_' + 'x'.repeat(40),
-      requestPrNumber: 77,
-      now,
-      fetcher: github.fetcher,
-    })).rejects.toMatchObject({ code: 'DUAL_APPROVAL_REQUIRED' })
-  })
-
-  it('rejects duplicate or missing second maintainer approval', async () => {
-    const now = new Date('2026-10-24T12:00:00.000Z')
-    const signed = await issueTestOidcToken(now)
-    const github = githubFetcher({
-      now,
-      jwk: signed.jwk,
-      reviews: [
-        { state: 'APPROVED', submitted_at: new Date(now.getTime() - 4 * 60_000).toISOString(), commit_id: 'a'.repeat(40), user: { login: 'maintainer-a' } },
-        { state: 'APPROVED', submitted_at: new Date(now.getTime() - 3 * 60_000).toISOString(), commit_id: 'z'.repeat(40), user: { login: 'maintainer-b' } },
-      ],
-    })
-    await expect(verifyTargetBoundDualApproval({
-      oidcToken: signed.token,
-      githubToken: 'ghs_' + 'x'.repeat(40),
-      requestPrNumber: 77,
-      now,
-      fetcher: github.fetcher,
-    })).rejects.toMatchObject({ code: 'DUAL_APPROVAL_REQUIRED' })
-  })
-
-  it('rejects a reviewer without repository write authority', async () => {
-    const now = new Date('2026-10-24T12:00:00.000Z')
-    const signed = await issueTestOidcToken(now)
-    const github = githubFetcher({ now, jwk: signed.jwk, permissions: { 'maintainer-a': 'maintain', 'maintainer-b': 'read' } })
-    await expect(verifyTargetBoundDualApproval({
-      oidcToken: signed.token,
-      githubToken: 'ghs_' + 'x'.repeat(40),
-      requestPrNumber: 77,
-      now,
-      fetcher: github.fetcher,
-    })).rejects.toMatchObject({ code: 'DUAL_APPROVAL_REQUIRED' })
-  })
-
-  it('rejects a malformed workflow token before consulting GitHub approval evidence', async () => {
+  it('rejects malformed workflow tokens before consulting GitHub approval evidence', async () => {
     const fetcher: typeof fetch = async () => { throw new Error('GitHub should not be contacted') }
-    await expect(verifyTargetBoundDualApproval({
-      oidcToken: 'not.a.valid.jwt',
-      githubToken: 'ghs_' + 'x'.repeat(40),
-      requestPrNumber: 77,
-      now: new Date('2026-10-24T12:00:00.000Z'),
-      fetcher,
-    })).rejects.toMatchObject({ code: 'OIDC_INVALID' })
+    await expect(callVerifier('not.a.valid.jwt', fetcher, new Date('2026-10-24T12:00:00.000Z')))
+      .rejects.toMatchObject({ code: 'OIDC_INVALID' })
+  })
+
+  it('rejects requests with invalid expiry', async () => {
+    const now = new Date('2026-10-24T12:00:00.000Z')
+    const signed = await issueTestOidcToken(now)
+    const github = githubFetcher({
+      now,
+      jwk: signed.jwk,
+      requestOverrides: { expiresAt: new Date(now.getTime() - 1).toISOString() },
+    })
+    await expect(callVerifier(signed.token, github.fetcher, now))
+      .rejects.toMatchObject({ code: 'REQUEST_EXPIRED_OR_INVALID' })
   })
 })
