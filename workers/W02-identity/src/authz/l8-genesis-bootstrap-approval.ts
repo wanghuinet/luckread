@@ -248,8 +248,8 @@ export async function verifyTargetBoundDualApproval(input: {
     input.githubToken,
     fetcher,
   )
-  if (!files.some((file) => file.filename === L8_BOOTSTRAP_REQUEST_PATH)) {
-    throw new L8BootstrapApprovalError('REQUEST_FILE_MISSING', 'approved PR did not change the bootstrap request file')
+  if (files.length !== 1 || files[0]?.filename !== L8_BOOTSTRAP_REQUEST_PATH) {
+    throw new L8BootstrapApprovalError('REQUEST_PR_SCOPE_INVALID', 'bootstrap request PR must contain only the target-bound request JSON')
   }
 
   const content = await githubRequest<{ content?: string; encoding?: string }>(
