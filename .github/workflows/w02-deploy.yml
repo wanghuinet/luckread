@@ -44,6 +44,17 @@ jobs:
         run: |
           git diff --exit-code -- workers/W02-identity/migrations/0001_role_assignments.sql
           git diff --exit-code -- workers/W02-identity/migrations/0003_role_authorization_versions.sql
+      - name: Enforce AUTH-007 for MFA-dependent W02 runtime
+        run: |
+          if [ -f scripts/verify-auth-007-deployment-gate.mjs ]; then
+            node scripts/verify-auth-007-deployment-gate.mjs
+          elif [ -f workers/W02-identity/migrations/0006_better_auth_two_factor.sql ] || grep -Fq 'LEFT JOIN "twoFactor"' workers/W02-identity/src/authz/role-assignment.ts; then
+            echo "MFA-dependent W02 source has no AUTH-007 deployment gate; refusing deployment."
+            exit 1
+          else
+            echo "Selected source does not contain the MFA-dependent W02 runtime; AUTH-007 deployment gate not required."
+          fi
+
       - name: Deploy W02 with pinned Wrangler
         working-directory: workers/W02-identity
         env:
