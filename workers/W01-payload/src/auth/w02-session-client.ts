@@ -89,6 +89,51 @@ export type BetterAuthPrincipal = {
   }>
 }
 
+export type MfaStatusResponse = {
+  enabled: boolean
+  verified: boolean
+  enrolledAt: string | null
+}
+
+/**
+ * Read the authenticated user's MFA projection through the W01 -> W02 binding.
+ * The caller marker is added by this server-side adapter; clients cannot
+ * select or override the target user ID.
+ */
+export async function getMfaStatus(request: Request): Promise<MfaStatusResponse> {
+  const response = await callW02('/internal/auth/mfa/status', {
+    request,
+    headers: {
+      'X-LuckRead-Caller': 'W01',
+      'X-LuckRead-Transport-Version': '1.0',
+    },
+  })
+
+  let payload: unknown = null
+  try { payload = await response.json() } catch {}
+  const data = payload && typeof payload === 'object'
+    ? (payload as { data?: unknown }).data
+    : null
+  if (
+    response.ok &&
+    data && typeof data === 'object' &&
+    typeof (data as MfaStatusResponse).enabled === 'boolean' &&
+    typeof (data as MfaStatusResponse).verified === 'boolean' &&
+    ((data as MfaStatusResponse).enrolledAt === null ||
+      (typeof (data as MfaStatusResponse).enrolledAt === 'string' &&
+        Number.isFinite(Date.parse((data as MfaStatusResponse).enrolledAt as string))))
+  ) {
+    const value = data as MfaStatusResponse
+    return {
+      enabled: value.enabled,
+      verified: value.verified,
+      enrolledAt: value.enrolledAt,
+    }
+  }
+
+  throw new W02AuthClientError(response.status || 503, 'MFA status failed', errorCode(payload) ?? undefined)
+}
+
 export async function getBetterAuthPrincipal(request: Request): Promise<BetterAuthPrincipal> {
   const response = await callW02('/internal/auth/principal', { request })
   let payload: unknown = null
