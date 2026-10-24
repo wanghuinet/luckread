@@ -26,7 +26,7 @@
 
 ## 2. Missing canonical traceability
 
-- Canonical MFA API operation IDs: missing.
+- Canonical API/DTO proposal: `contracts/api/AUTH-007-mfa-totp-contract.v1.json` now defines W01 public operation IDs, request/response DTOs, factor lifecycle, audit events, no-store behavior and security invariants. It remains `CONTRACTED_NOT_VERIFIED`; the operations are not yet bound into canonical OpenAPI, DTO registries, operation policy or executable W01 routes.
 - MFA enrollment-start DTO: missing.
 - MFA enrollment-confirm DTO: missing.
 - MFA challenge DTO: missing.
@@ -58,6 +58,15 @@
 - Added an implementation-evidence row that explicitly remains `BLOCKED`; source code and migration presence are not admitted production evidence.
 - The contract identifies `lastAcceptedTotpTimeStep` as a required replay-prevention field, but it is currently absent from the migration/runtime. No MFA deployment or L8 grant is authorized by this progress update.
 - `AUTH-007` remains `BLOCKED_NOT_GREEN` and Implementation authorization remains `false`.
+
+
+
+## 2B. Public API contract proposal (2026-10-24)
+
+- Added `contracts/api/AUTH-007-mfa-totp-contract.v1.json` defining the W01 public MFA enrollment/status/confirmation/challenge/disable/recovery-code operations. W01 remains the only APP/H5/PC public API entry; W02 remains the factor/identity/D1-01 authority.
+- The proposed contract explicitly requires an atomic persisted TOTP time-step replay guard, identity-bound single-use challenges, recovery-code single-use/rotation, account/factor lockout, no-store responses, step-up for factor disable/recovery rotation, session invalidation on enable/disable, and audit event coverage.
+- This is a proposal contract only: the OpenAPI operation IDs, DTO registries, API policy, W01 route adapters, runtime persistence and security E2E still need implementation/evidence. It does not authorize runtime promotion.
+- `AUTH-007` remains `BLOCKED_NOT_GREEN`; implementation authorization remains `false`.
 
 ## 3. Security interpretation rules
 
