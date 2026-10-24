@@ -64,11 +64,16 @@ export function buildMfaAuditEvent(input: {
   reasonCode?: string
   factorState?: MfaAuditEvent['payload']['factorState']
   challengeMethod?: MfaAuditEvent['payload']['challengeMethod']
+  idempotencyKey?: string
 }): MfaAuditEvent {
   if (typeof input.userId !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(input.userId)) {
     throw new TypeError('invalid MFA audit subject')
   }
   const eventId = 'evt_' + crypto.randomUUID().replaceAll('-', '')
+  if (input.idempotencyKey !== undefined &&
+      (typeof input.idempotencyKey !== 'string' || !/^[A-Za-z0-9._:-]{1,255}$/.test(input.idempotencyKey))) {
+    throw new TypeError('invalid MFA audit idempotency key')
+  }
   const occurredAt = input.occurredAt ?? new Date().toISOString()
   if (!Number.isFinite(Date.parse(occurredAt))) throw new TypeError('invalid MFA audit timestamp')
   const correlationId = safeCorrelation(input.correlationId ?? null, eventId)
@@ -91,7 +96,7 @@ export function buildMfaAuditEvent(input: {
     publishedAt: occurredAt,
     correlationId,
     causationId,
-    idempotencyKey: 'mfa-' + eventId,
+    idempotencyKey: input.idempotencyKey ?? 'mfa-' + eventId,
     attempt: 1,
     sourceVersion: 1,
     actor: { actorId: input.userId, actorType: 'user' },
@@ -136,4 +141,39 @@ export async function recordMfaAuditEvent(
   const result = await buildMfaAuditOutboxInsert(db, event).run()
   if (!result.success || result.meta?.changes !== 1) throw new Error('MFA_AUDIT_OUTBOX_WRITE_FAILED')
   return event
+}
+
+/**
+ * Insert an event once for a stable source condition such as one particular
+ * lockout window. The D1 unique idempotency key is the concurrency guard;
+ * a duplicate producer invocation is considered successful only after a
+ * read-back proves that the original key is already durable.
+ */
+export async function recordMfaAuditEventOnce(
+  db: D1Database,
+  input: Parameters<typeof buildMfaAuditEvent>[0] & { idempotencyKey: string },
+): Promise<boolean> {
+  const event = buildMfaAuditEvent(input)
+  const existing = await db.prepare(
+    'SELECT event_id AS eventId FROM auth_007_mfa_publication_journal WHERE idempotency_key = ? LIMIT 1',
+  ).bind(event.idempotencyKey).first<{ eventId: string }>()
+  if (existing) return false
+
+  let result: D1Result
+  try {
+    result = await buildMfaAuditOutboxInsert(db, event).run()
+  } catch {
+    const raced = await db.prepare(
+      'SELECT event_id AS eventId FROM auth_007_mfa_publication_journal WHERE idempotency_key = ? LIMIT 1',
+    ).bind(event.idempotencyKey).first<{ eventId: string }>()
+    if (raced) return false
+    throw new Error('MFA_AUDIT_OUTBOX_WRITE_FAILED')
+  }
+
+  if (result.success && result.meta?.changes === 1) return true
+  const afterWrite = await db.prepare(
+    'SELECT event_id AS eventId FROM auth_007_mfa_publication_journal WHERE idempotency_key = ? LIMIT 1',
+  ).bind(event.idempotencyKey).first<{ eventId: string }>()
+  if (afterWrite) return false
+  throw new Error('MFA_AUDIT_OUTBOX_WRITE_FAILED')
 }

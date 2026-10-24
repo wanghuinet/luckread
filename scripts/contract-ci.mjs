@@ -52,6 +52,15 @@ async function loadJson(path) {
   }
 }
 
+async function fileExists(path) {
+  try {
+    await stat(path)
+    return true
+  } catch {
+    return false
+  }
+}
+
 const DOMAIN_DIRS = {
   common: 'schemas/common',
   enums: 'enums',
@@ -341,9 +350,38 @@ async function checkEvents() {
       'auth.mfa.enrollment_started',
       'auth.mfa.enrollment_verified',
       'auth.mfa.enrollment_failed',
+      'auth.mfa.challenge_succeeded',
+      'auth.mfa.challenge_failed',
+      'auth.mfa.factor_disabled',
+      'auth.mfa.recovery_codes_rotated',
+      'auth.mfa.recovery_code_consumed',
+      'auth.mfa.locked',
+      'auth.mfa.replay_rejected',
     ]
-    if (JSON.stringify(implemented) !== JSON.stringify(expectedImplemented)) {
-      fail('events/AUTH-007-mfa-audit-binding.v1.json: claimed source emission coverage must match the reviewed enrollment source slice')
+    if (JSON.stringify(implemented) !== JSON.stringify(expectedImplemented) ||
+        (coverage.notYetEmittedByW02 ?? []).length !== 0) {
+      fail('events/AUTH-007-mfa-audit-binding.v1.json: all ten canonical event producers must be source-implemented and none may be reported as missing')
+    }
+    const mfaProducerSource = await readFile('workers/W02-identity/src/auth/better-auth.ts', 'utf8')
+    const mfaHookSource = await readFile('workers/W02-identity/src/auth/mfa-audit-hooks.ts', 'utf8')
+    const requiredHookTokens = [
+      "'/two-factor/verify-totp'",
+      "'/two-factor/verify-backup-code'",
+      "'/two-factor/disable'",
+      "'/two-factor/generate-backup-codes'",
+      "classifyMfaAuditHookOutcome",
+      'recordMfaAuditEventOnce',
+      'consumeTotpTimeStep',
+      'auth.mfa.replay_rejected',
+      'auth.mfa.locked',
+    ]
+    if (!(await fileExists('workers/W02-identity/src/auth/mfa-audit-hooks.test.ts')) ||
+        !(await fileExists('workers/W02-identity/src/auth/mfa-audit-events.test.ts')) ||
+        !requiredHookTokens.every((token) => mfaProducerSource.includes(token)) ||
+        !["auth.mfa.challenge_succeeded", "auth.mfa.challenge_failed",
+          "auth.mfa.factor_disabled", "auth.mfa.recovery_codes_rotated",
+          "auth.mfa.recovery_code_consumed"].every((token) => mfaHookSource.includes(token))) {
+      fail('events/AUTH-007-mfa-audit-binding.v1.json: reviewed W02 lifecycle hooks must implement the declared challenge, factor, recovery, lockout and replay events')
     }
     if (coverage.consumerSupportsAllRegisteredEvents !== true) {
       fail('events/AUTH-007-mfa-audit-binding.v1.json: W06 consumer coverage must be explicit')

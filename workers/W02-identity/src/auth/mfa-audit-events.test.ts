@@ -1,0 +1,81 @@
+import { describe, expect, it, vi } from 'vitest'
+import { buildMfaAuditEvent, recordMfaAuditEventOnce } from './mfa-audit-events'
+
+const input = {
+  eventType: 'auth.mfa.locked' as const,
+  userId: 'user-123',
+  occurredAt: '2026-10-24T14:00:00.000Z',
+  result: 'rejected' as const,
+  reasonCode: 'VERIFICATION_LOCKOUT',
+  challengeMethod: 'totp' as const,
+  idempotencyKey: 'mfa-lock:user-123:1792850400000',
+}
+
+function fakeDb(options: {
+  existing?: boolean
+  insertSuccess?: boolean
+  raceAppearsAfterInsert?: boolean
+} = {}) {
+  let selectCount = 0
+  const first = vi.fn(async () => {
+    selectCount += 1
+    if (options.existing) return { eventId: 'evt_existing' }
+    if (options.raceAppearsAfterInsert && selectCount >= 2) return { eventId: 'evt_raced' }
+    return null
+  })
+  const run = vi.fn().mockResolvedValue({
+    success: options.insertSuccess !== false,
+    meta: { changes: options.insertSuccess === false ? 0 : 1 },
+  })
+  const prepare = vi.fn((sql: string) => ({
+    bind: vi.fn((...values: unknown[]) => ({
+      first: () => first(),
+      run: () => run(),
+      sql,
+    })),
+  }))
+  return { db: { prepare } as unknown as D1Database, prepare, first, run }
+}
+
+describe('AUTH-007 MFA audit event builder and idempotent writer', () => {
+  it('builds a safe MFA lock event with a stable, bounded idempotency key', () => {
+    const event = buildMfaAuditEvent(input)
+    expect(event.eventType).toBe('auth.mfa.locked')
+    expect(event.producer).toBe('W02')
+    expect(event.resourceId).toBe('user-123')
+    expect(event.idempotencyKey).toBe(input.idempotencyKey)
+    expect(event.payload).toEqual({
+      operationId: 'authMfaChallengeVerify',
+      result: 'rejected',
+      reasonCode: 'VERIFICATION_LOCKOUT',
+      challengeMethod: 'totp',
+    })
+    expect(JSON.stringify(event)).not.toMatch(/password|secret|recoveryCodes|backupCodes|\"code\"/)
+  })
+
+  it('inserts a lockout event once when its deterministic key is new', async () => {
+    const { db, first, run } = fakeDb()
+    await expect(recordMfaAuditEventOnce(db, input)).resolves.toBe(true)
+    expect(first).toHaveBeenCalledTimes(1)
+    expect(run).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not write again if the same lockout window already exists', async () => {
+    const { db, first, run } = fakeDb({ existing: true })
+    await expect(recordMfaAuditEventOnce(db, input)).resolves.toBe(false)
+    expect(first).toHaveBeenCalledTimes(1)
+    expect(run).not.toHaveBeenCalled()
+  })
+
+  it('treats a concurrent insert of the same lockout key as already recorded after read-back', async () => {
+    const { db, first, run } = fakeDb({ insertSuccess: false, raceAppearsAfterInsert: true })
+    await expect(recordMfaAuditEventOnce(db, input)).resolves.toBe(false)
+    expect(first).toHaveBeenCalledTimes(2)
+    expect(run).toHaveBeenCalledTimes(1)
+  })
+
+  it('fails when the insert is rejected and the idempotency key is not present', async () => {
+    const { db } = fakeDb({ insertSuccess: false })
+    await expect(recordMfaAuditEventOnce(db, input)).rejects.toThrow('MFA_AUDIT_OUTBOX_WRITE_FAILED')
+  })
+})
