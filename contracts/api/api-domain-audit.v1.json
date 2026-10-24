@@ -34,7 +34,7 @@
         "recovery flow",
         "explicit anti-abuse/resource budgets",
         "security E2E evidence",
-        "MFA runtime W01/W02 endpoint adapters and login-challenge normalization",
+        "MFA enrollment/confirmation/login-challenge/disable/recovery W01/W02 adapters and login-challenge normalization",
         "persisted atomic TOTP time-step replay guard and concurrent replay rejection",
         "factor/recovery lifecycle state-machine and secure step-up evidence",
         "MFA audit events, anti-abuse/resource budgets and security E2E evidence",
