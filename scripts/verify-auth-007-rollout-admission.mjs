@@ -206,10 +206,10 @@ if (blockers.length === 0) {
       /hasMfaEnforcement/.test(read('scripts/verify-admin-account-bootstrap-readiness.mjs')) &&
       /BLOCKED_NOT_GREEN/.test(read('scripts/verify-admin-account-bootstrap-readiness.mjs')),
     standaloneW01DeployUsesProtectedAdmission:
-      /environment:\\s*auth-mfa-rollout/.test(standaloneW01Workflow) &&
-      /github\\.ref == 'refs\\/heads\\/main'/.test(standaloneW01Workflow) &&
+      /environment:\s*auth-mfa-rollout/.test(standaloneW01Workflow) &&
+      /github\.ref == 'refs\/heads\/main'/.test(standaloneW01Workflow) &&
       /merge-base --is-ancestor/.test(standaloneW01Workflow) &&
-      /verify-auth-007-rollout-admission\\.mjs/.test(standaloneW01Workflow) &&
+      /verify-auth-007-rollout-admission\.mjs/.test(standaloneW01Workflow) &&
       standaloneW01Workflow.indexOf('verify-auth-007-rollout-admission.mjs') >= 0 &&
       standaloneW01Workflow.indexOf('verify-auth-007-rollout-admission.mjs') < standaloneW01Workflow.indexOf('run: pnpm run deploy:app'),
   }
