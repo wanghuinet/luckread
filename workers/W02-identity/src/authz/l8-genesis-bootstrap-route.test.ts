@@ -85,5 +85,11 @@ describe('W02 L8 genesis bootstrap service-boundary gate', () => {
     expect(source).not.toMatch(/mfaVerified\??\s*:/)
     expect(source).toContain('verifyTargetBoundDualApproval')
     expect(source).toContain('bootstrapSuperAdmin(env.D1_01, approval')
+
+    const authSource = readFileSync(fileURLToPath(new URL('../auth/better-auth.ts', import.meta.url)), 'utf8')
+    expect(authSource).toContain('trustDeviceMaxAge: 0')
+    expect(authSource).toContain('skipVerificationOnEnable: false')
+    expect(authSource).toContain('totpOptions: { allowPasswordless: false }')
+    expect(authSource).not.toMatch(/sendOTP\s*:/)
   })
 })
