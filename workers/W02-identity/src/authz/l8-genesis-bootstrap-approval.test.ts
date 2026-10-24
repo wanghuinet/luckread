@@ -163,6 +163,26 @@ describe('W02 L8 target-bound single environment approval verifier', () => {
       .rejects.toMatchObject({ code: 'SINGLE_APPROVAL_ENVIRONMENT_NOT_CONFIGURED' })
   })
 
+  it('rejects a different administrator as the genesis approver when the repository owner is the sole configured maintainer', async () => {
+    const now = new Date('2026-10-24T12:00:00.000Z')
+    const signed = await issueTestOidcToken(now)
+    const github = githubFetcher({
+      now,
+      jwk: signed.jwk,
+      environment: {
+        name: 'l8-genesis-bootstrap',
+        protection_rules: [{
+          type: 'required_reviewers',
+          prevent_self_review: false,
+          reviewers: [{ type: 'User', reviewer: { id: 987654321, login: 'another-admin' } }],
+        }],
+        deployment_branch_policy: { protected_branches: true, custom_branch_policies: false },
+      },
+    })
+    await expect(callVerifier(signed.token, github.fetcher, now))
+      .rejects.toMatchObject({ code: 'SINGLE_APPROVAL_ENVIRONMENT_NOT_CONFIGURED' })
+  })
+
   it('rejects an environment with multiple required reviewers because the initial path is single-approver by design', async () => {
     const now = new Date('2026-10-24T12:00:00.000Z')
     const signed = await issueTestOidcToken(now)
