@@ -8,12 +8,14 @@ const workflowPaths = [
   '.github/workflows/w01-payload-app-deploy.yml',
   '.github/workflows/w01-w02-binding-deploy.yml',
   '.github/workflows/w02-role-assignment-migration.yml',
+  '.github/workflows/w06-deploy.yml',
 ]
 const protectedMutationWorkflowPaths = [
   '.github/workflows/w02-deploy.yml',
   '.github/workflows/w01-payload-app-deploy.yml',
   '.github/workflows/w01-w02-binding-deploy.yml',
   '.github/workflows/w02-role-assignment-migration.yml',
+  '.github/workflows/w06-deploy.yml',
 ]
 const verifier = readFileSync('scripts/verify-auth-007-rollout-admission.mjs', 'utf8')
 
@@ -49,5 +51,14 @@ describe('AUTH-007 protected-ref admission contract', () => {
         path + ' must require protected main in the job-level condition',
       )
     }
+  })
+
+  it('gates W06 deployment with AUTH-007 environment admission before Wrangler deploy', () => {
+    const workflow = readFileSync('.github/workflows/w06-deploy.yml', 'utf8')
+    assert.match(workflow, /environment:\s*auth-mfa-rollout/)
+    assert.match(workflow, /GITHUB_REF_PROTECTED:\s*\$\{\{\s*github\.ref_protected\s*\}\}/)
+    const admission = workflow.indexOf('run: node scripts/verify-auth-007-rollout-admission.mjs')
+    const deploy = workflow.indexOf('run: npx --yes wrangler@4.116.0 deploy --config wrangler.jsonc')
+    assert.ok(admission >= 0 && deploy > admission, 'AUTH-007 admission must run before W06 deployment')
   })
 })

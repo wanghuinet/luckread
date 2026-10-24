@@ -18,12 +18,14 @@ const protectedRefWorkflowPaths = [
   '.github/workflows/w01-payload-app-deploy.yml',
   '.github/workflows/w01-w02-binding-deploy.yml',
   '.github/workflows/w02-role-assignment-migration.yml',
+  '.github/workflows/w06-deploy.yml',
 ]
 const protectedMutationWorkflowPaths = [
   '.github/workflows/w02-deploy.yml',
   '.github/workflows/w01-payload-app-deploy.yml',
   '.github/workflows/w01-w02-binding-deploy.yml',
   '.github/workflows/w02-role-assignment-migration.yml',
+  '.github/workflows/w06-deploy.yml',
 ]
 
 function requireSource(condition, message) {
@@ -187,6 +189,7 @@ if (blockers.length === 0) {
   implementationAuthorization = reconciliation.match(/^- Implementation authorization:\s*`([^`]+)`/m)?.[1] ?? null
   const standaloneW01Workflow = read('.github/workflows/w01-payload-app-deploy.yml')
   const readOnlyPreflightWorkflow = read('.github/workflows/auth-mfa-rollout-preflight.yml')
+  const w06DeployWorkflow = read('.github/workflows/w06-deploy.yml')
   const protectedRefCallSitesConfigured = protectedRefWorkflowPaths.every((file) =>
     /GITHUB_REF_PROTECTED:\s*\$\{\{\s*github\.ref_protected\s*\}\}/.test(read(file))
   )
@@ -361,6 +364,13 @@ if (blockers.length === 0) {
       /verify-auth-007-rollout-admission\.mjs/.test(standaloneW01Workflow) &&
       standaloneW01Workflow.indexOf('verify-auth-007-rollout-admission.mjs') >= 0 &&
       standaloneW01Workflow.indexOf('verify-auth-007-rollout-admission.mjs') < standaloneW01Workflow.indexOf('run: pnpm run deploy:app'),
+    w06DeploymentUsesProtectedAdmission:
+      /environment:\s*auth-mfa-rollout/.test(w06DeployWorkflow) &&
+      /github\.ref == 'refs\/heads\/main'/.test(w06DeployWorkflow) &&
+      /GITHUB_REF_PROTECTED:\s*\$\{\{\s*github\.ref_protected\s*\}\}/.test(w06DeployWorkflow) &&
+      /verify-auth-007-rollout-admission\.mjs/.test(w06DeployWorkflow) &&
+      w06DeployWorkflow.indexOf('verify-auth-007-rollout-admission.mjs') >= 0 &&
+      w06DeployWorkflow.indexOf('verify-auth-007-rollout-admission.mjs') < w06DeployWorkflow.indexOf('run: npx --yes wrangler@4.116.0 deploy --config wrangler.jsonc'),
     allRolloutWorkflowCallSitesRequireProtectedMain: protectedRefCallSitesConfigured,
     allMutationWorkflowJobsRequireProtectedMain: protectedMutationWorkflowJobsConfigured,
     readOnlyEnvironmentPreflightCannotMutateProduction:
