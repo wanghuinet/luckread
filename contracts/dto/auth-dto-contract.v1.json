@@ -38,7 +38,14 @@
         "browserCarrier": "Set-Cookie",
         "nativeRequestCarrier": "Authorization: Bearer",
         "refreshTokenIssued": false
-      }
+      },
+      "responseVariants": [
+        {
+          "status": 202,
+          "responseDtoId": "DTO-AUTH-007-MFA-CHALLENGE-REQUIRED",
+          "responseSchemaRef": "#/paths/~1auth~1login/post/responses/202/content/application~1json/schema"
+        }
+      ]
     },
     {
       "featureId": "AUTH-002",
@@ -253,6 +260,100 @@
         "ENT-USER"
       ],
       "status": "NO_BODY_DTO"
+    },
+    {
+      "featureId": "AUTH-007",
+      "operationId": "authMfaStatus",
+      "requestDtoId": null,
+      "responseDtoId": "DTO-AUTH-007-MFA-STATUS",
+      "requestSchemaRef": null,
+      "responseSchemaRef": "#/paths/~1auth~1mfa/get/responses/200/content/application~1json/schema",
+      "entityIds": [
+        "ENT-USER",
+        "ENT-MFA-FACTOR"
+      ],
+      "status": "CONTRACT_BOUND"
+    },
+    {
+      "featureId": "AUTH-007",
+      "operationId": "authMfaEnrollmentStart",
+      "requestDtoId": "DTO-AUTH-007-MFA-ENROLLMENT-START-REQUEST",
+      "responseDtoId": "DTO-AUTH-007-MFA-ENROLLMENT-START-RESPONSE",
+      "requestSchemaRef": "#/paths/~1auth~1mfa~1enrollment/post/requestBody/content/application~1json/schema",
+      "responseSchemaRef": "#/paths/~1auth~1mfa~1enrollment/post/responses/200/content/application~1json/schema",
+      "entityIds": [
+        "ENT-USER",
+        "ENT-MFA-FACTOR"
+      ],
+      "status": "CONTRACT_BOUND",
+      "wireSemantics": {
+        "secretsReturnedOnce": true,
+        "cacheControl": "no-store"
+      }
+    },
+    {
+      "featureId": "AUTH-007",
+      "operationId": "authMfaEnrollmentConfirm",
+      "requestDtoId": "DTO-AUTH-007-MFA-ENROLLMENT-CONFIRM-REQUEST",
+      "responseDtoId": "DTO-AUTH-007-MFA-STATUS",
+      "requestSchemaRef": "#/paths/~1auth~1mfa~1enrollment~1confirm/post/requestBody/content/application~1json/schema",
+      "responseSchemaRef": "#/paths/~1auth~1mfa~1enrollment~1confirm/post/responses/200/content/application~1json/schema",
+      "entityIds": [
+        "ENT-USER",
+        "ENT-MFA-FACTOR"
+      ],
+      "status": "CONTRACT_BOUND"
+    },
+    {
+      "featureId": "AUTH-007",
+      "operationId": "authMfaChallengeVerify",
+      "requestDtoId": "DTO-AUTH-007-MFA-CHALLENGE-VERIFY-REQUEST",
+      "responseDtoId": "DTO-AUTH-007-MFA-CHALLENGE-VERIFY-RESPONSE",
+      "requestSchemaRef": "#/paths/~1auth~1mfa~1challenge~1verify/post/requestBody/content/application~1json/schema",
+      "responseSchemaRef": "#/paths/~1auth~1mfa~1challenge~1verify/post/responses/200/content/application~1json/schema",
+      "entityIds": [
+        "ENT-USER",
+        "ENT-MFA-FACTOR",
+        "ENT-SESSION"
+      ],
+      "status": "CONTRACT_BOUND",
+      "wireSemantics": {
+        "challengeBound": true,
+        "sessionCredentialInJson": false,
+        "successHeader": "X-LuckRead-Session-Token"
+      }
+    },
+    {
+      "featureId": "AUTH-007",
+      "operationId": "authMfaDisable",
+      "requestDtoId": "DTO-AUTH-007-MFA-DISABLE-REQUEST",
+      "responseDtoId": null,
+      "requestSchemaRef": "#/paths/~1auth~1mfa~1disable/post/requestBody/content/application~1json/schema",
+      "responseSchemaRef": null,
+      "entityIds": [
+        "ENT-USER",
+        "ENT-MFA-FACTOR",
+        "ENT-SESSION"
+      ],
+      "responseStatus": 204,
+      "status": "CONTRACT_BOUND"
+    },
+    {
+      "featureId": "AUTH-007",
+      "operationId": "authMfaRecoveryCodesRotate",
+      "requestDtoId": "DTO-AUTH-007-MFA-RECOVERY-CODES-ROTATE-REQUEST",
+      "responseDtoId": "DTO-AUTH-007-MFA-RECOVERY-CODES-ROTATE-RESPONSE",
+      "requestSchemaRef": "#/paths/~1auth~1mfa~1recovery-codes~1rotate/post/requestBody/content/application~1json/schema",
+      "responseSchemaRef": "#/paths/~1auth~1mfa~1recovery-codes~1rotate/post/responses/200/content/application~1json/schema",
+      "entityIds": [
+        "ENT-USER",
+        "ENT-MFA-FACTOR"
+      ],
+      "status": "CONTRACT_BOUND",
+      "wireSemantics": {
+        "plaintextRecoveryCodesReturnedOnce": true,
+        "oldCodesInvalidatedAtomically": true
+      }
     }
   ],
   "bindingRules": {
