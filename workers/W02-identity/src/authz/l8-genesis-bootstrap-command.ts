@@ -1,6 +1,6 @@
 import layers from '../../../../contracts/authz/layers.json'
 import type { VerifiedL8BootstrapApproval } from './l8-genesis-bootstrap-approval.js'
-import { L8BootstrapApprovalError } from './l8-genesis-bootstrap-approval.js'
+import { prepareRoleVersionAdvance, readRoleVersion } from './role-version.js'
 
 type ExistingAudit = {
   requestPrNumber: number
@@ -53,6 +53,7 @@ export async function bootstrapSuperAdmin(
   validFrom: string
   validUntil: string
   replayed: boolean
+  roleVersion: number
 }> {
   const request = approval?.request
   if (
@@ -63,7 +64,10 @@ export async function bootstrapSuperAdmin(
     request.scopeId !== null ||
     roleToLayer.get('super_admin') !== 'L8' ||
     mfaRequiredByLayer.get('L8') !== true ||
+    typeof request.targetUserId !== 'string' ||
     !/^[A-Za-z0-9_-]{8,128}$/.test(request.targetUserId) ||
+    typeof request.nonce !== 'string' ||
+    !/^[a-f0-9]{64}$/i.test(request.nonce) ||
     !Number.isSafeInteger(approval.requestPrNumber) ||
     approval.requestPrNumber < 1 ||
     !/^[0-9a-f]{40}$/i.test(approval.requestHeadSha) ||
@@ -79,7 +83,7 @@ export async function bootstrapSuperAdmin(
   const createdAt = Date.parse(request.createdAt)
   const expiresAt = Date.parse(request.expiresAt)
   const nowMs = Date.parse(now)
-  if (!Number.isFinite(createdAt) || !Number.isFinite(expiresAt) || expiresAt <= nowMs || createdAt > nowMs) {
+  if (!Number.isFinite(createdAt) || !Number.isFinite(expiresAt) || expiresAt <= createdAt || expiresAt <= nowMs || createdAt > nowMs) {
     throw new L8BootstrapCommandError('REQUEST_EXPIRED_OR_INVALID', 'approved bootstrap request is outside its validity interval')
   }
 
@@ -131,6 +135,7 @@ export async function bootstrapSuperAdmin(
         validFrom: persisted.validFrom,
         validUntil: existingAudit.validUntil,
         replayed: true,
+        roleVersion: await readRoleVersion(db, request.targetUserId),
       }
     }
     throw new L8BootstrapCommandError('BOOTSTRAP_ALREADY_CONSUMED', 'the bootstrap was already consumed and cannot be reissued')
@@ -194,6 +199,9 @@ export async function bootstrapSuperAdmin(
         "INSERT INTO role_assignments (id, subject_id, role_id, scope_type, scope_id, status, valid_from, valid_until, created_at, updated_at) " +
         "VALUES (?, ?, 'super_admin', 'global', NULL, 'ACTIVE', ?, ?, ?, ?)",
       ).bind(assignmentId, request.targetUserId, now, validUntil, now, now),
+      // Atomic role-version invalidation prevents caches from retaining the
+      // pre-bootstrap authorization after the assignment becomes effective.
+      prepareRoleVersionAdvance(db, request.targetUserId, now),
     ])
   } catch {
     const raced = await db.prepare(
@@ -220,6 +228,7 @@ export async function bootstrapSuperAdmin(
           validFrom: raced.validFrom,
           validUntil: raced.validUntil,
           replayed: true,
+          roleVersion: await readRoleVersion(db, request.targetUserId),
         }
       }
       throw new L8BootstrapCommandError('BOOTSTRAP_ALREADY_CONSUMED', 'another genesis request has already consumed the one-time guard')
@@ -250,6 +259,11 @@ export async function bootstrapSuperAdmin(
     throw new L8BootstrapCommandError('ROLE_ASSIGNMENT_WRITE_FAILED', 'persisted L8 bootstrap state failed read-back validation')
   }
 
+  const roleVersion = await readRoleVersion(db, request.targetUserId)
+  if (roleVersion < 1) {
+    throw new L8BootstrapCommandError('ROLE_ASSIGNMENT_WRITE_FAILED', 'bootstrap role version read-back failed')
+  }
+
   return {
     assignmentId,
     targetUserId: request.targetUserId,
@@ -257,5 +271,6 @@ export async function bootstrapSuperAdmin(
     validFrom: now,
     validUntil,
     replayed: false,
+    roleVersion,
   }
 }
