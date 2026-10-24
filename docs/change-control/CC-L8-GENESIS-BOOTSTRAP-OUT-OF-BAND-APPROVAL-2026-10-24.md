@@ -12,11 +12,11 @@ The repository currently has one authorized maintainer. For the first L8 bootstr
 The source code fails closed unless the GitHub Environment `l8-genesis-bootstrap` is configured with all of the following:
 
 - exactly one required reviewer, the repository owner's GitHub account (numeric user ID `190754094`) with repository `admin` or `maintain` permission;
-- `prevent_self_review: false`, so the sole maintainer can approve the run they dispatch;
+- `prevent_self_review: true`, so the workflow initiator cannot approve their own run;
 - deployment branch policy restricted to protected branches;
 - workflow execution from protected `main`, using the fixed workflow path and signed GitHub OIDC token.
 
-GitHub's environment gate must approve the workflow job before its steps can run. W02 then queries the environment configuration and rejects a missing reviewer rule, multiple reviewers, a team reviewer, an underprivileged reviewer, or an unprotected branch policy. The request PR number is included in the workflow run name so the operator can inspect the target-bound request before approving. A source-file `approved=true` flag is never accepted.
+GitHub's environment gate must approve the workflow job before its steps can run. The dispatch actor must be a separate authorized repository collaborator; the sole admin/maintainer cannot approve a run they initiated. W02 then queries the environment configuration and rejects a missing reviewer rule, multiple reviewers, a team reviewer, an underprivileged reviewer, self-review enabled, or an unprotected branch policy. The request PR number is included in the workflow run name so the reviewer can inspect the target-bound request before approving. If no independent authorized dispatch actor exists, initialization remains blocked; the self-review control must not be weakened. A source-file `approved=true` flag is never accepted.
 
 ## 2. Immutable request
 
@@ -37,14 +37,14 @@ The request PR must be merged to `main`; W02 reads the JSON at the immutable mer
 - The GitHub Environment requires one approval. That one approval gates the whole run.
 - Before any write, the run executes `scripts/verify-admin-account-bootstrap-readiness.mjs`. This source/evidence gate must pass; it currently must remain blocked while AUTH-007 is `BLOCKED_NOT_GREEN`.
 - If the gate passes, the same run obtains a short-lived OIDC token, calls W01's public API, and performs a read-only production preflight. A failed preflight never calls the grant route.
-- Only after the preflight passes does the same run request the one-time write. W02 independently revalidates the token, environment configuration, request, account state, L2 role, current L8 state, one-time guard and expiry. W02 alone writes the RoleAssignment.
+- Only after the preflight passes does the same run request the one-time write. W02 independently revalidates the token, environment configuration, request, account state, verified L2 role, current L8 state, target MFA enrollment/verification, one-time guard and expiry. Both readiness and write paths fail closed if the target lacks verified MFA, before the singleton audit guard can be consumed. W02 alone writes the RoleAssignment.
 - The four-hour grant is bounded by the canonical L8 contract. It is not a permanent L8 assignment.
 
 No direct D1 mutation, credential write, ad hoc SQL, additional Worker, or secret-bearing workflow is allowed.
 
 ## 4. MFA and production admission stay fail-closed
 
-L8 is not usable until W02's role resolver verifies Better Auth's TOTP enrollment state. The bootstrap path must never accept request-body MFA booleans or caller-supplied assurance claims. However, the repository's AUTH-007 reconciliation still records that canonical MFA operation/DTO contracts and complete executable evidence are missing. Therefore the new workflow runs the readiness gate first, and **no production initialization is permitted while AUTH-007 remains `BLOCKED_NOT_GREEN`**. The presence of MFA-related tables or a layer-level resolver is not a substitute for a green contract-and-test evidence chain.
+L8 is not usable until W02's role resolver verifies Better Auth's TOTP enrollment state. The bootstrap path must never accept request-body MFA booleans or caller-supplied assurance claims. However, the repository's AUTH-007 reconciliation still records that canonical MFA operation/DTO contracts and complete executable evidence are missing. Therefore the new workflow runs the readiness gate first, and **no production initialization is permitted while AUTH-007 remains `BLOCKED_NOT_GREEN`**. The presence of MFA-related tables or a layer-level resolver is not a substitute for a green contract-and-test evidence chain. The W02 migration and both W02-containing deployment workflows now run a source-bound AUTH-007 gate before production mutation; an MFA-dependent source cannot be deployed or migrated while the status is not `GREEN` and implementation authorization is not `true`.
 
 ## 5. Permanent audit guard and four-hour scope
 
