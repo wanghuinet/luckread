@@ -11,6 +11,7 @@ const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), 'u
 const exists = (relativePath) => fs.existsSync(path.join(root, relativePath))
 const blockers = []
 const staticOnly = process.argv.includes('--static-only')
+const readOnlyConfigPreflight = process.argv.includes('--read-only-config-preflight')
 
 function requireSource(condition, message) {
   if (!condition) blockers.push(message)
@@ -32,7 +33,7 @@ async function githubGet(apiPath, token) {
   return response.json()
 }
 
-async function verifyProtectedEnvironment() {
+async function verifyProtectedEnvironment({ requireDistinctActor = true } = {}) {
   const token = process.env.GITHUB_TOKEN ?? ''
   const repo = process.env.GITHUB_REPOSITORY ?? ''
   const actor = (process.env.GITHUB_ACTOR ?? '').toLowerCase()
@@ -69,6 +70,7 @@ async function verifyProtectedEnvironment() {
 
   if (
     environment.name !== environmentName ||
+    environment.can_admins_bypass !== false ||
     rules.length !== 1 ||
     reviewers.length !== 1 ||
     rules[0]?.prevent_self_review !== true ||
@@ -77,9 +79,9 @@ async function verifyProtectedEnvironment() {
     configuredReviewer?.type !== 'User' ||
     !reviewerLogin ||
     configuredReviewer?.reviewer?.id !== expectedReviewerId ||
-    reviewerLogin === actor
+    (requireDistinctActor && reviewerLogin === actor)
   ) {
-    throw new Error('AUTH-007 rollout environment must require the designated human maintainer, forbid self-review, and allow protected branches only')
+    throw new Error('AUTH-007 rollout environment must disable admin bypass, require the designated human maintainer, forbid self-review, and allow protected branches only')
   }
 
   const permission = await githubGet(
@@ -102,7 +104,7 @@ async function verifyProtectedEnvironment() {
     reviewerRole: permissionValue === 'admin' || roleName === 'admin' ? 'admin' : roleName,
     selfReviewPrevented: true,
     protectedBranchesOnly: true,
-    initiatorDiffersFromReviewer: true,
+    initiatorDiffersFromReviewer: reviewerLogin !== actor,
   }
 }
 
@@ -126,6 +128,7 @@ for (const file of [
   betterAuthPath,
   replayGuardPath,
   policyPath,
+  '.github/workflows/auth-mfa-rollout-preflight.yml',
 ]) {
   requireSource(exists(file), 'Required reviewed rollout artifact is missing: ' + file)
 }
@@ -150,7 +153,11 @@ if (blockers.length === 0) {
   const lifecycle = JSON.parse(read(lifecyclePath))
   const policy = JSON.parse(read(policyPath))
   const reconciliation = read(reconciliationPath)
+  // Resolve gate status before computing sourceEvidenceChecks below.
+  auth007Status = reconciliation.match(/^- Status:\s*`([^`]+)`/m)?.[1] ?? null
+  implementationAuthorization = reconciliation.match(/^- Implementation authorization:\s*`([^`]+)`/m)?.[1] ?? null
   const standaloneW01Workflow = read('.github/workflows/w01-payload-app-deploy.yml')
+  const readOnlyPreflightWorkflow = read('.github/workflows/auth-mfa-rollout-preflight.yml')
 
   const requiredMigrationTokens = [
     'two_factor_enabled',
@@ -178,6 +185,43 @@ if (blockers.length === 0) {
   const policyIds = new Set((policy.operations ?? []).map((operation) => operation.operationId))
   const canonicalOperationIds = new Set((apiContract.operations ?? []).map((operation) => operation.operationId))
 
+  const sourceEvidenceChecks = {
+    apiListsAllSixOperations: apiContract.evidenceStatus?.api?.includes('all six canonical operationIds') === true,
+    apiNoLongerClaimsRoutesMissing: !apiContract.evidenceStatus?.api?.includes('other five operations lack runtime adapters'),
+    runtimeDescriptionAccurate:
+      (apiContract.evidenceStatus?.runtime?.startsWith('SOURCE_IMPLEMENTED_TESTED_LOCALLY;') === true ||
+       ['PASS', 'VERIFIED'].includes(apiContract.evidenceStatus?.runtime)),
+    apiSecurityAndMappingStatusesAllowed:
+      ['MISSING', 'PASS', 'VERIFIED'].includes(apiContract.evidenceStatus?.securityE2E) &&
+      ['MISSING', 'PASS', 'VERIFIED'].includes(apiContract.evidenceStatus?.mapping0),
+    auth007StatusIsRecognized: ['BLOCKED_NOT_GREEN', 'GREEN'].includes(auth007Status),
+    contractStatusesMatchReconciliation:
+      apiContract.evidenceStatus?.auth007 === auth007Status &&
+      factorContract.evidenceStatus?.auth007 === auth007Status,
+    implementationAuthorizationMatchesStatus:
+      auth007Status === 'GREEN'
+        ? implementationAuthorization === 'true'
+        : implementationAuthorization !== 'true',
+    greenRequiresAllProductionEvidence: auth007Status !== 'GREEN' || (
+      ['PASS', 'VERIFIED'].includes(apiContract.evidenceStatus?.securityE2E) &&
+      ['PASS', 'VERIFIED'].includes(apiContract.evidenceStatus?.mapping0) &&
+      ['PASS', 'VERIFIED'].includes(apiContract.evidenceStatus?.persistence) &&
+      ['PASS', 'VERIFIED'].includes(factorContract.evidenceStatus?.totpReplayProtection) &&
+      ['PASS', 'VERIFIED'].includes(factorContract.evidenceStatus?.runtime) &&
+      ['PASS', 'VERIFIED'].includes(factorContract.evidenceStatus?.securityE2E) &&
+      ['PASS', 'VERIFIED'].includes(factorContract.evidenceStatus?.evidenceRegistry) &&
+      ['VERIFIED', 'GREEN'].includes(factorContract.status) &&
+      ['PASS', 'VERIFIED'].includes(factorContract.evidenceStatus?.entity) &&
+      ['PASS', 'VERIFIED'].includes(factorContract.evidenceStatus?.apiDto)
+    ),
+    factorMissingEvidenceStatusesAllowed:
+      ['MISSING', 'PASS', 'VERIFIED'].includes(factorContract.evidenceStatus?.securityE2E) &&
+      ['MISSING', 'PASS', 'VERIFIED'].includes(factorContract.evidenceStatus?.evidenceRegistry),
+    noStaleReplayInvariant:
+      !factorContract.securityInvariants.some((invariant) =>
+        invariant.includes('current migration 0006 does not provide this field')),
+  }
+
   sourceChecks = {
     reviewedMfaMigrationShape: requiredMigrationTokens.every((token) => migration.includes(token)),
     reviewedBootstrapAuditShape: requiredBootstrapTokens.every((token) => bootstrapMigration.includes(token)),
@@ -189,6 +233,8 @@ if (blockers.length === 0) {
     canonicalContractsDeclareExplicitStatus: ['CONTRACTED_NOT_VERIFIED', 'VERIFIED', 'GREEN'].includes(apiContract.status) &&
       ['CONTRACTED_NOT_VERIFIED', 'VERIFIED', 'GREEN'].includes(factorContract.status) &&
       ['CONTRACTED_NOT_VERIFIED', 'VERIFIED', 'GREEN'].includes(lifecycle.status),
+    sourceEvidenceIsAccurateAndPromotionConsistent: Object.values(sourceEvidenceChecks).every((passed) => passed === true),
+    ...Object.fromEntries(Object.entries(sourceEvidenceChecks).map(([key, passed]) => ['evidence_' + key, passed])),
     allSixPublicRoutesAndTestsPresent: operations.every((operation) =>
       exists(operation.route) &&
       exists(operation.test) &&
@@ -202,9 +248,15 @@ if (blockers.length === 0) {
       'workers/W02-identity/src/auth/totp-replay-guard.test.ts',
       'workers/W02-identity/src/auth/mfa-lifecycle-contract.test.ts',
     ].every(exists),
-    finalGenesisGateRemainsSeparate: exists('scripts/verify-admin-account-bootstrap-readiness.mjs') &&
-      /hasMfaEnforcement/.test(read('scripts/verify-admin-account-bootstrap-readiness.mjs')) &&
-      /BLOCKED_NOT_GREEN/.test(read('scripts/verify-admin-account-bootstrap-readiness.mjs')),
+    finalGenesisGateRequiresExplicitGreenPromotion: exists('scripts/verify-admin-account-bootstrap-readiness.mjs') &&
+      /auth007Status === 'GREEN'/.test(read('scripts/verify-admin-account-bootstrap-readiness.mjs')) &&
+      /implementationAuthorization === 'true'/.test(read('scripts/verify-admin-account-bootstrap-readiness.mjs')) &&
+      /!auth007PromotionVerified/.test(read('scripts/verify-admin-account-bootstrap-readiness.mjs')) &&
+      /AUTH-007 must be GREEN with implementation authorization true/.test(read('scripts/verify-admin-account-bootstrap-readiness.mjs')),
+    rolloutEnvironmentDisablesAdminBypass: read('scripts/verify-auth-007-rollout-admission.mjs').includes('environment.can_admins_bypass !== false'),
+    l8EnvironmentDisablesAdminBypass: read('workers/W02-identity/src/authz/l8-genesis-bootstrap-approval.ts').includes('environment.can_admins_bypass !== false') &&
+      /can_admins_bypass: true/.test(read('workers/W02-identity/src/authz/l8-genesis-bootstrap-approval.test.ts')) &&
+      /rejects environments that permit administrator bypass of protection rules/.test(read('workers/W02-identity/src/authz/l8-genesis-bootstrap-approval.test.ts')),
     standaloneW01DeployUsesProtectedAdmission:
       /environment:\s*auth-mfa-rollout/.test(standaloneW01Workflow) &&
       /github\.ref == 'refs\/heads\/main'/.test(standaloneW01Workflow) &&
@@ -212,6 +264,13 @@ if (blockers.length === 0) {
       /verify-auth-007-rollout-admission\.mjs/.test(standaloneW01Workflow) &&
       standaloneW01Workflow.indexOf('verify-auth-007-rollout-admission.mjs') >= 0 &&
       standaloneW01Workflow.indexOf('verify-auth-007-rollout-admission.mjs') < standaloneW01Workflow.indexOf('run: pnpm run deploy:app'),
+    readOnlyEnvironmentPreflightCannotMutateProduction:
+      /workflow_dispatch:/.test(readOnlyPreflightWorkflow) &&
+      /github\.ref == 'refs\/heads\/main'/.test(readOnlyPreflightWorkflow) &&
+      /--read-only-config-preflight/.test(readOnlyPreflightWorkflow) &&
+      /GITHUB_TOKEN:\s*\$\{\{\s*github\.token\s*\}\}/.test(readOnlyPreflightWorkflow) &&
+      !/environment:\s*auth-mfa-rollout/.test(readOnlyPreflightWorkflow) &&
+      !/wrangler\s+d1\s+(?:migrations\s+apply|execute)|CLOUDFLARE_API_TOKEN|wrangler[^\n]*\bdeploy\b/i.test(readOnlyPreflightWorkflow),
   }
 
   for (const [check, passed] of Object.entries(sourceChecks)) {
@@ -225,15 +284,15 @@ if (blockers.length === 0) {
 let protectedEnvironment = null
 if (blockers.length === 0 && !staticOnly) {
   try {
-    protectedEnvironment = await verifyProtectedEnvironment()
+    protectedEnvironment = await verifyProtectedEnvironment({ requireDistinctActor: !readOnlyConfigPreflight })
   } catch (error) {
     blockers.push(error instanceof Error ? error.message : 'Protected rollout environment could not be verified')
   }
 }
 
 const report = {
-  status: blockers.length > 0 ? 'BLOCKED_NOT_GREEN' : staticOnly ? 'STATIC_ROLLOUT_SOURCE_READY' : 'ROLLOUT_ADMISSION_READY_NOT_FINAL_GREEN',
-  gateMode: staticOnly ? 'STATIC_ONLY_NO_PRODUCTION_AUTHORIZATION' : 'PROTECTED_MANUAL_ROLLOUT',
+  status: blockers.length > 0 ? 'BLOCKED_NOT_GREEN' : staticOnly ? 'STATIC_ROLLOUT_SOURCE_READY' : readOnlyConfigPreflight ? 'READ_ONLY_ENVIRONMENT_PREFLIGHT_COMPLETE' : 'ROLLOUT_ADMISSION_READY_NOT_FINAL_GREEN',
+  gateMode: staticOnly ? 'STATIC_ONLY_NO_PRODUCTION_AUTHORIZATION' : readOnlyConfigPreflight ? 'READ_ONLY_ENVIRONMENT_CONFIGURATION_PREFLIGHT' : 'PROTECTED_MANUAL_ROLLOUT',
   rolloutEnvironment: protectedEnvironment,
   sourceChecks,
   finalAuth007Status: auth007Status,

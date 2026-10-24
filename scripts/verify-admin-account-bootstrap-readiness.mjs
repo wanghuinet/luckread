@@ -73,8 +73,12 @@ if (!hasEncryptedRecoveryCodes) {
   blockers.push('AUTH-007 recovery codes must use Better Auth encrypted-at-rest storage.')
 }
 
-if (!hasMfaEnforcement || /Status:\s*`BLOCKED_NOT_GREEN`/.test(reconciliation)) {
-  blockers.push('AUTH-007 MFA enforcement and executable test evidence are missing or still blocked.')
+const auth007Status = reconciliation.match(/^- Status:\s*`([^`]+)`/m)?.[1] ?? null
+const implementationAuthorization = reconciliation.match(/^- Implementation authorization:\s*`([^`]+)`/m)?.[1] ?? null
+const auth007PromotionVerified = auth007Status === 'GREEN' && implementationAuthorization === 'true'
+
+if (!hasMfaEnforcement || !auth007PromotionVerified) {
+  blockers.push('AUTH-007 must be GREEN with implementation authorization true before the L8 genesis grant is allowed.')
 }
 
 // Require a single, explicitly configured GitHub Environment reviewer, validated
@@ -93,9 +97,12 @@ if (!hasTargetBoundSingleApproval) {
 const hasNoSelfApprovalPolicy =
   /prevent_self_review !== true/.test(w02ProductionCode) &&
   /prevent_self_review: false/.test(w02TestCode) &&
-  /rejects a single-reviewer environment when self-review is permitted/.test(w02TestCode)
+  /rejects a single-reviewer environment when self-review is permitted/.test(w02TestCode) &&
+  read('workers/W02-identity/src/authz/l8-genesis-bootstrap-approval.ts').includes('environment.can_admins_bypass !== false') &&
+  /can_admins_bypass: true/.test(w02TestCode) &&
+  /rejects environments that permit administrator bypass of protection rules/.test(w02TestCode)
 if (!hasNoSelfApprovalPolicy) {
-  blockers.push('L8 genesis approval must prohibit initiator self-review and include a negative test.')
+  blockers.push('L8 genesis approval must prohibit initiator self-review and administrator bypass, with negative tests.')
 }
 
 const hasVerifiedMfaBeforeGenesisGrant =
@@ -133,7 +140,7 @@ const report = {
   checks: {
     workflowIsReadOnly: assertReadOnlyWorkflow,
     dedicatedW02L8Bootstrap: hasDedicatedW02L8Bootstrap,
-    mfaCodeAndTestEvidence: hasMfaEnforcement && !/Status:\s*`BLOCKED_NOT_GREEN`/.test(reconciliation),
+    mfaCodeAndTestEvidence: hasMfaEnforcement && auth007PromotionVerified,
     recoveryCodesEncryptedAtRest: hasEncryptedRecoveryCodes,
     totpReplayProtection: hasTotpReplayProtection,
     w02BootstrapApprovalCodeAndTestEvidence: hasTargetBoundSingleApproval,

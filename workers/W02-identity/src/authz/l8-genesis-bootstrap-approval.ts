@@ -48,6 +48,7 @@ type GitHubEnvironmentRule = {
 
 type GitHubEnvironment = {
   name?: string
+  can_admins_bypass?: boolean
   protection_rules?: GitHubEnvironmentRule[]
   deployment_branch_policy?: { protected_branches?: boolean; custom_branch_policies?: boolean } | null
 }
@@ -252,6 +253,7 @@ export async function verifyTargetBoundSingleApproval(input: {
   const configuredReviewerLogin = configuredReviewer?.reviewer?.login?.toLowerCase()
   if (
     environment.name !== 'l8-genesis-bootstrap' ||
+    environment.can_admins_bypass !== false ||
     requiredReviewerRules.length !== 1 ||
     environmentReviewers.length !== 1 ||
     requiredReviewerRules[0]?.prevent_self_review !== true ||
@@ -264,7 +266,7 @@ export async function verifyTargetBoundSingleApproval(input: {
   ) {
     throw new L8BootstrapApprovalError(
       'SINGLE_APPROVAL_ENVIRONMENT_NOT_CONFIGURED',
-      'l8-genesis-bootstrap must require one human admin/maintainer on protected branches',
+      'l8-genesis-bootstrap must disable admin bypass and require one human admin/maintainer on protected branches',
     )
   }
   const permissionPayload = await githubRequest<{ permission?: string; role_name?: string }>(

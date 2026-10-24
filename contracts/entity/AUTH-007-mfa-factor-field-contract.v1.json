@@ -211,8 +211,8 @@
       "eventExposure": "NEVER",
       "status": "CONTRACTED_NOT_VERIFIED",
       "physicalStatus": "PRESENT_IN_SOURCE_MIGRATION_0006_NOT_DEPLOYED"
-    }
-,    {
+    },
+    {
       "fieldId": "ENT-USER-F-MFA-ENROLLMENT-CONFIRM-KEY-HASH",
       "entityId": "ENT-USER",
       "name": "mfaEnrollmentConfirmKeyHash",
@@ -258,7 +258,7 @@
     "factor enrollment and disable require authenticated identity and step-up verification",
     "MFA enable/disable invalidates existing sessions; no trusted-device bypass is permitted for privileged access",
     "role grants at L5-L8 require user.twoFactorEnabled=true, factor.verified=true and a valid enrollment timestamp",
-    "TOTP replay protection requires a durable atomic lastAcceptedTotpTimeStep check; current migration 0006 does not provide this field and the standard plugin path has not been verified to reject a repeated successful TOTP time-step",
+    "TOTP replay protection requires a durable atomic lastAcceptedTotpTimeStep check; migration 0006 and the W02 source guard now declare and wire this field, and local replay/concurrency tests exist. Remote migration read-back and deployed security E2E remain unverified.",
     "failed-attempt, lockout, challenge expiry, replay and cross-account negative tests must pass before AUTH-007 can become GREEN"
   ],
   "verificationRequired": [
@@ -279,8 +279,8 @@
     "fields": "CONTRACTED_NOT_VERIFIED",
     "migration": "SOURCE_PRESENT_NOT_DEPLOYED_OR_VERIFIED",
     "runtime": "NOT_GREEN",
-    "apiDto": "MISSING",
-    "totpReplayProtection": "MISSING",
+    "apiDto": "BOUND_IN_CONTRACT_AND_SOURCE_NOT_PRODUCTION_VERIFIED",
+    "totpReplayProtection": "SOURCE_PRESENT_TESTED_LOCALLY_NOT_DEPLOYED_OR_READ_BACK",
     "securityE2E": "MISSING",
     "evidenceRegistry": "MISSING",
     "auth007": "BLOCKED_NOT_GREEN"
