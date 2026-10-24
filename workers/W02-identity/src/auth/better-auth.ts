@@ -1,7 +1,7 @@
 import { activateEmailVerifiedAccount } from '../account/account-state-transition.js'
 import { ensureBaseUserRole, ensureVerifiedUserRole } from '../authz/role-assignment.js'
 import { betterAuth } from 'better-auth'
-import { bearer } from 'better-auth/plugins'
+import { bearer, twoFactor } from 'better-auth/plugins'
 import { sendResendEmail } from './resend-email.js'
 
 export interface RateLimitBinding {
@@ -134,6 +134,7 @@ const buildLuckReadAuth = (env: BetterAuthEnv) => {
       // Map Better Auth's camelCase core fields to those exact column names.
       fields: {
         emailVerified: 'email_verified',
+        twoFactorEnabled: 'two_factor_enabled',
         createdAt: 'created_at',
         updatedAt: 'updated_at',
       },
@@ -229,7 +230,16 @@ const buildLuckReadAuth = (env: BetterAuthEnv) => {
         }))
       },
     },
-    plugins: [bearer()],
+    plugins: [
+      bearer(),
+      twoFactor({
+        issuer: 'LuckRead',
+        twoFactorCookieMaxAge: 10 * 60,
+        // Do not permit trusted-device cookies to bypass a fresh MFA challenge.
+        // Privileged W02 sessions must be created after two_factor_enabled_at.
+        trustDeviceMaxAge: 0,
+      }),
+    ],
     advanced: {
       // H5/PC and the canonical API hostname must share the same W02 session.
       crossSubDomainCookies: {
