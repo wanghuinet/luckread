@@ -63,6 +63,42 @@ describe('AUTH-007 MFA lifecycle contract', () => {
     ]))
   })
 
+  it('requires bounded resource budgets and anti-abuse policy while retaining missing production security E2E evidence', () => {
+    const policy = JSON.parse(
+      readFileSync(new URL('../../../../contracts/api/auth-operation-policy.v1.json', import.meta.url), 'utf8'),
+    ) as { operations: Array<{
+      operationId: string
+      resource?: { d1ReadMax?: number; d1WriteMax?: number; rpcMax?: number; outboundMax?: number }
+      cache?: { mode?: string; shared?: boolean }
+      antiAbuse?: { required?: boolean; scopes?: string[]; actions?: string[] }
+      evidence?: { securityE2E?: string }
+    }> }
+    const expected = [
+      'authMfaStatus',
+      'authMfaEnrollmentStart',
+      'authMfaEnrollmentConfirm',
+      'authMfaChallengeVerify',
+      'authMfaDisable',
+      'authMfaRecoveryCodesRotate',
+    ]
+    const records = policy.operations.filter((operation) => expected.includes(operation.operationId))
+    expect(records.map((operation) => operation.operationId).sort()).toEqual([...expected].sort())
+    for (const operation of records) {
+      expect(operation.resource).toBeDefined()
+      expect(Number.isInteger(operation.resource?.d1ReadMax)).toBe(true)
+      expect(Number.isInteger(operation.resource?.d1WriteMax)).toBe(true)
+      expect(Number.isInteger(operation.resource?.rpcMax)).toBe(true)
+      expect(Number.isInteger(operation.resource?.outboundMax)).toBe(true)
+      expect(operation.cache?.mode).toBe('NO_STORE')
+      expect(operation.cache?.shared).toBe(false)
+      expect(operation.antiAbuse?.required).toBe(true)
+      expect(operation.antiAbuse?.scopes?.length).toBeGreaterThan(0)
+      expect(operation.antiAbuse?.actions).toEqual(expect.arrayContaining(['ALLOW', 'THROTTLE', 'BLOCK']))
+      // Static policy and local tests do not substitute for production security E2E.
+      expect(operation.evidence?.securityE2E).toBe('MISSING')
+    }
+  })
+
   it('keeps the TOTP replay guard, verified status, encrypted recovery codes and no-trust-device runtime bindings', () => {
     const betterAuth = readFileSync(new URL('./better-auth.ts', import.meta.url), 'utf8')
     const replayGuard = readFileSync(new URL('./totp-replay-guard.ts', import.meta.url), 'utf8')
