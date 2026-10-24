@@ -69,7 +69,7 @@ describe('TOTP time-step replay guard', () => {
     await expect(consumeTotpTimeStep(db, 'user-123', -1)).rejects.toThrow('invalid TOTP replay-guard input')
   })
 
-  it('executes the conditional SQL against SQLite and rejects replay, older steps and other users', async () => {
+  it('atomically consumes a step once and rejects replay with real SQLite conditional SQL', async () => {
     const { db, sqlite, close } = makeSqliteD1()
     try {
       expect(await consumeTotpTimeStep(db, 'user-123', STEP)).toBe(true)
