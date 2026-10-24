@@ -26,7 +26,7 @@
 
 ## 2. Missing canonical traceability
 
-- Canonical API/DTO proposal: `contracts/api/AUTH-007-mfa-totp-contract.v1.json` now defines W01 public operation IDs, request/response DTOs, factor lifecycle, audit events, no-store behavior and security invariants. It remains `CONTRACTED_NOT_VERIFIED`; the operations are not yet bound into canonical OpenAPI, DTO registries, operation policy or executable W01 routes.
+- Canonical API/DTO contract: `contracts/api/AUTH-007-mfa-totp-contract.v1.json` defines W01 public operation IDs, DTOs, factor lifecycle, audit events, no-store behavior and security invariants. The six operations are now bound to OpenAPI and the DTO/policy/inventory registries; the contract remains `CONTRACTED_NOT_VERIFIED` because W01/W02 runtime adapters and executable evidence are missing.
 - MFA enrollment-start DTO: missing.
 - MFA enrollment-confirm DTO: missing.
 - MFA challenge DTO: missing.
@@ -65,7 +65,7 @@
 
 - Added `contracts/api/AUTH-007-mfa-totp-contract.v1.json` defining the W01 public MFA enrollment/status/confirmation/challenge/disable/recovery-code operations. W01 remains the only APP/H5/PC public API entry; W02 remains the factor/identity/D1-01 authority.
 - The proposed contract explicitly requires an atomic persisted TOTP time-step replay guard, identity-bound single-use challenges, recovery-code single-use/rotation, account/factor lockout, no-store responses, step-up for factor disable/recovery rotation, session invalidation on enable/disable, and audit event coverage.
-- This is a proposal contract only: the OpenAPI operation IDs, DTO registries, API policy, W01 route adapters, runtime persistence and security E2E still need implementation/evidence. It does not authorize runtime promotion.
+- The six operation IDs and login HTTP 202 challenge variant are now mapped in `contracts/openapi/v1/openapi.yaml`; the DTO contract and DTO records, auth operation policy, OpenAPI operation policy, self-scoped permission catalog and auth identity endpoint inventory have also been updated. These are contract bindings only, not runtime proof. W01 executable route adapters, W02 factor lifecycle/step-up handlers, atomic persisted TOTP replay guard, tests, controlled remote D1 schema read-back, Evidence Registry, and final Mapping 0 remain missing. It does not authorize runtime promotion.
 - `AUTH-007` remains `BLOCKED_NOT_GREEN`; implementation authorization remains `false`.
 
 ## 3. Security interpretation rules
