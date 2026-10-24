@@ -10,7 +10,7 @@ import {
   type AccountState,
 } from './account/account-state-transition.js'
 import { resolveBetterAuthPrincipal } from './auth/principal.js'
-import { isPrivilegedMfaEnrollmentEligible } from './auth/privileged-mfa-gate.js'
+import { isMfaEnrollmentEligible } from './auth/privileged-mfa-gate.js'
 import { handleCurrentUserSessionList } from './auth/session-list.js'
 import { handleCurrentUserSessionRevoke } from './auth/session-revoke.js'
 
@@ -164,7 +164,7 @@ export default {
         if (!principal) return json({ eligible: false }, 401)
         if (principal.accountState !== 'ACTIVE') return json({ eligible: false }, 403)
 
-        const eligible = await isPrivilegedMfaEnrollmentEligible(env.D1_01, principal.userId)
+        const eligible = isMfaEnrollmentEligible(principal.userId, principal.accountState)
         if (!eligible) return json({ eligible: false }, 403)
 
         return json({ eligible: true })
