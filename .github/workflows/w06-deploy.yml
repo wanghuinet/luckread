@@ -15,24 +15,40 @@ on:
         default: DEPLOY
 
 permissions:
-  contents: read
   actions: read
+  contents: read
+  deployments: read
+  pull-requests: read
 
 jobs:
   deploy:
-    if: ${{ inputs.confirm == 'DEPLOY' }}
+    if: ${{ inputs.confirm == 'DEPLOY' && github.ref == 'refs/heads/main' && github.ref_protected == true }}
     runs-on: ubuntu-latest
+    environment: auth-mfa-rollout
     timeout-minutes: 15
     steps:
       - name: Checkout exact implementation commit
         uses: actions/checkout@v4
         with:
           ref: ${{ inputs.source_sha }}
+          fetch-depth: 0
 
       - name: Setup Node 24
         uses: actions/setup-node@v4
         with:
           node-version: 24
+
+      - name: Verify protected AUTH-007 rollout admission before W06 deployment
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_REF: ${{ github.ref }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          GITHUB_REF_PROTECTED: ${{ github.ref_protected }}
+          AUTH007_ROLLOUT_ENVIRONMENT: auth-mfa-rollout
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: node scripts/verify-auth-007-rollout-admission.mjs
 
       - name: Verify required admission gates for the source SHA
         env:
