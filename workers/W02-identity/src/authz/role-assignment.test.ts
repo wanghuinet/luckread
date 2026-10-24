@@ -19,10 +19,10 @@ function assignment(overrides: Partial<RoleAssignmentRecord> = {}): RoleAssignme
   }
 }
 
-function fakeD1(rows: RoleAssignmentRecord[]) {
+function fakeD1(rows: RoleAssignmentRecord[], mfaEnabled = true) {
   let queryCount = 0
   const db = {
-    prepare: () => ({
+    prepare: (sql: string) => ({
       bind: (...args: unknown[]) => ({
         all: async <T>() => {
           queryCount += 1
@@ -36,6 +36,9 @@ function fakeD1(rows: RoleAssignmentRecord[]) {
             ).sort((a, b) => a.roleId.localeCompare(b.roleId) || a.id.localeCompare(b.id)) as T[],
           }
         },
+        first: async <T>() => sql.includes('two_factor_enabled')
+          ? ({ twoFactorEnabled: mfaEnabled ? 1 : 0 } as T)
+          : null,
       }),
     }),
   }
@@ -352,5 +355,38 @@ describe('Verified user role materialization', () => {
     await expect(ensureVerifiedUserRole(fixture.db, 'user-1', NOW))
       .rejects.toThrow('verified-user role assignment is not currently valid')
     expect(fixture.getInsertCount()).toBe(0)
+  })
+
+  it('does not resolve or expose an MFA-protected global admin role before verified MFA enrollment', async () => {
+    const { db } = fakeD1([
+      assignment({ id: 'ra-user', roleId: 'user' }),
+      assignment({ id: 'ra-verified', roleId: 'verified_user' }),
+      assignment({ id: 'ra-admin', roleId: 'admin' }),
+      assignment({ id: 'ra-super-admin', roleId: 'super_admin' }),
+    ], false)
+
+    await expect(resolveGlobalLayer(db, 'user-1', 'ACTIVE', NOW, true)).resolves.toEqual({
+      decision: 'ALLOW',
+      layer: 'L2',
+      roleAssignments: [
+        { id: 'ra-user', roleId: 'user', scopeType: 'global', scopeId: null },
+        { id: 'ra-verified', roleId: 'verified_user', scopeType: 'global', scopeId: null },
+      ],
+    })
+  })
+
+  it('resolves L8 only after authoritative MFA enrollment is enabled', async () => {
+    const { db } = fakeD1([
+      assignment({ id: 'ra-user', roleId: 'user' }),
+      assignment({ id: 'ra-verified', roleId: 'verified_user' }),
+      assignment({ id: 'ra-super-admin', roleId: 'super_admin' }),
+    ], true)
+
+    const result = await resolveGlobalLayer(db, 'user-1', 'ACTIVE', NOW, true)
+    expect(result.decision).toBe('ALLOW')
+    expect(result.layer).toBe('L8')
+    expect(result.roleAssignments).toContainEqual({
+      id: 'ra-super-admin', roleId: 'super_admin', scopeType: 'global', scopeId: null,
+    })
   })
 })
