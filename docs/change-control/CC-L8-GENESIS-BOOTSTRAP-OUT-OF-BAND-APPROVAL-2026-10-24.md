@@ -11,7 +11,7 @@ The repository currently has one authorized maintainer. For the first L8 bootstr
 
 The source code fails closed unless the GitHub Environment `l8-genesis-bootstrap` is configured with all of the following:
 
-- exactly one required reviewer, a human user with repository `admin` or `maintain` permission;
+- exactly one required reviewer, the repository owner's GitHub account (numeric user ID `190754094`) with repository `admin` or `maintain` permission;
 - `prevent_self_review: false`, so the sole maintainer can approve the run they dispatch;
 - deployment branch policy restricted to protected branches;
 - workflow execution from protected `main`, using the fixed workflow path and signed GitHub OIDC token.
