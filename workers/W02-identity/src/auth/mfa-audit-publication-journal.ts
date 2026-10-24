@@ -30,29 +30,33 @@ export async function publishPendingMfaAuditEvents(
   let failed = 0
 
   for (const row of rows.results ?? []) {
-    let eventType: unknown
+    let payload: unknown
     try {
-      const payload = JSON.parse(row.payload) as { eventType?: unknown }
-      eventType = payload?.eventType
-      if (!payload || typeof payload !== 'object' || Array.isArray(payload) ||
-          typeof eventType !== 'string' || !validEventNames.has(eventType)) {
+      payload = JSON.parse(row.payload)
+      const eventType = payload && typeof payload === 'object' && !Array.isArray(payload)
+        ? (payload as { eventType?: unknown }).eventType
+        : null
+      if (typeof eventType !== 'string' || !validEventNames.has(eventType)) {
         throw new Error('INVALID_AUTH_007_MFA_EVENT')
       }
+    } catch {
+      await env.D1_01.prepare(
+        'UPDATE auth_007_mfa_publication_journal SET status = ?, next_attempt_at = NULL, ' +
+        'last_error_code = ? WHERE journal_id = ? AND status = ?',
+      ).bind('FAILED', 'INVALID_EVENT_PAYLOAD', row.journalId, 'PENDING').run()
+      failed += 1
+      continue
+    }
+
+    try {
       await env.AUTH013_QUEUE.send(payload)
-    } catch (error) {
-      const malformed = error instanceof Error && error.message === 'INVALID_AUTH_007_MFA_EVENT'
+    } catch {
       const delay = retryDelaySeconds(row.attempt)
       const nextAttemptAt = new Date(Date.parse(now) + delay * 1000).toISOString()
       await env.D1_01.prepare(
         'UPDATE auth_007_mfa_publication_journal SET status = ?, attempt = attempt + 1, ' +
         'next_attempt_at = ?, last_error_code = ? WHERE journal_id = ? AND status = ?',
-      ).bind(
-        malformed ? 'FAILED' : 'PENDING',
-        malformed ? null : nextAttemptAt,
-        malformed ? 'INVALID_EVENT_PAYLOAD' : 'QUEUE_DESTINATION_FAILED',
-        row.journalId,
-        'PENDING',
-      ).run()
+      ).bind('PENDING', nextAttemptAt, 'QUEUE_DESTINATION_FAILED', row.journalId, 'PENDING').run()
       failed += 1
       continue
     }
