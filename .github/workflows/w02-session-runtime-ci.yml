@@ -29,6 +29,7 @@ on:
       - 'workers/W02-identity/wrangler.jsonc'
       - 'scripts/auth-010-session-runtime-e2e.mjs'
       - '.github/workflows/auth-010-remote-e2e.yml'
+      - '.github/workflows/w01-payload-app-deploy.yml'
       - '.github/workflows/w02-session-runtime-ci.yml'
   workflow_dispatch:
 
