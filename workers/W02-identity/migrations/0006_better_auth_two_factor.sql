@@ -17,6 +17,7 @@ CREATE TABLE "twoFactor" (
   verified INTEGER NOT NULL DEFAULT 0 CHECK (verified IN (0, 1)),
   failedVerificationCount INTEGER NOT NULL DEFAULT 0 CHECK (failedVerificationCount >= 0),
   lockedUntil TEXT,
+  lastAcceptedTotpTimeStep INTEGER CHECK (lastAcceptedTotpTimeStep IS NULL OR lastAcceptedTotpTimeStep >= 0),
   FOREIGN KEY (userId) REFERENCES "user"(id) ON UPDATE NO ACTION ON DELETE CASCADE
 );
 
