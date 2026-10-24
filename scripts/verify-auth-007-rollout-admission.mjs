@@ -206,7 +206,7 @@ if (blockers.length === 0) {
       /auth007Status === 'GREEN'/.test(read('scripts/verify-admin-account-bootstrap-readiness.mjs')) &&
       /implementationAuthorization === 'true'/.test(read('scripts/verify-admin-account-bootstrap-readiness.mjs')) &&
       /!auth007PromotionVerified/.test(read('scripts/verify-admin-account-bootstrap-readiness.mjs')) &&
-      /BLOCKED_NOT_GREEN/.test(read('scripts/verify-admin-account-bootstrap-readiness.mjs')),
+      /AUTH-007 must be GREEN with implementation authorization true/.test(read('scripts/verify-admin-account-bootstrap-readiness.mjs')),
     standaloneW01DeployUsesProtectedAdmission:
       /environment:\s*auth-mfa-rollout/.test(standaloneW01Workflow) &&
       /github\.ref == 'refs\/heads\/main'/.test(standaloneW01Workflow) &&
