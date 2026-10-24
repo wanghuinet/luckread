@@ -86,12 +86,10 @@ describe('W02 MFA enrollment eligibility', () => {
     expect(isMfaEnrollmentEligible('target-user-1', 'ACTIVE')).toBe(true)
   })
 
-  it('allows ordinary active accounts to self-enroll without granting privileges', () => {
-    for (const role of ['user', 'verified_user', 'creator', 'mcn_admin']) {
-      // This helper intentionally accepts only server-derived account state,
-      // never a client-supplied role or layer claim.
-      expect(isMfaEnrollmentEligible('active-user-1', 'ACTIVE')).toBe(true)
-    }
+  it('allows an ordinary active account to self-enroll without granting privileges', () => {
+    // The helper intentionally accepts only server-derived account state,
+    // never a client-supplied role or layer claim.
+    expect(isMfaEnrollmentEligible('active-user-1', 'ACTIVE')).toBe(true)
   })
 
   it('denies non-active accounts', () => {
