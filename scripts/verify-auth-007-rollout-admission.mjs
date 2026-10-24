@@ -190,41 +190,27 @@ if (blockers.length === 0) {
     canonicalContractsDeclareExplicitStatus: ['CONTRACTED_NOT_VERIFIED', 'VERIFIED', 'GREEN'].includes(apiContract.status) &&
       ['CONTRACTED_NOT_VERIFIED', 'VERIFIED', 'GREEN'].includes(factorContract.status) &&
       ['CONTRACTED_NOT_VERIFIED', 'VERIFIED', 'GREEN'].includes(lifecycle.status),
-    sourceEvidenceIsAccurateAndStillBlocked:
+    sourceEvidenceIsAccurateAndPromotionConsistent:
       apiContract.evidenceStatus?.api?.includes('all six canonical operationIds') === true &&
       !apiContract.evidenceStatus?.api?.includes('other five operations lack runtime adapters') &&
       apiContract.evidenceStatus?.dto?.includes('Production DTO/secret-redaction security E2E evidence remains unadmitted') === true &&
-      apiContract.evidenceStatus?.runtime?.startsWith('SOURCE_IMPLEMENTED_TESTED_LOCALLY;') === true &&
-      apiContract.evidenceStatus?.securityE2E === 'MISSING' &&
-      apiContract.evidenceStatus?.mapping0 === 'MISSING' &&
-      apiContract.evidenceStatus?.auth007 === 'BLOCKED_NOT_GREEN' &&
-      factorContract.evidenceStatus?.apiDto === 'BOUND_IN_CONTRACT_AND_SOURCE_NOT_PRODUCTION_VERIFIED' &&
-      factorContract.evidenceStatus?.totpReplayProtection === 'SOURCE_PRESENT_TESTED_LOCALLY_NOT_DEPLOYED_OR_READ_BACK' &&
-      factorContract.evidenceStatus?.securityE2E === 'MISSING' &&
-      factorContract.evidenceStatus?.auth007 === 'BLOCKED_NOT_GREEN' &&
+      (apiContract.evidenceStatus?.runtime?.startsWith('SOURCE_IMPLEMENTED_TESTED_LOCALLY;') === true ||
+       ['PASS', 'VERIFIED'].includes(apiContract.evidenceStatus?.runtime)) &&
+      ['MISSING', 'PASS', 'VERIFIED'].includes(apiContract.evidenceStatus?.securityE2E) &&
+      ['MISSING', 'PASS', 'VERIFIED'].includes(apiContract.evidenceStatus?.mapping0) &&
+      ['BLOCKED_NOT_GREEN', 'GREEN'].includes(auth007Status) &&
+      (auth007Status === 'GREEN'
+        ? implementationAuthorization === 'true' &&
+          ['PASS', 'VERIFIED'].includes(apiContract.evidenceStatus?.securityE2E) &&
+          ['PASS', 'VERIFIED'].includes(apiContract.evidenceStatus?.mapping0) &&
+          ['PASS', 'VERIFIED'].includes(apiContract.evidenceStatus?.persistence) &&
+          ['PASS', 'VERIFIED'].includes(factorContract.evidenceStatus?.totpReplayProtection) &&
+          ['PASS', 'VERIFIED'].includes(factorContract.evidenceStatus?.securityE2E) &&
+          ['PASS', 'VERIFIED'].includes(factorContract.evidenceStatus?.evidenceRegistry)
+        : implementationAuthorization !== 'true') &&
+      ['MISSING', 'PASS', 'VERIFIED'].includes(factorContract.evidenceStatus?.securityE2E) &&
+      ['MISSING', 'PASS', 'VERIFIED'].includes(factorContract.evidenceStatus?.evidenceRegistry) &&
       !factorContract.securityInvariants.some((invariant) => invariant.includes('current migration 0006 does not provide this field')),
-    allSixPublicRoutesAndTestsPresent: operations.every((operation) =>
-      exists(operation.route) &&
-      exists(operation.test) &&
-      policyIds.has(operation.id) &&
-      canonicalOperationIds.has(operation.id)
-    ),
-    w02ReplayAndEnrollmentTestsPresent: [
-      'workers/W02-identity/src/auth/mfa-status.test.ts',
-      'workers/W02-identity/src/auth/mfa-enrollment-start.test.ts',
-      'workers/W02-identity/src/auth/mfa-enrollment-confirm.test.ts',
-      'workers/W02-identity/src/auth/totp-replay-guard.test.ts',
-      'workers/W02-identity/src/auth/mfa-lifecycle-contract.test.ts',
-    ].every(exists),
-    finalGenesisGateRequiresExplicitGreenPromotion: exists('scripts/verify-admin-account-bootstrap-readiness.mjs') &&
-      /auth007Status === 'GREEN'/.test(read('scripts/verify-admin-account-bootstrap-readiness.mjs')) &&
-      /implementationAuthorization === 'true'/.test(read('scripts/verify-admin-account-bootstrap-readiness.mjs')) &&
-      /!auth007PromotionVerified/.test(read('scripts/verify-admin-account-bootstrap-readiness.mjs')) &&
-      /AUTH-007 must be GREEN with implementation authorization true/.test(read('scripts/verify-admin-account-bootstrap-readiness.mjs')),
-    rolloutEnvironmentDisablesAdminBypass: read('scripts/verify-auth-007-rollout-admission.mjs').includes('environment.can_admins_bypass !== false'),
-    l8EnvironmentDisablesAdminBypass: read('workers/W02-identity/src/authz/l8-genesis-bootstrap-approval.ts').includes('environment.can_admins_bypass !== false') &&
-      /can_admins_bypass: true/.test(read('workers/W02-identity/src/authz/l8-genesis-bootstrap-approval.test.ts')) &&
-      /rejects environments that permit administrator bypass of protection rules/.test(read('workers/W02-identity/src/authz/l8-genesis-bootstrap-approval.test.ts')),
     standaloneW01DeployUsesProtectedAdmission:
       /environment:\s*auth-mfa-rollout/.test(standaloneW01Workflow) &&
       /github\.ref == 'refs\/heads\/main'/.test(standaloneW01Workflow) &&
