@@ -23,7 +23,9 @@ function createEnv(rows: Array<{ journalId: string; payload: string; attempt: nu
   const update = vi.fn().mockResolvedValue({ success: true, meta: { changes: 1 } })
   const all = vi.fn().mockResolvedValue({ results: rows })
   const prepare = vi.fn((sql: string) => ({
-    bind: vi.fn(() => sql.startsWith('SELECT') ? { all } : { run: update }),
+    bind: vi.fn((...values: unknown[]) => sql.startsWith('SELECT')
+      ? { all: () => all(...values) }
+      : { run: () => update(...values) }),
   }))
   return {
     env: { D1_01: { prepare } as unknown as D1Database, AUTH013_QUEUE: { send: queueSend } as unknown as Queue },
