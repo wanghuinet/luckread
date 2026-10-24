@@ -321,8 +321,32 @@ async function checkEvents() {
     if (delivery.newWorkerD1QueueOrServiceBindingAllowed !== false) {
       fail('events/AUTH-007-mfa-audit-binding.v1.json: must forbid a new Worker, D1, Queue, or Service Binding')
     }
-    if (delivery.existingW02ToW06Binding !== 'UNRESOLVED') {
-      fail('events/AUTH-007-mfa-audit-binding.v1.json: unresolved runtime transport must not be represented as verified')
+    if (delivery.existingW02ToW06Binding !== 'AUTH013_QUEUE' ||
+        delivery.existingQueueName !== 'luckread-auth013-account-state') {
+      fail('events/AUTH-007-mfa-audit-binding.v1.json: MFA audit must reuse the existing W02-to-W06 AUTH013_QUEUE')
+    }
+    if (delivery.sourceImplementationStatus !== 'IMPLEMENTED_IN_SOURCE_NOT_PRODUCTION_VERIFIED') {
+      fail('events/AUTH-007-mfa-audit-binding.v1.json: source implementation status must not imply production verification')
+    }
+    const coverage = mfaAuditBinding.doc.runtimeEmissionCoverage ?? {}
+    const implemented = coverage.implementedInW02Source ?? []
+    const notYetEmitted = coverage.notYetEmittedByW02 ?? []
+    const coverageNames = [...implemented, ...notYetEmitted]
+    if (new Set(coverageNames).size !== coverageNames.length ||
+        expectedEventNames.some((eventName) => !coverageNames.includes(eventName)) ||
+        coverageNames.some((eventName) => !expectedEventNames.includes(eventName))) {
+      fail('events/AUTH-007-mfa-audit-binding.v1.json: runtime emission coverage must account for every canonical event exactly once')
+    }
+    const expectedImplemented = [
+      'auth.mfa.enrollment_started',
+      'auth.mfa.enrollment_verified',
+      'auth.mfa.enrollment_failed',
+    ]
+    if (JSON.stringify(implemented) !== JSON.stringify(expectedImplemented)) {
+      fail('events/AUTH-007-mfa-audit-binding.v1.json: claimed source emission coverage must match the reviewed enrollment source slice')
+    }
+    if (coverage.consumerSupportsAllRegisteredEvents !== true) {
+      fail('events/AUTH-007-mfa-audit-binding.v1.json: W06 consumer coverage must be explicit')
     }
   }
 
