@@ -93,6 +93,41 @@ const handler = async (
       )
     }
 
+    // The MFA plugin challenge is supported for privileged accounts only in
+    // this rollout. Require W02 to validate the current session and the
+    // persisted effective L5-L8 role before enabling, disabling, or rotating
+    // MFA material. Never trust a subject/layer supplied by the caller.
+    const privilegedMfaManagementEndpoints = new Set([
+      'two-factor/enable',
+      'two-factor/disable',
+      'two-factor/generate-backup-codes',
+      'two-factor/get-totp-uri',
+      'totp/generate',
+    ])
+    if (request.method === 'POST' && privilegedMfaManagementEndpoints.has(endpoint)) {
+      const eligibilityHeaders = new Headers(request.headers)
+      eligibilityHeaders.delete('host')
+      eligibilityHeaders.delete('content-length')
+      let eligibilityResponse: Response
+      try {
+        eligibilityResponse = await service.fetch(new Request(
+          'https://luckread-w02.internal/internal/auth/mfa/enrollment-eligibility',
+          { method: 'POST', headers: eligibilityHeaders },
+        ))
+      } catch {
+        return errorResponse(503, 'SERVICE_UNAVAILABLE', 'MFA enrollment eligibility unavailable')
+      }
+      if (!eligibilityResponse.ok) {
+        if (eligibilityResponse.status === 401) {
+          return errorResponse(401, 'UNAUTHENTICATED', 'Authentication required')
+        }
+        if (eligibilityResponse.status === 403) {
+          return errorResponse(403, 'MFA_PRIVILEGED_ROLE_REQUIRED', 'MFA management is available only to privileged accounts')
+        }
+        return errorResponse(503, 'SERVICE_UNAVAILABLE', 'MFA enrollment eligibility unavailable')
+      }
+    }
+
     const upstreamUrl = new URL(request.url)
     upstreamUrl.protocol = 'https:'
     upstreamUrl.hostname = 'luckread-w02.internal'
