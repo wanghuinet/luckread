@@ -150,6 +150,7 @@ if (blockers.length === 0) {
   const lifecycle = JSON.parse(read(lifecyclePath))
   const policy = JSON.parse(read(policyPath))
   const reconciliation = read(reconciliationPath)
+  const standaloneW01Workflow = read('.github/workflows/w01-payload-app-deploy.yml')
 
   const requiredMigrationTokens = [
     'two_factor_enabled',
@@ -204,6 +205,13 @@ if (blockers.length === 0) {
     finalGenesisGateRemainsSeparate: exists('scripts/verify-admin-account-bootstrap-readiness.mjs') &&
       /hasMfaEnforcement/.test(read('scripts/verify-admin-account-bootstrap-readiness.mjs')) &&
       /BLOCKED_NOT_GREEN/.test(read('scripts/verify-admin-account-bootstrap-readiness.mjs')),
+    standaloneW01DeployUsesProtectedAdmission:
+      /environment:\\s*auth-mfa-rollout/.test(standaloneW01Workflow) &&
+      /github\\.ref == 'refs\\/heads\\/main'/.test(standaloneW01Workflow) &&
+      /merge-base --is-ancestor/.test(standaloneW01Workflow) &&
+      /verify-auth-007-rollout-admission\\.mjs/.test(standaloneW01Workflow) &&
+      standaloneW01Workflow.indexOf('verify-auth-007-rollout-admission.mjs') >= 0 &&
+      standaloneW01Workflow.indexOf('verify-auth-007-rollout-admission.mjs') < standaloneW01Workflow.indexOf('run: pnpm run deploy:app'),
   }
 
   for (const [check, passed] of Object.entries(sourceChecks)) {
