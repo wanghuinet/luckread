@@ -21,6 +21,7 @@ on:
       - '.github/workflows/auth-010-remote-e2e.yml'
       - '.github/workflows/w01-payload-app-deploy.yml'
       - '.github/workflows/w02-session-runtime-ci.yml'
+      - '.github/workflows/auth-mfa-rollout-preflight.yml'
   pull_request:
     paths:
       - 'workers/W02-identity/src/auth/**'
@@ -34,6 +35,7 @@ on:
       - '.github/workflows/auth-010-remote-e2e.yml'
       - '.github/workflows/w01-payload-app-deploy.yml'
       - '.github/workflows/w02-session-runtime-ci.yml'
+      - '.github/workflows/auth-mfa-rollout-preflight.yml'
   workflow_dispatch:
 
 permissions:
