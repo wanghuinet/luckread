@@ -339,8 +339,8 @@
     "queue": "Only non-immediate notifications/audit projections may be asynchronous; the authoritative factor/session update is synchronous in W02."
   },
   "evidenceStatus": {
-    "api": "CONTRACTED_NOT_VERIFIED; OpenAPI and public W01 routes not yet reconciled",
-    "dto": "CONTRACTED_NOT_VERIFIED; DTO record registry not yet reconciled",
+    "api": "OPENAPI_CONTRACTED_NOT_VERIFIED; six operationIds and the login 202 challenge variant are present, but executable W01 route adapters and runtime tests are missing",
+    "dto": "DTO_CONTRACT_BOUND; request/response schemas are registered, but runtime validation and secret-redaction tests are missing",
     "entity": "PROPOSED",
     "persistence": "MISSING_REMOTE_SCHEMA_READBACK_AND_REPLAY_FIELD",
     "runtime": "NOT_GREEN",
