@@ -135,6 +135,30 @@ export async function POST(request: Request): Promise<Response> {
     return errorResponse(502, 'AUTH_UPSTREAM_RESPONSE_INVALID', 'Authentication service returned an invalid response')
   }
 
+  // Better Auth 1.7.8 deliberately withholds the session until the second
+  // factor is verified. Preserve the challenge cookie and return a bounded
+  // public DTO instead of treating a legitimate MFA challenge as malformed.
+  if (payload.twoFactorRedirect === true) {
+    const methods = Array.isArray(payload.twoFactorMethods)
+      ? [...new Set(payload.twoFactorMethods.filter((method): method is string =>
+          method === 'totp' || method === 'otp' || method === 'backup-code'))]
+      : []
+    if (methods.length === 0) {
+      return errorResponse(502, 'AUTH_UPSTREAM_RESPONSE_INVALID', 'Authentication service returned an invalid MFA challenge')
+    }
+    const headers = new Headers(upstream.headers)
+    headers.delete('set-auth-token')
+    headers.delete('content-length')
+    headers.delete('content-encoding')
+    headers.delete('transfer-encoding')
+    headers.set('content-type', 'application/json; charset=utf-8')
+    headers.set('cache-control', 'no-store')
+    return new Response(JSON.stringify({
+      data: { twoFactorRequired: true, twoFactorMethods: methods },
+      requestId: `req_${crypto.randomUUID().replaceAll('-', '')}`,
+    }), { status: 200, headers })
+  }
+
   const user = publicUser(payload.user)
   const headerToken = upstream.headers.get('set-auth-token')?.trim() ?? ''
   // Better Auth returns the raw session.token in JSON but the Bearer plugin
