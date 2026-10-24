@@ -6,12 +6,15 @@ const fail = (message) => {
 }
 
 const requestPrNumber = Number(process.env.REQUEST_PR_NUMBER)
+const mode = process.env.BOOTSTRAP_MODE ?? 'preflight'
 const githubToken = process.env.GITHUB_TOKEN
 const oidcRequestUrl = process.env.ACTIONS_ID_TOKEN_REQUEST_URL
 const oidcRequestToken = process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN
 
 if (!Number.isSafeInteger(requestPrNumber) || requestPrNumber < 1) {
   fail('REQUEST_PR_NUMBER must be a positive integer.')
+} else if (mode !== 'preflight' && mode !== 'execute') {
+  fail('BOOTSTRAP_MODE must be preflight or execute.')
 } else if (!githubToken || !oidcRequestUrl || !oidcRequestToken) {
   fail('GitHub Actions OIDC context or short-lived GitHub token is unavailable.')
 } else {
@@ -78,23 +81,39 @@ if (!Number.isSafeInteger(requestPrNumber) || requestPrNumber < 1) {
         productionMutationPerformed: false,
       }, null, 2))
 
-      // This is the only mutation call. W02 repeats all mutable checks and
-      // commits the singleton audit row + four-hour RoleAssignment atomically.
-      const grant = await postToW01('/api/v1/admin/bootstrap/super-admin')
-      if (!grant.response.ok) {
-        console.error(JSON.stringify({
-          phase: 'BOOTSTRAP_WRITE',
-          status: grant.response.status,
-          error: grant.result?.error?.code ?? 'BOOTSTRAP_FAILED',
-          message: 'W02 denied the L8 genesis bootstrap. No retry should be attempted until the blocker is reviewed.',
-        }))
-        process.exitCode = 1
-      } else {
+      if (mode === 'preflight') {
+        // Preflight-only mode intentionally stops here. A separate, explicit
+        // execute dispatch must independently pass the same read-only checks
+        // again before the one-time role write can be reached.
         console.log(JSON.stringify({
-          phase: 'BOOTSTRAP_WRITE',
-          status: 'BOOTSTRAP_RESULT',
-          data: grant.result?.data ?? grant.result,
+          phase: 'READ_ONLY_PREFLIGHT_COMPLETE',
+          status: 'REVIEW_REQUIRED_BEFORE_EXECUTE',
+          targetUserId: readiness.targetUserId,
+          requestPrNumber: readiness.requestPrNumber,
+          requestMergeSha: readiness.requestMergeSha,
+          approvedReviewers: readiness.approvedReviewers,
+          maxGrantSeconds: readiness.maxGrantSeconds,
+          productionMutationPerformed: false,
         }, null, 2))
+      } else {
+        // This is the only mutation call. W02 repeats approval and mutable
+        // preconditions and atomically commits the four-hour RoleAssignment.
+        const grant = await postToW01('/api/v1/admin/bootstrap/super-admin')
+        if (!grant.response.ok) {
+          console.error(JSON.stringify({
+            phase: 'BOOTSTRAP_WRITE',
+            status: grant.response.status,
+            error: grant.result?.error?.code ?? 'BOOTSTRAP_FAILED',
+            message: 'W02 denied the L8 genesis bootstrap. No retry should be attempted until the blocker is reviewed.',
+          }))
+          process.exitCode = 1
+        } else {
+          console.log(JSON.stringify({
+            phase: 'BOOTSTRAP_WRITE',
+            status: 'BOOTSTRAP_RESULT',
+            data: grant.result?.data ?? grant.result,
+          }, null, 2))
+        }
       }
     }
   } catch (error) {
