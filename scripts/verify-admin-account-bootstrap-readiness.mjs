@@ -59,6 +59,13 @@ const hasProtectedSingleApprovalWorkflow =
   /environment:\s*l8-genesis-bootstrap/.test(genesisWorkflow) &&
   /run-name:.*request_pr_number/.test(genesisWorkflow) &&
   /verify-admin-account-bootstrap-readiness\.mjs/.test(genesisWorkflow)
+const hasProtectedMainRuntimeGuard =
+  /if:\s*github\.ref\s*==\s*['"]refs\/heads\/main['"]\s*&&\s*github\.ref_protected\s*==\s*true/.test(genesisWorkflow) &&
+  /name:\s*Fail closed when GitHub main is not protected/.test(genesisWorkflow) &&
+  /if:\s*\$\{\{\s*github\.ref_protected\s*!=\s*true\s*\}\}/.test(genesisWorkflow)
+if (!hasProtectedMainRuntimeGuard) {
+  blockers.push('L8 genesis workflow must reject an unprotected main ref before readiness/API calls.')
+}
 if (!hasProtectedSingleApprovalWorkflow) {
   blockers.push('The genesis workflow lacks a target-labelled, protected environment approval or the AUTH-007 evidence gate.')
 }
@@ -151,6 +158,7 @@ const report = {
   productionMutationPerformed: false,
   checks: {
     workflowIsReadOnly: assertReadOnlyWorkflow,
+    mainBranchProtectionGuard: hasProtectedMainRuntimeGuard,
     bootstrapRequestPresentAndValid: hasValidBootstrapRequest,
     dedicatedW02L8Bootstrap: hasDedicatedW02L8Bootstrap,
     mfaCodeAndTestEvidence: hasMfaEnforcement && auth007PromotionVerified,

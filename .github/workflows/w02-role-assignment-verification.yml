@@ -13,6 +13,8 @@ on:
       - 'scripts/verify-admin-account-bootstrap-readiness.mjs'
       - 'scripts/l8-genesis-bootstrap-request.mjs'
       - 'scripts/l8-genesis-bootstrap-request.test.mjs'
+      - 'scripts/l8-genesis-bootstrap-protected-ref.test.mjs'
+      - '.github/workflows/l8-genesis-bootstrap.yml'
       - 'scripts/verify-auth-007-rollout-admission.mjs'
       - 'scripts/verify-auth-007-rollout-admission-protected-ref.test.mjs'
       - '.github/workflows/auth-mfa-rollout-preflight.yml'
@@ -32,6 +34,8 @@ on:
       - 'scripts/verify-admin-account-bootstrap-readiness.mjs'
       - 'scripts/l8-genesis-bootstrap-request.mjs'
       - 'scripts/l8-genesis-bootstrap-request.test.mjs'
+      - 'scripts/l8-genesis-bootstrap-protected-ref.test.mjs'
+      - '.github/workflows/l8-genesis-bootstrap.yml'
       - 'scripts/verify-auth-007-rollout-admission.mjs'
       - 'scripts/verify-auth-007-rollout-admission-protected-ref.test.mjs'
       - '.github/workflows/auth-mfa-rollout-preflight.yml'
@@ -80,6 +84,8 @@ jobs:
         run: node --test scripts/verify-auth-007-rollout-admission-protected-ref.test.mjs
       - name: Test L8 genesis request fail-closed validation
         run: node --test scripts/l8-genesis-bootstrap-request.test.mjs
+      - name: Test L8 genesis protected-main fail-closed gate
+        run: node --test scripts/l8-genesis-bootstrap-protected-ref.test.mjs
       - name: Check L8 bootstrap readiness audit syntax
         run: node --check scripts/verify-admin-account-bootstrap-readiness.mjs
       - name: Verify logical table authority boundary

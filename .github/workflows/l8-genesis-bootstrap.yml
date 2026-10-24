@@ -21,7 +21,7 @@ concurrency:
 
 jobs:
   bootstrap:
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && github.ref_protected == true
     runs-on: ubuntu-latest
     timeout-minutes: 5
     # Configure this GitHub Environment with one required reviewer: the sole
@@ -35,6 +35,12 @@ jobs:
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
+
+      - name: Fail closed when GitHub main is not protected
+        if: ${{ github.ref_protected != true }}
+        run: |
+          echo "::error::L8 genesis bootstrap requires GitHub to report main as protected."
+          exit 1
 
       - name: Setup Node 24
         uses: actions/setup-node@v4
