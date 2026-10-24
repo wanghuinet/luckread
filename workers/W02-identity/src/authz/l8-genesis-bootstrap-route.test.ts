@@ -1,0 +1,55 @@
+import { describe, expect, it } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+import worker from '../index.js'
+
+const env = {} as never
+
+describe('W02 L8 genesis bootstrap service-boundary gate', () => {
+  it('rejects direct write-route calls without trusted W01 service headers', async () => {
+    const response = await worker.fetch(new Request(
+      'https://luckread-w02.internal/internal/authz/bootstrap-super-admin',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          requestPrNumber: 77,
+          githubToken: 'ghs_' + 'x'.repeat(40),
+          mfaVerified: true,
+        }),
+      },
+    ), env)
+    expect(response.status).toBe(403)
+    await expect(response.json()).resolves.toMatchObject({
+      error: { code: 'FORBIDDEN' },
+    })
+  })
+
+  it('rejects direct read-only readiness calls without trusted W01 service headers', async () => {
+    const response = await worker.fetch(new Request(
+      'https://luckread-w02.internal/internal/authz/bootstrap-super-admin/readiness',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          requestPrNumber: 77,
+          githubToken: 'ghs_' + 'x'.repeat(40),
+          mfaVerified: true,
+        }),
+      },
+    ), env)
+    expect(response.status).toBe(403)
+    await expect(response.json()).resolves.toMatchObject({
+      error: { code: 'FORBIDDEN' },
+    })
+  })
+
+  it('does not accept a request-body MFA boolean as authentication evidence', () => {
+    const path = fileURLToPath(new URL('../index.ts', import.meta.url))
+    const source = readFileSync(path, 'utf8')
+    expect(source).not.toMatch(/mfaVerified\\s*:\\s*true/)
+    expect(source).not.toMatch(/mfaVerified\\??\\s*:/)
+    expect(source).toContain('verifyTargetBoundDualApproval')
+    expect(source).toContain('bootstrapSuperAdmin(env.D1_01, approval')
+  })
+})
