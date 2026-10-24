@@ -3,7 +3,7 @@ const WORKFLOW_REF = 'wanghuinet/luckread/.github/workflows/l8-genesis-bootstrap
 const OIDC_ISSUER = 'https://token.actions.githubusercontent.com'
 const OIDC_AUDIENCE = 'luckread-w02-l8-bootstrap'
 export const L8_BOOTSTRAP_REQUEST_PATH = 'docs/change-control/l8-genesis-bootstrap-request.json'
-const MAX_REQUEST_LIFETIME_MS = 24 * 60 * 60 * 1000
+const MAX_REQUEST_LIFETIME_MS = 4 * 60 * 60 * 1000
 const CLOCK_SKEW_SECONDS = 60
 
 export class L8BootstrapApprovalError extends Error {
@@ -35,6 +35,23 @@ export type VerifiedL8BootstrapApproval = {
   workflowRunId: string
 }
 
+type GitHubEnvironmentReviewer = {
+  type?: string
+  reviewer?: { id?: number; login?: string }
+}
+
+type GitHubEnvironmentRule = {
+  type?: string
+  prevent_self_review?: boolean
+  reviewers?: GitHubEnvironmentReviewer[]
+}
+
+type GitHubEnvironment = {
+  name?: string
+  protection_rules?: GitHubEnvironmentRule[]
+  deployment_branch_policy?: { protected_branches?: boolean; custom_branch_policies?: boolean } | null
+}
+
 type GitHubPull = {
   number: number
   state: string
@@ -44,14 +61,6 @@ type GitHubPull = {
   base?: { ref?: string; repo?: { full_name?: string } }
   head?: { sha?: string }
   user?: { login?: string }
-}
-
-type GitHubReview = {
-  id?: number
-  state?: string
-  submitted_at?: string | null
-  commit_id?: string | null
-  user?: { login?: string; type?: string }
 }
 
 const parseJson = <T>(value: string): T => {
@@ -204,7 +213,7 @@ const validRequest = (
     expires - created <= MAX_REQUEST_LIFETIME_MS
 }
 
-export async function verifyTargetBoundDualApproval(input: {
+export async function verifyTargetBoundSingleApproval(input: {
   oidcToken: string
   githubToken: string
   requestPrNumber: number
@@ -225,6 +234,51 @@ export async function verifyTargetBoundDualApproval(input: {
   }
 
   const workflow = await verifyGitHubOidcToken(input.oidcToken, Math.floor(now.getTime() / 1000), fetcher)
+
+  // The workflow must have passed the GitHub Environment gate before this job
+  // starts. Also verify that the environment still requires exactly one human
+  // reviewer with repo maintain/admin permission, and only on protected branches.
+  // With a single maintainer, self-review is intentionally allowed; MFA,
+  // immutable target binding, one-time consumption and four-hour expiry remain mandatory.
+  const environment = await githubRequest<GitHubEnvironment>(
+    '/repos/' + REPOSITORY + '/environments/l8-genesis-bootstrap',
+    input.githubToken,
+    fetcher,
+  )
+  const requiredReviewerRules = (environment.protection_rules ?? [])
+    .filter((rule) => rule.type === 'required_reviewers')
+  const environmentReviewers = requiredReviewerRules[0]?.reviewers ?? []
+  const configuredReviewer = environmentReviewers[0]
+  const configuredReviewerLogin = configuredReviewer?.reviewer?.login?.toLowerCase()
+  if (
+    environment.name !== 'l8-genesis-bootstrap' ||
+    requiredReviewerRules.length !== 1 ||
+    environmentReviewers.length !== 1 ||
+    requiredReviewerRules[0]?.prevent_self_review !== false ||
+    environment.deployment_branch_policy?.protected_branches !== true ||
+    environment.deployment_branch_policy?.custom_branch_policies !== false ||
+    configuredReviewer?.type !== 'User' ||
+    !configuredReviewerLogin ||
+    typeof configuredReviewer.reviewer?.id !== 'number' ||
+    !Number.isSafeInteger(configuredReviewer.reviewer.id)
+  ) {
+    throw new L8BootstrapApprovalError(
+      'SINGLE_APPROVAL_ENVIRONMENT_NOT_CONFIGURED',
+      'l8-genesis-bootstrap must require one human admin/maintainer on protected branches',
+    )
+  }
+  const permissionPayload = await githubRequest<{ permission?: string }>(
+    '/repos/' + REPOSITORY + '/collaborators/' + encodeURIComponent(configuredReviewerLogin) + '/permission',
+    input.githubToken,
+    fetcher,
+  )
+  const reviewerPermission = String(permissionPayload.permission ?? '').toLowerCase()
+  if (!['admin', 'maintain'].includes(reviewerPermission)) {
+    throw new L8BootstrapApprovalError(
+      'SINGLE_APPROVAL_ENVIRONMENT_NOT_CONFIGURED',
+      'the configured environment reviewer must have repository admin or maintain permission',
+    )
+  }
   const requestPath = '/repos/' + REPOSITORY + '/pulls/' + input.requestPrNumber
   const pull = await githubRequest<GitHubPull>(requestPath, input.githubToken, fetcher)
   const headSha = pull.head?.sha
@@ -238,7 +292,6 @@ export async function verifyTargetBoundDualApproval(input: {
     !headSha ||
     pull.base?.ref !== 'main' ||
     pull.base?.repo?.full_name?.toLowerCase() !== REPOSITORY ||
-    !author
   ) {
     throw new L8BootstrapApprovalError('PR_NOT_MERGED', 'bootstrap request PR must be merged into this repository main branch')
   }
@@ -268,38 +321,6 @@ export async function verifyTargetBoundDualApproval(input: {
     throw new L8BootstrapApprovalError('REQUEST_EXPIRED_OR_INVALID', 'bootstrap request is expired or violates the genesis request contract')
   }
 
-  const reviews = await githubRequest<GitHubReview[]>(
-    requestPath + '/reviews?per_page=100',
-    input.githubToken,
-    fetcher,
-  )
-  const latestReviewByLogin = new Map<string, GitHubReview>()
-  for (const review of reviews) {
-    const login = review.user?.login?.toLowerCase()
-    if (!login || review.user?.type !== 'User' || login.endsWith('[bot]') || review.commit_id !== headSha || !review.submitted_at) continue
-    const previous = latestReviewByLogin.get(login)
-    if (!previous || String(review.submitted_at) > String(previous.submitted_at)) {
-      latestReviewByLogin.set(login, review)
-    }
-  }
-
-  const eligible: Array<{ login: string; permission: string }> = []
-  for (const [login, review] of latestReviewByLogin) {
-    if (review.state !== 'APPROVED' || login === author) continue
-    const permissionPayload = await githubRequest<{ permission?: string }>(
-      '/repos/' + REPOSITORY + '/collaborators/' + encodeURIComponent(login) + '/permission',
-      input.githubToken,
-      fetcher,
-    )
-    const permission = String(permissionPayload.permission ?? '').toLowerCase()
-    if (['admin', 'maintain', 'write'].includes(permission)) eligible.push({ login, permission })
-  }
-
-  if (new Set(eligible.map((entry) => entry.login)).size < 2) {
-    throw new L8BootstrapApprovalError('DUAL_APPROVAL_REQUIRED', 'two distinct authorized maintainers must approve the exact latest PR head')
-  }
-
-  const selected = eligible.sort((a, b) => a.login.localeCompare(b.login))
   const nonceHash = await sha256Hex(request.nonce)
   if (!nonceHash) throw new L8BootstrapApprovalError('INVALID_EVIDENCE', 'bootstrap nonce hash could not be computed')
 
@@ -308,8 +329,8 @@ export async function verifyTargetBoundDualApproval(input: {
     requestPrNumber: input.requestPrNumber,
     requestHeadSha: headSha,
     requestMergeSha: mergeSha,
-    approvedReviewers: selected.map((entry) => entry.login),
-    reviewerPermissions: Object.fromEntries(selected.map((entry) => [entry.login, entry.permission])),
+    approvedReviewers: [configuredReviewerLogin],
+    reviewerPermissions: { [configuredReviewerLogin]: reviewerPermission },
     workflowRunId: workflow.runId,
   }
 }
