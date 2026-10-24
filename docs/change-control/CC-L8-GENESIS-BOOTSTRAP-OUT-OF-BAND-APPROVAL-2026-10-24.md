@@ -33,7 +33,7 @@ The request PR must be merged to `main`; W02 reads the JSON at the immutable mer
 
 ## 3. One approval, one run
 
-- The operator manually dispatches `.github/workflows/l8-genesis-bootstrap.yml` from protected `main` and supplies the merged request PR number.
+- The operator manually dispatches `.github/workflows/l8-genesis-bootstrap.yml` from protected `main` and supplies the merged request PR number. The workflow checks out the immutable `github.sha` for that run, not the moving `main` branch, so its static gate and execution script cannot silently drift while waiting for approval.
 - The GitHub Environment requires one approval. That one approval gates the whole run.
 - Before any write, the run executes `scripts/verify-admin-account-bootstrap-readiness.mjs`. This source/evidence gate must pass; it currently must remain blocked while AUTH-007 is `BLOCKED_NOT_GREEN`.
 - If the gate passes, the same run obtains a short-lived OIDC token, calls W01's public API, and performs a read-only production preflight. A failed preflight never calls the grant route.
