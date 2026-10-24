@@ -179,50 +179,83 @@ if (blockers.length === 0) {
   const policyIds = new Set((policy.operations ?? []).map((operation) => operation.operationId))
   const canonicalOperationIds = new Set((apiContract.operations ?? []).map((operation) => operation.operationId))
 
+  const sourceEvidenceChecks = {
+    apiListsAllSixOperations: apiContract.evidenceStatus?.api?.includes('all six canonical operationIds') === true,
+    apiNoLongerClaimsRoutesMissing: !apiContract.evidenceStatus?.api?.includes('other five operations lack runtime adapters'),
+    runtimeDescriptionAccurate:
+      (apiContract.evidenceStatus?.runtime?.startsWith('SOURCE_IMPLEMENTED_TESTED_LOCALLY;') === true ||
+       ['PASS', 'VERIFIED'].includes(apiContract.evidenceStatus?.runtime)),
+    apiSecurityAndMappingStatusesAllowed:
+      ['MISSING', 'PASS', 'VERIFIED'].includes(apiContract.evidenceStatus?.securityE2E) &&
+      ['MISSING', 'PASS', 'VERIFIED'].includes(apiContract.evidenceStatus?.mapping0),
+    auth007StatusIsRecognized: ['BLOCKED_NOT_GREEN', 'GREEN'].includes(auth007Status),
+    contractStatusesMatchReconciliation:
+      apiContract.evidenceStatus?.auth007 === auth007Status &&
+      factorContract.evidenceStatus?.auth007 === auth007Status,
+    implementationAuthorizationMatchesStatus:
+      auth007Status === 'GREEN'
+        ? implementationAuthorization === 'true'
+        : implementationAuthorization !== 'true',
+    greenRequiresAllProductionEvidence: auth007Status !== 'GREEN' || (
+      ['PASS', 'VERIFIED'].includes(apiContract.evidenceStatus?.securityE2E) &&
+      ['PASS', 'VERIFIED'].includes(apiContract.evidenceStatus?.mapping0) &&
+      ['PASS', 'VERIFIED'].includes(apiContract.evidenceStatus?.persistence) &&
+      ['PASS', 'VERIFIED'].includes(factorContract.evidenceStatus?.totpReplayProtection) &&
+      ['PASS', 'VERIFIED'].includes(factorContract.evidenceStatus?.runtime) &&
+      ['PASS', 'VERIFIED'].includes(factorContract.evidenceStatus?.securityE2E) &&
+      ['PASS', 'VERIFIED'].includes(factorContract.evidenceStatus?.evidenceRegistry) &&
+      ['VERIFIED', 'GREEN'].includes(factorContract.status) &&
+      ['PASS', 'VERIFIED'].includes(factorContract.evidenceStatus?.entity) &&
+      ['PASS', 'VERIFIED'].includes(factorContract.evidenceStatus?.apiDto)
+    ),
+    factorMissingEvidenceStatusesAllowed:
+      ['MISSING', 'PASS', 'VERIFIED'].includes(factorContract.evidenceStatus?.securityE2E) &&
+      ['MISSING', 'PASS', 'VERIFIED'].includes(factorContract.evidenceStatus?.evidenceRegistry),
+    noStaleReplayInvariant:
+      !factorContract.securityInvariants.some((invariant) =>
+        invariant.includes('current migration 0006 does not provide this field')),
+  }
+
   sourceChecks = {
     reviewedMfaMigrationShape: requiredMigrationTokens.every((token) => migration.includes(token)),
     reviewedBootstrapAuditShape: requiredBootstrapTokens.every((token) => bootstrapMigration.includes(token)),
-    encryptedRecoveryCodes: /backupCodeOptions:\s*\{[^}]*storeBackupCodes:\s*['"]encrypted['"]/.test(betterAuth),
-    privilegedTrustDeviceDisabled: /trustDeviceMaxAge:\s*0/.test(betterAuth),
+    encryptedRecoveryCodes: /backupCodeOptions:\\s*\\{[^}]*storeBackupCodes:\\s*['"]encrypted['"]/.test(betterAuth),
+    privilegedTrustDeviceDisabled: /trustDeviceMaxAge:\\s*0/.test(betterAuth),
     persistedTotpReplayGuard: /consumeTotpTimeStep/.test(betterAuth) &&
-      /two-factor\/verify-totp/.test(betterAuth) &&
+      /two-factor\\/verify-totp/.test(betterAuth) &&
       /UPDATE "twoFactor" SET lastAcceptedTotpTimeStep/.test(replayGuard),
     canonicalContractsDeclareExplicitStatus: ['CONTRACTED_NOT_VERIFIED', 'VERIFIED', 'GREEN'].includes(apiContract.status) &&
       ['CONTRACTED_NOT_VERIFIED', 'VERIFIED', 'GREEN'].includes(factorContract.status) &&
       ['CONTRACTED_NOT_VERIFIED', 'VERIFIED', 'GREEN'].includes(lifecycle.status),
-    sourceEvidenceIsAccurateAndPromotionConsistent:
-      apiContract.evidenceStatus?.api?.includes('all six canonical operationIds') === true &&
-      !apiContract.evidenceStatus?.api?.includes('other five operations lack runtime adapters') &&
-      (apiContract.evidenceStatus?.runtime?.startsWith('SOURCE_IMPLEMENTED_TESTED_LOCALLY;') === true ||
-       ['PASS', 'VERIFIED'].includes(apiContract.evidenceStatus?.runtime)) &&
-      ['MISSING', 'PASS', 'VERIFIED'].includes(apiContract.evidenceStatus?.securityE2E) &&
-      ['MISSING', 'PASS', 'VERIFIED'].includes(apiContract.evidenceStatus?.mapping0) &&
-      ['BLOCKED_NOT_GREEN', 'GREEN'].includes(auth007Status) &&
-      apiContract.evidenceStatus?.auth007 === auth007Status &&
-      factorContract.evidenceStatus?.auth007 === auth007Status &&
-      (auth007Status === 'GREEN'
-        ? implementationAuthorization === 'true' &&
-          ['PASS', 'VERIFIED'].includes(apiContract.evidenceStatus?.securityE2E) &&
-          ['PASS', 'VERIFIED'].includes(apiContract.evidenceStatus?.mapping0) &&
-          ['PASS', 'VERIFIED'].includes(apiContract.evidenceStatus?.persistence) &&
-          ['PASS', 'VERIFIED'].includes(factorContract.evidenceStatus?.totpReplayProtection) &&
-          ['PASS', 'VERIFIED'].includes(factorContract.evidenceStatus?.runtime) &&
-          ['PASS', 'VERIFIED'].includes(factorContract.evidenceStatus?.securityE2E) &&
-          ['PASS', 'VERIFIED'].includes(factorContract.evidenceStatus?.evidenceRegistry)
-        : implementationAuthorization !== 'true') &&
-      ['MISSING', 'PASS', 'VERIFIED'].includes(factorContract.evidenceStatus?.securityE2E) &&
-      ['MISSING', 'PASS', 'VERIFIED'].includes(factorContract.evidenceStatus?.evidenceRegistry) &&
-      (auth007Status !== 'GREEN' ||
-        (['VERIFIED', 'GREEN'].includes(factorContract.status) &&
-         ['PASS', 'VERIFIED'].includes(factorContract.evidenceStatus?.entity) &&
-         ['PASS', 'VERIFIED'].includes(factorContract.evidenceStatus?.apiDto) &&
-         ['PASS', 'VERIFIED'].includes(factorContract.evidenceStatus?.evidenceRegistry))) &&
-      !factorContract.securityInvariants.some((invariant) => invariant.includes('current migration 0006 does not provide this field')),
+    sourceEvidenceIsAccurateAndPromotionConsistent: Object.values(sourceEvidenceChecks).every((passed) => passed === true),
+    ...Object.fromEntries(Object.entries(sourceEvidenceChecks).map(([key, passed]) => ['evidence_' + key, passed])),
+    allSixPublicRoutesAndTestsPresent: operations.every((operation) =>
+      exists(operation.route) &&
+      exists(operation.test) &&
+      policyIds.has(operation.id) &&
+      canonicalOperationIds.has(operation.id)
+    ),
+    w02ReplayAndEnrollmentTestsPresent: [
+      'workers/W02-identity/src/auth/mfa-status.test.ts',
+      'workers/W02-identity/src/auth/mfa-enrollment-start.test.ts',
+      'workers/W02-identity/src/auth/mfa-enrollment-confirm.test.ts',
+      'workers/W02-identity/src/auth/totp-replay-guard.test.ts',
+      'workers/W02-identity/src/auth/mfa-lifecycle-contract.test.ts',
+    ].every(exists),
+    finalGenesisGateRequiresExplicitGreenPromotion: exists('scripts/verify-admin-account-bootstrap-readiness.mjs') &&
+      /auth007Status === 'GREEN'/.test(read('scripts/verify-admin-account-bootstrap-readiness.mjs')) &&
+      /implementationAuthorization === 'true'/.test(read('scripts/verify-admin-account-bootstrap-readiness.mjs')) &&
+      /!auth007PromotionVerified/.test(read('scripts/verify-admin-account-bootstrap-readiness.mjs')) &&
+      /AUTH-007 must be GREEN with implementation authorization true/.test(read('scripts/verify-admin-account-bootstrap-readiness.mjs')),
+    rolloutEnvironmentDisablesAdminBypass: read('scripts/verify-auth-007-rollout-admission.mjs').includes('environment.can_admins_bypass !== false'),
+    l8EnvironmentDisablesAdminBypass: read('workers/W02-identity/src/authz/l8-genesis-bootstrap-approval.ts').includes('environment.can_admins_bypass !== false') &&
+      /can_admins_bypass: true/.test(read('workers/W02-identity/src/authz/l8-genesis-bootstrap-approval.test.ts')) &&
+      /rejects environments that permit administrator bypass of protection rules/.test(read('workers/W02-identity/src/authz/l8-genesis-bootstrap-approval.test.ts')),
     standaloneW01DeployUsesProtectedAdmission:
-      /environment:\s*auth-mfa-rollout/.test(standaloneW01Workflow) &&
-      /github\.ref == 'refs\/heads\/main'/.test(standaloneW01Workflow) &&
+      /environment:\\s*auth-mfa-rollout/.test(standaloneW01Workflow) &&
+      /github\\.ref == 'refs\\/heads\\/main'/.test(standaloneW01Workflow) &&
       /merge-base --is-ancestor/.test(standaloneW01Workflow) &&
-      /verify-auth-007-rollout-admission\.mjs/.test(standaloneW01Workflow) &&
+      /verify-auth-007-rollout-admission\\.mjs/.test(standaloneW01Workflow) &&
       standaloneW01Workflow.indexOf('verify-auth-007-rollout-admission.mjs') >= 0 &&
       standaloneW01Workflow.indexOf('verify-auth-007-rollout-admission.mjs') < standaloneW01Workflow.indexOf('run: pnpm run deploy:app'),
   }
