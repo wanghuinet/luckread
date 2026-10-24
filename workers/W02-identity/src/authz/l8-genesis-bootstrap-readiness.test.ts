@@ -11,6 +11,7 @@ type FixtureOptions = {
   consumed?: boolean
   schemaReady?: boolean
   triggersReady?: boolean
+  targetMfa?: { twoFactorEnabled: number | boolean; mfaEnrolledAt: string | null; totpVerified: number | boolean | null } | null
 }
 
 type FakeStatement = {
@@ -42,6 +43,15 @@ class ReadinessD1 {
       },
       first: async <T>() => {
         void args
+        if (sql.includes('FROM "user" u LEFT JOIN "twoFactor" tf')) {
+          return (this.options.targetMfa === undefined
+            ? {
+                twoFactorEnabled: 1,
+                mfaEnrolledAt: '2026-10-24T11:00:00.000Z',
+                totpVerified: 1,
+              }
+            : this.options.targetMfa) as T | null
+        }
         if (sql.includes('FROM "user" WHERE id = ?')) {
           return (this.options.user === undefined
             ? { accountState: 'ACTIVE', emailVerified: 1 }
@@ -115,6 +125,14 @@ describe('read-only W02 L8 bootstrap readiness', () => {
     const db = new ReadinessD1({ user: { accountState: 'PENDING_VERIFICATION', emailVerified: 0 } }) as unknown as D1Database
     await expect(checkL8BootstrapReadiness(db, approval(), NOW))
       .rejects.toMatchObject({ code: 'TARGET_NOT_ELIGIBLE' })
+  })
+
+  it('blocks when target MFA has not been enabled and verified', async () => {
+    const db = new ReadinessD1({
+      targetMfa: { twoFactorEnabled: 0, mfaEnrolledAt: null, totpVerified: 0 },
+    }) as unknown as D1Database
+    await expect(checkL8BootstrapReadiness(db, approval(), NOW))
+      .rejects.toMatchObject({ code: 'MFA_REQUIRED' })
   })
 
   it('blocks when the target has no effective L2 verified_user assignment', async () => {
