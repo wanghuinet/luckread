@@ -21,27 +21,106 @@
     "crossWorkerAccessMustNotBeInferredFromSamePhysicalD1": true
   },
   "tables": [
-    { "name": "contents", "ownerWorker": "W03", "readPolicy": "OWNER_ONLY_WITH_EXCEPTIONS", "readExceptions": [
-      { "worker": "W05", "path": "workers/W05-social/src/comment-runtime.ts", "reason": "Bounded final comment-create visibility and audience-policy recheck; ordinary parent-content context is resolved through W03_CONTENT." },
-      { "worker": "W05", "path": "workers/W05-social/src/like-runtime.ts", "reason": "Bounded final content-like visibility and Block-race recheck; ordinary parent-content context is resolved through W03_CONTENT." }
-    ] },
-    { "name": "content_relationships", "ownerWorker": "W03" },
-    { "name": "content_series", "ownerWorker": "W03" },
-    { "name": "content_collections", "ownerWorker": "W03" },
-    { "name": "content_revisions", "ownerWorker": "W03" },
-    { "name": "content_mutation_idempotency", "ownerWorker": "W03" },
-    { "name": "role_assignments", "ownerWorker": "W02" },
-    { "name": "role_authorization_versions", "ownerWorker": "W02" },
-    { "name": "user", "ownerWorker": "W02" },
-    { "name": "session", "ownerWorker": "W02" },
-    { "name": "account", "ownerWorker": "W02" },
-    { "name": "verification", "ownerWorker": "W02" },
-    { "name": "social_comments", "ownerWorker": "W05" },
-    { "name": "interaction_likes", "ownerWorker": "W05" },
-    { "name": "social_user_interactions", "ownerWorker": "W05" },
-    { "name": "moderation_cases", "ownerWorker": "W06" },
-    { "name": "moderation_decisions", "ownerWorker": "W06" },
-    { "name": "analytics_event_dedupe", "ownerWorker": "W11" },
-    { "name": "analytics_content_hourly", "ownerWorker": "W11" }
+    {
+      "name": "contents",
+      "ownerWorker": "W03",
+      "readPolicy": "OWNER_ONLY_WITH_EXCEPTIONS",
+      "readExceptions": [
+        {
+          "worker": "W05",
+          "path": "workers/W05-social/src/comment-runtime.ts",
+          "reason": "Bounded final comment-create visibility and audience-policy recheck; ordinary parent-content context is resolved through W03_CONTENT."
+        },
+        {
+          "worker": "W05",
+          "path": "workers/W05-social/src/like-runtime.ts",
+          "reason": "Bounded final content-like visibility and Block-race recheck; ordinary parent-content context is resolved through W03_CONTENT."
+        }
+      ]
+    },
+    {
+      "name": "content_relationships",
+      "ownerWorker": "W03"
+    },
+    {
+      "name": "content_series",
+      "ownerWorker": "W03"
+    },
+    {
+      "name": "content_collections",
+      "ownerWorker": "W03"
+    },
+    {
+      "name": "content_revisions",
+      "ownerWorker": "W03"
+    },
+    {
+      "name": "content_mutation_idempotency",
+      "ownerWorker": "W03"
+    },
+    {
+      "name": "role_assignments",
+      "ownerWorker": "W02"
+    },
+    {
+      "name": "role_authorization_versions",
+      "ownerWorker": "W02"
+    },
+    {
+      "name": "user",
+      "ownerWorker": "W02"
+    },
+    {
+      "name": "session",
+      "ownerWorker": "W02"
+    },
+    {
+      "name": "account",
+      "ownerWorker": "W02"
+    },
+    {
+      "name": "verification",
+      "ownerWorker": "W02"
+    },
+    {
+      "name": "social_comments",
+      "ownerWorker": "W05"
+    },
+    {
+      "name": "interaction_likes",
+      "ownerWorker": "W05"
+    },
+    {
+      "name": "social_user_interactions",
+      "ownerWorker": "W05"
+    },
+    {
+      "name": "moderation_cases",
+      "ownerWorker": "W06"
+    },
+    {
+      "name": "moderation_decisions",
+      "ownerWorker": "W06"
+    },
+    {
+      "name": "analytics_event_dedupe",
+      "ownerWorker": "W11"
+    },
+    {
+      "name": "analytics_content_hourly",
+      "ownerWorker": "W11"
+    },
+    {
+      "name": "auth_013_publication_journal",
+      "ownerWorker": "W02",
+      "readPolicy": "OWNER_ONLY_WITH_EXCEPTIONS",
+      "readExceptions": []
+    },
+    {
+      "name": "auth_007_mfa_publication_journal",
+      "ownerWorker": "W02",
+      "readPolicy": "OWNER_ONLY_WITH_EXCEPTIONS",
+      "readExceptions": []
+    }
   ]
 }
