@@ -22,7 +22,7 @@
 6. The security threat model requires MFA as part of brute-force defense and explicitly requires MFA for L5+ privileged roles. fileciteturn270file0L1-L13
 7. The canonical L0-L8 model sets MFA as required for L5, L6, L7 and L8. fileciteturn272file0L1-L5
 8. The canonical identity/entity model separates `Credential` from `User` and explicitly allows Credential to represent authentication material, but the Credential entity and fields remain PROPOSED rather than verified. fileciteturn290file0L1-L3 fileciteturn286file0L1-L5
-9. Repository searches found no canonical MFA operation IDs and no executable MFA enrollment/challenge/verification implementation. Search did not identify `authMfa`, MFA enrollment/challenge functions, or TOTP/OTP factor persistence code.
+9. The initial reconciliation found no canonical MFA operation IDs or executable MFA enrollment/challenge/verification implementation. Follow-up work has now added the canonical operation IDs and a read-only W01/W02 MFA status route; enrollment, confirmation, login challenge, disable, recovery rotation and durable TOTP replay prevention still lack complete runtime implementation and accepted evidence.
 
 ## 2. Missing canonical traceability
 
@@ -65,7 +65,7 @@
 
 - Added `contracts/api/AUTH-007-mfa-totp-contract.v1.json` defining the W01 public MFA enrollment/status/confirmation/challenge/disable/recovery-code operations. W01 remains the only APP/H5/PC public API entry; W02 remains the factor/identity/D1-01 authority.
 - The proposed contract explicitly requires an atomic persisted TOTP time-step replay guard, identity-bound single-use challenges, recovery-code single-use/rotation, account/factor lockout, no-store responses, step-up for factor disable/recovery rotation, session invalidation on enable/disable, and audit event coverage.
-- The six operation IDs and login HTTP 202 challenge variant are now mapped in `contracts/openapi/v1/openapi.yaml`; the DTO contract and DTO records, auth operation policy, OpenAPI operation policy, self-scoped permission catalog and auth identity endpoint inventory have also been updated. These are contract bindings only, not runtime proof. W01 executable route adapters, W02 factor lifecycle/step-up handlers, atomic persisted TOTP replay guard, tests, controlled remote D1 schema read-back, Evidence Registry, and final Mapping 0 remain missing. It does not authorize runtime promotion.
+- The six operation IDs and login HTTP 202 challenge variant are mapped in `contracts/openapi/v1/openapi.yaml`; DTO records, auth operation policy, OpenAPI operation policy, self-scoped permissions and endpoint inventory are also bound. The `GET /v1/auth/mfa` read-only path now has W01 and W02 source adapters plus unit/integration tests. Source presence is not execution evidence: the remaining five MFA mutation/challenge paths, W02 factor lifecycle/step-up handlers, durable atomic TOTP replay guard, full security tests, controlled remote D1 schema read-back, Evidence Registry and final Mapping 0 remain missing. It does not authorize runtime promotion.
 - `AUTH-007` remains `BLOCKED_NOT_GREEN`; implementation authorization remains `false`.
 
 ## 3. Security interpretation rules
