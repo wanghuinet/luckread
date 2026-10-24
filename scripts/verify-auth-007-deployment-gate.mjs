@@ -10,12 +10,12 @@ const roleAssignmentPath = 'workers/W02-identity/src/authz/role-assignment.ts'
 const betterAuthPath = 'workers/W02-identity/src/auth/better-auth.ts'
 const reconciliationPath = 'contracts/alignment/mapping-batches/AUTH-007-real-evidence-reconciliation.v1.md'
 
+// Any MFA-dependent artifact makes this source subject to the gate.
+// Using AND here would allow a partial/renamed implementation to skip it.
 const mfaDependentRuntimePresent =
-  exists(mfaMigrationPath) &&
-  exists(roleAssignmentPath) &&
-  exists(betterAuthPath) &&
-  /LEFT JOIN\s+"twoFactor"/.test(read(roleAssignmentPath)) &&
-  /twoFactor\s*\(/.test(read(betterAuthPath))
+  exists(mfaMigrationPath) ||
+  (exists(roleAssignmentPath) && /LEFT JOIN\\s+"twoFactor"/.test(read(roleAssignmentPath))) ||
+  (exists(betterAuthPath) && /twoFactor\\s*\\(/.test(read(betterAuthPath)))
 
 if (!mfaDependentRuntimePresent) {
   console.log(JSON.stringify({
