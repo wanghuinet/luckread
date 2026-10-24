@@ -198,6 +198,7 @@ if (blockers.length === 0) {
       'workers/W02-identity/src/auth/mfa-enrollment-start.test.ts',
       'workers/W02-identity/src/auth/mfa-enrollment-confirm.test.ts',
       'workers/W02-identity/src/auth/totp-replay-guard.test.ts',
+      'workers/W02-identity/src/auth/mfa-lifecycle-contract.test.ts',
     ].every(exists),
     finalGenesisGateStillBlockedUntilEvidence: /Status:\s*`BLOCKED_NOT_GREEN`/.test(reconciliation) &&
       /Implementation authorization:\s*`false`/.test(reconciliation),
