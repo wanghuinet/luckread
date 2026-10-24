@@ -79,8 +79,8 @@ const approval = (): VerifiedL8BootstrapApproval => ({
   requestPrNumber: 77,
   requestHeadSha: 'a'.repeat(40),
   requestMergeSha: 'b'.repeat(40),
-  approvedReviewers: ['maintainer-a', 'maintainer-b'],
-  reviewerPermissions: { 'maintainer-a': 'maintain', 'maintainer-b': 'write' },
+  approvedReviewers: ['wanghuinet'],
+  reviewerPermissions: { 'wanghuinet': 'admin' },
   workflowRunId: '12345678',
 })
 
@@ -95,7 +95,7 @@ describe('read-only W02 L8 bootstrap readiness', () => {
       scopeType: 'global',
       maxGrantSeconds: 14400,
       productionMutationPerformed: false,
-      approvedReviewers: ['maintainer-a', 'maintainer-b'],
+      approvedReviewers: ['wanghuinet'],
     })
   })
 
