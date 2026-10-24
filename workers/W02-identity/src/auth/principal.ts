@@ -1,6 +1,8 @@
+import layers from '../../../../contracts/authz/layers.json'
 import { activateEmailVerifiedAccount } from '../account/account-state-transition.js'
-import { createLuckReadAuth, type BetterAuthEnv } from './better-auth.js'
 import { ensureVerifiedUserRole, resolveGlobalLayer, type LayerResolution, type ResolvedRoleAssignment } from '../authz/role-assignment.js'
+import { requireMfaForPrivilegedAction } from './privileged-mfa-gate.js'
+import { createLuckReadAuth, type BetterAuthEnv } from './better-auth.js'
 
 type AuthSession = {
   user: {
@@ -13,6 +15,7 @@ type AuthSession = {
   session: {
     id: string
     expiresAt: Date
+    createdAt?: Date | string
   }
 }
 
@@ -28,6 +31,11 @@ export type AuthenticatedPrincipal = {
 
 const toIso = (value: Date | string): string =>
   value instanceof Date ? value.toISOString() : new Date(value).toISOString()
+
+const roleLayerById = new Map<string, number>()
+for (const layer of layers['x-layers']) {
+  for (const role of layer.roles ?? []) roleLayerById.set(role, Number(layer.id.slice(1)))
+}
 
 export async function resolveBetterAuthPrincipal(
   env: BetterAuthEnv,
@@ -79,13 +87,42 @@ export async function resolveBetterAuthPrincipal(
 
   if (layerResolution.decision !== 'ALLOW' || !layerResolution.layer) return null
 
+  let effectiveLayer = layerResolution.layer
+  let effectiveAssignments = layerResolution.roleAssignments ?? []
+
+  // L5-L8 are unavailable until the current Better Auth session proves that
+  // TOTP was enabled and verified before that session was created. MFA is a
+  // gate over the authoritative role rows; it never writes or deletes roles.
+  if (Number(effectiveLayer.slice(1)) >= 5) {
+    const mfaVerified = await requireMfaForPrivilegedAction(
+      db,
+      String(result.user.id),
+      result.session.createdAt,
+    )
+    if (!mfaVerified) {
+      effectiveAssignments = effectiveAssignments.filter((assignment) => {
+        const roleLayer = roleLayerById.get(assignment.roleId)
+        return typeof roleLayer === 'number' && roleLayer < 5
+      })
+      const eligibleGlobalLayers = effectiveAssignments
+        .filter((assignment) => assignment.scopeType === 'global')
+        .map((assignment) => roleLayerById.get(assignment.roleId))
+        .filter((layer): layer is number => typeof layer === 'number' && layer < 5)
+
+      // Do not synthesize a fallback layer when no lower global RoleAssignment
+      // exists; fail closed. Normal registered users retain their L1/L2 roles.
+      if (eligibleGlobalLayers.length === 0) return null
+      effectiveLayer = ('L' + Math.max(...eligibleGlobalLayers)) as typeof effectiveLayer
+    }
+  }
+
   return {
     userId: String(result.user.id),
     email: String(result.user.email),
     sessionId: String(result.session.id),
     accountState,
     accountStateVersion,
-    layer: layerResolution.layer,
-    roleAssignments: layerResolution.roleAssignments ?? [],
+    layer: effectiveLayer,
+    roleAssignments: effectiveAssignments,
   }
 }
