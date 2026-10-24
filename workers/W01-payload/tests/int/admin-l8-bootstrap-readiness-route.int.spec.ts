@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { POST } from '../../src/app/api/v1/admin/bootstrap/super-admin/readiness/route.js'
 
@@ -34,10 +34,10 @@ describe('W01 L8 bootstrap read-only readiness boundary', () => {
   })
 
   it('forwards through the existing W02 binding and never writes from W01', () => {
-    const route = readFileSync(
-      resolve(process.cwd(), 'src/app/api/v1/admin/bootstrap/super-admin/readiness/route.ts'),
-      'utf8',
-    )
+    const routePathFromWorker = resolve(process.cwd(), 'src/app/api/v1/admin/bootstrap/super-admin/readiness/route.ts')
+    const routePathFromRepo = resolve(process.cwd(), 'workers/W01-payload/src/app/api/v1/admin/bootstrap/super-admin/readiness/route.ts')
+    const routePath = existsSync(routePathFromWorker) ? routePathFromWorker : routePathFromRepo
+    const route = readFileSync(routePath, 'utf8')
     expect(route).toContain("callW02('/internal/authz/bootstrap-super-admin/readiness'")
     expect(route).toContain("'X-LuckRead-Caller': 'W01'")
     expect(route).toContain("'X-LuckRead-Transport-Version': '1.0'")
