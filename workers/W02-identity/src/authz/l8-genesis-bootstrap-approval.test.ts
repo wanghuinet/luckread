@@ -158,8 +158,8 @@ describe('W02 L8 target-bound dual-approval verifier', () => {
       now,
       jwk: signed.jwk,
       reviews: [
-        { state: 'APPROVED', submitted_at: new Date(now.getTime() - 4 * 60_000).toISOString(), commit_id: 'head-1', user: { login: 'maintainer-a', type: 'Bot' } },
-        { state: 'APPROVED', submitted_at: new Date(now.getTime() - 3 * 60_000).toISOString(), commit_id: 'head-1', user: { login: 'maintainer-b', type: 'Bot' } },
+        { state: 'APPROVED', submitted_at: new Date(now.getTime() - 4 * 60_000).toISOString(), commit_id: 'a'.repeat(40), user: { login: 'maintainer-a', type: 'Bot' } },
+        { state: 'APPROVED', submitted_at: new Date(now.getTime() - 3 * 60_000).toISOString(), commit_id: 'a'.repeat(40), user: { login: 'maintainer-b', type: 'Bot' } },
       ],
     })
     await expect(verifyTargetBoundDualApproval({
