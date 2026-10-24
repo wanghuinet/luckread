@@ -70,6 +70,7 @@ export async function checkL8BootstrapReadiness(
       db.prepare('SELECT userId, verified FROM "twoFactor" LIMIT 0').all(),
       db.prepare('SELECT bootstrap_key FROM l8_genesis_bootstrap_audit LIMIT 0').all(),
       db.prepare('SELECT role_id, valid_until FROM role_assignments LIMIT 0').all(),
+      db.prepare('SELECT subject_id, role_version, updated_at FROM role_authorization_versions LIMIT 0').all(),
     ])
   } catch {
     throw new L8BootstrapReadinessError('SCHEMA_NOT_READY', 'required MFA or L8 bootstrap schema is missing')
