@@ -98,7 +98,7 @@ const hasNoSelfApprovalPolicy =
   /prevent_self_review !== true/.test(w02ProductionCode) &&
   /prevent_self_review: false/.test(w02TestCode) &&
   /rejects a single-reviewer environment when self-review is permitted/.test(w02TestCode) &&
-  /environment\.can_admins_bypass !== false/.test(w02ProductionCode) &&
+  read('workers/W02-identity/src/authz/l8-genesis-bootstrap-approval.ts').includes('environment.can_admins_bypass !== false') &&
   /can_admins_bypass: true/.test(w02TestCode) &&
   /rejects environments that permit administrator bypass of protection rules/.test(w02TestCode)
 if (!hasNoSelfApprovalPolicy) {
