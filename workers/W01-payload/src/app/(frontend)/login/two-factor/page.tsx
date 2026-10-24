@@ -31,11 +31,11 @@ export default function TwoFactorChallengePage() {
       setError(method === 'totp' ? '请输入身份验证器中的 6 位验证码。' : '请输入备用恢复码。')
       return
     }
-    if (method === 'totp' && !/^\\d{6}$/.test(normalizedCode)) {
+    if (method === 'totp' && !/^\d{6}$/.test(normalizedCode)) {
       setError('验证码应为 6 位数字。')
       return
     }
-    if (method === 'recovery_code' && (normalizedCode.length > 128 || !/^[\\x21-\\x7E]+$/.test(normalizedCode))) {
+    if (method === 'recovery_code' && (normalizedCode.length > 128 || !/^[\x21-\x7E]+$/.test(normalizedCode))) {
       setError('恢复码格式无效。')
       return
     }
