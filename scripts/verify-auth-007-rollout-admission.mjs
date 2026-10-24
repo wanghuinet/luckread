@@ -202,8 +202,10 @@ if (blockers.length === 0) {
       'workers/W02-identity/src/auth/totp-replay-guard.test.ts',
       'workers/W02-identity/src/auth/mfa-lifecycle-contract.test.ts',
     ].every(exists),
-    finalGenesisGateRemainsSeparate: exists('scripts/verify-admin-account-bootstrap-readiness.mjs') &&
-      /hasMfaEnforcement/.test(read('scripts/verify-admin-account-bootstrap-readiness.mjs')) &&
+    finalGenesisGateRequiresExplicitGreenPromotion: exists('scripts/verify-admin-account-bootstrap-readiness.mjs') &&
+      /auth007Status === 'GREEN'/.test(read('scripts/verify-admin-account-bootstrap-readiness.mjs')) &&
+      /implementationAuthorization === 'true'/.test(read('scripts/verify-admin-account-bootstrap-readiness.mjs')) &&
+      /!auth007PromotionVerified/.test(read('scripts/verify-admin-account-bootstrap-readiness.mjs')) &&
       /BLOCKED_NOT_GREEN/.test(read('scripts/verify-admin-account-bootstrap-readiness.mjs')),
     standaloneW01DeployUsesProtectedAdmission:
       /environment:\s*auth-mfa-rollout/.test(standaloneW01Workflow) &&
