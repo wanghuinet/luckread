@@ -30,8 +30,7 @@
       "responseFields": [
         "enabled",
         "verified",
-        "enrolledAt",
-        "recoveryCodesRemaining"
+        "enrolledAt"
       ],
       "forbiddenResponseFields": [
         "secret",
@@ -176,8 +175,7 @@
       "fields": {
         "enabled": "boolean",
         "verified": "boolean",
-        "enrolledAt": "date-time|null",
-        "recoveryCodesRemaining": "integer|null"
+        "enrolledAt": "date-time|null"
       }
     },
     "DTO-AUTH-007-MFA-ENROLLMENT-START-REQUEST": {
@@ -361,5 +359,13 @@
     "contracts/dto/auth-dto-records.v1.json",
     "workers/W01-payload/src/auth/w02-session-client.ts",
     "workers/W02-identity/src/auth/better-auth.ts"
-  ]
+  ],
+  "loginChallenge": {
+    "operationId": "authLogin",
+    "challengeResponseStatus": 202,
+    "responseDtoId": "DTO-AUTH-007-MFA-CHALLENGE-REQUIRED",
+    "nextOperationId": "authMfaChallengeVerify",
+    "sessionIssuedBeforeChallenge": false,
+    "challengeCookie": "short-lived HttpOnly W02-issued cookie"
+  }
 }
