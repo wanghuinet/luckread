@@ -11,7 +11,7 @@ describe('L8 genesis protected-main gate', () => {
     const executorIndex = workflow.indexOf('run: node scripts/execute-l8-genesis-bootstrap.mjs')
 
     assert.ok(guardIndex >= 0, 'protected-main guard step must exist')
-    assert.match(workflow, /if:\\s*\\$\\{\\{\\s*github\\.ref_protected\\s*!=\\s*true\\s*\\}\\}/)
+    assert.ok(workflow.includes('if: ${{ github.ref_protected != true }}'), 'missing/falsy protected-ref guard condition must fail')
     assert.ok(readinessIndex > guardIndex, 'readiness gate must run after the protected-main guard')
     assert.ok(executorIndex > guardIndex, 'bootstrap executor must run after the protected-main guard')
   })
