@@ -43,6 +43,7 @@ describe('L8 genesis request static preflight', () => {
   it('rejects an expired or future-dated request', () => {
     assert.equal(validateL8GenesisBootstrapRequest({
       ...validRequest(),
+      createdAt: '2026-10-24T11:58:00.000Z',
       expiresAt: '2026-10-24T11:59:00.000Z',
     }, NOW).reason, 'REQUEST_EXPIRED')
     assert.equal(validateL8GenesisBootstrapRequest({
