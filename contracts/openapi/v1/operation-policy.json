@@ -551,6 +551,19 @@
       "x-luckread-source": "contracts/api/api-inventory.v1.json"
     },
     {
+      "operationId": "authMfaStatus",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "user.mfa.read"
+      ],
+      "auditRequired": false,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none"
+    },
+    {
       "operationId": "authPrincipalGet",
       "auth": {
         "mode": "authenticated"
@@ -1750,6 +1763,69 @@
       "stateMachine": "none"
     },
     {
+      "operationId": "authMfaChallengeVerify",
+      "auth": {
+        "mode": "public"
+      },
+      "permissions": [],
+      "auditRequired": true,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": true,
+      "stateMachine": "none"
+    },
+    {
+      "operationId": "authMfaDisable",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "user.mfa.manage"
+      ],
+      "auditRequired": true,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": true,
+      "stateMachine": "none"
+    },
+    {
+      "operationId": "authMfaEnrollmentStart",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "user.mfa.manage"
+      ],
+      "auditRequired": true,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": true,
+      "stateMachine": "none"
+    },
+    {
+      "operationId": "authMfaEnrollmentConfirm",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "user.mfa.manage"
+      ],
+      "auditRequired": true,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": true,
+      "stateMachine": "none"
+    },
+    {
+      "operationId": "authMfaRecoveryCodesRotate",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "user.mfa.manage"
+      ],
+      "auditRequired": true,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": true,
+      "stateMachine": "none"
+    },
+    {
       "operationId": "authPasswordChange",
       "auth": {
         "mode": "authenticated"
@@ -2542,82 +2618,6 @@
       "stateMachine": "none",
       "x-luckread-contract-status": "DISCOVERY_DRAFT",
       "x-luckread-source": "contracts/api/api-inventory.v1.json"
-    },
-    {
-      "operationId": "authMfaStatus",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "user.mfa.read"
-      ],
-      "auditRequired": false,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": false,
-      "stateMachine": "none"
-    },
-    {
-      "operationId": "authMfaEnrollmentStart",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "user.mfa.manage"
-      ],
-      "auditRequired": true,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": true,
-      "stateMachine": "none"
-    },
-    {
-      "operationId": "authMfaEnrollmentConfirm",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "user.mfa.manage"
-      ],
-      "auditRequired": true,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": true,
-      "stateMachine": "none"
-    },
-    {
-      "operationId": "authMfaChallengeVerify",
-      "auth": {
-        "mode": "public"
-      },
-      "permissions": [],
-      "auditRequired": true,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": true,
-      "stateMachine": "none"
-    },
-    {
-      "operationId": "authMfaDisable",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "user.mfa.manage"
-      ],
-      "auditRequired": true,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": true,
-      "stateMachine": "none"
-    },
-    {
-      "operationId": "authMfaRecoveryCodesRotate",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "user.mfa.manage"
-      ],
-      "auditRequired": true,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": true,
-      "stateMachine": "none"
     }
   ]
 }
