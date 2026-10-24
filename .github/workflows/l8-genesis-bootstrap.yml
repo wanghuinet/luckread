@@ -20,7 +20,31 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  protected-main-admission:
+    name: Require protected main before any bootstrap gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      contents: read
+    steps:
+      - name: Reject dispatch outside protected main
+        env:
+          DISPATCH_REF: ${{ github.ref }}
+          REF_PROTECTED: ${{ github.ref_protected }}
+        run: |
+          if [[ "$DISPATCH_REF" != "refs/heads/main" ]]; then
+            echo "::error::L8 genesis bootstrap must be dispatched from refs/heads/main."
+            exit 1
+          fi
+          if [[ "$REF_PROTECTED" != "true" ]]; then
+            echo "::error::L8 genesis bootstrap requires GitHub to report main as protected."
+            echo "::error::Enable branch protection for main before retrying; no environment approval or production call was attempted."
+            exit 1
+          fi
+          echo "Protected main admission: PASS"
+
   bootstrap:
+    needs: protected-main-admission
     if: github.ref == 'refs/heads/main' && github.ref_protected == true
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -35,12 +59,6 @@ jobs:
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
-
-      - name: Fail closed when GitHub main is not protected
-        if: ${{ github.ref_protected != true }}
-        run: |
-          echo "::error::L8 genesis bootstrap requires GitHub to report main as protected."
-          exit 1
 
       - name: Setup Node 24
         uses: actions/setup-node@v4
