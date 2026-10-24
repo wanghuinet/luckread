@@ -114,4 +114,80 @@ describe('W02 Better Auth principal authority', () => {
       roleAssignments: [{ id: 'ra-1', roleId: 'creator', scopeType: 'global', scopeId: null }],
     })
   })
+  it('downgrades an L8 principal and removes privileged assignments until its session proves MFA', async () => {
+    mocks.resolveGlobalLayer.mockResolvedValueOnce({
+      decision: 'ALLOW',
+      layer: 'L8',
+      roleAssignments: [
+        { id: 'ra-user', roleId: 'user', scopeType: 'global', scopeId: null },
+        { id: 'ra-verified', roleId: 'verified_user', scopeType: 'global', scopeId: null },
+        { id: 'ra-super', roleId: 'super_admin', scopeType: 'global', scopeId: null },
+      ],
+    })
+    mocks.requireMfaForPrivilegedAction.mockResolvedValueOnce(false)
+    mocks.getSession.mockResolvedValueOnce({
+      user: { id: 'u-l8', email: 'l8@example.com', accountState: 'ACTIVE', accountStateVersion: 2 },
+      session: {
+        id: 's-l8-pre-mfa',
+        createdAt: new Date('2026-10-24T09:00:00.000Z'),
+        expiresAt: new Date('2026-10-24T18:00:00.000Z'),
+      },
+    })
+
+    const result = await resolveBetterAuthPrincipal(
+      { D1_01: {} as D1Database },
+      new Request('https://luckread.test', {
+        headers: { cookie: 'better-auth.session_token=test' },
+      }),
+      '2026-10-24T10:00:00.000Z',
+    )
+
+    expect(mocks.requireMfaForPrivilegedAction).toHaveBeenCalledWith(
+      expect.anything(),
+      'u-l8',
+      new Date('2026-10-24T09:00:00.000Z'),
+    )
+    expect(result).toMatchObject({
+      userId: 'u-l8',
+      layer: 'L2',
+      roleAssignments: [
+        { id: 'ra-user', roleId: 'user' },
+        { id: 'ra-verified', roleId: 'verified_user' },
+      ],
+    })
+    expect(result?.roleAssignments.some((assignment) => assignment.roleId === 'super_admin')).toBe(false)
+  })
+
+  it('preserves L8 only when the current session passes the MFA gate', async () => {
+    mocks.resolveGlobalLayer.mockResolvedValueOnce({
+      decision: 'ALLOW',
+      layer: 'L8',
+      roleAssignments: [
+        { id: 'ra-user', roleId: 'user', scopeType: 'global', scopeId: null },
+        { id: 'ra-verified', roleId: 'verified_user', scopeType: 'global', scopeId: null },
+        { id: 'ra-super', roleId: 'super_admin', scopeType: 'global', scopeId: null },
+      ],
+    })
+    mocks.requireMfaForPrivilegedAction.mockResolvedValueOnce(true)
+    mocks.getSession.mockResolvedValueOnce({
+      user: { id: 'u-l8', email: 'l8@example.com', accountState: 'ACTIVE', accountStateVersion: 2 },
+      session: {
+        id: 's-l8-mfa',
+        createdAt: new Date('2026-10-24T10:01:00.000Z'),
+        expiresAt: new Date('2026-10-24T18:00:00.000Z'),
+      },
+    })
+
+    const result = await resolveBetterAuthPrincipal(
+      { D1_01: {} as D1Database },
+      new Request('https://luckread.test', {
+        headers: { cookie: 'better-auth.session_token=test' },
+      }),
+      '2026-10-24T10:02:00.000Z',
+    )
+
+    expect(result?.layer).toBe('L8')
+    expect(result?.roleAssignments.some((assignment) => assignment.roleId === 'super_admin')).toBe(true)
+  })
+
 })
