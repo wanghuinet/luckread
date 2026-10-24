@@ -1,4 +1,5 @@
-name: L8 Genesis Bootstrap (Dual Approval + MFA Gate)
+name: L8 Genesis Bootstrap (Single Protected Environment Approval)
+run-name: L8 genesis bootstrap - request PR #\${{ inputs.request_pr_number }}
 
 on:
   workflow_dispatch:
@@ -7,16 +8,9 @@ on:
         description: "Merged PR number containing docs/change-control/l8-genesis-bootstrap-request.json"
         required: true
         type: number
-      mode:
-        description: "Run read-only online preflight first; run execute only after a successful reviewed preflight"
-        required: true
-        type: choice
-        options:
-          - preflight
-          - execute
-        default: preflight
 
 permissions:
+  actions: read
   contents: read
   pull-requests: read
   id-token: write
@@ -30,6 +24,9 @@ jobs:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    # Configure this GitHub Environment with exactly one required reviewer:
+    # the sole current repo admin/maintainer. The W02 verifier also reads back
+    # and checks the environment rules before accepting the OIDC token.
     environment: l8-genesis-bootstrap
     steps:
       - name: Checkout protected main revision
@@ -43,9 +40,8 @@ jobs:
         with:
           node-version: 24
 
-      - name: Request W01 to invoke W02's independently verified bootstrap
+      - name: Verify readiness and perform the one-time grant through W01/W02
         env:
-          REQUEST_PR_NUMBER: ${{ inputs.request_pr_number }}
-          BOOTSTRAP_MODE: ${{ inputs.mode }}
-          GITHUB_TOKEN: ${{ github.token }}
+          REQUEST_PR_NUMBER: \${{ inputs.request_pr_number }}
+          GITHUB_TOKEN: \${{ github.token }}
         run: node scripts/execute-l8-genesis-bootstrap.mjs
