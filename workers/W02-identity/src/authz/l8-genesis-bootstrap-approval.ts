@@ -135,10 +135,13 @@ async function verifyGitHubOidcToken(token: string, nowSeconds: number, fetcher:
     false,
     ['verify'],
   )
+  const signatureBytes = decodeBase64Url(pieces[2])
+  const signatureBuffer = new ArrayBuffer(signatureBytes.byteLength)
+  new Uint8Array(signatureBuffer).set(signatureBytes)
   const valid = await crypto.subtle.verify(
     'RSASSA-PKCS1-v1_5',
     publicKey,
-    decodeBase64Url(pieces[2]),
+    signatureBuffer,
     new TextEncoder().encode(pieces[0] + '.' + pieces[1]),
   )
   if (!valid) throw new L8BootstrapApprovalError('OIDC_INVALID', 'GitHub workflow identity signature is invalid')
