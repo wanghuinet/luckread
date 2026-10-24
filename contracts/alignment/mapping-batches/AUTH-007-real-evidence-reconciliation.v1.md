@@ -41,7 +41,7 @@
 - Recovery-code contract: rotate and single-use recovery behavior are defined in the canonical API/field contracts; deployed rotation, reuse rejection and recovery-specific security E2E evidence remain incomplete.
 - Step-up/session assurance result contract: missing.
 - MFA permission/scope IDs `user.mfa.read` and `user.mfa.manage` are registered as self-scoped permissions; operation-level proof and production authorization evidence remain incomplete.
-- MFA event IDs for enrollment, verification, disable/recovery and failed challenge: missing.
+- MFA event names for enrollment, verification, challenge success/failure, disable, recovery rotation/consumption, lockout and replay rejection are now registered in `contracts/events/domain-completion.v1.json` and bound to the canonical AUTH-007 operations in `contracts/events/AUTH-007-mfa-audit-binding.v1.json`. This is contract registration only: the exact existing W02-to-W06 delivery binding, W06 durable AuditEvent write path, idempotent consumer behavior, and current-head Evidence Registry records remain unverified.
 - Account-state enforcement mapping: incomplete.
 - Authoritative D1 persistence/table/column evidence: unresolved.
 - W01/Payload route adapters and route-level integration tests are present; deployed cross-Worker runtime evidence is still missing.
