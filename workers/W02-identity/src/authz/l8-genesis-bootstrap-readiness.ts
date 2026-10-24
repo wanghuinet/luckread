@@ -68,7 +68,7 @@ export async function checkL8BootstrapReadiness(
   try {
     await Promise.all([
       db.prepare('SELECT two_factor_enabled, mfa_enrolled_at FROM "user" LIMIT 0').all(),
-      db.prepare('SELECT userId, verified FROM "twoFactor" LIMIT 0').all(),
+      db.prepare('SELECT userId, verified, lastAcceptedTotpTimeStep FROM "twoFactor" LIMIT 0').all(),
       db.prepare('SELECT bootstrap_key FROM l8_genesis_bootstrap_audit LIMIT 0').all(),
       db.prepare('SELECT role_id, valid_until FROM role_assignments LIMIT 0').all(),
       db.prepare('SELECT subject_id, role_version, updated_at FROM role_authorization_versions LIMIT 0').all(),
