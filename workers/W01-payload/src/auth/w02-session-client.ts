@@ -36,10 +36,11 @@ const errorCode = (value: unknown): string | null => {
 
 export async function callW02(
   path: string,
-  options: { request: Request; method?: string; body?: unknown } ,
+  options: { request: Request; method?: string; body?: unknown; headers?: HeadersInit } ,
 ): Promise<Response> {
   const service = await getW02Service()
   const headers = forwardedHeaders(options.request.headers)
+  new Headers(options.headers).forEach((value, key) => headers.set(key, value))
   let body: BodyInit | undefined
   if (options.body !== undefined) {
     headers.set('content-type', 'application/json; charset=utf-8')
