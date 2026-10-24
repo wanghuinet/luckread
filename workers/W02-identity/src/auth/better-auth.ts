@@ -1,7 +1,10 @@
 import { activateEmailVerifiedAccount } from '../account/account-state-transition.js'
 import { ensureBaseUserRole, ensureVerifiedUserRole } from '../authz/role-assignment.js'
+import { APIError, createAuthMiddleware } from 'better-auth/api'
+import { symmetricDecrypt } from 'better-auth/crypto'
 import { betterAuth } from 'better-auth'
 import { bearer, twoFactor } from 'better-auth/plugins'
+import { consumeTotpTimeStep, matchTotpTimeStep } from './totp-replay-guard.js'
 import { sendResendEmail } from './resend-email.js'
 
 export interface RateLimitBinding {
@@ -86,6 +89,69 @@ const buildLuckReadAuth = (env: BetterAuthEnv) => {
   ]
 
   return betterAuth({
+    hooks: {
+      before: createAuthMiddleware(async (ctx) => {
+        if (ctx.path !== '/two-factor/verify-totp') return
+        const body = ctx.body as { code?: unknown }
+        if (typeof body.code !== 'string') return
+
+        // TOTP enrollment verification has an authenticated session. A sign-in
+        // MFA challenge does not, so resolve that subject only from Better
+        // Auth's signed, time-bounded, server-stored challenge.
+        let subjectId: string | null = null
+        try {
+          const session = await createLuckReadAuth(env).api.getSession({
+            headers: ctx.request.headers,
+            query: {},
+          }) as { user?: { id?: unknown } } | null
+          if (typeof session?.user?.id === 'string') subjectId = session.user.id
+        } catch {
+          // Continue to the signed challenge lookup; do not trust client IDs.
+        }
+
+        if (!subjectId) {
+          const challengeCookie = ctx.context.createAuthCookie('two_factor')
+          const signedChallenge = await ctx.getSignedCookie(
+            challengeCookie.name,
+            ctx.context.secret,
+          )
+          if (signedChallenge) {
+            const challenge = await ctx.context.internalAdapter.findVerificationValue(signedChallenge)
+            if (
+              challenge &&
+              typeof challenge.value === 'string' &&
+              Date.parse(String(challenge.expiresAt)) > Date.now()
+            ) {
+              subjectId = challenge.value
+            }
+          }
+        }
+        if (!subjectId) return
+
+        const factor = await env.D1_01.prepare(
+          'SELECT secret FROM "twoFactor" WHERE userId = ? LIMIT 1',
+        ).bind(subjectId).first<{ secret: string }>()
+        // Let the pinned plugin produce its canonical not-enabled/challenge error.
+        if (!factor) return
+
+        const secret = await symmetricDecrypt({
+          key: ctx.context.secretConfig,
+          data: factor.secret,
+        })
+        const match = await matchTotpTimeStep(secret, body.code)
+        // Invalid codes continue through Better Auth so its failure counters and
+        // challenge lockout remain authoritative.
+        if (match.kind === 'invalid') return
+        if (match.kind === 'ambiguous') {
+          throw APIError.from('UNAUTHORIZED', { code: 'INVALID_CODE', message: 'Invalid code' })
+        }
+
+        const consumed = await consumeTotpTimeStep(env.D1_01, subjectId, match.timeStep)
+        if (!consumed) {
+          throw APIError.from('UNAUTHORIZED', { code: 'INVALID_CODE', message: 'Invalid code' })
+        }
+      }),
+    },
     // W02 is the platform identity authority. Better Auth uses native D1
     // persistence here; Payload is not an authentication/database adapter.
     database: env.D1_01,
