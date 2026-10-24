@@ -5,6 +5,7 @@ import { symmetricDecrypt } from 'better-auth/crypto'
 import { betterAuth } from 'better-auth'
 import { bearer, twoFactor } from 'better-auth/plugins'
 import { consumeTotpTimeStep, matchTotpTimeStep } from './totp-replay-guard.js'
+import { isActiveMfaSubject } from './mfa-challenge-account-state.js'
 import { sendResendEmail } from './resend-email.js'
 
 export interface RateLimitBinding {
@@ -91,7 +92,9 @@ const buildLuckReadAuth = (env: BetterAuthEnv) => {
   return betterAuth({
     hooks: {
       before: createAuthMiddleware(async (ctx) => {
-        if (ctx.path !== '/two-factor/verify-totp') return
+        const isTotpVerification = ctx.path === '/two-factor/verify-totp'
+        const isBackupCodeVerification = ctx.path === '/two-factor/verify-backup-code'
+        if (!isTotpVerification && !isBackupCodeVerification) return
         const body = ctx.body as { code?: unknown }
         if (typeof body.code !== 'string') return
 
@@ -139,6 +142,19 @@ const buildLuckReadAuth = (env: BetterAuthEnv) => {
           })
         }
         if (!subjectId) return
+
+        // Factor completion must never activate a suspended, pending or missing
+        // account. Check W02-owned account state for TOTP and recovery paths.
+        const accountActive = await isActiveMfaSubject(env.D1_01, subjectId)
+        if (!accountActive) {
+          throw APIError.from('FORBIDDEN', {
+            code: 'ACCOUNT_NOT_ACTIVE',
+            message: 'Account is not eligible for authentication',
+          })
+        }
+        // Better Auth atomically validates and consumes backup codes. The
+        // persisted monotonic time-step guard applies specifically to TOTP.
+        if (isBackupCodeVerification) return
 
         const factor = await env.D1_01.prepare(
           'SELECT secret FROM "twoFactor" WHERE userId = ? LIMIT 1',
