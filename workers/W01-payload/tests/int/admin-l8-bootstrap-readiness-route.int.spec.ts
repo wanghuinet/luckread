@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
+import { resolve } from 'node:path'
 import { POST } from '../../src/app/api/v1/admin/bootstrap/super-admin/readiness/route.js'
 
 describe('W01 L8 bootstrap read-only readiness boundary', () => {
@@ -35,7 +35,7 @@ describe('W01 L8 bootstrap read-only readiness boundary', () => {
 
   it('forwards through the existing W02 binding and never writes from W01', () => {
     const route = readFileSync(
-      fileURLToPath(new URL('../../src/app/api/v1/admin/bootstrap/super-admin/readiness/route.ts', import.meta.url)), 
+      resolve(process.cwd(), 'src/app/api/v1/admin/bootstrap/super-admin/readiness/route.ts'),
       'utf8',
     )
     expect(route).toContain("callW02('/internal/authz/bootstrap-super-admin/readiness'")
