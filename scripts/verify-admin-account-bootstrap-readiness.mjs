@@ -54,10 +54,10 @@ const hasMfaEnforcement =
   /requireMfaForPrivilegedAction/.test(productionCode) &&
   /requireMfaForPrivilegedAction/.test(testCode) &&
   /two_factor_enabled/.test(productionCode) &&
-  /twoFactor\\.verified|totpVerified/.test(productionCode) &&
+  /twoFactor\.verified|totpVerified/.test(productionCode) &&
   /mfa_enrolled_at|mfaEnrolledAt/.test(productionCode) &&
-  /twoFactor\\.verified|TOTP is not verified/.test(testCode) &&
-  /trustDeviceMaxAge:\\s*0/.test(read('workers/W02-identity/src/auth/better-auth.ts'))
+  /twoFactor\.verified|TOTP is not verified/.test(testCode) &&
+  /trustDeviceMaxAge:\s*0/.test(read('workers/W02-identity/src/auth/better-auth.ts'))
 if (!hasMfaEnforcement || /Status:\s*`BLOCKED_NOT_GREEN`/.test(reconciliation)) {
   blockers.push('AUTH-007 MFA enforcement and executable test evidence are missing or still blocked.')
 }
