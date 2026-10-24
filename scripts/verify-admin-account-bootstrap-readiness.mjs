@@ -15,6 +15,7 @@ const walk = (directory) => {
 
 const workflowPath = '.github/workflows/admin-account-bootstrap.yml'
 const workflow = read(workflowPath)
+const genesisWorkflow = read('.github/workflows/l8-genesis-bootstrap.yml')
 const w02Index = read('workers/W02-identity/src/index.ts')
 const reconciliation = read('contracts/alignment/mapping-batches/AUTH-007-real-evidence-reconciliation.v1.md')
 const w02SourceFiles = walk('workers/W02-identity/src')
@@ -38,9 +39,16 @@ const testCode = sourceFiles
   .join('\n')
 
 const blockers = []
-const assertReadOnlyWorkflow = !/wrangler\s+d1\s+execute|--remote|CLOUDFLARE_API_TOKEN|LUCKREAD_ADMIN_BOOTSTRAP_PASSWORD|secrets\./i.test(workflow)
+const assertReadOnlyWorkflow = !/wrangler\s+d1\s+execute|--remote|CLOUDFLARE_API_TOKEN|LUCKREAD_ADMIN_BOOTSTRAP_PASSWORD|secrets\./i.test(workflow + '\n' + genesisWorkflow)
 if (!assertReadOnlyWorkflow) {
-  blockers.push('The workflow contains a production database command or privileged secret reference.')
+  blockers.push('A bootstrap workflow contains a direct production database command or privileged secret reference.')
+}
+const hasProtectedSingleApprovalWorkflow =
+  /environment:\s*l8-genesis-bootstrap/.test(genesisWorkflow) &&
+  /run-name:.*request_pr_number/.test(genesisWorkflow) &&
+  /verify-admin-account-bootstrap-readiness\.mjs/.test(genesisWorkflow)
+if (!hasProtectedSingleApprovalWorkflow) {
+  blockers.push('The genesis workflow lacks a target-labelled, protected environment approval or the AUTH-007 evidence gate.')
 }
 
 const hasDedicatedW02L8Bootstrap =
@@ -62,17 +70,17 @@ if (!hasMfaEnforcement || /Status:\s*`BLOCKED_NOT_GREEN`/.test(reconciliation)) 
   blockers.push('AUTH-007 MFA enforcement and executable test evidence are missing or still blocked.')
 }
 
-// A policy evaluator or its unit tests are not proof that the W02 RoleAssignment
-// writer enforces dual approval for the bootstrap mutation itself. Require the
-// route, grant command, validator, and corresponding W02 tests to be wired together.
-const hasTargetBoundDualApproval =
+// Require a single, explicitly configured GitHub Environment reviewer, validated
+// by W02 from the GitHub API, rather than accepting a user-supplied approval flag.
+const hasTargetBoundSingleApproval =
   /\/internal\/authz\/bootstrap-super-admin/.test(w02Index) &&
   /bootstrapSuperAdmin|grantSuperAdminBootstrap/.test(w02ProductionCode) &&
-  /validateL8DualApproval|verifyTargetBoundDualApproval/.test(w02ProductionCode) &&
+  /verifyTargetBoundSingleApproval/.test(w02ProductionCode) &&
+  /SINGLE_APPROVAL_ENVIRONMENT_NOT_CONFIGURED/.test(w02ProductionCode) &&
   /bootstrapSuperAdmin|grantSuperAdminBootstrap/.test(w02TestCode) &&
-  /validateL8DualApproval|verifyTargetBoundDualApproval/.test(w02TestCode)
-if (!hasTargetBoundDualApproval) {
-  blockers.push('W02 bootstrap write path lacks target-bound dual-approval enforcement with matching W02 tests.')
+  /verifyTargetBoundSingleApproval/.test(w02TestCode)
+if (!hasTargetBoundSingleApproval) {
+  blockers.push('W02 bootstrap write path lacks target-bound single-environment-approval enforcement with matching W02 tests.')
 }
 
 const hasReadOnlyProductionPreflight =
@@ -85,13 +93,13 @@ if (!hasReadOnlyProductionPreflight) {
 }
 
 const report = {
-  status: blockers.length === 0 ? 'READY_FOR_SEPARATE_REVIEW' : 'BLOCKED_NOT_GREEN',
+  status: blockers.length === 0 ? 'READY_FOR_CONTROLLED_EXECUTION' : 'BLOCKED_NOT_GREEN',
   productionMutationPerformed: false,
   checks: {
     workflowIsReadOnly: assertReadOnlyWorkflow,
     dedicatedW02L8Bootstrap: hasDedicatedW02L8Bootstrap,
     mfaCodeAndTestEvidence: hasMfaEnforcement && !/Status:\s*`BLOCKED_NOT_GREEN`/.test(reconciliation),
-    w02BootstrapApprovalCodeAndTestEvidence: hasTargetBoundDualApproval,
+    w02BootstrapApprovalCodeAndTestEvidence: hasTargetBoundSingleApproval,
     readOnlyProductionPreflight: hasReadOnlyProductionPreflight,
   },
   blockers,
