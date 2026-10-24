@@ -51,8 +51,13 @@ if (!hasDedicatedW02L8Bootstrap) {
 }
 
 const hasMfaEnforcement =
-  /verifyMfaStepUp|verifyMfaChallenge|requireMfaForPrivilegedAction/.test(productionCode) &&
-  /verifyMfaStepUp|verifyMfaChallenge|requireMfaForPrivilegedAction/.test(testCode)
+  /requireMfaForPrivilegedAction/.test(productionCode) &&
+  /requireMfaForPrivilegedAction/.test(testCode) &&
+  /two_factor_enabled/.test(productionCode) &&
+  /twoFactor\\.verified|totpVerified/.test(productionCode) &&
+  /mfa_enrolled_at|mfaEnrolledAt/.test(productionCode) &&
+  /twoFactor\\.verified|TOTP is not verified/.test(testCode) &&
+  /trustDeviceMaxAge:\\s*0/.test(read('workers/W02-identity/src/auth/better-auth.ts'))
 if (!hasMfaEnforcement || /Status:\s*`BLOCKED_NOT_GREEN`/.test(reconciliation)) {
   blockers.push('AUTH-007 MFA enforcement and executable test evidence are missing or still blocked.')
 }
@@ -70,6 +75,15 @@ if (!hasTargetBoundDualApproval) {
   blockers.push('W02 bootstrap write path lacks target-bound dual-approval enforcement with matching W02 tests.')
 }
 
+const hasReadOnlyProductionPreflight =
+  /\/internal\/authz\/bootstrap-super-admin\/readiness/.test(w02Index) &&
+  /\/api\/v1\/admin\/bootstrap\/super-admin\/readiness/.test(read('workers/W01-payload/src/app/api/v1/admin/bootstrap/super-admin/readiness/route.ts')) &&
+  /READ_ONLY_PREFLIGHT/.test(read('scripts/execute-l8-genesis-bootstrap.mjs')) &&
+  /READY_FOR_BOOTSTRAP/.test(read('scripts/execute-l8-genesis-bootstrap.mjs'))
+if (!hasReadOnlyProductionPreflight) {
+  blockers.push('A protected W01/W02 read-only production preflight is missing from the execution workflow.')
+}
+
 const report = {
   status: blockers.length === 0 ? 'READY_FOR_SEPARATE_REVIEW' : 'BLOCKED_NOT_GREEN',
   productionMutationPerformed: false,
@@ -78,6 +92,7 @@ const report = {
     dedicatedW02L8Bootstrap: hasDedicatedW02L8Bootstrap,
     mfaCodeAndTestEvidence: hasMfaEnforcement && !/Status:\s*`BLOCKED_NOT_GREEN`/.test(reconciliation),
     w02BootstrapApprovalCodeAndTestEvidence: hasTargetBoundDualApproval,
+    readOnlyProductionPreflight: hasReadOnlyProductionPreflight,
   },
   blockers,
 }
