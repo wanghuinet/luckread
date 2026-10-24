@@ -99,12 +99,18 @@ export function buildMfaAuditEvent(input: {
   }
 }
 
-export function buildMfaAuditOutboxInsert(db: D1Database, event: MfaAuditEvent): D1PreparedStatement {
-  return db.prepare(
-    'INSERT INTO auth_007_mfa_publication_journal ' +
-    '(journal_id, event_id, event_type, schema_version, resource_id, source_version, idempotency_key, payload, status, attempt, next_attempt_at, created_at, published_at, last_error_code) ' +
-    'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-  ).bind(
+export function buildMfaAuditOutboxInsert(
+  db: D1Database,
+  event: MfaAuditEvent,
+  options: { onlyWhenPreviousStatementChanged?: boolean } = {},
+): D1PreparedStatement {
+  const columns =
+    '(journal_id, event_id, event_type, schema_version, resource_id, source_version, idempotency_key, payload, status, attempt, next_attempt_at, created_at, published_at, last_error_code)'
+  const values = '(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+  const sql = options.onlyWhenPreviousStatementChanged
+    ? 'INSERT INTO auth_007_mfa_publication_journal ' + columns + ' SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? WHERE changes() = 1'
+    : 'INSERT INTO auth_007_mfa_publication_journal ' + columns + ' VALUES ' + values
+  return db.prepare(sql).bind(
     crypto.randomUUID(),
     event.eventId,
     event.eventType,
