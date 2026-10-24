@@ -128,6 +128,10 @@ export async function bootstrapSuperAdmin(
       persisted.validUntil === existingAudit.validUntil &&
       now < existingAudit.validUntil
     ) {
+      const roleVersion = await readRoleVersion(db, request.targetUserId)
+      if (roleVersion < 1) {
+        throw new L8BootstrapCommandError('ROLE_ASSIGNMENT_WRITE_FAILED', 'bootstrap role version is missing')
+      }
       return {
         assignmentId: persisted.id,
         targetUserId: request.targetUserId,
@@ -135,7 +139,7 @@ export async function bootstrapSuperAdmin(
         validFrom: persisted.validFrom,
         validUntil: existingAudit.validUntil,
         replayed: true,
-        roleVersion: await readRoleVersion(db, request.targetUserId),
+        roleVersion,
       }
     }
     throw new L8BootstrapCommandError('BOOTSTRAP_ALREADY_CONSUMED', 'the bootstrap was already consumed and cannot be reissued')
@@ -221,6 +225,10 @@ export async function bootstrapSuperAdmin(
         raced.assignmentId === assignmentId &&
         now < raced.validUntil
       ) {
+        const roleVersion = await readRoleVersion(db, request.targetUserId)
+        if (roleVersion < 1) {
+          throw new L8BootstrapCommandError('ROLE_ASSIGNMENT_WRITE_FAILED', 'bootstrap role version is missing')
+        }
         return {
           assignmentId: raced.assignmentId,
           targetUserId: request.targetUserId,
@@ -228,7 +236,7 @@ export async function bootstrapSuperAdmin(
           validFrom: raced.validFrom,
           validUntil: raced.validUntil,
           replayed: true,
-          roleVersion: await readRoleVersion(db, request.targetUserId),
+          roleVersion,
         }
       }
       throw new L8BootstrapCommandError('BOOTSTRAP_ALREADY_CONSUMED', 'another genesis request has already consumed the one-time guard')
