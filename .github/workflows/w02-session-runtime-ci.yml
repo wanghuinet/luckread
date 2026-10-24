@@ -9,6 +9,12 @@ on:
       - 'workers/W02-identity/src/account/**'
       - 'workers/W02-identity/src/index.ts'
       - 'workers/W02-identity/wrangler.jsonc'
+      - 'workers/W02-identity/migrations/0006_better_auth_two_factor.sql'
+      - 'workers/W02-identity/migrations/0007_l8_genesis_bootstrap_audit.sql'
+      - 'contracts/api/AUTH-007-mfa-totp-contract.v1.json'
+      - 'contracts/entity/AUTH-007-mfa-factor-field-contract.v1.json'
+      - 'contracts/state-machines/AUTH-007-mfa-lifecycle.v1.json'
+      - 'scripts/verify-auth-007-rollout-admission.mjs'
       - 'scripts/auth-010-session-runtime-e2e.mjs'
       - '.github/workflows/auth-010-remote-e2e.yml'
       - '.github/workflows/w02-session-runtime-ci.yml'
@@ -65,6 +71,10 @@ jobs:
         run: node --check scripts/auth-010-session-runtime-e2e.mjs
       - name: Run W02 principal, Resend, session-list and session-revoke tests
         run: npx vitest@3.2.4 run workers/W02-identity/src/auth/principal.test.ts workers/W02-identity/src/auth/resend-email.test.ts workers/W02-identity/src/auth/session-list.test.ts workers/W02-identity/src/auth/session-rate-limit.test.ts workers/W02-identity/src/auth/session-revoke.test.ts
+      - name: Run W02 AUTH-007 MFA lifecycle and replay tests
+        run: npx vitest@3.2.4 run workers/W02-identity/src/auth/mfa-status.test.ts workers/W02-identity/src/auth/mfa-enrollment-start.test.ts workers/W02-identity/src/auth/mfa-enrollment-confirm.test.ts workers/W02-identity/src/auth/totp-replay-guard.test.ts workers/W02-identity/src/auth/mfa-challenge-account-state.test.ts workers/W02-identity/src/auth/mfa-lifecycle-contract.test.ts
+      - name: Verify AUTH-007 rollout admission code without production access
+        run: node scripts/verify-auth-007-rollout-admission.mjs --static-only
 
   account-state-boundary:
     name: W02 Account State Boundary Tests
