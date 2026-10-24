@@ -110,6 +110,10 @@ async function verifyProtectedEnvironment({ requireDistinctActor = true } = {}) 
 
 const mfaMigrationPath = 'workers/W02-identity/migrations/0006_better_auth_two_factor.sql'
 const bootstrapMigrationPath = 'workers/W02-identity/migrations/0007_l8_genesis_bootstrap_audit.sql'
+const mfaAuditOutboxMigrationPath = 'workers/W02-identity/migrations/0008_auth_007_mfa_publication_journal.sql'
+const mfaAuditBindingPath = 'contracts/events/AUTH-007-mfa-audit-binding.v1.json'
+const mfaAuditOutboxContractPath = 'contracts/migration/AUTH-007-mfa-publication-journal.v1.json'
+const logicalDataAuthorityPath = 'contracts/transport/logical-data-authority.v1.json'
 const authContractPath = 'contracts/api/AUTH-007-mfa-totp-contract.v1.json'
 const factorContractPath = 'contracts/entity/AUTH-007-mfa-factor-field-contract.v1.json'
 const lifecyclePath = 'contracts/state-machines/AUTH-007-mfa-lifecycle.v1.json'
@@ -121,6 +125,10 @@ const policyPath = 'contracts/api/auth-operation-policy.v1.json'
 for (const file of [
   mfaMigrationPath,
   bootstrapMigrationPath,
+  mfaAuditOutboxMigrationPath,
+  mfaAuditBindingPath,
+  mfaAuditOutboxContractPath,
+  logicalDataAuthorityPath,
   authContractPath,
   factorContractPath,
   lifecyclePath,
@@ -146,6 +154,10 @@ let implementationAuthorization = null
 if (blockers.length === 0) {
   const migration = read(mfaMigrationPath)
   const bootstrapMigration = read(bootstrapMigrationPath)
+  const mfaAuditOutboxMigration = read(mfaAuditOutboxMigrationPath)
+  const mfaAuditBinding = JSON.parse(read(mfaAuditBindingPath))
+  const mfaAuditOutboxContract = JSON.parse(read(mfaAuditOutboxContractPath))
+  const logicalDataAuthority = JSON.parse(read(logicalDataAuthorityPath))
   const betterAuth = read(betterAuthPath)
   const replayGuard = read(replayGuardPath)
   const apiContract = JSON.parse(read(authContractPath))
@@ -173,6 +185,15 @@ if (blockers.length === 0) {
     'request_merge_sha',
     'approved_reviewers_json',
     'workflow_run_id',
+  ]
+  const requiredMfaAuditOutboxTokens = [
+    'CREATE TABLE auth_007_mfa_publication_journal',
+    'event_id TEXT NOT NULL UNIQUE',
+    'idempotency_key TEXT NOT NULL UNIQUE',
+    "CHECK (schema_version = '1.0')",
+    'json_valid(payload)',
+    'auth.mfa.enrollment_started',
+    'auth_007_mfa_publication_journal_status_next_attempt_idx',
   ]
   const operations = [
     { id: 'authMfaStatus', route: 'workers/W01-payload/src/app/api/v1/auth/mfa/route.ts', test: 'workers/W01-payload/tests/int/mfa-status-route.int.spec.ts' },
@@ -225,6 +246,40 @@ if (blockers.length === 0) {
   sourceChecks = {
     reviewedMfaMigrationShape: requiredMigrationTokens.every((token) => migration.includes(token)),
     reviewedBootstrapAuditShape: requiredBootstrapTokens.every((token) => bootstrapMigration.includes(token)),
+    reviewedMfaAuditOutboxMigrationShape: requiredMfaAuditOutboxTokens.every((token) => mfaAuditOutboxMigration.includes(token)),
+    mfaAuditOutboxContractMatchesMigration:
+      mfaAuditOutboxContract.target?.physicalTable === 'auth_007_mfa_publication_journal' &&
+      mfaAuditOutboxContract.target?.sourceMigration === mfaAuditOutboxMigrationPath &&
+      mfaAuditOutboxContract.target?.databaseBinding === 'workers/W02-identity/wrangler.jsonc:D1_01' &&
+      mfaAuditOutboxContract.promotion === 'NOT_GREEN',
+    mfaAuditBindingUsesExistingQueueWithoutProductionClaim:
+      mfaAuditBinding.delivery?.existingW02ToW06Binding === 'AUTH013_QUEUE' &&
+      mfaAuditBinding.delivery?.existingQueueName === 'luckread-auth013-account-state' &&
+      mfaAuditBinding.delivery?.newWorkerD1QueueOrServiceBindingAllowed === false &&
+      mfaAuditBinding.delivery?.sourceImplementationStatus === 'IMPLEMENTED_IN_SOURCE_NOT_PRODUCTION_VERIFIED',
+    mfaOutboxTableIsW02OwnedAndCrossWorkerReadRestricted:
+      ['auth_013_publication_journal', 'auth_007_mfa_publication_journal'].every((tableName) =>
+        (logicalDataAuthority.tables ?? []).some((table) =>
+          table.name === tableName &&
+          table.ownerWorker === 'W02' &&
+          table.readPolicy === 'OWNER_ONLY_WITH_EXCEPTIONS' &&
+          Array.isArray(table.readExceptions) &&
+          table.readExceptions.length === 0
+        )
+      ),
+    mfaAuditProducerCoverageRemainsExplicit:
+      JSON.stringify(mfaAuditBinding.runtimeEmissionCoverage?.implementedInW02Source) ===
+        JSON.stringify(['auth.mfa.enrollment_started', 'auth.mfa.enrollment_verified', 'auth.mfa.enrollment_failed']) &&
+      Array.isArray(mfaAuditBinding.runtimeEmissionCoverage?.notYetEmittedByW02) &&
+      mfaAuditBinding.runtimeEmissionCoverage.notYetEmittedByW02.length === 7 &&
+      mfaAuditBinding.runtimeEmissionCoverage.consumerSupportsAllRegisteredEvents === true,
+    mfaAuditSourceAndTestsPresent:
+      exists('workers/W02-identity/src/auth/mfa-audit-events.ts') &&
+      exists('workers/W02-identity/src/auth/mfa-audit-publication-journal.ts') &&
+      exists('workers/W02-identity/src/auth/mfa-audit-publication-journal.test.ts') &&
+      exists('scripts/auth-007-mfa-journal-migration-static-audit.mjs') &&
+      exists('workers/W06-governance/src/mfa-audit-queue-consumer.ts') &&
+      exists('workers/W06-governance/src/mfa-audit-queue-consumer.test.ts'),
     encryptedRecoveryCodes: /backupCodeOptions:\s*\{[^}]*storeBackupCodes:\s*['"]encrypted['"]/.test(betterAuth),
     privilegedTrustDeviceDisabled: /trustDeviceMaxAge:\s*0/.test(betterAuth),
     persistedTotpReplayGuard: /consumeTotpTimeStep/.test(betterAuth) &&

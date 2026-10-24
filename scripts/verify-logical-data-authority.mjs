@@ -122,6 +122,10 @@ const selfChecks = [
   { access: { table: 'contents', action: 'read' }, worker: 'W05', path: 'workers/W05-social/src/index.ts', expected: true },
   { access: { table: 'contents', action: 'write' }, worker: 'W05', path: 'workers/W05-social/src/like-runtime.ts', expected: true },
   { access: { table: 'role_assignments', action: 'write' }, worker: 'W08', path: 'workers/W08-creator/src/worker.ts', expected: true },
+  { access: { table: 'auth_013_publication_journal', action: 'write' }, worker: 'W02', path: 'workers/W02-identity/src/account/account-state-transition.ts', expected: false },
+  { access: { table: 'auth_013_publication_journal', action: 'read' }, worker: 'W06', path: 'workers/W06-governance/src/auth-013-queue-consumer.ts', expected: true },
+  { access: { table: 'auth_007_mfa_publication_journal', action: 'write' }, worker: 'W02', path: 'workers/W02-identity/src/auth/mfa-audit-events.ts', expected: false },
+  { access: { table: 'auth_007_mfa_publication_journal', action: 'read' }, worker: 'W06', path: 'workers/W06-governance/src/mfa-audit-queue-consumer.ts', expected: true },
   { access: { table: 'social_comments', action: 'write' }, worker: 'W05', path: 'workers/W05-social/src/comment-runtime.ts', expected: false },
 ]
 for (const check of selfChecks) {

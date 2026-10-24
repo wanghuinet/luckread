@@ -1,4 +1,5 @@
 import { createLuckReadAuth, type BetterAuthEnv } from './better-auth.js'
+import { buildMfaAuditEvent, buildMfaAuditOutboxInsert, recordMfaAuditEvent } from './mfa-audit-events.js'
 import { resolveBetterAuthPrincipal } from './principal.js'
 
 const json = (body: unknown, status = 200): Response => Response.json(body, {
@@ -70,19 +71,49 @@ export async function handleMfaEnrollmentStartRequest(
   }
 
   const keyHash = await sha256Hex(key)
+  const startedAt = new Date().toISOString()
+  const startedEvent = buildMfaAuditEvent({
+    eventType: 'auth.mfa.enrollment_started',
+    userId: principal.userId,
+    occurredAt: startedAt,
+    correlationId: request.headers.get('X-LuckRead-Correlation-Id'),
+    causationId: request.headers.get('X-LuckRead-Request-Id'),
+    result: 'started',
+    reasonCode: 'USER_INITIATED',
+    factorState: 'PENDING_VERIFICATION',
+  })
   let reserved = false
   try {
-    const reservation = await env.D1_01.prepare(
-      'UPDATE "user" SET mfa_enrollment_key_hash = ? ' +
-      'WHERE id = ? AND two_factor_enabled = 0 AND mfa_enrollment_key_hash IS NULL ' +
-      'AND NOT EXISTS (SELECT 1 FROM "twoFactor" WHERE userId = ?)',
-    ).bind(keyHash, principal.userId, principal.userId).run()
-    reserved = reservation.meta.changes === 1
+    const reservation = await env.D1_01.batch([
+      env.D1_01.prepare(
+        'UPDATE "user" SET mfa_enrollment_key_hash = ? ' +
+        'WHERE id = ? AND two_factor_enabled = 0 AND mfa_enrollment_key_hash IS NULL ' +
+        'AND NOT EXISTS (SELECT 1 FROM "twoFactor" WHERE userId = ?)',
+      ).bind(keyHash, principal.userId, principal.userId),
+      buildMfaAuditOutboxInsert(env.D1_01, startedEvent, { onlyWhenPreviousStatementChanged: true }),
+    ])
+    reserved = reservation[0]?.meta?.changes === 1 && reservation[1]?.meta?.changes === 1
   } catch {
     return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'MFA enrollment unavailable' } }, 503)
   }
   if (!reserved) {
     return json({ error: { code: 'MFA_ENROLLMENT_CONFLICT', message: 'MFA enrollment is already pending or enabled' } }, 409)
+  }
+
+  const recordEnrollmentFailure = async (reasonCode: string): Promise<void> => {
+    try {
+      await recordMfaAuditEvent(env.D1_01, {
+        eventType: 'auth.mfa.enrollment_failed',
+        userId: principal.userId,
+        correlationId: request.headers.get('X-LuckRead-Correlation-Id'),
+        causationId: request.headers.get('X-LuckRead-Request-Id'),
+        result: 'failed',
+        reasonCode,
+        factorState: 'PENDING_VERIFICATION',
+      })
+    } catch {
+      // The durable enrollment_started event remains as evidence of the attempt.
+    }
   }
 
   const headers = new Headers(request.headers)
@@ -102,6 +133,7 @@ export async function handleMfaEnrollmentStartRequest(
   try {
     upstream = await createLuckReadAuth(env).handler(authRequest)
   } catch {
+    await recordEnrollmentFailure('UPSTREAM_UNAVAILABLE')
     await releaseReservationIfNoFactor(env.D1_01, principal.userId, keyHash)
     return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'MFA enrollment unavailable' } }, 503)
   }
@@ -109,6 +141,9 @@ export async function handleMfaEnrollmentStartRequest(
   if (!upstream.ok) {
     // If Better Auth inserted a factor before returning an error, keep the
     // reservation and fail closed rather than allowing a second secret issue.
+    await recordEnrollmentFailure(upstream.status === 429 ? 'UPSTREAM_RATE_LIMITED' :
+      upstream.status === 401 ? 'REAUTHENTICATION_REQUIRED' :
+      upstream.status >= 500 ? 'UPSTREAM_UNAVAILABLE' : 'UPSTREAM_REJECTED')
     await releaseReservationIfNoFactor(env.D1_01, principal.userId, keyHash)
     const status = upstream.status === 429 ? 429 : upstream.status === 401 ? 401 :
       upstream.status >= 500 ? 503 : 400
@@ -126,6 +161,7 @@ export async function handleMfaEnrollmentStartRequest(
 
   let payload: unknown
   try { payload = await upstream.json() } catch {
+    await recordEnrollmentFailure('UPSTREAM_RESPONSE_INVALID')
     return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'MFA enrollment unavailable' } }, 503)
   }
   const value = payload && typeof payload === 'object'
@@ -140,6 +176,7 @@ export async function handleMfaEnrollmentStartRequest(
     value.backupCodes.length > 32 ||
     !value.backupCodes.every((code) => typeof code === 'string' && code.length >= 1 && code.length <= 128)
   ) {
+    await recordEnrollmentFailure('UPSTREAM_RESPONSE_INVALID')
     return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'MFA enrollment unavailable' } }, 503)
   }
 

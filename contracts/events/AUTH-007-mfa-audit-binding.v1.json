@@ -117,9 +117,14 @@
   },
   "delivery": {
     "mode": "EXISTING_TRANSPORT_ONLY",
-    "existingW02ToW06Binding": "UNRESOLVED",
+    "existingW02ToW06Binding": "AUTH013_QUEUE",
+    "existingQueueName": "luckread-auth013-account-state",
+    "outbox": "W02 D1-01 auth_007_mfa_publication_journal",
+    "publisher": "workers/W02-identity/src/auth/mfa-audit-publication-journal.ts",
+    "consumer": "workers/W06-governance/src/mfa-audit-queue-consumer.ts",
+    "sourceImplementationStatus": "IMPLEMENTED_IN_SOURCE_NOT_PRODUCTION_VERIFIED",
     "newWorkerD1QueueOrServiceBindingAllowed": false,
-    "admissionRule": "Do not claim event delivery or audit persistence until the exact existing W02-to-W06 transport, consumer behavior, idempotency, and failure semantics are tied to executable tests and current-head production evidence."
+    "admissionRule": "The existing AUTH013_QUEUE carries MFA audit messages using an explicit eventType discriminator. W02's durable D1-01 outbox and W06's D1-03 AuditEvent consumer are source-implemented; production deployment, schema read-back, live queue/DLQ evidence, and same-SHA security E2E remain required."
   },
   "invariants": [
     "Successful factor or recovery mutations must have an immutable canonical audit record after the authoritative mutation is accepted.",
@@ -136,9 +141,27 @@
     "Current-head Evidence Registry records and Mapping 0 validation are required before AUTH-007 promotion."
   ],
   "nonGoals": [
-    "Does not claim that runtime event emission is implemented.",
+    "Does not claim production delivery or persistence evidence.",
     "Does not authorize D1 migration, Worker deployment, MFA rollout, or first-L8 grant.",
     "Does not add a Worker, D1 database, Queue, or Service Binding.",
     "Does not mark AUTH-007 GREEN."
-  ]
+  ],
+  "runtimeEmissionCoverage": {
+    "implementedInW02Source": [
+      "auth.mfa.enrollment_started",
+      "auth.mfa.enrollment_verified",
+      "auth.mfa.enrollment_failed"
+    ],
+    "notYetEmittedByW02": [
+      "auth.mfa.challenge_succeeded",
+      "auth.mfa.challenge_failed",
+      "auth.mfa.factor_disabled",
+      "auth.mfa.recovery_codes_rotated",
+      "auth.mfa.recovery_code_consumed",
+      "auth.mfa.locked",
+      "auth.mfa.replay_rejected"
+    ],
+    "consumerSupportsAllRegisteredEvents": true,
+    "note": "W06's typed consumer accepts all registered event names, but names without a W02 producer must not be counted as runtime-covered."
+  }
 }

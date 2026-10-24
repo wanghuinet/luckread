@@ -1,0 +1,178 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/migration/AUTH-007-mfa-publication-journal.v1.json",
+  "version": "1.0.0",
+  "status": "CONTRACTED_NOT_VERIFIED",
+  "promotion": "NOT_GREEN",
+  "purpose": "Physical D1-01 schema contract for the durable AUTH-007 MFA audit publication outbox. This table records delivery intent only; it is not the authority for MFA factors, authentication assurance, or final audit records.",
+  "migrationId": "MIG-AUTH-007-MFA-PUBLICATION-JOURNAL-V1",
+  "featureId": "AUTH-007",
+  "authority": {
+    "worker": "W02",
+    "domain": "D1-01",
+    "businessAuthority": "W02",
+    "finalAuditAuthority": "W06",
+    "eventContract": "contracts/events/AUTH-007-mfa-audit-binding.v1.json"
+  },
+  "target": {
+    "physicalTable": "auth_007_mfa_publication_journal",
+    "sourceMigration": "workers/W02-identity/migrations/0008_auth_007_mfa_publication_journal.sql",
+    "databaseBinding": "workers/W02-identity/wrangler.jsonc:D1_01"
+  },
+  "columns": [
+    {
+      "column": "journal_id",
+      "dbType": "TEXT",
+      "nullable": false,
+      "primaryKey": true
+    },
+    {
+      "column": "event_id",
+      "dbType": "TEXT",
+      "nullable": false,
+      "unique": true
+    },
+    {
+      "column": "event_type",
+      "dbType": "TEXT",
+      "nullable": false,
+      "enum": [
+        "auth.mfa.enrollment_started",
+        "auth.mfa.enrollment_verified",
+        "auth.mfa.enrollment_failed",
+        "auth.mfa.challenge_succeeded",
+        "auth.mfa.challenge_failed",
+        "auth.mfa.factor_disabled",
+        "auth.mfa.recovery_codes_rotated",
+        "auth.mfa.recovery_code_consumed",
+        "auth.mfa.locked",
+        "auth.mfa.replay_rejected"
+      ]
+    },
+    {
+      "column": "schema_version",
+      "dbType": "TEXT",
+      "nullable": false,
+      "constant": "1.0"
+    },
+    {
+      "column": "resource_id",
+      "dbType": "TEXT",
+      "nullable": false,
+      "authority": "W02-derived User id"
+    },
+    {
+      "column": "source_version",
+      "dbType": "INTEGER",
+      "nullable": false,
+      "minimum": 1
+    },
+    {
+      "column": "idempotency_key",
+      "dbType": "TEXT",
+      "nullable": false,
+      "unique": true
+    },
+    {
+      "column": "payload",
+      "dbType": "TEXT",
+      "nullable": false,
+      "jsonObject": true,
+      "secretsForbidden": true
+    },
+    {
+      "column": "status",
+      "dbType": "TEXT",
+      "nullable": false,
+      "enum": [
+        "PENDING",
+        "PUBLISHED",
+        "FAILED"
+      ],
+      "default": "PENDING"
+    },
+    {
+      "column": "attempt",
+      "dbType": "INTEGER",
+      "nullable": false,
+      "minimum": 1,
+      "default": 1
+    },
+    {
+      "column": "next_attempt_at",
+      "dbType": "TEXT",
+      "nullable": true
+    },
+    {
+      "column": "created_at",
+      "dbType": "TEXT",
+      "nullable": false
+    },
+    {
+      "column": "published_at",
+      "dbType": "TEXT",
+      "nullable": true
+    },
+    {
+      "column": "last_error_code",
+      "dbType": "TEXT",
+      "nullable": true,
+      "maxLength": 128
+    }
+  ],
+  "constraints": {
+    "eventIdUnique": true,
+    "idempotencyKeyUnique": true,
+    "statusValues": [
+      "PENDING",
+      "PUBLISHED",
+      "FAILED"
+    ],
+    "schemaVersion": "1.0",
+    "eventTypes": [
+      "auth.mfa.enrollment_started",
+      "auth.mfa.enrollment_verified",
+      "auth.mfa.enrollment_failed",
+      "auth.mfa.challenge_succeeded",
+      "auth.mfa.challenge_failed",
+      "auth.mfa.factor_disabled",
+      "auth.mfa.recovery_codes_rotated",
+      "auth.mfa.recovery_code_consumed",
+      "auth.mfa.locked",
+      "auth.mfa.replay_rejected"
+    ],
+    "payloadJsonObject": true,
+    "retryableQueueFailureKeepsPending": true,
+    "malformedPayloadBecomesFailed": true
+  },
+  "indexes": [
+    "auth_007_mfa_publication_journal_status_next_attempt_idx"
+  ],
+  "rules": {
+    "journalIsNotMfaFactorAuthority": true,
+    "journalIsNotCanonicalAuditStore": true,
+    "w02IsAuthoritativeWriter": true,
+    "w02MustNotWriteD1_03": true,
+    "existingAuth013QueueOnly": true,
+    "noNewWorkerD1QueueOrServiceBinding": true,
+    "eventIdRetainedAcrossDeliveryRetries": true,
+    "consumerDeduplicationRemainsW06Responsibility": true,
+    "secretsNeverEnterPayload": true
+  },
+  "remoteExecution": {
+    "workflow": ".github/workflows/w02-role-assignment-migration.yml",
+    "mode": "CONTROLLED_REMOTE_D1",
+    "mutation": "NOT_EXECUTED"
+  },
+  "evidenceRequirements": [
+    "static migration and contract audit",
+    "exact source SHA",
+    "D1_01 binding and UUID verification",
+    "controlled migration execution under protected AUTH-007 rollout environment",
+    "post-migration remote table schema and index read-back",
+    "D1 migration ledger read-back",
+    "W02 outbox and publisher tests",
+    "W06 consumer duplicate-delivery and persistence failure tests",
+    "live existing-queue delivery/DLQ evidence"
+  ]
+}

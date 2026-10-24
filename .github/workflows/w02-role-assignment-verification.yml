@@ -54,5 +54,11 @@ jobs:
           git diff --exit-code -- workers/W02-identity/migrations/0003_role_authorization_versions.sql
       - name: Verify role_version mutation trigger semantics
         run: node scripts/verify-role-version-mutation.mjs
+      - name: Check AUTH-007 rollout admission script syntax
+        run: node --check scripts/verify-auth-007-rollout-admission.mjs
+      - name: Verify logical table authority boundary
+        run: node scripts/verify-logical-data-authority.mjs
+      - name: Execute AUTH-007 outbox migration static audit (local SQLite only)
+        run: node scripts/auth-007-mfa-journal-migration-static-audit.mjs
       - name: Run W02 authorization and session tests
-        run: npx vitest run workers/W02-identity/src/authz/role-assignment.test.ts workers/W02-identity/src/authz/role-version.test.ts workers/W02-identity/src/authz/authorization-decision.test.ts workers/W02-identity/src/authz/l8-genesis-bootstrap-approval.test.ts workers/W02-identity/src/authz/l8-genesis-bootstrap-command.test.ts workers/W02-identity/src/authz/l8-genesis-bootstrap-readiness.test.ts workers/W02-identity/src/authz/l8-genesis-bootstrap-route.test.ts workers/W02-identity/src/auth/totp-replay-guard.test.ts workers/W02-identity/src/session/session-runtime.test.ts
+        run: npx vitest run workers/W02-identity/src/authz/role-assignment.test.ts workers/W02-identity/src/authz/role-version.test.ts workers/W02-identity/src/authz/authorization-decision.test.ts workers/W02-identity/src/authz/l8-genesis-bootstrap-approval.test.ts workers/W02-identity/src/authz/l8-genesis-bootstrap-command.test.ts workers/W02-identity/src/authz/l8-genesis-bootstrap-readiness.test.ts workers/W02-identity/src/authz/l8-genesis-bootstrap-route.test.ts workers/W02-identity/src/auth/totp-replay-guard.test.ts workers/W02-identity/src/auth/mfa-audit-publication-journal.test.ts workers/W02-identity/src/auth/mfa-enrollment-start.test.ts workers/W02-identity/src/auth/mfa-enrollment-confirm.test.ts workers/W02-identity/src/session/session-runtime.test.ts

@@ -1,4 +1,5 @@
 import { createLuckReadAuth, type BetterAuthEnv } from './better-auth.js'
+import { buildMfaAuditEvent, buildMfaAuditOutboxInsert } from './mfa-audit-events.js'
 import { resolveBetterAuthPrincipal } from './principal.js'
 import { readAuthoritativeMfaStatus } from './mfa-status.js'
 
@@ -129,13 +130,26 @@ export async function handleMfaEnrollmentConfirmRequest(
       return json({ error: { code: 'MFA_READBACK_FAILED', message: 'MFA confirmation could not be verified' } }, 503)
     }
 
-    const stored = await env.D1_01.prepare(
-      'UPDATE "user" SET mfa_enrollment_key_hash = NULL, ' +
-      'mfa_enrollment_confirm_key_hash = ?, mfa_enrollment_confirm_request_hash = ? ' +
-      'WHERE id = ? AND two_factor_enabled = 1 ' +
-      'AND EXISTS (SELECT 1 FROM "twoFactor" WHERE userId = ? AND verified = 1)',
-    ).bind(keyHash, requestHash, principal.userId, principal.userId).run()
-    if (stored.meta.changes !== 1) {
+    const verifiedEvent = buildMfaAuditEvent({
+      eventType: 'auth.mfa.enrollment_verified',
+      userId: principal.userId,
+      occurredAt: status.enrolledAt,
+      correlationId: request.headers.get('X-LuckRead-Correlation-Id'),
+      causationId: request.headers.get('X-LuckRead-Request-Id'),
+      result: 'succeeded',
+      reasonCode: 'TOTP_ENROLLMENT_VERIFIED',
+      factorState: 'ENABLED',
+    })
+    const stored = await env.D1_01.batch([
+      env.D1_01.prepare(
+        'UPDATE "user" SET mfa_enrollment_key_hash = NULL, ' +
+        'mfa_enrollment_confirm_key_hash = ?, mfa_enrollment_confirm_request_hash = ? ' +
+        'WHERE id = ? AND two_factor_enabled = 1 ' +
+        'AND EXISTS (SELECT 1 FROM "twoFactor" WHERE userId = ? AND verified = 1)',
+      ).bind(keyHash, requestHash, principal.userId, principal.userId),
+      buildMfaAuditOutboxInsert(env.D1_01, verifiedEvent, { onlyWhenPreviousStatementChanged: true }),
+    ])
+    if (stored[0]?.meta?.changes !== 1 || stored[1]?.meta?.changes !== 1) {
       return json({ error: { code: 'MFA_READBACK_FAILED', message: 'MFA confirmation could not be verified' } }, 503)
     }
     // Better Auth rotates the authenticated session after verified enrollment.
