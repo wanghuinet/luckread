@@ -66,6 +66,13 @@ const hasMfaEnforcement =
   /mfa_enrolled_at|mfaEnrolledAt/.test(productionCode) &&
   /twoFactor\.verified|TOTP is not verified/.test(testCode) &&
   /trustDeviceMaxAge:\s*0/.test(read('workers/W02-identity/src/auth/better-auth.ts'))
+const betterAuthConfig = read('workers/W02-identity/src/auth/better-auth.ts')
+const hasEncryptedRecoveryCodes =
+  /backupCodeOptions:\s*\{[^}]*storeBackupCodes:\s*['"]encrypted['"]/.test(betterAuthConfig)
+if (!hasEncryptedRecoveryCodes) {
+  blockers.push('AUTH-007 recovery codes must use Better Auth encrypted-at-rest storage.')
+}
+
 if (!hasMfaEnforcement || /Status:\s*`BLOCKED_NOT_GREEN`/.test(reconciliation)) {
   blockers.push('AUTH-007 MFA enforcement and executable test evidence are missing or still blocked.')
 }
@@ -116,6 +123,7 @@ const report = {
     workflowIsReadOnly: assertReadOnlyWorkflow,
     dedicatedW02L8Bootstrap: hasDedicatedW02L8Bootstrap,
     mfaCodeAndTestEvidence: hasMfaEnforcement && !/Status:\s*`BLOCKED_NOT_GREEN`/.test(reconciliation),
+    recoveryCodesEncryptedAtRest: hasEncryptedRecoveryCodes,
     w02BootstrapApprovalCodeAndTestEvidence: hasTargetBoundSingleApproval,
     noSelfApprovalPolicy: hasNoSelfApprovalPolicy,
     targetMfaRequiredBeforeGrant: hasVerifiedMfaBeforeGenesisGrant,
