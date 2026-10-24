@@ -147,7 +147,7 @@ jobs:
             --command "SELECT COUNT(*) AS role_version_rows, MIN(role_version) AS min_role_version, MAX(role_version) AS max_role_version FROM role_authorization_versions;" \
             > ../../artifacts/mapping-0/w02-role-version-remote-row-count.txt
 
-          for expected in twoFactor l8_genesis_bootstrap_audit auth_007_mfa_publication_journal lastAcceptedTotpTimeStep user_mfa_enable_revoke_sessions user_mfa_disable_clear_enrollment; do
+          for expected in twoFactor l8_genesis_bootstrap_audit auth_007_mfa_publication_journal auth_007_mfa_publication_journal_status_next_attempt_idx lastAcceptedTotpTimeStep user_mfa_enable_revoke_sessions user_mfa_disable_clear_enrollment; do
             grep -q "$expected" ../../artifacts/mapping-0/w02-role-assignment-remote-schema.txt || { echo "Missing deployed schema object: $expected"; exit 1; }
           done
           for expected in 0006_better_auth_two_factor.sql 0007_l8_genesis_bootstrap_audit.sql 0008_auth_007_mfa_publication_journal.sql; do
