@@ -18,6 +18,7 @@ const makeRequest = (body: unknown = { code: '123456', method: 'totp' }) => new 
       cookie: 'two_factor=signed-challenge',
       'content-type': 'application/json',
       'cf-connecting-ip': '203.0.113.10',
+      'Idempotency-Key': 'mfa-challenge-key-0001',
     },
     body: JSON.stringify(body),
   },
@@ -62,7 +63,57 @@ describe('W01 public MFA challenge verification', () => {
     const request = mocks.w02Fetch.mock.calls.map((call) => call[0] as Request)
       .find((value) => new URL(value.url).pathname === '/api/auth/two-factor/verify-totp')
     expect(request).toBeDefined()
+    expect(request?.headers.get('Idempotency-Key')).toBe('mfa-challenge-key-0001')
     await expect(request?.json()).resolves.toEqual({ code: '123456', trustDevice: false })
+  })
+
+  it('requires Idempotency-Key and a challenge-only credential before calling W02', async () => {
+    const missingKey = await POST(new Request(
+      'https://api.luckread.com/v1/auth/mfa/challenge/verify',
+      {
+        method: 'POST',
+        headers: {
+          cookie: 'two_factor=signed-challenge',
+          'content-type': 'application/json',
+          'cf-connecting-ip': '203.0.113.10',
+        },
+        body: JSON.stringify({ code: '123456', method: 'totp' }),
+      },
+    ))
+    expect(missingKey.status).toBe(400)
+    await expect(missingKey.json()).resolves.toMatchObject({ error: { code: 'IDEMPOTENCY_KEY_REQUIRED' } })
+    expect(mocks.w02Fetch).not.toHaveBeenCalled()
+
+    const noChallenge = await POST(new Request(
+      'https://api.luckread.com/v1/auth/mfa/challenge/verify',
+      {
+        method: 'POST',
+        headers: {
+          'Idempotency-Key': 'mfa-challenge-key-0001',
+          'content-type': 'application/json',
+          'cf-connecting-ip': '203.0.113.10',
+        },
+        body: JSON.stringify({ code: '123456', method: 'totp' }),
+      },
+    ))
+    expect(noChallenge.status).toBe(401)
+    await expect(noChallenge.json()).resolves.toMatchObject({ error: { code: 'MFA_CHALLENGE_REQUIRED' } })
+
+    const authenticatedRequest = await POST(new Request(
+      'https://api.luckread.com/v1/auth/mfa/challenge/verify',
+      {
+        method: 'POST',
+        headers: {
+          cookie: 'two_factor=signed-challenge; better-auth.session_token=live-session',
+          'Idempotency-Key': 'mfa-challenge-key-0001',
+          'content-type': 'application/json',
+          'cf-connecting-ip': '203.0.113.10',
+        },
+        body: JSON.stringify({ code: '123456', method: 'totp' }),
+      },
+    ))
+    expect(authenticatedRequest.status).toBe(401)
+    expect(mocks.w02Fetch).not.toHaveBeenCalled()
   })
 
   it('uses Better Auth single-use recovery codes without trusting a device', async () => {

@@ -33,6 +33,33 @@ export async function POST(request: Request): Promise<Response> {
   const endpointError = await enforceMfaEndpointLimit(request, 'authMfaChallengeVerify')
   if (endpointError) return endpointError
 
+  const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
+  if (!/^[A-Za-z0-9._:-]{16,255}$/.test(idempotencyKey)) {
+    return mfaError(400, 'IDEMPOTENCY_KEY_REQUIRED', 'A valid Idempotency-Key is required')
+  }
+
+  // This endpoint is only for an unauthenticated, signed Better Auth 2FA
+  // challenge. Never let a live session or bearer credential turn this into
+  // a generic TOTP re-verification endpoint.
+  const cookieHeader = request.headers.get('cookie') ?? ''
+  const cookieEntries = cookieHeader.split(';').map((part) => {
+    const separator = part.indexOf('=')
+    return separator < 0
+      ? { name: part.trim(), value: '' }
+      : { name: part.slice(0, separator).trim(), value: part.slice(separator + 1).trim() }
+  })
+  const hasChallengeCookie = cookieEntries.some((cookie) =>
+    /(^|[._-])two_factor$/i.test(cookie.name) && cookie.value.length > 0)
+  const hasSessionCookie = cookieEntries.some((cookie) =>
+    /(^|[._-])session_token$/i.test(cookie.name) && cookie.value.length > 0)
+  if (
+    !hasChallengeCookie ||
+    hasSessionCookie ||
+    /^Bearer\\s+\\S+/i.test(request.headers.get('authorization') ?? '')
+  ) {
+    return mfaError(401, 'MFA_CHALLENGE_REQUIRED', 'A valid MFA sign-in challenge is required')
+  }
+
   let body: unknown
   try { body = await request.json() } catch {
     return mfaError(422, 'VALIDATION_FAILED', 'Invalid MFA challenge request')
