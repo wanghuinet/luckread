@@ -12,7 +12,7 @@ import {
 import { resolveBetterAuthPrincipal } from './auth/principal.js'
 import { handleCurrentUserSessionList } from './auth/session-list.js'
 import { handleCurrentUserSessionRevoke } from './auth/session-revoke.js'
-import { verifyTargetBoundDualApproval, L8BootstrapApprovalError } from './authz/l8-genesis-bootstrap-approval.js'
+import { verifyTargetBoundSingleApproval, L8BootstrapApprovalError } from './authz/l8-genesis-bootstrap-approval.js'
 import { bootstrapSuperAdmin, L8BootstrapCommandError } from './authz/l8-genesis-bootstrap-command.js'
 import { checkL8BootstrapReadiness, L8BootstrapReadinessError } from './authz/l8-genesis-bootstrap-readiness.js'
 
@@ -225,7 +225,7 @@ export default {
 
     if (request.method === 'POST' && url.pathname === '/internal/authz/bootstrap-super-admin/readiness') {
       // This is a read-only preflight. It independently verifies the same
-      // protected GitHub workflow identity and target-bound dual approval as
+      // protected GitHub workflow identity and target-bound single protected environment approval as
       // the write route but never calls the grant command.
       if (
         request.headers.get('X-LuckRead-Caller') !== 'W01' ||
@@ -235,7 +235,7 @@ export default {
       }
 
       const authorization = request.headers.get('authorization') ?? ''
-      const tokenMatch = authorization.match(/^Bearer\\s+(\\S+)$/i)
+      const tokenMatch = authorization.match(/^Bearer\s+(\S+)$/i)
       if (!tokenMatch || tokenMatch[1].length > 8192) {
         return json({ error: { code: 'UNAUTHENTICATED', message: 'GitHub workflow identity token required' } }, 401)
       }
@@ -254,7 +254,7 @@ export default {
       }
 
       try {
-        const approval = await verifyTargetBoundDualApproval({
+        const approval = await verifyTargetBoundSingleApproval({
           oidcToken: tokenMatch[1],
           githubToken: body.githubToken,
           requestPrNumber: body.requestPrNumber as number,
@@ -264,14 +264,14 @@ export default {
       } catch (error) {
         if (error instanceof L8BootstrapApprovalError) {
           const status =
-            error.code === 'OIDC_FORBIDDEN' || error.code === 'DUAL_APPROVAL_REQUIRED' ? 403 :
+            error.code === 'OIDC_FORBIDDEN' || error.code === 'SINGLE_APPROVAL_ENVIRONMENT_NOT_CONFIGURED' ? 403 :
             error.code === 'PR_NOT_MERGED' || error.code === 'REQUEST_FILE_MISSING' || error.code === 'REQUEST_PR_SCOPE_INVALID' ? 409 :
             error.code === 'REQUEST_EXPIRED_OR_INVALID' ? 412 :
             error.code === 'VALIDATION_FAILED' || error.code === 'OIDC_INVALID' ? 400 : 503
           return json({
             error: {
               code: error.code,
-              message: status === 403 ? 'dual approval or trusted workflow identity was denied' :
+              message: status === 403 ? 'single protected environment approval or trusted workflow identity was denied' :
                 status === 409 ? 'bootstrap request PR is not an eligible merged request' :
                 status === 412 ? 'bootstrap request has expired or violates the request contract' :
                 status === 400 ? 'bootstrap evidence was invalid' :
@@ -303,7 +303,7 @@ export default {
     if (request.method === 'POST' && url.pathname === '/internal/authz/bootstrap-super-admin') {
       // First-L8 bootstrap is workflow-authenticated, not application-session-authenticated.
       // W01 is only the public boundary; W02 independently verifies GitHub OIDC, the merged
-      // target-bound request PR, two authorized reviewers, one-time state, and the grant.
+      // target-bound request PR, one required environment reviewer, one-time state, and the grant.
       if (
         request.headers.get('X-LuckRead-Caller') !== 'W01' ||
         request.headers.get('X-LuckRead-Transport-Version') !== '1.0'
@@ -331,7 +331,7 @@ export default {
       }
 
       try {
-        const approval = await verifyTargetBoundDualApproval({
+        const approval = await verifyTargetBoundSingleApproval({
           oidcToken: tokenMatch[1],
           githubToken: body.githubToken,
           requestPrNumber: body.requestPrNumber as number,
@@ -347,14 +347,14 @@ export default {
       } catch (error) {
         if (error instanceof L8BootstrapApprovalError) {
           const status =
-            error.code === 'OIDC_FORBIDDEN' || error.code === 'DUAL_APPROVAL_REQUIRED' ? 403 :
+            error.code === 'OIDC_FORBIDDEN' || error.code === 'SINGLE_APPROVAL_ENVIRONMENT_NOT_CONFIGURED' ? 403 :
             error.code === 'PR_NOT_MERGED' || error.code === 'REQUEST_FILE_MISSING' || error.code === 'REQUEST_PR_SCOPE_INVALID' ? 409 :
             error.code === 'REQUEST_EXPIRED_OR_INVALID' ? 412 :
             error.code === 'VALIDATION_FAILED' || error.code === 'OIDC_INVALID' ? 400 : 503
           return json({
             error: {
               code: error.code,
-              message: status === 403 ? 'dual approval or trusted workflow identity was denied' :
+              message: status === 403 ? 'single protected environment approval or trusted workflow identity was denied' :
                 status === 409 ? 'bootstrap request PR is not an eligible merged request' :
                 status === 412 ? 'bootstrap request has expired or violates the request contract' :
                 status === 400 ? 'bootstrap evidence was invalid' :
