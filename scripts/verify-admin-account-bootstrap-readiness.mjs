@@ -93,7 +93,7 @@ if (!hasNoSelfApprovalPolicy) {
 
 const hasVerifiedMfaBeforeGenesisGrant =
   /MFA_REQUIRED/.test(w02ProductionCode) &&
-  /LEFT JOIN\\s+"twoFactor"/.test(w02ProductionCode) &&
+  w02ProductionCode.includes('LEFT JOIN "twoFactor"') &&
   /target MFA is not enrolled and verified/.test(w02TestCode) &&
   /blocks when target MFA has not been enabled and verified/.test(w02TestCode)
 if (!hasVerifiedMfaBeforeGenesisGrant) {
