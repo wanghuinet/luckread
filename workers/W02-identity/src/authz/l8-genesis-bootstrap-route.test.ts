@@ -45,9 +45,14 @@ describe('W02 L8 genesis bootstrap service-boundary gate', () => {
   })
 
   it('uses W02-owned account state and ignores a caller-supplied ACTIVE state', async () => {
+    type TestStatement = {
+      bind: (...values: unknown[]) => TestStatement
+      first: <T>() => Promise<T | null>
+      all: <T>() => Promise<{ results: T[] }>
+    }
     const db = {
       prepare: (sql: string) => {
-        const statement = {
+        const statement: TestStatement = {
           bind: (..._values: unknown[]) => statement,
           first: async <T>() => sql.includes('FROM "user"')
             ? ({ accountState: 'SUSPENDED' } as T)
