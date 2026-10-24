@@ -3,6 +3,7 @@ import { bootstrapSuperAdmin, L8BootstrapCommandError } from './l8-genesis-boots
 import type { VerifiedL8BootstrapApproval } from './l8-genesis-bootstrap-approval.js'
 
 type UserRow = { accountState: string; emailVerified: number | boolean }
+type MfaRow = { twoFactorEnabled: number | boolean; mfaEnrolledAt: string | null; totpVerified: number | boolean | null }
 type Assignment = {
   id: string; subjectId: string; roleId: string; scopeType: string; scopeId: string | null
   status: string; validFrom: string; validUntil: string | null
@@ -24,6 +25,7 @@ class Statement {
       const row = this.db.roleVersions.get(String(v[0]))
       return (row ? { roleVersion: row.roleVersion } : null) as T | null
     }
+    if (this.sql.includes('FROM "user" u LEFT JOIN "twoFactor" tf')) return this.db.mfa as T | null
     if (this.sql.includes('FROM "user"')) return this.db.user as T | null
     if (this.sql.includes("role_id = 'verified_user'")) {
       return this.db.assignments.some((row) =>
@@ -92,6 +94,11 @@ class Statement {
 
 class FakeD1 {
   user: UserRow | null = { accountState: 'ACTIVE', emailVerified: 1 }
+  mfa: MfaRow | null = {
+    twoFactorEnabled: 1,
+    mfaEnrolledAt: '2026-10-24T11:00:00.000Z',
+    totpVerified: 1,
+  }
   assignments: Assignment[] = [{
     id: 'verified-user-target-123', subjectId: 'existing-user-123', roleId: 'verified_user',
     scopeType: 'global', scopeId: null, status: 'ACTIVE', validFrom: '2026-10-01T00:00:00.000Z',
@@ -165,6 +172,15 @@ describe('W02 one-time L8 genesis grant command', () => {
       operation: 'INITIAL_L8_BOOTSTRAP',
       workflowRunId: '12345678',
     })
+  })
+
+  it('refuses to consume the one-time guard when target MFA is not enrolled and verified', async () => {
+    const db = new FakeD1()
+    db.mfa = { twoFactorEnabled: 0, mfaEnrolledAt: null, totpVerified: 0 }
+    await expect(bootstrapSuperAdmin(db as unknown as D1Database, approval(), NOW))
+      .rejects.toMatchObject({ code: 'MFA_REQUIRED' })
+    expect(db.audit).toBeNull()
+    expect(db.assignments.filter((row) => row.roleId === 'super_admin')).toHaveLength(0)
   })
 
   it('accepts an exact successful replay without creating another assignment', async () => {
