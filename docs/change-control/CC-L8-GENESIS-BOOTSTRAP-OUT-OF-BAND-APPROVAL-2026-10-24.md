@@ -1,6 +1,6 @@
 # CC-L8-GENESIS-BOOTSTRAP-OUT-OF-BAND-APPROVAL-2026-10-24
 
-- Status: PROPOSED / NOT IMPLEMENTED
+- Status: IMPLEMENTED IN PR #1299 / NOT MERGED / NOT DEPLOYED / NO PRODUCTION MUTATION
 - Scope: one-time initial creation of the first effective global `super_admin` (L8) RoleAssignment.
 - Related: `docs/301-L0-L8-PERMISSION-LAYER-CONTRACT-v1.0.md`, `docs/307-SECURITY-THREAT-MODEL-CONTRACT-v1.0.md`, `contracts/alignment/mapping-batches/AUTH-007-real-evidence-reconciliation.v1.md`, `.github/workflows/admin-account-bootstrap.yml`.
 - Architecture invariant: W02 remains the sole writer of RoleAssignment on D1-01. W01 remains the public request boundary and may call W02 only through the already-existing `W02_AUTH` Service Binding. No direct D1 writes from GitHub Actions; no new Worker, D1, Queue, or Service Binding.
@@ -9,7 +9,7 @@
 
 The application currently has no L8 principal. Requiring existing application L8 identities to approve the first L8 grant creates a circular bootstrap dependency. That dependency must not be solved by silently skipping the two-person control.
 
-## 2. Proposed genesis-only approval authority
+## 2. Genesis-only approval authority (out-of-band dual approval)
 
 For the first L8 only, dual approval is supplied out-of-band by two distinct, authorized GitHub repository maintainers. These are approval identities, not LuckRead application roles; no existing L8 account is required.
 
@@ -26,7 +26,8 @@ The executing workflow must verify the request PR is merged into `main`, that tw
 
 ## 3. Execution and authority boundary
 
-- Workflow authentication and immutable approval evidence must be validated before any mutation.
+- Workflow authentication and immutable approval evidence are validated by W02 before any mutation.
+- `.github/workflows/l8-genesis-bootstrap.yml` has separate `preflight` and `execute` modes; `preflight` performs a read-only production check and never calls the grant route. `execute` repeats the same preflight immediately before mutation and requires a separate explicit dispatch.
 - The workflow must call the W01 public API boundary. W01 validates the external approval evidence and forwards the admitted command to W02 through the existing `W02_AUTH` binding.
 - W02 revalidates all target, one-time, role-mapping, expiry, and approval constraints, then alone creates the global `super_admin` RoleAssignment.
 - Use a deterministic idempotency key derived from the approved request/nonce; concurrent retries must not create a second effective assignment.
@@ -47,7 +48,7 @@ The bootstrap path must deny all privileged operations before MFA is verified, p
 - Maximum initial role validity is four hours, matching the canonical L8 contract. The role is not a permanent bootstrap credential.
 - A second L8 or subsequent L8 role assignment does not use this genesis exception and must follow the standard reviewed privileged-approval workflow.
 
-## 6. Required implementation evidence
+## 6. Review and production admission gates
 
 Before enabling production mutation, a separate review must confirm:
 
@@ -60,4 +61,4 @@ Before enabling production mutation, a separate review must confirm:
 - executable positive and negative tests for every condition above;
 - successful controlled runtime evidence bound to the deployed source commit.
 
-This proposal does not itself authorize production writes or claim that any of these requirements are implemented.
+This change-control record does not authorize production writes. Runtime source and negative tests have been added in PR #1299, but the PR is unmerged, current GitHub Actions checks have not completed, D1 migrations and Worker deployments have not run, and no online read-only preflight evidence has been produced. AUTH-007 remains `BLOCKED_NOT_GREEN`; do not run execute mode until the merge, independent review, CI/build, controlled migration and deployment evidence, online preflight, and MFA contract/evidence gate are all satisfied.
