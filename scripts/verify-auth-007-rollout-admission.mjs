@@ -151,6 +151,9 @@ if (blockers.length === 0) {
   const lifecycle = JSON.parse(read(lifecyclePath))
   const policy = JSON.parse(read(policyPath))
   const reconciliation = read(reconciliationPath)
+  // Resolve gate status before computing sourceEvidenceChecks below.
+  auth007Status = reconciliation.match(/^- Status:\s*`([^`]+)`/m)?.[1] ?? null
+  implementationAuthorization = reconciliation.match(/^- Implementation authorization:\s*`([^`]+)`/m)?.[1] ?? null
   const standaloneW01Workflow = read('.github/workflows/w01-payload-app-deploy.yml')
 
   const requiredMigrationTokens = [
