@@ -190,6 +190,15 @@ if (blockers.length === 0) {
     canonicalContractsDeclareExplicitStatus: ['CONTRACTED_NOT_VERIFIED', 'VERIFIED', 'GREEN'].includes(apiContract.status) &&
       ['CONTRACTED_NOT_VERIFIED', 'VERIFIED', 'GREEN'].includes(factorContract.status) &&
       ['CONTRACTED_NOT_VERIFIED', 'VERIFIED', 'GREEN'].includes(lifecycle.status),
+    sourceEvidenceIsAccurateAndStillBlocked:
+      apiContract.evidenceStatus?.runtime?.startsWith('SOURCE_IMPLEMENTED_TESTED_LOCALLY;') === true &&
+      apiContract.evidenceStatus?.securityE2E === 'MISSING' &&
+      apiContract.evidenceStatus?.mapping0 === 'MISSING' &&
+      apiContract.evidenceStatus?.auth007 === 'BLOCKED_NOT_GREEN' &&
+      factorContract.evidenceStatus?.totpReplayProtection === 'SOURCE_PRESENT_TESTED_LOCALLY_NOT_DEPLOYED_OR_READ_BACK' &&
+      factorContract.evidenceStatus?.securityE2E === 'MISSING' &&
+      factorContract.evidenceStatus?.auth007 === 'BLOCKED_NOT_GREEN' &&
+      !apiContract.evidenceStatus?.runtime?.includes('remain incomplete'),
     allSixPublicRoutesAndTestsPresent: operations.every((operation) =>
       exists(operation.route) &&
       exists(operation.test) &&
