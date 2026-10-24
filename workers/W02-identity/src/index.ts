@@ -13,6 +13,7 @@ import { resolveBetterAuthPrincipal } from './auth/principal.js'
 import { handleCurrentUserSessionList } from './auth/session-list.js'
 import { handleCurrentUserSessionRevoke } from './auth/session-revoke.js'
 import { handleMfaStatusRequest } from './auth/mfa-status.js'
+import { handleMfaEnrollmentConfirmRequest } from './auth/mfa-enrollment-confirm.js'
 import { verifyTargetBoundSingleApproval, L8BootstrapApprovalError } from './authz/l8-genesis-bootstrap-approval.js'
 import { bootstrapSuperAdmin, L8BootstrapCommandError } from './authz/l8-genesis-bootstrap-command.js'
 import { checkL8BootstrapReadiness, L8BootstrapReadinessError } from './authz/l8-genesis-bootstrap-readiness.js'
@@ -189,6 +190,10 @@ export default {
         return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'registration rollback unavailable' } }, 503)
       }
     }
+    if (request.method === 'POST' && url.pathname === '/internal/auth/mfa/enrollment/confirm') {
+      return handleMfaEnrollmentConfirmRequest(env, request)
+    }
+
     if (request.method === 'POST' && url.pathname === '/internal/auth/mfa/status') {
       return handleMfaStatusRequest(env, request)
     }

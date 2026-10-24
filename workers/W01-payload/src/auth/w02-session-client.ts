@@ -134,6 +134,40 @@ export async function getMfaStatus(request: Request): Promise<MfaStatusResponse>
   throw new W02AuthClientError(response.status || 503, 'MFA status failed', errorCode(payload) ?? undefined)
 }
 
+export async function confirmMfaEnrollment(request: Request, code: string): Promise<MfaStatusResponse> {
+  const response = await callW02('/internal/auth/mfa/enrollment/confirm', {
+    request,
+    body: { code },
+    headers: {
+      'X-LuckRead-Caller': 'W01',
+      'X-LuckRead-Transport-Version': '1.0',
+    },
+  })
+  let payload: unknown = null
+  try { payload = await response.json() } catch {}
+  const data = payload && typeof payload === 'object'
+    ? (payload as { data?: unknown }).data
+    : null
+  if (
+    response.ok &&
+    data && typeof data === 'object' &&
+    typeof (data as MfaStatusResponse).enabled === 'boolean' &&
+    typeof (data as MfaStatusResponse).verified === 'boolean' &&
+    typeof (data as MfaStatusResponse).enrolledAt === 'string' &&
+    Number.isFinite(Date.parse((data as MfaStatusResponse).enrolledAt as string))
+  ) {
+    const status = data as MfaStatusResponse
+    if (status.enabled && status.verified) {
+      return {
+        enabled: true,
+        verified: true,
+        enrolledAt: new Date(status.enrolledAt as string).toISOString(),
+      }
+    }
+  }
+  throw new W02AuthClientError(response.status || 503, 'MFA enrollment confirmation failed', errorCode(payload) ?? undefined)
+}
+
 export async function getBetterAuthPrincipal(request: Request): Promise<BetterAuthPrincipal> {
   const response = await callW02('/internal/auth/principal', { request })
   let payload: unknown = null
