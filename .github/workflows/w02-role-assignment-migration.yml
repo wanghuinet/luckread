@@ -25,7 +25,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - name: Validate immutable source SHA before checkout
+      - name: Checkout protected main for source validation
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Validate immutable source SHA is committed to main
         env:
           SOURCE_SHA: ${{ inputs.source_sha }}
         run: |
@@ -33,10 +39,17 @@ jobs:
             echo "source_sha must be a full 40-character commit SHA"
             exit 1
           fi
+          git cat-file -e "$SOURCE_SHA^{commit}"
+          git merge-base --is-ancestor "$SOURCE_SHA" origin/main || {
+            echo "source_sha must be an immutable commit already contained in protected main"
+            exit 1
+          }
+
       - name: Checkout exact implementation commit
         uses: actions/checkout@v4
         with:
           ref: ${{ inputs.source_sha }}
+          fetch-depth: 0
       - name: Setup Node 24
         uses: actions/setup-node@v4
         with:
