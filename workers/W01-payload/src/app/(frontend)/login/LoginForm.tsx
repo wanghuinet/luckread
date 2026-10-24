@@ -16,6 +16,8 @@ type ApiResponse = {
   }
 }
 
+type ApiError = ApiResponse
+
 export default function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -155,6 +157,7 @@ export default function LoginForm() {
         <Link className="text-center text-sm text-main-accent hover:underline" href="/register">还没有账号？立即注册</Link>
       </div>
       <Link className="text-center text-sm text-main-accent hover:underline" href="/verify-email">收不到验证邮件？点此重发</Link>
+      <Link className="text-center text-sm text-main-accent hover:underline" href="/login/mfa">已登录账号？配置双重验证</Link>
     </form>
   )
 }
