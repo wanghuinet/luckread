@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "operation": "INITIAL_L8_BOOTSTRAP",
+  "targetUserId": "REPLACE_WITH_EXISTING_BETTER_AUTH_USER_ID",
+  "roleId": "super_admin",
+  "scopeType": "global",
+  "scopeId": null,
+  "reason": "Initial L8 bootstrap because the system has no existing L8 approver; authorized out-of-band review is required.",
+  "nonce": "REPLACE_WITH_64_HEX_CHAR_RANDOM_NONCE",
+  "createdAt": "2026-10-24T00:00:00.000Z",
+  "expiresAt": "2026-10-25T00:00:00.000Z"
+}
