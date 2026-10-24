@@ -72,7 +72,7 @@ export default function MfaSetupPage() {
     event.preventDefault()
     setError('')
     const normalizedCode = code.trim()
-    if (!/^\\d{6}$/.test(normalizedCode)) {
+    if (!/^\d{6}$/.test(normalizedCode)) {
       setError('请输入身份验证器当前显示的 6 位数字验证码。')
       return
     }
