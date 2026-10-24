@@ -6,6 +6,8 @@ on:
       - 'workers/W01-payload/src/auth/w08-creator-client.ts'
       - 'workers/W01-payload/src/app/api/v1/creator-applications/**'
       - 'workers/W01-payload/src/app/api/v1/admin/creator-applications/**'
+      - 'workers/W01-payload/src/app/api/v1/admin/bootstrap/super-admin/**'
+      - 'workers/W01-payload/tests/int/admin-l8-bootstrap-readiness-route.int.spec.ts'
       - 'workers/W01-payload/wrangler.jsonc'
       - 'workers/W01-payload/src/app/(frontend)/creator-application/**'
       - 'workers/W01-payload/src/app/(frontend)/creator-review/**'
@@ -18,6 +20,11 @@ on:
       - 'workers/W01-payload/tests/live/**'
       - '.github/workflows/w01-w02-binding-deploy.yml'
       - 'workers/W02-identity/src/index.ts'
+      - 'workers/W02-identity/src/auth/better-auth.ts'
+      - 'workers/W02-identity/src/authz/l8-genesis-bootstrap-approval.ts'
+      - 'workers/W02-identity/src/authz/l8-genesis-bootstrap-command.ts'
+      - 'workers/W02-identity/src/authz/l8-genesis-bootstrap-readiness.ts'
+      - 'workers/W02-identity/src/authz/role-assignment.ts'
       - 'workers/W02-identity/src/authz/role-assignment-command.ts'
       - 'workers/W02-identity/src/authz/role-grant-approval-policy.ts'
       - 'workers/W02-identity/src/authz/role-assignment-command.test.ts'
@@ -75,6 +82,10 @@ jobs:
       - name: Install locked W01 dependencies
         working-directory: workers/W01-payload
         run: pnpm install --frozen-lockfile
+
+      - name: Run W01 protected L8 bootstrap readiness route tests
+        working-directory: workers/W01-payload
+        run: pnpm exec vitest run --config ./vitest.config.mts tests/int/admin-l8-bootstrap-readiness-route.int.spec.ts
 
       - name: Validate production creator E2E suite without network access
         working-directory: workers/W01-payload
