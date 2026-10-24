@@ -3,6 +3,7 @@
 import { FormEvent, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { fetchJson, jsonHeaders } from '../../../lib/client-api.js'
 
 type EnrollmentStartResponse = {
   data?: { totpUri?: string; recoveryCodes?: string[] }
@@ -34,16 +35,12 @@ export default function MfaSetupPage() {
 
     setBusy(true)
     try {
-      const response = await fetch('/api/v1/auth/mfa/enrollment', {
+      const { response, data: payload } = await fetchJson<EnrollmentStartResponse>('/api/v1/auth/mfa/enrollment', {
         method: 'POST',
         credentials: 'include',
-        headers: {
-          'content-type': 'application/json',
-          'Idempotency-Key': 'mfa-enrollment:' + crypto.randomUUID(),
-        },
+        headers: jsonHeaders({ 'Idempotency-Key': 'mfa-enrollment:' + crypto.randomUUID() }),
         body: JSON.stringify({ currentPassword: password }),
       })
-      const payload = await response.json().catch(() => null) as EnrollmentStartResponse | null
       const data = payload?.data
       if (!response.ok || typeof data?.totpUri !== 'string' ||
           !data.totpUri.startsWith('otpauth://totp/') ||
@@ -81,16 +78,12 @@ export default function MfaSetupPage() {
     const key = confirmationKey || ('mfa-confirm:' + crypto.randomUUID())
     setConfirmationKey(key)
     try {
-      const response = await fetch('/api/v1/auth/mfa/enrollment/confirm', {
+      const { response, data: payload } = await fetchJson<EnrollmentConfirmResponse>('/api/v1/auth/mfa/enrollment/confirm', {
         method: 'POST',
         credentials: 'include',
-        headers: {
-          'content-type': 'application/json',
-          'Idempotency-Key': key,
-        },
+        headers: jsonHeaders({ 'Idempotency-Key': key }),
         body: JSON.stringify({ code: normalizedCode }),
       })
-      const payload = await response.json().catch(() => null) as EnrollmentConfirmResponse | null
       if (!response.ok || payload?.data?.enabled !== true ||
           payload.data.verified !== true || !payload.data.enrolledAt) {
         if (response.status === 401) {
