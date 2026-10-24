@@ -1,3 +1,4 @@
+import { DatabaseSync } from 'node:sqlite'
 import { describe, expect, it } from 'vitest'
 import { createOTP } from '@better-auth/utils/otp'
 import { consumeTotpTimeStep, matchTotpTimeStep } from './totp-replay-guard.js'
@@ -5,6 +6,40 @@ import { consumeTotpTimeStep, matchTotpTimeStep } from './totp-replay-guard.js'
 const SECRET = 'luckread-totp-test-secret'
 const NOW = Date.parse('2026-10-24T12:00:00.000Z')
 const STEP = Math.floor(NOW / 30_000)
+
+const makeSqliteD1 = (userId = 'user-123') => {
+  const sqlite = new DatabaseSync(':memory:')
+  sqlite.exec(
+    'CREATE TABLE "twoFactor" (' +
+      'id TEXT PRIMARY KEY, ' +
+      'userId TEXT NOT NULL UNIQUE, ' +
+      'lastAcceptedTotpTimeStep INTEGER CHECK (' +
+      'lastAcceptedTotpTimeStep IS NULL OR lastAcceptedTotpTimeStep >= 0' +
+      '))',
+  )
+  sqlite.prepare(
+    'INSERT INTO "twoFactor" (id, userId, lastAcceptedTotpTimeStep) VALUES (?, ?, NULL)',
+  ).run('factor-1', userId)
+
+  const db = {
+    prepare(sql: string) {
+      const statement = sqlite.prepare(sql)
+      let values: (string | number | null)[] = []
+      return {
+        bind(...next: (string | number | null)[]) {
+          values = next
+          return this
+        },
+        async run() {
+          const result = statement.run(...values)
+          return { meta: { changes: Number(result.changes) } }
+        },
+      }
+    },
+  } as unknown as D1Database
+
+  return { db, sqlite, close: () => sqlite.close() }
+}
 
 describe('TOTP time-step replay guard', () => {
   it('identifies the exact current accepted step', async () => {
@@ -34,53 +69,33 @@ describe('TOTP time-step replay guard', () => {
     await expect(consumeTotpTimeStep(db, 'user-123', -1)).rejects.toThrow('invalid TOTP replay-guard input')
   })
 
-  it('atomically consumes a step once and rejects replay, older steps and other users', async () => {
-    const state: { userId: string; lastStep: number | null } = { userId: 'user-123', lastStep: null }
-    const db = {
-      prepare(sql: string) {
-        expect(sql).toContain('lastAcceptedTotpTimeStep IS NULL OR lastAcceptedTotpTimeStep < ?')
-        let values: unknown[] = []
-        return {
-          bind(...next: unknown[]) { values = next; return this },
-          async run() {
-            const [writeStep, userId, comparisonStep] = values as [number, string, number]
-            const eligible = userId === state.userId &&
-              (state.lastStep === null || state.lastStep < comparisonStep)
-            if (eligible) state.lastStep = writeStep
-            return { meta: { changes: eligible ? 1 : 0 } }
-          },
-        }
-      },
-    } as unknown as D1Database
+  it('executes the conditional SQL against SQLite and rejects replay, older steps and other users', async () => {
+    const { db, sqlite, close } = makeSqliteD1()
+    try {
+      expect(await consumeTotpTimeStep(db, 'user-123', STEP)).toBe(true)
+      expect(await consumeTotpTimeStep(db, 'user-123', STEP)).toBe(false)
+      expect(await consumeTotpTimeStep(db, 'user-123', STEP - 1)).toBe(false)
+      expect(await consumeTotpTimeStep(db, 'other-user', STEP + 1)).toBe(false)
 
-    expect(await consumeTotpTimeStep(db, 'user-123', STEP)).toBe(true)
-    expect(await consumeTotpTimeStep(db, 'user-123', STEP)).toBe(false)
-    expect(await consumeTotpTimeStep(db, 'user-123', STEP - 1)).toBe(false)
-    expect(await consumeTotpTimeStep(db, 'other-user', STEP + 1)).toBe(false)
-    expect(state.lastStep).toBe(STEP)
+      const row = sqlite.prepare(
+        'SELECT lastAcceptedTotpTimeStep FROM "twoFactor" WHERE userId = ?',
+      ).get('user-123') as { lastAcceptedTotpTimeStep: number | null } | undefined
+      expect(row?.lastAcceptedTotpTimeStep).toBe(STEP)
+    } finally {
+      close()
+    }
   })
 
-  it('has one winner when concurrent duplicate steps target the atomic conditional update', async () => {
-    const state: { lastStep: number | null } = { lastStep: null }
-    const db = {
-      prepare(sql: string) {
-        expect(sql).toContain('lastAcceptedTotpTimeStep IS NULL OR lastAcceptedTotpTimeStep < ?')
-        let values: unknown[] = []
-        return {
-          bind(...next: unknown[]) { values = next; return this },
-          async run() {
-            const [writeStep, , comparisonStep] = values as [number, string, number]
-            const eligible = state.lastStep === null || state.lastStep < comparisonStep
-            if (eligible) state.lastStep = writeStep
-            return { meta: { changes: eligible ? 1 : 0 } }
-          },
-        }
-      },
-    } as unknown as D1Database
-    const results = await Promise.all([
-      consumeTotpTimeStep(db, 'user-123', STEP),
-      consumeTotpTimeStep(db, 'user-123', STEP),
-    ])
-    expect(results.sort()).toEqual([false, true])
+  it('has one winner when concurrent duplicate calls target the actual SQLite conditional update', async () => {
+    const { db, close } = makeSqliteD1()
+    try {
+      const results = await Promise.all([
+        consumeTotpTimeStep(db, 'user-123', STEP),
+        consumeTotpTimeStep(db, 'user-123', STEP),
+      ])
+      expect(results.sort()).toEqual([false, true])
+    } finally {
+      close()
+    }
   })
 })
