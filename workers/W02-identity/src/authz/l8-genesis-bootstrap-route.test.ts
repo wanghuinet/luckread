@@ -83,7 +83,7 @@ describe('W02 L8 genesis bootstrap service-boundary gate', () => {
     const source = readFileSync(path, 'utf8')
     expect(source).not.toMatch(/mfaVerified\s*:\s*true/)
     expect(source).not.toMatch(/mfaVerified\??\s*:/)
-    expect(source).toContain('verifyTargetBoundDualApproval')
+    expect(source).toContain('verifyTargetBoundSingleApproval')
     expect(source).toContain('bootstrapSuperAdmin(env.D1_01, approval')
 
     const authSource = readFileSync(fileURLToPath(new URL('../auth/better-auth.ts', import.meta.url)), 'utf8')
