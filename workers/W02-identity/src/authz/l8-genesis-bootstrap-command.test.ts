@@ -41,6 +41,7 @@ class Statement {
     }
     if (this.sql.includes('FROM l8_genesis_bootstrap_audit')) {
       if (!this.db.audit) return null
+      if (this.sql.includes('request_pr_number AS requestPrNumber')) return this.db.audit as T
       if (this.sql.includes('role_assignment_id AS assignmentId')) return { assignmentId: this.db.audit.assignmentId } as T
       return this.db.audit as T
     }
