@@ -97,9 +97,12 @@ if (!hasTargetBoundSingleApproval) {
 const hasNoSelfApprovalPolicy =
   /prevent_self_review !== true/.test(w02ProductionCode) &&
   /prevent_self_review: false/.test(w02TestCode) &&
-  /rejects a single-reviewer environment when self-review is permitted/.test(w02TestCode)
+  /rejects a single-reviewer environment when self-review is permitted/.test(w02TestCode) &&
+  /environment\.can_admins_bypass !== false/.test(w02ProductionCode) &&
+  /can_admins_bypass: true/.test(w02TestCode) &&
+  /rejects environments that permit administrator bypass of protection rules/.test(w02TestCode)
 if (!hasNoSelfApprovalPolicy) {
-  blockers.push('L8 genesis approval must prohibit initiator self-review and include a negative test.')
+  blockers.push('L8 genesis approval must prohibit initiator self-review and administrator bypass, with negative tests.')
 }
 
 const hasVerifiedMfaBeforeGenesisGrant =
