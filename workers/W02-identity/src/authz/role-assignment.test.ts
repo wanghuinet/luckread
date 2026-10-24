@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ensureBaseUserRole, ensureVerifiedUserRole, resolveGlobalLayer, type RoleAssignmentRecord } from './role-assignment.js'
+import { ensureBaseUserRole, ensureVerifiedUserRole, requireMfaForPrivilegedAction, resolveGlobalLayer, type RoleAssignmentRecord } from './role-assignment.js'
 
 const NOW = '2026-09-22T12:00:00.000Z'
 
@@ -44,6 +44,16 @@ function fakeD1(rows: RoleAssignmentRecord[], mfaEnabled = true) {
   }
   return { db: db as unknown as D1Database, getQueryCount: () => queryCount }
 }
+
+describe('privileged MFA gate', () => {
+  it('requires enrollment for MFA-protected layers and denies unknown layers', () => {
+    expect(requireMfaForPrivilegedAction('L8', false)).toBe(false)
+    expect(requireMfaForPrivilegedAction('L7', false)).toBe(false)
+    expect(requireMfaForPrivilegedAction('L8', true)).toBe(true)
+    expect(requireMfaForPrivilegedAction('L2', false)).toBe(true)
+    expect(requireMfaForPrivilegedAction('LX', true)).toBe(false)
+  })
+})
 
 describe('RoleAssignment global layer resolution', () => {
   it('resolves a valid global user role', async () => {
