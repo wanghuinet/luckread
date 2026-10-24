@@ -1,0 +1,43 @@
+name: L8 Genesis Bootstrap (Dual Approval + MFA Gate)
+
+on:
+  workflow_dispatch:
+    inputs:
+      request_pr_number:
+        description: "Merged PR number containing docs/change-control/l8-genesis-bootstrap-request.json"
+        required: true
+        type: number
+
+permissions:
+  contents: read
+  pull-requests: read
+  administration: read
+  id-token: write
+
+concurrency:
+  group: l8-genesis-bootstrap
+  cancel-in-progress: false
+
+jobs:
+  bootstrap:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: l8-genesis-bootstrap
+    steps:
+      - name: Checkout protected main revision
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Request W01 to invoke W02's independently verified bootstrap
+        env:
+          REQUEST_PR_NUMBER: ${{ inputs.request_pr_number }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/execute-l8-genesis-bootstrap.mjs
