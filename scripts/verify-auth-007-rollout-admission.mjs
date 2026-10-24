@@ -219,10 +219,10 @@ if (blockers.length === 0) {
   sourceChecks = {
     reviewedMfaMigrationShape: requiredMigrationTokens.every((token) => migration.includes(token)),
     reviewedBootstrapAuditShape: requiredBootstrapTokens.every((token) => bootstrapMigration.includes(token)),
-    encryptedRecoveryCodes: /backupCodeOptions:\\s*\\{[^}]*storeBackupCodes:\\s*['"]encrypted['"]/.test(betterAuth),
-    privilegedTrustDeviceDisabled: /trustDeviceMaxAge:\\s*0/.test(betterAuth),
+    encryptedRecoveryCodes: /backupCodeOptions:\s*\{[^}]*storeBackupCodes:\s*['"]encrypted['"]/.test(betterAuth),
+    privilegedTrustDeviceDisabled: /trustDeviceMaxAge:\s*0/.test(betterAuth),
     persistedTotpReplayGuard: /consumeTotpTimeStep/.test(betterAuth) &&
-      /two-factor\\/verify-totp/.test(betterAuth) &&
+      /two-factor\/verify-totp/.test(betterAuth) &&
       /UPDATE "twoFactor" SET lastAcceptedTotpTimeStep/.test(replayGuard),
     canonicalContractsDeclareExplicitStatus: ['CONTRACTED_NOT_VERIFIED', 'VERIFIED', 'GREEN'].includes(apiContract.status) &&
       ['CONTRACTED_NOT_VERIFIED', 'VERIFIED', 'GREEN'].includes(factorContract.status) &&
@@ -252,10 +252,10 @@ if (blockers.length === 0) {
       /can_admins_bypass: true/.test(read('workers/W02-identity/src/authz/l8-genesis-bootstrap-approval.test.ts')) &&
       /rejects environments that permit administrator bypass of protection rules/.test(read('workers/W02-identity/src/authz/l8-genesis-bootstrap-approval.test.ts')),
     standaloneW01DeployUsesProtectedAdmission:
-      /environment:\\s*auth-mfa-rollout/.test(standaloneW01Workflow) &&
-      /github\\.ref == 'refs\\/heads\\/main'/.test(standaloneW01Workflow) &&
+      /environment:\s*auth-mfa-rollout/.test(standaloneW01Workflow) &&
+      /github\.ref == 'refs\/heads\/main'/.test(standaloneW01Workflow) &&
       /merge-base --is-ancestor/.test(standaloneW01Workflow) &&
-      /verify-auth-007-rollout-admission\\.mjs/.test(standaloneW01Workflow) &&
+      /verify-auth-007-rollout-admission\.mjs/.test(standaloneW01Workflow) &&
       standaloneW01Workflow.indexOf('verify-auth-007-rollout-admission.mjs') >= 0 &&
       standaloneW01Workflow.indexOf('verify-auth-007-rollout-admission.mjs') < standaloneW01Workflow.indexOf('run: pnpm run deploy:app'),
   }
