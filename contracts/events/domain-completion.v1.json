@@ -4,17 +4,100 @@
   "title": "Domain Completion Event Contract",
   "type": "object",
   "x-events": [
-    {"name":"org.member.added","aggregate":"OrgMembership"},
-    {"name":"org.member.removed","aggregate":"OrgMembership"},
-    {"name":"org.member.role_changed","aggregate":"OrgMembership"},
-    {"name":"ip.transferred","aggregate":"IP"},
-    {"name":"ip.dissolved","aggregate":"IP"},
-    {"name":"entitlement.granted","aggregate":"Entitlement"},
-    {"name":"entitlement.revoked","aggregate":"Entitlement"},
-    {"name":"media.processing.completed","aggregate":"Media"},
-    {"name":"media.processing.failed","aggregate":"Media"},
-    {"name":"moderation.case.decided","aggregate":"ModerationCase"},
-    {"name":"moderation.case.appealed","aggregate":"ModerationCase"}
+    {
+      "name": "org.member.added",
+      "aggregate": "OrgMembership"
+    },
+    {
+      "name": "org.member.removed",
+      "aggregate": "OrgMembership"
+    },
+    {
+      "name": "org.member.role_changed",
+      "aggregate": "OrgMembership"
+    },
+    {
+      "name": "ip.transferred",
+      "aggregate": "IP"
+    },
+    {
+      "name": "ip.dissolved",
+      "aggregate": "IP"
+    },
+    {
+      "name": "entitlement.granted",
+      "aggregate": "Entitlement"
+    },
+    {
+      "name": "entitlement.revoked",
+      "aggregate": "Entitlement"
+    },
+    {
+      "name": "media.processing.completed",
+      "aggregate": "Media"
+    },
+    {
+      "name": "media.processing.failed",
+      "aggregate": "Media"
+    },
+    {
+      "name": "moderation.case.decided",
+      "aggregate": "ModerationCase"
+    },
+    {
+      "name": "moderation.case.appealed",
+      "aggregate": "ModerationCase"
+    },
+    {
+      "name": "auth.mfa.enrollment_started",
+      "aggregate": "User"
+    },
+    {
+      "name": "auth.mfa.enrollment_verified",
+      "aggregate": "User"
+    },
+    {
+      "name": "auth.mfa.enrollment_failed",
+      "aggregate": "User"
+    },
+    {
+      "name": "auth.mfa.challenge_succeeded",
+      "aggregate": "User"
+    },
+    {
+      "name": "auth.mfa.challenge_failed",
+      "aggregate": "User"
+    },
+    {
+      "name": "auth.mfa.factor_disabled",
+      "aggregate": "User"
+    },
+    {
+      "name": "auth.mfa.recovery_codes_rotated",
+      "aggregate": "User"
+    },
+    {
+      "name": "auth.mfa.recovery_code_consumed",
+      "aggregate": "User"
+    },
+    {
+      "name": "auth.mfa.locked",
+      "aggregate": "User"
+    },
+    {
+      "name": "auth.mfa.replay_rejected",
+      "aggregate": "User"
+    }
   ],
-  "required": ["event_id","event_type","occurred_at","aggregate_type","aggregate_id","schema_version","actor_type","actor_id","payload"]
+  "required": [
+    "event_id",
+    "event_type",
+    "occurred_at",
+    "aggregate_type",
+    "aggregate_id",
+    "schema_version",
+    "actor_type",
+    "actor_id",
+    "payload"
+  ]
 }
