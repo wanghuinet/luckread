@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({
   proxyBetterAuth: vi.fn(),
   enforceAuthRateLimit: vi.fn(),
+  authServiceFetch: vi.fn(),
 }))
 
 vi.mock('../../src/auth/w02-session-client.js', () => ({
@@ -17,6 +18,13 @@ vi.mock('../../src/auth/traffic-limit.js', () => ({
   rateLimitResponse: vi.fn(),
 }))
 
+vi.mock('@opennextjs/cloudflare', () => ({
+  getCloudflareContext: async () => ({
+    env: { W02_AUTH: { fetch: mocks.authServiceFetch } },
+  }),
+}))
+
+import { POST as authApi } from '../../src/app/api/auth/[...segments]/route.js'
 import { POST as login } from '../../src/app/auth/login/route.js'
 import { GET as session } from '../../src/app/auth/session/route.js'
 import { POST as refresh } from '../../src/app/auth/refresh/route.js'
@@ -73,6 +81,66 @@ describe('W01 Better Auth boundary', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.enforceAuthRateLimit.mockResolvedValue(undefined)
+  })
+
+
+  it('checks privileged eligibility before allowing MFA enrollment or management', async () => {
+    const eligibilityRequest = new Request('https://luckread-w02.internal/internal/auth/mfa/enrollment-eligibility', { method: 'POST' })
+    mocks.authServiceFetch.mockImplementation(async (input: RequestInfo | URL) => {
+      const url = new URL(input instanceof Request ? input.url : String(input))
+      if (url.pathname === '/internal/auth/mfa/enrollment-eligibility') {
+        return new Response(JSON.stringify({ eligible: false }), { status: 403 })
+      }
+      return new Response(JSON.stringify({ method: 'totp', totpURI: 'otpauth://secret', backupCodes: ['one'] }), { status: 200 })
+    })
+    const response = await authApi(request('https://luckread.test/api/auth/two-factor/enable', 'POST', {
+      password: 'password',
+      method: 'totp',
+    }), { params: Promise.resolve({ segments: ['two-factor', 'enable'] }) })
+
+    expect(response.status).toBe(403)
+    expect((await response.json() as { error: { code: string } }).error.code).toBe('MFA_PRIVILEGED_ROLE_REQUIRED')
+    expect(mocks.authServiceFetch).toHaveBeenCalledTimes(1)
+    expect(mocks.authServiceFetch).toHaveBeenCalledWith(expect.objectContaining({
+      url: eligibilityRequest.url,
+    }))
+  })
+
+  it('strips Better Auth raw session tokens from successful MFA verification responses', async () => {
+    mocks.authServiceFetch.mockImplementation(async (input: RequestInfo | URL) => {
+      const request = input instanceof Request ? input : new Request(input)
+      const url = new URL(request.url)
+      if (url.pathname === '/internal/auth/mfa/enrollment-eligibility') {
+        return new Response(JSON.stringify({ eligible: true }), { status: 200 })
+      }
+      if (url.pathname === '/api/auth/two-factor/verify-totp') {
+        return new Response(JSON.stringify({
+          token: 'raw-session-token-must-not-escape',
+          user: { id: 'u-l8', email: 'l8@example.com' },
+        }), {
+          status: 200,
+          headers: {
+            'set-auth-token': 'signed-session-token',
+            'set-cookie': 'better-auth.session_token=signed-session-token; Path=/; HttpOnly; Secure; SameSite=Lax',
+          },
+        })
+      }
+      return new Response(null, { status: 404 })
+    })
+    const response = await authApi(request('https://luckread.test/api/auth/two-factor/verify-totp', 'POST', {
+      code: '123456',
+    }), { params: Promise.resolve({ segments: ['two-factor', 'verify-totp'] }) })
+    const data = await response.json() as { data: { verified: boolean }; requestId: string }
+
+    expect(response.status).toBe(200)
+    expect(data.data.verified).toBe(true)
+    expect(data.requestId).toBeTruthy()
+    expect(JSON.stringify(data)).not.toContain('raw-session-token-must-not-escape')
+    expect(JSON.stringify(data)).not.toContain('signed-session-token')
+    expect(response.headers.get('x-luckread-session-token')).toBe('signed-session-token')
+    expect(response.headers.get('set-auth-token')).toBeNull()
+    expect(response.headers.get('set-cookie')).toContain('HttpOnly')
+    expect(response.headers.get('cache-control')).toBe('no-store')
   })
 
   it('does not expose direct Better Auth signup without the W01 registration seam', () => {
@@ -232,6 +300,38 @@ describe('W01 Better Auth boundary', () => {
         body: { email: 'user@example.com', password: 'correct-password', rememberMe: true },
       }),
     )
+  })
+
+
+  it('returns a bounded MFA challenge from login without inventing a session credential', async () => {
+    mocks.proxyBetterAuth.mockResolvedValue(new Response(JSON.stringify({
+      twoFactorRedirect: true,
+      twoFactorMethods: ['totp', 'backup-code'],
+    }), {
+      status: 200,
+      headers: {
+        'set-cookie': 'better-auth.two_factor=challenge; Path=/; HttpOnly; Secure; SameSite=Lax',
+        'cache-control': 'no-store',
+      },
+    }))
+
+    const response = await login(request('https://luckread.test/api/v1/auth/login', 'POST', {
+      identity: 'l8@example.com',
+      credential: 'correct-password',
+    }))
+    const data = await response.json() as {
+      data: { twoFactorRequired: boolean; twoFactorMethods: string[] }
+      requestId: string
+    }
+
+    expect(response.status).toBe(200)
+    expect(data.data).toEqual({ twoFactorRequired: true, twoFactorMethods: ['totp', 'backup-code'] })
+    expect(data.requestId).toBeTruthy()
+    expect(JSON.stringify(data)).not.toContain('challenge')
+    expect(response.headers.get('x-luckread-session-token')).toBeNull()
+    expect(response.headers.get('set-auth-token')).toBeNull()
+    expect(response.headers.get('set-cookie')).toContain('two_factor=challenge')
+    expect(response.headers.get('cache-control')).toBe('no-store')
   })
 
   it('accepts the Bearer plugin header as the canonical credential when JSON has no token field', async () => {
