@@ -25,6 +25,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
+      - name: Validate immutable source SHA before checkout
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          if ! [[ "$SOURCE_SHA" =~ ^[0-9a-fA-F]{40}$ ]]; then
+            echo "source_sha must be a full 40-character commit SHA"
+            exit 1
+          fi
       - name: Checkout exact implementation commit
         uses: actions/checkout@v4
         with:
@@ -70,35 +78,37 @@ jobs:
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        run: npx --yes wrangler@4.116.0 d1 migrations apply "${{ inputs.database_name }}" --remote --config wrangler.jsonc
+          DATABASE_NAME: ${{ inputs.database_name }}
+        run: npx --yes wrangler@4.116.0 d1 migrations apply "$DATABASE_NAME" --remote --config wrangler.jsonc
 
-      - name: Verify RoleAssignment persistence remotely
+      - name: Verify W02 identity/MFA/L8 persistence remotely
         working-directory: workers/W02-identity
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          DATABASE_NAME: ${{ inputs.database_name }}
         run: |
           mkdir -p ../../artifacts/mapping-0
-          npx --yes wrangler@4.116.0 d1 execute "${{ inputs.database_name }}" --remote --config wrangler.jsonc \
+          npx --yes wrangler@4.116.0 d1 execute "$DATABASE_NAME" --remote --config wrangler.jsonc \
             --command "SELECT type, name, sql FROM sqlite_master WHERE name = 'role_assignments' OR name LIKE 'role_assignments_%' OR name = 'role_authorization_versions' OR name LIKE 'role_authorization_versions_%' OR name IN ('twoFactor', 'l8_genesis_bootstrap_audit', 'user_mfa_enable_revoke_sessions', 'user_mfa_disable_clear_enrollment') OR name = 'user' ORDER BY type, name;" \
             > ../../artifacts/mapping-0/w02-role-assignment-remote-schema.txt
-          npx --yes wrangler@4.116.0 d1 execute "${{ inputs.database_name }}" --remote --config wrangler.jsonc \
+          npx --yes wrangler@4.116.0 d1 execute "$DATABASE_NAME" --remote --config wrangler.jsonc \
             --command "SELECT name FROM sqlite_master WHERE type='table' AND name='d1_migrations';" \
             > ../../artifacts/mapping-0/w02-role-assignment-remote-ledger-check.txt
-          npx --yes wrangler@4.116.0 d1 execute "${{ inputs.database_name }}" --remote --config wrangler.jsonc \
+          npx --yes wrangler@4.116.0 d1 execute "$DATABASE_NAME" --remote --config wrangler.jsonc \
             --command "SELECT * FROM d1_migrations ORDER BY id;" \
             > ../../artifacts/mapping-0/w02-role-assignment-remote-ledger.txt
-          npx --yes wrangler@4.116.0 d1 execute "${{ inputs.database_name }}" --remote --config wrangler.jsonc \
+          npx --yes wrangler@4.116.0 d1 execute "$DATABASE_NAME" --remote --config wrangler.jsonc \
             --command "SELECT name FROM d1_migrations WHERE name LIKE '%0006_better_auth_two_factor.sql' OR name LIKE '%0007_l8_genesis_bootstrap_audit.sql' ORDER BY name;" \
             > ../../artifacts/mapping-0/w02-mfa-l8-migration-ledger-check.txt
-          npx --yes wrangler@4.116.0 d1 execute "${{ inputs.database_name }}" --remote --config wrangler.jsonc \
+          npx --yes wrangler@4.116.0 d1 execute "$DATABASE_NAME" --remote --config wrangler.jsonc \
             --command "SELECT name FROM sqlite_master WHERE type = 'trigger' AND name IN ('user_mfa_enable_revoke_sessions', 'user_mfa_disable_clear_enrollment') ORDER BY name;" \
             > ../../artifacts/mapping-0/w02-mfa-lifecycle-trigger-readback.txt
-          npx --yes wrangler@4.116.0 d1 execute "${{ inputs.database_name }}" --remote --config wrangler.jsonc \
+          npx --yes wrangler@4.116.0 d1 execute "$DATABASE_NAME" --remote --config wrangler.jsonc \
             --command "SELECT COUNT(*) AS role_assignment_rows FROM role_assignments;" \
             > ../../artifacts/mapping-0/w02-role-assignment-remote-row-count.txt
 
-          npx --yes wrangler@4.116.0 d1 execute "${{ inputs.database_name }}" --remote --config wrangler.jsonc \
+          npx --yes wrangler@4.116.0 d1 execute "$DATABASE_NAME" --remote --config wrangler.jsonc \
             --command "SELECT COUNT(*) AS role_version_rows, MIN(role_version) AS min_role_version, MAX(role_version) AS max_role_version FROM role_authorization_versions;" \
             > ../../artifacts/mapping-0/w02-role-version-remote-row-count.txt
 
@@ -113,11 +123,14 @@ jobs:
           done
 
       - name: Write controlled provenance
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          DATABASE_NAME: ${{ inputs.database_name }}
         run: |
           cat > artifacts/mapping-0/w02-role-assignment-remote-provenance.txt <<'EOF'
           workflow=W02 Identity Security D1-01 Migration
-          source_sha=${{ inputs.source_sha }}
-          database_name=${{ inputs.database_name }}
+          source_sha=$SOURCE_SHA
+          database_name=$DATABASE_NAME
           binding=D1_01
           database_id=2f80471e-3756-49f9-8db1-7707a433ad64
           remote_mutation=true
