@@ -84,7 +84,7 @@ function githubFetcher(input: {
     name: 'l8-genesis-bootstrap',
     protection_rules: [{
       type: 'required_reviewers',
-      prevent_self_review: false,
+      prevent_self_review: true,
       reviewers: [{
         type: 'User',
         reviewer: { id: 190754094, login: 'wanghuinet' },
@@ -173,7 +173,7 @@ describe('W02 L8 target-bound single environment approval verifier', () => {
         name: 'l8-genesis-bootstrap',
         protection_rules: [{
           type: 'required_reviewers',
-          prevent_self_review: false,
+          prevent_self_review: true,
           reviewers: [{ type: 'User', reviewer: { id: 987654321, login: 'another-admin' } }],
         }],
         deployment_branch_policy: { protected_branches: true, custom_branch_policies: false },
@@ -193,7 +193,7 @@ describe('W02 L8 target-bound single environment approval verifier', () => {
         name: 'l8-genesis-bootstrap',
         protection_rules: [{
           type: 'required_reviewers',
-          prevent_self_review: false,
+          prevent_self_review: true,
           reviewers: [
             { type: 'User', reviewer: { id: 190754094, login: 'wanghuinet' } },
             { type: 'User', reviewer: { id: 987654321, login: 'another-user' } },
@@ -233,7 +233,7 @@ describe('W02 L8 target-bound single environment approval verifier', () => {
         name: 'l8-genesis-bootstrap',
         protection_rules: [{
           type: 'required_reviewers',
-          prevent_self_review: false,
+          prevent_self_review: true,
           reviewers: [{ type: 'User', reviewer: { id: 190754094, login: 'wanghuinet' } }],
         }],
         deployment_branch_policy: { protected_branches: false, custom_branch_policies: true },
