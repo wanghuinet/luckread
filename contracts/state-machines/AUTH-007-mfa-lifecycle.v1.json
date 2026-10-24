@@ -206,18 +206,6 @@
       "reason": "MFA cannot become effective without successful verification of the pending factor."
     },
     {
-      "domain": "factor",
-      "from": "PENDING_VERIFICATION",
-      "to": "ENABLED",
-      "reason": "client-supplied enabled, verified, layer or assurance flags cannot authorize the transition."
-    },
-    {
-      "domain": "factor",
-      "from": "ENABLED",
-      "to": "DISABLED",
-      "reason": "disable without both current-password and valid-TOTP step-up is forbidden."
-    },
-    {
       "domain": "signInChallenge",
       "from": "CONSUMED",
       "to": "CONSUMED",
@@ -234,6 +222,30 @@
       "from": "REJECTED",
       "to": "CONSUMED",
       "reason": "a rejected challenge cannot later be reused."
+    }
+  ],
+  "x-guarded-forbidden": [
+    {
+      "domain": "factor",
+      "from": "PENDING_VERIFICATION",
+      "to": "ENABLED",
+      "unless": [
+        "server-verified six-digit TOTP",
+        "atomic TOTP time-step replay guard accepted",
+        "same authenticated factor and ACTIVE identity read back"
+      ],
+      "reason": "The conditional transition is allowed only with the listed guards; client-supplied assurance flags never satisfy them."
+    },
+    {
+      "domain": "factor",
+      "from": "ENABLED",
+      "to": "DISABLED",
+      "unless": [
+        "current-password reauthentication",
+        "valid TOTP step-up",
+        "ACTIVE account state"
+      ],
+      "reason": "Disable is denied unless all step-up and account-state checks succeed."
     }
   ],
   "reconciliation": {
