@@ -11,6 +11,7 @@ const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), 'u
 const exists = (relativePath) => fs.existsSync(path.join(root, relativePath))
 const blockers = []
 const staticOnly = process.argv.includes('--static-only')
+const readOnlyConfigPreflight = process.argv.includes('--read-only-config-preflight')
 
 function requireSource(condition, message) {
   if (!condition) blockers.push(message)
@@ -32,7 +33,7 @@ async function githubGet(apiPath, token) {
   return response.json()
 }
 
-async function verifyProtectedEnvironment() {
+async function verifyProtectedEnvironment({ requireDistinctActor = true } = {}) {
   const token = process.env.GITHUB_TOKEN ?? ''
   const repo = process.env.GITHUB_REPOSITORY ?? ''
   const actor = (process.env.GITHUB_ACTOR ?? '').toLowerCase()
@@ -78,7 +79,7 @@ async function verifyProtectedEnvironment() {
     configuredReviewer?.type !== 'User' ||
     !reviewerLogin ||
     configuredReviewer?.reviewer?.id !== expectedReviewerId ||
-    reviewerLogin === actor
+    (requireDistinctActor && reviewerLogin === actor)
   ) {
     throw new Error('AUTH-007 rollout environment must disable admin bypass, require the designated human maintainer, forbid self-review, and allow protected branches only')
   }
@@ -127,6 +128,7 @@ for (const file of [
   betterAuthPath,
   replayGuardPath,
   policyPath,
+  '.github/workflows/auth-mfa-rollout-preflight.yml',
 ]) {
   requireSource(exists(file), 'Required reviewed rollout artifact is missing: ' + file)
 }
@@ -155,6 +157,7 @@ if (blockers.length === 0) {
   auth007Status = reconciliation.match(/^- Status:\s*`([^`]+)`/m)?.[1] ?? null
   implementationAuthorization = reconciliation.match(/^- Implementation authorization:\s*`([^`]+)`/m)?.[1] ?? null
   const standaloneW01Workflow = read('.github/workflows/w01-payload-app-deploy.yml')
+  const readOnlyPreflightWorkflow = read('.github/workflows/auth-mfa-rollout-preflight.yml')
 
   const requiredMigrationTokens = [
     'two_factor_enabled',
@@ -261,6 +264,13 @@ if (blockers.length === 0) {
       /verify-auth-007-rollout-admission\.mjs/.test(standaloneW01Workflow) &&
       standaloneW01Workflow.indexOf('verify-auth-007-rollout-admission.mjs') >= 0 &&
       standaloneW01Workflow.indexOf('verify-auth-007-rollout-admission.mjs') < standaloneW01Workflow.indexOf('run: pnpm run deploy:app'),
+    readOnlyEnvironmentPreflightCannotMutateProduction:
+      /workflow_dispatch:/.test(readOnlyPreflightWorkflow) &&
+      /github\.ref == 'refs\/heads\/main'/.test(readOnlyPreflightWorkflow) &&
+      /--read-only-config-preflight/.test(readOnlyPreflightWorkflow) &&
+      /GITHUB_TOKEN:\s*\$\{\{\s*github\.token\s*\}\}/.test(readOnlyPreflightWorkflow) &&
+      !/environment:\s*auth-mfa-rollout/.test(readOnlyPreflightWorkflow) &&
+      !/wrangler\s+d1\s+(?:migrations\s+apply|execute)|CLOUDFLARE_API_TOKEN|wrangler[^\n]*\bdeploy\b/i.test(readOnlyPreflightWorkflow),
   }
 
   for (const [check, passed] of Object.entries(sourceChecks)) {
@@ -274,15 +284,15 @@ if (blockers.length === 0) {
 let protectedEnvironment = null
 if (blockers.length === 0 && !staticOnly) {
   try {
-    protectedEnvironment = await verifyProtectedEnvironment()
+    protectedEnvironment = await verifyProtectedEnvironment({ requireDistinctActor: !readOnlyConfigPreflight })
   } catch (error) {
     blockers.push(error instanceof Error ? error.message : 'Protected rollout environment could not be verified')
   }
 }
 
 const report = {
-  status: blockers.length > 0 ? 'BLOCKED_NOT_GREEN' : staticOnly ? 'STATIC_ROLLOUT_SOURCE_READY' : 'ROLLOUT_ADMISSION_READY_NOT_FINAL_GREEN',
-  gateMode: staticOnly ? 'STATIC_ONLY_NO_PRODUCTION_AUTHORIZATION' : 'PROTECTED_MANUAL_ROLLOUT',
+  status: blockers.length > 0 ? 'BLOCKED_NOT_GREEN' : staticOnly ? 'STATIC_ROLLOUT_SOURCE_READY' : readOnlyConfigPreflight ? 'READ_ONLY_ENVIRONMENT_PREFLIGHT_COMPLETE' : 'ROLLOUT_ADMISSION_READY_NOT_FINAL_GREEN',
+  gateMode: staticOnly ? 'STATIC_ONLY_NO_PRODUCTION_AUTHORIZATION' : readOnlyConfigPreflight ? 'READ_ONLY_ENVIRONMENT_CONFIGURATION_PREFLIGHT' : 'PROTECTED_MANUAL_ROLLOUT',
   rolloutEnvironment: protectedEnvironment,
   sourceChecks,
   finalAuth007Status: auth007Status,
