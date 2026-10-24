@@ -51,16 +51,6 @@ class Statement {
   }
 
   async run(): Promise<{ meta: { changes: number } }> {
-    if (this.sql.includes('INSERT INTO role_authorization_versions')) {
-      const [subjectId, updatedAt] = this.values
-      const key = String(subjectId)
-      const current = this.db.roleVersions.get(key)
-      this.db.roleVersions.set(key, {
-        roleVersion: current ? current.roleVersion + 1 : 1,
-        updatedAt: String(updatedAt),
-      })
-      return { meta: { changes: 1 } }
-    }
     if (this.sql.includes('INSERT INTO l8_genesis_bootstrap_audit')) {
       if (this.db.audit) throw new Error('bootstrap singleton consumed')
       const [bootstrapKey, operation, requestPrNumber, requestHeadSha, requestMergeSha, targetUserId,
@@ -86,6 +76,13 @@ class Statement {
       this.db.assignments.push({
         id: String(id), subjectId: String(subjectId), roleId: 'super_admin', scopeType: 'global',
         scopeId: null, status: 'ACTIVE', validFrom: String(validFrom), validUntil: String(validUntil),
+      })
+      // Simulate the installed role_authorization_versions_on_role_assignment_insert trigger.
+      const key = String(subjectId)
+      const current = this.db.roleVersions.get(key)
+      this.db.roleVersions.set(key, {
+        roleVersion: current ? current.roleVersion + 1 : 1,
+        updatedAt: 'CURRENT_TIMESTAMP',
       })
     }
     return { meta: { changes: 1 } }
@@ -156,7 +153,7 @@ describe('W02 one-time L8 genesis grant command', () => {
       id: result.assignmentId, subjectId: 'existing-user-123', roleId: 'super_admin',
       scopeType: 'global', scopeId: null, validUntil: result.validUntil,
     }))
-    expect(db.roleVersions.get('existing-user-123')).toEqual({ roleVersion: 1, updatedAt: NOW })
+    expect(db.roleVersions.get('existing-user-123')?.roleVersion).toBe(1)
     expect(result.roleVersion).toBe(1)
     expect(db.audit).toMatchObject({
       requestPrNumber: 77,
