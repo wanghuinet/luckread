@@ -150,9 +150,7 @@
     "implementedInW02Source": [
       "auth.mfa.enrollment_started",
       "auth.mfa.enrollment_verified",
-      "auth.mfa.enrollment_failed"
-    ],
-    "notYetEmittedByW02": [
+      "auth.mfa.enrollment_failed",
       "auth.mfa.challenge_succeeded",
       "auth.mfa.challenge_failed",
       "auth.mfa.factor_disabled",
@@ -161,7 +159,8 @@
       "auth.mfa.locked",
       "auth.mfa.replay_rejected"
     ],
+    "notYetEmittedByW02": [],
     "consumerSupportsAllRegisteredEvents": true,
-    "note": "W06's typed consumer accepts all registered event names, but names without a W02 producer must not be counted as runtime-covered."
+    "note": "All ten canonical event types now have source-level W02 producers: enrollment handlers emit the three enrollment events; Better Auth's before/after hooks emit challenge, factor, recovery-code, lockout and TOTP replay events. This records source coverage only. Production delivery, migration read-back and same-SHA runtime security evidence remain required."
   }
 }
