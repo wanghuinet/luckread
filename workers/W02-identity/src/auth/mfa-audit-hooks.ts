@@ -1,9 +1,9 @@
-export const MFA_AUDIT_HOOK_CONTEXT_KEY = '__luckreadAuth007MfaAuditState'
-
 export type MfaAuditHookState = {
   userId: string
   isChallenge: boolean
 }
+
+const mfaAuditStateByContext = new WeakMap<object, MfaAuditHookState>()
 
 export type MfaAuditHookEvent = {
   eventType:
@@ -22,19 +22,14 @@ const subjectPattern = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/
 
 export function setMfaAuditHookState(context: object, state: MfaAuditHookState): void {
   if (!subjectPattern.test(state.userId)) throw new TypeError('invalid MFA audit subject')
-  ;(context as Record<string, unknown>)[MFA_AUDIT_HOOK_CONTEXT_KEY] = {
+  mfaAuditStateByContext.set(context, {
     userId: state.userId,
     isChallenge: state.isChallenge,
-  } satisfies MfaAuditHookState
+  })
 }
 
 export function getMfaAuditHookState(context: object): MfaAuditHookState | null {
-  const value = (context as Record<string, unknown>)[MFA_AUDIT_HOOK_CONTEXT_KEY]
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
-  const candidate = value as Record<string, unknown>
-  if (typeof candidate.userId !== 'string' || !subjectPattern.test(candidate.userId) ||
-      typeof candidate.isChallenge !== 'boolean') return null
-  return { userId: candidate.userId, isChallenge: candidate.isChallenge }
+  return mfaAuditStateByContext.get(context) ?? null
 }
 
 /**
