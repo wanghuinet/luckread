@@ -213,9 +213,21 @@ export async function resolveGlobalLayer(
     // intentionally omitted until TOTP enrollment has been verified.
     // The enrollment hook revokes pre-MFA sessions, forcing a fresh 2FA sign-in.
     const userMfa = await db.prepare(
-      'SELECT two_factor_enabled AS twoFactorEnabled FROM "user" WHERE id = ? LIMIT 1',
-    ).bind(subjectId).first<{ twoFactorEnabled: number | boolean }>()
-    mfaEnabled = userMfa?.twoFactorEnabled === true || userMfa?.twoFactorEnabled === 1
+      'SELECT u.two_factor_enabled AS twoFactorEnabled, u.mfa_enrolled_at AS mfaEnrolledAt, ' +
+      'tf.verified AS totpVerified FROM "user" u ' +
+      'LEFT JOIN "twoFactor" tf ON tf.userId = u.id WHERE u.id = ? LIMIT 1',
+    ).bind(subjectId).first<{
+      twoFactorEnabled: number | boolean
+      mfaEnrolledAt: string | null
+      totpVerified: number | boolean | null
+    }>()
+    const enrollmentTimestamp = Date.parse(userMfa?.mfaEnrolledAt ?? '')
+    const totpVerified = userMfa?.totpVerified === true || userMfa?.totpVerified === 1
+    mfaEnabled =
+      (userMfa?.twoFactorEnabled === true || userMfa?.twoFactorEnabled === 1) &&
+      totpVerified &&
+      Number.isFinite(enrollmentTimestamp) &&
+      enrollmentTimestamp <= Date.parse(now)
   }
 
   for (const assignment of result.results) {
