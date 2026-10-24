@@ -135,9 +135,9 @@ const buildLuckReadAuth = (env: BetterAuthEnv) => {
             ).bind(userId).first<{ id: string }>()
             if (!pendingMfaEnrollment) return
 
-            // A TOTP-enabled principal must not keep sessions issued before
-            // enrollment. Mark the verified enrollment, then revoke every
-            // older session; subsequent sign-in must complete the 2FA challenge.
+            // The reviewed D1 lifecycle triggers are authoritative and revoke
+            // sessions on every enable/disable transition. This hook is a fallback
+            // for a legacy or partially migrated row with a missing enrollment time.
             const enrolledAt = new Date().toISOString()
             await env.D1_01.batch([
               env.D1_01.prepare(
