@@ -24,9 +24,10 @@ jobs:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    # Configure this GitHub Environment with exactly one required reviewer:
-    # the sole current repo admin/maintainer. The W02 verifier also reads back
-    # and checks the environment rules before accepting the OIDC token.
+    # Configure this GitHub Environment with one required reviewer: the sole
+    # current repo admin/maintainer, and set prevent_self_review=true. Dispatch
+    # must be initiated by a separate authorized collaborator; otherwise remain
+    # blocked. W02 reads back and verifies the environment rules.
     environment: l8-genesis-bootstrap
     steps:
       - name: Checkout protected main revision
