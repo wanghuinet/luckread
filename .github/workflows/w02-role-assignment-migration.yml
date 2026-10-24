@@ -86,6 +86,9 @@ jobs:
           console.log('W02 MFA/L8 migration artifacts: PASS')
           NODE
 
+      - name: Enforce AUTH-007 before applying MFA/L8 schema
+        run: node scripts/verify-auth-007-deployment-gate.mjs
+
       - name: Apply D1-01 migration remotely
         working-directory: workers/W02-identity
         env:
