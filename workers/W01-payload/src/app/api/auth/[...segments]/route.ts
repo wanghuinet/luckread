@@ -149,6 +149,32 @@ const handler = async (
       }),
     )
 
+    if (
+      request.method === 'POST' &&
+      upstream.ok &&
+      (endpoint === 'two-factor/verify-totp' || endpoint === 'two-factor/verify-backup-code')
+    ) {
+      // Better Auth's verify endpoints include the raw session token in JSON.
+      // W01 owns the public auth DTO: promote the Bearer plugin's signed
+      // session credential to the LuckRead header and never echo the raw token.
+      const sessionToken = upstream.headers.get('set-auth-token')?.trim() ?? ''
+      if (!sessionToken) {
+        return errorResponse(502, 'AUTH_UPSTREAM_RESPONSE_INVALID', 'Authentication service returned an invalid MFA session')
+      }
+      const responseHeaders = new Headers(upstream.headers)
+      responseHeaders.delete('set-auth-token')
+      responseHeaders.delete('content-length')
+      responseHeaders.delete('content-encoding')
+      responseHeaders.delete('transfer-encoding')
+      responseHeaders.set('content-type', 'application/json; charset=utf-8')
+      responseHeaders.set('cache-control', 'no-store')
+      responseHeaders.set('X-LuckRead-Session-Token', sessionToken)
+      return new Response(JSON.stringify({
+        data: { verified: true },
+        requestId: `req_${crypto.randomUUID().replaceAll('-', '')}`,
+      }), { status: upstream.status, headers: responseHeaders })
+    }
+
     const responseHeaders = new Headers(upstream.headers)
     responseHeaders.set('cache-control', 'no-store')
 
