@@ -48,12 +48,12 @@ export async function requireMfaForPrivilegedAction(
 }
 
 /**
- * The initial L8 setup screen is intentionally restricted to an account that
- * already has the canonical global super_admin assignment. A regular account
- * cannot opt into the app-wide two-factor login challenge and unexpectedly
- * lose compatibility with clients that do not yet implement MFA challenges.
+ * TOTP enrollment is restricted to an account with an effective global L5-L8
+ * assignment. This prevents ordinary accounts from unexpectedly enabling a
+ * login challenge before all client contracts are admitted, while allowing
+ * the first L8 account to enroll even though the MFA gate downgrades its layer.
  */
-export async function isSuperAdminMfaEnrollmentEligible(
+export async function isPrivilegedMfaEnrollmentEligible(
   db: D1Database,
   subjectId: string,
   now = new Date().toISOString(),
@@ -65,11 +65,18 @@ export async function isSuperAdminMfaEnrollmentEligible(
     !Number.isFinite(Date.parse(now))
   ) return false
 
+  const privilegedRoleIds = layers['x-layers']
+    .filter((layer) => Number(layer.id.slice(1)) >= 5)
+    .flatMap((layer) => layer.roles ?? [])
+  if (privilegedRoleIds.length === 0) return false
+
+  const placeholders = privilegedRoleIds.map(() => '?').join(', ')
   const assignment = await db.prepare(
-    "SELECT id FROM role_assignments WHERE subject_id = ? AND role_id = 'super_admin' " +
+    'SELECT id FROM role_assignments WHERE subject_id = ? ' +
+    `AND role_id IN (${placeholders}) ` +
     "AND scope_type = 'global' AND scope_id IS NULL AND status = 'ACTIVE' " +
-    "AND valid_from <= ? AND (valid_until IS NULL OR ? < valid_until) LIMIT 1",
-  ).bind(subjectId, now, now).first<{ id: string }>()
+    'AND valid_from <= ? AND (valid_until IS NULL OR ? < valid_until) LIMIT 1',
+  ).bind(subjectId, ...privilegedRoleIds, now, now).first<{ id: string }>()
 
   return !!assignment
 }
