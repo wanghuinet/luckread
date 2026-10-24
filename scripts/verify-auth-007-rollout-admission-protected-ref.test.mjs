@@ -37,6 +37,7 @@ describe('AUTH-007 protected-ref admission contract', () => {
   it('includes every rollout call site in the verifier source checks', () => {
     for (const path of workflowPaths) assert.ok(verifier.includes(path), path + ' is not registered')
     assert.match(verifier, /allRolloutWorkflowCallSitesRequireProtectedMain:\s*protectedRefCallSitesConfigured/)
+    assert.match(verifier, /allMutationWorkflowJobsRequireProtectedMain:\s*protectedMutationWorkflowJobsConfigured/)
   })
 
   it('blocks every production deployment/migration job before Environment approval on an unprotected ref', () => {
