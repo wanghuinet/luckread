@@ -75,8 +75,10 @@ export async function ensureBaseUserRole(
   }
 }
 const roleToLayer = new Map<string, string>()
+const mfaRequiredByLayer = new Map<string, boolean>()
 for (const layer of layers['x-layers']) {
   for (const role of layer.roles ?? []) roleToLayer.set(role, layer.id)
+  mfaRequiredByLayer.set(layer.id, layer.mfa === true)
 }
 
 
@@ -195,6 +197,20 @@ export async function resolveGlobalLayer(
   const result = await db.prepare(sql).bind(subjectId, 'ACTIVE', now, now).all<RoleAssignmentRecord>()
   const eligible: Array<{ assignment: RoleAssignmentRecord; layer: string }> = []
   const resolvedAssignments: ResolvedRoleAssignment[] = []
+  const hasMfaProtectedAssignment = result.results.some((assignment) => {
+    const layer = roleToLayer.get(assignment.roleId)
+    return !!layer && mfaRequiredByLayer.get(layer) === true
+  })
+  let mfaEnabled = false
+  if (hasMfaProtectedAssignment) {
+    // Better Auth is the MFA state authority. Elevated RoleAssignments are
+    // intentionally omitted until TOTP enrollment has been verified.
+    // The enrollment hook revokes pre-MFA sessions, forcing a fresh 2FA sign-in.
+    const userMfa = await db.prepare(
+      'SELECT two_factor_enabled AS twoFactorEnabled FROM "user" WHERE id = ? LIMIT 1',
+    ).bind(subjectId).first<{ twoFactorEnabled: number | boolean }>()
+    mfaEnabled = userMfa?.twoFactorEnabled === true || userMfa?.twoFactorEnabled === 1
+  }
 
   for (const assignment of result.results) {
     const layer = roleToLayer.get(assignment.roleId)
@@ -205,6 +221,12 @@ export async function resolveGlobalLayer(
         (typeof assignment.scopeId !== 'string' || assignment.scopeId.length === 0)) ||
       !['global', 'organization', 'ip'].includes(assignment.scopeType)
     )) return { decision: 'DENY' }
+    if (!layer) return { decision: 'DENY' }
+    if (mfaRequiredByLayer.get(layer) === true && !mfaEnabled) {
+      // Don't expose the elevated role at all, since downstream workers may
+      // consume roleAssignments independently of the selected layer.
+      continue
+    }
     if (includeRoleAssignments) {
       resolvedAssignments.push({
         id: assignment.id,
@@ -214,7 +236,6 @@ export async function resolveGlobalLayer(
       })
     }
     if (assignment.scopeType !== 'global') continue
-    if (!layer) return { decision: 'DENY' }
     eligible.push({ assignment, layer })
   }
 
