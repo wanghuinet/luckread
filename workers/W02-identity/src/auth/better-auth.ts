@@ -99,14 +99,18 @@ const buildLuckReadAuth = (env: BetterAuthEnv) => {
         // MFA challenge does not, so resolve that subject only from Better
         // Auth's signed, time-bounded, server-stored challenge.
         let subjectId: string | null = null
-        try {
-          const session = await createLuckReadAuth(env).api.getSession({
-            headers: ctx.request.headers,
-            query: {},
-          }) as { user?: { id?: unknown } } | null
-          if (typeof session?.user?.id === 'string') subjectId = session.user.id
-        } catch {
-          // Continue to the signed challenge lookup; do not trust client IDs.
+        let sessionLookupFailed = false
+        const requestHeaders = ctx.request?.headers ?? ctx.headers
+        if (requestHeaders) {
+          try {
+            const session = await createLuckReadAuth(env).api.getSession({
+              headers: requestHeaders,
+              query: {},
+            }) as { user?: { id?: unknown } } | null
+            if (typeof session?.user?.id === 'string') subjectId = session.user.id
+          } catch {
+            sessionLookupFailed = true
+          }
         }
 
         if (!subjectId) {
@@ -125,6 +129,14 @@ const buildLuckReadAuth = (env: BetterAuthEnv) => {
               subjectId = challenge.value
             }
           }
+        }
+        if (!subjectId && sessionLookupFailed) {
+          // Do not silently skip replay protection when the authenticated
+          // subject could not be resolved because an authority read failed.
+          throw APIError.from('INTERNAL_SERVER_ERROR', {
+            code: 'TOTP_REPLAY_GUARD_UNAVAILABLE',
+            message: 'TOTP verification is temporarily unavailable',
+          })
         }
         if (!subjectId) return
 
