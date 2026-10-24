@@ -1,6 +1,7 @@
 import { buildAccountStateChangedAuditEvent, type AccountStateChangedAuditInput } from './audit-event'
 import { persistAuditEvent } from './audit-event-persistence'
 import { consumeAccountStateChanged } from './auth-013-queue-consumer'
+import { consumeMfaAuditEvent } from './mfa-audit-queue-consumer'
 import {
   ModerationRuntimeError,
   decideModerationCase,
@@ -407,13 +408,23 @@ export default {
   async queue(batch: MessageBatch<unknown>, env: Env): Promise<void> {
     for (const message of batch.messages) {
       try {
-        await consumeAccountStateChanged(env.D1_03, message.body)
+        const body = message.body && typeof message.body === 'object'
+          ? message.body as Record<string, unknown>
+          : null
+        if (typeof body?.eventType === 'string' && body.eventType.startsWith('auth.mfa.')) {
+          await consumeMfaAuditEvent(env.D1_03, message.body)
+        } else {
+          await consumeAccountStateChanged(env.D1_03, message.body)
+        }
         message.ack()
       } catch (error) {
-        if (error instanceof Error && error.message === 'INVALID_AUTH_013_EVENT') {
+        if (error instanceof Error &&
+            (error.message === 'INVALID_AUTH_013_EVENT' || error.message === 'INVALID_AUTH_007_MFA_EVENT')) {
           message.retry({ delaySeconds: 0 })
           continue
         }
+        // Persistence errors and transient D1 failures use the queue's normal
+        // retry policy; duplicate logical events are acked by their consumer.
         message.retry()
       }
     }
