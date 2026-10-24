@@ -12,6 +12,13 @@ const exists = (relativePath) => fs.existsSync(path.join(root, relativePath))
 const blockers = []
 const staticOnly = process.argv.includes('--static-only')
 const readOnlyConfigPreflight = process.argv.includes('--read-only-config-preflight')
+const protectedRefWorkflowPaths = [
+  '.github/workflows/auth-mfa-rollout-preflight.yml',
+  '.github/workflows/w02-deploy.yml',
+  '.github/workflows/w01-payload-app-deploy.yml',
+  '.github/workflows/w01-w02-binding-deploy.yml',
+  '.github/workflows/w02-role-assignment-migration.yml',
+]
 
 function requireSource(condition, message) {
   if (!condition) blockers.push(message)
@@ -39,6 +46,7 @@ async function verifyProtectedEnvironment({ requireDistinctActor = true } = {}) 
   const actor = (process.env.GITHUB_ACTOR ?? '').toLowerCase()
   const ref = process.env.GITHUB_REF ?? ''
   const eventName = process.env.GITHUB_EVENT_NAME ?? ''
+  const refProtected = process.env.GITHUB_REF_PROTECTED ?? ''
   const configuredEnvironment = process.env.AUTH007_ROLLOUT_ENVIRONMENT ?? ''
   const sourceSha = process.env.SOURCE_SHA ?? ''
   const currentSha = spawnSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' })
@@ -53,13 +61,14 @@ async function verifyProtectedEnvironment({ requireDistinctActor = true } = {}) 
     !actor ||
     ref !== 'refs/heads/main' ||
     eventName !== 'workflow_dispatch' ||
+    refProtected !== 'true' ||
     configuredEnvironment !== environmentName ||
     !sourceExists ||
     !sourceIsMainAncestor ||
     currentSha.status !== 0 ||
     currentSha.stdout.trim().toLowerCase() !== sourceSha.toLowerCase()
   ) {
-    throw new Error('Rollout must use an immutable source SHA already committed to protected main and be explicitly dispatched there')
+    throw new Error('Rollout must use an immutable source SHA already committed to protected main, explicitly dispatched there, with GitHub confirming the ref is protected')
   }
 
   const environment = await githubGet('/repos/' + repository + '/environments/' + environmentName, token)
@@ -100,6 +109,7 @@ async function verifyProtectedEnvironment({ requireDistinctActor = true } = {}) 
 
   return {
     environment: environmentName,
+    protectedRef: true,
     reviewer: reviewerLogin,
     reviewerRole: permissionValue === 'admin' || roleName === 'admin' ? 'admin' : roleName,
     selfReviewPrevented: true,
@@ -137,6 +147,7 @@ for (const file of [
   replayGuardPath,
   policyPath,
   '.github/workflows/auth-mfa-rollout-preflight.yml',
+  ...protectedRefWorkflowPaths.filter((file) => file !== '.github/workflows/auth-mfa-rollout-preflight.yml'),
 ]) {
   requireSource(exists(file), 'Required reviewed rollout artifact is missing: ' + file)
 }
@@ -170,6 +181,9 @@ if (blockers.length === 0) {
   implementationAuthorization = reconciliation.match(/^- Implementation authorization:\s*`([^`]+)`/m)?.[1] ?? null
   const standaloneW01Workflow = read('.github/workflows/w01-payload-app-deploy.yml')
   const readOnlyPreflightWorkflow = read('.github/workflows/auth-mfa-rollout-preflight.yml')
+  const protectedRefCallSitesConfigured = protectedRefWorkflowPaths.every((file) =>
+    /GITHUB_REF_PROTECTED:\\s*\\$\\{\\{\\s*github\\.ref_protected\\s*\\}\\}/.test(read(file))
+  )
 
   const requiredMigrationTokens = [
     'two_factor_enabled',
@@ -338,6 +352,7 @@ if (blockers.length === 0) {
       /verify-auth-007-rollout-admission\.mjs/.test(standaloneW01Workflow) &&
       standaloneW01Workflow.indexOf('verify-auth-007-rollout-admission.mjs') >= 0 &&
       standaloneW01Workflow.indexOf('verify-auth-007-rollout-admission.mjs') < standaloneW01Workflow.indexOf('run: pnpm run deploy:app'),
+    allRolloutWorkflowCallSitesRequireProtectedMain: protectedRefCallSitesConfigured,
     readOnlyEnvironmentPreflightCannotMutateProduction:
       /workflow_dispatch:/.test(readOnlyPreflightWorkflow) &&
       /github\.ref == 'refs\/heads\/main'/.test(readOnlyPreflightWorkflow) &&
