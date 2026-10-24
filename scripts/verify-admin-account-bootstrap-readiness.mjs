@@ -107,6 +107,17 @@ if (!hasVerifiedMfaBeforeGenesisGrant) {
   blockers.push('The L8 bootstrap readiness and write paths must both require pre-enrolled, verified MFA and have negative tests.')
 }
 
+const replayGuardSource = read('workers/W02-identity/src/auth/totp-replay-guard.ts')
+const hasTotpReplayProtection =
+  /lastAcceptedTotpTimeStep/.test(read('workers/W02-identity/migrations/0006_better_auth_two_factor.sql')) &&
+  /two-factor\/verify-totp/.test(read('workers/W02-identity/src/auth/better-auth.ts')) &&
+  /consumeTotpTimeStep/.test(read('workers/W02-identity/src/auth/better-auth.ts')) &&
+  /UPDATE "twoFactor" SET lastAcceptedTotpTimeStep/.test(replayGuardSource) &&
+  /atomically consumes a step once and rejects replay/.test(w02TestCode)
+if (!hasTotpReplayProtection) {
+  blockers.push('AUTH-007 requires a persisted atomic TOTP time-step replay guard, wired to Better Auth verification and covered by tests.')
+}
+
 const hasReadOnlyProductionPreflight =
   /\/internal\/authz\/bootstrap-super-admin\/readiness/.test(w02Index) &&
   /\/api\/v1\/admin\/bootstrap\/super-admin\/readiness/.test(read('workers/W01-payload/src/app/api/v1/admin/bootstrap/super-admin/readiness/route.ts')) &&
@@ -124,6 +135,7 @@ const report = {
     dedicatedW02L8Bootstrap: hasDedicatedW02L8Bootstrap,
     mfaCodeAndTestEvidence: hasMfaEnforcement && !/Status:\s*`BLOCKED_NOT_GREEN`/.test(reconciliation),
     recoveryCodesEncryptedAtRest: hasEncryptedRecoveryCodes,
+    totpReplayProtection: hasTotpReplayProtection,
     w02BootstrapApprovalCodeAndTestEvidence: hasTargetBoundSingleApproval,
     noSelfApprovalPolicy: hasNoSelfApprovalPolicy,
     targetMfaRequiredBeforeGrant: hasVerifiedMfaBeforeGenesisGrant,
