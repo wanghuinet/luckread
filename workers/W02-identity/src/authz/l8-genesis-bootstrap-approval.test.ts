@@ -49,6 +49,7 @@ function githubFetcher(input: {
   jwk: JsonWebKey
   reviews?: Array<Record<string, unknown>>
   permissions?: Record<string, string>
+  files?: Array<Record<string, unknown>>
 }) {
   const nowMs = input.now.getTime()
   const headSha = 'a'.repeat(40)
@@ -88,7 +89,7 @@ function githubFetcher(input: {
     }
     if (url.pathname === '/repos/wanghuinet/luckread/pulls/77') return Response.json(pull)
     if (url.pathname === '/repos/wanghuinet/luckread/pulls/77/files') {
-      return Response.json([{ filename: 'docs/change-control/l8-genesis-bootstrap-request.json' }])
+      return Response.json(input.files ?? [{ filename: 'docs/change-control/l8-genesis-bootstrap-request.json' }])
     }
     if (url.pathname === '/repos/wanghuinet/luckread/contents/docs/change-control/l8-genesis-bootstrap-request.json') {
       return Response.json({ encoding: 'base64', content: btoa(JSON.stringify(request)) })
@@ -128,6 +129,26 @@ describe('W02 L8 target-bound dual-approval verifier', () => {
       approvedReviewers: ['maintainer-a', 'maintainer-b'],
       workflowRunId: '12345678',
     })
+  })
+
+  it('rejects request PRs that bundle unrelated code changes with the bootstrap request', async () => {
+    const now = new Date('2026-10-24T12:00:00.000Z')
+    const signed = await issueTestOidcToken(now)
+    const github = githubFetcher({
+      now,
+      jwk: signed.jwk,
+      files: [
+        { filename: 'docs/change-control/l8-genesis-bootstrap-request.json' },
+        { filename: 'workers/W02-identity/src/index.ts' },
+      ],
+    })
+    await expect(verifyTargetBoundDualApproval({
+      oidcToken: signed.token,
+      githubToken: 'ghs_' + 'x'.repeat(40),
+      requestPrNumber: 77,
+      now,
+      fetcher: github.fetcher,
+    })).rejects.toMatchObject({ code: 'REQUEST_PR_SCOPE_INVALID' })
   })
 
   it('rejects duplicate or missing second maintainer approval', async () => {
