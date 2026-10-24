@@ -259,7 +259,7 @@ export async function verifyTargetBoundSingleApproval(input: {
     environment.deployment_branch_policy?.custom_branch_policies !== false ||
     configuredReviewer?.type !== 'User' ||
     !configuredReviewerLogin ||
-    typeof configuredReviewer?.reviewer?.id !== 'number' ||
+    configuredReviewer?.reviewer?.id !== 190754094 ||
     !Number.isSafeInteger(configuredReviewer?.reviewer?.id)
   ) {
     throw new L8BootstrapApprovalError(
