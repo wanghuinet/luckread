@@ -353,8 +353,8 @@ async function checkEvents() {
         (coverage.notYetEmittedByW02 ?? []).length !== 0) {
       fail('events/AUTH-007-mfa-audit-binding.v1.json: all ten canonical event producers must be source-implemented and none may be reported as missing')
     }
-    const mfaProducerSource = read('workers/W02-identity/src/auth/better-auth.ts')
-    const mfaHookSource = read('workers/W02-identity/src/auth/mfa-audit-hooks.ts')
+    const mfaProducerSource = await readFile('workers/W02-identity/src/auth/better-auth.ts', 'utf8')
+    const mfaHookSource = await readFile('workers/W02-identity/src/auth/mfa-audit-hooks.ts', 'utf8')
     const requiredHookTokens = [
       "'/two-factor/verify-totp'",
       "'/two-factor/verify-backup-code'",
