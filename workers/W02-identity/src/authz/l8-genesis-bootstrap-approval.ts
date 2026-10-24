@@ -254,7 +254,7 @@ export async function verifyTargetBoundSingleApproval(input: {
     environment.name !== 'l8-genesis-bootstrap' ||
     requiredReviewerRules.length !== 1 ||
     environmentReviewers.length !== 1 ||
-    requiredReviewerRules[0]?.prevent_self_review !== false ||
+    requiredReviewerRules[0]?.prevent_self_review !== true ||
     environment.deployment_branch_policy?.protected_branches !== true ||
     environment.deployment_branch_policy?.custom_branch_policies !== false ||
     configuredReviewer?.type !== 'User' ||
