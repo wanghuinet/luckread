@@ -1040,9 +1040,7 @@
           "ip.content.read",
           "ip.create",
           "ip.member.invite",
-          "ip.member.remove",
-          "user.mfa.manage",
-          "user.mfa.read"
+          "ip.member.remove"
         ],
         "scopeType": "ip"
       },
@@ -1053,18 +1051,14 @@
           "org.member.manage.scope",
           "organization.member.manage",
           "organization.member.read",
-          "organization.role.manage",
-          "user.mfa.manage",
-          "user.mfa.read"
+          "organization.role.manage"
         ],
         "scopeType": "organization"
       },
       {
         "role": "mcn_editor",
         "permissions": [
-          "organization.member.read",
-          "user.mfa.manage",
-          "user.mfa.read"
+          "organization.member.read"
         ],
         "scopeType": "organization"
       },
