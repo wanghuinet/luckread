@@ -263,6 +263,15 @@ const buildLuckReadAuth = (env: BetterAuthEnv) => {
       // enrollment when sendOTP is absent. Elevated authorization additionally
       // requires a persisted, TOTP-verified row in the twoFactor table.
       totpOptions: { allowPasswordless: false },
+      // Plugin-contributed fields need the plugin schema mapping; the root
+      // user.fields map alone does not rename twoFactorEnabled for this plugin.
+      schema: {
+        user: {
+          fields: {
+            twoFactorEnabled: 'two_factor_enabled',
+          },
+        },
+      },
     })],
     advanced: {
       // H5/PC and the canonical API hostname must share the same W02 session.
