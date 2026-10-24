@@ -82,6 +82,12 @@ for (const layer of layers['x-layers']) {
 }
 
 
+export function requireMfaForPrivilegedAction(layer: string, mfaEnabled: boolean): boolean {
+  const mfaRequired = mfaRequiredByLayer.get(layer)
+  if (mfaRequired === undefined) return false
+  return mfaRequired ? mfaEnabled : true
+}
+
 /**
  * Materialize the L2 verification role only after W02 has committed both
  * ACTIVE account state and Better Auth's authoritative email_verified flag.
@@ -222,7 +228,7 @@ export async function resolveGlobalLayer(
       !['global', 'organization', 'ip'].includes(assignment.scopeType)
     )) return { decision: 'DENY' }
     if (!layer) return { decision: 'DENY' }
-    if (mfaRequiredByLayer.get(layer) === true && !mfaEnabled) {
+    if (!requireMfaForPrivilegedAction(layer, mfaEnabled)) {
       // Don't expose the elevated role at all, since downstream workers may
       // consume roleAssignments independently of the selected layer.
       continue
