@@ -132,8 +132,8 @@ const approval = (overrides: Partial<VerifiedL8BootstrapApproval> = {}): Verifie
   requestPrNumber: 77,
   requestHeadSha: 'a'.repeat(40),
   requestMergeSha: 'b'.repeat(40),
-  approvedReviewers: ['maintainer-a', 'maintainer-b'],
-  reviewerPermissions: { 'maintainer-a': 'maintain', 'maintainer-b': 'write' },
+  approvedReviewers: ['wanghuinet'],
+  reviewerPermissions: { 'wanghuinet': 'admin' },
   workflowRunId: '12345678',
   ...overrides,
 })
@@ -215,7 +215,7 @@ describe('W02 one-time L8 genesis grant command', () => {
       .rejects.toMatchObject({ code: 'L8_ALREADY_EXISTS' })
   })
 
-  it('rejects expired approvals and malformed two-person evidence', async () => {
+  it('rejects expired approvals and malformed single-approver evidence', async () => {
     const db = new FakeD1()
     await expect(bootstrapSuperAdmin(db as unknown as D1Database, approval({
       request: { ...approval().request, expiresAt: '2026-10-24T11:59:59.000Z' },
