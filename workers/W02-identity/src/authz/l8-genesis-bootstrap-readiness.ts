@@ -49,7 +49,8 @@ export async function checkL8BootstrapReadiness(
     !/^[a-f0-9]{40}$/i.test(approval.requestHeadSha) ||
     !/^[a-f0-9]{40}$/i.test(approval.requestMergeSha) ||
     !Array.isArray(approval.approvedReviewers) ||
-    new Set(approval.approvedReviewers.map((name) => name.toLowerCase())).size < 2
+    approval.approvedReviewers.length !== 1 ||
+    new Set(approval.approvedReviewers.map((name) => name.toLowerCase())).size !== 1
   ) {
     throw new L8BootstrapReadinessError('REQUEST_EXPIRED_OR_INVALID', 'approved bootstrap request is invalid or expired')
   }
