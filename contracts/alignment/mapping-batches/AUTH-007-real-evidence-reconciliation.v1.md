@@ -32,12 +32,12 @@
 - MFA challenge DTO: missing.
 - MFA verification DTO: missing.
 - MFA enrollment/recovery result DTOs: missing.
-- MFA factor entity ID: missing.
-- Factor field contract: missing.
+- MFA factor entity ID: proposed as `ENT-MFA-FACTOR` in `contracts/entity/entity-catalog.v1.json`; the catalog status remains `PROPOSED` and is not promoted to canonical.
+- Factor field contract: `contracts/entity/AUTH-007-mfa-factor-field-contract.v1.json` has been added with status `CONTRACTED_NOT_VERIFIED`; the global entity field catalog remains `NOT_GREEN` and schema/read-back evidence is missing.
 - Factor status/lifecycle contract: missing.
-- Secret/protected-factor storage contract: missing.
-- Challenge lifecycle contract: missing.
-- Replay/attempt-counter persistence mapping: missing.
+- Secret/protected-factor storage contract: the proposed field contract now requires encrypted TOTP secret and recovery-code storage with no secret exposure; independent implementation and at-rest evidence remain missing.
+- Challenge lifecycle contract: missing; the standard plugin challenge behavior has not yet been reconciled to the canonical API, DTO and state-machine contract.
+- Replay/attempt-counter persistence mapping: partial only. Failed-attempt/lockout fields exist in migration source, but durable atomic `lastAcceptedTotpTimeStep` is absent from migration 0006 and runtime; duplicate successful TOTP time-step rejection remains a blocker.
 - Recovery-code contract: missing.
 - Step-up/session assurance result contract: missing.
 - MFA permission/scope IDs: missing.
@@ -49,6 +49,15 @@
 - Positive and negative security E2E evidence: missing.
 - Integration test evidence: missing.
 - Evidence Registry IDs: missing.
+
+
+
+## 2A. Field-contract progress (2026-10-24)
+
+- Added `contracts/entity/AUTH-007-mfa-factor-field-contract.v1.json` as `CONTRACTED_NOT_VERIFIED`; registered `ENT-MFA-FACTOR` as `PROPOSED` and added proposed fields to the entity field catalog.
+- Added an implementation-evidence row that explicitly remains `BLOCKED`; source code and migration presence are not admitted production evidence.
+- The contract identifies `lastAcceptedTotpTimeStep` as a required replay-prevention field, but it is currently absent from the migration/runtime. No MFA deployment or L8 grant is authorized by this progress update.
+- `AUTH-007` remains `BLOCKED_NOT_GREEN` and Implementation authorization remains `false`.
 
 ## 3. Security interpretation rules
 
