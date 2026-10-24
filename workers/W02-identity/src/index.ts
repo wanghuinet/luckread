@@ -14,6 +14,7 @@ import { handleCurrentUserSessionList } from './auth/session-list.js'
 import { handleCurrentUserSessionRevoke } from './auth/session-revoke.js'
 import { verifyTargetBoundDualApproval, L8BootstrapApprovalError } from './authz/l8-genesis-bootstrap-approval.js'
 import { bootstrapSuperAdmin, L8BootstrapCommandError } from './authz/l8-genesis-bootstrap-command.js'
+import { checkL8BootstrapReadiness, L8BootstrapReadinessError } from './authz/l8-genesis-bootstrap-readiness.js'
 
 interface Env {
   D1_01: D1Database
@@ -215,6 +216,83 @@ export default {
         return json(result)
       } catch {
         return json({ decision: 'DENY' }, 503)
+      }
+    }
+
+    if (request.method === 'POST' && url.pathname === '/internal/authz/bootstrap-super-admin/readiness') {
+      // This is a read-only preflight. It independently verifies the same
+      // protected GitHub workflow identity and target-bound dual approval as
+      // the write route but never calls the grant command.
+      if (
+        request.headers.get('X-LuckRead-Caller') !== 'W01' ||
+        request.headers.get('X-LuckRead-Transport-Version') !== '1.0'
+      ) {
+        return json({ error: { code: 'FORBIDDEN', message: 'authorized W01 service boundary required' } }, 403)
+      }
+
+      const authorization = request.headers.get('authorization') ?? ''
+      const tokenMatch = authorization.match(/^Bearer\\s+(\\S+)$/i)
+      if (!tokenMatch || tokenMatch[1].length > 8192) {
+        return json({ error: { code: 'UNAUTHENTICATED', message: 'GitHub workflow identity token required' } }, 401)
+      }
+
+      const body = await readJsonBody<{ requestPrNumber?: unknown; githubToken?: unknown }>(request)
+      if (
+        !body ||
+        !Number.isSafeInteger(body.requestPrNumber) ||
+        Number(body.requestPrNumber) < 1 ||
+        Number(body.requestPrNumber) > 2_147_483_647 ||
+        typeof body.githubToken !== 'string' ||
+        body.githubToken.length < 20 ||
+        body.githubToken.length > 4096
+      ) {
+        return json({ error: { code: 'VALIDATION_FAILED', message: 'invalid bootstrap readiness envelope' } }, 400)
+      }
+
+      try {
+        const approval = await verifyTargetBoundDualApproval({
+          oidcToken: tokenMatch[1],
+          githubToken: body.githubToken,
+          requestPrNumber: body.requestPrNumber as number,
+        })
+        const readiness = await checkL8BootstrapReadiness(env.D1_01, approval)
+        return json({ data: readiness })
+      } catch (error) {
+        if (error instanceof L8BootstrapApprovalError) {
+          const status =
+            error.code === 'OIDC_FORBIDDEN' || error.code === 'DUAL_APPROVAL_REQUIRED' ? 403 :
+            error.code === 'PR_NOT_MERGED' || error.code === 'REQUEST_FILE_MISSING' ? 409 :
+            error.code === 'REQUEST_EXPIRED_OR_INVALID' ? 412 :
+            error.code === 'VALIDATION_FAILED' || error.code === 'OIDC_INVALID' ? 400 : 503
+          return json({
+            error: {
+              code: error.code,
+              message: status === 403 ? 'dual approval or trusted workflow identity was denied' :
+                status === 409 ? 'bootstrap request PR is not an eligible merged request' :
+                status === 412 ? 'bootstrap request has expired or violates the request contract' :
+                status === 400 ? 'bootstrap evidence was invalid' :
+                'bootstrap evidence verification is temporarily unavailable',
+            },
+          }, status)
+        }
+        if (error instanceof L8BootstrapReadinessError) {
+          const status =
+            error.code === 'REQUEST_EXPIRED_OR_INVALID' ? 412 :
+            error.code === 'TARGET_NOT_ELIGIBLE' || error.code === 'VERIFIED_ROLE_REQUIRED' ? 403 :
+            error.code === 'L8_ALREADY_EXISTS' || error.code === 'BOOTSTRAP_ALREADY_CONSUMED' ? 409 :
+            error.code === 'ROLE_MAPPING_INVALID' || error.code === 'SCHEMA_NOT_READY' ? 503 : 400
+          return json({
+            error: {
+              code: error.code,
+              message: status === 400 ? 'invalid readiness request' :
+                status === 403 ? 'target account is not eligible for bootstrap' :
+                status === 409 ? 'the one-time L8 bootstrap path is no longer available' :
+                status === 412 ? 'bootstrap request has expired' :
+                'required production schema or authorization state is not ready',
+            },
+          }, status)
+        }
+        return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'L8 bootstrap readiness unavailable' } }, 503)
       }
     }
 
