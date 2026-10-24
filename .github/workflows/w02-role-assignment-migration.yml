@@ -17,12 +17,16 @@ on:
         type: string
 
 permissions:
+  actions: read
   contents: read
+  deployments: read
+  pull-requests: read
 
 jobs:
   migrate:
-    if: ${{ inputs.confirm == 'APPLY' }}
+    if: ${{ inputs.confirm == 'APPLY' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
+    environment: auth-mfa-rollout
     timeout-minutes: 15
     steps:
       - name: Checkout protected main for source validation
@@ -86,8 +90,16 @@ jobs:
           console.log('W02 MFA/L8 migration artifacts: PASS')
           NODE
 
-      - name: Enforce AUTH-007 before applying MFA/L8 schema
-        run: node scripts/verify-auth-007-deployment-gate.mjs
+      - name: Verify protected AUTH-007 rollout admission before schema mutation
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_REF: ${{ github.ref }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          AUTH007_ROLLOUT_ENVIRONMENT: auth-mfa-rollout
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: node scripts/verify-auth-007-rollout-admission.mjs
 
       - name: Apply D1-01 migration remotely
         working-directory: workers/W02-identity
