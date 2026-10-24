@@ -17,29 +17,52 @@ on:
         default: DEPLOY_BINDING
 
 permissions:
+  actions: read
   contents: read
+  deployments: read
+  pull-requests: read
 
 jobs:
   deploy:
-    if: ${{ inputs.confirm == 'DEPLOY_BINDING' || inputs.confirm == 'DEPLOY_BINDING_AND_W08_CREATOR' }}
+    if: ${{ (inputs.confirm == 'DEPLOY_BINDING' || inputs.confirm == 'DEPLOY_BINDING_AND_W08_CREATOR') && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
+    environment: auth-mfa-rollout
     timeout-minutes: 25
     steps:
+      - name: Checkout protected main for source validation
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Validate immutable source SHA is committed to main
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          if ! [[ "$SOURCE_SHA" =~ ^[0-9a-fA-F]{40}$ ]]; then
+            echo "source_sha must be a full 40-character commit SHA"
+            exit 1
+          fi
+          git cat-file -e "$SOURCE_SHA^{commit}"
+          git merge-base --is-ancestor "$SOURCE_SHA" origin/main || {
+            echo "source_sha must be an immutable commit already contained in protected main"
+            exit 1
+          }
       - name: Checkout exact source commit
         uses: actions/checkout@v4
         with:
           ref: ${{ inputs.source_sha }}
+          fetch-depth: 0
 
-      - name: Enforce AUTH-007 for MFA-dependent W02 runtime before production changes
-        run: |
-          if [ -f scripts/verify-auth-007-deployment-gate.mjs ]; then
-            node scripts/verify-auth-007-deployment-gate.mjs
-          elif [ -f workers/W02-identity/migrations/0006_better_auth_two_factor.sql ] || grep -Fq 'LEFT JOIN "twoFactor"' workers/W02-identity/src/authz/role-assignment.ts; then
-            echo "MFA-dependent W02 source has no AUTH-007 deployment gate; refusing deployment."
-            exit 1
-          else
-            echo "Selected source does not contain the MFA-dependent W02 runtime; AUTH-007 deployment gate not required."
-          fi
+      - name: Verify protected AUTH-007 rollout admission before W01/W02 deployment
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_REF: ${{ github.ref }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          AUTH007_ROLLOUT_ENVIRONMENT: auth-mfa-rollout
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: node scripts/verify-auth-007-rollout-admission.mjs
 
       - name: Gate optional W08 Creator deployment before any production mutation
         env:
