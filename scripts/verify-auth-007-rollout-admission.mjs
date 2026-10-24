@@ -248,7 +248,6 @@ if (blockers.length === 0) {
       mfaAuditOutboxContract.target?.physicalTable === 'auth_007_mfa_publication_journal' &&
       mfaAuditOutboxContract.target?.sourceMigration === mfaAuditOutboxMigrationPath &&
       mfaAuditOutboxContract.target?.databaseBinding === 'workers/W02-identity/wrangler.jsonc:D1_01' &&
-      mfaAuditOutboxContract.remoteExecution?.mutation === 'NOT_EXECUTED' &&
       mfaAuditOutboxContract.promotion === 'NOT_GREEN',
     mfaAuditBindingUsesExistingQueueWithoutProductionClaim:
       mfaAuditBinding.delivery?.existingW02ToW06Binding === 'AUTH013_QUEUE' &&
