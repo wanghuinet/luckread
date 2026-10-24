@@ -1,1 +1,1 @@
-export { POST } from '../../../../../../auth/mfa/disable/route'
+export { POST } from '../../../../../auth/mfa/disable/route'
