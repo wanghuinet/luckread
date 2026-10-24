@@ -7,6 +7,14 @@ on:
         description: "Merged PR number containing docs/change-control/l8-genesis-bootstrap-request.json"
         required: true
         type: number
+      mode:
+        description: "Run read-only online preflight first; run execute only after a successful reviewed preflight"
+        required: true
+        type: choice
+        options:
+          - preflight
+          - execute
+        default: preflight
 
 permissions:
   contents: read
@@ -38,5 +46,6 @@ jobs:
       - name: Request W01 to invoke W02's independently verified bootstrap
         env:
           REQUEST_PR_NUMBER: ${{ inputs.request_pr_number }}
+          BOOTSTRAP_MODE: ${{ inputs.mode }}
           GITHUB_TOKEN: ${{ github.token }}
         run: node scripts/execute-l8-genesis-bootstrap.mjs
