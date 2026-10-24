@@ -267,13 +267,20 @@ export async function verifyTargetBoundSingleApproval(input: {
       'l8-genesis-bootstrap must require one human admin/maintainer on protected branches',
     )
   }
-  const permissionPayload = await githubRequest<{ permission?: string }>(
+  const permissionPayload = await githubRequest<{ permission?: string; role_name?: string }>(
     '/repos/' + REPOSITORY + '/collaborators/' + encodeURIComponent(configuredReviewerLogin) + '/permission',
     input.githubToken,
     fetcher,
   )
-  const reviewerPermission = String(permissionPayload.permission ?? '').toLowerCase()
-  if (!['admin', 'maintain'].includes(reviewerPermission)) {
+  // GitHub's legacy "permission" field maps the maintain role to "write".
+  // Require the actual role_name for maintain so ordinary write collaborators
+  // are never mistaken for privileged bootstrap approvers.
+  const repositoryPermission = String(permissionPayload.permission ?? '').toLowerCase()
+  const repositoryRole = String(permissionPayload.role_name ?? '').toLowerCase()
+  const reviewerPermission =
+    repositoryPermission === 'admin' || repositoryRole === 'admin' ? 'admin' :
+    repositoryRole === 'maintain' ? 'maintain' : ''
+  if (!reviewerPermission) {
     throw new L8BootstrapApprovalError(
       'SINGLE_APPROVAL_ENVIRONMENT_NOT_CONFIGURED',
       'the configured environment reviewer must have repository admin or maintain permission',
