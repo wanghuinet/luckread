@@ -191,14 +191,18 @@ if (blockers.length === 0) {
       ['CONTRACTED_NOT_VERIFIED', 'VERIFIED', 'GREEN'].includes(factorContract.status) &&
       ['CONTRACTED_NOT_VERIFIED', 'VERIFIED', 'GREEN'].includes(lifecycle.status),
     sourceEvidenceIsAccurateAndStillBlocked:
+      apiContract.evidenceStatus?.api?.includes('all six canonical operationIds') === true &&
+      !apiContract.evidenceStatus?.api?.includes('other five operations lack runtime adapters') &&
+      apiContract.evidenceStatus?.dto?.includes('Production DTO/secret-redaction security E2E evidence remains unadmitted') === true &&
       apiContract.evidenceStatus?.runtime?.startsWith('SOURCE_IMPLEMENTED_TESTED_LOCALLY;') === true &&
       apiContract.evidenceStatus?.securityE2E === 'MISSING' &&
       apiContract.evidenceStatus?.mapping0 === 'MISSING' &&
       apiContract.evidenceStatus?.auth007 === 'BLOCKED_NOT_GREEN' &&
+      factorContract.evidenceStatus?.apiDto === 'BOUND_IN_CONTRACT_AND_SOURCE_NOT_PRODUCTION_VERIFIED' &&
       factorContract.evidenceStatus?.totpReplayProtection === 'SOURCE_PRESENT_TESTED_LOCALLY_NOT_DEPLOYED_OR_READ_BACK' &&
       factorContract.evidenceStatus?.securityE2E === 'MISSING' &&
       factorContract.evidenceStatus?.auth007 === 'BLOCKED_NOT_GREEN' &&
-      !apiContract.evidenceStatus?.runtime?.includes('remain incomplete'),
+      !factorContract.securityInvariants.some((invariant) => invariant.includes('current migration 0006 does not provide this field')),
     allSixPublicRoutesAndTestsPresent: operations.every((operation) =>
       exists(operation.route) &&
       exists(operation.test) &&
