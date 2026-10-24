@@ -160,7 +160,7 @@
       "adminExposure": "NEVER",
       "eventExposure": "NEVER",
       "status": "CONTRACTED_NOT_VERIFIED",
-      "physicalStatus": "MISSING_FROM_MIGRATION_0006",
+      "physicalStatus": "PRESENT_IN_MIGRATION_0006_AND_W02_RUNTIME_GUARD_SOURCE_NOT_DEPLOYED",
       "requiredInvariant": "The same TOTP time-step must not be accepted more than once for the same factor; update must be atomic with successful verification."
     }
   ],
