@@ -52,6 +52,15 @@ async function loadJson(path) {
   }
 }
 
+async function fileExists(path) {
+  try {
+    await stat(path)
+    return true
+  } catch {
+    return false
+  }
+}
+
 const DOMAIN_DIRS = {
   common: 'schemas/common',
   enums: 'enums',
@@ -366,8 +375,8 @@ async function checkEvents() {
       'auth.mfa.replay_rejected',
       'auth.mfa.locked',
     ]
-    if (!exists('workers/W02-identity/src/auth/mfa-audit-hooks.test.ts') ||
-        !exists('workers/W02-identity/src/auth/mfa-audit-events.test.ts') ||
+    if (!(await fileExists('workers/W02-identity/src/auth/mfa-audit-hooks.test.ts')) ||
+        !(await fileExists('workers/W02-identity/src/auth/mfa-audit-events.test.ts')) ||
         !requiredHookTokens.every((token) => mfaProducerSource.includes(token)) ||
         !["auth.mfa.challenge_succeeded", "auth.mfa.challenge_failed",
           "auth.mfa.factor_disabled", "auth.mfa.recovery_codes_rotated",
