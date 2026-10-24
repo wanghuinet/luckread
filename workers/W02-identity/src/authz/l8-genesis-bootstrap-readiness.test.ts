@@ -13,7 +13,6 @@ type FixtureOptions = {
 }
 
 class ReadinessD1 {
-  readonly writes = 0
   constructor(private readonly options: FixtureOptions = {}) {}
 
   prepare(sql: string) {
@@ -21,8 +20,8 @@ class ReadinessD1 {
     const statement = {
       bind: (...values: unknown[]) => { args = values; return statement },
       all: async <T>() => {
-        if (!this.options.schemaReady && sql.includes('twoFactor')) throw new Error('missing twoFactor')
-        if (!this.options.schemaReady && sql.includes('l8_genesis_bootstrap_audit')) throw new Error('missing audit table')
+        if (this.options.schemaReady === false && sql.includes('twoFactor')) throw new Error('missing twoFactor')
+        if (this.options.schemaReady === false && sql.includes('l8_genesis_bootstrap_audit')) throw new Error('missing audit table')
         return { results: [] as T[] }
       },
       first: async <T>() => {
