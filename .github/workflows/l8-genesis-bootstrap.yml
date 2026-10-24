@@ -40,6 +40,9 @@ jobs:
         with:
           node-version: 24
 
+      - name: Enforce AUTH-007 and L8 bootstrap readiness evidence
+        run: node scripts/verify-admin-account-bootstrap-readiness.mjs
+
       - name: Verify readiness and perform the one-time grant through W01/W02
         env:
           REQUEST_PR_NUMBER: \${{ inputs.request_pr_number }}
