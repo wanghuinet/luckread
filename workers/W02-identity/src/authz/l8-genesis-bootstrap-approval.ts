@@ -283,7 +283,6 @@ export async function verifyTargetBoundSingleApproval(input: {
   const pull = await githubRequest<GitHubPull>(requestPath, input.githubToken, fetcher)
   const headSha = pull.head?.sha
   const mergeSha = pull.merge_commit_sha
-  const author = pull.user?.login?.toLowerCase()
   if (
     pull.number !== input.requestPrNumber ||
     pull.state !== 'closed' ||
@@ -291,7 +290,7 @@ export async function verifyTargetBoundSingleApproval(input: {
     !mergeSha ||
     !headSha ||
     pull.base?.ref !== 'main' ||
-    pull.base?.repo?.full_name?.toLowerCase() !== REPOSITORY ||
+    pull.base?.repo?.full_name?.toLowerCase() !== REPOSITORY
   ) {
     throw new L8BootstrapApprovalError('PR_NOT_MERGED', 'bootstrap request PR must be merged into this repository main branch')
   }
