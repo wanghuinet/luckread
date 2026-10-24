@@ -18,18 +18,24 @@ const makeDb = (row: unknown = { userEnabled: 0, factorVerified: 0 }) => {
   const statement = {
     bind: vi.fn().mockReturnThis(),
     first: vi.fn().mockResolvedValue(row),
+    run: vi.fn().mockResolvedValue({ meta: { changes: 1 } }),
   }
   const db = { prepare: vi.fn(() => statement) }
   return { db: db as unknown as D1Database, prepare: db.prepare, statement }
 }
 
-const makeRequest = (body: unknown = { code: '123456' }, w01 = true) => new Request(
+const makeRequest = (
+  body: unknown = { code: '123456' },
+  w01 = true,
+  key = 'mfa-confirm-key-0001',
+) => new Request(
   'https://luckread-w02.internal/internal/auth/mfa/enrollment/confirm',
   {
     method: 'POST',
     headers: {
       cookie: 'better-auth.session_token=opaque-session',
       'content-type': 'application/json',
+      ...(key ? { 'Idempotency-Key': key } : {}),
       ...(w01 ? {
         'X-LuckRead-Caller': 'W01',
         'X-LuckRead-Transport-Version': '1.0',
@@ -83,6 +89,45 @@ describe('W02 MFA enrollment confirmation authority', () => {
     expect(authRequest.headers.get('cookie')).toBe('better-auth.session_token=opaque-session')
     await expect(authRequest.json()).resolves.toEqual({ code: '123456', trustDevice: false })
     expect(mocks.readStatus).toHaveBeenCalledWith(db, principal.userId)
+  })
+
+  it('requires an idempotency key before resolving the principal or verifying TOTP', async () => {
+    const { db } = makeDb()
+    const response = await handleMfaEnrollmentConfirmRequest(
+      { D1_01: db } as BetterAuthEnv,
+      makeRequest({ code: '123456' }, true, ''),
+    )
+    expect(response.status).toBe(400)
+    expect(mocks.resolvePrincipal).not.toHaveBeenCalled()
+    expect(mocks.handler).not.toHaveBeenCalled()
+  })
+
+  it('replays only the same successful request and rejects key reuse with a different code', async () => {
+    const hash = async (value: string) => {
+      const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value))
+      return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('')
+    }
+    const key = 'mfa-confirm-key-0001'
+    const row = {
+      userEnabled: 1,
+      factorVerified: 1,
+      confirmationKeyHash: await hash(key),
+      confirmationRequestHash: await hash(key + String.fromCharCode(0) + '123456'),
+    }
+    const { db } = makeDb(row)
+    const replay = await handleMfaEnrollmentConfirmRequest(
+      { D1_01: db } as BetterAuthEnv,
+      makeRequest({ code: '123456' }, true, key),
+    )
+    expect(replay.status).toBe(200)
+    expect(mocks.handler).not.toHaveBeenCalled()
+
+    const differentPayload = await handleMfaEnrollmentConfirmRequest(
+      { D1_01: db } as BetterAuthEnv,
+      makeRequest({ code: '654321' }, true, key),
+    )
+    expect(differentPayload.status).toBe(409)
+    expect(mocks.handler).not.toHaveBeenCalled()
   })
 
   it('rejects calls that did not arrive through the W01 service contract', async () => {

@@ -10,7 +10,7 @@ vi.mock('@opennextjs/cloudflare', () => ({ getCloudflareContext: mocks.getCloudf
 
 import { POST } from '../../src/app/api/v1/auth/mfa/enrollment/confirm/route.js'
 
-const makeRequest = (body: unknown = { code: '123456' }) => new Request(
+const makeRequest = (body: unknown = { code: '123456' }, key = 'mfa-confirm-key-0001') => new Request(
   'https://api.luckread.com/v1/auth/mfa/enrollment/confirm',
   {
     method: 'POST',
@@ -18,6 +18,7 @@ const makeRequest = (body: unknown = { code: '123456' }) => new Request(
       cookie: 'better-auth.session_token=opaque-session',
       'content-type': 'application/json',
       'cf-connecting-ip': '203.0.113.10',
+      ...(key ? { 'Idempotency-Key': key } : {}),
     },
     body: JSON.stringify(body),
   },
@@ -64,8 +65,16 @@ describe('W01 public MFA enrollment-confirm route', () => {
     const confirm = requests.find((request) => new URL(request.url).pathname === '/internal/auth/mfa/enrollment/confirm')
     expect(confirm?.headers.get('X-LuckRead-Caller')).toBe('W01')
     expect(confirm?.headers.get('cookie')).toBe('better-auth.session_token=opaque-session')
+    expect(confirm?.headers.get('Idempotency-Key')).toBe('mfa-confirm-key-0001')
     await expect(confirm?.json()).resolves.toEqual({ code: '123456' })
     expect(mocks.writeLimiter.limit).toHaveBeenCalledWith({ key: 'w01-write:endpoint:authMfaEnrollmentConfirm' })
+  })
+
+  it('requires Idempotency-Key before contacting W02', async () => {
+    const response = await POST(makeRequest({ code: '123456' }, ''))
+    expect(response.status).toBe(400)
+    await expect(response.json()).resolves.toMatchObject({ error: { code: 'IDEMPOTENCY_KEY_REQUIRED' } })
+    expect(mocks.w02Fetch).not.toHaveBeenCalled()
   })
 
   it('rejects malformed codes before account lookup or factor mutation', async () => {

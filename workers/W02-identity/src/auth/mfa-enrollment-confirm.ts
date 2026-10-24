@@ -77,7 +77,7 @@ export async function handleMfaEnrollmentConfirmRequest(
     // Include the key in the request fingerprint so a replay with the same key
     // and same code can recover status without re-consuming TOTP; never persist
     // the short six-digit code or an unkeyed hash of the code alone.
-    const requestHash = await sha256Hex(idempotencyKey + '\0' + (await request.clone().json() as { code: string }).code)
+    const requestHash = await sha256Hex(idempotencyKey + '\0' + (body).code)
 
     if (isTrue(pending.userEnabled) && isTrue(pending.factorVerified)) {
       if (pending.confirmationKeyHash === keyHash &&
