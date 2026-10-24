@@ -1,15 +1,30 @@
 import { describe, expect, it } from 'vitest'
-import { requireMfaForPrivilegedAction } from './privileged-mfa-gate.js'
+import { isPrivilegedMfaEnrollmentEligible, requireMfaForPrivilegedAction } from './privileged-mfa-gate.js'
 
 class FakeStatement {
-  constructor(private readonly row: Record<string, unknown> | null) {}
-  bind() { return this }
-  async first<T>() { return this.row as T | null }
+  private values: unknown[] = []
+  constructor(private readonly db: FakeD1, private readonly sql: string) {}
+  bind(...values: unknown[]) { this.values = values; return this }
+  async first<T>() {
+    if (this.sql.includes('FROM "user"')) return this.db.row as T | null
+    if (this.sql.includes('FROM role_assignments')) {
+      const subjectId = this.values[0]
+      const queriedRoles = this.values.slice(1, -2).map(String)
+      return subjectId === this.db.subjectId && queriedRoles.some((role) => this.db.roles.includes(role))
+        ? { id: 'ra-1' } as T
+        : null
+    }
+    return null
+  }
 }
 
 class FakeD1 {
-  constructor(private readonly row: Record<string, unknown> | null) {}
-  prepare() { return new FakeStatement(this.row) }
+  constructor(
+    readonly row: Record<string, unknown> | null,
+    readonly roles: string[] = [],
+    readonly subjectId = 'user-1',
+  ) {}
+  prepare(sql: string) { return new FakeStatement(this, sql) }
 }
 
 const enabled = {
@@ -63,5 +78,37 @@ describe('W02 privileged MFA gate', () => {
       'user-1',
       '2026-10-24T10:01:00.000Z',
     )).toBe(false)
+  })
+})
+
+describe('W02 privileged MFA enrollment eligibility', () => {
+  it('allows enrollment for an effective global L7/L8 role even if the MFA gate downgraded its returned layer', async () => {
+    expect(await isPrivilegedMfaEnrollmentEligible(
+      new FakeD1(null, ['admin']) as unknown as D1Database,
+      'user-1',
+      '2026-10-24T10:00:00.000Z',
+    )).toBe(true)
+    expect(await isPrivilegedMfaEnrollmentEligible(
+      new FakeD1(null, ['super_admin']) as unknown as D1Database,
+      'user-1',
+      '2026-10-24T10:00:00.000Z',
+    )).toBe(true)
+  })
+
+  it('does not allow ordinary L1-L4 roles to enable privileged login MFA', async () => {
+    for (const role of ['user', 'verified_user', 'creator', 'mcn_admin']) {
+      expect(await isPrivilegedMfaEnrollmentEligible(
+        new FakeD1(null, [role]) as unknown as D1Database,
+        'user-1',
+        '2026-10-24T10:00:00.000Z',
+      )).toBe(false)
+    }
+  })
+
+  it('fails closed for a different subject, invalid target, or invalid time', async () => {
+    const db = new FakeD1(null, ['super_admin']) as unknown as D1Database
+    expect(await isPrivilegedMfaEnrollmentEligible(db, 'another-user', '2026-10-24T10:00:00.000Z')).toBe(false)
+    expect(await isPrivilegedMfaEnrollmentEligible(db, '', '2026-10-24T10:00:00.000Z')).toBe(false)
+    expect(await isPrivilegedMfaEnrollmentEligible(db, 'user-1', 'bad-time')).toBe(false)
   })
 })
