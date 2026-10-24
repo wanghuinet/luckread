@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import { describe, it } from 'node:test'
 
 const workflow = readFileSync('.github/workflows/l8-genesis-bootstrap.yml', 'utf8')
+const readinessSource = readFileSync('scripts/verify-admin-account-bootstrap-readiness.mjs', 'utf8')
 const admissionStart = workflow.indexOf('  protected-main-admission:')
 const bootstrapStart = workflow.indexOf('  bootstrap:')
 const admissionJob = admissionStart >= 0 && bootstrapStart > admissionStart
@@ -27,5 +28,8 @@ describe('L8 genesis protected-main gate', () => {
     assert.ok(environmentIndex > bootstrapStart, 'L8 Environment approval must only belong to the guarded bootstrap job')
     assert.ok(readinessIndex > environmentIndex, 'readiness gate must run only after protected Environment approval')
     assert.ok(executorIndex > readinessIndex, 'bootstrap executor must run after the readiness gate')
+    assert.ok(readinessSource.includes("genesisWorkflow.indexOf('  protected-main-admission:')"), 'readiness gate must validate the standalone protected-main preflight job')
+    assert.ok(readinessSource.includes('REF_PROTECTED'), 'readiness gate must inspect GitHub protected-ref evidence')
+    assert.ok(!readinessSource.includes('Fail closed when GitHub main is not protected'), 'readiness gate must not depend on the removed legacy guard step')
   })
 })
