@@ -33,17 +33,26 @@ export async function readRoleVersion(db: D1Database, subjectId: string): Promis
   return row.roleVersion
 }
 
+/**
+ * Create the same monotonic role-version mutation for a larger D1 batch so
+ * the version cannot be left behind if the related RoleAssignment write fails.
+ */
+export function prepareRoleVersionAdvance(
+  db: D1Database,
+  subjectId: string,
+  now = new Date().toISOString(),
+): D1PreparedStatement {
+  if (!subjectId) throw new Error('role version requires subjectId')
+  if (Number.isNaN(Date.parse(now))) throw new Error('role version requires a valid timestamp')
+  return db.prepare(UPSERT_ROLE_VERSION).bind(subjectId, now)
+}
+
 export async function advanceRoleVersion(
   db: D1Database,
   subjectId: string,
   now = new Date().toISOString(),
 ): Promise<number> {
-  if (!subjectId) throw new Error('role version requires subjectId')
-
-  const row = await db
-    .prepare(UPSERT_ROLE_VERSION)
-    .bind(subjectId, now)
-    .first<{ roleVersion: number }>()
+  const row = await prepareRoleVersionAdvance(db, subjectId, now).first<{ roleVersion: number }>()
 
   if (row === null || !Number.isSafeInteger(row.roleVersion) || row.roleVersion < 1) {
     throw new Error('role_version mutation did not return a valid version')

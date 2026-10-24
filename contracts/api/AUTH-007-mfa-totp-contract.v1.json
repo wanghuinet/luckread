@@ -1,0 +1,371 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/api/AUTH-007-mfa-totp-contract.v1.json",
+  "version": "1.0.0",
+  "status": "CONTRACTED_NOT_VERIFIED",
+  "featureId": "AUTH-007",
+  "publicBoundary": {
+    "worker": "W01",
+    "canonicalServer": "https://api.luckread.com/v1",
+    "identityAndFactorAuthority": "W02",
+    "roleAssignmentAuthority": "W02_D1-01",
+    "frontendDirectDatabaseAccess": false,
+    "rawBetterAuthEndpointsPubliclyExposed": false,
+    "dataPersistenceAuthority": "W02 D1-01 only",
+    "contractRule": "All APP/H5/PC clients call W01-owned public endpoints. W01 forwards validated operations to W02 over existing W02_AUTH Service Binding. Client request data is never accepted as MFA assurance evidence."
+  },
+  "operations": [
+    {
+      "operationId": "authMfaStatus",
+      "method": "GET",
+      "path": "/auth/mfa",
+      "authorization": {
+        "required": true,
+        "permission": "user.mfa.read",
+        "scope": "self",
+        "accountState": "ACTIVE"
+      },
+      "requestDtoId": null,
+      "responseDtoId": "DTO-AUTH-007-MFA-STATUS",
+      "responseFields": [
+        "enabled",
+        "verified",
+        "enrolledAt"
+      ],
+      "forbiddenResponseFields": [
+        "secret",
+        "backupCodes",
+        "lastAcceptedTotpTimeStep",
+        "failedVerificationCount",
+        "lockedUntil"
+      ],
+      "cache": "NO_STORE"
+    },
+    {
+      "operationId": "authMfaEnrollmentStart",
+      "method": "POST",
+      "path": "/auth/mfa/enrollment",
+      "authorization": {
+        "required": true,
+        "permission": "user.mfa.manage",
+        "scope": "self",
+        "accountState": "ACTIVE",
+        "reauthentication": "current_password"
+      },
+      "requestDtoId": "DTO-AUTH-007-MFA-ENROLLMENT-START-REQUEST",
+      "responseDtoId": "DTO-AUTH-007-MFA-ENROLLMENT-START-RESPONSE",
+      "requestFields": [
+        "currentPassword"
+      ],
+      "responseFields": [
+        "totpUri",
+        "recoveryCodes"
+      ],
+      "responseSemantics": {
+        "totpUri": "one-time enrollment response only; contains secret material",
+        "recoveryCodes": "one-time plaintext disclosure; never persisted or logged in plaintext",
+        "enabled": false,
+        "verified": false
+      },
+      "idempotency": "An already verified factor cannot be silently replaced; re-enrollment requires the explicit secure replacement flow.",
+      "cache": "NO_STORE"
+    },
+    {
+      "operationId": "authMfaEnrollmentConfirm",
+      "method": "POST",
+      "path": "/auth/mfa/enrollment/confirm",
+      "authorization": {
+        "required": true,
+        "permission": "user.mfa.manage",
+        "scope": "self",
+        "accountState": "ACTIVE",
+        "challenge": "identity-bound-pending-factor"
+      },
+      "requestDtoId": "DTO-AUTH-007-MFA-ENROLLMENT-CONFIRM-REQUEST",
+      "responseDtoId": "DTO-AUTH-007-MFA-STATUS",
+      "requestFields": [
+        "code"
+      ],
+      "codePolicy": {
+        "format": "6-digit TOTP",
+        "expires": "authenticator-time-step-window",
+        "singleAcceptedUsePerFactorTimeStep": true
+      },
+      "successSemantics": "Persist verified=true only after a valid TOTP challenge; set the enrollment timestamp and invalidate sessions before privileged usage.",
+      "cache": "NO_STORE"
+    },
+    {
+      "operationId": "authMfaChallengeVerify",
+      "method": "POST",
+      "path": "/auth/mfa/challenge/verify",
+      "authorization": {
+        "required": false,
+        "permission": "challenge_bound",
+        "scope": "W02-issued-authentication-challenge",
+        "accountState": "ACTIVE"
+      },
+      "requestDtoId": "DTO-AUTH-007-MFA-CHALLENGE-VERIFY-REQUEST",
+      "responseDtoId": "DTO-AUTH-007-MFA-CHALLENGE-VERIFY-RESPONSE",
+      "requestFields": [
+        "code",
+        "method"
+      ],
+      "methodValues": [
+        "totp",
+        "recovery_code"
+      ],
+      "security": [
+        "A valid short-lived W02 challenge cookie is required",
+        "The challenge is identity-bound, purpose-bound, single-use and expires",
+        "Do not accept trust-device or client-supplied assurance flags",
+        "Do not return the session credential in JSON"
+      ],
+      "nativeSuccessCarrier": "X-LuckRead-Session-Token",
+      "browserSuccessCarrier": "Set-Cookie (HttpOnly)",
+      "cache": "NO_STORE"
+    },
+    {
+      "operationId": "authMfaDisable",
+      "method": "POST",
+      "path": "/auth/mfa/disable",
+      "authorization": {
+        "required": true,
+        "permission": "user.mfa.manage",
+        "scope": "self",
+        "accountState": "ACTIVE",
+        "reauthentication": "current_password_plus_valid_TOTP_step_up"
+      },
+      "requestDtoId": "DTO-AUTH-007-MFA-DISABLE-REQUEST",
+      "responseDtoId": null,
+      "requestFields": [
+        "currentPassword",
+        "code"
+      ],
+      "responseStatus": 204,
+      "successSemantics": "Disable only after password and TOTP step-up both pass; remove the active factor, clear enrollment timestamp and revoke existing sessions; do not silently keep a privileged session alive.",
+      "cache": "NO_STORE"
+    },
+    {
+      "operationId": "authMfaRecoveryCodesRotate",
+      "method": "POST",
+      "path": "/auth/mfa/recovery-codes/rotate",
+      "authorization": {
+        "required": true,
+        "permission": "user.mfa.manage",
+        "scope": "self",
+        "accountState": "ACTIVE",
+        "reauthentication": "current_password_plus_valid_TOTP_step_up"
+      },
+      "requestDtoId": "DTO-AUTH-007-MFA-RECOVERY-CODES-ROTATE-REQUEST",
+      "responseDtoId": "DTO-AUTH-007-MFA-RECOVERY-CODES-ROTATE-RESPONSE",
+      "requestFields": [
+        "currentPassword",
+        "code"
+      ],
+      "responseFields": [
+        "recoveryCodes"
+      ],
+      "responseSemantics": "New recovery codes are returned once, encrypted at rest, and atomically replace/invalidate all previous recovery codes.",
+      "cache": "NO_STORE"
+    }
+  ],
+  "dtoDefinitions": {
+    "DTO-AUTH-007-MFA-STATUS": {
+      "kind": "response",
+      "fields": {
+        "enabled": "boolean",
+        "verified": "boolean",
+        "enrolledAt": "date-time|null"
+      }
+    },
+    "DTO-AUTH-007-MFA-ENROLLMENT-START-REQUEST": {
+      "kind": "request",
+      "fields": {
+        "currentPassword": "string"
+      }
+    },
+    "DTO-AUTH-007-MFA-ENROLLMENT-START-RESPONSE": {
+      "kind": "response",
+      "fields": {
+        "totpUri": "string",
+        "recoveryCodes": "string[]"
+      }
+    },
+    "DTO-AUTH-007-MFA-ENROLLMENT-CONFIRM-REQUEST": {
+      "kind": "request",
+      "fields": {
+        "code": "6-digit string"
+      }
+    },
+    "DTO-AUTH-007-MFA-CHALLENGE-VERIFY-REQUEST": {
+      "kind": "request",
+      "fields": {
+        "code": "TOTP or recovery-code string",
+        "method": "totp|recovery_code"
+      }
+    },
+    "DTO-AUTH-007-MFA-CHALLENGE-VERIFY-RESPONSE": {
+      "kind": "response",
+      "fields": {
+        "authenticated": "true",
+        "user": "public-user-projection"
+      }
+    },
+    "DTO-AUTH-007-MFA-DISABLE-REQUEST": {
+      "kind": "request",
+      "fields": {
+        "currentPassword": "string",
+        "code": "6-digit TOTP string"
+      }
+    },
+    "DTO-AUTH-007-MFA-RECOVERY-CODES-ROTATE-REQUEST": {
+      "kind": "request",
+      "fields": {
+        "currentPassword": "string",
+        "code": "6-digit TOTP string"
+      }
+    },
+    "DTO-AUTH-007-MFA-RECOVERY-CODES-ROTATE-RESPONSE": {
+      "kind": "response",
+      "fields": {
+        "recoveryCodes": "string[]"
+      }
+    }
+  },
+  "lifecycle": {
+    "states": [
+      "DISABLED",
+      "PENDING_ENROLLMENT",
+      "ENABLED_VERIFIED",
+      "LOCKED"
+    ],
+    "transitions": [
+      {
+        "from": "DISABLED",
+        "to": "PENDING_ENROLLMENT",
+        "actor": "authenticated_user",
+        "preconditions": [
+          "ACTIVE account",
+          "current password reauthentication",
+          "no verified factor exists"
+        ]
+      },
+      {
+        "from": "PENDING_ENROLLMENT",
+        "to": "ENABLED_VERIFIED",
+        "actor": "authenticated_user",
+        "preconditions": [
+          "valid TOTP",
+          "challenge not expired",
+          "accepted time-step not previously consumed"
+        ]
+      },
+      {
+        "from": "PENDING_ENROLLMENT",
+        "to": "DISABLED",
+        "actor": "system",
+        "preconditions": [
+          "enrollment expired or safely cancelled"
+        ]
+      },
+      {
+        "from": "ENABLED_VERIFIED",
+        "to": "LOCKED",
+        "actor": "system",
+        "preconditions": [
+          "failed-attempt budget exhausted"
+        ]
+      },
+      {
+        "from": "LOCKED",
+        "to": "ENABLED_VERIFIED",
+        "actor": "system",
+        "preconditions": [
+          "lockout expiry and policy reset"
+        ]
+      },
+      {
+        "from": "ENABLED_VERIFIED",
+        "to": "DISABLED",
+        "actor": "authenticated_user",
+        "preconditions": [
+          "current password and valid TOTP step-up",
+          "existing sessions revoked",
+          "enrollment timestamp cleared"
+        ]
+      }
+    ]
+  },
+  "securityInvariants": [
+    "No caller-supplied boolean or role claim can satisfy MFA.",
+    "Factor secret, TOTP URI after the enrollment response, plaintext recovery codes, and internal verification metadata must never be logged, cached, traced, or placed in public user/profile DTOs.",
+    "Every TOTP factor requires a durable atomic lastAcceptedTotpTimeStep guard; same-factor same-time-step code reuse must fail, including concurrent duplicate requests.",
+    "Recovery codes are single-use and atomically consumed; rotation invalidates old codes.",
+    "Challenge verification is identity-bound, purpose-bound, short-lived, single-use, replay-resistant and bounded by failed-attempt/lockout policy.",
+    "MFA enable/disable and recovery rotation require authenticated W01 entry and W02 identity/factor authority.",
+    "L5-L8 grants and sensitive privileged operations require authoritative W02 factor state and step-up assurance; cached layer values do not establish assurance.",
+    "MFA enable or disable revokes existing sessions, and disabling MFA cannot retain an old privileged session.",
+    "Failure responses do not disclose whether a target account or factor exists."
+  ],
+  "persistenceRequirements": {
+    "writer": "W02",
+    "database": "D1-01",
+    "tables": [
+      "user",
+      "twoFactor"
+    ],
+    "requiredReplayField": "twoFactor.lastAcceptedTotpTimeStep",
+    "replayConsumption": "atomic conditional compare-and-set per factor and TOTP time-step",
+    "recoveryCodeConsumption": "atomic update that removes exactly one matching code",
+    "migrationAndRemoteReadbackRequired": true,
+    "directD1MutationFromGitHubActions": false
+  },
+  "auditEventsRequired": [
+    "auth.mfa.enrollment_started",
+    "auth.mfa.enrollment_verified",
+    "auth.mfa.enrollment_failed",
+    "auth.mfa.challenge_succeeded",
+    "auth.mfa.challenge_failed",
+    "auth.mfa.factor_disabled",
+    "auth.mfa.recovery_codes_rotated",
+    "auth.mfa.recovery_code_consumed",
+    "auth.mfa.locked",
+    "auth.mfa.replay_rejected"
+  ],
+  "resourcePolicy": {
+    "cache": "NO_STORE",
+    "rateLimit": "existing W01 auth limiter and W02 account/factor attempt counters; no new binding",
+    "idempotency": "required for repeatable authenticated mutations where a response may be retried; enrollment/recovery-secret disclosure must be replay-safe without redisclosing secrets",
+    "queue": "Only non-immediate notifications/audit projections may be asynchronous; the authoritative factor/session update is synchronous in W02."
+  },
+  "evidenceStatus": {
+    "api": "OPENAPI_CONTRACTED_NOT_VERIFIED; six operationIds and login HTTP 202 challenge variant are present; read-only GET /v1/auth/mfa has W01/W02 source adapters and tests, while the other five operations lack runtime adapters and no CI/production evidence is yet admitted",
+    "dto": "DTO_CONTRACT_BOUND; request/response schemas are registered, but runtime validation and secret-redaction tests are missing",
+    "entity": "PROPOSED",
+    "persistence": "MISSING_REMOTE_SCHEMA_READBACK_AND_REPLAY_FIELD",
+    "runtime": "PARTIAL_SOURCE_ONLY; MFA status projection implemented; enrollment, confirmation, login challenge, disable, recovery rotation and durable TOTP replay protection remain incomplete",
+    "securityE2E": "MISSING",
+    "mapping0": "MISSING",
+    "auth007": "BLOCKED_NOT_GREEN"
+  },
+  "sourceRefs": [
+    "contracts/alignment/mapping-batches/AUTH-007-real-evidence-reconciliation.v1.md",
+    "contracts/entity/AUTH-007-mfa-factor-field-contract.v1.json",
+    "contracts/entity/entity-catalog.v1.json",
+    "contracts/entity/entity-field-contract.v1.json",
+    "contracts/entity/entity-implementation-evidence.v1.json",
+    "contracts/openapi/v1/openapi.yaml",
+    "contracts/dto/auth-dto-contract.v1.json",
+    "contracts/dto/auth-dto-records.v1.json",
+    "workers/W01-payload/src/auth/w02-session-client.ts",
+    "workers/W02-identity/src/auth/better-auth.ts"
+  ],
+  "loginChallenge": {
+    "operationId": "authLogin",
+    "challengeResponseStatus": 202,
+    "responseDtoId": "DTO-AUTH-007-MFA-CHALLENGE-REQUIRED",
+    "nextOperationId": "authMfaChallengeVerify",
+    "sessionIssuedBeforeChallenge": false,
+    "challengeCookie": "short-lived HttpOnly W02-issued cookie"
+  }
+}

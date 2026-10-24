@@ -36,10 +36,11 @@ const errorCode = (value: unknown): string | null => {
 
 export async function callW02(
   path: string,
-  options: { request: Request; method?: string; body?: unknown } ,
+  options: { request: Request; method?: string; body?: unknown; headers?: HeadersInit } ,
 ): Promise<Response> {
   const service = await getW02Service()
   const headers = forwardedHeaders(options.request.headers)
+  new Headers(options.headers).forEach((value, key) => headers.set(key, value))
   let body: BodyInit | undefined
   if (options.body !== undefined) {
     headers.set('content-type', 'application/json; charset=utf-8')
@@ -86,6 +87,109 @@ export type BetterAuthPrincipal = {
     scopeType: 'global' | 'organization' | 'ip'
     scopeId: string | null
   }>
+}
+
+export type MfaStatusResponse = {
+  enabled: boolean
+  verified: boolean
+  enrolledAt: string | null
+}
+
+/**
+ * Read the authenticated user's MFA projection through the W01 -> W02 binding.
+ * The caller marker is added by this server-side adapter; clients cannot
+ * select or override the target user ID.
+ */
+export async function getMfaStatus(request: Request): Promise<MfaStatusResponse> {
+  const response = await callW02('/internal/auth/mfa/status', {
+    request,
+    headers: {
+      'X-LuckRead-Caller': 'W01',
+      'X-LuckRead-Transport-Version': '1.0',
+    },
+  })
+
+  let payload: unknown = null
+  try { payload = await response.json() } catch {}
+  const data = payload && typeof payload === 'object'
+    ? (payload as { data?: unknown }).data
+    : null
+  if (
+    response.ok &&
+    data && typeof data === 'object' &&
+    typeof (data as MfaStatusResponse).enabled === 'boolean' &&
+    typeof (data as MfaStatusResponse).verified === 'boolean' &&
+    ((data as MfaStatusResponse).enrolledAt === null ||
+      (typeof (data as MfaStatusResponse).enrolledAt === 'string' &&
+        Number.isFinite(Date.parse((data as MfaStatusResponse).enrolledAt as string))))
+  ) {
+    const value = data as MfaStatusResponse
+    return {
+      enabled: value.enabled,
+      verified: value.verified,
+      enrolledAt: value.enrolledAt,
+    }
+  }
+
+  throw new W02AuthClientError(response.status || 503, 'MFA status failed', errorCode(payload) ?? undefined)
+}
+
+const readSetCookieHeaders = (headers: Headers): string[] => {
+  const enhanced = headers as Headers & { getSetCookie?: () => string[] }
+  if (typeof enhanced.getSetCookie === 'function') {
+    return enhanced.getSetCookie.call(headers).filter((value) => value.length > 0)
+  }
+  const single = headers.get('set-cookie')
+  return single ? [single] : []
+}
+
+export type ConfirmMfaEnrollmentResult = {
+  status: MfaStatusResponse
+  setCookieHeaders: string[]
+}
+
+export async function confirmMfaEnrollment(
+  request: Request,
+  code: string,
+  idempotencyKey: string,
+): Promise<ConfirmMfaEnrollmentResult> {
+  const response = await callW02('/internal/auth/mfa/enrollment/confirm', {
+    request,
+    body: { code },
+    headers: {
+      'X-LuckRead-Caller': 'W01',
+      'X-LuckRead-Transport-Version': '1.0',
+      'Idempotency-Key': idempotencyKey,
+    },
+  })
+  let payload: unknown = null
+  try { payload = await response.json() } catch {}
+  const data = payload && typeof payload === 'object'
+    ? (payload as { data?: unknown }).data
+    : null
+  if (
+    response.ok &&
+    data && typeof data === 'object' &&
+    typeof (data as MfaStatusResponse).enabled === 'boolean' &&
+    typeof (data as MfaStatusResponse).verified === 'boolean' &&
+    typeof (data as MfaStatusResponse).enrolledAt === 'string' &&
+    Number.isFinite(Date.parse((data as MfaStatusResponse).enrolledAt as string))
+  ) {
+    const status = data as MfaStatusResponse
+    if (status.enabled && status.verified) {
+      return {
+        status: {
+          enabled: true,
+          verified: true,
+          enrolledAt: new Date(status.enrolledAt as string).toISOString(),
+        },
+        // These cookies are forwarded only after W02 validates the response DTO.
+        // The Better Auth JSON body (which contains its raw token) is never exposed.
+        setCookieHeaders: readSetCookieHeaders(response.headers),
+      }
+    }
+  }
+  throw new W02AuthClientError(response.status || 503, 'MFA enrollment confirmation failed', errorCode(payload) ?? undefined)
 }
 
 export async function getBetterAuthPrincipal(request: Request): Promise<BetterAuthPrincipal> {

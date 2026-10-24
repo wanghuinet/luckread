@@ -136,6 +136,17 @@ paths:
                       user:
                         $ref: '#/components/schemas/AuthSessionUser'
                   requestId: { type: string }
+        '202':
+          description: MFA challenge required; no authenticated session is issued until the challenge is verified.
+          headers:
+            Set-Cookie:
+              description: Short-lived HttpOnly MFA challenge cookie issued by W02.
+              schema: { type: string }
+            Cache-Control:
+              schema: { type: string, const: no-store }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthMfaChallengeRequired' }
         '400': { $ref: '#/components/responses/ValidationFailed' }
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '422': { $ref: '#/components/responses/ValidationFailed' }
@@ -551,6 +562,185 @@ paths:
           description: Session revoked or already-revoked owned session.
         '403': { $ref: '#/components/responses/PermissionDenied' }
         '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /auth/mfa:
+    get:
+      tags: [Auth]
+      summary: Read the current user's MFA status
+      operationId: authMfaStatus
+      responses:
+        '200':
+          description: Factor state projected by W02; never includes factor secrets or internal lockout/replay data.
+          headers:
+            Cache-Control: { schema: { type: string, const: no-store } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthMfaStatus' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/PermissionDenied' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /auth/mfa/enrollment:
+    post:
+      tags: [Auth]
+      summary: Start authenticated TOTP enrollment
+      description: >-
+        W01 validates the request and forwards it to W02. The secret-bearing
+        TOTP URI and plaintext recovery codes are returned only in this
+        no-store response and must never be logged or cached. Enrollment is
+        pending until a separate valid TOTP confirmation succeeds.
+      operationId: authMfaEnrollmentStart
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AuthMfaEnrollmentStartRequest' }
+      responses:
+        '200':
+          description: Pending enrollment; TOTP URI and recovery codes disclosed once.
+          headers:
+            Cache-Control: { schema: { type: string, const: no-store } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthMfaEnrollmentStartResponse' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/PermissionDenied' }
+        '409': { $ref: '#/components/responses/ClientError' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /auth/mfa/enrollment/confirm:
+    post:
+      tags: [Auth]
+      summary: Confirm TOTP enrollment with a valid one-time code
+      operationId: authMfaEnrollmentConfirm
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AuthMfaEnrollmentConfirmRequest' }
+      responses:
+        '200':
+          description: Enrollment confirmed and factor state updated by W02.
+          headers:
+            X-LuckRead-Session-Token:
+              description: Rotated native session credential, when Better Auth refreshes the current session.
+              schema: { type: string }
+            Set-Cookie:
+              description: Refreshed HttpOnly browser session cookie, when issued by W02.
+              schema: { type: string }
+            Cache-Control: { schema: { type: string, const: no-store } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthMfaStatus' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/PermissionDenied' }
+        '409': { $ref: '#/components/responses/ClientError' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /auth/mfa/challenge/verify:
+    post:
+      tags: [Auth]
+      summary: Complete a login MFA challenge
+      description: >-
+        This operation consumes a short-lived, identity-bound W02 challenge
+        cookie created by authLogin. It accepts a TOTP or single-use recovery
+        code, but never accepts trust-device flags or caller-supplied assurance.
+      security: []
+      operationId: authMfaChallengeVerify
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AuthMfaChallengeVerifyRequest' }
+      responses:
+        '200':
+          description: Challenge consumed and authentication completed.
+          headers:
+            X-LuckRead-Session-Token:
+              required: true
+              description: Opaque native session credential; never returned in JSON.
+              schema: { type: string, minLength: 1 }
+            Set-Cookie:
+              description: HttpOnly browser session cookie.
+              schema: { type: string }
+            Cache-Control: { schema: { type: string, const: no-store } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthMfaChallengeVerifyResponse' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '409': { $ref: '#/components/responses/ClientError' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /auth/mfa/disable:
+    post:
+      tags: [Auth]
+      summary: Disable the current user's MFA factor after password and TOTP step-up
+      description: Disabling MFA cannot rely on a password check alone; a valid TOTP step-up is required.
+      operationId: authMfaDisable
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AuthMfaDisableRequest' }
+      responses:
+        '204':
+          description: MFA disabled by W02; existing sessions are invalidated and privileged access fails closed.
+          headers:
+            Cache-Control: { schema: { type: string, const: no-store } }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/PermissionDenied' }
+        '409': { $ref: '#/components/responses/ClientError' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /auth/mfa/recovery-codes/rotate:
+    post:
+      tags: [Auth]
+      summary: Rotate recovery codes after password and TOTP step-up
+      description: Old recovery codes are atomically invalidated; new plaintext codes are disclosed once.
+      operationId: authMfaRecoveryCodesRotate
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AuthMfaRecoveryCodesRotateRequest' }
+      responses:
+        '200':
+          description: New one-time recovery codes; old recovery codes are no longer valid.
+          headers:
+            Cache-Control: { schema: { type: string, const: no-store } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthMfaRecoveryCodesRotateResponse' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/PermissionDenied' }
+        '409': { $ref: '#/components/responses/ClientError' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
   /users/me:
     get:
@@ -3773,7 +3963,856 @@ components:
       content:
         application/json:
           schema: { $ref: '#/components/schemas/ErrorResponse' }
+    ServiceUnavailable:
+      description: Service unavailable.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
   schemas:
+    AuthMfaStatus:
+      type: object
+      required: [enabled, verified, enrolledAt]
+      additionalProperties: false
+      properties:
+        enabled: { type: boolean }
+        verified: { type: boolean }
+        enrolledAt: { type: [string, 'null'], format: date-time }
+    AuthMfaChallengeRequired:
+      type: object
+      required: [data, requestId]
+      additionalProperties: false
+      properties:
+        data:
+          type: object
+          required: [mfaRequired, availableMethods]
+          additionalProperties: false
+          properties:
+            mfaRequired: { type: boolean, const: true }
+            availableMethods:
+              type: array
+              uniqueItems: true
+              items: { type: string, enum: [totp, recovery_code] }
+        requestId: { type: string }
+    AuthMfaEnrollmentStartRequest:
+      type: object
+      required: [currentPassword]
+      additionalProperties: false
+      properties:
+        currentPassword: { type: string, minLength: 1, writeOnly: true }
+    AuthMfaEnrollmentStartResponse:
+      type: object
+      required: [totpUri, recoveryCodes]
+      additionalProperties: false
+      properties:
+        totpUri: { type: string, format: uri, writeOnly: true }
+        recoveryCodes:
+          type: array
+          minItems: 1
+          items: { type: string, minLength: 8, writeOnly: true }
+    AuthMfaEnrollmentConfirmRequest:
+      type: object
+      required: [code]
+      additionalProperties: false
+      properties:
+        code: { type: string, pattern: '^\\d{6}      type: object
+      required: [id, email, emailVerified]
+      additionalProperties: false
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        email: { type: string, format: email }
+        name: { type: [string, 'null'] }
+        emailVerified: { type: boolean }
+        image: { type: [string, 'null'], format: uri }
+    ResourceId:
+      type: string
+      minLength: 1
+      maxLength: 128
+    Credential:
+      type: object
+      required: [credentialId, kind, active]
+      additionalProperties: false
+      properties:
+        credentialId:
+          $ref: '#/components/schemas/ResourceId'
+        kind:
+          type: string
+          enum: [username, email, phone]
+        active:
+          type: boolean
+    Cursor:
+      $ref: '../../schemas/common/cursor.json'
+    RequestId:
+      $ref: '../../schemas/common/request-id.json'
+    TraceId:
+      $ref: '../../schemas/common/trace-id.json'
+    ETag:
+      type: string
+      minLength: 1
+      maxLength: 256
+    AuthRegistrationConsent:
+      type: object
+      required: [purpose, policyVersion]
+      properties:
+        purpose: { type: string, enum: [ACCOUNT_REGISTRATION] }
+        policyVersion: { type: string }
+      additionalProperties: false
+    AccountState:
+      $ref: '../../enums/account-state.json'
+    ContentState:
+      $ref: '../../enums/content-state.json'
+    ErrorResponse:
+      $ref: '../../schemas/common/error-response.json'
+    ListResponse:
+      $ref: '../../schemas/common/list-response.json'
+    User:
+      type: object
+      required: [id, username, accountState, layer]
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        username: { type: string }
+        accountState: { $ref: '#/components/schemas/AccountState' }
+        layer: { type: string, pattern: '^L[0-8]$' }
+    Content:
+      type: object
+      required: [id, state, version, etag]
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        state: { $ref: '#/components/schemas/ContentState' }
+        version: { type: integer, minimum: 1 }
+        etag: { $ref: '#/components/schemas/ETag' }
+        creator:
+          description: Optional public author projection included by list endpoints to avoid per-item profile requests.
+          $ref: '#/components/schemas/PublicAuthor'
+    PublicAuthor:
+      type: object
+      required: [id, username, displayName, avatar]
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        username: { type: string }
+        displayName: { type: [string, 'null'] }
+        avatar: { type: [string, 'null'] }
+    ContentInput:
+      type: object
+      required: [title, bodyRef]
+      properties:
+        title: { type: string, minLength: 1, maxLength: 512 }
+        bodyRef: { type: string, description: R2 object reference }
+    Media:
+      type: object
+      required: [id, mimeType, size, checksum, status]
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        mimeType: { type: string }
+        size: { type: integer, minimum: 1 }
+        checksum: { type: string }
+        status: { enum: [INITIATED, UPLOADING, READY, FAILED, QUARANTINED] }
+    Comment:
+      type: object
+      required: [id, body, state]
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        body: { type: string }
+        state: { enum: [PENDING, PUBLISHED, REJECTED] }
+        author:
+          description: Optional public author projection included by list endpoints to avoid per-comment profile requests.
+          $ref: '#/components/schemas/PublicAuthor'
+    ContentPollOption:
+      type: object
+      required: [optionId, text, position, votes]
+      additionalProperties: false
+      properties:
+        optionId: { $ref: '#/components/schemas/ResourceId' }
+        text: { type: string, minLength: 1, maxLength: 50 }
+        position: { type: integer, minimum: 0, maximum: 3 }
+        votes: { type: integer, minimum: 0 }
+    ContentPoll:
+      type: object
+      required: [pollId, contentId, options, durationHours, endsAt, totalVotes, viewerOptionId, closed]
+      additionalProperties: false
+      properties:
+        pollId: { $ref: '#/components/schemas/ResourceId' }
+        contentId: { $ref: '#/components/schemas/ResourceId' }
+        options:
+          type: array
+          minItems: 2
+          maxItems: 4
+          items: { $ref: '#/components/schemas/ContentPollOption' }
+        durationHours: { type: integer, enum: [24, 72, 168] }
+        endsAt: { type: [string, 'null'], format: date-time }
+        totalVotes: { type: integer, minimum: 0 }
+        viewerOptionId: { type: [string, 'null'], maxLength: 128 }
+        closed: { type: boolean }
+    InteractionTarget:
+      type: object
+      required: [targetType, targetId]
+      properties:
+        targetType: { enum: [content, comment, creator, ip] }
+        targetId: { $ref: '#/components/schemas/ResourceId' }
+    Creator:
+      type: object
+      required: [id, userId, displayName]
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        userId: { $ref: '#/components/schemas/ResourceId' }
+        displayName: { type: string }
+    IP:
+      type: object
+      required: [id, name]
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        name: { type: string }
+    Organization:
+      type: object
+      required: [id, name]
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        name: { type: string }
+    ModerationQueueItem:
+      type: object
+      additionalProperties: false
+      required: [caseId, targetType, targetId, policyVersion, state, priority, version, createdAt]
+      properties:
+        caseId: { $ref: '#/components/schemas/ResourceId' }
+        targetType: { type: string, enum: [content, comment, creator, ip, user] }
+        targetId: { $ref: '#/components/schemas/ResourceId' }
+        policyVersion: { type: string, minLength: 1, maxLength: 128 }
+        state: { $ref: '../../enums/moderation-case-state.json' }
+        priority: { type: integer, minimum: 0 }
+        version: { type: integer, minimum: 1 }
+        createdAt: { type: string, format: date-time }
+    ModerationQueueResponse:
+      type: object
+      additionalProperties: false
+      required: [items, nextCursor, hasMore, requestId]
+      properties:
+        items:
+          type: array
+          maxItems: 50
+          items: { $ref: '#/components/schemas/ModerationQueueItem' }
+        nextCursor:
+          type: [string, 'null']
+        hasMore: { type: boolean }
+        requestId: { $ref: '#/components/schemas/RequestId' }
+    ModerationCaseResponse:
+      type: object
+      additionalProperties: false
+      required: [caseId, target, contentReference, policyVersion, currentDecision, evidenceRefs, status, version, createdAt, updatedAt]
+      properties:
+        caseId: { $ref: '#/components/schemas/ResourceId' }
+        target:
+          $ref: '#/components/schemas/ModerationTarget'
+        contentReference:
+          $ref: '#/components/schemas/ModerationContentReference'
+        policyVersion: { type: string, minLength: 1, maxLength: 128 }
+        currentDecision:
+          anyOf:
+            - { $ref: '#/components/schemas/ModerationDecisionSummary' }
+            - { type: 'null' }
+        evidenceRefs:
+          type: array
+          maxItems: 50
+          items: { type: string }
+        status:
+          $ref: '../../enums/moderation-case-state.json'
+        version: { type: integer, minimum: 1 }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    ModerationTarget:
+      type: object
+      additionalProperties: false
+      required: [targetType, targetId]
+      properties:
+        targetType: { type: string, enum: [content, comment, creator, ip, user] }
+        targetId: { $ref: '#/components/schemas/ResourceId' }
+    ModerationContentReference:
+      type: object
+      additionalProperties: false
+      required: [contentId]
+      properties:
+        contentId: { $ref: '#/components/schemas/ResourceId' }
+    ModerationDecisionSummary:
+      type: object
+      additionalProperties: false
+      required: [decisionId, outcome, policyVersion, effectiveAt]
+      properties:
+        decisionId: { $ref: '#/components/schemas/ResourceId' }
+        outcome: { type: string, enum: [APPROVED, REJECTED] }
+        policyVersion: { type: string, minLength: 1, maxLength: 128 }
+        effectiveAt: { type: string, format: date-time }
+    ModerationDecisionRequest:
+      type: object
+      additionalProperties: false
+      required: [expectedVersion, decision, policyVersion, reasonCode, severity, scope, effectiveAt]
+      properties:
+        expectedVersion: { type: integer, minimum: 1 }
+        decision: { type: string, enum: [APPROVED, REJECTED] }
+        policyVersion: { type: string, minLength: 1, maxLength: 128 }
+        reasonCode: { type: string, minLength: 1, maxLength: 128 }
+        severity: { type: string, minLength: 1, maxLength: 64 }
+        scope: { type: string, minLength: 1, maxLength: 128 }
+        effectiveAt: { type: string, format: date-time }
+        expiresAt:
+          type: [string, 'null']
+          format: date-time
+    ModerationDecisionResponse:
+      type: object
+      additionalProperties: false
+      required: [caseId, decisionId, outcome, version, effectiveAt, requestId]
+      properties:
+        caseId: { $ref: '#/components/schemas/ResourceId' }
+        decisionId: { $ref: '#/components/schemas/ResourceId' }
+        outcome: { type: string, enum: [APPROVED, REJECTED] }
+        version: { type: integer, minimum: 1 }
+        effectiveAt: { type: string, format: date-time }
+        requestId: { $ref: '#/components/schemas/RequestId' }
+ }
+, writeOnly: true }
+    AuthMfaChallengeVerifyRequest:
+      type: object
+      required: [code, method]
+      additionalProperties: false
+      properties:
+        code: { type: string, minLength: 6, maxLength: 128, writeOnly: true }
+        method: { type: string, enum: [totp, recovery_code] }
+    AuthMfaChallengeVerifyResponse:
+      type: object
+      required: [data, requestId]
+      additionalProperties: false
+      properties:
+        data:
+          type: object
+          required: [user]
+          additionalProperties: false
+          properties:
+            user: { $ref: '#/components/schemas/AuthSessionUser' }
+        requestId: { type: string }
+    AuthMfaDisableRequest:
+      type: object
+      required: [currentPassword, code]
+      additionalProperties: false
+      properties:
+        currentPassword: { type: string, minLength: 1, writeOnly: true }
+        code: { type: string, pattern: '^\\d{6}      type: object
+      required: [id, email, emailVerified]
+      additionalProperties: false
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        email: { type: string, format: email }
+        name: { type: [string, 'null'] }
+        emailVerified: { type: boolean }
+        image: { type: [string, 'null'], format: uri }
+    ResourceId:
+      type: string
+      minLength: 1
+      maxLength: 128
+    Credential:
+      type: object
+      required: [credentialId, kind, active]
+      additionalProperties: false
+      properties:
+        credentialId:
+          $ref: '#/components/schemas/ResourceId'
+        kind:
+          type: string
+          enum: [username, email, phone]
+        active:
+          type: boolean
+    Cursor:
+      $ref: '../../schemas/common/cursor.json'
+    RequestId:
+      $ref: '../../schemas/common/request-id.json'
+    TraceId:
+      $ref: '../../schemas/common/trace-id.json'
+    ETag:
+      type: string
+      minLength: 1
+      maxLength: 256
+    AuthRegistrationConsent:
+      type: object
+      required: [purpose, policyVersion]
+      properties:
+        purpose: { type: string, enum: [ACCOUNT_REGISTRATION] }
+        policyVersion: { type: string }
+      additionalProperties: false
+    AccountState:
+      $ref: '../../enums/account-state.json'
+    ContentState:
+      $ref: '../../enums/content-state.json'
+    ErrorResponse:
+      $ref: '../../schemas/common/error-response.json'
+    ListResponse:
+      $ref: '../../schemas/common/list-response.json'
+    User:
+      type: object
+      required: [id, username, accountState, layer]
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        username: { type: string }
+        accountState: { $ref: '#/components/schemas/AccountState' }
+        layer: { type: string, pattern: '^L[0-8]$' }
+    Content:
+      type: object
+      required: [id, state, version, etag]
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        state: { $ref: '#/components/schemas/ContentState' }
+        version: { type: integer, minimum: 1 }
+        etag: { $ref: '#/components/schemas/ETag' }
+        creator:
+          description: Optional public author projection included by list endpoints to avoid per-item profile requests.
+          $ref: '#/components/schemas/PublicAuthor'
+    PublicAuthor:
+      type: object
+      required: [id, username, displayName, avatar]
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        username: { type: string }
+        displayName: { type: [string, 'null'] }
+        avatar: { type: [string, 'null'] }
+    ContentInput:
+      type: object
+      required: [title, bodyRef]
+      properties:
+        title: { type: string, minLength: 1, maxLength: 512 }
+        bodyRef: { type: string, description: R2 object reference }
+    Media:
+      type: object
+      required: [id, mimeType, size, checksum, status]
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        mimeType: { type: string }
+        size: { type: integer, minimum: 1 }
+        checksum: { type: string }
+        status: { enum: [INITIATED, UPLOADING, READY, FAILED, QUARANTINED] }
+    Comment:
+      type: object
+      required: [id, body, state]
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        body: { type: string }
+        state: { enum: [PENDING, PUBLISHED, REJECTED] }
+        author:
+          description: Optional public author projection included by list endpoints to avoid per-comment profile requests.
+          $ref: '#/components/schemas/PublicAuthor'
+    ContentPollOption:
+      type: object
+      required: [optionId, text, position, votes]
+      additionalProperties: false
+      properties:
+        optionId: { $ref: '#/components/schemas/ResourceId' }
+        text: { type: string, minLength: 1, maxLength: 50 }
+        position: { type: integer, minimum: 0, maximum: 3 }
+        votes: { type: integer, minimum: 0 }
+    ContentPoll:
+      type: object
+      required: [pollId, contentId, options, durationHours, endsAt, totalVotes, viewerOptionId, closed]
+      additionalProperties: false
+      properties:
+        pollId: { $ref: '#/components/schemas/ResourceId' }
+        contentId: { $ref: '#/components/schemas/ResourceId' }
+        options:
+          type: array
+          minItems: 2
+          maxItems: 4
+          items: { $ref: '#/components/schemas/ContentPollOption' }
+        durationHours: { type: integer, enum: [24, 72, 168] }
+        endsAt: { type: [string, 'null'], format: date-time }
+        totalVotes: { type: integer, minimum: 0 }
+        viewerOptionId: { type: [string, 'null'], maxLength: 128 }
+        closed: { type: boolean }
+    InteractionTarget:
+      type: object
+      required: [targetType, targetId]
+      properties:
+        targetType: { enum: [content, comment, creator, ip] }
+        targetId: { $ref: '#/components/schemas/ResourceId' }
+    Creator:
+      type: object
+      required: [id, userId, displayName]
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        userId: { $ref: '#/components/schemas/ResourceId' }
+        displayName: { type: string }
+    IP:
+      type: object
+      required: [id, name]
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        name: { type: string }
+    Organization:
+      type: object
+      required: [id, name]
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        name: { type: string }
+    ModerationQueueItem:
+      type: object
+      additionalProperties: false
+      required: [caseId, targetType, targetId, policyVersion, state, priority, version, createdAt]
+      properties:
+        caseId: { $ref: '#/components/schemas/ResourceId' }
+        targetType: { type: string, enum: [content, comment, creator, ip, user] }
+        targetId: { $ref: '#/components/schemas/ResourceId' }
+        policyVersion: { type: string, minLength: 1, maxLength: 128 }
+        state: { $ref: '../../enums/moderation-case-state.json' }
+        priority: { type: integer, minimum: 0 }
+        version: { type: integer, minimum: 1 }
+        createdAt: { type: string, format: date-time }
+    ModerationQueueResponse:
+      type: object
+      additionalProperties: false
+      required: [items, nextCursor, hasMore, requestId]
+      properties:
+        items:
+          type: array
+          maxItems: 50
+          items: { $ref: '#/components/schemas/ModerationQueueItem' }
+        nextCursor:
+          type: [string, 'null']
+        hasMore: { type: boolean }
+        requestId: { $ref: '#/components/schemas/RequestId' }
+    ModerationCaseResponse:
+      type: object
+      additionalProperties: false
+      required: [caseId, target, contentReference, policyVersion, currentDecision, evidenceRefs, status, version, createdAt, updatedAt]
+      properties:
+        caseId: { $ref: '#/components/schemas/ResourceId' }
+        target:
+          $ref: '#/components/schemas/ModerationTarget'
+        contentReference:
+          $ref: '#/components/schemas/ModerationContentReference'
+        policyVersion: { type: string, minLength: 1, maxLength: 128 }
+        currentDecision:
+          anyOf:
+            - { $ref: '#/components/schemas/ModerationDecisionSummary' }
+            - { type: 'null' }
+        evidenceRefs:
+          type: array
+          maxItems: 50
+          items: { type: string }
+        status:
+          $ref: '../../enums/moderation-case-state.json'
+        version: { type: integer, minimum: 1 }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    ModerationTarget:
+      type: object
+      additionalProperties: false
+      required: [targetType, targetId]
+      properties:
+        targetType: { type: string, enum: [content, comment, creator, ip, user] }
+        targetId: { $ref: '#/components/schemas/ResourceId' }
+    ModerationContentReference:
+      type: object
+      additionalProperties: false
+      required: [contentId]
+      properties:
+        contentId: { $ref: '#/components/schemas/ResourceId' }
+    ModerationDecisionSummary:
+      type: object
+      additionalProperties: false
+      required: [decisionId, outcome, policyVersion, effectiveAt]
+      properties:
+        decisionId: { $ref: '#/components/schemas/ResourceId' }
+        outcome: { type: string, enum: [APPROVED, REJECTED] }
+        policyVersion: { type: string, minLength: 1, maxLength: 128 }
+        effectiveAt: { type: string, format: date-time }
+    ModerationDecisionRequest:
+      type: object
+      additionalProperties: false
+      required: [expectedVersion, decision, policyVersion, reasonCode, severity, scope, effectiveAt]
+      properties:
+        expectedVersion: { type: integer, minimum: 1 }
+        decision: { type: string, enum: [APPROVED, REJECTED] }
+        policyVersion: { type: string, minLength: 1, maxLength: 128 }
+        reasonCode: { type: string, minLength: 1, maxLength: 128 }
+        severity: { type: string, minLength: 1, maxLength: 64 }
+        scope: { type: string, minLength: 1, maxLength: 128 }
+        effectiveAt: { type: string, format: date-time }
+        expiresAt:
+          type: [string, 'null']
+          format: date-time
+    ModerationDecisionResponse:
+      type: object
+      additionalProperties: false
+      required: [caseId, decisionId, outcome, version, effectiveAt, requestId]
+      properties:
+        caseId: { $ref: '#/components/schemas/ResourceId' }
+        decisionId: { $ref: '#/components/schemas/ResourceId' }
+        outcome: { type: string, enum: [APPROVED, REJECTED] }
+        version: { type: integer, minimum: 1 }
+        effectiveAt: { type: string, format: date-time }
+        requestId: { $ref: '#/components/schemas/RequestId' }
+ }
+, writeOnly: true }
+    AuthMfaRecoveryCodesRotateRequest:
+      type: object
+      required: [currentPassword, code]
+      additionalProperties: false
+      properties:
+        currentPassword: { type: string, minLength: 1, writeOnly: true }
+        code: { type: string, pattern: '^\\d{6}      type: object
+      required: [id, email, emailVerified]
+      additionalProperties: false
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        email: { type: string, format: email }
+        name: { type: [string, 'null'] }
+        emailVerified: { type: boolean }
+        image: { type: [string, 'null'], format: uri }
+    ResourceId:
+      type: string
+      minLength: 1
+      maxLength: 128
+    Credential:
+      type: object
+      required: [credentialId, kind, active]
+      additionalProperties: false
+      properties:
+        credentialId:
+          $ref: '#/components/schemas/ResourceId'
+        kind:
+          type: string
+          enum: [username, email, phone]
+        active:
+          type: boolean
+    Cursor:
+      $ref: '../../schemas/common/cursor.json'
+    RequestId:
+      $ref: '../../schemas/common/request-id.json'
+    TraceId:
+      $ref: '../../schemas/common/trace-id.json'
+    ETag:
+      type: string
+      minLength: 1
+      maxLength: 256
+    AuthRegistrationConsent:
+      type: object
+      required: [purpose, policyVersion]
+      properties:
+        purpose: { type: string, enum: [ACCOUNT_REGISTRATION] }
+        policyVersion: { type: string }
+      additionalProperties: false
+    AccountState:
+      $ref: '../../enums/account-state.json'
+    ContentState:
+      $ref: '../../enums/content-state.json'
+    ErrorResponse:
+      $ref: '../../schemas/common/error-response.json'
+    ListResponse:
+      $ref: '../../schemas/common/list-response.json'
+    User:
+      type: object
+      required: [id, username, accountState, layer]
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        username: { type: string }
+        accountState: { $ref: '#/components/schemas/AccountState' }
+        layer: { type: string, pattern: '^L[0-8]$' }
+    Content:
+      type: object
+      required: [id, state, version, etag]
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        state: { $ref: '#/components/schemas/ContentState' }
+        version: { type: integer, minimum: 1 }
+        etag: { $ref: '#/components/schemas/ETag' }
+        creator:
+          description: Optional public author projection included by list endpoints to avoid per-item profile requests.
+          $ref: '#/components/schemas/PublicAuthor'
+    PublicAuthor:
+      type: object
+      required: [id, username, displayName, avatar]
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        username: { type: string }
+        displayName: { type: [string, 'null'] }
+        avatar: { type: [string, 'null'] }
+    ContentInput:
+      type: object
+      required: [title, bodyRef]
+      properties:
+        title: { type: string, minLength: 1, maxLength: 512 }
+        bodyRef: { type: string, description: R2 object reference }
+    Media:
+      type: object
+      required: [id, mimeType, size, checksum, status]
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        mimeType: { type: string }
+        size: { type: integer, minimum: 1 }
+        checksum: { type: string }
+        status: { enum: [INITIATED, UPLOADING, READY, FAILED, QUARANTINED] }
+    Comment:
+      type: object
+      required: [id, body, state]
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        body: { type: string }
+        state: { enum: [PENDING, PUBLISHED, REJECTED] }
+        author:
+          description: Optional public author projection included by list endpoints to avoid per-comment profile requests.
+          $ref: '#/components/schemas/PublicAuthor'
+    ContentPollOption:
+      type: object
+      required: [optionId, text, position, votes]
+      additionalProperties: false
+      properties:
+        optionId: { $ref: '#/components/schemas/ResourceId' }
+        text: { type: string, minLength: 1, maxLength: 50 }
+        position: { type: integer, minimum: 0, maximum: 3 }
+        votes: { type: integer, minimum: 0 }
+    ContentPoll:
+      type: object
+      required: [pollId, contentId, options, durationHours, endsAt, totalVotes, viewerOptionId, closed]
+      additionalProperties: false
+      properties:
+        pollId: { $ref: '#/components/schemas/ResourceId' }
+        contentId: { $ref: '#/components/schemas/ResourceId' }
+        options:
+          type: array
+          minItems: 2
+          maxItems: 4
+          items: { $ref: '#/components/schemas/ContentPollOption' }
+        durationHours: { type: integer, enum: [24, 72, 168] }
+        endsAt: { type: [string, 'null'], format: date-time }
+        totalVotes: { type: integer, minimum: 0 }
+        viewerOptionId: { type: [string, 'null'], maxLength: 128 }
+        closed: { type: boolean }
+    InteractionTarget:
+      type: object
+      required: [targetType, targetId]
+      properties:
+        targetType: { enum: [content, comment, creator, ip] }
+        targetId: { $ref: '#/components/schemas/ResourceId' }
+    Creator:
+      type: object
+      required: [id, userId, displayName]
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        userId: { $ref: '#/components/schemas/ResourceId' }
+        displayName: { type: string }
+    IP:
+      type: object
+      required: [id, name]
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        name: { type: string }
+    Organization:
+      type: object
+      required: [id, name]
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        name: { type: string }
+    ModerationQueueItem:
+      type: object
+      additionalProperties: false
+      required: [caseId, targetType, targetId, policyVersion, state, priority, version, createdAt]
+      properties:
+        caseId: { $ref: '#/components/schemas/ResourceId' }
+        targetType: { type: string, enum: [content, comment, creator, ip, user] }
+        targetId: { $ref: '#/components/schemas/ResourceId' }
+        policyVersion: { type: string, minLength: 1, maxLength: 128 }
+        state: { $ref: '../../enums/moderation-case-state.json' }
+        priority: { type: integer, minimum: 0 }
+        version: { type: integer, minimum: 1 }
+        createdAt: { type: string, format: date-time }
+    ModerationQueueResponse:
+      type: object
+      additionalProperties: false
+      required: [items, nextCursor, hasMore, requestId]
+      properties:
+        items:
+          type: array
+          maxItems: 50
+          items: { $ref: '#/components/schemas/ModerationQueueItem' }
+        nextCursor:
+          type: [string, 'null']
+        hasMore: { type: boolean }
+        requestId: { $ref: '#/components/schemas/RequestId' }
+    ModerationCaseResponse:
+      type: object
+      additionalProperties: false
+      required: [caseId, target, contentReference, policyVersion, currentDecision, evidenceRefs, status, version, createdAt, updatedAt]
+      properties:
+        caseId: { $ref: '#/components/schemas/ResourceId' }
+        target:
+          $ref: '#/components/schemas/ModerationTarget'
+        contentReference:
+          $ref: '#/components/schemas/ModerationContentReference'
+        policyVersion: { type: string, minLength: 1, maxLength: 128 }
+        currentDecision:
+          anyOf:
+            - { $ref: '#/components/schemas/ModerationDecisionSummary' }
+            - { type: 'null' }
+        evidenceRefs:
+          type: array
+          maxItems: 50
+          items: { type: string }
+        status:
+          $ref: '../../enums/moderation-case-state.json'
+        version: { type: integer, minimum: 1 }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    ModerationTarget:
+      type: object
+      additionalProperties: false
+      required: [targetType, targetId]
+      properties:
+        targetType: { type: string, enum: [content, comment, creator, ip, user] }
+        targetId: { $ref: '#/components/schemas/ResourceId' }
+    ModerationContentReference:
+      type: object
+      additionalProperties: false
+      required: [contentId]
+      properties:
+        contentId: { $ref: '#/components/schemas/ResourceId' }
+    ModerationDecisionSummary:
+      type: object
+      additionalProperties: false
+      required: [decisionId, outcome, policyVersion, effectiveAt]
+      properties:
+        decisionId: { $ref: '#/components/schemas/ResourceId' }
+        outcome: { type: string, enum: [APPROVED, REJECTED] }
+        policyVersion: { type: string, minLength: 1, maxLength: 128 }
+        effectiveAt: { type: string, format: date-time }
+    ModerationDecisionRequest:
+      type: object
+      additionalProperties: false
+      required: [expectedVersion, decision, policyVersion, reasonCode, severity, scope, effectiveAt]
+      properties:
+        expectedVersion: { type: integer, minimum: 1 }
+        decision: { type: string, enum: [APPROVED, REJECTED] }
+        policyVersion: { type: string, minLength: 1, maxLength: 128 }
+        reasonCode: { type: string, minLength: 1, maxLength: 128 }
+        severity: { type: string, minLength: 1, maxLength: 64 }
+        scope: { type: string, minLength: 1, maxLength: 128 }
+        effectiveAt: { type: string, format: date-time }
+        expiresAt:
+          type: [string, 'null']
+          format: date-time
+    ModerationDecisionResponse:
+      type: object
+      additionalProperties: false
+      required: [caseId, decisionId, outcome, version, effectiveAt, requestId]
+      properties:
+        caseId: { $ref: '#/components/schemas/ResourceId' }
+        decisionId: { $ref: '#/components/schemas/ResourceId' }
+        outcome: { type: string, enum: [APPROVED, REJECTED] }
+        version: { type: integer, minimum: 1 }
+        effectiveAt: { type: string, format: date-time }
+        requestId: { $ref: '#/components/schemas/RequestId' }
+ }
+, writeOnly: true }
+    AuthMfaRecoveryCodesRotateResponse:
+      type: object
+      required: [recoveryCodes]
+      additionalProperties: false
+      properties:
+        recoveryCodes:
+          type: array
+          minItems: 1
+          items: { type: string, minLength: 8, writeOnly: true }
     AuthSessionUser:
       type: object
       required: [id, email, emailVerified]

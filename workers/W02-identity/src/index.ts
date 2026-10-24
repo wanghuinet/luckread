@@ -12,6 +12,12 @@ import {
 import { resolveBetterAuthPrincipal } from './auth/principal.js'
 import { handleCurrentUserSessionList } from './auth/session-list.js'
 import { handleCurrentUserSessionRevoke } from './auth/session-revoke.js'
+import { handleMfaStatusRequest } from './auth/mfa-status.js'
+import { handleMfaEnrollmentStartRequest } from './auth/mfa-enrollment-start.js'
+import { handleMfaEnrollmentConfirmRequest } from './auth/mfa-enrollment-confirm.js'
+import { verifyTargetBoundSingleApproval, L8BootstrapApprovalError } from './authz/l8-genesis-bootstrap-approval.js'
+import { bootstrapSuperAdmin, L8BootstrapCommandError } from './authz/l8-genesis-bootstrap-command.js'
+import { checkL8BootstrapReadiness, L8BootstrapReadinessError } from './authz/l8-genesis-bootstrap-readiness.js'
 
 interface Env {
   D1_01: D1Database
@@ -21,12 +27,6 @@ interface Env {
   AUTH_EMAIL_FROM?: string
   AUTH013_QUEUE: Queue
   AUTH013_PROJECTION_QUEUE: Queue
-}
-
-type ResolveLayerRequest = {
-  subjectId: string
-  accountState: string
-  now?: string
 }
 
 const readJsonBody = async <T>(request: Request): Promise<T | null> => {
@@ -191,6 +191,18 @@ export default {
         return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'registration rollback unavailable' } }, 503)
       }
     }
+    if (request.method === 'POST' && url.pathname === '/internal/auth/mfa/enrollment/start') {
+      return handleMfaEnrollmentStartRequest(env, request)
+    }
+
+    if (request.method === 'POST' && url.pathname === '/internal/auth/mfa/enrollment/confirm') {
+      return handleMfaEnrollmentConfirmRequest(env, request)
+    }
+
+    if (request.method === 'POST' && url.pathname === '/internal/auth/mfa/status') {
+      return handleMfaStatusRequest(env, request)
+    }
+
     if (request.method === 'POST' && url.pathname === '/internal/auth/session/list') {
       return handleCurrentUserSessionList(env, request)
     }
@@ -200,16 +212,190 @@ export default {
     }
 
     if (request.method === 'POST' && url.pathname === '/internal/authz/resolve-layer') {
-      const body = await readJsonBody<ResolveLayerRequest>(request)
-      if (!body || typeof body.subjectId !== 'string' || typeof body.accountState !== 'string') {
+      const body = await readJsonBody<{ subjectId?: unknown }>(request)
+      if (!body || typeof body.subjectId !== 'string' || body.subjectId.length < 1 || body.subjectId.length > 128) {
         return json({ decision: 'DENY' }, 400)
       }
 
       try {
-        const result = await resolveGlobalLayer(env.D1_01, body.subjectId, body.accountState, body.now)
+        // W02 owns account-state truth. Never trust accountState or evaluation
+        // time supplied by W01 or another internal caller for a privileged role.
+        const account = await env.D1_01.prepare(
+          'SELECT account_state AS accountState FROM "user" WHERE id = ? LIMIT 1',
+        ).bind(body.subjectId).first<{ accountState: string }>()
+        if (!account || typeof account.accountState !== 'string') {
+          return json({ decision: 'DENY' })
+        }
+        const result = await resolveGlobalLayer(
+          env.D1_01,
+          body.subjectId,
+          account.accountState,
+          new Date().toISOString(),
+        )
         return json(result)
       } catch {
         return json({ decision: 'DENY' }, 503)
+      }
+    }
+
+    if (request.method === 'POST' && url.pathname === '/internal/authz/bootstrap-super-admin/readiness') {
+      // This is a read-only preflight. It independently verifies the same
+      // protected GitHub workflow identity and target-bound single protected environment approval as
+      // the write route but never calls the grant command.
+      if (
+        request.headers.get('X-LuckRead-Caller') !== 'W01' ||
+        request.headers.get('X-LuckRead-Transport-Version') !== '1.0'
+      ) {
+        return json({ error: { code: 'FORBIDDEN', message: 'authorized W01 service boundary required' } }, 403)
+      }
+
+      const authorization = request.headers.get('authorization') ?? ''
+      const tokenMatch = authorization.match(/^Bearer\s+(\S+)$/i)
+      if (!tokenMatch || tokenMatch[1].length > 8192) {
+        return json({ error: { code: 'UNAUTHENTICATED', message: 'GitHub workflow identity token required' } }, 401)
+      }
+
+      const body = await readJsonBody<{ requestPrNumber?: unknown; githubToken?: unknown }>(request)
+      if (
+        !body ||
+        !Number.isSafeInteger(body.requestPrNumber) ||
+        Number(body.requestPrNumber) < 1 ||
+        Number(body.requestPrNumber) > 2_147_483_647 ||
+        typeof body.githubToken !== 'string' ||
+        body.githubToken.length < 20 ||
+        body.githubToken.length > 4096
+      ) {
+        return json({ error: { code: 'VALIDATION_FAILED', message: 'invalid bootstrap readiness envelope' } }, 400)
+      }
+
+      try {
+        const approval = await verifyTargetBoundSingleApproval({
+          oidcToken: tokenMatch[1],
+          githubToken: body.githubToken,
+          requestPrNumber: body.requestPrNumber as number,
+        })
+        const readiness = await checkL8BootstrapReadiness(env.D1_01, approval)
+        return json({ data: readiness })
+      } catch (error) {
+        if (error instanceof L8BootstrapApprovalError) {
+          const status =
+            error.code === 'OIDC_FORBIDDEN' || error.code === 'SINGLE_APPROVAL_ENVIRONMENT_NOT_CONFIGURED' ? 403 :
+            error.code === 'PR_NOT_MERGED' || error.code === 'REQUEST_FILE_MISSING' || error.code === 'REQUEST_PR_SCOPE_INVALID' ? 409 :
+            error.code === 'REQUEST_EXPIRED_OR_INVALID' ? 412 :
+            error.code === 'VALIDATION_FAILED' || error.code === 'OIDC_INVALID' ? 400 : 503
+          return json({
+            error: {
+              code: error.code,
+              message: status === 403 ? 'single protected environment approval or trusted workflow identity was denied' :
+                status === 409 ? 'bootstrap request PR is not an eligible merged request' :
+                status === 412 ? 'bootstrap request has expired or violates the request contract' :
+                status === 400 ? 'bootstrap evidence was invalid' :
+                'bootstrap evidence verification is temporarily unavailable',
+            },
+          }, status)
+        }
+        if (error instanceof L8BootstrapReadinessError) {
+          const status =
+            error.code === 'REQUEST_EXPIRED_OR_INVALID' ? 412 :
+            error.code === 'TARGET_NOT_ELIGIBLE' || error.code === 'VERIFIED_ROLE_REQUIRED' ? 403 :
+            error.code === 'L8_ALREADY_EXISTS' || error.code === 'BOOTSTRAP_ALREADY_CONSUMED' ? 409 :
+            error.code === 'ROLE_MAPPING_INVALID' || error.code === 'SCHEMA_NOT_READY' ? 503 : 400
+          return json({
+            error: {
+              code: error.code,
+              message: status === 400 ? 'invalid readiness request' :
+                status === 403 ? 'target account is not eligible for bootstrap' :
+                status === 409 ? 'the one-time L8 bootstrap path is no longer available' :
+                status === 412 ? 'bootstrap request has expired' :
+                'required production schema or authorization state is not ready',
+            },
+          }, status)
+        }
+        return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'L8 bootstrap readiness unavailable' } }, 503)
+      }
+    }
+
+    if (request.method === 'POST' && url.pathname === '/internal/authz/bootstrap-super-admin') {
+      // First-L8 bootstrap is workflow-authenticated, not application-session-authenticated.
+      // W01 is only the public boundary; W02 independently verifies GitHub OIDC, the merged
+      // target-bound request PR, one required environment reviewer, one-time state, and the grant.
+      if (
+        request.headers.get('X-LuckRead-Caller') !== 'W01' ||
+        request.headers.get('X-LuckRead-Transport-Version') !== '1.0'
+      ) {
+        return json({ error: { code: 'FORBIDDEN', message: 'authorized W01 service boundary required' } }, 403)
+      }
+
+      const authorization = request.headers.get('authorization') ?? ''
+      const tokenMatch = authorization.match(/^Bearer\s+(\S+)$/i)
+      if (!tokenMatch || tokenMatch[1].length > 8192) {
+        return json({ error: { code: 'UNAUTHENTICATED', message: 'GitHub workflow identity token required' } }, 401)
+      }
+
+      const body = await readJsonBody<{ requestPrNumber?: unknown; githubToken?: unknown }>(request)
+      if (
+        !body ||
+        !Number.isSafeInteger(body.requestPrNumber) ||
+        Number(body.requestPrNumber) < 1 ||
+        Number(body.requestPrNumber) > 2_147_483_647 ||
+        typeof body.githubToken !== 'string' ||
+        body.githubToken.length < 20 ||
+        body.githubToken.length > 4096
+      ) {
+        return json({ error: { code: 'VALIDATION_FAILED', message: 'invalid bootstrap request envelope' } }, 400)
+      }
+
+      try {
+        const approval = await verifyTargetBoundSingleApproval({
+          oidcToken: tokenMatch[1],
+          githubToken: body.githubToken,
+          requestPrNumber: body.requestPrNumber as number,
+        })
+        const grant = await bootstrapSuperAdmin(env.D1_01, approval)
+        return json({
+          data: {
+            ...grant,
+            approvalRef: 'github-pr:' + approval.requestPrNumber + '@' + approval.requestMergeSha,
+            approvedReviewers: approval.approvedReviewers,
+          },
+        })
+      } catch (error) {
+        if (error instanceof L8BootstrapApprovalError) {
+          const status =
+            error.code === 'OIDC_FORBIDDEN' || error.code === 'SINGLE_APPROVAL_ENVIRONMENT_NOT_CONFIGURED' ? 403 :
+            error.code === 'PR_NOT_MERGED' || error.code === 'REQUEST_FILE_MISSING' || error.code === 'REQUEST_PR_SCOPE_INVALID' ? 409 :
+            error.code === 'REQUEST_EXPIRED_OR_INVALID' ? 412 :
+            error.code === 'VALIDATION_FAILED' || error.code === 'OIDC_INVALID' ? 400 : 503
+          return json({
+            error: {
+              code: error.code,
+              message: status === 403 ? 'single protected environment approval or trusted workflow identity was denied' :
+                status === 409 ? 'bootstrap request PR is not an eligible merged request' :
+                status === 412 ? 'bootstrap request has expired or violates the request contract' :
+                status === 400 ? 'bootstrap evidence was invalid' :
+                'bootstrap evidence verification is temporarily unavailable',
+            },
+          }, status)
+        }
+        if (error instanceof L8BootstrapCommandError) {
+          const status =
+            error.code === 'VALIDATION_FAILED' ? 400 :
+            error.code === 'TARGET_NOT_ELIGIBLE' || error.code === 'VERIFIED_ROLE_REQUIRED' ? 403 :
+            error.code === 'BOOTSTRAP_ALREADY_CONSUMED' || error.code === 'L8_ALREADY_EXISTS' ? 409 :
+            error.code === 'REQUEST_EXPIRED_OR_INVALID' ? 412 : 503
+          return json({
+            error: {
+              code: error.code,
+              message:
+                status === 400 ? 'invalid L8 bootstrap command' :
+                status === 403 ? 'target account is not eligible for bootstrap' :
+                status === 409 ? 'the one-time L8 bootstrap path is no longer available' :
+                status === 412 ? 'bootstrap request has expired' :
+                'L8 bootstrap could not be committed',
+            },
+          }, status)
+        }
+        return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'L8 bootstrap service unavailable' } }, 503)
       }
     }
 

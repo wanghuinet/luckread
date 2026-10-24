@@ -100,6 +100,96 @@
       "schemaRef": "#/paths/~1users~1{userId}~1account-state/post/responses/200/content/application~1json/schema",
       "fieldAuthority": "OPENAPI_RESPONSE_SCHEMA",
       "runtimeStatus": "NOT_IMPLEMENTED_EVIDENCE"
+    },
+    {
+      "dtoId": "DTO-AUTH-007-MFA-STATUS",
+      "kind": "response",
+      "featureId": "AUTH-007",
+      "operationId": "authMfaStatus",
+      "schemaRef": "#/paths/~1auth~1mfa/get/responses/200/content/application~1json/schema",
+      "fieldAuthority": "OPENAPI_RESPONSE_SCHEMA",
+      "runtimeStatus": "NOT_IMPLEMENTED_EVIDENCE"
+    },
+    {
+      "dtoId": "DTO-AUTH-007-MFA-ENROLLMENT-START-REQUEST",
+      "kind": "request",
+      "featureId": "AUTH-007",
+      "operationId": "authMfaEnrollmentStart",
+      "schemaRef": "#/paths/~1auth~1mfa~1enrollment/post/requestBody/content/application~1json/schema",
+      "fieldAuthority": "OPENAPI_REQUEST_SCHEMA",
+      "runtimeStatus": "NOT_IMPLEMENTED_EVIDENCE"
+    },
+    {
+      "dtoId": "DTO-AUTH-007-MFA-ENROLLMENT-START-RESPONSE",
+      "kind": "response",
+      "featureId": "AUTH-007",
+      "operationId": "authMfaEnrollmentStart",
+      "schemaRef": "#/paths/~1auth~1mfa~1enrollment/post/responses/200/content/application~1json/schema",
+      "fieldAuthority": "OPENAPI_RESPONSE_SCHEMA",
+      "runtimeStatus": "NOT_IMPLEMENTED_EVIDENCE"
+    },
+    {
+      "dtoId": "DTO-AUTH-007-MFA-ENROLLMENT-CONFIRM-REQUEST",
+      "kind": "request",
+      "featureId": "AUTH-007",
+      "operationId": "authMfaEnrollmentConfirm",
+      "schemaRef": "#/paths/~1auth~1mfa~1enrollment~1confirm/post/requestBody/content/application~1json/schema",
+      "fieldAuthority": "OPENAPI_REQUEST_SCHEMA",
+      "runtimeStatus": "NOT_IMPLEMENTED_EVIDENCE"
+    },
+    {
+      "dtoId": "DTO-AUTH-007-MFA-CHALLENGE-REQUIRED",
+      "kind": "response",
+      "featureId": "AUTH-007",
+      "operationId": "authLogin",
+      "schemaRef": "#/paths/~1auth~1login/post/responses/202/content/application~1json/schema",
+      "fieldAuthority": "OPENAPI_RESPONSE_SCHEMA",
+      "runtimeStatus": "NOT_IMPLEMENTED_EVIDENCE"
+    },
+    {
+      "dtoId": "DTO-AUTH-007-MFA-CHALLENGE-VERIFY-REQUEST",
+      "kind": "request",
+      "featureId": "AUTH-007",
+      "operationId": "authMfaChallengeVerify",
+      "schemaRef": "#/paths/~1auth~1mfa~1challenge~1verify/post/requestBody/content/application~1json/schema",
+      "fieldAuthority": "OPENAPI_REQUEST_SCHEMA",
+      "runtimeStatus": "NOT_IMPLEMENTED_EVIDENCE"
+    },
+    {
+      "dtoId": "DTO-AUTH-007-MFA-CHALLENGE-VERIFY-RESPONSE",
+      "kind": "response",
+      "featureId": "AUTH-007",
+      "operationId": "authMfaChallengeVerify",
+      "schemaRef": "#/paths/~1auth~1mfa~1challenge~1verify/post/responses/200/content/application~1json/schema",
+      "fieldAuthority": "OPENAPI_RESPONSE_SCHEMA",
+      "runtimeStatus": "NOT_IMPLEMENTED_EVIDENCE"
+    },
+    {
+      "dtoId": "DTO-AUTH-007-MFA-DISABLE-REQUEST",
+      "kind": "request",
+      "featureId": "AUTH-007",
+      "operationId": "authMfaDisable",
+      "schemaRef": "#/paths/~1auth~1mfa~1disable/post/requestBody/content/application~1json/schema",
+      "fieldAuthority": "OPENAPI_REQUEST_SCHEMA",
+      "runtimeStatus": "NOT_IMPLEMENTED_EVIDENCE"
+    },
+    {
+      "dtoId": "DTO-AUTH-007-MFA-RECOVERY-CODES-ROTATE-REQUEST",
+      "kind": "request",
+      "featureId": "AUTH-007",
+      "operationId": "authMfaRecoveryCodesRotate",
+      "schemaRef": "#/paths/~1auth~1mfa~1recovery-codes~1rotate/post/requestBody/content/application~1json/schema",
+      "fieldAuthority": "OPENAPI_REQUEST_SCHEMA",
+      "runtimeStatus": "NOT_IMPLEMENTED_EVIDENCE"
+    },
+    {
+      "dtoId": "DTO-AUTH-007-MFA-RECOVERY-CODES-ROTATE-RESPONSE",
+      "kind": "response",
+      "featureId": "AUTH-007",
+      "operationId": "authMfaRecoveryCodesRotate",
+      "schemaRef": "#/paths/~1auth~1mfa~1recovery-codes~1rotate/post/responses/200/content/application~1json/schema",
+      "fieldAuthority": "OPENAPI_RESPONSE_SCHEMA",
+      "runtimeStatus": "NOT_IMPLEMENTED_EVIDENCE"
     }
   ],
   "noBodyOperations": [
@@ -112,6 +202,12 @@
     {
       "featureId": "AUTH-003",
       "operationId": "authCredentialRemove",
+      "responseStatus": 204,
+      "dtoRequired": false
+    },
+    {
+      "featureId": "AUTH-007",
+      "operationId": "authMfaDisable",
       "responseStatus": 204,
       "dtoRequired": false
     }

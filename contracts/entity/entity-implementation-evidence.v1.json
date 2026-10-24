@@ -255,6 +255,39 @@
         "No concrete implementation evidence recorded."
       ],
       "status": "BLOCKED"
+    },
+    {
+      "entityId": "ENT-MFA-FACTOR",
+      "catalogStatus": "PROPOSED",
+      "implementationStatus": "IMPLEMENTED",
+      "implementationRefs": [
+        "workers/W02-identity/src/auth/better-auth.ts",
+        "workers/W02-identity/src/authz/role-assignment.ts",
+        "workers/W02-identity/src/authz/l8-genesis-bootstrap-command.ts",
+        "workers/W02-identity/migrations/0006_better_auth_two_factor.sql"
+      ],
+      "schemaEvidenceRefs": [
+        "contracts/entity/AUTH-007-mfa-factor-field-contract.v1.json",
+        "workers/W02-identity/migrations/0006_better_auth_two_factor.sql"
+      ],
+      "migrationEvidenceRefs": [
+        "workers/W02-identity/migrations/0006_better_auth_two_factor.sql"
+      ],
+      "payloadNativeEvidenceRefs": [],
+      "extensionEvidenceRefs": [
+        "workers/W02-identity/src/auth/better-auth.ts",
+        "workers/W02-identity/src/authz/role-assignment.ts"
+      ],
+      "blockers": [
+        "ENT-MFA-FACTOR is PROPOSED and has not been promoted through canonical entity authority.",
+        "Migration 0006 is source-only; no controlled remote D1 schema/read-back evidence is admitted.",
+        "Persisted atomic lastAcceptedTotpTimeStep replay protection is not present in migration 0006 or verified in runtime.",
+        "Canonical W01 public MFA API operations and DTO bindings are missing.",
+        "MFA lifecycle, recovery, challenge replay, concurrency, account-state, session invalidation and cross-account security E2E evidence is missing.",
+        "AUTH-007 remains BLOCKED_NOT_GREEN with implementation authorization false; no production mutation is authorized.",
+        "Evidence Registry and exact-SHA Mapping 0 admission are missing."
+      ],
+      "status": "BLOCKED"
     }
   ]
 }

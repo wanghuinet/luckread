@@ -22,33 +22,51 @@
 6. The security threat model requires MFA as part of brute-force defense and explicitly requires MFA for L5+ privileged roles. fileciteturn270file0L1-L13
 7. The canonical L0-L8 model sets MFA as required for L5, L6, L7 and L8. fileciteturn272file0L1-L5
 8. The canonical identity/entity model separates `Credential` from `User` and explicitly allows Credential to represent authentication material, but the Credential entity and fields remain PROPOSED rather than verified. fileciteturn290file0L1-L3 fileciteturn286file0L1-L5
-9. Repository searches found no canonical MFA operation IDs and no executable MFA enrollment/challenge/verification implementation. Search did not identify `authMfa`, MFA enrollment/challenge functions, or TOTP/OTP factor persistence code.
+9. The initial reconciliation finding that MFA operation IDs and runtime adapters were absent is superseded by the current source slice: all six canonical W01 MFA routes (status, enrollment start/confirm, challenge verification, disable, recovery-code rotation) are present, W02 owns factor/identity persistence, and W02's persisted TOTP replay guard has SQLite conditional-update and concurrency unit tests. W01 route-level integration tests and W02 handler tests are present in CI. These prove implementation and local test coverage only; they do not prove production schema installation, deployed cross-Worker behavior, or security E2E acceptance.
 
 ## 2. Missing canonical traceability
 
-- Canonical MFA API operation IDs: missing.
-- MFA enrollment-start DTO: missing.
-- MFA enrollment-confirm DTO: missing.
-- MFA challenge DTO: missing.
-- MFA verification DTO: missing.
-- MFA enrollment/recovery result DTOs: missing.
-- MFA factor entity ID: missing.
-- Factor field contract: missing.
-- Factor status/lifecycle contract: missing.
-- Secret/protected-factor storage contract: missing.
-- Challenge lifecycle contract: missing.
-- Replay/attempt-counter persistence mapping: missing.
-- Recovery-code contract: missing.
+- Canonical API/DTO contract: `contracts/api/AUTH-007-mfa-totp-contract.v1.json` defines W01 public operation IDs, DTOs, factor lifecycle requirements, audit-event requirements, no-store behavior and security invariants. The six operations are bound to OpenAPI and the DTO/policy/inventory registries, and source adapters/tests now exist. The contract remains `CONTRACTED_NOT_VERIFIED` because production runtime, persistence and accepted security evidence are not complete.
+- MFA enrollment-start DTO: defined in `AUTH-007-mfa-totp-contract.v1.json` and registered; runtime/evidence admission remains incomplete.
+- MFA enrollment-confirm DTO: defined and registered; production and security evidence remains incomplete.
+- MFA challenge DTO: defined and registered; challenge expiry, single-use and security E2E evidence remains incomplete.
+- MFA verification DTO: represented by the canonical challenge-verify request/response DTOs; exact-SHA security evidence remains incomplete.
+- MFA enrollment and recovery result DTOs: defined in the canonical API contract; one-time disclosure and deployed rotation evidence remain incomplete.
+- MFA factor entity ID: proposed as `ENT-MFA-FACTOR` in `contracts/entity/entity-catalog.v1.json`; the catalog status remains `PROPOSED` and is not promoted to canonical.
+- Factor field contract: `contracts/entity/AUTH-007-mfa-factor-field-contract.v1.json` has been added with status `CONTRACTED_NOT_VERIFIED`; the global entity field catalog remains `NOT_GREEN` and schema/read-back evidence is missing.
+- Factor status/lifecycle: `contracts/state-machines/AUTH-007-mfa-lifecycle.v1.json` now declares factor and sign-in challenge states, allowed and forbidden transitions, and security invariants. `workers/W02-identity/src/auth/mfa-lifecycle-contract.test.ts` binds key contract invariants to the W02 replay, verification and privileged-session source. The contract remains `CONTRACTED_NOT_VERIFIED`; production transition and end-to-end evidence remain incomplete.
+- Secret/protected-factor storage contract: the proposed field contract now requires encrypted TOTP secret and recovery-code storage with no secret exposure; independent implementation and at-rest evidence remain missing.
+- Challenge lifecycle requirements are represented in the API contract and W01/W02 adapters, but exact expiry, cross-account, single-use and deployed security E2E behavior has not yet been accepted.
+- Replay/attempt-counter persistence mapping: migration 0006 now declares `lastAcceptedTotpTimeStep`; W02 source uses a monotonic conditional D1 update and reserves the exact accepted TOTP time step before Better Auth completes verification. The migration has not been deployed, and same-SHA runtime, concurrency/replay and remote schema read-back evidence remain required before promotion.
+- Recovery-code contract: rotate and single-use recovery behavior are defined in the canonical API/field contracts; deployed rotation, reuse rejection and recovery-specific security E2E evidence remain incomplete.
 - Step-up/session assurance result contract: missing.
-- MFA permission/scope IDs: missing.
+- MFA permission/scope IDs `user.mfa.read` and `user.mfa.manage` are registered as self-scoped permissions; operation-level proof and production authorization evidence remain incomplete.
 - MFA event IDs for enrollment, verification, disable/recovery and failed challenge: missing.
 - Account-state enforcement mapping: incomplete.
 - Authoritative D1 persistence/table/column evidence: unresolved.
-- Payload implementation evidence: missing.
-- Executable Worker/application implementation evidence: missing.
+- W01/Payload route adapters and route-level integration tests are present; deployed cross-Worker runtime evidence is still missing.
+- Executable W01/W02 implementation and local test evidence are present; deployed-source and remote D1 read-back evidence are still missing.
 - Positive and negative security E2E evidence: missing.
-- Integration test evidence: missing.
+- W01 route-level integration tests and W02 handler/unit tests are present; live W01↔W02 integration evidence is still missing.
 - Evidence Registry IDs: missing.
+
+
+
+## 2A. Field-contract progress (2026-10-24)
+
+- Added `contracts/entity/AUTH-007-mfa-factor-field-contract.v1.json` as `CONTRACTED_NOT_VERIFIED`; registered `ENT-MFA-FACTOR` as `PROPOSED` and added proposed fields to the entity field catalog.
+- Added an implementation-evidence row that explicitly remains `BLOCKED`; source code and migration presence are not admitted production evidence.
+- The contract identifies `lastAcceptedTotpTimeStep` as a required replay-prevention field; it now exists in the source migration and is consumed by the W02 source guard. Production deployment/read-back and accepted security evidence remain absent. No MFA deployment or L8 grant is authorized by this progress update.
+- `AUTH-007` remains `BLOCKED_NOT_GREEN` and Implementation authorization remains `false`.
+
+
+
+## 2B. Public API contract proposal (2026-10-24)
+
+- Added `contracts/api/AUTH-007-mfa-totp-contract.v1.json` defining the W01 public MFA enrollment/status/confirmation/challenge/disable/recovery-code operations. W01 remains the only APP/H5/PC public API entry; W02 remains the factor/identity/D1-01 authority.
+- The proposed contract explicitly requires an atomic persisted TOTP time-step replay guard, identity-bound single-use challenges, recovery-code single-use/rotation, account/factor lockout, no-store responses, step-up for factor disable/recovery rotation, session invalidation on enable/disable, and audit event coverage.
+- The six operation IDs and login HTTP 202 challenge variant are mapped in `contracts/openapi/v1/openapi.yaml`; DTO records, auth operation policy, OpenAPI operation policy, self-scoped permissions and endpoint inventory are bound. W01 adapters and route-level tests cover status, enrollment start/confirm, challenge verification, disable and recovery rotation. W02 tests cover authoritative status, pending-factor/idempotency guards, verified confirmation, account-state checks, atomic/concurrent TOTP replay rejection and the new lifecycle contract. Operation-policy `state` evidence is now marked `PASS` only for the local lifecycle slices with source tests; resource-budget and anti-abuse dimensions now have explicit bounded policies and local test coverage; production security E2E remains missing. Production security E2E, controlled D1-01 migration/read-back, audit-event/Evidence Registry admission and final Mapping 0 validation remain outstanding. This progress does not authorize production deployment or the L8 grant.
+- `AUTH-007` remains `BLOCKED_NOT_GREEN`; implementation authorization remains `false`.
 
 ## 3. Security interpretation rules
 

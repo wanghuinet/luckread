@@ -1175,6 +1175,501 @@
       "queue": {
         "enqueueMax": 0
       }
+    },
+    {
+      "operationId": "authMfaStatus",
+      "method": "GET",
+      "path": "/auth/mfa",
+      "visibility": "public_authenticated",
+      "capability": "mfa_status_read",
+      "contractStatus": "CONTRACTED_PARTIAL",
+      "auth": {
+        "mode": "session_cookie_or_bearer",
+        "subject": "current_user"
+      },
+      "authorization": {
+        "required": true,
+        "permission": "user.mfa.read",
+        "scope": "self",
+        "accountState": "ACTIVE"
+      },
+      "resource": {
+        "class": "BOUNDED_READ",
+        "d1ReadMax": 2,
+        "d1WriteMax": 0,
+        "d1ReadRowsMax": 2,
+        "d1WriteRowsMax": 0,
+        "rpcMax": 1,
+        "outboundMax": 0
+      },
+      "cache": {
+        "mode": "NO_STORE",
+        "shared": false,
+        "authorizationBoundary": true
+      },
+      "retry": {
+        "maxAttempts": 1,
+        "clientRetrySafe": true,
+        "requiresIdempotency": false
+      },
+      "event": {
+        "syncConsumersMax": 0,
+        "asyncEventsMax": 0,
+        "fanoutMax": 0
+      },
+      "queue": {
+        "enqueueMax": 0
+      },
+      "antiAbuse": {
+        "required": true,
+        "scopes": [
+          "account",
+          "session",
+          "endpoint"
+        ],
+        "actions": [
+          "ALLOW",
+          "THROTTLE",
+          "BLOCK"
+        ]
+      },
+      "idempotency": {
+        "required": false,
+        "semantic": "read-only authoritative factor status"
+      },
+      "security": [
+        "self_scope_only",
+        "factor_secret_never_returned",
+        "no_store",
+        "account_state_enforced"
+      ],
+      "evidence": {
+        "openapi": "PASS",
+        "inventory": "PASS",
+        "permission": "PASS",
+        "state": "N/A",
+        "resource": "PASS",
+        "cache": "PASS",
+        "antiAbuse": "PASS",
+        "integration": "PASS",
+        "securityE2E": "MISSING"
+      }
+    },
+    {
+      "operationId": "authMfaEnrollmentStart",
+      "method": "POST",
+      "path": "/auth/mfa/enrollment",
+      "visibility": "public_authenticated",
+      "capability": "mfa_enrollment_start",
+      "contractStatus": "CONTRACTED_PARTIAL",
+      "auth": {
+        "mode": "session_cookie_or_bearer",
+        "subject": "current_user"
+      },
+      "authorization": {
+        "required": true,
+        "permission": "user.mfa.manage",
+        "scope": "self",
+        "accountState": "ACTIVE"
+      },
+      "resource": {
+        "class": "SINGLE_AUTHORITATIVE_WRITE",
+        "d1ReadMax": 4,
+        "d1WriteMax": 4,
+        "d1ReadRowsMax": 8,
+        "d1WriteRowsMax": 4,
+        "rpcMax": 1,
+        "outboundMax": 0
+      },
+      "cache": {
+        "mode": "NO_STORE",
+        "shared": false,
+        "authorizationBoundary": true
+      },
+      "retry": {
+        "maxAttempts": 1,
+        "clientRetrySafe": false,
+        "requiresIdempotency": true
+      },
+      "event": {
+        "syncConsumersMax": 1,
+        "asyncEventsMax": 0,
+        "fanoutMax": 0
+      },
+      "queue": {
+        "enqueueMax": 0
+      },
+      "antiAbuse": {
+        "required": true,
+        "scopes": [
+          "account",
+          "session",
+          "endpoint",
+          "ip"
+        ],
+        "actions": [
+          "ALLOW",
+          "THROTTLE",
+          "BLOCK"
+        ]
+      },
+      "idempotency": {
+        "required": true,
+        "key": "Idempotency-Key",
+        "semantic": "retry must not replace factor silently or redisclose plaintext recovery codes"
+      },
+      "security": [
+        "current_password_reauthentication",
+        "pending_factor_only",
+        "secret_material_never_logged",
+        "recovery_codes_returned_once",
+        "no_store"
+      ],
+      "evidence": {
+        "openapi": "PASS",
+        "inventory": "PASS",
+        "permission": "PASS",
+        "state": "PASS",
+        "resource": "PASS",
+        "cache": "PASS",
+        "antiAbuse": "PASS",
+        "integration": "PASS",
+        "securityE2E": "MISSING"
+      }
+    },
+    {
+      "operationId": "authMfaEnrollmentConfirm",
+      "method": "POST",
+      "path": "/auth/mfa/enrollment/confirm",
+      "visibility": "public_authenticated",
+      "capability": "mfa_enrollment_confirm",
+      "contractStatus": "CONTRACTED_PARTIAL",
+      "auth": {
+        "mode": "session_cookie_or_bearer",
+        "subject": "current_user"
+      },
+      "authorization": {
+        "required": true,
+        "permission": "user.mfa.manage",
+        "scope": "self",
+        "accountState": "ACTIVE"
+      },
+      "resource": {
+        "class": "SINGLE_AUTHORITATIVE_WRITE",
+        "d1ReadMax": 4,
+        "d1WriteMax": 4,
+        "d1ReadRowsMax": 8,
+        "d1WriteRowsMax": 4,
+        "rpcMax": 1,
+        "outboundMax": 0
+      },
+      "cache": {
+        "mode": "NO_STORE",
+        "shared": false,
+        "authorizationBoundary": true
+      },
+      "retry": {
+        "maxAttempts": 1,
+        "clientRetrySafe": true,
+        "requiresIdempotency": true
+      },
+      "event": {
+        "syncConsumersMax": 1,
+        "asyncEventsMax": 0,
+        "fanoutMax": 0
+      },
+      "queue": {
+        "enqueueMax": 0
+      },
+      "antiAbuse": {
+        "required": true,
+        "scopes": [
+          "account",
+          "factor",
+          "session",
+          "endpoint",
+          "ip"
+        ],
+        "actions": [
+          "ALLOW",
+          "THROTTLE",
+          "BLOCK"
+        ]
+      },
+      "idempotency": {
+        "required": true,
+        "key": "Idempotency-Key",
+        "semantic": "exact successful replay returns same result without re-consuming TOTP; distinct request using the same time-step is denied"
+      },
+      "security": [
+        "TOTP_replay_denied",
+        "challenge_expiry_enforced",
+        "session_invalidation",
+        "no_store"
+      ],
+      "evidence": {
+        "openapi": "PASS",
+        "inventory": "PASS",
+        "permission": "PASS",
+        "state": "PASS",
+        "resource": "PASS",
+        "cache": "PASS",
+        "antiAbuse": "PASS",
+        "integration": "PASS",
+        "securityE2E": "MISSING"
+      }
+    },
+    {
+      "operationId": "authMfaChallengeVerify",
+      "method": "POST",
+      "path": "/auth/mfa/challenge/verify",
+      "visibility": "public_challenge_bound",
+      "capability": "mfa_login_challenge",
+      "contractStatus": "CONTRACTED_PARTIAL",
+      "auth": {
+        "mode": "challenge_cookie",
+        "subject": "W02_issued_challenge"
+      },
+      "authorization": {
+        "required": false,
+        "permission": "challenge_bound",
+        "scope": "identity+purpose+single_use"
+      },
+      "resource": {
+        "class": "BOUNDED_COMPOSITION",
+        "d1ReadMax": 4,
+        "d1WriteMax": 4,
+        "d1ReadRowsMax": 8,
+        "d1WriteRowsMax": 4,
+        "rpcMax": 1,
+        "outboundMax": 0
+      },
+      "cache": {
+        "mode": "NO_STORE",
+        "shared": false,
+        "authorizationBoundary": true
+      },
+      "retry": {
+        "maxAttempts": 1,
+        "clientRetrySafe": false,
+        "requiresIdempotency": true
+      },
+      "event": {
+        "syncConsumersMax": 1,
+        "asyncEventsMax": 0,
+        "fanoutMax": 0
+      },
+      "queue": {
+        "enqueueMax": 0
+      },
+      "antiAbuse": {
+        "required": true,
+        "scopes": [
+          "account",
+          "challenge",
+          "factor",
+          "session",
+          "endpoint",
+          "ip"
+        ],
+        "actions": [
+          "ALLOW",
+          "THROTTLE",
+          "BLOCK"
+        ]
+      },
+      "idempotency": {
+        "required": true,
+        "key": "Idempotency-Key",
+        "semantic": "challenge code consumption is single-use and response replay is idempotency-bound"
+      },
+      "security": [
+        "challenge_cookie_required",
+        "identity_purpose_and_expiry_bound",
+        "TOTP_and_recovery_replay_denied",
+        "trust_device_not_accepted",
+        "session_credential_never_in_json",
+        "no_account_enumeration"
+      ],
+      "evidence": {
+        "openapi": "PASS",
+        "inventory": "PASS",
+        "permission": "N/A",
+        "state": "PASS",
+        "resource": "PASS",
+        "cache": "PASS",
+        "antiAbuse": "PASS",
+        "integration": "PASS",
+        "securityE2E": "MISSING"
+      }
+    },
+    {
+      "operationId": "authMfaDisable",
+      "method": "POST",
+      "path": "/auth/mfa/disable",
+      "visibility": "public_authenticated",
+      "capability": "mfa_disable",
+      "contractStatus": "CONTRACTED_PARTIAL",
+      "auth": {
+        "mode": "session_cookie_or_bearer",
+        "subject": "current_user"
+      },
+      "authorization": {
+        "required": true,
+        "permission": "user.mfa.manage",
+        "scope": "self",
+        "accountState": "ACTIVE",
+        "stepUp": "current_password+valid_TOTP"
+      },
+      "resource": {
+        "class": "SINGLE_AUTHORITATIVE_WRITE",
+        "d1ReadMax": 5,
+        "d1WriteMax": 5,
+        "d1ReadRowsMax": 8,
+        "d1WriteRowsMax": 64,
+        "rpcMax": 1,
+        "outboundMax": 0
+      },
+      "cache": {
+        "mode": "NO_STORE",
+        "shared": false,
+        "authorizationBoundary": true
+      },
+      "retry": {
+        "maxAttempts": 1,
+        "clientRetrySafe": true,
+        "requiresIdempotency": true
+      },
+      "event": {
+        "syncConsumersMax": 1,
+        "asyncEventsMax": 0,
+        "fanoutMax": 0
+      },
+      "queue": {
+        "enqueueMax": 0
+      },
+      "antiAbuse": {
+        "required": true,
+        "scopes": [
+          "account",
+          "factor",
+          "session",
+          "endpoint",
+          "ip"
+        ],
+        "actions": [
+          "ALLOW",
+          "THROTTLE",
+          "BLOCK"
+        ]
+      },
+      "idempotency": {
+        "required": true,
+        "key": "Idempotency-Key",
+        "semantic": "same-request replay must not repeat factor disable or retain privileged assurance"
+      },
+      "security": [
+        "current_password_and_TOTP_step_up",
+        "factor_removed_or_disabled",
+        "enrollment_timestamp_cleared",
+        "session_invalidated",
+        "privileged_access_fails_closed"
+      ],
+      "evidence": {
+        "openapi": "PASS",
+        "inventory": "PASS",
+        "permission": "PASS",
+        "state": "PASS",
+        "resource": "PASS",
+        "cache": "PASS",
+        "antiAbuse": "PASS",
+        "integration": "PASS",
+        "securityE2E": "MISSING"
+      }
+    },
+    {
+      "operationId": "authMfaRecoveryCodesRotate",
+      "method": "POST",
+      "path": "/auth/mfa/recovery-codes/rotate",
+      "visibility": "public_authenticated",
+      "capability": "mfa_recovery_codes_rotate",
+      "contractStatus": "CONTRACTED_PARTIAL",
+      "auth": {
+        "mode": "session_cookie_or_bearer",
+        "subject": "current_user"
+      },
+      "authorization": {
+        "required": true,
+        "permission": "user.mfa.manage",
+        "scope": "self",
+        "accountState": "ACTIVE",
+        "stepUp": "current_password+valid_TOTP"
+      },
+      "resource": {
+        "class": "SINGLE_AUTHORITATIVE_WRITE",
+        "d1ReadMax": 4,
+        "d1WriteMax": 4,
+        "d1ReadRowsMax": 8,
+        "d1WriteRowsMax": 8,
+        "rpcMax": 1,
+        "outboundMax": 0
+      },
+      "cache": {
+        "mode": "NO_STORE",
+        "shared": false,
+        "authorizationBoundary": true
+      },
+      "retry": {
+        "maxAttempts": 1,
+        "clientRetrySafe": false,
+        "requiresIdempotency": true
+      },
+      "event": {
+        "syncConsumersMax": 1,
+        "asyncEventsMax": 0,
+        "fanoutMax": 0
+      },
+      "queue": {
+        "enqueueMax": 0
+      },
+      "antiAbuse": {
+        "required": true,
+        "scopes": [
+          "account",
+          "factor",
+          "session",
+          "endpoint",
+          "ip"
+        ],
+        "actions": [
+          "ALLOW",
+          "THROTTLE",
+          "BLOCK"
+        ]
+      },
+      "idempotency": {
+        "required": true,
+        "key": "Idempotency-Key",
+        "semantic": "old codes invalidated atomically and plaintext new codes disclosed once per operation"
+      },
+      "security": [
+        "current_password_and_TOTP_step_up",
+        "recovery_code_single_use",
+        "old_codes_atomically_invalidated",
+        "new_codes_returned_once",
+        "codes_never_logged"
+      ],
+      "evidence": {
+        "openapi": "PASS",
+        "inventory": "PASS",
+        "permission": "PASS",
+        "state": "PASS",
+        "resource": "PASS",
+        "cache": "PASS",
+        "antiAbuse": "PASS",
+        "integration": "PASS",
+        "securityE2E": "MISSING"
+      }
     }
   ]
 }

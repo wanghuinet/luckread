@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ensureBaseUserRole, ensureVerifiedUserRole, resolveGlobalLayer, type RoleAssignmentRecord } from './role-assignment.js'
+import { ensureBaseUserRole, ensureVerifiedUserRole, requireMfaForPrivilegedAction, resolveGlobalLayer, type RoleAssignmentRecord } from './role-assignment.js'
 
 const NOW = '2026-09-22T12:00:00.000Z'
 
@@ -19,10 +19,15 @@ function assignment(overrides: Partial<RoleAssignmentRecord> = {}): RoleAssignme
   }
 }
 
-function fakeD1(rows: RoleAssignmentRecord[]) {
+function fakeD1(
+  rows: RoleAssignmentRecord[],
+  mfaEnabled = true,
+  mfaEnrolled = mfaEnabled,
+  totpVerified = mfaEnabled,
+) {
   let queryCount = 0
   const db = {
-    prepare: () => ({
+    prepare: (sql: string) => ({
       bind: (...args: unknown[]) => ({
         all: async <T>() => {
           queryCount += 1
@@ -36,11 +41,40 @@ function fakeD1(rows: RoleAssignmentRecord[]) {
             ).sort((a, b) => a.roleId.localeCompare(b.roleId) || a.id.localeCompare(b.id)) as T[],
           }
         },
+        first: async <T>() => sql.includes('two_factor_enabled')
+          ? ({
+              twoFactorEnabled: mfaEnabled ? 1 : 0,
+              mfaEnrolledAt: mfaEnrolled ? NOW : null,
+              totpVerified: totpVerified ? 1 : 0,
+            } as T)
+          : null,
       }),
     }),
   }
   return { db: db as unknown as D1Database, getQueryCount: () => queryCount }
 }
+
+describe('privileged MFA gate', () => {
+  it('requires enrollment for MFA-protected layers and denies unknown layers', () => {
+    expect(requireMfaForPrivilegedAction('L8', false)).toBe(false)
+    expect(requireMfaForPrivilegedAction('L7', false)).toBe(false)
+    expect(requireMfaForPrivilegedAction('L8', true)).toBe(true)
+    expect(requireMfaForPrivilegedAction('L2', false)).toBe(true)
+    expect(requireMfaForPrivilegedAction('LX', true)).toBe(false)
+  })
+
+  it('denies a privileged assignment when the database flag is set but TOTP is not verified', async () => {
+    const { db } = fakeD1([assignment({ roleId: 'admin' })], true, true, false)
+    await expect(resolveGlobalLayer(db, 'user-1', 'ACTIVE', NOW))
+      .resolves.toEqual({ decision: 'DENY' })
+  })
+
+  it('denies a privileged assignment if MFA enrollment has no verified timestamp', async () => {
+    const { db } = fakeD1([assignment({ roleId: 'admin' })], true, false, true)
+    await expect(resolveGlobalLayer(db, 'user-1', 'ACTIVE', NOW))
+      .resolves.toEqual({ decision: 'DENY' })
+  })
+})
 
 describe('RoleAssignment global layer resolution', () => {
   it('resolves a valid global user role', async () => {
@@ -352,5 +386,38 @@ describe('Verified user role materialization', () => {
     await expect(ensureVerifiedUserRole(fixture.db, 'user-1', NOW))
       .rejects.toThrow('verified-user role assignment is not currently valid')
     expect(fixture.getInsertCount()).toBe(0)
+  })
+
+  it('does not resolve or expose an MFA-protected global admin role before verified MFA enrollment', async () => {
+    const { db } = fakeD1([
+      assignment({ id: 'ra-user', roleId: 'user' }),
+      assignment({ id: 'ra-verified', roleId: 'verified_user' }),
+      assignment({ id: 'ra-admin', roleId: 'admin' }),
+      assignment({ id: 'ra-super-admin', roleId: 'super_admin' }),
+    ], false)
+
+    await expect(resolveGlobalLayer(db, 'user-1', 'ACTIVE', NOW, true)).resolves.toEqual({
+      decision: 'ALLOW',
+      layer: 'L2',
+      roleAssignments: [
+        { id: 'ra-user', roleId: 'user', scopeType: 'global', scopeId: null },
+        { id: 'ra-verified', roleId: 'verified_user', scopeType: 'global', scopeId: null },
+      ],
+    })
+  })
+
+  it('resolves L8 only after authoritative MFA enrollment is enabled', async () => {
+    const { db } = fakeD1([
+      assignment({ id: 'ra-user', roleId: 'user' }),
+      assignment({ id: 'ra-verified', roleId: 'verified_user' }),
+      assignment({ id: 'ra-super-admin', roleId: 'super_admin' }),
+    ], true)
+
+    const result = await resolveGlobalLayer(db, 'user-1', 'ACTIVE', NOW, true)
+    expect(result.decision).toBe('ALLOW')
+    expect(result.layer).toBe('L8')
+    expect(result.roleAssignments).toContainEqual({
+      id: 'ra-super-admin', roleId: 'super_admin', scopeType: 'global', scopeId: null,
+    })
   })
 })

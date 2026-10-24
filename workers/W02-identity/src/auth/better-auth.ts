@@ -1,7 +1,11 @@
 import { activateEmailVerifiedAccount } from '../account/account-state-transition.js'
 import { ensureBaseUserRole, ensureVerifiedUserRole } from '../authz/role-assignment.js'
+import { APIError, createAuthMiddleware } from 'better-auth/api'
+import { symmetricDecrypt } from 'better-auth/crypto'
 import { betterAuth } from 'better-auth'
-import { bearer } from 'better-auth/plugins'
+import { bearer, twoFactor } from 'better-auth/plugins'
+import { consumeTotpTimeStep, matchTotpTimeStep } from './totp-replay-guard.js'
+import { isActiveMfaSubject } from './mfa-challenge-account-state.js'
 import { sendResendEmail } from './resend-email.js'
 
 export interface RateLimitBinding {
@@ -86,6 +90,96 @@ const buildLuckReadAuth = (env: BetterAuthEnv) => {
   ]
 
   return betterAuth({
+    hooks: {
+      before: createAuthMiddleware(async (ctx) => {
+        const isTotpVerification = ctx.path === '/two-factor/verify-totp'
+        const isBackupCodeVerification = ctx.path === '/two-factor/verify-backup-code'
+        if (!isTotpVerification && !isBackupCodeVerification) return
+        const body = ctx.body as { code?: unknown }
+        if (typeof body.code !== 'string') return
+
+        // TOTP enrollment verification has an authenticated session. A sign-in
+        // MFA challenge does not, so resolve that subject only from Better
+        // Auth's signed, time-bounded, server-stored challenge.
+        let subjectId: string | null = null
+        let sessionLookupFailed = false
+        const requestHeaders = ctx.request?.headers ?? ctx.headers
+        if (requestHeaders) {
+          try {
+            const session = await createLuckReadAuth(env).api.getSession({
+              headers: requestHeaders,
+              query: {},
+            }) as { user?: { id?: unknown } } | null
+            if (typeof session?.user?.id === 'string') subjectId = session.user.id
+          } catch {
+            sessionLookupFailed = true
+          }
+        }
+
+        if (!subjectId) {
+          const challengeCookie = ctx.context.createAuthCookie('two_factor')
+          const signedChallenge = await ctx.getSignedCookie(
+            challengeCookie.name,
+            ctx.context.secret,
+          )
+          if (signedChallenge) {
+            const challenge = await ctx.context.internalAdapter.findVerificationValue(signedChallenge)
+            if (
+              challenge &&
+              typeof challenge.value === 'string' &&
+              Date.parse(String(challenge.expiresAt)) > Date.now()
+            ) {
+              subjectId = challenge.value
+            }
+          }
+        }
+        if (!subjectId && sessionLookupFailed) {
+          // Do not silently skip replay protection when the authenticated
+          // subject could not be resolved because an authority read failed.
+          throw APIError.from('INTERNAL_SERVER_ERROR', {
+            code: 'TOTP_REPLAY_GUARD_UNAVAILABLE',
+            message: 'TOTP verification is temporarily unavailable',
+          })
+        }
+        if (!subjectId) return
+
+        // Factor completion must never activate a suspended, pending or missing
+        // account. Check W02-owned account state for TOTP and recovery paths.
+        const accountActive = await isActiveMfaSubject(env.D1_01, subjectId)
+        if (!accountActive) {
+          throw APIError.from('FORBIDDEN', {
+            code: 'ACCOUNT_NOT_ACTIVE',
+            message: 'Account is not eligible for authentication',
+          })
+        }
+        // Better Auth atomically validates and consumes backup codes. The
+        // persisted monotonic time-step guard applies specifically to TOTP.
+        if (isBackupCodeVerification) return
+
+        const factor = await env.D1_01.prepare(
+          'SELECT secret FROM "twoFactor" WHERE userId = ? LIMIT 1',
+        ).bind(subjectId).first<{ secret: string }>()
+        // Let the pinned plugin produce its canonical not-enabled/challenge error.
+        if (!factor) return
+
+        const secret = await symmetricDecrypt({
+          key: ctx.context.secretConfig,
+          data: factor.secret,
+        })
+        const match = await matchTotpTimeStep(secret, body.code)
+        // Invalid codes continue through Better Auth so its failure counters and
+        // challenge lockout remain authoritative.
+        if (match.kind === 'invalid') return
+        if (match.kind === 'ambiguous') {
+          throw APIError.from('UNAUTHORIZED', { code: 'INVALID_CODE', message: 'Invalid code' })
+        }
+
+        const consumed = await consumeTotpTimeStep(env.D1_01, subjectId, match.timeStep)
+        if (!consumed) {
+          throw APIError.from('UNAUTHORIZED', { code: 'INVALID_CODE', message: 'Invalid code' })
+        }
+      }),
+    },
     // W02 is the platform identity authority. Better Auth uses native D1
     // persistence here; Payload is not an authentication/database adapter.
     database: env.D1_01,
@@ -127,6 +221,26 @@ const buildLuckReadAuth = (env: BetterAuthEnv) => {
             await ensureBaseUserRole(env.D1_01, String(user.id), new Date().toISOString())
           },
         },
+        update: {
+          after: async (user) => {
+            const userId = String(user.id)
+            const pendingMfaEnrollment = await env.D1_01.prepare(
+              'SELECT id FROM "user" WHERE id = ? AND two_factor_enabled = 1 AND mfa_enrolled_at IS NULL LIMIT 1',
+            ).bind(userId).first<{ id: string }>()
+            if (!pendingMfaEnrollment) return
+
+            // The reviewed D1 lifecycle triggers are authoritative and revoke
+            // sessions on every enable/disable transition. This hook is a fallback
+            // for a legacy or partially migrated row with a missing enrollment time.
+            const enrolledAt = new Date().toISOString()
+            await env.D1_01.batch([
+              env.D1_01.prepare(
+                'UPDATE "user" SET mfa_enrolled_at = ? WHERE id = ? AND two_factor_enabled = 1 AND mfa_enrolled_at IS NULL',
+              ).bind(enrolledAt, userId),
+              env.D1_01.prepare('DELETE FROM "session" WHERE user_id = ?').bind(userId),
+            ])
+          },
+        },
       },
     },
     user: {
@@ -134,6 +248,7 @@ const buildLuckReadAuth = (env: BetterAuthEnv) => {
       // Map Better Auth's camelCase core fields to those exact column names.
       fields: {
         emailVerified: 'email_verified',
+        twoFactorEnabled: 'two_factor_enabled',
         createdAt: 'created_at',
         updatedAt: 'updated_at',
       },
@@ -229,7 +344,31 @@ const buildLuckReadAuth = (env: BetterAuthEnv) => {
         }))
       },
     },
-    plugins: [bearer()],
+    // High-privilege layers cannot rely on a long-lived trusted-device cookie.
+    // Require a new TOTP challenge during credential sign-in rather than letting
+    // clients mark a device as trusted for the default 30-day window.
+    plugins: [bearer(), twoFactor({
+      issuer: 'LuckRead',
+      trustDeviceMaxAge: 0,
+      // Backup codes are recovery credentials: explicitly encrypt them at rest.
+      backupCodeOptions: { storeBackupCodes: 'encrypted' },
+      twoFactorCookieMaxAge: 10 * 60,
+      allowPasswordless: false,
+      skipVerificationOnEnable: false,
+      // No email/SMS OTP sender is configured; the plugin rejects "otp"
+      // enrollment when sendOTP is absent. Elevated authorization additionally
+      // requires a persisted, TOTP-verified row in the twoFactor table.
+      totpOptions: { allowPasswordless: false },
+      // Plugin-contributed fields need the plugin schema mapping; the root
+      // user.fields map alone does not rename twoFactorEnabled for this plugin.
+      schema: {
+        user: {
+          fields: {
+            twoFactorEnabled: 'two_factor_enabled',
+          },
+        },
+      },
+    })],
     advanced: {
       // H5/PC and the canonical API hostname must share the same W02 session.
       crossSubDomainCookies: {

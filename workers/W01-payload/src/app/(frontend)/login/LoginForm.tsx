@@ -6,6 +6,10 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { fetchJson, getApiErrorMessage, jsonHeaders } from '../../../lib/client-api.js'
 
 type ApiError = {
+  data?: {
+    challengeRequired?: boolean
+    methods?: string[]
+  }
   error?: {
     code?: string
     message?: string
@@ -113,6 +117,12 @@ export default function LoginForm() {
       const returnTo = requestedReturnTo && requestedReturnTo.startsWith('/') && !requestedReturnTo.startsWith('//')
         ? requestedReturnTo
         : '/home'
+      // A 202 MFA challenge is not an authenticated session. Redirect only
+      // after the W01 login adapter explicitly reports the challenge DTO.
+      if (data?.data?.challengeRequired === true) {
+        router.push('/login/two-factor?returnTo=' + encodeURIComponent(returnTo))
+        return
+      }
       router.push(returnTo)
     } catch {
       setError('网络连接异常，登录请求未能完成。请检查网络后重试。')
@@ -146,6 +156,7 @@ export default function LoginForm() {
         <Link className="text-center text-sm text-main-accent hover:underline" href="/forgot-password">忘记密码？</Link>
         <Link className="text-center text-sm text-main-accent hover:underline" href="/register">还没有账号？立即注册</Link>
       </div>
+      <Link className="text-center text-sm text-main-accent hover:underline" href="/login/mfa">配置双重验证</Link>
       <Link className="text-center text-sm text-main-accent hover:underline" href="/verify-email">收不到验证邮件？点此重发</Link>
     </form>
   )

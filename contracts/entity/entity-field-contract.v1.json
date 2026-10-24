@@ -219,6 +219,56 @@
             "contracts/state-machines/account.json",
             "contracts/enums/account-state.json"
           ]
+        },
+        {
+          "fieldId": "ENT-USER-F-TWO-FACTOR-ENABLED",
+          "name": "twoFactorEnabled",
+          "type": "boolean",
+          "nullable": false,
+          "required": true,
+          "defaultValue": false,
+          "unique": false,
+          "indexed": false,
+          "lifecycle": "mutable-only-through-W02-MFA-lifecycle",
+          "classification": "AUTHENTICATION_SECURITY_STATE",
+          "status": "PROPOSED",
+          "payloadNative": false,
+          "sourceRef": "workers/W02-identity/migrations/0006_better_auth_two_factor.sql",
+          "payloadConfigRef": "contracts/entity/non-payload-d1-authority",
+          "apiExposure": "SELF_STATUS_ONLY",
+          "adminExposure": "SCOPED_READ_ONLY",
+          "eventExposure": "STATE_CHANGE_ONLY",
+          "migrationVersion": "0006_better_auth_two_factor.sql",
+          "postgresqlPortability": "PORTABLE",
+          "evidenceRefs": [
+            "contracts/entity/AUTH-007-mfa-factor-field-contract.v1.json",
+            "workers/W02-identity/migrations/0006_better_auth_two_factor.sql",
+            "workers/W02-identity/src/auth/better-auth.ts"
+          ]
+        },
+        {
+          "fieldId": "ENT-USER-F-MFA-ENROLLED-AT",
+          "name": "mfaEnrolledAt",
+          "type": "datetime",
+          "nullable": true,
+          "required": false,
+          "unique": false,
+          "indexed": false,
+          "lifecycle": "set-on-enable-cleared-on-disable",
+          "classification": "AUTHENTICATION_SECURITY_METADATA",
+          "status": "PROPOSED",
+          "payloadNative": false,
+          "sourceRef": "workers/W02-identity/migrations/0006_better_auth_two_factor.sql",
+          "payloadConfigRef": "contracts/entity/non-payload-d1-authority",
+          "apiExposure": "NEVER",
+          "adminExposure": "NEVER",
+          "eventExposure": "STATE_CHANGE_ONLY",
+          "migrationVersion": "0006_better_auth_two_factor.sql",
+          "postgresqlPortability": "PORTABLE",
+          "evidenceRefs": [
+            "contracts/entity/AUTH-007-mfa-factor-field-contract.v1.json",
+            "workers/W02-identity/migrations/0006_better_auth_two_factor.sql"
+          ]
         }
       ],
       "evidenceRefs": [
@@ -1954,6 +2004,217 @@
         "contracts/persistence/MODERATION-QUEUE-FOUNDATION-persistence.v1.json",
         "docs/63-MODERATION-APPEALS-SYSTEM-CONTRACT-v1.0.md",
         "contracts/api/moderation-operation-policy.v1.json"
+      ]
+    },
+    {
+      "entityId": "ENT-MFA-FACTOR",
+      "status": "PROPOSED",
+      "fields": [
+        {
+          "fieldId": "ENT-MFA-FACTOR-F-ID",
+          "name": "id",
+          "type": "text",
+          "nullable": false,
+          "required": true,
+          "unique": true,
+          "indexed": true,
+          "lifecycle": "immutable",
+          "classification": "INTERNAL_IDENTIFIER",
+          "status": "PROPOSED",
+          "payloadNative": false,
+          "sourceRef": "workers/W02-identity/migrations/0006_better_auth_two_factor.sql",
+          "payloadConfigRef": "contracts/entity/non-payload-d1-authority",
+          "apiExposure": "NONE",
+          "adminExposure": "NEVER",
+          "eventExposure": "NEVER",
+          "migrationVersion": "0006_better_auth_two_factor.sql",
+          "postgresqlPortability": "PORTABLE",
+          "evidenceRefs": [
+            "contracts/entity/AUTH-007-mfa-factor-field-contract.v1.json",
+            "workers/W02-identity/migrations/0006_better_auth_two_factor.sql",
+            "workers/W02-identity/src/auth/better-auth.ts"
+          ]
+        },
+        {
+          "fieldId": "ENT-MFA-FACTOR-F-USER-ID",
+          "name": "userId",
+          "type": "text",
+          "nullable": false,
+          "required": true,
+          "unique": true,
+          "indexed": true,
+          "lifecycle": "immutable",
+          "classification": "INTERNAL_RELATION",
+          "status": "PROPOSED",
+          "payloadNative": false,
+          "sourceRef": "workers/W02-identity/migrations/0006_better_auth_two_factor.sql",
+          "payloadConfigRef": "contracts/entity/non-payload-d1-authority",
+          "apiExposure": "NONE",
+          "adminExposure": "NEVER",
+          "eventExposure": "NEVER",
+          "migrationVersion": "0006_better_auth_two_factor.sql",
+          "postgresqlPortability": "PORTABLE",
+          "evidenceRefs": [
+            "contracts/entity/AUTH-007-mfa-factor-field-contract.v1.json",
+            "workers/W02-identity/migrations/0006_better_auth_two_factor.sql",
+            "workers/W02-identity/src/auth/better-auth.ts"
+          ]
+        },
+        {
+          "fieldId": "ENT-MFA-FACTOR-F-SECRET",
+          "name": "secret",
+          "type": "text",
+          "nullable": false,
+          "required": true,
+          "unique": false,
+          "indexed": false,
+          "lifecycle": "replace-only-through-secure-reenrollment",
+          "classification": "ENCRYPTED_AUTHENTICATION_SECRET",
+          "status": "PROPOSED",
+          "payloadNative": false,
+          "sourceRef": "workers/W02-identity/migrations/0006_better_auth_two_factor.sql",
+          "payloadConfigRef": "contracts/entity/non-payload-d1-authority",
+          "apiExposure": "NEVER",
+          "adminExposure": "NEVER",
+          "eventExposure": "NEVER",
+          "migrationVersion": "0006_better_auth_two_factor.sql",
+          "postgresqlPortability": "PORTABLE",
+          "evidenceRefs": [
+            "contracts/entity/AUTH-007-mfa-factor-field-contract.v1.json",
+            "workers/W02-identity/migrations/0006_better_auth_two_factor.sql",
+            "workers/W02-identity/src/auth/better-auth.ts"
+          ]
+        },
+        {
+          "fieldId": "ENT-MFA-FACTOR-F-BACKUP-CODES",
+          "name": "backupCodes",
+          "type": "text",
+          "nullable": false,
+          "required": true,
+          "unique": false,
+          "indexed": false,
+          "lifecycle": "atomic-consume-and-rotate",
+          "classification": "ENCRYPTED_RECOVERY_MATERIAL",
+          "status": "PROPOSED",
+          "payloadNative": false,
+          "sourceRef": "workers/W02-identity/migrations/0006_better_auth_two_factor.sql",
+          "payloadConfigRef": "contracts/entity/non-payload-d1-authority",
+          "apiExposure": "NEVER_AFTER_ISSUANCE",
+          "adminExposure": "NEVER",
+          "eventExposure": "NEVER",
+          "migrationVersion": "0006_better_auth_two_factor.sql",
+          "postgresqlPortability": "PORTABLE",
+          "evidenceRefs": [
+            "contracts/entity/AUTH-007-mfa-factor-field-contract.v1.json",
+            "workers/W02-identity/migrations/0006_better_auth_two_factor.sql",
+            "workers/W02-identity/src/auth/better-auth.ts"
+          ]
+        },
+        {
+          "fieldId": "ENT-MFA-FACTOR-F-VERIFIED",
+          "name": "verified",
+          "type": "boolean",
+          "nullable": false,
+          "required": true,
+          "unique": false,
+          "indexed": false,
+          "lifecycle": "false-to-true-only-per-factor",
+          "classification": "AUTHENTICATION_SECURITY_STATE",
+          "status": "PROPOSED",
+          "payloadNative": false,
+          "sourceRef": "workers/W02-identity/migrations/0006_better_auth_two_factor.sql",
+          "payloadConfigRef": "contracts/entity/non-payload-d1-authority",
+          "apiExposure": "SELF_STATUS_DERIVED_ONLY",
+          "adminExposure": "NEVER",
+          "eventExposure": "NEVER",
+          "migrationVersion": "0006_better_auth_two_factor.sql",
+          "postgresqlPortability": "PORTABLE",
+          "evidenceRefs": [
+            "contracts/entity/AUTH-007-mfa-factor-field-contract.v1.json",
+            "workers/W02-identity/migrations/0006_better_auth_two_factor.sql",
+            "workers/W02-identity/src/auth/better-auth.ts"
+          ]
+        },
+        {
+          "fieldId": "ENT-MFA-FACTOR-F-FAILED-VERIFICATION-COUNT",
+          "name": "failedVerificationCount",
+          "type": "integer",
+          "nullable": false,
+          "required": true,
+          "unique": false,
+          "indexed": false,
+          "lifecycle": "increment-on-failure-reset-on-success",
+          "classification": "ANTI_ABUSE_SECURITY_STATE",
+          "status": "PROPOSED",
+          "payloadNative": false,
+          "sourceRef": "workers/W02-identity/migrations/0006_better_auth_two_factor.sql",
+          "payloadConfigRef": "contracts/entity/non-payload-d1-authority",
+          "apiExposure": "NEVER",
+          "adminExposure": "NEVER",
+          "eventExposure": "NEVER",
+          "migrationVersion": "0006_better_auth_two_factor.sql",
+          "postgresqlPortability": "PORTABLE",
+          "evidenceRefs": [
+            "contracts/entity/AUTH-007-mfa-factor-field-contract.v1.json",
+            "workers/W02-identity/migrations/0006_better_auth_two_factor.sql",
+            "workers/W02-identity/src/auth/better-auth.ts"
+          ]
+        },
+        {
+          "fieldId": "ENT-MFA-FACTOR-F-LOCKED-UNTIL",
+          "name": "lockedUntil",
+          "type": "datetime",
+          "nullable": true,
+          "required": false,
+          "unique": false,
+          "indexed": true,
+          "lifecycle": "expiring-lockout",
+          "classification": "ANTI_ABUSE_SECURITY_STATE",
+          "status": "PROPOSED",
+          "payloadNative": false,
+          "sourceRef": "workers/W02-identity/migrations/0006_better_auth_two_factor.sql",
+          "payloadConfigRef": "contracts/entity/non-payload-d1-authority",
+          "apiExposure": "NEVER",
+          "adminExposure": "NEVER",
+          "eventExposure": "NEVER",
+          "migrationVersion": "0006_better_auth_two_factor.sql",
+          "postgresqlPortability": "PORTABLE",
+          "evidenceRefs": [
+            "contracts/entity/AUTH-007-mfa-factor-field-contract.v1.json",
+            "workers/W02-identity/migrations/0006_better_auth_two_factor.sql",
+            "workers/W02-identity/src/auth/better-auth.ts"
+          ]
+        },
+        {
+          "fieldId": "ENT-MFA-FACTOR-F-LAST-ACCEPTED-TOTP-TIME-STEP",
+          "name": "lastAcceptedTotpTimeStep",
+          "type": "integer",
+          "nullable": true,
+          "required": false,
+          "unique": false,
+          "indexed": false,
+          "lifecycle": "monotonic-by-accepted-TOTP-time-step",
+          "classification": "REPLAY_PREVENTION_SECURITY_STATE",
+          "status": "PROPOSED",
+          "payloadNative": false,
+          "sourceRef": "contracts/entity/AUTH-007-mfa-factor-field-contract.v1.json",
+          "payloadConfigRef": "contracts/entity/non-payload-d1-authority",
+          "apiExposure": "NEVER",
+          "adminExposure": "NEVER",
+          "eventExposure": "NEVER",
+          "migrationVersion": "PENDING_REPLAY_GUARD_MIGRATION",
+          "postgresqlPortability": "PORTABLE",
+          "evidenceRefs": [
+            "contracts/entity/AUTH-007-mfa-factor-field-contract.v1.json",
+            "workers/W02-identity/migrations/0006_better_auth_two_factor.sql",
+            "workers/W02-identity/src/auth/better-auth.ts"
+          ]
+        }
+      ],
+      "evidenceRefs": [
+        "contracts/entity/AUTH-007-mfa-factor-field-contract.v1.json",
+        "workers/W02-identity/migrations/0006_better_auth_two_factor.sql",
+        "workers/W02-identity/src/auth/better-auth.ts"
       ]
     }
   ],

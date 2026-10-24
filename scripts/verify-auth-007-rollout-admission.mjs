@@ -1,0 +1,247 @@
+import fs from 'node:fs'
+import path from 'node:path'
+import { spawnSync } from 'node:child_process'
+
+const root = process.cwd()
+const repository = 'wanghuinet/luckread'
+const environmentName = 'auth-mfa-rollout'
+const expectedReviewerId = 190754094
+
+const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), 'utf8')
+const exists = (relativePath) => fs.existsSync(path.join(root, relativePath))
+const blockers = []
+const staticOnly = process.argv.includes('--static-only')
+
+function requireSource(condition, message) {
+  if (!condition) blockers.push(message)
+}
+
+async function githubGet(apiPath, token) {
+  const response = await fetch('https://api.github.com' + apiPath, {
+    headers: {
+      accept: 'application/vnd.github+json',
+      authorization: 'Bearer ' + token,
+      'x-github-api-version': '2022-11-28',
+      'user-agent': 'LuckRead-AUTH-007-Rollout-Admission',
+    },
+    cache: 'no-store',
+  })
+  if (!response.ok) {
+    throw new Error('GitHub rollout approval configuration could not be verified (HTTP ' + response.status + ')')
+  }
+  return response.json()
+}
+
+async function verifyProtectedEnvironment() {
+  const token = process.env.GITHUB_TOKEN ?? ''
+  const repo = process.env.GITHUB_REPOSITORY ?? ''
+  const actor = (process.env.GITHUB_ACTOR ?? '').toLowerCase()
+  const ref = process.env.GITHUB_REF ?? ''
+  const eventName = process.env.GITHUB_EVENT_NAME ?? ''
+  const configuredEnvironment = process.env.AUTH007_ROLLOUT_ENVIRONMENT ?? ''
+  const sourceSha = process.env.SOURCE_SHA ?? ''
+  const currentSha = spawnSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' })
+  const sourceExists = /^[a-f0-9]{40}$/i.test(sourceSha) &&
+    spawnSync('git', ['cat-file', '-e', sourceSha + '^{commit}']).status === 0
+  const sourceIsMainAncestor = sourceExists &&
+    spawnSync('git', ['merge-base', '--is-ancestor', sourceSha, 'origin/main']).status === 0
+
+  if (
+    token.length < 20 ||
+    repo.toLowerCase() !== repository ||
+    !actor ||
+    ref !== 'refs/heads/main' ||
+    eventName !== 'workflow_dispatch' ||
+    configuredEnvironment !== environmentName ||
+    !sourceExists ||
+    !sourceIsMainAncestor ||
+    currentSha.status !== 0 ||
+    currentSha.stdout.trim().toLowerCase() !== sourceSha.toLowerCase()
+  ) {
+    throw new Error('Rollout must use an immutable source SHA already committed to protected main and be explicitly dispatched there')
+  }
+
+  const environment = await githubGet('/repos/' + repository + '/environments/' + environmentName, token)
+  const rules = (environment.protection_rules ?? []).filter((rule) => rule.type === 'required_reviewers')
+  const reviewers = rules[0]?.reviewers ?? []
+  const configuredReviewer = reviewers[0]
+  const reviewerLogin = configuredReviewer?.reviewer?.login?.toLowerCase()
+
+  if (
+    environment.name !== environmentName ||
+    rules.length !== 1 ||
+    reviewers.length !== 1 ||
+    rules[0]?.prevent_self_review !== true ||
+    environment.deployment_branch_policy?.protected_branches !== true ||
+    environment.deployment_branch_policy?.custom_branch_policies !== false ||
+    configuredReviewer?.type !== 'User' ||
+    !reviewerLogin ||
+    configuredReviewer?.reviewer?.id !== expectedReviewerId ||
+    reviewerLogin === actor
+  ) {
+    throw new Error('AUTH-007 rollout environment must require the designated human maintainer, forbid self-review, and allow protected branches only')
+  }
+
+  const permission = await githubGet(
+    '/repos/' + repository + '/collaborators/' + encodeURIComponent(reviewerLogin) + '/permission',
+    token,
+  )
+  const permissionValue = String(permission.permission ?? '').toLowerCase()
+  const roleName = String(permission.role_name ?? '').toLowerCase()
+  if (
+    permissionValue !== 'admin' &&
+    roleName !== 'admin' &&
+    roleName !== 'maintain'
+  ) {
+    throw new Error('AUTH-007 rollout reviewer must have repository admin or maintain permission')
+  }
+
+  return {
+    environment: environmentName,
+    reviewer: reviewerLogin,
+    reviewerRole: permissionValue === 'admin' || roleName === 'admin' ? 'admin' : roleName,
+    selfReviewPrevented: true,
+    protectedBranchesOnly: true,
+    initiatorDiffersFromReviewer: true,
+  }
+}
+
+const mfaMigrationPath = 'workers/W02-identity/migrations/0006_better_auth_two_factor.sql'
+const bootstrapMigrationPath = 'workers/W02-identity/migrations/0007_l8_genesis_bootstrap_audit.sql'
+const authContractPath = 'contracts/api/AUTH-007-mfa-totp-contract.v1.json'
+const factorContractPath = 'contracts/entity/AUTH-007-mfa-factor-field-contract.v1.json'
+const lifecyclePath = 'contracts/state-machines/AUTH-007-mfa-lifecycle.v1.json'
+const reconciliationPath = 'contracts/alignment/mapping-batches/AUTH-007-real-evidence-reconciliation.v1.md'
+const betterAuthPath = 'workers/W02-identity/src/auth/better-auth.ts'
+const replayGuardPath = 'workers/W02-identity/src/auth/totp-replay-guard.ts'
+const policyPath = 'contracts/api/auth-operation-policy.v1.json'
+
+for (const file of [
+  mfaMigrationPath,
+  bootstrapMigrationPath,
+  authContractPath,
+  factorContractPath,
+  lifecyclePath,
+  reconciliationPath,
+  betterAuthPath,
+  replayGuardPath,
+  policyPath,
+]) {
+  requireSource(exists(file), 'Required reviewed rollout artifact is missing: ' + file)
+}
+
+const legacyConflictingMigration = 'workers/W02-identity/migrations/0006_auth_mfa_two_factor.sql'
+requireSource(
+  !exists(legacyConflictingMigration),
+  'Conflicting second MFA migration exists; select one canonical D1-01 schema before rollout.',
+)
+
+let sourceChecks = {}
+let auth007Status = null
+let implementationAuthorization = null
+
+if (blockers.length === 0) {
+  const migration = read(mfaMigrationPath)
+  const bootstrapMigration = read(bootstrapMigrationPath)
+  const betterAuth = read(betterAuthPath)
+  const replayGuard = read(replayGuardPath)
+  const apiContract = JSON.parse(read(authContractPath))
+  const factorContract = JSON.parse(read(factorContractPath))
+  const lifecycle = JSON.parse(read(lifecyclePath))
+  const policy = JSON.parse(read(policyPath))
+  const reconciliation = read(reconciliationPath)
+  const standaloneW01Workflow = read('.github/workflows/w01-payload-app-deploy.yml')
+
+  const requiredMigrationTokens = [
+    'two_factor_enabled',
+    'mfa_enrolled_at',
+    'CREATE TABLE "twoFactor"',
+    'lastAcceptedTotpTimeStep',
+    'user_mfa_enable_revoke_sessions',
+    'user_mfa_disable_clear_enrollment',
+  ]
+  const requiredBootstrapTokens = [
+    "bootstrap_key = 'first-l8'",
+    'nonce_sha256',
+    'request_merge_sha',
+    'approved_reviewers_json',
+    'workflow_run_id',
+  ]
+  const operations = [
+    { id: 'authMfaStatus', route: 'workers/W01-payload/src/app/api/v1/auth/mfa/route.ts', test: 'workers/W01-payload/tests/int/mfa-status-route.int.spec.ts' },
+    { id: 'authMfaEnrollmentStart', route: 'workers/W01-payload/src/app/api/v1/auth/mfa/enrollment/route.ts', test: 'workers/W01-payload/tests/int/mfa-enrollment-start-route.int.spec.ts' },
+    { id: 'authMfaEnrollmentConfirm', route: 'workers/W01-payload/src/app/api/v1/auth/mfa/enrollment/confirm/route.ts', test: 'workers/W01-payload/tests/int/mfa-enrollment-confirm-route.int.spec.ts' },
+    { id: 'authMfaChallengeVerify', route: 'workers/W01-payload/src/app/api/v1/auth/mfa/challenge/verify/route.ts', test: 'workers/W01-payload/tests/int/mfa-challenge-verify-route.int.spec.ts' },
+    { id: 'authMfaDisable', route: 'workers/W01-payload/src/app/api/v1/auth/mfa/disable/route.ts', test: 'workers/W01-payload/tests/int/mfa-factor-management-route.int.spec.ts' },
+    { id: 'authMfaRecoveryCodesRotate', route: 'workers/W01-payload/src/app/api/v1/auth/mfa/recovery-codes/rotate/route.ts', test: 'workers/W01-payload/tests/int/mfa-factor-management-route.int.spec.ts' },
+  ]
+  const policyIds = new Set((policy.operations ?? []).map((operation) => operation.operationId))
+  const canonicalOperationIds = new Set((apiContract.operations ?? []).map((operation) => operation.operationId))
+
+  sourceChecks = {
+    reviewedMfaMigrationShape: requiredMigrationTokens.every((token) => migration.includes(token)),
+    reviewedBootstrapAuditShape: requiredBootstrapTokens.every((token) => bootstrapMigration.includes(token)),
+    encryptedRecoveryCodes: /backupCodeOptions:\s*\{[^}]*storeBackupCodes:\s*['"]encrypted['"]/.test(betterAuth),
+    privilegedTrustDeviceDisabled: /trustDeviceMaxAge:\s*0/.test(betterAuth),
+    persistedTotpReplayGuard: /consumeTotpTimeStep/.test(betterAuth) &&
+      /two-factor\/verify-totp/.test(betterAuth) &&
+      /UPDATE "twoFactor" SET lastAcceptedTotpTimeStep/.test(replayGuard),
+    canonicalContractsDeclareExplicitStatus: ['CONTRACTED_NOT_VERIFIED', 'VERIFIED', 'GREEN'].includes(apiContract.status) &&
+      ['CONTRACTED_NOT_VERIFIED', 'VERIFIED', 'GREEN'].includes(factorContract.status) &&
+      ['CONTRACTED_NOT_VERIFIED', 'VERIFIED', 'GREEN'].includes(lifecycle.status),
+    allSixPublicRoutesAndTestsPresent: operations.every((operation) =>
+      exists(operation.route) &&
+      exists(operation.test) &&
+      policyIds.has(operation.id) &&
+      canonicalOperationIds.has(operation.id)
+    ),
+    w02ReplayAndEnrollmentTestsPresent: [
+      'workers/W02-identity/src/auth/mfa-status.test.ts',
+      'workers/W02-identity/src/auth/mfa-enrollment-start.test.ts',
+      'workers/W02-identity/src/auth/mfa-enrollment-confirm.test.ts',
+      'workers/W02-identity/src/auth/totp-replay-guard.test.ts',
+      'workers/W02-identity/src/auth/mfa-lifecycle-contract.test.ts',
+    ].every(exists),
+    finalGenesisGateRemainsSeparate: exists('scripts/verify-admin-account-bootstrap-readiness.mjs') &&
+      /hasMfaEnforcement/.test(read('scripts/verify-admin-account-bootstrap-readiness.mjs')) &&
+      /BLOCKED_NOT_GREEN/.test(read('scripts/verify-admin-account-bootstrap-readiness.mjs')),
+    standaloneW01DeployUsesProtectedAdmission:
+      /environment:\s*auth-mfa-rollout/.test(standaloneW01Workflow) &&
+      /github\.ref == 'refs\/heads\/main'/.test(standaloneW01Workflow) &&
+      /merge-base --is-ancestor/.test(standaloneW01Workflow) &&
+      /verify-auth-007-rollout-admission\.mjs/.test(standaloneW01Workflow) &&
+      standaloneW01Workflow.indexOf('verify-auth-007-rollout-admission.mjs') >= 0 &&
+      standaloneW01Workflow.indexOf('verify-auth-007-rollout-admission.mjs') < standaloneW01Workflow.indexOf('run: pnpm run deploy:app'),
+  }
+
+  for (const [check, passed] of Object.entries(sourceChecks)) {
+    if (!passed) blockers.push('AUTH-007 rollout source check failed: ' + check)
+  }
+
+  auth007Status = reconciliation.match(/^- Status:\s*`([^`]+)`/m)?.[1] ?? null
+  implementationAuthorization = reconciliation.match(/^- Implementation authorization:\s*`([^`]+)`/m)?.[1] ?? null
+}
+
+let protectedEnvironment = null
+if (blockers.length === 0 && !staticOnly) {
+  try {
+    protectedEnvironment = await verifyProtectedEnvironment()
+  } catch (error) {
+    blockers.push(error instanceof Error ? error.message : 'Protected rollout environment could not be verified')
+  }
+}
+
+const report = {
+  status: blockers.length > 0 ? 'BLOCKED_NOT_GREEN' : staticOnly ? 'STATIC_ROLLOUT_SOURCE_READY' : 'ROLLOUT_ADMISSION_READY_NOT_FINAL_GREEN',
+  gateMode: staticOnly ? 'STATIC_ONLY_NO_PRODUCTION_AUTHORIZATION' : 'PROTECTED_MANUAL_ROLLOUT',
+  rolloutEnvironment: protectedEnvironment,
+  sourceChecks,
+  finalAuth007Status: auth007Status,
+  implementationAuthorization,
+  finalAuth007PromotionAllowed: false,
+  l8GenesisGrantAllowed: false,
+  productionMutationPerformed: false,
+  blockers,
+}
+console.log(JSON.stringify(report, null, 2))
+if (blockers.length > 0) process.exitCode = 1

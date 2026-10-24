@@ -135,7 +135,30 @@ export async function POST(request: Request): Promise<Response> {
     return errorResponse(502, 'AUTH_UPSTREAM_RESPONSE_INVALID', 'Authentication service returned an invalid response')
   }
 
-  const user = publicUser(payload.user)
+  if (payload.twoFactorRedirect === true) {
+    const methods = Array.isArray(payload.twoFactorMethods)
+      ? payload.twoFactorMethods.filter((method): method is string => typeof method === 'string')
+      : []
+    const cookiesSource = upstream.headers as Headers & { getSetCookie?: () => string[] }
+    const challengeCookies = cookiesSource.getSetCookie?.() ??
+      (upstream.headers.get('set-cookie') ? [upstream.headers.get('set-cookie') as string] : [])
+    // A 2FA response is not a completed login: require the signed short-lived
+    // challenge cookie and return no session credential until verification.
+    if (!methods.includes('totp') || !challengeCookies.some((cookie) => /two_factor/i.test(cookie))) {
+      return errorResponse(502, 'AUTH_UPSTREAM_RESPONSE_INVALID', 'Authentication service returned an invalid challenge')
+    }
+    const headers = new Headers({
+      'content-type': 'application/json; charset=utf-8',
+      'cache-control': 'no-store',
+    })
+    for (const cookie of challengeCookies) headers.append('set-cookie', cookie)
+    return new Response(JSON.stringify({
+      data: { challengeRequired: true, methods: ['totp', 'recovery_code'] },
+      requestId: 'req_' + crypto.randomUUID().replaceAll('-', ''),
+    }), { status: 202, headers })
+  }
+
+const user = publicUser(payload.user)
   const headerToken = upstream.headers.get('set-auth-token')?.trim() ?? ''
   // Better Auth returns the raw session.token in JSON but the Bearer plugin
   // returns the signed session-cookie credential in set-auth-token. They are

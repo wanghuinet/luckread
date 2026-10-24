@@ -75,10 +75,18 @@ export async function ensureBaseUserRole(
   }
 }
 const roleToLayer = new Map<string, string>()
+const mfaRequiredByLayer = new Map<string, boolean>()
 for (const layer of layers['x-layers']) {
   for (const role of layer.roles ?? []) roleToLayer.set(role, layer.id)
+  mfaRequiredByLayer.set(layer.id, layer.mfa === true)
 }
 
+
+export function requireMfaForPrivilegedAction(layer: string, mfaEnabled: boolean): boolean {
+  const mfaRequired = mfaRequiredByLayer.get(layer)
+  if (mfaRequired === undefined) return false
+  return mfaRequired ? mfaEnabled : true
+}
 
 /**
  * Materialize the L2 verification role only after W02 has committed both
@@ -195,6 +203,32 @@ export async function resolveGlobalLayer(
   const result = await db.prepare(sql).bind(subjectId, 'ACTIVE', now, now).all<RoleAssignmentRecord>()
   const eligible: Array<{ assignment: RoleAssignmentRecord; layer: string }> = []
   const resolvedAssignments: ResolvedRoleAssignment[] = []
+  const hasMfaProtectedAssignment = result.results.some((assignment) => {
+    const layer = roleToLayer.get(assignment.roleId)
+    return !!layer && mfaRequiredByLayer.get(layer) === true
+  })
+  let mfaEnabled = false
+  if (hasMfaProtectedAssignment) {
+    // Better Auth is the MFA state authority. Elevated RoleAssignments are
+    // intentionally omitted until TOTP enrollment has been verified.
+    // The enrollment hook revokes pre-MFA sessions, forcing a fresh 2FA sign-in.
+    const userMfa = await db.prepare(
+      'SELECT u.two_factor_enabled AS twoFactorEnabled, u.mfa_enrolled_at AS mfaEnrolledAt, ' +
+      'tf.verified AS totpVerified FROM "user" u ' +
+      'LEFT JOIN "twoFactor" tf ON tf.userId = u.id WHERE u.id = ? LIMIT 1',
+    ).bind(subjectId).first<{
+      twoFactorEnabled: number | boolean
+      mfaEnrolledAt: string | null
+      totpVerified: number | boolean | null
+    }>()
+    const enrollmentTimestamp = Date.parse(userMfa?.mfaEnrolledAt ?? '')
+    const totpVerified = userMfa?.totpVerified === true || userMfa?.totpVerified === 1
+    mfaEnabled =
+      (userMfa?.twoFactorEnabled === true || userMfa?.twoFactorEnabled === 1) &&
+      totpVerified &&
+      Number.isFinite(enrollmentTimestamp) &&
+      enrollmentTimestamp <= Date.parse(now)
+  }
 
   for (const assignment of result.results) {
     const layer = roleToLayer.get(assignment.roleId)
@@ -205,6 +239,12 @@ export async function resolveGlobalLayer(
         (typeof assignment.scopeId !== 'string' || assignment.scopeId.length === 0)) ||
       !['global', 'organization', 'ip'].includes(assignment.scopeType)
     )) return { decision: 'DENY' }
+    if (!layer) return { decision: 'DENY' }
+    if (!requireMfaForPrivilegedAction(layer, mfaEnabled)) {
+      // Don't expose the elevated role at all, since downstream workers may
+      // consume roleAssignments independently of the selected layer.
+      continue
+    }
     if (includeRoleAssignments) {
       resolvedAssignments.push({
         id: assignment.id,
@@ -214,7 +254,6 @@ export async function resolveGlobalLayer(
       })
     }
     if (assignment.scopeType !== 'global') continue
-    if (!layer) return { decision: 'DENY' }
     eligible.push({ assignment, layer })
   }
 
