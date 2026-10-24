@@ -94,6 +94,9 @@ jobs:
           console.log('W02 MFA/L8/MFA-audit outbox migration artifacts: PASS')
           NODE
 
+      - name: Execute AUTH-007 outbox migration static audit (local SQLite only)
+        run: node scripts/auth-007-mfa-journal-migration-static-audit.mjs
+
       - name: Verify protected AUTH-007 rollout admission before schema mutation
         env:
           GITHUB_TOKEN: ${{ github.token }}
