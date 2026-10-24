@@ -5,7 +5,11 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { fetchJson, getApiErrorMessage, jsonHeaders } from '../../../lib/client-api.js'
 
-type ApiError = {
+type ApiResponse = {
+  data?: {
+    twoFactorRequired?: boolean
+    twoFactorMethods?: string[]
+  }
   error?: {
     code?: string
     message?: string
@@ -86,7 +90,7 @@ export default function LoginForm() {
 
     setBusy(true)
     try {
-      const { response, data } = await fetchJson<ApiError | null>('/api/v1/auth/login', {
+      const { response, data } = await fetchJson<ApiResponse | null>('/api/v1/auth/login', {
         method: 'POST',
         headers: jsonHeaders(),
         credentials: 'include',
@@ -113,6 +117,10 @@ export default function LoginForm() {
       const returnTo = requestedReturnTo && requestedReturnTo.startsWith('/') && !requestedReturnTo.startsWith('//')
         ? requestedReturnTo
         : '/home'
+      if (data?.data?.twoFactorRequired === true) {
+        router.push('/login/two-factor?returnTo=' + encodeURIComponent(returnTo))
+        return
+      }
       router.push(returnTo)
     } catch {
       setError('网络连接异常，登录请求未能完成。请检查网络后重试。')
