@@ -48,7 +48,7 @@
       "indexed": true,
       "references": {
         "entityId": "ENT-USER",
-        "fieldId": "ENT-USER-F-ID"
+        "fieldName": "id"
       },
       "classification": "INTERNAL_RELATION",
       "lifecycle": "immutable",
