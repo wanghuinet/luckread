@@ -353,6 +353,27 @@ async function checkEvents() {
         (coverage.notYetEmittedByW02 ?? []).length !== 0) {
       fail('events/AUTH-007-mfa-audit-binding.v1.json: all ten canonical event producers must be source-implemented and none may be reported as missing')
     }
+    const mfaProducerSource = read('workers/W02-identity/src/auth/better-auth.ts')
+    const mfaHookSource = read('workers/W02-identity/src/auth/mfa-audit-hooks.ts')
+    const requiredHookTokens = [
+      "'/two-factor/verify-totp'",
+      "'/two-factor/verify-backup-code'",
+      "'/two-factor/disable'",
+      "'/two-factor/generate-backup-codes'",
+      "classifyMfaAuditHookOutcome",
+      'recordMfaAuditEventOnce',
+      'consumeTotpTimeStep',
+      'auth.mfa.replay_rejected',
+      'auth.mfa.locked',
+    ]
+    if (!exists('workers/W02-identity/src/auth/mfa-audit-hooks.test.ts') ||
+        !exists('workers/W02-identity/src/auth/mfa-audit-events.test.ts') ||
+        !requiredHookTokens.every((token) => mfaProducerSource.includes(token)) ||
+        !["auth.mfa.challenge_succeeded", "auth.mfa.challenge_failed",
+          "auth.mfa.factor_disabled", "auth.mfa.recovery_codes_rotated",
+          "auth.mfa.recovery_code_consumed"].every((token) => mfaHookSource.includes(token))) {
+      fail('events/AUTH-007-mfa-audit-binding.v1.json: reviewed W02 lifecycle hooks must implement the declared challenge, factor, recovery, lockout and replay events')
+    }
     if (coverage.consumerSupportsAllRegisteredEvents !== true) {
       fail('events/AUTH-007-mfa-audit-binding.v1.json: W06 consumer coverage must be explicit')
     }
