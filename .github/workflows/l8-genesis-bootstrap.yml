@@ -32,7 +32,7 @@ jobs:
       - name: Checkout protected main revision
         uses: actions/checkout@v4
         with:
-          ref: main
+          ref: ${{ github.sha }}
           persist-credentials: false
 
       - name: Setup Node 24
