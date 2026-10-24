@@ -151,6 +151,26 @@ describe('W02 L8 target-bound dual-approval verifier', () => {
     })).rejects.toMatchObject({ code: 'REQUEST_PR_SCOPE_INVALID' })
   })
 
+  it('rejects GitHub App/bot review identities even if their logins resemble maintainers', async () => {
+    const now = new Date('2026-10-24T12:00:00.000Z')
+    const signed = await issueTestOidcToken(now)
+    const github = githubFetcher({
+      now,
+      jwk: signed.jwk,
+      reviews: [
+        { state: 'APPROVED', submitted_at: new Date(now.getTime() - 4 * 60_000).toISOString(), commit_id: 'head-1', user: { login: 'maintainer-a', type: 'Bot' } },
+        { state: 'APPROVED', submitted_at: new Date(now.getTime() - 3 * 60_000).toISOString(), commit_id: 'head-1', user: { login: 'maintainer-b', type: 'Bot' } },
+      ],
+    })
+    await expect(verifyTargetBoundDualApproval({
+      oidcToken: signed.token,
+      githubToken: 'ghs_' + 'x'.repeat(40),
+      requestPrNumber: 77,
+      now,
+      fetcher: github.fetcher,
+    })).rejects.toMatchObject({ code: 'DUAL_APPROVAL_REQUIRED' })
+  })
+
   it('rejects duplicate or missing second maintainer approval', async () => {
     const now = new Date('2026-10-24T12:00:00.000Z')
     const signed = await issueTestOidcToken(now)
