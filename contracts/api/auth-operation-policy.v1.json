@@ -1246,12 +1246,12 @@
       "evidence": {
         "openapi": "PASS",
         "inventory": "PASS",
-        "permission": "MISSING",
+        "permission": "PASS",
         "state": "N/A",
         "resource": "PASS",
         "cache": "PASS",
         "antiAbuse": "PASS",
-        "integration": "MISSING",
+        "integration": "PASS",
         "securityE2E": "MISSING"
       }
     },
@@ -1328,12 +1328,12 @@
       "evidence": {
         "openapi": "PASS",
         "inventory": "PASS",
-        "permission": "MISSING",
-        "state": "MISSING",
+        "permission": "PASS",
+        "state": "PASS",
         "resource": "MISSING",
-        "cache": "MISSING",
-        "antiAbuse": "MISSING",
-        "integration": "MISSING",
+        "cache": "PASS",
+        "antiAbuse": "PASS",
+        "integration": "PASS",
         "securityE2E": "MISSING"
       }
     },
@@ -1410,12 +1410,12 @@
       "evidence": {
         "openapi": "PASS",
         "inventory": "PASS",
-        "permission": "MISSING",
-        "state": "MISSING",
+        "permission": "PASS",
+        "state": "PASS",
         "resource": "MISSING",
-        "cache": "MISSING",
+        "cache": "PASS",
         "antiAbuse": "MISSING",
-        "integration": "MISSING",
+        "integration": "PASS",
         "securityE2E": "MISSING"
       }
     },
@@ -1497,9 +1497,9 @@
         "permission": "N/A",
         "state": "MISSING",
         "resource": "MISSING",
-        "cache": "MISSING",
+        "cache": "PASS",
         "antiAbuse": "MISSING",
-        "integration": "MISSING",
+        "integration": "PASS",
         "securityE2E": "MISSING"
       }
     },
@@ -1578,12 +1578,12 @@
       "evidence": {
         "openapi": "PASS",
         "inventory": "PASS",
-        "permission": "MISSING",
+        "permission": "PASS",
         "state": "MISSING",
         "resource": "MISSING",
-        "cache": "MISSING",
+        "cache": "PASS",
         "antiAbuse": "MISSING",
-        "integration": "MISSING",
+        "integration": "PASS",
         "securityE2E": "MISSING"
       }
     },
@@ -1662,12 +1662,12 @@
       "evidence": {
         "openapi": "PASS",
         "inventory": "PASS",
-        "permission": "MISSING",
+        "permission": "PASS",
         "state": "MISSING",
         "resource": "MISSING",
-        "cache": "MISSING",
+        "cache": "PASS",
         "antiAbuse": "MISSING",
-        "integration": "MISSING",
+        "integration": "PASS",
         "securityE2E": "MISSING"
       }
     }
