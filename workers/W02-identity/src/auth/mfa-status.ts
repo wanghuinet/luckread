@@ -43,8 +43,10 @@ export async function readAuthoritativeMfaStatus(
 
   const timestamp = typeof row.enrolledAt === 'string' ? Date.parse(row.enrolledAt) : Number.NaN
   const validEnrollment = Number.isFinite(timestamp) && timestamp <= now.getTime()
-  const verified = isTrue(row.factorVerified)
-  const enabled = isTrue(row.userEnabled) && verified && validEnrollment
+  // A factor verification bit alone is insufficient if the authoritative
+  // enrollment timestamp is missing, invalid, or in the future.
+  const verified = isTrue(row.factorVerified) && validEnrollment
+  const enabled = isTrue(row.userEnabled) && verified
 
   return {
     enabled,
