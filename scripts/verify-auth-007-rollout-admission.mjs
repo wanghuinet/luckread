@@ -69,6 +69,7 @@ async function verifyProtectedEnvironment() {
 
   if (
     environment.name !== environmentName ||
+    environment.can_admins_bypass !== false ||
     rules.length !== 1 ||
     reviewers.length !== 1 ||
     rules[0]?.prevent_self_review !== true ||
@@ -79,7 +80,7 @@ async function verifyProtectedEnvironment() {
     configuredReviewer?.reviewer?.id !== expectedReviewerId ||
     reviewerLogin === actor
   ) {
-    throw new Error('AUTH-007 rollout environment must require the designated human maintainer, forbid self-review, and allow protected branches only')
+    throw new Error('AUTH-007 rollout environment must disable admin bypass, require the designated human maintainer, forbid self-review, and allow protected branches only')
   }
 
   const permission = await githubGet(
@@ -207,6 +208,10 @@ if (blockers.length === 0) {
       /implementationAuthorization === 'true'/.test(read('scripts/verify-admin-account-bootstrap-readiness.mjs')) &&
       /!auth007PromotionVerified/.test(read('scripts/verify-admin-account-bootstrap-readiness.mjs')) &&
       /AUTH-007 must be GREEN with implementation authorization true/.test(read('scripts/verify-admin-account-bootstrap-readiness.mjs')),
+    rolloutEnvironmentDisablesAdminBypass: /environment\\.can_admins_bypass !== false/.test(read('scripts/verify-auth-007-rollout-admission.mjs')),
+    l8EnvironmentDisablesAdminBypass: /environment\\.can_admins_bypass !== false/.test(w02ProductionCode) &&
+      /can_admins_bypass: true/.test(w02TestCode) &&
+      /rejects environments that permit administrator bypass of protection rules/.test(w02TestCode),
     standaloneW01DeployUsesProtectedAdmission:
       /environment:\s*auth-mfa-rollout/.test(standaloneW01Workflow) &&
       /github\.ref == 'refs\/heads\/main'/.test(standaloneW01Workflow) &&
