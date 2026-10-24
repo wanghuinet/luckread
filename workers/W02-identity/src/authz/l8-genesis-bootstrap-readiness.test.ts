@@ -18,14 +18,15 @@ class ReadinessD1 {
 
   prepare(sql: string) {
     let args: unknown[] = []
-    return {
-      bind: (...values: unknown[]) => { args = values; return this },
+    const statement = {
+      bind: (...values: unknown[]) => { args = values; return statement },
       all: async <T>() => {
         if (!this.options.schemaReady && sql.includes('twoFactor')) throw new Error('missing twoFactor')
         if (!this.options.schemaReady && sql.includes('l8_genesis_bootstrap_audit')) throw new Error('missing audit table')
         return { results: [] as T[] }
       },
       first: async <T>() => {
+        void args
         if (sql.includes('FROM "user" WHERE id = ?')) {
           return (this.options.user === undefined
             ? { accountState: 'ACTIVE', emailVerified: 1 }
@@ -43,6 +44,7 @@ class ReadinessD1 {
         return null
       },
     }
+    return statement
   }
 }
 
