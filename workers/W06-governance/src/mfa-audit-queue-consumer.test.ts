@@ -29,12 +29,11 @@ function createDb(existing = false, writeSuccess = true) {
 
 describe('AUTH-007 W06 MFA audit queue consumer', () => {
   it('persists a safe MFA event into canonical AuditEvent storage', async () => {
-    const { db, prepare, run, bind } = createDb()
+    const { db, prepare, run } = createDb()
     await expect(consumeMfaAuditEvent(db, event)).resolves.toBe('persisted')
     expect(prepare).toHaveBeenCalledTimes(2)
     expect(run).toHaveBeenCalledTimes(1)
-    const inserted = bind.mock.calls[1]
-    expect(inserted).toBeDefined()
+    expect(prepare).toHaveBeenLastCalledWith(expect.stringContaining('INSERT INTO audit_events'))
   })
 
   it('deduplicates repeated delivery by eventId', async () => {
