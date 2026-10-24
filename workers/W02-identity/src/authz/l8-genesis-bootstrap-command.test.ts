@@ -20,6 +20,10 @@ class Statement {
 
   async first<T>(): Promise<T | null> {
     const v = this.values
+    if (this.sql.includes('FROM role_authorization_versions')) {
+      const row = this.db.roleVersions.get(String(v[0]))
+      return (row ? { roleVersion: row.roleVersion } : null) as T | null
+    }
     if (this.sql.includes('FROM "user"')) return this.db.user as T | null
     if (this.sql.includes("role_id = 'verified_user'")) {
       return this.db.assignments.some((row) =>
@@ -47,6 +51,16 @@ class Statement {
   }
 
   async run(): Promise<{ meta: { changes: number } }> {
+    if (this.sql.includes('INSERT INTO role_authorization_versions')) {
+      const [subjectId, updatedAt] = this.values
+      const key = String(subjectId)
+      const current = this.db.roleVersions.get(key)
+      this.db.roleVersions.set(key, {
+        roleVersion: current ? current.roleVersion + 1 : 1,
+        updatedAt: String(updatedAt),
+      })
+      return { meta: { changes: 1 } }
+    }
     if (this.sql.includes('INSERT INTO l8_genesis_bootstrap_audit')) {
       if (this.db.audit) throw new Error('bootstrap singleton consumed')
       const [bootstrapKey, operation, requestPrNumber, requestHeadSha, requestMergeSha, targetUserId,
@@ -86,15 +100,18 @@ class FakeD1 {
     validUntil: null,
   }]
   audit: Audit | null = null
+  roleVersions = new Map<string, { roleVersion: number; updatedAt: string }>()
   prepare(sql: string) { return new Statement(this, sql) }
   async batch(statements: Statement[]) {
     const beforeAudit = this.audit
     const beforeAssignments = [...this.assignments]
+    const beforeRoleVersions = new Map(this.roleVersions)
     try {
       for (const statement of statements) await statement.run()
     } catch (error) {
       this.audit = beforeAudit
       this.assignments = beforeAssignments
+      this.roleVersions = beforeRoleVersions
       throw error
     }
     return []
@@ -139,6 +156,8 @@ describe('W02 one-time L8 genesis grant command', () => {
       id: result.assignmentId, subjectId: 'existing-user-123', roleId: 'super_admin',
       scopeType: 'global', scopeId: null, validUntil: result.validUntil,
     }))
+    expect(db.roleVersions.get('existing-user-123')).toEqual({ roleVersion: 1, updatedAt: NOW })
+    expect(result.roleVersion).toBe(1)
     expect(db.audit).toMatchObject({
       requestPrNumber: 77,
       requestHeadSha: 'a'.repeat(40),
@@ -156,6 +175,8 @@ describe('W02 one-time L8 genesis grant command', () => {
     const second = await bootstrapSuperAdmin(db as unknown as D1Database, approval(), NOW)
     expect(second.assignmentId).toBe(first.assignmentId)
     expect(second.replayed).toBe(true)
+    expect(second.roleVersion).toBe(1)
+    expect(db.roleVersions.get('existing-user-123')?.roleVersion).toBe(1)
     expect(db.assignments.filter((row) => row.roleId === 'super_admin')).toHaveLength(1)
   })
 
