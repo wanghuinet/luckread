@@ -18,10 +18,14 @@ const makeDb = (row: unknown = { userEnabled: 0, factorVerified: 0 }) => {
   const statement = {
     bind: vi.fn().mockReturnThis(),
     first: vi.fn().mockResolvedValue(row),
-    run: vi.fn().mockResolvedValue({ meta: { changes: 1 } }),
+    run: vi.fn().mockResolvedValue({ success: true, meta: { changes: 1 } }),
   }
-  const db = { prepare: vi.fn(() => statement) }
-  return { db: db as unknown as D1Database, prepare: db.prepare, statement }
+  const db = {
+    prepare: vi.fn(() => statement),
+    batch: vi.fn(async (statements: Array<{ run: () => Promise<{ success: boolean; meta: { changes: number } }> }>) =>
+      Promise.all(statements.map((item) => item.run()))),
+  }
+  return { db: db as unknown as D1Database, prepare: db.prepare, statement, batch: db.batch }
 }
 
 const makeRequest = (
