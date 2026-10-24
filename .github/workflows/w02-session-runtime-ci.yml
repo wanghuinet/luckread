@@ -18,6 +18,7 @@ on:
       - 'scripts/verify-auth-007-rollout-admission.mjs'
       - 'scripts/auth-010-session-runtime-e2e.mjs'
       - '.github/workflows/auth-010-remote-e2e.yml'
+      - '.github/workflows/w01-payload-app-deploy.yml'
       - '.github/workflows/w02-session-runtime-ci.yml'
   pull_request:
     paths:
