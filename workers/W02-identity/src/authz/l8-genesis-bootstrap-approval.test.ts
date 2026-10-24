@@ -49,7 +49,7 @@ type EnvironmentPayload = Record<string, unknown>
 function githubFetcher(input: {
   now: Date
   jwk: JsonWebKey
-  permissions?: Record<string, string>
+  permissions?: { permission?: string; role_name?: string }
   files?: Array<Record<string, unknown>>
   environment?: EnvironmentPayload
   requestOverrides?: Record<string, unknown>
@@ -92,7 +92,7 @@ function githubFetcher(input: {
     }],
     deployment_branch_policy: { protected_branches: true, custom_branch_policies: false },
   }
-  const permissions = input.permissions ?? { wanghuinet: 'admin' }
+  const permissions = input.permissions ?? { permission: 'admin' }
 
   const fetcher: typeof fetch = async (requestUrl) => {
     const url = new URL(String(requestUrl))
@@ -103,8 +103,8 @@ function githubFetcher(input: {
       return Response.json(environment)
     }
     if (url.pathname === '/repos/wanghuinet/luckread/collaborators/wanghuinet/permission') {
-      return permissions.wanghuinet
-        ? Response.json({ permission: permissions.wanghuinet })
+      return permissions.permission || permissions.role_name
+        ? Response.json(permissions)
         : new Response('{}', { status: 404 })
     }
     if (url.pathname === '/repos/wanghuinet/luckread/pulls/77') return Response.json(pull)
@@ -189,10 +189,19 @@ describe('W02 L8 target-bound single environment approval verifier', () => {
   it('rejects an environment reviewer without admin or maintain permission', async () => {
     const now = new Date('2026-10-24T12:00:00.000Z')
     const signed = await issueTestOidcToken(now)
-    const github = githubFetcher({ now, jwk: signed.jwk, permissions: { wanghuinet: 'read' } })
+    const github = githubFetcher({ now, jwk: signed.jwk, permissions: { permission: 'read' } })
     await expect(callVerifier(signed.token, github.fetcher, now))
       .rejects.toMatchObject({ code: 'SINGLE_APPROVAL_ENVIRONMENT_NOT_CONFIGURED' })
   })
+
+  it('accepts a repository maintainer using GitHub role_name even though legacy permission is write', async () => {
+    const now = new Date('2026-10-24T12:00:00.000Z')
+    const signed = await issueTestOidcToken(now)
+    const github = githubFetcher({ now, jwk: signed.jwk, permissions: { permission: 'write', role_name: 'maintain' } })
+    const result = await callVerifier(signed.token, github.fetcher, now)
+    expect(result.reviewerPermissions).toEqual({ wanghuinet: 'maintain' })
+  })
+
 
   it('rejects unprotected deployment branches even when a reviewer is configured', async () => {
     const now = new Date('2026-10-24T12:00:00.000Z')
