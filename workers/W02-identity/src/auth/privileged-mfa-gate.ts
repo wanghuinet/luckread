@@ -55,6 +55,7 @@ export async function requireMfaForPrivilegedAction(
  * bootstrap command correctly requires verified MFA before it writes the first
  * L8 RoleAssignment, so the target must be able to enroll before holding that
  * assignment. Privileged actions remain gated by requireMfaForPrivilegedAction.
+ * This decision accepts no role or layer input from the caller.
  */
 export function isMfaEnrollmentEligible(
   subjectId: string,
