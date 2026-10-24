@@ -182,7 +182,7 @@ if (blockers.length === 0) {
   const standaloneW01Workflow = read('.github/workflows/w01-payload-app-deploy.yml')
   const readOnlyPreflightWorkflow = read('.github/workflows/auth-mfa-rollout-preflight.yml')
   const protectedRefCallSitesConfigured = protectedRefWorkflowPaths.every((file) =>
-    /GITHUB_REF_PROTECTED:\\s*\\$\\{\\{\\s*github\\.ref_protected\\s*\\}\\}/.test(read(file))
+    /GITHUB_REF_PROTECTED:\s*\$\{\{\s*github\.ref_protected\s*\}\}/.test(read(file))
   )
 
   const requiredMigrationTokens = [
