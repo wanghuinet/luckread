@@ -48,35 +48,20 @@ export async function requireMfaForPrivilegedAction(
 }
 
 /**
- * TOTP enrollment is restricted to an account with an effective global L5-L8
- * assignment. This prevents ordinary accounts from unexpectedly enabling a
- * login challenge before all client contracts are admitted, while allowing
- * the first L8 account to enroll even though the MFA gate downgrades its layer.
+ * MFA enrollment is self-service for an authenticated ACTIVE account.
+ *
+ * Enrollment does not grant authority. Requiring an existing L5-L8 assignment
+ * here would create a circular dependency for the first L8 bootstrap: the
+ * bootstrap command correctly requires verified MFA before it writes the first
+ * L8 RoleAssignment, so the target must be able to enroll before holding that
+ * assignment. Privileged actions remain gated by requireMfaForPrivilegedAction.
  */
-export async function isPrivilegedMfaEnrollmentEligible(
-  db: D1Database,
+export function isMfaEnrollmentEligible(
   subjectId: string,
-  now = new Date().toISOString(),
-): Promise<boolean> {
-  if (
-    typeof subjectId !== 'string' ||
-    subjectId.length < 1 ||
-    subjectId.length > 128 ||
-    !Number.isFinite(Date.parse(now))
-  ) return false
-
-  const privilegedRoleIds = layers['x-layers']
-    .filter((layer) => Number(layer.id.slice(1)) >= 5)
-    .flatMap((layer) => layer.roles ?? [])
-  if (privilegedRoleIds.length === 0) return false
-
-  const placeholders = privilegedRoleIds.map(() => '?').join(', ')
-  const assignment = await db.prepare(
-    'SELECT id FROM role_assignments WHERE subject_id = ? ' +
-    `AND role_id IN (${placeholders}) ` +
-    "AND scope_type = 'global' AND scope_id IS NULL AND status = 'ACTIVE' " +
-    'AND valid_from <= ? AND (valid_until IS NULL OR ? < valid_until) LIMIT 1',
-  ).bind(subjectId, ...privilegedRoleIds, now, now).first<{ id: string }>()
-
-  return !!assignment
+  accountState: string,
+): boolean {
+  return typeof subjectId === 'string' &&
+    subjectId.length >= 1 &&
+    subjectId.length <= 128 &&
+    accountState === 'ACTIVE'
 }
