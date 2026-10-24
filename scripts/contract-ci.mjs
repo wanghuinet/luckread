@@ -341,9 +341,17 @@ async function checkEvents() {
       'auth.mfa.enrollment_started',
       'auth.mfa.enrollment_verified',
       'auth.mfa.enrollment_failed',
+      'auth.mfa.challenge_succeeded',
+      'auth.mfa.challenge_failed',
+      'auth.mfa.factor_disabled',
+      'auth.mfa.recovery_codes_rotated',
+      'auth.mfa.recovery_code_consumed',
+      'auth.mfa.locked',
+      'auth.mfa.replay_rejected',
     ]
-    if (JSON.stringify(implemented) !== JSON.stringify(expectedImplemented)) {
-      fail('events/AUTH-007-mfa-audit-binding.v1.json: claimed source emission coverage must match the reviewed enrollment source slice')
+    if (JSON.stringify(implemented) !== JSON.stringify(expectedImplemented) ||
+        (coverage.notYetEmittedByW02 ?? []).length !== 0) {
+      fail('events/AUTH-007-mfa-audit-binding.v1.json: all ten canonical event producers must be source-implemented and none may be reported as missing')
     }
     if (coverage.consumerSupportsAllRegisteredEvents !== true) {
       fail('events/AUTH-007-mfa-audit-binding.v1.json: W06 consumer coverage must be explicit')
