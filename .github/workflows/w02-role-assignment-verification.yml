@@ -22,6 +22,7 @@ on:
       - '.github/workflows/w01-payload-app-deploy.yml'
       - '.github/workflows/w01-w02-binding-deploy.yml'
       - '.github/workflows/w02-role-assignment-migration.yml'
+      - '.github/workflows/w06-deploy.yml'
       - '.github/workflows/w02-role-assignment-verification.yml'
   pull_request:
     paths:
@@ -43,6 +44,7 @@ on:
       - '.github/workflows/w01-payload-app-deploy.yml'
       - '.github/workflows/w01-w02-binding-deploy.yml'
       - '.github/workflows/w02-role-assignment-migration.yml'
+      - '.github/workflows/w06-deploy.yml'
       - '.github/workflows/w02-role-assignment-verification.yml'
   workflow_dispatch:
 
