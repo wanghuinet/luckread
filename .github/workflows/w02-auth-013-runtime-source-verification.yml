@@ -41,6 +41,9 @@ jobs:
           set -o pipefail
           npx vitest run workers/W02-identity/src/account/account-state-transition.test.ts workers/W02-identity/src/account/publication-journal-publisher.test.ts 2>&1 | tee artifacts/mapping-0/auth-013-runtime-source/test-output.txt
 
+      - name: Run W02 privileged MFA session gate regression tests
+        run: npx vitest run workers/W02-identity/src/auth/privileged-mfa-gate.test.ts
+
       - name: Capture AUTH-013 source provenance
         run: |
           {
