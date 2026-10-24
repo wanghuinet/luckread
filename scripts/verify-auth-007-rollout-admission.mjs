@@ -1,5 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import { spawnSync } from 'node:child_process'
 
 const root = process.cwd()
 const repository = 'wanghuinet/luckread'
@@ -37,6 +38,12 @@ async function verifyProtectedEnvironment() {
   const ref = process.env.GITHUB_REF ?? ''
   const eventName = process.env.GITHUB_EVENT_NAME ?? ''
   const configuredEnvironment = process.env.AUTH007_ROLLOUT_ENVIRONMENT ?? ''
+  const sourceSha = process.env.SOURCE_SHA ?? ''
+  const currentSha = spawnSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' })
+  const sourceExists = /^[a-f0-9]{40}$/i.test(sourceSha) &&
+    spawnSync('git', ['cat-file', '-e', sourceSha + '^{commit}']).status === 0
+  const sourceIsMainAncestor = sourceExists &&
+    spawnSync('git', ['merge-base', '--is-ancestor', sourceSha, 'origin/main']).status === 0
 
   if (
     token.length < 20 ||
@@ -44,9 +51,13 @@ async function verifyProtectedEnvironment() {
     !actor ||
     ref !== 'refs/heads/main' ||
     eventName !== 'workflow_dispatch' ||
-    configuredEnvironment !== environmentName
+    configuredEnvironment !== environmentName ||
+    !sourceExists ||
+    !sourceIsMainAncestor ||
+    currentSha.status !== 0 ||
+    currentSha.stdout.trim().toLowerCase() !== sourceSha.toLowerCase()
   ) {
-    throw new Error('Rollout must be explicitly dispatched on protected main with the canonical repository and environment')
+    throw new Error('Rollout must use an immutable source SHA already committed to protected main and be explicitly dispatched there')
   }
 
   const environment = await githubGet('/repos/' + repository + '/environments/' + environmentName, token)
