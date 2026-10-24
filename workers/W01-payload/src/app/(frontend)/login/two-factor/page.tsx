@@ -4,11 +4,6 @@ import { FormEvent, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
-type AuthResponse = {
-  error?: { code?: string; message?: string }
-  data?: unknown
-}
-
 function safeReturnTo(): string {
   const requested = new URLSearchParams(window.location.search).get('returnTo')
   return requested && requested.startsWith('/') && !requested.startsWith('//')
@@ -48,7 +43,6 @@ export default function TwoFactorChallengePage() {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(body),
       })
-      const payload = await response.json().catch(() => null) as AuthResponse | null
       if (!response.ok) {
         if (response.status === 429) {
           setError('验证码尝试次数过多，请稍后再试。')
