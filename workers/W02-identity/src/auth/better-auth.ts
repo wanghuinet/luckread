@@ -7,6 +7,14 @@ import { bearer, twoFactor } from 'better-auth/plugins'
 import { consumeTotpTimeStep, matchTotpTimeStep } from './totp-replay-guard.js'
 import { isActiveMfaSubject } from './mfa-challenge-account-state.js'
 import { sendResendEmail } from './resend-email.js'
+import { recordMfaAuditEvent, recordMfaAuditEventOnce } from './mfa-audit-events.js'
+import {
+  classifyMfaAuditHookOutcome,
+  getMfaAuditHookState,
+  isMfaAuditFailureOutcome,
+  MFA_AUDIT_OBSERVED_PATHS,
+  setMfaAuditHookState,
+} from './mfa-audit-hooks.js'
 
 export interface RateLimitBinding {
   limit(input: { key: string }): Promise<{ success: boolean }>
@@ -94,14 +102,18 @@ const buildLuckReadAuth = (env: BetterAuthEnv) => {
       before: createAuthMiddleware(async (ctx) => {
         const isTotpVerification = ctx.path === '/two-factor/verify-totp'
         const isBackupCodeVerification = ctx.path === '/two-factor/verify-backup-code'
-        if (!isTotpVerification && !isBackupCodeVerification) return
-        const body = ctx.body as { code?: unknown }
-        if (typeof body.code !== 'string') return
+        const isDisable = ctx.path === '/two-factor/disable'
+        const isRecoveryRotation = ctx.path === '/two-factor/generate-backup-codes'
+        if (!isTotpVerification && !isBackupCodeVerification && !isDisable && !isRecoveryRotation) return
 
-        // TOTP enrollment verification has an authenticated session. A sign-in
-        // MFA challenge does not, so resolve that subject only from Better
-        // Auth's signed, time-bounded, server-stored challenge.
+        const body = ctx.body as { code?: unknown }
+        if ((isTotpVerification || isBackupCodeVerification) && typeof body.code !== 'string') return
+
+        // Resolve subject only from the Better Auth session or, for unauthenticated
+        // sign-in challenges, a signed and unexpired server-stored two_factor
+        // challenge. Never accept an audit subject from the request body.
         let subjectId: string | null = null
+        let sessionSubject = false
         let sessionLookupFailed = false
         const requestHeaders = ctx.request?.headers ?? ctx.headers
         if (requestHeaders) {
@@ -110,13 +122,17 @@ const buildLuckReadAuth = (env: BetterAuthEnv) => {
               headers: requestHeaders,
               query: {},
             }) as { user?: { id?: unknown } } | null
-            if (typeof session?.user?.id === 'string') subjectId = session.user.id
+            if (typeof session?.user?.id === 'string') {
+              subjectId = session.user.id
+              sessionSubject = true
+            }
           } catch {
             sessionLookupFailed = true
           }
         }
 
-        if (!subjectId) {
+        let signedChallengeSubject = false
+        if (!subjectId && (isTotpVerification || isBackupCodeVerification)) {
           const challengeCookie = ctx.context.createAuthCookie('two_factor')
           const signedChallenge = await ctx.getSignedCookie(
             challengeCookie.name,
@@ -130,10 +146,11 @@ const buildLuckReadAuth = (env: BetterAuthEnv) => {
               Date.parse(String(challenge.expiresAt)) > Date.now()
             ) {
               subjectId = challenge.value
+              signedChallengeSubject = true
             }
           }
         }
-        if (!subjectId && sessionLookupFailed) {
+        if (!subjectId && sessionLookupFailed && (isTotpVerification || isBackupCodeVerification)) {
           // Do not silently skip replay protection when the authenticated
           // subject could not be resolved because an authority read failed.
           throw APIError.from('INTERNAL_SERVER_ERROR', {
@@ -142,6 +159,16 @@ const buildLuckReadAuth = (env: BetterAuthEnv) => {
           })
         }
         if (!subjectId) return
+
+        setMfaAuditHookState(ctx.context, {
+          userId: subjectId,
+          isChallenge: signedChallengeSubject && !sessionSubject,
+        })
+
+        // Disable and recovery-code rotation require a live session. Their
+        // authority is checked by Better Auth; this hook only snapshots the
+        // authenticated subject before a disable trigger can revoke that session.
+        if (isDisable || isRecoveryRotation) return
 
         // Factor completion must never activate a suspended, pending or missing
         // account. Check W02-owned account state for TOTP and recovery paths.
@@ -166,7 +193,7 @@ const buildLuckReadAuth = (env: BetterAuthEnv) => {
           key: ctx.context.secretConfig,
           data: factor.secret,
         })
-        const match = await matchTotpTimeStep(secret, body.code)
+        const match = await matchTotpTimeStep(secret, body.code as string)
         // Invalid codes continue through Better Auth so its failure counters and
         // challenge lockout remain authoritative.
         if (match.kind === 'invalid') return
@@ -176,7 +203,88 @@ const buildLuckReadAuth = (env: BetterAuthEnv) => {
 
         const consumed = await consumeTotpTimeStep(env.D1_01, subjectId, match.timeStep)
         if (!consumed) {
+          // The TOTP was valid but its monotonically increasing step was already
+          // accepted. Persist the rejection before returning the auth failure.
+          try {
+            await recordMfaAuditEvent(env.D1_01, {
+              eventType: 'auth.mfa.replay_rejected',
+              userId: subjectId,
+              correlationId: requestHeaders?.get('X-LuckRead-Correlation-Id'),
+              causationId: requestHeaders?.get('X-LuckRead-Request-Id'),
+              result: 'rejected',
+              reasonCode: 'TOTP_STEP_ALREADY_ACCEPTED',
+              challengeMethod: 'totp',
+            })
+          } catch {
+            throw APIError.from('INTERNAL_SERVER_ERROR', {
+              code: 'MFA_AUDIT_UNAVAILABLE',
+              message: 'TOTP verification is temporarily unavailable',
+            })
+          }
           throw APIError.from('UNAUTHORIZED', { code: 'INVALID_CODE', message: 'Invalid code' })
+        }
+      }),
+      after: createAuthMiddleware(async (ctx) => {
+        if (!MFA_AUDIT_OBSERVED_PATHS.has(ctx.path)) return
+        const state = getMfaAuditHookState(ctx.context)
+        if (!state) return
+
+        const failed = isMfaAuditFailureOutcome(ctx.context.returned)
+        const outcomes = classifyMfaAuditHookOutcome({
+          path: ctx.path,
+          isChallenge: state.isChallenge,
+          failed,
+        })
+        for (const outcome of outcomes) {
+          try {
+            await recordMfaAuditEvent(env.D1_01, {
+              ...outcome,
+              userId: state.userId,
+              correlationId: ctx.request?.headers.get('X-LuckRead-Correlation-Id') ??
+                ctx.headers.get('X-LuckRead-Correlation-Id'),
+              causationId: ctx.request?.headers.get('X-LuckRead-Request-Id') ??
+                ctx.headers.get('X-LuckRead-Request-Id'),
+            })
+          } catch {
+            // An after-hook must not hide a successful sign-in or a newly rotated
+            // recovery-code set from the user. Keep the failure observable without
+            // logging user identifiers, credentials, request bodies, or secrets.
+            console.error(JSON.stringify({
+              event: 'auth.mfa.audit_outbox_write_failed',
+              eventType: outcome.eventType,
+              code: 'MFA_AUDIT_OUTBOX_WRITE_FAILED',
+            }))
+          }
+        }
+
+        if (failed &&
+            (ctx.path === '/two-factor/verify-totp' || ctx.path === '/two-factor/verify-backup-code')) {
+          try {
+            const factor = await env.D1_01.prepare(
+              'SELECT lockedUntil FROM "twoFactor" WHERE userId = ? LIMIT 1',
+            ).bind(state.userId).first<{ lockedUntil: string | null }>()
+            const lockUntil = typeof factor?.lockedUntil === 'string' ? Date.parse(factor.lockedUntil) : Number.NaN
+            if (Number.isFinite(lockUntil) && lockUntil > Date.now()) {
+              await recordMfaAuditEventOnce(env.D1_01, {
+                eventType: 'auth.mfa.locked',
+                userId: state.userId,
+                correlationId: ctx.request?.headers.get('X-LuckRead-Correlation-Id') ??
+                  ctx.headers.get('X-LuckRead-Correlation-Id'),
+                causationId: ctx.request?.headers.get('X-LuckRead-Request-Id') ??
+                  ctx.headers.get('X-LuckRead-Request-Id'),
+                result: 'rejected',
+                reasonCode: 'VERIFICATION_LOCKOUT',
+                challengeMethod: ctx.path === '/two-factor/verify-backup-code' ? 'recovery_code' : 'totp',
+                idempotencyKey: 'mfa-lock:' + state.userId + ':' + lockUntil,
+              })
+            }
+          } catch {
+            console.error(JSON.stringify({
+              event: 'auth.mfa.audit_outbox_write_failed',
+              eventType: 'auth.mfa.locked',
+              code: 'MFA_AUDIT_OUTBOX_WRITE_FAILED',
+            }))
+          }
         }
       }),
     },
