@@ -4,8 +4,8 @@ on:
   workflow_dispatch:
     inputs:
       source_sha:
-        description: Optional exact source commit SHA; blank uses the selected ref head
-        required: false
+        description: Exact source commit already contained in protected main
+        required: true
         type: string
       confirm:
         description: Type DEPLOY to publish W01 to the configured production routes
@@ -14,7 +14,10 @@ on:
         type: string
 
 permissions:
+  actions: read
   contents: read
+  deployments: read
+  pull-requests: read
 
 concurrency:
   group: w01-payload-production-deploy
@@ -22,14 +25,48 @@ concurrency:
 
 jobs:
   deploy:
-    if: ${{ inputs.confirm == 'DEPLOY' }}
+    if: ${{ inputs.confirm == 'DEPLOY' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
+    environment: auth-mfa-rollout
     timeout-minutes: 30
     steps:
-      - name: Checkout exact source
+      - name: Checkout protected main for source validation
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.source_sha || github.sha }}
+          ref: main
+          fetch-depth: 0
+
+      - name: Validate immutable source SHA is committed to protected main
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          set -euo pipefail
+          if ! [[ "$SOURCE_SHA" =~ ^[0-9a-fA-F]{40}$ ]]; then
+            echo "source_sha must be a full 40-character commit SHA"
+            exit 1
+          fi
+          git cat-file -e "$SOURCE_SHA^{commit}"
+          git merge-base --is-ancestor "$SOURCE_SHA" origin/main || {
+            echo "source_sha must be an immutable commit already contained in protected main"
+            exit 1
+          }
+
+      - name: Checkout exact approved source commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha }}
+          fetch-depth: 0
+
+      - name: Verify protected AUTH-007 rollout admission before W01 production deployment
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_REF: ${{ github.ref }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          AUTH007_ROLLOUT_ENVIRONMENT: auth-mfa-rollout
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: node scripts/verify-auth-007-rollout-admission.mjs
 
       - name: Record deployment source
         id: source
