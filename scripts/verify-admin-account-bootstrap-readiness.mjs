@@ -59,10 +59,19 @@ const hasProtectedSingleApprovalWorkflow =
   /environment:\s*l8-genesis-bootstrap/.test(genesisWorkflow) &&
   /run-name:.*request_pr_number/.test(genesisWorkflow) &&
   /verify-admin-account-bootstrap-readiness\.mjs/.test(genesisWorkflow)
+const admissionStart = genesisWorkflow.indexOf('  protected-main-admission:')
+const bootstrapStart = genesisWorkflow.indexOf('  bootstrap:')
+const admissionJob = admissionStart >= 0 && bootstrapStart > admissionStart
+  ? genesisWorkflow.slice(admissionStart, bootstrapStart)
+  : ''
 const hasProtectedMainRuntimeGuard =
   /if:\s*github\.ref\s*==\s*['"]refs\/heads\/main['"]\s*&&\s*github\.ref_protected\s*==\s*true/.test(genesisWorkflow) &&
-  /name:\s*Fail closed when GitHub main is not protected/.test(genesisWorkflow) &&
-  /if:\s*\$\{\{\s*github\.ref_protected\s*!=\s*true\s*\}\}/.test(genesisWorkflow)
+  /needs:\s*protected-main-admission/.test(genesisWorkflow.slice(bootstrapStart)) &&
+  /DISPATCH_REF:\s*\$\{\{\s*github\.ref\s*\}\}/.test(admissionJob) &&
+  /REF_PROTECTED:\s*\$\{\{\s*github\.ref_protected\s*\}\}/.test(admissionJob) &&
+  /if\s+\[\[\s*"\$DISPATCH_REF"\s*!=\s*"refs\/heads\/main"\s*\]\]/.test(admissionJob) &&
+  /if\s+\[\[\s*"\$REF_PROTECTED"\s*!=\s*"true"\s*\]\]/.test(admissionJob) &&
+  !/environment:/.test(admissionJob)
 if (!hasProtectedMainRuntimeGuard) {
   blockers.push('L8 genesis workflow must reject an unprotected main ref before readiness/API calls.')
 }
