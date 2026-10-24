@@ -6,15 +6,12 @@ const fail = (message) => {
 }
 
 const requestPrNumber = Number(process.env.REQUEST_PR_NUMBER)
-const mode = process.env.BOOTSTRAP_MODE ?? 'preflight'
 const githubToken = process.env.GITHUB_TOKEN
 const oidcRequestUrl = process.env.ACTIONS_ID_TOKEN_REQUEST_URL
 const oidcRequestToken = process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN
 
 if (!Number.isSafeInteger(requestPrNumber) || requestPrNumber < 1) {
   fail('REQUEST_PR_NUMBER must be a positive integer.')
-} else if (mode !== 'preflight' && mode !== 'execute') {
-  fail('BOOTSTRAP_MODE must be preflight or execute.')
 } else if (!githubToken || !oidcRequestUrl || !oidcRequestToken) {
   fail('GitHub Actions OIDC context or short-lived GitHub token is unavailable.')
 } else {
@@ -48,9 +45,10 @@ if (!Number.isSafeInteger(requestPrNumber) || requestPrNumber < 1) {
       return { response, result }
     }
 
-    // Read-only production preflight: W01 forwards through W02_AUTH, while W02
-    // independently revalidates GitHub approvals and checks the deployed D1
-    // schema, target account, L2 assignment, existing global L8, and replay lock.
+    // One GitHub Environment approval authorizes this run. W02 independently
+    // verifies the signed OIDC identity, the single-reviewer environment
+    // policy, and the immutable request. Readiness is always checked first;
+    // no grant call is made if any read-only precondition fails.
     const preflight = await postToW01('/api/v1/admin/bootstrap/super-admin/readiness')
     const readiness = preflight.result?.data
     if (
@@ -60,7 +58,9 @@ if (!Number.isSafeInteger(requestPrNumber) || requestPrNumber < 1) {
       readiness?.targetUserId === undefined ||
       readiness?.roleId !== 'super_admin' ||
       readiness?.scopeType !== 'global' ||
-      readiness?.maxGrantSeconds !== 14400
+      readiness?.maxGrantSeconds !== 14400 ||
+      !Array.isArray(readiness?.approvedReviewers) ||
+      readiness.approvedReviewers.length !== 1
     ) {
       console.error(JSON.stringify({
         phase: 'READ_ONLY_PREFLIGHT',
@@ -71,49 +71,33 @@ if (!Number.isSafeInteger(requestPrNumber) || requestPrNumber < 1) {
       process.exitCode = 1
     } else {
       console.log(JSON.stringify({
-        phase: 'READ_ONLY_PREFLIGHT',
+        phase: 'READ_ONLY_PREFLIGHT_PASSED',
         status: readiness.status,
         targetUserId: readiness.targetUserId,
         requestPrNumber: readiness.requestPrNumber,
         requestMergeSha: readiness.requestMergeSha,
-        approvedReviewers: readiness.approvedReviewers,
+        approvedReviewer: readiness.approvedReviewers[0],
         maxGrantSeconds: readiness.maxGrantSeconds,
         productionMutationPerformed: false,
       }, null, 2))
 
-      if (mode === 'preflight') {
-        // Preflight-only mode intentionally stops here. A separate, explicit
-        // execute dispatch must independently pass the same read-only checks
-        // again before the one-time role write can be reached.
-        console.log(JSON.stringify({
-          phase: 'READ_ONLY_PREFLIGHT_COMPLETE',
-          status: 'REVIEW_REQUIRED_BEFORE_EXECUTE',
-          targetUserId: readiness.targetUserId,
-          requestPrNumber: readiness.requestPrNumber,
-          requestMergeSha: readiness.requestMergeSha,
-          approvedReviewers: readiness.approvedReviewers,
-          maxGrantSeconds: readiness.maxGrantSeconds,
-          productionMutationPerformed: false,
-        }, null, 2))
+      // Same approved run proceeds to the single one-time write only after the
+      // preflight passed. W02 repeats all mutable checks and atomically commits.
+      const grant = await postToW01('/api/v1/admin/bootstrap/super-admin')
+      if (!grant.response.ok) {
+        console.error(JSON.stringify({
+          phase: 'BOOTSTRAP_WRITE',
+          status: grant.response.status,
+          error: grant.result?.error?.code ?? 'BOOTSTRAP_FAILED',
+          message: 'W02 denied the L8 genesis bootstrap. Do not retry until the blocker is reviewed.',
+        }))
+        process.exitCode = 1
       } else {
-        // This is the only mutation call. W02 repeats approval and mutable
-        // preconditions and atomically commits the four-hour RoleAssignment.
-        const grant = await postToW01('/api/v1/admin/bootstrap/super-admin')
-        if (!grant.response.ok) {
-          console.error(JSON.stringify({
-            phase: 'BOOTSTRAP_WRITE',
-            status: grant.response.status,
-            error: grant.result?.error?.code ?? 'BOOTSTRAP_FAILED',
-            message: 'W02 denied the L8 genesis bootstrap. No retry should be attempted until the blocker is reviewed.',
-          }))
-          process.exitCode = 1
-        } else {
-          console.log(JSON.stringify({
-            phase: 'BOOTSTRAP_WRITE',
-            status: 'BOOTSTRAP_RESULT',
-            data: grant.result?.data ?? grant.result,
-          }, null, 2))
-        }
+        console.log(JSON.stringify({
+          phase: 'BOOTSTRAP_WRITE',
+          status: 'BOOTSTRAP_RESULT',
+          data: grant.result?.data ?? grant.result,
+        }, null, 2))
       }
     }
   } catch (error) {
