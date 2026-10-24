@@ -250,7 +250,15 @@ const buildLuckReadAuth = (env: BetterAuthEnv) => {
         }))
       },
     },
-    plugins: [bearer(), twoFactor({ issuer: 'LuckRead' })],
+    // High-privilege layers cannot rely on a long-lived trusted-device cookie.
+    // Require a new TOTP challenge during credential sign-in rather than letting
+    // clients mark a device as trusted for the default 30-day window.
+    plugins: [bearer(), twoFactor({
+      issuer: 'LuckRead',
+      trustDeviceMaxAge: 0,
+      allowPasswordless: false,
+      totpOptions: { allowPasswordless: false },
+    })],
     advanced: {
       // H5/PC and the canonical API hostname must share the same W02 session.
       crossSubDomainCookies: {
