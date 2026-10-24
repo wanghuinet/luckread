@@ -193,23 +193,30 @@ if (blockers.length === 0) {
     sourceEvidenceIsAccurateAndPromotionConsistent:
       apiContract.evidenceStatus?.api?.includes('all six canonical operationIds') === true &&
       !apiContract.evidenceStatus?.api?.includes('other five operations lack runtime adapters') &&
-      apiContract.evidenceStatus?.dto?.includes('Production DTO/secret-redaction security E2E evidence remains unadmitted') === true &&
       (apiContract.evidenceStatus?.runtime?.startsWith('SOURCE_IMPLEMENTED_TESTED_LOCALLY;') === true ||
        ['PASS', 'VERIFIED'].includes(apiContract.evidenceStatus?.runtime)) &&
       ['MISSING', 'PASS', 'VERIFIED'].includes(apiContract.evidenceStatus?.securityE2E) &&
       ['MISSING', 'PASS', 'VERIFIED'].includes(apiContract.evidenceStatus?.mapping0) &&
       ['BLOCKED_NOT_GREEN', 'GREEN'].includes(auth007Status) &&
+      apiContract.evidenceStatus?.auth007 === auth007Status &&
+      factorContract.evidenceStatus?.auth007 === auth007Status &&
       (auth007Status === 'GREEN'
         ? implementationAuthorization === 'true' &&
           ['PASS', 'VERIFIED'].includes(apiContract.evidenceStatus?.securityE2E) &&
           ['PASS', 'VERIFIED'].includes(apiContract.evidenceStatus?.mapping0) &&
           ['PASS', 'VERIFIED'].includes(apiContract.evidenceStatus?.persistence) &&
           ['PASS', 'VERIFIED'].includes(factorContract.evidenceStatus?.totpReplayProtection) &&
+          ['PASS', 'VERIFIED'].includes(factorContract.evidenceStatus?.runtime) &&
           ['PASS', 'VERIFIED'].includes(factorContract.evidenceStatus?.securityE2E) &&
           ['PASS', 'VERIFIED'].includes(factorContract.evidenceStatus?.evidenceRegistry)
         : implementationAuthorization !== 'true') &&
       ['MISSING', 'PASS', 'VERIFIED'].includes(factorContract.evidenceStatus?.securityE2E) &&
       ['MISSING', 'PASS', 'VERIFIED'].includes(factorContract.evidenceStatus?.evidenceRegistry) &&
+      (auth007Status !== 'GREEN' ||
+        (['VERIFIED', 'GREEN'].includes(factorContract.status) &&
+         ['PASS', 'VERIFIED'].includes(factorContract.evidenceStatus?.entity) &&
+         ['PASS', 'VERIFIED'].includes(factorContract.evidenceStatus?.apiDto) &&
+         ['PASS', 'VERIFIED'].includes(factorContract.evidenceStatus?.evidenceRegistry))) &&
       !factorContract.securityInvariants.some((invariant) => invariant.includes('current migration 0006 does not provide this field')),
     standaloneW01DeployUsesProtectedAdmission:
       /environment:\s*auth-mfa-rollout/.test(standaloneW01Workflow) &&
