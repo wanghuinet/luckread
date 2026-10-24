@@ -107,9 +107,9 @@ export async function handleMfaEnrollmentConfirmRequest(
       headers,
       body: JSON.stringify({ code: body.code, trustDevice: false }),
     })
-    // Never forward the native session token or upstream response body here.
-    // Enabling TOTP invalidates current sessions before the factor can be used
-    // for privileged authentication.
+    // The upstream body contains a session token and is deliberately discarded.
+    // A rotated session can be delivered only through the HTTP-only Set-Cookie
+    // header, and only after the authoritative read-back succeeds.
     const verified = await createLuckReadAuth(env).handler(authRequest)
     if (!verified.ok) {
       if (verified.status === 429) {
@@ -138,7 +138,16 @@ export async function handleMfaEnrollmentConfirmRequest(
     if (stored.meta.changes !== 1) {
       return json({ error: { code: 'MFA_READBACK_FAILED', message: 'MFA confirmation could not be verified' } }, 503)
     }
-    return json({ data: status })
+    // Better Auth rotates the authenticated session after verified enrollment.
+    // Forward only its Set-Cookie headers after D1 read-back and the idempotency
+    // marker have succeeded. Never expose the upstream token/body in JSON.
+    const response = json({ data: status })
+    const upstreamHeaders = verified.headers as Headers & { getSetCookie?: () => string[] }
+    const setCookies = typeof upstreamHeaders.getSetCookie === 'function'
+      ? upstreamHeaders.getSetCookie.call(verified.headers)
+      : (verified.headers.get('set-cookie') ? [verified.headers.get('set-cookie') as string] : [])
+    for (const cookie of setCookies) response.headers.append('set-cookie', cookie)
+    return response
   } catch {
     return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'MFA confirmation unavailable' } }, 503)
   }

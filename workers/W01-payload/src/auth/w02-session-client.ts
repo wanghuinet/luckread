@@ -134,11 +134,25 @@ export async function getMfaStatus(request: Request): Promise<MfaStatusResponse>
   throw new W02AuthClientError(response.status || 503, 'MFA status failed', errorCode(payload) ?? undefined)
 }
 
+const readSetCookieHeaders = (headers: Headers): string[] => {
+  const enhanced = headers as Headers & { getSetCookie?: () => string[] }
+  if (typeof enhanced.getSetCookie === 'function') {
+    return enhanced.getSetCookie.call(headers).filter((value) => value.length > 0)
+  }
+  const single = headers.get('set-cookie')
+  return single ? [single] : []
+}
+
+export type ConfirmMfaEnrollmentResult = {
+  status: MfaStatusResponse
+  setCookieHeaders: string[]
+}
+
 export async function confirmMfaEnrollment(
   request: Request,
   code: string,
   idempotencyKey: string,
-): Promise<MfaStatusResponse> {
+): Promise<ConfirmMfaEnrollmentResult> {
   const response = await callW02('/internal/auth/mfa/enrollment/confirm', {
     request,
     body: { code },
@@ -164,9 +178,14 @@ export async function confirmMfaEnrollment(
     const status = data as MfaStatusResponse
     if (status.enabled && status.verified) {
       return {
-        enabled: true,
-        verified: true,
-        enrolledAt: new Date(status.enrolledAt as string).toISOString(),
+        status: {
+          enabled: true,
+          verified: true,
+          enrolledAt: new Date(status.enrolledAt as string).toISOString(),
+        },
+        // These cookies are forwarded only after W02 validates the response DTO.
+        // The Better Auth JSON body (which contains its raw token) is never exposed.
+        setCookieHeaders: readSetCookieHeaders(response.headers),
       }
     }
   }

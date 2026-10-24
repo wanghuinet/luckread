@@ -61,7 +61,10 @@ describe('W02 MFA enrollment confirmation authority', () => {
     mocks.resolvePrincipal.mockResolvedValue(principal)
     mocks.handler.mockResolvedValue(Response.json(
       { token: 'must-not-leak', user: { id: principal.userId } },
-      { headers: { 'set-auth-token': 'must-not-leak-either' } },
+      { headers: {
+        'set-auth-token': 'must-not-leak-either',
+        'set-cookie': 'luckread.session_token=rotated-session; Domain=.luckread.com; Path=/; HttpOnly; Secure; SameSite=Lax',
+      } },
     ))
     mocks.createAuth.mockReturnValue({ handler: mocks.handler })
     mocks.readStatus.mockResolvedValue({
@@ -81,6 +84,12 @@ describe('W02 MFA enrollment confirmation authority', () => {
       data: { enabled: true, verified: true, enrolledAt: '2026-10-24T12:00:00.000Z' },
     })
     expect(JSON.stringify(payload)).not.toContain('must-not-leak')
+    const getSetCookie = (response.headers as Headers & { getSetCookie?: () => string[] }).getSetCookie
+    const cookies = typeof getSetCookie === 'function'
+      ? getSetCookie.call(response.headers)
+      : [response.headers.get('set-cookie') ?? '']
+    expect(cookies.some((cookie) => cookie.includes('rotated-session'))).toBe(true)
+    expect(cookies.some((cookie) => cookie.includes('must-not-leak'))).toBe(false)
     expect(prepare).toHaveBeenCalledWith(expect.stringContaining('LEFT JOIN "twoFactor"'))
     expect(statement.bind).toHaveBeenCalledWith(principal.userId)
     expect(mocks.handler).toHaveBeenCalledTimes(1)

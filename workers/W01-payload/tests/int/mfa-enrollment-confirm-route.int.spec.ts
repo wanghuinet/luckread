@@ -45,9 +45,10 @@ describe('W01 public MFA enrollment-confirm route', () => {
         })
       }
       if (path === '/internal/auth/mfa/enrollment/confirm') {
-        return Response.json({
-          data: { enabled: true, verified: true, enrolledAt: '2026-10-24T12:00:00.000Z' },
-        })
+        return Response.json(
+          { data: { enabled: true, verified: true, enrolledAt: '2026-10-24T12:00:00.000Z' } },
+          { headers: { 'set-cookie': 'luckread.session_token=rotated-session; Domain=.luckread.com; Path=/; HttpOnly; Secure; SameSite=Lax' } },
+        )
       }
       return Response.json({ error: { code: 'NOT_FOUND' } }, { status: 404 })
     })
@@ -57,6 +58,11 @@ describe('W01 public MFA enrollment-confirm route', () => {
     const response = await POST(makeRequest())
     expect(response.status).toBe(200)
     expect(response.headers.get('cache-control')).toBe('no-store')
+    const getSetCookie = (response.headers as Headers & { getSetCookie?: () => string[] }).getSetCookie
+    const cookies = typeof getSetCookie === 'function'
+      ? getSetCookie.call(response.headers)
+      : [response.headers.get('set-cookie') ?? '']
+    expect(cookies.some((cookie) => cookie.includes('rotated-session'))).toBe(true)
     await expect(response.json()).resolves.toMatchObject({
       data: { enabled: true, verified: true, enrolledAt: '2026-10-24T12:00:00.000Z' },
     })

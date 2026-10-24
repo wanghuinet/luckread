@@ -63,11 +63,13 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   try {
-    const data = await confirmMfaEnrollment(request, body.code, idempotencyKey)
-    return Response.json(
-      { data, requestId: 'req_' + crypto.randomUUID() },
+    const confirmed = await confirmMfaEnrollment(request, body.code, idempotencyKey)
+    const response = Response.json(
+      { data: confirmed.status, requestId: 'req_' + crypto.randomUUID() },
       { status: 200, headers: { 'cache-control': 'no-store' } },
     )
+    for (const cookie of confirmed.setCookieHeaders) response.headers.append('set-cookie', cookie)
+    return response
   } catch (error) {
     if (error instanceof W02AuthClientError) {
       if (error.status === 401) return errorResponse(401, 'MFA_CODE_INVALID', 'MFA confirmation failed')
