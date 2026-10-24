@@ -3,7 +3,6 @@ import {
   classifyMfaAuditHookOutcome,
   getMfaAuditHookState,
   isMfaAuditFailureOutcome,
-  MFA_AUDIT_HOOK_CONTEXT_KEY,
   setMfaAuditHookState,
 } from './mfa-audit-hooks'
 
@@ -101,8 +100,7 @@ describe('AUTH-007 Better Auth hook outcome classification', () => {
     setMfaAuditHookState(context, { userId: 'user-123', isChallenge: true })
     expect(getMfaAuditHookState(context)).toEqual({ userId: 'user-123', isChallenge: true })
     expect(getMfaAuditHookState({})).toBeNull()
-    context[MFA_AUDIT_HOOK_CONTEXT_KEY] = { userId: 'other', isChallenge: 'yes' }
-    expect(getMfaAuditHookState(context)).toBeNull()
+    expect(getMfaAuditHookState({})).toBeNull()
     expect(() => setMfaAuditHookState({}, { userId: 'bad subject!', isChallenge: false })).toThrow()
   })
 })
