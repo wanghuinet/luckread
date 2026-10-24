@@ -74,6 +74,7 @@ jobs:
           GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_REF: ${{ github.ref }}
           GITHUB_EVENT_NAME: ${{ github.event_name }}
+          GITHUB_REF_PROTECTED: ${{ github.ref_protected }}
           AUTH007_ROLLOUT_ENVIRONMENT: auth-mfa-rollout
           SOURCE_SHA: ${{ inputs.source_sha }}
         run: node scripts/verify-auth-007-rollout-admission.mjs
