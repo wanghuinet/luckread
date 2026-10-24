@@ -22,7 +22,7 @@
 6. The security threat model requires MFA as part of brute-force defense and explicitly requires MFA for L5+ privileged roles. fileciteturn270file0L1-L13
 7. The canonical L0-L8 model sets MFA as required for L5, L6, L7 and L8. fileciteturn272file0L1-L5
 8. The canonical identity/entity model separates `Credential` from `User` and explicitly allows Credential to represent authentication material, but the Credential entity and fields remain PROPOSED rather than verified. fileciteturn290file0L1-L3 fileciteturn286file0L1-L5
-9. The initial reconciliation found no canonical MFA operation IDs or executable MFA enrollment/challenge/verification implementation. Follow-up work has now added the canonical operation IDs and a read-only W01/W02 MFA status route; enrollment, confirmation, login challenge, disable, recovery rotation and durable TOTP replay prevention still lack complete runtime implementation and accepted evidence.
+9. The initial reconciliation found no canonical MFA operation IDs or executable MFA enrollment/challenge/verification implementation. Follow-up work has now added the canonical operation IDs and a read-only W01/W02 MFA status route; enrollment, confirmation, login challenge, disable and recovery rotation still lack complete runtime implementation and accepted evidence. W02 source now includes an atomic persisted TOTP time-step guard, but this is source-level evidence until the security tests and deployed-schema read-back are accepted.
 
 ## 2. Missing canonical traceability
 
@@ -37,7 +37,7 @@
 - Factor status/lifecycle contract: missing.
 - Secret/protected-factor storage contract: the proposed field contract now requires encrypted TOTP secret and recovery-code storage with no secret exposure; independent implementation and at-rest evidence remain missing.
 - Challenge lifecycle contract: missing; the standard plugin challenge behavior has not yet been reconciled to the canonical API, DTO and state-machine contract.
-- Replay/attempt-counter persistence mapping: partial only. Failed-attempt/lockout fields exist in migration source, but durable atomic `lastAcceptedTotpTimeStep` is absent from migration 0006 and runtime; duplicate successful TOTP time-step rejection remains a blocker.
+- Replay/attempt-counter persistence mapping: migration 0006 now declares `lastAcceptedTotpTimeStep`; W02 source uses a monotonic conditional D1 update and reserves the exact accepted TOTP time step before Better Auth completes verification. The migration has not been deployed, and same-SHA runtime, concurrency/replay and remote schema read-back evidence remain required before promotion.
 - Recovery-code contract: missing.
 - Step-up/session assurance result contract: missing.
 - MFA permission/scope IDs: missing.
@@ -56,7 +56,7 @@
 
 - Added `contracts/entity/AUTH-007-mfa-factor-field-contract.v1.json` as `CONTRACTED_NOT_VERIFIED`; registered `ENT-MFA-FACTOR` as `PROPOSED` and added proposed fields to the entity field catalog.
 - Added an implementation-evidence row that explicitly remains `BLOCKED`; source code and migration presence are not admitted production evidence.
-- The contract identifies `lastAcceptedTotpTimeStep` as a required replay-prevention field, but it is currently absent from the migration/runtime. No MFA deployment or L8 grant is authorized by this progress update.
+- The contract identifies `lastAcceptedTotpTimeStep` as a required replay-prevention field; it now exists in the source migration and is consumed by the W02 source guard. Production deployment/read-back and accepted security evidence remain absent. No MFA deployment or L8 grant is authorized by this progress update.
 - `AUTH-007` remains `BLOCKED_NOT_GREEN` and Implementation authorization remains `false`.
 
 
@@ -65,7 +65,7 @@
 
 - Added `contracts/api/AUTH-007-mfa-totp-contract.v1.json` defining the W01 public MFA enrollment/status/confirmation/challenge/disable/recovery-code operations. W01 remains the only APP/H5/PC public API entry; W02 remains the factor/identity/D1-01 authority.
 - The proposed contract explicitly requires an atomic persisted TOTP time-step replay guard, identity-bound single-use challenges, recovery-code single-use/rotation, account/factor lockout, no-store responses, step-up for factor disable/recovery rotation, session invalidation on enable/disable, and audit event coverage.
-- The six operation IDs and login HTTP 202 challenge variant are mapped in `contracts/openapi/v1/openapi.yaml`; DTO records, auth operation policy, OpenAPI operation policy, self-scoped permissions and endpoint inventory are also bound. The `GET /v1/auth/mfa` read-only path now has W01 and W02 source adapters plus unit/integration tests. Source presence is not execution evidence: the remaining five MFA mutation/challenge paths, W02 factor lifecycle/step-up handlers, durable atomic TOTP replay guard, full security tests, controlled remote D1 schema read-back, Evidence Registry and final Mapping 0 remain missing. It does not authorize runtime promotion.
+- The six operation IDs and login HTTP 202 challenge variant are mapped in `contracts/openapi/v1/openapi.yaml`; DTO records, auth operation policy, OpenAPI operation policy, self-scoped permissions and endpoint inventory are also bound. The `GET /v1/auth/mfa` read-only path now has W01 and W02 source adapters plus unit/integration tests. The W02 TOTP replay guard is now wired into Better Auth verification and has unit tests, but source presence is not execution or production evidence: the remaining five MFA mutation/challenge paths, full positive/negative/concurrency security tests, controlled remote D1 schema read-back, Evidence Registry and final Mapping 0 remain incomplete. It does not authorize runtime promotion.
 - `AUTH-007` remains `BLOCKED_NOT_GREEN`; implementation authorization remains `false`.
 
 ## 3. Security interpretation rules
