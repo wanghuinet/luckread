@@ -66,6 +66,6 @@ describe('AUTH-007 MFA audit outbox publisher', () => {
       selected: 1, published: 0, failed: 1,
     })
     expect(queueSend).not.toHaveBeenCalled()
-    expect(update).toHaveBeenCalledWith('FAILED', null, 'INVALID_EVENT_PAYLOAD', 'journal-1', 'PENDING')
+    expect(update).toHaveBeenCalledWith('FAILED', 'INVALID_EVENT_PAYLOAD', 'journal-1', 'PENDING')
   })
 })
