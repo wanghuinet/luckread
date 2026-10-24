@@ -29,8 +29,8 @@ function fakeDb(options: {
   })
   const prepare = vi.fn((sql: string) => ({
     bind: vi.fn((...values: unknown[]) => ({
-      first: () => first(...values),
-      run: () => run(...values),
+      first: () => first(),
+      run: () => run(),
       sql,
     })),
   }))
