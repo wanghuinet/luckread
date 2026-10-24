@@ -241,9 +241,9 @@ const buildLuckReadAuth = (env: BetterAuthEnv) => {
               ...outcome,
               userId: state.userId,
               correlationId: ctx.request?.headers.get('X-LuckRead-Correlation-Id') ??
-                ctx.headers.get('X-LuckRead-Correlation-Id'),
+                ctx.headers?.get('X-LuckRead-Correlation-Id') ?? null,
               causationId: ctx.request?.headers.get('X-LuckRead-Request-Id') ??
-                ctx.headers.get('X-LuckRead-Request-Id'),
+                ctx.headers?.get('X-LuckRead-Request-Id') ?? null,
             })
           } catch {
             // An after-hook must not hide a successful sign-in or a newly rotated
@@ -269,9 +269,9 @@ const buildLuckReadAuth = (env: BetterAuthEnv) => {
                 eventType: 'auth.mfa.locked',
                 userId: state.userId,
                 correlationId: ctx.request?.headers.get('X-LuckRead-Correlation-Id') ??
-                  ctx.headers.get('X-LuckRead-Correlation-Id'),
+                  ctx.headers?.get('X-LuckRead-Correlation-Id') ?? null,
                 causationId: ctx.request?.headers.get('X-LuckRead-Request-Id') ??
-                  ctx.headers.get('X-LuckRead-Request-Id'),
+                  ctx.headers?.get('X-LuckRead-Request-Id') ?? null,
                 result: 'rejected',
                 reasonCode: 'VERIFICATION_LOCKOUT',
                 challengeMethod: ctx.path === '/two-factor/verify-backup-code' ? 'recovery_code' : 'totp',
