@@ -238,8 +238,8 @@ export async function verifyTargetBoundSingleApproval(input: {
   // The workflow must have passed the GitHub Environment gate before this job
   // starts. Also verify that the environment still requires exactly one human
   // reviewer with repo maintain/admin permission, and only on protected branches.
-  // Self-review remains forbidden; MFA,
-  // immutable target binding, one-time consumption and four-hour expiry remain mandatory.
+  // Self-review remains forbidden. A separate authorized actor must dispatch the
+  // run; immutable target binding, one-time consumption and four-hour expiry remain mandatory.
   const environment = await githubRequest<GitHubEnvironment>(
     '/repos/' + REPOSITORY + '/environments/l8-genesis-bootstrap',
     input.githubToken,
