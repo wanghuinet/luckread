@@ -23,7 +23,7 @@ describe('W01 canonical MFA frontend integration', () => {
     expect(page).toContain("'/api/v1/auth/mfa/challenge/verify'")
     expect(page).toContain("'Idempotency-Key'")
     expect(page).toContain("credentials: 'include'")
-    expect(page).toContain("method: 'recovery_code'")
+    expect(page).toContain("useState<'totp' | 'recovery_code'>")
     expect(page).not.toContain("'/api/auth/two-factor/verify-totp'")
     expect(page).not.toContain("'/api/auth/two-factor/verify-backup-code'")
     expect(page).not.toContain('localStorage')
