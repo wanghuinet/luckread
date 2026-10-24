@@ -19,7 +19,12 @@ function assignment(overrides: Partial<RoleAssignmentRecord> = {}): RoleAssignme
   }
 }
 
-function fakeD1(rows: RoleAssignmentRecord[], mfaEnabled = true) {
+function fakeD1(
+  rows: RoleAssignmentRecord[],
+  mfaEnabled = true,
+  mfaEnrolled = mfaEnabled,
+  totpVerified = mfaEnabled,
+) {
   let queryCount = 0
   const db = {
     prepare: (sql: string) => ({
@@ -37,7 +42,11 @@ function fakeD1(rows: RoleAssignmentRecord[], mfaEnabled = true) {
           }
         },
         first: async <T>() => sql.includes('two_factor_enabled')
-          ? ({ twoFactorEnabled: mfaEnabled ? 1 : 0 } as T)
+          ? ({
+              twoFactorEnabled: mfaEnabled ? 1 : 0,
+              mfaEnrolledAt: mfaEnrolled ? NOW : null,
+              totpVerified: totpVerified ? 1 : 0,
+            } as T)
           : null,
       }),
     }),
@@ -52,6 +61,18 @@ describe('privileged MFA gate', () => {
     expect(requireMfaForPrivilegedAction('L8', true)).toBe(true)
     expect(requireMfaForPrivilegedAction('L2', false)).toBe(true)
     expect(requireMfaForPrivilegedAction('LX', true)).toBe(false)
+  })
+
+  it('denies a privileged assignment when the database flag is set but TOTP is not verified', async () => {
+    const { db } = fakeD1([assignment({ roleId: 'admin' })], true, true, false)
+    await expect(resolveGlobalLayer(db, 'user-1', 'ACTIVE', NOW))
+      .resolves.toEqual({ decision: 'DENY' })
+  })
+
+  it('denies a privileged assignment if MFA enrollment has no verified timestamp', async () => {
+    const { db } = fakeD1([assignment({ roleId: 'admin' })], true, false, true)
+    await expect(resolveGlobalLayer(db, 'user-1', 'ACTIVE', NOW))
+      .resolves.toEqual({ decision: 'DENY' })
   })
 })
 
