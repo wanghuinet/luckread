@@ -60,6 +60,7 @@ const hasProtectedSingleApprovalWorkflow =
   /run-name:.*request_pr_number/.test(genesisWorkflow) &&
   /verify-admin-account-bootstrap-readiness\.mjs/.test(genesisWorkflow)
 const hasProtectedMainRuntimeGuard =
+  /if:\s*github\.ref\s*==\s*['"]refs\/heads\/main['"]\s*&&\s*github\.ref_protected\s*==\s*true/.test(genesisWorkflow) &&
   /name:\s*Fail closed when GitHub main is not protected/.test(genesisWorkflow) &&
   /if:\s*\$\{\{\s*github\.ref_protected\s*!=\s*true\s*\}\}/.test(genesisWorkflow)
 if (!hasProtectedMainRuntimeGuard) {
