@@ -20,7 +20,7 @@ permissions:
 
 jobs:
   deploy:
-    if: ${{ inputs.confirm == 'DEPLOY' && github.ref == 'refs/heads/main' }}
+    if: ${{ inputs.confirm == 'DEPLOY' && github.ref == 'refs/heads/main' && github.ref_protected == true }}
     runs-on: ubuntu-latest
     environment: auth-mfa-rollout
     timeout-minutes: 15
