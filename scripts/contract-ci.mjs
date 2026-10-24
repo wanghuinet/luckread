@@ -286,6 +286,68 @@ async function checkAuthz() {
 /* ------------------------------------------------------------------ events */
 async function checkEvents() {
   const { docs } = await validateJsonDomain('events')
+  const mfaAuditBinding = docs.find((d) => d.id.endsWith('/AUTH-007-mfa-audit-binding.v1.json'))
+  const domainCompletion = docs.find((d) => d.id.endsWith('/domain-completion.v1.json'))
+  const mfaApi = await loadJson(join(CONTRACTS_ROOT, 'api', 'AUTH-007-mfa-totp-contract.v1.json'))
+
+  if (!mfaAuditBinding) {
+    fail('events: AUTH-007-mfa-audit-binding.v1.json is required to register MFA audit events')
+  } else if (mfaApi) {
+    const expectedEventNames = mfaApi.auditEventsRequired ?? []
+    const boundEvents = mfaAuditBinding.doc.events ?? []
+    const boundNames = boundEvents.map((event) => event.name)
+    const boundNameSet = new Set(boundNames)
+    const apiOperationIds = new Set((mfaApi.operations ?? []).map((operation) => operation.operationId))
+
+    if (expectedEventNames.length === 0) fail('api/AUTH-007-mfa-totp-contract.v1.json: auditEventsRequired must be non-empty')
+    if (boundNameSet.size !== boundNames.length) fail('events/AUTH-007-mfa-audit-binding.v1.json: duplicate MFA event name')
+    for (const eventName of expectedEventNames) {
+      if (!boundNameSet.has(eventName)) fail('events/AUTH-007-mfa-audit-binding.v1.json: missing canonical MFA event ' + eventName)
+    }
+    for (const eventName of boundNames) {
+      if (!expectedEventNames.includes(eventName)) fail('events/AUTH-007-mfa-audit-binding.v1.json: unregistered MFA event ' + eventName)
+    }
+
+    for (const event of boundEvents) {
+      const operationIds = event.operationIds ?? (event.operationId ? [event.operationId] : [])
+      if (operationIds.length === 0) fail('events/AUTH-007-mfa-audit-binding.v1.json: event missing operation binding ' + event.name)
+      for (const operationId of operationIds) {
+        if (!apiOperationIds.has(operationId)) fail('events/AUTH-007-mfa-audit-binding.v1.json: unknown AUTH-007 operation ' + operationId)
+      }
+      if (event.targetType !== 'User') fail('events/AUTH-007-mfa-audit-binding.v1.json: targetType must remain User for ' + event.name)
+    }
+
+    const delivery = mfaAuditBinding.doc.delivery ?? {}
+    if (delivery.newWorkerD1QueueOrServiceBindingAllowed !== false) {
+      fail('events/AUTH-007-mfa-audit-binding.v1.json: must forbid a new Worker, D1, Queue, or Service Binding')
+    }
+    if (delivery.existingW02ToW06Binding !== 'UNRESOLVED') {
+      fail('events/AUTH-007-mfa-audit-binding.v1.json: unresolved runtime transport must not be represented as verified')
+    }
+  }
+
+  if (!domainCompletion) {
+    fail('events: domain-completion.v1.json is required for canonical domain event registration')
+  } else {
+    const registered = new Map((domainCompletion.doc['x-events'] ?? []).map((event) => [event.name, event.aggregate]))
+    const expectedMfaEvents = [
+      'auth.mfa.enrollment_started',
+      'auth.mfa.enrollment_verified',
+      'auth.mfa.enrollment_failed',
+      'auth.mfa.challenge_succeeded',
+      'auth.mfa.challenge_failed',
+      'auth.mfa.factor_disabled',
+      'auth.mfa.recovery_codes_rotated',
+      'auth.mfa.recovery_code_consumed',
+      'auth.mfa.locked',
+      'auth.mfa.replay_rejected',
+    ]
+    for (const eventName of expectedMfaEvents) {
+      if (registered.get(eventName) !== 'User') {
+        fail('events/domain-completion.v1.json: missing MFA event or wrong aggregate for ' + eventName)
+      }
+    }
+  }
   const auth013 = docs.find((d) => d.id.endsWith('/identity-account-state-changed.v1.json'))
   if (!auth013) {
     fail('events: identity-account-state-changed.v1.json is required for admitted AUTH-013 event path')
