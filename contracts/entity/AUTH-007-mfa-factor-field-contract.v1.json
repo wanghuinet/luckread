@@ -195,6 +195,22 @@
       "adminExposure": "NEVER",
       "status": "CONTRACTED_NOT_VERIFIED",
       "physicalStatus": "PRESENT_IN_SOURCE_MIGRATION"
+    },
+    {
+      "fieldId": "ENT-USER-F-MFA-ENROLLMENT-KEY-HASH",
+      "entityId": "ENT-USER",
+      "name": "mfaEnrollmentKeyHash",
+      "columnName": "mfa_enrollment_key_hash",
+      "type": "text",
+      "nullable": true,
+      "required": false,
+      "classification": "IDEMPOTENCY_SECURITY_METADATA",
+      "lifecycle": "one-pending-enrollment-reservation; cleared-on-disable-or-safe-failure; stores-SHA-256-hash-only",
+      "apiExposure": "NEVER",
+      "adminExposure": "NEVER",
+      "eventExposure": "NEVER",
+      "status": "CONTRACTED_NOT_VERIFIED",
+      "physicalStatus": "PRESENT_IN_SOURCE_MIGRATION_0006_NOT_DEPLOYED"
     }
   ],
   "stateDerivation": {
