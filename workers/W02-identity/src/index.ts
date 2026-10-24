@@ -10,6 +10,7 @@ import {
   type AccountState,
 } from './account/account-state-transition.js'
 import { resolveBetterAuthPrincipal } from './auth/principal.js'
+import { isPrivilegedMfaEnrollmentEligible } from './auth/privileged-mfa-gate.js'
 import { handleCurrentUserSessionList } from './auth/session-list.js'
 import { handleCurrentUserSessionRevoke } from './auth/session-revoke.js'
 
@@ -152,6 +153,23 @@ export default {
         })
       } catch {
         return json({ active: false }, 503)
+      }
+    }
+
+    if (request.method === 'POST' && url.pathname === '/internal/auth/mfa/enrollment-eligibility') {
+      // The identity comes only from the authenticated Better Auth session.
+      // Body-supplied subject IDs, layers, and role names are intentionally ignored.
+      try {
+        const principal = await resolveBetterAuthPrincipal(env, request)
+        if (!principal) return json({ eligible: false }, 401)
+        if (principal.accountState !== 'ACTIVE') return json({ eligible: false }, 403)
+
+        const eligible = await isPrivilegedMfaEnrollmentEligible(env.D1_01, principal.userId)
+        if (!eligible) return json({ eligible: false }, 403)
+
+        return json({ eligible: true })
+      } catch {
+        return json({ eligible: false, error: { code: 'SERVICE_UNAVAILABLE' } }, 503)
       }
     }
 
