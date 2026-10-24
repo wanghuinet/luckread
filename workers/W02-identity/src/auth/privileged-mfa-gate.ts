@@ -46,3 +46,30 @@ export async function requireMfaForPrivilegedAction(
 
   return Date.parse(createdAt) >= Date.parse(assurance.enabledAt)
 }
+
+/**
+ * The initial L8 setup screen is intentionally restricted to an account that
+ * already has the canonical global super_admin assignment. A regular account
+ * cannot opt into the app-wide two-factor login challenge and unexpectedly
+ * lose compatibility with clients that do not yet implement MFA challenges.
+ */
+export async function isSuperAdminMfaEnrollmentEligible(
+  db: D1Database,
+  subjectId: string,
+  now = new Date().toISOString(),
+): Promise<boolean> {
+  if (
+    typeof subjectId !== 'string' ||
+    subjectId.length < 1 ||
+    subjectId.length > 128 ||
+    !Number.isFinite(Date.parse(now))
+  ) return false
+
+  const assignment = await db.prepare(
+    "SELECT id FROM role_assignments WHERE subject_id = ? AND role_id = 'super_admin' " +
+    "AND scope_type = 'global' AND scope_id IS NULL AND status = 'ACTIVE' " +
+    "AND valid_from <= ? AND (valid_until IS NULL OR ? < valid_until) LIMIT 1",
+  ).bind(subjectId, now, now).first<{ id: string }>()
+
+  return !!assignment
+}
