@@ -99,6 +99,28 @@ export async function checkL8BootstrapReadiness(
     throw new L8BootstrapReadinessError('TARGET_NOT_ELIGIBLE', 'target must be an ACTIVE email-verified account')
   }
 
+  const targetMfa = await db.prepare(
+    'SELECT u.two_factor_enabled AS twoFactorEnabled, u.mfa_enrolled_at AS mfaEnrolledAt, ' +
+    'tf.verified AS totpVerified FROM "user" u ' +
+    'LEFT JOIN "twoFactor" tf ON tf.userId = u.id WHERE u.id = ? LIMIT 1',
+  ).bind(request.targetUserId).first<{
+    twoFactorEnabled: number | boolean
+    mfaEnrolledAt: string | null
+    totpVerified: number | boolean | null
+  }>()
+  const mfaEnrolledAt = Date.parse(targetMfa?.mfaEnrolledAt ?? '')
+  if (
+    !(targetMfa?.twoFactorEnabled === true || targetMfa?.twoFactorEnabled === 1) ||
+    !(targetMfa?.totpVerified === true || targetMfa?.totpVerified === 1) ||
+    !Number.isFinite(mfaEnrolledAt) ||
+    mfaEnrolledAt > parseNow
+  ) {
+    throw new L8BootstrapReadinessError(
+      'MFA_REQUIRED',
+      'target must have a currently enabled and verified MFA factor before bootstrap is ready',
+    )
+  }
+
   const l2 = await db.prepare(
     "SELECT id FROM role_assignments WHERE subject_id = ? AND role_id = 'verified_user' " +
     "AND scope_type = 'global' AND scope_id IS NULL AND status = 'ACTIVE' " +
