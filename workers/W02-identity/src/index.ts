@@ -164,6 +164,8 @@ export default {
         if (!principal) return json({ eligible: false }, 401)
         if (principal.accountState !== 'ACTIVE') return json({ eligible: false }, 403)
 
+        // Eligibility uses the ACTIVE state resolved from W02's authenticated session.
+        // Request-body role/layer claims are ignored; enrollment never grants a RoleAssignment.
         const eligible = isMfaEnrollmentEligible(principal.userId, principal.accountState)
         if (!eligible) return json({ eligible: false }, 403)
 
