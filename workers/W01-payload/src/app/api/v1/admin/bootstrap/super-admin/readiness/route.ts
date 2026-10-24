@@ -1,4 +1,4 @@
-import { callW02 } from '../../../../../../auth/w02-session-client.js'
+import { callW02 } from '../../../../../../../auth/w02-session-client.js'
 
 const jsonError = (status: number, code: string, message: string): Response =>
   Response.json(
