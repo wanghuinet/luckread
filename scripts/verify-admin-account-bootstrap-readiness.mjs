@@ -1,5 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import { validateL8GenesisBootstrapRequest } from './l8-genesis-bootstrap-request.mjs'
 
 const root = process.cwd()
 const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), 'utf8')
@@ -39,6 +40,17 @@ const testCode = sourceFiles
   .join('\n')
 
 const blockers = []
+const bootstrapRequestPath = 'docs/change-control/l8-genesis-bootstrap-request.json'
+const hasValidBootstrapRequest = (() => {
+  try {
+    return validateL8GenesisBootstrapRequest(JSON.parse(read(bootstrapRequestPath))).valid
+  } catch {
+    return false
+  }
+})()
+if (!hasValidBootstrapRequest) {
+  blockers.push('The one-time L8 request file must exist on main and contain a valid, unexpired target-bound request before production preflight.')
+}
 const assertReadOnlyWorkflow = !/wrangler\s+d1\s+execute|--remote|CLOUDFLARE_API_TOKEN|LUCKREAD_ADMIN_BOOTSTRAP_PASSWORD|secrets\./i.test(workflow + '\n' + genesisWorkflow)
 if (!assertReadOnlyWorkflow) {
   blockers.push('A bootstrap workflow contains a direct production database command or privileged secret reference.')
@@ -139,6 +151,7 @@ const report = {
   productionMutationPerformed: false,
   checks: {
     workflowIsReadOnly: assertReadOnlyWorkflow,
+    bootstrapRequestPresentAndValid: hasValidBootstrapRequest,
     dedicatedW02L8Bootstrap: hasDedicatedW02L8Bootstrap,
     mfaCodeAndTestEvidence: hasMfaEnforcement && auth007PromotionVerified,
     recoveryCodesEncryptedAtRest: hasEncryptedRecoveryCodes,
