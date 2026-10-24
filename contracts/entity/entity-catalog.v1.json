@@ -164,6 +164,19 @@
         "docs/63-MODERATION-APPEALS-SYSTEM-CONTRACT-v1.0.md",
         "contracts/api/moderation-operation-policy.v1.json"
       ]
+    },
+    {
+      "entityId": "ENT-MFA-FACTOR",
+      "name": "MfaFactor",
+      "domainId": "D01 Core",
+      "classification": "AUTHORITATIVE",
+      "status": "PROPOSED",
+      "evidenceRefs": [
+        "contracts/entity/AUTH-007-mfa-factor-field-contract.v1.json",
+        "workers/W02-identity/migrations/0006_better_auth_two_factor.sql",
+        "workers/W02-identity/src/auth/better-auth.ts",
+        "contracts/alignment/mapping-batches/AUTH-007-real-evidence-reconciliation.v1.md"
+      ]
     }
   ],
   "rules": {
