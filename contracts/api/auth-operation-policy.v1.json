@@ -1245,12 +1245,12 @@
       ],
       "evidence": {
         "openapi": "PASS",
-        "inventory": "PENDING",
-        "permission": "PENDING",
-        "state": "MISSING",
-        "resource": "PENDING",
+        "inventory": "PASS",
+        "permission": "MISSING",
+        "state": "N/A",
+        "resource": "PASS",
         "cache": "PASS",
-        "antiAbuse": "MISSING",
+        "antiAbuse": "PASS",
         "integration": "MISSING",
         "securityE2E": "MISSING"
       }
@@ -1327,11 +1327,11 @@
       ],
       "evidence": {
         "openapi": "PASS",
-        "inventory": "PENDING",
-        "permission": "PENDING",
+        "inventory": "PASS",
+        "permission": "MISSING",
         "state": "MISSING",
-        "resource": "PENDING",
-        "cache": "PASS",
+        "resource": "MISSING",
+        "cache": "MISSING",
         "antiAbuse": "MISSING",
         "integration": "MISSING",
         "securityE2E": "MISSING"
@@ -1409,11 +1409,11 @@
       ],
       "evidence": {
         "openapi": "PASS",
-        "inventory": "PENDING",
-        "permission": "PENDING",
+        "inventory": "PASS",
+        "permission": "MISSING",
         "state": "MISSING",
-        "resource": "PENDING",
-        "cache": "PASS",
+        "resource": "MISSING",
+        "cache": "MISSING",
         "antiAbuse": "MISSING",
         "integration": "MISSING",
         "securityE2E": "MISSING"
@@ -1493,11 +1493,11 @@
       ],
       "evidence": {
         "openapi": "PASS",
-        "inventory": "PENDING",
+        "inventory": "PASS",
         "permission": "N/A",
         "state": "MISSING",
-        "resource": "PENDING",
-        "cache": "PASS",
+        "resource": "MISSING",
+        "cache": "MISSING",
         "antiAbuse": "MISSING",
         "integration": "MISSING",
         "securityE2E": "MISSING"
@@ -1577,11 +1577,11 @@
       ],
       "evidence": {
         "openapi": "PASS",
-        "inventory": "PENDING",
-        "permission": "PENDING",
+        "inventory": "PASS",
+        "permission": "MISSING",
         "state": "MISSING",
-        "resource": "PENDING",
-        "cache": "PASS",
+        "resource": "MISSING",
+        "cache": "MISSING",
         "antiAbuse": "MISSING",
         "integration": "MISSING",
         "securityE2E": "MISSING"
@@ -1661,11 +1661,11 @@
       ],
       "evidence": {
         "openapi": "PASS",
-        "inventory": "PENDING",
-        "permission": "PENDING",
+        "inventory": "PASS",
+        "permission": "MISSING",
         "state": "MISSING",
-        "resource": "PENDING",
-        "cache": "PASS",
+        "resource": "MISSING",
+        "cache": "MISSING",
         "antiAbuse": "MISSING",
         "integration": "MISSING",
         "securityE2E": "MISSING"
