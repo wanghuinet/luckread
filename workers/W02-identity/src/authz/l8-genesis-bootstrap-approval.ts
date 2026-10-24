@@ -259,8 +259,8 @@ export async function verifyTargetBoundSingleApproval(input: {
     environment.deployment_branch_policy?.custom_branch_policies !== false ||
     configuredReviewer?.type !== 'User' ||
     !configuredReviewerLogin ||
-    typeof configuredReviewer.reviewer?.id !== 'number' ||
-    !Number.isSafeInteger(configuredReviewer.reviewer.id)
+    typeof configuredReviewer?.reviewer?.id !== 'number' ||
+    !Number.isSafeInteger(configuredReviewer?.reviewer?.id)
   ) {
     throw new L8BootstrapApprovalError(
       'SINGLE_APPROVAL_ENVIRONMENT_NOT_CONFIGURED',
