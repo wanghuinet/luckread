@@ -339,11 +339,11 @@
     "queue": "Only non-immediate notifications/audit projections may be asynchronous; the authoritative factor/session update is synchronous in W02."
   },
   "evidenceStatus": {
-    "api": "OPENAPI_CONTRACTED_NOT_VERIFIED; six operationIds and the login 202 challenge variant are present, but executable W01 route adapters and runtime tests are missing",
+    "api": "OPENAPI_CONTRACTED_NOT_VERIFIED; six operationIds and login HTTP 202 challenge variant are present; read-only GET /v1/auth/mfa has W01/W02 source adapters and tests, while the other five operations lack runtime adapters and no CI/production evidence is yet admitted",
     "dto": "DTO_CONTRACT_BOUND; request/response schemas are registered, but runtime validation and secret-redaction tests are missing",
     "entity": "PROPOSED",
     "persistence": "MISSING_REMOTE_SCHEMA_READBACK_AND_REPLAY_FIELD",
-    "runtime": "NOT_GREEN",
+    "runtime": "PARTIAL_SOURCE_ONLY; MFA status projection implemented; enrollment, confirmation, login challenge, disable, recovery rotation and durable TOTP replay protection remain incomplete",
     "securityE2E": "MISSING",
     "mapping0": "MISSING",
     "auth007": "BLOCKED_NOT_GREEN"
