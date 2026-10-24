@@ -75,6 +75,20 @@ export async function checkL8BootstrapReadiness(
     throw new L8BootstrapReadinessError('SCHEMA_NOT_READY', 'required MFA or L8 bootstrap schema is missing')
   }
 
+  const lifecycleTriggers = await db.prepare(
+    "SELECT name FROM sqlite_master WHERE type = 'trigger' AND name IN (?, ?)",
+  ).bind('user_mfa_enable_revoke_sessions', 'user_mfa_disable_clear_enrollment').all<{ name: string }>()
+  const installedTriggers = new Set(lifecycleTriggers.results.map((trigger) => trigger.name))
+  if (
+    !installedTriggers.has('user_mfa_enable_revoke_sessions') ||
+    !installedTriggers.has('user_mfa_disable_clear_enrollment')
+  ) {
+    throw new L8BootstrapReadinessError(
+      'SCHEMA_NOT_READY',
+      'MFA lifecycle session-revocation triggers are missing',
+    )
+  }
+
   const target = await db.prepare(
     'SELECT account_state AS accountState, email_verified AS emailVerified ' +
     'FROM "user" WHERE id = ? LIMIT 1',
