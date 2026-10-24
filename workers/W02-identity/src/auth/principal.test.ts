@@ -3,9 +3,19 @@ import { describe, expect, it, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({
   activateEmailVerifiedAccount: vi.fn(),
   ensureVerifiedUserRole: vi.fn().mockResolvedValue(undefined),
+  requireMfaForPrivilegedAction: vi.fn().mockResolvedValue(false),
+  resolveGlobalLayer: vi.fn().mockResolvedValue({
+    decision: 'ALLOW',
+    layer: 'L3',
+    roleAssignments: [{ id: 'ra-1', roleId: 'creator', scopeType: 'global', scopeId: null }],
+  }),
   getSession: vi.fn().mockResolvedValue({
     user: { id: 'u1', email: 'user@example.com', accountState: 'ACTIVE', accountStateVersion: 2 },
-    session: { id: 's1', expiresAt: new Date('2026-10-07T00:00:00.000Z') },
+    session: {
+      id: 's1',
+      createdAt: new Date('2026-10-06T00:00:00.000Z'),
+      expiresAt: new Date('2026-10-07T00:00:00.000Z'),
+    },
   }),
 }))
 
@@ -21,7 +31,11 @@ vi.mock('./better-auth.js', () => ({
 
 vi.mock('../authz/role-assignment.js', () => ({
   ensureVerifiedUserRole: mocks.ensureVerifiedUserRole,
-  resolveGlobalLayer: vi.fn().mockResolvedValue({ decision: 'ALLOW', layer: 'L3', roleAssignments: [{ id: 'ra-1', roleId: 'creator', scopeType: 'global', scopeId: null }] }),
+  resolveGlobalLayer: mocks.resolveGlobalLayer,
+}))
+
+vi.mock('./privileged-mfa-gate.js', () => ({
+  requireMfaForPrivilegedAction: mocks.requireMfaForPrivilegedAction,
 }))
 
 import { resolveBetterAuthPrincipal } from './principal.js'
