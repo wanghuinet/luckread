@@ -269,12 +269,31 @@ if (blockers.length === 0) {
       ),
     mfaAuditProducerCoverageRemainsExplicit:
       JSON.stringify(mfaAuditBinding.runtimeEmissionCoverage?.implementedInW02Source) ===
-        JSON.stringify(['auth.mfa.enrollment_started', 'auth.mfa.enrollment_verified', 'auth.mfa.enrollment_failed']) &&
+        JSON.stringify([
+          'auth.mfa.enrollment_started',
+          'auth.mfa.enrollment_verified',
+          'auth.mfa.enrollment_failed',
+          'auth.mfa.challenge_succeeded',
+          'auth.mfa.challenge_failed',
+          'auth.mfa.factor_disabled',
+          'auth.mfa.recovery_codes_rotated',
+          'auth.mfa.recovery_code_consumed',
+          'auth.mfa.locked',
+          'auth.mfa.replay_rejected',
+        ]) &&
       Array.isArray(mfaAuditBinding.runtimeEmissionCoverage?.notYetEmittedByW02) &&
-      mfaAuditBinding.runtimeEmissionCoverage.notYetEmittedByW02.length === 7 &&
+      mfaAuditBinding.runtimeEmissionCoverage.notYetEmittedByW02.length === 0 &&
       mfaAuditBinding.runtimeEmissionCoverage.consumerSupportsAllRegisteredEvents === true,
+    mfaAuditLifecycleProducerHooksWired:
+      /after:\\s*createAuthMiddleware/.test(betterAuth) &&
+      /classifyMfaAuditHookOutcome/.test(betterAuth) &&
+      /recordMfaAuditEventOnce/.test(betterAuth) &&
+      /auth\\.mfa\\.replay_rejected/.test(betterAuth),
     mfaAuditSourceAndTestsPresent:
       exists('workers/W02-identity/src/auth/mfa-audit-events.ts') &&
+      exists('workers/W02-identity/src/auth/mfa-audit-events.test.ts') &&
+      exists('workers/W02-identity/src/auth/mfa-audit-hooks.ts') &&
+      exists('workers/W02-identity/src/auth/mfa-audit-hooks.test.ts') &&
       exists('workers/W02-identity/src/auth/mfa-audit-publication-journal.ts') &&
       exists('workers/W02-identity/src/auth/mfa-audit-publication-journal.test.ts') &&
       exists('scripts/auth-007-mfa-journal-migration-static-audit.mjs') &&
