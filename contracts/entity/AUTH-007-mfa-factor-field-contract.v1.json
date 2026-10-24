@@ -212,6 +212,38 @@
       "status": "CONTRACTED_NOT_VERIFIED",
       "physicalStatus": "PRESENT_IN_SOURCE_MIGRATION_0006_NOT_DEPLOYED"
     }
+,    {
+      "fieldId": "ENT-USER-F-MFA-ENROLLMENT-CONFIRM-KEY-HASH",
+      "entityId": "ENT-USER",
+      "name": "mfaEnrollmentConfirmKeyHash",
+      "columnName": "mfa_enrollment_confirm_key_hash",
+      "type": "text",
+      "nullable": true,
+      "required": false,
+      "classification": "IDEMPOTENCY_SECURITY_METADATA",
+      "lifecycle": "set-after-successful-enrollment-confirm; cleared-on-disable; stores-SHA-256-key-hash-only",
+      "apiExposure": "NEVER",
+      "adminExposure": "NEVER",
+      "eventExposure": "NEVER",
+      "status": "CONTRACTED_NOT_VERIFIED",
+      "physicalStatus": "PRESENT_IN_SOURCE_MIGRATION_0006_NOT_DEPLOYED"
+    },
+    {
+      "fieldId": "ENT-USER-F-MFA-ENROLLMENT-CONFIRM-REQUEST-HASH",
+      "entityId": "ENT-USER",
+      "name": "mfaEnrollmentConfirmRequestHash",
+      "columnName": "mfa_enrollment_confirm_request_hash",
+      "type": "text",
+      "nullable": true,
+      "required": false,
+      "classification": "IDEMPOTENCY_SECURITY_METADATA",
+      "lifecycle": "fingerprint-of-idempotency-key-and-confirm-request; cleared-on-disable; stores-SHA-256-hash-only",
+      "apiExposure": "NEVER",
+      "adminExposure": "NEVER",
+      "eventExposure": "NEVER",
+      "status": "CONTRACTED_NOT_VERIFIED",
+      "physicalStatus": "PRESENT_IN_SOURCE_MIGRATION_0006_NOT_DEPLOYED"
+    }
   ],
   "stateDerivation": {
     "pendingEnrollment": "twoFactor row exists and verified=false; user.twoFactorEnabled must not authorize privileged actions",

@@ -25,6 +25,11 @@ export async function POST(request: Request): Promise<Response> {
     return errorResponse(503, 'SERVICE_UNAVAILABLE', 'MFA confirmation unavailable')
   }
 
+  const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
+  if (!/^[A-Za-z0-9._:-]{16,255}$/.test(idempotencyKey)) {
+    return errorResponse(400, 'IDEMPOTENCY_KEY_REQUIRED', 'A valid Idempotency-Key is required')
+  }
+
   let body: { code?: unknown }
   try {
     body = await request.json() as typeof body
@@ -58,7 +63,7 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   try {
-    const data = await confirmMfaEnrollment(request, body.code)
+    const data = await confirmMfaEnrollment(request, body.code, idempotencyKey)
     return Response.json(
       { data, requestId: 'req_' + crypto.randomUUID() },
       { status: 200, headers: { 'cache-control': 'no-store' } },

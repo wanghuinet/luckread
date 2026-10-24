@@ -134,13 +134,18 @@ export async function getMfaStatus(request: Request): Promise<MfaStatusResponse>
   throw new W02AuthClientError(response.status || 503, 'MFA status failed', errorCode(payload) ?? undefined)
 }
 
-export async function confirmMfaEnrollment(request: Request, code: string): Promise<MfaStatusResponse> {
+export async function confirmMfaEnrollment(
+  request: Request,
+  code: string,
+  idempotencyKey: string,
+): Promise<MfaStatusResponse> {
   const response = await callW02('/internal/auth/mfa/enrollment/confirm', {
     request,
     body: { code },
     headers: {
       'X-LuckRead-Caller': 'W01',
       'X-LuckRead-Transport-Version': '1.0',
+      'Idempotency-Key': idempotencyKey,
     },
   })
   let payload: unknown = null

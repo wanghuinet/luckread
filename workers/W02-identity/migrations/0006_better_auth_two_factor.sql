@@ -15,6 +15,15 @@ ALTER TABLE "user"
 ALTER TABLE "user"
   ADD COLUMN mfa_enrollment_key_hash TEXT;
 
+-- Successful confirmation replays are bound to the operation key and request
+-- fingerprint. Only hashes are stored; neither the TOTP code nor factor secret
+-- is persisted by the idempotency seam.
+ALTER TABLE "user"
+  ADD COLUMN mfa_enrollment_confirm_key_hash TEXT;
+
+ALTER TABLE "user"
+  ADD COLUMN mfa_enrollment_confirm_request_hash TEXT;
+
 CREATE TABLE "twoFactor" (
   id TEXT NOT NULL PRIMARY KEY,
   userId TEXT NOT NULL UNIQUE,
@@ -47,6 +56,8 @@ CREATE TRIGGER user_mfa_disable_clear_enrollment
 AFTER UPDATE OF two_factor_enabled ON "user"
 WHEN OLD.two_factor_enabled = 1 AND NEW.two_factor_enabled = 0
 BEGIN
-  UPDATE "user" SET mfa_enrolled_at = NULL, mfa_enrollment_key_hash = NULL WHERE id = NEW.id;
+  UPDATE "user" SET mfa_enrolled_at = NULL, mfa_enrollment_key_hash = NULL,
+    mfa_enrollment_confirm_key_hash = NULL, mfa_enrollment_confirm_request_hash = NULL
+    WHERE id = NEW.id;
   DELETE FROM "session" WHERE user_id = NEW.id;
 END;
