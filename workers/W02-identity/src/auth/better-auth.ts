@@ -256,7 +256,12 @@ const buildLuckReadAuth = (env: BetterAuthEnv) => {
     plugins: [bearer(), twoFactor({
       issuer: 'LuckRead',
       trustDeviceMaxAge: 0,
+      twoFactorCookieMaxAge: 10 * 60,
       allowPasswordless: false,
+      skipVerificationOnEnable: false,
+      // No email/SMS OTP sender is configured; the plugin rejects "otp"
+      // enrollment when sendOTP is absent. Elevated authorization additionally
+      // requires a persisted, TOTP-verified row in the twoFactor table.
       totpOptions: { allowPasswordless: false },
     })],
     advanced: {
