@@ -76,7 +76,7 @@ const sha256Hex = async (value: string): Promise<string> => {
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('')
 }
 
-async function verifyGitHubOidcToken(token: string, nowSeconds: number): Promise<{ runId: string }> {
+async function verifyGitHubOidcToken(token: string, nowSeconds: number, fetcher: typeof fetch): Promise<{ runId: string }> {
   const pieces = token.split('.')
   if (pieces.length !== 3) throw new L8BootstrapApprovalError('OIDC_INVALID', 'GitHub workflow identity token is malformed')
 
@@ -119,7 +119,7 @@ async function verifyGitHubOidcToken(token: string, nowSeconds: number): Promise
     throw new L8BootstrapApprovalError('OIDC_FORBIDDEN', 'request did not originate from the protected L8 bootstrap workflow on main')
   }
 
-  const jwksResponse = await fetch(OIDC_ISSUER + '/.well-known/jwks', {
+  const jwksResponse = await fetcher(OIDC_ISSUER + '/.well-known/jwks', {
     headers: { accept: 'application/json' },
     cache: 'no-store',
   })
@@ -221,7 +221,7 @@ export async function verifyTargetBoundDualApproval(input: {
     throw new L8BootstrapApprovalError('VALIDATION_FAILED', 'invalid bootstrap evidence request')
   }
 
-  const workflow = await verifyGitHubOidcToken(input.oidcToken, Math.floor(now.getTime() / 1000))
+  const workflow = await verifyGitHubOidcToken(input.oidcToken, Math.floor(now.getTime() / 1000), fetcher)
   const requestPath = '/repos/' + REPOSITORY + '/pulls/' + input.requestPrNumber
   const pull = await githubRequest<GitHubPull>(requestPath, input.githubToken, fetcher)
   const headSha = pull.head?.sha
