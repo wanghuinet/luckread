@@ -3,6 +3,7 @@
 import { FormEvent, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { fetchJson, jsonHeaders } from '../../../lib/client-api.js'
 
 type ChallengeResponse = {
   data?: { authenticated?: boolean }
@@ -42,16 +43,12 @@ export default function TwoFactorChallengePage() {
 
     setBusy(true)
     try {
-      const response = await fetch('/api/v1/auth/mfa/challenge/verify', {
+      const { response, data: payload } = await fetchJson<ChallengeResponse>('/api/v1/auth/mfa/challenge/verify', {
         method: 'POST',
         credentials: 'include',
-        headers: {
-          'content-type': 'application/json',
-          'Idempotency-Key': 'mfa-challenge:' + crypto.randomUUID(),
-        },
+        headers: jsonHeaders({ 'Idempotency-Key': 'mfa-challenge:' + crypto.randomUUID() }),
         body: JSON.stringify({ code: normalizedCode, method }),
       })
-      const payload = await response.json().catch(() => null) as ChallengeResponse | null
       if (!response.ok || payload?.data?.authenticated !== true) {
         if (response.status === 429) {
           setError('验证码尝试次数过多，请稍后再试。')
