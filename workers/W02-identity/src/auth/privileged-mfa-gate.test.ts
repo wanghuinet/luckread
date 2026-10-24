@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isPrivilegedMfaEnrollmentEligible, requireMfaForPrivilegedAction } from './privileged-mfa-gate.js'
+import { isMfaEnrollmentEligible, requireMfaForPrivilegedAction } from './privileged-mfa-gate.js'
 
 class FakeStatement {
   private values: unknown[] = []
@@ -81,34 +81,27 @@ describe('W02 privileged MFA gate', () => {
   })
 })
 
-describe('W02 privileged MFA enrollment eligibility', () => {
-  it('allows enrollment for an effective global L7/L8 role even if the MFA gate downgraded its returned layer', async () => {
-    expect(await isPrivilegedMfaEnrollmentEligible(
-      new FakeD1(null, ['admin']) as unknown as D1Database,
-      'user-1',
-      '2026-10-24T10:00:00.000Z',
-    )).toBe(true)
-    expect(await isPrivilegedMfaEnrollmentEligible(
-      new FakeD1(null, ['super_admin']) as unknown as D1Database,
-      'user-1',
-      '2026-10-24T10:00:00.000Z',
-    )).toBe(true)
+describe('W02 MFA enrollment eligibility', () => {
+  it('allows an active non-privileged first-L8 target to enroll before a RoleAssignment exists', () => {
+    expect(isMfaEnrollmentEligible('target-user-1', 'ACTIVE')).toBe(true)
   })
 
-  it('does not allow ordinary L1-L4 roles to enable privileged login MFA', async () => {
+  it('allows ordinary active accounts to self-enroll without granting privileges', () => {
     for (const role of ['user', 'verified_user', 'creator', 'mcn_admin']) {
-      expect(await isPrivilegedMfaEnrollmentEligible(
-        new FakeD1(null, [role]) as unknown as D1Database,
-        'user-1',
-        '2026-10-24T10:00:00.000Z',
-      )).toBe(false)
+      // This helper intentionally accepts only server-derived account state,
+      // never a client-supplied role or layer claim.
+      expect(isMfaEnrollmentEligible('active-user-1', 'ACTIVE')).toBe(true)
     }
   })
 
-  it('fails closed for a different subject, invalid target, or invalid time', async () => {
-    const db = new FakeD1(null, ['super_admin']) as unknown as D1Database
-    expect(await isPrivilegedMfaEnrollmentEligible(db, 'another-user', '2026-10-24T10:00:00.000Z')).toBe(false)
-    expect(await isPrivilegedMfaEnrollmentEligible(db, '', '2026-10-24T10:00:00.000Z')).toBe(false)
-    expect(await isPrivilegedMfaEnrollmentEligible(db, 'user-1', 'bad-time')).toBe(false)
+  it('denies non-active accounts', () => {
+    expect(isMfaEnrollmentEligible('user-1', 'PENDING_VERIFICATION')).toBe(false)
+    expect(isMfaEnrollmentEligible('user-1', 'SUSPENDED')).toBe(false)
+  })
+
+  it('fails closed for missing or invalid subject identifiers', () => {
+    expect(isMfaEnrollmentEligible('', 'ACTIVE')).toBe(false)
+    expect(isMfaEnrollmentEligible('x'.repeat(129), 'ACTIVE')).toBe(false)
+    expect(isMfaEnrollmentEligible('user-1', '')).toBe(false)
   })
 })
