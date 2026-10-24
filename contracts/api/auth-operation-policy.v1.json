@@ -1330,7 +1330,7 @@
         "inventory": "PASS",
         "permission": "PASS",
         "state": "PASS",
-        "resource": "MISSING",
+        "resource": "PASS",
         "cache": "PASS",
         "antiAbuse": "PASS",
         "integration": "PASS",
@@ -1412,9 +1412,9 @@
         "inventory": "PASS",
         "permission": "PASS",
         "state": "PASS",
-        "resource": "MISSING",
+        "resource": "PASS",
         "cache": "PASS",
-        "antiAbuse": "MISSING",
+        "antiAbuse": "PASS",
         "integration": "PASS",
         "securityE2E": "MISSING"
       }
@@ -1496,9 +1496,9 @@
         "inventory": "PASS",
         "permission": "N/A",
         "state": "PASS",
-        "resource": "MISSING",
+        "resource": "PASS",
         "cache": "PASS",
-        "antiAbuse": "MISSING",
+        "antiAbuse": "PASS",
         "integration": "PASS",
         "securityE2E": "MISSING"
       }
@@ -1580,9 +1580,9 @@
         "inventory": "PASS",
         "permission": "PASS",
         "state": "PASS",
-        "resource": "MISSING",
+        "resource": "PASS",
         "cache": "PASS",
-        "antiAbuse": "MISSING",
+        "antiAbuse": "PASS",
         "integration": "PASS",
         "securityE2E": "MISSING"
       }
@@ -1664,9 +1664,9 @@
         "inventory": "PASS",
         "permission": "PASS",
         "state": "PASS",
-        "resource": "MISSING",
+        "resource": "PASS",
         "cache": "PASS",
-        "antiAbuse": "MISSING",
+        "antiAbuse": "PASS",
         "integration": "PASS",
         "securityE2E": "MISSING"
       }
