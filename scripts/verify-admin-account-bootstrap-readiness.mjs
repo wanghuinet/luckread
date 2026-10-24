@@ -83,6 +83,23 @@ if (!hasTargetBoundSingleApproval) {
   blockers.push('W02 bootstrap write path lacks target-bound single-environment-approval enforcement with matching W02 tests.')
 }
 
+const hasNoSelfApprovalPolicy =
+  /prevent_self_review !== true/.test(w02ProductionCode) &&
+  /prevent_self_review: false/.test(w02TestCode) &&
+  /rejects a single-reviewer environment when self-review is permitted/.test(w02TestCode)
+if (!hasNoSelfApprovalPolicy) {
+  blockers.push('L8 genesis approval must prohibit initiator self-review and include a negative test.')
+}
+
+const hasVerifiedMfaBeforeGenesisGrant =
+  /MFA_REQUIRED/.test(w02ProductionCode) &&
+  /LEFT JOIN\\s+"twoFactor"/.test(w02ProductionCode) &&
+  /target MFA is not enrolled and verified/.test(w02TestCode) &&
+  /blocks when target MFA has not been enabled and verified/.test(w02TestCode)
+if (!hasVerifiedMfaBeforeGenesisGrant) {
+  blockers.push('The L8 bootstrap readiness and write paths must both require pre-enrolled, verified MFA and have negative tests.')
+}
+
 const hasReadOnlyProductionPreflight =
   /\/internal\/authz\/bootstrap-super-admin\/readiness/.test(w02Index) &&
   /\/api\/v1\/admin\/bootstrap\/super-admin\/readiness/.test(read('workers/W01-payload/src/app/api/v1/admin/bootstrap/super-admin/readiness/route.ts')) &&
@@ -100,6 +117,8 @@ const report = {
     dedicatedW02L8Bootstrap: hasDedicatedW02L8Bootstrap,
     mfaCodeAndTestEvidence: hasMfaEnforcement && !/Status:\s*`BLOCKED_NOT_GREEN`/.test(reconciliation),
     w02BootstrapApprovalCodeAndTestEvidence: hasTargetBoundSingleApproval,
+    noSelfApprovalPolicy: hasNoSelfApprovalPolicy,
+    targetMfaRequiredBeforeGrant: hasVerifiedMfaBeforeGenesisGrant,
     readOnlyProductionPreflight: hasReadOnlyProductionPreflight,
   },
   blockers,
