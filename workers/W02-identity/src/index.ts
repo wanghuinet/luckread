@@ -12,7 +12,7 @@ import {
 import { resolveBetterAuthPrincipal } from './auth/principal.js'
 import { handleCurrentUserSessionList } from './auth/session-list.js'
 import { handleCurrentUserSessionRevoke } from './auth/session-revoke.js'
-import { readAuthoritativeMfaStatus } from './auth/mfa-status.js'
+import { handleMfaStatusRequest } from './auth/mfa-status.js'
 import { verifyTargetBoundSingleApproval, L8BootstrapApprovalError } from './authz/l8-genesis-bootstrap-approval.js'
 import { bootstrapSuperAdmin, L8BootstrapCommandError } from './authz/l8-genesis-bootstrap-command.js'
 import { checkL8BootstrapReadiness, L8BootstrapReadinessError } from './authz/l8-genesis-bootstrap-readiness.js'
@@ -190,27 +190,7 @@ export default {
       }
     }
     if (request.method === 'POST' && url.pathname === '/internal/auth/mfa/status') {
-      if (
-        request.headers.get('X-LuckRead-Caller') !== 'W01' ||
-        request.headers.get('X-LuckRead-Transport-Version') !== '1.0'
-      ) {
-        return json({ error: { code: 'FORBIDDEN', message: 'authorized W01 service boundary required' } }, 403)
-      }
-
-      try {
-        const principal = await resolveBetterAuthPrincipal(env, request)
-        if (!principal || principal.accountState !== 'ACTIVE') {
-          return json({ error: { code: 'UNAUTHENTICATED', message: 'Authentication required' } }, 401)
-        }
-
-        const status = await readAuthoritativeMfaStatus(env.D1_01, principal.userId)
-        if (!status) return json({ error: { code: 'UNAUTHENTICATED', message: 'Authentication required' } }, 401)
-        return json({ data: status })
-      } catch {
-        // AUTH-007 schema is still gated; a missing table or failed read is a
-        // closed service failure, never an inferred "MFA disabled" response.
-        return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'MFA status unavailable' } }, 503)
-      }
+      return handleMfaStatusRequest(env, request)
     }
 
     if (request.method === 'POST' && url.pathname === '/internal/auth/session/list') {
