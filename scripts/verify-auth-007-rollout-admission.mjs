@@ -285,10 +285,10 @@ if (blockers.length === 0) {
       mfaAuditBinding.runtimeEmissionCoverage.notYetEmittedByW02.length === 0 &&
       mfaAuditBinding.runtimeEmissionCoverage.consumerSupportsAllRegisteredEvents === true,
     mfaAuditLifecycleProducerHooksWired:
-      /after:\\s*createAuthMiddleware/.test(betterAuth) &&
+      /after:\s*createAuthMiddleware/.test(betterAuth) &&
       /classifyMfaAuditHookOutcome/.test(betterAuth) &&
       /recordMfaAuditEventOnce/.test(betterAuth) &&
-      /auth\\.mfa\\.replay_rejected/.test(betterAuth),
+      /auth\.mfa\.replay_rejected/.test(betterAuth),
     mfaAuditSourceAndTestsPresent:
       exists('workers/W02-identity/src/auth/mfa-audit-events.ts') &&
       exists('workers/W02-identity/src/auth/mfa-audit-events.test.ts') &&
