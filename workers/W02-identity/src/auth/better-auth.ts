@@ -1,7 +1,7 @@
 import { activateEmailVerifiedAccount } from '../account/account-state-transition.js'
 import { ensureBaseUserRole, ensureVerifiedUserRole } from '../authz/role-assignment.js'
 import { betterAuth } from 'better-auth'
-import { bearer } from 'better-auth/plugins'
+import { bearer, twoFactor } from 'better-auth/plugins'
 import { sendResendEmail } from './resend-email.js'
 
 export interface RateLimitBinding {
@@ -127,6 +127,26 @@ const buildLuckReadAuth = (env: BetterAuthEnv) => {
             await ensureBaseUserRole(env.D1_01, String(user.id), new Date().toISOString())
           },
         },
+        update: {
+          after: async (user) => {
+            const userId = String(user.id)
+            const pendingMfaEnrollment = await env.D1_01.prepare(
+              'SELECT id FROM "user" WHERE id = ? AND two_factor_enabled = 1 AND mfa_enrolled_at IS NULL LIMIT 1',
+            ).bind(userId).first<{ id: string }>()
+            if (!pendingMfaEnrollment) return
+
+            // A TOTP-enabled principal must not keep sessions issued before
+            // enrollment. Mark the verified enrollment, then revoke every
+            // older session; subsequent sign-in must complete the 2FA challenge.
+            const enrolledAt = new Date().toISOString()
+            await env.D1_01.batch([
+              env.D1_01.prepare(
+                'UPDATE "user" SET mfa_enrolled_at = ? WHERE id = ? AND two_factor_enabled = 1 AND mfa_enrolled_at IS NULL',
+              ).bind(enrolledAt, userId),
+              env.D1_01.prepare('DELETE FROM "session" WHERE user_id = ?').bind(userId),
+            ])
+          },
+        },
       },
     },
     user: {
@@ -134,6 +154,7 @@ const buildLuckReadAuth = (env: BetterAuthEnv) => {
       // Map Better Auth's camelCase core fields to those exact column names.
       fields: {
         emailVerified: 'email_verified',
+        twoFactorEnabled: 'two_factor_enabled',
         createdAt: 'created_at',
         updatedAt: 'updated_at',
       },
@@ -229,7 +250,7 @@ const buildLuckReadAuth = (env: BetterAuthEnv) => {
         }))
       },
     },
-    plugins: [bearer()],
+    plugins: [bearer(), twoFactor({ issuer: 'LuckRead' })],
     advanced: {
       // H5/PC and the canonical API hostname must share the same W02 session.
       crossSubDomainCookies: {
