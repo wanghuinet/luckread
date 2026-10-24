@@ -83,7 +83,12 @@ describe('W01 public MFA enrollment-start route', () => {
     mocks.w02Fetch.mockResolvedValueOnce(Response.json({ error: { code: 'MFA_ENROLLMENT_CONFLICT' } }, { status: 409 }))
     const response = await POST(makeRequest())
     expect(response.status).toBe(409)
-    expect(await response.text()).not.toContain('MFA_ENROLLMENT_CONFLICT')
+    await expect(response.json()).resolves.toMatchObject({
+      error: {
+        code: 'MFA_ENROLLMENT_CONFLICT',
+        message: 'MFA enrollment is already pending or enabled',
+      },
+    })
   })
 
   it('fails closed on exhausted rate limit or malformed identity-service output', async () => {
