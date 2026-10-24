@@ -208,8 +208,8 @@ if (blockers.length === 0) {
       /implementationAuthorization === 'true'/.test(read('scripts/verify-admin-account-bootstrap-readiness.mjs')) &&
       /!auth007PromotionVerified/.test(read('scripts/verify-admin-account-bootstrap-readiness.mjs')) &&
       /AUTH-007 must be GREEN with implementation authorization true/.test(read('scripts/verify-admin-account-bootstrap-readiness.mjs')),
-    rolloutEnvironmentDisablesAdminBypass: /environment\\.can_admins_bypass !== false/.test(read('scripts/verify-auth-007-rollout-admission.mjs')),
-    l8EnvironmentDisablesAdminBypass: /environment\\.can_admins_bypass !== false/.test(read('workers/W02-identity/src/authz/l8-genesis-bootstrap-approval.ts')) &&
+    rolloutEnvironmentDisablesAdminBypass: read('scripts/verify-auth-007-rollout-admission.mjs').includes('environment.can_admins_bypass !== false'),
+    l8EnvironmentDisablesAdminBypass: read('workers/W02-identity/src/authz/l8-genesis-bootstrap-approval.ts').includes('environment.can_admins_bypass !== false') &&
       /can_admins_bypass: true/.test(read('workers/W02-identity/src/authz/l8-genesis-bootstrap-approval.test.ts')) &&
       /rejects environments that permit administrator bypass of protection rules/.test(read('workers/W02-identity/src/authz/l8-genesis-bootstrap-approval.test.ts')),
     standaloneW01DeployUsesProtectedAdmission:
