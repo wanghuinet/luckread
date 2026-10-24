@@ -1,4 +1,4 @@
-name: W02 RoleAssignment D1-01 Migration
+name: W02 Identity Security D1-01 Migration (RoleAssignment + MFA + L8 Bootstrap)
 
 on:
   workflow_dispatch:
@@ -49,6 +49,22 @@ jobs:
         run: node scripts/generate-role-version-migration.mjs
       - name: Assert generated role_version migration is committed
         run: git diff --exit-code -- workers/W02-identity/migrations/0003_role_authorization_versions.sql
+
+      - name: Verify reviewed MFA and one-time L8 migration artifacts
+        run: |
+          node --input-type=module - <<'NODE'
+          import fs from 'node:fs'
+          const mfa = fs.readFileSync('workers/W02-identity/migrations/0006_better_auth_two_factor.sql', 'utf8')
+          const bootstrap = fs.readFileSync('workers/W02-identity/migrations/0007_l8_genesis_bootstrap_audit.sql', 'utf8')
+          for (const field of ['two_factor_enabled', 'mfa_enrolled_at', 'CREATE TABLE "twoFactor"', 'verified', 'failedVerificationCount', 'lockedUntil', 'user_mfa_enable_revoke_sessions', 'user_mfa_disable_clear_enrollment']) {
+            if (!mfa.includes(field)) throw new Error('MFA migration missing required schema/lifecycle element: ' + field)
+          }
+          for (const field of ['CREATE TABLE l8_genesis_bootstrap_audit', "bootstrap_key = 'first-l8'", 'nonce_sha256', 'request_merge_sha', 'approved_reviewers_json', 'workflow_run_id']) {
+            if (!bootstrap.includes(field)) throw new Error('L8 audit migration missing required guard/provenance element: ' + field)
+          }
+          console.log('W02 MFA/L8 migration artifacts: PASS')
+          NODE
+
       - name: Apply D1-01 migration remotely
         working-directory: workers/W02-identity
         env:
@@ -64,7 +80,7 @@ jobs:
         run: |
           mkdir -p ../../artifacts/mapping-0
           npx --yes wrangler@4.116.0 d1 execute "${{ inputs.database_name }}" --remote --config wrangler.jsonc \
-            --command "SELECT type, name, sql FROM sqlite_master WHERE name = 'role_assignments' OR name LIKE 'role_assignments_%' OR name = 'role_authorization_versions' OR name LIKE 'role_authorization_versions_%' ORDER BY type, name;" \
+            --command "SELECT type, name, sql FROM sqlite_master WHERE name = 'role_assignments' OR name LIKE 'role_assignments_%' OR name = 'role_authorization_versions' OR name LIKE 'role_authorization_versions_%' OR name IN ('twoFactor', 'l8_genesis_bootstrap_audit', 'user_mfa_enable_revoke_sessions', 'user_mfa_disable_clear_enrollment') OR name = 'user' ORDER BY type, name;" \
             > ../../artifacts/mapping-0/w02-role-assignment-remote-schema.txt
           npx --yes wrangler@4.116.0 d1 execute "${{ inputs.database_name }}" --remote --config wrangler.jsonc \
             --command "SELECT name FROM sqlite_master WHERE type='table' AND name='d1_migrations';" \
@@ -72,6 +88,12 @@ jobs:
           npx --yes wrangler@4.116.0 d1 execute "${{ inputs.database_name }}" --remote --config wrangler.jsonc \
             --command "SELECT * FROM d1_migrations ORDER BY id;" \
             > ../../artifacts/mapping-0/w02-role-assignment-remote-ledger.txt
+          npx --yes wrangler@4.116.0 d1 execute "${{ inputs.database_name }}" --remote --config wrangler.jsonc \
+            --command "SELECT name FROM d1_migrations WHERE name LIKE '%0006_better_auth_two_factor.sql' OR name LIKE '%0007_l8_genesis_bootstrap_audit.sql' ORDER BY name;" \
+            > ../../artifacts/mapping-0/w02-mfa-l8-migration-ledger-check.txt
+          npx --yes wrangler@4.116.0 d1 execute "${{ inputs.database_name }}" --remote --config wrangler.jsonc \
+            --command "SELECT name FROM sqlite_master WHERE type = 'trigger' AND name IN ('user_mfa_enable_revoke_sessions', 'user_mfa_disable_clear_enrollment') ORDER BY name;" \
+            > ../../artifacts/mapping-0/w02-mfa-lifecycle-trigger-readback.txt
           npx --yes wrangler@4.116.0 d1 execute "${{ inputs.database_name }}" --remote --config wrangler.jsonc \
             --command "SELECT COUNT(*) AS role_assignment_rows FROM role_assignments;" \
             > ../../artifacts/mapping-0/w02-role-assignment-remote-row-count.txt
@@ -90,7 +112,7 @@ jobs:
           database_id=2f80471e-3756-49f9-8db1-7707a433ad64
           remote_mutation=true
           post_migration_remote_readback=true
-          verification_scope=role_assignments schema, role_authorization_versions schema, D1 migration ledger, row-count
+          verification_scope=RoleAssignment, MFA/TOTP, L8 audit and MFA lifecycle-trigger schema, D1 migration ledger, row-count
           EOF
 
       - name: Upload controlled remote evidence
@@ -98,3 +120,5 @@ jobs:
         with:
           name: w02-role-assignment-d1-01-remote-evidence-${{ inputs.source_sha }}
           path: artifacts/mapping-0/w02-role-assignment-remote-*
+            artifacts/mapping-0/w02-mfa-l8-migration-ledger-check.txt
+            artifacts/mapping-0/w02-mfa-lifecycle-trigger-readback.txt
