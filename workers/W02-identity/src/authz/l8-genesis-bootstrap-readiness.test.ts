@@ -10,6 +10,7 @@ type FixtureOptions = {
   hasL8?: boolean
   consumed?: boolean
   schemaReady?: boolean
+  triggersReady?: boolean
 }
 
 type FakeStatement = {
@@ -28,6 +29,15 @@ class ReadinessD1 {
       all: async <T>() => {
         if (this.options.schemaReady === false && sql.includes('twoFactor')) throw new Error('missing twoFactor')
         if (this.options.schemaReady === false && sql.includes('l8_genesis_bootstrap_audit')) throw new Error('missing audit table')
+        if (sql.includes('sqlite_master')) {
+          const results = this.options.triggersReady === false
+            ? []
+            : [
+                { name: 'user_mfa_enable_revoke_sessions' },
+                { name: 'user_mfa_disable_clear_enrollment' },
+              ]
+          return { results: results as T[] }
+        }
         return { results: [] as T[] }
       },
       first: async <T>() => {
@@ -91,6 +101,12 @@ describe('read-only W02 L8 bootstrap readiness', () => {
 
   it('blocks when the deployed MFA/audit schema is missing', async () => {
     const db = new ReadinessD1({ schemaReady: false }) as unknown as D1Database
+    await expect(checkL8BootstrapReadiness(db, approval(), NOW))
+      .rejects.toMatchObject({ code: 'SCHEMA_NOT_READY' })
+  })
+
+  it('blocks when MFA lifecycle session-revocation triggers are missing', async () => {
+    const db = new ReadinessD1({ triggersReady: false }) as unknown as D1Database
     await expect(checkL8BootstrapReadiness(db, approval(), NOW))
       .rejects.toMatchObject({ code: 'SCHEMA_NOT_READY' })
   })
