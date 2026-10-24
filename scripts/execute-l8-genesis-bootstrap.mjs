@@ -28,29 +28,74 @@ if (!Number.isSafeInteger(requestPrNumber) || requestPrNumber < 1) {
       throw new Error('GitHub Actions returned an invalid OIDC token')
     }
 
-    const response = await fetch('https://api.luckread.com/api/v1/admin/bootstrap/super-admin', {
-      method: 'POST',
-      headers: {
-        authorization: 'Bearer ' + oidcPayload.value,
-        'content-type': 'application/json; charset=utf-8',
-        accept: 'application/json',
-      },
-      body: JSON.stringify({ requestPrNumber, githubToken }),
-      cache: 'no-store',
-    })
-    const responseText = await response.text()
-    let result
-    try { result = JSON.parse(responseText) } catch { result = { error: { code: 'INVALID_RESPONSE' } } }
+    const postToW01 = async (route) => {
+      const response = await fetch('https://api.luckread.com' + route, {
+        method: 'POST',
+        headers: {
+          authorization: 'Bearer ' + oidcPayload.value,
+          'content-type': 'application/json; charset=utf-8',
+          accept: 'application/json',
+        },
+        body: JSON.stringify({ requestPrNumber, githubToken }),
+        cache: 'no-store',
+      })
+      const text = await response.text()
+      let result
+      try { result = JSON.parse(text) } catch { result = { error: { code: 'INVALID_RESPONSE' } } }
+      return { response, result }
+    }
 
-    if (!response.ok) {
+    // Read-only production preflight: W01 forwards through W02_AUTH, while W02
+    // independently revalidates GitHub approvals and checks the deployed D1
+    // schema, target account, L2 assignment, existing global L8, and replay lock.
+    const preflight = await postToW01('/api/v1/admin/bootstrap/super-admin/readiness')
+    const readiness = preflight.result?.data
+    if (
+      !preflight.response.ok ||
+      readiness?.status !== 'READY_FOR_BOOTSTRAP' ||
+      readiness?.productionMutationPerformed !== false ||
+      readiness?.targetUserId === undefined ||
+      readiness?.roleId !== 'super_admin' ||
+      readiness?.scopeType !== 'global' ||
+      readiness?.maxGrantSeconds !== 14400
+    ) {
       console.error(JSON.stringify({
-        status: response.status,
-        error: result?.error?.code ?? 'BOOTSTRAP_FAILED',
-        message: 'W02 denied the L8 genesis bootstrap. No further retry should be attempted until the blocker is reviewed.',
+        phase: 'READ_ONLY_PREFLIGHT',
+        status: preflight.response.status,
+        error: preflight.result?.error?.code ?? 'READINESS_CONTRACT_FAILED',
+        message: 'Read-only production preflight did not pass. No grant request was sent.',
       }))
       process.exitCode = 1
     } else {
-      console.log(JSON.stringify({ status: 'BOOTSTRAP_RESULT', data: result?.data ?? result }, null, 2))
+      console.log(JSON.stringify({
+        phase: 'READ_ONLY_PREFLIGHT',
+        status: readiness.status,
+        targetUserId: readiness.targetUserId,
+        requestPrNumber: readiness.requestPrNumber,
+        requestMergeSha: readiness.requestMergeSha,
+        approvedReviewers: readiness.approvedReviewers,
+        maxGrantSeconds: readiness.maxGrantSeconds,
+        productionMutationPerformed: false,
+      }, null, 2))
+
+      // This is the only mutation call. W02 repeats all mutable checks and
+      // commits the singleton audit row + four-hour RoleAssignment atomically.
+      const grant = await postToW01('/api/v1/admin/bootstrap/super-admin')
+      if (!grant.response.ok) {
+        console.error(JSON.stringify({
+          phase: 'BOOTSTRAP_WRITE',
+          status: grant.response.status,
+          error: grant.result?.error?.code ?? 'BOOTSTRAP_FAILED',
+          message: 'W02 denied the L8 genesis bootstrap. No retry should be attempted until the blocker is reviewed.',
+        }))
+        process.exitCode = 1
+      } else {
+        console.log(JSON.stringify({
+          phase: 'BOOTSTRAP_WRITE',
+          status: 'BOOTSTRAP_RESULT',
+          data: grant.result?.data ?? grant.result,
+        }, null, 2))
+      }
     }
   } catch (error) {
     fail(error instanceof Error ? error.message : 'L8 bootstrap request failed')
