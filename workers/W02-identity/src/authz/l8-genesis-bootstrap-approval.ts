@@ -276,7 +276,7 @@ export async function verifyTargetBoundDualApproval(input: {
   const latestReviewByLogin = new Map<string, GitHubReview>()
   for (const review of reviews) {
     const login = review.user?.login?.toLowerCase()
-    if (!login || login.endsWith('[bot]') || review.commit_id !== headSha || !review.submitted_at) continue
+    if (!login || review.user?.type !== 'User' || login.endsWith('[bot]') || review.commit_id !== headSha || !review.submitted_at) continue
     const previous = latestReviewByLogin.get(login)
     if (!previous || String(review.submitted_at) > String(previous.submitted_at)) {
       latestReviewByLogin.set(login, review)
