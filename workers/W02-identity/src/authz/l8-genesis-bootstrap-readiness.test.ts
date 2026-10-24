@@ -12,12 +12,18 @@ type FixtureOptions = {
   schemaReady?: boolean
 }
 
+type FakeStatement = {
+  bind: (...values: unknown[]) => FakeStatement
+  all: <T>() => Promise<{ results: T[] }>
+  first: <T>() => Promise<T | null>
+}
+
 class ReadinessD1 {
   constructor(private readonly options: FixtureOptions = {}) {}
 
-  prepare(sql: string) {
+  prepare(sql: string): FakeStatement {
     let args: unknown[] = []
-    const statement = {
+    const statement: FakeStatement = {
       bind: (...values: unknown[]) => { args = values; return statement },
       all: async <T>() => {
         if (this.options.schemaReady === false && sql.includes('twoFactor')) throw new Error('missing twoFactor')
