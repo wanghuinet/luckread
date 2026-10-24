@@ -1,0 +1,144 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/events/AUTH-007-mfa-audit-binding.v1.json",
+  "title": "AUTH-007 MFA Audit Event Binding",
+  "version": "1.0.0",
+  "status": "CONTRACTED_NOT_VERIFIED",
+  "featureId": "AUTH-007",
+  "sourceRefs": [
+    "contracts/api/AUTH-007-mfa-totp-contract.v1.json",
+    "contracts/state-machines/AUTH-007-mfa-lifecycle.v1.json",
+    "contracts/schemas/common/audit-event.json",
+    "contracts/alignment/mapping-batches/AUTH-007-real-evidence-reconciliation.v1.md"
+  ],
+  "authority": {
+    "factorAndIdentityAuthority": {
+      "worker": "W02",
+      "database": "D1-01"
+    },
+    "publicEntry": {
+      "worker": "W01"
+    },
+    "canonicalAuditEventAuthority": {
+      "worker": "W06",
+      "database": "D1-03",
+      "schema": "contracts/schemas/common/audit-event.json"
+    },
+    "actorRule": "Actor and target identity are derived server-side from the authenticated W02 principal or the identity-bound W02 challenge; never accept caller-supplied actor, user ID, role, layer, or MFA assurance."
+  },
+  "events": [
+    {
+      "name": "auth.mfa.enrollment_started",
+      "operationId": "authMfaEnrollmentStart",
+      "trigger": "A valid authenticated enrollment attempt starts a pending factor.",
+      "targetType": "User"
+    },
+    {
+      "name": "auth.mfa.enrollment_verified",
+      "operationId": "authMfaEnrollmentConfirm",
+      "trigger": "W02 confirms the pending TOTP factor and reads back enabled+verified state.",
+      "targetType": "User"
+    },
+    {
+      "name": "auth.mfa.enrollment_failed",
+      "operationIds": [
+        "authMfaEnrollmentStart",
+        "authMfaEnrollmentConfirm"
+      ],
+      "trigger": "An enrollment attempt fails after the identity has been authoritatively resolved.",
+      "targetType": "User"
+    },
+    {
+      "name": "auth.mfa.challenge_succeeded",
+      "operationId": "authMfaChallengeVerify",
+      "trigger": "A valid TOTP or recovery-code challenge is verified.",
+      "targetType": "User"
+    },
+    {
+      "name": "auth.mfa.challenge_failed",
+      "operationId": "authMfaChallengeVerify",
+      "trigger": "A challenge verification fails after its identity-bound subject is resolved.",
+      "targetType": "User"
+    },
+    {
+      "name": "auth.mfa.factor_disabled",
+      "operationId": "authMfaDisable",
+      "trigger": "A factor disable operation succeeds after password and TOTP step-up and session invalidation.",
+      "targetType": "User"
+    },
+    {
+      "name": "auth.mfa.recovery_codes_rotated",
+      "operationId": "authMfaRecoveryCodesRotate",
+      "trigger": "Recovery codes are rotated after password and TOTP step-up; plaintext codes are disclosed only through the permitted one-time response.",
+      "targetType": "User"
+    },
+    {
+      "name": "auth.mfa.recovery_code_consumed",
+      "operationId": "authMfaChallengeVerify",
+      "trigger": "A single-use recovery code is successfully consumed during challenge verification.",
+      "targetType": "User"
+    },
+    {
+      "name": "auth.mfa.locked",
+      "operationId": "authMfaChallengeVerify",
+      "trigger": "The authoritative provider/factor enters its locked state after bounded failures.",
+      "targetType": "User"
+    },
+    {
+      "name": "auth.mfa.replay_rejected",
+      "operationId": "authMfaChallengeVerify",
+      "trigger": "W02's persisted atomic TOTP time-step guard rejects a reused or concurrent duplicate time-step.",
+      "targetType": "User"
+    }
+  ],
+  "payloadPolicy": {
+    "allowedFields": [
+      "operationId",
+      "result",
+      "reasonCode",
+      "factorState",
+      "challengeMethod"
+    ],
+    "secretFieldsForbidden": [
+      "secret",
+      "totpUri",
+      "code",
+      "backupCodes",
+      "recoveryCode",
+      "sessionToken",
+      "cookie",
+      "lastAcceptedTotpTimeStep",
+      "mfaEnrollmentKeyHash",
+      "mfaEnrollmentConfirmKeyHash"
+    ],
+    "actorAndTargetMustBeServerDerived": true,
+    "noAccountEnumeration": true,
+    "noClientSuppliedAssurance": true
+  },
+  "delivery": {
+    "mode": "EXISTING_TRANSPORT_ONLY",
+    "existingW02ToW06Binding": "UNRESOLVED",
+    "newWorkerD1QueueOrServiceBindingAllowed": false,
+    "admissionRule": "Do not claim event delivery or audit persistence until the exact existing W02-to-W06 transport, consumer behavior, idempotency, and failure semantics are tied to executable tests and current-head production evidence."
+  },
+  "invariants": [
+    "Successful factor or recovery mutations must have an immutable canonical audit record after the authoritative mutation is accepted.",
+    "Security failures are audited without logging factor secrets, TOTP/recovery codes, raw session tokens, challenge tokens, or secret-derived hashes.",
+    "Repeated delivery must be idempotent and must not create duplicate logical audit records.",
+    "W02 remains the only authority for factor state and TOTP replay decisions; W06 remains the canonical AuditEvent persistence authority.",
+    "Audit delivery failure must not be reported as successful evidence; the contract must define a fail-closed or admitted durable-outbox behavior before runtime acceptance."
+  ],
+  "verificationRequirements": [
+    "All ten event names are registered and mapped to canonical AUTH-007 operations.",
+    "W02 producer source and the existing W02-to-W06 transport are verified against the exact commit SHA.",
+    "W06 consumes each event and persists canonical AuditEvent records without duplicate logical writes.",
+    "Positive and negative tests prove actor/target provenance, secret redaction, replay rejection, duplicate-delivery idempotency, and audit failure handling.",
+    "Current-head Evidence Registry records and Mapping 0 validation are required before AUTH-007 promotion."
+  ],
+  "nonGoals": [
+    "Does not claim that runtime event emission is implemented.",
+    "Does not authorize D1 migration, Worker deployment, MFA rollout, or first-L8 grant.",
+    "Does not add a Worker, D1 database, Queue, or Service Binding.",
+    "Does not mark AUTH-007 GREEN."
+  ]
+}
