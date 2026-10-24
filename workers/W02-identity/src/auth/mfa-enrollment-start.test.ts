@@ -121,7 +121,7 @@ describe('W02 MFA enrollment-start authority', () => {
       D1_01: db, AUTH_SESSION_WRITE_LIMITER: mocks.limiter,
     } as BetterAuthEnv, makeRequest())
     expect(duplicate.status).toBe(409)
-    expect(mocks.handler).toHaveBeenCalledTimes(1)
+    expect(mocks.handler).not.toHaveBeenCalled()
   })
 
   it('requires a real idempotency key and clears only an unmaterialized reservation after adapter failure', async () => {
