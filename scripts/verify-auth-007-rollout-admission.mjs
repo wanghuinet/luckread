@@ -104,7 +104,7 @@ async function verifyProtectedEnvironment({ requireDistinctActor = true } = {}) 
     reviewerRole: permissionValue === 'admin' || roleName === 'admin' ? 'admin' : roleName,
     selfReviewPrevented: true,
     protectedBranchesOnly: true,
-    initiatorDiffersFromReviewer: true,
+    initiatorDiffersFromReviewer: reviewerLogin !== actor,
   }
 }
 
