@@ -37,7 +37,8 @@ describe('W01 public MFA status route', () => {
 
     expect(response.status).toBe(200)
     expect(response.headers.get('cache-control')).toBe('no-store')
-    await expect(response.json()).resolves.toMatchObject({
+    const body = await response.json()
+    expect(body).toMatchObject({
       data: {
         enabled: true,
         verified: true,
@@ -54,7 +55,7 @@ describe('W01 public MFA status route', () => {
     expect(forwarded.headers.get('cookie')).toBe('better-auth.session_token=opaque-session')
     expect(forwarded.headers.get('X-LuckRead-Caller')).toBe('W01')
     expect(forwarded.headers.get('X-LuckRead-Transport-Version')).toBe('1.0')
-    expect(JSON.stringify(await response.clone().json())).not.toMatch(/secret|backupCodes|lockedUntil|failedVerificationCount/i)
+    expect(JSON.stringify(body)).not.toMatch(/secret|backupCodes|lockedUntil|failedVerificationCount/i)
   })
 
   it('maps an unauthenticated W02 session to 401 without inventing a disabled status', async () => {
