@@ -21,3 +21,25 @@ CREATE TABLE "twoFactor" (
 );
 
 CREATE INDEX twoFactor_userId_idx ON "twoFactor"(userId);
+
+-- MFA lifecycle transitions are authoritative at the database boundary. Revoke
+-- every pre-existing session on both enable and disable, and clear the
+-- enrollment timestamp when MFA is disabled so a later re-enrollment cannot
+-- inherit stale assurance from an earlier TOTP factor.
+CREATE TRIGGER user_mfa_enable_revoke_sessions
+AFTER UPDATE OF two_factor_enabled ON "user"
+WHEN OLD.two_factor_enabled = 0 AND NEW.two_factor_enabled = 1
+BEGIN
+  UPDATE "user"
+    SET mfa_enrolled_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+    WHERE id = NEW.id;
+  DELETE FROM "session" WHERE user_id = NEW.id;
+END;
+
+CREATE TRIGGER user_mfa_disable_clear_enrollment
+AFTER UPDATE OF two_factor_enabled ON "user"
+WHEN OLD.two_factor_enabled = 1 AND NEW.two_factor_enabled = 0
+BEGIN
+  UPDATE "user" SET mfa_enrolled_at = NULL WHERE id = NEW.id;
+  DELETE FROM "session" WHERE user_id = NEW.id;
+END;
