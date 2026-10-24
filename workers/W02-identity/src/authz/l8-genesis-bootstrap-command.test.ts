@@ -183,6 +183,19 @@ describe('W02 one-time L8 genesis grant command', () => {
     expect(db.assignments.filter((row) => row.roleId === 'super_admin')).toHaveLength(0)
   })
 
+  it('refuses an enabled but not TOTP-verified target before consuming the guard', async () => {
+    const db = new FakeD1()
+    db.mfa = {
+      twoFactorEnabled: 1,
+      mfaEnrolledAt: '2026-10-24T11:00:00.000Z',
+      totpVerified: 0,
+    }
+    await expect(bootstrapSuperAdmin(db as unknown as D1Database, approval(), NOW))
+      .rejects.toMatchObject({ code: 'MFA_REQUIRED' })
+    expect(db.audit).toBeNull()
+    expect(db.assignments.filter((row) => row.roleId === 'super_admin')).toHaveLength(0)
+  })
+
   it('accepts an exact successful replay without creating another assignment', async () => {
     const db = new FakeD1()
     const first = await bootstrapSuperAdmin(db as unknown as D1Database, approval(), NOW)
