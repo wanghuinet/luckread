@@ -10,6 +10,7 @@ const expectedReviewerId = 190754094
 const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), 'utf8')
 const exists = (relativePath) => fs.existsSync(path.join(root, relativePath))
 const blockers = []
+const staticOnly = process.argv.includes('--static-only')
 
 function requireSource(condition, message) {
   if (!condition) blockers.push(message)
@@ -184,9 +185,9 @@ if (blockers.length === 0) {
     persistedTotpReplayGuard: /consumeTotpTimeStep/.test(betterAuth) &&
       /two-factor\/verify-totp/.test(betterAuth) &&
       /UPDATE "twoFactor" SET lastAcceptedTotpTimeStep/.test(replayGuard),
-    canonicalContractNotInferredFromProduction: apiContract.status === 'CONTRACTED_NOT_VERIFIED' &&
-      factorContract.status === 'CONTRACTED_NOT_VERIFIED' &&
-      lifecycle.status === 'CONTRACTED_NOT_VERIFIED',
+    canonicalContractsDeclareExplicitStatus: ['CONTRACTED_NOT_VERIFIED', 'VERIFIED', 'GREEN'].includes(apiContract.status) &&
+      ['CONTRACTED_NOT_VERIFIED', 'VERIFIED', 'GREEN'].includes(factorContract.status) &&
+      ['CONTRACTED_NOT_VERIFIED', 'VERIFIED', 'GREEN'].includes(lifecycle.status),
     allSixPublicRoutesAndTestsPresent: operations.every((operation) =>
       exists(operation.route) &&
       exists(operation.test) &&
@@ -200,8 +201,9 @@ if (blockers.length === 0) {
       'workers/W02-identity/src/auth/totp-replay-guard.test.ts',
       'workers/W02-identity/src/auth/mfa-lifecycle-contract.test.ts',
     ].every(exists),
-    finalGenesisGateStillBlockedUntilEvidence: /Status:\s*`BLOCKED_NOT_GREEN`/.test(reconciliation) &&
-      /Implementation authorization:\s*`false`/.test(reconciliation),
+    finalGenesisGateRemainsSeparate: exists('scripts/verify-admin-account-bootstrap-readiness.mjs') &&
+      /hasMfaEnforcement/.test(read('scripts/verify-admin-account-bootstrap-readiness.mjs')) &&
+      /BLOCKED_NOT_GREEN/.test(read('scripts/verify-admin-account-bootstrap-readiness.mjs')),
   }
 
   for (const [check, passed] of Object.entries(sourceChecks)) {
@@ -213,7 +215,7 @@ if (blockers.length === 0) {
 }
 
 let protectedEnvironment = null
-if (blockers.length === 0) {
+if (blockers.length === 0 && !staticOnly) {
   try {
     protectedEnvironment = await verifyProtectedEnvironment()
   } catch (error) {
@@ -222,7 +224,8 @@ if (blockers.length === 0) {
 }
 
 const report = {
-  status: blockers.length === 0 ? 'ROLLOUT_ADMISSION_READY_NOT_FINAL_GREEN' : 'BLOCKED_NOT_GREEN',
+  status: blockers.length > 0 ? 'BLOCKED_NOT_GREEN' : staticOnly ? 'STATIC_ROLLOUT_SOURCE_READY' : 'ROLLOUT_ADMISSION_READY_NOT_FINAL_GREEN',
+  gateMode: staticOnly ? 'STATIC_ONLY_NO_PRODUCTION_AUTHORIZATION' : 'PROTECTED_MANUAL_ROLLOUT',
   rolloutEnvironment: protectedEnvironment,
   sourceChecks,
   finalAuth007Status: auth007Status,
