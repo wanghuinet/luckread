@@ -26,12 +26,6 @@ interface Env {
   AUTH013_PROJECTION_QUEUE: Queue
 }
 
-type ResolveLayerRequest = {
-  subjectId: string
-  accountState: string
-  now?: string
-}
-
 const readJsonBody = async <T>(request: Request): Promise<T | null> => {
   try {
     const body = await request.json<T>()
