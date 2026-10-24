@@ -25,6 +25,13 @@ const makeDb = () => {
     'CREATE TABLE "twoFactor" (' +
       'id TEXT PRIMARY KEY, userId TEXT NOT NULL UNIQUE)',
   )
+  sqlite.exec(
+    'CREATE TABLE auth_007_mfa_publication_journal (' +
+      'journal_id TEXT PRIMARY KEY NOT NULL, event_id TEXT NOT NULL UNIQUE, event_type TEXT NOT NULL, ' +
+      'schema_version TEXT NOT NULL, resource_id TEXT NOT NULL, source_version INTEGER NOT NULL, ' +
+      'idempotency_key TEXT NOT NULL UNIQUE, payload TEXT NOT NULL, status TEXT NOT NULL, attempt INTEGER NOT NULL, ' +
+      'next_attempt_at TEXT, created_at TEXT NOT NULL, published_at TEXT, last_error_code TEXT)',
+  )
   sqlite.prepare(
     'INSERT INTO "user" (id, two_factor_enabled, mfa_enrollment_key_hash) VALUES (?, 0, NULL)',
   ).run('user-12345678')
@@ -40,7 +47,7 @@ const makeDb = () => {
         },
         async run() {
           const result = statement.run(...values)
-          return { meta: { changes: Number(result.changes) } }
+          return { success: true, meta: { changes: Number(result.changes) } }
         },
         async first<T>() {
           return (statement.get(...values) as T | undefined) ?? null
@@ -48,6 +55,18 @@ const makeDb = () => {
         async all<T>() {
           return { results: statement.all(...values) as T[] }
         },
+      }
+    },
+    async batch(prepared: Array<{ run: () => Promise<{ success: boolean; meta: { changes: number } }> }>) {
+      sqlite.exec('BEGIN')
+      try {
+        const results = []
+        for (const statement of prepared) results.push(await statement.run())
+        sqlite.exec('COMMIT')
+        return results
+      } catch (error) {
+        sqlite.exec('ROLLBACK')
+        throw error
       }
     },
   } as unknown as D1Database
@@ -112,6 +131,14 @@ describe('W02 MFA enrollment-start authority', () => {
       const account = sqlite.prepare('SELECT mfa_enrollment_key_hash FROM "user" WHERE id = ?')
         .get('user-12345678') as { mfa_enrollment_key_hash: string | null }
       expect(account.mfa_enrollment_key_hash).toMatch(/^[a-f0-9]{64}$/)
+      const audit = sqlite.prepare('SELECT event_type, resource_id, status, payload FROM auth_007_mfa_publication_journal')
+        .get() as { event_type: string; resource_id: string; status: string; payload: string }
+      expect(audit.event_type).toBe('auth.mfa.enrollment_started')
+      expect(audit.resource_id).toBe('user-12345678')
+      expect(audit.status).toBe('PENDING')
+      expect(audit.payload).not.toContain('correct horse battery staple')
+      expect(audit.payload).not.toContain('ABCDEFGHIJKLMNOP')
+      expect(audit.payload).not.toContain('RECOVERY-ONE')
     } finally {
       close()
     }
