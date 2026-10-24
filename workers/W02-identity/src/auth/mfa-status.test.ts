@@ -16,7 +16,7 @@ const makeDb = (row: unknown) => {
     bind: vi.fn().mockReturnThis(),
     first: vi.fn().mockResolvedValue(row),
   }
-  const db = { prepare: vi.fn(() => statement) }
+  const db = { prepare: vi.fn((sql: string) => { void sql; return statement }) }
   return { db: db as unknown as D1Database, prepare: db.prepare, statement }
 }
 
