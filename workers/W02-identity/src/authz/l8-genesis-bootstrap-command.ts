@@ -73,8 +73,12 @@ export async function bootstrapSuperAdmin(
     !/^[0-9a-f]{40}$/i.test(approval.requestHeadSha) ||
     !/^[0-9a-f]{40}$/i.test(approval.requestMergeSha) ||
     !/^[0-9]+$/.test(approval.workflowRunId) ||
-    new Set(approval.approvedReviewers.map((value) => value.toLowerCase())).size < 2 ||
-    Object.keys(approval.reviewerPermissions).length < 2 ||
+    !Array.isArray(approval.approvedReviewers) ||
+    approval.approvedReviewers.length !== 1 ||
+    new Set(approval.approvedReviewers.map((value) => value.toLowerCase())).size !== 1 ||
+    Object.keys(approval.reviewerPermissions).length !== 1 ||
+    Object.keys(approval.reviewerPermissions)[0]?.toLowerCase() !== approval.approvedReviewers[0]?.toLowerCase() ||
+    !['admin', 'maintain'].includes(String(approval.reviewerPermissions[approval.approvedReviewers[0]] ?? '').toLowerCase()) ||
     Number.isNaN(Date.parse(now))
   ) {
     throw new L8BootstrapCommandError('VALIDATION_FAILED', 'invalid verified L8 bootstrap command')
