@@ -1,6 +1,6 @@
 import layers from '../../../../contracts/authz/layers.json'
 import type { VerifiedL8BootstrapApproval } from './l8-genesis-bootstrap-approval.js'
-import { prepareRoleVersionAdvance, readRoleVersion } from './role-version.js'
+import { readRoleVersion } from './role-version.js'
 
 type ExistingAudit = {
   requestPrNumber: number
@@ -203,9 +203,8 @@ export async function bootstrapSuperAdmin(
         "INSERT INTO role_assignments (id, subject_id, role_id, scope_type, scope_id, status, valid_from, valid_until, created_at, updated_at) " +
         "VALUES (?, ?, 'super_admin', 'global', NULL, 'ACTIVE', ?, ?, ?, ?)",
       ).bind(assignmentId, request.targetUserId, now, validUntil, now, now),
-      // Atomic role-version invalidation prevents caches from retaining the
-      // pre-bootstrap authorization after the assignment becomes effective.
-      prepareRoleVersionAdvance(db, request.targetUserId, now),
+      // The existing D1 role_assignments INSERT trigger advances role_version
+      // atomically in this same batch; do not increment it a second time.
     ])
   } catch {
     const raced = await db.prepare(
