@@ -9,6 +9,12 @@ ALTER TABLE "user"
 ALTER TABLE "user"
   ADD COLUMN mfa_enrolled_at TEXT;
 
+-- A single pending enrollment can be started per account. Store only a hash of
+-- the public Idempotency-Key so retries cannot replace a pending factor or
+-- cause the one-time plaintext recovery-code response to be issued again.
+ALTER TABLE "user"
+  ADD COLUMN mfa_enrollment_key_hash TEXT;
+
 CREATE TABLE "twoFactor" (
   id TEXT NOT NULL PRIMARY KEY,
   userId TEXT NOT NULL UNIQUE,
@@ -41,6 +47,6 @@ CREATE TRIGGER user_mfa_disable_clear_enrollment
 AFTER UPDATE OF two_factor_enabled ON "user"
 WHEN OLD.two_factor_enabled = 1 AND NEW.two_factor_enabled = 0
 BEGIN
-  UPDATE "user" SET mfa_enrolled_at = NULL WHERE id = NEW.id;
+  UPDATE "user" SET mfa_enrolled_at = NULL, mfa_enrollment_key_hash = NULL WHERE id = NEW.id;
   DELETE FROM "session" WHERE user_id = NEW.id;
 END;
