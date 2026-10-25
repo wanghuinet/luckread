@@ -40,6 +40,12 @@ export function classifyWranglerTailStderr(stderr) {
   return CATEGORIES.UNKNOWN
 }
 
+export function parseLifecycleMarker(raw) {
+  return typeof raw === 'string' && raw.trim() === 'INTENTIONAL_STOP'
+    ? 'INTENTIONAL_STOP'
+    : 'UNCONFIRMED'
+}
+
 export function parsePipelineExitStatus(raw) {
   if (typeof raw !== 'string') return { wranglerExitCode: 'UNKNOWN', sanitizerExitCode: 'UNKNOWN' }
   const match = raw.trim().match(/^wrangler=(\d{1,3}) sanitizer=(\d{1,3})$/)
@@ -53,8 +59,10 @@ export function parsePipelineExitStatus(raw) {
 async function main() {
   const path = process.argv[2]
   const statusPath = process.argv[3]
+  const lifecyclePath = process.argv[4]
   let stderr = ''
   let statusRaw = ''
+  let lifecycleRaw = ''
   if (path) {
     try {
       stderr = await readFile(path, 'utf8')
@@ -69,10 +77,18 @@ async function main() {
       // A missing status marker is represented as UNKNOWN.
     }
   }
+  if (lifecyclePath) {
+    try {
+      lifecycleRaw = await readFile(lifecyclePath, 'utf8')
+    } catch {
+      // A missing marker means process termination was not confirmed as intentional.
+    }
+  }
   const category = classifyWranglerTailStderr(stderr)
   const { wranglerExitCode, sanitizerExitCode } = parsePipelineExitStatus(statusRaw)
+  const lifecycle = parseLifecycleMarker(lifecycleRaw)
   const annotation = category === CATEGORIES.EMPTY && wranglerExitCode === '0' ? 'notice' : 'warning'
-  process.stdout.write(`::${annotation}::W02 tail diagnostic category=${category} wrangler_exit=${wranglerExitCode} sanitizer_exit=${sanitizerExitCode}\n`)
+  process.stdout.write(`::${annotation}::W02 tail diagnostic category=${category} wrangler_exit=${wranglerExitCode} sanitizer_exit=${sanitizerExitCode} lifecycle=${lifecycle}\n`)
 }
 
 if (process.argv[1] && new URL(import.meta.url).pathname === new URL(`file://${process.argv[1]}`).pathname) {

@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { classifyWranglerTailStderr, parsePipelineExitStatus } from './auth-007-classify-wrangler-tail-stderr.mjs'
+import { classifyWranglerTailStderr, parseLifecycleMarker, parsePipelineExitStatus } from './auth-007-classify-wrangler-tail-stderr.mjs'
 
 describe('AUTH-007 Wrangler tail stderr classifier', () => {
   it('classifies common Cloudflare token and permission failures without returning source text', () => {
@@ -39,6 +39,12 @@ describe('AUTH-007 Wrangler tail stderr classifier', () => {
     assert.equal(classifyWranglerTailStderr('opaque diagnostic'), 'NONEMPTY_UNCLASSIFIED_DETAILS_REDACTED')
     assert.equal(classifyWranglerTailStderr('  '), 'STDERR_EMPTY')
     assert.equal(classifyWranglerTailStderr(null), 'STDERR_EMPTY')
+  })
+
+  it('distinguishes intentional stream shutdown from unconfirmed process termination', () => {
+    assert.equal(parseLifecycleMarker('INTENTIONAL_STOP'), 'INTENTIONAL_STOP')
+    assert.equal(parseLifecycleMarker('unexpected error details'), 'UNCONFIRMED')
+    assert.equal(parseLifecycleMarker(null), 'UNCONFIRMED')
   })
 
   it('retains only numeric Wrangler and sanitizer pipeline exit codes', () => {
