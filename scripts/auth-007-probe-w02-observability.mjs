@@ -306,7 +306,7 @@ async function main() {
       'stageFailureMarkerInvocations', 'mfaSummaryLogs', 'selected', 'published', 'failed',
     ].map((key) => `${key[0].toLowerCase() + key.slice(1)}=${result[key]}`),
   ]
-  process.stdout.write(`W02_OBSERVABILITY_CRON_DIAGNOSTIC ${fields.join(' ')}\\n`)
+  process.stdout.write(`W02_OBSERVABILITY_CRON_DIAGNOSTIC ${fields.join(' ')}\n`)
   if (result.status !== 'PASS') process.exitCode = 1
 }
 
