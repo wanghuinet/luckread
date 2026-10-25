@@ -11,6 +11,10 @@ on:
       - 'scripts/generate-role-version-migration.mjs'
       - 'scripts/verify-role-version-mutation.mjs'
       - 'scripts/verify-admin-account-bootstrap-readiness.mjs'
+      - 'scripts/auth-007-mfa-live-security-e2e.mjs'
+      - 'scripts/auth-007-totp.mjs'
+      - 'scripts/auth-007-totp.test.mjs'
+      - '.github/workflows/auth-007-mfa-live-security-e2e.yml'
       - 'scripts/l8-genesis-bootstrap-request.mjs'
       - 'scripts/l8-genesis-bootstrap-request.test.mjs'
       - 'scripts/l8-genesis-bootstrap-protected-ref.test.mjs'
@@ -33,6 +37,10 @@ on:
       - 'scripts/generate-role-version-migration.mjs'
       - 'scripts/verify-role-version-mutation.mjs'
       - 'scripts/verify-admin-account-bootstrap-readiness.mjs'
+      - 'scripts/auth-007-mfa-live-security-e2e.mjs'
+      - 'scripts/auth-007-totp.mjs'
+      - 'scripts/auth-007-totp.test.mjs'
+      - '.github/workflows/auth-007-mfa-live-security-e2e.yml'
       - 'scripts/l8-genesis-bootstrap-request.mjs'
       - 'scripts/l8-genesis-bootstrap-request.test.mjs'
       - 'scripts/l8-genesis-bootstrap-protected-ref.test.mjs'
@@ -90,6 +98,12 @@ jobs:
         run: node --test scripts/l8-genesis-bootstrap-protected-ref.test.mjs
       - name: Check L8 bootstrap readiness audit syntax
         run: node --check scripts/verify-admin-account-bootstrap-readiness.mjs
+      - name: Check live MFA E2E and TOTP helper syntax
+        run: |
+          node --check scripts/auth-007-mfa-live-security-e2e.mjs
+          node --check scripts/auth-007-totp.mjs
+      - name: Test RFC-compatible live MFA TOTP helper
+        run: node --test scripts/auth-007-totp.test.mjs
       - name: Verify logical table authority boundary
         run: node scripts/verify-logical-data-authority.mjs
       - name: Execute AUTH-007 outbox migration static audit (local SQLite only)
