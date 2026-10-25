@@ -14,7 +14,7 @@ const response = (status, payload) => ({
 })
 
 describe('AUTH-007 read-only W02 scheduled Observability probe', () => {
-  it('runs a dry, bounded W02-only query and classifies event types without storing raw evidence', async () => {
+  it('runs a dry, bounded account-wide query and classifies W02 event types without storing raw evidence', async () => {
     let observed
     const result = await probeW02ScheduledObservability({
       ...valid,
@@ -77,11 +77,11 @@ describe('AUTH-007 read-only W02 scheduled Observability probe', () => {
     assert.equal(observed.init.method, 'POST')
     assert.equal(observed.body.dry, true)
     assert.equal(observed.body.view, 'invocations')
-    assert.equal(observed.body.queryId, 'auth007-w02-invocation-eventtype-diagnostic')
-    assert.equal(observed.body.timeframe.to - observed.body.timeframe.from, 600_000)
-    assert.deepEqual(observed.body.parameters.filters.map((filter) => filter.key), [
-      '$workers.scriptName',
-    ])
+    assert.equal(observed.body.queryId, 'auth007-account-wide-invocation-diagnostic')
+    assert.equal(observed.body.timeframe.to - observed.body.timeframe.from, 1_800_000)
+    assert.equal(observed.body.parameters.limit, 200)
+    assert.equal(Object.hasOwn(observed.body.parameters, 'filters'), false)
+    assert.equal(Object.hasOwn(observed.body, 'limit'), false)
     assert.deepEqual(result, {
       status: 'PASS',
       category: 'NONE',
