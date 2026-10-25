@@ -20,10 +20,8 @@ const W02_PUBLICATION_LOG_FILTER = Object.freeze({
   type: 'string',
   value: 'W02 scheduled publication',
 })
-const W02_OBSERVABILITY_FILTERS = Object.freeze([
-  W02_SCRIPT_FILTER,
-  W02_PUBLICATION_LOG_FILTER,
-])
+// Apply fields appropriate to each view: invocation records do not necessarily
+// have the same message metadata as individual log-event rows.
 
 const CATEGORIES = Object.freeze({
   CONFIG: 'CONFIGURATION_MISSING',
@@ -290,7 +288,7 @@ async function probeW02EventsView({ accountId, apiToken, now, fetchImpl }) {
           parameters: {
             datasets: ['cloudflare-workers'],
             filterCombination: 'and',
-            filters: W02_OBSERVABILITY_FILTERS,
+            filters: [W02_PUBLICATION_LOG_FILTER],
           },
         }),
       },
@@ -331,9 +329,10 @@ async function probeW02EventsView({ accountId, apiToken, now, fetchImpl }) {
 
 /**
  * Query Cloudflare Workers Observability without opening a WebSocket tail.
- * Apply the exact W02 script-name filter on the server before result limits,
- * so unrelated Workers cannot crowd scheduled records out of the evidence window.
- * Only fixed labels and safe numeric aggregates survive; event bodies and
+ * Invocation queries are scoped by W02 service name; event queries are scoped
+ * by the fixed scheduled-publication message prefix. Keep these filters view-specific
+ * because invocation metadata may not carry the same message field as log events.
+ * Only fixed labels and safe numeric aggregates survive; raw event bodies and
  * request identifiers are never logged or persisted.
  */
 export async function probeW02ScheduledObservability({
@@ -377,7 +376,7 @@ export async function probeW02ScheduledObservability({
           parameters: {
             datasets: ['cloudflare-workers'],
             filterCombination: 'and',
-            filters: W02_OBSERVABILITY_FILTERS,
+            filters: [W02_SCRIPT_FILTER],
           },
         }),
       },
