@@ -40,9 +40,21 @@ export function classifyWranglerTailStderr(stderr) {
   return CATEGORIES.UNKNOWN
 }
 
+export function parsePipelineExitStatus(raw) {
+  if (typeof raw !== 'string') return { wranglerExitCode: 'UNKNOWN', sanitizerExitCode: 'UNKNOWN' }
+  const match = raw.trim().match(/^wrangler=(\d{1,3}) sanitizer=(\d{1,3})$/)
+  if (!match) return { wranglerExitCode: 'UNKNOWN', sanitizerExitCode: 'UNKNOWN' }
+  return {
+    wranglerExitCode: String(Number(match[1])),
+    sanitizerExitCode: String(Number(match[2])),
+  }
+}
+
 async function main() {
   const path = process.argv[2]
+  const statusPath = process.argv[3]
   let stderr = ''
+  let statusRaw = ''
   if (path) {
     try {
       stderr = await readFile(path, 'utf8')
@@ -50,9 +62,17 @@ async function main() {
       // Missing/unreadable diagnostic files are treated like an empty stream.
     }
   }
+  if (statusPath) {
+    try {
+      statusRaw = await readFile(statusPath, 'utf8')
+    } catch {
+      // A missing status marker is represented as UNKNOWN.
+    }
+  }
   const category = classifyWranglerTailStderr(stderr)
-  const annotation = category === CATEGORIES.EMPTY ? 'notice' : 'warning'
-  process.stdout.write(`::${annotation}::W02 tail diagnostic category=${category}\n`)
+  const { wranglerExitCode, sanitizerExitCode } = parsePipelineExitStatus(statusRaw)
+  const annotation = category === CATEGORIES.EMPTY && wranglerExitCode === '0' ? 'notice' : 'warning'
+  process.stdout.write(`::${annotation}::W02 tail diagnostic category=${category} wrangler_exit=${wranglerExitCode} sanitizer_exit=${sanitizerExitCode}\n`)
 }
 
 if (process.argv[1] && new URL(import.meta.url).pathname === new URL(`file://${process.argv[1]}`).pathname) {
