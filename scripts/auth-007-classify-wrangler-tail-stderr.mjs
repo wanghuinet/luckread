@@ -8,6 +8,8 @@ const CATEGORIES = Object.freeze({
   RATE: 'RATE_LIMITED',
   OTHER: 'OTHER_ERROR_DETAILS_REDACTED',
   UNKNOWN: 'NONEMPTY_UNCLASSIFIED_DETAILS_REDACTED',
+  TOOLING: 'WRANGLER_CONFIGURATION_OR_ARGUMENT',
+  API: 'CLOUDFLARE_API_FAILURE_REDACTED',
 })
 
 export function classifyWranglerTailStderr(stderr) {
@@ -18,14 +20,21 @@ export function classifyWranglerTailStderr(stderr) {
   if (/(authentication|authenticat(?:e|ion)|invalid.{0,20}token|not authenticated|not logged in|unauthorized|forbidden|insufficient permissions?|missing.{0,30}permissions?|permission denied|access denied|not authorized|workers tail read|metadata read-only|(?:^|[^0-9])(401|403|10000)(?:[^0-9]|$))/i.test(stderr)) {
     return CATEGORIES.AUTH
   }
-  if (/(websocket|connection|ECONN[A-Z]+|ETIMEDOUT|timed out|network|fetch failed|ENOTFOUND|socket|DNS|TLS handshake)/i.test(stderr)) {
+  if (/(websocket|connection|ECONN[A-Z]+|ETIMEDOUT|timed out|network|fetch failed|failed.{0,40}(fetch|connect|connection|websocket|network|socket)|unable.{0,40}(fetch|connect|connection|network|socket)|ENOTFOUND|ECONNRESET|ECONNREFUSED|EAI_AGAIN|socket hang up|DNS|TLS handshake)/i.test(stderr)) {
     return CATEGORIES.NETWORK
   }
-  if (/(worker|script|service).{0,60}(not found|does not exist|unknown)|not found.{0,60}(worker|script|service)/i.test(stderr)) {
+  if (/(worker|script|service).{0,60}(not found|does not exist|unknown)|not found.{0,60}(worker|script|service)|no script found|could not find script/i.test(stderr)) {
     return CATEGORIES.SCOPE
   }
   if (/(rate.?limit|too many requests|(?:^|[^0-9])429(?:[^0-9]|$))/i.test(stderr)) {
     return CATEGORIES.RATE
+  }
+  if (/(unknown (?:option|argument|command)|invalid (?:option|argument|flag)|unexpected argument|could not determine executable to run|command not found|config(?:uration)? file.{0,40}(?:missing|not found|invalid)|npm error code e404|package.{0,40}not found)/i.test(stderr)) {
+    return CATEGORIES.TOOLING
+  }
+  if (/(cloudflare api|api request|request to .*api|request failed|api error|http status.{0,10}5[0-9]{2}|status code.{0,10}5[0-9]{2})/i.test(stderr) &&
+      /(error|failed|failure|denied|status)/i.test(stderr)) {
+    return CATEGORIES.API
   }
   if (/(error|failed|cannot|unable|denied)/i.test(stderr)) return CATEGORIES.OTHER
   return CATEGORIES.UNKNOWN
