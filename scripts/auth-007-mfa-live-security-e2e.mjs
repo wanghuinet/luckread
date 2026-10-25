@@ -142,7 +142,8 @@ const finish = async () => {
     passed: result.checks.length - failed.length,
     failed: failed.length,
   }
-  const priorStatus = result.status\n  result.status = failed.length === 0 ? 'PASS' : (priorStatus !== 'PENDING' ? priorStatus : 'FAIL')
+  const priorStatus = result.status
+  result.status = failed.length === 0 ? 'PASS' : (priorStatus !== 'PENDING' ? priorStatus : 'FAIL')
   await mkdir(evidenceDir, { recursive: true, mode: 0o700 })
   await writeFile(evidencePath, JSON.stringify(result, null, 2) + '\n', { mode: 0o600 })
   console.log(`Sanitized evidence written: ${evidencePath}`)
