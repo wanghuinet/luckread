@@ -7,6 +7,7 @@ const SAFE_LABELS = Object.freeze({
   taskFailed: 'W02 scheduled publication task failed',
   stageFailed: 'W02 scheduled publication stage failed',
 })
+const COMMON_EVENT_TYPES = new Set(['fetch', 'scheduled', 'cron', 'queue'])
 
 const CATEGORIES = Object.freeze({
   CONFIG: 'CONFIGURATION_MISSING',
@@ -60,6 +61,13 @@ function safeInvocationStats(invocations) {
 
   const stats = {
     queriedInvocationGroups: groups.length,
+    w02InvocationGroups: 0,
+    fetchInvocations: 0,
+    scheduledEventTypeInvocations: 0,
+    cronEventTypeInvocations: 0,
+    queueInvocations: 0,
+    otherEventTypeInvocations: 0,
+    unknownEventTypeInvocations: 0,
     scheduledInvocations: 0,
     outcomeOk: 0,
     outcomeError: 0,
@@ -76,28 +84,57 @@ function safeInvocationStats(invocations) {
 
   for (const group of groups) {
     const events = Array.isArray(group) ? group : [group]
-    let matchingScheduledInvocation = false
-    let outcome = null
+    const eventTypes = new Set()
+    let matchingW02Invocation = false
+    let scheduledOutcome = null
+
+    for (const event of events) {
+      if (!event || typeof event !== 'object') continue
+      const meta = event.$workers && typeof event.$workers === 'object'
+        ? event.$workers
+        : null
+      if (!meta || meta.scriptName !== EXPECTED_SCRIPT) continue
+
+      matchingW02Invocation = true
+      if (typeof meta.eventType === 'string' && meta.eventType.length > 0) {
+        eventTypes.add(meta.eventType.toLowerCase())
+        if ((meta.eventType === 'scheduled' || meta.eventType === 'cron') &&
+            typeof meta.outcome === 'string') {
+          scheduledOutcome = meta.outcome.toLowerCase()
+        }
+      }
+    }
+
+    if (!matchingW02Invocation) continue
+    stats.w02InvocationGroups += 1
+
+    if (eventTypes.has('fetch')) stats.fetchInvocations += 1
+    if (eventTypes.has('scheduled')) stats.scheduledEventTypeInvocations += 1
+    if (eventTypes.has('cron')) stats.cronEventTypeInvocations += 1
+    if (eventTypes.has('queue')) stats.queueInvocations += 1
+    if ([...eventTypes].some((type) => !COMMON_EVENT_TYPES.has(type))) {
+      stats.otherEventTypeInvocations += 1
+    }
+    if (eventTypes.size === 0 || eventTypes.has('unknown')) {
+      stats.unknownEventTypeInvocations += 1
+    }
+
+    const isScheduledInvocation = eventTypes.has('scheduled') || eventTypes.has('cron')
+    if (!isScheduledInvocation) continue
+
+    stats.scheduledInvocations += 1
+    if (scheduledOutcome === 'ok' || scheduledOutcome === 'success') stats.outcomeOk += 1
+    else if (['error', 'exception', 'failure', 'canceled'].includes(scheduledOutcome)) stats.outcomeError += 1
+    else stats.outcomeOther += 1
+
+    // Scan only scheduled invocation events in memory. Only fixed labels and
+    // numeric aggregates survive; no log body, user data, URL, or event ID is returned.
     let rawContainsTick = false
     let rawContainsResult = false
     let rawContainsTaskFailure = false
     let rawContainsStageFailure = false
-
     for (const event of events) {
       if (!event || typeof event !== 'object') continue
-      const workers = event.$workers && typeof event.$workers === 'object'
-        ? [event.$workers]
-        : []
-      for (const meta of workers) {
-        if (meta.scriptName === EXPECTED_SCRIPT &&
-            (meta.eventType === 'scheduled' || meta.eventType === 'cron')) {
-          matchingScheduledInvocation = true
-          if (typeof meta.outcome === 'string') outcome = meta.outcome.toLowerCase()
-        }
-      }
-
-      // Scan only the in-memory response. Only booleans and fixed numeric
-      // aggregates survive; no log body, user data, URL, or event ID is returned.
       let serialized = ''
       try { serialized = JSON.stringify(event) } catch { /* treat as no marker */ }
       rawContainsTick ||= serialized.includes(SAFE_LABELS.tick)
@@ -106,12 +143,6 @@ function safeInvocationStats(invocations) {
       rawContainsStageFailure ||= serialized.includes(SAFE_LABELS.stageFailed)
       countSafeDetails(event, stats)
     }
-
-    if (!matchingScheduledInvocation) continue
-    stats.scheduledInvocations += 1
-    if (outcome === 'ok' || outcome === 'success') stats.outcomeOk += 1
-    else if (['error', 'exception', 'failure', 'canceled'].includes(outcome)) stats.outcomeError += 1
-    else stats.outcomeOther += 1
     if (rawContainsTick) stats.tickMarkerInvocations += 1
     if (rawContainsResult) stats.resultMarkerInvocations += 1
     if (rawContainsTaskFailure) stats.taskFailureMarkerInvocations += 1
@@ -120,6 +151,13 @@ function safeInvocationStats(invocations) {
 
   return {
     queriedInvocationGroups: safeCount(stats.queriedInvocationGroups),
+    w02InvocationGroups: safeCount(stats.w02InvocationGroups),
+    fetchInvocations: safeCount(stats.fetchInvocations),
+    scheduledEventTypeInvocations: safeCount(stats.scheduledEventTypeInvocations),
+    cronEventTypeInvocations: safeCount(stats.cronEventTypeInvocations),
+    queueInvocations: safeCount(stats.queueInvocations),
+    otherEventTypeInvocations: safeCount(stats.otherEventTypeInvocations),
+    unknownEventTypeInvocations: safeCount(stats.unknownEventTypeInvocations),
     scheduledInvocations: safeCount(stats.scheduledInvocations),
     outcomeOk: safeCount(stats.outcomeOk),
     outcomeError: safeCount(stats.outcomeError),
@@ -137,8 +175,9 @@ function safeInvocationStats(invocations) {
 
 /**
  * Query Cloudflare Workers Observability without opening a WebSocket tail.
- * The query is dry-run and limited to a ten-minute time window. The API
- * response is held in memory and reduced to fixed counters only.
+ * The query is dry-run and limited to a ten-minute time window. It filters on
+ * the W02 script only, then classifies event types in memory. This avoids an
+ * eventType filter hiding whether the query sees any W02 invocation records.
  */
 export async function probeW02ScheduledObservability({
   accountId,
@@ -173,7 +212,7 @@ export async function probeW02ScheduledObservability({
         cache: 'no-store',
         signal: AbortSignal.timeout(15_000),
         body: JSON.stringify({
-          queryId: 'auth007-w02-scheduled-observability-diagnostic',
+          queryId: 'auth007-w02-invocation-eventtype-diagnostic',
           timeframe: { from: now - WINDOW_MS, to: now },
           view: 'invocations',
           limit: MAX_INVOCATIONS,
@@ -183,7 +222,6 @@ export async function probeW02ScheduledObservability({
             filterCombination: 'and',
             filters: [
               { key: '$workers.scriptName', operation: 'eq', type: 'string', value: EXPECTED_SCRIPT },
-              { key: '$workers.eventType', operation: 'in', type: 'string', value: 'scheduled,cron' },
             ],
           },
         }),
@@ -260,12 +298,15 @@ async function main() {
     `http_status=${result.httpStatus}`,
     `window_minutes=${result.windowMinutes}`,
     ...[
+      'queriedInvocationGroups', 'w02InvocationGroups', 'fetchInvocations',
+      'scheduledEventTypeInvocations', 'cronEventTypeInvocations', 'queueInvocations',
+      'otherEventTypeInvocations', 'unknownEventTypeInvocations',
       'scheduledInvocations', 'outcomeOk', 'outcomeError', 'outcomeOther',
       'tickMarkerInvocations', 'resultMarkerInvocations', 'taskFailureMarkerInvocations',
       'stageFailureMarkerInvocations', 'mfaSummaryLogs', 'selected', 'published', 'failed',
     ].map((key) => `${key[0].toLowerCase() + key.slice(1)}=${result[key]}`),
   ]
-  process.stdout.write(`W02_OBSERVABILITY_CRON_DIAGNOSTIC ${fields.join(' ')}\n`)
+  process.stdout.write(`W02_OBSERVABILITY_CRON_DIAGNOSTIC ${fields.join(' ')}\\n`)
   if (result.status !== 'PASS') process.exitCode = 1
 }
 

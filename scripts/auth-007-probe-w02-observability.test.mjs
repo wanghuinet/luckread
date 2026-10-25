@@ -14,7 +14,7 @@ const response = (status, payload) => ({
 })
 
 describe('AUTH-007 read-only W02 scheduled Observability probe', () => {
-  it('runs a dry, bounded query and emits fixed aggregate runtime evidence only', async () => {
+  it('runs a dry, bounded W02-only query and classifies event types without storing raw evidence', async () => {
     let observed
     const result = await probeW02ScheduledObservability({
       ...valid,
@@ -61,6 +61,9 @@ describe('AUTH-007 read-only W02 scheduled Observability probe', () => {
                   ] }] },
                 },
               ],
+              'private-fetch-request-id': [
+                { '$workers': { scriptName: 'luckread-w02', eventType: 'fetch', outcome: 'ok' } },
+              ],
               'unrelated-request-id': [
                 { '$workers': { scriptName: 'another-worker', eventType: 'scheduled', outcome: 'ok' } },
               ],
@@ -74,18 +77,24 @@ describe('AUTH-007 read-only W02 scheduled Observability probe', () => {
     assert.equal(observed.init.method, 'POST')
     assert.equal(observed.body.dry, true)
     assert.equal(observed.body.view, 'invocations')
-    assert.equal(observed.body.queryId, 'auth007-w02-scheduled-observability-diagnostic')
+    assert.equal(observed.body.queryId, 'auth007-w02-invocation-eventtype-diagnostic')
     assert.equal(observed.body.timeframe.to - observed.body.timeframe.from, 600_000)
     assert.deepEqual(observed.body.parameters.filters.map((filter) => filter.key), [
       '$workers.scriptName',
-      '$workers.eventType',
     ])
     assert.deepEqual(result, {
       status: 'PASS',
       category: 'NONE',
       httpStatus: 200,
       windowMinutes: 10,
-      queriedInvocationGroups: 3,
+      queriedInvocationGroups: 4,
+      w02InvocationGroups: 3,
+      fetchInvocations: 1,
+      scheduledEventTypeInvocations: 1,
+      cronEventTypeInvocations: 1,
+      queueInvocations: 0,
+      otherEventTypeInvocations: 0,
+      unknownEventTypeInvocations: 0,
       scheduledInvocations: 2,
       outcomeOk: 1,
       outcomeError: 1,
@@ -102,6 +111,27 @@ describe('AUTH-007 read-only W02 scheduled Observability probe', () => {
     assert.equal(JSON.stringify(result).includes('must-not-escape'), false)
     assert.equal(JSON.stringify(result).includes('private-request-id'), false)
     assert.equal(JSON.stringify(result).includes('private exception'), false)
+  })
+
+  it('distinguishes a visible W02 fetch invocation from missing scheduler evidence', async () => {
+    const result = await probeW02ScheduledObservability({
+      ...valid,
+      fetchImpl: async () => response(200, {
+        success: true,
+        result: {
+          invocations: {
+            'private-fetch-request-id': [
+              { '$workers': { scriptName: 'luckread-w02', eventType: 'fetch', outcome: 'ok' } },
+            ],
+          },
+        },
+      }),
+    })
+    assert.equal(result.queriedInvocationGroups, 1)
+    assert.equal(result.w02InvocationGroups, 1)
+    assert.equal(result.fetchInvocations, 1)
+    assert.equal(result.scheduledInvocations, 0)
+    assert.equal(result.tickMarkerInvocations, 0)
   })
 
   it('does not call Cloudflare when configuration is missing', async () => {
