@@ -354,24 +354,227 @@ const run = async () => {
       })
     }
 
+    const afterRejections = await request('mfa_remains_enabled_after_invalid_code', 'GET', '/v1/auth/mfa')
+    const afterRejectionData = totpStatus(afterRejections.payload)
+    check('invalid_mfa_attempt_does_not_disable_factor',
+      afterRejections.facts.status === 200 && afterRejectionData?.enabled === true &&
+      afterRejectionData?.verified === true, {
+        status: afterRejections.facts.status,
+        factorStillEnabled: afterRejectionData?.enabled === true && afterRejectionData?.verified === true,
+      })
+
     if (factorEnabled && totp && confirmedStep !== null) {
-      const replayCode = codeForStep(totp.secret, confirmedStep, totp.digits, totp.algorithm)
-      const replayAttempt = await request('mfa_disable_rejects_reused_totp_step', 'POST', '/v1/auth/mfa/disable', {
+      // A distinct fresh time step is required because enrollment confirmation
+      // has already atomically consumed its own TOTP step.
+      while (currentStep(totp.period) <= (latestAcceptedTotpStep ?? confirmedStep)) {
+        const step = latestAcceptedTotpStep ?? confirmedStep
+        const remainingMs = (step + 1) * totp.period * 1000 - Date.now()
+        await sleep(Math.max(250, Math.min(remainingMs + 250, 31_000)))
+      }
+
+      clearCookies()
+      const challengeLogin = await request('login_requires_mfa_challenge', 'POST', '/v1/auth/login', {
         headers: { 'content-type': 'application/json' },
-        body: { currentPassword: password, code: replayCode },
+        body: { identity: email, credential: password },
       })
-      check('mfa_disable_rejects_replayed_totp_step', replayAttempt.facts.status === 401, {
-        status: replayAttempt.facts.status,
-        errorCode: replayAttempt.facts.errorCode,
-        replayCodeLogged: false,
+      const challengeMethods = challengeLogin.payload?.data?.methods
+      const challengeLoginPass = challengeLogin.facts.status === 202 &&
+        challengeLogin.payload?.data?.challengeRequired === true &&
+        Array.isArray(challengeMethods) && challengeMethods.includes('totp') &&
+        challengeMethods.includes('recovery_code') &&
+        !challengeLogin.response?.headers.has('x-luckread-session-token') &&
+        cookieNames().some((name) => /two_factor/i.test(name)) &&
+        !cookieNames().some((name) => /session_token/i.test(name))
+      check('password_login_requires_totp_challenge_without_session', Boolean(challengeLoginPass), {
+        status: challengeLogin.facts.status,
+        challengeCookiePresent: cookieNames().some((name) => /two_factor/i.test(name)),
+        sessionCredentialIssued: Boolean(challengeLogin.response?.headers.has('x-luckread-session-token')),
       })
-      const afterRejections = await request('mfa_remains_enabled_after_negative_tests', 'GET', '/v1/auth/mfa')
-      const afterRejectionData = totpStatus(afterRejections.payload)
-      check('negative_mfa_attempts_do_not_disable_factor',
-        afterRejections.facts.status === 200 && afterRejectionData?.enabled === true &&
-        afterRejectionData?.verified === true, {
-          status: afterRejections.facts.status,
-          factorStillEnabled: afterRejectionData?.enabled === true && afterRejectionData?.verified === true,
+      if (!challengeLoginPass) {
+        result.status = 'MFA_SIGN_IN_CHALLENGE_FAILED'
+        restoreCookieHeader(lastAuthenticatedCookie)
+        return
+      }
+      const totpChallengeCookie = cookieHeader()
+      const challengeStep = currentStep(totp.period)
+      const challengeCode = codeForStep(totp.secret, challengeStep, totp.digits, totp.algorithm)
+      const challengeVerify = await request('signin_totp_challenge_success', 'POST', '/v1/auth/mfa/challenge/verify', {
+        headers: {
+          'content-type': 'application/json',
+          'Idempotency-Key': `${baseKey}-signin-totp`,
+        },
+        body: { code: challengeCode, method: 'totp' },
+      })
+      const challengeData = challengeVerify.payload?.data
+      const challengeVerifyPass = challengeVerify.facts.status === 200 &&
+        challengeData?.authenticated === true && challengeData?.user?.id === userId &&
+        challengeVerify.response?.headers.has('x-luckread-session-token') &&
+        !hasCredentialField(challengeVerify.payload) &&
+        cookieNames().some((name) => /session_token/i.test(name))
+      check('valid_totp_completes_signin_challenge_without_json_token_leak', Boolean(challengeVerifyPass), {
+        status: challengeVerify.facts.status,
+        cacheControl: challengeVerify.facts.cacheControl,
+        nativeSessionHeaderPresent: Boolean(challengeVerify.response?.headers.has('x-luckread-session-token')),
+        sessionTokenInJson: hasCredentialField(challengeVerify.payload),
+      })
+      if (!challengeVerifyPass) {
+        result.status = 'MFA_SIGNIN_TOTP_CHALLENGE_FAILED'
+        restoreCookieHeader(lastAuthenticatedCookie)
+        return
+      }
+      latestAcceptedTotpStep = challengeStep
+      lastAuthenticatedCookie = cookieHeader()
+
+      const challengeReplay = await request('signin_challenge_cookie_is_single_use', 'POST', '/v1/auth/mfa/challenge/verify', {
+        headers: {
+          cookie: totpChallengeCookie,
+          'content-type': 'application/json',
+          'Idempotency-Key': `${baseKey}-signin-totp-replay`,
+        },
+        body: { code: challengeCode, method: 'totp' },
+        useCookies: false,
+      })
+      check('consumed_totp_challenge_cookie_is_rejected', challengeReplay.facts.status === 401, {
+        status: challengeReplay.facts.status,
+        errorCode: challengeReplay.facts.errorCode,
+      })
+
+      const totpReplay = await request('reused_signin_totp_step_is_rejected', 'POST', '/v1/auth/mfa/disable', {
+        headers: { 'content-type': 'application/json' },
+        body: { currentPassword: password, code: challengeCode },
+      })
+      check('mfa_rejects_totp_step_already_accepted_during_signin', totpReplay.facts.status === 401, {
+        status: totpReplay.facts.status,
+        errorCode: totpReplay.facts.errorCode,
+        totpValueLogged: false,
+      })
+
+      const enabledAfterTotpReplay = await request('mfa_stays_enabled_after_signin_replay', 'GET', '/v1/auth/mfa')
+      const enabledAfterTotpReplayData = totpStatus(enabledAfterTotpReplay.payload)
+      check('replayed_signin_totp_does_not_disable_factor',
+        enabledAfterTotpReplay.facts.status === 200 &&
+        enabledAfterTotpReplayData?.enabled === true && enabledAfterTotpReplayData?.verified === true, {
+          status: enabledAfterTotpReplay.facts.status,
+          factorStillEnabled: enabledAfterTotpReplayData?.enabled === true &&
+            enabledAfterTotpReplayData?.verified === true,
+        })
+
+      // Exercise one-time recovery-code consumption via a separate fresh
+      // sign-in challenge. The recovery code remains in memory only.
+      const recoveryCode = recoveryCodes[0]
+      check('recovery_code_available_for_one_time_challenge_test',
+        typeof recoveryCode === 'string' && recoveryCode.length > 0, {
+          recoveryCodeCount: recoveryCodes.length,
+          recoveryCodeLogged: false,
+        })
+      if (typeof recoveryCode !== 'string' || recoveryCode.length === 0) {
+        result.status = 'MFA_RECOVERY_CODE_NOT_AVAILABLE'
+        restoreCookieHeader(lastAuthenticatedCookie)
+        return
+      }
+
+      clearCookies()
+      const recoveryLogin = await request('login_issues_recovery_challenge', 'POST', '/v1/auth/login', {
+        headers: { 'content-type': 'application/json' },
+        body: { identity: email, credential: password },
+      })
+      const recoveryLoginPass = recoveryLogin.facts.status === 202 &&
+        recoveryLogin.payload?.data?.challengeRequired === true &&
+        Array.isArray(recoveryLogin.payload?.data?.methods) &&
+        recoveryLogin.payload.data.methods.includes('recovery_code') &&
+        cookieNames().some((name) => /two_factor/i.test(name))
+      check('fresh_login_issues_recovery_code_challenge', Boolean(recoveryLoginPass), {
+        status: recoveryLogin.facts.status,
+        challengeCookiePresent: cookieNames().some((name) => /two_factor/i.test(name)),
+      })
+      if (!recoveryLoginPass) {
+        result.status = 'MFA_RECOVERY_CHALLENGE_FAILED'
+        restoreCookieHeader(lastAuthenticatedCookie)
+        return
+      }
+      const recoveryChallengeCookie = cookieHeader()
+      const recoveryVerify = await request('signin_recovery_code_success', 'POST', '/v1/auth/mfa/challenge/verify', {
+        headers: {
+          'content-type': 'application/json',
+          'Idempotency-Key': `${baseKey}-recovery-code`,
+        },
+        body: { code: recoveryCode, method: 'recovery_code' },
+      })
+      const recoveryData = recoveryVerify.payload?.data
+      const recoveryVerifyPass = recoveryVerify.facts.status === 200 &&
+        recoveryData?.authenticated === true && recoveryData?.user?.id === userId &&
+        recoveryVerify.response?.headers.has('x-luckread-session-token') &&
+        !hasCredentialField(recoveryVerify.payload) &&
+        cookieNames().some((name) => /session_token/i.test(name))
+      check('valid_recovery_code_completes_signin_without_json_token_leak', Boolean(recoveryVerifyPass), {
+        status: recoveryVerify.facts.status,
+        cacheControl: recoveryVerify.facts.cacheControl,
+        nativeSessionHeaderPresent: Boolean(recoveryVerify.response?.headers.has('x-luckread-session-token')),
+        sessionTokenInJson: hasCredentialField(recoveryVerify.payload),
+      })
+      if (!recoveryVerifyPass) {
+        result.status = 'MFA_RECOVERY_CODE_CHALLENGE_FAILED'
+        restoreCookieHeader(lastAuthenticatedCookie)
+        return
+      }
+      lastAuthenticatedCookie = cookieHeader()
+
+      const recoveryChallengeReplay = await request('consumed_recovery_challenge_cookie_is_single_use', 'POST',
+        '/v1/auth/mfa/challenge/verify', {
+          headers: {
+            cookie: recoveryChallengeCookie,
+            'content-type': 'application/json',
+            'Idempotency-Key': `${baseKey}-recovery-challenge-replay`,
+          },
+          body: { code: recoveryCode, method: 'recovery_code' },
+          useCookies: false,
+        })
+      check('consumed_recovery_challenge_cookie_is_rejected', recoveryChallengeReplay.facts.status === 401, {
+        status: recoveryChallengeReplay.facts.status,
+        errorCode: recoveryChallengeReplay.facts.errorCode,
+      })
+
+      // A fresh challenge with the same recovery code must fail too; this
+      // distinguishes recovery-code consumption from challenge-cookie expiry.
+      clearCookies()
+      const recoveryReuseLogin = await request('login_for_recovery_reuse_negative_test', 'POST', '/v1/auth/login', {
+        headers: { 'content-type': 'application/json' },
+        body: { identity: email, credential: password },
+      })
+      const recoveryReuseChallengeReady = recoveryReuseLogin.facts.status === 202 &&
+        recoveryReuseLogin.payload?.data?.challengeRequired === true &&
+        cookieNames().some((name) => /two_factor/i.test(name))
+      check('fresh_challenge_available_for_recovery_reuse_test', Boolean(recoveryReuseChallengeReady), {
+        status: recoveryReuseLogin.facts.status,
+        challengeCookiePresent: cookieNames().some((name) => /two_factor/i.test(name)),
+      })
+      if (recoveryReuseChallengeReady) {
+        const recoveryReuse = await request('reused_recovery_code_rejected_on_fresh_challenge', 'POST',
+          '/v1/auth/mfa/challenge/verify', {
+            headers: {
+              'content-type': 'application/json',
+              'Idempotency-Key': `${baseKey}-recovery-code-replay`,
+            },
+            body: { code: recoveryCode, method: 'recovery_code' },
+          })
+        check('recovery_code_is_single_use_across_new_challenges', recoveryReuse.facts.status === 401, {
+          status: recoveryReuse.facts.status,
+          errorCode: recoveryReuse.facts.errorCode,
+          recoveryCodeLogged: false,
+        })
+      } else {
+        check('recovery_code_is_single_use_across_new_challenges', false, {
+          reason: 'fresh recovery challenge could not be established',
+        })
+      }
+
+      restoreCookieHeader(lastAuthenticatedCookie)
+      const recoveredStatus = await request('mfa_stays_enabled_after_recovery_flow', 'GET', '/v1/auth/mfa')
+      const recoveredData = totpStatus(recoveredStatus.payload)
+      check('recovery_code_flow_keeps_authoritative_factor_enabled',
+        recoveredStatus.facts.status === 200 && recoveredData?.enabled === true && recoveredData?.verified === true, {
+          status: recoveredStatus.facts.status,
+          factorStillEnabled: recoveredData?.enabled === true && recoveredData?.verified === true,
         })
     }
 
