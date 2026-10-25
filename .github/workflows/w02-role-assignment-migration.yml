@@ -163,7 +163,7 @@ jobs:
           SOURCE_SHA: ${{ inputs.source_sha }}
           DATABASE_NAME: ${{ inputs.database_name }}
         run: |
-          cat > artifacts/mapping-0/w02-role-assignment-remote-provenance.txt <<'EOF'
+          cat > artifacts/mapping-0/w02-role-assignment-remote-provenance.txt <<EOF
           workflow=W02 Identity Security D1-01 Migration
           source_sha=$SOURCE_SHA
           database_name=$DATABASE_NAME
