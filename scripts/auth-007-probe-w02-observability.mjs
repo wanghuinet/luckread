@@ -1,5 +1,5 @@
 const EXPECTED_SCRIPT = 'luckread-w02'
-const WINDOW_MS = 10 * 60 * 1000
+const WINDOW_MS = 30 * 60 * 1000
 const MAX_INVOCATIONS = 200
 const SAFE_LABELS = Object.freeze({
   tick: 'W02 scheduled publication tick',
@@ -175,9 +175,11 @@ function safeInvocationStats(invocations) {
 
 /**
  * Query Cloudflare Workers Observability without opening a WebSocket tail.
- * The query is dry-run and limited to a ten-minute time window. It filters on
- * the W02 script only, then classifies event types in memory. This avoids an
- * eventType filter hiding whether the query sees any W02 invocation records.
+ * The dry-run scans at most 200 invocation groups in a 30-minute window and
+ * deliberately has no server-side Worker filter. This distinguishes an empty
+ * account-level result from a W02 filter mismatch. Only fixed labels and safe
+ * numeric aggregates survive; event bodies and request identifiers are never
+ * logged or persisted.
  */
 export async function probeW02ScheduledObservability({
   accountId,
@@ -212,7 +214,7 @@ export async function probeW02ScheduledObservability({
         cache: 'no-store',
         signal: AbortSignal.timeout(15_000),
         body: JSON.stringify({
-          queryId: 'auth007-w02-invocation-eventtype-diagnostic',
+          queryId: 'auth007-account-wide-invocation-diagnostic',
           timeframe: { from: now - WINDOW_MS, to: now },
           view: 'invocations',
           limit: MAX_INVOCATIONS,
@@ -220,9 +222,6 @@ export async function probeW02ScheduledObservability({
           parameters: {
             datasets: ['cloudflare-workers'],
             filterCombination: 'and',
-            filters: [
-              { key: '$workers.scriptName', operation: 'eq', type: 'string', value: EXPECTED_SCRIPT },
-            ],
           },
         }),
       },
