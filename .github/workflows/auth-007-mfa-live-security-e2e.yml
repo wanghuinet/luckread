@@ -27,7 +27,7 @@ jobs:
   live-security-e2e:
     if: ${{ inputs.confirm == 'RUN_MFA_E2E' && github.ref == 'refs/heads/main' && github.ref_protected == true }}
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 20
     environment: auth-mfa-rollout
     steps:
       - name: Checkout protected main for source validation
@@ -78,6 +78,11 @@ jobs:
 
       - name: Check MFA E2E harness syntax
         run: node --check scripts/auth-007-mfa-live-security-e2e.mjs
+      - name: Check and unit test MFA audit evidence reconciliation
+        run: |
+          node --check scripts/auth-007-mfa-audit-delivery-e2e.mjs
+          node --check scripts/auth-007-mfa-audit-evidence.mjs
+          node --test scripts/auth-007-mfa-audit-evidence.test.mjs
 
       - name: Run production MFA enrollment, invalid-code, replay and disable acceptance
         env:
@@ -87,12 +92,22 @@ jobs:
           LUCKREAD_AUTH007_MFA_E2E_EMAIL: ${{ secrets.LUCKREAD_AUTH007_MFA_E2E_EMAIL }}
           LUCKREAD_AUTH007_MFA_E2E_PASSWORD: ${{ secrets.LUCKREAD_AUTH007_MFA_E2E_PASSWORD }}
         run: node scripts/auth-007-mfa-live-security-e2e.mjs
+      - name: Verify production MFA outbox to W06 AuditEvent delivery (read-only D1 queries)
+        if: success()
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          LUCKREAD_AUTH007_MFA_E2E_EMAIL: ${{ secrets.LUCKREAD_AUTH007_MFA_E2E_EMAIL }}
+          LUCKREAD_SOURCE_SHA: ${{ inputs.source_sha }}
+        run: node scripts/auth-007-mfa-audit-delivery-e2e.mjs
 
       - name: Upload sanitized MFA security E2E evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: auth-007-mfa-live-security-e2e-${{ github.run_id }}-${{ github.run_attempt }}
-          path: artifacts/mapping-0/auth-007-mfa-live-security-e2e/*.json
+          path: |
+            artifacts/mapping-0/auth-007-mfa-live-security-e2e/*.json
+            artifacts/mapping-0/auth-007-mfa-audit-delivery-e2e/*.json
           if-no-files-found: warn
           retention-days: 30

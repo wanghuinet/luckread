@@ -9,6 +9,8 @@ const password = process.env.LUCKREAD_AUTH007_MFA_E2E_PASSWORD || ''
 const runId = process.env.GITHUB_RUN_ID || 'local'
 const runAttempt = process.env.GITHUB_RUN_ATTEMPT || '1'
 const sourceSha = process.env.LUCKREAD_SOURCE_SHA || process.env.GITHUB_SHA || 'unknown'
+const auditCorrelationId = `req_auth007mfa_${runId}_${runAttempt}`
+const auditRequestId = `req_auth007mfareq_${runId}_${runAttempt}`
 const evidenceDir = resolve('artifacts/mapping-0/auth-007-mfa-live-security-e2e')
 const evidencePath = resolve(evidenceDir, `auth-007-mfa-live-security-e2e-${runId}-${runAttempt}.json`)
 
@@ -19,6 +21,7 @@ const result = {
   workflowRunId: runId,
   workflowRunAttempt: runAttempt,
   sourceSha,
+  auditCorrelationId,
   credentialsLogged: false,
   responseBodiesStored: false,
   passwordsStored: false,
@@ -85,6 +88,8 @@ const request = async (name, method, path, { body, headers = {}, useCookies = tr
   try {
     const outgoingHeaders = new Headers({
       accept: 'application/json',
+      'x-luckread-correlation-id': auditCorrelationId,
+      'x-luckread-request-id': auditRequestId,
       ...(method.toUpperCase() === 'GET' ? {} : { origin: browserOrigin }),
       ...headers,
     })
