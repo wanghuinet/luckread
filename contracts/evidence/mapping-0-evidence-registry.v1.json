@@ -1490,6 +1490,25 @@
       "checkId": "114232662574",
       "workflowRef": "https://github.com/wanghuinet/luckread/actions/runs/38058806887",
       "freshnessMode": "EXECUTED_AT_TESTED_COMMIT"
+    },
+    {
+      "evidenceId": "EVD-AUTH007-MFA-LIVE-SECURITY-E2E-20261025-001",
+      "type": "SECURITY",
+      "claimId": "AUTH-007::MFA-LIVE-SECURITY-E2E-ENROLLMENT-CHALLENGE-RECOVERY-DISABLE",
+      "subjectType": "FEATURE",
+      "subjectId": "AUTH-007",
+      "source": "GitHub Actions AUTH-007 MFA Live Security E2E against the production API",
+      "sourceRef": "https://github.com/wanghuinet/luckread/actions/runs/40157067122/artifacts/12585720278",
+      "commitSha": "afae8f8947a4b2b7aa3358c5f359eb7577ba7b31",
+      "timestamp": "2026-10-25T03:08:34.849Z",
+      "producer": "AUTH-007 MFA Live Security E2E / run 40157067122 / job 121060602451",
+      "result": "PASS",
+      "status": "CREATED",
+      "checkId": "121060602451",
+      "workflowRef": "https://github.com/wanghuinet/luckread/actions/runs/40157067122",
+      "freshnessMode": "EXECUTED_AT_TESTED_COMMIT",
+      "validUntil": "2026-11-24T03:09:37Z",
+      "note": "Sanitized live evidence artifact reports 25/25 assertions passed: unauthenticated/missing challenge rejection; QA login and safe status projection; enrollment and verified read-back; invalid-code rejection without mutation; password login challenge; valid TOTP; consumed challenge rejection; accepted-step TOTP replay rejection; one-time recovery-code success and reuse rejection across fresh challenges; password+fresh-TOTP disable; old-session revocation; post-disable status read-back and login. Secret material and response bodies are not stored. Scoped evidence only: this run does not cover challenge expiry, cross-account probes, abuse/lockout thresholds, production audit-outbox/Queue/W06/DLQ delivery, Evidence Registry acceptance, or final Mapping 0 validation. Record is CREATED and has not been promoted to VERIFIED; AUTH-007 remains blocked."
     }
   ],
   "testedCommitSha": "53e3bcbb855be8e1240171390c69dd034bf04f8b"
