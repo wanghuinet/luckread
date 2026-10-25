@@ -113,8 +113,20 @@ jobs:
           for attempt in $(seq 1 10); do
             pid="$(cat "$pid_file")"
             if ! kill -0 "$pid" 2>/dev/null; then
-              echo "::warning::W02 runtime log capture unavailable; continuing protected E2E without tail evidence"
-              tail -n 20 "$stderr_file" || true
+              echo "::warning::W02 runtime log capture exited before readiness"
+              if [[ -s "$stderr_file" ]]; then
+                if grep -Eiq '(invalid.*token|not authenticated|not logged in|unauthorized|forbidden|permission denied|access denied|(^|[^0-9])(401|403)([^0-9]|$))' "$stderr_file"; then
+                  echo "::warning::W02 tail diagnostic category=AUTH_OR_PERMISSION"
+                elif grep -Eiq '(websocket|connection|ECONN|ETIMEDOUT|timed out|network|fetch failed|ENOTFOUND|socket|DNS)' "$stderr_file"; then
+                  echo "::warning::W02 tail diagnostic category=NETWORK_OR_CONNECTION"
+                elif grep -Eiq '(error|failed|cannot|unable)' "$stderr_file"; then
+                  echo "::warning::W02 tail diagnostic category=OTHER_ERROR_DETAILS_REDACTED"
+                else
+                  echo "::warning::W02 tail diagnostic category=NONEMPTY_UNCLASSIFIED_DETAILS_REDACTED"
+                fi
+              else
+                echo "::warning::W02 tail diagnostic category=STDERR_EMPTY"
+              fi
               exit 0
             fi
             sleep 1
@@ -154,11 +166,25 @@ jobs:
             kill -KILL -- "-$pid" 2>/dev/null || kill -KILL "$pid" 2>/dev/null || true
           fi
           output_file="artifacts/mapping-0/auth-007-mfa-audit-delivery-e2e/w02-runtime-sanitized-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.jsonl"
+          stderr_file="$capture_dir/wrangler.stderr"
+          if [[ -s "$stderr_file" ]]; then
+            if grep -Eiq '(invalid.*token|not authenticated|not logged in|unauthorized|forbidden|permission denied|access denied|(^|[^0-9])(401|403)([^0-9]|$))' "$stderr_file"; then
+              echo "::warning::W02 tail diagnostic category=AUTH_OR_PERMISSION"
+            elif grep -Eiq '(websocket|connection|ECONN|ETIMEDOUT|timed out|network|fetch failed|ENOTFOUND|socket|DNS)' "$stderr_file"; then
+              echo "::warning::W02 tail diagnostic category=NETWORK_OR_CONNECTION"
+            elif grep -Eiq '(error|failed|cannot|unable)' "$stderr_file"; then
+              echo "::warning::W02 tail diagnostic category=OTHER_ERROR_DETAILS_REDACTED"
+            else
+              echo "::notice::W02 tail diagnostic category=NONEMPTY_UNCLASSIFIED_DETAILS_REDACTED"
+            fi
+          else
+            echo "::notice::W02 tail diagnostic category=STDERR_EMPTY"
+          fi
           if [[ -s "$output_file" ]]; then
             echo "Sanitized W02 runtime diagnostics:"
             cat "$output_file"
           else
-            echo "::warning::No allowlisted W02 runtime diagnostic records were captured"
+            echo "::warning::No sanitized W02 runtime summary was captured"
           fi
 
       - name: Upload sanitized MFA security E2E evidence
