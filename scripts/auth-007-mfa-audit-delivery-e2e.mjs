@@ -142,11 +142,11 @@ async function readDedicatedQaUserId() {
 async function readOutboxAggregates(qaUserId) {
   return queryD1(
     databases.W02_D1_01,
-    `SELECT event_type AS eventType, status, COUNT(*) AS count
+    `SELECT event_type AS eventType, status, attempt, last_error_code AS lastErrorCode, COUNT(*) AS count
        FROM auth_007_mfa_publication_journal
       WHERE json_extract(payload, '$.correlationId') = ? AND resource_id = ?
-      GROUP BY event_type, status
-      ORDER BY event_type, status`,
+      GROUP BY event_type, status, attempt, last_error_code
+      ORDER BY event_type, status, attempt, last_error_code`,
     [correlationId, qaUserId],
   )
 }
@@ -216,6 +216,10 @@ async function main() {
       evidence.outboxEvents = outboxRows.map((row) => ({
         eventType: typeof row.eventType === 'string' && /^auth\.mfa\.[a-z_]+$/.test(row.eventType) ? row.eventType : 'UNKNOWN',
         status: ['PENDING', 'PUBLISHED', 'FAILED'].includes(row.status) ? row.status : 'UNKNOWN',
+        attempt: Number.isSafeInteger(Number(row.attempt)) && Number(row.attempt) >= 0 ? Number(row.attempt) : 0,
+        lastErrorCode: row.lastErrorCode == null
+          ? null
+          : (typeof row.lastErrorCode === 'string' && /^[A-Z0-9_]{1,64}$/.test(row.lastErrorCode) ? row.lastErrorCode : 'UNKNOWN'),
         count: Number.isSafeInteger(Number(row.count)) && Number(row.count) >= 0 ? Number(row.count) : 0,
       }))
       evidence.canonicalAuditEvents = auditRows.map((row) => ({
