@@ -10,7 +10,7 @@ const runId = process.env.GITHUB_RUN_ID || 'local'
 const runAttempt = process.env.GITHUB_RUN_ATTEMPT || '1'
 const sourceSha = process.env.LUCKREAD_SOURCE_SHA || process.env.GITHUB_SHA || 'unknown'
 const auditCorrelationId = `req_auth007mfa_${runId}_${runAttempt}`
-const auditRequestId = auditCorrelationId
+const auditRequestId = `req_auth007mfareq_${runId}_${runAttempt}`
 const evidenceDir = resolve('artifacts/mapping-0/auth-007-mfa-live-security-e2e')
 const evidencePath = resolve(evidenceDir, `auth-007-mfa-live-security-e2e-${runId}-${runAttempt}.json`)
 
