@@ -1509,6 +1509,25 @@
       "freshnessMode": "EXECUTED_AT_TESTED_COMMIT",
       "validUntil": "2026-11-24T03:09:37Z",
       "note": "Sanitized live evidence artifact reports 25/25 assertions passed: unauthenticated/missing challenge rejection; QA login and safe status projection; enrollment and verified read-back; invalid-code rejection without mutation; password login challenge; valid TOTP; consumed challenge rejection; accepted-step TOTP replay rejection; one-time recovery-code success and reuse rejection across fresh challenges; password+fresh-TOTP disable; old-session revocation; post-disable status read-back and login. Secret material and response bodies are not stored. Scoped evidence only: this run does not cover challenge expiry, cross-account probes, abuse/lockout thresholds, production audit-outbox/Queue/W06/DLQ delivery, Evidence Registry acceptance, or final Mapping 0 validation. Record is CREATED and has not been promoted to VERIFIED; AUTH-007 remains blocked."
+    },
+    {
+      "evidenceId": "EVD-AUTH007-MFA-D1-01-SCHEMA-READBACK-20261025-001",
+      "type": "INTEGRATION_TEST",
+      "claimId": "AUTH-007::D1-01-MFA-REMOTE-SCHEMA-READBACK",
+      "subjectType": "FEATURE",
+      "subjectId": "AUTH-007",
+      "source": "GitHub Actions W02 Identity Security D1-01 Migration — controlled remote schema and migration-ledger read-back",
+      "sourceRef": "https://github.com/wanghuinet/luckread/actions/runs/40152799763/artifacts/12583636257",
+      "commitSha": "7d9011fc3aa64190205e0112fa37660b9f065a4b",
+      "timestamp": "2026-10-25T02:06:24Z",
+      "producer": "W02 Identity Security D1-01 Migration / run 40152799763",
+      "result": "PASS",
+      "status": "CREATED",
+      "checkId": "121057110000",
+      "workflowRef": "https://github.com/wanghuinet/luckread/actions/runs/40152799763",
+      "freshnessMode": "EXECUTED_AT_TESTED_COMMIT",
+      "validUntil": "2026-11-24T02:06:24Z",
+      "note": "Controlled remote D1-01 read-back against database luckread (UUID 2f80471e-3756-49f9-8db1-7707a433ad64) confirms migrations 0006_better_auth_two_factor.sql, 0007_l8_genesis_bootstrap_audit.sql and 0008_auth_007_mfa_publication_journal.sql in the remote migration ledger, the auth_007_mfa_publication_journal table and status/next_attempt index, two MFA lifecycle triggers, and role_assignment row count read-only. GitHub run metadata binds this artifact to source SHA 7d9011fc3aa64190205e0112fa37660b9f065a4b; however, the artifact's embedded provenance text mistakenly contains literal $SOURCE_SHA and $DATABASE_NAME because the workflow used a single-quoted heredoc. A later workflow fix is present in PR #1314 / main. Therefore result is recorded as PASS with status CREATED and is not formally VERIFIED until its provenance is reconciled. Compare 7d9011fc3aa64190205e0112fa37660b9f065a4b to d58faf8ae7994bd9d6f04818ec15eab13a45427f shows only the migration workflow changed, so W02 migration source/runtime paths were unchanged. No L8 grant or AUTH-007 promotion follows from this record."
     }
   ],
   "testedCommitSha": "53e3bcbb855be8e1240171390c69dd034bf04f8b"
