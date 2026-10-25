@@ -214,12 +214,12 @@ async function main() {
         readCanonicalAuditAggregates(qaUserId),
       ])
       evidence.outboxEvents = outboxRows.map((row) => ({
-        eventType: typeof row.eventType === 'string' && /^auth\\.mfa\\.[a-z_]+$/.test(row.eventType) ? row.eventType : 'UNKNOWN',
+        eventType: typeof row.eventType === 'string' && /^auth\.mfa\.[a-z_]+$/.test(row.eventType) ? row.eventType : 'UNKNOWN',
         status: ['PENDING', 'PUBLISHED', 'FAILED'].includes(row.status) ? row.status : 'UNKNOWN',
         count: Number.isSafeInteger(Number(row.count)) && Number(row.count) >= 0 ? Number(row.count) : 0,
       }))
       evidence.canonicalAuditEvents = auditRows.map((row) => ({
-        action: typeof row.action === 'string' && /^auth\\.mfa\\.[a-z_]+$/.test(row.action) ? row.action : 'UNKNOWN',
+        action: typeof row.action === 'string' && /^auth\.mfa\.[a-z_]+$/.test(row.action) ? row.action : 'UNKNOWN',
         count: Number.isSafeInteger(Number(row.count)) && Number(row.count) >= 0 ? Number(row.count) : 0,
       }))
       evaluation = evaluateMfaAuditDelivery(evidence.outboxEvents, evidence.canonicalAuditEvents)
