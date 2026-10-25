@@ -279,13 +279,14 @@
         "workers/W02-identity/src/authz/role-assignment.ts"
       ],
       "blockers": [
-        "ENT-MFA-FACTOR is PROPOSED and has not been promoted through canonical entity authority.",
-        "Migration 0006 is source-only; no controlled remote D1 schema/read-back evidence is admitted.",
-        "Persisted atomic lastAcceptedTotpTimeStep replay protection is not present in migration 0006 or verified in runtime.",
-        "Canonical W01 public MFA API operations and DTO bindings are missing.",
-        "MFA lifecycle, recovery, challenge replay, concurrency, account-state, session invalidation and cross-account security E2E evidence is missing.",
-        "AUTH-007 remains BLOCKED_NOT_GREEN with implementation authorization false; no production mutation is authorized.",
-        "Evidence Registry and exact-SHA Mapping 0 admission are missing."
+        "ENT-MFA-FACTOR remains PROPOSED and has not been promoted through canonical entity authority.",
+        "Controlled remote D1-01 schema and migration-ledger read-back occurred in run 40152799763 (artifact 12583636257), confirming migrations 0006-0008 and the MFA replay/outbox schema. The artifact's embedded provenance fields contain literal $SOURCE_SHA and $DATABASE_NAME due the earlier heredoc bug, so its registry entry is CREATED and formal evidence admission remains pending.",
+        "The lastAcceptedTotpTimeStep field exists in migration 0006 and was present in the remote schema read-back; the deployed W02 runtime rejected a repeated accepted TOTP step in live MFA E2E run 40157067122. Current evidence records are CREATED, not VERIFIED; concurrent replay and full attempt/lockout evidence remain outstanding.",
+        "Canonical W01 MFA endpoints and DTO bindings exist in source, and the deployed API passed scoped status/enrollment/confirmation/challenge/disable/recovery-code-consumption tests. Canonical entity/field promotion and full operation-level acceptance, including recovery-code rotation, remain outstanding.",
+        "Live security E2E run 40157067122 passed 25/25 scoped assertions, including TOTP and recovery-code replay denial and session invalidation. Challenge-expiry, cross-account authorization, rate-limit/lockout and abuse-negative tests remain outstanding.",
+        "Production W02 outbox -> existing AUTH013_QUEUE -> W06 canonical AuditEvent persistence, duplicate delivery, retry/DLQ and failure evidence are not yet admitted.",
+        "AUTH-007 remains BLOCKED_NOT_GREEN with implementation authorization false. No L8 genesis grant or further privileged production mutation is authorized by this record.",
+        "Evidence Registry records EVD-AUTH007-MFA-LIVE-SECURITY-E2E-20261025-001, EVD-AUTH007-MFA-D1-01-SCHEMA-READBACK-20261025-001, and EVD-AUTH007-W01-W02-PRODUCTION-RUNTIME-20261025-001 are CREATED pending formal admission; current-head Evidence Registry and final Mapping 0 acceptance remain open."
       ],
       "status": "BLOCKED"
     }
