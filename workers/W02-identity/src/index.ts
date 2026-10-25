@@ -1,6 +1,7 @@
 import { createLuckReadAuth, type RateLimitBinding } from './auth/better-auth.js'
 import { publishPendingAccountStateEvents } from './account/publication-journal-publisher.js'
 import { publishPendingMfaAuditEvents } from './auth/mfa-audit-publication-journal.js'
+import { runScheduledPublicationTicks } from './auth/scheduled-publication.js'
 import { resolveGlobalLayer } from './authz/role-assignment.js'
 import { grantCreatorBusinessRole, RoleAssignmentCommandError } from './authz/role-assignment-command.js'
 import { mayApproveRoleGrant } from './authz/role-grant-approval-policy.js'
@@ -475,7 +476,9 @@ export default {
   },
 
   async scheduled(_controller: ScheduledController, env: Env): Promise<void> {
-    await publishPendingAccountStateEvents(env)
-    await publishPendingMfaAuditEvents(env)
+    await runScheduledPublicationTicks([
+      { name: 'account-state', publish: () => publishPendingAccountStateEvents(env) },
+      { name: 'mfa-audit', publish: () => publishPendingMfaAuditEvents(env) },
+    ])
   },
 }
