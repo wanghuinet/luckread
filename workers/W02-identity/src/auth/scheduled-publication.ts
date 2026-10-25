@@ -5,6 +5,20 @@ export type ScheduledPublicationTask = {
   publish: () => Promise<unknown>
 }
 
+export type MfaPublicationSummary = {
+  selected: number
+  published: number
+  failed: number
+}
+
+function isMfaPublicationSummary(value: unknown): value is MfaPublicationSummary {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  const summary = value as Record<string, unknown>
+  return ['selected', 'published', 'failed'].every((key) =>
+    Number.isSafeInteger(summary[key]) && Number(summary[key]) >= 0,
+  )
+}
+
 /**
  * Run existing W02 journal publishers independently.
  *
@@ -15,11 +29,22 @@ export type ScheduledPublicationTask = {
 export async function runScheduledPublicationTicks(
   tasks: readonly ScheduledPublicationTask[],
   logFailure: (name: ScheduledPublicationName) => void = (name) => {
-    console.error(`W02 ${name} scheduled publication tick failed`)
+    console.error('W02 scheduled publication task failed', { task: name })
+  },
+  logMfaAuditSummary: (summary: MfaPublicationSummary) => void = (summary) => {
+    console.info('W02 scheduled publication result', { task: 'mfa-audit', ...summary })
   },
 ): Promise<void> {
   const outcomes = await Promise.allSettled(tasks.map((task) => task.publish()))
   outcomes.forEach((outcome, index) => {
-    if (outcome.status === 'rejected') logFailure(tasks[index]!.name)
+    const task = tasks[index]!
+    if (outcome.status === 'rejected') {
+      logFailure(task.name)
+      return
+    }
+    if (task.name === 'mfa-audit' && isMfaPublicationSummary(outcome.value)) {
+      const summary = outcome.value
+      if (summary.selected > 0 || summary.failed > 0) logMfaAuditSummary(summary)
+    }
   })
 }
