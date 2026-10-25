@@ -149,7 +149,7 @@ describe('AUTH-007 read-only W02 scheduled Observability probe', () => {
       queriedEventRows: 5,
       w02EventRows: 4,
       fetchEventRows: 1,
-      scheduledEventRows: 1,
+      scheduledEventRows: 2,
       cronEventRows: 1,
       queueEventRows: 0,
       otherEventTypeRows: 0,
