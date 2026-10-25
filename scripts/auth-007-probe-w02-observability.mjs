@@ -367,6 +367,7 @@ export async function probeW02ScheduledObservability({
           parameters: {
             datasets: ['cloudflare-workers'],
             filterCombination: 'and',
+            filters: [W02_SCRIPT_FILTER],
           },
         }),
       },
