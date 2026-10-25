@@ -4,6 +4,7 @@ import { evaluateMfaAuditDelivery } from './auth-007-mfa-audit-evidence.mjs'
 
 const accountId = process.env.CLOUDFLARE_ACCOUNT_ID || ''
 const apiToken = process.env.CLOUDFLARE_API_TOKEN || ''
+const qaEmail = process.env.LUCKREAD_AUTH007_MFA_E2E_EMAIL || ''
 const runId = process.env.GITHUB_RUN_ID || ''
 const runAttempt = process.env.GITHUB_RUN_ATTEMPT || '1'
 const sourceSha = process.env.LUCKREAD_SOURCE_SHA || process.env.GITHUB_SHA || 'unknown'
@@ -31,6 +32,8 @@ const evidence = {
   rawEventPayloadsStored: false,
   queryResultsLimitedToAggregates: true,
   userIdentifiersStored: false,
+  qaEmailStored: false,
+  qaAccountResolved: false,
   databaseIdsStored: false,
   sqlMutationsPerformed: false,
   queryMode: 'READ_ONLY_SELECT_ONLY',
@@ -121,27 +124,42 @@ async function queryD1(databaseId, sql, params) {
   return results.flatMap((item) => item.results)
 }
 
-async function readOutboxAggregates() {
+async function readDedicatedQaUserId() {
+  const rows = await queryD1(
+    databases.W02_D1_01,
+    'SELECT id FROM "user" WHERE lower(email) = lower(?) LIMIT 2',
+    [qaEmail],
+  )
+  if (rows.length !== 1 || typeof rows[0]?.id !== 'string' ||
+      !/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(rows[0].id)) {
+    const error = new Error('dedicated MFA QA account was not uniquely resolved')
+    error.code = 'DEDICATED_MFA_QA_ACCOUNT_NOT_UNIQUE'
+    throw error
+  }
+  return rows[0].id
+}
+
+async function readOutboxAggregates(qaUserId) {
   return queryD1(
     databases.W02_D1_01,
     `SELECT event_type AS eventType, status, COUNT(*) AS count
        FROM auth_007_mfa_publication_journal
-      WHERE json_extract(payload, '$.correlationId') = ?
+      WHERE json_extract(payload, '$.correlationId') = ? AND resource_id = ?
       GROUP BY event_type, status
       ORDER BY event_type, status`,
-    [correlationId],
+    [correlationId, qaUserId],
   )
 }
 
-async function readCanonicalAuditAggregates() {
+async function readCanonicalAuditAggregates(qaUserId) {
   return queryD1(
     databases.W06_D1_03,
     `SELECT action, COUNT(*) AS count
        FROM audit_events
-      WHERE request_id = ? AND action LIKE 'auth.mfa.%'
+      WHERE request_id = ? AND target_id = ? AND action LIKE 'auth.mfa.%'
       GROUP BY action
       ORDER BY action`,
-    [correlationId],
+    [correlationId, qaUserId],
   )
 }
 
@@ -163,7 +181,7 @@ async function main() {
   }
   check('immutable_source_and_run_identity_valid', true)
 
-  if (!/^[a-f0-9]{32}$/i.test(accountId) || apiToken.length < 20) {
+  if (!/^[a-f0-9]{32}$/i.test(accountId) || apiToken.length < 20 || !qaEmail.includes('@')) {
     check('cloudflare_d1_read_credentials_configured', false)
     evidence.status = 'BLOCKED'
     evidence.failureCode = 'CLOUDFLARE_D1_READ_CREDENTIALS_MISSING'
@@ -171,6 +189,18 @@ async function main() {
   }
   check('cloudflare_d1_read_credentials_configured', true)
   check('query_sql_is_read_only_select', true, { databaseAliases: ['W02_D1_01', 'W06_D1_03'] })
+
+  let qaUserId
+  try {
+    qaUserId = await readDedicatedQaUserId()
+    evidence.qaAccountResolved = true
+    check('dedicated_qa_account_resolved_for_scope_only', true)
+  } catch (error) {
+    evidence.status = 'BLOCKED'
+    evidence.failureCode = failureCodeFrom(error)
+    check('dedicated_qa_account_resolved_for_scope_only', false)
+    return
+  }
 
   const startedAt = Date.now()
   const deadline = startedAt + maxWaitMs
@@ -180,8 +210,8 @@ async function main() {
   do {
     try {
       const [outboxRows, auditRows] = await Promise.all([
-        readOutboxAggregates(),
-        readCanonicalAuditAggregates(),
+        readOutboxAggregates(qaUserId),
+        readCanonicalAuditAggregates(qaUserId),
       ])
       evidence.outboxEvents = outboxRows.map((row) => ({
         eventType: typeof row.eventType === 'string' ? row.eventType : 'UNKNOWN',
