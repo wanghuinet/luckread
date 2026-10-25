@@ -6,6 +6,7 @@ const root = process.cwd()
 const repository = 'wanghuinet/luckread'
 const environmentName = 'auth-mfa-rollout'
 const expectedReviewerId = 190754094
+const expectedReviewerLogins = ['wanghuinet', 'luckread']
 
 const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), 'utf8')
 const exists = (relativePath) => fs.existsSync(path.join(root, relativePath))
@@ -43,7 +44,7 @@ async function githubGet(apiPath, token) {
     cache: 'no-store',
   })
   if (!response.ok) {
-    throw new Error('GitHub rollout approval configuration could not be verified (HTTP ' + response.status + ')')
+    throw new Error('GitHub rollout configuration endpoint ' + apiPath + ' failed (HTTP ' + response.status + ')')
   }
   return response.json()
 }
@@ -82,47 +83,73 @@ async function verifyProtectedEnvironment({ requireDistinctActor = true } = {}) 
   const environment = await githubGet('/repos/' + repository + '/environments/' + environmentName, token)
   const rules = (environment.protection_rules ?? []).filter((rule) => rule.type === 'required_reviewers')
   const reviewers = rules[0]?.reviewers ?? []
-  const configuredReviewer = reviewers[0]
-  const reviewerLogin = configuredReviewer?.reviewer?.login?.toLowerCase()
+  const reviewerLogins = reviewers.map((entry) => entry?.reviewer?.login?.toLowerCase() ?? '')
+  const wanghuinetReviewer = reviewers.find((entry) => entry?.reviewer?.login?.toLowerCase() === 'wanghuinet')
+  const luckreadReviewer = reviewers.find((entry) => entry?.reviewer?.login?.toLowerCase() === 'luckread')
+  const exactReviewerSet =
+    reviewers.length === expectedReviewerLogins.length &&
+    reviewers.every((entry) =>
+      entry?.type === 'User' &&
+      typeof entry?.reviewer?.login === 'string' &&
+      Number.isSafeInteger(entry?.reviewer?.id)
+    ) &&
+    new Set(reviewerLogins).size === expectedReviewerLogins.length &&
+    expectedReviewerLogins.every((login) => reviewerLogins.includes(login)) &&
+    wanghuinetReviewer?.reviewer?.id === expectedReviewerId
 
   if (
     environment.name !== environmentName ||
     environment.can_admins_bypass !== false ||
     rules.length !== 1 ||
-    reviewers.length !== 1 ||
+    !exactReviewerSet ||
     rules[0]?.prevent_self_review !== true ||
     environment.deployment_branch_policy?.protected_branches !== true ||
-    environment.deployment_branch_policy?.custom_branch_policies !== false ||
-    configuredReviewer?.type !== 'User' ||
-    !reviewerLogin ||
-    configuredReviewer?.reviewer?.id !== expectedReviewerId ||
-    (requireDistinctActor && reviewerLogin === actor)
+    environment.deployment_branch_policy?.custom_branch_policies !== false
   ) {
-    throw new Error('AUTH-007 rollout environment must disable admin bypass, require the designated human maintainer, forbid self-review, and allow protected branches only')
+    throw new Error('AUTH-007 rollout environment must disable admin bypass, require exactly the wanghuinet and luckread human reviewers, forbid self-review, and allow protected branches only')
   }
 
-  const permission = await githubGet(
-    '/repos/' + repository + '/collaborators/' + encodeURIComponent(reviewerLogin) + '/permission',
-    token,
-  )
-  const permissionValue = String(permission.permission ?? '').toLowerCase()
-  const roleName = String(permission.role_name ?? '').toLowerCase()
+  // Pin the fallback reviewer to the actual public GitHub account identity, not
+  // merely a display name. The environment reviewer ID must match this profile.
+  const luckreadProfile = await githubGet('/users/luckread', token)
   if (
-    permissionValue !== 'admin' &&
-    roleName !== 'admin' &&
-    roleName !== 'maintain'
+    luckreadProfile.login?.toLowerCase() !== 'luckread' ||
+    !Number.isSafeInteger(luckreadProfile.id) ||
+    luckreadReviewer?.reviewer?.id !== luckreadProfile.id
   ) {
-    throw new Error('AUTH-007 rollout reviewer must have repository admin or maintain permission')
+    throw new Error('AUTH-007 fallback reviewer configuration does not match the current luckread GitHub account identity')
+  }
+
+  const reviewerPermissions = {}
+  for (const reviewerLogin of expectedReviewerLogins) {
+    const permission = await githubGet(
+      '/repos/' + repository + '/collaborators/' + encodeURIComponent(reviewerLogin) + '/permission',
+      token,
+    )
+    const permissionValue = String(permission.permission ?? '').toLowerCase()
+    const roleName = String(permission.role_name ?? '').toLowerCase()
+    const reviewerRole =
+      permissionValue === 'admin' || roleName === 'admin' ? 'admin' :
+      roleName === 'maintain' ? 'maintain' : ''
+    if (!reviewerRole) {
+      throw new Error('AUTH-007 rollout reviewer ' + reviewerLogin + ' must have repository admin or maintain permission (role_name=' + (roleName || 'missing') + ')')
+    }
+    reviewerPermissions[reviewerLogin] = reviewerRole
+  }
+
+  if (requireDistinctActor && !expectedReviewerLogins.some((login) => login !== actor)) {
+    throw new Error('AUTH-007 rollout must be initiated by an actor other than its configured environment reviewers')
   }
 
   return {
     environment: environmentName,
     protectedRef: true,
-    reviewer: reviewerLogin,
-    reviewerRole: permissionValue === 'admin' || roleName === 'admin' ? 'admin' : roleName,
+    reviewer: 'wanghuinet',
+    reviewerRole: reviewerPermissions.wanghuinet,
+    reviewers: expectedReviewerLogins.map((login) => ({ login, role: reviewerPermissions[login] })),
     selfReviewPrevented: true,
     protectedBranchesOnly: true,
-    initiatorDiffersFromReviewer: reviewerLogin !== actor,
+    initiatorDiffersFromReviewer: expectedReviewerLogins.some((login) => login !== actor),
   }
 }
 
