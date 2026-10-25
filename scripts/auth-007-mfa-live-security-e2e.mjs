@@ -1,4 +1,4 @@
-import { createHmac } from 'node:crypto'
+import { codeForStep, currentStep, parseTotpUri } from './auth-007-totp.mjs'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 
@@ -124,53 +124,6 @@ const request = async (name, method, path, { body, headers = {}, useCookies = tr
   }
 }
 
-const decodeBase32 = (value) => {
-  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'
-  const normalized = String(value || '').replace(/=+$/g, '').toUpperCase()
-  if (!normalized || !/^[A-Z2-7]+$/.test(normalized)) throw new Error('INVALID_TOTP_SECRET_FORMAT')
-  let bits = 0
-  let accumulator = 0
-  const bytes = []
-  for (const character of normalized) {
-    const digit = alphabet.indexOf(character)
-    if (digit < 0) throw new Error('INVALID_TOTP_SECRET_FORMAT')
-    accumulator = (accumulator << 5) | digit
-    bits += 5
-    if (bits >= 8) {
-      bits -= 8
-      bytes.push((accumulator >> bits) & 0xff)
-    }
-  }
-  return Buffer.from(bytes)
-}
-
-const codeForStep = (secret, step, digits = 6, algorithm = 'sha1') => {
-  const key = decodeBase32(secret)
-  const counter = Buffer.alloc(8)
-  counter.writeBigUInt64BE(BigInt(step))
-  const digest = createHmac(algorithm.toLowerCase(), key).update(counter).digest()
-  const offset = digest[digest.length - 1] & 0x0f
-  const binary = ((digest[offset] & 0x7f) << 24) |
-    ((digest[offset + 1] & 0xff) << 16) |
-    ((digest[offset + 2] & 0xff) << 8) |
-    (digest[offset + 3] & 0xff)
-  return String(binary % (10 ** digits)).padStart(digits, '0')
-}
-
-const parseTotpUri = (value) => {
-  const uri = new URL(value)
-  if (uri.protocol !== 'otpauth:' || uri.hostname.toLowerCase() !== 'totp') throw new Error('INVALID_TOTP_URI')
-  const secret = uri.searchParams.get('secret') || ''
-  const digits = Number(uri.searchParams.get('digits') || '6')
-  const period = Number(uri.searchParams.get('period') || '30')
-  const algorithm = (uri.searchParams.get('algorithm') || 'SHA1').toLowerCase()
-  if (!Number.isInteger(digits) || digits !== 6 || !Number.isInteger(period) || period !== 30 ||
-      !['sha1'].includes(algorithm)) throw new Error('UNSUPPORTED_TOTP_PARAMETERS')
-  decodeBase32(secret)
-  return { secret, digits, period, algorithm }
-}
-
-const currentStep = (period) => Math.floor(Date.now() / (period * 1000))
 const sleep = (ms) => new Promise((resolveSleep) => setTimeout(resolveSleep, ms))
 
 const totpStatus = (payload) => payload && typeof payload === 'object' &&
