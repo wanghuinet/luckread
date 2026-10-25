@@ -21,6 +21,8 @@ on:
       - 'scripts/auth-007-probe-w02-cron-schedule.test.mjs'
       - 'scripts/auth-007-probe-w02-tail-access.mjs'
       - 'scripts/auth-007-probe-w02-tail-access.test.mjs'
+      - 'scripts/auth-007-probe-w02-observability.mjs'
+      - 'scripts/auth-007-probe-w02-observability.test.mjs'
       - 'scripts/auth-010-session-runtime-e2e.mjs'
       - '.github/workflows/auth-010-remote-e2e.yml'
       - '.github/workflows/w01-payload-app-deploy.yml'
@@ -39,6 +41,8 @@ on:
       - 'scripts/auth-007-probe-w02-cron-schedule.test.mjs'
       - 'scripts/auth-007-probe-w02-tail-access.mjs'
       - 'scripts/auth-007-probe-w02-tail-access.test.mjs'
+      - 'scripts/auth-007-probe-w02-observability.mjs'
+      - 'scripts/auth-007-probe-w02-observability.test.mjs'
       - 'scripts/auth-010-session-runtime-e2e.mjs'
       - '.github/workflows/auth-010-remote-e2e.yml'
       - '.github/workflows/w01-payload-app-deploy.yml'
@@ -92,12 +96,14 @@ jobs:
         run: npx vitest@3.2.4 run workers/W02-identity/src/auth/principal.test.ts workers/W02-identity/src/auth/resend-email.test.ts workers/W02-identity/src/auth/session-list.test.ts workers/W02-identity/src/auth/session-rate-limit.test.ts workers/W02-identity/src/auth/session-revoke.test.ts
       - name: Run W02 AUTH-007 MFA lifecycle and replay tests
         run: npx vitest@3.2.4 run workers/W02-identity/src/auth/mfa-status.test.ts workers/W02-identity/src/auth/mfa-enrollment-start.test.ts workers/W02-identity/src/auth/mfa-enrollment-confirm.test.ts workers/W02-identity/src/auth/totp-replay-guard.test.ts workers/W02-identity/src/auth/mfa-challenge-account-state.test.ts workers/W02-identity/src/auth/mfa-lifecycle-contract.test.ts
-      - name: Verify W02 read-only Cron and Tail preflight probes
+      - name: Verify W02 read-only Cron, Tail and Observability probes
         run: |
           node --check scripts/auth-007-probe-w02-cron-schedule.mjs
           node --test scripts/auth-007-probe-w02-cron-schedule.test.mjs
           node --check scripts/auth-007-probe-w02-tail-access.mjs
           node --test scripts/auth-007-probe-w02-tail-access.test.mjs
+          node --check scripts/auth-007-probe-w02-observability.mjs
+          node --test scripts/auth-007-probe-w02-observability.test.mjs
 
       - name: Verify AUTH-007 rollout admission code without production access
         run: node scripts/verify-auth-007-rollout-admission.mjs --static-only

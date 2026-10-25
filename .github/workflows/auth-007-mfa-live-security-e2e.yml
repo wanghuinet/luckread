@@ -86,7 +86,9 @@ jobs:
           node --check scripts/auth-007-classify-wrangler-tail-stderr.mjs
           node --check scripts/auth-007-probe-w02-tail-access.mjs
           node --check scripts/auth-007-probe-w02-cron-schedule.mjs
+          node --check scripts/auth-007-probe-w02-observability.mjs
           node --test scripts/auth-007-probe-w02-cron-schedule.test.mjs
+          node --test scripts/auth-007-probe-w02-observability.test.mjs
           node --test scripts/auth-007-classify-wrangler-tail-stderr.test.mjs
           node --test scripts/auth-007-mfa-audit-evidence.test.mjs
           node --test scripts/auth-007-sanitize-w02-runtime-tail.test.mjs
@@ -100,7 +102,8 @@ jobs:
         run: |
           node scripts/auth-007-probe-w02-tail-access.mjs || tail_probe_status=$?
           node scripts/auth-007-probe-w02-cron-schedule.mjs || cron_probe_status=$?
-          printf 'W02_PREFLIGHT_RESULT tail_probe_exit=%s cron_probe_exit=%s\n' "${tail_probe_status:-0}" "${cron_probe_status:-0}"
+          node scripts/auth-007-probe-w02-observability.mjs || observability_probe_status=$?
+          printf 'W02_PREFLIGHT_RESULT tail_probe_exit=%s cron_probe_exit=%s observability_probe_exit=%s\n' "${tail_probe_status:-0}" "${cron_probe_status:-0}" "${observability_probe_status:-0}"
           exit 0
 
       - name: Start sanitized W02 scheduled publication runtime capture
