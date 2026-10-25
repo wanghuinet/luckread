@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { classifyWranglerTailStderr } from './auth-007-classify-wrangler-tail-stderr.mjs'
+import { classifyWranglerTailStderr, parsePipelineExitStatus } from './auth-007-classify-wrangler-tail-stderr.mjs'
 
 describe('AUTH-007 Wrangler tail stderr classifier', () => {
   it('classifies common Cloudflare token and permission failures without returning source text', () => {
@@ -19,6 +19,14 @@ describe('AUTH-007 Wrangler tail stderr classifier', () => {
   it('classifies network and transport failures', () => {
     assert.equal(classifyWranglerTailStderr('Error: connect ETIMEDOUT'), 'NETWORK_OR_CONNECTION')
     assert.equal(classifyWranglerTailStderr('WebSocket connection closed'), 'NETWORK_OR_CONNECTION')
+    assert.equal(classifyWranglerTailStderr('Unable to fetch the requested data'), 'NETWORK_OR_CONNECTION')
+    assert.equal(classifyWranglerTailStderr('Failed to connect to Cloudflare API'), 'NETWORK_OR_CONNECTION')
+  })
+
+  it('classifies Cloudflare API and Wrangler tooling errors without retaining raw diagnostics', () => {
+    assert.equal(classifyWranglerTailStderr('A request to the Cloudflare API failed with a server error'), 'CLOUDFLARE_API_FAILURE_REDACTED')
+    assert.equal(classifyWranglerTailStderr('Unknown option --unsafe-option'), 'WRANGLER_CONFIGURATION_OR_ARGUMENT')
+    assert.equal(classifyWranglerTailStderr('Command not found: wrangler'), 'WRANGLER_CONFIGURATION_OR_ARGUMENT')
   })
 
   it('classifies worker-not-found and rate-limited errors without retaining details', () => {
@@ -31,5 +39,16 @@ describe('AUTH-007 Wrangler tail stderr classifier', () => {
     assert.equal(classifyWranglerTailStderr('opaque diagnostic'), 'NONEMPTY_UNCLASSIFIED_DETAILS_REDACTED')
     assert.equal(classifyWranglerTailStderr('  '), 'STDERR_EMPTY')
     assert.equal(classifyWranglerTailStderr(null), 'STDERR_EMPTY')
+  })
+
+  it('retains only numeric Wrangler and sanitizer pipeline exit codes', () => {
+    assert.deepEqual(parsePipelineExitStatus('wrangler=1 sanitizer=0'), {
+      wranglerExitCode: '1',
+      sanitizerExitCode: '0',
+    })
+    assert.deepEqual(parsePipelineExitStatus('bad input with private data'), {
+      wranglerExitCode: 'UNKNOWN',
+      sanitizerExitCode: 'UNKNOWN',
+    })
   })
 })

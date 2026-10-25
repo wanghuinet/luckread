@@ -1,6 +1,7 @@
 import { createInterface } from 'node:readline'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { classifyWranglerTailStderr } from './auth-007-classify-wrangler-tail-stderr.mjs'
 
 const SAFE_LABELS = new Set([
   'W02 scheduled publication tick',
@@ -17,6 +18,16 @@ const STAGES = new Set([
 ])
 const SAFE_LEVELS = new Set(['debug', 'info', 'log', 'warn', 'error'])
 const MARKER_PREFIX = 'W02 scheduled publication'
+const MALFORMED_LINE_CATEGORY_KEYS = [
+  'AUTH_OR_PERMISSION',
+  'NETWORK_OR_CONNECTION',
+  'WORKER_OR_SCOPE_NOT_FOUND',
+  'RATE_LIMITED',
+  'WRANGLER_CONFIGURATION_OR_ARGUMENT',
+  'CLOUDFLARE_API_FAILURE_REDACTED',
+  'OTHER_ERROR_DETAILS_REDACTED',
+  'NONEMPTY_UNCLASSIFIED_DETAILS_REDACTED',
+]
 
 function safeCount(value) {
   return Number.isSafeInteger(value) && value >= 0 ? value : 0
@@ -65,6 +76,7 @@ export function createRuntimeTailStats() {
       stageFailed: 0,
     },
     levels: { debug: 0, info: 0, log: 0, warn: 0, error: 0 },
+    malformedLineCategories: Object.fromEntries(MALFORMED_LINE_CATEGORY_KEYS.map((key) => [key, 0])),
   }
 }
 
@@ -91,6 +103,19 @@ export function summarizeRuntimeTailStats(stats) {
       warn: safeCount(stats.levels?.warn),
       error: safeCount(stats.levels?.error),
     },
+    malformedLineCategories: Object.fromEntries(
+      MALFORMED_LINE_CATEGORY_KEYS.map((key) => [key, safeCount(stats.malformedLineCategories?.[key])]),
+    ),
+  }
+}
+
+export function recordMalformedRuntimeLine(line, stats) {
+  if (!stats || typeof stats !== 'object') return
+  stats.malformedJsonLines = safeCount(stats.malformedJsonLines) + 1
+  if (typeof line !== 'string' || line.trim().length === 0) return
+  const category = classifyWranglerTailStderr(line)
+  if (Object.hasOwn(stats.malformedLineCategories ?? {}, category)) {
+    stats.malformedLineCategories[category] = safeCount(stats.malformedLineCategories[category]) + 1
   }
 }
 
@@ -176,8 +201,9 @@ function run() {
       const safe = sanitizeRuntimeTailRecord(record, stats)
       if (safe) process.stdout.write(JSON.stringify(safe) + '\n')
     } catch {
-      // Wrangler banners and malformed lines are counted only, never copied.
-      stats.malformedJsonLines += 1
+      // Wrangler banners and errors printed to stdout are categorized with
+      // fixed labels only; raw text is never copied to the artifact.
+      recordMalformedRuntimeLine(line, stats)
     }
   })
   input.on('close', emitSummary)
