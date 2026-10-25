@@ -15,9 +15,11 @@ const STAGES = new Set([
   'mark-retry',
   'mark-published',
 ])
+const SAFE_LEVELS = new Set(['debug', 'info', 'log', 'warn', 'error'])
+const MARKER_PREFIX = 'W02 scheduled publication'
 
 function safeCount(value) {
-  return Number.isSafeInteger(value) && value >= 0 ? value : undefined
+  return Number.isSafeInteger(value) && value >= 0 ? value : 0
 }
 
 function safeDetail(label, raw) {
@@ -33,7 +35,7 @@ function safeDetail(label, raw) {
     safe.task = 'mfa-audit'
     for (const key of ['selected', 'published', 'failed']) {
       const value = safeCount(detail[key])
-      if (value === undefined) return null
+      if (!Number.isSafeInteger(detail[key]) || detail[key] < 0) return null
       safe[key] = value
     }
   } else if (label === 'W02 scheduled publication task failed') {
@@ -47,22 +49,102 @@ function safeDetail(label, raw) {
   return safe
 }
 
+export function createRuntimeTailStats() {
+  return {
+    recordsSeen: 0,
+    malformedJsonLines: 0,
+    nonObjectRecords: 0,
+    recordsWithoutLogsArray: 0,
+    recordsWithLogs: 0,
+    logEntriesSeen: 0,
+    markerPrefixCandidates: 0,
+    recognizedMarkers: {
+      tick: 0,
+      result: 0,
+      taskFailed: 0,
+      stageFailed: 0,
+    },
+    levels: { debug: 0, info: 0, log: 0, warn: 0, error: 0 },
+  }
+}
+
+export function summarizeRuntimeTailStats(stats) {
+  return {
+    diagnostic: 'W02_TAIL_CAPTURE_SUMMARY',
+    recordsSeen: safeCount(stats.recordsSeen),
+    malformedJsonLines: safeCount(stats.malformedJsonLines),
+    nonObjectRecords: safeCount(stats.nonObjectRecords),
+    recordsWithoutLogsArray: safeCount(stats.recordsWithoutLogsArray),
+    recordsWithLogs: safeCount(stats.recordsWithLogs),
+    logEntriesSeen: safeCount(stats.logEntriesSeen),
+    markerPrefixCandidates: safeCount(stats.markerPrefixCandidates),
+    recognizedMarkers: {
+      tick: safeCount(stats.recognizedMarkers?.tick),
+      result: safeCount(stats.recognizedMarkers?.result),
+      taskFailed: safeCount(stats.recognizedMarkers?.taskFailed),
+      stageFailed: safeCount(stats.recognizedMarkers?.stageFailed),
+    },
+    levels: {
+      debug: safeCount(stats.levels?.debug),
+      info: safeCount(stats.levels?.info),
+      log: safeCount(stats.levels?.log),
+      warn: safeCount(stats.levels?.warn),
+      error: safeCount(stats.levels?.error),
+    },
+  }
+}
+
 /**
- * Keep only explicit W02 scheduled-publication labels and an allowlist of
- * counts/stage fields. Request details, user identifiers, payloads, URLs,
- * arbitrary log messages, and thrown error text are never copied.
+ * Retain only fixed W02 marker values and aggregate shape counters.
+ * No request metadata, user identifiers, payloads, URLs, arbitrary messages,
+ * token material, or exception strings are ever copied to the artifact.
  */
-export function sanitizeRuntimeTailRecord(record) {
-  if (!record || typeof record !== 'object' || Array.isArray(record)) return null
+export function sanitizeRuntimeTailRecord(record, stats) {
+  if (stats) stats.recordsSeen += 1
+  if (!record || typeof record !== 'object' || Array.isArray(record)) {
+    if (stats) stats.nonObjectRecords += 1
+    return null
+  }
+
+  if (!Array.isArray(record.logs)) {
+    if (stats) stats.recordsWithoutLogsArray += 1
+    return null
+  }
+  if (record.logs.length > 0 && stats) stats.recordsWithLogs += 1
+
   const acceptedLogs = []
-  for (const item of Array.isArray(record.logs) ? record.logs : []) {
-    if (!item || typeof item !== 'object') continue
-    const message = Array.isArray(item.message) ? item.message : []
-    const label = message[0]
-    if (typeof label !== 'string' || !SAFE_LABELS.has(label)) continue
-    const sanitized = safeDetail(label, message[1])
+  for (const item of record.logs) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) continue
+    if (typeof item.level === 'string' && SAFE_LEVELS.has(item.level) && stats) {
+      stats.levels[item.level] += 1
+    }
+    const message = Array.isArray(item.message)
+      ? item.message
+      : typeof item.message === 'string'
+        ? [item.message]
+        : []
+    if (!stats) {
+      // Tests and call sites without stats still get strict sanitization.
+    } else {
+      stats.logEntriesSeen += 1
+    }
+    const textParts = message.filter((part) => typeof part === 'string')
+    if (stats && textParts.some((part) => part.includes(MARKER_PREFIX))) {
+      stats.markerPrefixCandidates += 1
+    }
+
+    const labelIndex = message.findIndex((part) => typeof part === 'string' && SAFE_LABELS.has(part))
+    if (labelIndex < 0) continue
+    const label = message[labelIndex]
+    const metricKey = label === 'W02 scheduled publication tick' ? 'tick'
+      : label === 'W02 scheduled publication result' ? 'result'
+        : label === 'W02 scheduled publication task failed' ? 'taskFailed'
+          : 'stageFailed'
+    if (stats) stats.recognizedMarkers[metricKey] += 1
+    const sanitized = safeDetail(label, message[labelIndex + 1])
     if (sanitized) acceptedLogs.push(sanitized)
   }
+
   if (acceptedLogs.length === 0) return null
 
   const safeRecord = { logs: acceptedLogs }
@@ -77,14 +159,30 @@ export function sanitizeRuntimeTailRecord(record) {
 
 function run() {
   const input = createInterface({ input: process.stdin, crlfDelay: Infinity })
+  const stats = createRuntimeTailStats()
+  let summaryEmitted = false
+
+  const emitSummary = () => {
+    if (summaryEmitted) return
+    summaryEmitted = true
+    process.stdout.write(JSON.stringify(summarizeRuntimeTailStats(stats)) + '\n', () => {
+      process.exit(0)
+    })
+  }
+
   input.on('line', (line) => {
     try {
-      const safe = sanitizeRuntimeTailRecord(JSON.parse(line))
+      const record = JSON.parse(line)
+      const safe = sanitizeRuntimeTailRecord(record, stats)
       if (safe) process.stdout.write(JSON.stringify(safe) + '\n')
     } catch {
-      // Wrangler connection banners and malformed lines are intentionally dropped.
+      // Wrangler banners and malformed lines are counted only, never copied.
+      stats.malformedJsonLines += 1
     }
   })
+  input.on('close', emitSummary)
+  process.on('SIGTERM', emitSummary)
+  process.on('SIGINT', emitSummary)
 }
 
 if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url) run()
