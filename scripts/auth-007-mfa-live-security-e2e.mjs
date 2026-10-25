@@ -51,6 +51,16 @@ const cookieJar = new Map()
 const cookieHeader = () => [...cookieJar].map(([name, value]) => `${name}=${value}`).join('; ')
 const cookieNames = () => [...cookieJar.keys()].sort()
 const clearCookies = () => cookieJar.clear()
+const restoreCookieHeader = (value) => {
+  cookieJar.clear()
+  for (const part of String(value || '').split(';')) {
+    const separator = part.indexOf('=')
+    if (separator <= 0) continue
+    const name = part.slice(0, separator).trim()
+    const content = part.slice(separator + 1).trim()
+    if (name && content) cookieJar.set(name, content)
+  }
+}
 const updateCookies = (headers) => {
   const source = headers
   const list = typeof source.getSetCookie === 'function'
@@ -126,6 +136,13 @@ const request = async (name, method, path, { body, headers = {}, useCookies = tr
 
 const sleep = (ms) => new Promise((resolveSleep) => setTimeout(resolveSleep, ms))
 
+const hasCredentialField = (value) => {
+  if (!value || typeof value !== 'object') return false
+  if (Array.isArray(value)) return value.some(hasCredentialField)
+  return Object.entries(value).some(([key, nested]) =>
+    /^(?:token|accessToken|refreshToken|sessionToken)$/i.test(key) || hasCredentialField(nested))
+}
+
 const totpStatus = (payload) => payload && typeof payload === 'object' &&
   payload.data && typeof payload.data === 'object' ? payload.data : null
 
@@ -172,7 +189,10 @@ const run = async () => {
   let factorEnabled = false
   let normalDisableSucceeded = false
   let confirmedStep = null
+  let latestAcceptedTotpStep = null
   let userId = ''
+  let recoveryCodes = []
+  let lastAuthenticatedCookie = ''
   const baseKey = `mfa-e2e-${runId}-${runAttempt}`
 
   try {
@@ -211,6 +231,7 @@ const run = async () => {
       return
     }
     userId = loginUser.id
+    lastAuthenticatedCookie = cookieHeader()
 
     const initialStatus = await request('mfa_preflight_status', 'GET', '/v1/auth/mfa')
     const initialData = totpStatus(initialStatus.payload)
@@ -255,6 +276,7 @@ const run = async () => {
       return
     }
     enrollmentStarted = true
+    recoveryCodes = [...enrollData.recoveryCodes]
     totp = parseTotpUri(enrollData.totpUri)
 
     let confirmation = null
@@ -273,7 +295,9 @@ const run = async () => {
       if (confirmation.facts.status === 200 && totpStatus(confirmation.payload)?.enabled === true &&
           totpStatus(confirmation.payload)?.verified === true) {
         confirmedStep = step
+        latestAcceptedTotpStep = step
         factorEnabled = true
+        lastAuthenticatedCookie = cookieHeader()
         break
       }
       if (confirmation.facts.status !== 401) break
