@@ -21,7 +21,7 @@ export async function probeW02TailAccess({
   if (!/^[a-f0-9]{32}$/i.test(accountId ?? '') ||
       typeof apiToken !== 'string' || apiToken.length < 20 ||
       typeof fetchImpl !== 'function') {
-    return { status: 'FAIL', category: CATEGORIES.CONFIG, httpStatus: 'NONE' }
+    return { status: 'FAIL', category: CATEGORIES.CONFIG, httpStatus: 'NONE', activeTailCount: 0 }
   }
 
   let response
@@ -39,7 +39,7 @@ export async function probeW02TailAccess({
       },
     )
   } catch {
-    return { status: 'FAIL', category: CATEGORIES.NETWORK, httpStatus: 'NONE' }
+    return { status: 'FAIL', category: CATEGORIES.NETWORK, httpStatus: 'NONE', activeTailCount: 0 }
   }
 
   if (!response.ok) {
@@ -52,20 +52,25 @@ export async function probeW02TailAccess({
           : response.status >= 500
             ? CATEGORIES.API
             : CATEGORIES.HTTP
-    return { status: 'FAIL', category, httpStatus: response.status }
+    return { status: 'FAIL', category, httpStatus: response.status, activeTailCount: 0 }
   }
 
   let payload
   try {
     payload = await response.json()
   } catch {
-    return { status: 'FAIL', category: CATEGORIES.API, httpStatus: response.status }
+    return { status: 'FAIL', category: CATEGORIES.API, httpStatus: response.status, activeTailCount: 0 }
   }
 
   if (payload?.success === true && Array.isArray(payload.result)) {
-    return { status: 'PASS', category: 'NONE', httpStatus: response.status }
+    return {
+      status: 'PASS',
+      category: 'NONE',
+      httpStatus: response.status,
+      activeTailCount: payload.result.length,
+    }
   }
-  return { status: 'FAIL', category: CATEGORIES.API, httpStatus: response.status }
+  return { status: 'FAIL', category: CATEGORIES.API, httpStatus: response.status, activeTailCount: 0 }
 }
 
 async function main() {
@@ -74,10 +79,10 @@ async function main() {
     apiToken: process.env.CLOUDFLARE_API_TOKEN,
   })
   if (result.status === 'PASS') {
-    process.stdout.write(`W02_TAIL_ACCESS_PREFLIGHT status=PASS http_status=${result.httpStatus}\n`)
+    process.stdout.write(`W02_TAIL_ACCESS_PREFLIGHT status=PASS http_status=${result.httpStatus} active_tail_count=${result.activeTailCount}\n`)
   } else {
     process.stdout.write(
-      `::warning::W02_TAIL_ACCESS_PREFLIGHT status=FAIL category=${result.category} http_status=${result.httpStatus}\n`,
+      `::warning::W02_TAIL_ACCESS_PREFLIGHT status=FAIL category=${result.category} http_status=${result.httpStatus} active_tail_count=${result.activeTailCount}\n`,
     )
     process.exitCode = 1
   }
