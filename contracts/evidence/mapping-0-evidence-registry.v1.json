@@ -1528,6 +1528,25 @@
       "freshnessMode": "EXECUTED_AT_TESTED_COMMIT",
       "validUntil": "2026-11-24T02:06:24Z",
       "note": "Controlled remote D1-01 read-back against database luckread (UUID 2f80471e-3756-49f9-8db1-7707a433ad64) confirms migrations 0006_better_auth_two_factor.sql, 0007_l8_genesis_bootstrap_audit.sql and 0008_auth_007_mfa_publication_journal.sql in the remote migration ledger, the auth_007_mfa_publication_journal table and status/next_attempt index, two MFA lifecycle triggers, and role_assignment row count read-only. GitHub run metadata binds this artifact to source SHA 7d9011fc3aa64190205e0112fa37660b9f065a4b; however, the artifact's embedded provenance text mistakenly contains literal $SOURCE_SHA and $DATABASE_NAME because the workflow used a single-quoted heredoc. A later workflow fix is present in PR #1314 / main. Therefore result is recorded as PASS with status CREATED and is not formally VERIFIED until its provenance is reconciled. Compare 7d9011fc3aa64190205e0112fa37660b9f065a4b to d58faf8ae7994bd9d6f04818ec15eab13a45427f shows only the migration workflow changed, so W02 migration source/runtime paths were unchanged. No L8 grant or AUTH-007 promotion follows from this record."
+    },
+    {
+      "evidenceId": "EVD-AUTH007-W01-W02-PRODUCTION-RUNTIME-20261025-001",
+      "type": "INTEGRATION_TEST",
+      "claimId": "AUTH-007::W01-W02-PRODUCTION-RUNTIME-BINDING",
+      "subjectType": "FEATURE",
+      "subjectId": "AUTH-007",
+      "source": "GitHub Actions W01 W02 Auth Binding Deploy — deployed W01 public API and W02 identity authority",
+      "sourceRef": "https://github.com/wanghuinet/luckread/actions/runs/40154014151/artifacts/12584315720",
+      "commitSha": "d58faf8ae7994bd9d6f04818ec15eab13a45427f",
+      "timestamp": "2026-10-25T02:22:48Z",
+      "producer": "W01 W02 Auth Binding Deploy / run 40154014151 / job 121051354332",
+      "result": "PASS",
+      "status": "CREATED",
+      "checkId": "121051354332",
+      "workflowRef": "https://github.com/wanghuinet/luckread/actions/runs/40154014151",
+      "freshnessMode": "EXECUTED_AT_TESTED_COMMIT",
+      "validUntil": "2026-11-24T02:22:48Z",
+      "note": "Deployment artifact records successful deployment of W02 Worker luckread-w02 version 07c1f043-49dd-44fc-a5d3-cbc942094d63 and W01 Worker luckread-w01-payload version a405d338-62b2-47c3-a547-28f1c16386e7, with W01 W02_AUTH Service Binding to luckread-w02; no D1 mutation and no new Worker/D1/Queue. The separate app-auth-session live E2E artifact from the same run passed 12/12 session/login/logout assertions. Compare d58faf8ae7994bd9d6f04818ec15eab13a45427f to AUTH-007 live test source afae8f8947a4b2b7aa3358c5f359eb7577ba7b31 shows only E2E/test/CI files were added or modified, not production runtime files, so this is the deployed runtime source exercised by the later AUTH-007 live MFA E2E. Record is CREATED pending evidence admission, not VERIFIED."
     }
   ],
   "testedCommitSha": "53e3bcbb855be8e1240171390c69dd034bf04f8b"
