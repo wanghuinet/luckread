@@ -475,7 +475,12 @@ export default {
     return new Response(null, { status: 404 })
   },
 
-  async scheduled(_controller: ScheduledController, env: Env): Promise<void> {
+  async scheduled(controller: ScheduledController, env: Env): Promise<void> {
+    // Safe runtime marker: no user, event, queue payload, or database identifiers.
+    console.info('W02 scheduled publication tick', {
+      cron: controller.cron,
+      scheduledTime: controller.scheduledTime,
+    })
     await runScheduledPublicationTicks([
       { name: 'account-state', publish: () => publishPendingAccountStateEvents(env) },
       { name: 'mfa-audit', publish: () => publishPendingMfaAuditEvents(env) },
