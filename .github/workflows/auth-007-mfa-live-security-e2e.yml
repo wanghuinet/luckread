@@ -116,7 +116,7 @@ jobs:
             pid="$(cat "$pid_file")"
             if ! kill -0 "$pid" 2>/dev/null; then
               echo "::warning::W02 runtime log capture exited before readiness"
-                            node "$GITHUB_WORKSPACE/scripts/auth-007-classify-wrangler-tail-stderr.mjs" "$stderr_file"
+              node "$GITHUB_WORKSPACE/scripts/auth-007-classify-wrangler-tail-stderr.mjs" "$stderr_file"
               exit 0
             fi
             sleep 1
@@ -157,7 +157,7 @@ jobs:
           fi
           output_file="artifacts/mapping-0/auth-007-mfa-audit-delivery-e2e/w02-runtime-sanitized-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.jsonl"
           stderr_file="$capture_dir/wrangler.stderr"
-                    node "$GITHUB_WORKSPACE/scripts/auth-007-classify-wrangler-tail-stderr.mjs" "$stderr_file"
+          node "$GITHUB_WORKSPACE/scripts/auth-007-classify-wrangler-tail-stderr.mjs" "$stderr_file"
           if [[ -s "$output_file" ]]; then
             echo "Sanitized W02 runtime diagnostics:"
             cat "$output_file"
