@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { createRuntimeTailStats, sanitizeRuntimeTailRecord, summarizeRuntimeTailStats } from './auth-007-sanitize-w02-runtime-tail.mjs'
+import { createRuntimeTailStats, recordMalformedRuntimeLine, sanitizeRuntimeTailRecord, summarizeRuntimeTailStats } from './auth-007-sanitize-w02-runtime-tail.mjs'
 
 describe('W02 runtime tail sanitizer', () => {
   it('keeps only a cron marker and safe scheduling metadata', () => {
@@ -86,8 +86,34 @@ describe('W02 runtime tail sanitizer', () => {
       markerPrefixCandidates: 0,
       recognizedMarkers: { tick: 0, result: 0, taskFailed: 0, stageFailed: 0 },
       levels: { debug: 0, info: 1, log: 0, warn: 0, error: 1 },
+      malformedLineCategories: {
+        AUTH_OR_PERMISSION: 0,
+        NETWORK_OR_CONNECTION: 0,
+        WORKER_OR_SCOPE_NOT_FOUND: 0,
+        RATE_LIMITED: 0,
+        WRANGLER_CONFIGURATION_OR_ARGUMENT: 0,
+        CLOUDFLARE_API_FAILURE_REDACTED: 0,
+        OTHER_ERROR_DETAILS_REDACTED: 0,
+        NONEMPTY_UNCLASSIFIED_DETAILS_REDACTED: 0,
+      },
     })
     assert.equal(JSON.stringify(summarizeRuntimeTailStats(stats)).includes('must-not-escape'), false)
+  })
+
+  it('classifies malformed stdout errors using only safe fixed labels', () => {
+    const stats = createRuntimeTailStats()
+    recordMalformedRuntimeLine(
+      'Error: 403 Forbidden for https://api.cloudflare.com/client/v4/accounts/private?token=must-not-escape',
+      stats,
+    )
+    recordMalformedRuntimeLine('opaque malformed runtime line', stats)
+    recordMalformedRuntimeLine('   ', stats)
+    const summary = summarizeRuntimeTailStats(stats)
+    assert.equal(summary.malformedJsonLines, 3)
+    assert.equal(summary.malformedLineCategories.AUTH_OR_PERMISSION, 1)
+    assert.equal(summary.malformedLineCategories.NONEMPTY_UNCLASSIFIED_DETAILS_REDACTED, 1)
+    assert.equal(JSON.stringify(summary).includes('must-not-escape'), false)
+    assert.equal(JSON.stringify(summary).includes('private'), false)
   })
 
   it('counts marker-like logs whose label shape differs without copying their content', () => {
