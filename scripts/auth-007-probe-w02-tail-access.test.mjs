@@ -37,7 +37,7 @@ describe('AUTH-007 read-only W02 Tail access probe', () => {
       apiToken: '',
       fetchImpl: async () => { called = true },
     })
-    assert.deepEqual(result, { status: 'FAIL', category: 'CONFIGURATION_MISSING', httpStatus: 'NONE', activeTailCount: 0 })
+    assert.deepEqual(result, { status: 'FAIL', category: 'CONFIGURATION_MISSING', httpStatus: 'NONE', activeTailCount: null })
     assert.equal(called, false)
   })
 
@@ -47,7 +47,7 @@ describe('AUTH-007 read-only W02 Tail access probe', () => {
       apiToken,
       fetchImpl: async () => response(403, { errors: [{ message: 'sensitive diagnostic' }] }),
     })
-    assert.deepEqual(result, { status: 'FAIL', category: 'AUTH_OR_PERMISSION', httpStatus: 403, activeTailCount: 0 })
+    assert.deepEqual(result, { status: 'FAIL', category: 'AUTH_OR_PERMISSION', httpStatus: 403, activeTailCount: null })
     assert.equal(JSON.stringify(result).includes('sensitive diagnostic'), false)
   })
 
@@ -55,7 +55,7 @@ describe('AUTH-007 read-only W02 Tail access probe', () => {
     const result = await probeW02TailAccess({
       accountId, apiToken, fetchImpl: async () => response(404, {}),
     })
-    assert.deepEqual(result, { status: 'FAIL', category: 'WORKER_OR_SCOPE_NOT_FOUND', httpStatus: 404, activeTailCount: 0 })
+    assert.deepEqual(result, { status: 'FAIL', category: 'WORKER_OR_SCOPE_NOT_FOUND', httpStatus: 404, activeTailCount: null })
   })
 
   it('classifies throttling and server failures without exposing the response body', async () => {
@@ -65,8 +65,8 @@ describe('AUTH-007 read-only W02 Tail access probe', () => {
     const server = await probeW02TailAccess({
       accountId, apiToken, fetchImpl: async () => response(503, { detail: 'private' }),
     })
-    assert.deepEqual(limited, { status: 'FAIL', category: 'RATE_LIMITED', httpStatus: 429, activeTailCount: 0 })
-    assert.deepEqual(server, { status: 'FAIL', category: 'CLOUDFLARE_API_FAILURE_REDACTED', httpStatus: 503, activeTailCount: 0 })
+    assert.deepEqual(limited, { status: 'FAIL', category: 'RATE_LIMITED', httpStatus: 429, activeTailCount: null })
+    assert.deepEqual(server, { status: 'FAIL', category: 'CLOUDFLARE_API_FAILURE_REDACTED', httpStatus: 503, activeTailCount: null })
   })
 
   it('classifies transport and malformed success responses safely', async () => {
@@ -76,7 +76,7 @@ describe('AUTH-007 read-only W02 Tail access probe', () => {
     const malformed = await probeW02TailAccess({
       accountId, apiToken, fetchImpl: async () => response(200, { success: false, errors: [{ message: 'private' }] }),
     })
-    assert.deepEqual(network, { status: 'FAIL', category: 'NETWORK_OR_CONNECTION', httpStatus: 'NONE', activeTailCount: 0 })
-    assert.deepEqual(malformed, { status: 'FAIL', category: 'CLOUDFLARE_API_FAILURE_REDACTED', httpStatus: 200, activeTailCount: 0 })
+    assert.deepEqual(network, { status: 'FAIL', category: 'NETWORK_OR_CONNECTION', httpStatus: 'NONE', activeTailCount: null })
+    assert.deepEqual(malformed, { status: 'FAIL', category: 'CLOUDFLARE_API_FAILURE_REDACTED', httpStatus: 200, activeTailCount: null })
   })
 })
