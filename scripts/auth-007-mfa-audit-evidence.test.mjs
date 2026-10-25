@@ -58,3 +58,10 @@ test('reconciles multiple events of the same type by total count', () => {
   assert.equal(result.pass, true)
   assert.equal(result.events.find((event) => event.eventType === 'auth.mfa.challenge_succeeded')?.publishedCount, 2)
 })
+
+test('blocks canonical audit rows that have no matching outbox event', () => {
+  const rows = [...audit, { action: 'auth.mfa.locked', count: 1 }]
+  const result = evaluateMfaAuditDelivery(outbox, rows)
+  assert.equal(result.pass, false)
+  assert.equal(result.persistedExactlyOnce, false)
+})
