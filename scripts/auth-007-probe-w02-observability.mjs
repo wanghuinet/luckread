@@ -8,6 +8,12 @@ const SAFE_LABELS = Object.freeze({
   stageFailed: 'W02 scheduled publication stage failed',
 })
 const COMMON_EVENT_TYPES = new Set(['fetch', 'scheduled', 'cron', 'queue'])
+const W02_SCRIPT_FILTER = Object.freeze({
+  key: '$workers.scriptName',
+  operation: 'eq',
+  type: 'string',
+  value: EXPECTED_SCRIPT,
+})
 
 const CATEGORIES = Object.freeze({
   CONFIG: 'CONFIGURATION_MISSING',
@@ -266,7 +272,7 @@ async function probeW02EventsView({ accountId, apiToken, now, fetchImpl }) {
         cache: 'no-store',
         signal: AbortSignal.timeout(15_000),
         body: JSON.stringify({
-          queryId: 'auth007-account-wide-event-diagnostic',
+          queryId: 'auth007-w02-event-diagnostic',
           timeframe: { from: now - WINDOW_MS, to: now },
           view: 'events',
           limit: MAX_INVOCATIONS,
@@ -274,6 +280,7 @@ async function probeW02EventsView({ accountId, apiToken, now, fetchImpl }) {
           parameters: {
             datasets: ['cloudflare-workers'],
             filterCombination: 'and',
+            filters: [W02_SCRIPT_FILTER],
           },
         }),
       },
@@ -314,11 +321,10 @@ async function probeW02EventsView({ accountId, apiToken, now, fetchImpl }) {
 
 /**
  * Query Cloudflare Workers Observability without opening a WebSocket tail.
- * The dry-run scans at most 200 invocation groups in a 30-minute window and
- * deliberately has no server-side Worker filter. This distinguishes an empty
- * account-level result from a W02 filter mismatch. Only fixed labels and safe
- * numeric aggregates survive; event bodies and request identifiers are never
- * logged or persisted.
+ * Apply the exact W02 script-name filter on the server before result limits,
+ * so unrelated Workers cannot crowd scheduled records out of the evidence window.
+ * Only fixed labels and safe numeric aggregates survive; event bodies and
+ * request identifiers are never logged or persisted.
  */
 export async function probeW02ScheduledObservability({
   accountId,
@@ -353,7 +359,7 @@ export async function probeW02ScheduledObservability({
         cache: 'no-store',
         signal: AbortSignal.timeout(15_000),
         body: JSON.stringify({
-          queryId: 'auth007-account-wide-invocation-diagnostic',
+          queryId: 'auth007-w02-invocation-diagnostic',
           timeframe: { from: now - WINDOW_MS, to: now },
           view: 'invocations',
           limit: MAX_INVOCATIONS,
@@ -420,7 +426,9 @@ export async function probeW02ScheduledObservability({
   // Query success is not proof that the scheduled handler ran. Publish a separate
   // evidence boolean so callers can fail fast before mutating the live MFA QA account.
   const scheduledExecutionObserved = stats.scheduledInvocations > 0 ||
-    safeCount(eventsView.scheduledEventRows) + safeCount(eventsView.cronEventRows) > 0
+    stats.tickMarkerInvocations > 0 ||
+    safeCount(eventsView.scheduledEventRows) + safeCount(eventsView.cronEventRows) +
+      safeCount(eventsView.tickMarkerRows) > 0
   return {
     status: 'PASS',
     category: 'NONE',
