@@ -83,6 +83,8 @@ jobs:
           node --check scripts/auth-007-mfa-audit-delivery-e2e.mjs
           node --check scripts/auth-007-mfa-audit-evidence.mjs
           node --check scripts/auth-007-sanitize-w02-runtime-tail.mjs
+          node --check scripts/auth-007-classify-wrangler-tail-stderr.mjs
+          node --test scripts/auth-007-classify-wrangler-tail-stderr.test.mjs
           node --test scripts/auth-007-mfa-audit-evidence.test.mjs
           node --test scripts/auth-007-sanitize-w02-runtime-tail.test.mjs
 
@@ -114,19 +116,7 @@ jobs:
             pid="$(cat "$pid_file")"
             if ! kill -0 "$pid" 2>/dev/null; then
               echo "::warning::W02 runtime log capture exited before readiness"
-              if [[ -s "$stderr_file" ]]; then
-                if grep -Eiq '(invalid.*token|not authenticated|not logged in|unauthorized|forbidden|permission denied|access denied|(^|[^0-9])(401|403)([^0-9]|$))' "$stderr_file"; then
-                  echo "::warning::W02 tail diagnostic category=AUTH_OR_PERMISSION"
-                elif grep -Eiq '(websocket|connection|ECONN|ETIMEDOUT|timed out|network|fetch failed|ENOTFOUND|socket|DNS)' "$stderr_file"; then
-                  echo "::warning::W02 tail diagnostic category=NETWORK_OR_CONNECTION"
-                elif grep -Eiq '(error|failed|cannot|unable)' "$stderr_file"; then
-                  echo "::warning::W02 tail diagnostic category=OTHER_ERROR_DETAILS_REDACTED"
-                else
-                  echo "::warning::W02 tail diagnostic category=NONEMPTY_UNCLASSIFIED_DETAILS_REDACTED"
-                fi
-              else
-                echo "::warning::W02 tail diagnostic category=STDERR_EMPTY"
-              fi
+              node "$GITHUB_WORKSPACE/scripts/auth-007-classify-wrangler-tail-stderr.mjs" "$stderr_file"
               exit 0
             fi
             sleep 1
@@ -167,19 +157,7 @@ jobs:
           fi
           output_file="artifacts/mapping-0/auth-007-mfa-audit-delivery-e2e/w02-runtime-sanitized-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.jsonl"
           stderr_file="$capture_dir/wrangler.stderr"
-          if [[ -s "$stderr_file" ]]; then
-            if grep -Eiq '(invalid.*token|not authenticated|not logged in|unauthorized|forbidden|permission denied|access denied|(^|[^0-9])(401|403)([^0-9]|$))' "$stderr_file"; then
-              echo "::warning::W02 tail diagnostic category=AUTH_OR_PERMISSION"
-            elif grep -Eiq '(websocket|connection|ECONN|ETIMEDOUT|timed out|network|fetch failed|ENOTFOUND|socket|DNS)' "$stderr_file"; then
-              echo "::warning::W02 tail diagnostic category=NETWORK_OR_CONNECTION"
-            elif grep -Eiq '(error|failed|cannot|unable)' "$stderr_file"; then
-              echo "::warning::W02 tail diagnostic category=OTHER_ERROR_DETAILS_REDACTED"
-            else
-              echo "::notice::W02 tail diagnostic category=NONEMPTY_UNCLASSIFIED_DETAILS_REDACTED"
-            fi
-          else
-            echo "::notice::W02 tail diagnostic category=STDERR_EMPTY"
-          fi
+          node "$GITHUB_WORKSPACE/scripts/auth-007-classify-wrangler-tail-stderr.mjs" "$stderr_file"
           if [[ -s "$output_file" ]]; then
             echo "Sanitized W02 runtime diagnostics:"
             cat "$output_file"
