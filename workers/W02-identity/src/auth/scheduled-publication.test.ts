@@ -14,7 +14,8 @@ describe('W02 scheduled publication isolation', () => {
 
     expect(accountStatePublish).toHaveBeenCalledTimes(1)
     expect(mfaAuditPublish).toHaveBeenCalledTimes(1)
-    expect(logFailure).toHaveBeenCalledExactlyOnceWith('account-state')
+    expect(logFailure).toHaveBeenCalledTimes(1)
+    expect(logFailure).toHaveBeenCalledWith('account-state')
     expect(logFailure).not.toHaveBeenCalledWith('mfa-audit')
   })
 
@@ -30,6 +31,7 @@ describe('W02 scheduled publication isolation', () => {
 
     expect(accountStatePublish).toHaveBeenCalledTimes(1)
     expect(mfaAuditPublish).toHaveBeenCalledTimes(1)
-    expect(logFailure).toHaveBeenCalledExactlyOnceWith('mfa-audit')
+    expect(logFailure).toHaveBeenCalledTimes(1)
+    expect(logFailure).toHaveBeenCalledWith('mfa-audit')
   })
 })
