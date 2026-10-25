@@ -79,9 +79,9 @@ describe('AUTH-007 read-only W02 scheduled Observability probe', () => {
     assert.equal(observed.body.view, 'invocations')
     assert.equal(observed.body.queryId, 'auth007-account-wide-invocation-diagnostic')
     assert.equal(observed.body.timeframe.to - observed.body.timeframe.from, 1_800_000)
-    assert.equal(observed.body.parameters.limit, 200)
+    assert.equal(observed.body.limit, 200)
     assert.equal(Object.hasOwn(observed.body.parameters, 'filters'), false)
-    assert.equal(Object.hasOwn(observed.body, 'limit'), false)
+    assert.equal(Object.hasOwn(observed.body.parameters, 'limit'), false)
     assert.deepEqual(result, {
       status: 'PASS',
       category: 'NONE',
