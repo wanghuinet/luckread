@@ -112,7 +112,7 @@ jobs:
               node "$GITHUB_WORKSPACE/scripts/auth-007-sanitize-w02-runtime-tail.mjs" \
                 > "$GITHUB_WORKSPACE/artifacts/mapping-0/auth-007-mfa-audit-delivery-e2e/w02-runtime-sanitized-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.jsonl"
             pipeline_status=( "${PIPESTATUS[@]}" )
-            printf 'wrangler=%s sanitizer=%s\\n' "${pipeline_status[0]}" "${pipeline_status[1]}" > "$RUNNER_TEMP/auth007-w02-tail/pipeline-status"
+            printf 'wrangler=%s sanitizer=%s\n' "${pipeline_status[0]}" "${pipeline_status[1]}" > "$RUNNER_TEMP/auth007-w02-tail/pipeline-status"
             exit "${pipeline_status[0]}"
           ' </dev/null >/dev/null 2>&1 &
           echo "$!" > "$pid_file"
@@ -120,7 +120,7 @@ jobs:
             pid="$(cat "$pid_file")"
             if ! kill -0 "$pid" 2>/dev/null; then
               echo "::warning::W02 runtime log capture exited before readiness"
-              node "$GITHUB_WORKSPACE/scripts/auth-007-classify-wrangler-tail-stderr.mjs" "$stderr_file" "$status_file" "$status_file"
+              node "$GITHUB_WORKSPACE/scripts/auth-007-classify-wrangler-tail-stderr.mjs" "$stderr_file" "$status_file"
               exit 0
             fi
             sleep 1
@@ -161,7 +161,8 @@ jobs:
           fi
           output_file="artifacts/mapping-0/auth-007-mfa-audit-delivery-e2e/w02-runtime-sanitized-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.jsonl"
           stderr_file="$capture_dir/wrangler.stderr"
-          node "$GITHUB_WORKSPACE/scripts/auth-007-classify-wrangler-tail-stderr.mjs" "$stderr_file"
+          status_file="$capture_dir/pipeline-status"
+          node "$GITHUB_WORKSPACE/scripts/auth-007-classify-wrangler-tail-stderr.mjs" "$stderr_file" "$status_file"
           if [[ -s "$output_file" ]]; then
             echo "Sanitized W02 runtime diagnostics:"
             cat "$output_file"
@@ -180,3 +181,4 @@ jobs:
             artifacts/mapping-0/auth-007-mfa-audit-delivery-e2e/w02-runtime-sanitized-*.jsonl
           if-no-files-found: warn
           retention-days: 30
+
