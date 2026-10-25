@@ -59,20 +59,27 @@ async function queryD1(databaseId, sql, params) {
     error.code = 'READ_ONLY_QUERY_GUARD_REJECTED_SQL'
     throw error
   }
-  const response = await fetch(
-    `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(accountId)}/d1/database/${databaseId}/query`,
-    {
-      method: 'POST',
-      headers: {
-        authorization: `Bearer ${apiToken}`,
-        'content-type': 'application/json',
-        accept: 'application/json',
+  let response
+  try {
+    response = await fetch(
+      `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(accountId)}/d1/database/${databaseId}/query`,
+      {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${apiToken}`,
+          'content-type': 'application/json',
+          accept: 'application/json',
+        },
+        body: JSON.stringify({ sql, params }),
+        cache: 'no-store',
+        signal: AbortSignal.timeout(15_000),
       },
-      body: JSON.stringify({ sql, params }),
-      cache: 'no-store',
-      signal: AbortSignal.timeout(15_000),
-    },
-  )
+    )
+  } catch {
+    const error = new Error('Cloudflare D1 read-only query transport failed')
+    error.code = 'CLOUDFLARE_D1_QUERY_TRANSPORT'
+    throw error
+  }
   if (!response.ok) {
     const error = new Error('Cloudflare D1 read-only query failed')
     error.code = `CLOUDFLARE_D1_QUERY_HTTP_${response.status}`
@@ -206,9 +213,11 @@ async function main() {
     } catch (error) {
       lastErrorCode = failureCodeFrom(error)
       evidence.pollingDurationMs = Date.now() - startedAt
-      if (Date.now() >= deadline || !['CLOUDFLARE_D1_QUERY_HTTP_429', 'CLOUDFLARE_D1_QUERY_HTTP_500',
-          'CLOUDFLARE_D1_QUERY_HTTP_502', 'CLOUDFLARE_D1_QUERY_HTTP_503',
-          'CLOUDFLARE_D1_QUERY_HTTP_504'].includes(lastErrorCode)) {
+      const retryable = lastErrorCode === 'CLOUDFLARE_D1_QUERY_TRANSPORT' ||
+        ['CLOUDFLARE_D1_QUERY_HTTP_408', 'CLOUDFLARE_D1_QUERY_HTTP_429',
+          'CLOUDFLARE_D1_QUERY_HTTP_500', 'CLOUDFLARE_D1_QUERY_HTTP_502',
+          'CLOUDFLARE_D1_QUERY_HTTP_503', 'CLOUDFLARE_D1_QUERY_HTTP_504'].includes(lastErrorCode)
+      if (Date.now() >= deadline || !retryable) {
         evidence.status = 'BLOCKED'
         evidence.failureCode = lastErrorCode
         break
