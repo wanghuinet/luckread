@@ -78,6 +78,21 @@
 - This addendum supersedes earlier statements that *no live MFA end-to-end run exists* only for the scenarios enumerated above. It does **not** establish complete AUTH-007 closure. Still outstanding: challenge-expiry testing; cross-account authorization negatives; bounded-attempt/rate-limit/lockout evidence; production W02 outbox → existing `AUTH013_QUEUE` → W06 canonical AuditEvent persistence, duplicate delivery and DLQ/failure evidence; canonical entity/field admission; current-head Evidence Registry acceptance and final Mapping 0 validation.
 - Consequently, this run does not change the top-level status: `AUTH-007 = BLOCKED_NOT_GREEN`, implementation authorization `false`, and no L8 grant is allowed.
 
+
+## 2D. Controlled production D1-01 schema read-back (2026-10-25)
+
+- Controlled remote migration run: https://github.com/wanghuinet/luckread/actions/runs/40152799763; artifact: https://github.com/wanghuinet/luckread/actions/runs/40152799763/artifacts/12583636257; run head SHA: `7d9011fc3aa64190205e0112fa37660b9f065a4b`; job: `121047677844`.
+- The remote read-back explicitly reports D1-01 database `luckread`, UUID `2f80471e-3756-49f9-8db1-7707a433ad64`, and migration-ledger entries `0006_better_auth_two_factor.sql`, `0007_l8_genesis_bootstrap_audit.sql`, and `0008_auth_007_mfa_publication_journal.sql`. Remote schema output includes the `twoFactor.lastAcceptedTotpTimeStep` column, user MFA/enrollment columns, `auth_007_mfa_publication_journal` plus its status/next-attempt index, and the two MFA lifecycle triggers.
+- Provenance caveat: the artifact's `w02-role-assignment-remote-provenance.txt` contains literal `$SOURCE_SHA` and `$DATABASE_NAME` values because that historical workflow used a single-quoted heredoc. GitHub run metadata independently binds the run to the SHA above; PR #1314 subsequently fixed heredoc expansion. The Evidence Registry therefore records this result as `PASS / CREATED`, **not** `VERIFIED`, pending admission of the provenance caveat.
+- Comparing the migration run SHA to deployed runtime SHA `d58faf8ae7994bd9d6f04818ec15eab13a45427f` shows only the migration workflow file changed between those commits; the W02 runtime/migration source did not change. This section supersedes older statements that migrations 0006-0008 had not been applied remotely, but it does not promote AUTH-007 or authorize L8.
+
+## 2E. Deployed W01/W02 source bound to live MFA acceptance (2026-10-25)
+
+- Deployment run: https://github.com/wanghuinet/luckread/actions/runs/40154014151; artifact: https://github.com/wanghuinet/luckread/actions/runs/40154014151/artifacts/12584315720; source SHA: `d58faf8ae7994bd9d6f04818ec15eab13a45427f`; job: `121051354332`.
+- The deployment evidence records W02 Worker `luckread-w02` version `07c1f043-49dd-44fc-a5d3-cbc942094d63`, W01 Worker `luckread-w01-payload` version `a405d338-62b2-47c3-a547-28f1c16386e7`, and W01's `W02_AUTH` binding to `luckread-w02`. It records no D1 mutation and no new Worker, D1, Queue, or Service Binding. The companion session/login/logout live E2E artifact passed 12/12 checks.
+- Comparing deployed SHA `d58faf8ae7994bd9d6f04818ec15eab13a45427f` to live MFA E2E harness SHA `afae8f8947a4b2b7aa3358c5f359eb7577ba7b31` shows only the MFA acceptance workflow, its test harness/helper, and W02 verification workflow changed; production runtime files did not. The 25/25 live MFA assertions therefore exercised the deployed W01/W02 runtime source. This does not prove W02 outbox-to-Queue-to-W06 audit delivery, DLQ behavior, or final audit-event persistence.
+- Evidence Registry record `EVD-AUTH007-W01-W02-PRODUCTION-RUNTIME-20261025-001` is `PASS / CREATED` and pending formal admission.
+
 ## 3. Security interpretation rules
 
 No factor type, endpoint, entity, secret field, recovery mechanism, challenge algorithm, attempt limit, or persistence location is promoted to canonical design merely because MFA is named in the Blueprint or referenced by security documents.
