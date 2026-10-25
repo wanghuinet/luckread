@@ -10,7 +10,7 @@ const SAFE_LABELS = Object.freeze({
 const COMMON_EVENT_TYPES = new Set(['fetch', 'scheduled', 'cron', 'queue'])
 const W02_SCRIPT_FILTER = Object.freeze({
   key: '$metadata.service',
-  operation: 'eq',
+  operation: 'starts_with',
   type: 'string',
   value: EXPECTED_SCRIPT,
 })
