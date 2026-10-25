@@ -101,7 +101,10 @@ jobs:
           output_file="$GITHUB_WORKSPACE/$artifact_dir/w02-runtime-sanitized-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.jsonl"
           stderr_file="$capture_dir/wrangler.stderr"
           status_file="$capture_dir/pipeline-status"
+          stats_file="$capture_dir/w02-tail-live-stats-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.json"
           pid_file="$capture_dir/tail.pid"
+          rm -f "$stats_file" "$capture_dir/intentional-stop"
+          export AUTH007_TAIL_STATS_FILE="$stats_file"
           setsid bash -c '
             set -uo pipefail
             cd "$GITHUB_WORKSPACE/workers/W02-identity"
@@ -116,16 +119,27 @@ jobs:
             exit "${pipeline_status[0]}"
           ' </dev/null >/dev/null 2>&1 &
           echo "$!" > "$pid_file"
-          for attempt in $(seq 1 10); do
+          for attempt in $(seq 1 90); do
             pid="$(cat "$pid_file")"
             if ! kill -0 "$pid" 2>/dev/null; then
-              echo "::warning::W02 runtime log capture exited before readiness"
+              echo "::warning::W02 runtime tail process exited before a scheduled publication marker was observed"
               node "$GITHUB_WORKSPACE/scripts/auth-007-classify-wrangler-tail-stderr.mjs" "$stderr_file" "$status_file"
+              exit 0
+            fi
+            if [[ -s "$stats_file" ]] && grep -Eq '"tick":[1-9][0-9]*' "$stats_file"; then
+              echo "W02 Tail received a scheduled publication tick marker; only aggregate telemetry is persisted."
               exit 0
             fi
             sleep 1
           done
-          echo "Runtime capture is active; only allowlisted W02 cron counters and stage codes are retained."
+          if [[ -s "$stats_file" ]]; then
+            echo "::warning::W02 Tail remained alive but no scheduled publication tick marker was observed within 90 seconds"
+            echo "Sanitized W02 live aggregate telemetry:"
+            cat "$stats_file"
+          else
+            echo "::warning::W02 Tail remained alive but no structured stream telemetry was observed within 90 seconds"
+          fi
+          exit 0
 
       - name: Run production MFA enrollment, invalid-code, replay and disable acceptance
         env:
@@ -149,20 +163,28 @@ jobs:
         run: |
           set +e
           capture_dir="$RUNNER_TEMP/auth007-w02-tail"
+          artifact_dir="artifacts/mapping-0/auth-007-mfa-audit-delivery-e2e"
           pid_file="$capture_dir/tail.pid"
+          intentional_stop="$capture_dir/intentional-stop"
           if [[ -f "$pid_file" ]]; then
             pid="$(cat "$pid_file")"
-            kill -TERM -- "-$pid" 2>/dev/null || kill -TERM "$pid" 2>/dev/null || true
-            for attempt in $(seq 1 5); do
-              kill -0 "$pid" 2>/dev/null || break
-              sleep 1
-            done
-            kill -KILL -- "-$pid" 2>/dev/null || kill -KILL "$pid" 2>/dev/null || true
+            if kill -0 "$pid" 2>/dev/null; then
+              printf 'INTENTIONAL_STOP\n' > "$intentional_stop"
+              kill -TERM -- "-$pid" 2>/dev/null || kill -TERM "$pid" 2>/dev/null || true
+              for attempt in $(seq 1 5); do
+                kill -0 "$pid" 2>/dev/null || break
+                sleep 1
+              done
+            fi
           fi
-          output_file="artifacts/mapping-0/auth-007-mfa-audit-delivery-e2e/w02-runtime-sanitized-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.jsonl"
+          output_file="$artifact_dir/w02-runtime-sanitized-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.jsonl"
+          stats_file="$capture_dir/w02-tail-live-stats-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.json"
+          if [[ -s "$stats_file" ]]; then
+            cp "$stats_file" "$GITHUB_WORKSPACE/$artifact_dir/"
+          fi
           stderr_file="$capture_dir/wrangler.stderr"
           status_file="$capture_dir/pipeline-status"
-          node "$GITHUB_WORKSPACE/scripts/auth-007-classify-wrangler-tail-stderr.mjs" "$stderr_file" "$status_file"
+          node "$GITHUB_WORKSPACE/scripts/auth-007-classify-wrangler-tail-stderr.mjs" "$stderr_file" "$status_file" "$intentional_stop"
           if [[ -s "$output_file" ]]; then
             echo "Sanitized W02 runtime diagnostics:"
             cat "$output_file"
@@ -179,6 +201,7 @@ jobs:
             artifacts/mapping-0/auth-007-mfa-live-security-e2e/*.json
             artifacts/mapping-0/auth-007-mfa-audit-delivery-e2e/*.json
             artifacts/mapping-0/auth-007-mfa-audit-delivery-e2e/w02-runtime-sanitized-*.jsonl
+            artifacts/mapping-0/auth-007-mfa-audit-delivery-e2e/w02-tail-live-stats-*.json
           if-no-files-found: warn
           retention-days: 30
 
