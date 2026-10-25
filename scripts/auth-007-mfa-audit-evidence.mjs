@@ -50,7 +50,7 @@ export function evaluateMfaAuditDelivery(outboxRows, canonicalAuditRows) {
       failedCount,
       canonicalAuditCount,
       outboxSettled: totalCount > 0 && publishedCount === totalCount && pendingCount === 0 && failedCount === 0,
-      persistedExactlyOnce: canonicalAuditCount === publishedCount,
+      persistedExactlyOnce: publishedCount > 0 && canonicalAuditCount === publishedCount,
     }
   })
 
