@@ -68,6 +68,16 @@
 - The six operation IDs and login HTTP 202 challenge variant are mapped in `contracts/openapi/v1/openapi.yaml`; DTO records, auth operation policy, OpenAPI operation policy, self-scoped permissions and endpoint inventory are bound. W01 adapters and route-level tests cover status, enrollment start/confirm, challenge verification, disable and recovery rotation. W02 tests cover authoritative status, pending-factor/idempotency guards, verified confirmation, account-state checks, atomic/concurrent TOTP replay rejection and the new lifecycle contract. Operation-policy `state` evidence is now marked `PASS` only for the local lifecycle slices with source tests; resource-budget and anti-abuse dimensions now have explicit bounded policies and local test coverage; production security E2E remains missing. Production security E2E, controlled D1-01 migration/read-back, audit-event/Evidence Registry admission and final Mapping 0 validation remain outstanding. This progress does not authorize production deployment or the L8 grant.
 - `AUTH-007` remains `BLOCKED_NOT_GREEN`; implementation authorization remains `false`.
 
+
+## 2C. Production MFA security E2E evidence (2026-10-25)
+
+- Protected live workflow: https://github.com/wanghuinet/luckread/actions/runs/40157067122
+- Tested source SHA: `afae8f8947a4b2b7aa3358c5f359eb7577ba7b31`; job `121060602451`; sanitized evidence artifact: https://github.com/wanghuinet/luckread/actions/runs/40157067122/artifacts/12585720278
+- Result: **25/25 assertions passed; 0 failed**. The artifact confirms enrollment and authoritative read-back, invalid-code rejection without mutation, login challenge and successful TOTP, consumed-challenge rejection, same-step TOTP replay rejection, recovery-code success and reuse rejection on a fresh challenge, MFA disable with password + fresh TOTP, prior-session revocation, and post-disable read-back/login. It records no passwords, TOTP secrets/codes, recovery codes, cookies, session tokens, user identifiers or response bodies.
+- Evidence Registry record `EVD-AUTH007-MFA-LIVE-SECURITY-E2E-20261025-001` is added with result `PASS` and status `CREATED`. It is pending formal admission; it is not represented as `VERIFIED`.
+- This addendum supersedes earlier statements that *no live MFA end-to-end run exists* only for the scenarios enumerated above. It does **not** establish complete AUTH-007 closure. Still outstanding: challenge-expiry testing; cross-account authorization negatives; bounded-attempt/rate-limit/lockout evidence; production W02 outbox → existing `AUTH013_QUEUE` → W06 canonical AuditEvent persistence, duplicate delivery and DLQ/failure evidence; canonical entity/field admission; current-head Evidence Registry acceptance and final Mapping 0 validation.
+- Consequently, this run does not change the top-level status: `AUTH-007 = BLOCKED_NOT_GREEN`, implementation authorization `false`, and no L8 grant is allowed.
+
 ## 3. Security interpretation rules
 
 No factor type, endpoint, entity, secret field, recovery mechanism, challenge algorithm, attempt limit, or persistence location is promoted to canonical design merely because MFA is named in the Blueprint or referenced by security documents.
