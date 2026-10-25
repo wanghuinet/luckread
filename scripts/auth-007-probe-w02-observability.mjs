@@ -1,6 +1,6 @@
 const EXPECTED_SCRIPT = 'luckread-w02'
 const WINDOW_MS = 30 * 60 * 1000
-const MAX_INVOCATIONS = 200
+const MAX_INVOCATIONS = 100
 const SAFE_LABELS = Object.freeze({
   tick: 'W02 scheduled publication tick',
   result: 'W02 scheduled publication result',
