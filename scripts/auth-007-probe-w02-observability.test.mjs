@@ -86,7 +86,7 @@ describe('AUTH-007 read-only W02 scheduled Observability probe', () => {
       status: 'PASS',
       category: 'NONE',
       httpStatus: 200,
-      windowMinutes: 10,
+      windowMinutes: 30,
       queriedInvocationGroups: 4,
       w02InvocationGroups: 3,
       fetchInvocations: 1,
