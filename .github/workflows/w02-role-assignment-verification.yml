@@ -12,6 +12,9 @@ on:
       - 'scripts/verify-role-version-mutation.mjs'
       - 'scripts/verify-admin-account-bootstrap-readiness.mjs'
       - 'scripts/auth-007-mfa-live-security-e2e.mjs'
+      - 'scripts/auth-007-mfa-audit-delivery-e2e.mjs'
+      - 'scripts/auth-007-mfa-audit-evidence.mjs'
+      - 'scripts/auth-007-mfa-audit-evidence.test.mjs'
       - 'scripts/auth-007-totp.mjs'
       - 'scripts/auth-007-totp.test.mjs'
       - '.github/workflows/auth-007-mfa-live-security-e2e.yml'
@@ -38,6 +41,9 @@ on:
       - 'scripts/verify-role-version-mutation.mjs'
       - 'scripts/verify-admin-account-bootstrap-readiness.mjs'
       - 'scripts/auth-007-mfa-live-security-e2e.mjs'
+      - 'scripts/auth-007-mfa-audit-delivery-e2e.mjs'
+      - 'scripts/auth-007-mfa-audit-evidence.mjs'
+      - 'scripts/auth-007-mfa-audit-evidence.test.mjs'
       - 'scripts/auth-007-totp.mjs'
       - 'scripts/auth-007-totp.test.mjs'
       - '.github/workflows/auth-007-mfa-live-security-e2e.yml'
@@ -112,3 +118,9 @@ jobs:
         run: npx vitest run workers/W02-identity/src/authz/role-assignment.test.ts workers/W02-identity/src/authz/role-version.test.ts workers/W02-identity/src/authz/authorization-decision.test.ts workers/W02-identity/src/authz/l8-genesis-bootstrap-approval.test.ts workers/W02-identity/src/authz/l8-genesis-bootstrap-command.test.ts workers/W02-identity/src/authz/l8-genesis-bootstrap-readiness.test.ts workers/W02-identity/src/authz/l8-genesis-bootstrap-route.test.ts workers/W02-identity/src/auth/totp-replay-guard.test.ts workers/W02-identity/src/auth/mfa-audit-publication-journal.test.ts workers/W02-identity/src/auth/mfa-enrollment-start.test.ts workers/W02-identity/src/auth/mfa-enrollment-confirm.test.ts workers/W02-identity/src/session/session-runtime.test.ts
       - name: Run AUTH-007 MFA lifecycle hook and idempotent outbox tests
         run: npx vitest run workers/W02-identity/src/auth/mfa-audit-hooks.test.ts workers/W02-identity/src/auth/mfa-audit-events.test.ts
+      - name: Check AUTH-007 production MFA audit evidence harness
+        run: |
+          node --check scripts/auth-007-mfa-audit-delivery-e2e.mjs
+          node --check scripts/auth-007-mfa-audit-evidence.mjs
+      - name: Test AUTH-007 production MFA audit delivery evidence reconciliation
+        run: node --test scripts/auth-007-mfa-audit-evidence.test.mjs
