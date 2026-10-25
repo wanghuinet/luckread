@@ -156,7 +156,7 @@ async function main() {
   }
   check('immutable_source_and_run_identity_valid', true)
 
-  if (!/^\d{32}$/.test(accountId) || apiToken.length < 20) {
+  if (!/^[a-f0-9]{32}$/i.test(accountId) || apiToken.length < 20) {
     check('cloudflare_d1_read_credentials_configured', false)
     evidence.status = 'BLOCKED'
     evidence.failureCode = 'CLOUDFLARE_D1_READ_CREDENTIALS_MISSING'
