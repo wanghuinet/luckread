@@ -417,6 +417,10 @@ export async function probeW02ScheduledObservability({
     }
   }
   const eventsView = await probeW02EventsView({ accountId, apiToken, now, fetchImpl })
+  // Query success is not proof that the scheduled handler ran. Publish a separate
+  // evidence boolean so callers can fail fast before mutating the live MFA QA account.
+  const scheduledExecutionObserved = stats.scheduledInvocations > 0 ||
+    safeCount(eventsView.scheduledEventRows) + safeCount(eventsView.cronEventRows) > 0
   return {
     status: 'PASS',
     category: 'NONE',
@@ -424,6 +428,7 @@ export async function probeW02ScheduledObservability({
     windowMinutes: WINDOW_MS / 60_000,
     ...stats,
     ...eventsView,
+    scheduledExecutionObserved,
   }
 }
 
@@ -441,7 +446,7 @@ async function main() {
       'queriedInvocationGroups', 'w02InvocationGroups', 'fetchInvocations',
       'scheduledEventTypeInvocations', 'cronEventTypeInvocations', 'queueInvocations',
       'otherEventTypeInvocations', 'unknownEventTypeInvocations',
-      'scheduledInvocations', 'outcomeOk', 'outcomeError', 'outcomeOther',
+      'scheduledInvocations', 'scheduledExecutionObserved', 'outcomeOk', 'outcomeError', 'outcomeOther',
       'tickMarkerInvocations', 'resultMarkerInvocations', 'taskFailureMarkerInvocations',
       'stageFailureMarkerInvocations', 'mfaSummaryLogs', 'selected', 'published', 'failed',
     ].map((key) => `${key[0].toLowerCase() + key.slice(1)}=${result[key]}`),
