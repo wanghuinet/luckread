@@ -108,10 +108,10 @@ jobs:
           cron_probe_status=$?
           observability_output="$(node scripts/auth-007-probe-w02-observability.mjs 2>&1)"
           observability_probe_status=$?
-          printf '%s\\n' "$observability_output"
-          scheduler_observed="$(printf '%s\\n' "$observability_output" | sed -n 's/.*scheduledExecutionObserved=\\(true\\|false\\).*/\\1/p' | tail -n 1)"
-          observability_status="$(printf '%s\\n' "$observability_output" | sed -n 's/.*status=\\([A-Z]*\\).*/\\1/p' | head -n 1)"
-          printf 'W02_PREFLIGHT_RESULT tail_probe_exit=%s cron_probe_exit=%s observability_probe_exit=%s scheduled_observed=%s\\n' "${tail_probe_status:-0}" "${cron_probe_status:-0}" "${observability_probe_status:-0}" "${scheduler_observed:-false}"
+          printf '%s\n' "$observability_output"
+          scheduler_observed="$(printf '%s\n' "$observability_output" | sed -n 's/.*scheduledExecutionObserved=\(true\|false\).*/\1/p' | tail -n 1)"
+          observability_status="$(printf '%s\n' "$observability_output" | sed -n 's/^W02_OBSERVABILITY_CRON_DIAGNOSTIC status=\([A-Z]*\).*/\1/p' | head -n 1)"
+          printf 'W02_PREFLIGHT_RESULT tail_probe_exit=%s cron_probe_exit=%s observability_probe_exit=%s scheduled_observed=%s\n' "${tail_probe_status:-0}" "${cron_probe_status:-0}" "${observability_probe_status:-0}" "${scheduler_observed:-false}"
           echo "scheduler_observed=${scheduler_observed:-false}" >> "$GITHUB_OUTPUT"
           echo "observability_status=${observability_status:-FAIL}" >> "$GITHUB_OUTPUT"
           exit 0
