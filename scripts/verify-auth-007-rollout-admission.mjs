@@ -130,9 +130,22 @@ async function verifyProtectedEnvironment({ requireDistinctActor = true } = {}) 
     const roleName = String(permission.role_name ?? '').toLowerCase()
     const reviewerRole =
       permissionValue === 'admin' || roleName === 'admin' ? 'admin' :
-      roleName === 'maintain' ? 'maintain' : ''
-    if (!reviewerRole) {
-      throw new Error('AUTH-007 rollout reviewer ' + reviewerLogin + ' must have repository admin or maintain permission (role_name=' + (roleName || 'missing') + ')')
+      roleName === 'maintain' ? 'maintain' :
+      roleName || permissionValue
+
+    if (reviewerLogin === 'wanghuinet') {
+      if (reviewerRole !== 'admin' && reviewerRole !== 'maintain') {
+        throw new Error('AUTH-007 primary maintainer wanghuinet must have repository admin or maintain permission (role_name=' + (roleName || 'missing') + ')')
+      }
+    } else {
+      // GitHub Environment reviewers only need repository read access to approve.
+      // Keep the fallback account least-privileged; do not require or grant admin.
+      const hasRepositoryReadAccess =
+        ['read', 'write', 'admin'].includes(permissionValue) ||
+        ['read', 'triage', 'write', 'maintain', 'admin'].includes(roleName)
+      if (!hasRepositoryReadAccess) {
+        throw new Error('AUTH-007 fallback reviewer ' + reviewerLogin + ' must retain at least repository read access')
+      }
     }
     reviewerPermissions[reviewerLogin] = reviewerRole
   }
