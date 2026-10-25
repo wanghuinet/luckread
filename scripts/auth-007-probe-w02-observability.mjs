@@ -14,6 +14,16 @@ const W02_SCRIPT_FILTER = Object.freeze({
   type: 'string',
   value: EXPECTED_SCRIPT,
 })
+const W02_PUBLICATION_LOG_FILTER = Object.freeze({
+  key: '$metadata.message',
+  operation: 'starts_with',
+  type: 'string',
+  value: 'W02 scheduled publication',
+})
+const W02_OBSERVABILITY_FILTERS = Object.freeze([
+  W02_SCRIPT_FILTER,
+  W02_PUBLICATION_LOG_FILTER,
+])
 
 const CATEGORIES = Object.freeze({
   CONFIG: 'CONFIGURATION_MISSING',
@@ -280,7 +290,7 @@ async function probeW02EventsView({ accountId, apiToken, now, fetchImpl }) {
           parameters: {
             datasets: ['cloudflare-workers'],
             filterCombination: 'and',
-            filters: [W02_SCRIPT_FILTER],
+            filters: W02_OBSERVABILITY_FILTERS,
           },
         }),
       },
@@ -367,7 +377,7 @@ export async function probeW02ScheduledObservability({
           parameters: {
             datasets: ['cloudflare-workers'],
             filterCombination: 'and',
-            filters: [W02_SCRIPT_FILTER],
+            filters: W02_OBSERVABILITY_FILTERS,
           },
         }),
       },
