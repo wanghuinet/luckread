@@ -214,12 +214,12 @@ async function main() {
         readCanonicalAuditAggregates(qaUserId),
       ])
       evidence.outboxEvents = outboxRows.map((row) => ({
-        eventType: typeof row.eventType === 'string' ? row.eventType : 'UNKNOWN',
-        status: typeof row.status === 'string' ? row.status : 'UNKNOWN',
+        eventType: typeof row.eventType === 'string' && /^auth\\.mfa\\.[a-z_]+$/.test(row.eventType) ? row.eventType : 'UNKNOWN',
+        status: ['PENDING', 'PUBLISHED', 'FAILED'].includes(row.status) ? row.status : 'UNKNOWN',
         count: Number.isSafeInteger(Number(row.count)) && Number(row.count) >= 0 ? Number(row.count) : 0,
       }))
       evidence.canonicalAuditEvents = auditRows.map((row) => ({
-        action: typeof row.action === 'string' ? row.action : 'UNKNOWN',
+        action: typeof row.action === 'string' && /^auth\\.mfa\\.[a-z_]+$/.test(row.action) ? row.action : 'UNKNOWN',
         count: Number.isSafeInteger(Number(row.count)) && Number(row.count) >= 0 ? Number(row.count) : 0,
       }))
       evaluation = evaluateMfaAuditDelivery(evidence.outboxEvents, evidence.canonicalAuditEvents)
@@ -261,7 +261,7 @@ async function main() {
     evidence.failureCode = lastErrorCode || 'MFA_AUDIT_DELIVERY_NOT_CONVERGED'
   }
   check('expected_w02_outbox_and_w06_audit_delivery_converged', evidence.status === 'PASS', {
-    correlatedEventTypes: evidence.outboxEvents.length,
+    correlatedOutboxStatusGroups: evidence.outboxEvents.length,
     canonicalAuditTypes: evidence.canonicalAuditEvents.length,
     pollingDurationMs: evidence.pollingDurationMs,
   })
