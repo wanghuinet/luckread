@@ -97,6 +97,7 @@ jobs:
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          LUCKREAD_AUTH007_MFA_E2E_EMAIL: ${{ secrets.LUCKREAD_AUTH007_MFA_E2E_EMAIL }}
           LUCKREAD_SOURCE_SHA: ${{ inputs.source_sha }}
         run: node scripts/auth-007-mfa-audit-delivery-e2e.mjs
 
