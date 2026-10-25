@@ -25,9 +25,10 @@ const countRows = (rows, field, value) => rows
 export function evaluateMfaAuditDelivery(outboxRows, canonicalAuditRows) {
   const outbox = Array.isArray(outboxRows) ? outboxRows : []
   const audit = Array.isArray(canonicalAuditRows) ? canonicalAuditRows : []
-  const eventTypes = [...new Set(outbox
-    .map((row) => row?.eventType)
-    .filter((value) => typeof value === 'string'))].sort()
+  const eventTypes = [...new Set([
+    ...outbox.map((row) => row?.eventType),
+    ...audit.map((row) => row?.action),
+  ].filter((value) => typeof value === 'string'))].sort()
 
   const events = eventTypes.map((eventType) => {
     const totalCount = countRows(outbox, 'eventType', eventType)
