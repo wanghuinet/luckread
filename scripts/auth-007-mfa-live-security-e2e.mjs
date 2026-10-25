@@ -582,8 +582,8 @@ const run = async () => {
     let disable = null
     for (let attempt = 0; attempt < 4; attempt += 1) {
       const step = currentStep(totp.period)
-      if (step <= confirmedStep) {
-        const remainingMs = (confirmedStep + 1) * totp.period * 1000 - Date.now()
+      if (step <= (latestAcceptedTotpStep ?? confirmedStep)) {
+        const remainingMs = ((latestAcceptedTotpStep ?? confirmedStep) + 1) * totp.period * 1000 - Date.now()
         await sleep(Math.max(250, Math.min(remainingMs + 250, 31_000)))
         continue
       }
@@ -651,15 +651,20 @@ const run = async () => {
     result.failureCategory = error instanceof Error ? safeCode(error.message) || error.name : typeof error
     check('unexpected_test_error', false, { category: result.failureCategory })
   } finally {
-    // If the test failed after enabling MFA, attempt a bounded cleanup with a fresh
-    // time step. A cleanup failure is surfaced as a manual-review blocker, never hidden.
+    // If the test failed after enabling MFA, restore the most recently verified
+    // session cookie before attempting bounded cleanup with a fresh TOTP step.
+    // Cookie values remain memory-only and are never added to evidence or logs.
+    if (factorEnabled && !normalDisableSucceeded && lastAuthenticatedCookie) {
+      restoreCookieHeader(lastAuthenticatedCookie)
+    }
+    // Cleanup failure is surfaced as a manual-review blocker, never hidden.
     if (factorEnabled && !normalDisableSucceeded && totp && confirmedStep !== null) {
       result.cleanupStatus = 'cleanup_attempted'
       let cleanupSucceeded = false
       for (let attempt = 0; attempt < 4; attempt += 1) {
         const step = currentStep(totp.period)
-        if (step <= confirmedStep) {
-          const remainingMs = (confirmedStep + 1) * totp.period * 1000 - Date.now()
+        if (step <= (latestAcceptedTotpStep ?? confirmedStep)) {
+          const remainingMs = ((latestAcceptedTotpStep ?? confirmedStep) + 1) * totp.period * 1000 - Date.now()
           await sleep(Math.max(250, Math.min(remainingMs + 250, 31_000)))
           continue
         }
