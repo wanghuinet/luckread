@@ -111,9 +111,9 @@ describe('AUTH-007 read-only W02 scheduled Observability probe', () => {
       assert.equal(request.body.dry, true)
       assert.equal(request.body.timeframe.to - request.body.timeframe.from, 1_800_000)
       assert.equal(request.body.limit, 100)
-      const expectedFilters = request.body.view === 'invocations'
-        ? [{ key: '$metadata.service', operation: 'starts_with', type: 'string', value: 'luckread-w02' }]
-        : [{ key: '$metadata.message', operation: 'starts_with', type: 'string', value: 'W02 scheduled publication' }]
+      const expectedFilters = [
+        { key: '$metadata.service', operation: 'starts_with', type: 'string', value: 'luckread-w02' },
+      ]
       assert.deepEqual(request.body.parameters.filters, expectedFilters)
       assert.equal(request.body.parameters.filterCombination, 'and')
       assert.equal(Object.hasOwn(request.body.parameters, 'limit'), false)

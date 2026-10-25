@@ -14,14 +14,9 @@ const W02_SCRIPT_FILTER = Object.freeze({
   type: 'string',
   value: EXPECTED_SCRIPT,
 })
-const W02_PUBLICATION_LOG_FILTER = Object.freeze({
-  key: '$metadata.message',
-  operation: 'starts_with',
-  type: 'string',
-  value: 'W02 scheduled publication',
-})
-// Apply fields appropriate to each view: invocation records do not necessarily
-// have the same message metadata as individual log-event rows.
+// Scope both views by the indexed service name. Log-message fields can be represented
+// differently across invocation and event rows, so fixed marker matching happens
+// in memory after the bounded W02-only query.
 
 const CATEGORIES = Object.freeze({
   CONFIG: 'CONFIGURATION_MISSING',
@@ -288,7 +283,7 @@ async function probeW02EventsView({ accountId, apiToken, now, fetchImpl }) {
           parameters: {
             datasets: ['cloudflare-workers'],
             filterCombination: 'and',
-            filters: [W02_PUBLICATION_LOG_FILTER],
+            filters: [W02_SCRIPT_FILTER],
           },
         }),
       },
@@ -329,9 +324,9 @@ async function probeW02EventsView({ accountId, apiToken, now, fetchImpl }) {
 
 /**
  * Query Cloudflare Workers Observability without opening a WebSocket tail.
- * Invocation queries are scoped by W02 service name; event queries are scoped
- * by the fixed scheduled-publication message prefix. Keep these filters view-specific
- * because invocation metadata may not carry the same message field as log events.
+ * Both queries are scoped by the indexed W02 service name. For Events, avoid
+ * filtering on a message field whose representation can differ across invocation and
+ * log rows; inspect only bounded results in memory and retain fixed markers/counts.
  * Only fixed labels and safe numeric aggregates survive; raw event bodies and
  * request identifiers are never logged or persisted.
  */
