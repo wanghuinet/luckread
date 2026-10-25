@@ -108,6 +108,7 @@ jobs:
         run: |
           node --check scripts/auth-007-mfa-live-security-e2e.mjs
           node --check scripts/auth-007-totp.mjs
+          node --check scripts/auth-007-sanitize-w02-runtime-tail.mjs
       - name: Test RFC-compatible live MFA TOTP helper
         run: node --test scripts/auth-007-totp.test.mjs
       - name: Verify logical table authority boundary
@@ -124,3 +125,5 @@ jobs:
           node --check scripts/auth-007-mfa-audit-evidence.mjs
       - name: Test AUTH-007 production MFA audit delivery evidence reconciliation
         run: node --test scripts/auth-007-mfa-audit-evidence.test.mjs
+      - name: Test W02 runtime tail redaction
+        run: node --test scripts/auth-007-sanitize-w02-runtime-tail.test.mjs
