@@ -102,7 +102,9 @@ jobs:
           setsid bash -c '
             set -uo pipefail
             cd "$GITHUB_WORKSPACE/workers/W02-identity"
-            npx --yes wrangler@4.116.0 tail luckread-w02 --format json --search "W02 scheduled publication" --sampling-rate 1 \
+            # W02 markers use console.info; --search is documented as filtering console.log messages.
+            # Keep the raw stream in-memory only and persist output only after strict allowlist sanitization.
+            npx --yes wrangler@4.116.0 tail luckread-w02 --format json --sampling-rate 1 \
               2>"$RUNNER_TEMP/auth007-w02-tail/wrangler.stderr" |
               node "$GITHUB_WORKSPACE/scripts/auth-007-sanitize-w02-runtime-tail.mjs" \
                 > "$GITHUB_WORKSPACE/artifacts/mapping-0/auth-007-mfa-audit-delivery-e2e/w02-runtime-sanitized-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.jsonl"
