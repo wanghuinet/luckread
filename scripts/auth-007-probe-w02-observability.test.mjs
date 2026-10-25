@@ -132,6 +132,7 @@ describe('AUTH-007 read-only W02 scheduled Observability probe', () => {
       otherEventTypeInvocations: 0,
       unknownEventTypeInvocations: 0,
       scheduledInvocations: 2,
+      scheduledExecutionObserved: true,
       outcomeOk: 1,
       outcomeError: 1,
       outcomeOther: 0,
@@ -201,9 +202,11 @@ describe('AUTH-007 read-only W02 scheduled Observability probe', () => {
     assert.equal(result.w02InvocationGroups, 1)
     assert.equal(result.fetchInvocations, 1)
     assert.equal(result.scheduledInvocations, 0)
+    assert.equal(result.scheduledExecutionObserved, false)
     assert.equal(result.tickMarkerInvocations, 0)
     assert.equal(result.eventViewStatus, 'PASS')
     assert.equal(result.scheduledEventRows, 0)
+    assert.equal(result.scheduledExecutionObserved, false)
     assert.equal(result.tickMarkerRows, 0)
   })
 
