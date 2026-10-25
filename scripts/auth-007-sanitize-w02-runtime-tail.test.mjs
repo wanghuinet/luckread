@@ -9,6 +9,7 @@ describe('W02 runtime tail sanitizer', () => {
       outcome: 'ok',
       event: { request: { url: 'https://api.luckread.com/private?token=secret' } },
       logs: [{
+        level: 'info',
         message: ['W02 scheduled publication tick', {
           cron: '* * * * *',
           scheduledTime: 1792904400000,
