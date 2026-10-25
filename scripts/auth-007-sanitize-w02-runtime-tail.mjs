@@ -198,6 +198,7 @@ function writeLiveStats(stats) {
 function run() {
   const input = createInterface({ input: process.stdin, crlfDelay: Infinity })
   const stats = createRuntimeTailStats()
+  writeLiveStats(stats)
   let summaryEmitted = false
 
   const emitSummary = () => {
