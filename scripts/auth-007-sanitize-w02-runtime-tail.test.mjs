@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'node:test'
+import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 import { sanitizeRuntimeTailRecord } from './auth-007-sanitize-w02-runtime-tail.mjs'
 
