@@ -1,3 +1,4 @@
+import { writeFileSync } from 'node:fs'
 import { createInterface } from 'node:readline'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -182,6 +183,18 @@ export function sanitizeRuntimeTailRecord(record, stats) {
   return safeRecord
 }
 
+
+function writeLiveStats(stats) {
+  const path = process.env.AUTH007_TAIL_STATS_FILE
+  if (!path) return
+  try {
+    // This sidecar contains aggregate counters only; never write any raw log line.
+    writeFileSync(path, JSON.stringify(summarizeRuntimeTailStats(stats)) + '\n', { mode: 0o600 })
+  } catch {
+    // Telemetry must never change the tail sanitizer's streaming behavior.
+  }
+}
+
 function run() {
   const input = createInterface({ input: process.stdin, crlfDelay: Infinity })
   const stats = createRuntimeTailStats()
@@ -205,8 +218,12 @@ function run() {
       // fixed labels only; raw text is never copied to the artifact.
       recordMalformedRuntimeLine(line, stats)
     }
+    writeLiveStats(stats)
   })
-  input.on('close', emitSummary)
+  input.on('close', () => {
+    writeLiveStats(stats)
+    emitSummary()
+  })
   process.on('SIGTERM', emitSummary)
   process.on('SIGINT', emitSummary)
 }
