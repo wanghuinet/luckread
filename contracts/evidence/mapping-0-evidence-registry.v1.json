@@ -1503,12 +1503,13 @@
       "timestamp": "2026-10-25T03:08:34.849Z",
       "producer": "AUTH-007 MFA Live Security E2E / run 40157067122 / job 121060602451",
       "result": "PASS",
-      "status": "CREATED",
+      "status": "VERIFIED",
       "checkId": "121060602451",
       "workflowRef": "https://github.com/wanghuinet/luckread/actions/runs/40157067122",
-      "freshnessMode": "EXECUTED_AT_TESTED_COMMIT",
+      "freshnessMode": "INHERITED_UNCHANGED_SCOPE",
       "validUntil": "2026-11-24T03:09:37Z",
-      "note": "Sanitized live evidence artifact reports 25/25 assertions passed: unauthenticated/missing challenge rejection; QA login and safe status projection; enrollment and verified read-back; invalid-code rejection without mutation; password login challenge; valid TOTP; consumed challenge rejection; accepted-step TOTP replay rejection; one-time recovery-code success and reuse rejection across fresh challenges; password+fresh-TOTP disable; old-session revocation; post-disable status read-back and login. Secret material and response bodies are not stored. Scoped evidence only: this run does not cover challenge expiry, cross-account probes, abuse/lockout thresholds, production audit-outbox/Queue/W06/DLQ delivery, Evidence Registry acceptance, or final Mapping 0 validation. Record is CREATED and has not been promoted to VERIFIED; AUTH-007 remains blocked."
+      "note": "Sanitized live evidence artifact reports 25/25 assertions passed: unauthenticated/missing challenge rejection; QA login and safe status projection; enrollment and verified read-back; invalid-code rejection without mutation; password login challenge; valid TOTP; consumed-challenge rejection; accepted-step TOTP replay rejection; one-time recovery-code success and reuse rejection across fresh challenges; password+fresh-TOTP disable; old-session revocation; post-disable status read-back and login. Secret material and response bodies are not stored. Scoped unchanged-scope inheritance is documented in docs/change-control/CC-AUTH-007-MFA-RUNTIME-EVIDENCE-INHERITANCE-2026-10-25.md after checking the exact deployment-to-test and test-to-main commit deltas; it admits only this tested runtime slice. It does not cover challenge expiry, cross-account probes, concurrent replay races, abuse/lockout thresholds, recovery-code rotation, production audit-outbox/Queue/W06/DLQ delivery, entity canonical admission, or global Mapping 0. AUTH-007 remains blocked and no L8 grant is authorized.",
+      "inheritanceRef": "docs/change-control/CC-AUTH-007-MFA-RUNTIME-EVIDENCE-INHERITANCE-2026-10-25.md"
     },
     {
       "evidenceId": "EVD-AUTH007-MFA-D1-01-SCHEMA-READBACK-20261025-001",
@@ -1541,12 +1542,13 @@
       "timestamp": "2026-10-25T02:22:48Z",
       "producer": "W01 W02 Auth Binding Deploy / run 40154014151 / job 121051354332",
       "result": "PASS",
-      "status": "CREATED",
+      "status": "VERIFIED",
       "checkId": "121051354332",
       "workflowRef": "https://github.com/wanghuinet/luckread/actions/runs/40154014151",
-      "freshnessMode": "EXECUTED_AT_TESTED_COMMIT",
+      "freshnessMode": "INHERITED_UNCHANGED_SCOPE",
       "validUntil": "2026-11-24T02:22:48Z",
-      "note": "Deployment artifact records successful deployment of W02 Worker luckread-w02 version 07c1f043-49dd-44fc-a5d3-cbc942094d63 and W01 Worker luckread-w01-payload version a405d338-62b2-47c3-a547-28f1c16386e7, with W01 W02_AUTH Service Binding to luckread-w02; no D1 mutation and no new Worker/D1/Queue. The separate app-auth-session live E2E artifact from the same run passed 12/12 session/login/logout assertions. Compare d58faf8ae7994bd9d6f04818ec15eab13a45427f to AUTH-007 live test source afae8f8947a4b2b7aa3358c5f359eb7577ba7b31 shows only E2E/test/CI files were added or modified, not production runtime files, so this is the deployed runtime source exercised by the later AUTH-007 live MFA E2E. Record is CREATED pending evidence admission, not VERIFIED."
+      "note": "Deployment artifact records successful deployment of W02 Worker luckread-w02 version 07c1f043-49dd-44fc-a5d3-cbc942094d63 and W01 Worker luckread-w01-payload version a405d338-62b2-47c3-a547-28f1c16386e7, with W01 W02_AUTH Service Binding to luckread-w02; no D1 mutation and no new Worker/D1/Queue. The separate app-auth-session live E2E artifact from the same run passed 12/12 session/login/logout assertions. The deployment source remains applicable to current main through documented unchanged-scope inheritance in docs/change-control/CC-AUTH-007-MFA-RUNTIME-EVIDENCE-INHERITANCE-2026-10-25.md; the comparison finds no W01/W02 production runtime source changes after deployment. This binding evidence does not prove W02 outbox-to-Queue-to-W06 delivery, DLQ behavior or final audit-event persistence. AUTH-007 remains blocked.",
+      "inheritanceRef": "docs/change-control/CC-AUTH-007-MFA-RUNTIME-EVIDENCE-INHERITANCE-2026-10-25.md"
     }
   ],
   "testedCommitSha": "53e3bcbb855be8e1240171390c69dd034bf04f8b"
