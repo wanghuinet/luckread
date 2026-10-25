@@ -100,6 +100,7 @@ jobs:
           mkdir -p "$capture_dir" "$artifact_dir"
           output_file="$GITHUB_WORKSPACE/$artifact_dir/w02-runtime-sanitized-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.jsonl"
           stderr_file="$capture_dir/wrangler.stderr"
+          status_file="$capture_dir/pipeline-status"
           pid_file="$capture_dir/tail.pid"
           setsid bash -c '
             set -uo pipefail
@@ -110,13 +111,16 @@ jobs:
               2>"$RUNNER_TEMP/auth007-w02-tail/wrangler.stderr" |
               node "$GITHUB_WORKSPACE/scripts/auth-007-sanitize-w02-runtime-tail.mjs" \
                 > "$GITHUB_WORKSPACE/artifacts/mapping-0/auth-007-mfa-audit-delivery-e2e/w02-runtime-sanitized-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.jsonl"
+            pipeline_status=( "${PIPESTATUS[@]}" )
+            printf 'wrangler=%s sanitizer=%s\\n' "${pipeline_status[0]}" "${pipeline_status[1]}" > "$RUNNER_TEMP/auth007-w02-tail/pipeline-status"
+            exit "${pipeline_status[0]}"
           ' </dev/null >/dev/null 2>&1 &
           echo "$!" > "$pid_file"
           for attempt in $(seq 1 10); do
             pid="$(cat "$pid_file")"
             if ! kill -0 "$pid" 2>/dev/null; then
               echo "::warning::W02 runtime log capture exited before readiness"
-              node "$GITHUB_WORKSPACE/scripts/auth-007-classify-wrangler-tail-stderr.mjs" "$stderr_file"
+              node "$GITHUB_WORKSPACE/scripts/auth-007-classify-wrangler-tail-stderr.mjs" "$stderr_file" "$status_file" "$status_file"
               exit 0
             fi
             sleep 1
