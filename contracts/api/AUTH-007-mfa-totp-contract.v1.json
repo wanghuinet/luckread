@@ -342,8 +342,8 @@
     "api": "OPENAPI_CONTRACTED_NOT_VERIFIED; all six canonical operationIds, the login HTTP 202 challenge variant, and W01/W02 source adapters are present. W01 route integration and W02 lifecycle/replay tests run in CI. Production security E2E, deployed cross-Worker acceptance and final Mapping 0 evidence have not been admitted.",
     "dto": "DTO_CONTRACT_BOUND; canonical request/response schemas and DTO records are registered and local route/adaptor tests are present. Production DTO/secret-redaction security E2E evidence remains unadmitted.",
     "entity": "PROPOSED",
-    "persistence": "MISSING_REMOTE_SCHEMA_READBACK",
-    "runtime": "SOURCE_IMPLEMENTED_TESTED_LOCALLY; all six W01 MFA routes/W02 adapters and the persisted atomic TOTP replay-guard implementation have source and local test coverage. Production deployment, remote D1 read-back and security E2E remain unverified.",
+    "persistence": "REMOTE_SCHEMA_READBACK_EXECUTED_NOT_ADMITTED",
+    "runtime": "SOURCE_IMPLEMENTED_TESTED_LOCALLY; production W01/W02 deployment run 40154014151 and scoped live MFA E2E run 40157067122 succeeded against the deployed runtime source. Remote D1-01 schema read-back run 40152799763 confirms migration ledger entries 0006-0008 and the MFA replay/outbox schema. Associated registry records are CREATED, not formally VERIFIED. Remaining gaps include challenge expiry, cross-account authorization, bounded-attempt/lockout, full recovery-code rotation coverage, production W02 outbox-to-Queue-to-W06 audit persistence/DLQ evidence, canonical entity admission and current-head Mapping 0 acceptance.",
     "securityE2E": "MISSING",
     "mapping0": "MISSING",
     "auth007": "BLOCKED_NOT_GREEN"
