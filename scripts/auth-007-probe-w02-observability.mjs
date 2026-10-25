@@ -173,6 +173,145 @@ function safeInvocationStats(invocations) {
   }
 }
 
+function safeEventStats(events) {
+  const rows = Array.isArray(events) ? events.slice(0, MAX_INVOCATIONS) : null
+  if (!rows) return null
+
+  const stats = {
+    queriedEventRows: rows.length,
+    w02EventRows: 0,
+    fetchEventRows: 0,
+    scheduledEventRows: 0,
+    cronEventRows: 0,
+    queueEventRows: 0,
+    otherEventTypeRows: 0,
+    unknownEventTypeRows: 0,
+    tickMarkerRows: 0,
+    resultMarkerRows: 0,
+    taskFailureMarkerRows: 0,
+    stageFailureMarkerRows: 0,
+    eventMfaSummaryLogs: 0,
+    eventSelected: 0,
+    eventPublished: 0,
+    eventFailed: 0,
+  }
+  const details = { selected: 0, published: 0, failed: 0, summaryLogs: 0 }
+
+  for (const row of rows) {
+    if (!row || typeof row !== 'object' || Array.isArray(row)) continue
+    const meta = row.$workers && typeof row.$workers === 'object'
+      ? row.$workers
+      : null
+    if (!meta || meta.scriptName !== EXPECTED_SCRIPT) continue
+
+    stats.w02EventRows += 1
+    const type = typeof meta.eventType === 'string' ? meta.eventType.toLowerCase() : ''
+    if (type === 'fetch') stats.fetchEventRows += 1
+    else if (type === 'scheduled') stats.scheduledEventRows += 1
+    else if (type === 'cron') stats.cronEventRows += 1
+    else if (type === 'queue') stats.queueEventRows += 1
+    else if (type === '' || type === 'unknown') stats.unknownEventTypeRows += 1
+    else stats.otherEventTypeRows += 1
+
+    // Event payloads are inspected in memory only. No raw event, message,
+    // request ID, URL, or user information is returned or persisted.
+    let serialized = ''
+    try { serialized = JSON.stringify(row) } catch { /* no marker on serialization failure */ }
+    if (serialized.includes(SAFE_LABELS.tick)) stats.tickMarkerRows += 1
+    if (serialized.includes(SAFE_LABELS.result)) stats.resultMarkerRows += 1
+    if (serialized.includes(SAFE_LABELS.taskFailed)) stats.taskFailureMarkerRows += 1
+    if (serialized.includes(SAFE_LABELS.stageFailed)) stats.stageFailureMarkerRows += 1
+    countSafeDetails(row, details)
+  }
+
+  return {
+    queriedEventRows: safeCount(stats.queriedEventRows),
+    w02EventRows: safeCount(stats.w02EventRows),
+    fetchEventRows: safeCount(stats.fetchEventRows),
+    scheduledEventRows: safeCount(stats.scheduledEventRows),
+    cronEventRows: safeCount(stats.cronEventRows),
+    queueEventRows: safeCount(stats.queueEventRows),
+    otherEventTypeRows: safeCount(stats.otherEventTypeRows),
+    unknownEventTypeRows: safeCount(stats.unknownEventTypeRows),
+    tickMarkerRows: safeCount(stats.tickMarkerRows),
+    resultMarkerRows: safeCount(stats.resultMarkerRows),
+    taskFailureMarkerRows: safeCount(stats.taskFailureMarkerRows),
+    stageFailureMarkerRows: safeCount(stats.stageFailureMarkerRows),
+    eventMfaSummaryLogs: safeCount(details.summaryLogs),
+    eventSelected: safeCount(details.selected),
+    eventPublished: safeCount(details.published),
+    eventFailed: safeCount(details.failed),
+  }
+}
+
+async function probeW02EventsView({ accountId, apiToken, now, fetchImpl }) {
+  const empty = safeEventStats([])
+  const failure = (category, httpStatus = 'NONE') => ({
+    eventViewStatus: 'FAIL',
+    eventViewCategory: category,
+    eventViewHttpStatus: httpStatus,
+    ...empty,
+  })
+  let response
+  try {
+    response = await fetchImpl(
+      'https://api.cloudflare.com/client/v4/accounts/' + accountId + '/workers/observability/telemetry/query',
+      {
+        method: 'POST',
+        headers: {
+          authorization: 'Bearer ' + apiToken,
+          accept: 'application/json',
+          'content-type': 'application/json',
+        },
+        cache: 'no-store',
+        signal: AbortSignal.timeout(15_000),
+        body: JSON.stringify({
+          queryId: 'auth007-account-wide-event-diagnostic',
+          timeframe: { from: now - WINDOW_MS, to: now },
+          view: 'events',
+          limit: MAX_INVOCATIONS,
+          dry: true,
+          parameters: {
+            datasets: ['cloudflare-workers'],
+            filterCombination: 'and',
+          },
+        }),
+      },
+    )
+  } catch {
+    return failure(CATEGORIES.NETWORK)
+  }
+
+  if (!response.ok) {
+    const category = response.status === 401 || response.status === 403
+      ? CATEGORIES.AUTH
+      : response.status === 404
+        ? CATEGORIES.SCOPE
+        : response.status === 429
+          ? CATEGORIES.RATE
+          : response.status >= 500
+            ? CATEGORIES.API
+            : CATEGORIES.HTTP
+    return failure(category, response.status)
+  }
+
+  let payload
+  try { payload = await response.json() } catch {
+    return failure(CATEGORIES.RESPONSE, response.status)
+  }
+
+  const events = payload?.success === true ? payload.result?.events?.events : null
+  const stats = safeEventStats(events)
+  if (!stats) return failure(CATEGORIES.RESPONSE, response.status)
+
+  return {
+    eventViewStatus: 'PASS',
+    eventViewCategory: 'NONE',
+    eventViewHttpStatus: response.status,
+    ...stats,
+  }
+}
+
 /**
  * Query Cloudflare Workers Observability without opening a WebSocket tail.
  * The dry-run scans at most 200 invocation groups in a 30-minute window and
@@ -277,12 +416,14 @@ export async function probeW02ScheduledObservability({
       ...safeInvocationStats({}),
     }
   }
+  const eventsView = await probeW02EventsView({ accountId, apiToken, now, fetchImpl })
   return {
     status: 'PASS',
     category: 'NONE',
     httpStatus: response.status,
     windowMinutes: WINDOW_MS / 60_000,
     ...stats,
+    ...eventsView,
   }
 }
 
@@ -304,6 +445,13 @@ async function main() {
       'tickMarkerInvocations', 'resultMarkerInvocations', 'taskFailureMarkerInvocations',
       'stageFailureMarkerInvocations', 'mfaSummaryLogs', 'selected', 'published', 'failed',
     ].map((key) => `${key[0].toLowerCase() + key.slice(1)}=${result[key]}`),
+    ...[
+      'eventViewStatus', 'eventViewCategory', 'eventViewHttpStatus',
+      'queriedEventRows', 'w02EventRows', 'fetchEventRows', 'scheduledEventRows',
+      'cronEventRows', 'queueEventRows', 'otherEventTypeRows', 'unknownEventTypeRows',
+      'tickMarkerRows', 'resultMarkerRows', 'taskFailureMarkerRows', 'stageFailureMarkerRows',
+      'eventMfaSummaryLogs', 'eventSelected', 'eventPublished', 'eventFailed',
+    ].map((key) => `${key[0].toLowerCase() + key.slice(1)}=${result[key] ?? (key.startsWith('eventView') ? 'NOT_RUN' : 0)}`),
   ]
   process.stdout.write(`W02_OBSERVABILITY_CRON_DIAGNOSTIC ${fields.join(' ')}\n`)
   if (result.status !== 'PASS') process.exitCode = 1

@@ -15,11 +15,43 @@ const response = (status, payload) => ({
 
 describe('AUTH-007 read-only W02 scheduled Observability probe', () => {
   it('runs a dry, bounded account-wide query and classifies W02 event types without storing raw evidence', async () => {
-    let observed
+    const observed = []
     const result = await probeW02ScheduledObservability({
       ...valid,
       fetchImpl: async (url, init) => {
-        observed = { url, init, body: JSON.parse(init.body) }
+        const request = { url, init, body: JSON.parse(init.body) }
+        observed.push(request)
+        if (request.body.view === 'events') {
+          return response(200, {
+            success: true,
+            result: {
+              events: {
+                events: [
+                  {
+                    '$workers': { scriptName: 'luckread-w02', eventType: 'scheduled', outcome: 'ok' },
+                    source: { message: ['W02 scheduled publication tick', { cron: '* * * * *', privateField: 'must-not-escape' }] },
+                  },
+                  {
+                    '$workers': { scriptName: 'luckread-w02', eventType: 'scheduled', outcome: 'ok' },
+                    source: { message: ['W02 scheduled publication result', { task: 'mfa-audit', selected: 2, published: 2, failed: 0, privateField: 'must-not-escape' }] },
+                  },
+                  {
+                    '$workers': { scriptName: 'luckread-w02', eventType: 'cron', outcome: 'exception' },
+                    source: { message: ['W02 scheduled publication stage failed', { task: 'mfa-audit', stage: 'mark-published', error: 'private exception' }] },
+                  },
+                  {
+                    '$workers': { scriptName: 'luckread-w02', eventType: 'fetch', outcome: 'ok' },
+                    source: { message: 'ordinary fetch log' },
+                  },
+                  {
+                    '$workers': { scriptName: 'another-worker', eventType: 'scheduled', outcome: 'ok' },
+                    source: { message: ['W02 scheduled publication tick', { privateField: 'must-not-escape' }] },
+                  },
+                ],
+              },
+            },
+          })
+        }
         return response(200, {
           success: true,
           result: {
@@ -73,15 +105,19 @@ describe('AUTH-007 read-only W02 scheduled Observability probe', () => {
       },
     })
 
-    assert.equal(observed.url, 'https://api.cloudflare.com/client/v4/accounts/0123456789abcdef0123456789abcdef/workers/observability/telemetry/query')
-    assert.equal(observed.init.method, 'POST')
-    assert.equal(observed.body.dry, true)
-    assert.equal(observed.body.view, 'invocations')
-    assert.equal(observed.body.queryId, 'auth007-account-wide-invocation-diagnostic')
-    assert.equal(observed.body.timeframe.to - observed.body.timeframe.from, 1_800_000)
-    assert.equal(observed.body.limit, 200)
-    assert.equal(Object.hasOwn(observed.body.parameters, 'filters'), false)
-    assert.equal(Object.hasOwn(observed.body.parameters, 'limit'), false)
+    assert.equal(observed.length, 2)
+    assert.equal(observed[0].url, 'https://api.cloudflare.com/client/v4/accounts/0123456789abcdef0123456789abcdef/workers/observability/telemetry/query')
+    assert.equal(observed[0].init.method, 'POST')
+    assert.deepEqual(observed.map((request) => request.body.view), ['invocations', 'events'])
+    assert.equal(observed[0].body.queryId, 'auth007-account-wide-invocation-diagnostic')
+    assert.equal(observed[1].body.queryId, 'auth007-account-wide-event-diagnostic')
+    for (const request of observed) {
+      assert.equal(request.body.dry, true)
+      assert.equal(request.body.timeframe.to - request.body.timeframe.from, 1_800_000)
+      assert.equal(request.body.limit, 200)
+      assert.equal(Object.hasOwn(request.body.parameters, 'filters'), false)
+      assert.equal(Object.hasOwn(request.body.parameters, 'limit'), false)
+    }
     assert.deepEqual(result, {
       status: 'PASS',
       category: 'NONE',
@@ -107,6 +143,25 @@ describe('AUTH-007 read-only W02 scheduled Observability probe', () => {
       selected: 2,
       published: 2,
       failed: 0,
+      eventViewStatus: 'PASS',
+      eventViewCategory: 'NONE',
+      eventViewHttpStatus: 200,
+      queriedEventRows: 5,
+      w02EventRows: 4,
+      fetchEventRows: 1,
+      scheduledEventRows: 2,
+      cronEventRows: 1,
+      queueEventRows: 0,
+      otherEventTypeRows: 0,
+      unknownEventTypeRows: 0,
+      tickMarkerRows: 1,
+      resultMarkerRows: 1,
+      taskFailureMarkerRows: 0,
+      stageFailureMarkerRows: 1,
+      eventMfaSummaryLogs: 1,
+      eventSelected: 2,
+      eventPublished: 2,
+      eventFailed: 0,
     })
     assert.equal(JSON.stringify(result).includes('must-not-escape'), false)
     assert.equal(JSON.stringify(result).includes('private-request-id'), false)
@@ -116,22 +171,40 @@ describe('AUTH-007 read-only W02 scheduled Observability probe', () => {
   it('distinguishes a visible W02 fetch invocation from missing scheduler evidence', async () => {
     const result = await probeW02ScheduledObservability({
       ...valid,
-      fetchImpl: async () => response(200, {
-        success: true,
-        result: {
-          invocations: {
-            'private-fetch-request-id': [
-              { '$workers': { scriptName: 'luckread-w02', eventType: 'fetch', outcome: 'ok' } },
-            ],
+      fetchImpl: async (_url, init) => {
+        const body = JSON.parse(init.body)
+        if (body.view === 'events') {
+          return response(200, {
+            success: true,
+            result: {
+              events: {
+                events: [
+                  { '$workers': { scriptName: 'luckread-w02', eventType: 'fetch', outcome: 'ok' } },
+                ],
+              },
+            },
+          })
+        }
+        return response(200, {
+          success: true,
+          result: {
+            invocations: {
+              'private-fetch-request-id': [
+                { '$workers': { scriptName: 'luckread-w02', eventType: 'fetch', outcome: 'ok' } },
+              ],
+            },
           },
-        },
-      }),
+        })
+      },
     })
     assert.equal(result.queriedInvocationGroups, 1)
     assert.equal(result.w02InvocationGroups, 1)
     assert.equal(result.fetchInvocations, 1)
     assert.equal(result.scheduledInvocations, 0)
     assert.equal(result.tickMarkerInvocations, 0)
+    assert.equal(result.eventViewStatus, 'PASS')
+    assert.equal(result.scheduledEventRows, 0)
+    assert.equal(result.tickMarkerRows, 0)
   })
 
   it('does not call Cloudflare when configuration is missing', async () => {
