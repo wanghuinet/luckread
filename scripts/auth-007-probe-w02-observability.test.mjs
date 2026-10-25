@@ -40,10 +40,6 @@ describe('AUTH-007 read-only W02 scheduled Observability probe', () => {
                     source: { message: ['W02 scheduled publication stage failed', { task: 'mfa-audit', stage: 'mark-published', error: 'private exception' }] },
                   },
                   {
-                    '$workers': { scriptName: 'luckread-w02', eventType: 'fetch', outcome: 'ok' },
-                    source: { message: 'ordinary fetch log' },
-                  },
-                  {
                     '$workers': { scriptName: 'another-worker', eventType: 'scheduled', outcome: 'ok' },
                     source: { message: ['W02 scheduled publication tick', { privateField: 'must-not-escape' }] },
                   },
@@ -115,10 +111,11 @@ describe('AUTH-007 read-only W02 scheduled Observability probe', () => {
       assert.equal(request.body.dry, true)
       assert.equal(request.body.timeframe.to - request.body.timeframe.from, 1_800_000)
       assert.equal(request.body.limit, 100)
-      assert.deepEqual(request.body.parameters.filters, [
-        { key: '$metadata.service', operation: 'starts_with', type: 'string', value: 'luckread-w02' },
-        { key: '$metadata.message', operation: 'starts_with', type: 'string', value: 'W02 scheduled publication' },
-      ])
+      const expectedFilters = request.body.view === 'invocations'
+        ? [{ key: '$metadata.service', operation: 'starts_with', type: 'string', value: 'luckread-w02' }]
+        : [{ key: '$metadata.message', operation: 'starts_with', type: 'string', value: 'W02 scheduled publication' }]
+      assert.deepEqual(request.body.parameters.filters, expectedFilters)
+      assert.equal(request.body.parameters.filterCombination, 'and')
       assert.equal(Object.hasOwn(request.body.parameters, 'limit'), false)
     }
     assert.deepEqual(result, {
@@ -150,9 +147,9 @@ describe('AUTH-007 read-only W02 scheduled Observability probe', () => {
       eventViewStatus: 'PASS',
       eventViewCategory: 'NONE',
       eventViewHttpStatus: 200,
-      queriedEventRows: 5,
-      w02EventRows: 4,
-      fetchEventRows: 1,
+      queriedEventRows: 4,
+      w02EventRows: 3,
+      fetchEventRows: 0,
       scheduledEventRows: 2,
       cronEventRows: 1,
       queueEventRows: 0,
@@ -183,7 +180,7 @@ describe('AUTH-007 read-only W02 scheduled Observability probe', () => {
             result: {
               events: {
                 events: [
-                  { '$workers': { scriptName: 'luckread-w02', eventType: 'fetch', outcome: 'ok' } },
+
                 ],
               },
             },
