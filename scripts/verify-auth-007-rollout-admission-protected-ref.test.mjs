@@ -61,4 +61,23 @@ describe('AUTH-007 protected-ref admission contract', () => {
     const deploy = workflow.indexOf('run: npx --yes wrangler@4.116.0 deploy --config wrangler.jsonc')
     assert.ok(admission >= 0 && deploy > admission, 'AUTH-007 admission must run before W06 deployment')
   })
+ 
+  it('accepts exactly the two named mutual approvers with least-privilege role checks', () => {
+    assert.match(verifier, /const expectedReviewerLogins = \['wanghuinet', 'luckread'\]/)
+    assert.match(verifier, /reviewers\.length === expectedReviewerLogins\.length/)
+    assert.match(verifier, /new Set\(reviewerLogins\)\.size === expectedReviewerLogins\.length/)
+    assert.match(verifier, /wanghuinetReviewer\?\.reviewer\?\.id === expectedReviewerId/)
+    assert.match(verifier, /githubGet\('\/users\/luckread', token\)/)
+    assert.match(verifier, /luckreadReviewer\?\.reviewer\?\.id !== luckreadProfile\.id/)
+    assert.match(verifier, /for \(const reviewerLogin of expectedReviewerLogins\)/)
+    assert.match(verifier, /reviewerLogin === 'wanghuinet'/)
+    assert.match(verifier, /reviewerRole !== 'admin' && reviewerRole !== 'maintain'/)
+    assert.match(verifier, /hasRepositoryReadAccess/)
+    assert.match(verifier, /roleName === 'maintain'/)
+  })
+
+  it('identifies the failing GitHub API endpoint in read-only preflight diagnostics', () => {
+    assert.match(verifier, /rollout configuration endpoint ' \+ apiPath \+ ' failed \(HTTP '/)
+  })
+
 })
