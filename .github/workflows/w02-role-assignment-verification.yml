@@ -15,6 +15,12 @@ on:
       - 'scripts/auth-007-mfa-audit-delivery-e2e.mjs'
       - 'scripts/auth-007-mfa-audit-evidence.mjs'
       - 'scripts/auth-007-mfa-audit-evidence.test.mjs'
+      - 'scripts/auth-007-probe-w02-tail-access.mjs'
+      - 'scripts/auth-007-probe-w02-tail-access.test.mjs'
+      - 'scripts/auth-007-probe-w02-cron-schedule.mjs'
+      - 'scripts/auth-007-probe-w02-cron-schedule.test.mjs'
+      - 'scripts/auth-007-probe-w02-observability.mjs'
+      - 'scripts/auth-007-probe-w02-observability.test.mjs'
       - 'scripts/auth-007-totp.mjs'
       - 'scripts/auth-007-totp.test.mjs'
       - '.github/workflows/auth-007-mfa-live-security-e2e.yml'
@@ -44,6 +50,12 @@ on:
       - 'scripts/auth-007-mfa-audit-delivery-e2e.mjs'
       - 'scripts/auth-007-mfa-audit-evidence.mjs'
       - 'scripts/auth-007-mfa-audit-evidence.test.mjs'
+      - 'scripts/auth-007-probe-w02-tail-access.mjs'
+      - 'scripts/auth-007-probe-w02-tail-access.test.mjs'
+      - 'scripts/auth-007-probe-w02-cron-schedule.mjs'
+      - 'scripts/auth-007-probe-w02-cron-schedule.test.mjs'
+      - 'scripts/auth-007-probe-w02-observability.mjs'
+      - 'scripts/auth-007-probe-w02-observability.test.mjs'
       - 'scripts/auth-007-totp.mjs'
       - 'scripts/auth-007-totp.test.mjs'
       - '.github/workflows/auth-007-mfa-live-security-e2e.yml'
@@ -127,3 +139,13 @@ jobs:
         run: node --test scripts/auth-007-mfa-audit-evidence.test.mjs
       - name: Test W02 runtime tail redaction
         run: node --test scripts/auth-007-sanitize-w02-runtime-tail.test.mjs
+      - name: Check AUTH-007 read-only W02 probes
+        run: |
+          node --check scripts/auth-007-probe-w02-tail-access.mjs
+          node --check scripts/auth-007-probe-w02-cron-schedule.mjs
+          node --check scripts/auth-007-probe-w02-observability.mjs
+      - name: Test AUTH-007 read-only W02 production probes
+        run: |
+          node --test scripts/auth-007-probe-w02-tail-access.test.mjs
+          node --test scripts/auth-007-probe-w02-cron-schedule.test.mjs
+          node --test scripts/auth-007-probe-w02-observability.test.mjs
