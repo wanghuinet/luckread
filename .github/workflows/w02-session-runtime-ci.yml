@@ -17,6 +17,8 @@ on:
       - 'contracts/state-machines/AUTH-007-mfa-lifecycle.v1.json'
       - 'scripts/verify-auth-007-rollout-admission.mjs'
       - 'scripts/verify-admin-account-bootstrap-readiness.mjs'
+      - 'scripts/auth-007-probe-w02-cron-schedule.mjs'
+      - 'scripts/auth-007-probe-w02-cron-schedule.test.mjs'
       - 'scripts/auth-010-session-runtime-e2e.mjs'
       - '.github/workflows/auth-010-remote-e2e.yml'
       - '.github/workflows/w01-payload-app-deploy.yml'
@@ -31,6 +33,8 @@ on:
       - 'workers/W02-identity/wrangler.jsonc'
       - 'scripts/verify-auth-007-rollout-admission.mjs'
       - 'scripts/verify-admin-account-bootstrap-readiness.mjs'
+      - 'scripts/auth-007-probe-w02-cron-schedule.mjs'
+      - 'scripts/auth-007-probe-w02-cron-schedule.test.mjs'
       - 'scripts/auth-010-session-runtime-e2e.mjs'
       - '.github/workflows/auth-010-remote-e2e.yml'
       - '.github/workflows/w01-payload-app-deploy.yml'
@@ -84,6 +88,11 @@ jobs:
         run: npx vitest@3.2.4 run workers/W02-identity/src/auth/principal.test.ts workers/W02-identity/src/auth/resend-email.test.ts workers/W02-identity/src/auth/session-list.test.ts workers/W02-identity/src/auth/session-rate-limit.test.ts workers/W02-identity/src/auth/session-revoke.test.ts
       - name: Run W02 AUTH-007 MFA lifecycle and replay tests
         run: npx vitest@3.2.4 run workers/W02-identity/src/auth/mfa-status.test.ts workers/W02-identity/src/auth/mfa-enrollment-start.test.ts workers/W02-identity/src/auth/mfa-enrollment-confirm.test.ts workers/W02-identity/src/auth/totp-replay-guard.test.ts workers/W02-identity/src/auth/mfa-challenge-account-state.test.ts workers/W02-identity/src/auth/mfa-lifecycle-contract.test.ts
+      - name: Verify W02 Cron Trigger preflight probe syntax and behavior
+        run: |
+          node --check scripts/auth-007-probe-w02-cron-schedule.mjs
+          node --test scripts/auth-007-probe-w02-cron-schedule.test.mjs
+
       - name: Verify AUTH-007 rollout admission code without production access
         run: node scripts/verify-auth-007-rollout-admission.mjs --static-only
 
