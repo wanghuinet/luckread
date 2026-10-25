@@ -217,10 +217,10 @@ export async function probeW02ScheduledObservability({
           queryId: 'auth007-account-wide-invocation-diagnostic',
           timeframe: { from: now - WINDOW_MS, to: now },
           view: 'invocations',
+          limit: MAX_INVOCATIONS,
           dry: true,
           parameters: {
             datasets: ['cloudflare-workers'],
-            limit: MAX_INVOCATIONS,
             filterCombination: 'and',
           },
         }),
