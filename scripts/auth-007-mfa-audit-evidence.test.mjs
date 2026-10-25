@@ -59,6 +59,18 @@ test('reconciles multiple events of the same type by total count', () => {
   assert.equal(result.events.find((event) => event.eventType === 'auth.mfa.challenge_succeeded')?.publishedCount, 2)
 })
 
+test('does not treat zero published and zero canonical rows as exactly-once delivery', () => {
+  const pending = outbox.map((row) => ({ ...row, status: 'PENDING' }))
+  const result = evaluateMfaAuditDelivery(pending, [])
+  assert.equal(result.pass, false)
+  assert.equal(result.allOutboxSettled, false)
+  assert.equal(result.persistedExactlyOnce, false)
+  assert.equal(
+    result.checks.find((check) => check.name === 'canonical_w06_audit_rows_match_published_events')?.pass,
+    false,
+  )
+})
+
 test('blocks canonical audit rows that have no matching outbox event', () => {
   const rows = [...audit, { action: 'auth.mfa.locked', count: 1 }]
   const result = evaluateMfaAuditDelivery(outbox, rows)

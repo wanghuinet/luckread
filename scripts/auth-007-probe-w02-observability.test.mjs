@@ -14,7 +14,7 @@ const response = (status, payload) => ({
 })
 
 describe('AUTH-007 read-only W02 scheduled Observability probe', () => {
-  it('runs a dry, bounded account-wide query and classifies W02 event types without storing raw evidence', async () => {
+  it('runs dry, bounded, server-side W02-scoped queries without storing raw evidence', async () => {
     const observed = []
     const result = await probeW02ScheduledObservability({
       ...valid,
@@ -109,13 +109,16 @@ describe('AUTH-007 read-only W02 scheduled Observability probe', () => {
     assert.equal(observed[0].url, 'https://api.cloudflare.com/client/v4/accounts/0123456789abcdef0123456789abcdef/workers/observability/telemetry/query')
     assert.equal(observed[0].init.method, 'POST')
     assert.deepEqual(observed.map((request) => request.body.view), ['invocations', 'events'])
-    assert.equal(observed[0].body.queryId, 'auth007-account-wide-invocation-diagnostic')
-    assert.equal(observed[1].body.queryId, 'auth007-account-wide-event-diagnostic')
+    assert.equal(observed[0].body.queryId, 'auth007-w02-invocation-diagnostic')
+    assert.equal(observed[1].body.queryId, 'auth007-w02-event-diagnostic')
     for (const request of observed) {
       assert.equal(request.body.dry, true)
       assert.equal(request.body.timeframe.to - request.body.timeframe.from, 1_800_000)
-      assert.equal(request.body.limit, 200)
-      assert.equal(Object.hasOwn(request.body.parameters, 'filters'), false)
+      assert.equal(request.body.limit, 100)
+      assert.deepEqual(request.body.parameters.filters, [
+        { key: '$metadata.service', operation: 'starts_with', type: 'string', value: 'luckread-w02' },
+        { key: '$metadata.message', operation: 'starts_with', type: 'string', value: 'W02 scheduled publication' },
+      ])
       assert.equal(Object.hasOwn(request.body.parameters, 'limit'), false)
     }
     assert.deepEqual(result, {
@@ -132,6 +135,7 @@ describe('AUTH-007 read-only W02 scheduled Observability probe', () => {
       otherEventTypeInvocations: 0,
       unknownEventTypeInvocations: 0,
       scheduledInvocations: 2,
+      scheduledExecutionObserved: true,
       outcomeOk: 1,
       outcomeError: 1,
       outcomeOther: 0,
@@ -201,10 +205,47 @@ describe('AUTH-007 read-only W02 scheduled Observability probe', () => {
     assert.equal(result.w02InvocationGroups, 1)
     assert.equal(result.fetchInvocations, 1)
     assert.equal(result.scheduledInvocations, 0)
+    assert.equal(result.scheduledExecutionObserved, false)
     assert.equal(result.tickMarkerInvocations, 0)
     assert.equal(result.eventViewStatus, 'PASS')
     assert.equal(result.scheduledEventRows, 0)
+    assert.equal(result.scheduledExecutionObserved, false)
     assert.equal(result.tickMarkerRows, 0)
+  })
+
+  it('accepts the explicit W02 tick marker as scheduler evidence when eventType metadata is missing', async () => {
+    const result = await probeW02ScheduledObservability({
+      ...valid,
+      fetchImpl: async (_url, init) => {
+        const body = JSON.parse(init.body)
+        if (body.view === 'events') {
+          return response(200, {
+            success: true,
+            result: {
+              events: {
+                events: [{
+                  '$workers': { scriptName: 'luckread-w02' },
+                  '$metadata': { message: 'W02 scheduled publication tick' },
+                }],
+              },
+            },
+          })
+        }
+        return response(200, {
+          success: true,
+          result: {
+            invocations: {
+              'private-scheduled-request-id': [{
+                '$workers': { scriptName: 'luckread-w02' },
+              }],
+            },
+          },
+        })
+      },
+    })
+    assert.equal(result.scheduledInvocations, 0)
+    assert.equal(result.tickMarkerRows, 1)
+    assert.equal(result.scheduledExecutionObserved, true)
   })
 
   it('does not call Cloudflare when configuration is missing', async () => {

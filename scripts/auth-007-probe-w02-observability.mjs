@@ -1,6 +1,6 @@
 const EXPECTED_SCRIPT = 'luckread-w02'
 const WINDOW_MS = 30 * 60 * 1000
-const MAX_INVOCATIONS = 200
+const MAX_INVOCATIONS = 100
 const SAFE_LABELS = Object.freeze({
   tick: 'W02 scheduled publication tick',
   result: 'W02 scheduled publication result',
@@ -8,6 +8,22 @@ const SAFE_LABELS = Object.freeze({
   stageFailed: 'W02 scheduled publication stage failed',
 })
 const COMMON_EVENT_TYPES = new Set(['fetch', 'scheduled', 'cron', 'queue'])
+const W02_SCRIPT_FILTER = Object.freeze({
+  key: '$metadata.service',
+  operation: 'starts_with',
+  type: 'string',
+  value: EXPECTED_SCRIPT,
+})
+const W02_PUBLICATION_LOG_FILTER = Object.freeze({
+  key: '$metadata.message',
+  operation: 'starts_with',
+  type: 'string',
+  value: 'W02 scheduled publication',
+})
+const W02_OBSERVABILITY_FILTERS = Object.freeze([
+  W02_SCRIPT_FILTER,
+  W02_PUBLICATION_LOG_FILTER,
+])
 
 const CATEGORIES = Object.freeze({
   CONFIG: 'CONFIGURATION_MISSING',
@@ -266,7 +282,7 @@ async function probeW02EventsView({ accountId, apiToken, now, fetchImpl }) {
         cache: 'no-store',
         signal: AbortSignal.timeout(15_000),
         body: JSON.stringify({
-          queryId: 'auth007-account-wide-event-diagnostic',
+          queryId: 'auth007-w02-event-diagnostic',
           timeframe: { from: now - WINDOW_MS, to: now },
           view: 'events',
           limit: MAX_INVOCATIONS,
@@ -274,6 +290,7 @@ async function probeW02EventsView({ accountId, apiToken, now, fetchImpl }) {
           parameters: {
             datasets: ['cloudflare-workers'],
             filterCombination: 'and',
+            filters: W02_OBSERVABILITY_FILTERS,
           },
         }),
       },
@@ -314,11 +331,10 @@ async function probeW02EventsView({ accountId, apiToken, now, fetchImpl }) {
 
 /**
  * Query Cloudflare Workers Observability without opening a WebSocket tail.
- * The dry-run scans at most 200 invocation groups in a 30-minute window and
- * deliberately has no server-side Worker filter. This distinguishes an empty
- * account-level result from a W02 filter mismatch. Only fixed labels and safe
- * numeric aggregates survive; event bodies and request identifiers are never
- * logged or persisted.
+ * Apply the exact W02 script-name filter on the server before result limits,
+ * so unrelated Workers cannot crowd scheduled records out of the evidence window.
+ * Only fixed labels and safe numeric aggregates survive; event bodies and
+ * request identifiers are never logged or persisted.
  */
 export async function probeW02ScheduledObservability({
   accountId,
@@ -353,7 +369,7 @@ export async function probeW02ScheduledObservability({
         cache: 'no-store',
         signal: AbortSignal.timeout(15_000),
         body: JSON.stringify({
-          queryId: 'auth007-account-wide-invocation-diagnostic',
+          queryId: 'auth007-w02-invocation-diagnostic',
           timeframe: { from: now - WINDOW_MS, to: now },
           view: 'invocations',
           limit: MAX_INVOCATIONS,
@@ -361,6 +377,7 @@ export async function probeW02ScheduledObservability({
           parameters: {
             datasets: ['cloudflare-workers'],
             filterCombination: 'and',
+            filters: W02_OBSERVABILITY_FILTERS,
           },
         }),
       },
@@ -417,6 +434,12 @@ export async function probeW02ScheduledObservability({
     }
   }
   const eventsView = await probeW02EventsView({ accountId, apiToken, now, fetchImpl })
+  // Query success is not proof that the scheduled handler ran. Publish a separate
+  // evidence boolean so callers can fail fast before mutating the live MFA QA account.
+  const scheduledExecutionObserved = stats.scheduledInvocations > 0 ||
+    stats.tickMarkerInvocations > 0 ||
+    safeCount(eventsView.scheduledEventRows) + safeCount(eventsView.cronEventRows) +
+      safeCount(eventsView.tickMarkerRows) > 0
   return {
     status: 'PASS',
     category: 'NONE',
@@ -424,6 +447,7 @@ export async function probeW02ScheduledObservability({
     windowMinutes: WINDOW_MS / 60_000,
     ...stats,
     ...eventsView,
+    scheduledExecutionObserved,
   }
 }
 
@@ -441,7 +465,7 @@ async function main() {
       'queriedInvocationGroups', 'w02InvocationGroups', 'fetchInvocations',
       'scheduledEventTypeInvocations', 'cronEventTypeInvocations', 'queueInvocations',
       'otherEventTypeInvocations', 'unknownEventTypeInvocations',
-      'scheduledInvocations', 'outcomeOk', 'outcomeError', 'outcomeOther',
+      'scheduledInvocations', 'scheduledExecutionObserved', 'outcomeOk', 'outcomeError', 'outcomeOther',
       'tickMarkerInvocations', 'resultMarkerInvocations', 'taskFailureMarkerInvocations',
       'stageFailureMarkerInvocations', 'mfaSummaryLogs', 'selected', 'published', 'failed',
     ].map((key) => `${key[0].toLowerCase() + key.slice(1)}=${result[key]}`),
