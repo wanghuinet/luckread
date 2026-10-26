@@ -1,5 +1,10 @@
 import { createLuckReadAuth, type BetterAuthEnv } from './better-auth.js'
-import { createMfaAuditOperationReceipt, finalizeMfaAuditOperationReceipt, reconcileMfaAuditOperationReceipts, type MfaAuditReceiptEvent } from './mfa-audit-receipts.js'
+import {
+  createMfaAuditOperationReceipt,
+  finalizeMfaAuditOperationReceipt,
+  reconcileMfaAuditOperationReceipts,
+  type MfaAuditReceiptEvent,
+} from './mfa-audit-receipts.js'
 import { resolveBetterAuthPrincipal } from './principal.js'
 import { readAuthoritativeMfaStatus } from './mfa-status.js'
 
@@ -41,7 +46,6 @@ const enrollmentFailureEvent = (): MfaAuditReceiptEvent => ({
   eventType: 'auth.mfa.enrollment_failed',
   result: 'failed',
   reasonCode: 'ENROLLMENT_CONFIRMATION_REJECTED',
-  factorState: 'PENDING_VERIFICATION',
 })
 
 const sha256Hex = async (value: string): Promise<string> => {
