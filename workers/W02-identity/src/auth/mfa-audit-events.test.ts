@@ -19,8 +19,8 @@ function fakeDb(options: {
   let selectCount = 0
   const first = vi.fn(async () => {
     selectCount += 1
-    if (options.existing) return { eventId: 'evt_existing' }
-    if (options.raceAppearsAfterInsert && selectCount >= 2) return { eventId: 'evt_raced' }
+    if (options.existing) return { eventId: 'evt_existing', eventType: 'auth.mfa.locked' }
+    if (options.raceAppearsAfterInsert && selectCount >= 2) return { eventId: 'evt_raced', eventType: 'auth.mfa.locked' }
     return null
   })
   const run = vi.fn().mockResolvedValue({
@@ -78,6 +78,13 @@ describe('AUTH-007 MFA audit event builder and idempotent writer', () => {
     expect(boundValues[11]).toBe(event.publishedAt)
     expect(boundValues[12]).toBeNull()
     expect(storedPayload.publishedAt).not.toBe(storedPayload.occurredAt)
+  })
+
+  it('preserves a receipt-assigned eventId through the outbox envelope', () => {
+    const eventId = 'evt_0123456789abcdef0123456789abcdef'
+    const event = buildMfaAuditEvent({ ...input, eventId })
+    expect(event.eventId).toBe(eventId)
+    expect(() => buildMfaAuditEvent({ ...input, eventId: 'evt_not-a-valid-id' })).toThrow('invalid MFA audit event id')
   })
 
   it('inserts a lockout event once when its deterministic key is new', async () => {
