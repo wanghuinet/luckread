@@ -9,13 +9,21 @@ export type MfaPublicationSummary = {
   selected: number
   published: number
   failed: number
+  receiptSelected?: number
+  receiptEmitted?: number
+  receiptFailed?: number
+  receiptUnknown?: number
 }
 
 function isMfaPublicationSummary(value: unknown): value is MfaPublicationSummary {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false
   const summary = value as Record<string, unknown>
-  return ['selected', 'published', 'failed'].every((key) =>
+  const required = ['selected', 'published', 'failed']
+  const optional = ['receiptSelected', 'receiptEmitted', 'receiptFailed', 'receiptUnknown']
+  return required.every((key) =>
     Number.isSafeInteger(summary[key]) && Number(summary[key]) >= 0,
+  ) && optional.every((key) =>
+    summary[key] === undefined || (Number.isSafeInteger(summary[key]) && Number(summary[key]) >= 0),
   )
 }
 
@@ -44,7 +52,13 @@ export async function runScheduledPublicationTicks(
     }
     if (task.name === 'mfa-audit' && isMfaPublicationSummary(outcome.value)) {
       const summary = outcome.value
-      if (summary.selected > 0 || summary.failed > 0) logMfaAuditSummary(summary)
+      if (
+        summary.selected > 0 ||
+        summary.failed > 0 ||
+        (summary.receiptSelected ?? 0) > 0 ||
+        (summary.receiptFailed ?? 0) > 0 ||
+        (summary.receiptUnknown ?? 0) > 0
+      ) logMfaAuditSummary(summary)
     }
   })
 }
