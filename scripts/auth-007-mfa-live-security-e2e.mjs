@@ -238,6 +238,30 @@ const run = async () => {
     userId = loginUser.id
     lastAuthenticatedCookie = cookieHeader()
 
+    // A live session must never substitute for the signed, unauthenticated
+    // two_factor challenge cookie. The endpoint must reject before W02 even
+    // though this account has an authenticated session cookie.
+    const sessionCannotReplaceChallenge = await request(
+      'authenticated_session_cannot_replace_mfa_challenge',
+      'POST',
+      '/v1/auth/mfa/challenge/verify',
+      {
+        headers: {
+          'content-type': 'application/json',
+          'Idempotency-Key': `${baseKey}-session-not-challenge`,
+        },
+        body: { code: '123456', method: 'totp' },
+      },
+    )
+    check('authenticated_session_is_not_accepted_as_signin_challenge',
+      sessionCannotReplaceChallenge.facts.status === 401 &&
+      sessionCannotReplaceChallenge.facts.errorCode === 'MFA_CHALLENGE_REQUIRED' &&
+      !sessionCannotReplaceChallenge.response?.headers.has('x-luckread-session-token'), {
+        status: sessionCannotReplaceChallenge.facts.status,
+        errorCode: sessionCannotReplaceChallenge.facts.errorCode,
+        tokenIssued: Boolean(sessionCannotReplaceChallenge.response?.headers.has('x-luckread-session-token')),
+      })
+
     const initialStatus = await request('mfa_preflight_status', 'GET', '/v1/auth/mfa')
     const initialData = totpStatus(initialStatus.payload)
     const initialPass = initialStatus.facts.status === 200 &&
@@ -403,6 +427,32 @@ const run = async () => {
       const totpChallengeCookie = cookieHeader()
       const challengeStep = currentStep(totp.period)
       const challengeCode = codeForStep(totp.secret, challengeStep, totp.digits, totp.algorithm)
+
+      // Subject/actor/target IDs are never accepted from a challenge client.
+      // This malformed cross-account attempt must be rejected by W01 before
+      // the legitimate challenge is consumed or forwarded to W02.
+      const suppliedSubjectAttempt = await request(
+        'challenge_rejects_caller_supplied_account_subject',
+        'POST',
+        '/v1/auth/mfa/challenge/verify',
+        {
+          headers: {
+            'content-type': 'application/json',
+            'Idempotency-Key': `${baseKey}-client-subject-injection`,
+          },
+          body: { code: challengeCode, method: 'totp', userId: 'another-user-not-selected-by-client' },
+        },
+      )
+      check('challenge_rejects_caller_supplied_account_subject',
+        suppliedSubjectAttempt.facts.status === 422 &&
+        suppliedSubjectAttempt.facts.errorCode === 'VALIDATION_FAILED' &&
+        !suppliedSubjectAttempt.response?.headers.has('x-luckread-session-token'), {
+          status: suppliedSubjectAttempt.facts.status,
+          errorCode: suppliedSubjectAttempt.facts.errorCode,
+          tokenIssued: Boolean(suppliedSubjectAttempt.response?.headers.has('x-luckread-session-token')),
+          suppliedIdentityLogged: false,
+        })
+
       const challengeVerify = await request('signin_totp_challenge_success', 'POST', '/v1/auth/mfa/challenge/verify', {
         headers: {
           'content-type': 'application/json',
