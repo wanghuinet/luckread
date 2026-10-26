@@ -33,6 +33,7 @@ function createDb() {
   let failNextReceiptAppendAfterCommit = false
   let failNextReceiptEmissionAfterCommit = false
   let failNextReceiptUnknownAfterCommit = false
+  let failNextReceiptSelection = false
   const prepare = vi.fn((sql: string) => ({
     bind: (...args: unknown[]) => ({
       run: async () => {
@@ -251,8 +252,13 @@ function createDb() {
       },
       all: async () => {
         if (sql.includes('FROM auth_007_mfa_operation_receipts') && sql.includes('WHERE status = ?')) {
+          if (failNextReceiptSelection) {
+            failNextReceiptSelection = false
+            return { success: false, results: [] }
+          }
           const [status, now, limit] = args
           return {
+            success: true,
             results: [...receipts.values()]
               .filter((row) => row.status === status && (!row.nextAttemptAt || row.nextAttemptAt <= String(now)))
               .sort((a, b) => a.startedAt.localeCompare(b.startedAt))
@@ -284,6 +290,7 @@ function createDb() {
     failNextReceiptAppendAfterCommit: () => { failNextReceiptAppendAfterCommit = true },
     failNextReceiptEmissionAfterCommit: () => { failNextReceiptEmissionAfterCommit = true },
     failNextReceiptUnknownAfterCommit: () => { failNextReceiptUnknownAfterCommit = true },
+    failNextReceiptSelection: () => { failNextReceiptSelection = true },
   }
 }
 
@@ -300,6 +307,20 @@ describe('AUTH-007 durable MFA operation receipts', () => {
 
   beforeEach(() => {
     store = createDb()
+  })
+
+  it('fails closed when D1 reports an unsuccessful READY receipt selection', async () => {
+    const receiptId = await createMfaAuditOperationReceipt(store.db, {
+      userId: 'user-123',
+      operationPath: '/two-factor/verify-totp',
+      isChallenge: true,
+    },)
+    await finalizeMfaAuditOperationReceipt(store.db, receiptId, [successEvent], startedAt)
+    store.failNextReceiptSelection()
+
+    await expect(reconcileMfaAuditOperationReceipts(store.db, startedAt))
+      .rejects.toThrow('MFA_AUDIT_RECEIPT_SELECT_FAILED')
+    expect(store.receipts.get(receiptId)?.status).toBe('READY')
   })
 
   it('read-backs a receipt when D1 commits the insert but its response is lost', async () => {
