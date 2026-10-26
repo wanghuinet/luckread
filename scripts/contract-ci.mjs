@@ -363,6 +363,7 @@ async function checkEvents() {
       fail('events/AUTH-007-mfa-audit-binding.v1.json: all ten canonical event producers must be source-implemented and none may be reported as missing')
     }
     const mfaProducerSource = await readFile('workers/W02-identity/src/auth/better-auth.ts', 'utf8')
+    const mfaChallengeVerificationSource = await readFile('workers/W02-identity/src/auth/mfa-challenge-verification.ts', 'utf8')
     const mfaHookSource = await readFile('workers/W02-identity/src/auth/mfa-audit-hooks.ts', 'utf8')
     const mfaReceiptSource = await readFile('workers/W02-identity/src/auth/mfa-audit-receipts.ts', 'utf8')
     const mfaEventSource = await readFile('workers/W02-identity/src/auth/mfa-audit-events.ts', 'utf8')
@@ -378,9 +379,14 @@ async function checkEvents() {
       'createMfaAuditOperationReceipt',
       'finalizeMfaAuditOperationReceipt',
       'reconcileMfaAuditOperationReceipts',
+      'isUnexpiredMfaChallengeRecord',
       'consumeTotpTimeStep',
       'auth.mfa.replay_rejected',
       'auth.mfa.locked',
+    ]
+    const requiredChallengeExpiryTokens = [
+      'Date.parse(String(challenge.expiresAt))',
+      'expiresAt > nowMs',
     ]
     const requiredReceiptTokens = [
       'recordMfaAuditEventOnce',
@@ -410,6 +416,8 @@ async function checkEvents() {
         !(await fileExists('workers/W02-identity/src/auth/mfa-audit-events.test.ts')) ||
         !(await fileExists('workers/W02-identity/src/auth/mfa-audit-receipts.test.ts')) ||
         !requiredHookTokens.every((token) => mfaProducerSource.includes(token)) ||
+        !requiredChallengeExpiryTokens.every((token) => mfaChallengeVerificationSource.includes(token)) ||
+        !(await fileExists('workers/W02-identity/src/auth/mfa-challenge-verification.test.ts')) ||
         !requiredReceiptTokens.every((token) => mfaReceiptSource.includes(token)) ||
         !requiredAuditEvidenceTokens.every((token) => mfaAuditEvidenceSource.includes(token)) ||
         !requiredAuditDeliveryE2ETokens.every((token) => mfaAuditDeliveryE2ESource.includes(token)) ||
