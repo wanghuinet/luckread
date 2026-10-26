@@ -462,7 +462,12 @@ export async function reconcileMfaAuditOperationReceipts(
     'WHERE status = ? AND (next_attempt_at IS NULL OR next_attempt_at <= ?) ' +
     'ORDER BY started_at ASC LIMIT ?',
   ).bind('READY', now, maxBatch).all<ReceiptRow>()
-  const rows = selectedResult.results ?? []
+  // Treat a non-throwing unsuccessful D1 result as a real read failure. An empty
+  // receipt list is valid only after D1 confirms the SELECT succeeded.
+  if (selectedResult.success !== true || !Array.isArray(selectedResult.results)) {
+    throw new Error('MFA_AUDIT_RECEIPT_SELECT_FAILED')
+  }
+  const rows = selectedResult.results
   let emitted = 0
   let failed = 0
   let unknown = stale.success ? Number(stale.meta?.changes ?? 0) : 0

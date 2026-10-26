@@ -21,7 +21,7 @@ const event = {
 
 function createEnv(rows: Array<{ journalId: string; payload: string; attempt: number }>, queueSend = vi.fn().mockResolvedValue(undefined)) {
   const update = vi.fn().mockResolvedValue({ success: true, meta: { changes: 1 } })
-  const all = vi.fn().mockResolvedValue({ results: rows })
+  const all = vi.fn().mockResolvedValue({ success: true, results: rows })
   const prepare = vi.fn((sql: string) => ({
     bind: vi.fn((...values: unknown[]) => sql.startsWith('SELECT')
       ? { all: () => all(...values) }
@@ -48,6 +48,25 @@ describe('AUTH-007 MFA audit outbox publisher', () => {
     expect(update).toHaveBeenCalledWith('PUBLISHED', '2026-10-24T14:01:00.000Z', 'journal-1', 'PENDING')
     expect(prepare).toHaveBeenCalledTimes(2)
     expect(update).toHaveBeenCalledTimes(1)
+  })
+
+  it('fails closed when D1 reports an unsuccessful pending-outbox read', async () => {
+    const { env, all, queueSend } = createEnv([
+      { journalId: 'journal-1', payload: JSON.stringify(event), attempt: 1 },
+    ])
+    all.mockResolvedValueOnce({ success: false, results: [] })
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      await expect(publishPendingMfaAuditEvents(env, '2026-10-24T14:01:00.000Z'))
+        .rejects.toThrow('MFA_AUDIT_PUBLICATION_STAGE_FAILED')
+      expect(queueSend).not.toHaveBeenCalled()
+      expect(log).toHaveBeenCalledWith('W02 scheduled publication stage failed', {
+        task: 'mfa-audit',
+        stage: 'select-pending',
+      })
+    } finally {
+      log.mockRestore()
+    }
   })
 
   it('keeps an accepted event pending with backoff when queue send fails', async () => {
