@@ -120,7 +120,7 @@ export function buildMfaAuditEvent(input: {
   const correlationId = safeCorrelation(input.correlationId ?? null, eventId)
   const causationId = safeCorrelation(input.causationId ?? null, correlationId)
   const allowedOperationIds = MFA_AUDIT_OPERATION_IDS[input.eventType]
-  const operationId = input.operationId ?? allowedOperationIds[0]
+  const operationId = input.operationId ?? allowedOperationIds[0]!
   if (!allowedOperationIds.includes(operationId as MfaAuditOperationId)) {
     throw new TypeError('invalid MFA audit operation id for event type')
   }
