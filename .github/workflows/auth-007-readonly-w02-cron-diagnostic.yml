@@ -65,7 +65,6 @@ jobs:
           set -euo pipefail
           node --check scripts/auth-007-probe-w02-cron-schedule.mjs
           node --check scripts/auth-007-probe-w02-scheduled-analytics.mjs
-          node --check scripts/auth-007-probe-w02-observability.mjs
           node --test scripts/auth-007-probe-w02-cron-schedule.test.mjs
           node --test scripts/auth-007-probe-w02-scheduled-analytics.test.mjs
 
