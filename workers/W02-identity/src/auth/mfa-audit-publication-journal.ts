@@ -63,12 +63,16 @@ export async function publishPendingMfaAuditEvents(
         throw new Error('INVALID_AUTH_007_MFA_EVENT')
       }
     } catch {
+      let markFailedResult: D1Result
       try {
-        await env.D1_01.prepare(
+        markFailedResult = await env.D1_01.prepare(
           'UPDATE auth_007_mfa_publication_journal SET status = ?, next_attempt_at = NULL, ' +
           'last_error_code = ? WHERE journal_id = ? AND status = ?',
         ).bind('FAILED', 'INVALID_EVENT_PAYLOAD', row.journalId, 'PENDING').run()
       } catch {
+        return failAtPublicationStage('mark-invalid-payload')
+      }
+      if (markFailedResult.success !== true || markFailedResult.meta?.changes !== 1) {
         return failAtPublicationStage('mark-invalid-payload')
       }
       failed += 1
@@ -80,12 +84,16 @@ export async function publishPendingMfaAuditEvents(
     } catch {
       const delay = retryDelaySeconds(row.attempt)
       const nextAttemptAt = new Date(Date.parse(now) + delay * 1000).toISOString()
+      let markRetryResult: D1Result
       try {
-        await env.D1_01.prepare(
+        markRetryResult = await env.D1_01.prepare(
           'UPDATE auth_007_mfa_publication_journal SET status = ?, attempt = attempt + 1, ' +
           'next_attempt_at = ?, last_error_code = ? WHERE journal_id = ? AND status = ?',
         ).bind('PENDING', nextAttemptAt, 'QUEUE_DESTINATION_FAILED', row.journalId, 'PENDING').run()
       } catch {
+        return failAtPublicationStage('mark-retry')
+      }
+      if (markRetryResult.success !== true || markRetryResult.meta?.changes !== 1) {
         return failAtPublicationStage('mark-retry')
       }
       failed += 1
@@ -102,7 +110,10 @@ export async function publishPendingMfaAuditEvents(
       return failAtPublicationStage('mark-published')
     }
 
-    if (result.meta?.changes === 1) published += 1
+    if (result.success !== true || result.meta?.changes !== 1) {
+      return failAtPublicationStage('mark-published')
+    }
+    published += 1
   }
 
   return { selected: rows.results?.length ?? 0, published, failed }
