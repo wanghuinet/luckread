@@ -6,6 +6,19 @@ on:
     paths:
       - 'workers/W02-identity/migrations/0002_auth_013_account_state.sql'
       - 'scripts/auth-013-migration-static-audit.mjs'
+      - 'scripts/auth-013-migration-workflow-static-audit.mjs'
+      - '.github/workflows/auth-013-account-state-migration.yml'
+      - '.github/workflows/auth-013-publication-journal-migration.yml'
+      - '.github/workflows/auth-013-migration-static-verification.yml'
+  pull_request:
+    paths:
+      - 'workers/W02-identity/migrations/0002_auth_013_account_state.sql'
+      - 'workers/W02-identity/migrations/0003_auth_013_publication_journal.sql'
+      - 'scripts/auth-013-migration-static-audit.mjs'
+      - 'scripts/auth-013-journal-migration-static-audit.mjs'
+      - 'scripts/auth-013-migration-workflow-static-audit.mjs'
+      - '.github/workflows/auth-013-account-state-migration.yml'
+      - '.github/workflows/auth-013-publication-journal-migration.yml'
       - '.github/workflows/auth-013-migration-static-verification.yml'
   workflow_dispatch:
 
@@ -25,3 +38,5 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y sqlite3
       - name: Run AUTH-013 static migration audit
         run: node scripts/auth-013-migration-static-audit.mjs
+      - name: Run AUTH-013 migration workflow guard and syntax audit
+        run: node scripts/auth-013-migration-workflow-static-audit.mjs

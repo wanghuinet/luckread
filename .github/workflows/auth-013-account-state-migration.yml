@@ -72,8 +72,26 @@ jobs:
           const fs = require('node:fs');
           const count = JSON.parse(fs.readFileSync(process.env.GITHUB_WORKSPACE + '/artifacts/mapping-0/auth-013-migration/preflight-users-count.json', 'utf8'));
           const schema = JSON.parse(fs.readFileSync(process.env.GITHUB_WORKSPACE + '/artifacts/mapping-0/auth-013-migration/preflight-users-schema.json', 'utf8'));
-          const usersCount = count?.[0]?.results?.[0]?.users_count;
-          const columns = schema?.[0]?.results ?? [];
+          if (
+            !Array.isArray(count) ||
+            count.length !== 1 ||
+            count[0]?.success !== true ||
+            !Array.isArray(count[0]?.results) ||
+            count[0].results.length !== 1 ||
+            !Number.isSafeInteger(count[0].results[0]?.users_count)
+          ) {
+            throw new Error('AUTH-013 preflight failed: users count query did not return a successful single-row result');
+          }
+          if (
+            !Array.isArray(schema) ||
+            schema.length !== 1 ||
+            schema[0]?.success !== true ||
+            !Array.isArray(schema[0]?.results)
+          ) {
+            throw new Error('AUTH-013 preflight failed: users schema query did not return a successful row set');
+          }
+          const usersCount = count[0].results[0].users_count;
+          const columns = schema[0].results;
           if (usersCount !== 0) throw new Error('AUTH-013 fail-closed: non-empty target requires separate backfill admission');
           const forbidden = columns.filter((r) => ['account_state', 'account_state_version'].includes(r.name));
           if (forbidden.length) throw new Error('AUTH-013 target columns already exist; stop rather than applying a duplicate migration');
@@ -101,8 +119,26 @@ jobs:
           const fs = require('node:fs');
           const schema = JSON.parse(fs.readFileSync(process.env.GITHUB_WORKSPACE + '/artifacts/mapping-0/auth-013-migration/post-users-schema.json', 'utf8'));
           const count = JSON.parse(fs.readFileSync(process.env.GITHUB_WORKSPACE + '/artifacts/mapping-0/auth-013-migration/post-users-count.json', 'utf8'));
-          const rows = schema?.[0]?.results ?? [];
-          const usersCount = count?.[0]?.results?.[0]?.users_count;
+          if (
+            !Array.isArray(schema) ||
+            schema.length !== 1 ||
+            schema[0]?.success !== true ||
+            !Array.isArray(schema[0]?.results)
+          ) {
+            throw new Error('AUTH-013 post-migration failed: users schema query did not return a successful row set');
+          }
+          if (
+            !Array.isArray(count) ||
+            count.length !== 1 ||
+            count[0]?.success !== true ||
+            !Array.isArray(count[0]?.results) ||
+            count[0].results.length !== 1 ||
+            !Number.isSafeInteger(count[0].results[0]?.users_count)
+          ) {
+            throw new Error('AUTH-013 post-migration failed: users count query did not return a successful single-row result');
+          }
+          const rows = schema[0].results;
+          const usersCount = count[0].results[0].users_count;
           const state = rows.find((r) => r.name === 'account_state');
           const version = rows.find((r) => r.name === 'account_state_version');
           if (!state || state.notnull !== 1 || state.type !== 'TEXT' || state.dflt_value !== "'PENDING_VERIFICATION'") throw new Error('AUTH-013 post-schema account_state verification failed');

@@ -32,7 +32,7 @@ const db = path.join(root, '.tmp-auth-013-static.db');
 try {
   execFileSync(sqlite, [db, "CREATE TABLE users (id INTEGER PRIMARY KEY, email TEXT NOT NULL); INSERT INTO users (email) VALUES ('static@test.example');"], { stdio: 'pipe' });
   let failed = false;
-  try { execFileSync(sqlite, [db, sql], { stdio: 'pipe' }); } catch { failed = true; }
+  try { execFileSync(sqlite, [db], { input: sql, stdio: 'pipe' }); } catch { failed = true; }
   if (!failed) throw new Error('AUTH-013 fail-closed guard did not reject a non-empty users table');
 } finally {
   try { fs.unlinkSync(db); } catch {}
@@ -41,7 +41,7 @@ try {
 const emptyDb = path.join(root, '.tmp-auth-013-empty.db');
 try {
   execFileSync(sqlite, [emptyDb, 'CREATE TABLE users (id INTEGER PRIMARY KEY, email TEXT NOT NULL);'], { stdio: 'pipe' });
-  execFileSync(sqlite, [emptyDb, sql], { stdio: 'pipe' });
+  execFileSync(sqlite, [emptyDb], { input: sql, stdio: 'pipe' });
   const schema = JSON.parse(execFileSync(sqlite, [emptyDb, '-json', 'PRAGMA table_info(users);'], { encoding: 'utf8' }));
   const state = schema.find((r) => r.name === 'account_state');
   const version = schema.find((r) => r.name === 'account_state_version');
