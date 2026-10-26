@@ -9,12 +9,8 @@ const SAFE_LABELS = Object.freeze({
 })
 const COMMON_EVENT_TYPES = new Set(['fetch', 'scheduled', 'cron', 'queue'])
 const W02_SCRIPT_FILTER = Object.freeze({
-  key: '$metadata.service',
-  operation: 'starts_with',
-  type: 'string',
-  value: EXPECTED_SCRIPT,
-})
-const W02_SCRIPT_NAME_FILTER = Object.freeze({
+  // Scheduled invocation records may not expose indexed service metadata
+  // consistently; scope all views by the runtime Worker identity in $workers.
   key: '$workers.scriptName',
   operation: 'eq',
   type: 'string',
@@ -366,7 +362,7 @@ async function probeW02EventTypeValues({ accountId, apiToken, now, fetchImpl }) 
           key: '$workers.eventType',
           timeframe: { from: now - WINDOW_MS, to: now },
           type: 'string',
-          filters: [W02_SCRIPT_NAME_FILTER],
+          filters: [W02_SCRIPT_FILTER],
           limit: MAX_INVOCATIONS,
         }),
       },
