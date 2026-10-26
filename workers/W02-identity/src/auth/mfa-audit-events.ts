@@ -54,17 +54,35 @@ export type MfaAuditEvent = {
   }
 }
 
-const operationByEvent: Record<MfaAuditEventName, string> = {
-  'auth.mfa.enrollment_started': 'authMfaEnrollmentStart',
-  'auth.mfa.enrollment_verified': 'authMfaEnrollmentConfirm',
-  'auth.mfa.enrollment_failed': 'authMfaEnrollmentStart',
-  'auth.mfa.challenge_succeeded': 'authMfaChallengeVerify',
-  'auth.mfa.challenge_failed': 'authMfaChallengeVerify',
-  'auth.mfa.factor_disabled': 'authMfaDisable',
-  'auth.mfa.recovery_codes_rotated': 'authMfaRecoveryCodesRotate',
-  'auth.mfa.recovery_code_consumed': 'authMfaChallengeVerify',
-  'auth.mfa.locked': 'authMfaChallengeVerify',
-  'auth.mfa.replay_rejected': 'authMfaChallengeVerify',
+export type MfaAuditOperationId =
+  | 'authMfaEnrollmentStart'
+  | 'authMfaEnrollmentConfirm'
+  | 'authMfaChallengeVerify'
+  | 'authMfaDisable'
+  | 'authMfaRecoveryCodesRotate'
+
+/**
+ * Operation IDs accepted by the event contract. The first item is the
+ * default for event types that allow more than one operation source.
+ */
+export const MFA_AUDIT_OPERATION_IDS: Record<MfaAuditEventName, readonly MfaAuditOperationId[]> = {
+  'auth.mfa.enrollment_started': ['authMfaEnrollmentStart'],
+  'auth.mfa.enrollment_verified': ['authMfaEnrollmentConfirm'],
+  'auth.mfa.enrollment_failed': ['authMfaEnrollmentStart', 'authMfaEnrollmentConfirm'],
+  'auth.mfa.challenge_succeeded': ['authMfaChallengeVerify'],
+  'auth.mfa.challenge_failed': ['authMfaChallengeVerify'],
+  'auth.mfa.factor_disabled': ['authMfaDisable'],
+  'auth.mfa.recovery_codes_rotated': ['authMfaRecoveryCodesRotate'],
+  'auth.mfa.recovery_code_consumed': ['authMfaChallengeVerify'],
+  'auth.mfa.locked': ['authMfaChallengeVerify'],
+  'auth.mfa.replay_rejected': ['authMfaChallengeVerify'],
+}
+
+export function isAllowedMfaAuditOperationId(
+  eventType: MfaAuditEventName,
+  operationId: string,
+): boolean {
+  return MFA_AUDIT_OPERATION_IDS[eventType].includes(operationId as MfaAuditOperationId)
 }
 
 const safeCorrelation = (value: string | null, fallback: string): string =>
@@ -72,6 +90,7 @@ const safeCorrelation = (value: string | null, fallback: string): string =>
 
 export function buildMfaAuditEvent(input: {
   eventType: MfaAuditEventName
+  operationId?: string
   userId: string
   occurredAt?: string
   correlationId?: string | null
@@ -100,8 +119,13 @@ export function buildMfaAuditEvent(input: {
   const publishedAt = new Date().toISOString()
   const correlationId = safeCorrelation(input.correlationId ?? null, eventId)
   const causationId = safeCorrelation(input.causationId ?? null, correlationId)
+  const allowedOperationIds = MFA_AUDIT_OPERATION_IDS[input.eventType]
+  const operationId = input.operationId ?? allowedOperationIds[0]
+  if (!allowedOperationIds.includes(operationId as MfaAuditOperationId)) {
+    throw new TypeError('invalid MFA audit operation id for event type')
+  }
   const payload: MfaAuditEvent['payload'] = {
-    operationId: operationByEvent[input.eventType],
+    operationId,
     result: input.result,
     ...(input.reasonCode ? { reasonCode: input.reasonCode } : {}),
     ...(input.factorState ? { factorState: input.factorState } : {}),
