@@ -5,11 +5,19 @@ const mocks = vi.hoisted(() => ({
   createAuth: vi.fn(),
   resolvePrincipal: vi.fn(),
   readStatus: vi.fn(),
+  createReceipt: vi.fn(),
+  finalizeReceipt: vi.fn(),
+  reconcileReceipts: vi.fn(),
 }))
 
 vi.mock('./better-auth.js', () => ({ createLuckReadAuth: mocks.createAuth }))
 vi.mock('./principal.js', () => ({ resolveBetterAuthPrincipal: mocks.resolvePrincipal }))
 vi.mock('./mfa-status.js', () => ({ readAuthoritativeMfaStatus: mocks.readStatus }))
+vi.mock('./mfa-audit-receipts.js', () => ({
+  createMfaAuditOperationReceipt: mocks.createReceipt,
+  finalizeMfaAuditOperationReceipt: mocks.finalizeReceipt,
+  reconcileMfaAuditOperationReceipts: mocks.reconcileReceipts,
+}))
 
 import type { BetterAuthEnv } from './better-auth.js'
 import { handleMfaEnrollmentConfirmRequest } from './mfa-enrollment-confirm.js'
@@ -76,6 +84,9 @@ describe('W02 MFA enrollment confirmation authority', () => {
       verified: true,
       enrolledAt: '2026-10-24T12:00:00.000Z',
     })
+    mocks.createReceipt.mockResolvedValue('mfaop_0123456789abcdef0123456789abcdef')
+    mocks.finalizeReceipt.mockResolvedValue(true)
+    mocks.reconcileReceipts.mockResolvedValue({ selected: 1, emitted: 1, failed: 0, unknown: 0 })
   })
 
   it('verifies the pending factor through Better Auth then returns D1 read-back without session tokens', async () => {
@@ -100,7 +111,26 @@ describe('W02 MFA enrollment confirmation authority', () => {
     const authRequest = mocks.handler.mock.calls[0]?.[0] as Request
     expect(new URL(authRequest.url).pathname).toBe('/api/auth/two-factor/verify-totp')
     expect(authRequest.headers.get('cookie')).toBe('better-auth.session_token=opaque-session')
+    expect(authRequest.headers.get('X-LuckRead-MFA-Operation')).toBe('enrollment-confirm')
+    expect(authRequest.headers.get('X-LuckRead-MFA-Receipt-Id')).toBe('mfaop_0123456789abcdef0123456789abcdef')
+    expect(authRequest.headers.get('X-LuckRead-MFA-Receipt-Mode')).toBe('defer-finalization')
     await expect(authRequest.json()).resolves.toEqual({ code: '123456', trustDevice: false })
+    expect(mocks.createReceipt).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      userId: principal.userId,
+      operationPath: '/two-factor/verify-totp',
+      isChallenge: false,
+    }))
+    expect(mocks.finalizeReceipt).toHaveBeenCalledWith(
+      db,
+      'mfaop_0123456789abcdef0123456789abcdef',
+      expect.arrayContaining([expect.objectContaining({
+        eventType: 'auth.mfa.enrollment_verified',
+        result: 'succeeded',
+        reasonCode: 'TOTP_ENROLLMENT_VERIFIED',
+        factorState: 'ENABLED',
+      })]),
+    )
+    expect(mocks.reconcileReceipts).toHaveBeenCalledWith(db)
     expect(mocks.readStatus).toHaveBeenCalledWith(db, principal.userId)
   })
 
@@ -182,6 +212,15 @@ describe('W02 MFA enrollment confirmation authority', () => {
     const invalidCode = await handleMfaEnrollmentConfirmRequest({ D1_01: db } as BetterAuthEnv, makeRequest())
     expect(invalidCode.status).toBe(401)
     expect(await invalidCode.text()).not.toContain('private Better Auth internals')
+    expect(mocks.finalizeReceipt).toHaveBeenCalledWith(
+      db,
+      'mfaop_0123456789abcdef0123456789abcdef',
+      expect.arrayContaining([expect.objectContaining({
+        eventType: 'auth.mfa.enrollment_failed',
+        result: 'failed',
+        reasonCode: 'ENROLLMENT_CONFIRMATION_REJECTED',
+      })]),
+    )
 
     mocks.handler.mockResolvedValueOnce(Response.json({ ok: true }))
     mocks.readStatus.mockResolvedValueOnce({ enabled: false, verified: false, enrolledAt: null })
