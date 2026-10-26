@@ -1,0 +1,306 @@
+name: W01 Media Upload Idempotency Migration
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Exact immutable main commit containing the admitted migration source
+        required: true
+        type: string
+        default: ffb31cc8bac91d3322ea3b19a6fd65d3e1541352
+      database_name:
+        description: Controlled W01 D1 database (must be luckread)
+        required: true
+        type: string
+        default: luckread
+      confirm:
+        description: Type APPLY_MEDIA_UPLOAD_IDEMPOTENCY_MIGRATION to permit this schema migration
+        required: true
+        type: string
+        default: NO
+
+permissions:
+  contents: read
+
+env:
+  WRANGLER_VERSION: 4.116.0
+  TARGET_MIGRATION: 20261022_120000_MIG_MEDIA_UPLOAD_IDEMPOTENCY_V1
+  EXPECTED_DATABASE_ID: 2f80471e-3756-49f9-8db1-7707a433ad64
+  EXPECTED_PREDECESSORS: 20250929_111647,20260921_003203_MIG_AUTH_002_SESSION_V1,20260925_111503_MIG_ENT_USER_PROFILE_V1,20260928_020000_MIG_AUTH_001_REGISTRATION_BATCH_V1,20260928_104842_MIG_PAYLOAD_3902_NATIVE_SCHEMA_V1,20261002_120000_media_owner,20261006_202000_MIG_BETTER_AUTH_PROFILE_PROJECTION_V1
+
+jobs:
+  execute:
+    if: ${{ inputs.confirm == 'APPLY_MEDIA_UPLOAD_IDEMPOTENCY_MIGRATION' && github.ref == 'refs/heads/main' && github.ref_protected == true }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Validate dispatch inputs
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          DATABASE_NAME: ${{ inputs.database_name }}
+          CONFIRM: ${{ inputs.confirm }}
+        run: |
+          set -euo pipefail
+          test "$DATABASE_NAME" = "luckread"
+          test "$CONFIRM" = "APPLY_MEDIA_UPLOAD_IDEMPOTENCY_MIGRATION"
+          test "$GITHUB_REF" = "refs/heads/main"
+          test "$GITHUB_REF_PROTECTED" = "true"
+          if ! [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "source_sha must be a full 40-character commit SHA" >&2
+            exit 1
+          fi
+
+      - name: Checkout exact migration source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha }}
+          fetch-depth: 0
+
+      - name: Prove source is in protected main and migration source is exact
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          git fetch origin main --depth=1
+          git merge-base --is-ancestor "$SOURCE_SHA" origin/main
+          test "$(git rev-parse HEAD:workers/W01-payload/src/migrations/index.ts)" = "9408d589233db911dd880122316fecc936b76133"
+          test "$(git rev-parse HEAD:workers/W01-payload/src/migrations/20261022_120000_MIG_MEDIA_UPLOAD_IDEMPOTENCY_V1.ts)" = "bf9114b71e3e0c3836699d8813aa362104584f97"
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs'
+          const index = readFileSync('workers/W01-payload/src/migrations/index.ts', 'utf8')
+          const target = process.env.TARGET_MIGRATION
+          const registered = [...index.matchAll(/name:\s*'([^']+)'/g)].map((match) => match[1])
+          if (registered.filter((name) => name === target).length !== 1 || registered.at(-1) !== target) {
+            throw new Error('Expected one target registration and no later migration in this reviewed source')
+          }
+          console.log(JSON.stringify({ sourceSha: process.env.SOURCE_SHA, registeredMigrations: registered, target }))
+          NODE
+
+      - name: Setup Node 24 and pnpm 11
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+          run_install: false
+
+      - name: Install locked W01 dependencies
+        working-directory: workers/W01-payload
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate Cloudflare access and initialize evidence
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          test -n "$CLOUDFLARE_API_TOKEN"
+          mkdir -p artifacts/evidence/w01-media-upload-idempotency
+
+      - name: Capture read-only D1 preflight
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          DATABASE_NAME: ${{ inputs.database_name }}
+        working-directory: workers/W01-payload
+        run: |
+          set -euo pipefail
+          EVIDENCE_DIR=../../artifacts/evidence/w01-media-upload-idempotency
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 info "$DATABASE_NAME" --json --config wrangler.jsonc > "$EVIDENCE_DIR/preflight-d1-info.json"
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc --command 'SELECT id,name,batch FROM payload_migrations ORDER BY id;' > "$EVIDENCE_DIR/preflight-migrations.json"
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc --command 'PRAGMA table_info("media");' > "$EVIDENCE_DIR/preflight-media-schema.json"
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc --command 'PRAGMA index_list("media");' > "$EVIDENCE_DIR/preflight-media-indexes.json"
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc --command 'SELECT COUNT(*) AS media_count FROM media;' > "$EVIDENCE_DIR/preflight-media-count.json"
+
+      - name: Fail closed unless only the admitted migration is pending
+        id: preflight
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          DATABASE_NAME: ${{ inputs.database_name }}
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import { readFileSync, writeFileSync, appendFileSync } from 'node:fs'
+          const dir = 'artifacts/evidence/w01-media-upload-idempotency'
+          const read = (name) => JSON.parse(readFileSync(dir + '/' + name, 'utf8'))
+          const collect = (value, out = []) => {
+            if (Array.isArray(value)) {
+              for (const item of value) collect(item, out)
+              return out
+            }
+            if (!value || typeof value !== 'object') return out
+            if (Array.isArray(value.results)) out.push(...value.results)
+            if (Array.isArray(value.result)) out.push(...value.result)
+            for (const [key, item] of Object.entries(value)) {
+              if (key !== 'results' && key !== 'result') collect(item, out)
+            }
+            return out
+          }
+          const rows = (name) => [...new Map(
+            collect(read(name)).filter((row) => row && typeof row === 'object')
+              .map((row) => [JSON.stringify(row), row]),
+          ).values()]
+          const target = process.env.TARGET_MIGRATION
+          const expected = process.env.EXPECTED_PREDECESSORS.split(',')
+          const expectedDatabaseId = process.env.EXPECTED_DATABASE_ID
+          const databaseInfo = JSON.stringify(read('preflight-d1-info.json'))
+          const history = rows('preflight-migrations.json').map((row) => String(row.name ?? ''))
+          const schemaRows = rows('preflight-media-schema.json')
+          const indexRows = rows('preflight-media-indexes.json')
+          const countRows = rows('preflight-media-count.json')
+          const columns = new Set(schemaRows.map((row) => String(row.name)))
+          const indexes = new Map(indexRows.map((row) => [String(row.name), row]))
+          const mediaCount = Number(countRows[0]?.media_count ?? NaN)
+          const uniqueIndex = indexes.get('media_upload_idempotency_key_idx')
+          const targetPositions = history.flatMap((name, index) => name === target ? [index] : [])
+          const targetRecorded = targetPositions.length > 0
+          const errors = []
+          if (!databaseInfo.includes(expectedDatabaseId)) errors.push('D1 info does not prove the admitted database ID')
+          if (!columns.has('owner_user_id')) errors.push('media.owner_user_id is missing; baseline is not admitted')
+          if (!Number.isSafeInteger(mediaCount) || mediaCount < 0) errors.push('media row count could not be verified')
+          let decision = 'RUN_REQUIRED'
+          if (targetRecorded) {
+            const targetIndex = targetPositions[0]
+            if (targetPositions.length !== 1) errors.push('target migration is recorded more than once')
+            if (history.slice(0, targetIndex).join('|') !== expected.join('|')) errors.push('target migration predecessors do not match the admitted history')
+            if (!columns.has('upload_idempotency_key') || !columns.has('upload_fingerprint')) errors.push('target recorded but required columns are missing')
+            if (!uniqueIndex || !(uniqueIndex.unique === 1 || uniqueIndex.unique === true)) errors.push('target recorded but unique index is missing')
+            decision = 'ALREADY_APPLIED'
+          } else {
+            if (history.join('|') !== expected.join('|')) errors.push('unexpected or missing predecessor history; no mutation is allowed')
+            if (columns.has('upload_idempotency_key') || columns.has('upload_fingerprint')) errors.push('target columns exist without target migration record')
+            if (uniqueIndex) errors.push('target unique index exists without target migration record')
+          }
+          const summary = {
+            mode: 'READ_ONLY_PREFLIGHT',
+            result: errors.length ? 'BLOCKED' : 'PASS',
+            sourceSha: process.env.SOURCE_SHA,
+            databaseName: process.env.DATABASE_NAME,
+            expectedDatabaseId,
+            migrationHistory: history,
+            expectedPredecessors: expected,
+            targetMigration: target,
+            targetRecorded,
+            mediaCount,
+            mediaColumns: [...columns].sort(),
+            uniqueIndex: uniqueIndex ? { name: uniqueIndex.name, unique: uniqueIndex.unique } : null,
+            decision: errors.length ? 'BLOCKED' : decision,
+            errors,
+          }
+          writeFileSync(dir + '/preflight-summary.json', JSON.stringify(summary, null, 2) + '\n')
+          console.log(JSON.stringify(summary, null, 2))
+          if (errors.length) throw new Error('W01_MEDIA_UPLOAD_IDEMPOTENCY_PREFLIGHT_BLOCKED')
+          appendFileSync(process.env.GITHUB_OUTPUT, 'decision=' + decision + '\n')
+          NODE
+
+      - name: Execute the single admitted migration
+        if: steps.preflight.outputs.decision == 'RUN_REQUIRED'
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ENV: production
+          NODE_ENV: production
+          PAYLOAD_MIGRATION_REMOTE: 'true'
+          PAYLOAD_SECRET: ignore
+        working-directory: workers/W01-payload
+        run: pnpm exec payload migrate
+
+      - name: Verify exact post-migration state
+        if: always() && steps.preflight.outcome == 'success'
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          DATABASE_NAME: ${{ inputs.database_name }}
+        working-directory: workers/W01-payload
+        run: |
+          set -euo pipefail
+          EVIDENCE_DIR=../../artifacts/evidence/w01-media-upload-idempotency
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc --command 'SELECT id,name,batch FROM payload_migrations ORDER BY id;' > "$EVIDENCE_DIR/post-migrations.json"
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc --command 'PRAGMA table_info("media");' > "$EVIDENCE_DIR/post-media-schema.json"
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc --command 'PRAGMA index_list("media");' > "$EVIDENCE_DIR/post-media-indexes.json"
+          node --input-type=module <<'NODE'
+          import { readFileSync, writeFileSync } from 'node:fs'
+          const dir = '../../artifacts/evidence/w01-media-upload-idempotency'
+          const collect = (value, out = []) => {
+            if (Array.isArray(value)) {
+              for (const item of value) collect(item, out)
+              return out
+            }
+            if (!value || typeof value !== 'object') return out
+            if (Array.isArray(value.results)) out.push(...value.results)
+            if (Array.isArray(value.result)) out.push(...value.result)
+            for (const [key, item] of Object.entries(value)) {
+              if (key !== 'results' && key !== 'result') collect(item, out)
+            }
+            return out
+          }
+          const rows = (name) => [...new Map(
+            collect(JSON.parse(readFileSync(dir + '/' + name, 'utf8')))
+              .filter((row) => row && typeof row === 'object')
+              .map((row) => [JSON.stringify(row), row]),
+          ).values()]
+          const history = rows('post-migrations.json').map((row) => String(row.name ?? ''))
+          const target = process.env.TARGET_MIGRATION
+          const expectedPredecessors = process.env.EXPECTED_PREDECESSORS.split(',')
+          const targetPositions = history.flatMap((name, index) => name === target ? [index] : [])
+          const targetIndex = targetPositions[0] ?? -1
+          const columns = new Set(rows('post-media-schema.json').map((row) => String(row.name)))
+          const indexRows = rows('post-media-indexes.json')
+          const index = indexRows.find((row) => String(row.name) === 'media_upload_idempotency_key_idx')
+          const summary = {
+            migrationHistoryHasExactlyOneTarget: targetPositions.length === 1,
+            migrationPredecessorsMatchExactly: targetIndex >= 0
+              && history.slice(0, targetIndex).join('|') === expectedPredecessors.join('|'),
+            migrationHistory: history,
+            uploadIdempotencyKeyPresent: columns.has('upload_idempotency_key'),
+            uploadFingerprintPresent: columns.has('upload_fingerprint'),
+            uniqueIndexPresent: Boolean(index && (index.unique === 1 || index.unique === true)),
+            uniqueIndex: index ? { name: index.name, unique: index.unique } : null,
+          }
+          summary.result = summary.migrationHistoryHasExactlyOneTarget
+            && summary.migrationPredecessorsMatchExactly
+            && summary.uploadIdempotencyKeyPresent
+            && summary.uploadFingerprintPresent
+            && summary.uniqueIndexPresent
+            ? 'PASS' : 'FAIL'
+          writeFileSync(dir + '/post-validation-summary.json', JSON.stringify(summary, null, 2) + '\n')
+          console.log(JSON.stringify(summary, null, 2))
+          if (summary.result !== 'PASS') throw new Error('W01_MEDIA_UPLOAD_IDEMPOTENCY_POSTCHECK_FAILED')
+          NODE
+
+      - name: Record migration provenance
+        if: always()
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          DATABASE_NAME: ${{ inputs.database_name }}
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/evidence/w01-media-upload-idempotency
+          node --input-type=module <<'NODE'
+          import { writeFileSync } from 'node:fs'
+          writeFileSync(
+            'artifacts/evidence/w01-media-upload-idempotency/provenance.json',
+            JSON.stringify({
+              repository: process.env.GITHUB_REPOSITORY,
+              workflow: process.env.GITHUB_WORKFLOW,
+              runId: Number(process.env.GITHUB_RUN_ID),
+              sourceSha: process.env.SOURCE_SHA,
+              databaseName: process.env.DATABASE_NAME,
+              expectedDatabaseId: process.env.EXPECTED_DATABASE_ID,
+              migration: process.env.TARGET_MIGRATION,
+              environment: 'CONTROLLED_REMOTE_D1',
+            }, null, 2) + '\n',
+          )
+          NODE
+
+      - name: Upload migration evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: w01-media-upload-idempotency-migration-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/evidence/w01-media-upload-idempotency/
+          if-no-files-found: warn
+          retention-days: 30
