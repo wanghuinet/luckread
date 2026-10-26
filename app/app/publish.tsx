@@ -210,6 +210,7 @@ export default function PublishScreen() {
         status: 'ready',
         error: undefined,
       });
+      return true;
     } catch (error) {
       updateAsset(asset.localId, {
         uploaded,
@@ -219,6 +220,7 @@ export default function PublishScreen() {
           ? 'Upload is saved, but playback could not be authorized. Retry playback; the file will not be uploaded again.'
           : error instanceof Error ? error.message : 'Media upload failed. Retry this file.',
       });
+      return false;
     }
   }, [updateAsset]);
 
@@ -272,8 +274,13 @@ export default function PublishScreen() {
     setStatusMessage('Uploading media to LuckRead…');
     setBusy(true);
     try {
-      for (const asset of newAssets) await uploadAsset(asset);
-      setStatusMessage('Media upload complete. Server media references are ready to publish.');
+      const uploadResults: boolean[] = [];
+      for (const asset of newAssets) uploadResults.push(await uploadAsset(asset));
+      if (uploadResults.every(Boolean)) {
+        setStatusMessage('Media upload complete. Server media references are ready to publish.');
+      } else {
+        setStatusMessage('Some media uploads failed. Retry failed files before publishing.');
+      }
     } finally {
       setBusy(false);
     }
@@ -284,11 +291,23 @@ export default function PublishScreen() {
     setErrorMessage('');
     setStatusMessage('Retrying ' + asset.filename + '…');
     try {
-      await uploadAsset(asset);
+      const succeeded = await uploadAsset(asset);
+      const allReady = succeeded && assets.every((candidate) =>
+        candidate.localId === asset.localId
+          ? succeeded
+          : candidate.existing || candidate.status === 'ready',
+      );
+      setStatusMessage(
+        allReady
+          ? 'Media upload complete. Server media references are ready to publish.'
+          : succeeded
+            ? 'This file uploaded successfully. Retry any remaining failed media before publishing.'
+            : 'Media upload failed. Retry this file before publishing.',
+      );
     } finally {
       setBusy(false);
     }
-  }, [uploadAsset]);
+  }, [assets, uploadAsset]);
 
   const removeAsset = useCallback((localId: string) => {
     if (busy || publishPending) return;
