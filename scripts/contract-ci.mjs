@@ -366,6 +366,8 @@ async function checkEvents() {
     const mfaHookSource = await readFile('workers/W02-identity/src/auth/mfa-audit-hooks.ts', 'utf8')
     const mfaReceiptSource = await readFile('workers/W02-identity/src/auth/mfa-audit-receipts.ts', 'utf8')
     const mfaEventSource = await readFile('workers/W02-identity/src/auth/mfa-audit-events.ts', 'utf8')
+    const mfaAuditEvidenceSource = await readFile('scripts/auth-007-mfa-audit-evidence.mjs', 'utf8')
+    const mfaAuditDeliveryE2ESource = await readFile('scripts/auth-007-mfa-audit-delivery-e2e.mjs', 'utf8')
     const requiredHookTokens = [
       "'/two-factor/verify-totp'",
       "'/two-factor/verify-backup-code'",
@@ -385,11 +387,26 @@ async function checkEvents() {
       "'OUTBOX_WRITE_FAILED'",
       "'OUTCOME_NOT_FINALIZED'",
     ]
+    const requiredAuditEvidenceTokens = [
+      'SCENARIO_SPECIFIC_MFA_AUDIT_EVENT_TYPES',
+      'reconcileEventIds',
+      'canonicalTypeById.get(row.eventId) === eventType',
+      'allTenEventTypesVerified',
+    ]
+    const requiredAuditDeliveryE2ETokens = [
+      'readScopedOutboxEventRows',
+      'readScopedCanonicalAuditEventRows',
+      'eventIdsComparedInMemoryOnly',
+      'rawEventIdentifiersStored: false',
+    ]
     if (!(await fileExists('workers/W02-identity/src/auth/mfa-audit-hooks.test.ts')) ||
         !(await fileExists('workers/W02-identity/src/auth/mfa-audit-events.test.ts')) ||
         !(await fileExists('workers/W02-identity/src/auth/mfa-audit-receipts.test.ts')) ||
         !requiredHookTokens.every((token) => mfaProducerSource.includes(token)) ||
         !requiredReceiptTokens.every((token) => mfaReceiptSource.includes(token)) ||
+        !requiredAuditEvidenceTokens.every((token) => mfaAuditEvidenceSource.includes(token)) ||
+        !requiredAuditDeliveryE2ETokens.every((token) => mfaAuditDeliveryE2ESource.includes(token)) ||
+        !(await fileExists('scripts/auth-007-mfa-audit-evidence.test.mjs')) ||
         !mfaEventSource.includes('auth_007_mfa_publication_journal') ||
         !["auth.mfa.challenge_succeeded", "auth.mfa.challenge_failed",
           "auth.mfa.factor_disabled", "auth.mfa.recovery_codes_rotated",
