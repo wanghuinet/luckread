@@ -1,0 +1,163 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/migration/AUTH-007-mfa-operation-receipt.v1.json",
+  "version": "1.0.0",
+  "status": "CONTRACTED_NOT_VERIFIED",
+  "promotion": "NOT_GREEN",
+  "purpose": "Physical D1-01 schema contract for durable, secret-free receipts around MFA operations observed by Better Auth hooks. Receipts preserve incomplete/unknown outcomes and allow the existing W02 Cron to recover missing outbox inserts; they are not factor, session, role, or canonical audit authority.",
+  "migrationId": "MIG-AUTH-007-MFA-OPERATION-RECEIPTS-V1",
+  "featureId": "AUTH-007",
+  "authority": {
+    "worker": "W02",
+    "domain": "D1-01",
+    "businessAuthority": "W02",
+    "finalAuditAuthority": "W06",
+    "eventContract": "contracts/events/AUTH-007-mfa-audit-binding.v1.json"
+  },
+  "target": {
+    "physicalTable": "auth_007_mfa_operation_receipts",
+    "sourceMigration": "workers/W02-identity/migrations/0009_auth_007_mfa_operation_receipts.sql",
+    "databaseBinding": "workers/W02-identity/wrangler.jsonc:D1_01"
+  },
+  "columns": [
+    {
+      "column": "receipt_id",
+      "dbType": "TEXT",
+      "nullable": false,
+      "primaryKey": true
+    },
+    {
+      "column": "resource_id",
+      "dbType": "TEXT",
+      "nullable": false,
+      "authority": "W02-derived User id"
+    },
+    {
+      "column": "operation_path",
+      "dbType": "TEXT",
+      "nullable": false,
+      "enum": [
+        "/two-factor/verify-totp",
+        "/two-factor/verify-backup-code",
+        "/two-factor/disable",
+        "/two-factor/generate-backup-codes"
+      ]
+    },
+    {
+      "column": "is_challenge",
+      "dbType": "INTEGER",
+      "nullable": false,
+      "enum": [
+        0,
+        1
+      ]
+    },
+    {
+      "column": "status",
+      "dbType": "TEXT",
+      "nullable": false,
+      "enum": [
+        "STARTED",
+        "READY",
+        "EMITTED",
+        "RESOLVED",
+        "UNKNOWN"
+      ],
+      "default": "STARTED"
+    },
+    {
+      "column": "started_at",
+      "dbType": "TEXT",
+      "nullable": false
+    },
+    {
+      "column": "completed_at",
+      "dbType": "TEXT",
+      "nullable": true
+    },
+    {
+      "column": "correlation_id",
+      "dbType": "TEXT",
+      "nullable": false,
+      "maxLength": 128
+    },
+    {
+      "column": "causation_id",
+      "dbType": "TEXT",
+      "nullable": false,
+      "maxLength": 128
+    },
+    {
+      "column": "event_plan",
+      "dbType": "TEXT",
+      "nullable": true,
+      "jsonArray": true,
+      "secretsForbidden": true
+    },
+    {
+      "column": "attempt",
+      "dbType": "INTEGER",
+      "nullable": false,
+      "minimum": 0,
+      "default": 0
+    },
+    {
+      "column": "next_attempt_at",
+      "dbType": "TEXT",
+      "nullable": true
+    },
+    {
+      "column": "last_error_code",
+      "dbType": "TEXT",
+      "nullable": true,
+      "maxLength": 128
+    }
+  ],
+  "constraints": {
+    "statusValues": [
+      "STARTED",
+      "READY",
+      "EMITTED",
+      "RESOLVED",
+      "UNKNOWN"
+    ],
+    "operationPaths": [
+      "/two-factor/verify-totp",
+      "/two-factor/verify-backup-code",
+      "/two-factor/disable",
+      "/two-factor/generate-backup-codes"
+    ],
+    "eventPlanJsonArray": true,
+    "noCredentialsOrSecrets": true,
+    "retryableOutboxFailureKeepsReady": true,
+    "staleStartedReceiptBecomesUnknown": true,
+    "unknownOutcomeIsNeverSynthesized": true
+  },
+  "indexes": [
+    "auth_007_mfa_operation_receipts_status_next_attempt_idx"
+  ],
+  "rules": {
+    "receiptIsNotMfaFactorAuthority": true,
+    "receiptIsNotCanonicalAuditStore": true,
+    "w02IsAuthoritativeWriter": true,
+    "w02MustNotWriteD1_03": true,
+    "existingAuth013QueueOnly": true,
+    "noNewWorkerD1QueueOrServiceBinding": true,
+    "outboxEventInsertsUseStableIdempotencyKeys": true,
+    "secretsNeverEnterReceipt": true,
+    "unknownOutcomesRemainVisible": true
+  },
+  "remoteExecution": {
+    "workflow": ".github/workflows/w02-role-assignment-migration.yml",
+    "mode": "CONTROLLED_REMOTE_D1",
+    "mutation": "NOT_EXECUTED"
+  },
+  "evidenceRequirements": [
+    "static migration/contract audit with local SQLite constraint checks",
+    "exact source SHA and D1_01 binding/UUID verification",
+    "controlled migration execution under the protected AUTH-007 rollout environment",
+    "post-migration remote table/index and migration-ledger read-back",
+    "receipt failure injection, stable idempotency, stale STARTED and retry tests",
+    "W02 receipt/outbox/publisher tests and W06 duplicate-delivery persistence tests"
+  ]
+}
