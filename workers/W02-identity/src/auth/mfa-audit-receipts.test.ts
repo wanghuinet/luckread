@@ -499,7 +499,9 @@ describe('AUTH-007 durable MFA operation receipts', () => {
     })
     await finalizeMfaAuditOperationReceipt(store.db, receiptId, [{
       eventType: 'auth.mfa.locked',
-      eventId: desiredEventId,
+      // Simulate a receipt persisted by the earlier code before event IDs were
+      // normalized for lockout-window idempotency.
+      eventId: 'evt_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
       result: 'rejected',
       reasonCode: 'VERIFICATION_LOCKOUT',
       idempotencyKey,
@@ -540,7 +542,7 @@ describe('AUTH-007 durable MFA operation receipts', () => {
       failed: 0,
       unknown: 0,
     })
-    expect(originalPlan[0]?.eventId).toBe(desiredEventId)
+    expect(originalPlan[0]?.eventId).toBe('evt_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa')
     expect(store.receipts.get(receiptId)?.status).toBe('EMITTED')
     const persistedPlan = JSON.parse(store.receipts.get(receiptId)?.eventPlan ?? '[]') as Array<{eventId:string;idempotencyKey:string}>
     expect(persistedPlan.find((event) => event.idempotencyKey === idempotencyKey)?.eventId).toBe(legacyEventId)
