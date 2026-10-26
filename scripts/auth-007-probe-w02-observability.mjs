@@ -453,13 +453,19 @@ async function probeW02EventTypeValues({ accountId, apiToken, now, fetchImpl }) 
  * Only fixed labels and safe numeric aggregates survive; raw event bodies and
  * request identifiers are never logged or persisted.
  */
-async function probeW02ScheduledAnalytics({ accountId, apiToken, now, fetchImpl }) {
+export async function probeW02ScheduledAnalytics({ accountId, apiToken, now = Date.now(), fetchImpl = globalThis.fetch }) {
   const failure = (category, httpStatus = 'NONE') => ({
     scheduledAnalyticsStatus: 'FAIL',
     scheduledAnalyticsCategory: category,
     scheduledAnalyticsHttpStatus: httpStatus,
     scheduledAnalyticsRows: 0,
   })
+  if (!/^[a-f0-9]{32}$/i.test(accountId ?? '') ||
+      typeof apiToken !== 'string' || apiToken.length < 20 ||
+      typeof fetchImpl !== 'function' ||
+      !Number.isSafeInteger(now) || now <= WINDOW_MS) {
+    return failure(CATEGORIES.CONFIG)
+  }
   let response
   try {
     response = await fetchImpl(
