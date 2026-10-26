@@ -219,6 +219,7 @@ if (blockers.length === 0) {
   const bootstrapMigration = read(bootstrapMigrationPath)
   const mfaAuditOutboxMigration = read(mfaAuditOutboxMigrationPath)
   const mfaAuditReceiptMigration = read(mfaAuditReceiptMigrationPath)
+  const mfaAuditReceiptMigrationNormalized = mfaAuditReceiptMigration.replace(/\\s+/g, ' ')
   const mfaAuditReceiptContract = JSON.parse(read(mfaAuditReceiptContractPath))
   const mfaAuditBinding = JSON.parse(read(mfaAuditBindingPath))
   const mfaAuditOutboxContract = JSON.parse(read(mfaAuditOutboxContractPath))
@@ -327,7 +328,7 @@ if (blockers.length === 0) {
     reviewedMfaMigrationShape: requiredMigrationTokens.every((token) => migration.includes(token)),
     reviewedBootstrapAuditShape: requiredBootstrapTokens.every((token) => bootstrapMigration.includes(token)),
     reviewedMfaAuditOutboxMigrationShape: requiredMfaAuditOutboxTokens.every((token) => mfaAuditOutboxMigration.includes(token)),
-    reviewedMfaAuditReceiptMigrationShape: requiredMfaAuditReceiptTokens.every((token) => mfaAuditReceiptMigration.includes(token)),
+    reviewedMfaAuditReceiptMigrationShape: requiredMfaAuditReceiptTokens.every((token) => mfaAuditReceiptMigrationNormalized.includes(token)),
     mfaAuditReceiptContractMatchesMigration:
       mfaAuditReceiptContract.featureId === 'AUTH-007' &&
       mfaAuditReceiptContract.target?.physicalTable === 'auth_007_mfa_operation_receipts' &&
