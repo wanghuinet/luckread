@@ -3,6 +3,14 @@ name: W01 Media Upload Idempotency Migration
 on:
   workflow_dispatch:
     inputs:
+      mode:
+        description: Read-only binding proof or an explicitly confirmed schema migration
+        required: true
+        type: choice
+        options:
+          - preflight-only
+          - apply
+        default: preflight-only
       source_sha:
         description: Exact immutable main commit containing the admitted migration source
         required: true
@@ -30,7 +38,7 @@ env:
 
 jobs:
   execute:
-    if: ${{ inputs.confirm == 'APPLY_MEDIA_UPLOAD_IDEMPOTENCY_MIGRATION' && github.ref == 'refs/heads/main' && github.ref_protected == true }}
+    if: ${{ github.ref == 'refs/heads/main' && github.ref_protected == true && (inputs.mode == 'preflight-only' || (inputs.mode == 'apply' && inputs.confirm == 'APPLY_MEDIA_UPLOAD_IDEMPOTENCY_MIGRATION')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -39,12 +47,20 @@ jobs:
           SOURCE_SHA: ${{ inputs.source_sha }}
           DATABASE_NAME: ${{ inputs.database_name }}
           CONFIRM: ${{ inputs.confirm }}
+          MODE: ${{ inputs.mode }}
         run: |
           set -euo pipefail
           test "$DATABASE_NAME" = "luckread"
-          test "$CONFIRM" = "APPLY_MEDIA_UPLOAD_IDEMPOTENCY_MIGRATION"
           test "$GITHUB_REF" = "refs/heads/main"
           test "$GITHUB_REF_PROTECTED" = "true"
+          if [[ "$MODE" == "apply" ]]; then
+            test "$CONFIRM" = "APPLY_MEDIA_UPLOAD_IDEMPOTENCY_MIGRATION"
+          elif [[ "$MODE" == "preflight-only" ]]; then
+            echo "READ_ONLY_PREFLIGHT_ONLY: schema migration must not run"
+          else
+            echo "Invalid mode; use preflight-only or apply" >&2
+            exit 1
+          fi
           if ! [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]; then
             echo "source_sha must be a full 40-character commit SHA" >&2
             exit 1
@@ -196,20 +212,113 @@ jobs:
           appendFileSync(process.env.GITHUB_OUTPUT, 'decision=' + decision + '\n')
           NODE
 
-      - name: Execute the single admitted migration
+      - name: Verify Payload D1 binding matches the admitted remote schema
         if: steps.preflight.outputs.decision == 'RUN_REQUIRED'
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ENV: production
+          NODE_ENV: production
+          PAYLOAD_MIGRATION_REMOTE: 'true'
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        working-directory: workers/W01-payload
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import { getPlatformProxy } from 'wrangler'
+          import { writeFileSync } from 'node:fs'
+          import { resolve } from 'node:path'
+
+          const expected = process.env.EXPECTED_PREDECESSORS.split(',')
+          const target = process.env.TARGET_MIGRATION
+          const dir = '../../artifacts/evidence/w01-media-upload-idempotency'
+          const proxy = await getPlatformProxy({
+            configPath: resolve('wrangler.jsonc'),
+            remoteBindings: true,
+            persist: false,
+          })
+
+          try {
+            const db = proxy.env.D1
+            if (!db || typeof db.prepare !== 'function') {
+              throw new Error('Payload D1 binding is unavailable from the admitted Wrangler config')
+            }
+            const query = async (sql, label) => {
+              const result = await db.prepare(sql).all()
+              if (result?.success !== true || !Array.isArray(result.results)) {
+                throw new Error('Payload D1 binding query failed: ' + label)
+              }
+              return result.results
+            }
+            const [migrationRows, schemaRows, indexRows, countRows] = await Promise.all([
+              query('SELECT id,name,batch FROM payload_migrations ORDER BY id;', 'migration history'),
+              query("SELECT name FROM pragma_table_info('media');", 'media schema'),
+              query('SELECT name, "unique" AS is_unique FROM pragma_index_list(\'media\');', 'media indexes'),
+              query('SELECT COUNT(*) AS media_count FROM media;', 'media row count'),
+            ])
+            const history = migrationRows.map((row) => String(row.name ?? ''))
+            const columns = new Set(schemaRows.map((row) => String(row.name)))
+            const indexes = new Map(indexRows.map((row) => [String(row.name), row]))
+            const targetIndex = indexes.get('media_upload_idempotency_key_idx')
+            const mediaCount = Number(countRows[0]?.media_count ?? NaN)
+            const errors = []
+
+            if (history.join('|') !== expected.join('|')) {
+              errors.push('Payload D1 binding migration history differs from the admitted remote D1 preflight')
+            }
+            if (!columns.has('owner_user_id')) errors.push('Payload D1 binding is missing media.owner_user_id')
+            if (columns.has('upload_idempotency_key') || columns.has('upload_fingerprint')) {
+              errors.push('Payload D1 binding already has target columns while the admitted preflight says migration is pending')
+            }
+            if (targetIndex) errors.push('Payload D1 binding already has target index while the admitted preflight says migration is pending')
+            if (!Number.isSafeInteger(mediaCount) || mediaCount < 0) errors.push('Payload D1 binding media row count is invalid')
+
+            const evidence = {
+              mode: 'PAYLOAD_D1_BINDING_PREFLIGHT',
+              result: errors.length ? 'BLOCKED' : 'PASS',
+              sourceSha: process.env.SOURCE_SHA,
+              expectedDatabaseId: process.env.EXPECTED_DATABASE_ID,
+              binding: 'D1',
+              remoteBindings: true,
+              environment: 'base Wrangler config (no undefined production environment)',
+              migrationHistory: history,
+              expectedPredecessors: expected,
+              mediaCount,
+              mediaColumns: [...columns].sort(),
+              targetIndex: targetIndex ?? null,
+              targetMigration: target,
+              errors,
+            }
+            writeFileSync(dir + '/payload-binding-preflight.json', JSON.stringify(evidence, null, 2) + '\n')
+            console.log(JSON.stringify(evidence, null, 2))
+            if (errors.length) throw new Error('W01_PAYLOAD_D1_BINDING_PREFLIGHT_BLOCKED')
+          } finally {
+            await proxy.dispose()
+          }
+          NODE
+
+      - name: Execute the single admitted migration
+        id: execute_migration
+        if: inputs.mode == 'apply' && steps.preflight.outputs.decision == 'RUN_REQUIRED'
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           NODE_ENV: production
           PAYLOAD_MIGRATION_REMOTE: 'true'
           PAYLOAD_SECRET: ignore
         working-directory: workers/W01-payload
         run: pnpm exec payload migrate
 
+      - name: Assert read-only preflight did not invoke migration
+        if: inputs.mode == 'preflight-only'
+        env:
+          MIGRATION_OUTCOME: ${{ steps.execute_migration.outcome }}
+        run: |
+          set -euo pipefail
+          test "$MIGRATION_OUTCOME" = "skipped"
+          echo "PASS: preflight-only mode did not execute Payload migration"
+
       - name: Verify exact post-migration state
-        if: always() && steps.preflight.outcome == 'success'
+        if: inputs.mode == 'apply' && always() && steps.preflight.outcome == 'success'
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -276,6 +385,7 @@ jobs:
         env:
           SOURCE_SHA: ${{ inputs.source_sha }}
           DATABASE_NAME: ${{ inputs.database_name }}
+          MODE: ${{ inputs.mode }}
         run: |
           set -euo pipefail
           mkdir -p artifacts/evidence/w01-media-upload-idempotency
@@ -291,7 +401,8 @@ jobs:
               databaseName: process.env.DATABASE_NAME,
               expectedDatabaseId: process.env.EXPECTED_DATABASE_ID,
               migration: process.env.TARGET_MIGRATION,
-              environment: 'CONTROLLED_REMOTE_D1',
+              mode: process.env.MODE,
+              environment: process.env.MODE === 'apply' ? 'CONTROLLED_REMOTE_D1' : 'READ_ONLY_PREFLIGHT_ONLY',
             }, null, 2) + '\n',
           )
           NODE
