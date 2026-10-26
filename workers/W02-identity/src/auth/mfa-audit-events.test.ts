@@ -19,8 +19,8 @@ function fakeDb(options: {
   let selectCount = 0
   const first = vi.fn(async () => {
     selectCount += 1
-    if (options.existing) return { eventId: 'evt_existing', eventType: 'auth.mfa.locked', resourceId: 'user-123', operationId: 'authMfaChallengeVerify', result: 'rejected', reasonCode: 'VERIFICATION_LOCKOUT', factorState: null, challengeMethod: 'totp' }
-    if (options.raceAppearsAfterInsert && selectCount >= 2) return { eventId: 'evt_raced', eventType: 'auth.mfa.locked', resourceId: 'user-123', operationId: 'authMfaChallengeVerify', result: 'rejected', reasonCode: 'VERIFICATION_LOCKOUT', factorState: null, challengeMethod: 'totp' }
+    if (options.existing) return { eventId: 'evt_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee', eventType: 'auth.mfa.locked', resourceId: 'user-123', operationId: 'authMfaChallengeVerify', result: 'rejected', reasonCode: 'VERIFICATION_LOCKOUT', factorState: null, challengeMethod: 'totp' }
+    if (options.raceAppearsAfterInsert && selectCount >= 2) return { eventId: 'evt_cccccccccccccccccccccccccccccccc', eventType: 'auth.mfa.locked', resourceId: 'user-123', operationId: 'authMfaChallengeVerify', result: 'rejected', reasonCode: 'VERIFICATION_LOCKOUT', factorState: null, challengeMethod: 'totp' }
     return null
   })
   const run = vi.fn().mockResolvedValue({
@@ -189,6 +189,27 @@ describe('AUTH-007 MFA audit event builder and idempotent writer', () => {
     }))
     const db = { prepare } as unknown as D1Database
     await expect(recordMfaAuditEventOnce(db, input)).rejects.toThrow('MFA_AUDIT_EVENT_INTENT_CONFLICT')
+  })
+
+  it('rejects a malformed persisted eventId even when the producer did not supply one', async () => {
+    const prepare = vi.fn((sql: string) => ({
+      bind: vi.fn(() => ({
+        first: async () => ({
+          eventId: 'evt_invalid',
+          eventType: 'auth.mfa.locked',
+          resourceId: 'user-123',
+          operationId: 'authMfaChallengeVerify',
+          result: 'rejected',
+          reasonCode: 'VERIFICATION_LOCKOUT',
+          factorState: null,
+          challengeMethod: 'totp',
+        }),
+        run: vi.fn(),
+        sql,
+      })),
+    }))
+    const db = { prepare } as unknown as D1Database
+    await expect(recordMfaAuditEventOnce(db, input)).rejects.toThrow('MFA_AUDIT_EVENT_ID_CONFLICT')
   })
 
   it('fails when the insert is rejected and the idempotency key is not present', async () => {
