@@ -228,6 +228,7 @@ if (blockers.length === 0) {
   const logicalDataAuthority = JSON.parse(read(logicalDataAuthorityPath))
   const betterAuth = read(betterAuthPath)
   const replayGuard = read(replayGuardPath)
+  const challengeVerification = read('workers/W02-identity/src/auth/mfa-challenge-verification.ts')
   const apiContract = JSON.parse(read(authContractPath))
   const factorContract = JSON.parse(read(factorContractPath))
   const lifecycle = JSON.parse(read(lifecyclePath))
@@ -385,6 +386,10 @@ if (blockers.length === 0) {
       /finalizeMfaAuditOperationReceipt/.test(betterAuth) &&
       /reconcileMfaAuditOperationReceipts/.test(betterAuth) &&
       /auth\.mfa\.replay_rejected/.test(betterAuth),
+    mfaChallengeExpiryIsFailClosedAndWired:
+      /isUnexpiredMfaChallengeRecord\(challenge\)/.test(betterAuth) &&
+      /Number\.isFinite\(expiresAt\) && expiresAt > nowMs/.test(challengeVerification) &&
+      exists('workers/W02-identity/src/auth/mfa-challenge-verification.test.ts'),
     mfaAuditSourceAndTestsPresent:
       exists('workers/W02-identity/src/auth/mfa-audit-events.ts') &&
       exists('workers/W02-identity/src/auth/mfa-audit-events.test.ts') &&
