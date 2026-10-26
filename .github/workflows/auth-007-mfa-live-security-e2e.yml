@@ -87,6 +87,8 @@ jobs:
           node --check scripts/auth-007-probe-w02-tail-access.mjs
           node --check scripts/auth-007-probe-w02-cron-schedule.mjs
           node --check scripts/auth-007-probe-w02-observability.mjs
+          node --check scripts/auth-007-probe-w02-scheduled-analytics.mjs
+          node --test scripts/auth-007-probe-w02-scheduled-analytics.test.mjs
           node --test scripts/auth-007-probe-w02-cron-schedule.test.mjs
           node --test scripts/auth-007-probe-w02-observability.test.mjs
           node --test scripts/auth-007-classify-wrangler-tail-stderr.test.mjs
