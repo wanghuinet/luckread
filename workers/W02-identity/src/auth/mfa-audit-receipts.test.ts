@@ -164,7 +164,9 @@ function createDb() {
         }
         if (sql.includes('FROM auth_007_mfa_publication_journal WHERE idempotency_key = ?')) {
           const row = outbox.get(String(args[0]))
-          return row ? { eventId: row.eventId } : null
+          if (!row) return null
+          const payload = JSON.parse(row.payload) as { eventType: string }
+          return { eventId: row.eventId, eventType: payload.eventType }
         }
         throw new Error('Unhandled test SQL first: ' + sql)
       },
@@ -305,8 +307,13 @@ describe('AUTH-007 durable MFA operation receipts', () => {
     })
     expect(store.receipts.get(receiptId)?.status).toBe('EMITTED')
     expect(store.outbox.size).toBe(1)
+    const storedPlan = JSON.parse(store.receipts.get(receiptId)?.eventPlan ?? '[]') as Array<{ eventId: string; eventType: string; idempotencyKey: string }>
+    const planned = storedPlan[0]
+    expect(planned.eventId).toMatch(/^evt_[a-f0-9]{32}$/)
+    expect(store.outbox.get(planned.idempotencyKey)?.eventId).toBe(planned.eventId)
     await reconcileMfaAuditOperationReceipts(store.db, '2026-10-26T12:01:00.000Z')
     expect(store.outbox.size).toBe(1)
+    expect(store.outbox.get(planned.idempotencyKey)?.eventId).toBe(planned.eventId)
   })
 
   it('keeps a ready receipt retryable when the outbox insert fails, then recovers on a later cron tick', async () => {
