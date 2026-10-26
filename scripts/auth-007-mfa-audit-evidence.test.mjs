@@ -7,7 +7,7 @@ import {
 } from './auth-007-mfa-audit-evidence.mjs'
 
 const outbox = REQUIRED_MFA_AUDIT_EVENT_TYPES.map((eventType, i) => ({
-  eventId: `evt_core_${String(i).padStart(4, '0')}`,
+  eventId: `evt_${i.toString(16).padStart(32, '0')}`,
   eventType,
   resourceId: 'user_qa1',
   idempotencyKey: `mfa-e2e:core:${i}`,
@@ -32,11 +32,11 @@ test('accepts core-path delivery only when every published eventId maps to exact
   assert.equal(result.allTenEventTypesVerified, false)
   assert.equal(result.scenarioSpecificCoverage.length, 4)
   assert.ok(result.scenarioSpecificCoverage.every((item) => item.observedCount === 0 && !item.verified))
-  assert.equal(JSON.stringify(result).includes('evt_core_'), false, 'raw event IDs must not escape reconciliation')
+  assert.equal(JSON.stringify(result).includes(outbox[0].eventId), false, 'raw event IDs must not escape reconciliation')
 })
 
 test('blocks when a required event has no canonical W06 record', () => {
-  const result = evaluateMfaAuditDelivery(outbox, audit.filter((row) => row.eventId !== 'evt_core_0004'))
+  const result = evaluateMfaAuditDelivery(outbox, audit.filter((row) => row.eventId !== outbox[4].eventId))
   assert.equal(result.pass, false)
   assert.equal(result.expectedEventsPresent, false)
   assert.equal(result.totalUnmatchedPublishedEventIdCount, 1)
@@ -65,7 +65,7 @@ test('blocks a failed outbox event instead of treating partial delivery as succe
 test('blocks equal aggregate counts when event IDs differ', () => {
   const differentIds = audit.map((row, i) => ({
     ...row,
-    eventId: i === 0 ? 'evt_not_matching_any_outbox_row' : row.eventId,
+    eventId: i === 0 ? `evt_${'f'.repeat(32)}` : row.eventId,
   }))
   const result = evaluateMfaAuditDelivery(outbox, differentIds)
   assert.equal(outbox.length, differentIds.length)
@@ -95,7 +95,7 @@ test('blocks duplicate event IDs returned by either read-only query', () => {
 
 test('reconciles multiple events of the same type by exact eventId rather than count alone', () => {
   const extraOutbox = [...outbox, {
-    eventId: 'evt_second_challenge',
+    eventId: `evt_${'a'.repeat(32)}`,
     eventType: 'auth.mfa.challenge_succeeded',
     resourceId: 'user_qa1',
     idempotencyKey: 'mfa-e2e:extra:second-challenge',
@@ -104,7 +104,7 @@ test('reconciles multiple events of the same type by exact eventId rather than c
     lastErrorCode: null,
   }]
   const extraAudit = [...audit, {
-    eventId: 'evt_second_challenge',
+    eventId: `evt_${'a'.repeat(32)}`,
     action: 'auth.mfa.challenge_succeeded',
     targetType: 'User',
     targetId: 'user_qa1',
@@ -124,7 +124,7 @@ test('does not treat empty outbox and canonical result sets as exactly-once deli
 
 test('blocks canonical audit rows that have no matching outbox event', () => {
   const rows = [...audit, {
-    eventId: 'evt_orphan',
+    eventId: `evt_${'c'.repeat(32)}`,
     action: 'auth.mfa.locked',
     targetType: 'User',
     targetId: 'user_qa1',
@@ -137,7 +137,7 @@ test('blocks canonical audit rows that have no matching outbox event', () => {
 
 test('reports separate failure and lockout scenario coverage without requiring it in core E2E', () => {
   const extraTypes = SCENARIO_SPECIFIC_MFA_AUDIT_EVENT_TYPES.map((eventType, i) => ({
-    eventId: `evt_scenario_${String(i).padStart(4, '0')}`,
+    eventId: `evt_${(100 + i).toString(16).padStart(32, '0')}`,
     eventType,
     resourceId: 'user_qa1',
     idempotencyKey: `mfa-e2e:scenario:${i}`,
@@ -157,7 +157,7 @@ test('reports separate failure and lockout scenario coverage without requiring i
   assert.equal(result.pass, true)
   assert.equal(result.allTenEventTypesVerified, true)
   assert.ok(result.scenarioSpecificCoverage.every((item) => item.verified))
-  assert.equal(JSON.stringify(result).includes('evt_scenario_'), false)
+  assert.ok(!JSON.stringify(result).includes(extraTypes[0].eventId))
 })
 
 test('blocks a canonical event whose target user differs even when eventId and action match', () => {
@@ -171,11 +171,11 @@ test('blocks a canonical event whose target user differs even when eventId and a
 test('blocks a duplicate outbox idempotency key even when event IDs are unique', () => {
   const duplicateKey = [...outbox, {
     ...outbox[0],
-    eventId: 'evt_duplicate_key',
+    eventId: `evt_${'b'.repeat(32)}`,
   }]
   const correspondingAudit = [...audit, {
     ...audit[0],
-    eventId: 'evt_duplicate_key',
+    eventId: `evt_${'b'.repeat(32)}`,
   }]
   const result = evaluateMfaAuditDelivery(duplicateKey, correspondingAudit)
   assert.equal(result.pass, false)
@@ -188,4 +188,14 @@ test('blocks missing or malformed source subject/idempotency key and canonical t
   const invalidTarget = audit.map((row, i) => i === 0 ? { ...row, targetType: 'Session' } : row)
   assert.equal(evaluateMfaAuditDelivery(invalidSource, audit).pass, false)
   assert.equal(evaluateMfaAuditDelivery(outbox, invalidTarget).pass, false)
+})
+
+
+test('rejects malformed event IDs even when source and canonical values agree', () => {
+  const malformedOutbox = outbox.map((row, i) => i === 0 ? { ...row, eventId: 'evt_bad' } : row)
+  const malformedAudit = audit.map((row, i) => i === 0 ? { ...row, eventId: 'evt_bad' } : row)
+  const result = evaluateMfaAuditDelivery(malformedOutbox, malformedAudit)
+  assert.equal(result.pass, false)
+  assert.equal(result.invalidOutboxRowCount, 1)
+  assert.equal(result.invalidCanonicalRowCount, 1)
 })
