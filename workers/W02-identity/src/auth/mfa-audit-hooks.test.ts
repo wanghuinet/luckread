@@ -87,6 +87,27 @@ describe('AUTH-007 Better Auth hook outcome classification', () => {
     })).toEqual([])
   })
 
+  it('preserves trusted enrollment receipt defer-finalization state for the owning route', () => {
+    const context: Record<string, unknown> = {}
+    setMfaAuditHookState(context, {
+      userId: 'user-123',
+      isChallenge: false,
+      receiptId: 'mfaop_0123456789abcdef0123456789abcdef',
+      deferFinalization: true,
+    })
+    expect(getMfaAuditHookState(context)).toEqual({
+      userId: 'user-123',
+      isChallenge: false,
+      receiptId: 'mfaop_0123456789abcdef0123456789abcdef',
+      deferFinalization: true,
+    })
+    expect(() => setMfaAuditHookState({}, {
+      userId: 'user-123',
+      isChallenge: false,
+      deferFinalization: 'true' as unknown as boolean,
+    })).toThrow('invalid MFA audit defer-finalization flag')
+  })
+
   it('recognizes Better Auth error outcomes and failed HTTP responses', () => {
     expect(isMfaAuditFailureOutcome(new Error('rejected'))).toBe(true)
     expect(isMfaAuditFailureOutcome(new Response(null, { status: 401 }))).toBe(true)
