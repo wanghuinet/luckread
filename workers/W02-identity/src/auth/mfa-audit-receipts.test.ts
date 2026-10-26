@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+  appendMfaAuditOperationReceiptEvent,
   createMfaAuditOperationReceipt,
   finalizeMfaAuditOperationReceipt,
   reconcileMfaAuditOperationReceipts,
@@ -26,6 +27,7 @@ function createDb() {
   const outbox = new Map<string, { eventId: string; payload: string }>()
   let failNextOutboxInsert = false
   let failNextReceiptInsertAfterCommit = false
+  let failNextReceiptAppendAfterCommit = false
   const prepare = vi.fn((sql: string) => ({
     bind: (...args: unknown[]) => ({
       run: async () => {
@@ -79,6 +81,10 @@ function createDb() {
           const row = receipts.get(String(receiptId))
           if (!row || !['STARTED', 'READY'].includes(row.status)) return { success: true, meta: { changes: 0 } }
           row.eventPlan = String(eventPlan)
+          if (failNextReceiptAppendAfterCommit) {
+            failNextReceiptAppendAfterCommit = false
+            throw new Error('synthetic D1 response loss after receipt event append')
+          }
           return { success: true, meta: { changes: 1 } }
         }
 
@@ -194,6 +200,7 @@ function createDb() {
     outbox,
     failNextOutboxInsert: () => { failNextOutboxInsert = true },
     failNextReceiptInsertAfterCommit: () => { failNextReceiptInsertAfterCommit = true },
+    failNextReceiptAppendAfterCommit: () => { failNextReceiptAppendAfterCommit = true },
   }
 }
 
@@ -240,6 +247,27 @@ describe('AUTH-007 durable MFA operation receipts', () => {
     expect(receipt?.status).toBe('STARTED')
     expect(receipt?.eventPlan).toBeNull()
     expect(JSON.stringify(receipt)).not.toMatch(/password|secret|recoveryCodes|backupCodes|session_token|123456/)
+  })
+
+  it('read-backs an appended replay event if the D1 response is lost after commit', async () => {
+    const receiptId = await createMfaAuditOperationReceipt(store.db, {
+      userId: 'user-123',
+      operationPath: '/two-factor/verify-totp',
+      isChallenge: true,
+      now: startedAt,
+    })
+    store.failNextReceiptAppendAfterCommit()
+
+    await appendMfaAuditOperationReceiptEvent(store.db, receiptId, {
+      eventType: 'auth.mfa.replay_rejected',
+      result: 'rejected',
+      reasonCode: 'TOTP_STEP_ALREADY_ACCEPTED',
+      challengeMethod: 'totp',
+      idempotencyKey: `mfa-operation:${receiptId}:auth.mfa.replay_rejected`,
+      occurredAt: startedAt,
+    })
+
+    expect(store.receipts.get(receiptId)?.eventPlan).toContain('auth.mfa.replay_rejected')
   })
 
   it('persists the outcome before creating one idempotent outbox event', async () => {
