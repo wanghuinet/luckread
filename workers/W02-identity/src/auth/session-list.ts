@@ -115,7 +115,12 @@ export async function handleCurrentUserSessionList(
       ? statement.bind(userId, now, cursor.createdAt, cursor.createdAt, cursor.sessionId, limit + 1)
       : statement.bind(userId, now, limit + 1)
     const result = await bound.all<SessionRow>()
-    const rows = (result.results ?? []).filter((row) =>
+    // A D1 SELECT may resolve with success=false; never treat that as an empty
+    // session list, because it would hide a storage failure behind HTTP 200.
+    if (result.success !== true || !Array.isArray(result.results)) {
+      throw new Error('SESSION_LIST_SELECT_FAILED')
+    }
+    const rows = result.results.filter((row) =>
       typeof row.sessionId === 'string' &&
       row.sessionId.length > 0 &&
       typeof row.createdAt === 'string' &&
