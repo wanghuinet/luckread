@@ -51,6 +51,16 @@ describe('AUTH-007 W06 MFA audit queue consumer', () => {
     expect(prepare).not.toHaveBeenCalled()
   })
 
+  it('rejects malformed or oversized idempotency keys before touching canonical audit storage', async () => {
+    for (const idempotencyKey of ['mfa bad key', 'x'.repeat(256)]) {
+      const malformed = { ...event, idempotencyKey }
+      const prepare = vi.fn()
+      await expect(consumeMfaAuditEvent({ prepare } as unknown as D1Database, malformed))
+        .rejects.toThrow('INVALID_AUTH_007_MFA_EVENT')
+      expect(prepare).not.toHaveBeenCalled()
+    }
+  })
+
   it('persists a safe MFA event into canonical AuditEvent storage', async () => {
     const { db, prepare, run } = createDb()
     await expect(consumeMfaAuditEvent(db, event)).resolves.toBe('persisted')
