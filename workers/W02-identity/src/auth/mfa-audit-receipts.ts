@@ -178,6 +178,42 @@ function mergePlan(
   return [...byKey.values()]
 }
 
+/**
+ * Verify a receipt passed from the W02 enrollment handler into its nested
+ * Better Auth verification call. The receipt ID is server-generated and must
+ * still belong to the same user/path and remain STARTED before reuse.
+ */
+export async function assertMfaAuditOperationReceiptOwner(
+  db: D1Database,
+  input: {
+    receiptId: string
+    userId: string
+    operationPath: MfaAuditReceiptOperationPath
+    isChallenge: boolean
+  },
+): Promise<void> {
+  if (!/^mfaop_[a-f0-9]{32}$/.test(input.receiptId) || !subjectPattern.test(input.userId) ||
+      !validPaths.has(input.operationPath) || typeof input.isChallenge !== 'boolean') {
+    throw new Error('MFA_AUDIT_RECEIPT_CONTEXT_MISMATCH')
+  }
+  const row = await db.prepare(
+    'SELECT receipt_id AS receiptId, resource_id AS resourceId, operation_path AS operationPath, ' +
+    'is_challenge AS isChallenge, status FROM auth_007_mfa_operation_receipts ' +
+    'WHERE receipt_id = ? LIMIT 1',
+  ).bind(input.receiptId).first<{
+    receiptId: string
+    resourceId: string
+    operationPath: string
+    isChallenge: number | boolean
+    status: string
+  }>()
+  if (!row || row.receiptId !== input.receiptId || row.resourceId !== input.userId ||
+      row.operationPath !== input.operationPath || Boolean(row.isChallenge) !== input.isChallenge ||
+      row.status !== 'STARTED') {
+    throw new Error('MFA_AUDIT_RECEIPT_CONTEXT_MISMATCH')
+  }
+}
+
 async function loadReceipt(db: D1Database, receiptId: string): Promise<ReceiptRow> {
   const row = await db.prepare(
     'SELECT receipt_id AS receiptId, resource_id AS resourceId, operation_path AS operationPath, ' +
