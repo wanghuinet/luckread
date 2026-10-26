@@ -370,7 +370,7 @@ const buildLuckReadAuth = (env: BetterAuthEnv) => {
 
         const requestHeaders = ctx.request?.headers ?? ctx.headers
         if (requestHeaders?.get('X-LuckRead-MFA-Operation') === 'enrollment-confirm' &&
-            requestHeaders.get('X-LuckRead-MFA-Receipt-Mode') === 'defer-finalization') {
+            requestHeaders?.get('X-LuckRead-MFA-Receipt-Mode') === 'defer-finalization') {
           // The owning W02 enrollment endpoint performs authoritative factor
           // read-back before finalizing this receipt. Do not resolve a successful
           // enrollment as an empty receipt inside the nested plugin hook.
