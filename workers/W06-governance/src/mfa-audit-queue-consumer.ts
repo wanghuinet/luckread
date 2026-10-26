@@ -16,6 +16,7 @@ const operationIds: Record<string, readonly string[]> = {
 
 const allowedPayloadKeys = new Set(['operationId', 'result', 'reasonCode', 'factorState', 'challengeMethod'])
 const allowedResults = new Set(['started', 'succeeded', 'failed', 'rejected'])
+const eventIdPattern = /^evt_[a-f0-9]{32}$/
 const resourceIdPattern = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/
 const correlationPattern = /^[A-Za-z0-9._:-]{1,128}$/
 
@@ -65,7 +66,7 @@ function assertMfaAuditEvent(value: unknown): asserts value is MfaAuditQueueEven
     event.producer !== 'W02' ||
     event.resourceType !== 'User' ||
     requiredStrings.some((item) => typeof item !== 'string' || item.length === 0) ||
-    !resourceIdPattern.test(event.eventId as string) ||
+    !eventIdPattern.test(event.eventId as string) ||
     !resourceIdPattern.test(event.resourceId as string) ||
     !correlationPattern.test(event.correlationId as string) ||
     !correlationPattern.test(event.causationId as string) ||
