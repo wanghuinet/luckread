@@ -56,7 +56,7 @@ function assertMfaAuditEvent(value: unknown): asserts value is MfaAuditQueueEven
   }
   const actorValue = actor as Record<string, unknown>
   const payloadValue = payload as Record<string, unknown>
-  const validEvent = typeof event.eventType === 'string' && event.eventType in operationIds
+  const validEvent = typeof event.eventType === 'string' && Object.hasOwn(operationIds, event.eventType)
   const requiredStrings = [
     event.eventId, event.resourceId, event.occurredAt, event.publishedAt,
     event.correlationId, event.causationId, event.idempotencyKey,
