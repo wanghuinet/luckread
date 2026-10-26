@@ -253,14 +253,20 @@ const run = async () => {
         body: { code: '123456', method: 'totp' },
       },
     )
-    check('authenticated_session_is_not_accepted_as_signin_challenge',
+    const sessionChallengeRejected =
       sessionCannotReplaceChallenge.facts.status === 401 &&
       sessionCannotReplaceChallenge.facts.errorCode === 'MFA_CHALLENGE_REQUIRED' &&
-      !sessionCannotReplaceChallenge.response?.headers.has('x-luckread-session-token'), {
-        status: sessionCannotReplaceChallenge.facts.status,
-        errorCode: sessionCannotReplaceChallenge.facts.errorCode,
-        tokenIssued: Boolean(sessionCannotReplaceChallenge.response?.headers.has('x-luckread-session-token')),
-      })
+      !sessionCannotReplaceChallenge.response?.headers.has('x-luckread-session-token')
+    check('authenticated_session_is_not_accepted_as_signin_challenge', sessionChallengeRejected, {
+      status: sessionCannotReplaceChallenge.facts.status,
+      errorCode: sessionCannotReplaceChallenge.facts.errorCode,
+      tokenIssued: Boolean(sessionCannotReplaceChallenge.response?.headers.has('x-luckread-session-token')),
+    })
+    if (!sessionChallengeRejected) {
+      result.status = 'MFA_SESSION_SUBSTITUTED_FOR_CHALLENGE'
+      result.cleanupStatus = 'manual_review_required'
+      return
+    }
 
     const initialStatus = await request('mfa_preflight_status', 'GET', '/v1/auth/mfa')
     const initialData = totpStatus(initialStatus.payload)
@@ -296,29 +302,42 @@ const run = async () => {
         body: { currentPassword: wrongPassword },
       },
     )
-    check('mfa_enrollment_rejects_wrong_current_password_without_disclosing_one_time_material',
+    const wrongPasswordRejected =
       rejectedEnrollment.facts.status === 401 &&
       !rejectedEnrollment.payload?.data?.totpUri &&
-      !Array.isArray(rejectedEnrollment.payload?.data?.recoveryCodes), {
+      !Array.isArray(rejectedEnrollment.payload?.data?.recoveryCodes)
+    check('mfa_enrollment_rejects_wrong_current_password_without_disclosing_one_time_material',
+      wrongPasswordRejected, {
         status: rejectedEnrollment.facts.status,
         errorCode: rejectedEnrollment.facts.errorCode,
         oneTimeMaterialReturned: Boolean(rejectedEnrollment.payload?.data?.totpUri) ||
           Array.isArray(rejectedEnrollment.payload?.data?.recoveryCodes),
         passwordLogged: false,
       })
+    if (!wrongPasswordRejected) {
+      result.status = 'MFA_ENROLLMENT_NEGATIVE_TEST_FAILED'
+      result.cleanupStatus = 'manual_review_required'
+      return
+    }
 
     const afterRejectedEnrollment = await request('mfa_disabled_after_failed_enrollment', 'GET', '/v1/auth/mfa')
     const afterRejectedEnrollmentData = totpStatus(afterRejectedEnrollment.payload)
-    check('failed_enrollment_keeps_factor_disabled',
+    const failedEnrollmentKeptDisabled =
       afterRejectedEnrollment.facts.status === 200 &&
       afterRejectedEnrollmentData?.enabled === false &&
       afterRejectedEnrollmentData?.verified === false &&
-      afterRejectedEnrollmentData?.enrolledAt === null, {
-        status: afterRejectedEnrollment.facts.status,
-        factorStillDisabled: afterRejectedEnrollmentData?.enabled === false &&
-          afterRejectedEnrollmentData?.verified === false &&
-          afterRejectedEnrollmentData?.enrolledAt === null,
-      })
+      afterRejectedEnrollmentData?.enrolledAt === null
+    check('failed_enrollment_keeps_factor_disabled', failedEnrollmentKeptDisabled, {
+      status: afterRejectedEnrollment.facts.status,
+      factorStillDisabled: afterRejectedEnrollmentData?.enabled === false &&
+        afterRejectedEnrollmentData?.verified === false &&
+        afterRejectedEnrollmentData?.enrolledAt === null,
+    })
+    if (!failedEnrollmentKeptDisabled) {
+      result.status = 'MFA_FAILED_ENROLLMENT_MUTATED_STATE'
+      result.cleanupStatus = 'manual_review_required'
+      return
+    }
 
     const enroll = await request('mfa_enrollment_start', 'POST', '/v1/auth/mfa/enrollment', {
       headers: {
@@ -484,15 +503,21 @@ const run = async () => {
           body: { code: challengeCode, method: 'totp', userId: 'another-user-not-selected-by-client' },
         },
       )
-      check('challenge_rejects_caller_supplied_account_subject',
+      const clientSubjectRejected =
         suppliedSubjectAttempt.facts.status === 422 &&
         suppliedSubjectAttempt.facts.errorCode === 'VALIDATION_FAILED' &&
-        !suppliedSubjectAttempt.response?.headers.has('x-luckread-session-token'), {
-          status: suppliedSubjectAttempt.facts.status,
-          errorCode: suppliedSubjectAttempt.facts.errorCode,
-          tokenIssued: Boolean(suppliedSubjectAttempt.response?.headers.has('x-luckread-session-token')),
-          suppliedIdentityLogged: false,
-        })
+        !suppliedSubjectAttempt.response?.headers.has('x-luckread-session-token')
+      check('challenge_rejects_caller_supplied_account_subject', clientSubjectRejected, {
+        status: suppliedSubjectAttempt.facts.status,
+        errorCode: suppliedSubjectAttempt.facts.errorCode,
+        tokenIssued: Boolean(suppliedSubjectAttempt.response?.headers.has('x-luckread-session-token')),
+        suppliedIdentityLogged: false,
+      })
+      if (!clientSubjectRejected) {
+        lastAuthenticatedCookie = cookieHeader()
+        result.status = 'MFA_CHALLENGE_ACCEPTED_CLIENT_SUBJECT'
+        return
+      }
 
       const challengeVerify = await request('signin_totp_challenge_success', 'POST', '/v1/auth/mfa/challenge/verify', {
         headers: {
