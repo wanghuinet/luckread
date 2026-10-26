@@ -180,6 +180,12 @@ export async function recordMfaAuditEventOnce(
     "FROM auth_007_mfa_publication_journal WHERE idempotency_key = ? LIMIT 1"
 
   const assertSameIntent = (stored: StoredJournalEvent): void => {
+    // A matching idempotency key is not proof of a valid journal row unless
+    // its durable identity is valid, even when this producer did not assign
+    // an eventId before the first insert (for example, a lockout event).
+    if (typeof stored.eventId !== 'string' || !/^evt_[a-f0-9]{32}$/.test(stored.eventId)) {
+      throw new Error('MFA_AUDIT_EVENT_ID_CONFLICT')
+    }
     if (input.eventId && stored.eventId !== input.eventId) throw new Error('MFA_AUDIT_EVENT_ID_CONFLICT')
     if (stored.eventType !== event.eventType || stored.operationId !== event.payload.operationId) {
       throw new Error('MFA_AUDIT_EVENT_ACTION_CONFLICT')
