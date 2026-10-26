@@ -14,6 +14,12 @@ const W02_SCRIPT_FILTER = Object.freeze({
   type: 'string',
   value: EXPECTED_SCRIPT,
 })
+const W02_SCHEDULED_EVENT_FILTER = Object.freeze({
+  key: '$workers.eventType',
+  operation: 'in',
+  type: 'string',
+  value: 'scheduled,cron',
+})
 // Scope both views by the indexed service name. Log-message fields can be represented
 // differently across invocation and event rows, so fixed marker matching happens
 // in memory after the bounded W02-only query.
@@ -283,7 +289,7 @@ async function probeW02EventsView({ accountId, apiToken, now, fetchImpl }) {
           parameters: {
             datasets: ['cloudflare-workers'],
             filterCombination: 'and',
-            filters: [W02_SCRIPT_FILTER],
+            filters: [W02_SCRIPT_FILTER, W02_SCHEDULED_EVENT_FILTER],
           },
         }),
       },
@@ -324,9 +330,10 @@ async function probeW02EventsView({ accountId, apiToken, now, fetchImpl }) {
 
 /**
  * Query Cloudflare Workers Observability without opening a WebSocket tail.
- * Both queries are scoped by the indexed W02 service name. For Events, avoid
- * filtering on a message field whose representation can differ across invocation and
- * log rows; inspect only bounded results in memory and retain fixed markers/counts.
+ * Both queries are scoped server-side by the indexed W02 service name and the
+ * scheduled/cron event type, so frequent Fetch traffic cannot crowd scheduler evidence
+ * out of the bounded result window. Inspect only bounded results in memory and retain
+ * fixed markers/counts.
  * Only fixed labels and safe numeric aggregates survive; raw event bodies and
  * request identifiers are never logged or persisted.
  */
@@ -371,7 +378,7 @@ export async function probeW02ScheduledObservability({
           parameters: {
             datasets: ['cloudflare-workers'],
             filterCombination: 'and',
-            filters: [W02_SCRIPT_FILTER],
+            filters: [W02_SCRIPT_FILTER, W02_SCHEDULED_EVENT_FILTER],
           },
         }),
       },

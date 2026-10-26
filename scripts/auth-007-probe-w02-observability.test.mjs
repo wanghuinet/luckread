@@ -14,7 +14,7 @@ const response = (status, payload) => ({
 })
 
 describe('AUTH-007 read-only W02 scheduled Observability probe', () => {
-  it('runs dry, bounded, server-side W02-scoped queries without storing raw evidence', async () => {
+  it('runs dry, bounded, server-side W02 Cron-scoped queries without storing raw evidence', async () => {
     const observed = []
     const result = await probeW02ScheduledObservability({
       ...valid,
@@ -113,6 +113,7 @@ describe('AUTH-007 read-only W02 scheduled Observability probe', () => {
       assert.equal(request.body.limit, 100)
       const expectedFilters = [
         { key: '$metadata.service', operation: 'starts_with', type: 'string', value: 'luckread-w02' },
+        { key: '$workers.eventType', operation: 'in', type: 'string', value: 'scheduled,cron' },
       ]
       assert.deepEqual(request.body.parameters.filters, expectedFilters)
       assert.equal(request.body.parameters.filterCombination, 'and')
