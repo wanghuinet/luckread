@@ -44,6 +44,7 @@ async function finalizeEnrollmentAuditReceipt(
 
 const enrollmentFailureEvent = (): MfaAuditReceiptEvent => ({
   eventType: 'auth.mfa.enrollment_failed',
+  operationId: 'authMfaEnrollmentConfirm',
   result: 'failed',
   reasonCode: 'ENROLLMENT_CONFIRMATION_REJECTED',
 })
