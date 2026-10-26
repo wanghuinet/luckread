@@ -134,6 +134,32 @@ describe('W02 MFA enrollment confirmation authority', () => {
     expect(mocks.readStatus).toHaveBeenCalledWith(db, principal.userId)
   })
 
+
+  it('does not invent a failed MFA outcome when the handler throws and D1 read-back is indeterminate', async () => {
+    const { db } = makeDb()
+    mocks.handler.mockRejectedValueOnce(new Error('ambiguous internal failure'))
+    mocks.readStatus.mockResolvedValueOnce(null)
+    const response = await handleMfaEnrollmentConfirmRequest({ D1_01: db } as BetterAuthEnv, makeRequest())
+    expect(response.status).toBe(503)
+    expect(mocks.finalizeReceipt).not.toHaveBeenCalled()
+  })
+
+  it('records a verified enrollment if the handler throws but authoritative D1 state proves success', async () => {
+    const { db } = makeDb()
+    mocks.handler.mockRejectedValueOnce(new Error('response lost after mutation'))
+    const response = await handleMfaEnrollmentConfirmRequest({ D1_01: db } as BetterAuthEnv, makeRequest())
+    expect(response.status).toBe(503)
+    expect(mocks.finalizeReceipt).toHaveBeenCalledWith(
+      db,
+      'mfaop_0123456789abcdef0123456789abcdef',
+      expect.arrayContaining([expect.objectContaining({
+        eventType: 'auth.mfa.enrollment_verified',
+        result: 'succeeded',
+        reasonCode: 'TOTP_ENROLLMENT_VERIFIED',
+      })]),
+    )
+  })
+
   it('requires an idempotency key before resolving the principal or verifying TOTP', async () => {
     const { db } = makeDb()
     const response = await handleMfaEnrollmentConfirmRequest(
