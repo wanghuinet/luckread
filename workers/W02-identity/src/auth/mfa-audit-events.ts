@@ -174,12 +174,13 @@ export async function recordMfaAuditEvent(
 export async function recordMfaAuditEventOnce(
   db: D1Database,
   input: Parameters<typeof buildMfaAuditEvent>[0] & { idempotencyKey: string; eventId?: string },
-): Promise<boolean> {
+): Promise<{ inserted: boolean; eventId: string }> {
   const event = buildMfaAuditEvent(input)
   type StoredJournalEvent = {
     eventId: string
     eventType: string
     resourceId: string
+    status: string
     operationId: string | null
     result: string | null
     reasonCode: string | null
@@ -187,7 +188,7 @@ export async function recordMfaAuditEventOnce(
     challengeMethod: string | null
   }
   const selectByIdempotencyKey =
-    "SELECT event_id AS eventId, event_type AS eventType, resource_id AS resourceId, " +
+    "SELECT event_id AS eventId, event_type AS eventType, resource_id AS resourceId, status, " +
     "json_extract(payload, '$.payload.operationId') AS operationId, " +
     "json_extract(payload, '$.payload.result') AS result, " +
     "json_extract(payload, '$.payload.reasonCode') AS reasonCode, " +
@@ -195,6 +196,9 @@ export async function recordMfaAuditEventOnce(
     "json_extract(payload, '$.payload.challengeMethod') AS challengeMethod " +
     "FROM auth_007_mfa_publication_journal WHERE idempotency_key = ? LIMIT 1"
 
+  const canAdoptLegacyLockoutId = event.eventType === 'auth.mfa.locked' &&
+    input.idempotencyKey.startsWith('mfa-lock:') &&
+    input.eventId === await deriveMfaAuditEventIdForIdempotencyKey(input.idempotencyKey)
   const assertSameIntent = (stored: StoredJournalEvent): void => {
     // A matching idempotency key is not proof of a valid journal row unless
     // its durable identity is valid, even when this producer did not assign
@@ -202,7 +206,11 @@ export async function recordMfaAuditEventOnce(
     if (typeof stored.eventId !== 'string' || !/^evt_[a-f0-9]{32}$/.test(stored.eventId)) {
       throw new Error('MFA_AUDIT_EVENT_ID_CONFLICT')
     }
-    if (input.eventId && stored.eventId !== input.eventId) throw new Error('MFA_AUDIT_EVENT_ID_CONFLICT')
+    if (input.eventId && stored.eventId !== input.eventId && !canAdoptLegacyLockoutId) {
+      throw new Error('MFA_AUDIT_EVENT_ID_CONFLICT')
+    }
+    if (stored.status === 'FAILED') throw new Error('MFA_AUDIT_OUTBOX_PREVIOUSLY_FAILED')
+    if (!['PENDING', 'PUBLISHED'].includes(stored.status)) throw new Error('MFA_AUDIT_OUTBOX_STATUS_INVALID')
     if (stored.eventType !== event.eventType || stored.operationId !== event.payload.operationId) {
       throw new Error('MFA_AUDIT_EVENT_ACTION_CONFLICT')
     }
@@ -213,7 +221,7 @@ export async function recordMfaAuditEventOnce(
       stored.result !== event.payload.result ||
       !optionalMatches(stored.reasonCode, event.payload.reasonCode) ||
       !optionalMatches(stored.factorState, event.payload.factorState) ||
-      !optionalMatches(stored.challengeMethod, event.payload.challengeMethod)
+      (!canAdoptLegacyLockoutId && !optionalMatches(stored.challengeMethod, event.payload.challengeMethod))
     ) throw new Error('MFA_AUDIT_EVENT_INTENT_CONFLICT')
   }
   const existing = await db.prepare(selectByIdempotencyKey)
@@ -221,7 +229,7 @@ export async function recordMfaAuditEventOnce(
     .first<StoredJournalEvent>()
   if (existing) {
     assertSameIntent(existing)
-    return false
+    return { inserted: false, eventId: existing.eventId }
   }
 
   let result: D1Result
@@ -233,18 +241,20 @@ export async function recordMfaAuditEventOnce(
       .first<StoredJournalEvent>()
     if (raced) {
       assertSameIntent(raced)
-      return false
+      assertSameIntent(raced)
+      return { inserted: false, eventId: raced.eventId }
     }
     throw new Error('MFA_AUDIT_OUTBOX_WRITE_FAILED')
   }
 
-  if (result.success && result.meta?.changes === 1) return true
+  if (result.success && result.meta?.changes === 1) return { inserted: true, eventId: event.eventId }
   const afterWrite = await db.prepare(selectByIdempotencyKey)
     .bind(event.idempotencyKey)
     .first<StoredJournalEvent>()
   if (afterWrite) {
     assertSameIntent(afterWrite)
-    return false
+    assertSameIntent(afterWrite)
+    return { inserted: false, eventId: afterWrite.eventId }
   }
   throw new Error('MFA_AUDIT_OUTBOX_WRITE_FAILED')
 }
