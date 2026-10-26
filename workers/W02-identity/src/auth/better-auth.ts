@@ -7,6 +7,7 @@ import { bearer, twoFactor } from 'better-auth/plugins'
 import { consumeTotpTimeStep, matchTotpTimeStep } from './totp-replay-guard.js'
 import { isActiveMfaSubject } from './mfa-challenge-account-state.js'
 import { isUnexpiredMfaChallengeRecord } from './mfa-challenge-verification.js'
+import { deriveMfaAuditEventIdForIdempotencyKey } from './mfa-audit-events.js'
 import { sendResendEmail } from './resend-email.js'
 import {
   appendMfaAuditOperationReceiptEvent,
@@ -347,12 +348,14 @@ const buildLuckReadAuth = (env: BetterAuthEnv) => {
             ).bind(state.userId).first<{ lockedUntil: string | null }>()
             const lockUntil = typeof factor?.lockedUntil === 'string' ? Date.parse(factor.lockedUntil) : Number.NaN
             if (Number.isFinite(lockUntil) && lockUntil > Date.now()) {
+              const lockoutIdempotencyKey = 'mfa-lock:' + state.userId + ':' + lockUntil
               outcomes.push({
                 eventType: 'auth.mfa.locked',
+                eventId: await deriveMfaAuditEventIdForIdempotencyKey(lockoutIdempotencyKey),
                 result: 'rejected',
                 reasonCode: 'VERIFICATION_LOCKOUT',
                 challengeMethod: ctx.path === '/two-factor/verify-backup-code' ? 'recovery_code' : 'totp',
-                idempotencyKey: 'mfa-lock:' + state.userId + ':' + lockUntil,
+                idempotencyKey: lockoutIdempotencyKey,
               })
             }
           } catch {
