@@ -25,7 +25,7 @@ type Receipt = {
 
 function createDb() {
   const receipts = new Map<string, Receipt>()
-  const outbox = new Map<string, { eventId: string; payload: string }>()
+  const outbox = new Map<string, { eventId: string; payload: string; status: 'PENDING' | 'PUBLISHED' | 'FAILED' }>()
   let failNextOutboxInsert = false
   let failNextReceiptInsertAfterCommit = false
   let failNextReceiptAppendAfterCommit = false
@@ -68,12 +68,24 @@ function createDb() {
           outbox.set(String(idempotencyKey), {
             eventId: String(eventId),
             payload: String(payload),
+            status: 'PENDING',
           })
           expect(String(journalId)).toBeTruthy()
           expect(String(eventType)).toMatch(/^auth\.mfa\./)
           expect(schemaVersion).toBe('1.0')
           expect(String(resourceId)).toBeTruthy()
           expect(sourceVersion).toBe(1)
+          return { success: true, meta: { changes: 1 } }
+        }
+
+        if (sql.includes('UPDATE auth_007_mfa_operation_receipts') &&
+            sql.includes('SET event_plan = ?') && sql.includes('AND event_plan = ?')) {
+          const [eventPlan, receiptId, priorStatus, previousPlan] = args
+          const row = receipts.get(String(receiptId))
+          if (!row || row.status !== priorStatus || row.eventPlan !== previousPlan) {
+            return { success: true, meta: { changes: 0 } }
+          }
+          row.eventPlan = String(eventPlan)
           return { success: true, meta: { changes: 1 } }
         }
 
@@ -180,6 +192,7 @@ function createDb() {
           return {
             eventId: row.eventId,
             eventType: payload.eventType,
+            status: row.status,
             resourceId: payload.resourceId,
             operationId: payload.payload.operationId,
             result: payload.payload.result,
@@ -471,6 +484,67 @@ describe('AUTH-007 durable MFA operation receipts', () => {
     expect(store.receipts.get(secondReceiptId)?.status).toBe('EMITTED')
     expect(store.outbox.size).toBe(1)
     expect([...store.outbox.values()][0]?.eventId).toBe(eventId)
+  })
+
+
+  it('adopts a previously published legacy lockout event id and persists it in the receipt plan', async () => {
+    const idempotencyKey = 'mfa-lock:user-123:1792850400000'
+    const desiredEventId = await deriveMfaAuditEventIdForIdempotencyKey(idempotencyKey)
+    const legacyEventId = 'evt_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee'
+    const receiptId = await createMfaAuditOperationReceipt(store.db, {
+      userId: 'user-123',
+      operationPath: '/two-factor/verify-totp',
+      isChallenge: true,
+      now: startedAt,
+    })
+    await finalizeMfaAuditOperationReceipt(store.db, receiptId, [{
+      eventType: 'auth.mfa.locked',
+      eventId: desiredEventId,
+      result: 'rejected',
+      reasonCode: 'VERIFICATION_LOCKOUT',
+      idempotencyKey,
+      occurredAt: startedAt,
+    }], startedAt)
+    const originalPlan = JSON.parse(store.receipts.get(receiptId)?.eventPlan ?? '[]') as Array<{eventType:string;eventId:string;result:string;reasonCode:string;idempotencyKey:string;occurredAt:string}>
+    const legacyPayload = {
+      eventId: legacyEventId,
+      eventType: 'auth.mfa.locked',
+      schemaVersion: '1.0',
+      producer: 'W02',
+      resourceType: 'User',
+      resourceId: 'user-123',
+      occurredAt: startedAt,
+      publishedAt: startedAt,
+      correlationId: 'legacy-correlation',
+      causationId: 'legacy-causation',
+      idempotencyKey,
+      attempt: 1,
+      sourceVersion: 1,
+      actor: {actorId:'user-123',actorType:'user'},
+      payload: {
+        operationId: 'authMfaChallengeVerify',
+        result: 'rejected',
+        reasonCode: 'VERIFICATION_LOCKOUT',
+        challengeMethod: 'totp',
+      },
+    }
+    store.outbox.set(idempotencyKey, {
+      eventId: legacyEventId,
+      payload: JSON.stringify(legacyPayload),
+      status: 'PUBLISHED',
+    })
+
+    await expect(reconcileMfaAuditOperationReceipts(store.db, startedAt)).resolves.toEqual({
+      selected: 1,
+      emitted: 1,
+      failed: 0,
+      unknown: 0,
+    })
+    expect(originalPlan[0]?.eventId).toBe(desiredEventId)
+    expect(store.receipts.get(receiptId)?.status).toBe('EMITTED')
+    const persistedPlan = JSON.parse(store.receipts.get(receiptId)?.eventPlan ?? '[]') as Array<{eventId:string;idempotencyKey:string}>
+    expect(persistedPlan.find((event) => event.idempotencyKey === idempotencyKey)?.eventId).toBe(legacyEventId)
+    expect(store.outbox.get(idempotencyKey)?.eventId).toBe(legacyEventId)
   })
 
   it('retains two distinct events for a successful recovery-code login challenge', async () => {
