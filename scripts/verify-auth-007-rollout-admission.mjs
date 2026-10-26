@@ -200,7 +200,6 @@ for (const file of [
   betterAuthPath,
   replayGuardPath,
   rawAuthProxyRoutePath,
-  rawAuthProxyTestPath,
   'workers/W02-identity/src/auth/mfa-challenge-verification.ts',
   'workers/W02-identity/src/auth/mfa-challenge-verification.test.ts',
   policyPath,
@@ -245,7 +244,7 @@ if (blockers.length === 0) {
   const readOnlyPreflightWorkflow = read('.github/workflows/auth-mfa-rollout-preflight.yml')
   const w06DeployWorkflow = read('.github/workflows/w06-deploy.yml')
   const rawAuthProxySource = read(rawAuthProxyRoutePath).replace(/\s+/g, ' ')
-  const rawAuthProxyTest = read(rawAuthProxyTestPath)
+  const rawAuthProxyTest = exists(rawAuthProxyTestPath) ? read(rawAuthProxyTestPath) : ''
   // Static-only PR checks can run before the separate W01 route-hardening PR is
   // merged. Any real rollout/preflight must prove the native catch-all is closed
   // by default and has negative tests that prove W02 is never invoked.
