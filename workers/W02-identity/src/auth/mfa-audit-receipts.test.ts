@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { deriveMfaAuditEventIdForIdempotencyKey } from './mfa-audit-events'
 import {
   appendMfaAuditOperationReceiptEvent,
+  assertMfaAuditOperationReceiptOwner,
   createMfaAuditOperationReceipt,
   finalizeMfaAuditOperationReceipt,
   reconcileMfaAuditOperationReceipts,
@@ -12,6 +13,7 @@ type Receipt = {
   receiptId: string
   resourceId: string
   operationPath: string
+  isChallenge: number | boolean
   status: string
   startedAt: string
   completedAt: string | null
@@ -38,6 +40,7 @@ function createDb() {
             receiptId: String(receiptId),
             resourceId: String(resourceId),
             operationPath: String(operationPath),
+            isChallenge: isChallenge as number | boolean,
             status: String(status),
             startedAt: String(startedAt),
             completedAt: null,
@@ -176,6 +179,7 @@ function createDb() {
             receiptId: row.receiptId,
             resourceId: row.resourceId,
             operationPath: row.operationPath,
+            isChallenge: row.isChallenge,
             status: row.status,
             startedAt: row.startedAt,
             completedAt: row.completedAt,
@@ -292,6 +296,40 @@ describe('AUTH-007 durable MFA operation receipts', () => {
     expect(receipt?.status).toBe('STARTED')
     expect(receipt?.eventPlan).toBeNull()
     expect(JSON.stringify(receipt)).not.toMatch(/password|secret|recoveryCodes|backupCodes|session_token|123456/)
+  })
+
+
+  it('only permits a nested Better Auth receipt handoff for the same subject, path and challenge mode', async () => {
+    const receiptId = await createMfaAuditOperationReceipt(store.db, {
+      userId: 'user-123',
+      operationPath: '/two-factor/verify-totp',
+      isChallenge: false,
+      now: startedAt,
+    })
+    await expect(assertMfaAuditOperationReceiptOwner(store.db, {
+      receiptId,
+      userId: 'user-123',
+      operationPath: '/two-factor/verify-totp',
+      isChallenge: false,
+    })).resolves.toBeUndefined()
+    await expect(assertMfaAuditOperationReceiptOwner(store.db, {
+      receiptId,
+      userId: 'another-user',
+      operationPath: '/two-factor/verify-totp',
+      isChallenge: false,
+    })).rejects.toThrow('MFA_AUDIT_RECEIPT_CONTEXT_MISMATCH')
+    await expect(assertMfaAuditOperationReceiptOwner(store.db, {
+      receiptId,
+      userId: 'user-123',
+      operationPath: '/two-factor/verify-backup-code',
+      isChallenge: false,
+    })).rejects.toThrow('MFA_AUDIT_RECEIPT_CONTEXT_MISMATCH')
+    await expect(assertMfaAuditOperationReceiptOwner(store.db, {
+      receiptId,
+      userId: 'user-123',
+      operationPath: '/two-factor/verify-totp',
+      isChallenge: true,
+    })).rejects.toThrow('MFA_AUDIT_RECEIPT_CONTEXT_MISMATCH')
   })
 
   it('read-backs an appended replay event if the D1 response is lost after commit', async () => {
