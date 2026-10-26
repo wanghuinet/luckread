@@ -65,11 +65,13 @@ export function buildMfaAuditEvent(input: {
   factorState?: MfaAuditEvent['payload']['factorState']
   challengeMethod?: MfaAuditEvent['payload']['challengeMethod']
   idempotencyKey?: string
+  eventId?: string
 }): MfaAuditEvent {
   if (typeof input.userId !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(input.userId)) {
     throw new TypeError('invalid MFA audit subject')
   }
-  const eventId = 'evt_' + crypto.randomUUID().replaceAll('-', '')
+  const eventId = input.eventId ?? 'evt_' + crypto.randomUUID().replaceAll('-', '')
+  if (!/^evt_[a-f0-9]{32}$/.test(eventId)) throw new TypeError('invalid MFA audit event id')
   if (input.idempotencyKey !== undefined &&
       (typeof input.idempotencyKey !== 'string' || !/^[A-Za-z0-9._:-]{1,255}$/.test(input.idempotencyKey))) {
     throw new TypeError('invalid MFA audit idempotency key')
@@ -155,29 +157,41 @@ export async function recordMfaAuditEvent(
  */
 export async function recordMfaAuditEventOnce(
   db: D1Database,
-  input: Parameters<typeof buildMfaAuditEvent>[0] & { idempotencyKey: string },
+  input: Parameters<typeof buildMfaAuditEvent>[0] & { idempotencyKey: string; eventId?: string },
 ): Promise<boolean> {
   const event = buildMfaAuditEvent(input)
   const existing = await db.prepare(
-    'SELECT event_id AS eventId FROM auth_007_mfa_publication_journal WHERE idempotency_key = ? LIMIT 1',
+    'SELECT event_id AS eventId, event_type AS eventType FROM auth_007_mfa_publication_journal WHERE idempotency_key = ? LIMIT 1',
   ).bind(event.idempotencyKey).first<{ eventId: string }>()
-  if (existing) return false
+  if (existing) {
+    if (input.eventId && existing.eventId !== input.eventId) throw new Error('MFA_AUDIT_EVENT_ID_CONFLICT')
+    if (existing.eventType !== event.eventType) throw new Error('MFA_AUDIT_EVENT_TYPE_CONFLICT')
+    return false
+  }
 
   let result: D1Result
   try {
     result = await buildMfaAuditOutboxInsert(db, event).run()
   } catch {
     const raced = await db.prepare(
-      'SELECT event_id AS eventId FROM auth_007_mfa_publication_journal WHERE idempotency_key = ? LIMIT 1',
+      'SELECT event_id AS eventId, event_type AS eventType FROM auth_007_mfa_publication_journal WHERE idempotency_key = ? LIMIT 1',
     ).bind(event.idempotencyKey).first<{ eventId: string }>()
-    if (raced) return false
+    if (raced) {
+      if (input.eventId && raced.eventId !== input.eventId) throw new Error('MFA_AUDIT_EVENT_ID_CONFLICT')
+      if (raced.eventType !== event.eventType) throw new Error('MFA_AUDIT_EVENT_TYPE_CONFLICT')
+      return false
+    }
     throw new Error('MFA_AUDIT_OUTBOX_WRITE_FAILED')
   }
 
   if (result.success && result.meta?.changes === 1) return true
   const afterWrite = await db.prepare(
-    'SELECT event_id AS eventId FROM auth_007_mfa_publication_journal WHERE idempotency_key = ? LIMIT 1',
+    'SELECT event_id AS eventId, event_type AS eventType FROM auth_007_mfa_publication_journal WHERE idempotency_key = ? LIMIT 1',
   ).bind(event.idempotencyKey).first<{ eventId: string }>()
-  if (afterWrite) return false
+  if (afterWrite) {
+    if (input.eventId && afterWrite.eventId !== input.eventId) throw new Error('MFA_AUDIT_EVENT_ID_CONFLICT')
+    if (afterWrite.eventType !== event.eventType) throw new Error('MFA_AUDIT_EVENT_TYPE_CONFLICT')
+    return false
+  }
   throw new Error('MFA_AUDIT_OUTBOX_WRITE_FAILED')
 }
