@@ -65,6 +65,8 @@ on:
       - 'scripts/auth-007-probe-w02-tail-access.test.mjs'
       - 'scripts/auth-007-probe-w02-observability.mjs'
       - 'scripts/auth-007-probe-w02-observability.test.mjs'
+      - 'scripts/auth-007-probe-w02-scheduled-analytics.mjs'
+      - 'scripts/auth-007-probe-w02-scheduled-analytics.test.mjs'
       - 'scripts/auth-010-session-runtime-e2e.mjs'
       - '.github/workflows/auth-010-remote-e2e.yml'
       - '.github/workflows/w01-payload-app-deploy.yml'
