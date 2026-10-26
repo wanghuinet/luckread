@@ -10,6 +10,15 @@ type W02ServiceBinding = {
   fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response>
 }
 
+// Better Auth's raw handler is not a public API. APP/H5/PC use the
+// contract-owned /api/v1/auth routes, which validate DTOs and normalize
+// session credentials. Keep this method-aware allowlist deliberately empty
+// until a concrete raw endpoint is approved in the AUTH contract and has
+// route-level security tests. In particular, every two-factor/* endpoint
+// must remain reachable only through W01's dedicated MFA routes.
+const publicBetterAuthEndpointMethods: ReadonlyMap<string, ReadonlySet<string>> =
+  new Map()
+
 const errorResponse = (
   status: number,
   code: string,
@@ -51,6 +60,15 @@ const handler = async (
   ])
 
   if (canonicalW01AuthEndpoints.has(endpoint)) {
+    return errorResponse(
+      404,
+      'NOT_FOUND',
+      'This authentication operation is not available at this endpoint',
+    )
+  }
+
+  const allowedMethods = publicBetterAuthEndpointMethods.get(endpoint)
+  if (!allowedMethods?.has(request.method)) {
     return errorResponse(
       404,
       'NOT_FOUND',
