@@ -280,6 +280,7 @@ export async function reconcileMfaAuditOperationReceipts(
     'UPDATE auth_007_mfa_operation_receipts SET status = ?, last_error_code = ?, next_attempt_at = NULL ' +
     'WHERE status = ? AND started_at <= ?',
   ).bind('UNKNOWN', 'OUTCOME_NOT_FINALIZED', 'STARTED', staleBefore).run()
+  if (!stale.success) throw new Error('MFA_AUDIT_RECEIPT_STALE_SCAN_FAILED')
 
   const selectedResult = await db.prepare(
     'SELECT receipt_id AS receiptId, resource_id AS resourceId, status, started_at AS startedAt, ' +
@@ -304,7 +305,11 @@ export async function reconcileMfaAuditOperationReceipts(
           'UPDATE auth_007_mfa_operation_receipts SET status = ?, last_error_code = ?, ' +
           'next_attempt_at = NULL WHERE receipt_id = ? AND status = ?',
         ).bind('UNKNOWN', 'INVALID_EVENT_PLAN', row.receiptId, 'READY').run()
-        if (result.success && result.meta?.changes === 1) unknown += 1
+        if (result.success && result.meta?.changes === 1) {
+          unknown += 1
+        } else {
+          throw new Error('MFA_AUDIT_RECEIPT_MARK_UNKNOWN_FAILED')
+        }
       } catch {
         failed += 1
       }
