@@ -161,11 +161,11 @@ export async function recordMfaAuditEventOnce(
 ): Promise<boolean> {
   const event = buildMfaAuditEvent(input)
   const existing = await db.prepare(
-    'SELECT event_id AS eventId, event_type AS eventType FROM auth_007_mfa_publication_journal WHERE idempotency_key = ? LIMIT 1',
-  ).bind(event.idempotencyKey).first<{ eventId: string; eventType: string }>()
+    'SELECT event_id AS eventId, event_type AS eventType, json_extract(payload, '$.payload.operationId') AS operationId FROM auth_007_mfa_publication_journal WHERE idempotency_key = ? LIMIT 1',
+  ).bind(event.idempotencyKey).first<{ eventId: string; eventType: string; operationId: string }>()
   if (existing) {
     if (input.eventId && existing.eventId !== input.eventId) throw new Error('MFA_AUDIT_EVENT_ID_CONFLICT')
-    if (existing.eventType !== event.eventType) throw new Error('MFA_AUDIT_EVENT_TYPE_CONFLICT')
+    if (existing.eventType !== event.eventType || existing.operationId !== event.payload.operationId) throw new Error('MFA_AUDIT_EVENT_ACTION_CONFLICT')
     return false
   }
 
@@ -178,7 +178,7 @@ export async function recordMfaAuditEventOnce(
     ).bind(event.idempotencyKey).first<{ eventId: string }>()
     if (raced) {
       if (input.eventId && raced.eventId !== input.eventId) throw new Error('MFA_AUDIT_EVENT_ID_CONFLICT')
-      if (raced.eventType !== event.eventType) throw new Error('MFA_AUDIT_EVENT_TYPE_CONFLICT')
+      if (raced.eventType !== event.eventType || raced.operationId !== event.payload.operationId) throw new Error('MFA_AUDIT_EVENT_ACTION_CONFLICT')
       return false
     }
     throw new Error('MFA_AUDIT_OUTBOX_WRITE_FAILED')
@@ -190,7 +190,7 @@ export async function recordMfaAuditEventOnce(
   ).bind(event.idempotencyKey).first<{ eventId: string }>()
   if (afterWrite) {
     if (input.eventId && afterWrite.eventId !== input.eventId) throw new Error('MFA_AUDIT_EVENT_ID_CONFLICT')
-    if (afterWrite.eventType !== event.eventType) throw new Error('MFA_AUDIT_EVENT_TYPE_CONFLICT')
+    if (afterWrite.eventType !== event.eventType || afterWrite.operationId !== event.payload.operationId) throw new Error('MFA_AUDIT_EVENT_ACTION_CONFLICT')
     return false
   }
   throw new Error('MFA_AUDIT_OUTBOX_WRITE_FAILED')
