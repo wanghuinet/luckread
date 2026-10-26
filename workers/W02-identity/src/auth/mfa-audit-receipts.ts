@@ -330,7 +330,16 @@ export async function reconcileMfaAuditOperationReceipts(
         'UPDATE auth_007_mfa_operation_receipts SET status = ?, next_attempt_at = NULL, ' +
         'last_error_code = NULL WHERE receipt_id = ? AND status = ?',
       ).bind('EMITTED', row.receiptId, 'READY').run()
-      if (result.success && result.meta?.changes === 1) emitted += 1
+      if (result.success && result.meta?.changes === 1) {
+        emitted += 1
+      } else {
+        // A concurrent Cron invocation may already have finalized the receipt.
+        // Prove that state before treating the failed compare-and-set as safe.
+        const latest = await loadReceipt(db, row.receiptId)
+        if (latest.status !== 'EMITTED') {
+          throw new Error('MFA_AUDIT_RECEIPT_MARK_EMITTED_FAILED')
+        }
+      }
     } catch {
       const delay = retryDelaySeconds(row.attempt)
       const nextAttemptAt = new Date(Date.parse(now) + delay * 1000).toISOString()
