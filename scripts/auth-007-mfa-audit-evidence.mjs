@@ -24,7 +24,7 @@ const allKnownEventTypes = new Set([
 
 const safeEventId = (value) =>
   typeof value === 'string' &&
-  /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(value)
+  /^evt_[a-f0-9]{32}$/.test(value)
 
 function summarizeEventType(eventType, outboxRows, canonicalRows, idReconciliation) {
   const rows = outboxRows.filter((row) => row?.eventType === eventType)
