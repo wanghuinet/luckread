@@ -143,9 +143,18 @@ describe('W01 public MFA challenge verification', () => {
     })
   })
 
-  it('rejects caller-supplied assurance fields and malformed codes before W02', async () => {
-    const response = await POST(makeRequest({ code: '123456', method: 'totp', authenticated: true }))
-    expect(response.status).toBe(422)
+  it('rejects caller-supplied assurance and subject/target identity fields before W02', async () => {
+    for (const injectedField of ['authenticated', 'userId', 'targetUserId', 'actorId', 'subjectId']) {
+      const response = await POST(makeRequest({
+        code: '123456',
+        method: 'totp',
+        [injectedField]: 'another-user-not-selected-by-client',
+      }))
+      expect(response.status).toBe(422)
+      await expect(response.json()).resolves.toMatchObject({
+        error: { code: 'VALIDATION_FAILED' },
+      })
+    }
     expect(mocks.w02Fetch).not.toHaveBeenCalled()
   })
 
