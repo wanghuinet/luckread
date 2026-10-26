@@ -403,7 +403,7 @@ async function checkEvents() {
     const requiredTimestampSemanticTokens = [
       'const publishedAt = new Date().toISOString()',
       'event.publishedAt,',
-      'event.occurredAt,',
+      'const occurredAt = input.occurredAt ?? new Date().toISOString()',
       'SET status = ?, published_at = ?',
     ]
     if (!(await fileExists('workers/W02-identity/src/auth/mfa-audit-hooks.test.ts')) ||
