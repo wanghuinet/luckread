@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { buildMfaAuditEvent, buildMfaAuditOutboxInsert, MFA_AUDIT_EVENT_NAMES, recordMfaAuditEventOnce } from './mfa-audit-events'
+import { buildMfaAuditEvent, buildMfaAuditOutboxInsert, deriveMfaAuditEventIdForIdempotencyKey, MFA_AUDIT_EVENT_NAMES, recordMfaAuditEventOnce } from './mfa-audit-events'
 
 const input = {
   eventType: 'auth.mfa.locked' as const,
@@ -51,6 +51,17 @@ describe('AUTH-007 MFA audit event builder and idempotent writer', () => {
       challengeMethod: 'totp',
     })
     expect(JSON.stringify(event)).not.toMatch(/password|secret|recoveryCodes|backupCodes|\"code\"/)
+  })
+
+
+  it('derives a valid, stable event id for a shared idempotency condition', async () => {
+    const first = await deriveMfaAuditEventIdForIdempotencyKey(input.idempotencyKey)
+    const retry = await deriveMfaAuditEventIdForIdempotencyKey(input.idempotencyKey)
+    const different = await deriveMfaAuditEventIdForIdempotencyKey(input.idempotencyKey + ':different')
+    expect(first).toMatch(/^evt_[a-f0-9]{32}$/)
+    expect(retry).toBe(first)
+    expect(different).not.toBe(first)
+    await expect(deriveMfaAuditEventIdForIdempotencyKey('bad idempotency key')).rejects.toThrow('invalid MFA audit idempotency key')
   })
 
   it('sets publishedAt to the durable publication-intent time, distinct from occurredAt', () => {
