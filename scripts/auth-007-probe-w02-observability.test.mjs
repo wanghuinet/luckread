@@ -21,6 +21,19 @@ describe('AUTH-007 read-only W02 scheduled Observability probe', () => {
       fetchImpl: async (url, init) => {
         const request = { url, init, body: JSON.parse(init.body) }
         observed.push(request)
+        if (url.endsWith('/graphql')) {
+          return response(200, {
+            data: {
+              viewer: {
+                accounts: [{
+                  workersInvocationsScheduled: [
+                    { __typename: 'AccountWorkersInvocationsScheduled' },
+                  ],
+                }],
+              },
+            },
+          })
+        }
         if (url.endsWith('/values')) {
           return response(200, {
             success: true,
@@ -112,9 +125,10 @@ describe('AUTH-007 read-only W02 scheduled Observability probe', () => {
       },
     })
 
-    assert.equal(observed.length, 3)
+    assert.equal(observed.length, 4)
     const queryRequests = observed.filter((request) => request.url.endsWith('/query'))
     const valuesRequest = observed.find((request) => request.url.endsWith('/values'))
+    const analyticsRequest = observed.find((request) => request.url.endsWith('/graphql'))
     assert.equal(queryRequests.length, 2)
     assert.equal(queryRequests[0].url, 'https://api.cloudflare.com/client/v4/accounts/0123456789abcdef0123456789abcdef/workers/observability/telemetry/query')
     assert.equal(queryRequests[0].init.method, 'POST')
@@ -122,6 +136,15 @@ describe('AUTH-007 read-only W02 scheduled Observability probe', () => {
     assert.equal(queryRequests.find((request) => request.body.view === 'invocations').body.queryId, 'auth007-w02-invocation-diagnostic')
     assert.equal(queryRequests.find((request) => request.body.view === 'events').body.queryId, 'auth007-w02-event-diagnostic')
     assert.equal(valuesRequest.init.method, 'POST')
+    assert.equal(analyticsRequest.init.method, 'POST')
+    assert.match(analyticsRequest.body.query, /workersInvocationsScheduled/)
+    assert.deepEqual(analyticsRequest.body.variables, {
+      accountTag: valid.accountId,
+      start: new Date(valid.now - 1_800_000).toISOString(),
+      end: new Date(valid.now).toISOString(),
+      scriptName: 'luckread-w02',
+    })
+    assert.equal(Date.parse(analyticsRequest.body.variables.end) - Date.parse(analyticsRequest.body.variables.start), 1_800_000)
     assert.deepEqual(valuesRequest.body, {
       datasets: ['cloudflare-workers'],
       key: '$workers.eventType',
@@ -195,6 +218,10 @@ describe('AUTH-007 read-only W02 scheduled Observability probe', () => {
       eventTypeScheduledValuePresent: true,
       eventTypeCronValuePresent: true,
       eventTypeQueueValuePresent: true,
+      scheduledAnalyticsStatus: 'PASS',
+      scheduledAnalyticsCategory: 'NONE',
+      scheduledAnalyticsHttpStatus: 200,
+      scheduledAnalyticsRows: 1,
     })
     assert.equal(JSON.stringify(result).includes('must-not-escape'), false)
     assert.equal(JSON.stringify(result).includes('private-request-id'), false)
@@ -206,6 +233,9 @@ describe('AUTH-007 read-only W02 scheduled Observability probe', () => {
       ...valid,
       fetchImpl: async (url, init) => {
         const body = JSON.parse(init.body)
+        if (url.endsWith('/graphql')) {
+          return response(200, { errors: [{ message: 'private GraphQL error detail' }] })
+        }
         if (url.endsWith('/values')) {
           return response(200, { success: true, result: [{
             dataset: 'cloudflare-workers', key: '$workers.eventType', type: 'string', value: 'fetch',
@@ -243,8 +273,11 @@ describe('AUTH-007 read-only W02 scheduled Observability probe', () => {
     assert.equal(result.tickMarkerInvocations, 0)
     assert.equal(result.eventViewStatus, 'PASS')
     assert.equal(result.scheduledEventRows, 0)
+    assert.equal(result.scheduledAnalyticsStatus, 'FAIL')
+    assert.equal(result.scheduledAnalyticsRows, 0)
     assert.equal(result.scheduledExecutionObserved, false)
     assert.equal(result.tickMarkerRows, 0)
+    assert.equal(JSON.stringify(result).includes('private GraphQL error detail'), false)
   })
 
   it('accepts the explicit W02 tick marker as scheduler evidence when eventType metadata is missing', async () => {
@@ -280,6 +313,51 @@ describe('AUTH-007 read-only W02 scheduled Observability probe', () => {
     })
     assert.equal(result.scheduledInvocations, 0)
     assert.equal(result.tickMarkerRows, 1)
+    assert.equal(result.scheduledExecutionObserved, true)
+  })
+
+  it('uses the independent scheduled-invocation analytics dataset as scheduler evidence', async () => {
+    let analyticsRequest
+    const result = await probeW02ScheduledObservability({
+      ...valid,
+      fetchImpl: async (url, init) => {
+        const body = JSON.parse(init.body)
+        if (url.endsWith('/graphql')) {
+          analyticsRequest = body
+          return response(200, {
+            data: {
+              viewer: {
+                accounts: [{
+                  workersInvocationsScheduled: [
+                    { __typename: 'AccountWorkersInvocationsScheduled' },
+                    { __typename: 'AccountWorkersInvocationsScheduled' },
+                  ],
+                }],
+              },
+            },
+          })
+        }
+        if (url.endsWith('/values')) {
+          return response(200, {
+            success: true,
+            result: [{ dataset: 'cloudflare-workers', key: '$workers.eventType', type: 'string', value: 'fetch' }],
+          })
+        }
+        if (body.view === 'events') {
+          return response(200, { success: true, result: { events: { events: [] } } })
+        }
+        return response(200, { success: true, result: { invocations: {} } })
+      },
+    })
+
+    assert.match(analyticsRequest.query, /workersInvocationsScheduled/)
+    assert.equal(analyticsRequest.variables.scriptName, 'luckread-w02')
+    assert.equal(Date.parse(analyticsRequest.variables.end) - Date.parse(analyticsRequest.variables.start), 1_800_000)
+    assert.equal(result.scheduledInvocations, 0)
+    assert.equal(result.scheduledEventRows, 0)
+    assert.equal(result.eventTypeScheduledValuePresent, false)
+    assert.equal(result.scheduledAnalyticsStatus, 'PASS')
+    assert.equal(result.scheduledAnalyticsRows, 2)
     assert.equal(result.scheduledExecutionObserved, true)
   })
 
