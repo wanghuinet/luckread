@@ -35,6 +35,7 @@ type ReceiptRow = {
 }
 
 type StoredReceiptEvent = MfaAuditReceiptEvent & {
+  eventId: string
   idempotencyKey: string
   occurredAt: string
 }
@@ -94,6 +95,9 @@ function validateEvent(value: unknown): StoredReceiptEvent {
   ) {
     throw new Error('INVALID_MFA_AUDIT_RECEIPT_PLAN')
   }
+  if (typeof event.eventId !== 'string' || !/^evt_[a-f0-9]{32}$/.test(event.eventId)) {
+    throw new Error('INVALID_MFA_AUDIT_RECEIPT_PLAN')
+  }
   if (typeof event.idempotencyKey !== 'string' || !idempotencyPattern.test(event.idempotencyKey)) {
     throw new Error('INVALID_MFA_AUDIT_RECEIPT_PLAN')
   }
@@ -103,6 +107,7 @@ function validateEvent(value: unknown): StoredReceiptEvent {
 
   return {
     eventType: event.eventType as MfaAuditEventName,
+    eventId: event.eventId,
     result: event.result as MfaAuditResult,
     ...(typeof event.reasonCode === 'string' ? { reasonCode: event.reasonCode } : {}),
     ...(typeof event.factorState === 'string'
@@ -142,10 +147,18 @@ function mergePlan(
       `mfa-operation:${receiptId}:${input.eventType}`
     const candidate = validateEvent({
       ...input,
+      eventId: /^evt_[a-f0-9]{32}$/.test((input as MfaAuditReceiptEvent & { eventId?: string }).eventId ?? '')
+        ? (input as MfaAuditReceiptEvent & { eventId: string }).eventId
+        : 'evt_' + crypto.randomUUID().replaceAll('-', ''),
       idempotencyKey,
       occurredAt: input.occurredAt ?? occurredAt,
     })
-    if (!byKey.has(candidate.idempotencyKey)) byKey.set(candidate.idempotencyKey, candidate)
+    const existingEvent = byKey.get(candidate.idempotencyKey)
+    if (existingEvent && (existingEvent.eventType !== candidate.eventType ||
+      (('eventId' in input) && (input as MfaAuditReceiptEvent & { eventId?: string }).eventId !== existingEvent.eventId))) {
+      throw new Error('MFA_AUDIT_EVENT_IDEMPOTENCY_CONFLICT')
+    }
+    if (!existingEvent) byKey.set(candidate.idempotencyKey, candidate)
   }
   if (byKey.size > 4) throw new Error('MFA_AUDIT_RECEIPT_PLAN_LIMIT_EXCEEDED')
   return [...byKey.values()]
@@ -357,6 +370,7 @@ export async function reconcileMfaAuditOperationReceipts(
           ...(event.factorState ? { factorState: event.factorState } : {}),
           ...(event.challengeMethod ? { challengeMethod: event.challengeMethod } : {}),
           idempotencyKey: event.idempotencyKey,
+          eventId: event.eventId,
         })
       }
       const result = await db.prepare(
