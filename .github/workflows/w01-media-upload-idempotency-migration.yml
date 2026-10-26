@@ -155,15 +155,17 @@ jobs:
           const indexes = new Map(indexRows.map((row) => [String(row.name), row]))
           const mediaCount = Number(countRows[0]?.media_count ?? NaN)
           const uniqueIndex = indexes.get('media_upload_idempotency_key_idx')
-          const targetRecorded = history.includes(target)
-          const expectedAfter = [...expected, target]
+          const targetPositions = history.flatMap((name, index) => name === target ? [index] : [])
+          const targetRecorded = targetPositions.length > 0
           const errors = []
           if (!databaseInfo.includes(expectedDatabaseId)) errors.push('D1 info does not prove the admitted database ID')
           if (!columns.has('owner_user_id')) errors.push('media.owner_user_id is missing; baseline is not admitted')
           if (!Number.isSafeInteger(mediaCount) || mediaCount < 0) errors.push('media row count could not be verified')
           let decision = 'RUN_REQUIRED'
           if (targetRecorded) {
-            if (history.join('|') !== expectedAfter.join('|')) errors.push('migration history is not exactly the predecessor list plus target')
+            const targetIndex = targetPositions[0]
+            if (targetPositions.length !== 1) errors.push('target migration is recorded more than once')
+            if (history.slice(0, targetIndex).join('|') !== expected.join('|')) errors.push('target migration predecessors do not match the admitted history')
             if (!columns.has('upload_idempotency_key') || !columns.has('upload_fingerprint')) errors.push('target recorded but required columns are missing')
             if (!uniqueIndex || !(uniqueIndex.unique === 1 || uniqueIndex.unique === true)) errors.push('target recorded but unique index is missing')
             decision = 'ALREADY_APPLIED'
