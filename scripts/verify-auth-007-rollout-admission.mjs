@@ -219,7 +219,7 @@ if (blockers.length === 0) {
   const bootstrapMigration = read(bootstrapMigrationPath)
   const mfaAuditOutboxMigration = read(mfaAuditOutboxMigrationPath)
   const mfaAuditReceiptMigration = read(mfaAuditReceiptMigrationPath)
-  const mfaAuditReceiptMigrationNormalized = mfaAuditReceiptMigration.replace(/\\s+/g, ' ')
+  const mfaAuditReceiptMigrationNormalized = mfaAuditReceiptMigration.replace(/\s+/g, ' ')
   const mfaAuditReceiptContract = JSON.parse(read(mfaAuditReceiptContractPath))
   const mfaAuditBinding = JSON.parse(read(mfaAuditBindingPath))
   const mfaAuditOutboxContract = JSON.parse(read(mfaAuditOutboxContractPath))
