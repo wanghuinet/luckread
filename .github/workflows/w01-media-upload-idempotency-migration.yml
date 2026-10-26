@@ -243,19 +243,25 @@ jobs:
               .map((row) => [JSON.stringify(row), row]),
           ).values()]
           const history = rows('post-migrations.json').map((row) => String(row.name ?? ''))
-          const expected = [...process.env.EXPECTED_PREDECESSORS.split(','), process.env.TARGET_MIGRATION]
+          const target = process.env.TARGET_MIGRATION
+          const expectedPredecessors = process.env.EXPECTED_PREDECESSORS.split(',')
+          const targetPositions = history.flatMap((name, index) => name === target ? [index] : [])
+          const targetIndex = targetPositions[0] ?? -1
           const columns = new Set(rows('post-media-schema.json').map((row) => String(row.name)))
           const indexRows = rows('post-media-indexes.json')
           const index = indexRows.find((row) => String(row.name) === 'media_upload_idempotency_key_idx')
           const summary = {
-            migrationHistoryMatchesExactly: history.join('|') === expected.join('|'),
+            migrationHistoryHasExactlyOneTarget: targetPositions.length === 1,
+            migrationPredecessorsMatchExactly: targetIndex >= 0
+              && history.slice(0, targetIndex).join('|') === expectedPredecessors.join('|'),
             migrationHistory: history,
             uploadIdempotencyKeyPresent: columns.has('upload_idempotency_key'),
             uploadFingerprintPresent: columns.has('upload_fingerprint'),
             uniqueIndexPresent: Boolean(index && (index.unique === 1 || index.unique === true)),
             uniqueIndex: index ? { name: index.name, unique: index.unique } : null,
           }
-          summary.result = summary.migrationHistoryMatchesExactly
+          summary.result = summary.migrationHistoryHasExactlyOneTarget
+            && summary.migrationPredecessorsMatchExactly
             && summary.uploadIdempotencyKeyPresent
             && summary.uploadFingerprintPresent
             && summary.uniqueIndexPresent
