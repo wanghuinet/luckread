@@ -41,12 +41,16 @@ function summarizeEventType(eventType, outboxRows, canonicalRows, idReconciliati
     duplicateOutboxEventIdCount: 0,
     duplicateCanonicalEventIdCount: 0,
     wrongActionEventIdCount: 0,
+    wrongSubjectEventIdCount: 0,
+    duplicateOutboxIdempotencyKeyCount: 0,
   }
   const idsMatch = idFacts.unmatchedPublishedEventIdCount === 0 &&
     idFacts.unmatchedCanonicalEventIdCount === 0 &&
     idFacts.duplicateOutboxEventIdCount === 0 &&
     idFacts.duplicateCanonicalEventIdCount === 0 &&
-    idFacts.wrongActionEventIdCount === 0
+    idFacts.wrongActionEventIdCount === 0 &&
+    idFacts.wrongSubjectEventIdCount === 0 &&
+    idFacts.duplicateOutboxIdempotencyKeyCount === 0
 
   return {
     eventType,
@@ -63,53 +67,90 @@ function summarizeEventType(eventType, outboxRows, canonicalRows, idReconciliati
   }
 }
 
+const safeResourceId = (value) =>
+  typeof value === 'string' &&
+  /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(value)
+
+const safeIdempotencyKey = (value) =>
+  typeof value === 'string' &&
+  /^[A-Za-z0-9._:-]{1,255}$/.test(value)
+
 function reconcileEventIds(outboxRows, canonicalRows) {
   const outboxIdCounts = new Map()
   const canonicalIdCounts = new Map()
   const outboxTypeById = new Map()
   const canonicalTypeById = new Map()
+  const outboxSubjectById = new Map()
+  const canonicalSubjectById = new Map()
+  const outboxKeyCounts = new Map()
+
   const invalidOutboxRows = outboxRows.filter((row) =>
     !row || !safeEventId(row.eventId) ||
     typeof row.eventType !== 'string' || !allKnownEventTypes.has(row.eventType) ||
-    !['PENDING', 'PUBLISHED', 'FAILED'].includes(row.status))
+    !['PENDING', 'PUBLISHED', 'FAILED'].includes(row.status) ||
+    !safeResourceId(row.resourceId) ||
+    !safeIdempotencyKey(row.idempotencyKey))
   const invalidCanonicalRows = canonicalRows.filter((row) =>
     !row || !safeEventId(row.eventId) ||
-    typeof row.action !== 'string' || !allKnownEventTypes.has(row.action))
+    typeof row.action !== 'string' || !allKnownEventTypes.has(row.action) ||
+    row.targetType !== 'User' || !safeResourceId(row.targetId))
 
   for (const row of outboxRows) {
     if (!row || !safeEventId(row.eventId) || typeof row.eventType !== 'string') continue
     outboxIdCounts.set(row.eventId, (outboxIdCounts.get(row.eventId) ?? 0) + 1)
     if (!outboxTypeById.has(row.eventId)) outboxTypeById.set(row.eventId, row.eventType)
+    if (safeResourceId(row.resourceId) && !outboxSubjectById.has(row.eventId)) {
+      outboxSubjectById.set(row.eventId, row.resourceId)
+    }
+    if (safeIdempotencyKey(row.idempotencyKey)) {
+      outboxKeyCounts.set(row.idempotencyKey, (outboxKeyCounts.get(row.idempotencyKey) ?? 0) + 1)
+    }
   }
   for (const row of canonicalRows) {
     if (!row || !safeEventId(row.eventId) || typeof row.action !== 'string') continue
     canonicalIdCounts.set(row.eventId, (canonicalIdCounts.get(row.eventId) ?? 0) + 1)
     if (!canonicalTypeById.has(row.eventId)) canonicalTypeById.set(row.eventId, row.action)
+    if (safeResourceId(row.targetId) && !canonicalSubjectById.has(row.eventId)) {
+      canonicalSubjectById.set(row.eventId, row.targetId)
+    }
   }
+
+  const duplicateOutboxIdempotencyKeyCount = new Set(
+    [...outboxKeyCounts.entries()].filter(([, count]) => count > 1).map(([key]) => key)
+  ).size
+  const invalidIdempotencyKeyCount = outboxRows.filter((row) =>
+    !row || !safeIdempotencyKey(row.idempotencyKey)).length
 
   const byEventType = {}
   for (const eventType of allKnownEventTypes) {
     const publishedRows = outboxRows.filter((row) => row?.eventType === eventType && row.status === 'PUBLISHED')
     const canonicalRowsForType = canonicalRows.filter((row) => row?.action === eventType)
-    const matchedEventIdCount = publishedRows.filter((row) =>
+    const matches = (row) =>
       outboxIdCounts.get(row.eventId) === 1 &&
       canonicalIdCounts.get(row.eventId) === 1 &&
       canonicalTypeById.get(row.eventId) === eventType &&
-      outboxTypeById.get(row.eventId) === eventType
-    ).length
-    const unmatchedPublishedEventIdCount = publishedRows.filter((row) =>
-      outboxIdCounts.get(row.eventId) !== 1 ||
-      canonicalIdCounts.get(row.eventId) !== 1 ||
-      canonicalTypeById.get(row.eventId) !== eventType ||
-      outboxTypeById.get(row.eventId) !== eventType
-    ).length
-    const unmatchedCanonicalEventIdCount = canonicalRowsForType.filter((row) =>
-      canonicalIdCounts.get(row.eventId) !== 1 ||
-      outboxIdCounts.get(row.eventId) !== 1 ||
-      outboxTypeById.get(row.eventId) !== eventType ||
-      canonicalTypeById.get(row.eventId) !== eventType ||
-      outboxRows.find((outboxRow) => outboxRow?.eventId === row.eventId)?.status !== 'PUBLISHED'
-    ).length
+      outboxTypeById.get(row.eventId) === eventType &&
+      safeResourceId(row.resourceId) &&
+      canonicalSubjectById.get(row.eventId) === row.resourceId &&
+      canonicalRows.find((canonicalRow) => canonicalRow?.eventId === row.eventId)?.targetType === 'User' &&
+      safeIdempotencyKey(row.idempotencyKey) &&
+      outboxKeyCounts.get(row.idempotencyKey) === 1
+
+    const matchedEventIdCount = publishedRows.filter(matches).length
+    const unmatchedPublishedEventIdCount = publishedRows.filter((row) => !matches(row)).length
+    const unmatchedCanonicalEventIdCount = canonicalRowsForType.filter((row) => {
+      const source = outboxRows.find((outboxRow) => outboxRow?.eventId === row.eventId)
+      return canonicalIdCounts.get(row.eventId) !== 1 ||
+        outboxIdCounts.get(row.eventId) !== 1 ||
+        outboxTypeById.get(row.eventId) !== eventType ||
+        canonicalTypeById.get(row.eventId) !== eventType ||
+        !source || source.status !== 'PUBLISHED' ||
+        !safeResourceId(row.targetId) ||
+        row.targetType !== 'User' ||
+        row.targetId !== source.resourceId ||
+        !safeIdempotencyKey(source.idempotencyKey) ||
+        outboxKeyCounts.get(source.idempotencyKey) !== 1
+    }).length
     const duplicateOutboxEventIdCount = new Set(outboxRows
       .filter((row) =>
         row?.eventType === eventType && safeEventId(row.eventId) && outboxIdCounts.get(row.eventId) > 1
@@ -125,29 +166,47 @@ function reconcileEventIds(outboxRows, canonicalRows) {
     ).length + canonicalRowsForType.filter((row) =>
       outboxIdCounts.has(row.eventId) && outboxTypeById.get(row.eventId) !== eventType
     ).length
+    const wrongSubjectEventIdCount = publishedRows.filter((row) =>
+      canonicalIdCounts.has(row.eventId) &&
+      canonicalSubjectById.get(row.eventId) !== row.resourceId
+    ).length + canonicalRowsForType.filter((row) => {
+      const source = outboxRows.find((outboxRow) => outboxRow?.eventId === row.eventId)
+      return source && (row.targetType !== 'User' || row.targetId !== source.resourceId)
+    }).length
+    const duplicateOutboxIdempotencyKeyForTypeCount = new Set(outboxRows
+      .filter((row) =>
+        row?.eventType === eventType && safeIdempotencyKey(row.idempotencyKey) &&
+        outboxKeyCounts.get(row.idempotencyKey) > 1
+      )
+      .map((row) => row.idempotencyKey)).size
 
     byEventType[eventType] = {
       matchedEventIdCount,
-      unmatchedPublishedEventIdCount: unmatchedPublishedEventIdCount + invalidOutboxRows.filter((row) => row?.eventType === eventType).length,
-      unmatchedCanonicalEventIdCount: unmatchedCanonicalEventIdCount + invalidCanonicalRows.filter((row) => row?.action === eventType).length,
+      unmatchedPublishedEventIdCount: unmatchedPublishedEventIdCount +
+        invalidOutboxRows.filter((row) => row?.eventType === eventType).length,
+      unmatchedCanonicalEventIdCount: unmatchedCanonicalEventIdCount +
+        invalidCanonicalRows.filter((row) => row?.action === eventType).length,
       duplicateOutboxEventIdCount,
       duplicateCanonicalEventIdCount,
       wrongActionEventIdCount,
+      wrongSubjectEventIdCount,
+      duplicateOutboxIdempotencyKeyCount: duplicateOutboxIdempotencyKeyForTypeCount,
     }
   }
 
-  // Any malformed row invalidates the reconciliation even if it cannot be
-  // assigned a safe event type. IDs and raw rows never enter the result.
   return {
     byEventType,
     invalidOutboxRowCount: invalidOutboxRows.length,
     invalidCanonicalRowCount: invalidCanonicalRows.length,
+    invalidIdempotencyKeyCount,
+    duplicateOutboxIdempotencyKeyCount,
     totalMatchedEventIdCount: Object.values(byEventType).reduce((sum, value) => sum + value.matchedEventIdCount, 0),
     totalUnmatchedPublishedEventIdCount: Object.values(byEventType).reduce((sum, value) => sum + value.unmatchedPublishedEventIdCount, 0),
     totalUnmatchedCanonicalEventIdCount: Object.values(byEventType).reduce((sum, value) => sum + value.unmatchedCanonicalEventIdCount, 0),
     totalDuplicateOutboxEventIdCount: Object.values(byEventType).reduce((sum, value) => sum + value.duplicateOutboxEventIdCount, 0),
     totalDuplicateCanonicalEventIdCount: Object.values(byEventType).reduce((sum, value) => sum + value.duplicateCanonicalEventIdCount, 0),
     totalWrongActionEventIdCount: Object.values(byEventType).reduce((sum, value) => sum + value.wrongActionEventIdCount, 0),
+    totalWrongSubjectEventIdCount: Object.values(byEventType).reduce((sum, value) => sum + value.wrongSubjectEventIdCount, 0),
   }
 }
 
@@ -190,6 +249,9 @@ export function evaluateMfaAuditDelivery(outboxInput, canonicalAuditInput) {
     idReconciliation.totalDuplicateOutboxEventIdCount === 0 &&
     idReconciliation.totalDuplicateCanonicalEventIdCount === 0 &&
     idReconciliation.totalWrongActionEventIdCount === 0 &&
+    idReconciliation.totalWrongSubjectEventIdCount === 0 &&
+    idReconciliation.duplicateOutboxIdempotencyKeyCount === 0 &&
+    idReconciliation.invalidIdempotencyKeyCount === 0 &&
     idReconciliation.totalMatchedEventIdCount === outbox.filter((row) => row.status === 'PUBLISHED').length &&
     outbox.every((row) => row.status === 'PUBLISHED') &&
     audit.length === outbox.length
@@ -213,6 +275,12 @@ export function evaluateMfaAuditDelivery(outboxInput, canonicalAuditInput) {
     ...requiredChecks,
     { name: 'all_correlated_outbox_events_published', pass: allOutboxSettled },
     { name: 'canonical_w06_audit_event_ids_match_outbox_event_ids', pass: persistedExactlyOnce },
+    { name: 'outbox_idempotency_keys_are_unique_and_valid', pass:
+      idReconciliation.invalidIdempotencyKeyCount === 0 &&
+      idReconciliation.duplicateOutboxIdempotencyKeyCount === 0 },
+    { name: 'canonical_w06_target_matches_outbox_subject', pass:
+      idReconciliation.totalWrongSubjectEventIdCount === 0 &&
+      idReconciliation.invalidCanonicalRowCount === 0 },
   ]
 
   return {
@@ -230,6 +298,9 @@ export function evaluateMfaAuditDelivery(outboxInput, canonicalAuditInput) {
     totalDuplicateOutboxEventIdCount: idReconciliation.totalDuplicateOutboxEventIdCount,
     totalDuplicateCanonicalEventIdCount: idReconciliation.totalDuplicateCanonicalEventIdCount,
     totalWrongActionEventIdCount: idReconciliation.totalWrongActionEventIdCount,
+    totalWrongSubjectEventIdCount: idReconciliation.totalWrongSubjectEventIdCount,
+    duplicateOutboxIdempotencyKeyCount: idReconciliation.duplicateOutboxIdempotencyKeyCount,
+    invalidIdempotencyKeyCount: idReconciliation.invalidIdempotencyKeyCount,
     correlatedEventTypes: events.filter((event) => event.totalCount > 0 || event.canonicalAuditCount > 0).length,
     checks,
     events,

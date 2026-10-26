@@ -149,7 +149,8 @@ async function readScopedOutboxEventRows(qaUserId) {
   // reconciliation. These row identifiers are never written to evidence.
   return queryD1(
     databases.W02_D1_01,
-    `SELECT event_id AS eventId, event_type AS eventType, status, attempt,
+    `SELECT event_id AS eventId, event_type AS eventType, resource_id AS resourceId,
+            idempotency_key AS idempotencyKey, status, attempt,
             last_error_code AS lastErrorCode
        FROM auth_007_mfa_publication_journal
       WHERE json_extract(payload, '$.correlationId') = ? AND resource_id = ?
@@ -161,7 +162,7 @@ async function readScopedOutboxEventRows(qaUserId) {
 async function readScopedCanonicalAuditEventRows(qaUserId) {
   return queryD1(
     databases.W06_D1_03,
-    `SELECT event_id AS eventId, action
+    `SELECT event_id AS eventId, action, target_type AS targetType, target_id AS targetId
        FROM audit_events
       WHERE request_id = ? AND target_id = ? AND action LIKE 'auth.mfa.%'
       ORDER BY action, event_id`,
@@ -242,6 +243,9 @@ async function main() {
         duplicateOutboxEventIdCount: evaluation.totalDuplicateOutboxEventIdCount,
         duplicateCanonicalEventIdCount: evaluation.totalDuplicateCanonicalEventIdCount,
         wrongActionEventIdCount: evaluation.totalWrongActionEventIdCount,
+        wrongSubjectEventIdCount: evaluation.totalWrongSubjectEventIdCount,
+        duplicateOutboxIdempotencyKeyCount: evaluation.duplicateOutboxIdempotencyKeyCount,
+        invalidIdempotencyKeyCount: evaluation.invalidIdempotencyKeyCount,
         invalidOutboxRowCount: evaluation.invalidOutboxRowCount,
         invalidCanonicalRowCount: evaluation.invalidCanonicalRowCount,
       }
@@ -250,7 +254,9 @@ async function main() {
       evidence.checks = evidence.checks.filter((entry) =>
         !entry.name.startsWith('required_event_') &&
         entry.name !== 'all_correlated_outbox_events_published' &&
-        entry.name !== 'canonical_w06_audit_event_ids_match_outbox_event_ids')
+        entry.name !== 'canonical_w06_audit_event_ids_match_outbox_event_ids' &&
+        entry.name !== 'outbox_idempotency_keys_are_unique_and_valid' &&
+        entry.name !== 'canonical_w06_target_matches_outbox_subject')
       evidence.checks.push(...evaluation.checks)
       evidence.pollingDurationMs = Date.now() - startedAt
       evidence.failureCode = null
@@ -291,6 +297,9 @@ async function main() {
     eventIdMismatchCount:
       (evidence.eventIdReconciliation?.unmatchedPublishedEventIdCount ?? 0) +
       (evidence.eventIdReconciliation?.unmatchedCanonicalEventIdCount ?? 0),
+    wrongSubjectEventIdCount: evidence.eventIdReconciliation?.wrongSubjectEventIdCount ?? 0,
+    duplicateOutboxIdempotencyKeyCount: evidence.eventIdReconciliation?.duplicateOutboxIdempotencyKeyCount ?? 0,
+    invalidIdempotencyKeyCount: evidence.eventIdReconciliation?.invalidIdempotencyKeyCount ?? 0,
     allTenEventTypesVerified: evidence.allTenEventTypesVerified,
     scenarioSpecificEventsObserved: evidence.scenarioSpecificCoverage.filter((item) => item.observedCount > 0).length,
     pollingDurationMs: evidence.pollingDurationMs,
