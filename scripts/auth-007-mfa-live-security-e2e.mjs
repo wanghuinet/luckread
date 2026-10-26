@@ -792,13 +792,19 @@ const run = async () => {
           },
           body: { code: oldUnusedRecoveryCode, method: 'recovery_code' },
         })
-      check('pre_rotation_unused_recovery_code_is_invalidated',
+      const oldRecoveryCodeRejected =
         oldCodeAttempt.facts.status === 401 &&
-        !oldCodeAttempt.response?.headers.has('x-luckread-session-token'), {
-          status: oldCodeAttempt.facts.status,
-          errorCode: oldCodeAttempt.facts.errorCode,
-          recoveryCodeValueLogged: false,
-        })
+        !oldCodeAttempt.response?.headers.has('x-luckread-session-token')
+      check('pre_rotation_unused_recovery_code_is_invalidated', oldRecoveryCodeRejected, {
+        status: oldCodeAttempt.facts.status,
+        errorCode: oldCodeAttempt.facts.errorCode,
+        recoveryCodeValueLogged: false,
+      })
+      if (!oldRecoveryCodeRejected) {
+        lastAuthenticatedCookie = cookieHeader()
+        result.status = 'MFA_OLD_RECOVERY_CODE_ACCEPTED_AFTER_ROTATION'
+        return
+      }
 
       clearCookies()
       const newCodeLogin = await request('login_for_new_recovery_code_acceptance', 'POST', '/v1/auth/login', {
