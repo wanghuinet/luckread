@@ -270,6 +270,23 @@ describe('AUTH-007 durable MFA operation receipts', () => {
     expect(store.receipts.get(receiptId)?.eventPlan).toContain('auth.mfa.replay_rejected')
   })
 
+  it('rejects a receipt reasonCode that the canonical W06 consumer would reject', async () => {
+    const receiptId = await createMfaAuditOperationReceipt(store.db, {
+      userId: 'user-123',
+      operationPath: '/two-factor/disable',
+      isChallenge: false,
+      now: startedAt,
+    })
+
+    await expect(finalizeMfaAuditOperationReceipt(store.db, receiptId, [{
+      eventType: 'auth.mfa.factor_disabled',
+      result: 'succeeded',
+      reasonCode: 'INVALID:DOWNSTREAM',
+    }], startedAt)).rejects.toThrow('INVALID_MFA_AUDIT_RECEIPT_PLAN')
+    expect(store.receipts.get(receiptId)?.status).toBe('STARTED')
+    expect(store.outbox.size).toBe(0)
+  })
+
   it('persists the outcome before creating one idempotent outbox event', async () => {
     const receiptId = await createMfaAuditOperationReceipt(store.db, {
       userId: 'user-123',
