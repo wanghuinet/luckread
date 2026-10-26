@@ -89,6 +89,31 @@ const sanitizeAuthDiagnostic = (value: string): string => value
   .replace(/(token|secret|password|authorization|api[_-]?key)\s*[:=]\s*[^\s,;]+/gi, '$1=[redacted]')
   .slice(0, 240)
 
+async function finalizeKnownMfaRejection(
+  db: D1Database,
+  receiptId: string,
+  events: MfaAuditReceiptEvent[],
+): Promise<void> {
+  try {
+    await finalizeMfaAuditOperationReceipt(db, receiptId, events)
+  } catch {
+    throw APIError.from('INTERNAL_SERVER_ERROR', {
+      code: 'MFA_AUDIT_UNAVAILABLE',
+      message: 'MFA verification is temporarily unavailable',
+    })
+  }
+
+  try {
+    await reconcileMfaAuditOperationReceipts(db)
+  } catch {
+    // A durable READY receipt is retried by the existing W02 Cron.
+    console.error(JSON.stringify({
+      event: 'auth.mfa.audit_receipt_reconcile_failed',
+      code: 'MFA_AUDIT_RECEIPT_RECONCILE_FAILED',
+    }))
+  }
+}
+
 const buildLuckReadAuth = (env: BetterAuthEnv) => {
   // Keep local origins available only to the local evidence/runtime profile.
   // Production must never inherit localhost trust from a shared config.
@@ -212,6 +237,16 @@ const buildLuckReadAuth = (env: BetterAuthEnv) => {
         // account. Check W02-owned account state for TOTP and recovery paths.
         const accountActive = await isActiveMfaSubject(env.D1_01, subjectId)
         if (!accountActive) {
+          await finalizeKnownMfaRejection(
+            env.D1_01,
+            receiptId,
+            isChallenge ? [{
+              eventType: 'auth.mfa.challenge_failed',
+              result: 'failed',
+              reasonCode: 'ACCOUNT_NOT_ACTIVE',
+              challengeMethod: isBackupCodeVerification ? 'recovery_code' : 'totp',
+            }] : [],
+          )
           throw APIError.from('FORBIDDEN', {
             code: 'ACCOUNT_NOT_ACTIVE',
             message: 'Account is not eligible for authentication',
@@ -236,6 +271,16 @@ const buildLuckReadAuth = (env: BetterAuthEnv) => {
         // challenge lockout remain authoritative.
         if (match.kind === 'invalid') return
         if (match.kind === 'ambiguous') {
+          await finalizeKnownMfaRejection(
+            env.D1_01,
+            receiptId,
+            isChallenge ? [{
+              eventType: 'auth.mfa.challenge_failed',
+              result: 'failed',
+              reasonCode: 'AMBIGUOUS_TOTP_TIME_STEP',
+              challengeMethod: 'totp',
+            }] : [],
+          )
           throw APIError.from('UNAUTHORIZED', { code: 'INVALID_CODE', message: 'Invalid code' })
         }
 
@@ -255,21 +300,12 @@ const buildLuckReadAuth = (env: BetterAuthEnv) => {
             // This rejection is decided inside the before hook, so finalize its
             // durable audit plan here instead of depending on an after hook that
             // may not run when the hook itself throws.
-            await finalizeMfaAuditOperationReceipt(env.D1_01, receiptId, [])
+            await finalizeKnownMfaRejection(env.D1_01, receiptId, [])
           } catch {
             throw APIError.from('INTERNAL_SERVER_ERROR', {
               code: 'MFA_AUDIT_UNAVAILABLE',
               message: 'TOTP verification is temporarily unavailable',
             })
-          }
-          try {
-            await reconcileMfaAuditOperationReceipts(env.D1_01)
-          } catch {
-            // The READY receipt remains durable and the existing Cron retries it.
-            console.error(JSON.stringify({
-              event: 'auth.mfa.audit_receipt_reconcile_failed',
-              code: 'MFA_AUDIT_RECEIPT_RECONCILE_FAILED',
-            }))
           }
           throw APIError.from('UNAUTHORIZED', { code: 'INVALID_CODE', message: 'Invalid code' })
         }
