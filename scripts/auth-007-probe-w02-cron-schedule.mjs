@@ -114,7 +114,7 @@ export async function probeW02CronSchedule({
 async function main() {
   const result = await probeW02CronSchedule({
     accountId: process.env.CLOUDFLARE_ACCOUNT_ID,
-    apiToken: process.env.CLOUDFLARE_API_TOKEN,
+    apiToken: process.env.CLOUDFLARE_AUTH007_READONLY_API_TOKEN ?? process.env.CLOUDFLARE_API_TOKEN,
   })
   process.stdout.write(
     `W02_CRON_SCHEDULE_PREFLIGHT status=${result.status} category=${result.category} http_status=${result.httpStatus} schedule_count=${result.scheduleCount} expected_cron_present=${result.expectedCronPresent}\n`,
