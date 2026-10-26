@@ -330,7 +330,7 @@ async function probeW02EventsView({ accountId, apiToken, now, fetchImpl }) {
 
 async function probeW02EventTypeValues({ accountId, apiToken, now, fetchImpl }) {
   const empty = {
-    eventTypeValueRows: 0,
+    eventTypeDistinctValues: 0,
     eventTypeFetchValuePresent: false,
     eventTypeScheduledValuePresent: false,
     eventTypeCronValuePresent: false,
@@ -403,7 +403,7 @@ async function probeW02EventTypeValues({ accountId, apiToken, now, fetchImpl }) 
     eventTypeValuesStatus: 'PASS',
     eventTypeValuesCategory: 'NONE',
     eventTypeValuesHttpStatus: response.status,
-    eventTypeValueRows: eventTypes.size,
+    eventTypeDistinctValues: eventTypes.size,
     eventTypeFetchValuePresent: eventTypes.has('fetch'),
     eventTypeScheduledValuePresent: eventTypes.has('scheduled'),
     eventTypeCronValuePresent: eventTypes.has('cron'),
@@ -569,7 +569,7 @@ async function main() {
     ].map((key) => `${key[0].toLowerCase() + key.slice(1)}=${result[key] ?? (key.startsWith('eventView') ? 'NOT_RUN' : 0)}`),
     ...[
       'eventTypeValuesStatus', 'eventTypeValuesCategory', 'eventTypeValuesHttpStatus',
-      'eventTypeValueRows', 'eventTypeFetchValuePresent', 'eventTypeScheduledValuePresent',
+      'eventTypeDistinctValues', 'eventTypeFetchValuePresent', 'eventTypeScheduledValuePresent',
       'eventTypeCronValuePresent', 'eventTypeQueueValuePresent',
     ].map((key) => `${key[0].toLowerCase() + key.slice(1)}=${result[key] ?? (key.startsWith('eventTypeValues') ? 'NOT_RUN' : false)}`),
   ]
