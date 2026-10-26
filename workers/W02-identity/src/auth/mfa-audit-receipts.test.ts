@@ -31,6 +31,7 @@ function createDb() {
   let failNextOutboxInsert = false
   let failNextReceiptInsertAfterCommit = false
   let failNextReceiptAppendAfterCommit = false
+  let failNextReceiptEmissionAfterCommit = false
   const prepare = vi.fn((sql: string) => ({
     bind: (...args: unknown[]) => ({
       run: async () => {
@@ -179,6 +180,10 @@ function createDb() {
           row.status = String(status)
           row.nextAttemptAt = null
           row.lastErrorCode = null
+          if (status === 'EMITTED' && failNextReceiptEmissionAfterCommit) {
+            failNextReceiptEmissionAfterCommit = false
+            throw new Error('synthetic D1 response loss after receipt emission commit')
+          }
           return { success: true, meta: { changes: 1 } }
         }
 
@@ -272,6 +277,7 @@ function createDb() {
     failNextOutboxInsert: () => { failNextOutboxInsert = true },
     failNextReceiptInsertAfterCommit: () => { failNextReceiptInsertAfterCommit = true },
     failNextReceiptAppendAfterCommit: () => { failNextReceiptAppendAfterCommit = true },
+    failNextReceiptEmissionAfterCommit: () => { failNextReceiptEmissionAfterCommit = true },
   }
 }
 
@@ -647,6 +653,26 @@ describe('AUTH-007 durable MFA operation receipts', () => {
     expect(store.receipts.get(receiptId)?.lastErrorCode).toBe('OUTBOX_WRITE_FAILED')
 
     await expect(reconcileMfaAuditOperationReceipts(store.db, '2026-10-26T12:00:05.000Z')).resolves.toEqual({
+      selected: 1,
+      emitted: 1,
+      failed: 0,
+      unknown: 0,
+    })
+    expect(store.receipts.get(receiptId)?.status).toBe('EMITTED')
+    expect(store.outbox.size).toBe(1)
+  })
+
+  it('reads back EMITTED after D1 commits the terminal state but loses its response', async () => {
+    const receiptId = await createMfaAuditOperationReceipt(store.db, {
+      userId: 'user-123',
+      operationPath: '/two-factor/verify-totp',
+      isChallenge: true,
+      now: startedAt,
+    })
+    await finalizeMfaAuditOperationReceipt(store.db, receiptId, [successEvent], startedAt)
+    store.failNextReceiptEmissionAfterCommit()
+
+    await expect(reconcileMfaAuditOperationReceipts(store.db, startedAt)).resolves.toEqual({
       selected: 1,
       emitted: 1,
       failed: 0,
