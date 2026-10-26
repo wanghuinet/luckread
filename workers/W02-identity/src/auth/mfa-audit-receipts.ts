@@ -370,20 +370,46 @@ export async function finalizeMfaAuditOperationReceipt(
   now = new Date().toISOString(),
 ): Promise<boolean> {
   if (!Number.isFinite(Date.parse(now))) throw new TypeError('invalid MFA audit receipt timestamp')
-  const row = await loadReceipt(db, receiptId)
-  if (row.status === 'EMITTED' || row.status === 'RESOLVED') return false
-  if (row.status === 'UNKNOWN') throw new Error('MFA_AUDIT_RECEIPT_OUTCOME_UNKNOWN')
 
-  const plan = mergePlan(receiptId, parsePlan(row.eventPlan), events, now)
-  const nextStatus = plan.length > 0 ? 'READY' : 'RESOLVED'
-  const result = await db.prepare(
-    'UPDATE auth_007_mfa_operation_receipts SET status = ?, event_plan = ?, completed_at = ?, ' +
-    'next_attempt_at = NULL, last_error_code = NULL WHERE receipt_id = ? AND status IN (?, ?)',
-  ).bind(nextStatus, JSON.stringify(plan), now, receiptId, 'STARTED', 'READY').run()
-  if (result.success && result.meta?.changes === 1) return true
+  const maxCompareAndSetAttempts = 4
+  for (let attempt = 0; attempt < maxCompareAndSetAttempts; attempt += 1) {
+    const row = await loadReceipt(db, receiptId)
+    if (row.status === 'UNKNOWN') throw new Error('MFA_AUDIT_RECEIPT_OUTCOME_UNKNOWN')
 
-  const latest = await loadReceipt(db, receiptId)
-  if (latest.status === 'EMITTED' || latest.status === 'RESOLVED') return false
+    const currentPlan = parsePlan(row.eventPlan)
+    const plan = mergePlan(receiptId, currentPlan, events, now)
+
+    // READY is the immutable hand-off to the existing Cron publisher. A retry
+    // of the same finalization is idempotent; a new event after finalization is
+    // rejected rather than racing a drain and being silently omitted.
+    if (row.status === 'READY' || row.status === 'EMITTED' || row.status === 'RESOLVED') {
+      if (plan.length === currentPlan.length) return false
+      throw new Error('MFA_AUDIT_RECEIPT_ALREADY_FINALIZED')
+    }
+    if (row.status !== 'STARTED') throw new Error('MFA_AUDIT_RECEIPT_STATUS_INVALID')
+
+    const nextStatus = plan.length > 0 ? 'READY' : 'RESOLVED'
+    const serializedPlan = JSON.stringify(plan)
+    const updateSql = row.eventPlan === null
+      ? 'UPDATE auth_007_mfa_operation_receipts SET status = ?, event_plan = ?, completed_at = ?, ' +
+        'next_attempt_at = NULL, last_error_code = NULL ' +
+        'WHERE receipt_id = ? AND status = ? AND event_plan IS NULL'
+      : 'UPDATE auth_007_mfa_operation_receipts SET status = ?, event_plan = ?, completed_at = ?, ' +
+        'next_attempt_at = NULL, last_error_code = NULL ' +
+        'WHERE receipt_id = ? AND status = ? AND event_plan = ?'
+
+    try {
+      const statement = db.prepare(updateSql)
+      const result = row.eventPlan === null
+        ? await statement.bind(nextStatus, serializedPlan, now, receiptId, 'STARTED').run()
+        : await statement.bind(nextStatus, serializedPlan, now, receiptId, 'STARTED', row.eventPlan).run()
+      if (result.success && result.meta?.changes === 1) return true
+    } catch {
+      // D1 can commit a status transition while its response is lost. A retry
+      // re-reads the authoritative state and proves whether it already landed.
+    }
+  }
+
   throw new Error('MFA_AUDIT_RECEIPT_FINALIZE_FAILED')
 }
 
