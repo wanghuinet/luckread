@@ -558,12 +558,25 @@ export async function probeW02ScheduledAnalytics({ accountId, apiToken, now = Da
     const timestamp = Date.parse(row.datetime)
     return Number.isFinite(timestamp) && timestamp >= startMs && timestamp <= endMs
   })
+  // A scheduled row proves that Cloudflare invoked the handler, not that the
+  // handler completed successfully. Keep success/failure/unknown status counts
+  // separate so diagnostics cannot report a healthy Cron from failed invocations.
+  const successfulRows = verifiedRows.filter((row) =>
+    typeof row.status === 'string' && row.status.toLowerCase() === 'success')
+  const failedRows = verifiedRows.filter((row) =>
+    typeof row.status === 'string' && row.status.trim().length > 0 &&
+    row.status.toLowerCase() !== 'success')
+  const unknownStatusRows = verifiedRows.filter((row) =>
+    typeof row.status !== 'string' || row.status.trim().length === 0)
 
   return {
     scheduledAnalyticsStatus: 'PASS',
     scheduledAnalyticsCategory: 'NONE',
     scheduledAnalyticsHttpStatus: response.status,
     scheduledAnalyticsRows: safeCount(verifiedRows.length),
+    scheduledAnalyticsSuccessfulRows: safeCount(successfulRows.length),
+    scheduledAnalyticsFailedRows: safeCount(failedRows.length),
+    scheduledAnalyticsUnknownStatusRows: safeCount(unknownStatusRows.length),
   }
 }
 
