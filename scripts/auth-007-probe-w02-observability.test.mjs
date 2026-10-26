@@ -143,7 +143,7 @@ describe('AUTH-007 read-only W02 scheduled Observability probe', () => {
     assert.equal(queryRequests.find((request) => request.body.view === 'events').body.queryId, 'auth007-w02-event-diagnostic')
     assert.equal(valuesRequest.init.method, 'POST')
     assert.equal(analyticsRequest.init.method, 'POST')
-    assert.match(analyticsRequest.body.query, /workersInvocationsScheduled[\\s\\S]*scriptName[\\s\\S]*datetime[\\s\\S]*scheduledDatetime[\\s\\S]*cron[\\s\\S]*status/)
+    assert.ok(['workersInvocationsScheduled', 'scriptName', 'datetime', 'scheduledDatetime', 'cron', 'status'].every((field) => analyticsRequest.body.query.includes(field)))
     assert.deepEqual(analyticsRequest.body.variables, {
       accountTag: valid.accountId,
       start: new Date(valid.now - 1_800_000).toISOString(),
