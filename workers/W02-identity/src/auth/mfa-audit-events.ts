@@ -105,6 +105,24 @@ export function buildMfaAuditEvent(input: {
   if (typeof input.userId !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(input.userId)) {
     throw new TypeError('invalid MFA audit subject')
   }
+  if (!(MFA_AUDIT_EVENT_NAMES as readonly string[]).includes(input.eventType)) {
+    throw new TypeError('invalid MFA audit event type')
+  }
+  if (!['started', 'succeeded', 'failed', 'rejected'].includes(input.result)) {
+    throw new TypeError('invalid MFA audit result')
+  }
+  if (input.reasonCode !== undefined &&
+      (typeof input.reasonCode !== 'string' || !/^[A-Z0-9_]{1,64}$/.test(input.reasonCode))) {
+    throw new TypeError('invalid MFA audit reason code')
+  }
+  if (input.factorState !== undefined &&
+      !['PENDING_VERIFICATION', 'ENABLED', 'DISABLED'].includes(input.factorState)) {
+    throw new TypeError('invalid MFA audit factor state')
+  }
+  if (input.challengeMethod !== undefined &&
+      !['totp', 'recovery_code'].includes(input.challengeMethod)) {
+    throw new TypeError('invalid MFA audit challenge method')
+  }
   const eventId = input.eventId ?? 'evt_' + crypto.randomUUID().replaceAll('-', '')
   if (!/^evt_[a-f0-9]{32}$/.test(eventId)) throw new TypeError('invalid MFA audit event id')
   if (input.idempotencyKey !== undefined &&
