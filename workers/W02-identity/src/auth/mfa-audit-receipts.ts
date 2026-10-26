@@ -318,6 +318,7 @@ export async function appendMfaAuditOperationReceiptEvent(
   }
   const plan = mergePlan(receiptId, parsePlan(row.eventPlan), [event], event.occurredAt ?? new Date().toISOString())
   const idempotencyKey = event.idempotencyKey ?? `mfa-operation:${receiptId}:${event.eventType}`
+  const operationId = event.operationId ?? MFA_AUDIT_OPERATION_IDS[event.eventType][0]!
   try {
     const result = await db.prepare(
       'UPDATE auth_007_mfa_operation_receipts SET event_plan = ?, ' +
@@ -333,7 +334,7 @@ export async function appendMfaAuditOperationReceiptEvent(
     if (parsePlan(latest.eventPlan).some((item) =>
       item.idempotencyKey === idempotencyKey &&
       item.eventType === event.eventType &&
-      item.operationId === event.operationId &&
+      item.operationId === operationId &&
       item.result === event.result &&
       item.reasonCode === event.reasonCode &&
       item.factorState === event.factorState &&
