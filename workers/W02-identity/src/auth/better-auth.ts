@@ -89,13 +89,31 @@ const sanitizeAuthDiagnostic = (value: string): string => value
   .replace(/(token|secret|password|authorization|api[_-]?key)\s*[:=]\s*[^\s,;]+/gi, '$1=[redacted]')
   .slice(0, 240)
 
+async function finalizeMfaAuditOperationReceiptWithRetry(
+  db: D1Database,
+  receiptId: string,
+  events: MfaAuditReceiptEvent[],
+): Promise<boolean> {
+  let lastError: unknown
+  // A D1 response can be lost after commit. Retrying the idempotent receipt
+  // transition lets us read the committed state and avoids false UNKNOWN rows.
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      return await finalizeMfaAuditOperationReceipt(db, receiptId, events)
+    } catch (error) {
+      lastError = error
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error('MFA_AUDIT_RECEIPT_FINALIZE_FAILED')
+}
+
 async function finalizeKnownMfaRejection(
   db: D1Database,
   receiptId: string,
   events: MfaAuditReceiptEvent[],
 ): Promise<void> {
   try {
-    await finalizeMfaAuditOperationReceipt(db, receiptId, events)
+    await finalizeMfaAuditOperationReceiptWithRetry(db, receiptId, events)
   } catch {
     throw APIError.from('INTERNAL_SERVER_ERROR', {
       code: 'MFA_AUDIT_UNAVAILABLE',
@@ -351,7 +369,7 @@ const buildLuckReadAuth = (env: BetterAuthEnv) => {
         try {
           // Persist the terminal outcome before trying the ordinary outbox.
           // A failed outbox insert leaves READY work for the existing W02 Cron.
-          await finalizeMfaAuditOperationReceipt(env.D1_01, state.receiptId, outcomes)
+          await finalizeMfaAuditOperationReceiptWithRetry(env.D1_01, state.receiptId, outcomes)
         } catch {
           // Do not turn a completed MFA mutation into a misleading failure:
           // the durable STARTED receipt will be surfaced as UNKNOWN if recovery
