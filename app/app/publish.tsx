@@ -292,15 +292,22 @@ export default function PublishScreen() {
     setStatusMessage('Retrying ' + asset.filename + '…');
     try {
       const succeeded = await uploadAsset(asset);
+      const allReady = succeeded && assets.every((candidate) =>
+        candidate.localId === asset.localId
+          ? succeeded
+          : candidate.existing || candidate.status === 'ready',
+      );
       setStatusMessage(
-        succeeded
+        allReady
           ? 'Media upload complete. Server media references are ready to publish.'
-          : 'Media upload failed. Retry this file before publishing.',
+          : succeeded
+            ? 'This file uploaded successfully. Retry any remaining failed media before publishing.'
+            : 'Media upload failed. Retry this file before publishing.',
       );
     } finally {
       setBusy(false);
     }
-  }, [uploadAsset]);
+  }, [assets, uploadAsset]);
 
   const removeAsset = useCallback((localId: string) => {
     if (busy || publishPending) return;
