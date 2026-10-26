@@ -62,8 +62,8 @@ jobs:
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
-          git fetch origin main --depth=1
-          git merge-base --is-ancestor "$SOURCE_SHA" origin/main
+          git fetch --no-tags origin main
+          git merge-base --is-ancestor "$SOURCE_SHA" FETCH_HEAD
           test "$(git rev-parse HEAD:workers/W01-payload/src/migrations/index.ts)" = "9408d589233db911dd880122316fecc936b76133"
           test "$(git rev-parse HEAD:workers/W01-payload/src/migrations/20261022_120000_MIG_MEDIA_UPLOAD_IDEMPOTENCY_V1.ts)" = "bf9114b71e3e0c3836699d8813aa362104584f97"
           node --input-type=module <<'NODE'
