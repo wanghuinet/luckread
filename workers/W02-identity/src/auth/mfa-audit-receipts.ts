@@ -1,8 +1,10 @@
 import {
   MFA_AUDIT_EVENT_NAMES,
   deriveMfaAuditEventIdForIdempotencyKey,
+  isAllowedMfaAuditOperationId,
   recordMfaAuditEventOnce,
   type MfaAuditEventName,
+  type MfaAuditOperationId,
   type MfaAuditResult,
 } from './mfa-audit-events.js'
 
@@ -14,6 +16,7 @@ export type MfaAuditReceiptOperationPath =
 
 export type MfaAuditReceiptEvent = {
   eventType: MfaAuditEventName
+  operationId?: MfaAuditOperationId
   eventId?: string
   result: MfaAuditResult
   reasonCode?: string
@@ -79,6 +82,11 @@ function validateEvent(value: unknown): StoredReceiptEvent {
   if (typeof event.result !== 'string' || !validResults.has(event.result as MfaAuditResult)) {
     throw new Error('INVALID_MFA_AUDIT_RECEIPT_PLAN')
   }
+  if (event.operationId !== undefined &&
+      (typeof event.operationId !== 'string' ||
+       !isAllowedMfaAuditOperationId(event.eventType as MfaAuditEventName, event.operationId))) {
+    throw new Error('INVALID_MFA_AUDIT_RECEIPT_PLAN')
+  }
   if (
     event.reasonCode !== undefined &&
     (typeof event.reasonCode !== 'string' || !/^[A-Z0-9_]{1,64}$/.test(event.reasonCode))
@@ -109,6 +117,9 @@ function validateEvent(value: unknown): StoredReceiptEvent {
 
   return {
     eventType: event.eventType as MfaAuditEventName,
+    ...(typeof event.operationId === 'string'
+      ? { operationId: event.operationId as MfaAuditOperationId }
+      : {}),
     eventId: event.eventId,
     result: event.result as MfaAuditResult,
     ...(typeof event.reasonCode === 'string' ? { reasonCode: event.reasonCode } : {}),
@@ -162,6 +173,7 @@ function mergePlan(
         input.occurredAt !== existingEvent.occurredAt
       const eventIntentConflict =
         existingEvent.eventType !== candidate.eventType ||
+        existingEvent.operationId !== candidate.operationId ||
         existingEvent.result !== candidate.result ||
         existingEvent.reasonCode !== candidate.reasonCode ||
         existingEvent.factorState !== candidate.factorState ||
@@ -318,6 +330,7 @@ export async function appendMfaAuditOperationReceiptEvent(
     if (parsePlan(latest.eventPlan).some((item) =>
       item.idempotencyKey === idempotencyKey &&
       item.eventType === event.eventType &&
+      item.operationId === event.operationId &&
       item.result === event.result &&
       item.reasonCode === event.reasonCode &&
       item.factorState === event.factorState &&
@@ -442,6 +455,7 @@ export async function reconcileMfaAuditOperationReceipts(
           : event.eventId
         const recorded = await recordMfaAuditEventOnce(db, {
           eventType: event.eventType,
+          ...(event.operationId ? { operationId: event.operationId } : {}),
           userId: row.resourceId,
           occurredAt: event.occurredAt,
           correlationId: row.correlationId,
