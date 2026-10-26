@@ -124,9 +124,12 @@ function createDb() {
         }
 
         if (sql.includes('UPDATE auth_007_mfa_operation_receipts') && sql.includes('SET status = ?, event_plan = ?, completed_at = ?')) {
-          const [status, eventPlan, completedAt, receiptId] = args
+          const [status, eventPlan, completedAt, receiptId, priorStatus, previousPlan] = args
           const row = receipts.get(String(receiptId))
-          if (!row || !['STARTED', 'READY'].includes(row.status)) return { success: true, meta: { changes: 0 } }
+          const planMatches = sql.includes('AND event_plan IS NULL')
+            ? row?.eventPlan === null
+            : row?.eventPlan === previousPlan
+          if (!row || row.status !== priorStatus || !planMatches) return { success: true, meta: { changes: 0 } }
           row.status = String(status)
           row.eventPlan = String(eventPlan)
           row.completedAt = String(completedAt)
@@ -593,6 +596,31 @@ describe('AUTH-007 durable MFA operation receipts', () => {
     await reconcileMfaAuditOperationReceipts(store.db, '2026-10-26T12:01:00.000Z')
     expect(store.outbox.size).toBe(1)
     expect(store.outbox.get(planned.idempotencyKey)?.eventId).toBe(planned.eventId)
+  })
+
+  it('freezes a finalized plan and treats the same finalization as idempotent', async () => {
+    const receiptId = await createMfaAuditOperationReceipt(store.db, {
+      userId: 'user-123',
+      operationPath: '/two-factor/verify-totp',
+      isChallenge: true,
+      now: startedAt,
+    })
+    await expect(finalizeMfaAuditOperationReceipt(store.db, receiptId, [successEvent], startedAt))
+      .resolves.toBe(true)
+    const finalizedPlan = store.receipts.get(receiptId)?.eventPlan
+
+    await expect(finalizeMfaAuditOperationReceipt(store.db, receiptId, [successEvent], startedAt))
+      .resolves.toBe(false)
+    await expect(finalizeMfaAuditOperationReceipt(store.db, receiptId, [{
+      eventType: 'auth.mfa.replay_rejected',
+      result: 'rejected',
+      reasonCode: 'TOTP_STEP_ALREADY_ACCEPTED',
+      challengeMethod: 'totp',
+      idempotencyKey: `mfa-operation:${receiptId}:late-event`,
+      occurredAt: startedAt,
+    }], startedAt)).rejects.toThrow('MFA_AUDIT_RECEIPT_ALREADY_FINALIZED')
+
+    expect(store.receipts.get(receiptId)?.eventPlan).toBe(finalizedPlan)
   })
 
   it('keeps a ready receipt retryable when the outbox insert fails, then recovers on a later cron tick', async () => {
