@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { buildMfaAuditEvent, buildMfaAuditOutboxInsert, recordMfaAuditEventOnce } from './mfa-audit-events'
+import { buildMfaAuditEvent, buildMfaAuditOutboxInsert, MFA_AUDIT_EVENT_NAMES, recordMfaAuditEventOnce } from './mfa-audit-events'
 
 const input = {
   eventType: 'auth.mfa.locked' as const,
@@ -78,6 +78,28 @@ describe('AUTH-007 MFA audit event builder and idempotent writer', () => {
     expect(boundValues[11]).toBe(event.publishedAt)
     expect(boundValues[12]).toBeNull()
     expect(storedPayload.publishedAt).not.toBe(storedPayload.occurredAt)
+  })
+
+  it('maps all ten canonical MFA event types to a stable action and valid event identity', () => {
+    const expectedActions: Record<(typeof MFA_AUDIT_EVENT_NAMES)[number], string> = {
+      'auth.mfa.enrollment_started': 'authMfaEnrollmentStart',
+      'auth.mfa.enrollment_verified': 'authMfaEnrollmentConfirm',
+      'auth.mfa.enrollment_failed': 'authMfaEnrollmentStart',
+      'auth.mfa.challenge_succeeded': 'authMfaChallengeVerify',
+      'auth.mfa.challenge_failed': 'authMfaChallengeVerify',
+      'auth.mfa.factor_disabled': 'authMfaDisable',
+      'auth.mfa.recovery_codes_rotated': 'authMfaRecoveryCodesRotate',
+      'auth.mfa.recovery_code_consumed': 'authMfaChallengeVerify',
+      'auth.mfa.locked': 'authMfaChallengeVerify',
+      'auth.mfa.replay_rejected': 'authMfaChallengeVerify',
+    }
+    expect(Object.keys(expectedActions).sort()).toEqual([...MFA_AUDIT_EVENT_NAMES].sort())
+    for (const eventType of MFA_AUDIT_EVENT_NAMES) {
+      const event = buildMfaAuditEvent({ ...input, eventType })
+      expect(event.eventId).toMatch(/^evt_[a-f0-9]{32}$/)
+      expect(event.payload.operationId).toBe(expectedActions[eventType])
+      expect(event.publishedAt).not.toBe(event.occurredAt)
+    }
   })
 
   it('preserves a receipt-assigned eventId through the outbox envelope', () => {
