@@ -159,18 +159,25 @@ function reconcileEventIds(outboxRows, canonicalRows) {
         row?.action === eventType && safeEventId(row.eventId) && canonicalIdCounts.get(row.eventId) > 1
       )
       .map((row) => row.eventId)).size
-    const wrongActionEventIdCount = publishedRows.filter((row) =>
-      canonicalIdCounts.has(row.eventId) && canonicalTypeById.get(row.eventId) !== eventType
-    ).length + canonicalRowsForType.filter((row) =>
-      outboxIdCounts.has(row.eventId) && outboxTypeById.get(row.eventId) !== eventType
-    ).length
-    const wrongSubjectEventIdCount = publishedRows.filter((row) =>
-      canonicalIdCounts.has(row.eventId) &&
-      canonicalSubjectById.get(row.eventId) !== row.resourceId
-    ).length + canonicalRowsForType.filter((row) => {
-      const source = outboxRows.find((outboxRow) => outboxRow?.eventId === row.eventId)
-      return source && (row.targetType !== 'User' || row.targetId !== source.resourceId)
-    }).length
+    const wrongActionEventIdCount = new Set([
+      ...publishedRows.filter((row) =>
+        canonicalIdCounts.has(row.eventId) && canonicalTypeById.get(row.eventId) !== eventType
+      ).map((row) => row.eventId),
+      ...canonicalRowsForType.filter((row) =>
+        outboxIdCounts.has(row.eventId) && outboxTypeById.get(row.eventId) !== eventType
+      ).map((row) => row.eventId),
+    ]).size
+    const wrongSubjectEventIdCount = new Set([
+      ...publishedRows.filter((row) =>
+        canonicalIdCounts.has(row.eventId) &&
+        (canonicalSubjectById.get(row.eventId) !== row.resourceId ||
+          canonicalRows.find((canonicalRow) => canonicalRow?.eventId === row.eventId)?.targetType !== 'User')
+      ).map((row) => row.eventId),
+      ...canonicalRowsForType.filter((row) => {
+        const source = outboxRows.find((outboxRow) => outboxRow?.eventId === row.eventId)
+        return source && (row.targetType !== 'User' || row.targetId !== source.resourceId)
+      }).map((row) => row.eventId),
+    ]).size
     const duplicateOutboxIdempotencyKeyForTypeCount = new Set(outboxRows
       .filter((row) =>
         row?.eventType === eventType && safeIdempotencyKey(row.idempotencyKey) &&
@@ -180,10 +187,8 @@ function reconcileEventIds(outboxRows, canonicalRows) {
 
     byEventType[eventType] = {
       matchedEventIdCount,
-      unmatchedPublishedEventIdCount: unmatchedPublishedEventIdCount +
-        invalidOutboxRows.filter((row) => row?.eventType === eventType).length,
-      unmatchedCanonicalEventIdCount: unmatchedCanonicalEventIdCount +
-        invalidCanonicalRows.filter((row) => row?.action === eventType).length,
+      unmatchedPublishedEventIdCount,
+      unmatchedCanonicalEventIdCount,
       duplicateOutboxEventIdCount,
       duplicateCanonicalEventIdCount,
       wrongActionEventIdCount,

@@ -165,7 +165,7 @@ test('blocks a canonical event whose target user differs even when eventId and a
   const result = evaluateMfaAuditDelivery(outbox, wrongSubject)
   assert.equal(result.pass, false)
   assert.equal(result.persistedExactlyOnce, false)
-  assert.ok(result.totalWrongSubjectEventIdCount > 0)
+  assert.equal(result.totalWrongSubjectEventIdCount, 1)
 })
 
 test('blocks a duplicate outbox idempotency key even when event IDs are unique', () => {
