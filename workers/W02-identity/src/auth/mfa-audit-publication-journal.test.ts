@@ -45,7 +45,7 @@ describe('AUTH-007 MFA audit outbox publisher', () => {
     expect(queueSend).toHaveBeenCalledWith(event)
     // Queue transport acknowledgment time is stored in the journal column;
     // the immutable event envelope is sent as-is and is never rewritten.
-    expect(update).toHaveBeenCalledWith('PUBLISHED', '2026-10-24T14:01:00.000Z', null, null, 'journal-1', 'PENDING')
+    expect(update).toHaveBeenCalledWith('PUBLISHED', '2026-10-24T14:01:00.000Z', 'journal-1', 'PENDING')
     expect(prepare).toHaveBeenCalledTimes(2)
     expect(update).toHaveBeenCalledTimes(1)
   })
