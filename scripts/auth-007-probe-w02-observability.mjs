@@ -14,6 +14,12 @@ const W02_SCRIPT_FILTER = Object.freeze({
   type: 'string',
   value: EXPECTED_SCRIPT,
 })
+const W02_SCRIPT_NAME_FILTER = Object.freeze({
+  key: '$workers.scriptName',
+  operation: 'eq',
+  type: 'string',
+  value: EXPECTED_SCRIPT,
+})
 const W02_SCHEDULED_EVENT_FILTER = Object.freeze({
   key: '$workers.eventType',
   operation: 'in',
@@ -360,7 +366,7 @@ async function probeW02EventTypeValues({ accountId, apiToken, now, fetchImpl }) 
           key: '$workers.eventType',
           timeframe: { from: now - WINDOW_MS, to: now },
           type: 'string',
-          filters: [W02_SCRIPT_FILTER],
+          filters: [W02_SCRIPT_NAME_FILTER],
           limit: MAX_INVOCATIONS,
         }),
       },
