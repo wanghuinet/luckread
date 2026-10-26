@@ -108,6 +108,11 @@ describe('AUTH-007 W06 MFA audit queue consumer', () => {
     const invalidEvent = { ...event, eventType: 'auth.mfa.unknown' }
     await expect(consumeMfaAuditEvent({ prepare: vi.fn() } as unknown as D1Database, invalidEvent))
       .rejects.toThrow('INVALID_AUTH_007_MFA_EVENT')
+    const inheritedPropertyEvent = { ...event, eventType: 'toString' }
+    const prepare = vi.fn()
+    await expect(consumeMfaAuditEvent({ prepare } as unknown as D1Database, inheritedPropertyEvent))
+      .rejects.toThrow('INVALID_AUTH_007_MFA_EVENT')
+    expect(prepare).not.toHaveBeenCalled()
     const invalidOperation = { ...event, payload: { ...event.payload, operationId: 'adminGrantL8' } }
     await expect(consumeMfaAuditEvent({ prepare: vi.fn() } as unknown as D1Database, invalidOperation))
       .rejects.toThrow('INVALID_AUTH_007_MFA_EVENT')
