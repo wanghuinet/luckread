@@ -20,7 +20,7 @@ const request = (body: unknown) => new Request('https://luckread-w02.internal/in
 const makeDatabase = (rows: unknown[] = []) => {
   const statement = {
     bind: vi.fn().mockReturnThis(),
-    all: vi.fn().mockResolvedValue({ results: rows }),
+    all: vi.fn().mockResolvedValue({ success: true, results: rows }),
   }
   const database = { prepare: vi.fn().mockReturnValue(statement) }
   return { database: database as unknown as D1Database, statement, prepare: database.prepare }
@@ -162,6 +162,35 @@ describe('W02 bounded session list', () => {
     expect(payload.error?.code).toBe('RATE_LIMITED')
     expect(limiter.limit).toHaveBeenCalledTimes(2)
     expect(db.prepare).not.toHaveBeenCalled()
+  })
+
+  it('fails closed when D1 reports an unsuccessful session query', async () => {
+    const db = makeDatabase()
+    db.statement.all.mockResolvedValueOnce({ success: false, results: [] })
+    const env = makeEnv(db.database)
+
+    const response = await handleCurrentUserSessionList(env, request({ limit: 10 }))
+    const payload = await response.json() as { error?: { code?: string }; items?: unknown[] }
+
+    expect(response.status).toBe(503)
+    expect(payload.error?.code).toBe('SERVICE_UNAVAILABLE')
+    expect(payload.items).toBeUndefined()
+    expect(db.statement.all).toHaveBeenCalledTimes(1)
+  })
+
+  it('fails closed when D1 reports success without a valid results array', async () => {
+    const db = makeDatabase()
+    db.statement.all.mockResolvedValueOnce(
+      { success: true } as unknown as { success: boolean; results: unknown[] },
+    )
+    const env = makeEnv(db.database)
+
+    const response = await handleCurrentUserSessionList(env, request({ limit: 10 }))
+    const payload = await response.json() as { error?: { code?: string }; items?: unknown[] }
+
+    expect(response.status).toBe(503)
+    expect(payload.error?.code).toBe('SERVICE_UNAVAILABLE')
+    expect(payload.items).toBeUndefined()
   })
 
   it('fails closed when D1 cannot serve the session query', async () => {
