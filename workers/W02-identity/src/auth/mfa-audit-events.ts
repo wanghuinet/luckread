@@ -175,7 +175,7 @@ export async function recordMfaAuditEventOnce(
   } catch {
     const raced = await db.prepare(
       'SELECT event_id AS eventId, event_type AS eventType FROM auth_007_mfa_publication_journal WHERE idempotency_key = ? LIMIT 1',
-    ).bind(event.idempotencyKey).first<{ eventId: string }>()
+    ).bind(event.idempotencyKey).first<{ eventId: string; eventType: string }>()
     if (raced) {
       if (input.eventId && raced.eventId !== input.eventId) throw new Error('MFA_AUDIT_EVENT_ID_CONFLICT')
       if (raced.eventType !== event.eventType || raced.operationId !== event.payload.operationId) throw new Error('MFA_AUDIT_EVENT_ACTION_CONFLICT')
