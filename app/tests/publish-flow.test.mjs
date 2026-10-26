@@ -79,3 +79,13 @@ test('native post detail reads poll state and submits votes through existing W01
   expect(socialPoll).toContain('option.votes / poll.totalVotes');
   expect(socialPoll).toContain('poll.closed');
 });
+
+test('media upload success is reported only when every attachment is ready', () => {
+  expect(composer).toContain('return true;');
+  expect(composer).toContain('return false;');
+  expect(composer).toContain('const uploadResults: boolean[] = [];');
+  expect(composer).toContain('uploadResults.push(await uploadAsset(asset))');
+  expect(composer).toContain('uploadResults.every(Boolean)');
+  expect(composer).toContain('Some media uploads failed. Retry failed files before publishing.');
+  expect(composer).toContain('Media upload failed. Retry this file before publishing.');
+});
