@@ -559,6 +559,24 @@ export async function reconcileMfaAuditOperationReceipts(
         }
       }
     } catch (error) {
+      // A D1 response can be lost after a terminal receipt transition commits.
+      // Read the authoritative state before counting this as a delivery failure;
+      // otherwise the dashboard reports a false failure for an already-emitted receipt.
+      try {
+        const latest = await loadReceipt(db, row.receiptId)
+        if (latest.status === 'EMITTED') {
+          emitted += 1
+          continue
+        }
+        if (latest.status === 'RESOLVED') continue
+        if (latest.status === 'UNKNOWN') {
+          unknown += 1
+          continue
+        }
+      } catch {
+        // When status cannot be proven, retain the retry/error path below.
+      }
+
       const terminalErrorCode = terminalMfaOutboxErrorCode(error)
       if (terminalErrorCode) {
         try {
