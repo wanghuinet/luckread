@@ -145,6 +145,26 @@ describe('AUTH-007 MFA audit event builder and idempotent writer', () => {
     })).rejects.toThrow('MFA_AUDIT_EVENT_ACTION_CONFLICT')
   })
 
+  it('rejects a durable idempotency match with a different stable eventId', async () => {
+    const prepare = vi.fn((sql: string) => ({
+      bind: vi.fn(() => ({
+        first: async () => ({
+          eventId: 'evt_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+          eventType: 'auth.mfa.locked',
+          operationId: 'authMfaChallengeVerify',
+        }),
+        run: vi.fn(),
+        sql,
+      })),
+    }))
+    const db = { prepare } as unknown as D1Database
+    await expect(recordMfaAuditEventOnce(db, {
+      ...input,
+      eventId: 'evt_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+    })).rejects.toThrow('MFA_AUDIT_EVENT_ID_CONFLICT')
+    expect(prepare.mock.calls[0]?.[0]).toContain("json_extract(payload, '$.payload.operationId')")
+  })
+
   it('fails when the insert is rejected and the idempotency key is not present', async () => {
     const { db } = fakeDb({ insertSuccess: false })
     await expect(recordMfaAuditEventOnce(db, input)).rejects.toThrow('MFA_AUDIT_OUTBOX_WRITE_FAILED')
