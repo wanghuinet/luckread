@@ -197,6 +197,8 @@ for (const file of [
   reconciliationPath,
   betterAuthPath,
   replayGuardPath,
+  'workers/W02-identity/src/auth/mfa-challenge-verification.ts',
+  'workers/W02-identity/src/auth/mfa-challenge-verification.test.ts',
   policyPath,
   '.github/workflows/auth-mfa-rollout-preflight.yml',
   ...protectedRefWorkflowPaths.filter((file) => file !== '.github/workflows/auth-mfa-rollout-preflight.yml'),
@@ -392,6 +394,8 @@ if (blockers.length === 0) {
       exists('workers/W02-identity/src/auth/mfa-audit-publication-journal.test.ts') &&
       exists('workers/W02-identity/src/auth/mfa-audit-receipts.ts') &&
       exists('workers/W02-identity/src/auth/mfa-audit-receipts.test.ts') &&
+      exists('workers/W02-identity/src/auth/mfa-challenge-verification.ts') &&
+      exists('workers/W02-identity/src/auth/mfa-challenge-verification.test.ts') &&
       exists('scripts/auth-007-mfa-journal-migration-static-audit.mjs') &&
       exists('scripts/auth-007-mfa-operation-receipts-static-audit.mjs') &&
       exists('workers/W06-governance/src/mfa-audit-queue-consumer.ts') &&
