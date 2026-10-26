@@ -82,6 +82,21 @@ function createDb() {
         }
 
         if (sql.includes('UPDATE auth_007_mfa_operation_receipts') &&
+            sql.includes('SET event_plan = ?') && sql.includes('AND event_plan IS NULL')) {
+          const [eventPlan, receiptId, priorStatus] = args
+          const row = receipts.get(String(receiptId))
+          if (!row || row.status !== priorStatus || row.eventPlan !== null) {
+            return { success: true, meta: { changes: 0 } }
+          }
+          row.eventPlan = String(eventPlan)
+          if (failNextReceiptAppendAfterCommit) {
+            failNextReceiptAppendAfterCommit = false
+            throw new Error('synthetic D1 response loss after receipt event append')
+          }
+          return { success: true, meta: { changes: 1 } }
+        }
+
+        if (sql.includes('UPDATE auth_007_mfa_operation_receipts') &&
             sql.includes('SET event_plan = ?') && sql.includes('AND event_plan = ?')) {
           const [eventPlan, receiptId, priorStatus, previousPlan] = args
           const row = receipts.get(String(receiptId))
@@ -89,13 +104,17 @@ function createDb() {
             return { success: true, meta: { changes: 0 } }
           }
           row.eventPlan = String(eventPlan)
+          if (failNextReceiptAppendAfterCommit) {
+            failNextReceiptAppendAfterCommit = false
+            throw new Error('synthetic D1 response loss after receipt event append')
+          }
           return { success: true, meta: { changes: 1 } }
         }
 
         if (sql.includes('UPDATE auth_007_mfa_operation_receipts') && sql.includes('SET event_plan = ?')) {
           const [eventPlan, receiptId] = args
           const row = receipts.get(String(receiptId))
-          if (!row || !['STARTED', 'READY'].includes(row.status)) return { success: true, meta: { changes: 0 } }
+          if (!row || row.status !== 'STARTED') return { success: true, meta: { changes: 0 } }
           row.eventPlan = String(eventPlan)
           if (failNextReceiptAppendAfterCommit) {
             failNextReceiptAppendAfterCommit = false
@@ -400,6 +419,66 @@ describe('AUTH-007 durable MFA operation receipts', () => {
       operationPath: '/two-factor/verify-totp',
       isChallenge: true,
     })).rejects.toThrow('MFA_AUDIT_RECEIPT_CONTEXT_MISMATCH')
+  })
+
+  it('preserves distinct concurrent appends with compare-and-set retries', async () => {
+    const receiptId = await createMfaAuditOperationReceipt(store.db, {
+      userId: 'user-123',
+      operationPath: '/two-factor/verify-totp',
+      isChallenge: true,
+      now: startedAt,
+    })
+
+    await Promise.all([
+      appendMfaAuditOperationReceiptEvent(store.db, receiptId, {
+        eventType: 'auth.mfa.replay_rejected',
+        result: 'rejected',
+        reasonCode: 'TOTP_STEP_ALREADY_ACCEPTED',
+        challengeMethod: 'totp',
+        idempotencyKey: `mfa-operation:${receiptId}:replay`,
+        occurredAt: startedAt,
+      }),
+      appendMfaAuditOperationReceiptEvent(store.db, receiptId, {
+        eventType: 'auth.mfa.challenge_failed',
+        result: 'failed',
+        reasonCode: 'CHALLENGE_REJECTED',
+        challengeMethod: 'totp',
+        idempotencyKey: `mfa-operation:${receiptId}:challenge-failed`,
+        occurredAt: startedAt,
+      }),
+    ])
+
+    const plan = JSON.parse(store.receipts.get(receiptId)?.eventPlan ?? '[]') as Array<{
+      eventType: string
+      idempotencyKey: string
+    }>
+    expect(plan).toHaveLength(2)
+    expect(plan.map((item) => item.eventType).sort()).toEqual([
+      'auth.mfa.challenge_failed',
+      'auth.mfa.replay_rejected',
+    ])
+  })
+
+  it('freezes a READY event plan so the cron drain cannot miss a late append', async () => {
+    const receiptId = await createMfaAuditOperationReceipt(store.db, {
+      userId: 'user-123',
+      operationPath: '/two-factor/verify-totp',
+      isChallenge: true,
+      now: startedAt,
+    })
+    await finalizeMfaAuditOperationReceipt(store.db, receiptId, [successEvent], startedAt)
+    const before = store.receipts.get(receiptId)?.eventPlan
+
+    await expect(appendMfaAuditOperationReceiptEvent(store.db, receiptId, {
+      eventType: 'auth.mfa.replay_rejected',
+      result: 'rejected',
+      reasonCode: 'TOTP_STEP_ALREADY_ACCEPTED',
+      challengeMethod: 'totp',
+      idempotencyKey: `mfa-operation:${receiptId}:late-replay`,
+      occurredAt: startedAt,
+    })).rejects.toThrow('MFA_AUDIT_RECEIPT_NOT_APPENDABLE')
+
+    expect(store.receipts.get(receiptId)?.eventPlan).toBe(before)
   })
 
   it('read-backs an appended replay event if the D1 response is lost after commit', async () => {
