@@ -239,13 +239,28 @@ export async function appendMfaAuditOperationReceiptEvent(
     throw new Error('MFA_AUDIT_RECEIPT_NOT_APPENDABLE')
   }
   const plan = mergePlan(receiptId, parsePlan(row.eventPlan), [event], event.occurredAt ?? new Date().toISOString())
-  const result = await db.prepare(
-    'UPDATE auth_007_mfa_operation_receipts SET event_plan = ?, ' +
-    'last_error_code = NULL WHERE receipt_id = ? AND status IN (?, ?)',
-  ).bind(JSON.stringify(plan), receiptId, 'STARTED', 'READY').run()
-  if (!result.success || result.meta?.changes !== 1) {
-    throw new Error('MFA_AUDIT_RECEIPT_WRITE_FAILED')
+  const idempotencyKey = event.idempotencyKey ?? `mfa-operation:${receiptId}:${event.eventType}`
+  try {
+    const result = await db.prepare(
+      'UPDATE auth_007_mfa_operation_receipts SET event_plan = ?, ' +
+      'last_error_code = NULL WHERE receipt_id = ? AND status IN (?, ?)',
+    ).bind(JSON.stringify(plan), receiptId, 'STARTED', 'READY').run()
+    if (result.success && result.meta?.changes === 1) return
+  } catch {
+    // The D1 write may have committed even when the response was lost.
   }
+
+  try {
+    const latest = await loadReceipt(db, receiptId)
+    if (parsePlan(latest.eventPlan).some((item) =>
+      item.idempotencyKey === idempotencyKey &&
+      item.eventType === event.eventType &&
+      item.result === event.result
+    )) return
+  } catch {
+    // Without an authoritative read-back, fail closed before returning the auth error.
+  }
+  throw new Error('MFA_AUDIT_RECEIPT_WRITE_FAILED')
 }
 
 /** Store the known outcome durably before attempting any outbox insert. */
