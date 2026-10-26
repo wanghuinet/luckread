@@ -1,5 +1,5 @@
 import { createLuckReadAuth, type BetterAuthEnv } from './better-auth.js'
-import { buildMfaAuditEvent, buildMfaAuditOutboxInsert } from './mfa-audit-events.js'
+import { createMfaAuditOperationReceipt, finalizeMfaAuditOperationReceipt, reconcileMfaAuditOperationReceipts, type MfaAuditReceiptEvent } from './mfa-audit-receipts.js'
 import { resolveBetterAuthPrincipal } from './principal.js'
 import { readAuthoritativeMfaStatus } from './mfa-status.js'
 
@@ -9,6 +9,40 @@ const json = (body: unknown, status = 200): Response => Response.json(body, {
 })
 
 const isTrue = (value: number | boolean | null | undefined): boolean => value === true || value === 1
+
+async function finalizeEnrollmentAuditReceipt(
+  env: BetterAuthEnv,
+  receiptId: string,
+  event: MfaAuditReceiptEvent,
+): Promise<void> {
+  let lastError: unknown
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      await finalizeMfaAuditOperationReceipt(env.D1_01, receiptId, [event])
+      try {
+        // The durable READY receipt is sufficient for safe response behavior;
+        // Cron can retry an outbox insert that is transiently unavailable.
+        await reconcileMfaAuditOperationReceipts(env.D1_01)
+      } catch {
+        console.error(JSON.stringify({
+          event: 'auth.mfa.enrollment_receipt_reconcile_deferred',
+          code: 'MFA_AUDIT_RECEIPT_RECONCILE_FAILED',
+        }))
+      }
+      return
+    } catch (error) {
+      lastError = error
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error('MFA_AUDIT_RECEIPT_FINALIZE_FAILED')
+}
+
+const enrollmentFailureEvent = (): MfaAuditReceiptEvent => ({
+  eventType: 'auth.mfa.enrollment_failed',
+  result: 'failed',
+  reasonCode: 'ENROLLMENT_CONFIRMATION_REJECTED',
+  factorState: 'PENDING_VERIFICATION',
+})
 
 const sha256Hex = async (value: string): Promise<string> => {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value))
@@ -99,10 +133,29 @@ export async function handleMfaEnrollmentConfirmRequest(
       return json({ error: { code: 'FACTOR_ALREADY_VERIFIED', message: 'MFA enrollment must not replace a verified factor' } }, 409)
     }
 
+    let receiptId: string
+    try {
+      // Create the operation receipt in the outer W02 endpoint, before invoking
+      // Better Auth. The internal handoff lets its hooks validate and reuse this
+      // receipt rather than prematurely resolving a nested enrollment mutation.
+      receiptId = await createMfaAuditOperationReceipt(env.D1_01, {
+        userId: principal.userId,
+        operationPath: '/two-factor/verify-totp',
+        isChallenge: false,
+        correlationId: request.headers.get('X-LuckRead-Correlation-Id'),
+        causationId: request.headers.get('X-LuckRead-Request-Id'),
+      })
+    } catch {
+      return json({ error: { code: 'MFA_AUDIT_UNAVAILABLE', message: 'MFA confirmation unavailable' } }, 503)
+    }
+
     const headers = new Headers(request.headers)
     headers.delete('host')
     headers.delete('content-length')
     headers.set('content-type', 'application/json; charset=utf-8')
+    headers.set('X-LuckRead-MFA-Operation', 'enrollment-confirm')
+    headers.set('X-LuckRead-MFA-Receipt-Id', receiptId)
+    headers.set('X-LuckRead-MFA-Receipt-Mode', 'defer-finalization')
     const authRequest = new Request('https://luckread.com/api/auth/two-factor/verify-totp', {
       method: 'POST',
       headers,
@@ -111,8 +164,23 @@ export async function handleMfaEnrollmentConfirmRequest(
     // The upstream body contains a session token and is deliberately discarded.
     // A rotated session can be delivered only through the HTTP-only Set-Cookie
     // header, and only after the authoritative read-back succeeds.
-    const verified = await createLuckReadAuth(env).handler(authRequest)
+    let verified: Response
+    try {
+      verified = await createLuckReadAuth(env).handler(authRequest)
+    } catch {
+      try {
+        await finalizeEnrollmentAuditReceipt(env, receiptId, enrollmentFailureEvent())
+      } catch {
+        return json({ error: { code: 'MFA_AUDIT_UNAVAILABLE', message: 'MFA confirmation unavailable' } }, 503)
+      }
+      return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'MFA confirmation unavailable' } }, 503)
+    }
     if (!verified.ok) {
+      try {
+        await finalizeEnrollmentAuditReceipt(env, receiptId, enrollmentFailureEvent())
+      } catch {
+        return json({ error: { code: 'MFA_AUDIT_UNAVAILABLE', message: 'MFA confirmation unavailable' } }, 503)
+      }
       if (verified.status === 429) {
         return json({ error: { code: 'RATE_LIMITED', message: 'Too many requests' } }, 429)
       }
@@ -130,26 +198,24 @@ export async function handleMfaEnrollmentConfirmRequest(
       return json({ error: { code: 'MFA_READBACK_FAILED', message: 'MFA confirmation could not be verified' } }, 503)
     }
 
-    const verifiedEvent = buildMfaAuditEvent({
-      eventType: 'auth.mfa.enrollment_verified',
-      userId: principal.userId,
-      occurredAt: status.enrolledAt,
-      correlationId: request.headers.get('X-LuckRead-Correlation-Id'),
-      causationId: request.headers.get('X-LuckRead-Request-Id'),
-      result: 'succeeded',
-      reasonCode: 'TOTP_ENROLLMENT_VERIFIED',
-      factorState: 'ENABLED',
-    })
-    const stored = await env.D1_01.batch([
-      env.D1_01.prepare(
-        'UPDATE "user" SET mfa_enrollment_key_hash = NULL, ' +
-        'mfa_enrollment_confirm_key_hash = ?, mfa_enrollment_confirm_request_hash = ? ' +
-        'WHERE id = ? AND two_factor_enabled = 1 ' +
-        'AND EXISTS (SELECT 1 FROM "twoFactor" WHERE userId = ? AND verified = 1)',
-      ).bind(keyHash, requestHash, principal.userId, principal.userId),
-      buildMfaAuditOutboxInsert(env.D1_01, verifiedEvent, { onlyWhenPreviousStatementChanged: true }),
-    ])
-    if (stored[0]?.meta?.changes !== 1 || stored[1]?.meta?.changes !== 1) {
+    try {
+      await finalizeEnrollmentAuditReceipt(env, receiptId, {
+        eventType: 'auth.mfa.enrollment_verified',
+        result: 'succeeded',
+        reasonCode: 'TOTP_ENROLLMENT_VERIFIED',
+        factorState: 'ENABLED',
+        occurredAt: status.enrolledAt,
+      })
+    } catch {
+      return json({ error: { code: 'MFA_AUDIT_UNAVAILABLE', message: 'MFA confirmation unavailable' } }, 503)
+    }
+    const stored = await env.D1_01.prepare(
+      'UPDATE "user" SET mfa_enrollment_key_hash = NULL, ' +
+      'mfa_enrollment_confirm_key_hash = ?, mfa_enrollment_confirm_request_hash = ? ' +
+      'WHERE id = ? AND two_factor_enabled = 1 ' +
+      'AND EXISTS (SELECT 1 FROM "twoFactor" WHERE userId = ? AND verified = 1)',
+    ).bind(keyHash, requestHash, principal.userId, principal.userId).run()
+    if (!stored.success || stored.meta?.changes !== 1) {
       return json({ error: { code: 'MFA_READBACK_FAILED', message: 'MFA confirmation could not be verified' } }, 503)
     }
     // Better Auth rotates the authenticated session after verified enrollment.
