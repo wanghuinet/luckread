@@ -7,7 +7,7 @@ async function main() {
   })
   const observed = result.scheduledAnalyticsStatus === 'PASS' && result.scheduledAnalyticsRows > 0
   process.stdout.write(
-    `W02_SCHEDULED_ANALYTICS_PREFLIGHT status=${result.scheduledAnalyticsStatus} category=${result.scheduledAnalyticsCategory} http_status=${result.scheduledAnalyticsHttpStatus} rows=${result.scheduledAnalyticsRows} scheduled_execution_observed=${observed}\\n`,
+    `W02_SCHEDULED_ANALYTICS_PREFLIGHT status=${result.scheduledAnalyticsStatus} category=${result.scheduledAnalyticsCategory} http_status=${result.scheduledAnalyticsHttpStatus} rows=${result.scheduledAnalyticsRows} scheduled_execution_observed=${observed}\n`,
   )
   if (!observed) process.exitCode = 1
 }
