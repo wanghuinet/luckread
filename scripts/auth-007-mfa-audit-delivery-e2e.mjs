@@ -30,7 +30,9 @@ const evidence = {
   apiTokenStored: false,
   rawResponseBodiesStored: false,
   rawEventPayloadsStored: false,
-  queryResultsLimitedToAggregates: true,
+  queryResultsStoredAsAggregates: true,
+  eventIdsComparedInMemoryOnly: true,
+  rawEventIdentifiersStored: false,
   userIdentifiersStored: false,
   qaEmailStored: false,
   qaAccountResolved: false,
@@ -40,6 +42,9 @@ const evidence = {
   checks: [],
   outboxEvents: [],
   canonicalAuditEvents: [],
+  eventIdReconciliation: null,
+  scenarioSpecificCoverage: [],
+  allTenEventTypesVerified: false,
   status: 'PENDING',
   failureCode: null,
   pollingDurationMs: 0,
@@ -139,26 +144,27 @@ async function readDedicatedQaUserId() {
   return rows[0].id
 }
 
-async function readOutboxAggregates(qaUserId) {
+async function readScopedOutboxEventRows(qaUserId) {
+  // Fetch only event IDs and status metadata for an exact in-memory
+  // reconciliation. These row identifiers are never written to evidence.
   return queryD1(
     databases.W02_D1_01,
-    `SELECT event_type AS eventType, status, attempt, last_error_code AS lastErrorCode, COUNT(*) AS count
+    `SELECT event_id AS eventId, event_type AS eventType, status, attempt,
+            last_error_code AS lastErrorCode
        FROM auth_007_mfa_publication_journal
       WHERE json_extract(payload, '$.correlationId') = ? AND resource_id = ?
-      GROUP BY event_type, status, attempt, last_error_code
-      ORDER BY event_type, status, attempt, last_error_code`,
+      ORDER BY event_type, event_id`,
     [correlationId, qaUserId],
   )
 }
 
-async function readCanonicalAuditAggregates(qaUserId) {
+async function readScopedCanonicalAuditEventRows(qaUserId) {
   return queryD1(
     databases.W06_D1_03,
-    `SELECT action, COUNT(*) AS count
+    `SELECT event_id AS eventId, action
        FROM audit_events
       WHERE request_id = ? AND target_id = ? AND action LIKE 'auth.mfa.%'
-      GROUP BY action
-      ORDER BY action`,
+      ORDER BY action, event_id`,
     [correlationId, qaUserId],
   )
 }
@@ -210,27 +216,41 @@ async function main() {
   do {
     try {
       const [outboxRows, auditRows] = await Promise.all([
-        readOutboxAggregates(qaUserId),
-        readCanonicalAuditAggregates(qaUserId),
+        readScopedOutboxEventRows(qaUserId),
+        readScopedCanonicalAuditEventRows(qaUserId),
       ])
-      evidence.outboxEvents = outboxRows.map((row) => ({
-        eventType: typeof row.eventType === 'string' && /^auth\.mfa\.[a-z_]+$/.test(row.eventType) ? row.eventType : 'UNKNOWN',
-        status: ['PENDING', 'PUBLISHED', 'FAILED'].includes(row.status) ? row.status : 'UNKNOWN',
-        attempt: Number.isSafeInteger(Number(row.attempt)) && Number(row.attempt) >= 0 ? Number(row.attempt) : 0,
-        lastErrorCode: row.lastErrorCode == null
-          ? null
-          : (typeof row.lastErrorCode === 'string' && /^[A-Z0-9_]{1,64}$/.test(row.lastErrorCode) ? row.lastErrorCode : 'UNKNOWN'),
-        count: Number.isSafeInteger(Number(row.count)) && Number(row.count) >= 0 ? Number(row.count) : 0,
-      }))
-      evidence.canonicalAuditEvents = auditRows.map((row) => ({
-        action: typeof row.action === 'string' && /^auth\.mfa\.[a-z_]+$/.test(row.action) ? row.action : 'UNKNOWN',
-        count: Number.isSafeInteger(Number(row.count)) && Number(row.count) >= 0 ? Number(row.count) : 0,
-      }))
-      evaluation = evaluateMfaAuditDelivery(evidence.outboxEvents, evidence.canonicalAuditEvents)
+      // Match eventId/action one-to-one in memory only. The artifact stores
+      // aggregate diagnostics; no event IDs, raw payloads or account IDs.
+      evaluation = evaluateMfaAuditDelivery(outboxRows, auditRows)
+      evidence.outboxEvents = evaluation.events
+        .filter((row) => row.totalCount > 0)
+        .map((row) => ({
+          eventType: row.eventType,
+          totalCount: row.totalCount,
+          publishedCount: row.publishedCount,
+          pendingCount: row.pendingCount,
+          failedCount: row.failedCount,
+          outboxSettled: row.outboxSettled,
+        }))
+      evidence.canonicalAuditEvents = evaluation.events
+        .filter((row) => row.canonicalAuditCount > 0)
+        .map((row) => ({ action: row.eventType, count: row.canonicalAuditCount }))
+      evidence.eventIdReconciliation = {
+        matchedEventIdCount: evaluation.totalMatchedEventIdCount,
+        unmatchedPublishedEventIdCount: evaluation.totalUnmatchedPublishedEventIdCount,
+        unmatchedCanonicalEventIdCount: evaluation.totalUnmatchedCanonicalEventIdCount,
+        duplicateOutboxEventIdCount: evaluation.totalDuplicateOutboxEventIdCount,
+        duplicateCanonicalEventIdCount: evaluation.totalDuplicateCanonicalEventIdCount,
+        wrongActionEventIdCount: evaluation.totalWrongActionEventIdCount,
+        invalidOutboxRowCount: evaluation.invalidOutboxRowCount,
+        invalidCanonicalRowCount: evaluation.invalidCanonicalRowCount,
+      }
+      evidence.scenarioSpecificCoverage = evaluation.scenarioSpecificCoverage
+      evidence.allTenEventTypesVerified = evaluation.allTenEventTypesVerified
       evidence.checks = evidence.checks.filter((entry) =>
         !entry.name.startsWith('required_event_') &&
         entry.name !== 'all_correlated_outbox_events_published' &&
-        entry.name !== 'canonical_w06_audit_rows_match_published_events')
+        entry.name !== 'canonical_w06_audit_event_ids_match_outbox_event_ids')
       evidence.checks.push(...evaluation.checks)
       evidence.pollingDurationMs = Date.now() - startedAt
       evidence.failureCode = null
@@ -265,8 +285,14 @@ async function main() {
     evidence.failureCode = lastErrorCode || 'MFA_AUDIT_DELIVERY_NOT_CONVERGED'
   }
   check('expected_w02_outbox_and_w06_audit_delivery_converged', evidence.status === 'PASS', {
-    correlatedOutboxStatusGroups: evidence.outboxEvents.length,
+    correlatedOutboxEventTypes: evidence.outboxEvents.length,
     canonicalAuditTypes: evidence.canonicalAuditEvents.length,
+    exactEventIdMatches: evidence.eventIdReconciliation?.matchedEventIdCount ?? 0,
+    eventIdMismatchCount:
+      (evidence.eventIdReconciliation?.unmatchedPublishedEventIdCount ?? 0) +
+      (evidence.eventIdReconciliation?.unmatchedCanonicalEventIdCount ?? 0),
+    allTenEventTypesVerified: evidence.allTenEventTypesVerified,
+    scenarioSpecificEventsObserved: evidence.scenarioSpecificCoverage.filter((item) => item.observedCount > 0).length,
     pollingDurationMs: evidence.pollingDurationMs,
   })
   if (evidence.status !== 'PASS' && evidence.failureCode) {
