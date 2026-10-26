@@ -282,7 +282,7 @@ async function main() {
       evidence.checks = evidence.checks.filter((entry) =>
         !entry.name.startsWith('required_event_') &&
         !entry.name.startsWith('correlated_mfa_operation_receipts_') &&
-        !entry.name.startsWith('mfa_operation_receipt_') &&
+        !entry.name.startsWith('mfa_operation_receipt') &&
         entry.name !== 'all_correlated_outbox_events_published' &&
         entry.name !== 'canonical_w06_audit_event_ids_match_outbox_event_ids' &&
         entry.name !== 'outbox_idempotency_keys_are_unique_and_valid' &&
