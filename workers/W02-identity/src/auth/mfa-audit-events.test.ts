@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { buildMfaAuditEvent, recordMfaAuditEventOnce } from './mfa-audit-events'
+import { buildMfaAuditEvent, buildMfaAuditOutboxInsert, recordMfaAuditEventOnce } from './mfa-audit-events'
 
 const input = {
   eventType: 'auth.mfa.locked' as const,
@@ -51,6 +51,33 @@ describe('AUTH-007 MFA audit event builder and idempotent writer', () => {
       challengeMethod: 'totp',
     })
     expect(JSON.stringify(event)).not.toMatch(/password|secret|recoveryCodes|backupCodes|\"code\"/)
+  })
+
+  it('sets publishedAt to the durable publication-intent time, distinct from occurredAt', () => {
+    const event = buildMfaAuditEvent(input)
+    expect(Date.parse(event.publishedAt)).toBeGreaterThan(Date.parse(event.occurredAt))
+    expect(event.occurredAt).toBe(input.occurredAt)
+    expect(event.publishedAt).not.toBe(event.occurredAt)
+  })
+
+  it('persists the same immutable publishedAt in the envelope and outbox created_at field', () => {
+    const event = buildMfaAuditEvent(input)
+    let boundValues: unknown[] = []
+    const db = {
+      prepare: vi.fn(() => ({
+        bind: (...values: unknown[]) => {
+          boundValues = values
+          return { run: vi.fn() }
+        },
+      })),
+    } as unknown as D1Database
+
+    buildMfaAuditOutboxInsert(db, event)
+    const storedPayload = JSON.parse(String(boundValues[7])) as typeof event
+    expect(storedPayload).toEqual(event)
+    expect(boundValues[11]).toBe(event.publishedAt)
+    expect(boundValues[12]).toBeNull()
+    expect(storedPayload.publishedAt).not.toBe(storedPayload.occurredAt)
   })
 
   it('inserts a lockout event once when its deterministic key is new', async () => {
