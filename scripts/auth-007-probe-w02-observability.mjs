@@ -682,17 +682,15 @@ export async function probeW02ScheduledObservability({
     probeW02EventTypeValues({ accountId, apiToken, now, fetchImpl }),
     probeW02ScheduledAnalytics({ accountId, apiToken, now, fetchImpl }),
   ])
-  // Observability is the primary log source. The separate GraphQL scheduled-
-  // invocation dataset provides an independent, read-only scheduler signal.
-  // A GraphQL error is never treated as scheduler evidence.
-  const scheduledExecutionObserved = stats.scheduledInvocations > 0 ||
-    stats.tickMarkerInvocations > 0 ||
-    safeCount(eventsView.scheduledEventRows) + safeCount(eventsView.cronEventRows) +
-      safeCount(eventsView.tickMarkerRows) > 0 ||
-    (eventTypeValues.eventTypeValuesStatus === 'PASS' &&
-      (eventTypeValues.eventTypeScheduledValuePresent || eventTypeValues.eventTypeCronValuePresent)) ||
-    (scheduledAnalytics.scheduledAnalyticsStatus === 'PASS' &&
-      safeCount(scheduledAnalytics.scheduledAnalyticsRows) > 0)
+  // This boolean gates potentially mutating live MFA E2E. Log markers and
+  // aggregate event-type Values only indicate that those labels exist; a generic
+  // scheduled row can also represent an invocation that failed or has unknown status.
+  // Require the independent, bounded W02 invocation dataset to contain at least one
+  // recent record whose Cloudflare status is explicitly successful. This is scheduler
+  // evidence only, not proof that MFA outbox events were delivered to W06.
+  const scheduledExecutionObserved =
+    scheduledAnalytics.scheduledAnalyticsStatus === 'PASS' &&
+    safeCount(scheduledAnalytics.scheduledAnalyticsSuccessfulRows) > 0
   return {
     status: 'PASS',
     category: 'NONE',
@@ -741,6 +739,8 @@ async function main() {
     ...[
       'scheduledAnalyticsStatus', 'scheduledAnalyticsCategory',
       'scheduledAnalyticsHttpStatus', 'scheduledAnalyticsRows',
+      'scheduledAnalyticsSuccessfulRows', 'scheduledAnalyticsFailedRows',
+      'scheduledAnalyticsUnknownStatusRows',
     ].map((key) => `${key[0].toLowerCase() + key.slice(1)}=${result[key] ?? (key.startsWith('scheduledAnalytics') ? 'NOT_RUN' : 0)}`),
   ]
   process.stdout.write(`W02_OBSERVABILITY_CRON_DIAGNOSTIC ${fields.join(' ')}\n`)
