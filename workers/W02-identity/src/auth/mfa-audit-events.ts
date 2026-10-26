@@ -162,7 +162,7 @@ export async function recordMfaAuditEventOnce(
   const event = buildMfaAuditEvent(input)
   const existing = await db.prepare(
     'SELECT event_id AS eventId, event_type AS eventType FROM auth_007_mfa_publication_journal WHERE idempotency_key = ? LIMIT 1',
-  ).bind(event.idempotencyKey).first<{ eventId: string }>()
+  ).bind(event.idempotencyKey).first<{ eventId: string; eventType: string }>()
   if (existing) {
     if (input.eventId && existing.eventId !== input.eventId) throw new Error('MFA_AUDIT_EVENT_ID_CONFLICT')
     if (existing.eventType !== event.eventType) throw new Error('MFA_AUDIT_EVENT_TYPE_CONFLICT')
