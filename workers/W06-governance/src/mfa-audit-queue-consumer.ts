@@ -19,6 +19,7 @@ const allowedResults = new Set(['started', 'succeeded', 'failed', 'rejected'])
 const eventIdPattern = /^evt_[a-f0-9]{32}$/
 const resourceIdPattern = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/
 const correlationPattern = /^[A-Za-z0-9._:-]{1,128}$/
+const idempotencyKeyPattern = /^[A-Za-z0-9._:-]{1,255}$/
 
 export type MfaAuditQueueEvent = {
   eventId: string
@@ -70,6 +71,7 @@ function assertMfaAuditEvent(value: unknown): asserts value is MfaAuditQueueEven
     !resourceIdPattern.test(event.resourceId as string) ||
     !correlationPattern.test(event.correlationId as string) ||
     !correlationPattern.test(event.causationId as string) ||
+    !idempotencyKeyPattern.test(event.idempotencyKey as string) ||
     !Number.isInteger(event.attempt) || event.attempt !== 1 ||
     !Number.isInteger(event.sourceVersion) || Number(event.sourceVersion) < 1 ||
     Number.isNaN(Date.parse(event.occurredAt as string)) ||
