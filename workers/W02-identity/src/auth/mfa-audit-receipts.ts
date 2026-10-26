@@ -1,5 +1,6 @@
 import {
   MFA_AUDIT_EVENT_NAMES,
+  deriveMfaAuditEventIdForIdempotencyKey,
   recordMfaAuditEventOnce,
   type MfaAuditEventName,
   type MfaAuditResult,
@@ -379,6 +380,10 @@ export async function reconcileMfaAuditOperationReceipts(
       let adoptedLegacyIdentity = false
       for (let index = 0; index < plan.length; index += 1) {
         const event = plan[index]!
+        const requestedEventId = event.eventType === 'auth.mfa.locked' &&
+          event.idempotencyKey.startsWith('mfa-lock:')
+          ? await deriveMfaAuditEventIdForIdempotencyKey(event.idempotencyKey)
+          : event.eventId
         const recorded = await recordMfaAuditEventOnce(db, {
           eventType: event.eventType,
           userId: row.resourceId,
@@ -390,7 +395,7 @@ export async function reconcileMfaAuditOperationReceipts(
           ...(event.factorState ? { factorState: event.factorState } : {}),
           ...(event.challengeMethod ? { challengeMethod: event.challengeMethod } : {}),
           idempotencyKey: event.idempotencyKey,
-          eventId: event.eventId,
+          eventId: requestedEventId,
         })
         if (recorded.eventId !== event.eventId) {
           plan[index] = { ...event, eventId: recorded.eventId }
