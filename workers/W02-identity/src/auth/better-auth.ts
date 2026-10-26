@@ -6,6 +6,7 @@ import { betterAuth } from 'better-auth'
 import { bearer, twoFactor } from 'better-auth/plugins'
 import { consumeTotpTimeStep, matchTotpTimeStep } from './totp-replay-guard.js'
 import { isActiveMfaSubject } from './mfa-challenge-account-state.js'
+import { isUnexpiredMfaChallengeRecord } from './mfa-challenge-verification.js'
 import { sendResendEmail } from './resend-email.js'
 import {
   appendMfaAuditOperationReceiptEvent,
@@ -189,11 +190,7 @@ const buildLuckReadAuth = (env: BetterAuthEnv) => {
           )
           if (signedChallenge) {
             const challenge = await ctx.context.internalAdapter.findVerificationValue(signedChallenge)
-            if (
-              challenge &&
-              typeof challenge.value === 'string' &&
-              Date.parse(String(challenge.expiresAt)) > Date.now()
-            ) {
+            if (isUnexpiredMfaChallengeRecord(challenge)) {
               subjectId = challenge.value
               signedChallengeSubject = true
             }
