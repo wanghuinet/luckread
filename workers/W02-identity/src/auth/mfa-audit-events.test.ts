@@ -132,6 +132,25 @@ describe('AUTH-007 MFA audit event builder and idempotent writer', () => {
     })).toThrow('invalid MFA audit operation id for event type')
   })
 
+  it('rejects payload values that the canonical W06 consumer would reject', () => {
+    expect(() => buildMfaAuditEvent({
+      ...input,
+      reasonCode: 'lowercase reason',
+    })).toThrow('invalid MFA audit reason code')
+    expect(() => buildMfaAuditEvent({
+      ...input,
+      factorState: 'UNKNOWN' as never,
+    })).toThrow('invalid MFA audit factor state')
+    expect(() => buildMfaAuditEvent({
+      ...input,
+      challengeMethod: 'sms' as never,
+    })).toThrow('invalid MFA audit challenge method')
+    expect(() => buildMfaAuditEvent({
+      ...input,
+      result: 'unknown' as never,
+    })).toThrow('invalid MFA audit result')
+  })
+
   it('preserves a receipt-assigned eventId through the outbox envelope', () => {
     const eventId = 'evt_0123456789abcdef0123456789abcdef'
     const event = buildMfaAuditEvent({ ...input, eventId })
