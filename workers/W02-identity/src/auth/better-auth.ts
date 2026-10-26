@@ -252,11 +252,24 @@ const buildLuckReadAuth = (env: BetterAuthEnv) => {
               idempotencyKey: `mfa-operation:${receiptId}:auth.mfa.replay_rejected`,
               occurredAt: new Date().toISOString(),
             })
+            // This rejection is decided inside the before hook, so finalize its
+            // durable audit plan here instead of depending on an after hook that
+            // may not run when the hook itself throws.
+            await finalizeMfaAuditOperationReceipt(env.D1_01, receiptId, [])
           } catch {
             throw APIError.from('INTERNAL_SERVER_ERROR', {
               code: 'MFA_AUDIT_UNAVAILABLE',
               message: 'TOTP verification is temporarily unavailable',
             })
+          }
+          try {
+            await reconcileMfaAuditOperationReceipts(env.D1_01)
+          } catch {
+            // The READY receipt remains durable and the existing Cron retries it.
+            console.error(JSON.stringify({
+              event: 'auth.mfa.audit_receipt_reconcile_failed',
+              code: 'MFA_AUDIT_RECEIPT_RECONCILE_FAILED',
+            }))
           }
           throw APIError.from('UNAUTHORIZED', { code: 'INVALID_CODE', message: 'Invalid code' })
         }
