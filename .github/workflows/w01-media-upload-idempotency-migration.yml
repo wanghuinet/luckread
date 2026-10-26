@@ -216,8 +216,8 @@ jobs:
         id: binding_contract
         if: steps.preflight.outcome == 'success'
         env:
-          SOURCE_SHA: \${{ inputs.source_sha }}
-          DATABASE_NAME: \${{ inputs.database_name }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          DATABASE_NAME: ${{ inputs.database_name }}
         working-directory: workers/W01-payload
         run: |
           set -euo pipefail
@@ -249,16 +249,16 @@ jobs:
           if (config.env?.production) {
             errors.push('Unexpected named production environment could select a different binding set')
           }
-          if (!/db:\\s*sqliteD1Adapter\\(\\s*\\{\\s*binding:\\s*cloudflare\\.env\\.D1,/s.test(payloadConfig)) {
+          if (!/db:\s*sqliteD1Adapter\(\s*\{\s*binding:\s*cloudflare\.env\.D1,/s.test(payloadConfig)) {
             errors.push('Payload sqliteD1Adapter is not bound directly to cloudflare.env.D1')
           }
-          if (!/const isExplicitRemoteMigration = process\\.env\\.PAYLOAD_MIGRATION_REMOTE === 'true'/.test(payloadConfig)) {
+          if (!/const isExplicitRemoteMigration = process\.env\.PAYLOAD_MIGRATION_REMOTE === 'true'/.test(payloadConfig)) {
             errors.push('Payload config is missing the explicit remote-migration switch')
           }
-          if (!/remoteBindings:\\s*isProduction\\s*&&\\s*\\(isPayloadCLI\\s*\\|\\|\\s*isExplicitRemoteMigration\\)/s.test(payloadConfig)) {
+          if (!/remoteBindings:\s*isProduction\s*&&\s*\(isPayloadCLI\s*\|\|\s*isExplicitRemoteMigration\)/s.test(payloadConfig)) {
             errors.push('Payload remote binding selection no longer matches the reviewed production migration contract')
           }
-          if (!/environment:\\s*process\\.env\\.CLOUDFLARE_ENV/.test(payloadConfig)) {
+          if (!/environment:\s*process\.env\.CLOUDFLARE_ENV/.test(payloadConfig)) {
             errors.push('Payload Wrangler environment resolution changed; refusing to assume base-config selection')
           }
 
@@ -290,13 +290,13 @@ jobs:
             expectedDatabaseId,
             expectedDatabaseName,
             namedProductionEnvironment: Boolean(config.env?.production),
-            payloadAdapterBoundToCloudflareEnvD1: /db:\\s*sqliteD1Adapter\\(\\s*\\{\\s*binding:\\s*cloudflare\\.env\\.D1,/s.test(payloadConfig),
-            explicitRemoteMigrationGatePresent: /const isExplicitRemoteMigration = process\\.env\\.PAYLOAD_MIGRATION_REMOTE === 'true'/.test(payloadConfig),
-            remoteBindingGatePresent: /remoteBindings:\\s*isProduction\\s*&&\\s*\\(isPayloadCLI\\s*\\|\\|\\s*isExplicitRemoteMigration\\)/s.test(payloadConfig),
+            payloadAdapterBoundToCloudflareEnvD1: /db:\s*sqliteD1Adapter\(\s*\{\s*binding:\s*cloudflare\.env\.D1,/s.test(payloadConfig),
+            explicitRemoteMigrationGatePresent: /const isExplicitRemoteMigration = process\.env\.PAYLOAD_MIGRATION_REMOTE === 'true'/.test(payloadConfig),
+            remoteBindingGatePresent: /remoteBindings:\s*isProduction\s*&&\s*\(isPayloadCLI\s*\|\|\s*isExplicitRemoteMigration\)/s.test(payloadConfig),
             runtimeProxyProbe: 'not used; direct remote D1 identity plus exact source configuration are validated',
             errors,
           }
-          writeFileSync(dir + '/payload-d1-config-preflight.json', JSON.stringify(evidence, null, 2) + '\\n')
+          writeFileSync(dir + '/payload-d1-config-preflight.json', JSON.stringify(evidence, null, 2) + '\n')
           console.log(JSON.stringify(evidence, null, 2))
           if (errors.length) throw new Error('W01_PAYLOAD_D1_CONFIG_CONTRACT_PREFLIGHT_BLOCKED')
           NODE
