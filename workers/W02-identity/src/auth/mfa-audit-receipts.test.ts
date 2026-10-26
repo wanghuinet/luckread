@@ -32,6 +32,7 @@ function createDb() {
   let failNextReceiptInsertAfterCommit = false
   let failNextReceiptAppendAfterCommit = false
   let failNextReceiptEmissionAfterCommit = false
+  let failNextReceiptUnknownAfterCommit = false
   const prepare = vi.fn((sql: string) => ({
     bind: (...args: unknown[]) => ({
       run: async () => {
@@ -160,6 +161,10 @@ function createDb() {
           row.status = String(status)
           row.lastErrorCode = String(errorCode)
           row.nextAttemptAt = null
+          if (status === 'UNKNOWN' && failNextReceiptUnknownAfterCommit) {
+            failNextReceiptUnknownAfterCommit = false
+            throw new Error('synthetic D1 response loss after receipt UNKNOWN commit')
+          }
           return { success: true, meta: { changes: 1 } }
         }
 
@@ -278,6 +283,7 @@ function createDb() {
     failNextReceiptInsertAfterCommit: () => { failNextReceiptInsertAfterCommit = true },
     failNextReceiptAppendAfterCommit: () => { failNextReceiptAppendAfterCommit = true },
     failNextReceiptEmissionAfterCommit: () => { failNextReceiptEmissionAfterCommit = true },
+    failNextReceiptUnknownAfterCommit: () => { failNextReceiptUnknownAfterCommit = true },
   }
 }
 
@@ -832,6 +838,49 @@ describe('AUTH-007 durable MFA operation receipts', () => {
         },
       }),
     })
+
+    await expect(reconcileMfaAuditOperationReceipts(store.db, startedAt)).resolves.toEqual({
+      selected: 1,
+      emitted: 0,
+      failed: 0,
+      unknown: 1,
+    })
+    expect(store.receipts.get(receiptId)?.status).toBe('UNKNOWN')
+    expect(store.receipts.get(receiptId)?.lastErrorCode).toBe('OUTBOX_PREVIOUSLY_FAILED')
+  })
+
+  it('reads back UNKNOWN after a permanent outbox failure commits its terminal transition', async () => {
+    const idempotencyKey = 'mfa-lock:user-123:1792850400000'
+    const eventId = await deriveMfaAuditEventIdForIdempotencyKey(idempotencyKey)
+    const receiptId = await createMfaAuditOperationReceipt(store.db, {
+      userId: 'user-123',
+      operationPath: '/two-factor/verify-totp',
+      isChallenge: true,
+      now: startedAt,
+    })
+    await finalizeMfaAuditOperationReceipt(store.db, receiptId, [{
+      eventType: 'auth.mfa.locked',
+      eventId,
+      result: 'rejected',
+      reasonCode: 'VERIFICATION_LOCKOUT',
+      idempotencyKey,
+      occurredAt: startedAt,
+    }], startedAt)
+    store.outbox.set(idempotencyKey, {
+      eventId,
+      status: 'FAILED',
+      payload: JSON.stringify({
+        eventId,
+        eventType: 'auth.mfa.locked',
+        resourceId: 'user-123',
+        payload: {
+          operationId: 'authMfaChallengeVerify',
+          result: 'rejected',
+          reasonCode: 'VERIFICATION_LOCKOUT',
+        },
+      }),
+    })
+    store.failNextReceiptUnknownAfterCommit()
 
     await expect(reconcileMfaAuditOperationReceipts(store.db, startedAt)).resolves.toEqual({
       selected: 1,
