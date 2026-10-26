@@ -88,4 +88,6 @@ test('media upload success is reported only when every attachment is ready', () 
   expect(composer).toContain('uploadResults.every(Boolean)');
   expect(composer).toContain('Some media uploads failed. Retry failed files before publishing.');
   expect(composer).toContain('Media upload failed. Retry this file before publishing.');
+  expect(composer).toContain('const allReady = succeeded && assets.every((candidate) =>');
+  expect(composer).toContain('Retry any remaining failed media before publishing.');
 });
