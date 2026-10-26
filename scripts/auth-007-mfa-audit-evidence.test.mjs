@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
   evaluateMfaAuditDelivery,
+  evaluateMfaOperationReceiptStates,
   REQUIRED_MFA_AUDIT_EVENT_TYPES,
   SCENARIO_SPECIFIC_MFA_AUDIT_EVENT_TYPES,
 } from './auth-007-mfa-audit-evidence.mjs'
@@ -21,6 +22,49 @@ const audit = outbox.map((row) => ({
   targetType: 'User',
   targetId: row.resourceId,
 }))
+
+test('accepts correlated operation receipts only when every row is terminal and error-free', () => {
+  const result = evaluateMfaOperationReceiptStates([
+    { status: 'EMITTED', lastErrorCode: null },
+    { status: 'RESOLVED', lastErrorCode: null },
+  ])
+  assert.equal(result.pass, true)
+  assert.equal(result.totalCount, 2)
+  assert.equal(result.emittedCount, 1)
+  assert.equal(result.resolvedCount, 1)
+  assert.equal(result.startedCount, 0)
+  assert.equal(result.readyCount, 0)
+  assert.equal(result.unknownCount, 0)
+  assert.equal(result.invalidStatusCount, 0)
+  assert.equal(result.nonEmptyErrorCodeCount, 0)
+})
+
+test('blocks missing, STARTED, READY, UNKNOWN, malformed or error-bearing operation receipts', () => {
+  const missing = evaluateMfaOperationReceiptStates([])
+  const unsettled = evaluateMfaOperationReceiptStates([
+    { status: 'STARTED', lastErrorCode: null },
+    { status: 'READY', lastErrorCode: null },
+    { status: 'UNKNOWN', lastErrorCode: 'OUTBOX_FAILED' },
+  ])
+  const malformed = evaluateMfaOperationReceiptStates([
+    { status: 'DONE', lastErrorCode: null },
+    { status: 'EMITTED', lastErrorCode: 'STALE_ERROR' },
+    null,
+  ])
+
+  assert.equal(missing.pass, false)
+  assert.equal(missing.checks[0]?.pass, false)
+  assert.equal(unsettled.pass, false)
+  assert.equal(unsettled.startedCount, 1)
+  assert.equal(unsettled.readyCount, 1)
+  assert.equal(unsettled.unknownCount, 1)
+  assert.equal(unsettled.nonEmptyErrorCodeCount, 1)
+  assert.equal(malformed.pass, false)
+  assert.equal(malformed.invalidStatusCount, 2)
+  assert.equal(malformed.nonEmptyErrorCodeCount, 1)
+  assert.equal(JSON.stringify({ missing, unsettled, malformed }).includes('OUTBOX_FAILED'), false,
+    'receipt error values must never be copied into the aggregate evaluator result')
+})
 
 test('accepts core-path delivery only when every published eventId maps to exactly one W06 action', () => {
   const result = evaluateMfaAuditDelivery(outbox, audit)
