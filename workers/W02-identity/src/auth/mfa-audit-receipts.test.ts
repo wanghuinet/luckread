@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { deriveMfaAuditEventIdForIdempotencyKey } from './mfa-audit-events'
 import {
   appendMfaAuditOperationReceiptEvent,
   createMfaAuditOperationReceipt,
@@ -165,8 +166,27 @@ function createDb() {
         if (sql.includes('FROM auth_007_mfa_publication_journal WHERE idempotency_key = ?')) {
           const row = outbox.get(String(args[0]))
           if (!row) return null
-          const payload = JSON.parse(row.payload) as { eventType: string; payload: { operationId: string } }
-          return { eventId: row.eventId, eventType: payload.eventType, operationId: payload.payload.operationId }
+          const payload = JSON.parse(row.payload) as {
+            eventType: string
+            resourceId: string
+            payload: {
+              operationId: string
+              result: string
+              reasonCode?: string
+              factorState?: string
+              challengeMethod?: string
+            }
+          }
+          return {
+            eventId: row.eventId,
+            eventType: payload.eventType,
+            resourceId: payload.resourceId,
+            operationId: payload.payload.operationId,
+            result: payload.payload.result,
+            reasonCode: payload.payload.reasonCode ?? null,
+            factorState: payload.payload.factorState ?? null,
+            challengeMethod: payload.payload.challengeMethod ?? null,
+          }
         }
         throw new Error('Unhandled test SQL first: ' + sql)
       },
@@ -411,6 +431,46 @@ describe('AUTH-007 durable MFA operation receipts', () => {
     expect(store.receipts.get(receiptId)?.status).toBe('UNKNOWN')
     expect(store.receipts.get(receiptId)?.lastErrorCode).toBe('OUTCOME_NOT_FINALIZED')
     expect(store.outbox.size).toBe(0)
+  })
+
+
+  it('reconciles the same lockout window across multiple receipts with one stable event id', async () => {
+    const idempotencyKey = 'mfa-lock:user-123:1792850400000'
+    const eventId = await deriveMfaAuditEventIdForIdempotencyKey(idempotencyKey)
+    const event: MfaAuditReceiptEvent = {
+      eventType: 'auth.mfa.locked',
+      eventId,
+      result: 'rejected',
+      reasonCode: 'VERIFICATION_LOCKOUT',
+      challengeMethod: 'totp',
+      idempotencyKey,
+      occurredAt: startedAt,
+    }
+    const firstReceiptId = await createMfaAuditOperationReceipt(store.db, {
+      userId: 'user-123',
+      operationPath: '/two-factor/verify-totp',
+      isChallenge: true,
+      now: startedAt,
+    })
+    const secondReceiptId = await createMfaAuditOperationReceipt(store.db, {
+      userId: 'user-123',
+      operationPath: '/two-factor/verify-totp',
+      isChallenge: true,
+      now: '2026-10-26T12:00:01.000Z',
+    })
+    await finalizeMfaAuditOperationReceipt(store.db, firstReceiptId, [event], startedAt)
+    await finalizeMfaAuditOperationReceipt(store.db, secondReceiptId, [event], '2026-10-26T12:00:01.000Z')
+
+    await expect(reconcileMfaAuditOperationReceipts(store.db, startedAt)).resolves.toEqual({
+      selected: 2,
+      emitted: 2,
+      failed: 0,
+      unknown: 0,
+    })
+    expect(store.receipts.get(firstReceiptId)?.status).toBe('EMITTED')
+    expect(store.receipts.get(secondReceiptId)?.status).toBe('EMITTED')
+    expect(store.outbox.size).toBe(1)
+    expect([...store.outbox.values()][0]?.eventId).toBe(eventId)
   })
 
   it('retains two distinct events for a successful recovery-code login challenge', async () => {
