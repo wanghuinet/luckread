@@ -324,6 +324,26 @@ function retryDelaySeconds(attempt: number): number {
   return Math.min(2 ** Math.max(0, attempt), maxBackoffSeconds)
 }
 
+function terminalMfaOutboxErrorCode(error: unknown): string | null {
+  if (!(error instanceof Error)) return null
+  switch (error.message) {
+    case 'MFA_AUDIT_OUTBOX_PREVIOUSLY_FAILED':
+      return 'OUTBOX_PREVIOUSLY_FAILED'
+    case 'MFA_AUDIT_EVENT_ID_CONFLICT':
+      return 'OUTBOX_EVENT_ID_CONFLICT'
+    case 'MFA_AUDIT_EVENT_ACTION_CONFLICT':
+      return 'OUTBOX_ACTION_CONFLICT'
+    case 'MFA_AUDIT_EVENT_INTENT_CONFLICT':
+      return 'OUTBOX_INTENT_CONFLICT'
+    case 'MFA_AUDIT_OUTBOX_STATUS_INVALID':
+      return 'OUTBOX_STATUS_INVALID'
+    case 'MFA_AUDIT_RECEIPT_IDENTITY_RECONCILIATION_FAILED':
+      return 'RECEIPT_IDENTITY_CONFLICT'
+    default:
+      return null
+  }
+}
+
 /**
  * Reconcile the receipt journal on the existing W02 Cron path. A receipt is
  * EMITTED only after every event has a durable, idempotent W02 outbox row.
@@ -444,14 +464,37 @@ export async function reconcileMfaAuditOperationReceipts(
           throw new Error('MFA_AUDIT_RECEIPT_MARK_EMITTED_FAILED')
         }
       }
-    } catch {
+    } catch (error) {
+      const terminalErrorCode = terminalMfaOutboxErrorCode(error)
+      if (terminalErrorCode) {
+        try {
+          const terminal = await db.prepare(
+            'UPDATE auth_007_mfa_operation_receipts SET status = ?, next_attempt_at = NULL, ' +
+            'last_error_code = ? WHERE receipt_id = ? AND status = ?',
+          ).bind('UNKNOWN', terminalErrorCode, row.receiptId, 'READY').run()
+          if (terminal.success && terminal.meta?.changes === 1) {
+            unknown += 1
+            continue
+          }
+          const latest = await loadReceipt(db, row.receiptId)
+          if (latest.status === 'UNKNOWN') {
+            unknown += 1
+            continue
+          }
+          if (latest.status === 'EMITTED' || latest.status === 'RESOLVED') continue
+        } catch {
+          // If the terminal transition cannot be proven, keep the receipt
+          // retryable and observable instead of assuming the transition worked.
+        }
+      }
+
       const delay = retryDelaySeconds(row.attempt)
       const nextAttemptAt = new Date(Date.parse(now) + delay * 1000).toISOString()
       try {
         await db.prepare(
           'UPDATE auth_007_mfa_operation_receipts SET attempt = attempt + 1, next_attempt_at = ?, ' +
           'last_error_code = ? WHERE receipt_id = ? AND status = ?',
-        ).bind(nextAttemptAt, 'OUTBOX_WRITE_FAILED', row.receiptId, 'READY').run()
+        ).bind(nextAttemptAt, terminalErrorCode ?? 'OUTBOX_WRITE_FAILED', row.receiptId, 'READY').run()
       } catch {
         // Leave READY durable so the next scheduled tick can retry it.
       }
