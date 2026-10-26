@@ -3,6 +3,14 @@ name: W01 Media Upload Idempotency Migration
 on:
   workflow_dispatch:
     inputs:
+      mode:
+        description: Read-only binding proof or an explicitly confirmed schema migration
+        required: true
+        type: choice
+        options:
+          - preflight-only
+          - apply
+        default: preflight-only
       source_sha:
         description: Exact immutable main commit containing the admitted migration source
         required: true
@@ -30,7 +38,7 @@ env:
 
 jobs:
   execute:
-    if: ${{ inputs.confirm == 'APPLY_MEDIA_UPLOAD_IDEMPOTENCY_MIGRATION' && github.ref == 'refs/heads/main' && github.ref_protected == true }}
+    if: ${{ github.ref == 'refs/heads/main' && github.ref_protected == true && (inputs.mode == 'preflight-only' || (inputs.mode == 'apply' && inputs.confirm == 'APPLY_MEDIA_UPLOAD_IDEMPOTENCY_MIGRATION')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -39,12 +47,20 @@ jobs:
           SOURCE_SHA: ${{ inputs.source_sha }}
           DATABASE_NAME: ${{ inputs.database_name }}
           CONFIRM: ${{ inputs.confirm }}
+          MODE: ${{ inputs.mode }}
         run: |
           set -euo pipefail
           test "$DATABASE_NAME" = "luckread"
-          test "$CONFIRM" = "APPLY_MEDIA_UPLOAD_IDEMPOTENCY_MIGRATION"
           test "$GITHUB_REF" = "refs/heads/main"
           test "$GITHUB_REF_PROTECTED" = "true"
+          if [[ "$MODE" == "apply" ]]; then
+            test "$CONFIRM" = "APPLY_MEDIA_UPLOAD_IDEMPOTENCY_MIGRATION"
+          elif [[ "$MODE" == "preflight-only" ]]; then
+            echo "READ_ONLY_PREFLIGHT_ONLY: schema migration must not run"
+          else
+            echo "Invalid mode; use preflight-only or apply" >&2
+            exit 1
+          fi
           if ! [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]; then
             echo "source_sha must be a full 40-character commit SHA" >&2
             exit 1
@@ -281,7 +297,8 @@ jobs:
           NODE
 
       - name: Execute the single admitted migration
-        if: steps.preflight.outputs.decision == 'RUN_REQUIRED'
+        id: execute_migration
+        if: inputs.mode == 'apply' && steps.preflight.outputs.decision == 'RUN_REQUIRED'
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -291,8 +308,17 @@ jobs:
         working-directory: workers/W01-payload
         run: pnpm exec payload migrate
 
+      - name: Assert read-only preflight did not invoke migration
+        if: inputs.mode == 'preflight-only'
+        env:
+          MIGRATION_OUTCOME: ${{ steps.execute_migration.outcome }}
+        run: |
+          set -euo pipefail
+          test "$MIGRATION_OUTCOME" = "skipped"
+          echo "PASS: preflight-only mode did not execute Payload migration"
+
       - name: Verify exact post-migration state
-        if: always() && steps.preflight.outcome == 'success'
+        if: inputs.mode == 'apply' && always() && steps.preflight.outcome == 'success'
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -359,6 +385,7 @@ jobs:
         env:
           SOURCE_SHA: ${{ inputs.source_sha }}
           DATABASE_NAME: ${{ inputs.database_name }}
+          MODE: ${{ inputs.mode }}
         run: |
           set -euo pipefail
           mkdir -p artifacts/evidence/w01-media-upload-idempotency
@@ -374,7 +401,8 @@ jobs:
               databaseName: process.env.DATABASE_NAME,
               expectedDatabaseId: process.env.EXPECTED_DATABASE_ID,
               migration: process.env.TARGET_MIGRATION,
-              environment: 'CONTROLLED_REMOTE_D1',
+              mode: process.env.MODE,
+              environment: process.env.MODE === 'apply' ? 'CONTROLLED_REMOTE_D1' : 'READ_ONLY_PREFLIGHT_ONLY',
             }, null, 2) + '\n',
           )
           NODE
