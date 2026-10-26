@@ -328,6 +328,89 @@ async function probeW02EventsView({ accountId, apiToken, now, fetchImpl }) {
   }
 }
 
+async function probeW02EventTypeValues({ accountId, apiToken, now, fetchImpl }) {
+  const empty = {
+    eventTypeDistinctValues: 0,
+    eventTypeFetchValuePresent: false,
+    eventTypeScheduledValuePresent: false,
+    eventTypeCronValuePresent: false,
+    eventTypeQueueValuePresent: false,
+  }
+  const failure = (category, httpStatus = 'NONE') => ({
+    eventTypeValuesStatus: 'FAIL',
+    eventTypeValuesCategory: category,
+    eventTypeValuesHttpStatus: httpStatus,
+    ...empty,
+  })
+  let response
+  try {
+    response = await fetchImpl(
+      'https://api.cloudflare.com/client/v4/accounts/' + accountId + '/workers/observability/telemetry/values',
+      {
+        method: 'POST',
+        headers: {
+          authorization: 'Bearer ' + apiToken,
+          accept: 'application/json',
+          'content-type': 'application/json',
+        },
+        cache: 'no-store',
+        signal: AbortSignal.timeout(15_000),
+        body: JSON.stringify({
+          datasets: ['cloudflare-workers'],
+          key: '$workers.eventType',
+          timeframe: { from: now - WINDOW_MS, to: now },
+          type: 'string',
+          filters: [W02_SCRIPT_FILTER],
+          limit: MAX_INVOCATIONS,
+        }),
+      },
+    )
+  } catch {
+    return failure(CATEGORIES.NETWORK)
+  }
+
+  if (!response.ok) {
+    const category = response.status === 401 || response.status === 403
+      ? CATEGORIES.AUTH
+      : response.status === 404
+        ? CATEGORIES.SCOPE
+        : response.status === 429
+          ? CATEGORIES.RATE
+          : response.status >= 500
+            ? CATEGORIES.API
+            : CATEGORIES.HTTP
+    return failure(category, response.status)
+  }
+
+  let payload
+  try { payload = await response.json() } catch {
+    return failure(CATEGORIES.RESPONSE, response.status)
+  }
+
+  const rows = payload?.success === true && Array.isArray(payload.result)
+    ? payload.result.slice(0, MAX_INVOCATIONS)
+    : null
+  if (!rows) return failure(CATEGORIES.RESPONSE, response.status)
+
+  const eventTypes = new Set(
+    rows
+      .filter((row) => row && typeof row === 'object' &&
+        row.key === '$workers.eventType' && row.type === 'string' &&
+        typeof row.value === 'string')
+      .map((row) => row.value),
+  )
+  return {
+    eventTypeValuesStatus: 'PASS',
+    eventTypeValuesCategory: 'NONE',
+    eventTypeValuesHttpStatus: response.status,
+    eventTypeDistinctValues: eventTypes.size,
+    eventTypeFetchValuePresent: eventTypes.has('fetch'),
+    eventTypeScheduledValuePresent: eventTypes.has('scheduled'),
+    eventTypeCronValuePresent: eventTypes.has('cron'),
+    eventTypeQueueValuePresent: eventTypes.has('queue'),
+  }
+}
+
 /**
  * Query Cloudflare Workers Observability without opening a WebSocket tail.
  * Both queries are scoped server-side by the indexed W02 service name and the
@@ -434,13 +517,19 @@ export async function probeW02ScheduledObservability({
       ...safeInvocationStats({}),
     }
   }
-  const eventsView = await probeW02EventsView({ accountId, apiToken, now, fetchImpl })
-  // Query success is not proof that the scheduled handler ran. Publish a separate
-  // evidence boolean so callers can fail fast before mutating the live MFA QA account.
+  const [eventsView, eventTypeValues] = await Promise.all([
+    probeW02EventsView({ accountId, apiToken, now, fetchImpl }),
+    probeW02EventTypeValues({ accountId, apiToken, now, fetchImpl }),
+  ])
+  // Query-view filters may return no rows when fields are indexed differently across
+  // views. Inspect the documented Values endpoint as independent evidence, still
+  // scoped to this Worker and the same bounded time window.
   const scheduledExecutionObserved = stats.scheduledInvocations > 0 ||
     stats.tickMarkerInvocations > 0 ||
     safeCount(eventsView.scheduledEventRows) + safeCount(eventsView.cronEventRows) +
-      safeCount(eventsView.tickMarkerRows) > 0
+      safeCount(eventsView.tickMarkerRows) > 0 ||
+    (eventTypeValues.eventTypeValuesStatus === 'PASS' &&
+      (eventTypeValues.eventTypeScheduledValuePresent || eventTypeValues.eventTypeCronValuePresent))
   return {
     status: 'PASS',
     category: 'NONE',
@@ -448,6 +537,7 @@ export async function probeW02ScheduledObservability({
     windowMinutes: WINDOW_MS / 60_000,
     ...stats,
     ...eventsView,
+    ...eventTypeValues,
     scheduledExecutionObserved,
   }
 }
@@ -477,6 +567,11 @@ async function main() {
       'tickMarkerRows', 'resultMarkerRows', 'taskFailureMarkerRows', 'stageFailureMarkerRows',
       'eventMfaSummaryLogs', 'eventSelected', 'eventPublished', 'eventFailed',
     ].map((key) => `${key[0].toLowerCase() + key.slice(1)}=${result[key] ?? (key.startsWith('eventView') ? 'NOT_RUN' : 0)}`),
+    ...[
+      'eventTypeValuesStatus', 'eventTypeValuesCategory', 'eventTypeValuesHttpStatus',
+      'eventTypeDistinctValues', 'eventTypeFetchValuePresent', 'eventTypeScheduledValuePresent',
+      'eventTypeCronValuePresent', 'eventTypeQueueValuePresent',
+    ].map((key) => `${key[0].toLowerCase() + key.slice(1)}=${result[key] ?? (key.startsWith('eventTypeValues') ? 'NOT_RUN' : false)}`),
   ]
   process.stdout.write(`W02_OBSERVABILITY_CRON_DIAGNOSTIC ${fields.join(' ')}\n`)
   if (result.status !== 'PASS') process.exitCode = 1

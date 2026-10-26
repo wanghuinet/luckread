@@ -21,6 +21,17 @@ describe('AUTH-007 read-only W02 scheduled Observability probe', () => {
       fetchImpl: async (url, init) => {
         const request = { url, init, body: JSON.parse(init.body) }
         observed.push(request)
+        if (url.endsWith('/values')) {
+          return response(200, {
+            success: true,
+            result: ['fetch', 'scheduled', 'cron', 'queue'].map((value) => ({
+              dataset: 'cloudflare-workers',
+              key: '$workers.eventType',
+              type: 'string',
+              value,
+            })),
+          })
+        }
         if (request.body.view === 'events') {
           return response(200, {
             success: true,
@@ -101,13 +112,25 @@ describe('AUTH-007 read-only W02 scheduled Observability probe', () => {
       },
     })
 
-    assert.equal(observed.length, 2)
-    assert.equal(observed[0].url, 'https://api.cloudflare.com/client/v4/accounts/0123456789abcdef0123456789abcdef/workers/observability/telemetry/query')
-    assert.equal(observed[0].init.method, 'POST')
-    assert.deepEqual(observed.map((request) => request.body.view), ['invocations', 'events'])
-    assert.equal(observed[0].body.queryId, 'auth007-w02-invocation-diagnostic')
-    assert.equal(observed[1].body.queryId, 'auth007-w02-event-diagnostic')
-    for (const request of observed) {
+    assert.equal(observed.length, 3)
+    const queryRequests = observed.filter((request) => request.url.endsWith('/query'))
+    const valuesRequest = observed.find((request) => request.url.endsWith('/values'))
+    assert.equal(queryRequests.length, 2)
+    assert.equal(queryRequests[0].url, 'https://api.cloudflare.com/client/v4/accounts/0123456789abcdef0123456789abcdef/workers/observability/telemetry/query')
+    assert.equal(queryRequests[0].init.method, 'POST')
+    assert.deepEqual(queryRequests.map((request) => request.body.view).sort(), ['events', 'invocations'])
+    assert.equal(queryRequests.find((request) => request.body.view === 'invocations').body.queryId, 'auth007-w02-invocation-diagnostic')
+    assert.equal(queryRequests.find((request) => request.body.view === 'events').body.queryId, 'auth007-w02-event-diagnostic')
+    assert.equal(valuesRequest.init.method, 'POST')
+    assert.deepEqual(valuesRequest.body, {
+      datasets: ['cloudflare-workers'],
+      key: '$workers.eventType',
+      timeframe: { from: valid.now - 1_800_000, to: valid.now },
+      type: 'string',
+      filters: [{ key: '$metadata.service', operation: 'starts_with', type: 'string', value: 'luckread-w02' }],
+      limit: 100,
+    })
+    for (const request of queryRequests) {
       assert.equal(request.body.dry, true)
       assert.equal(request.body.timeframe.to - request.body.timeframe.from, 1_800_000)
       assert.equal(request.body.limit, 100)
@@ -164,6 +187,14 @@ describe('AUTH-007 read-only W02 scheduled Observability probe', () => {
       eventSelected: 2,
       eventPublished: 2,
       eventFailed: 0,
+      eventTypeValuesStatus: 'PASS',
+      eventTypeValuesCategory: 'NONE',
+      eventTypeValuesHttpStatus: 200,
+      eventTypeDistinctValues: 4,
+      eventTypeFetchValuePresent: true,
+      eventTypeScheduledValuePresent: true,
+      eventTypeCronValuePresent: true,
+      eventTypeQueueValuePresent: true,
     })
     assert.equal(JSON.stringify(result).includes('must-not-escape'), false)
     assert.equal(JSON.stringify(result).includes('private-request-id'), false)
@@ -173,8 +204,13 @@ describe('AUTH-007 read-only W02 scheduled Observability probe', () => {
   it('distinguishes a visible W02 fetch invocation from missing scheduler evidence', async () => {
     const result = await probeW02ScheduledObservability({
       ...valid,
-      fetchImpl: async (_url, init) => {
+      fetchImpl: async (url, init) => {
         const body = JSON.parse(init.body)
+        if (url.endsWith('/values')) {
+          return response(200, { success: true, result: [{
+            dataset: 'cloudflare-workers', key: '$workers.eventType', type: 'string', value: 'fetch',
+          }] })
+        }
         if (body.view === 'events') {
           return response(200, {
             success: true,
@@ -214,8 +250,9 @@ describe('AUTH-007 read-only W02 scheduled Observability probe', () => {
   it('accepts the explicit W02 tick marker as scheduler evidence when eventType metadata is missing', async () => {
     const result = await probeW02ScheduledObservability({
       ...valid,
-      fetchImpl: async (_url, init) => {
+      fetchImpl: async (url, init) => {
         const body = JSON.parse(init.body)
+        if (url.endsWith('/values')) return response(200, { success: true, result: [] })
         if (body.view === 'events') {
           return response(200, {
             success: true,
@@ -243,6 +280,38 @@ describe('AUTH-007 read-only W02 scheduled Observability probe', () => {
     })
     assert.equal(result.scheduledInvocations, 0)
     assert.equal(result.tickMarkerRows, 1)
+    assert.equal(result.scheduledExecutionObserved, true)
+  })
+
+  it('uses the bounded Values endpoint when both query views return no rows', async () => {
+    const result = await probeW02ScheduledObservability({
+      ...valid,
+      fetchImpl: async (url, init) => {
+        if (url.endsWith('/values')) {
+          const body = JSON.parse(init.body)
+          assert.equal(body.key, '$workers.eventType')
+          assert.deepEqual(body.filters, [
+            { key: '$metadata.service', operation: 'starts_with', type: 'string', value: 'luckread-w02' },
+          ])
+          return response(200, {
+            success: true,
+            result: [{
+              dataset: 'cloudflare-workers',
+              key: '$workers.eventType',
+              type: 'string',
+              value: 'scheduled',
+            }],
+          })
+        }
+        const body = JSON.parse(init.body)
+        if (body.view === 'events') return response(200, { success: true, result: { events: { events: [] } } })
+        return response(200, { success: true, result: { invocations: {} } })
+      },
+    })
+    assert.equal(result.w02InvocationGroups, 0)
+    assert.equal(result.queriedEventRows, 0)
+    assert.equal(result.eventTypeValuesStatus, 'PASS')
+    assert.equal(result.eventTypeScheduledValuePresent, true)
     assert.equal(result.scheduledExecutionObserved, true)
   })
 
