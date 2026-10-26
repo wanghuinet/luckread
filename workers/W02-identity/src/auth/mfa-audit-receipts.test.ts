@@ -289,6 +289,55 @@ describe('AUTH-007 durable MFA operation receipts', () => {
     expect(store.outbox.size).toBe(0)
   })
 
+  it('rejects a retry that changes the durable result under the same idempotency key', async () => {
+    const receiptId = await createMfaAuditOperationReceipt(store.db, {
+      userId: 'user-123',
+      operationPath: '/two-factor/verify-totp',
+      isChallenge: true,
+      now: startedAt,
+    })
+    const idempotencyKey = `mfa-operation:${receiptId}:auth.mfa.challenge_failed`
+    await appendMfaAuditOperationReceiptEvent(store.db, receiptId, {
+      eventType: 'auth.mfa.challenge_failed',
+      result: 'failed',
+      reasonCode: 'CHALLENGE_REJECTED',
+      challengeMethod: 'totp',
+      idempotencyKey,
+      occurredAt: startedAt,
+    })
+
+    await expect(finalizeMfaAuditOperationReceipt(store.db, receiptId, [{
+      eventType: 'auth.mfa.challenge_failed',
+      result: 'succeeded',
+      reasonCode: 'CHALLENGE_VERIFIED',
+      challengeMethod: 'totp',
+      idempotencyKey,
+      occurredAt: startedAt,
+    }], startedAt)).rejects.toThrow('MFA_AUDIT_EVENT_IDEMPOTENCY_CONFLICT')
+    expect(store.receipts.get(receiptId)?.status).toBe('STARTED')
+    expect(store.outbox.size).toBe(0)
+  })
+
+  it('rejects an explicitly supplied malformed eventId instead of replacing it', async () => {
+    const receiptId = await createMfaAuditOperationReceipt(store.db, {
+      userId: 'user-123',
+      operationPath: '/two-factor/verify-totp',
+      isChallenge: true,
+      now: startedAt,
+    })
+
+    await expect(finalizeMfaAuditOperationReceipt(store.db, receiptId, [{
+      eventType: 'auth.mfa.challenge_failed',
+      eventId: 'evt_not-valid',
+      result: 'failed',
+      reasonCode: 'CHALLENGE_REJECTED',
+      challengeMethod: 'totp',
+      occurredAt: startedAt,
+    }], startedAt)).rejects.toThrow('INVALID_MFA_AUDIT_RECEIPT_PLAN')
+    expect(store.receipts.get(receiptId)?.status).toBe('STARTED')
+    expect(store.outbox.size).toBe(0)
+  })
+
   it('persists the outcome before creating one idempotent outbox event', async () => {
     const receiptId = await createMfaAuditOperationReceipt(store.db, {
       userId: 'user-123',
