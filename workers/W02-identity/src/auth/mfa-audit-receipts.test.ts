@@ -25,6 +25,7 @@ function createDb() {
   const receipts = new Map<string, Receipt>()
   const outbox = new Map<string, { eventId: string; payload: string }>()
   let failNextOutboxInsert = false
+  let failNextReceiptInsertAfterCommit = false
   const prepare = vi.fn((sql: string) => ({
     bind: (...args: unknown[]) => ({
       run: async () => {
@@ -45,6 +46,10 @@ function createDb() {
             lastErrorCode: null,
           })
           expect(isChallenge === 0 || isChallenge === 1).toBe(true)
+          if (failNextReceiptInsertAfterCommit) {
+            failNextReceiptInsertAfterCommit = false
+            throw new Error('synthetic D1 response loss after receipt commit')
+          }
           return { success: true, meta: { changes: 1 } }
         }
 
@@ -188,6 +193,7 @@ function createDb() {
     receipts,
     outbox,
     failNextOutboxInsert: () => { failNextOutboxInsert = true },
+    failNextReceiptInsertAfterCommit: () => { failNextReceiptInsertAfterCommit = true },
   }
 }
 
@@ -204,6 +210,20 @@ describe('AUTH-007 durable MFA operation receipts', () => {
 
   beforeEach(() => {
     store = createDb()
+  })
+
+  it('read-backs a receipt when D1 commits the insert but its response is lost', async () => {
+    store.failNextReceiptInsertAfterCommit()
+
+    const receiptId = await createMfaAuditOperationReceipt(store.db, {
+      userId: 'user-123',
+      operationPath: '/two-factor/verify-totp',
+      isChallenge: true,
+      now: startedAt,
+    })
+
+    expect(store.receipts.get(receiptId)?.status).toBe('STARTED')
+    expect(store.receipts.size).toBe(1)
   })
 
   it('persists a secret-free operation intent before the caller can mutate MFA state', async () => {
