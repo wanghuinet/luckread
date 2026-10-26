@@ -169,6 +169,8 @@ async function verifyProtectedEnvironment({ requireDistinctActor = true } = {}) 
 const mfaMigrationPath = 'workers/W02-identity/migrations/0006_better_auth_two_factor.sql'
 const bootstrapMigrationPath = 'workers/W02-identity/migrations/0007_l8_genesis_bootstrap_audit.sql'
 const mfaAuditOutboxMigrationPath = 'workers/W02-identity/migrations/0008_auth_007_mfa_publication_journal.sql'
+const mfaAuditReceiptMigrationPath = 'workers/W02-identity/migrations/0009_auth_007_mfa_operation_receipts.sql'
+const mfaAuditReceiptContractPath = 'contracts/migration/AUTH-007-mfa-operation-receipt.v1.json'
 const mfaAuditBindingPath = 'contracts/events/AUTH-007-mfa-audit-binding.v1.json'
 const mfaAuditOutboxContractPath = 'contracts/migration/AUTH-007-mfa-publication-journal.v1.json'
 const logicalDataAuthorityPath = 'contracts/transport/logical-data-authority.v1.json'
@@ -179,11 +181,15 @@ const reconciliationPath = 'contracts/alignment/mapping-batches/AUTH-007-real-ev
 const betterAuthPath = 'workers/W02-identity/src/auth/better-auth.ts'
 const replayGuardPath = 'workers/W02-identity/src/auth/totp-replay-guard.ts'
 const policyPath = 'contracts/api/auth-operation-policy.v1.json'
+const rawAuthProxyRoutePath = 'workers/W01-payload/src/app/api/auth/[...segments]/route.ts'
+const rawAuthProxyTestPath = 'workers/W01-payload/tests/int/auth-raw-better-auth-proxy.int.spec.ts'
 
 for (const file of [
   mfaMigrationPath,
   bootstrapMigrationPath,
   mfaAuditOutboxMigrationPath,
+  mfaAuditReceiptMigrationPath,
+  mfaAuditReceiptContractPath,
   mfaAuditBindingPath,
   mfaAuditOutboxContractPath,
   logicalDataAuthorityPath,
@@ -193,6 +199,9 @@ for (const file of [
   reconciliationPath,
   betterAuthPath,
   replayGuardPath,
+  rawAuthProxyRoutePath,
+  'workers/W02-identity/src/auth/mfa-challenge-verification.ts',
+  'workers/W02-identity/src/auth/mfa-challenge-verification.test.ts',
   policyPath,
   '.github/workflows/auth-mfa-rollout-preflight.yml',
   ...protectedRefWorkflowPaths.filter((file) => file !== '.github/workflows/auth-mfa-rollout-preflight.yml'),
@@ -214,11 +223,15 @@ if (blockers.length === 0) {
   const migration = read(mfaMigrationPath)
   const bootstrapMigration = read(bootstrapMigrationPath)
   const mfaAuditOutboxMigration = read(mfaAuditOutboxMigrationPath)
+  const mfaAuditReceiptMigration = read(mfaAuditReceiptMigrationPath)
+  const mfaAuditReceiptMigrationNormalized = mfaAuditReceiptMigration.replace(/\s+/g, ' ')
+  const mfaAuditReceiptContract = JSON.parse(read(mfaAuditReceiptContractPath))
   const mfaAuditBinding = JSON.parse(read(mfaAuditBindingPath))
   const mfaAuditOutboxContract = JSON.parse(read(mfaAuditOutboxContractPath))
   const logicalDataAuthority = JSON.parse(read(logicalDataAuthorityPath))
   const betterAuth = read(betterAuthPath)
   const replayGuard = read(replayGuardPath)
+  const challengeVerification = read('workers/W02-identity/src/auth/mfa-challenge-verification.ts')
   const apiContract = JSON.parse(read(authContractPath))
   const factorContract = JSON.parse(read(factorContractPath))
   const lifecycle = JSON.parse(read(lifecyclePath))
@@ -230,6 +243,18 @@ if (blockers.length === 0) {
   const standaloneW01Workflow = read('.github/workflows/w01-payload-app-deploy.yml')
   const readOnlyPreflightWorkflow = read('.github/workflows/auth-mfa-rollout-preflight.yml')
   const w06DeployWorkflow = read('.github/workflows/w06-deploy.yml')
+  const rawAuthProxySource = read(rawAuthProxyRoutePath).replace(/\s+/g, ' ')
+  const rawAuthProxyTest = exists(rawAuthProxyTestPath) ? read(rawAuthProxyTestPath) : ''
+  // Static-only PR checks can run before the separate W01 route-hardening PR is
+  // merged. Any real rollout/preflight must prove the native catch-all is closed
+  // by default and has negative tests that prove W02 is never invoked.
+  const w01RawAuthProxyClosedByDefault = staticOnly || (
+    /const publicBetterAuthEndpointMethods: ReadonlyMap<string, ReadonlySet<string>> = new Map\(\)/.test(rawAuthProxySource) &&
+    /if \(!allowedMethods\?\.has\(request\.method\)\)/.test(rawAuthProxySource) &&
+    /fails closed for raw endpoint/.test(rawAuthProxyTest) &&
+    rawAuthProxyTest.includes('two-factor/verify-totp') &&
+    /mocks\.w02Fetch\)\.not\.toHaveBeenCalled\(\)/.test(rawAuthProxyTest)
+  )
   const protectedRefCallSitesConfigured = protectedRefWorkflowPaths.every((file) =>
     /GITHUB_REF_PROTECTED:\s*\$\{\{\s*github\.ref_protected\s*\}\}/.test(read(file))
   )
@@ -261,6 +286,15 @@ if (blockers.length === 0) {
     'auth.mfa.enrollment_started',
     'auth_007_mfa_publication_journal_status_next_attempt_idx',
   ]
+  const requiredMfaAuditReceiptTokens = [
+    'CREATE TABLE auth_007_mfa_operation_receipts',
+    "CHECK (is_challenge IN (0, 1))",
+    'json_valid(event_plan)',
+    'CHECK (attempt >= 0)',
+    'auth_007_mfa_operation_receipts_status_next_attempt_idx',
+  ]
+  const receiptStatusConstraintPresent =
+    /CHECK\s*\(\s*status\s+IN\s*\(\s*'STARTED'\s*,\s*'READY'\s*,\s*'EMITTED'\s*,\s*'RESOLVED'\s*,\s*'UNKNOWN'\s*\)\s*\)/.test(mfaAuditReceiptMigration)
   const operations = [
     { id: 'authMfaStatus', route: 'workers/W01-payload/src/app/api/v1/auth/mfa/route.ts', test: 'workers/W01-payload/tests/int/mfa-status-route.int.spec.ts' },
     { id: 'authMfaEnrollmentStart', route: 'workers/W01-payload/src/app/api/v1/auth/mfa/enrollment/route.ts', test: 'workers/W01-payload/tests/int/mfa-enrollment-start-route.int.spec.ts' },
@@ -313,6 +347,16 @@ if (blockers.length === 0) {
     reviewedMfaMigrationShape: requiredMigrationTokens.every((token) => migration.includes(token)),
     reviewedBootstrapAuditShape: requiredBootstrapTokens.every((token) => bootstrapMigration.includes(token)),
     reviewedMfaAuditOutboxMigrationShape: requiredMfaAuditOutboxTokens.every((token) => mfaAuditOutboxMigration.includes(token)),
+    reviewedMfaAuditReceiptMigrationShape: requiredMfaAuditReceiptTokens.every((token) => mfaAuditReceiptMigrationNormalized.includes(token)) && receiptStatusConstraintPresent,
+    mfaAuditReceiptContractMatchesMigration:
+      mfaAuditReceiptContract.featureId === 'AUTH-007' &&
+      mfaAuditReceiptContract.target?.physicalTable === 'auth_007_mfa_operation_receipts' &&
+      mfaAuditReceiptContract.target?.sourceMigration === mfaAuditReceiptMigrationPath &&
+      mfaAuditReceiptContract.target?.databaseBinding === 'workers/W02-identity/wrangler.jsonc:D1_01' &&
+      mfaAuditReceiptContract.status === 'CONTRACTED_NOT_VERIFIED' &&
+      mfaAuditReceiptContract.promotion === 'NOT_GREEN' &&
+      mfaAuditReceiptContract.rules?.noNewWorkerD1QueueOrServiceBinding === true &&
+      mfaAuditReceiptContract.rules?.secretsNeverEnterReceipt === true,
     mfaAuditOutboxContractMatchesMigration:
       mfaAuditOutboxContract.target?.physicalTable === 'auth_007_mfa_publication_journal' &&
       mfaAuditOutboxContract.target?.sourceMigration === mfaAuditOutboxMigrationPath &&
@@ -324,7 +368,7 @@ if (blockers.length === 0) {
       mfaAuditBinding.delivery?.newWorkerD1QueueOrServiceBindingAllowed === false &&
       mfaAuditBinding.delivery?.sourceImplementationStatus === 'IMPLEMENTED_IN_SOURCE_NOT_PRODUCTION_VERIFIED',
     mfaOutboxTableIsW02OwnedAndCrossWorkerReadRestricted:
-      ['auth_013_publication_journal', 'auth_007_mfa_publication_journal'].every((tableName) =>
+      ['auth_013_publication_journal', 'auth_007_mfa_publication_journal', 'auth_007_mfa_operation_receipts'].every((tableName) =>
         (logicalDataAuthority.tables ?? []).some((table) =>
           table.name === tableName &&
           table.ownerWorker === 'W02' &&
@@ -353,8 +397,14 @@ if (blockers.length === 0) {
     mfaAuditLifecycleProducerHooksWired:
       /after:\s*createAuthMiddleware/.test(betterAuth) &&
       /classifyMfaAuditHookOutcome/.test(betterAuth) &&
-      /recordMfaAuditEventOnce/.test(betterAuth) &&
+      /createMfaAuditOperationReceipt/.test(betterAuth) &&
+      /finalizeMfaAuditOperationReceipt/.test(betterAuth) &&
+      /reconcileMfaAuditOperationReceipts/.test(betterAuth) &&
       /auth\.mfa\.replay_rejected/.test(betterAuth),
+    mfaChallengeExpiryIsFailClosedAndWired:
+      /isUnexpiredMfaChallengeRecord\(challenge\)/.test(betterAuth) &&
+      /Number\.isFinite\(expiresAt\) && expiresAt > nowMs/.test(challengeVerification) &&
+      exists('workers/W02-identity/src/auth/mfa-challenge-verification.test.ts'),
     mfaAuditSourceAndTestsPresent:
       exists('workers/W02-identity/src/auth/mfa-audit-events.ts') &&
       exists('workers/W02-identity/src/auth/mfa-audit-events.test.ts') &&
@@ -362,7 +412,12 @@ if (blockers.length === 0) {
       exists('workers/W02-identity/src/auth/mfa-audit-hooks.test.ts') &&
       exists('workers/W02-identity/src/auth/mfa-audit-publication-journal.ts') &&
       exists('workers/W02-identity/src/auth/mfa-audit-publication-journal.test.ts') &&
+      exists('workers/W02-identity/src/auth/mfa-audit-receipts.ts') &&
+      exists('workers/W02-identity/src/auth/mfa-audit-receipts.test.ts') &&
+      exists('workers/W02-identity/src/auth/mfa-challenge-verification.ts') &&
+      exists('workers/W02-identity/src/auth/mfa-challenge-verification.test.ts') &&
       exists('scripts/auth-007-mfa-journal-migration-static-audit.mjs') &&
+      exists('scripts/auth-007-mfa-operation-receipts-static-audit.mjs') &&
       exists('workers/W06-governance/src/mfa-audit-queue-consumer.ts') &&
       exists('workers/W06-governance/src/mfa-audit-queue-consumer.test.ts'),
     encryptedRecoveryCodes: /backupCodeOptions:\s*\{[^}]*storeBackupCodes:\s*['"]encrypted['"]/.test(betterAuth),
@@ -381,6 +436,7 @@ if (blockers.length === 0) {
       policyIds.has(operation.id) &&
       canonicalOperationIds.has(operation.id)
     ),
+    w01RawAuthProxyClosedByDefault,
     w02ReplayAndEnrollmentTestsPresent: [
       'workers/W02-identity/src/auth/mfa-status.test.ts',
       'workers/W02-identity/src/auth/mfa-enrollment-start.test.ts',

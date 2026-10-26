@@ -121,6 +121,12 @@
       "ownerWorker": "W02",
       "readPolicy": "OWNER_ONLY_WITH_EXCEPTIONS",
       "readExceptions": []
+    },
+    {
+      "name": "auth_007_mfa_operation_receipts",
+      "ownerWorker": "W02",
+      "readPolicy": "OWNER_ONLY_WITH_EXCEPTIONS",
+      "readExceptions": []
     }
   ]
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { buildMfaAuditEvent, recordMfaAuditEventOnce } from './mfa-audit-events'
+import { buildMfaAuditEvent, buildMfaAuditOutboxInsert, deriveMfaAuditEventIdForIdempotencyKey, MFA_AUDIT_EVENT_NAMES, recordMfaAuditEventOnce } from './mfa-audit-events'
 
 const input = {
   eventType: 'auth.mfa.locked' as const,
@@ -19,8 +19,8 @@ function fakeDb(options: {
   let selectCount = 0
   const first = vi.fn(async () => {
     selectCount += 1
-    if (options.existing) return { eventId: 'evt_existing' }
-    if (options.raceAppearsAfterInsert && selectCount >= 2) return { eventId: 'evt_raced' }
+    if (options.existing) return { eventId: 'evt_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee', eventType: 'auth.mfa.locked', resourceId: 'user-123', status: 'PUBLISHED', operationId: 'authMfaChallengeVerify', result: 'rejected', reasonCode: 'VERIFICATION_LOCKOUT', factorState: null, challengeMethod: 'totp' }
+    if (options.raceAppearsAfterInsert && selectCount >= 2) return { eventId: 'evt_cccccccccccccccccccccccccccccccc', eventType: 'auth.mfa.locked', resourceId: 'user-123', status: 'PENDING', operationId: 'authMfaChallengeVerify', result: 'rejected', reasonCode: 'VERIFICATION_LOCKOUT', factorState: null, challengeMethod: 'totp' }
     return null
   })
   const run = vi.fn().mockResolvedValue({
@@ -53,25 +53,253 @@ describe('AUTH-007 MFA audit event builder and idempotent writer', () => {
     expect(JSON.stringify(event)).not.toMatch(/password|secret|recoveryCodes|backupCodes|\"code\"/)
   })
 
+
+  it('derives a valid, stable event id for a shared idempotency condition', async () => {
+    const first = await deriveMfaAuditEventIdForIdempotencyKey(input.idempotencyKey)
+    const retry = await deriveMfaAuditEventIdForIdempotencyKey(input.idempotencyKey)
+    const different = await deriveMfaAuditEventIdForIdempotencyKey(input.idempotencyKey + ':different')
+    expect(first).toMatch(/^evt_[a-f0-9]{32}$/)
+    expect(retry).toBe(first)
+    expect(different).not.toBe(first)
+    await expect(deriveMfaAuditEventIdForIdempotencyKey('bad idempotency key')).rejects.toThrow('invalid MFA audit idempotency key')
+  })
+
+  it('sets publishedAt to the durable publication-intent time, distinct from occurredAt', () => {
+    const event = buildMfaAuditEvent(input)
+    expect(Date.parse(event.publishedAt)).toBeGreaterThan(Date.parse(event.occurredAt))
+    expect(event.occurredAt).toBe(input.occurredAt)
+    expect(event.publishedAt).not.toBe(event.occurredAt)
+  })
+
+  it('persists the same immutable publishedAt in the envelope and outbox created_at field', () => {
+    const event = buildMfaAuditEvent(input)
+    let boundValues: unknown[] = []
+    const db = {
+      prepare: vi.fn(() => ({
+        bind: (...values: unknown[]) => {
+          boundValues = values
+          return { run: vi.fn() }
+        },
+      })),
+    } as unknown as D1Database
+
+    buildMfaAuditOutboxInsert(db, event)
+    const storedPayload = JSON.parse(String(boundValues[7])) as typeof event
+    expect(storedPayload).toEqual(event)
+    expect(boundValues[11]).toBe(event.publishedAt)
+    expect(boundValues[12]).toBeNull()
+    expect(storedPayload.publishedAt).not.toBe(storedPayload.occurredAt)
+  })
+
+  it('maps all ten canonical MFA event types to a stable action and valid event identity', () => {
+    const expectedActions: Record<(typeof MFA_AUDIT_EVENT_NAMES)[number], string> = {
+      'auth.mfa.enrollment_started': 'authMfaEnrollmentStart',
+      'auth.mfa.enrollment_verified': 'authMfaEnrollmentConfirm',
+      'auth.mfa.enrollment_failed': 'authMfaEnrollmentStart',
+      'auth.mfa.challenge_succeeded': 'authMfaChallengeVerify',
+      'auth.mfa.challenge_failed': 'authMfaChallengeVerify',
+      'auth.mfa.factor_disabled': 'authMfaDisable',
+      'auth.mfa.recovery_codes_rotated': 'authMfaRecoveryCodesRotate',
+      'auth.mfa.recovery_code_consumed': 'authMfaChallengeVerify',
+      'auth.mfa.locked': 'authMfaChallengeVerify',
+      'auth.mfa.replay_rejected': 'authMfaChallengeVerify',
+    }
+    expect(Object.keys(expectedActions).sort()).toEqual([...MFA_AUDIT_EVENT_NAMES].sort())
+    for (const eventType of MFA_AUDIT_EVENT_NAMES) {
+      const event = buildMfaAuditEvent({ ...input, eventType })
+      expect(event.eventId).toMatch(/^evt_[a-f0-9]{32}$/)
+      expect(event.payload.operationId).toBe(expectedActions[eventType])
+      expect(event.publishedAt).not.toBe(event.occurredAt)
+    }
+  })
+
+  it('honors the contracted operation source for enrollment failures without widening other mappings', () => {
+    const startFailure = buildMfaAuditEvent({
+      ...input,
+      eventType: 'auth.mfa.enrollment_failed',
+    })
+    const confirmationFailure = buildMfaAuditEvent({
+      ...input,
+      eventType: 'auth.mfa.enrollment_failed',
+      operationId: 'authMfaEnrollmentConfirm',
+    })
+    expect(startFailure.payload.operationId).toBe('authMfaEnrollmentStart')
+    expect(confirmationFailure.payload.operationId).toBe('authMfaEnrollmentConfirm')
+    expect(() => buildMfaAuditEvent({
+      ...input,
+      eventType: 'auth.mfa.challenge_failed',
+      operationId: 'authMfaEnrollmentConfirm',
+    })).toThrow('invalid MFA audit operation id for event type')
+  })
+
+  it('rejects payload values that the canonical W06 consumer would reject', () => {
+    expect(() => buildMfaAuditEvent({
+      ...input,
+      reasonCode: 'lowercase reason',
+    })).toThrow('invalid MFA audit reason code')
+    expect(() => buildMfaAuditEvent({
+      ...input,
+      factorState: 'UNKNOWN' as never,
+    })).toThrow('invalid MFA audit factor state')
+    expect(() => buildMfaAuditEvent({
+      ...input,
+      challengeMethod: 'sms' as never,
+    })).toThrow('invalid MFA audit challenge method')
+    expect(() => buildMfaAuditEvent({
+      ...input,
+      result: 'unknown' as never,
+    })).toThrow('invalid MFA audit result')
+  })
+
+  it('preserves a receipt-assigned eventId through the outbox envelope', () => {
+    const eventId = 'evt_0123456789abcdef0123456789abcdef'
+    const event = buildMfaAuditEvent({ ...input, eventId })
+    expect(event.eventId).toBe(eventId)
+    expect(() => buildMfaAuditEvent({ ...input, eventId: 'evt_not-a-valid-id' })).toThrow('invalid MFA audit event id')
+  })
+
   it('inserts a lockout event once when its deterministic key is new', async () => {
     const { db, first, run } = fakeDb()
-    await expect(recordMfaAuditEventOnce(db, input)).resolves.toBe(true)
+    const recorded = await recordMfaAuditEventOnce(db, input)
+    expect(recorded.inserted).toBe(true)
+    expect(recorded.eventId).toMatch(/^evt_[a-f0-9]{32}$/)
     expect(first).toHaveBeenCalledTimes(1)
     expect(run).toHaveBeenCalledTimes(1)
   })
 
   it('does not write again if the same lockout window already exists', async () => {
     const { db, first, run } = fakeDb({ existing: true })
-    await expect(recordMfaAuditEventOnce(db, input)).resolves.toBe(false)
+    await expect(recordMfaAuditEventOnce(db, input)).resolves.toEqual({ inserted: false, eventId: 'evt_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee' })
     expect(first).toHaveBeenCalledTimes(1)
     expect(run).not.toHaveBeenCalled()
   })
 
   it('treats a concurrent insert of the same lockout key as already recorded after read-back', async () => {
     const { db, first, run } = fakeDb({ insertSuccess: false, raceAppearsAfterInsert: true })
-    await expect(recordMfaAuditEventOnce(db, input)).resolves.toBe(false)
+    await expect(recordMfaAuditEventOnce(db, input)).resolves.toEqual({ inserted: false, eventId: 'evt_cccccccccccccccccccccccccccccccc' })
     expect(first).toHaveBeenCalledTimes(2)
     expect(run).toHaveBeenCalledTimes(1)
+  })
+
+
+  it('adopts an existing legacy lockout event id for the same deterministic lockout identity', async () => {
+    const { db, first, run } = fakeDb({ existing: true })
+    const stableEventId = await deriveMfaAuditEventIdForIdempotencyKey(input.idempotencyKey)
+    const recorded = await recordMfaAuditEventOnce(db, {
+      ...input,
+      challengeMethod: 'recovery_code',
+      eventId: stableEventId,
+    })
+    expect(recorded).toEqual({ inserted: false, eventId: 'evt_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee' })
+    expect(first).toHaveBeenCalledTimes(1)
+    expect(run).not.toHaveBeenCalled()
+  })
+
+  it('does not treat a previously FAILED idempotency row as delivered', async () => {
+    const prepare = vi.fn((sql: string) => ({
+      bind: vi.fn(() => ({
+        first: async () => ({
+          eventId: 'evt_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',
+          eventType: 'auth.mfa.locked',
+          resourceId: 'user-123',
+          status: 'FAILED',
+          operationId: 'authMfaChallengeVerify',
+          result: 'rejected',
+          reasonCode: 'VERIFICATION_LOCKOUT',
+          factorState: null,
+          challengeMethod: 'totp',
+        }),
+        run: vi.fn(),
+        sql,
+      })),
+    }))
+    const db = { prepare } as unknown as D1Database
+    await expect(recordMfaAuditEventOnce(db, input)).rejects.toThrow('MFA_AUDIT_OUTBOX_PREVIOUSLY_FAILED')
+  })
+
+  it('rejects a durable idempotency match whose canonical action differs', async () => {
+    const prepare = vi.fn((sql: string) => ({
+      bind: vi.fn(() => ({
+        first: async () => ({ eventId: 'evt_0123456789abcdef0123456789abcdef', eventType: 'auth.mfa.locked', resourceId: 'user-123', status: 'PUBLISHED', operationId: 'authMfaDisable', result: 'rejected', reasonCode: 'VERIFICATION_LOCKOUT', factorState: null, challengeMethod: 'totp' }),
+        run: vi.fn(),
+        sql,
+      })),
+    }))
+    const db = { prepare } as unknown as D1Database
+    await expect(recordMfaAuditEventOnce(db, {
+      ...input,
+      eventId: 'evt_0123456789abcdef0123456789abcdef',
+    })).rejects.toThrow('MFA_AUDIT_EVENT_ACTION_CONFLICT')
+  })
+
+  it('rejects a durable idempotency match with a different stable eventId', async () => {
+    const prepare = vi.fn((sql: string) => ({
+      bind: vi.fn(() => ({
+        first: async () => ({
+          eventId: 'evt_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+          eventType: 'auth.mfa.locked',
+          resourceId: 'user-123',
+          status: 'PUBLISHED',
+          operationId: 'authMfaChallengeVerify',
+          result: 'rejected',
+          reasonCode: 'VERIFICATION_LOCKOUT',
+          factorState: null,
+          challengeMethod: 'totp',
+        }),
+        run: vi.fn(),
+        sql,
+      })),
+    }))
+    const db = { prepare } as unknown as D1Database
+    await expect(recordMfaAuditEventOnce(db, {
+      ...input,
+      eventId: 'evt_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+    })).rejects.toThrow('MFA_AUDIT_EVENT_ID_CONFLICT')
+    expect(prepare.mock.calls[0]?.[0]).toContain("json_extract(payload, '$.payload.operationId')")
+  })
+
+  it('rejects an idempotency match for a different subject or outcome', async () => {
+    const prepare = vi.fn((sql: string) => ({
+      bind: vi.fn(() => ({
+        first: async () => ({
+          eventId: 'evt_0123456789abcdef0123456789abcdef',
+          eventType: 'auth.mfa.locked',
+          resourceId: 'another-user',
+          status: 'PUBLISHED',
+          operationId: 'authMfaChallengeVerify',
+          result: 'rejected',
+          reasonCode: 'VERIFICATION_LOCKOUT',
+          factorState: null,
+          challengeMethod: 'totp',
+        }),
+        run: vi.fn(),
+        sql,
+      })),
+    }))
+    const db = { prepare } as unknown as D1Database
+    await expect(recordMfaAuditEventOnce(db, input)).rejects.toThrow('MFA_AUDIT_EVENT_INTENT_CONFLICT')
+  })
+
+  it('rejects a malformed persisted eventId even when the producer did not supply one', async () => {
+    const prepare = vi.fn((sql: string) => ({
+      bind: vi.fn(() => ({
+        first: async () => ({
+          eventId: 'evt_invalid',
+          eventType: 'auth.mfa.locked',
+          resourceId: 'user-123',
+          status: 'PUBLISHED',
+          operationId: 'authMfaChallengeVerify',
+          result: 'rejected',
+          reasonCode: 'VERIFICATION_LOCKOUT',
+          factorState: null,
+          challengeMethod: 'totp',
+        }),
+        run: vi.fn(),
+        sql,
+      })),
+    }))
+    const db = { prepare } as unknown as D1Database
+    await expect(recordMfaAuditEventOnce(db, input)).rejects.toThrow('MFA_AUDIT_EVENT_ID_CONFLICT')
   })
 
   it('fails when the insert is rejected and the idempotency key is not present', async () => {

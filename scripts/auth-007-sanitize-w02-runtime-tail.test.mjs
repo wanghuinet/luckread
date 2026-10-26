@@ -30,13 +30,14 @@ describe('W02 runtime tail sanitizer', () => {
   it('keeps publisher counts but rejects malformed counts and unrelated logs', () => {
     const output = sanitizeRuntimeTailRecord({
       logs: [
-        { message: ['W02 scheduled publication result', { task: 'mfa-audit', selected: 8, published: 8, failed: 0, payload: 'secret' }] },
+        { message: ['W02 scheduled publication result', { task: 'mfa-audit', selected: 8, published: 8, failed: 0, receiptSelected: 4, receiptEmitted: 3, receiptFailed: 0, receiptUnknown: 1, payload: 'secret' }] },
         { message: ['W02 scheduled publication result', { task: 'mfa-audit', selected: '8', published: 8, failed: 0 }] },
+        { message: ['W02 scheduled publication result', { task: 'mfa-audit', selected: 8, published: 8, failed: 0, receiptUnknown: '1' }] },
         { message: ['unrelated log', { token: 'secret' }] },
       ],
     })
     assert.deepEqual(output, {
-      logs: [{ label: 'W02 scheduled publication result', task: 'mfa-audit', selected: 8, published: 8, failed: 0 }],
+      logs: [{ label: 'W02 scheduled publication result', task: 'mfa-audit', selected: 8, published: 8, failed: 0, receiptSelected: 4, receiptEmitted: 3, receiptFailed: 0, receiptUnknown: 1 }],
     })
     assert.equal(JSON.stringify(output).includes('secret'), false)
   })

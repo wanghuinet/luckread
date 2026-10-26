@@ -1,6 +1,6 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
-import { evaluateMfaAuditDelivery } from './auth-007-mfa-audit-evidence.mjs'
+import { evaluateMfaAuditDelivery, evaluateMfaOperationReceiptStates } from './auth-007-mfa-audit-evidence.mjs'
 
 const accountId = process.env.CLOUDFLARE_ACCOUNT_ID || ''
 const apiToken = process.env.CLOUDFLARE_API_TOKEN || ''
@@ -30,7 +30,9 @@ const evidence = {
   apiTokenStored: false,
   rawResponseBodiesStored: false,
   rawEventPayloadsStored: false,
-  queryResultsLimitedToAggregates: true,
+  queryResultsStoredAsAggregates: true,
+  eventIdsComparedInMemoryOnly: true,
+  rawEventIdentifiersStored: false,
   userIdentifiersStored: false,
   qaEmailStored: false,
   qaAccountResolved: false,
@@ -40,6 +42,10 @@ const evidence = {
   checks: [],
   outboxEvents: [],
   canonicalAuditEvents: [],
+  eventIdReconciliation: null,
+  operationReceiptStates: null,
+  scenarioSpecificCoverage: [],
+  allTenEventTypesVerified: false,
   status: 'PENDING',
   failureCode: null,
   pollingDurationMs: 0,
@@ -139,26 +145,41 @@ async function readDedicatedQaUserId() {
   return rows[0].id
 }
 
-async function readOutboxAggregates(qaUserId) {
+async function readScopedOutboxEventRows(qaUserId) {
+  // Fetch only event IDs and status metadata for an exact in-memory
+  // reconciliation. These row identifiers are never written to evidence.
   return queryD1(
     databases.W02_D1_01,
-    `SELECT event_type AS eventType, status, attempt, last_error_code AS lastErrorCode, COUNT(*) AS count
+    `SELECT event_id AS eventId, event_type AS eventType, resource_id AS resourceId,
+            idempotency_key AS idempotencyKey, status, attempt,
+            last_error_code AS lastErrorCode
        FROM auth_007_mfa_publication_journal
       WHERE json_extract(payload, '$.correlationId') = ? AND resource_id = ?
-      GROUP BY event_type, status, attempt, last_error_code
-      ORDER BY event_type, status, attempt, last_error_code`,
+      ORDER BY event_type, event_id`,
     [correlationId, qaUserId],
   )
 }
 
-async function readCanonicalAuditAggregates(qaUserId) {
+async function readScopedCanonicalAuditEventRows(qaUserId) {
   return queryD1(
     databases.W06_D1_03,
-    `SELECT action, COUNT(*) AS count
+    `SELECT event_id AS eventId, action, target_type AS targetType, target_id AS targetId
        FROM audit_events
       WHERE request_id = ? AND target_id = ? AND action LIKE 'auth.mfa.%'
-      GROUP BY action
-      ORDER BY action`,
+      ORDER BY action, event_id`,
+    [correlationId, qaUserId],
+  )
+}
+
+async function readScopedOperationReceiptRows(qaUserId) {
+  // Only status and whether an error code remains are retained. Receipt IDs,
+  // subject identifiers, and exact error codes never enter the evidence artifact.
+  return queryD1(
+    databases.W02_D1_01,
+    `SELECT status, last_error_code AS lastErrorCode
+       FROM auth_007_mfa_operation_receipts
+      WHERE correlation_id = ? AND resource_id = ?
+      ORDER BY started_at`,
     [correlationId, qaUserId],
   )
 }
@@ -205,40 +226,77 @@ async function main() {
   const startedAt = Date.now()
   const deadline = startedAt + maxWaitMs
   let evaluation = null
+  let receiptEvaluation = null
   let lastErrorCode = null
 
   do {
     try {
-      const [outboxRows, auditRows] = await Promise.all([
-        readOutboxAggregates(qaUserId),
-        readCanonicalAuditAggregates(qaUserId),
+      const [outboxRows, auditRows, receiptRows] = await Promise.all([
+        readScopedOutboxEventRows(qaUserId),
+        readScopedCanonicalAuditEventRows(qaUserId),
+        readScopedOperationReceiptRows(qaUserId),
       ])
-      evidence.outboxEvents = outboxRows.map((row) => ({
-        eventType: typeof row.eventType === 'string' && /^auth\.mfa\.[a-z_]+$/.test(row.eventType) ? row.eventType : 'UNKNOWN',
-        status: ['PENDING', 'PUBLISHED', 'FAILED'].includes(row.status) ? row.status : 'UNKNOWN',
-        attempt: Number.isSafeInteger(Number(row.attempt)) && Number(row.attempt) >= 0 ? Number(row.attempt) : 0,
-        lastErrorCode: row.lastErrorCode == null
-          ? null
-          : (typeof row.lastErrorCode === 'string' && /^[A-Z0-9_]{1,64}$/.test(row.lastErrorCode) ? row.lastErrorCode : 'UNKNOWN'),
-        count: Number.isSafeInteger(Number(row.count)) && Number(row.count) >= 0 ? Number(row.count) : 0,
-      }))
-      evidence.canonicalAuditEvents = auditRows.map((row) => ({
-        action: typeof row.action === 'string' && /^auth\.mfa\.[a-z_]+$/.test(row.action) ? row.action : 'UNKNOWN',
-        count: Number.isSafeInteger(Number(row.count)) && Number(row.count) >= 0 ? Number(row.count) : 0,
-      }))
-      evaluation = evaluateMfaAuditDelivery(evidence.outboxEvents, evidence.canonicalAuditEvents)
+      // Match eventId, action, subject, and idempotency identity in memory only.
+      // Operation receipts are also checked for terminal, error-free states.
+      // The artifact stores aggregate diagnostics, never raw IDs or account IDs.
+      evaluation = evaluateMfaAuditDelivery(outboxRows, auditRows)
+      receiptEvaluation = evaluateMfaOperationReceiptStates(receiptRows)
+      evidence.operationReceiptStates = {
+        totalCount: receiptEvaluation.totalCount,
+        startedCount: receiptEvaluation.startedCount,
+        readyCount: receiptEvaluation.readyCount,
+        emittedCount: receiptEvaluation.emittedCount,
+        resolvedCount: receiptEvaluation.resolvedCount,
+        unknownCount: receiptEvaluation.unknownCount,
+        invalidStatusCount: receiptEvaluation.invalidStatusCount,
+        nonEmptyErrorCodeCount: receiptEvaluation.nonEmptyErrorCodeCount,
+      }
+      evidence.outboxEvents = evaluation.events
+        .filter((row) => row.totalCount > 0)
+        .map((row) => ({
+          eventType: row.eventType,
+          totalCount: row.totalCount,
+          publishedCount: row.publishedCount,
+          pendingCount: row.pendingCount,
+          failedCount: row.failedCount,
+          outboxSettled: row.outboxSettled,
+        }))
+      evidence.canonicalAuditEvents = evaluation.events
+        .filter((row) => row.canonicalAuditCount > 0)
+        .map((row) => ({ action: row.eventType, count: row.canonicalAuditCount }))
+      evidence.eventIdReconciliation = {
+        matchedEventIdCount: evaluation.totalMatchedEventIdCount,
+        unmatchedPublishedEventIdCount: evaluation.totalUnmatchedPublishedEventIdCount,
+        unmatchedCanonicalEventIdCount: evaluation.totalUnmatchedCanonicalEventIdCount,
+        duplicateOutboxEventIdCount: evaluation.totalDuplicateOutboxEventIdCount,
+        duplicateCanonicalEventIdCount: evaluation.totalDuplicateCanonicalEventIdCount,
+        wrongActionEventIdCount: evaluation.totalWrongActionEventIdCount,
+        wrongSubjectEventIdCount: evaluation.totalWrongSubjectEventIdCount,
+        duplicateOutboxIdempotencyKeyCount: evaluation.duplicateOutboxIdempotencyKeyCount,
+        invalidIdempotencyKeyCount: evaluation.invalidIdempotencyKeyCount,
+        invalidOutboxRowCount: evaluation.invalidOutboxRowCount,
+        invalidCanonicalRowCount: evaluation.invalidCanonicalRowCount,
+      }
+      evidence.scenarioSpecificCoverage = evaluation.scenarioSpecificCoverage
+      evidence.allTenEventTypesVerified = evaluation.allTenEventTypesVerified
       evidence.checks = evidence.checks.filter((entry) =>
         !entry.name.startsWith('required_event_') &&
+        !entry.name.startsWith('correlated_mfa_operation_receipts_') &&
+        !entry.name.startsWith('mfa_operation_receipt') &&
         entry.name !== 'all_correlated_outbox_events_published' &&
-        entry.name !== 'canonical_w06_audit_rows_match_published_events')
-      evidence.checks.push(...evaluation.checks)
+        entry.name !== 'canonical_w06_audit_event_ids_match_outbox_event_ids' &&
+        entry.name !== 'outbox_idempotency_keys_are_unique_and_valid' &&
+        entry.name !== 'canonical_w06_target_matches_outbox_subject')
+      evidence.checks.push(...evaluation.checks, ...receiptEvaluation.checks)
       evidence.pollingDurationMs = Date.now() - startedAt
       evidence.failureCode = null
-      if (evaluation.pass) {
+      if (evaluation.pass && receiptEvaluation.pass) {
         evidence.status = 'PASS'
         break
       }
-      lastErrorCode = 'MFA_AUDIT_DELIVERY_NOT_CONVERGED'
+      lastErrorCode = !receiptEvaluation.pass
+        ? 'MFA_OPERATION_RECEIPT_STATES_NOT_SETTLED'
+        : 'MFA_AUDIT_DELIVERY_NOT_CONVERGED'
       if (Date.now() >= deadline) {
         evidence.status = 'FAIL'
         evidence.failureCode = lastErrorCode
@@ -264,10 +322,29 @@ async function main() {
     evidence.status = 'FAIL'
     evidence.failureCode = lastErrorCode || 'MFA_AUDIT_DELIVERY_NOT_CONVERGED'
   }
-  check('expected_w02_outbox_and_w06_audit_delivery_converged', evidence.status === 'PASS', {
-    correlatedOutboxStatusGroups: evidence.outboxEvents.length,
+  check('expected_w02_outbox_and_w06_audit_delivery_converged', evaluation?.pass === true, {
+    correlatedOutboxEventTypes: evidence.outboxEvents.length,
     canonicalAuditTypes: evidence.canonicalAuditEvents.length,
+    exactEventIdMatches: evidence.eventIdReconciliation?.matchedEventIdCount ?? 0,
+    eventIdMismatchCount:
+      (evidence.eventIdReconciliation?.unmatchedPublishedEventIdCount ?? 0) +
+      (evidence.eventIdReconciliation?.unmatchedCanonicalEventIdCount ?? 0),
+    wrongSubjectEventIdCount: evidence.eventIdReconciliation?.wrongSubjectEventIdCount ?? 0,
+    duplicateOutboxIdempotencyKeyCount: evidence.eventIdReconciliation?.duplicateOutboxIdempotencyKeyCount ?? 0,
+    invalidIdempotencyKeyCount: evidence.eventIdReconciliation?.invalidIdempotencyKeyCount ?? 0,
+    allTenEventTypesVerified: evidence.allTenEventTypesVerified,
+    scenarioSpecificEventsObserved: evidence.scenarioSpecificCoverage.filter((item) => item.observedCount > 0).length,
     pollingDurationMs: evidence.pollingDurationMs,
+  })
+  check('correlated_mfa_operation_receipts_terminal_and_error_free', receiptEvaluation?.pass === true, {
+    totalReceiptCount: evidence.operationReceiptStates?.totalCount ?? 0,
+    startedCount: evidence.operationReceiptStates?.startedCount ?? 0,
+    readyCount: evidence.operationReceiptStates?.readyCount ?? 0,
+    emittedCount: evidence.operationReceiptStates?.emittedCount ?? 0,
+    resolvedCount: evidence.operationReceiptStates?.resolvedCount ?? 0,
+    unknownCount: evidence.operationReceiptStates?.unknownCount ?? 0,
+    invalidStatusCount: evidence.operationReceiptStates?.invalidStatusCount ?? 0,
+    nonEmptyErrorCodeCount: evidence.operationReceiptStates?.nonEmptyErrorCodeCount ?? 0,
   })
   if (evidence.status !== 'PASS' && evidence.failureCode) {
     console.error(`MFA audit delivery evidence status=${evidence.status} code=${evidence.failureCode}`)

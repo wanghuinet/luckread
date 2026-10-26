@@ -50,6 +50,12 @@ function safeDetail(label, raw) {
       if (!Number.isSafeInteger(detail[key]) || detail[key] < 0) return null
       safe[key] = value
     }
+    // Preserve only the four bounded receipt counters; never copy arbitrary log fields.
+    for (const key of ['receiptSelected', 'receiptEmitted', 'receiptFailed', 'receiptUnknown']) {
+      if (detail[key] === undefined) continue
+      if (!Number.isSafeInteger(detail[key]) || detail[key] < 0) return null
+      safe[key] = detail[key]
+    }
   } else if (label === 'W02 scheduled publication task failed') {
     if (!TASKS.has(detail.task)) return null
     safe.task = detail.task

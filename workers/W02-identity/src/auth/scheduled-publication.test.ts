@@ -40,6 +40,26 @@ describe('W02 scheduled publication isolation', () => {
     expect(logMfaAuditSummary).not.toHaveBeenCalled()
   })
 
+  it('surfaces receipt retries and unresolved operation outcomes in the MFA summary', async () => {
+    const logMfaAuditSummary = vi.fn()
+    const summary = {
+      selected: 0,
+      published: 0,
+      failed: 0,
+      receiptSelected: 1,
+      receiptEmitted: 0,
+      receiptFailed: 0,
+      receiptUnknown: 1,
+    }
+
+    await runScheduledPublicationTicks([
+      { name: 'mfa-audit', publish: async () => summary },
+    ], vi.fn(), logMfaAuditSummary)
+
+    expect(logMfaAuditSummary).toHaveBeenCalledTimes(1)
+    expect(logMfaAuditSummary).toHaveBeenCalledWith(summary)
+  })
+
   it('does not emit an empty MFA summary or accept untrusted count shapes', async () => {
     const logMfaAuditSummary = vi.fn()
     await runScheduledPublicationTicks([

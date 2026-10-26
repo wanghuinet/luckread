@@ -238,6 +238,36 @@ const run = async () => {
     userId = loginUser.id
     lastAuthenticatedCookie = cookieHeader()
 
+    // A live session must never substitute for the signed, unauthenticated
+    // two_factor challenge cookie. The endpoint must reject before W02 even
+    // though this account has an authenticated session cookie.
+    const sessionCannotReplaceChallenge = await request(
+      'authenticated_session_cannot_replace_mfa_challenge',
+      'POST',
+      '/v1/auth/mfa/challenge/verify',
+      {
+        headers: {
+          'content-type': 'application/json',
+          'Idempotency-Key': `${baseKey}-session-not-challenge`,
+        },
+        body: { code: '123456', method: 'totp' },
+      },
+    )
+    const sessionChallengeRejected =
+      sessionCannotReplaceChallenge.facts.status === 401 &&
+      sessionCannotReplaceChallenge.facts.errorCode === 'MFA_CHALLENGE_REQUIRED' &&
+      !sessionCannotReplaceChallenge.response?.headers.has('x-luckread-session-token')
+    check('authenticated_session_is_not_accepted_as_signin_challenge', sessionChallengeRejected, {
+      status: sessionCannotReplaceChallenge.facts.status,
+      errorCode: sessionCannotReplaceChallenge.facts.errorCode,
+      tokenIssued: Boolean(sessionCannotReplaceChallenge.response?.headers.has('x-luckread-session-token')),
+    })
+    if (!sessionChallengeRejected) {
+      result.status = 'MFA_SESSION_SUBSTITUTED_FOR_CHALLENGE'
+      result.cleanupStatus = 'manual_review_required'
+      return
+    }
+
     const initialStatus = await request('mfa_preflight_status', 'GET', '/v1/auth/mfa')
     const initialData = totpStatus(initialStatus.payload)
     const initialPass = initialStatus.facts.status === 200 &&
@@ -252,6 +282,60 @@ const run = async () => {
     })
     if (!initialPass) {
       result.status = initialStatus.facts.status === 200 ? 'BLOCKED_QA_ACCOUNT_NOT_CLEAN' : 'BLOCKED_MFA_STATUS_ENDPOINT'
+      return
+    }
+
+    // Emit and verify the enrollment-failure path with a deliberately
+    // non-matching password, then prove no factor or one-time material leaked
+    // and the account remains eligible for a clean enrollment attempt.
+    let wrongPassword = 'AUTH007-invalid-password-' + password.slice(-12)
+    if (wrongPassword === password) wrongPassword = 'Definitely-not-the-current-password-007!'
+    const rejectedEnrollment = await request(
+      'mfa_enrollment_rejects_wrong_current_password',
+      'POST',
+      '/v1/auth/mfa/enrollment',
+      {
+        headers: {
+          'content-type': 'application/json',
+          'Idempotency-Key': `${baseKey}-enroll-wrong-password`,
+        },
+        body: { currentPassword: wrongPassword },
+      },
+    )
+    const wrongPasswordRejected =
+      rejectedEnrollment.facts.status === 401 &&
+      !rejectedEnrollment.payload?.data?.totpUri &&
+      !Array.isArray(rejectedEnrollment.payload?.data?.recoveryCodes)
+    check('mfa_enrollment_rejects_wrong_current_password_without_disclosing_one_time_material',
+      wrongPasswordRejected, {
+        status: rejectedEnrollment.facts.status,
+        errorCode: rejectedEnrollment.facts.errorCode,
+        oneTimeMaterialReturned: Boolean(rejectedEnrollment.payload?.data?.totpUri) ||
+          Array.isArray(rejectedEnrollment.payload?.data?.recoveryCodes),
+        passwordLogged: false,
+      })
+    if (!wrongPasswordRejected) {
+      result.status = 'MFA_ENROLLMENT_NEGATIVE_TEST_FAILED'
+      result.cleanupStatus = 'manual_review_required'
+      return
+    }
+
+    const afterRejectedEnrollment = await request('mfa_disabled_after_failed_enrollment', 'GET', '/v1/auth/mfa')
+    const afterRejectedEnrollmentData = totpStatus(afterRejectedEnrollment.payload)
+    const failedEnrollmentKeptDisabled =
+      afterRejectedEnrollment.facts.status === 200 &&
+      afterRejectedEnrollmentData?.enabled === false &&
+      afterRejectedEnrollmentData?.verified === false &&
+      afterRejectedEnrollmentData?.enrolledAt === null
+    check('failed_enrollment_keeps_factor_disabled', failedEnrollmentKeptDisabled, {
+      status: afterRejectedEnrollment.facts.status,
+      factorStillDisabled: afterRejectedEnrollmentData?.enabled === false &&
+        afterRejectedEnrollmentData?.verified === false &&
+        afterRejectedEnrollmentData?.enrolledAt === null,
+    })
+    if (!failedEnrollmentKeptDisabled) {
+      result.status = 'MFA_FAILED_ENROLLMENT_MUTATED_STATE'
+      result.cleanupStatus = 'manual_review_required'
       return
     }
 
@@ -403,6 +487,94 @@ const run = async () => {
       const totpChallengeCookie = cookieHeader()
       const challengeStep = currentStep(totp.period)
       const challengeCode = codeForStep(totp.secret, challengeStep, totp.digits, totp.algorithm)
+
+      // Subject/actor/target IDs are never accepted from a challenge client.
+      // This malformed cross-account attempt must be rejected by W01 before
+      // the legitimate challenge is consumed or forwarded to W02.
+      const suppliedSubjectAttempt = await request(
+        'challenge_rejects_caller_supplied_account_subject',
+        'POST',
+        '/v1/auth/mfa/challenge/verify',
+        {
+          headers: {
+            'content-type': 'application/json',
+            'Idempotency-Key': `${baseKey}-client-subject-injection`,
+          },
+          body: { code: challengeCode, method: 'totp', userId: 'another-user-not-selected-by-client' },
+        },
+      )
+      const clientSubjectRejected =
+        suppliedSubjectAttempt.facts.status === 422 &&
+        suppliedSubjectAttempt.facts.errorCode === 'VALIDATION_FAILED' &&
+        !suppliedSubjectAttempt.response?.headers.has('x-luckread-session-token')
+      check('challenge_rejects_caller_supplied_account_subject', clientSubjectRejected, {
+        status: suppliedSubjectAttempt.facts.status,
+        errorCode: suppliedSubjectAttempt.facts.errorCode,
+        tokenIssued: Boolean(suppliedSubjectAttempt.response?.headers.has('x-luckread-session-token')),
+        suppliedIdentityLogged: false,
+      })
+      if (!clientSubjectRejected) {
+        lastAuthenticatedCookie = cookieHeader()
+        result.status = 'MFA_CHALLENGE_ACCEPTED_CLIENT_SUBJECT'
+        return
+      }
+
+      // Exercise a real W02 challenge failure (not a W01 schema rejection)
+      // before the success path. Build a code guaranteed not to match the
+      // currently accepted TOTP tolerance window; one failed attempt must not
+      // issue a session token or destroy the valid challenge.
+      const challengeWindowCodes = new Set()
+      const challengeNowStep = currentStep(totp.period)
+      for (let step = Math.max(0, challengeNowStep - 2); step <= challengeNowStep + 2; step += 1) {
+        challengeWindowCodes.add(codeForStep(totp.secret, step, totp.digits, totp.algorithm))
+      }
+      const challengeBaseCode = Number(challengeCode)
+      let invalidChallengeCode = ''
+      for (let delta = 1; delta < 100; delta += 1) {
+        const candidate = String((challengeBaseCode + delta) % (10 ** totp.digits))
+          .padStart(totp.digits, '0')
+        if (!challengeWindowCodes.has(candidate)) {
+          invalidChallengeCode = candidate
+          break
+        }
+      }
+      check('negative_test_has_nonmatching_signin_challenge_code',
+        invalidChallengeCode.length === totp.digits, {
+          codeValueLogged: false,
+          candidateMatchesCurrentTOTPWindow: challengeWindowCodes.has(invalidChallengeCode),
+        })
+      if (!invalidChallengeCode) {
+        result.status = 'MFA_CHALLENGE_NEGATIVE_TEST_PRECONDITION_FAILED'
+        restoreCookieHeader(lastAuthenticatedCookie)
+        return
+      }
+
+      const failedChallengeAttempt = await request(
+        'signin_totp_challenge_wrong_code_rejected',
+        'POST',
+        '/v1/auth/mfa/challenge/verify',
+        {
+          headers: {
+            'content-type': 'application/json',
+            'Idempotency-Key': `${baseKey}-signin-totp-invalid`,
+          },
+          body: { code: invalidChallengeCode, method: 'totp' },
+        },
+      )
+      const failedChallengePass = failedChallengeAttempt.facts.status === 401 &&
+        !failedChallengeAttempt.response?.headers.has('x-luckread-session-token')
+      check('invalid_totp_is_rejected_inside_w02_challenge_flow', failedChallengePass, {
+        status: failedChallengeAttempt.facts.status,
+        errorCode: failedChallengeAttempt.facts.errorCode,
+        tokenIssued: Boolean(failedChallengeAttempt.response?.headers.has('x-luckread-session-token')),
+        totpValueLogged: false,
+      })
+      if (!failedChallengePass) {
+        result.status = 'MFA_INVALID_CHALLENGE_CODE_ACCEPTED'
+        restoreCookieHeader(lastAuthenticatedCookie)
+        return
+      }
+
       const challengeVerify = await request('signin_totp_challenge_success', 'POST', '/v1/auth/mfa/challenge/verify', {
         headers: {
           'content-type': 'application/json',
@@ -580,6 +752,169 @@ const run = async () => {
         recoveredStatus.facts.status === 200 && recoveredData?.enabled === true && recoveredData?.verified === true, {
           status: recoveredStatus.facts.status,
           factorStillEnabled: recoveredData?.enabled === true && recoveredData?.verified === true,
+        })
+
+      // Rotation must invalidate every unused code from the old set and
+      // return a new no-store set. Only counts and booleans enter evidence.
+      const oldUnusedRecoveryCode = recoveryCodes.find((code) => code !== recoveryCode)
+      check('unused_pre_rotation_recovery_code_available', typeof oldUnusedRecoveryCode === 'string', {
+        recoveryCodeCount: recoveryCodes.length,
+        recoveryCodeValuesLogged: false,
+      })
+      if (typeof oldUnusedRecoveryCode !== 'string') {
+        result.status = 'MFA_RECOVERY_ROTATION_PRECONDITION_FAILED'
+        return
+      }
+
+      let rotation = null
+      let rotationStep = null
+      let rotatedRecoveryCodes = []
+      for (let attempt = 0; attempt < 4; attempt += 1) {
+        const step = currentStep(totp.period)
+        if (step <= (latestAcceptedTotpStep ?? confirmedStep)) {
+          const previousStep = latestAcceptedTotpStep ?? confirmedStep
+          const remainingMs = (previousStep + 1) * totp.period * 1000 - Date.now()
+          await sleep(Math.max(250, Math.min(remainingMs + 250, 31_000)))
+          continue
+        }
+        const code = codeForStep(totp.secret, step, totp.digits, totp.algorithm)
+        rotation = await request('rotate_recovery_codes_with_password_and_fresh_totp',
+          'POST', '/v1/auth/mfa/recovery-codes/rotate', {
+            headers: {
+              'content-type': 'application/json',
+              'Idempotency-Key': `${baseKey}-recovery-rotation-${attempt}`,
+            },
+            body: { currentPassword: password, code },
+          })
+        const candidate = rotation.payload?.data?.recoveryCodes
+        if (rotation.facts.status === 200 && Array.isArray(candidate) &&
+            candidate.length >= 1 && candidate.length <= 32 &&
+            candidate.every((value) => typeof value === 'string' && value.length >= 1 && value.length <= 128)) {
+          rotationStep = step
+          rotatedRecoveryCodes = [...candidate]
+          break
+        }
+        if (rotation.facts.status !== 401) break
+        await sleep(1_000)
+      }
+
+      const oldAndNewCodesDisjoint = rotatedRecoveryCodes.length > 0 &&
+        rotatedRecoveryCodes.every((code) => !recoveryCodes.includes(code))
+      const rotationPass = rotation?.facts.status === 200 &&
+        rotation.facts.cacheControl === 'no-store' &&
+        rotatedRecoveryCodes.length > 0 &&
+        oldAndNewCodesDisjoint
+      check('recovery_code_rotation_requires_password_and_fresh_totp_and_replaces_entire_set',
+        Boolean(rotationPass), {
+          status: rotation?.facts.status ?? null,
+          cacheControl: rotation?.facts.cacheControl ?? null,
+          oldRecoveryCodeCount: recoveryCodes.length,
+          newRecoveryCodeCount: rotatedRecoveryCodes.length,
+          oldAndNewSetsDisjoint: oldAndNewCodesDisjoint,
+          recoveryCodeValuesLogged: false,
+        })
+      if (!rotationPass || rotationStep === null) {
+        result.status = 'MFA_RECOVERY_CODE_ROTATION_FAILED'
+        return
+      }
+      recoveryCodes = rotatedRecoveryCodes
+      latestAcceptedTotpStep = rotationStep
+      lastAuthenticatedCookie = cookieHeader()
+
+      clearCookies()
+      const oldCodeLogin = await request('login_for_old_recovery_code_rejection', 'POST', '/v1/auth/login', {
+        headers: { 'content-type': 'application/json' },
+        body: { identity: email, credential: password },
+      })
+      const oldCodeChallengeReady = oldCodeLogin.facts.status === 202 &&
+        oldCodeLogin.payload?.data?.challengeRequired === true &&
+        Array.isArray(oldCodeLogin.payload?.data?.methods) &&
+        oldCodeLogin.payload.data.methods.includes('recovery_code') &&
+        cookieNames().some((name) => /two_factor/i.test(name))
+      check('fresh_challenge_available_for_old_recovery_code_rejection', Boolean(oldCodeChallengeReady), {
+        status: oldCodeLogin.facts.status,
+        challengeCookiePresent: cookieNames().some((name) => /two_factor/i.test(name)),
+      })
+      if (!oldCodeChallengeReady) {
+        result.status = 'MFA_OLD_RECOVERY_CODE_CHALLENGE_FAILED'
+        restoreCookieHeader(lastAuthenticatedCookie)
+        return
+      }
+      const oldCodeAttempt = await request('pre_rotation_unused_recovery_code_rejected_after_rotation',
+        'POST', '/v1/auth/mfa/challenge/verify', {
+          headers: {
+            'content-type': 'application/json',
+            'Idempotency-Key': `${baseKey}-old-recovery-code-after-rotation`,
+          },
+          body: { code: oldUnusedRecoveryCode, method: 'recovery_code' },
+        })
+      const oldRecoveryCodeRejected =
+        oldCodeAttempt.facts.status === 401 &&
+        !oldCodeAttempt.response?.headers.has('x-luckread-session-token')
+      check('pre_rotation_unused_recovery_code_is_invalidated', oldRecoveryCodeRejected, {
+        status: oldCodeAttempt.facts.status,
+        errorCode: oldCodeAttempt.facts.errorCode,
+        recoveryCodeValueLogged: false,
+      })
+      if (!oldRecoveryCodeRejected) {
+        lastAuthenticatedCookie = cookieHeader()
+        result.status = 'MFA_OLD_RECOVERY_CODE_ACCEPTED_AFTER_ROTATION'
+        return
+      }
+
+      clearCookies()
+      const newCodeLogin = await request('login_for_new_recovery_code_acceptance', 'POST', '/v1/auth/login', {
+        headers: { 'content-type': 'application/json' },
+        body: { identity: email, credential: password },
+      })
+      const newCodeChallengeReady = newCodeLogin.facts.status === 202 &&
+        newCodeLogin.payload?.data?.challengeRequired === true &&
+        Array.isArray(newCodeLogin.payload?.data?.methods) &&
+        newCodeLogin.payload.data.methods.includes('recovery_code') &&
+        cookieNames().some((name) => /two_factor/i.test(name))
+      check('fresh_challenge_available_for_new_recovery_code', Boolean(newCodeChallengeReady), {
+        status: newCodeLogin.facts.status,
+        challengeCookiePresent: cookieNames().some((name) => /two_factor/i.test(name)),
+      })
+      if (!newCodeChallengeReady) {
+        result.status = 'MFA_NEW_RECOVERY_CODE_CHALLENGE_FAILED'
+        restoreCookieHeader(lastAuthenticatedCookie)
+        return
+      }
+      const newCodeAttempt = await request('newly_rotated_recovery_code_is_accepted',
+        'POST', '/v1/auth/mfa/challenge/verify', {
+          headers: {
+            'content-type': 'application/json',
+            'Idempotency-Key': `${baseKey}-new-recovery-code-after-rotation`,
+          },
+          body: { code: recoveryCodes[0], method: 'recovery_code' },
+        })
+      const newCodeData = newCodeAttempt.payload?.data
+      const newCodeAccepted = newCodeAttempt.facts.status === 200 &&
+        newCodeData?.authenticated === true && newCodeData?.user?.id === userId &&
+        newCodeAttempt.response?.headers.has('x-luckread-session-token') &&
+        !hasCredentialField(newCodeAttempt.payload)
+      check('newly_rotated_recovery_code_completes_signin_without_json_token_leak',
+        Boolean(newCodeAccepted), {
+          status: newCodeAttempt.facts.status,
+          tokenIssuedInHeader: Boolean(newCodeAttempt.response?.headers.has('x-luckread-session-token')),
+          sessionTokenInJson: hasCredentialField(newCodeAttempt.payload),
+          recoveryCodeValueLogged: false,
+        })
+      if (!newCodeAccepted) {
+        result.status = 'MFA_NEW_RECOVERY_CODE_REJECTED'
+        restoreCookieHeader(lastAuthenticatedCookie)
+        return
+      }
+      lastAuthenticatedCookie = cookieHeader()
+      restoreCookieHeader(lastAuthenticatedCookie)
+      const afterRotationStatus = await request('mfa_status_after_recovery_rotation', 'GET', '/v1/auth/mfa')
+      const afterRotationData = totpStatus(afterRotationStatus.payload)
+      check('recovery_rotation_keeps_factor_enabled',
+        afterRotationStatus.facts.status === 200 && afterRotationData?.enabled === true &&
+        afterRotationData?.verified === true, {
+          status: afterRotationStatus.facts.status,
+          factorStillEnabled: afterRotationData?.enabled === true && afterRotationData?.verified === true,
         })
     }
 

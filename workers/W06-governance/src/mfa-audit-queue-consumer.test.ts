@@ -19,8 +19,22 @@ const event = {
   payload: { operationId: 'authMfaEnrollmentStart', result: 'started', factorState: 'PENDING_VERIFICATION' },
 }
 
-function createDb(existing = false, writeSuccess = true) {
-  const first = vi.fn().mockResolvedValue(existing ? { eventId: event.eventId } : null)
+function createDb(existing = false, writeSuccess = true, existingOverrides: Record<string, unknown> = {}) {
+  const existingRow = {
+    eventId: event.eventId,
+    requestId: event.correlationId,
+    traceId: event.causationId,
+    actorJson: JSON.stringify(event.actor),
+    action: event.eventType,
+    targetType: 'User',
+    targetId: event.resourceId,
+    beforeJson: '{}',
+    afterJson: JSON.stringify(event.payload),
+    reason: event.payload.reasonCode ?? null,
+    occurredAt: event.occurredAt,
+    ...existingOverrides,
+  }
+  const first = vi.fn().mockResolvedValue(existing ? existingRow : null)
   const run = vi.fn().mockResolvedValue({ success: writeSuccess })
   const bind = vi.fn(() => ({ first, run }))
   const prepare = vi.fn((sql: string) => ({ bind, sql }))
@@ -28,6 +42,25 @@ function createDb(existing = false, writeSuccess = true) {
 }
 
 describe('AUTH-007 W06 MFA audit queue consumer', () => {
+
+  it('rejects malformed event IDs before touching canonical audit storage', async () => {
+    const malformed = { ...event, eventId: 'evt_0123456789abcdef' }
+    const prepare = vi.fn()
+    await expect(consumeMfaAuditEvent({ prepare } as unknown as D1Database, malformed))
+      .rejects.toThrow('INVALID_AUTH_007_MFA_EVENT')
+    expect(prepare).not.toHaveBeenCalled()
+  })
+
+  it('rejects malformed or oversized idempotency keys before touching canonical audit storage', async () => {
+    for (const idempotencyKey of ['mfa bad key', 'x'.repeat(256)]) {
+      const malformed = { ...event, idempotencyKey }
+      const prepare = vi.fn()
+      await expect(consumeMfaAuditEvent({ prepare } as unknown as D1Database, malformed))
+        .rejects.toThrow('INVALID_AUTH_007_MFA_EVENT')
+      expect(prepare).not.toHaveBeenCalled()
+    }
+  })
+
   it('persists a safe MFA event into canonical AuditEvent storage', async () => {
     const { db, prepare, run } = createDb()
     await expect(consumeMfaAuditEvent(db, event)).resolves.toBe('persisted')
@@ -41,6 +74,24 @@ describe('AUTH-007 W06 MFA audit queue consumer', () => {
     await expect(consumeMfaAuditEvent(db, event)).resolves.toBe('duplicate')
     expect(prepare).toHaveBeenCalledTimes(1)
     expect(run).not.toHaveBeenCalled()
+  })
+
+  it('rejects a reused eventId whose action or target user differs', async () => {
+    const wrongAction = createDb(true, true, { action: 'auth.mfa.factor_disabled' })
+    await expect(consumeMfaAuditEvent(wrongAction.db, event))
+      .rejects.toThrow('MFA_AUDIT_EVENT_IDENTITY_CONFLICT')
+
+    const wrongSubject = createDb(true, true, { targetId: 'user-2' })
+    await expect(consumeMfaAuditEvent(wrongSubject.db, event))
+      .rejects.toThrow('MFA_AUDIT_EVENT_IDENTITY_CONFLICT')
+  })
+
+  it('rejects a reused eventId whose persisted event payload differs', async () => {
+    const wrongPayload = createDb(true, true, {
+      afterJson: JSON.stringify({ ...event.payload, result: 'succeeded' }),
+    })
+    await expect(consumeMfaAuditEvent(wrongPayload.db, event))
+      .rejects.toThrow('MFA_AUDIT_EVENT_IDENTITY_CONFLICT')
   })
 
   it('rejects client-injected actor identity and payload secrets', async () => {
@@ -57,6 +108,11 @@ describe('AUTH-007 W06 MFA audit queue consumer', () => {
     const invalidEvent = { ...event, eventType: 'auth.mfa.unknown' }
     await expect(consumeMfaAuditEvent({ prepare: vi.fn() } as unknown as D1Database, invalidEvent))
       .rejects.toThrow('INVALID_AUTH_007_MFA_EVENT')
+    const inheritedPropertyEvent = { ...event, eventType: 'toString' }
+    const prepare = vi.fn()
+    await expect(consumeMfaAuditEvent({ prepare } as unknown as D1Database, inheritedPropertyEvent))
+      .rejects.toThrow('INVALID_AUTH_007_MFA_EVENT')
+    expect(prepare).not.toHaveBeenCalled()
     const invalidOperation = { ...event, payload: { ...event.payload, operationId: 'adminGrantL8' } }
     await expect(consumeMfaAuditEvent({ prepare: vi.fn() } as unknown as D1Database, invalidOperation))
       .rejects.toThrow('INVALID_AUTH_007_MFA_EVENT')

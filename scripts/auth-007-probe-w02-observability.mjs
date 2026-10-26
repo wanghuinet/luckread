@@ -51,10 +51,16 @@ function countSafeDetails(node, summary, depth = 0, budget = { nodes: 0 }) {
       if (label === SAFE_LABELS.result && detail && typeof detail === 'object' &&
           !Array.isArray(detail) && detail.task === 'mfa-audit' &&
           ['selected', 'published', 'failed'].every((key) =>
-            Number.isSafeInteger(detail[key]) && detail[key] >= 0)) {
+            Number.isSafeInteger(detail[key]) && detail[key] >= 0) &&
+          ['receiptSelected', 'receiptEmitted', 'receiptFailed', 'receiptUnknown'].every((key) =>
+            detail[key] === undefined || (Number.isSafeInteger(detail[key]) && detail[key] >= 0))) {
         summary.selected += detail.selected
         summary.published += detail.published
         summary.failed += detail.failed
+        summary.receiptSelected += detail.receiptSelected ?? 0
+        summary.receiptEmitted += detail.receiptEmitted ?? 0
+        summary.receiptFailed += detail.receiptFailed ?? 0
+        summary.receiptUnknown += detail.receiptUnknown ?? 0
         summary.summaryLogs += 1
       }
       countSafeDetails(node[i], summary, depth + 1, budget)
@@ -96,6 +102,10 @@ function safeInvocationStats(invocations) {
     selected: 0,
     published: 0,
     failed: 0,
+    receiptSelected: 0,
+    receiptEmitted: 0,
+    receiptFailed: 0,
+    receiptUnknown: 0,
     summaryLogs: 0,
   }
 
@@ -187,6 +197,10 @@ function safeInvocationStats(invocations) {
     selected: safeCount(stats.selected),
     published: safeCount(stats.published),
     failed: safeCount(stats.failed),
+    receiptSelected: safeCount(stats.receiptSelected),
+    receiptEmitted: safeCount(stats.receiptEmitted),
+    receiptFailed: safeCount(stats.receiptFailed),
+    receiptUnknown: safeCount(stats.receiptUnknown),
   }
 }
 
@@ -211,8 +225,21 @@ function safeEventStats(events) {
     eventSelected: 0,
     eventPublished: 0,
     eventFailed: 0,
+    eventReceiptSelected: 0,
+    eventReceiptEmitted: 0,
+    eventReceiptFailed: 0,
+    eventReceiptUnknown: 0,
   }
-  const details = { selected: 0, published: 0, failed: 0, summaryLogs: 0 }
+  const details = {
+    selected: 0,
+    published: 0,
+    failed: 0,
+    receiptSelected: 0,
+    receiptEmitted: 0,
+    receiptFailed: 0,
+    receiptUnknown: 0,
+    summaryLogs: 0,
+  }
 
   for (const row of rows) {
     if (!row || typeof row !== 'object' || Array.isArray(row)) continue
@@ -258,6 +285,10 @@ function safeEventStats(events) {
     eventSelected: safeCount(details.selected),
     eventPublished: safeCount(details.published),
     eventFailed: safeCount(details.failed),
+    eventReceiptSelected: safeCount(details.receiptSelected),
+    eventReceiptEmitted: safeCount(details.receiptEmitted),
+    eventReceiptFailed: safeCount(details.receiptFailed),
+    eventReceiptUnknown: safeCount(details.receiptUnknown),
   }
 }
 
@@ -673,6 +704,7 @@ async function main() {
       'scheduledInvocations', 'scheduledExecutionObserved', 'outcomeOk', 'outcomeError', 'outcomeOther',
       'tickMarkerInvocations', 'resultMarkerInvocations', 'taskFailureMarkerInvocations',
       'stageFailureMarkerInvocations', 'mfaSummaryLogs', 'selected', 'published', 'failed',
+      'receiptSelected', 'receiptEmitted', 'receiptFailed', 'receiptUnknown',
     ].map((key) => `${key[0].toLowerCase() + key.slice(1)}=${result[key]}`),
     ...[
       'eventViewStatus', 'eventViewCategory', 'eventViewHttpStatus',
@@ -680,6 +712,7 @@ async function main() {
       'cronEventRows', 'queueEventRows', 'otherEventTypeRows', 'unknownEventTypeRows',
       'tickMarkerRows', 'resultMarkerRows', 'taskFailureMarkerRows', 'stageFailureMarkerRows',
       'eventMfaSummaryLogs', 'eventSelected', 'eventPublished', 'eventFailed',
+      'eventReceiptSelected', 'eventReceiptEmitted', 'eventReceiptFailed', 'eventReceiptUnknown',
     ].map((key) => `${key[0].toLowerCase() + key.slice(1)}=${result[key] ?? (key.startsWith('eventView') ? 'NOT_RUN' : 0)}`),
     ...[
       'eventTypeValuesStatus', 'eventTypeValuesCategory', 'eventTypeValuesHttpStatus',

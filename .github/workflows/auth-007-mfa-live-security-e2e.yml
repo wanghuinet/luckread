@@ -185,7 +185,7 @@ jobs:
           fi
           exit 0
 
-      - name: Run production MFA enrollment, invalid-code, replay and disable acceptance
+      - name: Run production MFA enrollment, challenge rejection, recovery rotation, replay and disable acceptance
         env:
           LUCKREAD_API_BASE_URL: https://api.luckread.com
           LUCKREAD_BROWSER_ORIGIN: https://luckread.com

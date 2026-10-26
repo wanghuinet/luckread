@@ -16,8 +16,10 @@ const operationIds: Record<string, readonly string[]> = {
 
 const allowedPayloadKeys = new Set(['operationId', 'result', 'reasonCode', 'factorState', 'challengeMethod'])
 const allowedResults = new Set(['started', 'succeeded', 'failed', 'rejected'])
+const eventIdPattern = /^evt_[a-f0-9]{32}$/
 const resourceIdPattern = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/
 const correlationPattern = /^[A-Za-z0-9._:-]{1,128}$/
+const idempotencyKeyPattern = /^[A-Za-z0-9._:-]{1,255}$/
 
 export type MfaAuditQueueEvent = {
   eventId: string
@@ -54,7 +56,7 @@ function assertMfaAuditEvent(value: unknown): asserts value is MfaAuditQueueEven
   }
   const actorValue = actor as Record<string, unknown>
   const payloadValue = payload as Record<string, unknown>
-  const validEvent = typeof event.eventType === 'string' && event.eventType in operationIds
+  const validEvent = typeof event.eventType === 'string' && Object.hasOwn(operationIds, event.eventType)
   const requiredStrings = [
     event.eventId, event.resourceId, event.occurredAt, event.publishedAt,
     event.correlationId, event.causationId, event.idempotencyKey,
@@ -65,10 +67,11 @@ function assertMfaAuditEvent(value: unknown): asserts value is MfaAuditQueueEven
     event.producer !== 'W02' ||
     event.resourceType !== 'User' ||
     requiredStrings.some((item) => typeof item !== 'string' || item.length === 0) ||
-    !resourceIdPattern.test(event.eventId as string) ||
+    !eventIdPattern.test(event.eventId as string) ||
     !resourceIdPattern.test(event.resourceId as string) ||
     !correlationPattern.test(event.correlationId as string) ||
     !correlationPattern.test(event.causationId as string) ||
+    !idempotencyKeyPattern.test(event.idempotencyKey as string) ||
     !Number.isInteger(event.attempt) || event.attempt !== 1 ||
     !Number.isInteger(event.sourceVersion) || Number(event.sourceVersion) < 1 ||
     Number.isNaN(Date.parse(event.occurredAt as string)) ||
@@ -99,6 +102,59 @@ function assertMfaAuditEvent(value: unknown): asserts value is MfaAuditQueueEven
   }
 }
 
+type ExistingMfaAuditRow = {
+  eventId: string
+  requestId: string | null
+  traceId: string | null
+  actorJson: string
+  action: string
+  targetType: string
+  targetId: string
+  beforeJson: string
+  afterJson: string
+  reason: string | null
+  occurredAt: string
+}
+
+function parseJsonObject(value: string): Record<string, unknown> | null {
+  try {
+    const parsed: unknown = JSON.parse(value)
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? parsed as Record<string, unknown>
+      : null
+  } catch {
+    return null
+  }
+}
+
+function sameRecord(actual: Record<string, unknown> | null, expected: Record<string, unknown>): boolean {
+  if (!actual) return false
+  const actualKeys = Object.keys(actual).sort()
+  const expectedKeys = Object.keys(expected).sort()
+  return actualKeys.length === expectedKeys.length &&
+    actualKeys.every((key, index) => key === expectedKeys[index] && actual[key] === expected[key])
+}
+
+function isSamePersistedMfaAuditEvent(
+  existing: ExistingMfaAuditRow,
+  event: MfaAuditQueueEvent,
+): boolean {
+  return existing.eventId === event.eventId &&
+    existing.requestId === event.correlationId &&
+    existing.traceId === event.causationId &&
+    existing.action === event.eventType &&
+    existing.targetType === 'User' &&
+    existing.targetId === event.resourceId &&
+    existing.reason === (event.payload.reasonCode ?? null) &&
+    existing.occurredAt === event.occurredAt &&
+    sameRecord(parseJsonObject(existing.actorJson), {
+      actorId: event.resourceId,
+      actorType: 'user',
+    }) &&
+    sameRecord(parseJsonObject(existing.beforeJson), {}) &&
+    sameRecord(parseJsonObject(existing.afterJson), event.payload as unknown as Record<string, unknown>)
+}
+
 /**
  * Persists a safe MFA security event in W06's canonical immutable AuditEvent
  * store. Event IDs are the deduplication key; D1's primary key remains the
@@ -112,10 +168,18 @@ export async function consumeMfaAuditEvent(
   const event = raw
 
   const existing = await db.prepare(
-    'SELECT event_id AS eventId FROM audit_events WHERE event_id = ? LIMIT 1',
-  ).bind(event.eventId).first<{ eventId: string }>()
+    'SELECT event_id AS eventId, request_id AS requestId, trace_id AS traceId, ' +
+    'actor_json AS actorJson, action, target_type AS targetType, target_id AS targetId, ' +
+    'before_json AS beforeJson, after_json AS afterJson, reason, occurred_at AS occurredAt ' +
+    'FROM audit_events WHERE event_id = ? LIMIT 1',
+  ).bind(event.eventId).first<ExistingMfaAuditRow>()
 
-  if (existing) return 'duplicate'
+  if (existing) {
+    if (!isSamePersistedMfaAuditEvent(existing, event)) {
+      throw new Error('MFA_AUDIT_EVENT_IDENTITY_CONFLICT')
+    }
+    return 'duplicate'
+  }
 
   const auditEvent: AuditEvent = {
     eventId: event.eventId,

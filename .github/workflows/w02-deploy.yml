@@ -79,6 +79,41 @@ jobs:
           SOURCE_SHA: ${{ inputs.source_sha }}
         run: node scripts/verify-auth-007-rollout-admission.mjs
 
+      - name: Verify AUTH-007 operation-receipt schema before runtime deployment (read-only)
+        working-directory: workers/W02-identity
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          DATABASE_NAME: luckread
+          EXPECTED_D1_01_ID: "2f80471e-3756-49f9-8db1-7707a433ad64"
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs'
+          const config = JSON.parse(fs.readFileSync('wrangler.jsonc', 'utf8'))
+          const target = config.d1_databases?.find((item) => item.binding === 'D1_01')
+          if (!target) throw new Error('D1_01 binding missing; deployment stopped')
+          if (target.database_name !== process.env.DATABASE_NAME) throw new Error('D1_01 database name mismatch; deployment stopped')
+          if (target.database_id !== process.env.EXPECTED_D1_01_ID) throw new Error('D1_01 database UUID mismatch; deployment stopped')
+          console.log(JSON.stringify({ binding: target.binding, database_name: target.database_name, database_id: target.database_id, mode: 'READONLY_PREDEPLOY' }))
+          NODE
+          npx --yes wrangler@4.116.0 d1 execute "$DATABASE_NAME" --remote --config wrangler.jsonc \
+            --command "SELECT name FROM d1_migrations WHERE name LIKE '%0009_auth_007_mfa_operation_receipts.sql';" \
+            > /tmp/auth007-mfa-receipt-migration-ledger.txt
+          grep -q '0009_auth_007_mfa_operation_receipts.sql' /tmp/auth007-mfa-receipt-migration-ledger.txt || {
+            echo "Required D1-01 migration 0009 is not recorded; refusing to deploy W02 runtime."
+            exit 1
+          }
+          npx --yes wrangler@4.116.0 d1 execute "$DATABASE_NAME" --remote --config wrangler.jsonc \
+            --command "SELECT type, name, sql FROM sqlite_master WHERE name IN ('auth_007_mfa_operation_receipts', 'auth_007_mfa_operation_receipts_status_next_attempt_idx') ORDER BY type, name;" \
+            > /tmp/auth007-mfa-receipt-schema.txt
+          for expected in auth_007_mfa_operation_receipts auth_007_mfa_operation_receipts_status_next_attempt_idx; do
+            grep -q "$expected" /tmp/auth007-mfa-receipt-schema.txt || {
+              echo "Required D1-01 schema object $expected is missing; refusing to deploy W02 runtime."
+              exit 1
+            }
+          done
+
       - name: Deploy W02 with pinned Wrangler
         working-directory: workers/W02-identity
         env:

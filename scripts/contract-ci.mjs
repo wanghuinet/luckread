@@ -363,21 +363,85 @@ async function checkEvents() {
       fail('events/AUTH-007-mfa-audit-binding.v1.json: all ten canonical event producers must be source-implemented and none may be reported as missing')
     }
     const mfaProducerSource = await readFile('workers/W02-identity/src/auth/better-auth.ts', 'utf8')
+    const mfaChallengeVerificationSource = await readFile('workers/W02-identity/src/auth/mfa-challenge-verification.ts', 'utf8')
     const mfaHookSource = await readFile('workers/W02-identity/src/auth/mfa-audit-hooks.ts', 'utf8')
+    const mfaReceiptSource = await readFile('workers/W02-identity/src/auth/mfa-audit-receipts.ts', 'utf8')
+    const mfaEventSource = await readFile('workers/W02-identity/src/auth/mfa-audit-events.ts', 'utf8')
+    const mfaPublicationSource = await readFile('workers/W02-identity/src/auth/mfa-audit-publication-journal.ts', 'utf8')
+    const mfaAuditEvidenceSource = await readFile('scripts/auth-007-mfa-audit-evidence.mjs', 'utf8')
+    const mfaAuditDeliveryE2ESource = await readFile('scripts/auth-007-mfa-audit-delivery-e2e.mjs', 'utf8')
+    const mfaLiveSecurityE2ESource = await readFile('scripts/auth-007-mfa-live-security-e2e.mjs', 'utf8')
     const requiredHookTokens = [
       "'/two-factor/verify-totp'",
       "'/two-factor/verify-backup-code'",
       "'/two-factor/disable'",
       "'/two-factor/generate-backup-codes'",
       "classifyMfaAuditHookOutcome",
-      'recordMfaAuditEventOnce',
+      'createMfaAuditOperationReceipt',
+      'finalizeMfaAuditOperationReceipt',
+      'reconcileMfaAuditOperationReceipts',
+      'isUnexpiredMfaChallengeRecord',
       'consumeTotpTimeStep',
       'auth.mfa.replay_rejected',
       'auth.mfa.locked',
     ]
+    const requiredChallengeExpiryTokens = [
+      'Date.parse(String(challenge.expiresAt))',
+      'expiresAt > nowMs',
+    ]
+    const requiredReceiptTokens = [
+      'recordMfaAuditEventOnce',
+      'idempotencyKey: event.idempotencyKey',
+      "'OUTBOX_WRITE_FAILED'",
+      "'OUTCOME_NOT_FINALIZED'",
+    ]
+    const requiredAuditEvidenceTokens = [
+      'SCENARIO_SPECIFIC_MFA_AUDIT_EVENT_TYPES',
+      'reconcileEventIds',
+      'canonicalTypeById.get(row.eventId) === eventType',
+      'allTenEventTypesVerified',
+    ]
+    const requiredAuditDeliveryE2ETokens = [
+      'readScopedOutboxEventRows',
+      'readScopedCanonicalAuditEventRows',
+      'eventIdsComparedInMemoryOnly',
+      'rawEventIdentifiersStored: false',
+    ]
+    const requiredLiveMfaNegativeTestTokens = [
+      'authenticated_session_is_not_accepted_as_signin_challenge',
+      'challenge_rejects_caller_supplied_account_subject',
+      'negative_test_has_nonmatching_signin_challenge_code',
+      'invalid_totp_is_rejected_inside_w02_challenge_flow',
+      'mfa_enrollment_rejects_wrong_current_password_without_disclosing_one_time_material',
+      'recovery_code_rotation_requires_password_and_fresh_totp_and_replaces_entire_set',
+      'pre_rotation_unused_recovery_code_is_invalidated',
+      'newly_rotated_recovery_code_completes_signin_without_json_token_leak',
+    ]
+    const requiredTimestampSemanticTokens = [
+      'const publishedAt = new Date().toISOString()',
+      'event.publishedAt,',
+      'const occurredAt = input.occurredAt ?? new Date().toISOString()',
+      'SET status = ?, published_at = ?',
+    ]
     if (!(await fileExists('workers/W02-identity/src/auth/mfa-audit-hooks.test.ts')) ||
         !(await fileExists('workers/W02-identity/src/auth/mfa-audit-events.test.ts')) ||
+        !(await fileExists('workers/W02-identity/src/auth/mfa-audit-receipts.test.ts')) ||
         !requiredHookTokens.every((token) => mfaProducerSource.includes(token)) ||
+        !requiredChallengeExpiryTokens.every((token) => mfaChallengeVerificationSource.includes(token)) ||
+        !(await fileExists('workers/W02-identity/src/auth/mfa-challenge-verification.test.ts')) ||
+        !requiredReceiptTokens.every((token) => mfaReceiptSource.includes(token)) ||
+        !requiredAuditEvidenceTokens.every((token) => mfaAuditEvidenceSource.includes(token)) ||
+        !requiredAuditDeliveryE2ETokens.every((token) => mfaAuditDeliveryE2ESource.includes(token)) ||
+        !requiredLiveMfaNegativeTestTokens.every((token) => mfaLiveSecurityE2ESource.includes(token)) ||
+        !requiredTimestampSemanticTokens.every((token) =>
+          token === 'SET status = ?, published_at = ?'
+            ? mfaPublicationSource.includes(token)
+            : mfaEventSource.includes(token)
+        ) ||
+        !(await fileExists('scripts/auth-007-mfa-audit-evidence.test.mjs')) ||
+        !(await fileExists('workers/W02-identity/src/auth/mfa-audit-events.test.ts')) ||
+        !(await fileExists('workers/W02-identity/src/auth/mfa-audit-publication-journal.test.ts')) ||
+        !mfaEventSource.includes('auth_007_mfa_publication_journal') ||
         !["auth.mfa.challenge_succeeded", "auth.mfa.challenge_failed",
           "auth.mfa.factor_disabled", "auth.mfa.recovery_codes_rotated",
           "auth.mfa.recovery_code_consumed"].every((token) => mfaHookSource.includes(token))) {

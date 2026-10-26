@@ -14,6 +14,22 @@ export const MFA_AUDIT_EVENT_NAMES = [
 export type MfaAuditEventName = typeof MFA_AUDIT_EVENT_NAMES[number]
 export type MfaAuditResult = 'started' | 'succeeded' | 'failed' | 'rejected'
 
+/**
+ * Derive one stable event identity for a global idempotency condition such as
+ * a single user's lockout window. Distinct operation receipts can observe the
+ * same condition, so a random per-receipt ID would create false conflicts.
+ */
+export async function deriveMfaAuditEventIdForIdempotencyKey(idempotencyKey: string): Promise<string> {
+  if (typeof idempotencyKey !== 'string' || !/^[A-Za-z0-9._:-]{1,255}$/.test(idempotencyKey)) {
+    throw new TypeError('invalid MFA audit idempotency key')
+  }
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(idempotencyKey))
+  const hex = Array.from(new Uint8Array(digest).slice(0, 16), (byte) =>
+    byte.toString(16).padStart(2, '0'),
+  ).join('')
+  return 'evt_' + hex
+}
+
 export type MfaAuditEvent = {
   eventId: string
   eventType: MfaAuditEventName
@@ -38,17 +54,35 @@ export type MfaAuditEvent = {
   }
 }
 
-const operationByEvent: Record<MfaAuditEventName, string> = {
-  'auth.mfa.enrollment_started': 'authMfaEnrollmentStart',
-  'auth.mfa.enrollment_verified': 'authMfaEnrollmentConfirm',
-  'auth.mfa.enrollment_failed': 'authMfaEnrollmentStart',
-  'auth.mfa.challenge_succeeded': 'authMfaChallengeVerify',
-  'auth.mfa.challenge_failed': 'authMfaChallengeVerify',
-  'auth.mfa.factor_disabled': 'authMfaDisable',
-  'auth.mfa.recovery_codes_rotated': 'authMfaRecoveryCodesRotate',
-  'auth.mfa.recovery_code_consumed': 'authMfaChallengeVerify',
-  'auth.mfa.locked': 'authMfaChallengeVerify',
-  'auth.mfa.replay_rejected': 'authMfaChallengeVerify',
+export type MfaAuditOperationId =
+  | 'authMfaEnrollmentStart'
+  | 'authMfaEnrollmentConfirm'
+  | 'authMfaChallengeVerify'
+  | 'authMfaDisable'
+  | 'authMfaRecoveryCodesRotate'
+
+/**
+ * Operation IDs accepted by the event contract. The first item is the
+ * default for event types that allow more than one operation source.
+ */
+export const MFA_AUDIT_OPERATION_IDS: Record<MfaAuditEventName, readonly MfaAuditOperationId[]> = {
+  'auth.mfa.enrollment_started': ['authMfaEnrollmentStart'],
+  'auth.mfa.enrollment_verified': ['authMfaEnrollmentConfirm'],
+  'auth.mfa.enrollment_failed': ['authMfaEnrollmentStart', 'authMfaEnrollmentConfirm'],
+  'auth.mfa.challenge_succeeded': ['authMfaChallengeVerify'],
+  'auth.mfa.challenge_failed': ['authMfaChallengeVerify'],
+  'auth.mfa.factor_disabled': ['authMfaDisable'],
+  'auth.mfa.recovery_codes_rotated': ['authMfaRecoveryCodesRotate'],
+  'auth.mfa.recovery_code_consumed': ['authMfaChallengeVerify'],
+  'auth.mfa.locked': ['authMfaChallengeVerify'],
+  'auth.mfa.replay_rejected': ['authMfaChallengeVerify'],
+}
+
+export function isAllowedMfaAuditOperationId(
+  eventType: MfaAuditEventName,
+  operationId: string,
+): boolean {
+  return MFA_AUDIT_OPERATION_IDS[eventType].includes(operationId as MfaAuditOperationId)
 }
 
 const safeCorrelation = (value: string | null, fallback: string): string =>
@@ -56,6 +90,7 @@ const safeCorrelation = (value: string | null, fallback: string): string =>
 
 export function buildMfaAuditEvent(input: {
   eventType: MfaAuditEventName
+  operationId?: string
   userId: string
   occurredAt?: string
   correlationId?: string | null
@@ -65,21 +100,50 @@ export function buildMfaAuditEvent(input: {
   factorState?: MfaAuditEvent['payload']['factorState']
   challengeMethod?: MfaAuditEvent['payload']['challengeMethod']
   idempotencyKey?: string
+  eventId?: string
 }): MfaAuditEvent {
   if (typeof input.userId !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(input.userId)) {
     throw new TypeError('invalid MFA audit subject')
   }
-  const eventId = 'evt_' + crypto.randomUUID().replaceAll('-', '')
+  if (!(MFA_AUDIT_EVENT_NAMES as readonly string[]).includes(input.eventType)) {
+    throw new TypeError('invalid MFA audit event type')
+  }
+  if (!['started', 'succeeded', 'failed', 'rejected'].includes(input.result)) {
+    throw new TypeError('invalid MFA audit result')
+  }
+  if (input.reasonCode !== undefined &&
+      (typeof input.reasonCode !== 'string' || !/^[A-Z0-9_]{1,64}$/.test(input.reasonCode))) {
+    throw new TypeError('invalid MFA audit reason code')
+  }
+  if (input.factorState !== undefined &&
+      !['PENDING_VERIFICATION', 'ENABLED', 'DISABLED'].includes(input.factorState)) {
+    throw new TypeError('invalid MFA audit factor state')
+  }
+  if (input.challengeMethod !== undefined &&
+      !['totp', 'recovery_code'].includes(input.challengeMethod)) {
+    throw new TypeError('invalid MFA audit challenge method')
+  }
+  const eventId = input.eventId ?? 'evt_' + crypto.randomUUID().replaceAll('-', '')
+  if (!/^evt_[a-f0-9]{32}$/.test(eventId)) throw new TypeError('invalid MFA audit event id')
   if (input.idempotencyKey !== undefined &&
       (typeof input.idempotencyKey !== 'string' || !/^[A-Za-z0-9._:-]{1,255}$/.test(input.idempotencyKey))) {
     throw new TypeError('invalid MFA audit idempotency key')
   }
   const occurredAt = input.occurredAt ?? new Date().toISOString()
   if (!Number.isFinite(Date.parse(occurredAt))) throw new TypeError('invalid MFA audit timestamp')
+  // publishedAt is the immutable durable-publication intent timestamp, not the
+  // business occurrence time and not the later Queue delivery acknowledgement.
+  // The journal's published_at column records the separate Queue-accepted time.
+  const publishedAt = new Date().toISOString()
   const correlationId = safeCorrelation(input.correlationId ?? null, eventId)
   const causationId = safeCorrelation(input.causationId ?? null, correlationId)
+  const allowedOperationIds = MFA_AUDIT_OPERATION_IDS[input.eventType]
+  const operationId = input.operationId ?? allowedOperationIds[0]!
+  if (!allowedOperationIds.includes(operationId as MfaAuditOperationId)) {
+    throw new TypeError('invalid MFA audit operation id for event type')
+  }
   const payload: MfaAuditEvent['payload'] = {
-    operationId: operationByEvent[input.eventType],
+    operationId,
     result: input.result,
     ...(input.reasonCode ? { reasonCode: input.reasonCode } : {}),
     ...(input.factorState ? { factorState: input.factorState } : {}),
@@ -93,7 +157,7 @@ export function buildMfaAuditEvent(input: {
     resourceType: 'User',
     resourceId: input.userId,
     occurredAt,
-    publishedAt: occurredAt,
+    publishedAt,
     correlationId,
     causationId,
     idempotencyKey: input.idempotencyKey ?? 'mfa-' + eventId,
@@ -127,7 +191,7 @@ export function buildMfaAuditOutboxInsert(
     'PENDING',
     1,
     null,
-    event.occurredAt,
+    event.publishedAt,
     null,
     null,
   )
@@ -151,29 +215,86 @@ export async function recordMfaAuditEvent(
  */
 export async function recordMfaAuditEventOnce(
   db: D1Database,
-  input: Parameters<typeof buildMfaAuditEvent>[0] & { idempotencyKey: string },
-): Promise<boolean> {
+  input: Parameters<typeof buildMfaAuditEvent>[0] & { idempotencyKey: string; eventId?: string },
+): Promise<{ inserted: boolean; eventId: string }> {
   const event = buildMfaAuditEvent(input)
-  const existing = await db.prepare(
-    'SELECT event_id AS eventId FROM auth_007_mfa_publication_journal WHERE idempotency_key = ? LIMIT 1',
-  ).bind(event.idempotencyKey).first<{ eventId: string }>()
-  if (existing) return false
+  type StoredJournalEvent = {
+    eventId: string
+    eventType: string
+    resourceId: string
+    status: string
+    operationId: string | null
+    result: string | null
+    reasonCode: string | null
+    factorState: string | null
+    challengeMethod: string | null
+  }
+  const selectByIdempotencyKey =
+    "SELECT event_id AS eventId, event_type AS eventType, resource_id AS resourceId, status, " +
+    "json_extract(payload, '$.payload.operationId') AS operationId, " +
+    "json_extract(payload, '$.payload.result') AS result, " +
+    "json_extract(payload, '$.payload.reasonCode') AS reasonCode, " +
+    "json_extract(payload, '$.payload.factorState') AS factorState, " +
+    "json_extract(payload, '$.payload.challengeMethod') AS challengeMethod " +
+    "FROM auth_007_mfa_publication_journal WHERE idempotency_key = ? LIMIT 1"
+
+  const canAdoptLegacyLockoutId = event.eventType === 'auth.mfa.locked' &&
+    input.idempotencyKey.startsWith('mfa-lock:') &&
+    input.eventId === await deriveMfaAuditEventIdForIdempotencyKey(input.idempotencyKey)
+  const assertSameIntent = (stored: StoredJournalEvent): void => {
+    // A matching idempotency key is not proof of a valid journal row unless
+    // its durable identity is valid, even when this producer did not assign
+    // an eventId before the first insert (for example, a lockout event).
+    if (typeof stored.eventId !== 'string' || !/^evt_[a-f0-9]{32}$/.test(stored.eventId)) {
+      throw new Error('MFA_AUDIT_EVENT_ID_CONFLICT')
+    }
+    if (input.eventId && stored.eventId !== input.eventId && !canAdoptLegacyLockoutId) {
+      throw new Error('MFA_AUDIT_EVENT_ID_CONFLICT')
+    }
+    if (stored.status === 'FAILED') throw new Error('MFA_AUDIT_OUTBOX_PREVIOUSLY_FAILED')
+    if (!['PENDING', 'PUBLISHED'].includes(stored.status)) throw new Error('MFA_AUDIT_OUTBOX_STATUS_INVALID')
+    if (stored.eventType !== event.eventType || stored.operationId !== event.payload.operationId) {
+      throw new Error('MFA_AUDIT_EVENT_ACTION_CONFLICT')
+    }
+    const optionalMatches = (storedValue: string | null, expected: string | undefined): boolean =>
+      (storedValue ?? undefined) === expected
+    if (
+      stored.resourceId !== event.resourceId ||
+      stored.result !== event.payload.result ||
+      !optionalMatches(stored.reasonCode, event.payload.reasonCode) ||
+      !optionalMatches(stored.factorState, event.payload.factorState) ||
+      (!canAdoptLegacyLockoutId && !optionalMatches(stored.challengeMethod, event.payload.challengeMethod))
+    ) throw new Error('MFA_AUDIT_EVENT_INTENT_CONFLICT')
+  }
+  const existing = await db.prepare(selectByIdempotencyKey)
+    .bind(event.idempotencyKey)
+    .first<StoredJournalEvent>()
+  if (existing) {
+    assertSameIntent(existing)
+    return { inserted: false, eventId: existing.eventId }
+  }
 
   let result: D1Result
   try {
     result = await buildMfaAuditOutboxInsert(db, event).run()
   } catch {
-    const raced = await db.prepare(
-      'SELECT event_id AS eventId FROM auth_007_mfa_publication_journal WHERE idempotency_key = ? LIMIT 1',
-    ).bind(event.idempotencyKey).first<{ eventId: string }>()
-    if (raced) return false
+    const raced = await db.prepare(selectByIdempotencyKey)
+      .bind(event.idempotencyKey)
+      .first<StoredJournalEvent>()
+    if (raced) {
+      assertSameIntent(raced)
+      return { inserted: false, eventId: raced.eventId }
+    }
     throw new Error('MFA_AUDIT_OUTBOX_WRITE_FAILED')
   }
 
-  if (result.success && result.meta?.changes === 1) return true
-  const afterWrite = await db.prepare(
-    'SELECT event_id AS eventId FROM auth_007_mfa_publication_journal WHERE idempotency_key = ? LIMIT 1',
-  ).bind(event.idempotencyKey).first<{ eventId: string }>()
-  if (afterWrite) return false
+  if (result.success && result.meta?.changes === 1) return { inserted: true, eventId: event.eventId }
+  const afterWrite = await db.prepare(selectByIdempotencyKey)
+    .bind(event.idempotencyKey)
+    .first<StoredJournalEvent>()
+  if (afterWrite) {
+    assertSameIntent(afterWrite)
+    return { inserted: false, eventId: afterWrite.eventId }
+  }
   throw new Error('MFA_AUDIT_OUTBOX_WRITE_FAILED')
 }
