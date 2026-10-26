@@ -299,6 +299,76 @@ describe('AUTH-007 durable MFA operation receipts', () => {
   })
 
 
+  it('persists the contracted confirmation operation through the receipt, outbox and retry path', async () => {
+    const receiptId = await createMfaAuditOperationReceipt(store.db, {
+      userId: 'user-123',
+      operationPath: '/two-factor/verify-totp',
+      isChallenge: false,
+      now: startedAt,
+    })
+    await finalizeMfaAuditOperationReceipt(store.db, receiptId, [{
+      eventType: 'auth.mfa.enrollment_failed',
+      operationId: 'authMfaEnrollmentConfirm',
+      result: 'failed',
+      reasonCode: 'ENROLLMENT_CONFIRMATION_REJECTED',
+      occurredAt: startedAt,
+    }], startedAt)
+
+    const planned = JSON.parse(store.receipts.get(receiptId)?.eventPlan ?? '[]') as Array<{
+      eventType: string
+      operationId: string
+      idempotencyKey: string
+    }>
+    expect(planned[0]?.operationId).toBe('authMfaEnrollmentConfirm')
+
+    await expect(reconcileMfaAuditOperationReceipts(store.db, startedAt)).resolves.toEqual({
+      selected: 1,
+      emitted: 1,
+      failed: 0,
+      unknown: 0,
+    })
+    const outboxRow = store.outbox.get(planned[0]!.idempotencyKey)
+    expect(outboxRow).toBeDefined()
+    expect(JSON.parse(outboxRow!.payload).payload.operationId).toBe('authMfaEnrollmentConfirm')
+    expect(JSON.parse(outboxRow!.payload).eventType).toBe('auth.mfa.enrollment_failed')
+
+    await expect(reconcileMfaAuditOperationReceipts(store.db, '2026-10-26T12:01:00.000Z')).resolves.toEqual({
+      selected: 0,
+      emitted: 0,
+      failed: 0,
+      unknown: 0,
+    })
+    expect(JSON.parse(outboxRow!.payload).payload.operationId).toBe('authMfaEnrollmentConfirm')
+  })
+
+  it('rejects a retry that changes the enrollment-failure operation source under the same idempotency key', async () => {
+    const receiptId = await createMfaAuditOperationReceipt(store.db, {
+      userId: 'user-123',
+      operationPath: '/two-factor/verify-totp',
+      isChallenge: false,
+      now: startedAt,
+    })
+    const idempotencyKey = `mfa-operation:${receiptId}:auth.mfa.enrollment_failed`
+    await appendMfaAuditOperationReceiptEvent(store.db, receiptId, {
+      eventType: 'auth.mfa.enrollment_failed',
+      result: 'failed',
+      reasonCode: 'ENROLLMENT_CONFIRMATION_REJECTED',
+      idempotencyKey,
+      occurredAt: startedAt,
+    })
+
+    await expect(finalizeMfaAuditOperationReceipt(store.db, receiptId, [{
+      eventType: 'auth.mfa.enrollment_failed',
+      operationId: 'authMfaEnrollmentConfirm',
+      result: 'failed',
+      reasonCode: 'ENROLLMENT_CONFIRMATION_REJECTED',
+      idempotencyKey,
+      occurredAt: startedAt,
+    }], startedAt)).rejects.toThrow('MFA_AUDIT_EVENT_IDEMPOTENCY_CONFLICT')
+    expect(store.receipts.get(receiptId)?.status).toBe('STARTED')
+    expect(store.outbox.size).toBe(0)
+  })
+
   it('only permits a nested Better Auth receipt handoff for the same subject, path and challenge mode', async () => {
     const receiptId = await createMfaAuditOperationReceipt(store.db, {
       userId: 'user-123',
