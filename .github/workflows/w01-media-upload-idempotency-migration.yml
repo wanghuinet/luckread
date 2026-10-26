@@ -212,93 +212,98 @@ jobs:
           appendFileSync(process.env.GITHUB_OUTPUT, 'decision=' + decision + '\n')
           NODE
 
-      - name: Verify Payload D1 binding matches the admitted remote schema
-        if: steps.preflight.outputs.decision == 'RUN_REQUIRED'
+      - name: Verify Payload migration selects the admitted D1 binding
+        id: binding_contract
+        if: steps.preflight.outcome == 'success'
         env:
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          NODE_ENV: production
-          PAYLOAD_MIGRATION_REMOTE: 'true'
-          SOURCE_SHA: ${{ inputs.source_sha }}
+          SOURCE_SHA: \${{ inputs.source_sha }}
+          DATABASE_NAME: \${{ inputs.database_name }}
         working-directory: workers/W01-payload
         run: |
           set -euo pipefail
           node --input-type=module <<'NODE'
-          import { getPlatformProxy } from 'wrangler'
-          import { writeFileSync } from 'node:fs'
-          import { resolve } from 'node:path'
+          import { readFileSync, writeFileSync } from 'node:fs'
 
-          const expected = process.env.EXPECTED_PREDECESSORS.split(',')
-          const target = process.env.TARGET_MIGRATION
           const dir = '../../artifacts/evidence/w01-media-upload-idempotency'
-          const proxy = await getPlatformProxy({
-            configPath: resolve('wrangler.jsonc'),
-            remoteBindings: true,
-            persist: false,
-          })
+          const config = JSON.parse(readFileSync('wrangler.jsonc', 'utf8'))
+          const payloadConfig = readFileSync('src/payload.config.ts', 'utf8')
+          const livePreflight = JSON.parse(readFileSync(dir + '/preflight-summary.json', 'utf8'))
+          const expectedDatabaseId = process.env.EXPECTED_DATABASE_ID
+          const expectedDatabaseName = process.env.DATABASE_NAME
+          const errors = []
+          const bindings = Array.isArray(config.d1_databases) ? config.d1_databases : []
+          const d1Bindings = bindings.filter((binding) => binding && binding.binding === 'D1')
 
-          try {
-            const db = proxy.env.D1
-            if (!db || typeof db.prepare !== 'function') {
-              throw new Error('Payload D1 binding is unavailable from the admitted Wrangler config')
+          if (d1Bindings.length !== 1) {
+            errors.push('Wrangler config must define exactly one D1 binding named D1')
+          } else {
+            const binding = d1Bindings[0]
+            if (binding.database_id !== expectedDatabaseId) {
+              errors.push('Wrangler D1 binding database_id differs from the admitted production database ID')
             }
-            const query = async (sql, label) => {
-              const result = await db.prepare(sql).all()
-              if (result?.success !== true || !Array.isArray(result.results)) {
-                throw new Error('Payload D1 binding query failed: ' + label)
-              }
-              return result.results
+            if (binding.database_name !== expectedDatabaseName) {
+              errors.push('Wrangler D1 binding database_name differs from the admitted database name')
             }
-            const [migrationRows, schemaRows, indexRows, countRows] = await Promise.all([
-              query('SELECT id,name,batch FROM payload_migrations ORDER BY id;', 'migration history'),
-              query("SELECT name FROM pragma_table_info('media');", 'media schema'),
-              query('SELECT name, "unique" AS is_unique FROM pragma_index_list(\'media\');', 'media indexes'),
-              query('SELECT COUNT(*) AS media_count FROM media;', 'media row count'),
-            ])
-            const history = migrationRows.map((row) => String(row.name ?? ''))
-            const columns = new Set(schemaRows.map((row) => String(row.name)))
-            const indexes = new Map(indexRows.map((row) => [String(row.name), row]))
-            const targetIndex = indexes.get('media_upload_idempotency_key_idx')
-            const mediaCount = Number(countRows[0]?.media_count ?? NaN)
-            const errors = []
-
-            if (history.join('|') !== expected.join('|')) {
-              errors.push('Payload D1 binding migration history differs from the admitted remote D1 preflight')
-            }
-            if (!columns.has('owner_user_id')) errors.push('Payload D1 binding is missing media.owner_user_id')
-            if (columns.has('upload_idempotency_key') || columns.has('upload_fingerprint')) {
-              errors.push('Payload D1 binding already has target columns while the admitted preflight says migration is pending')
-            }
-            if (targetIndex) errors.push('Payload D1 binding already has target index while the admitted preflight says migration is pending')
-            if (!Number.isSafeInteger(mediaCount) || mediaCount < 0) errors.push('Payload D1 binding media row count is invalid')
-
-            const evidence = {
-              mode: 'PAYLOAD_D1_BINDING_PREFLIGHT',
-              result: errors.length ? 'BLOCKED' : 'PASS',
-              sourceSha: process.env.SOURCE_SHA,
-              expectedDatabaseId: process.env.EXPECTED_DATABASE_ID,
-              binding: 'D1',
-              remoteBindings: true,
-              environment: 'base Wrangler config (no undefined production environment)',
-              migrationHistory: history,
-              expectedPredecessors: expected,
-              mediaCount,
-              mediaColumns: [...columns].sort(),
-              targetIndex: targetIndex ?? null,
-              targetMigration: target,
-              errors,
-            }
-            writeFileSync(dir + '/payload-binding-preflight.json', JSON.stringify(evidence, null, 2) + '\n')
-            console.log(JSON.stringify(evidence, null, 2))
-            if (errors.length) throw new Error('W01_PAYLOAD_D1_BINDING_PREFLIGHT_BLOCKED')
-          } finally {
-            await proxy.dispose()
           }
+
+          if (config.env?.production) {
+            errors.push('Unexpected named production environment could select a different binding set')
+          }
+          if (!/db:\\s*sqliteD1Adapter\\(\\s*\\{\\s*binding:\\s*cloudflare\\.env\\.D1,/s.test(payloadConfig)) {
+            errors.push('Payload sqliteD1Adapter is not bound directly to cloudflare.env.D1')
+          }
+          if (!/const isExplicitRemoteMigration = process\\.env\\.PAYLOAD_MIGRATION_REMOTE === 'true'/.test(payloadConfig)) {
+            errors.push('Payload config is missing the explicit remote-migration switch')
+          }
+          if (!/remoteBindings:\\s*isProduction\\s*&&\\s*\\(isPayloadCLI\\s*\\|\\|\\s*isExplicitRemoteMigration\\)/s.test(payloadConfig)) {
+            errors.push('Payload remote binding selection no longer matches the reviewed production migration contract')
+          }
+          if (!/environment:\\s*process\\.env\\.CLOUDFLARE_ENV/.test(payloadConfig)) {
+            errors.push('Payload Wrangler environment resolution changed; refusing to assume base-config selection')
+          }
+
+          if (livePreflight.result !== 'PASS') {
+            errors.push('Live direct-Wrangler D1 preflight did not pass')
+          }
+          if (livePreflight.expectedDatabaseId !== expectedDatabaseId) {
+            errors.push('Live preflight database ID does not match the admitted ID')
+          }
+          if (livePreflight.databaseName !== expectedDatabaseName) {
+            errors.push('Live preflight database name does not match the admitted name')
+          }
+          if (!['RUN_REQUIRED', 'ALREADY_APPLIED'].includes(livePreflight.decision)) {
+            errors.push('Live preflight did not produce an admitted migration decision')
+          }
+
+          const evidence = {
+            mode: 'PAYLOAD_D1_CONFIG_CONTRACT_PREFLIGHT',
+            result: errors.length ? 'BLOCKED' : 'PASS',
+            sourceSha: process.env.SOURCE_SHA,
+            workerName: config.name ?? null,
+            wranglerConfig: 'workers/W01-payload/wrangler.jsonc',
+            directLiveD1Preflight: livePreflight.result,
+            binding: d1Bindings.length === 1 ? {
+              name: 'D1',
+              databaseName: d1Bindings[0].database_name ?? null,
+              databaseId: d1Bindings[0].database_id ?? null,
+            } : null,
+            expectedDatabaseId,
+            expectedDatabaseName,
+            namedProductionEnvironment: Boolean(config.env?.production),
+            payloadAdapterBoundToCloudflareEnvD1: /db:\\s*sqliteD1Adapter\\(\\s*\\{\\s*binding:\\s*cloudflare\\.env\\.D1,/s.test(payloadConfig),
+            explicitRemoteMigrationGatePresent: /const isExplicitRemoteMigration = process\\.env\\.PAYLOAD_MIGRATION_REMOTE === 'true'/.test(payloadConfig),
+            remoteBindingGatePresent: /remoteBindings:\\s*isProduction\\s*&&\\s*\\(isPayloadCLI\\s*\\|\\|\\s*isExplicitRemoteMigration\\)/s.test(payloadConfig),
+            runtimeProxyProbe: 'not used; direct remote D1 identity plus exact source configuration are validated',
+            errors,
+          }
+          writeFileSync(dir + '/payload-d1-config-preflight.json', JSON.stringify(evidence, null, 2) + '\\n')
+          console.log(JSON.stringify(evidence, null, 2))
+          if (errors.length) throw new Error('W01_PAYLOAD_D1_CONFIG_CONTRACT_PREFLIGHT_BLOCKED')
           NODE
 
       - name: Execute the single admitted migration
         id: execute_migration
-        if: inputs.mode == 'apply' && steps.preflight.outputs.decision == 'RUN_REQUIRED'
+        if: inputs.mode == 'apply' && steps.preflight.outputs.decision == 'RUN_REQUIRED' && steps.binding_contract.outcome == 'success'
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -306,7 +311,11 @@ jobs:
           PAYLOAD_MIGRATION_REMOTE: 'true'
           PAYLOAD_SECRET: ignore
         working-directory: workers/W01-payload
-        run: pnpm exec payload migrate
+        run: |
+          set -euo pipefail
+          unset CLOUDFLARE_ENV
+          echo "CLOUDFLARE_ENV unset; Payload migration must resolve base wrangler.jsonc D1 binding"
+          pnpm exec payload migrate
 
       - name: Assert read-only preflight did not invoke migration
         if: inputs.mode == 'preflight-only'
@@ -318,7 +327,7 @@ jobs:
           echo "PASS: preflight-only mode did not execute Payload migration"
 
       - name: Verify exact post-migration state
-        if: inputs.mode == 'apply' && always() && steps.preflight.outcome == 'success'
+        if: inputs.mode == 'apply' && always() && steps.preflight.outcome == 'success' && steps.binding_contract.outcome == 'success'
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
