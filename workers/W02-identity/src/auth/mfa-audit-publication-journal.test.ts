@@ -151,4 +151,24 @@ describe('AUTH-007 MFA audit outbox publisher', () => {
     }
   })
 
+
+  it('fails closed when D1 reports success but the published-state update changes zero rows', async () => {
+    const { env, update, queueSend } = createEnv([
+      { journalId: 'journal-1', payload: JSON.stringify(event), attempt: 1 },
+    ])
+    update.mockResolvedValueOnce({ success: true, meta: { changes: 0 } })
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      await expect(publishPendingMfaAuditEvents(env, '2026-10-24T14:01:00.000Z'))
+        .rejects.toThrow('MFA_AUDIT_PUBLICATION_STAGE_FAILED')
+      expect(queueSend).toHaveBeenCalledWith(event)
+      expect(log).toHaveBeenCalledWith('W02 scheduled publication stage failed', {
+        task: 'mfa-audit',
+        stage: 'mark-published',
+      })
+    } finally {
+      log.mockRestore()
+    }
+  })
+
 })
