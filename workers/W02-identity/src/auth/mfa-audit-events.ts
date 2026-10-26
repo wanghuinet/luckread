@@ -160,17 +160,45 @@ export async function recordMfaAuditEventOnce(
   input: Parameters<typeof buildMfaAuditEvent>[0] & { idempotencyKey: string; eventId?: string },
 ): Promise<boolean> {
   const event = buildMfaAuditEvent(input)
-  type StoredJournalEvent = { eventId: string; eventType: string; operationId: string | null }
+  type StoredJournalEvent = {
+    eventId: string
+    eventType: string
+    resourceId: string
+    operationId: string | null
+    result: string | null
+    reasonCode: string | null
+    factorState: string | null
+    challengeMethod: string | null
+  }
   const selectByIdempotencyKey =
-    "SELECT event_id AS eventId, event_type AS eventType, " +
-    "json_extract(payload, '$.payload.operationId') AS operationId " +
+    "SELECT event_id AS eventId, event_type AS eventType, resource_id AS resourceId, " +
+    "json_extract(payload, '$.payload.operationId') AS operationId, " +
+    "json_extract(payload, '$.payload.result') AS result, " +
+    "json_extract(payload, '$.payload.reasonCode') AS reasonCode, " +
+    "json_extract(payload, '$.payload.factorState') AS factorState, " +
+    "json_extract(payload, '$.payload.challengeMethod') AS challengeMethod " +
     "FROM auth_007_mfa_publication_journal WHERE idempotency_key = ? LIMIT 1"
+
+  const assertSameIntent = (stored: StoredJournalEvent): void => {
+    if (input.eventId && stored.eventId !== input.eventId) throw new Error('MFA_AUDIT_EVENT_ID_CONFLICT')
+    if (stored.eventType !== event.eventType || stored.operationId !== event.payload.operationId) {
+      throw new Error('MFA_AUDIT_EVENT_ACTION_CONFLICT')
+    }
+    const optionalMatches = (storedValue: string | null, expected: string | undefined): boolean =>
+      (storedValue ?? undefined) === expected
+    if (
+      stored.resourceId !== event.resourceId ||
+      stored.result !== event.payload.result ||
+      !optionalMatches(stored.reasonCode, event.payload.reasonCode) ||
+      !optionalMatches(stored.factorState, event.payload.factorState) ||
+      !optionalMatches(stored.challengeMethod, event.payload.challengeMethod)
+    ) throw new Error('MFA_AUDIT_EVENT_INTENT_CONFLICT')
+  }
   const existing = await db.prepare(selectByIdempotencyKey)
     .bind(event.idempotencyKey)
     .first<StoredJournalEvent>()
   if (existing) {
-    if (input.eventId && existing.eventId !== input.eventId) throw new Error('MFA_AUDIT_EVENT_ID_CONFLICT')
-    if (existing.eventType !== event.eventType || existing.operationId !== event.payload.operationId) throw new Error('MFA_AUDIT_EVENT_ACTION_CONFLICT')
+    assertSameIntent(existing)
     return false
   }
 
@@ -182,8 +210,7 @@ export async function recordMfaAuditEventOnce(
       .bind(event.idempotencyKey)
       .first<StoredJournalEvent>()
     if (raced) {
-      if (input.eventId && raced.eventId !== input.eventId) throw new Error('MFA_AUDIT_EVENT_ID_CONFLICT')
-      if (raced.eventType !== event.eventType || raced.operationId !== event.payload.operationId) throw new Error('MFA_AUDIT_EVENT_ACTION_CONFLICT')
+      assertSameIntent(raced)
       return false
     }
     throw new Error('MFA_AUDIT_OUTBOX_WRITE_FAILED')
@@ -194,8 +221,7 @@ export async function recordMfaAuditEventOnce(
     .bind(event.idempotencyKey)
     .first<StoredJournalEvent>()
   if (afterWrite) {
-    if (input.eventId && afterWrite.eventId !== input.eventId) throw new Error('MFA_AUDIT_EVENT_ID_CONFLICT')
-    if (afterWrite.eventType !== event.eventType || afterWrite.operationId !== event.payload.operationId) throw new Error('MFA_AUDIT_EVENT_ACTION_CONFLICT')
+    assertSameIntent(afterWrite)
     return false
   }
   throw new Error('MFA_AUDIT_OUTBOX_WRITE_FAILED')
