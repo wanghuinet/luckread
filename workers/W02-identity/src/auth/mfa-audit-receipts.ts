@@ -13,6 +13,7 @@ export type MfaAuditReceiptOperationPath =
 
 export type MfaAuditReceiptEvent = {
   eventType: MfaAuditEventName
+  eventId?: string
   result: MfaAuditResult
   reasonCode?: string
   factorState?: 'PENDING_VERIFICATION' | 'ENABLED' | 'DISABLED'
@@ -147,18 +148,30 @@ function mergePlan(
       `mfa-operation:${receiptId}:${input.eventType}`
     const candidate = validateEvent({
       ...input,
-      eventId: /^evt_[a-f0-9]{32}$/.test((input as MfaAuditReceiptEvent & { eventId?: string }).eventId ?? '')
-        ? (input as MfaAuditReceiptEvent & { eventId: string }).eventId
-        : 'evt_' + crypto.randomUUID().replaceAll('-', ''),
+      // An explicit invalid ID must be rejected; never silently replace caller intent.
+      eventId: input.eventId ?? 'evt_' + crypto.randomUUID().replaceAll('-', ''),
       idempotencyKey,
       occurredAt: input.occurredAt ?? occurredAt,
     })
     const existingEvent = byKey.get(candidate.idempotencyKey)
-    if (existingEvent && (existingEvent.eventType !== candidate.eventType ||
-      (('eventId' in input) && (input as MfaAuditReceiptEvent & { eventId?: string }).eventId !== existingEvent.eventId))) {
-      throw new Error('MFA_AUDIT_EVENT_IDEMPOTENCY_CONFLICT')
+    if (existingEvent) {
+      const explicitEventIdConflict = input.eventId !== undefined &&
+        input.eventId !== existingEvent.eventId
+      const explicitOccurrenceConflict = input.occurredAt !== undefined &&
+        input.occurredAt !== existingEvent.occurredAt
+      const eventIntentConflict =
+        existingEvent.eventType !== candidate.eventType ||
+        existingEvent.result !== candidate.result ||
+        existingEvent.reasonCode !== candidate.reasonCode ||
+        existingEvent.factorState !== candidate.factorState ||
+        existingEvent.challengeMethod !== candidate.challengeMethod ||
+        explicitEventIdConflict ||
+        explicitOccurrenceConflict
+      if (eventIntentConflict) throw new Error('MFA_AUDIT_EVENT_IDEMPOTENCY_CONFLICT')
+      // Keep the first durable identity and occurrence timestamp on a retry.
+      continue
     }
-    if (!existingEvent) byKey.set(candidate.idempotencyKey, candidate)
+    byKey.set(candidate.idempotencyKey, candidate)
   }
   if (byKey.size > 4) throw new Error('MFA_AUDIT_RECEIPT_PLAN_LIMIT_EXCEEDED')
   return [...byKey.values()]
@@ -268,7 +281,12 @@ export async function appendMfaAuditOperationReceiptEvent(
     if (parsePlan(latest.eventPlan).some((item) =>
       item.idempotencyKey === idempotencyKey &&
       item.eventType === event.eventType &&
-      item.result === event.result
+      item.result === event.result &&
+      item.reasonCode === event.reasonCode &&
+      item.factorState === event.factorState &&
+      item.challengeMethod === event.challengeMethod &&
+      (event.eventId === undefined || item.eventId === event.eventId) &&
+      (event.occurredAt === undefined || item.occurredAt === event.occurredAt)
     )) return
   } catch {
     // Without an authoritative read-back, fail closed before returning the auth error.
