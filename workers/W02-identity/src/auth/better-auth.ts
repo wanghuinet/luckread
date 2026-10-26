@@ -354,7 +354,6 @@ const buildLuckReadAuth = (env: BetterAuthEnv) => {
                 eventId: await deriveMfaAuditEventIdForIdempotencyKey(lockoutIdempotencyKey),
                 result: 'rejected',
                 reasonCode: 'VERIFICATION_LOCKOUT',
-                challengeMethod: ctx.path === '/two-factor/verify-backup-code' ? 'recovery_code' : 'totp',
                 idempotencyKey: lockoutIdempotencyKey,
               })
             }
