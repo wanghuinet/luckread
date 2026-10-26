@@ -9,8 +9,10 @@ const SAFE_LABELS = Object.freeze({
 })
 const COMMON_EVENT_TYPES = new Set(['fetch', 'scheduled', 'cron', 'queue'])
 const W02_SCRIPT_FILTER = Object.freeze({
-  key: '$metadata.service',
-  operation: 'starts_with',
+  // Scheduled invocation records may not expose indexed service metadata
+  // consistently; scope all views by the runtime Worker identity in $workers.
+  key: '$workers.scriptName',
+  operation: 'eq',
   type: 'string',
   value: EXPECTED_SCRIPT,
 })
