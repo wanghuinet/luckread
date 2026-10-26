@@ -459,7 +459,11 @@ async function probeW02ScheduledAnalytics({ accountId, apiToken, now, fetchImpl 
                   },
                   limit: 100
                 ) {
-                  __typename
+                  scriptName
+                  datetime
+                  scheduledDatetime
+                  cron
+                  status
                 }
               }
             }
@@ -507,11 +511,22 @@ async function probeW02ScheduledAnalytics({ accountId, apiToken, now, fetchImpl 
     return failure('GRAPHQL_SCHEDULED_DATA_UNAVAILABLE', response.status)
   }
 
+  // Validate returned evidence in memory as well as filtering server-side.
+  // Count a row only for this exact Worker and this bounded execution window.
+  const startMs = now - WINDOW_MS
+  const endMs = now
+  const verifiedRows = rows.filter((row) => {
+    if (!row || typeof row !== 'object' || Array.isArray(row) ||
+        row.scriptName !== EXPECTED_SCRIPT || typeof row.datetime !== 'string') return false
+    const timestamp = Date.parse(row.datetime)
+    return Number.isFinite(timestamp) && timestamp >= startMs && timestamp <= endMs
+  })
+
   return {
     scheduledAnalyticsStatus: 'PASS',
     scheduledAnalyticsCategory: 'NONE',
     scheduledAnalyticsHttpStatus: response.status,
-    scheduledAnalyticsRows: safeCount(rows.length),
+    scheduledAnalyticsRows: safeCount(verifiedRows.length),
   }
 }
 
