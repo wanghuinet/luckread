@@ -1,6 +1,7 @@
 export type MfaAuditHookState = {
   userId: string
   isChallenge: boolean
+  receiptId?: string
 }
 
 const mfaAuditStateByContext = new WeakMap<object, MfaAuditHookState>()
@@ -25,6 +26,7 @@ export function setMfaAuditHookState(context: object, state: MfaAuditHookState):
   mfaAuditStateByContext.set(context, {
     userId: state.userId,
     isChallenge: state.isChallenge,
+    ...(state.receiptId ? { receiptId: state.receiptId } : {}),
   })
 }
 
