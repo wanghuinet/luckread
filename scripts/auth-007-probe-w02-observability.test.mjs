@@ -190,7 +190,7 @@ describe('AUTH-007 read-only W02 scheduled Observability probe', () => {
       eventTypeValuesStatus: 'PASS',
       eventTypeValuesCategory: 'NONE',
       eventTypeValuesHttpStatus: 200,
-      eventTypeValueRows: 4,
+      eventTypeDistinctValues: 4,
       eventTypeFetchValuePresent: true,
       eventTypeScheduledValuePresent: true,
       eventTypeCronValuePresent: true,
