@@ -422,6 +422,99 @@ async function probeW02EventTypeValues({ accountId, apiToken, now, fetchImpl }) 
  * Only fixed labels and safe numeric aggregates survive; raw event bodies and
  * request identifiers are never logged or persisted.
  */
+async function probeW02ScheduledAnalytics({ accountId, apiToken, now, fetchImpl }) {
+  const failure = (category, httpStatus = 'NONE') => ({
+    scheduledAnalyticsStatus: 'FAIL',
+    scheduledAnalyticsCategory: category,
+    scheduledAnalyticsHttpStatus: httpStatus,
+    scheduledAnalyticsRows: 0,
+  })
+  let response
+  try {
+    response = await fetchImpl(
+      'https://api.cloudflare.com/client/v4/graphql',
+      {
+        method: 'POST',
+        headers: {
+          authorization: 'Bearer ' + apiToken,
+          accept: 'application/json',
+          'content-type': 'application/json',
+        },
+        cache: 'no-store',
+        signal: AbortSignal.timeout(15_000),
+        body: JSON.stringify({
+          query: `query Auth007W02ScheduledInvocations(
+            $accountTag: string!,
+            $start: string!,
+            $end: string!,
+            $scriptName: string!
+          ) {
+            viewer {
+              accounts(filter: { accountTag: $accountTag }) {
+                workersInvocationsScheduled(
+                  filter: {
+                    scriptName: $scriptName,
+                    datetime_geq: $start,
+                    datetime_leq: $end
+                  },
+                  limit: 100
+                ) {
+                  __typename
+                }
+              }
+            }
+          }`,
+          variables: {
+            accountTag: accountId,
+            start: new Date(now - WINDOW_MS).toISOString(),
+            end: new Date(now).toISOString(),
+            scriptName: EXPECTED_SCRIPT,
+          },
+        }),
+      },
+    )
+  } catch {
+    return failure('NETWORK_OR_CONNECTION')
+  }
+
+  if (!response.ok) {
+    const category = response.status === 401 || response.status === 403
+      ? CATEGORIES.AUTH
+      : response.status === 429
+        ? CATEGORIES.RATE
+        : response.status >= 500
+          ? CATEGORIES.API
+          : CATEGORIES.HTTP
+    return failure(category, response.status)
+  }
+
+  let payload
+  try { payload = await response.json() } catch {
+    return failure(CATEGORIES.RESPONSE, response.status)
+  }
+
+  // GraphQL can return HTTP 200 for schema, query, or authorization errors.
+  // Never emit raw errors or result rows: preserve only a fixed category and count.
+  if (Array.isArray(payload?.errors) && payload.errors.length > 0) {
+    return failure('GRAPHQL_QUERY_OR_PERMISSION_ERROR', response.status)
+  }
+  const accounts = payload?.data?.viewer?.accounts
+  if (!Array.isArray(accounts) || accounts.length !== 1) {
+    return failure('GRAPHQL_ACCOUNT_SCOPE_UNAVAILABLE', response.status)
+  }
+  const rows = accounts[0]?.workersInvocationsScheduled
+  if (!Array.isArray(rows)) {
+    return failure('GRAPHQL_SCHEDULED_DATA_UNAVAILABLE', response.status)
+  }
+
+  return {
+    scheduledAnalyticsStatus: 'PASS',
+    scheduledAnalyticsCategory: 'NONE',
+    scheduledAnalyticsHttpStatus: response.status,
+    scheduledAnalyticsRows: safeCount(rows.length),
+  }
+}
+
 export async function probeW02ScheduledObservability({
   accountId,
   apiToken,
@@ -519,19 +612,22 @@ export async function probeW02ScheduledObservability({
       ...safeInvocationStats({}),
     }
   }
-  const [eventsView, eventTypeValues] = await Promise.all([
+  const [eventsView, eventTypeValues, scheduledAnalytics] = await Promise.all([
     probeW02EventsView({ accountId, apiToken, now, fetchImpl }),
     probeW02EventTypeValues({ accountId, apiToken, now, fetchImpl }),
+    probeW02ScheduledAnalytics({ accountId, apiToken, now, fetchImpl }),
   ])
-  // Query-view filters may return no rows when fields are indexed differently across
-  // views. Inspect the documented Values endpoint as independent evidence, still
-  // scoped to this Worker and the same bounded time window.
+  // Observability is the primary log source. The separate GraphQL scheduled-
+  // invocation dataset provides an independent, read-only scheduler signal.
+  // A GraphQL error is never treated as scheduler evidence.
   const scheduledExecutionObserved = stats.scheduledInvocations > 0 ||
     stats.tickMarkerInvocations > 0 ||
     safeCount(eventsView.scheduledEventRows) + safeCount(eventsView.cronEventRows) +
       safeCount(eventsView.tickMarkerRows) > 0 ||
     (eventTypeValues.eventTypeValuesStatus === 'PASS' &&
-      (eventTypeValues.eventTypeScheduledValuePresent || eventTypeValues.eventTypeCronValuePresent))
+      (eventTypeValues.eventTypeScheduledValuePresent || eventTypeValues.eventTypeCronValuePresent)) ||
+    (scheduledAnalytics.scheduledAnalyticsStatus === 'PASS' &&
+      safeCount(scheduledAnalytics.scheduledAnalyticsRows) > 0)
   return {
     status: 'PASS',
     category: 'NONE',
@@ -540,6 +636,7 @@ export async function probeW02ScheduledObservability({
     ...stats,
     ...eventsView,
     ...eventTypeValues,
+    ...scheduledAnalytics,
     scheduledExecutionObserved,
   }
 }
@@ -574,6 +671,10 @@ async function main() {
       'eventTypeDistinctValues', 'eventTypeFetchValuePresent', 'eventTypeScheduledValuePresent',
       'eventTypeCronValuePresent', 'eventTypeQueueValuePresent',
     ].map((key) => `${key[0].toLowerCase() + key.slice(1)}=${result[key] ?? (key.startsWith('eventTypeValues') ? 'NOT_RUN' : false)}`),
+    ...[
+      'scheduledAnalyticsStatus', 'scheduledAnalyticsCategory',
+      'scheduledAnalyticsHttpStatus', 'scheduledAnalyticsRows',
+    ].map((key) => `${key[0].toLowerCase() + key.slice(1)}=${result[key] ?? (key.startsWith('scheduledAnalytics') ? 'NOT_RUN' : 0)}`),
   ]
   process.stdout.write(`W02_OBSERVABILITY_CRON_DIAGNOSTIC ${fields.join(' ')}\n`)
   if (result.status !== 'PASS') process.exitCode = 1
