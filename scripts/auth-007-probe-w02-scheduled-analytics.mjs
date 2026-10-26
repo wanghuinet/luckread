@@ -3,7 +3,7 @@ import { probeW02ScheduledAnalytics } from './auth-007-probe-w02-observability.m
 async function main() {
   const result = await probeW02ScheduledAnalytics({
     accountId: process.env.CLOUDFLARE_ACCOUNT_ID,
-    apiToken: process.env.CLOUDFLARE_API_TOKEN,
+    apiToken: process.env.CLOUDFLARE_AUTH007_READONLY_API_TOKEN,
   })
   const observed = result.scheduledAnalyticsStatus === 'PASS' && result.scheduledAnalyticsRows > 0
   process.stdout.write(
