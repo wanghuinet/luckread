@@ -11,6 +11,7 @@ import { deriveMfaAuditEventIdForIdempotencyKey } from './mfa-audit-events.js'
 import { sendResendEmail } from './resend-email.js'
 import {
   appendMfaAuditOperationReceiptEvent,
+  assertMfaAuditOperationReceiptOwner,
   createMfaAuditOperationReceipt,
   finalizeMfaAuditOperationReceipt,
   reconcileMfaAuditOperationReceipts,
@@ -216,26 +217,56 @@ const buildLuckReadAuth = (env: BetterAuthEnv) => {
         }
 
         const isChallenge = signedChallengeSubject && !sessionSubject
+        const mfaOperation = requestHeaders?.get('X-LuckRead-MFA-Operation')
+        const suppliedReceiptId = requestHeaders?.get('X-LuckRead-MFA-Receipt-Id')
+        const receiptMode = requestHeaders?.get('X-LuckRead-MFA-Receipt-Mode')
+        const hasReceiptHandoffHeader = Boolean(mfaOperation || suppliedReceiptId || receiptMode)
+        const isEnrollmentConfirmation = mfaOperation === 'enrollment-confirm' &&
+          receiptMode === 'defer-finalization' && Boolean(suppliedReceiptId)
+        if (hasReceiptHandoffHeader && (!isEnrollmentConfirmation || !isTotpVerification)) {
+          throw APIError.from('FORBIDDEN', {
+            code: 'MFA_AUDIT_RECEIPT_HANDOFF_INVALID',
+            message: 'MFA operation could not be verified',
+          })
+        }
+
         let receiptId: string
-        try {
-          // Persist the secret-free intent before Better Auth can change MFA
-          // state. If this fails, the operation is not allowed to proceed.
-          receiptId = await createMfaAuditOperationReceipt(env.D1_01, {
-            userId: subjectId,
-            operationPath: ctx.path as
-              | '/two-factor/verify-totp'
-              | '/two-factor/verify-backup-code'
-              | '/two-factor/disable'
-              | '/two-factor/generate-backup-codes',
-            isChallenge,
-            correlationId: requestHeaders?.get('X-LuckRead-Correlation-Id'),
-            causationId: requestHeaders?.get('X-LuckRead-Request-Id'),
-          })
-        } catch {
-          throw APIError.from('INTERNAL_SERVER_ERROR', {
-            code: 'MFA_AUDIT_UNAVAILABLE',
-            message: 'MFA operations are temporarily unavailable',
-          })
+        if (isEnrollmentConfirmation) {
+          try {
+            await assertMfaAuditOperationReceiptOwner(env.D1_01, {
+              receiptId: suppliedReceiptId as string,
+              userId: subjectId,
+              operationPath: '/two-factor/verify-totp',
+              isChallenge: false,
+            })
+            receiptId = suppliedReceiptId as string
+          } catch {
+            throw APIError.from('INTERNAL_SERVER_ERROR', {
+              code: 'MFA_AUDIT_UNAVAILABLE',
+              message: 'MFA operations are temporarily unavailable',
+            })
+          }
+        } else {
+          try {
+            // Persist the secret-free intent before Better Auth can change MFA
+            // state. If this fails, the operation is not allowed to proceed.
+            receiptId = await createMfaAuditOperationReceipt(env.D1_01, {
+              userId: subjectId,
+              operationPath: ctx.path as
+                | '/two-factor/verify-totp'
+                | '/two-factor/verify-backup-code'
+                | '/two-factor/disable'
+                | '/two-factor/generate-backup-codes',
+              isChallenge,
+              correlationId: requestHeaders?.get('X-LuckRead-Correlation-Id'),
+              causationId: requestHeaders?.get('X-LuckRead-Request-Id'),
+            })
+          } catch {
+            throw APIError.from('INTERNAL_SERVER_ERROR', {
+              code: 'MFA_AUDIT_UNAVAILABLE',
+              message: 'MFA operations are temporarily unavailable',
+            })
+          }
         }
 
         setMfaAuditHookState(ctx.context, {
@@ -253,16 +284,18 @@ const buildLuckReadAuth = (env: BetterAuthEnv) => {
         // account. Check W02-owned account state for TOTP and recovery paths.
         const accountActive = await isActiveMfaSubject(env.D1_01, subjectId)
         if (!accountActive) {
-          await finalizeKnownMfaRejection(
-            env.D1_01,
-            receiptId,
-            isChallenge ? [{
-              eventType: 'auth.mfa.challenge_failed',
-              result: 'failed',
-              reasonCode: 'ACCOUNT_NOT_ACTIVE',
-              challengeMethod: isBackupCodeVerification ? 'recovery_code' : 'totp',
-            }] : [],
-          )
+          if (!isEnrollmentConfirmation) {
+            await finalizeKnownMfaRejection(
+              env.D1_01,
+              receiptId,
+              isChallenge ? [{
+                eventType: 'auth.mfa.challenge_failed',
+                result: 'failed',
+                reasonCode: 'ACCOUNT_NOT_ACTIVE',
+                challengeMethod: isBackupCodeVerification ? 'recovery_code' : 'totp',
+              }] : [],
+            )
+          }
           throw APIError.from('FORBIDDEN', {
             code: 'ACCOUNT_NOT_ACTIVE',
             message: 'Account is not eligible for authentication',
@@ -287,16 +320,18 @@ const buildLuckReadAuth = (env: BetterAuthEnv) => {
         // challenge lockout remain authoritative.
         if (match.kind === 'invalid') return
         if (match.kind === 'ambiguous') {
-          await finalizeKnownMfaRejection(
-            env.D1_01,
-            receiptId,
-            isChallenge ? [{
-              eventType: 'auth.mfa.challenge_failed',
-              result: 'failed',
-              reasonCode: 'AMBIGUOUS_TOTP_TIME_STEP',
-              challengeMethod: 'totp',
-            }] : [],
-          )
+          if (!isEnrollmentConfirmation) {
+            await finalizeKnownMfaRejection(
+              env.D1_01,
+              receiptId,
+              isChallenge ? [{
+                eventType: 'auth.mfa.challenge_failed',
+                result: 'failed',
+                reasonCode: 'AMBIGUOUS_TOTP_TIME_STEP',
+                challengeMethod: 'totp',
+              }] : [],
+            )
+          }
           throw APIError.from('UNAUTHORIZED', { code: 'INVALID_CODE', message: 'Invalid code' })
         }
 
@@ -316,7 +351,9 @@ const buildLuckReadAuth = (env: BetterAuthEnv) => {
             // This rejection is decided inside the before hook, so finalize its
             // durable audit plan here instead of depending on an after hook that
             // may not run when the hook itself throws.
-            await finalizeKnownMfaRejection(env.D1_01, receiptId, [])
+            if (!isEnrollmentConfirmation) {
+              await finalizeKnownMfaRejection(env.D1_01, receiptId, [])
+            }
           } catch {
             throw APIError.from('INTERNAL_SERVER_ERROR', {
               code: 'MFA_AUDIT_UNAVAILABLE',
@@ -330,6 +367,15 @@ const buildLuckReadAuth = (env: BetterAuthEnv) => {
         if (!MFA_AUDIT_OBSERVED_PATHS.has(ctx.path)) return
         const state = getMfaAuditHookState(ctx.context)
         if (!state?.receiptId) return
+
+        const requestHeaders = ctx.request?.headers ?? ctx.headers
+        if (requestHeaders?.get('X-LuckRead-MFA-Operation') === 'enrollment-confirm' &&
+            requestHeaders.get('X-LuckRead-MFA-Receipt-Mode') === 'defer-finalization') {
+          // The owning W02 enrollment endpoint performs authoritative factor
+          // read-back before finalizing this receipt. Do not resolve a successful
+          // enrollment as an empty receipt inside the nested plugin hook.
+          return
+        }
 
         const failed = isMfaAuditFailureOutcome(ctx.context.returned)
         const outcomes: MfaAuditReceiptEvent[] = classifyMfaAuditHookOutcome({
