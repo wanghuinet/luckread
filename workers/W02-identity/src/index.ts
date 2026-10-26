@@ -1,6 +1,7 @@
 import { createLuckReadAuth, type RateLimitBinding } from './auth/better-auth.js'
 import { publishPendingAccountStateEvents } from './account/publication-journal-publisher.js'
 import { publishPendingMfaAuditEvents } from './auth/mfa-audit-publication-journal.js'
+import { reconcileMfaAuditOperationReceipts } from './auth/mfa-audit-receipts.js'
 import { runScheduledPublicationTicks } from './auth/scheduled-publication.js'
 import { resolveGlobalLayer } from './authz/role-assignment.js'
 import { grantCreatorBusinessRole, RoleAssignmentCommandError } from './authz/role-assignment-command.js'
@@ -483,7 +484,32 @@ export default {
     })
     await runScheduledPublicationTicks([
       { name: 'account-state', publish: () => publishPendingAccountStateEvents(env) },
-      { name: 'mfa-audit', publish: () => publishPendingMfaAuditEvents(env) },
+      {
+        name: 'mfa-audit',
+        publish: async () => {
+          let receiptSummary = { selected: 0, emitted: 0, failed: 0, unknown: 0 }
+          try {
+            receiptSummary = await reconcileMfaAuditOperationReceipts(env.D1_01)
+          } catch {
+            // Keep the durable outbox publisher independent from receipt scanning.
+            // The fixed code is safe for logs; never print receipt rows or user IDs.
+            console.error(JSON.stringify({
+              event: 'auth.mfa.audit_receipt_reconcile_failed',
+              code: 'MFA_AUDIT_RECEIPT_RECONCILE_FAILED',
+            }))
+            receiptSummary.failed = 1
+          }
+
+          const publication = await publishPendingMfaAuditEvents(env)
+          return {
+            ...publication,
+            receiptSelected: receiptSummary.selected,
+            receiptEmitted: receiptSummary.emitted,
+            receiptFailed: receiptSummary.failed,
+            receiptUnknown: receiptSummary.unknown,
+          }
+        },
+      },
     ])
   },
 }
