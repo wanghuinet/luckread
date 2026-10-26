@@ -365,6 +365,7 @@ async function checkEvents() {
     const mfaProducerSource = await readFile('workers/W02-identity/src/auth/better-auth.ts', 'utf8')
     const mfaHookSource = await readFile('workers/W02-identity/src/auth/mfa-audit-hooks.ts', 'utf8')
     const mfaReceiptSource = await readFile('workers/W02-identity/src/auth/mfa-audit-receipts.ts', 'utf8')
+    const mfaEventSource = await readFile('workers/W02-identity/src/auth/mfa-audit-events.ts', 'utf8')
     const requiredHookTokens = [
       "'/two-factor/verify-totp'",
       "'/two-factor/verify-backup-code'",
@@ -381,7 +382,6 @@ async function checkEvents() {
     const requiredReceiptTokens = [
       'recordMfaAuditEventOnce',
       'idempotencyKey: event.idempotencyKey',
-      'auth_007_mfa_publication_journal',
       "'OUTBOX_WRITE_FAILED'",
       "'OUTCOME_NOT_FINALIZED'",
     ]
@@ -390,6 +390,7 @@ async function checkEvents() {
         !(await fileExists('workers/W02-identity/src/auth/mfa-audit-receipts.test.ts')) ||
         !requiredHookTokens.every((token) => mfaProducerSource.includes(token)) ||
         !requiredReceiptTokens.every((token) => mfaReceiptSource.includes(token)) ||
+        !mfaEventSource.includes('auth_007_mfa_publication_journal') ||
         !["auth.mfa.challenge_succeeded", "auth.mfa.challenge_failed",
           "auth.mfa.factor_disabled", "auth.mfa.recovery_codes_rotated",
           "auth.mfa.recovery_code_consumed"].every((token) => mfaHookSource.includes(token))) {
