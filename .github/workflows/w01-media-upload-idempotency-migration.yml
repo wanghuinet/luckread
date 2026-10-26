@@ -209,7 +209,7 @@ jobs:
           set -euo pipefail
           node --input-type=module <<'NODE'
           import { getPlatformProxy } from 'wrangler'
-          import { readFileSync, writeFileSync } from 'node:fs'
+          import { writeFileSync } from 'node:fs'
           import { resolve } from 'node:path'
 
           const expected = process.env.EXPECTED_PREDECESSORS.split(',')
