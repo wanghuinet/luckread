@@ -22,11 +22,6 @@ const allKnownEventTypes = new Set([
   ...SCENARIO_SPECIFIC_MFA_AUDIT_EVENT_TYPES,
 ])
 
-const safeCount = (value) => {
-  const count = typeof value === 'number' ? value : Number(value)
-  return Number.isSafeInteger(count) && count >= 0 ? count : 0
-}
-
 const safeEventId = (value) =>
   typeof value === 'string' &&
   /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(value)
@@ -115,12 +110,16 @@ function reconcileEventIds(outboxRows, canonicalRows) {
       canonicalTypeById.get(row.eventId) !== eventType ||
       outboxRows.find((outboxRow) => outboxRow?.eventId === row.eventId)?.status !== 'PUBLISHED'
     ).length
-    const duplicateOutboxEventIdCount = outboxRows.filter((row) =>
-      row?.eventType === eventType && safeEventId(row.eventId) && outboxIdCounts.get(row.eventId) > 1
-    ).length
-    const duplicateCanonicalEventIdCount = canonicalRows.filter((row) =>
-      row?.action === eventType && safeEventId(row.eventId) && canonicalIdCounts.get(row.eventId) > 1
-    ).length
+    const duplicateOutboxEventIdCount = new Set(outboxRows
+      .filter((row) =>
+        row?.eventType === eventType && safeEventId(row.eventId) && outboxIdCounts.get(row.eventId) > 1
+      )
+      .map((row) => row.eventId)).size
+    const duplicateCanonicalEventIdCount = new Set(canonicalRows
+      .filter((row) =>
+        row?.action === eventType && safeEventId(row.eventId) && canonicalIdCounts.get(row.eventId) > 1
+      )
+      .map((row) => row.eventId)).size
     const wrongActionEventIdCount = publishedRows.filter((row) =>
       canonicalIdCounts.has(row.eventId) && canonicalTypeById.get(row.eventId) !== eventType
     ).length + canonicalRowsForType.filter((row) =>
