@@ -410,6 +410,8 @@ async function checkEvents() {
     const requiredLiveMfaNegativeTestTokens = [
       'authenticated_session_is_not_accepted_as_signin_challenge',
       'challenge_rejects_caller_supplied_account_subject',
+      'negative_test_has_nonmatching_signin_challenge_code',
+      'invalid_totp_is_rejected_inside_w02_challenge_flow',
       'mfa_enrollment_rejects_wrong_current_password_without_disclosing_one_time_material',
       'recovery_code_rotation_requires_password_and_fresh_totp_and_replaces_entire_set',
       'pre_rotation_unused_recovery_code_is_invalidated',
