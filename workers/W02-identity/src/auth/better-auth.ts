@@ -273,6 +273,7 @@ const buildLuckReadAuth = (env: BetterAuthEnv) => {
           userId: subjectId,
           isChallenge,
           receiptId,
+          ...(isEnrollmentConfirmation ? { deferFinalization: true } : {}),
         })
 
         // Disable and recovery-code rotation require a live session. Their
@@ -368,9 +369,7 @@ const buildLuckReadAuth = (env: BetterAuthEnv) => {
         const state = getMfaAuditHookState(ctx.context)
         if (!state?.receiptId) return
 
-        const requestHeaders = ctx.request?.headers ?? ctx.headers
-        if (requestHeaders?.get('X-LuckRead-MFA-Operation') === 'enrollment-confirm' &&
-            requestHeaders?.get('X-LuckRead-MFA-Receipt-Mode') === 'defer-finalization') {
+        if (state.deferFinalization) {
           // The owning W02 enrollment endpoint performs authoritative factor
           // read-back before finalizing this receipt. Do not resolve a successful
           // enrollment as an empty receipt inside the nested plugin hook.
