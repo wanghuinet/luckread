@@ -459,6 +459,9 @@ export async function probeW02ScheduledAnalytics({ accountId, apiToken, now = Da
     scheduledAnalyticsCategory: category,
     scheduledAnalyticsHttpStatus: httpStatus,
     scheduledAnalyticsRows: 0,
+    scheduledAnalyticsSuccessfulRows: 0,
+    scheduledAnalyticsFailedRows: 0,
+    scheduledAnalyticsUnknownStatusRows: 0,
   })
   if (!/^[a-f0-9]{32}$/i.test(accountId ?? '') ||
       typeof apiToken !== 'string' || apiToken.length < 20 ||
