@@ -181,6 +181,8 @@ const reconciliationPath = 'contracts/alignment/mapping-batches/AUTH-007-real-ev
 const betterAuthPath = 'workers/W02-identity/src/auth/better-auth.ts'
 const replayGuardPath = 'workers/W02-identity/src/auth/totp-replay-guard.ts'
 const policyPath = 'contracts/api/auth-operation-policy.v1.json'
+const rawAuthProxyRoutePath = 'workers/W01-payload/src/app/api/auth/[...segments]/route.ts'
+const rawAuthProxyTestPath = 'workers/W01-payload/tests/int/auth-raw-better-auth-proxy.int.spec.ts'
 
 for (const file of [
   mfaMigrationPath,
@@ -197,6 +199,8 @@ for (const file of [
   reconciliationPath,
   betterAuthPath,
   replayGuardPath,
+  rawAuthProxyRoutePath,
+  rawAuthProxyTestPath,
   'workers/W02-identity/src/auth/mfa-challenge-verification.ts',
   'workers/W02-identity/src/auth/mfa-challenge-verification.test.ts',
   policyPath,
@@ -240,6 +244,18 @@ if (blockers.length === 0) {
   const standaloneW01Workflow = read('.github/workflows/w01-payload-app-deploy.yml')
   const readOnlyPreflightWorkflow = read('.github/workflows/auth-mfa-rollout-preflight.yml')
   const w06DeployWorkflow = read('.github/workflows/w06-deploy.yml')
+  const rawAuthProxySource = read(rawAuthProxyRoutePath).replace(/\s+/g, ' ')
+  const rawAuthProxyTest = read(rawAuthProxyTestPath)
+  // Static-only PR checks can run before the separate W01 route-hardening PR is
+  // merged. Any real rollout/preflight must prove the native catch-all is closed
+  // by default and has negative tests that prove W02 is never invoked.
+  const w01RawAuthProxyClosedByDefault = staticOnly || (
+    /const publicBetterAuthEndpointMethods: ReadonlyMap<string, ReadonlySet<string>> = new Map\(\)/.test(rawAuthProxySource) &&
+    /if \(!allowedMethods\?\.has\(request\.method\)\)/.test(rawAuthProxySource) &&
+    /fails closed for raw endpoint/.test(rawAuthProxyTest) &&
+    rawAuthProxyTest.includes('two-factor/verify-totp') &&
+    /mocks\.w02Fetch\)\.not\.toHaveBeenCalled\(\)/.test(rawAuthProxyTest)
+  )
   const protectedRefCallSitesConfigured = protectedRefWorkflowPaths.every((file) =>
     /GITHUB_REF_PROTECTED:\s*\$\{\{\s*github\.ref_protected\s*\}\}/.test(read(file))
   )
@@ -421,6 +437,7 @@ if (blockers.length === 0) {
       policyIds.has(operation.id) &&
       canonicalOperationIds.has(operation.id)
     ),
+    w01RawBetterAuthProxyClosedByDefault,
     w02ReplayAndEnrollmentTestsPresent: [
       'workers/W02-identity/src/auth/mfa-status.test.ts',
       'workers/W02-identity/src/auth/mfa-enrollment-start.test.ts',
