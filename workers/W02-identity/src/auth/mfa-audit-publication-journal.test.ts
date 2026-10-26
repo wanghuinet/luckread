@@ -9,7 +9,7 @@ const event = {
   resourceType: 'User',
   resourceId: 'user-1',
   occurredAt: '2026-10-24T14:00:00.000Z',
-  publishedAt: '2026-10-24T14:00:00.000Z',
+  publishedAt: '2026-10-24T14:00:30.000Z',
   correlationId: 'corr-1',
   causationId: 'cause-1',
   idempotencyKey: 'mfa-evt_01234567890123456789012345678901',
@@ -41,7 +41,11 @@ describe('AUTH-007 MFA audit outbox publisher', () => {
     await expect(publishPendingMfaAuditEvents(env, '2026-10-24T14:01:00.000Z')).resolves.toEqual({
       selected: 1, published: 1, failed: 0,
     })
+    expect(event.publishedAt).not.toBe(event.occurredAt)
     expect(queueSend).toHaveBeenCalledWith(event)
+    // Queue transport acknowledgment time is stored in the journal column;
+    // the immutable event envelope is sent as-is and is never rewritten.
+    expect(update).toHaveBeenCalledWith('PUBLISHED', '2026-10-24T14:01:00.000Z', null, null, 'journal-1', 'PENDING')
     expect(prepare).toHaveBeenCalledTimes(2)
     expect(update).toHaveBeenCalledTimes(1)
   })
