@@ -55,12 +55,15 @@ for (const path of validPaths) {
 for (const token of [
   'CREATE TABLE auth_007_mfa_operation_receipts',
   "CHECK (is_challenge IN (0, 1))",
-  "CHECK (status IN ('STARTED', 'READY', 'EMITTED', 'RESOLVED', 'UNKNOWN'))",
   'json_valid(event_plan)',
   'CHECK (attempt >= 0)',
   'auth_007_mfa_operation_receipts_status_next_attempt_idx',
 ]) {
   if (!sql.includes(token)) fail('migration missing invariant: ' + token)
+}
+
+if (!/CHECK\s*\(\s*status\s+IN\s*\(\s*'STARTED'\s*,\s*'READY'\s*,\s*'EMITTED'\s*,\s*'RESOLVED'\s*,\s*'UNKNOWN'\s*\)\s*\)/.test(sql)) {
+  fail('migration missing the full receipt status constraint')
 }
 
 const db = new DatabaseSync(':memory:')
