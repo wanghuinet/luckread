@@ -631,6 +631,163 @@ const run = async () => {
           status: recoveredStatus.facts.status,
           factorStillEnabled: recoveredData?.enabled === true && recoveredData?.verified === true,
         })
+
+      // Rotation must invalidate every unused code from the old set and
+      // return a new no-store set. Only counts and booleans enter evidence.
+      const oldUnusedRecoveryCode = recoveryCodes.find((code) => code !== recoveryCode)
+      check('unused_pre_rotation_recovery_code_available', typeof oldUnusedRecoveryCode === 'string', {
+        recoveryCodeCount: recoveryCodes.length,
+        recoveryCodeValuesLogged: false,
+      })
+      if (typeof oldUnusedRecoveryCode !== 'string') {
+        result.status = 'MFA_RECOVERY_ROTATION_PRECONDITION_FAILED'
+        return
+      }
+
+      let rotation = null
+      let rotationStep = null
+      let rotatedRecoveryCodes = []
+      for (let attempt = 0; attempt < 4; attempt += 1) {
+        const step = currentStep(totp.period)
+        if (step <= (latestAcceptedTotpStep ?? confirmedStep)) {
+          const previousStep = latestAcceptedTotpStep ?? confirmedStep
+          const remainingMs = (previousStep + 1) * totp.period * 1000 - Date.now()
+          await sleep(Math.max(250, Math.min(remainingMs + 250, 31_000)))
+          continue
+        }
+        const code = codeForStep(totp.secret, step, totp.digits, totp.algorithm)
+        rotation = await request('rotate_recovery_codes_with_password_and_fresh_totp',
+          'POST', '/v1/auth/mfa/recovery-codes/rotate', {
+            headers: {
+              'content-type': 'application/json',
+              'Idempotency-Key': `${baseKey}-recovery-rotation-${attempt}`,
+            },
+            body: { currentPassword: password, code },
+          })
+        const candidate = rotation.payload?.data?.recoveryCodes
+        if (rotation.facts.status === 200 && Array.isArray(candidate) &&
+            candidate.length >= 1 && candidate.length <= 32 &&
+            candidate.every((value) => typeof value === 'string' && value.length >= 1 && value.length <= 128)) {
+          rotationStep = step
+          rotatedRecoveryCodes = [...candidate]
+          break
+        }
+        if (rotation.facts.status !== 401) break
+        await sleep(1_000)
+      }
+
+      const oldAndNewCodesDisjoint = rotatedRecoveryCodes.length > 0 &&
+        rotatedRecoveryCodes.every((code) => !recoveryCodes.includes(code))
+      const rotationPass = rotation?.facts.status === 200 &&
+        rotation.facts.cacheControl === 'no-store' &&
+        rotatedRecoveryCodes.length > 0 &&
+        oldAndNewCodesDisjoint
+      check('recovery_code_rotation_requires_password_and_fresh_totp_and_replaces_entire_set',
+        Boolean(rotationPass), {
+          status: rotation?.facts.status ?? null,
+          cacheControl: rotation?.facts.cacheControl ?? null,
+          oldRecoveryCodeCount: recoveryCodes.length,
+          newRecoveryCodeCount: rotatedRecoveryCodes.length,
+          oldAndNewSetsDisjoint: oldAndNewCodesDisjoint,
+          recoveryCodeValuesLogged: false,
+        })
+      if (!rotationPass || rotationStep === null) {
+        result.status = 'MFA_RECOVERY_CODE_ROTATION_FAILED'
+        return
+      }
+      recoveryCodes = rotatedRecoveryCodes
+      latestAcceptedTotpStep = rotationStep
+      lastAuthenticatedCookie = cookieHeader()
+
+      clearCookies()
+      const oldCodeLogin = await request('login_for_old_recovery_code_rejection', 'POST', '/v1/auth/login', {
+        headers: { 'content-type': 'application/json' },
+        body: { identity: email, credential: password },
+      })
+      const oldCodeChallengeReady = oldCodeLogin.facts.status === 202 &&
+        oldCodeLogin.payload?.data?.challengeRequired === true &&
+        Array.isArray(oldCodeLogin.payload?.data?.methods) &&
+        oldCodeLogin.payload.data.methods.includes('recovery_code') &&
+        cookieNames().some((name) => /two_factor/i.test(name))
+      check('fresh_challenge_available_for_old_recovery_code_rejection', Boolean(oldCodeChallengeReady), {
+        status: oldCodeLogin.facts.status,
+        challengeCookiePresent: cookieNames().some((name) => /two_factor/i.test(name)),
+      })
+      if (!oldCodeChallengeReady) {
+        result.status = 'MFA_OLD_RECOVERY_CODE_CHALLENGE_FAILED'
+        restoreCookieHeader(lastAuthenticatedCookie)
+        return
+      }
+      const oldCodeAttempt = await request('pre_rotation_unused_recovery_code_rejected_after_rotation',
+        'POST', '/v1/auth/mfa/challenge/verify', {
+          headers: {
+            'content-type': 'application/json',
+            'Idempotency-Key': `${baseKey}-old-recovery-code-after-rotation`,
+          },
+          body: { code: oldUnusedRecoveryCode, method: 'recovery_code' },
+        })
+      check('pre_rotation_unused_recovery_code_is_invalidated',
+        oldCodeAttempt.facts.status === 401 &&
+        !oldCodeAttempt.response?.headers.has('x-luckread-session-token'), {
+          status: oldCodeAttempt.facts.status,
+          errorCode: oldCodeAttempt.facts.errorCode,
+          recoveryCodeValueLogged: false,
+        })
+
+      clearCookies()
+      const newCodeLogin = await request('login_for_new_recovery_code_acceptance', 'POST', '/v1/auth/login', {
+        headers: { 'content-type': 'application/json' },
+        body: { identity: email, credential: password },
+      })
+      const newCodeChallengeReady = newCodeLogin.facts.status === 202 &&
+        newCodeLogin.payload?.data?.challengeRequired === true &&
+        Array.isArray(newCodeLogin.payload?.data?.methods) &&
+        newCodeLogin.payload.data.methods.includes('recovery_code') &&
+        cookieNames().some((name) => /two_factor/i.test(name))
+      check('fresh_challenge_available_for_new_recovery_code', Boolean(newCodeChallengeReady), {
+        status: newCodeLogin.facts.status,
+        challengeCookiePresent: cookieNames().some((name) => /two_factor/i.test(name)),
+      })
+      if (!newCodeChallengeReady) {
+        result.status = 'MFA_NEW_RECOVERY_CODE_CHALLENGE_FAILED'
+        restoreCookieHeader(lastAuthenticatedCookie)
+        return
+      }
+      const newCodeAttempt = await request('newly_rotated_recovery_code_is_accepted',
+        'POST', '/v1/auth/mfa/challenge/verify', {
+          headers: {
+            'content-type': 'application/json',
+            'Idempotency-Key': `${baseKey}-new-recovery-code-after-rotation`,
+          },
+          body: { code: recoveryCodes[0], method: 'recovery_code' },
+        })
+      const newCodeData = newCodeAttempt.payload?.data
+      const newCodeAccepted = newCodeAttempt.facts.status === 200 &&
+        newCodeData?.authenticated === true && newCodeData?.user?.id === userId &&
+        newCodeAttempt.response?.headers.has('x-luckread-session-token') &&
+        !hasCredentialField(newCodeAttempt.payload)
+      check('newly_rotated_recovery_code_completes_signin_without_json_token_leak',
+        Boolean(newCodeAccepted), {
+          status: newCodeAttempt.facts.status,
+          tokenIssuedInHeader: Boolean(newCodeAttempt.response?.headers.has('x-luckread-session-token')),
+          sessionTokenInJson: hasCredentialField(newCodeAttempt.payload),
+          recoveryCodeValueLogged: false,
+        })
+      if (!newCodeAccepted) {
+        result.status = 'MFA_NEW_RECOVERY_CODE_REJECTED'
+        restoreCookieHeader(lastAuthenticatedCookie)
+        return
+      }
+      lastAuthenticatedCookie = cookieHeader()
+      restoreCookieHeader(lastAuthenticatedCookie)
+      const afterRotationStatus = await request('mfa_status_after_recovery_rotation', 'GET', '/v1/auth/mfa')
+      const afterRotationData = totpStatus(afterRotationStatus.payload)
+      check('recovery_rotation_keeps_factor_enabled',
+        afterRotationStatus.facts.status === 200 && afterRotationData?.enabled === true &&
+        afterRotationData?.verified === true, {
+          status: afterRotationStatus.facts.status,
+          factorStillEnabled: afterRotationData?.enabled === true && afterRotationData?.verified === true,
+        })
     }
 
     const oldCookie = cookieHeader()
