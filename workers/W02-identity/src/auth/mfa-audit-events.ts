@@ -14,6 +14,22 @@ export const MFA_AUDIT_EVENT_NAMES = [
 export type MfaAuditEventName = typeof MFA_AUDIT_EVENT_NAMES[number]
 export type MfaAuditResult = 'started' | 'succeeded' | 'failed' | 'rejected'
 
+/**
+ * Derive one stable event identity for a global idempotency condition such as
+ * a single user's lockout window. Distinct operation receipts can observe the
+ * same condition, so a random per-receipt ID would create false conflicts.
+ */
+export async function deriveMfaAuditEventIdForIdempotencyKey(idempotencyKey: string): Promise<string> {
+  if (typeof idempotencyKey !== 'string' || !/^[A-Za-z0-9._:-]{1,255}$/.test(idempotencyKey)) {
+    throw new TypeError('invalid MFA audit idempotency key')
+  }
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(idempotencyKey))
+  const hex = Array.from(new Uint8Array(digest).slice(0, 16), (byte) =>
+    byte.toString(16).padStart(2, '0'),
+  ).join('')
+  return 'evt_' + hex
+}
+
 export type MfaAuditEvent = {
   eventId: string
   eventType: MfaAuditEventName
