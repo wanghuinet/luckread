@@ -98,8 +98,10 @@ jobs:
           console.log('W02 MFA/L8/MFA-audit outbox/operation-receipt migration artifacts: PASS')
           NODE
 
-      - name: Execute AUTH-007 outbox migration static audit (local SQLite only)
-        run: node scripts/auth-007-mfa-journal-migration-static-audit.mjs
+      - name: Execute AUTH-007 outbox and operation-receipt migration audits (local SQLite only)
+        run: |
+          node scripts/auth-007-mfa-journal-migration-static-audit.mjs
+          node scripts/auth-007-mfa-operation-receipts-static-audit.mjs
 
       - name: Verify protected AUTH-007 rollout admission before schema mutation
         env:
