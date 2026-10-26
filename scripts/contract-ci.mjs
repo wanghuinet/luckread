@@ -370,6 +370,7 @@ async function checkEvents() {
     const mfaPublicationSource = await readFile('workers/W02-identity/src/auth/mfa-audit-publication-journal.ts', 'utf8')
     const mfaAuditEvidenceSource = await readFile('scripts/auth-007-mfa-audit-evidence.mjs', 'utf8')
     const mfaAuditDeliveryE2ESource = await readFile('scripts/auth-007-mfa-audit-delivery-e2e.mjs', 'utf8')
+    const mfaLiveSecurityE2ESource = await readFile('scripts/auth-007-mfa-live-security-e2e.mjs', 'utf8')
     const requiredHookTokens = [
       "'/two-factor/verify-totp'",
       "'/two-factor/verify-backup-code'",
@@ -406,6 +407,14 @@ async function checkEvents() {
       'eventIdsComparedInMemoryOnly',
       'rawEventIdentifiersStored: false',
     ]
+    const requiredLiveMfaNegativeTestTokens = [
+      'authenticated_session_is_not_accepted_as_signin_challenge',
+      'challenge_rejects_caller_supplied_account_subject',
+      'mfa_enrollment_rejects_wrong_current_password_without_disclosing_one_time_material',
+      'recovery_code_rotation_requires_password_and_fresh_totp_and_replaces_entire_set',
+      'pre_rotation_unused_recovery_code_is_invalidated',
+      'newly_rotated_recovery_code_completes_signin_without_json_token_leak',
+    ]
     const requiredTimestampSemanticTokens = [
       'const publishedAt = new Date().toISOString()',
       'event.publishedAt,',
@@ -421,6 +430,7 @@ async function checkEvents() {
         !requiredReceiptTokens.every((token) => mfaReceiptSource.includes(token)) ||
         !requiredAuditEvidenceTokens.every((token) => mfaAuditEvidenceSource.includes(token)) ||
         !requiredAuditDeliveryE2ETokens.every((token) => mfaAuditDeliveryE2ESource.includes(token)) ||
+        !requiredLiveMfaNegativeTestTokens.every((token) => mfaLiveSecurityE2ESource.includes(token)) ||
         !requiredTimestampSemanticTokens.every((token) =>
           token === 'SET status = ?, published_at = ?'
             ? mfaPublicationSource.includes(token)
