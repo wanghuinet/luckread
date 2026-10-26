@@ -600,6 +600,24 @@ export async function reconcileMfaAuditOperationReceipts(
         }
       }
 
+      // The transition to UNKNOWN has its own ambiguous-response window too.
+      // Re-read after attempting that transition so a committed terminal state is
+      // never misreported as a retryable failure solely because its response was lost.
+      try {
+        const latest = await loadReceipt(db, row.receiptId)
+        if (latest.status === 'EMITTED') {
+          emitted += 1
+          continue
+        }
+        if (latest.status === 'RESOLVED') continue
+        if (latest.status === 'UNKNOWN') {
+          unknown += 1
+          continue
+        }
+      } catch {
+        // If the terminal state still cannot be read, preserve the existing retry path.
+      }
+
       const delay = retryDelaySeconds(row.attempt)
       const nextAttemptAt = new Date(Date.parse(now) + delay * 1000).toISOString()
       try {
