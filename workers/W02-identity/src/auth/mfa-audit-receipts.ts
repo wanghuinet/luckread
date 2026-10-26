@@ -376,8 +376,10 @@ export async function reconcileMfaAuditOperationReceipts(
     }
 
     try {
-      for (const event of plan) {
-        await recordMfaAuditEventOnce(db, {
+      let adoptedLegacyIdentity = false
+      for (let index = 0; index < plan.length; index += 1) {
+        const event = plan[index]!
+        const recorded = await recordMfaAuditEventOnce(db, {
           eventType: event.eventType,
           userId: row.resourceId,
           occurredAt: event.occurredAt,
@@ -390,7 +392,39 @@ export async function reconcileMfaAuditOperationReceipts(
           idempotencyKey: event.idempotencyKey,
           eventId: event.eventId,
         })
+        if (recorded.eventId !== event.eventId) {
+          plan[index] = { ...event, eventId: recorded.eventId }
+          adoptedLegacyIdentity = true
+        }
       }
+
+      // Preserve an already-existing legacy outbox ID in the receipt plan before
+      // marking the receipt EMITTED. Otherwise W02 would claim reconciliation
+      // while the durable receipt and W06 canonical event disagree on identity.
+      if (adoptedLegacyIdentity) {
+        const updatedPlan = JSON.stringify(plan)
+        const persisted = await db.prepare(
+          'UPDATE auth_007_mfa_operation_receipts SET event_plan = ? ' +
+          'WHERE receipt_id = ? AND status = ? AND event_plan = ?',
+        ).bind(updatedPlan, row.receiptId, 'READY', row.eventPlan).run()
+        if (!persisted.success || persisted.meta?.changes !== 1) {
+          const latest = await loadReceipt(db, row.receiptId)
+          const latestPlan = parsePlan(latest.eventPlan)
+          const allIdentitiesAlreadyAdopted = plan.every((event) =>
+            latestPlan.some((candidate) =>
+              candidate.idempotencyKey === event.idempotencyKey &&
+              candidate.eventType === event.eventType &&
+              candidate.eventId === event.eventId
+            )
+          )
+          if (!allIdentitiesAlreadyAdopted ||
+              (latest.status !== 'READY' && latest.status !== 'EMITTED')) {
+            throw new Error('MFA_AUDIT_RECEIPT_IDENTITY_RECONCILIATION_FAILED')
+          }
+          plan = latestPlan
+        }
+      }
+
       const result = await db.prepare(
         'UPDATE auth_007_mfa_operation_receipts SET status = ?, next_attempt_at = NULL, ' +
         'last_error_code = NULL WHERE receipt_id = ? AND status = ?',
