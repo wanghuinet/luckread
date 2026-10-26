@@ -436,7 +436,7 @@ if (blockers.length === 0) {
       policyIds.has(operation.id) &&
       canonicalOperationIds.has(operation.id)
     ),
-    w01RawBetterAuthProxyClosedByDefault,
+    w01RawAuthProxyClosedByDefault,
     w02ReplayAndEnrollmentTestsPresent: [
       'workers/W02-identity/src/auth/mfa-status.test.ts',
       'workers/W02-identity/src/auth/mfa-enrollment-start.test.ts',
