@@ -2,6 +2,7 @@ import { MFA_AUDIT_EVENT_NAMES } from './mfa-audit-events.js'
 
 type JournalRow = { journalId: string; payload: string; attempt: number }
 type PublicationEnv = { D1_01: D1Database; AUTH013_QUEUE: Queue }
+type JournalSelectResult = { success?: boolean; results?: JournalRow[] | null }
 
 const MAX_BATCH = 10
 const MAX_BACKOFF_SECONDS = 300
@@ -32,13 +33,18 @@ export async function publishPendingMfaAuditEvents(
   env: PublicationEnv,
   now = new Date().toISOString(),
 ): Promise<{ selected: number; published: number; failed: number }> {
-  let rows: { results?: JournalRow[] }
+  let rows: JournalSelectResult
   try {
     rows = await env.D1_01.prepare(
       'SELECT journal_id AS journalId, payload, attempt FROM auth_007_mfa_publication_journal ' +
       'WHERE status = ? AND (next_attempt_at IS NULL OR next_attempt_at <= ?) ' +
       'ORDER BY created_at ASC LIMIT ?',
     ).bind('PENDING', now, MAX_BATCH).all<JournalRow>()
+    // D1 exposes a success flag on result objects. A non-throwing unsuccessful
+    // selection must not be interpreted as an empty outbox.
+    if (rows.success !== true || !Array.isArray(rows.results)) {
+      return failAtPublicationStage('select-pending')
+    }
   } catch {
     return failAtPublicationStage('select-pending')
   }
