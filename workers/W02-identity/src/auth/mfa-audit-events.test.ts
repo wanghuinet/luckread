@@ -113,6 +113,25 @@ describe('AUTH-007 MFA audit event builder and idempotent writer', () => {
     }
   })
 
+  it('honors the contracted operation source for enrollment failures without widening other mappings', () => {
+    const startFailure = buildMfaAuditEvent({
+      ...input,
+      eventType: 'auth.mfa.enrollment_failed',
+    })
+    const confirmationFailure = buildMfaAuditEvent({
+      ...input,
+      eventType: 'auth.mfa.enrollment_failed',
+      operationId: 'authMfaEnrollmentConfirm',
+    })
+    expect(startFailure.payload.operationId).toBe('authMfaEnrollmentStart')
+    expect(confirmationFailure.payload.operationId).toBe('authMfaEnrollmentConfirm')
+    expect(() => buildMfaAuditEvent({
+      ...input,
+      eventType: 'auth.mfa.challenge_failed',
+      operationId: 'authMfaEnrollmentConfirm',
+    })).toThrow('invalid MFA audit operation id for event type')
+  })
+
   it('preserves a receipt-assigned eventId through the outbox envelope', () => {
     const eventId = 'evt_0123456789abcdef0123456789abcdef'
     const event = buildMfaAuditEvent({ ...input, eventId })
