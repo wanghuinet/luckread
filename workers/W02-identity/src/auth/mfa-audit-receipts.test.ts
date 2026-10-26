@@ -127,6 +127,16 @@ function createDb() {
           return { success: true, meta: { changes } }
         }
 
+        if (sql.includes("SET status = ?, next_attempt_at = NULL, last_error_code = ? WHERE receipt_id = ? AND status = ?")) {
+          const [status, errorCode, receiptId, priorStatus] = args
+          const row = receipts.get(String(receiptId))
+          if (!row || row.status !== priorStatus) return { success: true, meta: { changes: 0 } }
+          row.status = String(status)
+          row.lastErrorCode = String(errorCode)
+          row.nextAttemptAt = null
+          return { success: true, meta: { changes: 1 } }
+        }
+
         if (sql.includes("SET status = ?, last_error_code = ?, next_attempt_at = NULL WHERE receipt_id = ?")) {
           const [status, errorCode, receiptId, priorStatus] = args
           const row = receipts.get(String(receiptId))
@@ -547,6 +557,49 @@ describe('AUTH-007 durable MFA operation receipts', () => {
     const persistedPlan = JSON.parse(store.receipts.get(receiptId)?.eventPlan ?? '[]') as Array<{eventId:string;idempotencyKey:string}>
     expect(persistedPlan.find((event) => event.idempotencyKey === idempotencyKey)?.eventId).toBe(legacyEventId)
     expect(store.outbox.get(idempotencyKey)?.eventId).toBe(legacyEventId)
+  })
+
+
+  it('marks a receipt UNKNOWN instead of retrying forever when its outbox row is permanently FAILED', async () => {
+    const idempotencyKey = 'mfa-lock:user-123:1792850400000'
+    const eventId = await deriveMfaAuditEventIdForIdempotencyKey(idempotencyKey)
+    const receiptId = await createMfaAuditOperationReceipt(store.db, {
+      userId: 'user-123',
+      operationPath: '/two-factor/verify-totp',
+      isChallenge: true,
+      now: startedAt,
+    })
+    await finalizeMfaAuditOperationReceipt(store.db, receiptId, [{
+      eventType: 'auth.mfa.locked',
+      eventId,
+      result: 'rejected',
+      reasonCode: 'VERIFICATION_LOCKOUT',
+      idempotencyKey,
+      occurredAt: startedAt,
+    }], startedAt)
+    store.outbox.set(idempotencyKey, {
+      eventId,
+      status: 'FAILED',
+      payload: JSON.stringify({
+        eventId,
+        eventType: 'auth.mfa.locked',
+        resourceId: 'user-123',
+        payload: {
+          operationId: 'authMfaChallengeVerify',
+          result: 'rejected',
+          reasonCode: 'VERIFICATION_LOCKOUT',
+        },
+      }),
+    })
+
+    await expect(reconcileMfaAuditOperationReceipts(store.db, startedAt)).resolves.toEqual({
+      selected: 1,
+      emitted: 0,
+      failed: 0,
+      unknown: 1,
+    })
+    expect(store.receipts.get(receiptId)?.status).toBe('UNKNOWN')
+    expect(store.receipts.get(receiptId)?.lastErrorCode).toBe('OUTBOX_PREVIOUSLY_FAILED')
   })
 
   it('retains two distinct events for a successful recovery-code login challenge', async () => {
