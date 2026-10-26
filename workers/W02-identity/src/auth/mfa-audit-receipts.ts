@@ -1,5 +1,6 @@
 import {
   MFA_AUDIT_EVENT_NAMES,
+  MFA_AUDIT_OPERATION_IDS,
   deriveMfaAuditEventIdForIdempotencyKey,
   isAllowedMfaAuditOperationId,
   recordMfaAuditEventOnce,
@@ -39,7 +40,8 @@ type ReceiptRow = {
   attempt: number
 }
 
-type StoredReceiptEvent = MfaAuditReceiptEvent & {
+type StoredReceiptEvent = Omit<MfaAuditReceiptEvent, 'operationId'> & {
+  operationId: MfaAuditOperationId
   eventId: string
   idempotencyKey: string
   occurredAt: string
@@ -115,11 +117,12 @@ function validateEvent(value: unknown): StoredReceiptEvent {
     throw new Error('INVALID_MFA_AUDIT_RECEIPT_PLAN')
   }
 
+  const operationId = typeof event.operationId === 'string'
+    ? event.operationId as MfaAuditOperationId
+    : MFA_AUDIT_OPERATION_IDS[event.eventType as MfaAuditEventName][0]!
   return {
     eventType: event.eventType as MfaAuditEventName,
-    ...(typeof event.operationId === 'string'
-      ? { operationId: event.operationId as MfaAuditOperationId }
-      : {}),
+    operationId,
     eventId: event.eventId,
     result: event.result as MfaAuditResult,
     ...(typeof event.reasonCode === 'string' ? { reasonCode: event.reasonCode } : {}),
