@@ -241,7 +241,6 @@ export async function recordMfaAuditEventOnce(
       .first<StoredJournalEvent>()
     if (raced) {
       assertSameIntent(raced)
-      assertSameIntent(raced)
       return { inserted: false, eventId: raced.eventId }
     }
     throw new Error('MFA_AUDIT_OUTBOX_WRITE_FAILED')
@@ -252,7 +251,6 @@ export async function recordMfaAuditEventOnce(
     .bind(event.idempotencyKey)
     .first<StoredJournalEvent>()
   if (afterWrite) {
-    assertSameIntent(afterWrite)
     assertSameIntent(afterWrite)
     return { inserted: false, eventId: afterWrite.eventId }
   }
