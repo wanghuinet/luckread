@@ -2,6 +2,7 @@ export type MfaAuditHookState = {
   userId: string
   isChallenge: boolean
   receiptId?: string
+  deferFinalization?: boolean
 }
 
 const mfaAuditStateByContext = new WeakMap<object, MfaAuditHookState>()
@@ -23,10 +24,14 @@ const subjectPattern = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/
 
 export function setMfaAuditHookState(context: object, state: MfaAuditHookState): void {
   if (!subjectPattern.test(state.userId)) throw new TypeError('invalid MFA audit subject')
+  if (state.deferFinalization !== undefined && typeof state.deferFinalization !== 'boolean') {
+    throw new TypeError('invalid MFA audit defer-finalization flag')
+  }
   mfaAuditStateByContext.set(context, {
     userId: state.userId,
     isChallenge: state.isChallenge,
     ...(state.receiptId ? { receiptId: state.receiptId } : {}),
+    ...(state.deferFinalization ? { deferFinalization: true } : {}),
   })
 }
 
