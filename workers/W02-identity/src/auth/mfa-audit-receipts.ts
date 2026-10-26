@@ -190,25 +190,38 @@ export async function createMfaAuditOperationReceipt(
   const receiptId = 'mfaop_' + crypto.randomUUID().replaceAll('-', '')
   const correlationId = safeCorrelation(input.correlationId, receiptId)
   const causationId = safeCorrelation(input.causationId, correlationId)
-  const result = await db.prepare(
-    'INSERT INTO auth_007_mfa_operation_receipts ' +
-    '(receipt_id, resource_id, operation_path, is_challenge, status, started_at, completed_at, ' +
-    'correlation_id, causation_id, event_plan, attempt, next_attempt_at, last_error_code) ' +
-    'VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?, NULL, 0, NULL, NULL)',
-  ).bind(
-    receiptId,
-    input.userId,
-    input.operationPath,
-    input.isChallenge ? 1 : 0,
-    'STARTED',
-    now,
-    correlationId,
-    causationId,
-  ).run()
-  if (!result.success || result.meta?.changes !== 1) {
-    throw new Error('MFA_AUDIT_RECEIPT_WRITE_FAILED')
+  try {
+    const result = await db.prepare(
+      'INSERT INTO auth_007_mfa_operation_receipts ' +
+      '(receipt_id, resource_id, operation_path, is_challenge, status, started_at, completed_at, ' +
+      'correlation_id, causation_id, event_plan, attempt, next_attempt_at, last_error_code) ' +
+      'VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?, NULL, 0, NULL, NULL)',
+    ).bind(
+      receiptId,
+      input.userId,
+      input.operationPath,
+      input.isChallenge ? 1 : 0,
+      'STARTED',
+      now,
+      correlationId,
+      causationId,
+    ).run()
+    if (result.success && result.meta?.changes === 1) return receiptId
+  } catch {
+    // The write may have committed even if the D1 response was lost. Verify
+    // the exact server-generated receipt ID before deciding the operation
+    // must fail closed.
   }
-  return receiptId
+
+  try {
+    const existing = await db.prepare(
+      'SELECT receipt_id AS receiptId FROM auth_007_mfa_operation_receipts WHERE receipt_id = ? LIMIT 1',
+    ).bind(receiptId).first<{ receiptId: string }>()
+    if (existing?.receiptId === receiptId) return receiptId
+  } catch {
+    // Without a read-back proof, a failed receipt write remains a hard block.
+  }
+  throw new Error('MFA_AUDIT_RECEIPT_WRITE_FAILED')
 }
 
 /**
