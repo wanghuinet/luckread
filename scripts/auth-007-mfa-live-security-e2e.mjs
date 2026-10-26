@@ -519,6 +519,62 @@ const run = async () => {
         return
       }
 
+      // Exercise a real W02 challenge failure (not a W01 schema rejection)
+      // before the success path. Build a code guaranteed not to match the
+      // currently accepted TOTP tolerance window; one failed attempt must not
+      // issue a session token or destroy the valid challenge.
+      const challengeWindowCodes = new Set()
+      const challengeNowStep = currentStep(totp.period)
+      for (let step = Math.max(0, challengeNowStep - 2); step <= challengeNowStep + 2; step += 1) {
+        challengeWindowCodes.add(codeForStep(totp.secret, step, totp.digits, totp.algorithm))
+      }
+      const challengeBaseCode = Number(challengeCode)
+      let invalidChallengeCode = ''
+      for (let delta = 1; delta < 100; delta += 1) {
+        const candidate = String((challengeBaseCode + delta) % (10 ** totp.digits))
+          .padStart(totp.digits, '0')
+        if (!challengeWindowCodes.has(candidate)) {
+          invalidChallengeCode = candidate
+          break
+        }
+      }
+      check('negative_test_has_nonmatching_signin_challenge_code',
+        invalidChallengeCode.length === totp.digits, {
+          codeValueLogged: false,
+          candidateMatchesCurrentTOTPWindow: challengeWindowCodes.has(invalidChallengeCode),
+        })
+      if (!invalidChallengeCode) {
+        result.status = 'MFA_CHALLENGE_NEGATIVE_TEST_PRECONDITION_FAILED'
+        restoreCookieHeader(lastAuthenticatedCookie)
+        return
+      }
+
+      const failedChallengeAttempt = await request(
+        'signin_totp_challenge_wrong_code_rejected',
+        'POST',
+        '/v1/auth/mfa/challenge/verify',
+        {
+          headers: {
+            'content-type': 'application/json',
+            'Idempotency-Key': `${baseKey}-signin-totp-invalid`,
+          },
+          body: { code: invalidChallengeCode, method: 'totp' },
+        },
+      )
+      const failedChallengePass = failedChallengeAttempt.facts.status === 401 &&
+        !failedChallengeAttempt.response?.headers.has('x-luckread-session-token')
+      check('invalid_totp_is_rejected_inside_w02_challenge_flow', failedChallengePass, {
+        status: failedChallengeAttempt.facts.status,
+        errorCode: failedChallengeAttempt.facts.errorCode,
+        tokenIssued: Boolean(failedChallengeAttempt.response?.headers.has('x-luckread-session-token')),
+        totpValueLogged: false,
+      })
+      if (!failedChallengePass) {
+        result.status = 'MFA_INVALID_CHALLENGE_CODE_ACCEPTED'
+        restoreCookieHeader(lastAuthenticatedCookie)
+        return
+      }
+
       const challengeVerify = await request('signin_totp_challenge_success', 'POST', '/v1/auth/mfa/challenge/verify', {
         headers: {
           'content-type': 'application/json',
