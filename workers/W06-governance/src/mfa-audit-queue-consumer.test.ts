@@ -19,8 +19,22 @@ const event = {
   payload: { operationId: 'authMfaEnrollmentStart', result: 'started', factorState: 'PENDING_VERIFICATION' },
 }
 
-function createDb(existing = false, writeSuccess = true) {
-  const first = vi.fn().mockResolvedValue(existing ? { eventId: event.eventId } : null)
+function createDb(existing = false, writeSuccess = true, existingOverrides: Record<string, unknown> = {}) {
+  const existingRow = {
+    eventId: event.eventId,
+    requestId: event.correlationId,
+    traceId: event.causationId,
+    actorJson: JSON.stringify(event.actor),
+    action: event.eventType,
+    targetType: 'User',
+    targetId: event.resourceId,
+    beforeJson: '{}',
+    afterJson: JSON.stringify(event.payload),
+    reason: event.payload.reasonCode ?? null,
+    occurredAt: event.occurredAt,
+    ...existingOverrides,
+  }
+  const first = vi.fn().mockResolvedValue(existing ? existingRow : null)
   const run = vi.fn().mockResolvedValue({ success: writeSuccess })
   const bind = vi.fn(() => ({ first, run }))
   const prepare = vi.fn((sql: string) => ({ bind, sql }))
@@ -41,6 +55,24 @@ describe('AUTH-007 W06 MFA audit queue consumer', () => {
     await expect(consumeMfaAuditEvent(db, event)).resolves.toBe('duplicate')
     expect(prepare).toHaveBeenCalledTimes(1)
     expect(run).not.toHaveBeenCalled()
+  })
+
+  it('rejects a reused eventId whose action or target user differs', async () => {
+    const wrongAction = createDb(true, true, { action: 'auth.mfa.factor_disabled' })
+    await expect(consumeMfaAuditEvent(wrongAction.db, event))
+      .rejects.toThrow('MFA_AUDIT_EVENT_IDENTITY_CONFLICT')
+
+    const wrongSubject = createDb(true, true, { targetId: 'user-2' })
+    await expect(consumeMfaAuditEvent(wrongSubject.db, event))
+      .rejects.toThrow('MFA_AUDIT_EVENT_IDENTITY_CONFLICT')
+  })
+
+  it('rejects a reused eventId whose persisted event payload differs', async () => {
+    const wrongPayload = createDb(true, true, {
+      afterJson: JSON.stringify({ ...event.payload, result: 'succeeded' }),
+    })
+    await expect(consumeMfaAuditEvent(wrongPayload.db, event))
+      .rejects.toThrow('MFA_AUDIT_EVENT_IDENTITY_CONFLICT')
   })
 
   it('rejects client-injected actor identity and payload secrets', async () => {
