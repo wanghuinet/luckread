@@ -7,7 +7,13 @@ import { bearer, twoFactor } from 'better-auth/plugins'
 import { consumeTotpTimeStep, matchTotpTimeStep } from './totp-replay-guard.js'
 import { isActiveMfaSubject } from './mfa-challenge-account-state.js'
 import { sendResendEmail } from './resend-email.js'
-import { recordMfaAuditEvent, recordMfaAuditEventOnce } from './mfa-audit-events.js'
+import {
+  appendMfaAuditOperationReceiptEvent,
+  createMfaAuditOperationReceipt,
+  finalizeMfaAuditOperationReceipt,
+  reconcileMfaAuditOperationReceipts,
+  type MfaAuditReceiptEvent,
+} from './mfa-audit-receipts.js'
 import {
   classifyMfaAuditHookOutcome,
   getMfaAuditHookState,
@@ -158,11 +164,43 @@ const buildLuckReadAuth = (env: BetterAuthEnv) => {
             message: 'TOTP verification is temporarily unavailable',
           })
         }
-        if (!subjectId) return
+        if (!subjectId) {
+          // Every MFA mutation/challenge must have a server-derived subject. If
+          // W02 cannot bind the request to a session or signed challenge, fail
+          // before the plugin can consume a factor or issue a session.
+          throw APIError.from('UNAUTHORIZED', {
+            code: isDisable || isRecoveryRotation ? 'UNAUTHENTICATED' : 'INVALID_CODE',
+            message: isDisable || isRecoveryRotation ? 'Authentication is required' : 'Invalid code',
+          })
+        }
+
+        const isChallenge = signedChallengeSubject && !sessionSubject
+        let receiptId: string
+        try {
+          // Persist the secret-free intent before Better Auth can change MFA
+          // state. If this fails, the operation is not allowed to proceed.
+          receiptId = await createMfaAuditOperationReceipt(env.D1_01, {
+            userId: subjectId,
+            operationPath: ctx.path as
+              | '/two-factor/verify-totp'
+              | '/two-factor/verify-backup-code'
+              | '/two-factor/disable'
+              | '/two-factor/generate-backup-codes',
+            isChallenge,
+            correlationId: requestHeaders?.get('X-LuckRead-Correlation-Id'),
+            causationId: requestHeaders?.get('X-LuckRead-Request-Id'),
+          })
+        } catch {
+          throw APIError.from('INTERNAL_SERVER_ERROR', {
+            code: 'MFA_AUDIT_UNAVAILABLE',
+            message: 'MFA operations are temporarily unavailable',
+          })
+        }
 
         setMfaAuditHookState(ctx.context, {
           userId: subjectId,
-          isChallenge: signedChallengeSubject && !sessionSubject,
+          isChallenge,
+          receiptId,
         })
 
         // Disable and recovery-code rotation require a live session. Their
@@ -206,14 +244,13 @@ const buildLuckReadAuth = (env: BetterAuthEnv) => {
           // The TOTP was valid but its monotonically increasing step was already
           // accepted. Persist the rejection before returning the auth failure.
           try {
-            await recordMfaAuditEvent(env.D1_01, {
+            await appendMfaAuditOperationReceiptEvent(env.D1_01, receiptId, {
               eventType: 'auth.mfa.replay_rejected',
-              userId: subjectId,
-              correlationId: requestHeaders?.get('X-LuckRead-Correlation-Id'),
-              causationId: requestHeaders?.get('X-LuckRead-Request-Id'),
               result: 'rejected',
               reasonCode: 'TOTP_STEP_ALREADY_ACCEPTED',
               challengeMethod: 'totp',
+              idempotencyKey: `mfa-operation:${receiptId}:auth.mfa.replay_rejected`,
+              occurredAt: new Date().toISOString(),
             })
           } catch {
             throw APIError.from('INTERNAL_SERVER_ERROR', {
@@ -227,36 +264,17 @@ const buildLuckReadAuth = (env: BetterAuthEnv) => {
       after: createAuthMiddleware(async (ctx) => {
         if (!MFA_AUDIT_OBSERVED_PATHS.has(ctx.path)) return
         const state = getMfaAuditHookState(ctx.context)
-        if (!state) return
+        if (!state?.receiptId) return
 
         const failed = isMfaAuditFailureOutcome(ctx.context.returned)
-        const outcomes = classifyMfaAuditHookOutcome({
+        const outcomes: MfaAuditReceiptEvent[] = classifyMfaAuditHookOutcome({
           path: ctx.path,
           isChallenge: state.isChallenge,
           failed,
-        })
-        for (const outcome of outcomes) {
-          try {
-            await recordMfaAuditEvent(env.D1_01, {
-              ...outcome,
-              userId: state.userId,
-              correlationId: ctx.request?.headers.get('X-LuckRead-Correlation-Id') ??
-                ctx.headers?.get('X-LuckRead-Correlation-Id') ?? null,
-              causationId: ctx.request?.headers.get('X-LuckRead-Request-Id') ??
-                ctx.headers?.get('X-LuckRead-Request-Id') ?? null,
-            })
-          } catch {
-            // An after-hook must not hide a successful sign-in or a newly rotated
-            // recovery-code set from the user. Keep the failure observable without
-            // logging user identifiers, credentials, request bodies, or secrets.
-            console.error(JSON.stringify({
-              event: 'auth.mfa.audit_outbox_write_failed',
-              eventType: outcome.eventType,
-              code: 'MFA_AUDIT_OUTBOX_WRITE_FAILED',
-            }))
-          }
-        }
+        }).map((outcome) => ({ ...outcome }))
 
+        // Include lockout as part of this operation's durable plan so it is
+        // retried under the same receipt if its outbox insert temporarily fails.
         if (failed &&
             (ctx.path === '/two-factor/verify-totp' || ctx.path === '/two-factor/verify-backup-code')) {
           try {
@@ -265,13 +283,8 @@ const buildLuckReadAuth = (env: BetterAuthEnv) => {
             ).bind(state.userId).first<{ lockedUntil: string | null }>()
             const lockUntil = typeof factor?.lockedUntil === 'string' ? Date.parse(factor.lockedUntil) : Number.NaN
             if (Number.isFinite(lockUntil) && lockUntil > Date.now()) {
-              await recordMfaAuditEventOnce(env.D1_01, {
+              outcomes.push({
                 eventType: 'auth.mfa.locked',
-                userId: state.userId,
-                correlationId: ctx.request?.headers.get('X-LuckRead-Correlation-Id') ??
-                  ctx.headers?.get('X-LuckRead-Correlation-Id') ?? null,
-                causationId: ctx.request?.headers.get('X-LuckRead-Request-Id') ??
-                  ctx.headers?.get('X-LuckRead-Request-Id') ?? null,
                 result: 'rejected',
                 reasonCode: 'VERIFICATION_LOCKOUT',
                 challengeMethod: ctx.path === '/two-factor/verify-backup-code' ? 'recovery_code' : 'totp',
@@ -280,11 +293,35 @@ const buildLuckReadAuth = (env: BetterAuthEnv) => {
             }
           } catch {
             console.error(JSON.stringify({
-              event: 'auth.mfa.audit_outbox_write_failed',
-              eventType: 'auth.mfa.locked',
-              code: 'MFA_AUDIT_OUTBOX_WRITE_FAILED',
+              event: 'auth.mfa.lockout_state_read_failed',
+              code: 'MFA_AUDIT_STATE_READ_FAILED',
             }))
           }
+        }
+
+        try {
+          // Persist the terminal outcome before trying the ordinary outbox.
+          // A failed outbox insert leaves READY work for the existing W02 Cron.
+          await finalizeMfaAuditOperationReceipt(env.D1_01, state.receiptId, outcomes)
+        } catch {
+          // Do not turn a completed MFA mutation into a misleading failure:
+          // the durable STARTED receipt will be surfaced as UNKNOWN if recovery
+          // cannot establish its outcome after the stale-operation threshold.
+          console.error(JSON.stringify({
+            event: 'auth.mfa.audit_receipt_finalize_failed',
+            code: 'MFA_AUDIT_RECEIPT_FINALIZE_FAILED',
+          }))
+          return
+        }
+
+        try {
+          await reconcileMfaAuditOperationReceipts(env.D1_01)
+        } catch {
+          // The receipt is already durable; the scheduled publisher retries it.
+          console.error(JSON.stringify({
+            event: 'auth.mfa.audit_receipt_reconcile_failed',
+            code: 'MFA_AUDIT_RECEIPT_RECONCILE_FAILED',
+          }))
         }
       }),
     },
