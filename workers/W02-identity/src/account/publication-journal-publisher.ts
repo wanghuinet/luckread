@@ -28,10 +28,15 @@ export async function publishPendingAccountStateEvents(
     .bind('PENDING', now, MAX_BATCH)
     .all<PublicationJournalRow>()
 
+  // Do not interpret an unsuccessful D1 read as an empty account-state journal.
+  if (rows.success !== true || !Array.isArray(rows.results)) {
+    throw new Error('AUTH013_PUBLICATION_JOURNAL_SELECT_FAILED')
+  }
+
   let published = 0
   let failed = 0
 
-  for (const row of rows.results ?? []) {
+  for (const row of rows.results) {
     let payload: unknown
     try {
       payload = JSON.parse(row.payload)
@@ -80,7 +85,7 @@ export async function publishPendingAccountStateEvents(
   }
 
   return {
-    selected: rows.results?.length ?? 0,
+    selected: rows.results.length,
     published,
     failed,
   }
