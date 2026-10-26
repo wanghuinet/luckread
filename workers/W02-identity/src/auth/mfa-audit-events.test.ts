@@ -19,8 +19,8 @@ function fakeDb(options: {
   let selectCount = 0
   const first = vi.fn(async () => {
     selectCount += 1
-    if (options.existing) return { eventId: 'evt_existing', eventType: 'auth.mfa.locked', operationId: 'authMfaChallengeVerify' }
-    if (options.raceAppearsAfterInsert && selectCount >= 2) return { eventId: 'evt_raced', eventType: 'auth.mfa.locked', operationId: 'authMfaChallengeVerify' }
+    if (options.existing) return { eventId: 'evt_existing', eventType: 'auth.mfa.locked', resourceId: 'user-123', operationId: 'authMfaChallengeVerify', result: 'rejected', reasonCode: 'VERIFICATION_LOCKOUT', factorState: null, challengeMethod: 'totp' }
+    if (options.raceAppearsAfterInsert && selectCount >= 2) return { eventId: 'evt_raced', eventType: 'auth.mfa.locked', resourceId: 'user-123', operationId: 'authMfaChallengeVerify', result: 'rejected', reasonCode: 'VERIFICATION_LOCKOUT', factorState: null, challengeMethod: 'totp' }
     return null
   })
   const run = vi.fn().mockResolvedValue({
@@ -133,7 +133,7 @@ describe('AUTH-007 MFA audit event builder and idempotent writer', () => {
   it('rejects a durable idempotency match whose canonical action differs', async () => {
     const prepare = vi.fn((sql: string) => ({
       bind: vi.fn(() => ({
-        first: async () => ({ eventId: 'evt_0123456789abcdef0123456789abcdef', eventType: 'auth.mfa.locked', operationId: 'authMfaDisable' }),
+        first: async () => ({ eventId: 'evt_0123456789abcdef0123456789abcdef', eventType: 'auth.mfa.locked', resourceId: 'user-123', operationId: 'authMfaDisable', result: 'rejected', reasonCode: 'VERIFICATION_LOCKOUT', factorState: null, challengeMethod: 'totp' }),
         run: vi.fn(),
         sql,
       })),
@@ -151,7 +151,12 @@ describe('AUTH-007 MFA audit event builder and idempotent writer', () => {
         first: async () => ({
           eventId: 'evt_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
           eventType: 'auth.mfa.locked',
+          resourceId: 'user-123',
           operationId: 'authMfaChallengeVerify',
+          result: 'rejected',
+          reasonCode: 'VERIFICATION_LOCKOUT',
+          factorState: null,
+          challengeMethod: 'totp',
         }),
         run: vi.fn(),
         sql,
@@ -163,6 +168,27 @@ describe('AUTH-007 MFA audit event builder and idempotent writer', () => {
       eventId: 'evt_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
     })).rejects.toThrow('MFA_AUDIT_EVENT_ID_CONFLICT')
     expect(prepare.mock.calls[0]?.[0]).toContain("json_extract(payload, '$.payload.operationId')")
+  })
+
+  it('rejects an idempotency match for a different subject or outcome', async () => {
+    const prepare = vi.fn((sql: string) => ({
+      bind: vi.fn(() => ({
+        first: async () => ({
+          eventId: 'evt_0123456789abcdef0123456789abcdef',
+          eventType: 'auth.mfa.locked',
+          resourceId: 'another-user',
+          operationId: 'authMfaChallengeVerify',
+          result: 'rejected',
+          reasonCode: 'VERIFICATION_LOCKOUT',
+          factorState: null,
+          challengeMethod: 'totp',
+        }),
+        run: vi.fn(),
+        sql,
+      })),
+    }))
+    const db = { prepare } as unknown as D1Database
+    await expect(recordMfaAuditEventOnce(db, input)).rejects.toThrow('MFA_AUDIT_EVENT_INTENT_CONFLICT')
   })
 
   it('fails when the insert is rejected and the idempotency key is not present', async () => {
