@@ -70,7 +70,15 @@ jobs:
           node - <<'NODE'
           const fs = require('node:fs');
           const schema = JSON.parse(fs.readFileSync(process.env.GITHUB_WORKSPACE + '/artifacts/mapping-0/auth-013-journal-migration/preflight-journal-schema.json', 'utf8'));
-          const rows = schema?.[0]?.results ?? [];
+          if (
+            !Array.isArray(schema) ||
+            schema.length !== 1 ||
+            schema[0]?.success !== true ||
+            !Array.isArray(schema[0]?.results)
+          ) {
+            throw new Error('AUTH-013 preflight failed: journal schema query did not return a successful row set');
+          }
+          const rows = schema[0].results;
           if (rows.length) throw new Error('AUTH-013 fail-closed: journal table already exists; stop rather than applying a duplicate migration');
           console.log(JSON.stringify({ targetJournalPresent: false }));
           NODE
@@ -97,8 +105,24 @@ jobs:
           const root = process.env.GITHUB_WORKSPACE + '/artifacts/mapping-0/auth-013-journal-migration';
           const schema = JSON.parse(fs.readFileSync(root + '/post-journal-schema.json', 'utf8'));
           const indexes = JSON.parse(fs.readFileSync(root + '/post-journal-indexes.json', 'utf8'));
-          const rows = schema?.[0]?.results ?? [];
-          const indexRows = indexes?.[0]?.results ?? [];
+          if (
+            !Array.isArray(schema) ||
+            schema.length !== 1 ||
+            schema[0]?.success !== true ||
+            !Array.isArray(schema[0]?.results)
+          ) {
+            throw new Error('AUTH-013 post-migration failed: journal schema query did not return a successful row set');
+          }
+          if (
+            !Array.isArray(indexes) ||
+            indexes.length !== 1 ||
+            indexes[0]?.success !== true ||
+            !Array.isArray(indexes[0]?.results)
+          ) {
+            throw new Error('AUTH-013 post-migration failed: journal index query did not return a successful row set');
+          }
+          const rows = schema[0].results;
+          const indexRows = indexes[0].results;
           const names = new Set(rows.map((r) => r.name));
           const required = ['journal_id','event_id','event_type','schema_version','resource_id','source_version','payload','status','attempt','next_attempt_at','created_at','published_at','last_error_code'];
           for (const name of required) if (!names.has(name)) throw new Error('Missing journal column: ' + name);
