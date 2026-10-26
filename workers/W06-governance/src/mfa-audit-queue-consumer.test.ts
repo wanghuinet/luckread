@@ -42,6 +42,15 @@ function createDb(existing = false, writeSuccess = true, existingOverrides: Reco
 }
 
 describe('AUTH-007 W06 MFA audit queue consumer', () => {
+
+  it('rejects malformed event IDs before touching canonical audit storage', async () => {
+    const malformed = { ...event, eventId: 'evt_0123456789abcdef' }
+    const prepare = vi.fn()
+    await expect(consumeMfaAuditEvent({ prepare } as unknown as D1Database, malformed))
+      .rejects.toThrow('INVALID_AUTH_007_MFA_EVENT')
+    expect(prepare).not.toHaveBeenCalled()
+  })
+
   it('persists a safe MFA event into canonical AuditEvent storage', async () => {
     const { db, prepare, run } = createDb()
     await expect(consumeMfaAuditEvent(db, event)).resolves.toBe('persisted')
