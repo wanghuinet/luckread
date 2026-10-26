@@ -279,6 +279,47 @@ const run = async () => {
       return
     }
 
+    // Emit and verify the enrollment-failure path with a deliberately
+    // non-matching password, then prove no factor or one-time material leaked
+    // and the account remains eligible for a clean enrollment attempt.
+    let wrongPassword = 'AUTH007-invalid-password-' + password.slice(-12)
+    if (wrongPassword === password) wrongPassword = 'Definitely-not-the-current-password-007!'
+    const rejectedEnrollment = await request(
+      'mfa_enrollment_rejects_wrong_current_password',
+      'POST',
+      '/v1/auth/mfa/enrollment',
+      {
+        headers: {
+          'content-type': 'application/json',
+          'Idempotency-Key': `${baseKey}-enroll-wrong-password`,
+        },
+        body: { currentPassword: wrongPassword },
+      },
+    )
+    check('mfa_enrollment_rejects_wrong_current_password_without_disclosing_one_time_material',
+      rejectedEnrollment.facts.status === 401 &&
+      !rejectedEnrollment.payload?.data?.totpUri &&
+      !Array.isArray(rejectedEnrollment.payload?.data?.recoveryCodes), {
+        status: rejectedEnrollment.facts.status,
+        errorCode: rejectedEnrollment.facts.errorCode,
+        oneTimeMaterialReturned: Boolean(rejectedEnrollment.payload?.data?.totpUri) ||
+          Array.isArray(rejectedEnrollment.payload?.data?.recoveryCodes),
+        passwordLogged: false,
+      })
+
+    const afterRejectedEnrollment = await request('mfa_disabled_after_failed_enrollment', 'GET', '/v1/auth/mfa')
+    const afterRejectedEnrollmentData = totpStatus(afterRejectedEnrollment.payload)
+    check('failed_enrollment_keeps_factor_disabled',
+      afterRejectedEnrollment.facts.status === 200 &&
+      afterRejectedEnrollmentData?.enabled === false &&
+      afterRejectedEnrollmentData?.verified === false &&
+      afterRejectedEnrollmentData?.enrolledAt === null, {
+        status: afterRejectedEnrollment.facts.status,
+        factorStillDisabled: afterRejectedEnrollmentData?.enabled === false &&
+          afterRejectedEnrollmentData?.verified === false &&
+          afterRejectedEnrollmentData?.enrolledAt === null,
+      })
+
     const enroll = await request('mfa_enrollment_start', 'POST', '/v1/auth/mfa/enrollment', {
       headers: {
         'content-type': 'application/json',
