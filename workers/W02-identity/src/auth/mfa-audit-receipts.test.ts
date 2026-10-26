@@ -165,8 +165,8 @@ function createDb() {
         if (sql.includes('FROM auth_007_mfa_publication_journal WHERE idempotency_key = ?')) {
           const row = outbox.get(String(args[0]))
           if (!row) return null
-          const payload = JSON.parse(row.payload) as { eventType: string }
-          return { eventId: row.eventId, eventType: payload.eventType }
+          const payload = JSON.parse(row.payload) as { eventType: string; payload: { operationId: string } }
+          return { eventId: row.eventId, eventType: payload.eventType, operationId: payload.payload.operationId }
         }
         throw new Error('Unhandled test SQL first: ' + sql)
       },
