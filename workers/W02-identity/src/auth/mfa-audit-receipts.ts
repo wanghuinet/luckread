@@ -78,7 +78,7 @@ function validateEvent(value: unknown): StoredReceiptEvent {
   }
   if (
     event.reasonCode !== undefined &&
-    (typeof event.reasonCode !== 'string' || !/^[A-Z0-9_:-]{1,96}$/.test(event.reasonCode))
+    (typeof event.reasonCode !== 'string' || !/^[A-Z0-9_]{1,64}$/.test(event.reasonCode))
   ) {
     throw new Error('INVALID_MFA_AUDIT_RECEIPT_PLAN')
   }
