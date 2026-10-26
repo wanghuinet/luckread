@@ -80,4 +80,18 @@ describe('AUTH-007 protected-ref admission contract', () => {
     assert.match(verifier, /rollout configuration endpoint ' \+ apiPath \+ ' failed \(HTTP '/)
   })
 
+
+  it('keeps the read-only Cron diagnostic outside the MFA mutation approval gate and on a dedicated read-only credential', () => {
+    const workflow = readFileSync('.github/workflows/auth-007-readonly-w02-cron-diagnostic.yml', 'utf8')
+    assert.match(workflow, /^\s+if:\s*\$\{\{[^\n]*github\.ref == 'refs\/heads\/main'[^\n]*github\.ref_protected\s*==\s*true[^\n]*\}\}$/m)
+    assert.doesNotMatch(workflow, /environment:\s*auth-mfa-rollout/)
+    assert.match(workflow, /CLOUDFLARE_AUTH007_READONLY_ACCOUNT_ID/)
+    assert.match(workflow, /CLOUDFLARE_AUTH007_READONLY_API_TOKEN/)
+    assert.doesNotMatch(workflow, /\bCLOUDFLARE_API_TOKEN\b/)
+    assert.doesNotMatch(workflow, /auth-007-probe-w02-observability\.mjs|auth-007-probe-w02-tail-access\.mjs|auth-007-mfa-live-security-e2e\.mjs/)
+    assert.match(workflow, /auth-007-probe-w02-scheduled-analytics\.mjs/)
+    assert.doesNotMatch(workflow, /\bwrangler\s+(?:deploy|d1|secret)\b/i)
+    assert.match(workflow, /permissions:\s*\n\s+contents:\s+read/)
+  })
+
 })

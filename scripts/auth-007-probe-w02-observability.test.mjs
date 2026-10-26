@@ -236,6 +236,9 @@ describe('AUTH-007 read-only W02 scheduled Observability probe', () => {
       scheduledAnalyticsCategory: 'NONE',
       scheduledAnalyticsHttpStatus: 200,
       scheduledAnalyticsRows: 1,
+      scheduledAnalyticsSuccessfulRows: 1,
+      scheduledAnalyticsFailedRows: 0,
+      scheduledAnalyticsUnknownStatusRows: 0,
     })
     assert.equal(JSON.stringify(result).includes('must-not-escape'), false)
     assert.equal(JSON.stringify(result).includes('private-request-id'), false)
@@ -294,7 +297,7 @@ describe('AUTH-007 read-only W02 scheduled Observability probe', () => {
     assert.equal(JSON.stringify(result).includes('private GraphQL error detail'), false)
   })
 
-  it('accepts the explicit W02 tick marker as scheduler evidence when eventType metadata is missing', async () => {
+  it('does not treat a tick log marker without successful invocation status as sufficient MFA E2E admission evidence', async () => {
     const result = await probeW02ScheduledObservability({
       ...valid,
       fetchImpl: async (url, init) => {
@@ -327,7 +330,8 @@ describe('AUTH-007 read-only W02 scheduled Observability probe', () => {
     })
     assert.equal(result.scheduledInvocations, 0)
     assert.equal(result.tickMarkerRows, 1)
-    assert.equal(result.scheduledExecutionObserved, true)
+    assert.equal(result.scheduledAnalyticsSuccessfulRows, 0)
+    assert.equal(result.scheduledExecutionObserved, false)
   })
 
   it('uses the independent scheduled-invocation analytics dataset as scheduler evidence', async () => {
@@ -384,6 +388,7 @@ describe('AUTH-007 read-only W02 scheduled Observability probe', () => {
     assert.equal(result.eventTypeScheduledValuePresent, false)
     assert.equal(result.scheduledAnalyticsStatus, 'PASS')
     assert.equal(result.scheduledAnalyticsRows, 2)
+    assert.equal(result.scheduledAnalyticsSuccessfulRows, 2)
     assert.equal(result.scheduledExecutionObserved, true)
   })
 
@@ -420,7 +425,9 @@ describe('AUTH-007 read-only W02 scheduled Observability probe', () => {
     })
     assert.equal(result.scheduledAnalyticsStatus, 'PASS')
     assert.equal(result.scheduledAnalyticsRows, 1)
-    assert.equal(result.scheduledExecutionObserved, true)
+    assert.equal(result.scheduledAnalyticsSuccessfulRows, 0)
+    assert.equal(result.scheduledAnalyticsUnknownStatusRows, 1)
+    assert.equal(result.scheduledExecutionObserved, false)
   })
 
   it('uses the bounded Values endpoint when both query views return no rows', async () => {
@@ -452,7 +459,8 @@ describe('AUTH-007 read-only W02 scheduled Observability probe', () => {
     assert.equal(result.queriedEventRows, 0)
     assert.equal(result.eventTypeValuesStatus, 'PASS')
     assert.equal(result.eventTypeScheduledValuePresent, true)
-    assert.equal(result.scheduledExecutionObserved, true)
+    assert.equal(result.scheduledAnalyticsSuccessfulRows, 0)
+    assert.equal(result.scheduledExecutionObserved, false)
   })
 
   it('does not call Cloudflare when configuration is missing', async () => {

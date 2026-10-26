@@ -33,6 +33,8 @@ on:
       - 'scripts/auth-007-probe-w02-tail-access.test.mjs'
       - 'scripts/auth-007-probe-w02-observability.mjs'
       - 'scripts/auth-007-probe-w02-observability.test.mjs'
+      - 'scripts/auth-007-probe-w02-scheduled-analytics.mjs'
+      - 'scripts/auth-007-probe-w02-scheduled-analytics.test.mjs'
       - 'scripts/auth-010-session-runtime-e2e.mjs'
       - '.github/workflows/auth-010-remote-e2e.yml'
       - '.github/workflows/w01-payload-app-deploy.yml'
@@ -63,6 +65,8 @@ on:
       - 'scripts/auth-007-probe-w02-tail-access.test.mjs'
       - 'scripts/auth-007-probe-w02-observability.mjs'
       - 'scripts/auth-007-probe-w02-observability.test.mjs'
+      - 'scripts/auth-007-probe-w02-scheduled-analytics.mjs'
+      - 'scripts/auth-007-probe-w02-scheduled-analytics.test.mjs'
       - 'scripts/auth-010-session-runtime-e2e.mjs'
       - '.github/workflows/auth-010-remote-e2e.yml'
       - '.github/workflows/w01-payload-app-deploy.yml'
@@ -132,6 +136,8 @@ jobs:
           node --test scripts/auth-007-probe-w02-tail-access.test.mjs
           node --check scripts/auth-007-probe-w02-observability.mjs
           node --test scripts/auth-007-probe-w02-observability.test.mjs
+          node --check scripts/auth-007-probe-w02-scheduled-analytics.mjs
+          node --test scripts/auth-007-probe-w02-scheduled-analytics.test.mjs
 
       - name: Verify AUTH-007 rollout admission code without production access
         run: node scripts/verify-auth-007-rollout-admission.mjs --static-only
