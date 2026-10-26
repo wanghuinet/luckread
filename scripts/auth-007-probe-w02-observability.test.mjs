@@ -27,7 +27,13 @@ describe('AUTH-007 read-only W02 scheduled Observability probe', () => {
               viewer: {
                 accounts: [{
                   workersInvocationsScheduled: [
-                    { __typename: 'AccountWorkersInvocationsScheduled' },
+                    {
+                      scriptName: 'luckread-w02',
+                      datetime: new Date(valid.now - 60_000).toISOString(),
+                      scheduledDatetime: new Date(valid.now - 60_000).toISOString(),
+                      cron: '* * * * *',
+                      status: 'success',
+                    },
                   ],
                 }],
               },
@@ -137,7 +143,7 @@ describe('AUTH-007 read-only W02 scheduled Observability probe', () => {
     assert.equal(queryRequests.find((request) => request.body.view === 'events').body.queryId, 'auth007-w02-event-diagnostic')
     assert.equal(valuesRequest.init.method, 'POST')
     assert.equal(analyticsRequest.init.method, 'POST')
-    assert.match(analyticsRequest.body.query, /workersInvocationsScheduled/)
+    assert.match(analyticsRequest.body.query, /workersInvocationsScheduled[\\s\\S]*scriptName[\\s\\S]*datetime[\\s\\S]*scheduledDatetime[\\s\\S]*cron[\\s\\S]*status/)
     assert.deepEqual(analyticsRequest.body.variables, {
       accountTag: valid.accountId,
       start: new Date(valid.now - 1_800_000).toISOString(),
@@ -329,8 +335,20 @@ describe('AUTH-007 read-only W02 scheduled Observability probe', () => {
               viewer: {
                 accounts: [{
                   workersInvocationsScheduled: [
-                    { __typename: 'AccountWorkersInvocationsScheduled' },
-                    { __typename: 'AccountWorkersInvocationsScheduled' },
+                    {
+                      scriptName: 'luckread-w02',
+                      datetime: new Date(valid.now - 60_000).toISOString(),
+                      scheduledDatetime: new Date(valid.now - 60_000).toISOString(),
+                      cron: '* * * * *',
+                      status: 'success',
+                    },
+                    {
+                      scriptName: 'luckread-w02',
+                      datetime: new Date(valid.now - 120_000).toISOString(),
+                      scheduledDatetime: new Date(valid.now - 120_000).toISOString(),
+                      cron: '* * * * *',
+                      status: 'success',
+                    },
                   ],
                 }],
               },
@@ -358,6 +376,42 @@ describe('AUTH-007 read-only W02 scheduled Observability probe', () => {
     assert.equal(result.eventTypeScheduledValuePresent, false)
     assert.equal(result.scheduledAnalyticsStatus, 'PASS')
     assert.equal(result.scheduledAnalyticsRows, 2)
+    assert.equal(result.scheduledExecutionObserved, true)
+  })
+
+  it('rejects scheduled analytics rows for another Worker or outside the requested window', async () => {
+    const result = await probeW02ScheduledObservability({
+      ...valid,
+      fetchImpl: async (url, init) => {
+        const body = JSON.parse(init.body)
+        if (url.endsWith('/graphql')) {
+          return response(200, {
+            data: {
+              viewer: {
+                accounts: [{
+                  workersInvocationsScheduled: [
+                    { scriptName: 'another-worker', datetime: new Date(valid.now - 60_000).toISOString() },
+                    { scriptName: 'luckread-w02', datetime: new Date(valid.now - 1_900_000).toISOString() },
+                    { scriptName: 'luckread-w02', datetime: 'not-a-timestamp' },
+                    { scriptName: 'luckread-w02', datetime: new Date(valid.now - 60_000).toISOString() },
+                  ],
+                }],
+              },
+            },
+          })
+        }
+        if (url.endsWith('/values')) {
+          return response(200, {
+            success: true,
+            result: [{ dataset: 'cloudflare-workers', key: '$workers.eventType', type: 'string', value: 'fetch' }],
+          })
+        }
+        if (body.view === 'events') return response(200, { success: true, result: { events: { events: [] } } })
+        return response(200, { success: true, result: { invocations: {} } })
+      },
+    })
+    assert.equal(result.scheduledAnalyticsStatus, 'PASS')
+    assert.equal(result.scheduledAnalyticsRows, 1)
     assert.equal(result.scheduledExecutionObserved, true)
   })
 
