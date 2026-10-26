@@ -50,7 +50,9 @@ function summarizeEventType(eventType, outboxRows, canonicalRows, idReconciliati
     idFacts.duplicateCanonicalEventIdCount === 0 &&
     idFacts.wrongActionEventIdCount === 0 &&
     idFacts.wrongSubjectEventIdCount === 0 &&
-    idFacts.duplicateOutboxIdempotencyKeyCount === 0
+    idFacts.duplicateOutboxIdempotencyKeyCount === 0 &&
+    idReconciliation.duplicateOutboxIdempotencyKeyCount === 0 &&
+    idReconciliation.invalidIdempotencyKeyCount === 0
 
   return {
     eventType,
@@ -80,7 +82,6 @@ function reconcileEventIds(outboxRows, canonicalRows) {
   const canonicalIdCounts = new Map()
   const outboxTypeById = new Map()
   const canonicalTypeById = new Map()
-  const outboxSubjectById = new Map()
   const canonicalSubjectById = new Map()
   const outboxKeyCounts = new Map()
 
@@ -99,9 +100,6 @@ function reconcileEventIds(outboxRows, canonicalRows) {
     if (!row || !safeEventId(row.eventId) || typeof row.eventType !== 'string') continue
     outboxIdCounts.set(row.eventId, (outboxIdCounts.get(row.eventId) ?? 0) + 1)
     if (!outboxTypeById.has(row.eventId)) outboxTypeById.set(row.eventId, row.eventType)
-    if (safeResourceId(row.resourceId) && !outboxSubjectById.has(row.eventId)) {
-      outboxSubjectById.set(row.eventId, row.resourceId)
-    }
     if (safeIdempotencyKey(row.idempotencyKey)) {
       outboxKeyCounts.set(row.idempotencyKey, (outboxKeyCounts.get(row.idempotencyKey) ?? 0) + 1)
     }
@@ -266,6 +264,11 @@ export function evaluateMfaAuditDelivery(outboxInput, canonicalAuditInput) {
     }
   })
   const allTenEventTypesVerified =
+    idReconciliation.invalidOutboxRowCount === 0 &&
+    idReconciliation.invalidCanonicalRowCount === 0 &&
+    idReconciliation.totalWrongSubjectEventIdCount === 0 &&
+    idReconciliation.duplicateOutboxIdempotencyKeyCount === 0 &&
+    idReconciliation.invalidIdempotencyKeyCount === 0 &&
     [...REQUIRED_MFA_AUDIT_EVENT_TYPES, ...SCENARIO_SPECIFIC_MFA_AUDIT_EVENT_TYPES]
       .every((eventType) => {
         const found = events.find((event) => event.eventType === eventType)

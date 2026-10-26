@@ -220,8 +220,8 @@ async function main() {
         readScopedOutboxEventRows(qaUserId),
         readScopedCanonicalAuditEventRows(qaUserId),
       ])
-      // Match eventId/action one-to-one in memory only. The artifact stores
-      // aggregate diagnostics; no event IDs, raw payloads or account IDs.
+      // Match eventId, action, subject, and idempotency identity in memory only.
+      // The artifact stores aggregate diagnostics, never raw IDs or account IDs.
       evaluation = evaluateMfaAuditDelivery(outboxRows, auditRows)
       evidence.outboxEvents = evaluation.events
         .filter((row) => row.totalCount > 0)
