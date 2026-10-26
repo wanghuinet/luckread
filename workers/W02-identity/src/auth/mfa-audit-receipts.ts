@@ -312,39 +312,53 @@ export async function appendMfaAuditOperationReceiptEvent(
   receiptId: string,
   event: MfaAuditReceiptEvent,
 ): Promise<void> {
-  const row = await loadReceipt(db, receiptId)
-  if (!['STARTED', 'READY'].includes(row.status)) {
-    throw new Error('MFA_AUDIT_RECEIPT_NOT_APPENDABLE')
-  }
-  const plan = mergePlan(receiptId, parsePlan(row.eventPlan), [event], event.occurredAt ?? new Date().toISOString())
   const idempotencyKey = event.idempotencyKey ?? `mfa-operation:${receiptId}:${event.eventType}`
   const operationId = event.operationId ?? MFA_AUDIT_OPERATION_IDS[event.eventType][0]!
-  try {
-    const result = await db.prepare(
-      'UPDATE auth_007_mfa_operation_receipts SET event_plan = ?, ' +
-      'last_error_code = NULL WHERE receipt_id = ? AND status IN (?, ?)',
-    ).bind(JSON.stringify(plan), receiptId, 'STARTED', 'READY').run()
-    if (result.success && result.meta?.changes === 1) return
-  } catch {
-    // The D1 write may have committed even when the response was lost.
+
+  // Appends are only legal while the operation is still in progress. READY is
+  // a frozen event plan: the existing Cron may be publishing it concurrently.
+  // Letting an append mutate READY could race a drain that marks the old plan
+  // EMITTED and silently leave the new event behind.
+  const maxCompareAndSetAttempts = 4
+  for (let attempt = 0; attempt < maxCompareAndSetAttempts; attempt += 1) {
+    const row = await loadReceipt(db, receiptId)
+    if (row.status !== 'STARTED') {
+      throw new Error('MFA_AUDIT_RECEIPT_NOT_APPENDABLE')
+    }
+
+    const currentPlan = parsePlan(row.eventPlan)
+    const plan = mergePlan(
+      receiptId,
+      currentPlan,
+      [event],
+      event.occurredAt ?? new Date().toISOString(),
+    )
+
+    // mergePlan has already verified that a repeated idempotency key carries
+    // the same intent. This is also the read-back proof after a lost D1 response.
+    if (currentPlan.some((item) => item.idempotencyKey === idempotencyKey)) return
+
+    const nextEventPlan = JSON.stringify(plan)
+    const updateSql = row.eventPlan === null
+      ? 'UPDATE auth_007_mfa_operation_receipts SET event_plan = ?, last_error_code = NULL ' +
+        'WHERE receipt_id = ? AND status = ? AND event_plan IS NULL'
+      : 'UPDATE auth_007_mfa_operation_receipts SET event_plan = ?, last_error_code = NULL ' +
+        'WHERE receipt_id = ? AND status = ? AND event_plan = ?'
+
+    try {
+      const statement = db.prepare(updateSql)
+      const result = row.eventPlan === null
+        ? await statement.bind(nextEventPlan, receiptId, 'STARTED').run()
+        : await statement.bind(nextEventPlan, receiptId, 'STARTED', row.eventPlan).run()
+      if (result.success && result.meta?.changes === 1) return
+    } catch {
+      // The statement may have committed even when D1's response was lost.
+      // Re-read on the next iteration before deciding whether retry is safe.
+    }
   }
 
-  try {
-    const latest = await loadReceipt(db, receiptId)
-    if (parsePlan(latest.eventPlan).some((item) =>
-      item.idempotencyKey === idempotencyKey &&
-      item.eventType === event.eventType &&
-      item.operationId === operationId &&
-      item.result === event.result &&
-      item.reasonCode === event.reasonCode &&
-      item.factorState === event.factorState &&
-      item.challengeMethod === event.challengeMethod &&
-      (event.eventId === undefined || item.eventId === event.eventId) &&
-      (event.occurredAt === undefined || item.occurredAt === event.occurredAt)
-    )) return
-  } catch {
-    // Without an authoritative read-back, fail closed before returning the auth error.
-  }
+  // No unproven append is treated as successful. The caller must fail closed;
+  // retry exhaustion is observable through the enclosing MFA audit failure path.
   throw new Error('MFA_AUDIT_RECEIPT_WRITE_FAILED')
 }
 
