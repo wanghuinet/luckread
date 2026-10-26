@@ -44,8 +44,48 @@ describe('AUTH-007 least-privilege W02 scheduled analytics probe', () => {
     assert.match(request.body.query, /workersInvocationsScheduled/)
     assert.equal(result.scheduledAnalyticsStatus, 'PASS')
     assert.equal(result.scheduledAnalyticsRows, 1)
+    assert.equal(result.scheduledAnalyticsSuccessfulRows, 1)
+    assert.equal(result.scheduledAnalyticsFailedRows, 0)
+    assert.equal(result.scheduledAnalyticsUnknownStatusRows, 0)
     assert.equal(JSON.stringify(result).includes('must-not-escape'), false)
     assert.equal(JSON.stringify(result).includes('privateId'), false)
+  })
+
+  it('does not count failed scheduled invocations as successful execution evidence', async () => {
+    const result = await probeW02ScheduledAnalytics({
+      ...valid,
+      fetchImpl: async () => response(200, {
+        data: { viewer: { accounts: [{
+          workersInvocationsScheduled: [{
+            scriptName: 'luckread-w02',
+            datetime: new Date(valid.now - 60_000).toISOString(),
+            status: 'error',
+          }],
+        }] } },
+      }),
+    })
+    assert.equal(result.scheduledAnalyticsRows, 1)
+    assert.equal(result.scheduledAnalyticsSuccessfulRows, 0)
+    assert.equal(result.scheduledAnalyticsFailedRows, 1)
+    assert.equal(result.scheduledAnalyticsUnknownStatusRows, 0)
+  })
+
+  it('does not count missing status as successful execution evidence', async () => {
+    const result = await probeW02ScheduledAnalytics({
+      ...valid,
+      fetchImpl: async () => response(200, {
+        data: { viewer: { accounts: [{
+          workersInvocationsScheduled: [{
+            scriptName: 'luckread-w02',
+            datetime: new Date(valid.now - 60_000).toISOString(),
+          }],
+        }] } },
+      }),
+    })
+    assert.equal(result.scheduledAnalyticsRows, 1)
+    assert.equal(result.scheduledAnalyticsSuccessfulRows, 0)
+    assert.equal(result.scheduledAnalyticsFailedRows, 0)
+    assert.equal(result.scheduledAnalyticsUnknownStatusRows, 1)
   })
 
   it('fails closed on missing configuration without issuing a request', async () => {
