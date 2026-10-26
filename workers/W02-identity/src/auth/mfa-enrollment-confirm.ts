@@ -48,6 +48,42 @@ const enrollmentFailureEvent = (): MfaAuditReceiptEvent => ({
   reasonCode: 'ENROLLMENT_CONFIRMATION_REJECTED',
 })
 
+const enrollmentSuccessEvent = (occurredAt: string): MfaAuditReceiptEvent => ({
+  eventType: 'auth.mfa.enrollment_verified',
+  result: 'succeeded',
+  reasonCode: 'TOTP_ENROLLMENT_VERIFIED',
+  factorState: 'ENABLED',
+  occurredAt,
+})
+
+/**
+ * Resolve a transport/server error only when the W02-owned factor read-back
+ * proves an outcome. An indeterminate read-back leaves the receipt STARTED so
+ * the existing stale-receipt path can surface UNKNOWN without inventing success
+ * or failure.
+ */
+async function reconcileAmbiguousEnrollmentOutcome(
+  env: BetterAuthEnv,
+  receiptId: string,
+  userId: string,
+): Promise<'succeeded' | 'failed' | 'unknown'> {
+  let status: Awaited<ReturnType<typeof readAuthoritativeMfaStatus>>
+  try {
+    status = await readAuthoritativeMfaStatus(env.D1_01, userId)
+  } catch {
+    return 'unknown'
+  }
+  if (status?.enabled && status.verified && status.enrolledAt) {
+    await finalizeEnrollmentAuditReceipt(env, receiptId, enrollmentSuccessEvent(status.enrolledAt))
+    return 'succeeded'
+  }
+  if (status && (!status.enabled || !status.verified)) {
+    await finalizeEnrollmentAuditReceipt(env, receiptId, enrollmentFailureEvent())
+    return 'failed'
+  }
+  return 'unknown'
+}
+
 const sha256Hex = async (value: string): Promise<string> => {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value))
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('')
@@ -173,13 +209,23 @@ export async function handleMfaEnrollmentConfirmRequest(
       verified = await createLuckReadAuth(env).handler(authRequest)
     } catch {
       try {
-        await finalizeEnrollmentAuditReceipt(env, receiptId, enrollmentFailureEvent())
+        await reconcileAmbiguousEnrollmentOutcome(env, receiptId, principal.userId)
       } catch {
         return json({ error: { code: 'MFA_AUDIT_UNAVAILABLE', message: 'MFA confirmation unavailable' } }, 503)
       }
+      // No upstream response means there is no safe session-cookie envelope to
+      // forward. A proven state is audited; an unproven state stays STARTED.
       return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'MFA confirmation unavailable' } }, 503)
     }
     if (!verified.ok) {
+      if (verified.status >= 500) {
+        try {
+          await reconcileAmbiguousEnrollmentOutcome(env, receiptId, principal.userId)
+        } catch {
+          return json({ error: { code: 'MFA_AUDIT_UNAVAILABLE', message: 'MFA confirmation unavailable' } }, 503)
+        }
+        return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'MFA confirmation unavailable' } }, 503)
+      }
       try {
         await finalizeEnrollmentAuditReceipt(env, receiptId, enrollmentFailureEvent())
       } catch {
@@ -191,9 +237,6 @@ export async function handleMfaEnrollmentConfirmRequest(
       if (verified.status === 401) {
         return json({ error: { code: 'MFA_CODE_INVALID', message: 'MFA confirmation failed' } }, 401)
       }
-      if (verified.status >= 500) {
-        return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'MFA confirmation unavailable' } }, 503)
-      }
       return json({ error: { code: 'MFA_CONFIRM_REJECTED', message: 'MFA confirmation failed' } }, 400)
     }
 
@@ -203,13 +246,7 @@ export async function handleMfaEnrollmentConfirmRequest(
     }
 
     try {
-      await finalizeEnrollmentAuditReceipt(env, receiptId, {
-        eventType: 'auth.mfa.enrollment_verified',
-        result: 'succeeded',
-        reasonCode: 'TOTP_ENROLLMENT_VERIFIED',
-        factorState: 'ENABLED',
-        occurredAt: status.enrolledAt,
-      })
+      await finalizeEnrollmentAuditReceipt(env, receiptId, enrollmentSuccessEvent(status.enrolledAt))
     } catch {
       return json({ error: { code: 'MFA_AUDIT_UNAVAILABLE', message: 'MFA confirmation unavailable' } }, 503)
     }
