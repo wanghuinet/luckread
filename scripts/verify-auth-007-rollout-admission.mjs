@@ -271,11 +271,12 @@ if (blockers.length === 0) {
   const requiredMfaAuditReceiptTokens = [
     'CREATE TABLE auth_007_mfa_operation_receipts',
     "CHECK (is_challenge IN (0, 1))",
-    "CHECK (status IN ('STARTED', 'READY', 'EMITTED', 'RESOLVED', 'UNKNOWN'))",
     'json_valid(event_plan)',
     'CHECK (attempt >= 0)',
     'auth_007_mfa_operation_receipts_status_next_attempt_idx',
   ]
+  const receiptStatusConstraintPresent =
+    /CHECK\s*\(\s*status\s+IN\s*\(\s*'STARTED'\s*,\s*'READY'\s*,\s*'EMITTED'\s*,\s*'RESOLVED'\s*,\s*'UNKNOWN'\s*\)\s*\)/.test(mfaAuditReceiptMigration)
   const operations = [
     { id: 'authMfaStatus', route: 'workers/W01-payload/src/app/api/v1/auth/mfa/route.ts', test: 'workers/W01-payload/tests/int/mfa-status-route.int.spec.ts' },
     { id: 'authMfaEnrollmentStart', route: 'workers/W01-payload/src/app/api/v1/auth/mfa/enrollment/route.ts', test: 'workers/W01-payload/tests/int/mfa-enrollment-start-route.int.spec.ts' },
@@ -328,7 +329,7 @@ if (blockers.length === 0) {
     reviewedMfaMigrationShape: requiredMigrationTokens.every((token) => migration.includes(token)),
     reviewedBootstrapAuditShape: requiredBootstrapTokens.every((token) => bootstrapMigration.includes(token)),
     reviewedMfaAuditOutboxMigrationShape: requiredMfaAuditOutboxTokens.every((token) => mfaAuditOutboxMigration.includes(token)),
-    reviewedMfaAuditReceiptMigrationShape: requiredMfaAuditReceiptTokens.every((token) => mfaAuditReceiptMigrationNormalized.includes(token)),
+    reviewedMfaAuditReceiptMigrationShape: requiredMfaAuditReceiptTokens.every((token) => mfaAuditReceiptMigrationNormalized.includes(token)) && receiptStatusConstraintPresent,
     mfaAuditReceiptContractMatchesMigration:
       mfaAuditReceiptContract.featureId === 'AUTH-007' &&
       mfaAuditReceiptContract.target?.physicalTable === 'auth_007_mfa_operation_receipts' &&
