@@ -7,7 +7,7 @@ function createEnv(
   projectionSend = vi.fn().mockResolvedValue(undefined),
 ) {
   const run = vi.fn().mockResolvedValue({ success: true, meta: { changes: 1 } })
-  const all = vi.fn().mockResolvedValue({ results: rows })
+  const all = vi.fn().mockResolvedValue({ success: true, results: rows })
   const bind = vi.fn((...args: unknown[]) => ({ all, run, args }))
   const prepare = vi.fn((sql: string) => ({ bind, sql }))
   return {
@@ -46,6 +46,19 @@ const event = {
 }
 
 describe('AUTH-013 durable journal publisher', () => {
+  it('fails closed when D1 reports an unsuccessful pending journal read', async () => {
+    const { env, all, auditSend, projectionSend, run } = createEnv([])
+    all.mockResolvedValueOnce({ success: false, results: [] })
+
+    await expect(
+      publishPendingAccountStateEvents(env, '2026-09-24T08:31:00.000Z'),
+    ).rejects.toThrow('AUTH013_PUBLICATION_JOURNAL_SELECT_FAILED')
+
+    expect(auditSend).not.toHaveBeenCalled()
+    expect(projectionSend).not.toHaveBeenCalled()
+    expect(run).not.toHaveBeenCalled()
+  })
+
   it('publishes the same canonical event to audit and W04 projection destinations', async () => {
     const { env, auditSend, projectionSend, prepare } = createEnv([
       { journalId: 'journal-1', payload: JSON.stringify(event), attempt: 1 },
