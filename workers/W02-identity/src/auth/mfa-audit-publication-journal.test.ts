@@ -91,4 +91,84 @@ describe('AUTH-007 MFA audit outbox publisher', () => {
     expect(queueSend).not.toHaveBeenCalled()
     expect(update).toHaveBeenCalledWith('FAILED', 'INVALID_EVENT_PAYLOAD', 'journal-1', 'PENDING')
   })
+
+
+  it('fails closed when D1 does not confirm the published-state update', async () => {
+    const { env, update, queueSend } = createEnv([
+      { journalId: 'journal-1', payload: JSON.stringify(event), attempt: 1 },
+    ])
+    update.mockResolvedValueOnce({ success: false, meta: { changes: 0 } })
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      await expect(publishPendingMfaAuditEvents(env, '2026-10-24T14:01:00.000Z'))
+        .rejects.toThrow('MFA_AUDIT_PUBLICATION_STAGE_FAILED')
+      expect(queueSend).toHaveBeenCalledWith(event)
+      expect(log).toHaveBeenCalledWith('W02 scheduled publication stage failed', {
+        task: 'mfa-audit',
+        stage: 'mark-published',
+      })
+    } finally {
+      log.mockRestore()
+    }
+  })
+
+  it('fails closed when D1 does not confirm the retry/backoff update', async () => {
+    const queueSend = vi.fn().mockRejectedValue(new Error('queue unavailable'))
+    const { env, update } = createEnv([
+      { journalId: 'journal-1', payload: JSON.stringify(event), attempt: 2 },
+    ], queueSend)
+    update.mockResolvedValueOnce({ success: false, meta: { changes: 0 } })
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      await expect(publishPendingMfaAuditEvents(env, '2026-10-24T14:01:00.000Z'))
+        .rejects.toThrow('MFA_AUDIT_PUBLICATION_STAGE_FAILED')
+      expect(queueSend).toHaveBeenCalledTimes(1)
+      expect(log).toHaveBeenCalledWith('W02 scheduled publication stage failed', {
+        task: 'mfa-audit',
+        stage: 'mark-retry',
+      })
+    } finally {
+      log.mockRestore()
+    }
+  })
+
+  it('fails closed when D1 does not confirm invalid-payload quarantine', async () => {
+    const { env, update, queueSend } = createEnv([
+      { journalId: 'journal-1', payload: '{bad', attempt: 1 },
+    ])
+    update.mockResolvedValueOnce({ success: false, meta: { changes: 0 } })
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      await expect(publishPendingMfaAuditEvents(env, '2026-10-24T14:01:00.000Z'))
+        .rejects.toThrow('MFA_AUDIT_PUBLICATION_STAGE_FAILED')
+      expect(queueSend).not.toHaveBeenCalled()
+      expect(log).toHaveBeenCalledWith('W02 scheduled publication stage failed', {
+        task: 'mfa-audit',
+        stage: 'mark-invalid-payload',
+      })
+    } finally {
+      log.mockRestore()
+    }
+  })
+
+
+  it('fails closed when D1 reports success but the published-state update changes zero rows', async () => {
+    const { env, update, queueSend } = createEnv([
+      { journalId: 'journal-1', payload: JSON.stringify(event), attempt: 1 },
+    ])
+    update.mockResolvedValueOnce({ success: true, meta: { changes: 0 } })
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      await expect(publishPendingMfaAuditEvents(env, '2026-10-24T14:01:00.000Z'))
+        .rejects.toThrow('MFA_AUDIT_PUBLICATION_STAGE_FAILED')
+      expect(queueSend).toHaveBeenCalledWith(event)
+      expect(log).toHaveBeenCalledWith('W02 scheduled publication stage failed', {
+        task: 'mfa-audit',
+        stage: 'mark-published',
+      })
+    } finally {
+      log.mockRestore()
+    }
+  })
+
 })
