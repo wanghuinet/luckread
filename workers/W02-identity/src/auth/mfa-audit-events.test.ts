@@ -19,8 +19,8 @@ function fakeDb(options: {
   let selectCount = 0
   const first = vi.fn(async () => {
     selectCount += 1
-    if (options.existing) return { eventId: 'evt_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee', eventType: 'auth.mfa.locked', resourceId: 'user-123', operationId: 'authMfaChallengeVerify', result: 'rejected', reasonCode: 'VERIFICATION_LOCKOUT', factorState: null, challengeMethod: 'totp' }
-    if (options.raceAppearsAfterInsert && selectCount >= 2) return { eventId: 'evt_cccccccccccccccccccccccccccccccc', eventType: 'auth.mfa.locked', resourceId: 'user-123', operationId: 'authMfaChallengeVerify', result: 'rejected', reasonCode: 'VERIFICATION_LOCKOUT', factorState: null, challengeMethod: 'totp' }
+    if (options.existing) return { eventId: 'evt_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee', eventType: 'auth.mfa.locked', resourceId: 'user-123', status: 'PUBLISHED', operationId: 'authMfaChallengeVerify', result: 'rejected', reasonCode: 'VERIFICATION_LOCKOUT', factorState: null, challengeMethod: 'totp' }
+    if (options.raceAppearsAfterInsert && selectCount >= 2) return { eventId: 'evt_cccccccccccccccccccccccccccccccc', eventType: 'auth.mfa.locked', resourceId: 'user-123', status: 'PENDING', operationId: 'authMfaChallengeVerify', result: 'rejected', reasonCode: 'VERIFICATION_LOCKOUT', factorState: null, challengeMethod: 'totp' }
     return null
   })
   const run = vi.fn().mockResolvedValue({
@@ -122,29 +122,67 @@ describe('AUTH-007 MFA audit event builder and idempotent writer', () => {
 
   it('inserts a lockout event once when its deterministic key is new', async () => {
     const { db, first, run } = fakeDb()
-    await expect(recordMfaAuditEventOnce(db, input)).resolves.toBe(true)
+    const recorded = await recordMfaAuditEventOnce(db, input)
+    expect(recorded.inserted).toBe(true)
+    expect(recorded.eventId).toMatch(/^evt_[a-f0-9]{32}$/)
     expect(first).toHaveBeenCalledTimes(1)
     expect(run).toHaveBeenCalledTimes(1)
   })
 
   it('does not write again if the same lockout window already exists', async () => {
     const { db, first, run } = fakeDb({ existing: true })
-    await expect(recordMfaAuditEventOnce(db, input)).resolves.toBe(false)
+    await expect(recordMfaAuditEventOnce(db, input)).resolves.toEqual({ inserted: false, eventId: 'evt_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee' })
     expect(first).toHaveBeenCalledTimes(1)
     expect(run).not.toHaveBeenCalled()
   })
 
   it('treats a concurrent insert of the same lockout key as already recorded after read-back', async () => {
     const { db, first, run } = fakeDb({ insertSuccess: false, raceAppearsAfterInsert: true })
-    await expect(recordMfaAuditEventOnce(db, input)).resolves.toBe(false)
+    await expect(recordMfaAuditEventOnce(db, input)).resolves.toEqual({ inserted: false, eventId: 'evt_cccccccccccccccccccccccccccccccc' })
     expect(first).toHaveBeenCalledTimes(2)
     expect(run).toHaveBeenCalledTimes(1)
+  })
+
+
+  it('adopts an existing legacy lockout event id for the same deterministic lockout identity', async () => {
+    const { db, first, run } = fakeDb({ existing: true })
+    const stableEventId = await deriveMfaAuditEventIdForIdempotencyKey(input.idempotencyKey)
+    const recorded = await recordMfaAuditEventOnce(db, {
+      ...input,
+      challengeMethod: 'recovery_code',
+      eventId: stableEventId,
+    })
+    expect(recorded).toEqual({ inserted: false, eventId: 'evt_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee' })
+    expect(first).toHaveBeenCalledTimes(1)
+    expect(run).not.toHaveBeenCalled()
+  })
+
+  it('does not treat a previously FAILED idempotency row as delivered', async () => {
+    const prepare = vi.fn((sql: string) => ({
+      bind: vi.fn(() => ({
+        first: async () => ({
+          eventId: 'evt_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',
+          eventType: 'auth.mfa.locked',
+          resourceId: 'user-123',
+          status: 'FAILED',
+          operationId: 'authMfaChallengeVerify',
+          result: 'rejected',
+          reasonCode: 'VERIFICATION_LOCKOUT',
+          factorState: null,
+          challengeMethod: 'totp',
+        }),
+        run: vi.fn(),
+        sql,
+      })),
+    }))
+    const db = { prepare } as unknown as D1Database
+    await expect(recordMfaAuditEventOnce(db, input)).rejects.toThrow('MFA_AUDIT_OUTBOX_PREVIOUSLY_FAILED')
   })
 
   it('rejects a durable idempotency match whose canonical action differs', async () => {
     const prepare = vi.fn((sql: string) => ({
       bind: vi.fn(() => ({
-        first: async () => ({ eventId: 'evt_0123456789abcdef0123456789abcdef', eventType: 'auth.mfa.locked', resourceId: 'user-123', operationId: 'authMfaDisable', result: 'rejected', reasonCode: 'VERIFICATION_LOCKOUT', factorState: null, challengeMethod: 'totp' }),
+        first: async () => ({ eventId: 'evt_0123456789abcdef0123456789abcdef', eventType: 'auth.mfa.locked', resourceId: 'user-123', status: 'PUBLISHED', operationId: 'authMfaDisable', result: 'rejected', reasonCode: 'VERIFICATION_LOCKOUT', factorState: null, challengeMethod: 'totp' }),
         run: vi.fn(),
         sql,
       })),
@@ -163,6 +201,7 @@ describe('AUTH-007 MFA audit event builder and idempotent writer', () => {
           eventId: 'evt_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
           eventType: 'auth.mfa.locked',
           resourceId: 'user-123',
+          status: 'PUBLISHED',
           operationId: 'authMfaChallengeVerify',
           result: 'rejected',
           reasonCode: 'VERIFICATION_LOCKOUT',
@@ -188,6 +227,7 @@ describe('AUTH-007 MFA audit event builder and idempotent writer', () => {
           eventId: 'evt_0123456789abcdef0123456789abcdef',
           eventType: 'auth.mfa.locked',
           resourceId: 'another-user',
+          status: 'PUBLISHED',
           operationId: 'authMfaChallengeVerify',
           result: 'rejected',
           reasonCode: 'VERIFICATION_LOCKOUT',
@@ -209,6 +249,7 @@ describe('AUTH-007 MFA audit event builder and idempotent writer', () => {
           eventId: 'evt_invalid',
           eventType: 'auth.mfa.locked',
           resourceId: 'user-123',
+          status: 'PUBLISHED',
           operationId: 'authMfaChallengeVerify',
           result: 'rejected',
           reasonCode: 'VERIFICATION_LOCKOUT',
