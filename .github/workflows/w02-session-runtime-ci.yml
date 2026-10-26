@@ -115,7 +115,7 @@ jobs:
       - name: Run W02 principal, Resend, session-list and session-revoke tests
         run: npx vitest@3.2.4 run workers/W02-identity/src/auth/principal.test.ts workers/W02-identity/src/auth/resend-email.test.ts workers/W02-identity/src/auth/session-list.test.ts workers/W02-identity/src/auth/session-rate-limit.test.ts workers/W02-identity/src/auth/session-revoke.test.ts
       - name: Run W02 AUTH-007 MFA lifecycle and replay tests
-        run: npx vitest@3.2.4 run workers/W02-identity/src/auth/mfa-status.test.ts workers/W02-identity/src/auth/mfa-enrollment-start.test.ts workers/W02-identity/src/auth/mfa-enrollment-confirm.test.ts workers/W02-identity/src/auth/totp-replay-guard.test.ts workers/W02-identity/src/auth/mfa-challenge-account-state.test.ts workers/W02-identity/src/auth/mfa-lifecycle-contract.test.ts
+        run: npx vitest@3.2.4 run workers/W02-identity/src/auth/mfa-status.test.ts workers/W02-identity/src/auth/mfa-enrollment-start.test.ts workers/W02-identity/src/auth/mfa-enrollment-confirm.test.ts workers/W02-identity/src/auth/totp-replay-guard.test.ts workers/W02-identity/src/auth/mfa-challenge-account-state.test.ts workers/W02-identity/src/auth/mfa-challenge-verification.test.ts workers/W02-identity/src/auth/mfa-lifecycle-contract.test.ts
       - name: Run W02 AUTH-007 durable receipt and scheduled-publication tests
         run: npx vitest@3.2.4 run workers/W02-identity/src/auth/mfa-audit-receipts.test.ts workers/W02-identity/src/auth/scheduled-publication.test.ts
       - name: Audit AUTH-007 receipt migration constraints with local SQLite only
