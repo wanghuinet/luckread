@@ -22,6 +22,71 @@ const allKnownEventTypes = new Set([
   ...SCENARIO_SPECIFIC_MFA_AUDIT_EVENT_TYPES,
 ])
 
+export const MFA_OPERATION_RECEIPT_STATUSES = Object.freeze([
+  'STARTED',
+  'READY',
+  'EMITTED',
+  'RESOLVED',
+  'UNKNOWN',
+])
+
+/**
+ * Evaluate only scoped MFA receipt state rows. The result is aggregate-only:
+ * receipt IDs, user IDs, error values and raw database rows never escape.
+ */
+export function evaluateMfaOperationReceiptStates(input) {
+  const rows = Array.isArray(input) ? input : []
+  const counts = Object.fromEntries(MFA_OPERATION_RECEIPT_STATUSES.map((status) => [status, 0]))
+  let invalidStatusCount = 0
+  let nonEmptyErrorCodeCount = 0
+
+  for (const row of rows) {
+    if (!row || typeof row !== 'object' || Array.isArray(row)) {
+      invalidStatusCount += 1
+      continue
+    }
+    if (typeof row.status !== 'string' || !MFA_OPERATION_RECEIPT_STATUSES.includes(row.status)) {
+      invalidStatusCount += 1
+    } else {
+      counts[row.status] += 1
+    }
+    if (row.lastErrorCode !== undefined && row.lastErrorCode !== null && row.lastErrorCode !== '') {
+      nonEmptyErrorCodeCount += 1
+    }
+  }
+
+  const startedCount = counts.STARTED
+  const readyCount = counts.READY
+  const emittedCount = counts.EMITTED
+  const resolvedCount = counts.RESOLVED
+  const unknownCount = counts.UNKNOWN
+  const present = rows.length > 0
+  const validStatuses = invalidStatusCount === 0
+  const terminal = present && validStatuses &&
+    startedCount === 0 && readyCount === 0 && unknownCount === 0 &&
+    emittedCount + resolvedCount === rows.length
+  const errorsCleared = nonEmptyErrorCodeCount === 0
+  const checks = [
+    { name: 'correlated_mfa_operation_receipts_present', pass: present },
+    { name: 'mfa_operation_receipt_statuses_valid', pass: validStatuses },
+    { name: 'mfa_operation_receipts_terminal_without_unknown', pass: terminal },
+    { name: 'mfa_operation_receipt_error_codes_cleared', pass: errorsCleared },
+  ]
+
+  return {
+    pass: checks.every((check) => check.pass),
+    totalCount: rows.length,
+    startedCount,
+    readyCount,
+    emittedCount,
+    resolvedCount,
+    unknownCount,
+    invalidStatusCount,
+    nonEmptyErrorCodeCount,
+    checks,
+  }
+}
+
 const safeEventId = (value) =>
   typeof value === 'string' &&
   /^evt_[a-f0-9]{32}$/.test(value)
