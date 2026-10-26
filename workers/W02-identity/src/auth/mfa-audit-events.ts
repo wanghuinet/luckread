@@ -76,6 +76,10 @@ export function buildMfaAuditEvent(input: {
   }
   const occurredAt = input.occurredAt ?? new Date().toISOString()
   if (!Number.isFinite(Date.parse(occurredAt))) throw new TypeError('invalid MFA audit timestamp')
+  // publishedAt is the immutable durable-publication intent timestamp, not the
+  // business occurrence time and not the later Queue delivery acknowledgement.
+  // The journal's published_at column records the separate Queue-accepted time.
+  const publishedAt = new Date().toISOString()
   const correlationId = safeCorrelation(input.correlationId ?? null, eventId)
   const causationId = safeCorrelation(input.causationId ?? null, correlationId)
   const payload: MfaAuditEvent['payload'] = {
@@ -93,7 +97,7 @@ export function buildMfaAuditEvent(input: {
     resourceType: 'User',
     resourceId: input.userId,
     occurredAt,
-    publishedAt: occurredAt,
+    publishedAt,
     correlationId,
     causationId,
     idempotencyKey: input.idempotencyKey ?? 'mfa-' + eventId,
@@ -127,7 +131,7 @@ export function buildMfaAuditOutboxInsert(
     'PENDING',
     1,
     null,
-    event.occurredAt,
+    event.publishedAt,
     null,
     null,
   )
