@@ -169,6 +169,8 @@ async function verifyProtectedEnvironment({ requireDistinctActor = true } = {}) 
 const mfaMigrationPath = 'workers/W02-identity/migrations/0006_better_auth_two_factor.sql'
 const bootstrapMigrationPath = 'workers/W02-identity/migrations/0007_l8_genesis_bootstrap_audit.sql'
 const mfaAuditOutboxMigrationPath = 'workers/W02-identity/migrations/0008_auth_007_mfa_publication_journal.sql'
+const mfaAuditReceiptMigrationPath = 'workers/W02-identity/migrations/0009_auth_007_mfa_operation_receipts.sql'
+const mfaAuditReceiptContractPath = 'contracts/migration/AUTH-007-mfa-operation-receipt.v1.json'
 const mfaAuditBindingPath = 'contracts/events/AUTH-007-mfa-audit-binding.v1.json'
 const mfaAuditOutboxContractPath = 'contracts/migration/AUTH-007-mfa-publication-journal.v1.json'
 const logicalDataAuthorityPath = 'contracts/transport/logical-data-authority.v1.json'
@@ -184,6 +186,8 @@ for (const file of [
   mfaMigrationPath,
   bootstrapMigrationPath,
   mfaAuditOutboxMigrationPath,
+  mfaAuditReceiptMigrationPath,
+  mfaAuditReceiptContractPath,
   mfaAuditBindingPath,
   mfaAuditOutboxContractPath,
   logicalDataAuthorityPath,
@@ -214,6 +218,8 @@ if (blockers.length === 0) {
   const migration = read(mfaMigrationPath)
   const bootstrapMigration = read(bootstrapMigrationPath)
   const mfaAuditOutboxMigration = read(mfaAuditOutboxMigrationPath)
+  const mfaAuditReceiptMigration = read(mfaAuditReceiptMigrationPath)
+  const mfaAuditReceiptContract = JSON.parse(read(mfaAuditReceiptContractPath))
   const mfaAuditBinding = JSON.parse(read(mfaAuditBindingPath))
   const mfaAuditOutboxContract = JSON.parse(read(mfaAuditOutboxContractPath))
   const logicalDataAuthority = JSON.parse(read(logicalDataAuthorityPath))
@@ -260,6 +266,14 @@ if (blockers.length === 0) {
     'json_valid(payload)',
     'auth.mfa.enrollment_started',
     'auth_007_mfa_publication_journal_status_next_attempt_idx',
+  ]
+  const requiredMfaAuditReceiptTokens = [
+    'CREATE TABLE auth_007_mfa_operation_receipts',
+    "CHECK (is_challenge IN (0, 1))",
+    "CHECK (status IN ('STARTED', 'READY', 'EMITTED', 'RESOLVED', 'UNKNOWN'))",
+    'json_valid(event_plan)',
+    'CHECK (attempt >= 0)',
+    'auth_007_mfa_operation_receipts_status_next_attempt_idx',
   ]
   const operations = [
     { id: 'authMfaStatus', route: 'workers/W01-payload/src/app/api/v1/auth/mfa/route.ts', test: 'workers/W01-payload/tests/int/mfa-status-route.int.spec.ts' },
@@ -313,6 +327,16 @@ if (blockers.length === 0) {
     reviewedMfaMigrationShape: requiredMigrationTokens.every((token) => migration.includes(token)),
     reviewedBootstrapAuditShape: requiredBootstrapTokens.every((token) => bootstrapMigration.includes(token)),
     reviewedMfaAuditOutboxMigrationShape: requiredMfaAuditOutboxTokens.every((token) => mfaAuditOutboxMigration.includes(token)),
+    reviewedMfaAuditReceiptMigrationShape: requiredMfaAuditReceiptTokens.every((token) => mfaAuditReceiptMigration.includes(token)),
+    mfaAuditReceiptContractMatchesMigration:
+      mfaAuditReceiptContract.featureId === 'AUTH-007' &&
+      mfaAuditReceiptContract.target?.physicalTable === 'auth_007_mfa_operation_receipts' &&
+      mfaAuditReceiptContract.target?.sourceMigration === mfaAuditReceiptMigrationPath &&
+      mfaAuditReceiptContract.target?.databaseBinding === 'workers/W02-identity/wrangler.jsonc:D1_01' &&
+      mfaAuditReceiptContract.status === 'CONTRACTED_NOT_VERIFIED' &&
+      mfaAuditReceiptContract.promotion === 'NOT_GREEN' &&
+      mfaAuditReceiptContract.rules?.noNewWorkerD1QueueOrServiceBinding === true &&
+      mfaAuditReceiptContract.rules?.secretsNeverEnterReceipt === true,
     mfaAuditOutboxContractMatchesMigration:
       mfaAuditOutboxContract.target?.physicalTable === 'auth_007_mfa_publication_journal' &&
       mfaAuditOutboxContract.target?.sourceMigration === mfaAuditOutboxMigrationPath &&
@@ -324,7 +348,7 @@ if (blockers.length === 0) {
       mfaAuditBinding.delivery?.newWorkerD1QueueOrServiceBindingAllowed === false &&
       mfaAuditBinding.delivery?.sourceImplementationStatus === 'IMPLEMENTED_IN_SOURCE_NOT_PRODUCTION_VERIFIED',
     mfaOutboxTableIsW02OwnedAndCrossWorkerReadRestricted:
-      ['auth_013_publication_journal', 'auth_007_mfa_publication_journal'].every((tableName) =>
+      ['auth_013_publication_journal', 'auth_007_mfa_publication_journal', 'auth_007_mfa_operation_receipts'].every((tableName) =>
         (logicalDataAuthority.tables ?? []).some((table) =>
           table.name === tableName &&
           table.ownerWorker === 'W02' &&
@@ -353,7 +377,9 @@ if (blockers.length === 0) {
     mfaAuditLifecycleProducerHooksWired:
       /after:\s*createAuthMiddleware/.test(betterAuth) &&
       /classifyMfaAuditHookOutcome/.test(betterAuth) &&
-      /recordMfaAuditEventOnce/.test(betterAuth) &&
+      /createMfaAuditOperationReceipt/.test(betterAuth) &&
+      /finalizeMfaAuditOperationReceipt/.test(betterAuth) &&
+      /reconcileMfaAuditOperationReceipts/.test(betterAuth) &&
       /auth\.mfa\.replay_rejected/.test(betterAuth),
     mfaAuditSourceAndTestsPresent:
       exists('workers/W02-identity/src/auth/mfa-audit-events.ts') &&
@@ -362,7 +388,10 @@ if (blockers.length === 0) {
       exists('workers/W02-identity/src/auth/mfa-audit-hooks.test.ts') &&
       exists('workers/W02-identity/src/auth/mfa-audit-publication-journal.ts') &&
       exists('workers/W02-identity/src/auth/mfa-audit-publication-journal.test.ts') &&
+      exists('workers/W02-identity/src/auth/mfa-audit-receipts.ts') &&
+      exists('workers/W02-identity/src/auth/mfa-audit-receipts.test.ts') &&
       exists('scripts/auth-007-mfa-journal-migration-static-audit.mjs') &&
+      exists('scripts/auth-007-mfa-operation-receipts-static-audit.mjs') &&
       exists('workers/W06-governance/src/mfa-audit-queue-consumer.ts') &&
       exists('workers/W06-governance/src/mfa-audit-queue-consumer.test.ts'),
     encryptedRecoveryCodes: /backupCodeOptions:\s*\{[^}]*storeBackupCodes:\s*['"]encrypted['"]/.test(betterAuth),
