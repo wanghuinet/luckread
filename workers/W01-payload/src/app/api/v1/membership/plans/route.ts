@@ -51,6 +51,49 @@ async function resolveActiveCreatorId(request: Request): Promise<string | Respon
   return creatorId
 }
 
+type PlanBodyReadResult = { ok: true; value: unknown } | { ok: false; response: Response }
+
+async function readBoundedPlanBody(request: Request): Promise<PlanBodyReadResult> {
+  const declaredLength = Number(request.headers.get('content-length') ?? '0')
+  if (Number.isFinite(declaredLength) && declaredLength > 16_384) {
+    return { ok: false, response: errorResponse(400, 'VALIDATION_FAILED', 'Plan request is too large') }
+  }
+  if (!request.body) {
+    return { ok: false, response: errorResponse(400, 'VALIDATION_FAILED', 'A valid JSON plan body is required') }
+  }
+
+  const reader = request.body.getReader()
+  const chunks: Uint8Array[] = []
+  let byteLength = 0
+  try {
+    while (true) {
+      const part = await reader.read()
+      if (part.done) break
+      byteLength += part.value.byteLength
+      if (byteLength > 16_384) {
+        await reader.cancel()
+        return { ok: false, response: errorResponse(400, 'VALIDATION_FAILED', 'Plan request is too large') }
+      }
+      chunks.push(part.value)
+    }
+  } catch {
+    return { ok: false, response: errorResponse(400, 'VALIDATION_FAILED', 'A valid JSON plan body is required') }
+  }
+
+  const bytes = new Uint8Array(byteLength)
+  let offset = 0
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset)
+    offset += chunk.byteLength
+  }
+  try {
+    const text = new TextDecoder('utf-8', { fatal: true }).decode(bytes)
+    return { ok: true, value: JSON.parse(text) as unknown }
+  } catch {
+    return { ok: false, response: errorResponse(400, 'VALIDATION_FAILED', 'A valid JSON plan body is required') }
+  }
+}
+
 /** Creator plan management stays on the canonical W01 → W08/W07 paths. */
 export async function GET(request: Request): Promise<Response> {
   try {
@@ -83,20 +126,9 @@ export async function POST(request: Request): Promise<Response> {
     if (denied) return denied
     const creatorId = await resolveActiveCreatorId(request)
     if (creatorId instanceof Response) return creatorId
-    const declaredLength = Number(request.headers.get('content-length') ?? '0')
-    if (Number.isFinite(declaredLength) && declaredLength > 16_384) {
-      return errorResponse(400, 'VALIDATION_FAILED', 'Plan request is too large')
-    }
-    let body: unknown
-    try {
-      const raw = await request.text()
-      if (new TextEncoder().encode(raw).byteLength > 16_384) {
-        return errorResponse(400, 'VALIDATION_FAILED', 'Plan request is too large')
-      }
-      body = JSON.parse(raw) as unknown
-    } catch {
-      return errorResponse(400, 'VALIDATION_FAILED', 'A valid JSON plan body is required')
-    }
+    const bodyResult = await readBoundedPlanBody(request)
+    if (!bodyResult.ok) return bodyResult.response
+    const body = bodyResult.value
     return await callW07Subscription({
       request,
       pathname: '/membership/plans',
