@@ -50,3 +50,21 @@ BEFORE DELETE ON membership_plan_versions
 BEGIN
   SELECT RAISE(ABORT, 'membership plan versions are retained');
 END;
+
+CREATE TRIGGER IF NOT EXISTS membership_plans_owner_immutable_update
+BEFORE UPDATE OF owner_type, owner_id, created_at ON membership_plans
+WHEN NEW.owner_type <> OLD.owner_type OR NEW.owner_id <> OLD.owner_id OR NEW.created_at <> OLD.created_at
+BEGIN
+  SELECT RAISE(ABORT, 'membership plan owner and identity are immutable');
+END;
+
+CREATE TRIGGER IF NOT EXISTS membership_plans_current_version_forward_only
+BEFORE UPDATE OF current_version ON membership_plans
+WHEN NEW.current_version <= OLD.current_version
+  OR NOT EXISTS (
+    SELECT 1 FROM membership_plan_versions
+    WHERE plan_id = OLD.plan_id AND plan_version = NEW.current_version
+  )
+BEGIN
+  SELECT RAISE(ABORT, 'membership plan current version must advance to an existing version');
+END;
