@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/evidence/pay-002-order-api-admission.v1.json",
+  "title": "PAY-002 Commerce Order API Admission Gate",
+  "version": "1.0.0",
+  "status": "BLOCKED_ON_CANONICAL_OPENAPI_ALIGNMENT",
+  "purpose": "Admission gate for the candidate Commerce Order create/read DTOs; this contract does not itself enable public routes.",
+  "contract": "contracts/api/order-commerce.v1.json",
+  "requiredEvidence": [
+    {
+      "id": "API-OPENAPI-01",
+      "requirement": "Both candidate methods and exact paths are added to Canonical OpenAPI with closed request/response DTO schemas, common error envelopes and body size limits.",
+      "status": "PENDING"
+    },
+    {
+      "id": "AUTH-PERMISSION-01",
+      "requirement": "order.create.own and order.read.own are formally admitted to contracts/authz/permissions.json and CASL/role policy with owner scope; unauthorized and cross-owner reads are rejected.",
+      "status": "PENDING"
+    },
+    {
+      "id": "ITEM-RESOLUTION-01",
+      "requirement": "W07 resolves every submitted itemRef to an authoritative purchasable item/offer, immutable version and current price; unsupported/unavailable items fail closed.",
+      "status": "PENDING"
+    },
+    {
+      "id": "ENTITY-MAPPING-01",
+      "requirement": "Create/read response DTO fields map deterministically to ENT-ORDER and ENT-ORDER-LINE without exposing customerId, internal columns, or provider/ledger/entitlement internals.",
+      "status": "PENDING"
+    },
+    {
+      "id": "D1-04-BINDING-01",
+      "requirement": "Read-only D1-04 UUID/display-name preflight and reviewed physical schema/migration evidence pass before runtime writes are enabled.",
+      "status": "PENDING"
+    },
+    {
+      "id": "IDEMPOTENCY-01",
+      "requirement": "Same key and same semantic request replays the original order response; same key and a different request hash is rejected, atomically with order creation.",
+      "status": "PENDING"
+    },
+    {
+      "id": "ABUSE-01",
+      "requirement": "The route enforces a bounded request-body size, item-count and quantity limits, plus existing W01/W07 anti-abuse controls before any D1 write.",
+      "status": "PENDING"
+    },
+    {
+      "id": "E2E-SECURITY-01",
+      "requirement": "Exact-commit runtime tests cover successful create/read, malformed/unknown fields, price spoofing, missing idempotency key, replay/key-reuse conflict, owner isolation, unavailable items and concurrency/recovery.",
+      "status": "PENDING"
+    },
+    {
+      "id": "EVIDENCE-REGISTRY-01",
+      "requirement": "Schema, migration, security and runtime evidence is admitted against the exact implementation commit; PAY-002 remains unresolved until downstream mapping checks pass.",
+      "status": "PENDING"
+    }
+  ],
+  "greenRule": "This gate cannot be GREEN while any required evidence is PENDING; route publication and implementation admission are separate from a valid candidate DTO.",
+  "nextAction": "Admit the candidate permission IDs and canonical OpenAPI operation/DTO mapping, then implement through the W01 public API boundary to W07."
+}

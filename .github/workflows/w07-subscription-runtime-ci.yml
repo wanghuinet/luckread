@@ -11,6 +11,8 @@ on:
       - '.github/workflows/w07-subscription-runtime-ci.yml'
       - 'contracts/alignment/cross-system-mapping.v1.json'
       - 'contracts/alignment/mapping-batches/B13-B15-creator-membership-commerce.v1.json'
+      - 'contracts/api/order-commerce.v1.json'
+      - 'contracts/evidence/pay-002-order-api-admission.v1.json'
       - 'contracts/alignment/code-evidence-inventory.v1.json'
       - 'contracts/alignment/five-way-reconciliation.v1.json'
       - 'contracts/entity/SUBSCRIPTION-ENTITY-CONTRACT.v1.json'
@@ -34,6 +36,8 @@ on:
       - '.github/workflows/w07-subscription-runtime-ci.yml'
       - 'contracts/alignment/cross-system-mapping.v1.json'
       - 'contracts/alignment/mapping-batches/B13-B15-creator-membership-commerce.v1.json'
+      - 'contracts/api/order-commerce.v1.json'
+      - 'contracts/evidence/pay-002-order-api-admission.v1.json'
       - 'contracts/alignment/code-evidence-inventory.v1.json'
       - 'contracts/alignment/five-way-reconciliation.v1.json'
       - 'contracts/entity/SUBSCRIPTION-ENTITY-CONTRACT.v1.json'
@@ -71,7 +75,7 @@ jobs:
         run: node --test ../../workers/W07-subscription-commerce/scripts/verify-d1-04-binding.test.mjs
       - name: Run Subscription runtime and adapter tests
         working-directory: workers/W01-payload
-        run: pnpm exec vitest run --config ./vitest.config.mts ../../workers/W07-subscription-commerce/src/subscription-runtime.test.ts ../../workers/W07-subscription-commerce/src/d1-traffic-guard.test.ts ../../workers/W07-subscription-commerce/src/hyperswitch-webhook-signature.test.ts ../../workers/W07-subscription-commerce/src/hyperswitch-webhook-payment-validation.test.ts tests/int/subscription-v1-adapter.int.spec.ts
+        run: pnpm exec vitest run --config ./vitest.config.mts ../../workers/W07-subscription-commerce/src/subscription-runtime.test.ts ../../workers/W07-subscription-commerce/src/d1-traffic-guard.test.ts ../../workers/W07-subscription-commerce/src/hyperswitch-webhook-signature.test.ts ../../workers/W07-subscription-commerce/src/hyperswitch-webhook-payment-validation.test.ts ../../workers/W07-subscription-commerce/src/order-request-validation.test.ts tests/int/subscription-v1-adapter.int.spec.ts
       - name: Verify Subscription migration shape
         run: |
           set -euo pipefail
