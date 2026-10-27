@@ -1,0 +1,150 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/state-machines/order.json",
+  "title": "D1-04 Order State Machine Candidate",
+  "type": "object",
+  "x-luckread": {
+    "entity": "Order",
+    "domain": "D1-04",
+    "state-field": "status",
+    "version-field": "version",
+    "requires-optimistic-lock": true,
+    "initial-state": "CREATED",
+    "states": [
+      "CREATED",
+      "PENDING_PAYMENT",
+      "CONFIRMED",
+      "PROCESSING",
+      "COMPLETED",
+      "CANCELLED",
+      "FAILED"
+    ],
+    "terminal-states": [
+      "COMPLETED",
+      "CANCELLED",
+      "FAILED"
+    ],
+    "admissionStatus": "CANDIDATE_NOT_GREEN",
+    "paymentFactAuthority": "Paid Orders require verified provider result under admitted payment contract; zero-total confirmation requires server-computed eligibility."
+  },
+  "x-transitions": [
+    {
+      "from": "CREATED",
+      "to": "PENDING_PAYMENT",
+      "actor": "system|commerce",
+      "precondition": "server-resolved order has a positive payable total"
+    },
+    {
+      "from": "CREATED",
+      "to": "CONFIRMED",
+      "actor": "system|commerce",
+      "precondition": "server-resolved eligible order total is zero"
+    },
+    {
+      "from": "CREATED",
+      "to": "CANCELLED",
+      "actor": "customer|commerce|admin",
+      "precondition": "owner scope and cancellation policy pass"
+    },
+    {
+      "from": "CREATED",
+      "to": "FAILED",
+      "actor": "system|commerce",
+      "precondition": "server-side order validation failed"
+    },
+    {
+      "from": "PENDING_PAYMENT",
+      "to": "CONFIRMED",
+      "actor": "system|payment",
+      "precondition": "verified provider payment result or authoritative payment retrieval admitted"
+    },
+    {
+      "from": "PENDING_PAYMENT",
+      "to": "CANCELLED",
+      "actor": "customer|commerce|admin",
+      "precondition": "cancellation eligible and provider cancellation/release reconciled where needed"
+    },
+    {
+      "from": "PENDING_PAYMENT",
+      "to": "FAILED",
+      "actor": "system|payment",
+      "precondition": "verified non-retryable payment failure or bounded failure policy"
+    },
+    {
+      "from": "CONFIRMED",
+      "to": "PROCESSING",
+      "actor": "system|commerce",
+      "precondition": "fulfillment or digital-delivery policy admits processing"
+    },
+    {
+      "from": "CONFIRMED",
+      "to": "COMPLETED",
+      "actor": "system|commerce",
+      "precondition": "eligible digital purchase completes without separate processing"
+    },
+    {
+      "from": "CONFIRMED",
+      "to": "CANCELLED",
+      "actor": "commerce|admin",
+      "precondition": "cancellation policy passes and separate refund/reversal is recorded if required"
+    },
+    {
+      "from": "CONFIRMED",
+      "to": "FAILED",
+      "actor": "system|commerce",
+      "precondition": "fulfillment failure is durable and compensation is reconciled"
+    },
+    {
+      "from": "PROCESSING",
+      "to": "COMPLETED",
+      "actor": "system|commerce",
+      "precondition": "fulfillment/delivery acceptance passed"
+    },
+    {
+      "from": "PROCESSING",
+      "to": "FAILED",
+      "actor": "system|commerce",
+      "precondition": "failure durable and compensation obligations recorded"
+    }
+  ],
+  "x-forbidden": [
+    {
+      "from": "COMPLETED",
+      "to": "CREATED",
+      "reason": "terminal Order state must never be reopened"
+    },
+    {
+      "from": "CANCELLED",
+      "to": "CONFIRMED",
+      "reason": "cancelled Order is not reactivated; create a new Order"
+    },
+    {
+      "from": "FAILED",
+      "to": "CONFIRMED",
+      "reason": "failed Order is not reactivated; create a new Order"
+    },
+    {
+      "from": "PENDING_PAYMENT",
+      "to": "PROCESSING",
+      "reason": "payment confirmation gate may not be bypassed"
+    },
+    {
+      "from": "PENDING_PAYMENT",
+      "to": "COMPLETED",
+      "reason": "payment confirmation gate may not be bypassed"
+    }
+  ],
+  "reconciliation": {
+    "changeControl": "CC-PAY-002-ORDER-ENTITY-MODEL-2026-10-27",
+    "sourceRefs": [
+      "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
+      "docs/09-D1-DOMAIN-MASTER-v1.0.md",
+      "docs/65-MONETIZATION-COMMERCE-SYSTEM-CONTRACT-v1.0.md",
+      "docs/68-WALLET-LEDGER-AND-SETTLEMENT-CONTRACT-v1.0.md",
+      "docs/191-L5-L6-MEMBERSHIP-COMMERCE-ADVERTISING-WALLET-LEDGER-INSTANCE-REGISTRY-v1.0.md",
+      "docs/305-CONCURRENCY-ETAG-CONDITIONAL-REQUEST-AND-IDEMPOTENCY-CONTRACT-v1.0.md",
+      "docs/change-control/CC-PAY-002-ORDER-ENTITY-MODEL-2026-10-27.md"
+    ],
+    "note": "Candidate state machine only; not payment-finality proof and not permission to post ledger or grant entitlement."
+  }
+}

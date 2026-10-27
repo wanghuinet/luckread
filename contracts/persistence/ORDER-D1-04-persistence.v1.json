@@ -1,0 +1,365 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/persistence/ORDER-D1-04-persistence.v1.json",
+  "title": "LuckRead Order / OrderLine D1-04 Logical Persistence Candidate",
+  "version": "1.0.0",
+  "status": "CONTRACTED_NOT_VERIFIED",
+  "featureIds": [
+    "PAY-002"
+  ],
+  "entityId": "ENT-ORDER",
+  "relatedEntityIds": [
+    "ENT-ORDER-LINE"
+  ],
+  "entityFieldContract": "contracts/entity/entity-field-contract.v1.json#ENT-ORDER,ENT-ORDER-LINE",
+  "sourceOfTruth": "contracts/entity/ORDER-ENTITY-CONTRACT.v1.json",
+  "relatedEntityContract": "contracts/entity/ORDER-LINE-ENTITY-CONTRACT.v1.json",
+  "authoritativeDomain": "D1-04",
+  "primaryWorker": "W07",
+  "physicalResource": {
+    "binding": "D1_04",
+    "worker": "W07",
+    "databaseUuid": "9bfb89a5-fbb5-45b1-a2ee-eab674b0d736",
+    "databaseName": null,
+    "databaseNameAuthority": "D1 UUID is authoritative; current Wrangler display label requires comparison with live read-only Cloudflare inventory before deployment.",
+    "allocationStatus": "UUID_REGISTERED_REMOTE_NAME_PREFLIGHT_REQUIRED",
+    "allocationSource": "contracts/transport/worker-d1-access-boundary.v1.json#physicalD1Registry/D1-04",
+    "remoteNamePreflightRequired": true
+  },
+  "tables": {
+    "orders": {
+      "purpose": "Authoritative commercial Order lifecycle and immutable totals snapshot; not a payment transaction or ledger table.",
+      "primaryKey": "order_id",
+      "columns": {
+        "order_id": {
+          "fieldId": "ENT-ORDER-F-ORDER-ID",
+          "type": "TEXT",
+          "required": true,
+          "unique": true,
+          "indexed": true,
+          "immutable": true
+        },
+        "customer_id": {
+          "fieldId": "ENT-ORDER-F-CUSTOMER-ID",
+          "type": "TEXT",
+          "required": true,
+          "indexed": true,
+          "immutable": true
+        },
+        "status": {
+          "fieldId": "ENT-ORDER-F-STATUS",
+          "type": "TEXT",
+          "required": true,
+          "indexed": true,
+          "stateMachineRef": "contracts/state-machines/order.json"
+        },
+        "version": {
+          "fieldId": "ENT-ORDER-F-VERSION",
+          "type": "INTEGER",
+          "required": true,
+          "minimum": 1,
+          "indexed": true,
+          "monotonic": true
+        },
+        "currency": {
+          "fieldId": "ENT-ORDER-F-CURRENCY",
+          "type": "TEXT",
+          "required": true,
+          "length": 3,
+          "uppercase": true,
+          "immutable": true
+        },
+        "subtotal_minor": {
+          "fieldId": "ENT-ORDER-F-SUBTOTAL-MINOR",
+          "type": "INTEGER",
+          "required": true,
+          "minimum": 0,
+          "immutable": true
+        },
+        "discount_minor": {
+          "fieldId": "ENT-ORDER-F-DISCOUNT-MINOR",
+          "type": "INTEGER",
+          "required": true,
+          "minimum": 0,
+          "immutable": true
+        },
+        "tax_minor": {
+          "fieldId": "ENT-ORDER-F-TAX-MINOR",
+          "type": "INTEGER",
+          "required": true,
+          "minimum": 0,
+          "immutable": true
+        },
+        "total_minor": {
+          "fieldId": "ENT-ORDER-F-TOTAL-MINOR",
+          "type": "INTEGER",
+          "required": true,
+          "minimum": 0,
+          "immutable": true
+        },
+        "created_at": {
+          "fieldId": "ENT-ORDER-F-CREATED-AT",
+          "type": "TEXT",
+          "required": true,
+          "format": "date-time",
+          "immutable": true
+        },
+        "updated_at": {
+          "fieldId": "ENT-ORDER-F-UPDATED-AT",
+          "type": "TEXT",
+          "required": true,
+          "format": "date-time"
+        },
+        "confirmed_at": {
+          "fieldId": "ENT-ORDER-F-CONFIRMED-AT",
+          "type": "TEXT",
+          "required": false,
+          "nullable": true,
+          "format": "date-time"
+        },
+        "cancelled_at": {
+          "fieldId": "ENT-ORDER-F-CANCELLED-AT",
+          "type": "TEXT",
+          "required": false,
+          "nullable": true,
+          "format": "date-time"
+        },
+        "failure_code": {
+          "fieldId": "ENT-ORDER-F-FAILURE-CODE",
+          "type": "TEXT",
+          "required": false,
+          "nullable": true,
+          "maxLength": 128
+        }
+      },
+      "constraints": [
+        "customer_id is resolved from authenticated server principal.",
+        "version uses compare-and-set and increments once per accepted mutation.",
+        "All money is INTEGER minor units in one currency; floating-point money is forbidden.",
+        "total_minor = subtotal_minor - discount_minor + tax_minor and must be non-negative.",
+        "No provider network call occurs inside the D1 write transaction."
+      ],
+      "indexes": [
+        "ix_orders_customer_created_order (customer_id, created_at, order_id)",
+        "ix_orders_status_created_order (status, created_at, order_id)"
+      ]
+    },
+    "order_lines": {
+      "purpose": "Immutable priced item/version snapshot attached to authoritative Order.",
+      "primaryKey": "order_line_id",
+      "columns": {
+        "order_line_id": {
+          "fieldId": "ENT-ORDER-LINE-F-ORDER-LINE-ID",
+          "type": "TEXT",
+          "required": true,
+          "unique": true,
+          "indexed": true,
+          "immutable": true
+        },
+        "order_id": {
+          "fieldId": "ENT-ORDER-LINE-F-ORDER-ID",
+          "type": "TEXT",
+          "required": true,
+          "indexed": true,
+          "immutable": true,
+          "logicalRelation": "orders.order_id"
+        },
+        "item_type": {
+          "fieldId": "ENT-ORDER-LINE-F-ITEM-TYPE",
+          "type": "TEXT",
+          "required": true,
+          "allowed": [
+            "CONTENT",
+            "MEMBERSHIP_PLAN",
+            "DIGITAL_GOOD",
+            "BUNDLE"
+          ],
+          "immutable": true
+        },
+        "item_ref": {
+          "fieldId": "ENT-ORDER-LINE-F-ITEM-REF",
+          "type": "TEXT",
+          "required": true,
+          "indexed": true,
+          "immutable": true
+        },
+        "item_version": {
+          "fieldId": "ENT-ORDER-LINE-F-ITEM-VERSION",
+          "type": "TEXT",
+          "required": true,
+          "immutable": true
+        },
+        "quantity": {
+          "fieldId": "ENT-ORDER-LINE-F-QUANTITY",
+          "type": "INTEGER",
+          "required": true,
+          "minimum": 1,
+          "immutable": true
+        },
+        "unit_amount_minor": {
+          "fieldId": "ENT-ORDER-LINE-F-UNIT-AMOUNT-MINOR",
+          "type": "INTEGER",
+          "required": true,
+          "minimum": 0,
+          "immutable": true
+        },
+        "line_subtotal_minor": {
+          "fieldId": "ENT-ORDER-LINE-F-LINE-SUBTOTAL-MINOR",
+          "type": "INTEGER",
+          "required": true,
+          "minimum": 0,
+          "immutable": true
+        },
+        "line_discount_minor": {
+          "fieldId": "ENT-ORDER-LINE-F-LINE-DISCOUNT-MINOR",
+          "type": "INTEGER",
+          "required": true,
+          "minimum": 0,
+          "immutable": true
+        },
+        "line_tax_minor": {
+          "fieldId": "ENT-ORDER-LINE-F-LINE-TAX-MINOR",
+          "type": "INTEGER",
+          "required": true,
+          "minimum": 0,
+          "immutable": true
+        },
+        "line_total_minor": {
+          "fieldId": "ENT-ORDER-LINE-F-LINE-TOTAL-MINOR",
+          "type": "INTEGER",
+          "required": true,
+          "minimum": 0,
+          "immutable": true
+        },
+        "item_snapshot_json": {
+          "fieldId": "ENT-ORDER-LINE-F-ITEM-SNAPSHOT-JSON",
+          "type": "TEXT",
+          "required": true,
+          "format": "json",
+          "maxLength": 65536,
+          "immutable": true
+        },
+        "created_at": {
+          "fieldId": "ENT-ORDER-LINE-F-CREATED-AT",
+          "type": "TEXT",
+          "required": true,
+          "format": "date-time",
+          "immutable": true
+        }
+      },
+      "constraints": [
+        "order_id is a same-D1-04 logical relation; no cross-D1 foreign key is assumed.",
+        "line_subtotal_minor = unit_amount_minor * quantity using checked integer arithmetic.",
+        "line_total_minor = line_subtotal_minor - line_discount_minor + line_tax_minor and is non-negative.",
+        "item_snapshot_json is bounded and never replaces source item rights, ownership, current price or entitlement authority."
+      ],
+      "indexes": [
+        "ix_order_lines_order_id (order_id)",
+        "ix_order_lines_item_ref_version (item_ref, item_version)"
+      ]
+    },
+    "order_create_idempotency": {
+      "purpose": "D1-04-local idempotency for order create; transactionally paired with initial Order/OrderLine creation.",
+      "primaryKey": "id",
+      "uniqueKey": [
+        "customer_id",
+        "operation_key",
+        "idempotency_key"
+      ],
+      "columns": {
+        "id": {
+          "type": "TEXT",
+          "required": true,
+          "unique": true
+        },
+        "customer_id": {
+          "type": "TEXT",
+          "required": true,
+          "indexed": true
+        },
+        "operation_key": {
+          "type": "TEXT",
+          "required": true,
+          "allowed": [
+            "POST /v1/orders"
+          ]
+        },
+        "idempotency_key": {
+          "type": "TEXT",
+          "required": true,
+          "maxLength": 255
+        },
+        "request_hash": {
+          "type": "TEXT",
+          "required": true,
+          "format": "sha-256"
+        },
+        "state": {
+          "type": "TEXT",
+          "required": true,
+          "allowed": [
+            "IN_PROGRESS",
+            "COMPLETED",
+            "FAILED"
+          ]
+        },
+        "response_status": {
+          "type": "INTEGER",
+          "required": false
+        },
+        "response_json": {
+          "type": "TEXT",
+          "required": false,
+          "format": "json",
+          "maxLength": 65536
+        },
+        "created_at": {
+          "type": "TEXT",
+          "required": true,
+          "format": "date-time"
+        },
+        "expires_at": {
+          "type": "TEXT",
+          "required": true,
+          "format": "date-time"
+        }
+      },
+      "constraints": [
+        "Idempotency scope is authenticated customer + operation + client key.",
+        "Request hash is computed over canonical semantic DTO JSON.",
+        "Same key/payload replays the first completed response; same key/different payload fails deterministically.",
+        "Order, lines and initial idempotency record commit atomically in D1-04.",
+        "Default retention is 24 hours unless the admitted operation contract specifies longer."
+      ]
+    }
+  },
+  "mutationBudgets": {
+    "d1ReadMax": 2,
+    "d1WriteTransactionMax": 1,
+    "distributedTransactions": false,
+    "providerNetworkCallsInsideD1Transaction": false
+  },
+  "runtimeGates": {
+    "physicalD1Binding": "UUID_REGISTERED_REMOTE_NAME_PREFLIGHT_REQUIRED",
+    "migrationExecution": "NOT_PREPARED",
+    "optimisticConcurrency": "REQUIRED",
+    "idempotency": "REQUIRED",
+    "securityE2E": "REQUIRED",
+    "runtimePositive": "REQUIRED",
+    "runtimeNegative": "REQUIRED",
+    "remoteRuntimeEvidence": "REQUIRED"
+  },
+  "migration": {
+    "status": "NOT_CREATED",
+    "rule": "Logical candidate only; no migration file is proposed or applied until API/DTO field mappings, binding preflight and admission review pass."
+  },
+  "nonGoals": [
+    "No D1 table is asserted to exist remotely.",
+    "No physical migration, remote mutation or deployment is claimed.",
+    "No new Worker, D1, Queue or Service Binding.",
+    "No provider payment fact, immutable ledger entry, refund or entitlement grant is stored in Order authority.",
+    "No cross-D1 foreign key or distributed transaction.",
+    "No new PaymentIntent/Payment entity is defined by this PAY-002 slice."
+  ],
+  "promotionRule": "Remain CONTRACTED_NOT_VERIFIED until D1-04 display name is read-only verified, migration contract reviewed, API/DTO and permissions admitted, and positive/negative/concurrency/recovery tests plus exact-commit Evidence Registry evidence pass."
+}
