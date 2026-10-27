@@ -223,6 +223,8 @@ describe('subscription runtime', () => {
     expect(workflow).toContain('SOURCE_SHA: ${{ inputs.source_sha }}')
     expect(workflow).not.toContain('ref: ${{ inputs.source_sha }}')
     expect(workflow).not.toContain('[[ "${{ inputs.source_sha }}"')
+    expect(workflow).toContain('"sourceSha": "$SOURCE_SHA"')
+    expect(workflow).not.toContain('"sourceSha": "${{ inputs.source_sha }}"')
     expect(workflow).toContain('Read-only D1-01 migration and schema preflight')
     expect(workflow).toContain('SELECT name FROM d1_migrations')
     expect(workflow).toContain('PRAGMA table_info("membership_subscriptions")')
