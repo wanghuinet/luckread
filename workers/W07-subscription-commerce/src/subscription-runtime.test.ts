@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { changeSubscriptionPlan, createSubscription, etagForVersion, getSubscription, listSubscriptions, parseBoundedPositiveInt, transitionSubscription, type SubscriptionRow, type SubscriptionStatus } from './subscription-runtime.js'
+import w07 from './index.js'
 
 type Statement = { bind: (...values: unknown[]) => Statement; first: <T>() => Promise<T | null>; all: <T>() => Promise<{ results: T[] }>; run: () => Promise<{ meta: { changes: number } }> }
 
@@ -101,6 +102,34 @@ describe('subscription runtime', () => {
     expect(guard).toBeLessThan(changePlan)
     expect(index).toContain("'SERVICE_UNAVAILABLE'")
     expect(index).toContain('verified payment-provider synchronization is available')
+  })
+
+  it('returns 503 for authenticated W07 POST without touching D1', async () => {
+    let databaseTouched = false
+    const db = {
+      prepare() {
+        databaseTouched = true
+        throw new Error('D1 must not be touched by a fail-closed POST')
+      },
+    } as unknown as D1Database
+    const request = new Request('https://luckread-w07.internal/memberships/subscriptions', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'X-LuckRead-Caller': 'W01',
+        'X-LuckRead-Transport-Version': '1.0',
+        'X-LuckRead-Correlation-Id': 'test-correlation',
+        'X-LuckRead-Principal-User-Id': 'user_1',
+        'X-LuckRead-Principal-Layer': 'L2',
+        'Idempotency-Key': 'test-idempotency',
+      },
+      body: JSON.stringify({ planId: 'plan_basic' }),
+    })
+    const response = await w07.fetch(request, { D1_01: db })
+    const body = await response.json() as { error?: { code?: string } }
+    expect(response.status).toBe(503)
+    expect(body.error?.code).toBe('SERVICE_UNAVAILABLE')
+    expect(databaseTouched).toBe(false)
   })
   it('creates an idempotent pending subscription', async () => {
     const db = fakeDb([]); const first = await createSubscription(db, 'user_1', { planId: 'plan_basic', idempotencyKey: 'create-1' });
