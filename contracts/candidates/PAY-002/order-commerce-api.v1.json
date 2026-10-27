@@ -1,0 +1,7 @@
+{
+  "$id": "https://luckread.com/candidates/pay-002/order-commerce-api.v1.json",
+  "status": "CONTRACT_CANDIDATE_NOT_ADMITTED",
+  "nonGoals": [
+    "This candidate is intentionally stored outside contracts/api so it is not counted as a canonical API operation before permission/OpenAPI admission."
+  ]
+}

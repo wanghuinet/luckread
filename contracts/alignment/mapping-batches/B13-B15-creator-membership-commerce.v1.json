@@ -211,10 +211,10 @@
         "docs/68-WALLET-LEDGER-AND-SETTLEMENT-CONTRACT-v1.0.md",
         "docs/191-L5-L6-MEMBERSHIP-COMMERCE-ADVERTISING-WALLET-LEDGER-INSTANCE-REGISTRY-v1.0.md",
         "docs/305-CONCURRENCY-ETAG-CONDITIONAL-REQUEST-AND-IDEMPOTENCY-CONTRACT-v1.0.md",
-        "contracts/api/order-commerce.v1.json",
-        "contracts/evidence/pay-002-order-api-admission.v1.json",
         "workers/W07-subscription-commerce/src/order-request-validation.ts",
-        "workers/W07-subscription-commerce/src/order-request-validation.test.ts"
+        "workers/W07-subscription-commerce/src/order-request-validation.test.ts",
+        "contracts/candidates/PAY-002/order-commerce-api.v1.json",
+        "contracts/candidates/PAY-002/order-api-admission.v1.json"
       ],
       "blockers": [
         "Commerce Order create/read DTO and pure W07 request validation are now proposed; canonical OpenAPI and operation-policy alignment are not admitted.",

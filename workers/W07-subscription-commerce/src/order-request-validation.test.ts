@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { readFileSync } from 'node:fs'
 import {
   MAX_ORDER_ITEMS,
   MAX_ORDER_QUANTITY,
@@ -93,5 +94,26 @@ describe('Commerce Order Idempotency-Key candidate header', () => {
       ok: false,
       error: { code: 'VALIDATION_FAILED', status: 400, field: 'Idempotency-Key' },
     })
+  })
+})
+
+
+describe('PAY-002 API candidate admission boundary', () => {
+  it('keeps proposed order routes and permission IDs out of canonical OpenAPI/authz until admission', () => {
+    const candidate = JSON.parse(readFileSync(new URL('../../../contracts/candidates/PAY-002/order-commerce-api.v1.json', import.meta.url), 'utf8'))
+    const gate = JSON.parse(readFileSync(new URL('../../../contracts/candidates/PAY-002/order-api-admission.v1.json', import.meta.url), 'utf8'))
+    const openapi = readFileSync(new URL('../../../contracts/openapi/v1/openapi.yaml', import.meta.url), 'utf8')
+    const permissions = JSON.parse(readFileSync(new URL('../../../contracts/authz/permissions.json', import.meta.url), 'utf8'))
+
+    expect(candidate.status).toBe('CONTRACT_CANDIDATE_NOT_ADMITTED')
+    expect(candidate.operations.map((operation: { operationId: string }) => operation.operationId)).toEqual(['createCommerceOrder', 'getCommerceOrder'])
+    expect(candidate.operations.every((operation: { candidateStatus: string }) => operation.candidateStatus === 'NOT_PUBLISHED_IN_CANONICAL_OPENAPI')).toBe(true)
+    expect(gate.status).toBe('BLOCKED_ON_CANONICAL_OPENAPI_ALIGNMENT')
+    expect(gate.requiredEvidence.every((item: { status: string }) => item.status === 'PENDING')).toBe(true)
+    expect(openapi).not.toContain('operationId: createCommerceOrder')
+    expect(openapi).not.toContain('operationId: getCommerceOrder')
+    const registeredPermissions = (permissions['x-permissions'] ?? []).map((permission: { name: string }) => permission.name)
+    expect(registeredPermissions).not.toContain('order.create.own')
+    expect(registeredPermissions).not.toContain('order.read.own')
   })
 })
