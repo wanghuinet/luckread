@@ -194,7 +194,8 @@ jobs:
             privateNoStore:cache==='private, no-store',
             noSharedCacheHeader:!headers.includes('x-luckread-cache:'),
             noOwnerUserId:!body.includes('ownerUserId'),
-            projectedFieldsOnly:Object.keys(doc??{}).every(k=>allowed.has(k)),
+            // requestId is an API envelope field added to root-level Payload documents, not a Media field.
+            projectedFieldsOnly:Object.keys(doc??{}).filter(k=>k!=='requestId').every(k=>allowed.has(k)),
             readyStatus:doc?.status==='READY'
           }
           for(const [k,ok] of Object.entries(checks)) if(!ok) throw new Error('owner Media check failed: '+k)
