@@ -7,17 +7,14 @@ on:
         description: Exact W07 source commit to deploy
         required: true
         type: string
-        default: 1316b223b6308575946afa298e2df0fbaf9cd161
       confirm:
         description: Type DEPLOY_W07_SUBSCRIPTION to permit W07 deployment
         required: true
         type: string
-        default: DEPLOY_W07_SUBSCRIPTION
       migration_confirm:
         description: Type APPLY_W07_SUBSCRIPTION_MIGRATION to permit D1-01 migration
         required: true
         type: string
-        default: APPLY_W07_SUBSCRIPTION_MIGRATION
 
 permissions:
   contents: read
@@ -28,6 +25,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
+      - name: Validate explicit deployment source and confirmations
+        run: |
+          set -euo pipefail
+          [[ "${{ inputs.source_sha }}" =~ ^[0-9a-f]{40}$ ]]
+          [[ "${{ inputs.confirm }}" == "DEPLOY_W07_SUBSCRIPTION" ]]
+          [[ "${{ inputs.migration_confirm }}" == "APPLY_W07_SUBSCRIPTION_MIGRATION" ]]
       - name: Checkout exact source commit
         uses: actions/checkout@v4
         with:
