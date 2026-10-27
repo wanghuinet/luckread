@@ -67,8 +67,7 @@ jobs:
             let url;
             try { url = new URL(raw); } catch { throw new Error(name + ' must be a valid explicit HTTPS origin'); }
             if (
-              url.protocol !== 'https:' ||
-              url.hostname !== 'api.luckread.com' ||
+              url.origin !== 'https://api.luckread.com' ||
               url.username ||
               url.password ||
               (url.pathname !== '/' && url.pathname !== '') ||
