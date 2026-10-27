@@ -99,6 +99,11 @@ const PAYMENT_STATUSES = new Set<HyperswitchPaymentStatus>([
   'expired',
 ]);
 
+/** Shared runtime guard so webhook reconciliation uses the same status allowlist as API responses. */
+export function isHyperswitchPaymentStatus(value: unknown): value is HyperswitchPaymentStatus {
+  return typeof value === 'string' && PAYMENT_STATUSES.has(value as HyperswitchPaymentStatus);
+}
+
 function resolveConfig(config: HyperswitchClientConfig): {
   baseUrl: string;
   apiKey: string;
@@ -204,8 +209,7 @@ function normalizePayment(value: unknown): HyperswitchPayment {
     !Number.isSafeInteger(amount) ||
     typeof currency !== 'string' ||
     !CURRENCY_PATTERN.test(currency) ||
-    typeof status !== 'string' ||
-    !PAYMENT_STATUSES.has(status as HyperswitchPaymentStatus) ||
+    !isHyperswitchPaymentStatus(status) ||
     (clientSecret !== undefined && clientSecret !== null && typeof clientSecret !== 'string')
   ) {
     throw new HyperswitchClientError('UPSTREAM_INVALID_RESPONSE', 'Hyperswitch returned a malformed payment object.');

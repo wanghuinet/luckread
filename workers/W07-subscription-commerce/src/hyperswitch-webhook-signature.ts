@@ -112,6 +112,14 @@ const HYPERSWITCH_CONTENT_TYPES = [
 export type HyperswitchWebhookEventType = (typeof HYPERSWITCH_EVENT_TYPES)[number];
 export type HyperswitchWebhookContentType = (typeof HYPERSWITCH_CONTENT_TYPES)[number];
 
+export function isHyperswitchWebhookEventType(value: unknown): value is HyperswitchWebhookEventType {
+  return typeof value === 'string' && (HYPERSWITCH_EVENT_TYPES as readonly string[]).includes(value);
+}
+
+export function isHyperswitchWebhookContentType(value: unknown): value is HyperswitchWebhookContentType {
+  return typeof value === 'string' && (HYPERSWITCH_CONTENT_TYPES as readonly string[]).includes(value);
+}
+
 export type HyperswitchWebhookEnvelope = {
   merchantId: string;
   eventId: string;
