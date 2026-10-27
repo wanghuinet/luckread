@@ -25,7 +25,7 @@ beforeEach(() => {
   calls.length = 0;
   nextResult = {
     response: new Response('{}', { status: 201 }),
-    data: { doc: { id: 'media-1', url: 'https://assets.luckread.com/media-1.png', filename: 'photo.png', mimeType: 'image/png', filesize: 42 } },
+    data: { doc: { id: 'media-1', url: 'https://img.luckread.com/media-1.png', filename: 'photo.png', mimeType: 'image/png', filesize: 42 } },
     error: null,
   };
 });
@@ -43,7 +43,7 @@ test('uploads a selected file as multipart and reuses its supplied idempotency k
   }, 'upload-retry-key');
 
   expect(result.id).toBe('media-1');
-  expect(result.url).toBe('https://assets.luckread.com/media-1.png');
+  expect(result.url).toBe('https://img.luckread.com/media-1.png');
   expect(calls).toHaveLength(1);
   expect(calls[0].path).toBe('/media');
   expect(calls[0].options.method).toBe('POST');
@@ -66,7 +66,7 @@ test('rejects local temporary paths returned as media URLs', () => {
 test('uploads text body through Payload media so content receives a permanent bodyRef', async () => {
   const result = await uploadTextBody('Hello LuckRead', 'body-retry-key');
 
-  expect(result.url).toBe('https://assets.luckread.com/media-1.png');
+  expect(result.url).toBe('https://img.luckread.com/media-1.png');
   expect(calls[0].path).toBe('/media');
   expect(calls[0].options.idempotencyKey).toBe('body-retry-key');
   expect(calls[0].options.headers['X-LuckRead-Upload-Fingerprint']).toMatch(/^lr-up1-[a-f0-9]{16}$/);
@@ -77,28 +77,50 @@ test('uploads text body through Payload media so content receives a permanent bo
 test('resolves playback from the server using the media ID', async () => {
   nextResult = {
     response: new Response('{}', { status: 200 }),
-    data: { id: 'media-99', url: 'https://assets.luckread.com/clip.mp4', mimeType: 'video/mp4', filename: 'clip.mp4', filesize: 99, status: 'READY' },
+    data: { id: 'media-99', url: 'https://video.luckread.com/clip.mp4', mimeType: 'video/mp4', filename: 'clip.mp4', filesize: 99, status: 'READY' },
     error: null,
   };
   const playback = await getMediaPlayback('media-99');
 
   expect(calls[0].path).toBe('/media/media-99/playback');
   expect(calls[0].options.method).toBe('GET');
-  expect(playback.url).toBe('https://assets.luckread.com/clip.mp4');
+  expect(playback.url).toBe('https://video.luckread.com/clip.mp4');
   expect(playback.status).toBe('READY');
 });
 
-test('surfaces upload errors without pretending the media was saved', async () => {
+test('surfaces upload failure status, error code and request ID without pretending media was saved', async () => {
+  const requestId = 'req_media_upload_503_test';
   nextResult = {
-    response: new Response('{}', { status: 503 }),
-    data: { error: { message: 'Media store unavailable' } },
-    error: { status: 503 },
+    response: new Response(JSON.stringify({
+      error: { code: 'SERVICE_UNAVAILABLE', message: 'Media service unavailable' },
+      requestId,
+    }), { status: 503 }),
+    data: {
+      error: { code: 'SERVICE_UNAVAILABLE', message: 'Media service unavailable' },
+      requestId,
+    },
+    error: {
+      status: 503,
+      code: 'SERVICE_UNAVAILABLE',
+      message: 'Media service unavailable',
+      requestId,
+    },
   };
-  await expect(uploadMediaFile({
-    uri: 'content://device/cache/photo.png',
-    name: 'photo.png',
-    mimeType: 'image/png',
-  }, 'retry-key')).rejects.toThrow('Media upload failed. Please retry.');
+  let failure;
+  try {
+    await uploadMediaFile({
+      uri: 'content://device/cache/photo.png',
+      name: 'photo.png',
+      mimeType: 'image/png',
+    }, 'retry-key');
+  } catch (error) {
+    failure = error;
+  }
+  expect(failure).toBeInstanceOf(Error);
+  expect(failure.message).toContain('Media service unavailable');
+  expect(failure.message).toContain('HTTP 503');
+  expect(failure.message).toContain('SERVICE_UNAVAILABLE');
+  expect(failure.message).toContain('Request ID ' + requestId);
 });
 
 
