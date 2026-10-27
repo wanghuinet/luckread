@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { changeSubscriptionPlan, createSubscription, etagForVersion, getSubscription, listSubscriptions, parseBoundedPositiveInt, transitionSubscription, type SubscriptionRow, type SubscriptionStatus } from './subscription-runtime.js'
 import w07 from './index.js'
-import { verifyD1SubscriptionPreflight } from '../scripts/verify-remote-preflight.mjs'
+import { verifyD1SubscriptionPostflight, verifyD1SubscriptionPreflight } from '../scripts/verify-remote-preflight.mjs'
 
 type Statement = { bind: (...values: unknown[]) => Statement; first: <T>() => Promise<T | null>; all: <T>() => Promise<{ results: T[] }>; run: () => Promise<{ meta: { changes: number } }> }
 
@@ -228,11 +228,19 @@ describe('subscription runtime', () => {
     expect(workflow).toContain('Read-only D1-01 migration and schema preflight')
     expect(workflow).toContain('SELECT name FROM d1_migrations')
     expect(workflow).toContain('PRAGMA table_info("membership_subscriptions")')
+    expect(workflow).toContain('PRAGMA foreign_key_list("membership_subscriptions")')
+    expect(workflow).toContain('node scripts/verify-remote-preflight.mjs preflight')
+    expect(workflow).toContain('node scripts/verify-remote-preflight.mjs postflight')
+    expect(workflow).toContain('SELECT COUNT(*) AS invalid_versions')
     expect(workflow).toContain('migrationAction = \'apply\'')
     expect(workflow).toContain('migrationAction = \'skip\'')
     expect(workflow).toContain("if: steps.d1_preflight.outputs.migration_action == 'apply'")
     expect(workflow.indexOf('Read-only D1-01 migration and schema preflight'))
       .toBeLessThan(workflow.indexOf('Apply D1-01 Subscription migration'))
+    expect(workflow.indexOf('Apply D1-01 Subscription migration'))
+      .toBeLessThan(workflow.indexOf('Read-only D1-01 schema and version postflight'))
+    expect(workflow.indexOf('Read-only D1-01 schema and version postflight'))
+      .toBeLessThan(workflow.indexOf('Deploy W07'))
   })
 
   it('rejects invalid version ETag values', async () => {
@@ -278,6 +286,40 @@ const preflightInput = (withVersion = false, versionDefault = '1') => ({
     : [{ name: '0001_membership_subscriptions' }] }],
   subscriptionSchema: preflightSchema(withVersion,versionDefault),
   subscriptionIndexes: preflightIndexes,
+})
+
+describe('read-only D1 subscription migration postflight', () => {
+  it('passes only when migration 0002, the exact current schema, and version integrity are verified', () => {
+    const result = verifyD1SubscriptionPostflight({
+      ...preflightInput(true),
+      versionIntegrity: [{ results: [{ invalid_versions: 0 }] }],
+    })
+    expect(result.migrationAction).toBe('skip')
+    expect(result.invalidVersions).toBe(0)
+    expect(result.postflight).toBe('PASS')
+    expect(result.appliedMigrations).toEqual(['0001_membership_subscriptions', '0002_subscription_version_cas'])
+  })
+
+  it('fails closed when any existing subscription has an invalid version', () => {
+    expect(() => verifyD1SubscriptionPostflight({
+      ...preflightInput(true),
+      versionIntegrity: [{ results: [{ invalid_versions: 1 }] }],
+    })).toThrow('existing subscription versions include invalid or non-positive values')
+  })
+
+  it('fails closed when migration 0002 is not applied after the migration step', () => {
+    expect(() => verifyD1SubscriptionPostflight({
+      ...preflightInput(),
+      versionIntegrity: [{ results: [{ invalid_versions: 0 }] }],
+    })).toThrow('post-migration verification requires 0001 and 0002 with the exact current schema')
+  })
+
+  it('fails closed when the version integrity query has no single result', () => {
+    expect(() => verifyD1SubscriptionPostflight({
+      ...preflightInput(true),
+      versionIntegrity: [{ results: [] }],
+    })).toThrow('version integrity query did not return exactly one count')
+  })
 })
 
 describe('read-only D1 subscription migration preflight', () => {
