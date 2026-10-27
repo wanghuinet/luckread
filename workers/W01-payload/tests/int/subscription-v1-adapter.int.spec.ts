@@ -68,6 +68,16 @@ describe('v1 subscription adapter', () => {
     expect(creatorPlansRoute).toContain("pathname: '/membership/plans'")
   })
 
+  it('validates the complete W07 draft envelope and immutable v1 result before auditing', () => {
+    expect(creatorPlansRoute).toContain("typeof envelope.requestId !== 'string'")
+    expect(creatorPlansRoute).toContain("typeof plan.updatedAt !== 'string'")
+    expect(creatorPlansRoute).toContain("typeof plan.version !== 'number' || plan.version !== 1")
+    expect(creatorPlansRoute).toContain("plan.etag !== '\\"lr-plan-v1\\"'")
+    expect(creatorPlansRoute).toContain("typeof plan.replayed !== 'boolean'")
+    expect(creatorPlansRoute).toContain('!Array.isArray(plan.benefits)')
+    expect(creatorPlansRoute).toContain('new Set(plan.benefits).size !== plan.benefits.length')
+  })
+
   it('binds W01 to the canonical W07 subscription authority', () => {
     expect(wrangler).toContain('W07_SUBSCRIPTION')
     expect(wrangler).toContain('luckread-w07')

@@ -146,10 +146,13 @@ export async function POST(request: Request): Promise<Response> {
     if (!w07Response.ok) return w07Response
 
     const responseEnvelope: unknown = await w07Response.clone().json().catch((): null => null)
-    const plan = responseEnvelope && typeof responseEnvelope === 'object'
-      ? (responseEnvelope as { data?: Record<string, unknown> }).data
+    const envelope = responseEnvelope && typeof responseEnvelope === 'object' && !Array.isArray(responseEnvelope)
+      ? responseEnvelope as { data?: Record<string, unknown>; requestId?: unknown }
       : undefined
+    const plan = envelope?.data
     if (
+      !envelope ||
+      typeof envelope.requestId !== 'string' || envelope.requestId.trim().length < 1 || envelope.requestId.length > 256 ||
       !plan ||
       typeof plan.planId !== 'string' || !/^plan_[a-f0-9]{64}$/.test(plan.planId) ||
       plan.creatorId !== creatorId ||
@@ -158,6 +161,15 @@ export async function POST(request: Request): Promise<Response> {
       plan.visibility !== 'PRIVATE' ||
       typeof plan.createdAt !== 'string' ||
       Number.isNaN(Date.parse(plan.createdAt)) ||
+      typeof plan.updatedAt !== 'string' ||
+      Number.isNaN(Date.parse(plan.updatedAt)) ||
+      typeof plan.version !== 'number' || plan.version !== 1 ||
+      plan.etag !== '"lr-plan-v1"' ||
+      typeof plan.replayed !== 'boolean' ||
+      !Array.isArray(plan.benefits) ||
+      plan.benefits.length > 20 ||
+      plan.benefits.some((item: unknown) => typeof item !== 'string' || item.trim() !== item || item.length < 1 || item.length > 180) ||
+      new Set(plan.benefits).size !== plan.benefits.length ||
       typeof plan.name !== 'string' || plan.name.trim().length < 1 || plan.name.length > 120 ||
       typeof plan.tier !== 'string' || !/^[a-z][a-z0-9_-]{0,63}$/.test(plan.tier) ||
       (plan.billingInterval !== 'MONTHLY' && plan.billingInterval !== 'YEARLY') ||
