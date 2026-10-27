@@ -1,0 +1,45 @@
+name: W07 Hyperswitch Client CI
+
+on:
+  pull_request:
+    paths:
+      - 'workers/W07-subscription-commerce/src/hyperswitch-client.ts'
+      - 'workers/W07-subscription-commerce/src/hyperswitch-client.test.ts'
+      - 'workers/W01-payload/vitest.w07.config.mts'
+      - '.github/workflows/w07-hyperswitch-client-ci.yml'
+      - 'workers/W01-payload/package.json'
+      - 'workers/W01-payload/pnpm-lock.yaml'
+      - 'workers/W01-payload/vitest.config.mts'
+  push:
+    branches: [main]
+    paths:
+      - 'workers/W01-payload/vitest.w07.config.mts'
+      - 'workers/W07-subscription-commerce/src/hyperswitch-client.ts'
+      - 'workers/W07-subscription-commerce/src/hyperswitch-client.test.ts'
+      - '.github/workflows/w07-hyperswitch-client-ci.yml'
+      - 'workers/W01-payload/package.json'
+      - 'workers/W01-payload/pnpm-lock.yaml'
+      - 'workers/W01-payload/vitest.config.mts'
+
+permissions:
+  contents: read
+
+jobs:
+  hyperswitch-client:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Enable Corepack
+        run: corepack enable
+      - name: Install W01 test dependencies from committed lockfile
+        working-directory: workers/W01-payload
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Run Hyperswitch payment-client tests
+        working-directory: workers/W01-payload
+        run: pnpm exec vitest run --config ./vitest.w07.config.mts ../../workers/W07-subscription-commerce/src/hyperswitch-client.test.ts
