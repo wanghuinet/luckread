@@ -249,3 +249,130 @@ export async function changeSubscriptionPlan(db: D1Database, subscriberId: strin
   console.log(JSON.stringify({ event: 'membership.subscription.plan_changed', operation: 'changeSubscriptionPlan', subscriptionId: updated.subscription_id, subscriberId: updated.subscriber_id, previousPlanId: row.plan_id, planId: updated.plan_id, planVersion: updated.plan_version }))
   return toPublic(updated)
 }
+
+export type ActiveMembershipPlanRow = {
+  plan_id: string
+  owner_id: string
+  current_version: number
+  created_at: string
+  updated_at: string
+  name: string
+  tier: string
+  billing_interval: string
+  price_minor: number
+  currency: string
+  benefits_json: string
+}
+
+type PlanListCursor = { createdAt: string; planId: string }
+
+const encodePlanListCursor = (cursor: PlanListCursor): string => {
+  const bytes = new TextEncoder().encode(JSON.stringify(cursor))
+  let binary = ''
+  for (const byte of bytes) binary += String.fromCharCode(byte)
+  return btoa(binary).replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/g, '')
+}
+
+const decodePlanListCursor = (value: string | null): PlanListCursor | null => {
+  if (value === null) return null
+  const normalized = value.trim()
+  if (!normalized || normalized.length > 2048 || !/^[A-Za-z0-9_-]+$/.test(normalized)) {
+    throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
+  }
+  try {
+    const base64 = normalized.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - normalized.length % 4) % 4)
+    const binary = atob(base64)
+    const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0))
+    const parsed: unknown = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes))
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('invalid cursor shape')
+    const candidate = parsed as Record<string, unknown>
+    if (
+      typeof candidate.createdAt !== 'string' ||
+      candidate.createdAt.length > 64 ||
+      !Number.isFinite(Date.parse(candidate.createdAt)) ||
+      typeof candidate.planId !== 'string' ||
+      candidate.planId.trim().length === 0 ||
+      candidate.planId.length > MAX_ID
+    ) throw new Error('invalid cursor fields')
+    return { createdAt: candidate.createdAt, planId: candidate.planId }
+  } catch {
+    throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
+  }
+}
+
+/**
+ * Public discovery returns only active, public creator plans with an immutable
+ * current version. The cursor is an opaque stable (createdAt, planId) keyset;
+ * no offset scan or private-plan metadata is exposed.
+ */
+export async function listActiveMembershipPlans(
+  db: D1Database,
+  limit = 20,
+  cursorValue: string | null = null,
+): Promise<{
+  docs: Array<{
+    planId: string
+    creatorId: string
+    planVersion: number
+    name: string
+    tier: string
+    billingInterval: string
+    priceMinor: number
+    currency: string
+    benefits: unknown
+    createdAt: string
+    updatedAt: string
+  }>
+  limit: number
+  nextCursor: string | null
+  hasMore: boolean
+}> {
+  const safeLimit = Number.isSafeInteger(limit) ? Math.min(Math.max(limit, 1), 50) : 20
+  const cursor = decodePlanListCursor(cursorValue)
+  const baseSql =
+    'SELECT p.plan_id, p.owner_id, p.current_version, p.created_at, p.updated_at, ' +
+    'v.name, v.tier, v.billing_interval, v.price_minor, v.currency, v.benefits_json ' +
+    'FROM membership_plans AS p ' +
+    'INNER JOIN membership_plan_versions AS v ON v.plan_id = p.plan_id AND v.plan_version = p.current_version ' +
+    "WHERE p.owner_type = 'CREATOR' AND p.status = 'ACTIVE' AND p.visibility = 'PUBLIC' "
+  const statement = cursor
+    ? db.prepare(baseSql + 'AND (p.created_at < ? OR (p.created_at = ? AND p.plan_id < ?)) ORDER BY p.created_at DESC, p.plan_id DESC LIMIT ?')
+      .bind(cursor.createdAt, cursor.createdAt, cursor.planId, safeLimit + 1)
+    : db.prepare(baseSql + 'ORDER BY p.created_at DESC, p.plan_id DESC LIMIT ?').bind(safeLimit + 1)
+  const rows = await statement.all<ActiveMembershipPlanRow>()
+  const candidates = rows.results ?? []
+  const hasMore = candidates.length > safeLimit
+  const page = candidates.slice(0, safeLimit)
+  const docs = page.map((row) => {
+    let benefits: unknown
+    try {
+      benefits = JSON.parse(row.benefits_json) as unknown
+    } catch {
+      throw new SubscriptionRuntimeError('INTEGRITY_VIOLATION', 500)
+    }
+    if (!Number.isSafeInteger(row.current_version) || row.current_version < 1 || !Number.isSafeInteger(row.price_minor) || row.price_minor < 0) {
+      throw new SubscriptionRuntimeError('INTEGRITY_VIOLATION', 500)
+    }
+    return {
+      planId: row.plan_id,
+      creatorId: row.owner_id,
+      planVersion: row.current_version,
+      name: row.name,
+      tier: row.tier,
+      billingInterval: row.billing_interval,
+      priceMinor: row.price_minor,
+      currency: row.currency,
+      benefits,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    }
+  })
+  const last = page.at(-1)
+  return {
+    docs,
+    limit: safeLimit,
+    hasMore,
+    nextCursor: hasMore && last ? encodePlanListCursor({ createdAt: last.created_at, planId: last.plan_id }) : null,
+  }
+}
+
