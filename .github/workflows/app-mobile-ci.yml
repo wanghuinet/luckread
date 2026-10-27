@@ -82,6 +82,8 @@ jobs:
         run: bun run test:publish-flow
       - name: Test native notifications, bookmarks, relationships and discovery API routes
         run: bun run test:social-screen-api
+      - name: Test native subscription management API
+        run: bun run test:subscriptions-api
       - name: Test native block and mute management
         run: bun test tests/block-mute-management.test.mjs
       - name: Test native video feed API requests
