@@ -188,3 +188,6 @@ jobs:
               pass
           print('SUBSCRIPTION_D1_01_AND_MEMBERSHIP_PLAN_MIGRATIONS_STATIC=PASS')
           PY
+
+      - name: Verify isolated D1-04 Order migration candidate
+        run: python workers/W07-subscription-commerce/scripts/test_order_d1_04_migration.py

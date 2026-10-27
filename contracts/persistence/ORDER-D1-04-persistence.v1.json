@@ -21,7 +21,7 @@
     "worker": "W07",
     "databaseUuid": "9bfb89a5-fbb5-45b1-a2ee-eab674b0d736",
     "databaseName": "unimportant",
-    "databaseNameAuthority": "D1 UUID remains authoritative. The configured display label unimportant matched the current read-only Cloudflare inventory; repeat the read-only binding preflight before any future deployment or schema mutation.",
+    "databaseNameAuthority": "D1 UUID remains authoritative. The configured display label unimportant matched current read-only Cloudflare inventory; repeat the read-only binding preflight before any future deployment or schema mutation.",
     "allocationStatus": "UUID_AND_REMOTE_NAME_VERIFIED_SCHEMA_SNAPSHOT_COLLECTED",
     "allocationSource": "contracts/transport/worker-d1-access-boundary.v1.json#physicalD1Registry/D1-04",
     "remoteNamePreflightRequired": true,
@@ -359,7 +359,7 @@
   },
   "runtimeGates": {
     "physicalD1Binding": "UUID_REGISTERED_REMOTE_NAME_PREFLIGHT_REQUIRED",
-    "migrationExecution": "NOT_PREPARED",
+    "migrationExecution": "CANDIDATE_ONLY_NOT_APPLIED",
     "optimisticConcurrency": "REQUIRED",
     "idempotency": "REQUIRED",
     "securityE2E": "REQUIRED",
@@ -368,12 +368,16 @@
     "remoteRuntimeEvidence": "REQUIRED"
   },
   "migration": {
-    "status": "NOT_CREATED",
-    "rule": "Logical candidate only; no migration file is proposed or applied until API/DTO field mappings, binding preflight and admission review pass."
+    "status": "PROPOSED_NOT_APPLIED",
+    "file": "workers/W07-subscription-commerce/migrations-d1-04/0001_order_commerce.sql",
+    "id": "0001_order_commerce",
+    "targetBinding": "D1_04",
+    "appliedRemotely": false,
+    "rule": "Reviewed source candidate only. It is isolated from D1-01 migrations; no remote D1-04 mutation, Worker deployment, or runtime order write is authorized by this candidate."
   },
   "nonGoals": [
     "No D1 table is asserted to exist remotely.",
-    "No physical migration, remote mutation or deployment is claimed.",
+    "The source migration candidate is not evidence of a remote schema change; no remote mutation or deployment has been performed.",
     "No new Worker, D1, Queue or Service Binding.",
     "No provider payment fact, immutable ledger entry, refund or entitlement grant is stored in Order authority.",
     "No cross-D1 foreign key or distributed transaction.",
