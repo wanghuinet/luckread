@@ -106,6 +106,7 @@ describe('PAY-002 API contract admission boundary', () => {
     const permissions = JSON.parse(readFileSync(new URL('../../../contracts/authz/permissions.json', import.meta.url), 'utf8'))
     const policy = JSON.parse(readFileSync(new URL('../../../contracts/openapi/v1/operation-policy.json', import.meta.url), 'utf8'))
     const inventory = JSON.parse(readFileSync(new URL('../../../contracts/api/api-inventory.v1.json', import.meta.url), 'utf8'))
+    const persistence = JSON.parse(readFileSync(new URL('../../../contracts/persistence/ORDER-D1-04-persistence.v1.json', import.meta.url), 'utf8'))
 
     expect(candidate.status).toBe('CONTRACT_ADMITTED_RUNTIME_PENDING')
     expect(candidate.operations.map((operation: { operationId: string }) => operation.operationId)).toEqual(['createCommerceOrder', 'getCommerceOrder'])
@@ -121,6 +122,7 @@ describe('PAY-002 API contract admission boundary', () => {
     expect(openapi).toContain('operationId: getCommerceOrder')
     expect(openapi).toContain('x-luckread-runtime-status: BLOCKED_PENDING_PAY002_EVIDENCE')
     expect(openapi).toContain('x-luckread-max-body-bytes: 16384')
+    expect(openapi).toContain('maxLength: 256')
 
     const registeredPermissions = new Map((permissions['x-permissions'] ?? []).map((p: { name: string; scope?: string; minLayer: string }) => [p.name, p]))
     for (const name of ['order.create', 'order.read']) {
@@ -141,5 +143,7 @@ describe('PAY-002 API contract admission boundary', () => {
     const inventoryPaths = inventory.domains.subscription_entitlement_payment.endpoint_groups
     expect(inventoryPaths).toContain('POST /v1/commerce/orders')
     expect(inventoryPaths).toContain('GET /v1/commerce/orders/{orderId}')
+    expect(persistence.tables.order_create_idempotency.columns.operation_key.allowed).toEqual(['POST /v1/commerce/orders'])
+    expect(persistence.tables.order_create_idempotency.columns.idempotency_key.maxLength).toBe(256)
   })
 })
