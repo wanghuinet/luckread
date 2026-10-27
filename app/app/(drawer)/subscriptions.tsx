@@ -124,7 +124,7 @@ function SubscriptionCard({
         </View>
         {item.cancelAt ? (
           <View className="mt-3 flex-row items-start gap-3">
-            <Feather name="calendar-x" size={16} color="#667085" />
+            <Feather name="calendar" size={16} color="#667085" />
             <View className="flex-1">
               <Text className="text-xs text-neutral-500">取消时间</Text>
               <Text className="mt-1 text-sm text-neutral-700 dark:text-neutral-300">
