@@ -33,6 +33,10 @@ describe('v1 subscription adapter', () => {
     expect(w08CreatorClient).toContain("'/internal/authz/check-permission'")
     expect(creatorPlansRoute).not.toContain('body.creatorId')
     expect(creatorPlansRoute).not.toContain('body.ownerId')
+    expect(creatorPlansRoute).toContain('request.body.getReader()')
+    expect(creatorPlansRoute).toContain('byteLength > 16_384')
+    expect(creatorPlansRoute).toContain("new TextDecoder('utf-8', { fatal: true })")
+    expect(creatorPlansRoute).not.toContain('await request.text()')
   })
 
   it('contracts creator plan permissions and server-controlled draft fields', () => {
