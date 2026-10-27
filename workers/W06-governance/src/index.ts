@@ -1,4 +1,4 @@
-import { buildAccountStateChangedAuditEvent, type AccountStateChangedAuditInput } from './audit-event'
+import { buildAccountStateChangedAuditEvent, type AccountStateChangedAuditInput, type AuditEvent } from './audit-event'
 import { persistAuditEvent } from './audit-event-persistence'
 import { consumeAccountStateChanged } from './auth-013-queue-consumer'
 import { consumeMfaAuditEvent } from './mfa-audit-queue-consumer'
@@ -268,6 +268,99 @@ const errorResponse = (error: unknown, requestId?: string): Response => {
   return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Moderation service unavailable', details: {} }, requestId: canonicalRequestId(requestId) }, 503)
 }
 
+type MembershipPlanAuditInput = {
+  eventId: string
+  planId: string
+  creatorId: string
+  planVersion: 1
+  status: 'DRAFT'
+  visibility: 'PRIVATE'
+  occurredAt: string
+}
+
+type StoredAuditEvent = {
+  event_id: string
+  actor_json: string
+  action: string
+  target_type: string
+  target_id: string
+  before_json: string
+  after_json: string
+  occurred_at: string
+}
+
+function parseMembershipPlanAuditInput(value: unknown): MembershipPlanAuditInput {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('INVALID_MEMBERSHIP_PLAN_AUDIT')
+  const body = value as Record<string, unknown>
+  const allowed = new Set(['eventId', 'planId', 'creatorId', 'planVersion', 'status', 'visibility', 'occurredAt'])
+  if (Object.keys(body).some((key) => !allowed.has(key)) || Object.keys(body).length !== allowed.size) {
+    throw new Error('INVALID_MEMBERSHIP_PLAN_AUDIT')
+  }
+  if (
+    typeof body.planId !== 'string' || !/^plan_[a-f0-9]{64}$/.test(body.planId) ||
+    body.eventId !== 'evt_mpl_created_' + body.planId ||
+    typeof body.creatorId !== 'string' || !resourceIdPattern.test(body.creatorId) ||
+    body.planVersion !== 1 || body.status !== 'DRAFT' || body.visibility !== 'PRIVATE' ||
+    typeof body.occurredAt !== 'string' || !body.occurredAt || Number.isNaN(Date.parse(body.occurredAt))
+  ) throw new Error('INVALID_MEMBERSHIP_PLAN_AUDIT')
+  return body as MembershipPlanAuditInput
+}
+
+async function findAuditEvent(db: D1Database, eventId: string): Promise<StoredAuditEvent | null> {
+  return db.prepare(
+    'SELECT event_id, actor_json, action, target_type, target_id, before_json, after_json, occurred_at ' +
+    'FROM audit_events WHERE event_id = ? LIMIT 1',
+  ).bind(eventId).first<StoredAuditEvent>()
+}
+
+function matchesMembershipPlanAudit(existing: StoredAuditEvent, expected: AuditEvent): boolean {
+  try {
+    const storedActor = JSON.parse(existing.actor_json) as Record<string, unknown>
+    const expectedActor = expected.actor as unknown as Record<string, unknown>
+    return existing.event_id === expected.eventId &&
+      storedActor.actorId === expectedActor.actorId &&
+      storedActor.actorType === expectedActor.actorType &&
+      existing.action === expected.action &&
+      existing.target_type === expected.targetType &&
+      existing.target_id === expected.targetId &&
+      existing.before_json === JSON.stringify(expected.before) &&
+      existing.after_json === JSON.stringify(expected.after) &&
+      existing.occurred_at === expected.occurredAt
+  } catch {
+    return false
+  }
+}
+
+async function persistMembershipPlanAudit(env: Env, event: AuditEvent): Promise<Response> {
+  let existing: StoredAuditEvent | null
+  try {
+    existing = await findAuditEvent(env.D1_03, event.eventId)
+  } catch {
+    return json({ error: 'AUDIT_EVENT_LOOKUP_FAILED' }, 503)
+  }
+  if (existing) {
+    if (!matchesMembershipPlanAudit(existing, event)) return json({ error: 'AUDIT_EVENT_CONFLICT' }, 409)
+    return json({ eventId: event.eventId, action: event.action, targetType: event.targetType, targetId: event.targetId, replayed: true }, 200)
+  }
+
+  try {
+    await persistAuditEvent(env.D1_03, event)
+    return json({ eventId: event.eventId, action: event.action, targetType: event.targetType, targetId: event.targetId, replayed: false }, 201)
+  } catch {
+    // A concurrent retry may have won the unique event_id insert. Confirm the
+    // durable row before treating this request as an idempotent success.
+    try {
+      const raced = await findAuditEvent(env.D1_03, event.eventId)
+      if (raced && matchesMembershipPlanAudit(raced, event)) {
+        return json({ eventId: event.eventId, action: event.action, targetType: event.targetType, targetId: event.targetId, replayed: true }, 200)
+      }
+    } catch {
+      // Keep the response closed if the durable outcome cannot be confirmed.
+    }
+    return json({ error: 'AUDIT_EVENT_PERSISTENCE_FAILED' }, 503)
+  }
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     try {
@@ -378,6 +471,48 @@ export default {
       } catch (error) {
         return errorResponse(error, request.headers.get('X-LuckRead-Request-Id')?.trim())
       }
+    }
+
+    if (request.method === 'POST' && url.pathname === '/internal/audit-events/membership-plan-created') {
+      let principal: ReturnType<typeof requireW01Transport>
+      try { principal = requireW01Transport(request) }
+      catch (error) { return errorResponse(error, request.headers.get('X-LuckRead-Request-Id')?.trim()) }
+
+      const declaredLength = Number(request.headers.get('content-length') ?? '0')
+      if (Number.isFinite(declaredLength) && declaredLength > 4096) {
+        return json({ error: 'INVALID_MEMBERSHIP_PLAN_AUDIT' }, 400)
+      }
+      let input: MembershipPlanAuditInput
+      try {
+        const bodyText = await request.text()
+        if (new TextEncoder().encode(bodyText).byteLength > 4096) throw new Error('INVALID_MEMBERSHIP_PLAN_AUDIT')
+        input = parseMembershipPlanAuditInput(JSON.parse(bodyText) as unknown)
+      } catch {
+        return json({ error: 'INVALID_MEMBERSHIP_PLAN_AUDIT' }, 400)
+      }
+
+      const event: AuditEvent = {
+        eventId: input.eventId,
+        requestId: principal.requestId,
+        traceId: principal.correlationId,
+        actor: {
+          actorId: principal.userId,
+          actorType: 'user',
+          layer: principal.layer as AuditEvent['actor']['layer'],
+        },
+        action: 'membership.plan.created',
+        targetType: 'MembershipPlan',
+        targetId: input.planId,
+        before: {},
+        after: {
+          creatorId: input.creatorId,
+          planVersion: input.planVersion,
+          status: input.status,
+          visibility: input.visibility,
+        },
+        occurredAt: input.occurredAt,
+      }
+      return persistMembershipPlanAudit(env, event)
     }
 
     if (request.method === 'POST' && url.pathname === '/internal/audit-events/account-state-changed') {
