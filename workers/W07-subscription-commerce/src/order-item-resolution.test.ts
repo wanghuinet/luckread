@@ -1,3 +1,5 @@
+/// <reference types="@cloudflare/workers-types" />
+
 import { describe, expect, it } from 'vitest';
 import { resolveCommerceOrderItems } from './order-item-resolution.js';
 import { SubscriptionRuntimeError } from './subscription-runtime.js';
