@@ -23,6 +23,7 @@ export async function callW07Subscription(input: {
   pathname: string
   method: string
   principal: ContentPrincipal
+  verifiedCreatorId?: string
   body?: unknown
 }): Promise<Response> {
   const service = await getW07Service()
@@ -33,6 +34,11 @@ export async function callW07Subscription(input: {
     'X-LuckRead-Principal-User-Id': input.principal.userId,
   })
   if (input.principal.layer) headers.set('X-LuckRead-Principal-Layer', input.principal.layer)
+  if (input.verifiedCreatorId !== undefined) {
+    const creatorId = input.verifiedCreatorId.trim()
+    if (!creatorId || creatorId.length > 256) throw new W07SubscriptionClientError(403, 'PERMISSION_DENIED', 'Creator identity is unavailable')
+    headers.set('X-LuckRead-Verified-Creator-Id', creatorId)
+  }
   if (input.body !== undefined) headers.set('content-type', 'application/json; charset=utf-8')
   for (const name of ['Idempotency-Key', 'If-Match']) {
     const value = input.request.headers.get(name)?.trim()
