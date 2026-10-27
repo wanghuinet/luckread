@@ -36,6 +36,13 @@ class D104OrderMigrationTests(unittest.TestCase):
     def order(self, order_id="ord_1", customer="user_1", status="CREATED", version=1,
               currency="USD", subtotal=1000, discount=0, tax=0, total=1000,
               created=NOW, updated=NOW):
+        # The schema requires the matching completed idempotency response first.
+        self.idem(
+            row_id="seed_idem_" + order_id,
+            customer=customer,
+            key="seed_key_" + order_id,
+            response='{"orderId":"' + order_id + '"}',
+        )
         self.db.execute(
             """INSERT INTO orders(order_id,customer_id,status,version,currency,subtotal_minor,
                discount_minor,tax_minor,total_minor,created_at,updated_at)
@@ -76,6 +83,24 @@ class D104OrderMigrationTests(unittest.TestCase):
             "ix_order_create_idempotency_customer_created", "ix_order_create_idempotency_expiration",
         }.issubset(indexes))
         self.assertFalse(tables.intersection({"payments", "payment_intents", "ledger_entries", "refunds", "entitlements"}))
+
+    def test_order_insert_requires_matching_completed_idempotency_result(self):
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute(
+                """INSERT INTO orders(order_id,customer_id,status,version,currency,subtotal_minor,
+                   discount_minor,tax_minor,total_minor,created_at,updated_at)
+                   VALUES('ord_unclaimed','user_1','CREATED',1,'USD',100,0,0,100,?,?)""",
+                (NOW, NOW),
+            )
+        self.idem(row_id="idem_wrong_response", key="key_wrong_response",
+                  response='{"orderId":"different_order"}')
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute(
+                """INSERT INTO orders(order_id,customer_id,status,version,currency,subtotal_minor,
+                   discount_minor,tax_minor,total_minor,created_at,updated_at)
+                   VALUES('ord_wrong_response','user_1','CREATED',1,'USD',100,0,0,100,?,?)""",
+                (NOW, NOW),
+            )
 
     def test_order_constraints_and_immutable_money_snapshot(self):
         bad = [
