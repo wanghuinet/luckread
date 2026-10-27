@@ -7,27 +7,22 @@ on:
         description: Exact main commit deployed for article/video publishing
         required: true
         type: string
-        default: 54aada2e0122c26c9297cbacb3e0cfe92121352c
       launch_run_id:
         description: Successful production launch run to bind this E2E to
         required: true
         type: string
-        default: "37119717455"
       content_api_base_url:
         description: W01 public content API base URL
         required: true
         type: string
-        default: https://api.luckread.com
       moderation_base_url:
         description: W01 public moderation API base URL
         required: true
         type: string
-        default: https://api.luckread.com
       confirm:
         description: Type RUN_CONTENT_PUBLISH_E2E to permit controlled remote fixture/test mutations
         required: true
         type: string
-        default: RUN_CONTENT_PUBLISH_E2E
 
 permissions:
   contents: read
@@ -45,7 +40,6 @@ env:
 
 jobs:
   e2e:
-    if: ${{ inputs.confirm == 'RUN_CONTENT_PUBLISH_E2E' }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -54,6 +48,37 @@ jobs:
         with:
           ref: ${{ github.sha }}
           fetch-depth: 1
+
+      - name: Validate explicit E2E source, endpoint, and mutation confirmation
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          LAUNCH_RUN_ID: ${{ inputs.launch_run_id }}
+          CONTENT_API_BASE_URL: ${{ inputs.content_api_base_url }}
+          MODERATION_BASE_URL: ${{ inputs.moderation_base_url }}
+          CONFIRM: ${{ inputs.confirm }}
+        run: |
+          set -euo pipefail
+          [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::source_sha must be an explicit full 40-character lowercase commit SHA."; exit 1; }
+          [[ "$LAUNCH_RUN_ID" =~ ^[1-9][0-9]*$ ]] || { echo "::error::launch_run_id must be an explicit positive GitHub Actions run ID."; exit 1; }
+          [[ "$CONFIRM" == "RUN_CONTENT_PUBLISH_E2E" ]] || { echo "::error::Type RUN_CONTENT_PUBLISH_E2E explicitly to authorize controlled remote E2E fixture/test mutations."; exit 1; }
+          node --input-type=module <<'NODE'
+          for (const name of ['CONTENT_API_BASE_URL', 'MODERATION_BASE_URL']) {
+            const raw = process.env[name] ?? '';
+            let url;
+            try { url = new URL(raw); } catch { throw new Error(name + ' must be a valid explicit HTTPS origin'); }
+            if (
+              url.origin !== 'https://api.luckread.com' ||
+              url.username ||
+              url.password ||
+              (url.pathname !== '/' && url.pathname !== '') ||
+              url.search ||
+              url.hash
+            ) {
+              throw new Error(name + ' must be the exact trusted origin https://api.luckread.com without credentials, path, query, or fragment');
+            }
+          }
+          console.log('Explicit source SHA, launch run ID, trusted endpoints and remote-mutation confirmation: PASS');
+          NODE
 
       - name: Verify exact successful production launch
         env:
