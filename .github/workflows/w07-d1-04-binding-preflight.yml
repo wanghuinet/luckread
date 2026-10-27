@@ -1,0 +1,88 @@
+name: W07 D1-04 Read-only Binding Preflight
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Exact main commit SHA to inspect
+        required: true
+        type: string
+      confirm:
+        description: Type READ_ONLY_D1_04_PREFLIGHT; this workflow never writes to D1 or deploys
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  inspect-d1-04:
+    if: ${{ inputs.confirm == 'READ_ONLY_D1_04_PREFLIGHT' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout reviewed main history
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Validate explicit source SHA and read-only confirmation
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          PREFLIGHT_CONFIRM: ${{ inputs.confirm }}
+        run: |
+          set -euo pipefail
+          [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$PREFLIGHT_CONFIRM" == "READ_ONLY_D1_04_PREFLIGHT" ]]
+          git cat-file -e "$SOURCE_SHA^{commit}"
+          git merge-base --is-ancestor "$SOURCE_SHA" origin/main
+          echo "Validated source SHA is an ancestor of reviewed main."
+      - name: Checkout validated source commit
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: git checkout --detach "$SOURCE_SHA"
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Read current Cloudflare D1 inventory (no database writes)
+        working-directory: workers/W07-subscription-commerce
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          test -n "$CLOUDFLARE_API_TOKEN"
+          npx --yes wrangler@4.116.0 d1 list --json --config wrangler.jsonc > /tmp/w07-d1-list.json
+          node scripts/report-d1-04-live-name.mjs /tmp/w07-d1-list.json /tmp/w07-d1-04-live-name-report.json
+      - name: Summarize read-only result
+        if: always()
+        run: |
+          set -euo pipefail
+          if [[ -f /tmp/w07-d1-04-live-name-report.json ]]; then
+            node --input-type=commonjs - <<'NODE' >> "$GITHUB_STEP_SUMMARY"
+          const r = require('/tmp/w07-d1-04-live-name-report.json')
+          console.log('# W07 D1-04 read-only binding preflight')
+          console.log('')
+          console.log('- Result: ' + r.result)
+          console.log('- D1 UUID: ' + r.databaseUuid)
+          console.log('- Configured name: ' + String(r.configuredDatabaseName))
+          console.log('- Live name: ' + r.liveDatabaseName)
+          console.log('- Configured name matches: ' + r.displayNameMatches)
+          console.log('- Read-only: ' + r.readOnly)
+          console.log('- Migration applied: ' + r.migrationApplied)
+          console.log('- Deployment performed: ' + r.deploymentPerformed)
+          console.log('')
+          console.log(r.nextAction)
+          NODE
+          else
+            echo "D1-04 preflight report was not produced. No migration or deployment was attempted." >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Upload read-only preflight report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: w07-d1-04-read-only-preflight-${{ inputs.source_sha }}
+          path: /tmp/w07-d1-04-live-name-report.json
+          if-no-files-found: warn
