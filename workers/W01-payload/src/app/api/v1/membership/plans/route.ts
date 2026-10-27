@@ -157,7 +157,12 @@ export async function POST(request: Request): Promise<Response> {
       plan.status !== 'DRAFT' ||
       plan.visibility !== 'PRIVATE' ||
       typeof plan.createdAt !== 'string' ||
-      Number.isNaN(Date.parse(plan.createdAt))
+      Number.isNaN(Date.parse(plan.createdAt)) ||
+      typeof plan.name !== 'string' || plan.name.trim().length < 1 || plan.name.length > 120 ||
+      typeof plan.tier !== 'string' || !/^[a-z][a-z0-9_-]{0,63}$/.test(plan.tier) ||
+      (plan.billingInterval !== 'MONTHLY' && plan.billingInterval !== 'YEARLY') ||
+      typeof plan.priceMinor !== 'number' || !Number.isSafeInteger(plan.priceMinor) || plan.priceMinor < 0 || plan.priceMinor > 2_147_483_647 ||
+      typeof plan.currency !== 'string' || !/^[A-Z]{3}$/.test(plan.currency)
     ) {
       return errorResponse(503, 'PLAN_RESPONSE_INVALID', 'Membership plan result could not be verified')
     }
@@ -175,6 +180,11 @@ export async function POST(request: Request): Promise<Response> {
           status: 'DRAFT',
           visibility: 'PRIVATE',
           occurredAt: plan.createdAt,
+          name: plan.name,
+          tier: plan.tier,
+          billingInterval: plan.billingInterval,
+          priceMinor: plan.priceMinor,
+          currency: plan.currency,
         },
       })
     } catch {
