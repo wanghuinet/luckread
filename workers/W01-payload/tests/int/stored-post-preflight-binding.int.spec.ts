@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+const getCloudflareContextMock = vi.hoisted(() => vi.fn())
+
+vi.mock('@opennextjs/cloudflare', () => ({
+  getCloudflareContext: getCloudflareContextMock,
+}))
+
 import { bindPreflightToStoredPost } from '../../src/content/bind-post-publish-preflight.js'
 import { callW03Content } from '../../src/content/w03-content-client.js'
 import { validateOwnedPostMediaReferences } from '../../src/content/validate-owned-post-media-references.js'
@@ -36,6 +42,15 @@ const submitted = {
   },
 }
 
+const makeR2Object = (text: string, contentType = 'text/plain;charset=utf-8') => {
+  const bytes = new TextEncoder().encode(text)
+  return {
+    size: bytes.byteLength,
+    httpMetadata: { contentType },
+    body: new Response(bytes).body!,
+  }
+}
+
 const storedPost = (overrides: Record<string, unknown> = {}) => ({
   id: 'post-1',
   contentType: 'post',
@@ -52,6 +67,10 @@ describe('bind direct social post publishing to the stored body asset', () => {
     callW03ContentMock.mockReset()
     validateMediaReferencesMock.mockReset()
     validateMediaReferencesMock.mockResolvedValue({ valid: true })
+    getCloudflareContextMock.mockReset()
+    getCloudflareContextMock.mockResolvedValue({
+      env: { R2: { get: vi.fn(async () => makeR2Object('authoritative body stored in LuckRead media')) } },
+    })
   })
 
   afterEach(() => {
@@ -60,12 +79,9 @@ describe('bind direct social post publishing to the stored body asset', () => {
 
   it('replaces browser-supplied title/body/media with W03 metadata and the stored body file', async () => {
     callW03ContentMock.mockResolvedValue(new Response(JSON.stringify(storedPost()), { status: 200 }))
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response('authoritative body stored in LuckRead media', {
-        status: 200,
-        headers: { 'content-type': 'text/plain; charset=utf-8' },
-      }),
-    )
+    const r2Get = vi.fn(async (key: string) => makeR2Object('authoritative body stored in LuckRead media'))
+    getCloudflareContextMock.mockResolvedValue({ env: { R2: { get: r2Get } } })
+    const fetchMock = vi.spyOn(globalThis, 'fetch')
 
     const result = await bindPreflightToStoredPost(
       makeRequest(),
@@ -80,10 +96,8 @@ describe('bind direct social post publishing to the stored body asset', () => {
       method: 'GET',
       principal,
     }))
-    expect(fetchMock).toHaveBeenCalledWith(
-      'https://img.luckread.com/media/post-body.txt',
-      expect.objectContaining({ method: 'GET', redirect: 'manual' }),
-    )
+    expect(r2Get).toHaveBeenCalledWith('media/post-body.txt')
+    expect(fetchMock).not.toHaveBeenCalled()
     expect(result.to).toBe('PUBLISHED')
     expect(result.preflight.title).toBe('authoritative stored title')
     expect(result.preflight.body).toBe('authoritative body stored in LuckRead media')
@@ -148,17 +162,19 @@ describe('bind direct social post publishing to the stored body asset', () => {
     expect(headers.get('cookie')).toBe('better-auth.session_token=creator-session-cookie')
   })
 
-  it('does not forward owner credentials to another LuckRead subdomain', async () => {
-    callW03ContentMock.mockResolvedValue(new Response(JSON.stringify(storedPost()), { status: 200 }))
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response('public CDN body', { status: 200 }),
-    )
+  it('rejects an unapproved LuckRead subdomain without forwarding owner credentials', async () => {
+    callW03ContentMock.mockResolvedValue(new Response(JSON.stringify(storedPost({
+      bodyRef: 'https://unexpected.luckread.com/media/post-body.txt',
+    })), { status: 200 }))
+    const r2Get = vi.fn()
+    getCloudflareContextMock.mockResolvedValue({ env: { R2: { get: r2Get } } })
+    const fetchMock = vi.spyOn(globalThis, 'fetch')
     const request = makeRequest({
       authorization: 'Bearer creator-session-token',
       cookie: 'better-auth.session_token=creator-session-cookie',
     })
 
-    await bindPreflightToStoredPost(
+    const result = await bindPreflightToStoredPost(
       request,
       'post-1',
       principal,
@@ -166,10 +182,10 @@ describe('bind direct social post publishing to the stored body asset', () => {
       makeErrorResponse,
     )
 
-    const init = fetchMock.mock.calls[0]?.[1]
-    const headers = new Headers(init?.headers)
-    expect(headers.get('authorization')).toBeNull()
-    expect(headers.get('cookie')).toBeNull()
+    expect(result).toBeInstanceOf(Response)
+    expect((result as Response).status).toBe(422)
+    expect(r2Get).not.toHaveBeenCalled()
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 
   it('fails closed instead of fetching an untrusted bodyRef', async () => {
@@ -194,8 +210,10 @@ describe('bind direct social post publishing to the stored body asset', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
-  it('rejects redirects and oversized stored body files', async () => {
-    callW03ContentMock.mockResolvedValue(new Response(JSON.stringify(storedPost()), { status: 200 }))
+  it('rejects redirects and oversized stored body files from same-origin development reads', async () => {
+    callW03ContentMock.mockResolvedValue(new Response(JSON.stringify(storedPost({
+      bodyRef: '/api/media/file/post-body.txt',
+    })), { status: 200 }))
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(null, { status: 302, headers: { location: 'https://attacker.example/body' } }),
     )
@@ -211,9 +229,14 @@ describe('bind direct social post publishing to the stored body asset', () => {
     expect((redirected as Response).status).toBe(422)
 
     vi.restoreAllMocks()
-    callW03ContentMock.mockResolvedValue(new Response(JSON.stringify(storedPost()), { status: 200 }))
+    callW03ContentMock.mockResolvedValue(new Response(JSON.stringify(storedPost({
+      bodyRef: '/api/media/file/post-body.txt',
+    })), { status: 200 }))
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response('x'.repeat(16_385), { status: 200 }),
+      new Response('x'.repeat(16_385), {
+        status: 200,
+        headers: { 'content-type': 'text/plain;charset=utf-8' },
+      }),
     )
     const oversized = await bindPreflightToStoredPost(
       makeRequest(),
