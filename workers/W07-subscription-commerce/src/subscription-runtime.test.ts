@@ -102,7 +102,7 @@ function fakeDb(rows: SubscriptionRow[], plans: MembershipPlanRow[] = []): D1Dat
           }
           if (sql.includes('INSERT INTO membership_subscriptions')) {
             const plan = planState.get(String(values[7]))
-            if (!plan || plan.owner_type !== 'CREATOR' || plan.status !== 'ACTIVE' || plan.visibility !== 'PUBLIC') return { meta: { changes: 0 } }
+            if (!plan || plan.owner_type !== 'CREATOR' || plan.status !== 'ACTIVE' || plan.visibility !== 'PUBLIC' || !plan.has_current_version) return { meta: { changes: 0 } }
             const row: SubscriptionRow = {
               subscription_id: String(values[0]), subscriber_id: String(values[1]), plan_id: plan.plan_id,
               plan_version: plan.current_version, creator_id: plan.owner_id, status: 'PENDING',
@@ -321,6 +321,7 @@ describe('subscription runtime', () => {
       [activePlan('plan_basic', { status: 'DRAFT' })],
       [activePlan('plan_basic', { visibility: 'PRIVATE' })],
       [activePlan('plan_basic', { owner_type: 'COMMUNITY' })],
+      [activePlan('plan_basic', { has_current_version: false })],
     ]
     for (const plans of cases) {
       await expect(createSubscription(fakeDb([], plans), 'user_1', { planId: 'plan_basic', idempotencyKey: 'create-1' }))
