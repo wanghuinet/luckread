@@ -4,7 +4,7 @@ import {
   W07SubscriptionClientError,
 } from '../../../../../subscription/w07-subscription-client.js'
 import { callW08Creator, W08CreatorClientError } from '../../../../../auth/w08-creator-client.js'
-import { callW06MembershipPlanAudit } from '../../../../../moderation/w06-moderation-client.js'
+import { callW06MembershipPlanAudit, W06ModerationClientError } from '../../../../../moderation/w06-moderation-client.js'
 
 const errorResponse = (status: number, code: string, message: string) =>
   Response.json(
@@ -32,7 +32,7 @@ async function authorizePlanPermission(
   })
   const response = await callW08Creator(permissionRequest, '/internal/authz/check-permission', 'POST')
   if (!response.ok) return errorResponse(503, 'AUTHORIZATION_UNAVAILABLE', 'Creator authorization unavailable')
-  const value: unknown = await response.json().catch(() => null)
+  const value: unknown = await response.json().catch((): null => null)
   const decision = value && typeof value === 'object'
     ? (value as { data?: { decision?: unknown } }).data?.decision
     : undefined
@@ -45,7 +45,7 @@ async function authorizePlanPermission(
 async function resolveActiveCreatorId(request: Request): Promise<string | Response> {
   const response = await callW08Creator(request, '/internal/creator/self', 'GET')
   if (!response.ok) return response
-  const value: unknown = await response.json().catch(() => null)
+  const value: unknown = await response.json().catch((): null => null)
   // W08's JSON helper wraps successful bodies in the canonical data envelope.
   const creatorId = value && typeof value === 'object'
     ? (value as { data?: { creatorId?: unknown } }).data?.creatorId
@@ -133,7 +133,7 @@ export async function POST(request: Request): Promise<Response> {
     const creatorId = await resolveActiveCreatorId(request)
     if (creatorId instanceof Response) return creatorId
     const bodyResult = await readBoundedPlanBody(request)
-    if (!bodyResult.ok) return bodyResult.response
+    if (bodyResult.ok === false) return bodyResult.response
     const body = bodyResult.value
     const w07Response = await callW07Subscription({
       request,
@@ -145,7 +145,7 @@ export async function POST(request: Request): Promise<Response> {
     })
     if (!w07Response.ok) return w07Response
 
-    const responseEnvelope: unknown = await w07Response.clone().json().catch(() => null)
+    const responseEnvelope: unknown = await w07Response.clone().json().catch((): null => null)
     const plan = responseEnvelope && typeof responseEnvelope === 'object'
       ? (responseEnvelope as { data?: Record<string, unknown> }).data
       : undefined
@@ -190,7 +190,7 @@ export async function POST(request: Request): Promise<Response> {
     } catch {
       return errorResponse(503, 'AUDIT_UNAVAILABLE', 'Membership audit service unavailable')
     }
-    const auditResult: unknown = await auditResponse.json().catch(() => null)
+    const auditResult: unknown = await auditResponse.json().catch((): null => null)
     if (
       (auditResponse.status !== 200 && auditResponse.status !== 201) ||
       !auditResult || typeof auditResult !== 'object' ||
