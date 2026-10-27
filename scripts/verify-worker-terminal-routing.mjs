@@ -40,6 +40,9 @@ if (!creator || creator.ingressWorker !== 'W01' || creator.terminalWorker !== 'W
 if (!membership || membership.ingressWorker !== 'W01' || membership.terminalWorker !== 'W07') {
   throw new Error('Membership commerce terminal routing mismatch')
 }
+if (membership.auditWorker !== 'W06' || membership.auditTransportBinding !== 'W01-W06-moderation-http-binding.v1') {
+  throw new Error('Membership plan durable audit routing mismatch')
+}
 
 const service = (config, binding) => (config.services ?? []).find((x) => x.binding === binding)
 if (service(w01, 'W03_CONTENT')?.service !== 'luckread-w03') {
