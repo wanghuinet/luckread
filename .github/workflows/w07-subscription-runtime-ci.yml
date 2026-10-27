@@ -84,7 +84,7 @@ jobs:
         run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Test D1-04 binding preflight
         working-directory: workers/W01-payload
-        run: node --test ../../workers/W07-subscription-commerce/scripts/verify-d1-04-binding.test.mjs ../../workers/W07-subscription-commerce/scripts/report-d1-04-live-name.test.mjs
+        run: node --test ../../workers/W07-subscription-commerce/scripts/verify-d1-04-binding.test.mjs ../../workers/W07-subscription-commerce/scripts/report-d1-04-live-name.test.mjs ../../workers/W07-subscription-commerce/scripts/report-d1-04-schema-snapshot.test.mjs
       - name: Install repository typecheck dependencies from lockfile
         run: npm ci --ignore-scripts --no-audit --fund=false
       - name: Typecheck PAY-002 membership offer resolver
