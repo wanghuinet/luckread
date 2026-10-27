@@ -89,7 +89,8 @@ function isNonBlankString(value: unknown): value is string {
 }
 
 function parseTimestamp(value: unknown): number | null {
-  if (typeof value !== 'string') return null;
+  // Provider timestamps are short RFC3339 values; cap length before regex and parsing.
+  if (typeof value !== 'string' || value.length > 64) return null;
   const match = ISO_TIMESTAMP_PATTERN.exec(value);
   if (!match) return null;
 
