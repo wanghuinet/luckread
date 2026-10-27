@@ -199,7 +199,7 @@ jobs:
             "databaseName": "luckread",
             "migrations": ["0001_membership_subscriptions", "0002_subscription_version_cas"],
             "migrationAction": "${{ steps.d1_preflight.outputs.migration_action }}",
-            "remoteMigration": "${{ steps.d1_preflight.outputs.migration_action == 'apply' }}",
+            "remoteMigration": ${{ steps.d1_preflight.outputs.migration_action == 'apply' }},
             "confirmation": "DEPLOY_W07_SUBSCRIPTION",
             "migrationConfirmation": "APPLY_W07_SUBSCRIPTION_MIGRATION"
           }
