@@ -350,6 +350,9 @@ export async function listActiveMembershipPlans(
     } catch {
       throw new SubscriptionRuntimeError('INTEGRITY_VIOLATION', 500)
     }
+    if (!Array.isArray(benefits) || benefits.some((item) => typeof item !== 'string' || item.length === 0 || item.length > 180)) {
+      throw new SubscriptionRuntimeError('INTEGRITY_VIOLATION', 500)
+    }
     if (!Number.isSafeInteger(row.current_version) || row.current_version < 1 || !Number.isSafeInteger(row.price_minor) || row.price_minor < 0) {
       throw new SubscriptionRuntimeError('INTEGRITY_VIOLATION', 500)
     }
