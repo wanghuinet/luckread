@@ -18,4 +18,27 @@ describe('W07 D1 traffic guard', () => {
     expect(response.headers.get('retry-after')).toBe('60')
     expect(prepare).not.toHaveBeenCalled()
   })
+
+  it('fails closed when the origin limiter is missing', async () => {
+    const prepare = vi.fn()
+    const response = await runtime.fetch(
+      new Request('https://luckread-w07.internal/memberships/subscriptions', { method: 'GET' }),
+      { D1_01: { prepare } as unknown as D1Database },
+    )
+    expect(response.status).toBe(503)
+    expect(prepare).not.toHaveBeenCalled()
+  })
+
+  it('fails closed when the actor limiter is missing after origin allowance', async () => {
+    const prepare = vi.fn()
+    const response = await runtime.fetch(
+      new Request('https://luckread-w07.internal/memberships/subscriptions', { method: 'GET' }),
+      {
+        D1_01: { prepare } as unknown as D1Database,
+        SUBSCRIPTION_ORIGIN_GLOBAL_LIMITER: { limit: vi.fn(async () => ({ success: true })) },
+      },
+    )
+    expect(response.status).toBe(503)
+    expect(prepare).not.toHaveBeenCalled()
+  })
 })
