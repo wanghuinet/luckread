@@ -1,14 +1,25 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { changeSubscriptionPlan, createSubscription, etagForVersion, getSubscription, listSubscriptions, parseBoundedPositiveInt, transitionSubscription, type SubscriptionRow, type SubscriptionStatus } from './subscription-runtime.js'
+import { changeSubscriptionPlan, createMembershipPlanDraft, createSubscription, etagForVersion, getSubscription, listActiveMembershipPlans, listCreatorMembershipPlans, listSubscriptions, normalizeMembershipPlanDraft, parseBoundedPositiveInt, transitionSubscription, type SubscriptionRow, type SubscriptionStatus } from './subscription-runtime.js'
 import w07 from './index.js'
 import { verifyD1SubscriptionPostflight, verifyD1SubscriptionPreflight } from '../scripts/verify-remote-preflight.mjs'
 
 type Statement = { bind: (...values: unknown[]) => Statement; first: <T>() => Promise<T | null>; all: <T>() => Promise<{ results: T[] }>; run: () => Promise<{ meta: { changes: number } }> }
+type MembershipPlanRow = { plan_id: string; owner_type: 'CREATOR' | 'COMMUNITY' | 'PLATFORM'; owner_id: string; current_version: number; status: 'DRAFT' | 'ACTIVE' | 'PAUSED' | 'RETIRED'; visibility: 'PRIVATE' | 'PUBLIC'; version: number; has_current_version: boolean; created_at: string; updated_at: string; name: string; tier: string; billing_interval: string; price_minor: number; currency: string; benefits_json: string }
+type PlanVersionRow = { plan_id: string; plan_version: number; name: string; tier: string; billing_interval: string; price_minor: number; currency: string; benefits_json: string; created_at: string }
 
-function fakeDb(rows: SubscriptionRow[]): D1Database {
+function fakeDb(rows: SubscriptionRow[], plans: MembershipPlanRow[] = []): D1Database {
   const state = new Map(rows.map((row) => [row.subscription_id, { ...row }]))
+  const planState = new Map(plans.map((plan) => [plan.plan_id, { ...plan }]))
+  const planVersionState = new Map<string, PlanVersionRow>()
+  for (const plan of plans) {
+    if (plan.has_current_version) planVersionState.set(plan.plan_id + ':' + plan.current_version, {
+      plan_id: plan.plan_id, plan_version: plan.current_version, name: plan.name, tier: plan.tier,
+      billing_interval: plan.billing_interval, price_minor: plan.price_minor, currency: plan.currency,
+      benefits_json: plan.benefits_json, created_at: plan.created_at,
+    })
+  }
   return {
     prepare(sql: string) {
       let values: unknown[] = []
@@ -19,10 +30,36 @@ function fakeDb(rows: SubscriptionRow[]): D1Database {
             const row = state.get(String(values[0]))
             return (row && row.subscriber_id === String(values[1]) ? { ...row } : null) as T | null
           }
+          if (sql.includes('FROM membership_plans AS p')) {
+            const plan = planState.get(String(values[0]))
+            const version = planVersionState.get(String(values[0]) + ':1')
+            return (plan && version ? { ...plan, ...version } : null) as T | null
+          }
           const row = state.get(String(values[0]))
           return row ? { ...row } as T : null
         },
         async all<T>() {
+          if (sql.includes('FROM membership_plans AS p')) {
+            const hasCursor = sql.includes('p.created_at < ?')
+            const ownerQuery = sql.includes('p.owner_id = ?')
+            const cursorOffset = ownerQuery ? 1 : 0
+            const limit = Number(values[values.length - 1])
+            const cursorCreatedAt = hasCursor ? String(values[cursorOffset]) : null
+            const cursorPlanId = hasCursor ? String(values[cursorOffset + 2]) : null
+            const results = Array.from(planState.values())
+              .filter((plan) => !ownerQuery || (plan.owner_type === 'CREATOR' && plan.owner_id === String(values[0])))
+              .filter((plan) => ownerQuery || (plan.owner_type === 'CREATOR' && plan.status === 'ACTIVE' && plan.visibility === 'PUBLIC'))
+              .filter((plan) => plan.has_current_version)
+              .filter((plan) => !hasCursor || plan.created_at < cursorCreatedAt! || (plan.created_at === cursorCreatedAt && plan.plan_id < cursorPlanId!))
+              .sort((left, right) => right.created_at.localeCompare(left.created_at) || right.plan_id.localeCompare(left.plan_id))
+              .slice(0, limit)
+              .map((plan) => {
+                const version = planVersionState.get(plan.plan_id + ':' + plan.current_version)
+                return version ? { ...plan, ...version, current_version: plan.current_version } : null
+              })
+              .filter((plan) => plan !== null)
+            return { results: results as unknown as T[] }
+          }
           if (sql.includes('WHERE subscriber_id = ?')) {
             const limit = Number(values[1])
             const offset = Number(values[2])
@@ -35,13 +72,42 @@ function fakeDb(rows: SubscriptionRow[]): D1Database {
           return { results: [] as T[] }
         },
         async run() {
-          if (sql.includes('INSERT INTO')) {
+          if (sql.includes('INSERT OR IGNORE INTO membership_plans')) {
+            const planId = String(values[0])
+            if (planState.has(planId)) return { meta: { changes: 0 } }
+            planState.set(planId, {
+              plan_id: planId, owner_type: 'CREATOR', owner_id: String(values[1]), current_version: 1,
+              status: 'DRAFT', visibility: 'PRIVATE', version: 1, has_current_version: false,
+              created_at: String(values[2]), updated_at: String(values[3]),
+              name: '', tier: '', billing_interval: 'MONTHLY', price_minor: 0, currency: 'USD', benefits_json: '[]',
+            })
+            return { meta: { changes: 1 } }
+          }
+          if (sql.includes('INSERT OR IGNORE INTO membership_plan_versions')) {
+            const key = String(values[0]) + ':1'
+            if (planVersionState.has(key)) return { meta: { changes: 0 } }
+            const version: PlanVersionRow = {
+              plan_id: String(values[0]), plan_version: 1, name: String(values[1]), tier: String(values[2]),
+              billing_interval: String(values[3]), price_minor: Number(values[4]), currency: String(values[5]),
+              benefits_json: String(values[6]), created_at: String(values[7]),
+            }
+            planVersionState.set(key, version)
+            const plan = planState.get(version.plan_id)
+            if (plan) {
+              plan.name = version.name; plan.tier = version.tier; plan.billing_interval = version.billing_interval
+              plan.price_minor = version.price_minor; plan.currency = version.currency; plan.benefits_json = version.benefits_json
+              plan.has_current_version = true
+            }
+            return { meta: { changes: 1 } }
+          }
+          if (sql.includes('INSERT INTO membership_subscriptions')) {
+            const plan = planState.get(String(values[7]))
+            if (!plan || plan.owner_type !== 'CREATOR' || plan.status !== 'ACTIVE' || plan.visibility !== 'PUBLIC' || !plan.has_current_version) return { meta: { changes: 0 } }
             const row: SubscriptionRow = {
-              subscription_id: String(values[0]), subscriber_id: String(values[1]), plan_id: String(values[2]),
-              plan_version: Number(values[3]), creator_id: values[4] as string | null, status: values[5] as SubscriptionStatus,
-              started_at: String(values[6]), current_period_start: String(values[7]), current_period_end: String(values[8]),
-              cancel_at: values[9] as string | null, entitlement_snapshot_ref: values[10] as string | null,
-              created_at: String(values[11]), updated_at: String(values[12]), version: Number(values[13]),
+              subscription_id: String(values[0]), subscriber_id: String(values[1]), plan_id: plan.plan_id,
+              plan_version: plan.current_version, creator_id: plan.owner_id, status: 'PENDING',
+              started_at: String(values[2]), current_period_start: String(values[3]), current_period_end: String(values[4]),
+              cancel_at: null, entitlement_snapshot_ref: null, created_at: String(values[5]), updated_at: String(values[6]), version: 1,
             }
             if (state.has(row.subscription_id)) throw new Error('UNIQUE constraint failed')
             state.set(row.subscription_id, row)
@@ -54,9 +120,11 @@ function fakeDb(rows: SubscriptionRow[]): D1Database {
             return { meta: { changes: 1 } }
           }
           if (sql.includes('SET plan_id =')) {
-            const row = state.get(String(values[3]))
-            if (!row || row.subscriber_id !== String(values[4]) || row.version !== Number(values[5])) return { meta: { changes: 0 } }
-            row.plan_id = String(values[0]); row.plan_version = Number(values[1]); row.updated_at = String(values[2]); row.version += 1
+            const row = state.get(String(values[4]))
+            const plan = planState.get(String(values[7]))
+            if (!row || row.subscriber_id !== String(values[5]) || row.version !== Number(values[6])) return { meta: { changes: 0 } }
+            if (!plan || plan.owner_type !== 'CREATOR' || plan.status !== 'ACTIVE' || plan.visibility !== 'PUBLIC' || plan.owner_id !== String(values[8])) return { meta: { changes: 0 } }
+            row.plan_id = plan.plan_id; row.plan_version = plan.current_version; row.creator_id = plan.owner_id; row.updated_at = String(values[3]); row.version += 1
             return { meta: { changes: 1 } }
           }
           throw new Error('unexpected query')
@@ -64,8 +132,20 @@ function fakeDb(rows: SubscriptionRow[]): D1Database {
       }
       return statement as unknown as ReturnType<D1Database["prepare"]>
     },
+    async batch<T = unknown>(statements: D1PreparedStatement[]) {
+      const results = []
+      for (const item of statements) results.push(await (item as unknown as Statement).run())
+      return results as unknown as D1Result<T>[]
+    },
   } as unknown as D1Database
 }
+
+const activePlan = (planId = 'plan_basic', overrides: Partial<MembershipPlanRow> = {}): MembershipPlanRow => ({
+  plan_id: planId, owner_type: 'CREATOR', owner_id: 'creator_1', current_version: 3, status: 'ACTIVE', visibility: 'PUBLIC', version: 1,
+  has_current_version: true, created_at: '2026-10-02T12:00:00.000Z', updated_at: '2026-10-02T12:00:00.000Z',
+  name: 'Creator Basic', tier: 'basic', billing_interval: 'MONTHLY', price_minor: 500, currency: 'USD', benefits_json: '["member-posts"]',
+  ...overrides,
+})
 
 const baseRow = (overrides: Partial<SubscriptionRow> = {}): SubscriptionRow => ({
   subscription_id: 'sub_existing', subscriber_id: 'user_1', plan_id: 'plan_basic', plan_version: 1, creator_id: null, status: 'ACTIVE',
@@ -91,17 +171,114 @@ describe('subscription runtime', () => {
     expect(parseBoundedPositiveInt('50', 20, 50)).toBe(50)
     expect(parseBoundedPositiveInt('10000', 1, 10000)).toBe(10000)
   })
-  it('fails closed on W07 POST before routing or subscription writes', () => {
+  it('keeps subscription lifecycle POST disabled while admitting only creator draft creation', () => {
     const index = readFileSync(new URL('./index.ts', import.meta.url), 'utf8')
-    const guard = index.indexOf("if (request.method === 'POST')")
-    const routeResolution = index.indexOf('const operation = toOperation')
-    expect(guard).toBeGreaterThan(index.indexOf('requireLayer(request)'))
-    expect(guard).toBeLessThan(routeResolution)
+    const operationResolution = index.indexOf('const operation = toOperation')
+    const guard = index.indexOf("if (request.method === 'POST' && operation?.operation !== 'createPlan')")
+    expect(operationResolution).toBeGreaterThan(index.indexOf('requireLayer(request)'))
+    expect(guard).toBeGreaterThan(operationResolution)
     expect(index).toContain("'SERVICE_UNAVAILABLE'")
     expect(index).toContain('verified payment-provider synchronization is available')
+    expect(index).toContain('createMembershipPlanDraft(')
     expect(index).not.toContain('createSubscription(')
     expect(index).not.toContain('transitionSubscription(')
     expect(index).not.toContain('changeSubscriptionPlan(')
+  })
+
+  it('routes authenticated GET /plans through the active-public plan query', async () => {
+    const allowLimiter = { limit: async () => ({ success: true }) }
+    const request = new Request('https://luckread-w07.internal/plans?limit=10', {
+      method: 'GET',
+      headers: {
+        'X-LuckRead-Caller': 'W01',
+        'X-LuckRead-Transport-Version': '1.0',
+        'X-LuckRead-Correlation-Id': 'plans-catalog-test',
+        'X-LuckRead-Principal-User-Id': 'user_1',
+        'X-LuckRead-Principal-Layer': 'L2',
+      },
+    })
+    const response = await w07.fetch(request, {
+      D1_01: fakeDb([], [activePlan('plan_catalog')]),
+      SUBSCRIPTION_ORIGIN_GLOBAL_LIMITER: allowLimiter,
+      SUBSCRIPTION_READ_LIMITER: allowLimiter,
+      SUBSCRIPTION_WRITE_LIMITER: allowLimiter,
+    })
+    const body = await response.json() as { data?: { docs?: Array<{ planId: string; planVersion: number; priceMinor: number }> } }
+    expect(response.status).toBe(200)
+    expect(body.data?.docs).toHaveLength(1)
+    expect(body.data?.docs?.[0]).toMatchObject({ planId: 'plan_catalog', planVersion: 3, priceMinor: 500 })
+  })
+
+  it('creates creator plan drafts only with a trusted creator identity and idempotent key', async () => {
+    const allowLimiter = { limit: async () => ({ success: true }) }
+    const input = {
+      name: 'Supporter', tier: 'supporter', billingInterval: 'MONTHLY',
+      priceMinor: 500, currency: 'USD', benefits: ['member posts'],
+    }
+    const makeRequest = (layer = 'L3', creatorId = 'creator_1') => new Request('https://luckread-w07.internal/membership/plans', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'X-LuckRead-Caller': 'W01',
+        'X-LuckRead-Transport-Version': '1.0',
+        'X-LuckRead-Correlation-Id': 'creator-plan-create',
+        'X-LuckRead-Principal-User-Id': 'user_1',
+        'X-LuckRead-Principal-Layer': layer,
+        ...(creatorId ? { 'X-LuckRead-Verified-Creator-Id': creatorId } : {}),
+        'Idempotency-Key': 'plan-draft-create-1',
+      },
+      body: JSON.stringify(input),
+    })
+    const db = fakeDb([])
+    const env = {
+      D1_01: db,
+      SUBSCRIPTION_ORIGIN_GLOBAL_LIMITER: allowLimiter,
+      SUBSCRIPTION_READ_LIMITER: allowLimiter,
+      SUBSCRIPTION_WRITE_LIMITER: allowLimiter,
+    }
+    const first = await w07.fetch(makeRequest(), env)
+    const firstBody = await first.json() as { data?: { planId?: string; status?: string; visibility?: string; replayed?: boolean } }
+    expect(first.status).toBe(201)
+    expect(firstBody.data).toMatchObject({ status: 'DRAFT', visibility: 'PRIVATE', replayed: false })
+
+    const replay = await w07.fetch(makeRequest(), env)
+    const replayBody = await replay.json() as { data?: { planId?: string; replayed?: boolean } }
+    expect(replay.status).toBe(200)
+    expect(replayBody.data).toMatchObject({ planId: firstBody.data?.planId, replayed: true })
+
+    const lowerLayer = await w07.fetch(makeRequest('L2'), env)
+    expect(lowerLayer.status).toBe(403)
+
+    // The API contract specifies minimum L3; higher layers must not be rejected by an exact L3/L4 allowlist.
+    const higherLayer = await w07.fetch(makeRequest('L5'), env)
+    expect(higherLayer.status).toBe(200)
+  })
+
+  it('denies plan creation if W01 did not provide the W08-verified creator identity', async () => {
+    const allowLimiter = { limit: async () => ({ success: true }) }
+    const db = {
+      batch() { throw new Error('creator identity must be checked before D1 writes') },
+      prepare() { throw new Error('creator identity must be checked before D1 writes') },
+    } as unknown as D1Database
+    const response = await w07.fetch(new Request('https://luckread-w07.internal/membership/plans', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'X-LuckRead-Caller': 'W01',
+        'X-LuckRead-Transport-Version': '1.0',
+        'X-LuckRead-Correlation-Id': 'missing-creator-id',
+        'X-LuckRead-Principal-User-Id': 'user_1',
+        'X-LuckRead-Principal-Layer': 'L3',
+        'Idempotency-Key': 'plan-draft-create-2',
+      },
+      body: JSON.stringify({ name: 'Supporter', tier: 'supporter', billingInterval: 'MONTHLY', priceMinor: 500, currency: 'USD', benefits: [] }),
+    }), {
+      D1_01: db,
+      SUBSCRIPTION_ORIGIN_GLOBAL_LIMITER: allowLimiter,
+      SUBSCRIPTION_READ_LIMITER: allowLimiter,
+      SUBSCRIPTION_WRITE_LIMITER: allowLimiter,
+    })
+    expect(response.status).toBe(403)
   })
 
   it('returns 503 for authenticated W07 POST without touching D1', async () => {
@@ -137,13 +314,26 @@ describe('subscription runtime', () => {
     expect(body.error?.code).toBe('SERVICE_UNAVAILABLE')
     expect(databaseTouched).toBe(false)
   })
-  it('creates an idempotent pending subscription', async () => {
-    const db = fakeDb([]); const first = await createSubscription(db, 'user_1', { planId: 'plan_basic', idempotencyKey: 'create-1' });
+  it('creates an idempotent pending subscription from the current authoritative plan version', async () => {
+    const db = fakeDb([], [activePlan('plan_basic', { current_version: 3, owner_id: 'creator_1' })]); const first = await createSubscription(db, 'user_1', { planId: 'plan_basic', idempotencyKey: 'create-1' });
     const second = await createSubscription(db, 'user_1', { planId: 'plan_basic', idempotencyKey: 'create-1' });
-    expect(first.subscriptionId).toBe(second.subscriptionId); expect(first.status).toBe('PENDING'); expect(first.planVersion).toBe(1); expect(first.version).toBe(1); expect(first.etag).toBe(etagForVersion(1))
+    expect(first.subscriptionId).toBe(second.subscriptionId); expect(first.status).toBe('PENDING'); expect(first.planVersion).toBe(3); expect(first.creatorId).toBe('creator_1'); expect(first.version).toBe(1); expect(first.etag).toBe(etagForVersion(1))
+  })
+  it('fails closed for missing, inactive, private, or non-creator plans', async () => {
+    const cases: MembershipPlanRow[][] = [
+      [],
+      [activePlan('plan_basic', { status: 'DRAFT' })],
+      [activePlan('plan_basic', { visibility: 'PRIVATE' })],
+      [activePlan('plan_basic', { owner_type: 'COMMUNITY' })],
+      [activePlan('plan_basic', { has_current_version: false })],
+    ]
+    for (const plans of cases) {
+      await expect(createSubscription(fakeDb([], plans), 'user_1', { planId: 'plan_basic', idempotencyKey: 'create-1' }))
+        .rejects.toMatchObject({ code: 'PLAN_NOT_ACTIVE', status: 409 })
+    }
   })
   it('rejects idempotency-key reuse for a different plan', async () => {
-    const db = fakeDb([]); await createSubscription(db, 'user_1', { planId: 'plan_basic', idempotencyKey: 'create-1' })
+    const db = fakeDb([], [activePlan()]); await createSubscription(db, 'user_1', { planId: 'plan_basic', idempotencyKey: 'create-1' })
     await expect(createSubscription(db, 'user_1', { planId: 'plan_pro', idempotencyKey: 'create-1' })).rejects.toMatchObject({ code: 'CONFLICT', status: 409 })
   })
   it('scopes reads to the subscriber', async () => {
@@ -182,9 +372,28 @@ describe('subscription runtime', () => {
     const after = await transitionSubscription(db, 'user_1', 'sub_existing', 'pause', before.etag)
     expect(Date.parse(after.updatedAt)).toBe(Date.parse(before.updatedAt) + 1)
   })
-  it('changes plan only for mutable lifecycle states', async () => {
-    const db = fakeDb([baseRow()]); const before = await getSubscription(db, 'user_1', 'sub_existing'); const after = await changeSubscriptionPlan(db, 'user_1', 'sub_existing', 'plan_pro', before.etag)
-    expect(after.planId).toBe('plan_pro'); expect(after.status).toBe('ACTIVE'); expect(after.version).toBe(before.version + 1); expect(after.etag).toBe(etagForVersion(2))
+  it('changes plan only to an active authoritative version and updates the creator reference', async () => {
+    const db = fakeDb([baseRow({ creator_id: 'creator_1' })], [activePlan('plan_pro', { current_version: 7, owner_id: 'creator_1' })]); const before = await getSubscription(db, 'user_1', 'sub_existing'); const after = await changeSubscriptionPlan(db, 'user_1', 'sub_existing', 'plan_pro', before.etag)
+    expect(after.planId).toBe('plan_pro'); expect(after.planVersion).toBe(7); expect(after.creatorId).toBe('creator_pro'); expect(after.status).toBe('ACTIVE'); expect(after.version).toBe(before.version + 1); expect(after.etag).toBe(etagForVersion(2))
+  })
+
+  it('refuses a plan change to a missing or unavailable plan', async () => {
+    const db = fakeDb([baseRow()]); const before = await getSubscription(db, 'user_1', 'sub_existing')
+    await expect(changeSubscriptionPlan(db, 'user_1', 'sub_existing', 'plan_unavailable', before.etag)).rejects.toMatchObject({ code: 'PLAN_NOT_ACTIVE', status: 409 })
+    const after = await getSubscription(db, 'user_1', 'sub_existing')
+    expect(after.planId).toBe('plan_basic')
+    expect(after.version).toBe(before.version)
+  })
+
+  it('does not allow changing a subscription to another creator\'s plan', async () => {
+    const db = fakeDb([baseRow({ creator_id: 'creator_1' })], [activePlan('plan_other_creator', { owner_id: 'creator_2' })])
+    const before = await getSubscription(db, 'user_1', 'sub_existing')
+    await expect(changeSubscriptionPlan(db, 'user_1', 'sub_existing', 'plan_other_creator', before.etag))
+      .rejects.toMatchObject({ code: 'PLAN_NOT_ACTIVE', status: 409 })
+    const after = await getSubscription(db, 'user_1', 'sub_existing')
+    expect(after.planId).toBe('plan_basic')
+    expect(after.creatorId).toBe('creator_1')
+    expect(after.version).toBe(before.version)
   })
 
   it('treats a repeated plan change with a stale If-Match as an idempotent success when the plan already converged', async () => {
@@ -210,6 +419,101 @@ describe('subscription runtime', () => {
     expect(result.page).toBe(1)
   })
 
+  it('lists only active public creator plans with stable cursor pagination', async () => {
+    const db = fakeDb([], [
+      activePlan('plan_alpha', { created_at: '2026-10-26T12:00:00.000Z', name: 'Alpha' }),
+      activePlan('plan_beta', { created_at: '2026-10-26T12:00:00.000Z', name: 'Beta' }),
+      activePlan('plan_private', { visibility: 'PRIVATE' }),
+      activePlan('plan_paused', { status: 'PAUSED' }),
+      activePlan('plan_community', { owner_type: 'COMMUNITY' }),
+      activePlan('plan_missing_version', { has_current_version: false }),
+    ])
+    const first = await listActiveMembershipPlans(db, 1)
+    expect(first.docs).toHaveLength(1)
+    expect(first.docs[0]?.planId).toBe('plan_beta')
+    expect(first.docs[0]?.planVersion).toBe(3)
+    expect(first.docs[0]?.priceMinor).toBe(500)
+    expect(first.docs[0]?.benefits).toEqual(['member-posts'])
+    expect(first.hasMore).toBe(true)
+    expect(first.nextCursor).toBeTruthy()
+
+    const second = await listActiveMembershipPlans(db, 1, first.nextCursor)
+    expect(second.docs.map((plan) => plan.planId)).toEqual(['plan_alpha'])
+    expect(second.hasMore).toBe(false)
+    expect(second.nextCursor).toBeNull()
+    expect(JSON.stringify([first, second])).not.toContain('plan_private')
+    expect(JSON.stringify([first, second])).not.toContain('plan_paused')
+    expect(JSON.stringify([first, second])).not.toContain('plan_community')
+    expect(JSON.stringify([first, second])).not.toContain('plan_missing_version')
+  })
+
+  it('rejects malformed membership plan cursors', async () => {
+    await expect(listActiveMembershipPlans(fakeDb([], [activePlan()]), 20, 'not-a-valid-cursor'))
+      .rejects.toMatchObject({ code: 'VALIDATION_FAILED', status: 400 })
+  })
+
+  it('creates private creator-owned plan drafts idempotently and rejects key reuse with changed data', async () => {
+    const db = fakeDb([])
+    const input = {
+      name: 'Supporter',
+      tier: 'supporter',
+      billingInterval: 'MONTHLY',
+      priceMinor: 500,
+      currency: 'USD',
+      benefits: ['member posts', 'supporter badge'],
+    }
+    const first = await createMembershipPlanDraft(db, 'user_1', 'creator_1', input, 'draft-create-1')
+    const replay = await createMembershipPlanDraft(db, 'user_1', 'creator_1', input, 'draft-create-1')
+    expect(first).toMatchObject({ creatorId: 'creator_1', planVersion: 1, status: 'DRAFT', visibility: 'PRIVATE', version: 1, replayed: false })
+    expect(replay).toMatchObject({ planId: first.planId, status: 'DRAFT', visibility: 'PRIVATE', version: 1, replayed: true })
+    await expect(createMembershipPlanDraft(db, 'user_1', 'creator_1', { ...input, priceMinor: 900 }, 'draft-create-1'))
+      .rejects.toMatchObject({ code: 'CONFLICT', status: 409 })
+  })
+
+  it('rejects client-controlled owner, lifecycle state, malformed currency, and unsafe price values', () => {
+    expect(() => normalizeMembershipPlanDraft({
+      name: 'Basic', tier: 'basic', billingInterval: 'MONTHLY', priceMinor: 500, currency: 'USD', benefits: [],
+      creatorId: 'creator_attacker',
+    })).toThrowError(expect.objectContaining({ code: 'VALIDATION_FAILED', status: 400 }))
+    expect(() => normalizeMembershipPlanDraft({
+      name: 'Basic', tier: 'basic', billingInterval: 'MONTHLY', priceMinor: 500, currency: 'US$', benefits: [],
+    })).toThrowError(expect.objectContaining({ code: 'VALIDATION_FAILED', status: 400 }))
+    expect(() => normalizeMembershipPlanDraft({
+      name: 'Basic', tier: 'Basic', billingInterval: 'monthly', priceMinor: 500, currency: 'usd', benefits: [],
+    })).toThrowError(expect.objectContaining({ code: 'VALIDATION_FAILED', status: 400 }))
+    expect(() => normalizeMembershipPlanDraft({
+      name: 'Basic', tier: 'basic', billingInterval: 'MONTHLY', priceMinor: Number.MAX_SAFE_INTEGER, currency: 'USD', benefits: [],
+    })).toThrowError(expect.objectContaining({ code: 'VALIDATION_FAILED', status: 400 }))
+  })
+
+  it('lists only the verified creator-owned plans, including private drafts', async () => {
+    const db = fakeDb([], [
+      activePlan('plan_active'),
+      activePlan('plan_private', { status: 'DRAFT', visibility: 'PRIVATE', owner_id: 'creator_1', created_at: '2026-10-03T12:00:00.000Z' }),
+      activePlan('plan_other_creator', { owner_id: 'creator_2' }),
+    ])
+    const result = await listCreatorMembershipPlans(db, 'creator_1', 20)
+    expect(result.docs.map((plan) => plan.planId)).toEqual(['plan_private', 'plan_active'])
+    expect(result.docs.find((plan) => plan.planId === 'plan_private')).toMatchObject({ status: 'DRAFT', visibility: 'PRIVATE' })
+    expect(JSON.stringify(result)).not.toContain('plan_other_creator')
+  })
+
+  it('fails closed when persisted creator plan commercial fields are malformed', async () => {
+    const invalidBenefits = fakeDb([], [
+      activePlan('plan_corrupt_benefits', { benefits_json: '[1]' }),
+    ])
+    await expect(listCreatorMembershipPlans(invalidBenefits, 'creator_1'))
+      .rejects.toMatchObject({ code: 'INTEGRITY_VIOLATION', status: 500 })
+    await expect(listActiveMembershipPlans(invalidBenefits, 20))
+      .rejects.toMatchObject({ code: 'INTEGRITY_VIOLATION', status: 500 })
+
+    const invalidPrice = fakeDb([], [
+      activePlan('plan_corrupt_price', { price_minor: 12.5 }),
+    ])
+    await expect(listCreatorMembershipPlans(invalidPrice, 'creator_1'))
+      .rejects.toMatchObject({ code: 'INTEGRITY_VIOLATION', status: 500 })
+  })
+
   it('uses version CAS rather than updated_at as the concurrency authority', async () => {
     const runtime = readFileSync(new URL('./subscription-runtime.ts', import.meta.url), 'utf8')
     expect(runtime).toContain('version = version + 1')
@@ -226,12 +530,16 @@ describe('subscription runtime', () => {
     expect(workflow).toContain('"sourceSha": "$SOURCE_SHA"')
     expect(workflow).not.toContain('"sourceSha": "${{ inputs.source_sha }}"')
     expect(workflow).toContain('Read-only D1-01 migration and schema preflight')
-    expect(workflow).toContain('SELECT name FROM d1_migrations')
+    expect(workflow).toContain("0003_membership_plans")
     expect(workflow).toContain('PRAGMA table_info("membership_subscriptions")')
     expect(workflow).toContain('PRAGMA foreign_key_list("membership_subscriptions")')
+    expect(workflow).toContain('PRAGMA table_info("membership_plans")')
+    expect(workflow).toContain('PRAGMA table_info("membership_plan_versions")')
+    expect(workflow).toContain("tbl_name IN ('membership_plans','membership_plan_versions')")
+    expect(workflow).toContain('SELECT COUNT(*) AS invalid_versions')
+    expect(workflow).toContain('invalid_current_plan_versions')
     expect(workflow).toContain('node scripts/verify-remote-preflight.mjs preflight')
     expect(workflow).toContain('node scripts/verify-remote-preflight.mjs postflight')
-    expect(workflow).toContain('SELECT COUNT(*) AS invalid_versions')
     const preflight = readFileSync(new URL('../scripts/verify-remote-preflight.mjs', import.meta.url), 'utf8')
     expect(preflight).toContain("migrationAction = 'apply'")
     expect(preflight).toContain("migrationAction = 'skip'")
@@ -280,62 +588,129 @@ const preflightSchema = (withVersion = false, versionDefault = '1') => [{
       dflt_value: name === 'version' ? versionDefault : null,
     })),
 }]
-const preflightInput = (withVersion = false, versionDefault = '1') => ({
+const planColumnRows = [
+  ['plan_id','TEXT',1,1], ['owner_type','TEXT',1,0], ['owner_id','TEXT',1,0],
+  ['current_version','INTEGER',1,0], ['status','TEXT',1,0], ['visibility','TEXT',1,0],
+  ['version','INTEGER',1,0], ['created_at','TEXT',1,0], ['updated_at','TEXT',1,0],
+]
+const planVersionColumnRows = [
+  ['plan_id','TEXT',1,1], ['plan_version','INTEGER',1,2], ['name','TEXT',1,0],
+  ['tier','TEXT',1,0], ['billing_interval','TEXT',1,0], ['price_minor','INTEGER',1,0],
+  ['currency','TEXT',1,0], ['benefits_json','TEXT',1,0], ['created_at','TEXT',1,0],
+]
+const schemaRows = (rows) => [{ results: rows.map(([name,type,notnull,pk],cid) => ({ cid,name,type,notnull,pk,dflt_value:null })) }]
+const planIndexNames = [
+  'ix_membership_plans_owner_status_updated',
+  'ix_membership_plans_status_visibility_updated',
+]
+const planVersionIndexNames = ['ix_membership_plan_versions_created']
+const planTriggerNames = [
+  'membership_plan_versions_immutable_update',
+  'membership_plan_versions_immutable_delete',
+  'membership_plans_owner_immutable_update',
+  'membership_plans_current_version_forward_only',
+]
+const nameRows = (names) => [{ results: names.map((name,seq) => ({ name,seq })) }]
+const preflightInput = (withVersion = false, versionDefault = '1', withPlans = false) => ({
   databaseList: preflightDatabaseList,
-  migrationState: [{ results: withVersion
-    ? [{ name: '0001_membership_subscriptions' }, { name: '0002_subscription_version_cas' }]
-    : [{ name: '0001_membership_subscriptions' }] }],
+  migrationState: [{ results: [
+    { name: '0001_membership_subscriptions' },
+    ...(withVersion ? [{ name: '0002_subscription_version_cas' }] : []),
+    ...(withPlans ? [{ name: '0003_membership_plans' }] : []),
+  ] }],
   subscriptionSchema: preflightSchema(withVersion,versionDefault),
   subscriptionIndexes: preflightIndexes,
+  subscriptionForeignKeys: [],
+  planSchema: withPlans ? schemaRows(planColumnRows) : [{ results: [] }],
+  planVersionSchema: withPlans ? schemaRows(planVersionColumnRows) : [{ results: [] }],
+  planIndexes: withPlans ? nameRows(planIndexNames) : [{ results: [] }],
+  planVersionIndexes: withPlans ? nameRows(planVersionIndexNames) : [{ results: [] }],
+  planTriggers: withPlans ? nameRows(planTriggerNames) : [{ results: [] }],
 })
 
 describe('read-only D1 subscription migration postflight', () => {
-  it('passes only when migration 0002, the exact current schema, and version integrity are verified', () => {
+  it('passes only when all three migrations, exact table shapes, indexes, triggers and integrity checks are verified', () => {
     const result = verifyD1SubscriptionPostflight({
-      ...preflightInput(true),
+      ...preflightInput(true, '1', true),
       versionIntegrity: [{ results: [{ invalid_versions: 0 }] }],
+      planIntegrity: [{ results: [{ invalid_current_plan_versions: 0 }] }],
     })
     expect(result.migrationAction).toBe('skip')
     expect(result.invalidVersions).toBe(0)
+    expect(result.invalidCurrentPlanVersions).toBe(0)
     expect(result.postflight).toBe('PASS')
-    expect(result.appliedMigrations).toEqual(['0001_membership_subscriptions', '0002_subscription_version_cas'])
+    expect(result.appliedMigrations).toEqual([
+      '0001_membership_subscriptions',
+      '0002_subscription_version_cas',
+      '0003_membership_plans',
+    ])
   })
 
   it('fails closed when any existing subscription has an invalid version', () => {
     expect(() => verifyD1SubscriptionPostflight({
-      ...preflightInput(true),
+      ...preflightInput(true, '1', true),
       versionIntegrity: [{ results: [{ invalid_versions: 1 }] }],
+      planIntegrity: [{ results: [{ invalid_current_plan_versions: 0 }] }],
     })).toThrow('existing subscription versions include invalid or non-positive values')
   })
 
-  it('fails closed when migration 0002 is not applied after the migration step', () => {
+  it('fails closed when any plan points to a missing immutable current version', () => {
     expect(() => verifyD1SubscriptionPostflight({
-      ...preflightInput(),
+      ...preflightInput(true, '1', true),
       versionIntegrity: [{ results: [{ invalid_versions: 0 }] }],
-    })).toThrow('post-migration verification requires 0001 and 0002 with the exact current schema')
+      planIntegrity: [{ results: [{ invalid_current_plan_versions: 1 }] }],
+    })).toThrow('membership plans include a missing or invalid current immutable version')
   })
 
-  it('fails closed when the version integrity query has no single result', () => {
+  it('fails closed when the pre-migration state remains after the apply step', () => {
     expect(() => verifyD1SubscriptionPostflight({
-      ...preflightInput(true),
+      ...preflightInput(true, '1', false),
+      versionIntegrity: [{ results: [{ invalid_versions: 0 }] }],
+      planIntegrity: [{ results: [{ invalid_current_plan_versions: 0 }] }],
+    })).toThrow('post-migration verification requires migrations 0001, 0002, and 0003')
+  })
+
+  it('fails closed when either integrity query does not return exactly one count', () => {
+    expect(() => verifyD1SubscriptionPostflight({
+      ...preflightInput(true, '1', true),
       versionIntegrity: [{ results: [] }],
+      planIntegrity: [{ results: [{ invalid_current_plan_versions: 0 }] }],
     })).toThrow('version integrity query did not return exactly one count')
+    expect(() => verifyD1SubscriptionPostflight({
+      ...preflightInput(true, '1', true),
+      versionIntegrity: [{ results: [{ invalid_versions: 0 }] }],
+      planIntegrity: [{ results: [] }],
+    })).toThrow('membership plan integrity query did not return exactly one count')
   })
 })
 
 describe('read-only D1 subscription migration preflight', () => {
-  it('requests migration only for the exact legacy schema with migration 0001 applied', () => {
+  it('requests migration for the exact legacy schema with only migration 0001 applied', () => {
     const result = verifyD1SubscriptionPreflight(preflightInput())
     expect(result.migrationAction).toBe('apply')
     expect(result.appliedMigrations).toEqual(['0001_membership_subscriptions'])
     expect(result.columns.map((column) => column[0])).not.toContain('version')
   })
 
-  it('skips migration when migration 0002 and the exact version schema are already present', () => {
+  it('requests migration 0003 when subscription migration 0002 is already present but plan tables are absent', () => {
     const result = verifyD1SubscriptionPreflight(preflightInput(true))
-    expect(result.migrationAction).toBe('skip')
+    expect(result.migrationAction).toBe('apply')
     expect(result.appliedMigrations).toEqual(['0001_membership_subscriptions','0002_subscription_version_cas'])
+    expect(result.planColumns).toEqual([])
+  })
+
+  it('skips all migrations only when migration 0003 and exact plan schema are present', () => {
+    const result = verifyD1SubscriptionPreflight(preflightInput(true, '1', true))
+    expect(result.migrationAction).toBe('skip')
+    expect(result.appliedMigrations).toEqual([
+      '0001_membership_subscriptions',
+      '0002_subscription_version_cas',
+      '0003_membership_plans',
+    ])
     expect(result.columns.at(-1)).toEqual(['version','INTEGER',1,0])
+    expect(result.planColumns).toEqual(planColumnRows)
+    expect(result.planVersionColumns).toEqual(planVersionColumnRows)
+    expect(result.planTriggers).toEqual(planTriggerNames)
   })
 
   it('fails closed when the target D1 UUID does not match', () => {
@@ -349,10 +724,10 @@ describe('read-only D1 subscription migration preflight', () => {
     expect(() => verifyD1SubscriptionPreflight({
       ...preflightInput(true),
       migrationState: [{ results: [{ name: '0001_membership_subscriptions' }] }],
-    })).toThrow('migration history and physical Subscription schema do not match')
+    })).toThrow('migration history and physical Subscription/MembershipPlan schemas do not match')
   })
 
-  it('fails closed when the version default or expected indexes are missing', () => {
+  it('fails closed when the version default or expected subscription index is wrong', () => {
     expect(() => verifyD1SubscriptionPreflight(preflightInput(true, '0'))).toThrow(
       'version column does not satisfy INTEGER NOT NULL DEFAULT 1',
     )
@@ -360,5 +735,21 @@ describe('read-only D1 subscription migration preflight', () => {
       ...preflightInput(),
       subscriptionIndexes: [{ results: [{ seq: 0, name: 'only_some_index' }] }],
     })).toThrow('missing expected index')
+  })
+
+  it('fails closed when migration 0003 is recorded but any plan table, index, or immutable trigger is missing', () => {
+    const state = preflightInput(true, '1', true)
+    expect(() => verifyD1SubscriptionPreflight({
+      ...state,
+      planTriggers: [{ results: planTriggerNames.slice(0,3).map((name,seq) => ({ name,seq })) }],
+    })).toThrow('migration history and physical Subscription/MembershipPlan schemas do not match')
+    expect(() => verifyD1SubscriptionPreflight({
+      ...state,
+      planVersionSchema: [{ results: [] }],
+    })).toThrow('migration history and physical Subscription/MembershipPlan schemas do not match')
+    expect(() => verifyD1SubscriptionPreflight({
+      ...state,
+      planIndexes: [{ results: [{ seq: 0, name: 'unexpected_index' }] }],
+    })).toThrow('migration history and physical Subscription/MembershipPlan schemas do not match')
   })
 })

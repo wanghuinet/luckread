@@ -1,6 +1,7 @@
 import { admitCreatorDecision, creatorApplicationReplayMatches, parseExpectedVersion, validIdempotencyKey } from './policy.js'
 import { evaluateCreatorApplicationPermission } from './authz/creator-application-permission.js'
 import { handlePermissionCheck } from './authz/handler.js'
+import { evaluateCaslPermission, type LayerId } from './authz/casl-policy.js'
 
 interface Env {
   D1_01: D1Database
@@ -444,6 +445,29 @@ async function handleAdminApplicationDecision(env: Env, request: Request): Promi
   return json({ applicationId: application.application_id, status: application.status, grantState: application.grant_state, version: application.version })
 }
 
+async function handleActiveCreatorSelf(env: Env, request: Request): Promise<Response> {
+  const principal = await principalFor(env, request)
+  if (principal instanceof Response) return principal
+
+  const permission = evaluateCaslPermission({
+    layer: (principal.layer ?? '') as LayerId,
+    subjectId: principal.userId,
+    accountState: principal.accountState ?? null,
+    action: 'creator.read.self',
+    resourceType: 'Creator',
+    resourceAttributes: { ownerId: principal.userId },
+  })
+  if (permission.decision !== 'ALLOW') {
+    return errorResponse(403, 'CREATOR_PERMISSION_REQUIRED', 'An active creator identity is required')
+  }
+
+  const creator = await env.D1_01.prepare(
+    "SELECT creator_id FROM creators WHERE user_id = ? AND status = 'ACTIVE' LIMIT 1",
+  ).bind(principal.userId).first<{ creator_id: string }>()
+  if (!creator) return errorResponse(403, 'CREATOR_NOT_ACTIVE', 'An active creator identity is required')
+  return json({ creatorId: creator.creator_id, status: 'ACTIVE' })
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url)
@@ -456,6 +480,9 @@ export default {
           { status: 503, headers: { 'cache-control': 'no-store' } },
         )
       }
+    }
+    if (url.pathname === '/internal/creator/self' && request.method === 'GET') {
+      try { return await handleActiveCreatorSelf(env, request) } catch { return errorResponse(503, 'CREATOR_SERVICE_UNAVAILABLE', 'Creator service unavailable') }
     }
     if (url.pathname === '/api/v1/creator-applications' && request.method === 'POST') {
       try { return await handleApplicationCreate(env, request) } catch { return errorResponse(503, 'CREATOR_SERVICE_UNAVAILABLE', 'Creator application service unavailable') }

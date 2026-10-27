@@ -314,6 +314,40 @@ describe('CASL L0-L8 authorization policy', () => {
     }).decision).toBe('DENY')
   })
 
+  it('authorizes membership plan creation and reads only for the creator owner at L3+', () => {
+    expect(evaluate({
+      layer: 'L3',
+      action: 'membership.plan.create.own',
+      resourceType: 'MembershipPlan',
+      resourceAttributes: { ownerId: 'user-1' },
+    }).decision).toBe('ALLOW')
+    expect(evaluate({
+      layer: 'L3',
+      action: 'membership.plan.read.own',
+      resourceType: 'MembershipPlan',
+      resourceAttributes: { ownerId: 'user-1' },
+    }).decision).toBe('ALLOW')
+    expect(evaluate({
+      layer: 'L3',
+      action: 'membership.plan.create.own',
+      resourceType: 'MembershipPlan',
+      resourceAttributes: { ownerId: 'user-2' },
+    }).decision).toBe('DENY')
+    expect(evaluate({
+      layer: 'L2',
+      action: 'membership.plan.create.own',
+      resourceType: 'MembershipPlan',
+      resourceAttributes: { ownerId: 'user-1' },
+    }).decision).toBe('DENY')
+    expect(evaluate({
+      layer: 'L3',
+      accountState: 'FROZEN',
+      action: 'membership.plan.create.own',
+      resourceType: 'MembershipPlan',
+      resourceAttributes: { ownerId: 'user-1' },
+    }).decision).toBe('DENY')
+  })
+
   it('denies unknown permissions, unsupported subjects, and malformed attributes', () => {
     expect(evaluate({ action: 'permission.not.registered' })).toMatchObject({ decision: 'DENY', reasonCode: 'UNKNOWN_PERMISSION' })
     expect(evaluate({

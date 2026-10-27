@@ -1,6 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 
-import { getSubscription, listSubscriptions, parseBoundedPositiveInt, SubscriptionRuntimeError, validatePrincipal } from './subscription-runtime.js'
+import { createMembershipPlanDraft, getSubscription, listActiveMembershipPlans, listCreatorMembershipPlans, listSubscriptions, parseBoundedPositiveInt, SubscriptionRuntimeError, validatePrincipal } from './subscription-runtime.js'
 
 interface RateLimitBinding { limit(input: { key: string }): Promise<{ success: boolean }> }
 interface Env {
@@ -54,11 +54,67 @@ const requireLayer = (request: Request): void => {
 
 const parseSegments = (pathname: string): string[] => pathname.split('/').filter(Boolean).map((segment) => { try { return decodeURIComponent(segment) } catch { throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400) } })
 
+const requireCreatorLayer = (request: Request): void => {
+  const layer = request.headers.get('X-LuckRead-Principal-Layer')?.trim() ?? ''
+  if (!/^L[0-8]$/.test(layer) || Number(layer.slice(1)) < 3) {
+    throw new SubscriptionRuntimeError('PERMISSION_DENIED', 403)
+  }
+}
+
+const requireVerifiedCreatorId = (request: Request): string => {
+  const creatorId = request.headers.get('X-LuckRead-Verified-Creator-Id')?.trim() ?? ''
+  if (!creatorId || creatorId.length > 256) throw new SubscriptionRuntimeError('PERMISSION_DENIED', 403)
+  return validatePrincipal(creatorId)
+}
+
+const readJsonBody = async (request: Request): Promise<unknown> => {
+  const declaredLength = Number(request.headers.get('content-length') ?? '0')
+  if (Number.isFinite(declaredLength) && declaredLength > 16_384) {
+    throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
+  }
+  if (!request.body) throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
+  const reader = request.body.getReader()
+  const chunks: Uint8Array[] = []
+  let length = 0
+  try {
+    while (true) {
+      const part = await reader.read()
+      if (part.done) break
+      length += part.value.byteLength
+      if (length > 16_384) {
+        await reader.cancel()
+        throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
+      }
+      chunks.push(part.value)
+    }
+  } catch (error) {
+    if (error instanceof SubscriptionRuntimeError) throw error
+    throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
+  }
+  const bytes = new Uint8Array(length)
+  let offset = 0
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset)
+    offset += chunk.byteLength
+  }
+  try {
+    return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes)) as unknown
+  } catch {
+    throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
+  }
+}
+
 type Operation =
+  | { operation: 'listPlans'; subscriptionId: null }
+  | { operation: 'listOwnedPlans'; subscriptionId: null }
+  | { operation: 'createPlan'; subscriptionId: null }
   | { operation: 'list'; subscriptionId: null }
   | { operation: 'get'; subscriptionId: string }
 
 const toOperation = (method: string, segments: string[]): Operation | null => {
+  if (segments.length === 1 && segments[0] === 'plans' && method === 'GET') return { operation: 'listPlans', subscriptionId: null }
+  if (segments.length === 2 && segments[0] === 'membership' && segments[1] === 'plans' && method === 'GET') return { operation: 'listOwnedPlans', subscriptionId: null }
+  if (segments.length === 2 && segments[0] === 'membership' && segments[1] === 'plans' && method === 'POST') return { operation: 'createPlan', subscriptionId: null }
   if (segments.length === 2 && segments[0] === 'memberships' && segments[1] === 'subscriptions' && method === 'GET') return { operation: 'list', subscriptionId: null }
   if (segments.length === 3 && segments[0] === 'memberships' && segments[1] === 'subscriptions' && method === 'GET') return { operation: 'get', subscriptionId: segments[2] }
   return null
@@ -71,7 +127,8 @@ export default {
       requireTransport(request)
       const principal = requirePrincipal(request)
       requireLayer(request)
-      if (request.method === 'POST') {
+      const operation = toOperation(request.method, parseSegments(new URL(request.url).pathname))
+      if (request.method === 'POST' && operation?.operation !== 'createPlan') {
         return json({
           error: {
             code: 'SERVICE_UNAVAILABLE',
@@ -81,8 +138,33 @@ export default {
           requestId: crypto.randomUUID(),
         }, 503)
       }
-      const operation = toOperation(request.method, parseSegments(new URL(request.url).pathname))
       if (!operation) return new Response(null, { status: 404 })
+      if (operation.operation === 'createPlan') {
+        requireCreatorLayer(request)
+        const creatorId = requireVerifiedCreatorId(request)
+        const result = await createMembershipPlanDraft(
+          env.D1_01,
+          principal,
+          creatorId,
+          await readJsonBody(request),
+          request.headers.get('Idempotency-Key'),
+        )
+        return json({ data: result, requestId: crypto.randomUUID() }, result.replayed ? 200 : 201, result.etag)
+      }
+      if (operation.operation === 'listOwnedPlans') {
+        requireCreatorLayer(request)
+        const creatorId = requireVerifiedCreatorId(request)
+        const url = new URL(request.url)
+        const requestedLimit = parseBoundedPositiveInt(url.searchParams.get('limit'), 20, 50)
+        const result = await listCreatorMembershipPlans(env.D1_01, creatorId, requestedLimit, url.searchParams.get('cursor'))
+        return json({ data: result, requestId: crypto.randomUUID() })
+      }
+      if (operation.operation === 'listPlans') {
+        const url = new URL(request.url)
+        const requestedLimit = parseBoundedPositiveInt(url.searchParams.get('limit'), 20, 50)
+        const result = await listActiveMembershipPlans(env.D1_01, requestedLimit, url.searchParams.get('cursor'))
+        return json({ data: result, requestId: crypto.randomUUID() })
+      }
       if (operation.operation === 'list') {
         const url = new URL(request.url)
         const requestedLimit = parseBoundedPositiveInt(url.searchParams.get('limit'), 20, 50)
@@ -94,7 +176,7 @@ export default {
       return json({ data: result, requestId: crypto.randomUUID() }, 200, result.etag)
     } catch (error) {
       if (error instanceof SubscriptionRuntimeError) {
-        const message = error.code === 'PERMISSION_DENIED' ? 'permission denied' : error.code === 'PRECONDITION_REQUIRED' ? 'precondition required' : error.code === 'PRECONDITION_FAILED' ? 'precondition failed' : error.code === 'RESOURCE_NOT_FOUND' ? 'resource not found' : error.code === 'INVALID_STATE' ? 'invalid subscription state' : error.code === 'CONFLICT' ? 'subscription conflict' : error.code === 'VALIDATION_FAILED' ? 'validation failed' : error.code === 'RATE_LIMITED' ? 'too many requests' : error.code === 'SERVICE_UNAVAILABLE' ? 'service unavailable' : error.code
+        const message = error.code === 'PERMISSION_DENIED' ? 'permission denied' : error.code === 'PRECONDITION_REQUIRED' ? 'precondition required' : error.code === 'PRECONDITION_FAILED' ? 'precondition failed' : error.code === 'RESOURCE_NOT_FOUND' ? 'resource not found' : error.code === 'INVALID_STATE' ? 'invalid subscription state' : error.code === 'PLAN_NOT_ACTIVE' ? 'membership plan is unavailable' : error.code === 'CONFLICT' ? 'subscription conflict' : error.code === 'VALIDATION_FAILED' ? 'validation failed' : error.code === 'RATE_LIMITED' ? 'too many requests' : error.code === 'SERVICE_UNAVAILABLE' ? 'service unavailable' : error.code
         return new Response(JSON.stringify({ error: { code: error.code, message, details: error.code === 'RATE_LIMITED' ? { retryAfter: 60 } : {} }, requestId: crypto.randomUUID() }), { status: error.status, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', ...(error.code === 'RATE_LIMITED' ? { 'retry-after': '60' } : {}) } })
       }
       console.error(error)

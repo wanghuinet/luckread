@@ -7,8 +7,77 @@ const apiInventory = JSON.parse(readFileSync(resolve(process.cwd(), '../../contr
 
 describe('v1 subscription adapter', () => {
   const route = readFileSync(resolve(process.cwd(), 'src/app/api/v1/memberships/subscriptions/[[...segments]]/route.ts'), 'utf8')
+  const plansRoute = readFileSync(resolve(process.cwd(), 'src/app/api/v1/plans/route.ts'), 'utf8')
+  const creatorPlansRoute = readFileSync(resolve(process.cwd(), 'src/app/api/v1/membership/plans/route.ts'), 'utf8')
+  const w08CreatorClient = readFileSync(resolve(process.cwd(), 'src/auth/w08-creator-client.ts'), 'utf8')
+  const w08Worker = readFileSync(resolve(process.cwd(), '../W08-creator/src/worker.ts'), 'utf8')
+  const w06Worker = readFileSync(resolve(process.cwd(), '../W06-governance/src/index.ts'), 'utf8')
+  const w06Client = readFileSync(resolve(process.cwd(), 'src/moderation/w06-moderation-client.ts'), 'utf8')
   const client = readFileSync(resolve(process.cwd(), 'src/subscription/w07-subscription-client.ts'), 'utf8')
   const wrangler = readFileSync(resolve(process.cwd(), 'wrangler.jsonc'), 'utf8')
+
+  it('routes plan discovery through W07 and keeps the existing inventory path', () => {
+    expect(openapi).toContain('operationId: getPlans')
+    expect(apiInventory.domains.subscription_entitlement_payment.endpoint_groups).toContain('GET /v1/plans')
+    expect(plansRoute).toContain('resolveCookieSubscriptionPrincipal')
+    expect(plansRoute).toContain("pathname: '/plans' + url.search")
+    expect(plansRoute).toContain("method: 'GET'")
+    expect(plansRoute).toContain('callW07Subscription')
+    expect(plansRoute).not.toContain('export async function POST')
+  })
+
+  it('requires W08 CASL plus active creator identity before forwarding owner-scoped plan management', () => {
+    expect(creatorPlansRoute).toContain("membership.plan.create.own")
+    expect(creatorPlansRoute).toContain("membership.plan.read.own")
+    expect(creatorPlansRoute).toContain("'/internal/authz/check-permission'")
+    expect(creatorPlansRoute).toContain('(value as { data?: { decision?: unknown } }).data?.decision')
+    expect(creatorPlansRoute).toContain("'/internal/creator/self'")
+    expect(creatorPlansRoute).toContain('(value as { data?: { creatorId?: unknown } }).data?.creatorId')
+    expect(w08Worker).toContain('return json({ creatorId: creator.creator_id, status: \'ACTIVE\' })')
+    expect(creatorPlansRoute).toContain("verifiedCreatorId: creatorId")
+    expect(w08CreatorClient).toContain("'/internal/creator/self'")
+    expect(w08CreatorClient).toContain("'/internal/authz/check-permission'")
+    expect(creatorPlansRoute).not.toContain('body.creatorId')
+    expect(creatorPlansRoute).not.toContain('body.ownerId')
+    expect(creatorPlansRoute).toContain('request.body.getReader()')
+    expect(creatorPlansRoute).toContain('byteLength > 16_384')
+    expect(creatorPlansRoute).toContain("new TextDecoder('utf-8', { fatal: true })")
+    expect(creatorPlansRoute).not.toContain('await request.text()')
+  })
+
+  it('does not return plan creation success until W06 confirms the immutable audit event', () => {
+    expect(creatorPlansRoute).toContain('callW06MembershipPlanAudit')
+    expect(creatorPlansRoute).toContain("eventId: 'evt_mpl_created_' + plan.planId")
+    expect(creatorPlansRoute).toContain('priceMinor: plan.priceMinor')
+    expect(creatorPlansRoute).toContain('currency: plan.currency')
+    expect(creatorPlansRoute).toContain('billingInterval: plan.billingInterval')
+    expect(creatorPlansRoute).toContain("action?: unknown }).action !== 'membership.plan.created'")
+    expect(creatorPlansRoute).toContain('Membership plan audit was not durably confirmed')
+    expect(w06Client).toContain("'/internal/audit-events/membership-plan-created'")
+    expect(w06Worker).toContain("action: 'membership.plan.created'")
+    expect(w06Worker).toContain('AUDIT_EVENT_PERSISTENCE_FAILED')
+    expect(w06Worker).toContain('AUDIT_EVENT_CONFLICT')
+  })
+
+  it('contracts creator plan permissions and server-controlled draft fields', () => {
+    expect(openapi).toContain('operationId: listOwnMembershipPlans')
+    expect(openapi).toContain('operationId: createOwnMembershipPlanDraft')
+    expect(apiInventory.domains.subscription_entitlement_payment.endpoint_groups).toContain('GET /v1/membership/plans')
+    expect(apiInventory.domains.subscription_entitlement_payment.endpoint_groups).toContain('POST /v1/membership/plans')
+    expect(creatorPlansRoute).toContain("pathname: '/membership/plans' + url.search")
+    expect(creatorPlansRoute).toContain("pathname: '/membership/plans'")
+  })
+
+  it('validates the complete W07 draft envelope and immutable v1 result before auditing', () => {
+    expect(creatorPlansRoute).toContain("typeof envelope.requestId !== 'string'")
+    expect(creatorPlansRoute).toContain("typeof plan.updatedAt !== 'string'")
+    expect(creatorPlansRoute).toContain("typeof plan.version !== 'number' || plan.version !== 1")
+    expect(creatorPlansRoute).toContain('plan.etag !==')
+    expect(creatorPlansRoute).toContain('lr-plan-v1')
+    expect(creatorPlansRoute).toContain("typeof plan.replayed !== 'boolean'")
+    expect(creatorPlansRoute).toContain('!Array.isArray(plan.benefits)')
+    expect(creatorPlansRoute).toContain('new Set(plan.benefits).size !== plan.benefits.length')
+  })
 
   it('binds W01 to the canonical W07 subscription authority', () => {
     expect(wrangler).toContain('W07_SUBSCRIPTION')

@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://luckread.com/contracts/v1/transport/W01-W08-creator-http-binding.v1.json",
   "title": "W01 to W08 Creator Qualification API Internal HTTP Binding",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "status": "CONTRACTED_PARTIAL",
   "caller": {
     "logicalWorker": "W01",
@@ -61,6 +61,26 @@
       "precondition": "If-Match",
       "idempotency": "Idempotency-Key",
       "audit": "decision actor, reason, timestamp and application version are persisted by W08"
+    },
+    {
+      "operationId": "resolveActiveCreatorIdentityForMembershipPlans",
+      "method": "GET",
+      "publicPath": "/api/v1/membership/plans",
+      "internalPath": "/internal/creator/self",
+      "principalRequired": true,
+      "minimumGlobalLayer": "L3",
+      "cache": "NO_STORE",
+      "bodyAuthority": "No client body or creator ID is accepted; W08 derives the creator ID from the W02 principal and requires an ACTIVE creator record."
+    },
+    {
+      "operationId": "checkMembershipPlanPermission",
+      "method": "POST",
+      "publicPath": "/api/v1/membership/plans",
+      "internalPath": "/internal/authz/check-permission",
+      "principalRequired": true,
+      "minimumGlobalLayer": "L3",
+      "cache": "NO_STORE",
+      "bodyAuthority": "Only action, resourceType, and resourceAttributes are accepted; W08 resolves actor, layer, account state, and roles through W02/D1-01 and CASL."
     }
   ],
   "trustBoundary": {

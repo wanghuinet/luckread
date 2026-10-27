@@ -488,6 +488,20 @@
       "scope": "own"
     },
     {
+      "name": "membership.plan.create.own",
+      "resource": "membership_plan",
+      "action": "create",
+      "minLayer": "L3",
+      "scope": "own"
+    },
+    {
+      "name": "membership.plan.read.own",
+      "resource": "membership_plan",
+      "action": "read",
+      "minLayer": "L3",
+      "scope": "own"
+    },
+    {
       "name": "moderation.case.read",
       "resource": "moderation",
       "action": "case_read",

@@ -129,7 +129,195 @@ describe('W06 moderation queue pagination scope', () => {
   })
 })
 
+type PlanAuditTestStatement = {
+  bind(...args: unknown[]): PlanAuditTestStatement
+  first<T>(): Promise<T | null>
+  run(): Promise<{ success: boolean; meta?: { changes: number } }>
+}
+
 describe('W06 runtime', () => {
+  const planId = 'plan_' + 'a'.repeat(64)
+  const planAuditInput = {
+    eventId: 'evt_mpl_created_plan_' + 'a'.repeat(64),
+    planId,
+    creatorId: 'creator_001',
+    planVersion: 1,
+    status: 'DRAFT',
+    visibility: 'PRIVATE',
+    occurredAt: '2026-10-27T13:00:00.000Z',
+    name: 'Supporter',
+    tier: 'supporter',
+    billingInterval: 'MONTHLY',
+    priceMinor: 500,
+    currency: 'USD',
+  }
+  const planAuditRequest = (body: unknown, withTransport = true, requestId = 'req_plan_audit_1', layer = 'L3') => new Request(
+    'https://w06.internal/internal/audit-events/membership-plan-created',
+    {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        ...(withTransport ? {
+          'X-LuckRead-Caller': 'W01',
+          'X-LuckRead-Transport-Version': '1.0',
+          'X-LuckRead-Principal-User-Id': 'creator_user_001',
+          'X-LuckRead-Principal-Layer': layer,
+          'X-LuckRead-Correlation-Id': 'plan-audit-correlation',
+          'X-LuckRead-Request-Id': requestId,
+        } : {}),
+      },
+      body: JSON.stringify(body),
+    },
+  )
+  const createPlanAuditDb = (writeSuccess = true) => {
+    const rows = new Map<string, Record<string, unknown>>()
+    const prepare = vi.fn((sql: string) => {
+      let values: unknown[] = []
+      const statement: PlanAuditTestStatement = {
+        bind(...args: unknown[]) { values = args; return statement },
+        async first<T>() {
+          if (sql.includes('FROM audit_events WHERE event_id = ?')) {
+            return (rows.get(String(values[0])) ?? null) as T | null
+          }
+          return null as T | null
+        },
+        async run() {
+          if (sql.includes('INSERT INTO audit_events')) {
+            if (!writeSuccess) return { success: false }
+            if (rows.has(String(values[0]))) return { success: false }
+            rows.set(String(values[0]), {
+              event_id: String(values[0]),
+              request_id: values[1],
+              trace_id: values[2],
+              actor_json: String(values[3]),
+              action: String(values[4]),
+              target_type: String(values[5]),
+              target_id: String(values[6]),
+              before_json: String(values[7]),
+              after_json: String(values[8]),
+              occurred_at: String(values[12]),
+            })
+          }
+          return { success: true, meta: { changes: 1 } }
+        },
+      }
+      return statement
+    })
+    return { db: { prepare } as unknown as D1Database, prepare, rows }
+  }
+
+  it('requires the private W01 transport for membership-plan audit writes', async () => {
+    const { db, prepare } = createPlanAuditDb()
+    const runtime = await import('./index')
+    const response = await runtime.default.fetch(planAuditRequest(planAuditInput, false), { D1_03: db })
+    expect(response.status).toBe(403)
+    expect(prepare).not.toHaveBeenCalled()
+  })
+
+  it('rejects membership-plan audit requests below creator-capable layers', async () => {
+    const { db, prepare } = createPlanAuditDb()
+    const runtime = await import('./index')
+    const response = await runtime.default.fetch(
+      planAuditRequest(planAuditInput, true, 'req_plan_audit_l2', 'L2'),
+      { D1_03: db },
+    )
+    expect(response.status).toBe(403)
+    expect(await response.json()).toEqual({ error: 'PERMISSION_DENIED' })
+    expect(prepare).not.toHaveBeenCalled()
+  })
+
+  it('accepts higher creator-capable layers and records the actual W01 layer', async () => {
+    const { db, rows } = createPlanAuditDb()
+    const runtime = await import('./index')
+    const response = await runtime.default.fetch(
+      planAuditRequest(planAuditInput, true, 'req_plan_audit_l7', 'L7'),
+      { D1_03: db },
+    )
+    expect(response.status).toBe(201)
+    expect(rows.get(planAuditInput.eventId)).toMatchObject({
+      actor_json: JSON.stringify({ actorId: 'creator_user_001', actorType: 'user', layer: 'L7' }),
+      action: 'membership.plan.created',
+      target_id: planId,
+    })
+  })
+
+  it('persists a canonical membership-plan creation event using the W01 principal', async () => {
+    const { db, prepare, rows } = createPlanAuditDb()
+    const runtime = await import('./index')
+    const response = await runtime.default.fetch(planAuditRequest(planAuditInput), { D1_03: db })
+    expect(response.status).toBe(201)
+    expect(await response.json()).toMatchObject({
+      eventId: planAuditInput.eventId,
+      action: 'membership.plan.created',
+      targetType: 'MembershipPlan',
+      targetId: planId,
+      replayed: false,
+    })
+    expect(prepare).toHaveBeenCalledTimes(2)
+    const row = rows.get(planAuditInput.eventId)
+    expect(row).toMatchObject({
+      actor_json: JSON.stringify({ actorId: 'creator_user_001', actorType: 'user', layer: 'L3' }),
+      action: 'membership.plan.created',
+      target_type: 'MembershipPlan',
+      target_id: planId,
+      before_json: '{}',
+      after_json: JSON.stringify({
+        creatorId: 'creator_001',
+        planVersion: 1,
+        status: 'DRAFT',
+        visibility: 'PRIVATE',
+        name: 'Supporter',
+        tier: 'supporter',
+        billingInterval: 'MONTHLY',
+        priceMinor: 500,
+        currency: 'USD',
+      }),
+      occurred_at: planAuditInput.occurredAt,
+    })
+  })
+
+  it('rejects noncanonical plan commercial terms before any audit database access', async () => {
+    const { db, prepare } = createPlanAuditDb()
+    const runtime = await import('./index')
+    const response = await runtime.default.fetch(
+      planAuditRequest({ ...planAuditInput, priceMinor: -1 }),
+      { D1_03: db },
+    )
+    expect(response.status).toBe(400)
+    expect(await response.json()).toEqual({ error: 'INVALID_MEMBERSHIP_PLAN_AUDIT' })
+    expect(prepare).not.toHaveBeenCalled()
+  })
+
+  it('replays the same durable audit event without a duplicate write', async () => {
+    const { db, rows } = createPlanAuditDb()
+    const runtime = await import('./index')
+    const first = await runtime.default.fetch(planAuditRequest(planAuditInput), { D1_03: db })
+    const replay = await runtime.default.fetch(planAuditRequest(planAuditInput, true, 'req_plan_audit_retry'), { D1_03: db })
+    expect(first.status).toBe(201)
+    expect(replay.status).toBe(200)
+    expect(await replay.json()).toMatchObject({ eventId: planAuditInput.eventId, replayed: true })
+    expect(rows.size).toBe(1)
+  })
+
+  it('rejects a conflicting payload for an existing plan audit identity', async () => {
+    const { db, rows } = createPlanAuditDb()
+    const runtime = await import('./index')
+    await runtime.default.fetch(planAuditRequest(planAuditInput), { D1_03: db })
+    const conflicting = { ...planAuditInput, creatorId: 'creator_002' }
+    const response = await runtime.default.fetch(planAuditRequest(conflicting), { D1_03: db })
+    expect(response.status).toBe(409)
+    expect(await response.json()).toEqual({ error: 'AUDIT_EVENT_CONFLICT' })
+    expect(rows.size).toBe(1)
+  })
+
+  it('fails closed when the audit database does not confirm persistence', async () => {
+    const { db } = createPlanAuditDb(false)
+    const runtime = await import('./index')
+    const response = await runtime.default.fetch(planAuditRequest(planAuditInput), { D1_03: db })
+    expect(response.status).toBe(503)
+    expect(await response.json()).toEqual({ error: 'AUDIT_EVENT_PERSISTENCE_FAILED' })
+  })
+
   it('persists a canonical AUTH-013 account-state AuditEvent', async () => {
     const { db, prepare, bind, run } = createDb(true)
     const runtime = await import('./index')

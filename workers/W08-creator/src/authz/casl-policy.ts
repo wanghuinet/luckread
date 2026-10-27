@@ -65,6 +65,7 @@ export const SUPPORTED_AUTHZ_SUBJECTS = [
   'Appeal',
   'RoleAssignment',
   'Subscription',
+  'MembershipPlan',
   'PlatformConfig',
   'FeatureFlag',
   'Secret',
@@ -97,6 +98,7 @@ const RESTRICTED_ACCOUNT_WRITE_DENIES = new Set([
   'media.upload',
   'comment.create',
   'subscription.manage.any',
+  'membership.plan.create.own',
   'org.billing.read.scope',
 ])
 
@@ -228,6 +230,8 @@ function addL3Rules(
   grant('creator.read.self', 'Creator', selfOwnerCondition(subjectId))
   grant('creator.update.self', 'Creator', selfOwnerCondition(subjectId))
   grant('creator.stats.read.self', 'CreatorStats', selfOwnerCondition(subjectId))
+  grant('membership.plan.create.own', 'MembershipPlan', selfOwnerCondition(subjectId))
+  grant('membership.plan.read.own', 'MembershipPlan', selfOwnerCondition(subjectId))
 }
 
 function addL5Rules(grant: (action: string, subject: string, conditions?: Record<string, unknown>) => void): void {

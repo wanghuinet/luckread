@@ -2644,6 +2644,32 @@
       "optimisticLockRequired": false,
       "idempotencyRequired": false,
       "stateMachine": "none"
+    },
+    {
+      "operationId": "listOwnMembershipPlans",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "membership.plan.read.own"
+      ],
+      "auditRequired": false,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none"
+    },
+    {
+      "operationId": "createOwnMembershipPlanDraft",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "membership.plan.create.own"
+      ],
+      "auditRequired": true,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": true,
+      "stateMachine": "none"
     }
   ]
 }

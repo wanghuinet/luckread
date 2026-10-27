@@ -1,0 +1,132 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/transport/W01-W07-membership-commerce-http-binding.v1.json",
+  "title": "W01 to W07 Membership Commerce HTTP Binding",
+  "version": "1.0.0",
+  "status": "CONTRACTED_PARTIAL",
+  "caller": {
+    "logicalWorker": "W01",
+    "role": "Public API / Gateway",
+    "authority": "Public HTTP ingress only"
+  },
+  "callee": {
+    "logicalWorker": "W07",
+    "role": "Subscription and Commerce",
+    "authority": "MembershipPlan and subscription commerce runtime"
+  },
+  "transport": {
+    "kind": "Cloudflare Worker Service Binding HTTP",
+    "binding": "W07_SUBSCRIPTION",
+    "targetWorker": "luckread-w07",
+    "publicExposure": false,
+    "newWorker": false,
+    "newDatabase": false,
+    "newBinding": false
+  },
+  "operations": [
+    {
+      "operationId": "listActiveMembershipPlans",
+      "method": "GET",
+      "publicPath": "/api/v1/plans",
+      "internalPath": "/plans",
+      "principalRequired": true,
+      "minimumGlobalLayer": "L2",
+      "query": {
+        "limit": "optional integer 1..50, default 20",
+        "cursor": "optional opaque keyset cursor"
+      },
+      "cache": "NO_STORE",
+      "responseAuthority": "W07 returns only ACTIVE, PUBLIC creator plans backed by an immutable current plan version."
+    },
+    {
+      "operationId": "listOwnMembershipPlans",
+      "method": "GET",
+      "publicPath": "/api/v1/membership/plans",
+      "internalPath": "/membership/plans",
+      "principalRequired": true,
+      "permission": "membership.plan.read.own",
+      "minimumGlobalLayer": "L3",
+      "query": {
+        "limit": "optional integer 1..50, default 20",
+        "cursor": "optional opaque keyset cursor"
+      },
+      "ownerId": "W08-resolved ACTIVE creator ID only; never taken from public query or body",
+      "cache": "NO_STORE"
+    },
+    {
+      "operationId": "createOwnMembershipPlanDraft",
+      "method": "POST",
+      "publicPath": "/api/v1/membership/plans",
+      "internalPath": "/membership/plans",
+      "principalRequired": true,
+      "permission": "membership.plan.create.own",
+      "minimumGlobalLayer": "L3",
+      "idempotency": "Idempotency-Key",
+      "requestFields": [
+        "name",
+        "tier",
+        "billingInterval",
+        "priceMinor",
+        "currency",
+        "benefits"
+      ],
+      "serverControlledFields": [
+        "planId",
+        "creatorId",
+        "planVersion",
+        "status",
+        "visibility",
+        "version",
+        "createdAt",
+        "updatedAt"
+      ],
+      "initialState": {
+        "status": "DRAFT",
+        "visibility": "PRIVATE",
+        "planVersion": 1,
+        "version": 1
+      },
+      "ownerId": "W08-resolved ACTIVE creator ID only; never taken from public query or body",
+      "failurePolicy": {
+        "missingW08Creator": "FAIL_CLOSED",
+        "CASLDeny": "403",
+        "missingIdempotencyKey": "428",
+        "keyReuseWithDifferentBody": "409"
+      },
+      "cache": "NO_STORE",
+      "auditRequired": true,
+      "successRule": "W01 validates the W07 draft response and durably persists/confirm the stable membership.plan.created audit in W06 D1-03, including planVersion, status, visibility, name, tier, billingInterval, priceMinor, and currency, before returning either a new 201 or idempotent replay 200 to the caller.",
+      "auditTransportBinding": "W01-W06-moderation-http-binding.v1"
+    }
+  ],
+  "trustBoundary": {
+    "authentication": "W01 resolves the session through its established session principal path; W08 independently resolves the same session through W02 before authorizing creator plan operations.",
+    "authorization": "W08 CASL evaluates membership.plan.create.own or membership.plan.read.own from W02-resolved identity, current account state, and persisted L0-L8 role context.",
+    "creatorIdentity": "W08 loads creators.creator_id where user_id matches the W02 principal and status is ACTIVE. W01 sends that resolved identity over the private W07 Service Binding. Public client-supplied creator IDs are ignored/rejected.",
+    "planData": "W07 D1-01 owns plan and immutable plan-version rows. New plans start private and DRAFT; public catalog exposes only ACTIVE + PUBLIC plans with an existing current immutable version.",
+    "billing": "This binding does not enable subscription creation, payment intents, payment capture, webhook trust, or entitlement grants. Existing subscription POST paths remain fail-closed."
+  },
+  "security": {
+    "privateResponsesNoStore": true,
+    "noClientOwnerAuthority": true,
+    "noClientLifecycleAuthority": true,
+    "noClientPriceAssertionForPurchase": true,
+    "noRawPaymentCredentials": true,
+    "creatorPermissionAuthority": "W08 CASL; identity/role authority remains W02 Better Auth",
+    "planAuthority": "W07"
+  },
+  "topologyConstraints": {
+    "workerCountDelta": 0,
+    "databaseCountDelta": 0,
+    "queueCountDelta": 0,
+    "serviceBindingDelta": 0,
+    "d1Authority": "D1-01",
+    "crossD1Transactions": 0
+  },
+  "implementationStatus": {
+    "source": "IMPLEMENTED_ON_FEATURE_BRANCH",
+    "remoteMigration": "NOT_APPLIED",
+    "productionDeployment": "PENDING",
+    "endToEndAcceptance": "PENDING"
+  }
+}
