@@ -7,8 +7,19 @@ const apiInventory = JSON.parse(readFileSync(resolve(process.cwd(), '../../contr
 
 describe('v1 subscription adapter', () => {
   const route = readFileSync(resolve(process.cwd(), 'src/app/api/v1/memberships/subscriptions/[[...segments]]/route.ts'), 'utf8')
+  const plansRoute = readFileSync(resolve(process.cwd(), 'src/app/api/v1/plans/route.ts'), 'utf8')
   const client = readFileSync(resolve(process.cwd(), 'src/subscription/w07-subscription-client.ts'), 'utf8')
   const wrangler = readFileSync(resolve(process.cwd(), 'wrangler.jsonc'), 'utf8')
+
+  it('routes plan discovery through W07 and keeps the existing inventory path', () => {
+    expect(openapi).toContain('operationId: getPlans')
+    expect(apiInventory.domains.subscription_entitlement_payment.endpoint_groups).toContain('GET /v1/plans')
+    expect(plansRoute).toContain('resolveCookieSubscriptionPrincipal')
+    expect(plansRoute).toContain("pathname: '/plans' + url.search")
+    expect(plansRoute).toContain("method: 'GET'")
+    expect(plansRoute).toContain('callW07Subscription')
+    expect(plansRoute).not.toContain('export async function POST')
+  })
 
   it('binds W01 to the canonical W07 subscription authority', () => {
     expect(wrangler).toContain('W07_SUBSCRIPTION')
