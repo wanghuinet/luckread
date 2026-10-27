@@ -66,6 +66,9 @@ jobs:
       - name: Install W01 test dependencies from committed lockfile
         working-directory: workers/W01-payload
         run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Test D1-04 binding preflight
+        working-directory: workers/W01-payload
+        run: node --test ../../workers/W07-subscription-commerce/scripts/verify-d1-04-binding.test.mjs
       - name: Run Subscription runtime and adapter tests
         working-directory: workers/W01-payload
         run: pnpm exec vitest run --config ./vitest.config.mts ../../workers/W07-subscription-commerce/src/subscription-runtime.test.ts ../../workers/W07-subscription-commerce/src/d1-traffic-guard.test.ts tests/int/subscription-v1-adapter.int.spec.ts
