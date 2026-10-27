@@ -31,6 +31,22 @@ type MediaEnvelope = {
   error?: { message?: string };
 };
 
+type MediaApiResult = {
+  response: Response;
+  data: unknown;
+  error: { message: string; code?: string; requestId?: string } | null;
+};
+
+/** Preserve server correlation details so a failed media write can be traced in W01 logs. */
+function apiFailureMessage(result: MediaApiResult, fallback: string): string {
+  const message = result.error?.message ||
+    getApiErrorMessage(result.data, fallback, result.response.status);
+  const diagnostic = ['HTTP ' + result.response.status];
+  if (result.error?.code) diagnostic.push(result.error.code);
+  if (result.error?.requestId) diagnostic.push('Request ID ' + result.error.requestId);
+  return message + ' (' + diagnostic.join('; ') + ')';
+}
+
 function record(value: unknown): Record<string, unknown> | null {
   return value && typeof value === 'object' && !Array.isArray(value)
     ? value as Record<string, unknown>
@@ -127,7 +143,7 @@ export async function uploadMediaFile(
     },
   });
   if (!result.response.ok) {
-    throw new Error(getApiErrorMessage(result.data, 'Media upload failed. Please retry.', result.response.status));
+    throw new Error(apiFailureMessage(result, 'Media upload failed. Please retry.'));
   }
 
   const media = normalizeUploadedMedia(result.data);
@@ -161,7 +177,7 @@ export async function uploadTextBody(
     },
   });
   if (!result.response.ok) {
-    throw new Error(getApiErrorMessage(result.data, 'Post body upload failed. Please retry.', result.response.status));
+    throw new Error(apiFailureMessage(result, 'Post body upload failed. Please retry.'));
   }
 
   const media = normalizeUploadedMedia(result.data);
@@ -178,7 +194,7 @@ export async function getMediaPlayback(mediaId: string): Promise<MediaPlayback> 
     { method: 'GET' },
   );
   if (!result.response.ok) {
-    throw new Error(getApiErrorMessage(result.data, 'The server could not authorize media playback.', result.response.status));
+    throw new Error(apiFailureMessage(result, 'The server could not authorize media playback.'));
   }
 
   const media = normalizeUploadedMedia(result.data);
