@@ -1771,6 +1771,145 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/InvalidState' }
 
+  /membership/plans:
+    get:
+      tags: [Creators]
+      summary: List the authenticated creator's own membership plans
+      operationId: listOwnMembershipPlans
+      description: Requires membership.plan.read.own. W08 resolves the active creator identity; only that creator's plans, including private drafts, are returned.
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+        - name: cursor
+          in: query
+          required: false
+          schema: { type: string, maxLength: 2048 }
+      responses:
+        '200':
+          description: Creator-owned plan list.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, requestId]
+                properties:
+                  data:
+                    type: object
+                    required: [docs, limit, hasMore, nextCursor]
+                    properties:
+                      docs:
+                        type: array
+                        items:
+                          type: object
+                          required: [planId, creatorId, planVersion, name, tier, billingInterval, priceMinor, currency, benefits, status, visibility, version, createdAt, updatedAt, etag]
+                          properties:
+                            planId: { type: string }
+                            creatorId: { type: string }
+                            planVersion: { type: integer, minimum: 1 }
+                            name: { type: string, minLength: 1, maxLength: 120 }
+                            tier: { type: string, minLength: 1, maxLength: 64 }
+                            billingInterval: { type: string, enum: [MONTHLY, YEARLY] }
+                            priceMinor: { type: integer, minimum: 0, maximum: 2147483647 }
+                            currency: { type: string, pattern: '^[A-Z]{3}$' }
+                            benefits: { type: array, items: { type: string, minLength: 1, maxLength: 180 } }
+                            status: { type: string, enum: [DRAFT, ACTIVE, PAUSED, RETIRED] }
+                            visibility: { type: string, enum: [PRIVATE, PUBLIC] }
+                            version: { type: integer, minimum: 1 }
+                            createdAt: { type: string, format: date-time }
+                            updatedAt: { type: string, format: date-time }
+                            etag: { type: string }
+                      limit: { type: integer, minimum: 1, maximum: 50 }
+                      hasMore: { type: boolean }
+                      nextCursor: { type: [string, 'null'], maxLength: 2048 }
+                  requestId: { $ref: '#/components/schemas/RequestId' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/PermissionDenied' }
+        default: { $ref: '#/components/responses/ServiceUnavailable' }
+    post:
+      tags: [Creators]
+      summary: Create a private membership plan draft
+      operationId: createOwnMembershipPlanDraft
+      description: Requires membership.plan.create.own. Creator ID, plan ID, version, status and visibility are server-controlled. No subscription, payment or entitlement is created.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [name, tier, billingInterval, priceMinor, currency, benefits]
+              properties:
+                name: { type: string, minLength: 1, maxLength: 120 }
+                tier: { type: string, pattern: '^[a-z][a-z0-9_-]{0,63}$' }
+                billingInterval: { type: string, enum: [MONTHLY, YEARLY] }
+                priceMinor: { type: integer, minimum: 0, maximum: 2147483647 }
+                currency: { type: string, pattern: '^[A-Z]{3}$' }
+                benefits:
+                  type: array
+                  maxItems: 20
+                  items: { type: string, minLength: 1, maxLength: 180 }
+      responses:
+        '201':
+          description: Private draft created.
+          headers:
+            ETag:
+              schema: { $ref: '#/components/schemas/ETag' }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, requestId]
+                properties:
+                  data:
+                    type: object
+                    required: [planId, creatorId, planVersion, name, tier, billingInterval, priceMinor, currency, benefits, status, visibility, version, createdAt, updatedAt, etag, replayed]
+                    properties:
+                      planId: { type: string }
+                      creatorId: { type: string }
+                      planVersion: { type: integer, const: 1 }
+                      name: { type: string }
+                      tier: { type: string }
+                      billingInterval: { type: string, enum: [MONTHLY, YEARLY] }
+                      priceMinor: { type: integer, minimum: 0, maximum: 2147483647 }
+                      currency: { type: string, pattern: '^[A-Z]{3}$' }
+                      benefits: { type: array, items: { type: string } }
+                      status: { type: string, const: DRAFT }
+                      visibility: { type: string, const: PRIVATE }
+                      version: { type: integer, const: 1 }
+                      createdAt: { type: string, format: date-time }
+                      updatedAt: { type: string, format: date-time }
+                      etag: { type: string }
+                      replayed: { type: boolean, const: false }
+                  requestId: { $ref: '#/components/schemas/RequestId' }
+        '200':
+          description: Idempotent replay of the original create result.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, requestId]
+                properties:
+                  data:
+                    type: object
+                    required: [planId, creatorId, planVersion, status, visibility, replayed]
+                    properties:
+                      planId: { type: string }
+                      creatorId: { type: string }
+                      planVersion: { type: integer, const: 1 }
+                      status: { type: string, const: DRAFT }
+                      visibility: { type: string, const: PRIVATE }
+                      replayed: { type: boolean, const: true }
+                  requestId: { $ref: '#/components/schemas/RequestId' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '403': { $ref: '#/components/responses/PermissionDenied' }
+        '409': { $ref: '#/components/responses/ClientError' }
+        '428': { $ref: '#/components/responses/IdempotencyKeyRequired' }
+        default: { $ref: '#/components/responses/ServiceUnavailable' }
+
   /memberships/subscriptions:
     get:
       tags: [Users]
@@ -3116,14 +3255,59 @@ paths:
 
   /plans:
     get:
-      tags: [Users]
-      summary: Discovery draft for GET undefined
+      tags: [Creators]
+      summary: List active public creator membership plans
       operationId: getPlans
-      x-luckread-contract-status: DISCOVERY_DRAFT
-      x-luckread-source: contracts/api/api-inventory.v1.json
+      description: Returns only ACTIVE and PUBLIC creator plans backed by an immutable current version. This catalog does not create subscriptions or grant entitlements.
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+        - name: cursor
+          in: query
+          required: false
+          schema: { type: string, maxLength: 2048 }
       responses:
-        default:
-          description: Discovery-only operation; detailed response contract remains to be closed.
+        '200':
+          description: Active public plan catalog.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, requestId]
+                properties:
+                  data:
+                    type: object
+                    required: [docs, limit, hasMore, nextCursor]
+                    properties:
+                      docs:
+                        type: array
+                        items:
+                          type: object
+                          required: [planId, creatorId, planVersion, name, tier, billingInterval, priceMinor, currency, benefits, createdAt, updatedAt]
+                          properties:
+                            planId: { type: string, minLength: 1, maxLength: 256 }
+                            creatorId: { type: string, minLength: 1, maxLength: 256 }
+                            planVersion: { type: integer, minimum: 1 }
+                            name: { type: string, minLength: 1, maxLength: 120 }
+                            tier: { type: string, minLength: 1, maxLength: 64 }
+                            billingInterval: { type: string, enum: [MONTHLY, YEARLY] }
+                            priceMinor: { type: integer, minimum: 0, maximum: 2147483647 }
+                            currency: { type: string, pattern: '^[A-Z]{3}$' }
+                            benefits:
+                              type: array
+                              items: { type: string, minLength: 1, maxLength: 180 }
+                            createdAt: { type: string, format: date-time }
+                            updatedAt: { type: string, format: date-time }
+                      limit: { type: integer, minimum: 1, maximum: 50 }
+                      hasMore: { type: boolean }
+                      nextCursor: { type: [string, 'null'], maxLength: 2048 }
+                  requestId: { $ref: '#/components/schemas/RequestId' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/PermissionDenied' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        default: { $ref: '#/components/responses/ServiceUnavailable' }
 
   /posts:
     post:
