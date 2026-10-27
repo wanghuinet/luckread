@@ -101,9 +101,10 @@ async function readStoredPostBody(
     const body = await readBoundedUtf8(new Response(object.body, {
       headers: { 'content-length': String(object.size) },
     }), POST_BODY_MAX_BYTES)
-    return body === null
-      ? { ok: false, status: 422 }
-      : { ok: true, body }
+    if (!body.ok) {
+      return { ok: false, status: body.reason === 'unavailable' ? 503 : 422 }
+    }
+    return { ok: true, body: body.body }
   }
 
   // Retain authenticated same-origin reads for local development only; never
@@ -145,13 +146,21 @@ async function readStoredPostBody(
     return { ok: false, status: 422 }
   }
   const body = await readBoundedUtf8(response, POST_BODY_MAX_BYTES)
-  return body === null
-    ? { ok: false, status: 422 }
-    : { ok: true, body }
+  if (!body.ok) {
+    return { ok: false, status: body.reason === 'unavailable' ? 503 : 422 }
+  }
+  return { ok: true, body: body.body }
 }
-const readBoundedUtf8 = async (response: Response, maxBytes = 16_384): Promise<string | null> => {
+type BoundedUtf8ReadResult =
+  | { ok: true; body: string }
+  | { ok: false; reason: 'invalid' | 'unavailable' }
+
+const readBoundedUtf8 = async (
+  response: Response,
+  maxBytes = 16_384,
+): Promise<BoundedUtf8ReadResult> => {
   const reader = response.body?.getReader()
-  if (!reader) return null
+  if (!reader) return { ok: false, reason: 'invalid' }
   const chunks: Uint8Array[] = []
   let totalBytes = 0
   try {
@@ -160,8 +169,8 @@ const readBoundedUtf8 = async (response: Response, maxBytes = 16_384): Promise<s
       if (done) break
       totalBytes += value.byteLength
       if (totalBytes > maxBytes) {
-        await reader.cancel()
-        return null
+        await reader.cancel().catch((): undefined => undefined)
+        return { ok: false, reason: 'invalid' }
       }
       chunks.push(value)
     }
@@ -171,10 +180,16 @@ const readBoundedUtf8 = async (response: Response, maxBytes = 16_384): Promise<s
       bytes.set(chunk, offset)
       offset += chunk.byteLength
     }
-    return new TextDecoder('utf-8', { fatal: true }).decode(bytes)
+    try {
+      return { ok: true, body: new TextDecoder('utf-8', { fatal: true }).decode(bytes) }
+    } catch {
+      return { ok: false, reason: 'invalid' }
+    }
   } catch {
     await reader.cancel().catch((): undefined => undefined)
-    return null
+    return { ok: false, reason: 'unavailable' }
+  } finally {
+    reader.releaseLock()
   }
 }
 
