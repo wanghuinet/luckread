@@ -149,14 +149,37 @@ async function readJsonResponse(response: Response): Promise<unknown> {
     throw new HyperswitchClientError('UPSTREAM_INVALID_RESPONSE', 'Hyperswitch response exceeded the allowed size.');
   }
 
-  let bytes: ArrayBuffer;
-  try {
-    bytes = await response.arrayBuffer();
-  } catch {
-    throw new HyperswitchClientError('UPSTREAM_INVALID_RESPONSE', 'Hyperswitch response body could not be read.');
+  const reader = response.body?.getReader();
+  if (!reader) {
+    throw new HyperswitchClientError('UPSTREAM_INVALID_RESPONSE', 'Hyperswitch response body was missing.');
   }
-  if (bytes.byteLength > MAX_RESPONSE_BYTES) {
-    throw new HyperswitchClientError('UPSTREAM_INVALID_RESPONSE', 'Hyperswitch response exceeded the allowed size.');
+
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      totalBytes += value.byteLength;
+      if (totalBytes > MAX_RESPONSE_BYTES) {
+        await reader.cancel().catch(() => undefined);
+        throw new HyperswitchClientError('UPSTREAM_INVALID_RESPONSE', 'Hyperswitch response exceeded the allowed size.');
+      }
+      chunks.push(value);
+    }
+  } catch (error) {
+    await reader.cancel().catch(() => undefined);
+    if (error instanceof HyperswitchClientError) throw error;
+    throw new HyperswitchClientError('UPSTREAM_INVALID_RESPONSE', 'Hyperswitch response body could not be read.');
+  } finally {
+    reader.releaseLock();
+  }
+
+  const bytes = new Uint8Array(totalBytes);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
   }
 
   try {
