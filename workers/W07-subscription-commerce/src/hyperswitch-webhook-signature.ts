@@ -9,6 +9,9 @@
  */
 const SHA512_HEX_LENGTH = 128;
 const SHA512_HEX_PATTERN = /^[0-9a-fA-F]{128}$/;
+// Defense in depth for the verifier/parser. The HTTP route must also enforce
+// this limit while reading the request stream, before buffering it in memory.
+const MAX_WEBHOOK_BODY_BYTES = 1024 * 1024;
 
 function constantTimeHexEqual(expected: string, supplied: string): boolean {
   if (expected.length !== SHA512_HEX_LENGTH || supplied.length !== SHA512_HEX_LENGTH) return false;
@@ -36,6 +39,7 @@ export async function verifyHyperswitchWebhookSignature(
   signatureHeader: string | null | undefined,
   secret: string | null | undefined,
 ): Promise<boolean> {
+  if (!(rawBody instanceof ArrayBuffer) || rawBody.byteLength > MAX_WEBHOOK_BODY_BYTES) return false;
   if (typeof secret !== 'string' || secret.trim().length === 0) return false;
   if (typeof signatureHeader !== 'string') return false;
 
@@ -140,6 +144,7 @@ export function parseHyperswitchWebhookEnvelope(
   rawBody: ArrayBuffer,
   expectedMerchantId: string | null | undefined,
 ): HyperswitchWebhookEnvelope | null {
+  if (!(rawBody instanceof ArrayBuffer) || rawBody.byteLength > MAX_WEBHOOK_BODY_BYTES) return null;
   if (!isNonBlankString(expectedMerchantId)) return null;
   let decoded: unknown;
   try {
