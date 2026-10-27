@@ -1,4 +1,4 @@
-import { apiRequest, createIdempotencyKey } from './api-client';
+import { apiRequest } from './api-client';
 
 export type SubscriptionStatus =
   | 'PENDING'
@@ -30,8 +30,6 @@ export type MySubscriptionPage = {
   hasNextPage: boolean;
 };
 
-export type SubscriptionTransition = 'cancel' | 'pause' | 'resume';
-
 type PageOptions = {
   page?: number;
   limit?: number;
@@ -54,36 +52,4 @@ export function fetchMySubscriptionsPage(options: PageOptions = {}) {
     method: 'GET',
     signal: options.signal,
   });
-}
-
-/**
- * Change the current subscriber-owned record through W01 -> W07.
- * W07 validates ownership, lifecycle state, If-Match, and idempotency.
- */
-export function transitionMySubscription(
-  subscription: Pick<MySubscription, 'subscriptionId' | 'etag'>,
-  operation: SubscriptionTransition,
-) {
-  const subscriptionId = subscription.subscriptionId.trim();
-  const etag = subscription.etag.trim();
-  if (!subscriptionId || subscriptionId.length > 256) {
-    throw new TypeError('A valid subscription ID is required.');
-  }
-  if (!etag || etag.length > 256 || etag === '*') {
-    throw new TypeError('A current subscription version is required.');
-  }
-  if (!(['cancel', 'pause', 'resume'] as const).includes(operation)) {
-    throw new TypeError('Unsupported subscription transition.');
-  }
-
-  return apiRequest<unknown>(
-    '/memberships/subscriptions/' + encodeURIComponent(subscriptionId) + '/' + operation,
-    {
-      method: 'POST',
-      // W01's current command adapter requires a JSON object for POST transitions.
-      body: JSON.stringify({}),
-      headers: { 'If-Match': etag },
-      idempotencyKey: createIdempotencyKey(),
-    },
-  );
 }
