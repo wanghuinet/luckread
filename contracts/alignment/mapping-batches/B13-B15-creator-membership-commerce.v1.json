@@ -217,9 +217,11 @@
         "contracts/candidates/PAY-002/order-api-admission.v1.json"
       ],
       "blockers": [
-        "Commerce Order create/read DTO and pure W07 request validation are now proposed; canonical OpenAPI and operation-policy alignment are not admitted.",
-        "Proposed order.create.own / order.read.own permission identifiers are not in the canonical permission registry and cannot be enforced until reviewed and mapped to roles.",
-        "Authoritative purchasable-item/offer resolution, physical D1-04 migration/schema evidence, runtime persistence, idempotency replay/conflict, security E2E and Evidence Registry proof remain missing."
+        "The membership-plan resolver currently supports only active/public immutable-version MembershipPlan offers; CONTENT, DIGITAL_GOOD and BUNDLE remain fail-closed until their authoritative owner/price adapters are separately admitted.",
+        "D1-04 identity and read-only schema snapshot were collected on main commit 115c7165f3a618fb9527be8030db378476d3740d; the snapshot contains only the Cloudflare-managed _cf_KV table and no d1_migrations table. A reviewed D1-04 source migration and post-migration schema evidence are still pending.",
+        "D1-04 Order/OrderLine persistence and atomic order-create idempotency replay/key-conflict behavior are not implemented; public order runtime handlers remain disabled.",
+        "Exact-commit runtime evidence is still missing for positive/negative create/read, owner isolation, price spoofing, idempotency replay/conflict, concurrent duplicate requests, stale in-progress recovery, and failure handling.",
+        "PAY-002 remains UNRESOLVED until persistence, security, reconciliation and Evidence Registry evidence pass; no payment confirmation or entitlement grant may be inferred from order state."
       ]
     },
     {
