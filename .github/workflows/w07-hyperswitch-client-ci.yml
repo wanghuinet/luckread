@@ -13,6 +13,7 @@ on:
   push:
     branches: [main]
     paths:
+      - 'workers/W01-payload/vitest.w07.config.mts'
       - 'workers/W07-subscription-commerce/src/hyperswitch-client.ts'
       - 'workers/W07-subscription-commerce/src/hyperswitch-client.test.ts'
       - '.github/workflows/w07-hyperswitch-client-ci.yml'
