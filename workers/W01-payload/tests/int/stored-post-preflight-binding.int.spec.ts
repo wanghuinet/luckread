@@ -106,6 +106,41 @@ describe('bind direct social post publishing to the stored body asset', () => {
     expect(result.preflight.body).not.toBe(submitted.preflight.body)
   })
 
+  it('returns SERVICE_UNAVAILABLE when the existing R2 binding or read operation is unavailable', async () => {
+    callW03ContentMock.mockResolvedValue(new Response(JSON.stringify(storedPost()), { status: 200 }))
+    getCloudflareContextMock.mockResolvedValue({ env: {} })
+
+    const missingBinding = await bindPreflightToStoredPost(
+      makeRequest(),
+      'post-1',
+      principal,
+      submitted,
+      makeErrorResponse,
+    )
+    expect(missingBinding).toBeInstanceOf(Response)
+    expect((missingBinding as Response).status).toBe(503)
+    expect(await (missingBinding as Response).json()).toMatchObject({
+      error: { code: 'SERVICE_UNAVAILABLE' },
+    })
+
+    callW03ContentMock.mockResolvedValue(new Response(JSON.stringify(storedPost()), { status: 200 }))
+    const failingGet = vi.fn(async () => { throw new Error('R2 read failed') })
+    getCloudflareContextMock.mockResolvedValue({ env: { R2: { get: failingGet } } })
+
+    const unavailableRead = await bindPreflightToStoredPost(
+      makeRequest(),
+      'post-1',
+      principal,
+      submitted,
+      makeErrorResponse,
+    )
+    expect(unavailableRead).toBeInstanceOf(Response)
+    expect((unavailableRead as Response).status).toBe(503)
+    expect(await (unavailableRead as Response).json()).toMatchObject({
+      error: { code: 'SERVICE_UNAVAILABLE' },
+    })
+  })
+
   it('rejects non-text and oversized R2 body objects before running publish preflight', async () => {
     callW03ContentMock.mockResolvedValue(new Response(JSON.stringify(storedPost()), { status: 200 }))
     const nonTextGet = vi.fn(async () => makeR2Object('<html>not the canonical post body</html>', 'text/html'))
