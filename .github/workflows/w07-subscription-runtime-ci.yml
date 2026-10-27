@@ -76,20 +76,25 @@ jobs:
           import sqlite3
           from pathlib import Path
           db = sqlite3.connect(':memory:')
-          sql = Path('workers/W07-subscription-commerce/migrations/0001_membership_subscriptions.sql').read_text()
-          db.executescript(sql)
+          migration_1 = Path('workers/W07-subscription-commerce/migrations/0001_membership_subscriptions.sql').read_text()
+          migration_2 = Path('workers/W07-subscription-commerce/migrations/0002_subscription_version_cas.sql').read_text()
+          db.executescript(migration_1)
+          db.execute("""INSERT INTO membership_subscriptions (subscription_id, subscriber_id, plan_id, plan_version, creator_id, status, started_at, current_period_start, current_period_end, cancel_at, entitlement_snapshot_ref, created_at, updated_at) VALUES ('sub_migration_probe', 'user_migration_probe', 'plan_test', 1, NULL, 'PENDING', '2026-10-27T00:00:00.000Z', '2026-10-27T00:00:00.000Z', '2026-10-27T00:00:00.000Z', NULL, NULL, '2026-10-27T00:00:00.000Z', '2026-10-27T00:00:00.000Z')""")
+          db.executescript(migration_2)
           cols = db.execute('PRAGMA table_info("membership_subscriptions")').fetchall()
           expected = [
             ('subscription_id','TEXT',1,1),('subscriber_id','TEXT',1,0),('plan_id','TEXT',1,0),('plan_version','INTEGER',1,0),
             ('creator_id','TEXT',0,0),('status','TEXT',1,0),('started_at','TEXT',1,0),('current_period_start','TEXT',1,0),
             ('current_period_end','TEXT',1,0),('cancel_at','TEXT',0,0),('entitlement_snapshot_ref','TEXT',0,0),
-            ('created_at','TEXT',1,0),('updated_at','TEXT',1,0),
+            ('created_at','TEXT',1,0),('updated_at','TEXT',1,0),('version','INTEGER',1,0),
           ]
           got = [(r[1],r[2],r[3],r[5]) for r in cols]
           if got != expected: raise SystemExit(f'unexpected schema: {got!r}')
+          if cols[-1][4] != '1': raise SystemExit(f'version default must backfill existing records to 1, got {cols[-1][4]!r}')
+          if db.execute('SELECT version FROM membership_subscriptions WHERE subscription_id = ?', ('sub_migration_probe',)).fetchone() != (1,): raise SystemExit('pre-existing subscriptions were not backfilled to version 1')
           names = {r[1]: r[2] for r in db.execute('PRAGMA index_list("membership_subscriptions")').fetchall()}
           for name in ('ix_membership_subscriptions_subscriber_status_period','ix_membership_subscriptions_plan_version','ix_membership_subscriptions_creator_status','ix_membership_subscriptions_updated_at'):
             if name not in names: raise SystemExit(f'missing index: {name}')
           if db.execute('PRAGMA foreign_key_list("membership_subscriptions")').fetchall(): raise SystemExit('physical foreign key is forbidden')
-          print('SUBSCRIPTION_D1_01_MIGRATION_STATIC=PASS')
+          print('SUBSCRIPTION_D1_01_MIGRATION_AND_VERSION_CAS_STATIC=PASS')
           PY
