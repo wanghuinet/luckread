@@ -270,7 +270,7 @@ const encodePlanListCursor = (cursor: PlanListCursor): string => {
   const bytes = new TextEncoder().encode(JSON.stringify(cursor))
   let binary = ''
   for (const byte of bytes) binary += String.fromCharCode(byte)
-  return btoa(binary).replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/g, '')
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '')
 }
 
 const decodePlanListCursor = (value: string | null): PlanListCursor | null => {
