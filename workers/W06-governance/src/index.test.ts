@@ -151,7 +151,7 @@ describe('W06 runtime', () => {
     priceMinor: 500,
     currency: 'USD',
   }
-  const planAuditRequest = (body: unknown, withTransport = true, requestId = 'req_plan_audit_1') => new Request(
+  const planAuditRequest = (body: unknown, withTransport = true, requestId = 'req_plan_audit_1', layer = 'L3') => new Request(
     'https://w06.internal/internal/audit-events/membership-plan-created',
     {
       method: 'POST',
@@ -161,7 +161,7 @@ describe('W06 runtime', () => {
           'X-LuckRead-Caller': 'W01',
           'X-LuckRead-Transport-Version': '1.0',
           'X-LuckRead-Principal-User-Id': 'creator_user_001',
-          'X-LuckRead-Principal-Layer': 'L3',
+          'X-LuckRead-Principal-Layer': layer,
           'X-LuckRead-Correlation-Id': 'plan-audit-correlation',
           'X-LuckRead-Request-Id': requestId,
         } : {}),
@@ -211,6 +211,18 @@ describe('W06 runtime', () => {
     const runtime = await import('./index')
     const response = await runtime.default.fetch(planAuditRequest(planAuditInput, false), { D1_03: db })
     expect(response.status).toBe(403)
+    expect(prepare).not.toHaveBeenCalled()
+  })
+
+  it('rejects membership-plan audit requests below creator-capable layers', async () => {
+    const { db, prepare } = createPlanAuditDb()
+    const runtime = await import('./index')
+    const response = await runtime.default.fetch(
+      planAuditRequest(planAuditInput, true, 'req_plan_audit_l2', 'L2'),
+      { D1_03: db },
+    )
+    expect(response.status).toBe(403)
+    expect(await response.json()).toEqual({ error: 'PERMISSION_DENIED' })
     expect(prepare).not.toHaveBeenCalled()
   })
 
