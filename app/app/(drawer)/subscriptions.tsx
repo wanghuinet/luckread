@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   Pressable,
   RefreshControl,
@@ -16,11 +15,9 @@ import { getApiErrorMessage } from '~/lib/api-client';
 import { unwrapApiData } from '~/lib/content-adapter';
 import {
   fetchMySubscriptionsPage,
-  transitionMySubscription,
   type MySubscription,
   type MySubscriptionPage,
   type SubscriptionStatus,
-  type SubscriptionTransition,
 } from '~/lib/subscriptions-api';
 import { useAuthStore } from '~/store/auth-store';
 
@@ -66,26 +63,7 @@ function isSubscriptionRecord(value: unknown): value is MySubscription {
     typeof item.etag === 'string' && item.etag.length > 0;
 }
 
-function SubscriptionCard({
-  item,
-  busy,
-  onTransition,
-}: {
-  item: MySubscription;
-  busy: boolean;
-  onTransition: (item: MySubscription, operation: SubscriptionTransition) => void;
-}) {
-  const actions: Array<{ operation: SubscriptionTransition; label: string; icon: 'pause-circle' | 'play-circle' | 'x-circle'; danger?: boolean }> = [];
-  if (item.status === 'ACTIVE') {
-    actions.push({ operation: 'pause', label: '暂停订阅', icon: 'pause-circle' });
-    actions.push({ operation: 'cancel', label: '取消订阅', icon: 'x-circle', danger: true });
-  } else if (item.status === 'PAUSED') {
-    actions.push({ operation: 'resume', label: '恢复订阅', icon: 'play-circle' });
-    actions.push({ operation: 'cancel', label: '取消订阅', icon: 'x-circle', danger: true });
-  } else if (item.status === 'PAST_DUE') {
-    actions.push({ operation: 'cancel', label: '取消订阅', icon: 'x-circle', danger: true });
-  }
-
+function SubscriptionCard({ item }: { item: MySubscription }) {
   return (
     <View className="mx-4 mb-3 rounded-2xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-950">
       <View className="flex-row items-start justify-between gap-3">
@@ -135,35 +113,6 @@ function SubscriptionCard({
         ) : null}
       </View>
 
-      {actions.length > 0 ? (
-        <View className="mt-4 flex-row flex-wrap gap-2">
-          {actions.map((action) => (
-            <Pressable
-              key={action.operation}
-              accessibilityRole="button"
-              accessibilityLabel={action.label}
-              accessibilityState={{ disabled: busy }}
-              disabled={busy}
-              onPress={() => onTransition(item, action.operation)}
-              className={
-                'min-h-10 flex-row items-center justify-center gap-2 rounded-full border px-3 py-2 ' +
-                (action.danger
-                  ? 'border-rose-200 dark:border-rose-900'
-                  : 'border-neutral-300 dark:border-neutral-700') +
-                (busy ? ' opacity-50' : '')
-              }
-            >
-              {busy ? <ActivityIndicator size="small" color={PRIMARY} /> : (
-                <Feather name={action.icon} size={15} color={action.danger ? '#dc2626' : PRIMARY} />
-              )}
-              <Text className={'text-xs font-bold ' + (action.danger ? 'text-rose-600 dark:text-rose-300' : 'text-sky-600 dark:text-sky-300')}>
-                {action.label}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-      ) : null}
-
       <Text selectable className="mt-3 text-[11px] leading-4 text-neutral-400">
         订阅 ID：{item.subscriptionId}
       </Text>
@@ -180,10 +129,8 @@ export default function MySubscriptionsScreen() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [busyId, setBusyId] = useState<string | null>(null);
   const [authRequired, setAuthRequired] = useState(false);
   const [error, setError] = useState('');
-  const [message, setMessage] = useState('');
   const requestRef = useRef<AbortController | null>(null);
 
   const openLogin = useCallback(() => {
@@ -208,7 +155,6 @@ export default function MySubscriptionsScreen() {
     else setLoading(true);
     if (pullRefresh) setRefreshing(true);
     setError('');
-    setMessage('');
 
     try {
       const result = await fetchMySubscriptionsPage({ page, limit: 20, signal: controller.signal });
@@ -261,61 +207,6 @@ export default function MySubscriptionsScreen() {
     return () => requestRef.current?.abort();
   }, [authStatus, loadPage]);
 
-  const updateSubscription = useCallback(async (item: MySubscription, operation: SubscriptionTransition) => {
-    if (busyId) return;
-    setBusyId(item.subscriptionId);
-    setError('');
-    setMessage('');
-    try {
-      const result = await transitionMySubscription(item, operation);
-      if (result.response.status === 401) {
-        setAuthRequired(true);
-        setItems([]);
-        return;
-      }
-      if (!result.response.ok) {
-        if (result.response.status === 412) {
-          throw new Error('订阅状态已发生变化，请先刷新列表再重试。');
-        }
-        throw new Error(result.error?.message || getApiErrorMessage(
-          result.data,
-          '订阅更新失败，请重试。',
-          result.response.status,
-        ));
-      }
-
-      const updated = unwrapApiData<MySubscription>(result.data);
-      if (!isSubscriptionRecord(updated)) {
-        throw new Error('订阅服务未返回更新后的有效记录，请刷新列表确认状态。');
-      }
-      setItems((current) => current.map((currentItem) =>
-        currentItem.subscriptionId === updated.subscriptionId ? updated : currentItem,
-      ));
-      setMessage(operation === 'cancel' ? '订阅已取消。' : operation === 'pause' ? '订阅已暂停。' : '订阅已恢复。');
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : '订阅更新失败，请重试。');
-    } finally {
-      setBusyId(null);
-    }
-  }, [busyId]);
-
-  const handleTransition = useCallback((item: MySubscription, operation: SubscriptionTransition) => {
-    if (busyId) return;
-    if (operation !== 'cancel') {
-      void updateSubscription(item, operation);
-      return;
-    }
-
-    Alert.alert(
-      '取消订阅',
-      '确认取消这条订阅记录吗？取消操作会向订阅服务提交状态变更。',
-      [
-        { text: '暂不取消', style: 'cancel' },
-        { text: '确认取消', style: 'destructive', onPress: () => { void updateSubscription(item, operation); } },
-      ],
-    );
-  }, [busyId, updateSubscription]);
-
   if (authStatus === 'loading') {
     return (
       <View className="flex-1 items-center justify-center bg-white dark:bg-black">
@@ -365,16 +256,9 @@ export default function MySubscriptionsScreen() {
 
       <View className="border-b border-neutral-100 bg-white px-4 py-3 dark:border-neutral-800 dark:bg-black">
         <Text className="text-xs leading-5 text-neutral-500 dark:text-neutral-400">
-          订阅状态由 W07 订阅服务提供。订阅记录本身不证明付款已经完成或内容权益已经生效；APP 目前尚未接入正式方案目录和购买支付流程。
+          订阅状态由 W07 提供。订阅记录本身不证明付款已完成或内容权益已生效；在支付渠道、续费与退款同步通过验收前，APP 仅提供真实记录查询，不开放暂停、恢复或取消操作。
         </Text>
       </View>
-
-      {message ? (
-        <View className="mx-4 mt-3 flex-row items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-3 dark:border-emerald-900 dark:bg-emerald-950/30">
-          <Feather name="check-circle" size={16} color="#059669" />
-          <Text accessibilityLiveRegion="polite" className="flex-1 text-sm text-emerald-800 dark:text-emerald-300">{message}</Text>
-        </View>
-      ) : null}
 
       {error ? (
         <View className="mx-4 mt-3 flex-row items-center gap-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-3 dark:border-rose-900 dark:bg-rose-950/30">
@@ -390,13 +274,7 @@ export default function MySubscriptionsScreen() {
         keyExtractor={(item) => item.subscriptionId}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void loadPage(1, false, true)} />}
         contentContainerStyle={{ paddingTop: 14, paddingBottom: 36, flexGrow: 1 }}
-        renderItem={({ item }) => (
-          <SubscriptionCard
-            item={item}
-            busy={busyId === item.subscriptionId}
-            onTransition={handleTransition}
-          />
-        )}
+        renderItem={({ item }) => <SubscriptionCard item={item} />}
         ListEmptyComponent={(
           <View className="flex-1 items-center justify-center px-8 py-12">
             {loading ? <ActivityIndicator size="large" color={PRIMARY} /> : (
