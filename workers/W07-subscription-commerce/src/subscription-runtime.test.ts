@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { changeSubscriptionPlan, createSubscription, etagForUpdatedAt, getSubscription, listSubscriptions, parseBoundedPositiveInt, transitionSubscription, type SubscriptionRow, type SubscriptionStatus } from './subscription-runtime.js'
+import { changeSubscriptionPlan, createSubscription, etagForVersion, getSubscription, listSubscriptions, parseBoundedPositiveInt, transitionSubscription, type SubscriptionRow, type SubscriptionStatus } from './subscription-runtime.js'
 
 type Statement = { bind: (...values: unknown[]) => Statement; first: <T>() => Promise<T | null>; all: <T>() => Promise<{ results: T[] }>; run: () => Promise<{ meta: { changes: number } }> }
 
@@ -39,7 +39,7 @@ function fakeDb(rows: SubscriptionRow[]): D1Database {
               plan_version: Number(values[3]), creator_id: values[4] as string | null, status: values[5] as SubscriptionStatus,
               started_at: String(values[6]), current_period_start: String(values[7]), current_period_end: String(values[8]),
               cancel_at: values[9] as string | null, entitlement_snapshot_ref: values[10] as string | null,
-              created_at: String(values[11]), updated_at: String(values[12]),
+              created_at: String(values[11]), updated_at: String(values[12]), version: Number(values[13]),
             }
             if (state.has(row.subscription_id)) throw new Error('UNIQUE constraint failed')
             state.set(row.subscription_id, row)
@@ -47,14 +47,14 @@ function fakeDb(rows: SubscriptionRow[]): D1Database {
           }
           if (sql.includes('SET status =')) {
             const row = state.get(String(values[3]))
-            if (!row || row.subscriber_id !== String(values[4]) || row.updated_at !== String(values[5])) return { meta: { changes: 0 } }
-            row.status = values[0] as SubscriptionStatus; row.cancel_at = values[1] as string | null; row.updated_at = String(values[2])
+            if (!row || row.subscriber_id !== String(values[4]) || row.version !== Number(values[5])) return { meta: { changes: 0 } }
+            row.status = values[0] as SubscriptionStatus; row.cancel_at = values[1] as string | null; row.updated_at = String(values[2]); row.version += 1
             return { meta: { changes: 1 } }
           }
           if (sql.includes('SET plan_id =')) {
             const row = state.get(String(values[3]))
-            if (!row || row.subscriber_id !== String(values[4]) || row.updated_at !== String(values[5])) return { meta: { changes: 0 } }
-            row.plan_id = String(values[0]); row.plan_version = Number(values[1]); row.updated_at = String(values[2])
+            if (!row || row.subscriber_id !== String(values[4]) || row.version !== Number(values[5])) return { meta: { changes: 0 } }
+            row.plan_id = String(values[0]); row.plan_version = Number(values[1]); row.updated_at = String(values[2]); row.version += 1
             return { meta: { changes: 1 } }
           }
           throw new Error('unexpected query')
@@ -68,7 +68,7 @@ function fakeDb(rows: SubscriptionRow[]): D1Database {
 const baseRow = (overrides: Partial<SubscriptionRow> = {}): SubscriptionRow => ({
   subscription_id: 'sub_existing', subscriber_id: 'user_1', plan_id: 'plan_basic', plan_version: 1, creator_id: null, status: 'ACTIVE',
   started_at: '2026-10-02T12:00:00.000Z', current_period_start: '2026-10-02T12:00:00.000Z', current_period_end: '2026-11-01T12:00:00.000Z',
-  cancel_at: null, entitlement_snapshot_ref: null, created_at: '2026-10-02T12:00:00.000Z', updated_at: '2026-10-02T12:00:00.000Z', ...overrides
+  cancel_at: null, entitlement_snapshot_ref: null, created_at: '2026-10-02T12:00:00.000Z', updated_at: '2026-10-02T12:00:00.000Z', version: 1, ...overrides
 })
 
 describe('subscription runtime', () => {
@@ -97,7 +97,7 @@ describe('subscription runtime', () => {
   it('creates an idempotent pending subscription', async () => {
     const db = fakeDb([]); const first = await createSubscription(db, 'user_1', { planId: 'plan_basic', idempotencyKey: 'create-1' });
     const second = await createSubscription(db, 'user_1', { planId: 'plan_basic', idempotencyKey: 'create-1' });
-    expect(first.subscriptionId).toBe(second.subscriptionId); expect(first.status).toBe('PENDING'); expect(first.planVersion).toBe(1); expect(first.etag).toBe(etagForUpdatedAt(first.updatedAt))
+    expect(first.subscriptionId).toBe(second.subscriptionId); expect(first.status).toBe('PENDING'); expect(first.planVersion).toBe(1); expect(first.version).toBe(1); expect(first.etag).toBe(etagForVersion(1))
   })
   it('rejects idempotency-key reuse for a different plan', async () => {
     const db = fakeDb([]); await createSubscription(db, 'user_1', { planId: 'plan_basic', idempotencyKey: 'create-1' })
@@ -108,22 +108,22 @@ describe('subscription runtime', () => {
   })
   it('enforces If-Match for pause and transitions ACTIVE to PAUSED', async () => {
     const db = fakeDb([baseRow()]); const before = await getSubscription(db, 'user_1', 'sub_existing'); const after = await transitionSubscription(db, 'user_1', 'sub_existing', 'pause', before.etag)
-    expect(after.status).toBe('PAUSED'); expect(after.updatedAt).not.toBe(before.updatedAt)
+    expect(after.status).toBe('PAUSED'); expect(after.updatedAt).not.toBe(before.updatedAt); expect(after.version).toBe(before.version + 1); expect(after.etag).toBe(etagForVersion(2))
   })
   it('fails stale If-Match without changing state when the requested transition has not converged', async () => {
     const db = fakeDb([baseRow()]); await expect(transitionSubscription(db, 'user_1', 'sub_existing', 'pause', '"lr-stale"')).rejects.toMatchObject({ code: 'PRECONDITION_FAILED', status: 412 })
   })
 
   it('treats a repeated pause with a stale If-Match as an idempotent success', async () => {
-    const db = fakeDb([baseRow({ status: 'PAUSED', updated_at: '2026-10-02T12:00:01.000Z' })])
-    const result = await transitionSubscription(db, 'user_1', 'sub_existing', 'pause', etagForUpdatedAt('2026-10-02T12:00:00.000Z'))
+    const db = fakeDb([baseRow({ status: 'PAUSED', updated_at: '2026-10-02T12:00:01.000Z', version: 2 })])
+    const result = await transitionSubscription(db, 'user_1', 'sub_existing', 'pause', etagForVersion(1))
     expect(result.status).toBe('PAUSED')
     expect(result.updatedAt).toBe('2026-10-02T12:00:01.000Z')
   })
 
   it('treats a repeated cancel with a stale If-Match as an idempotent success', async () => {
-    const db = fakeDb([baseRow({ status: 'CANCELED', updated_at: '2026-10-02T12:00:01.000Z', cancel_at: '2026-10-02T12:00:01.000Z' })])
-    const result = await transitionSubscription(db, 'user_1', 'sub_existing', 'cancel', etagForUpdatedAt('2026-10-02T12:00:00.000Z'))
+    const db = fakeDb([baseRow({ status: 'CANCELED', updated_at: '2026-10-02T12:00:01.000Z', cancel_at: '2026-10-02T12:00:01.000Z', version: 2 })])
+    const result = await transitionSubscription(db, 'user_1', 'sub_existing', 'cancel', etagForVersion(1))
     expect(result.status).toBe('CANCELED')
   })
 
@@ -141,8 +141,8 @@ describe('subscription runtime', () => {
   })
 
   it('treats a repeated plan change with a stale If-Match as an idempotent success when the plan already converged', async () => {
-    const db = fakeDb([baseRow({ plan_id: 'plan_pro', updated_at: '2026-10-02T12:00:01.000Z' })])
-    const result = await changeSubscriptionPlan(db, 'user_1', 'sub_existing', 'plan_pro', etagForUpdatedAt('2026-10-02T12:00:00.000Z'))
+    const db = fakeDb([baseRow({ plan_id: 'plan_pro', updated_at: '2026-10-02T12:00:01.000Z', version: 2 })])
+    const result = await changeSubscriptionPlan(db, 'user_1', 'sub_existing', 'plan_pro', etagForVersion(1))
     expect(result.planId).toBe('plan_pro')
     expect(result.updatedAt).toBe('2026-10-02T12:00:01.000Z')
   })
