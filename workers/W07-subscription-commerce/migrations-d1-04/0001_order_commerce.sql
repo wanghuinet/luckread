@@ -101,6 +101,20 @@ CREATE TABLE order_create_idempotency (
 CREATE INDEX ix_order_create_idempotency_customer_created ON order_create_idempotency(customer_id, created_at);
 CREATE INDEX ix_order_create_idempotency_expiration ON order_create_idempotency(expires_at);
 
+-- A persisted Order must be tied to the completed idempotency response in the same D1 batch.
+CREATE TRIGGER orders_require_matching_completed_idempotency
+BEFORE INSERT ON orders
+WHEN NOT EXISTS (
+  SELECT 1 FROM order_create_idempotency
+  WHERE customer_id = NEW.customer_id
+    AND operation_key = 'POST /v1/commerce/orders'
+    AND state = 'COMPLETED'
+    AND response_json IS NOT NULL
+    AND json_valid(response_json)
+    AND json_extract(response_json, '$.orderId') = NEW.order_id
+)
+BEGIN SELECT RAISE(ABORT, 'order requires a matching completed idempotency response'); END;
+
 CREATE TRIGGER order_create_idempotency_identity_immutable
 BEFORE UPDATE OF id, customer_id, operation_key, idempotency_key, request_hash, created_at, expires_at ON order_create_idempotency
 WHEN NEW.id IS NOT OLD.id OR NEW.customer_id IS NOT OLD.customer_id
