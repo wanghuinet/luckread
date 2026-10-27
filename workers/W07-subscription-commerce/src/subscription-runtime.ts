@@ -123,20 +123,41 @@ export async function createSubscription(db: D1Database, subscriberId: string, i
   const planId = ensureId(input.planId)
   const idempotencyKey = validateIdempotencyKey(input.idempotencyKey)
   const subscriptionId = await subscriptionIdFromIdempotency(subscriber, idempotencyKey)
+
+  // Replay first: idempotency preserves the original result even if the plan
+  // was retired after the first successful request.
   const existing = await db.prepare('SELECT * FROM membership_subscriptions WHERE subscription_id = ? LIMIT 1').bind(subscriptionId).first<SubscriptionRow>()
   if (existing) {
     if (existing.subscriber_id !== subscriber || existing.plan_id !== planId) throw new SubscriptionRuntimeError('CONFLICT', 409)
     return toPublic(existing)
   }
+
   const now = nowIso()
+  let result: { meta?: { changes?: number } }
   try {
-    await db.prepare('INSERT INTO membership_subscriptions (subscription_id, subscriber_id, plan_id, plan_version, creator_id, status, started_at, current_period_start, current_period_end, cancel_at, entitlement_snapshot_ref, created_at, updated_at, version) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-      .bind(subscriptionId, subscriber, planId, 1, null, 'PENDING', now, now, now, null, null, now, now, 1).run()
+    // Resolve the active, public, creator-owned plan and snapshot its current
+    // immutable version in the same SQL statement as the subscription insert.
+    // This prevents a plan retirement/version switch between lookup and insert.
+    result = await db.prepare(
+      "INSERT INTO membership_subscriptions " +
+      "(subscription_id, subscriber_id, plan_id, plan_version, creator_id, status, started_at, current_period_start, current_period_end, cancel_at, entitlement_snapshot_ref, created_at, updated_at, version) " +
+      "SELECT ?, ?, p.plan_id, p.current_version, p.owner_id, 'PENDING', ?, ?, ?, NULL, NULL, ?, ?, 1 " +
+      "FROM membership_plans AS p " +
+      "WHERE p.plan_id = ? AND p.owner_type = 'CREATOR' AND p.status = 'ACTIVE' AND p.visibility = 'PUBLIC' " +
+      "AND EXISTS (SELECT 1 FROM membership_plan_versions AS pv WHERE pv.plan_id = p.plan_id AND pv.plan_version = p.current_version) " +
+      "LIMIT 1",
+    ).bind(subscriptionId, subscriber, now, now, now, now, now, planId).run()
   } catch (error) {
     if (!(error instanceof Error) || !error.message.toLowerCase().includes('unique')) throw error
+    const raced = await db.prepare('SELECT * FROM membership_subscriptions WHERE subscription_id = ? LIMIT 1').bind(subscriptionId).first<SubscriptionRow>()
+    if (!raced) throw error
+    if (raced.subscriber_id !== subscriber || raced.plan_id !== planId) throw new SubscriptionRuntimeError('CONFLICT', 409)
+    return toPublic(raced)
   }
+  if (Number(result.meta?.changes ?? 0) !== 1) throw new SubscriptionRuntimeError('PLAN_NOT_ACTIVE', 409)
+
   const row = await readSubscriptionRow(db, subscriptionId, subscriber)
-  console.log(JSON.stringify({ event: 'membership.subscription.created', operation: 'createSubscription', subscriptionId: row.subscription_id, subscriberId: row.subscriber_id, status: row.status }))
+  console.log(JSON.stringify({ event: 'membership.subscription.created', operation: 'createSubscription', subscriptionId: row.subscription_id, subscriberId: row.subscriber_id, status: row.status, planVersion: row.plan_version }))
   return toPublic(row)
 }
 
@@ -207,11 +228,24 @@ export async function changeSubscriptionPlan(db: D1Database, subscriberId: strin
   }
   if (!['ACTIVE', 'PAUSED', 'PAST_DUE'].includes(row.status)) throw new SubscriptionRuntimeError('INVALID_STATE', 409)
   if (row.plan_id === nextPlanId) return toPublic(row)
+
   const updatedAt = nextUpdatedAt(row.updated_at)
-  const result = await db.prepare('UPDATE membership_subscriptions SET plan_id = ?, plan_version = ?, updated_at = ?, version = version + 1 WHERE subscription_id = ? AND subscriber_id = ? AND version = ?')
-    .bind(nextPlanId, 1, updatedAt, row.subscription_id, subscriber, expectedVersion).run()
-  if (Number(result.meta?.changes ?? 0) !== 1) throw new SubscriptionRuntimeError('PRECONDITION_FAILED', 412)
+  const result = await db.prepare(
+    "UPDATE membership_subscriptions SET plan_id = ?, " +
+    "plan_version = (SELECT current_version FROM membership_plans WHERE plan_id = ? AND owner_type = 'CREATOR' AND status = 'ACTIVE' AND visibility = 'PUBLIC'), " +
+    "creator_id = (SELECT owner_id FROM membership_plans WHERE plan_id = ? AND owner_type = 'CREATOR' AND status = 'ACTIVE' AND visibility = 'PUBLIC'), " +
+    "updated_at = ?, version = version + 1 " +
+    "WHERE subscription_id = ? AND subscriber_id = ? AND version = ? " +
+    "AND EXISTS (SELECT 1 FROM membership_plans WHERE plan_id = ? AND owner_type = 'CREATOR' AND status = 'ACTIVE' AND visibility = 'PUBLIC' " +
+    "AND EXISTS (SELECT 1 FROM membership_plan_versions WHERE plan_id = membership_plans.plan_id AND plan_version = membership_plans.current_version))",
+  ).bind(nextPlanId, nextPlanId, nextPlanId, updatedAt, row.subscription_id, subscriber, expectedVersion, nextPlanId).run()
+  if (Number(result.meta?.changes ?? 0) !== 1) {
+    const latest = await readSubscriptionRow(db, row.subscription_id, subscriber)
+    if (latest.version !== expectedVersion) throw new SubscriptionRuntimeError('PRECONDITION_FAILED', 412)
+    throw new SubscriptionRuntimeError('PLAN_NOT_ACTIVE', 409)
+  }
+
   const updated = await readSubscriptionRow(db, row.subscription_id, subscriber)
-  console.log(JSON.stringify({ event: 'membership.subscription.plan_changed', operation: 'changeSubscriptionPlan', subscriptionId: updated.subscription_id, subscriberId: updated.subscriber_id, previousPlanId: row.plan_id, planId: updated.plan_id }))
+  console.log(JSON.stringify({ event: 'membership.subscription.plan_changed', operation: 'changeSubscriptionPlan', subscriptionId: updated.subscription_id, subscriberId: updated.subscriber_id, previousPlanId: row.plan_id, planId: updated.plan_id, planVersion: updated.plan_version }))
   return toPublic(updated)
 }
