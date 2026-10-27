@@ -354,6 +354,20 @@
         "childColumn": "order_id",
         "dtoSchema": "CommerceOrderLineResponse",
         "ordering": "order_line_id ASC"
+      },
+      "createdAt": {
+        "kind": "entity-field",
+        "entityId": "ENT-ORDER",
+        "fieldId": "ENT-ORDER-F-CREATED-AT",
+        "table": "orders",
+        "column": "created_at"
+      },
+      "updatedAt": {
+        "kind": "entity-field",
+        "entityId": "ENT-ORDER",
+        "fieldId": "ENT-ORDER-F-UPDATED-AT",
+        "table": "orders",
+        "column": "updated_at"
       }
     },
     "CommerceOrderLineResponse": {
