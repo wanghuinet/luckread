@@ -471,7 +471,29 @@ describe('subscription runtime', () => {
       creatorId: 'creator_attacker',
     })).toThrowError(expect.objectContaining({ code: 'VALIDATION_FAILED', status: 400 }))
     expect(() => normalizeMembershipPlanDraft({
-      name: 'Basic', tier: 'basic', billingInterval: 'MONTHLY', priceMinor: 500, currency: 'US
+      name: 'Basic', tier: 'basic', billingInterval: 'MONTHLY', priceMinor: 500, currency: 'US$', benefits: [],
+    })).toThrowError(expect.objectContaining({ code: 'VALIDATION_FAILED', status: 400 }))
+    expect(() => normalizeMembershipPlanDraft({
+      name: 'Basic', tier: 'Basic', billingInterval: 'monthly', priceMinor: 500, currency: 'usd', benefits: [],
+    })).toThrowError(expect.objectContaining({ code: 'VALIDATION_FAILED', status: 400 }))
+    expect(() => normalizeMembershipPlanDraft({
+      name: 'Basic', tier: 'basic', billingInterval: 'MONTHLY', priceMinor: Number.MAX_SAFE_INTEGER, currency: 'USD', benefits: [],
+    })).toThrowError(expect.objectContaining({ code: 'VALIDATION_FAILED', status: 400 }))
+  })
+
+  it('lists only the verified creator-owned plans, including private drafts', async () => {
+    const db = fakeDb([], [
+      activePlan('plan_active'),
+      activePlan('plan_private', { status: 'DRAFT', visibility: 'PRIVATE', owner_id: 'creator_1', created_at: '2026-10-03T12:00:00.000Z' }),
+      activePlan('plan_other_creator', { owner_id: 'creator_2' }),
+    ])
+    const result = await listCreatorMembershipPlans(db, 'creator_1', 20)
+    expect(result.docs.map((plan) => plan.planId)).toEqual(['plan_private', 'plan_active'])
+    expect(result.docs.find((plan) => plan.planId === 'plan_private')).toMatchObject({ status: 'DRAFT', visibility: 'PRIVATE' })
+    expect(JSON.stringify(result)).not.toContain('plan_other_creator')
+  })
+
+  it('uses version CAS rather than updated_at as the concurrency authority', async () => {
     const runtime = readFileSync(new URL('./subscription-runtime.ts', import.meta.url), 'utf8')
     expect(runtime).toContain('version = version + 1')
     expect(runtime).toContain('AND version = ?')
