@@ -25,16 +25,28 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - name: Validate explicit deployment source and confirmations
-        run: |
-          set -euo pipefail
-          [[ "${{ inputs.source_sha }}" =~ ^[0-9a-f]{40}$ ]]
-          [[ "${{ inputs.confirm }}" == "DEPLOY_W07_SUBSCRIPTION" ]]
-          [[ "${{ inputs.migration_confirm }}" == "APPLY_W07_SUBSCRIPTION_MIGRATION" ]]
-      - name: Checkout exact source commit
+      - name: Checkout reviewed main history
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.source_sha }}
+          ref: main
+          fetch-depth: 0
+      - name: Validate explicit deployment source and confirmations
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          DEPLOY_CONFIRM: ${{ inputs.confirm }}
+          MIGRATION_CONFIRM: ${{ inputs.migration_confirm }}
+        run: |
+          set -euo pipefail
+          [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$DEPLOY_CONFIRM" == "DEPLOY_W07_SUBSCRIPTION" ]]
+          [[ "$MIGRATION_CONFIRM" == "APPLY_W07_SUBSCRIPTION_MIGRATION" ]]
+          git cat-file -e "$SOURCE_SHA^{commit}"
+          git merge-base --is-ancestor "$SOURCE_SHA" origin/main
+          echo "Validated source SHA is an ancestor of reviewed main."
+      - name: Checkout validated source commit
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: git checkout --detach "$SOURCE_SHA"
       - name: Setup Node 24
         uses: actions/setup-node@v4
         with:
