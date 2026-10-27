@@ -1,6 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 
-import { getSubscription, listSubscriptions, parseBoundedPositiveInt, SubscriptionRuntimeError, validatePrincipal } from './subscription-runtime.js'
+import { getSubscription, listActiveMembershipPlans, listSubscriptions, parseBoundedPositiveInt, SubscriptionRuntimeError, validatePrincipal } from './subscription-runtime.js'
 
 interface RateLimitBinding { limit(input: { key: string }): Promise<{ success: boolean }> }
 interface Env {
@@ -55,10 +55,12 @@ const requireLayer = (request: Request): void => {
 const parseSegments = (pathname: string): string[] => pathname.split('/').filter(Boolean).map((segment) => { try { return decodeURIComponent(segment) } catch { throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400) } })
 
 type Operation =
+  | { operation: 'listPlans'; subscriptionId: null }
   | { operation: 'list'; subscriptionId: null }
   | { operation: 'get'; subscriptionId: string }
 
 const toOperation = (method: string, segments: string[]): Operation | null => {
+  if (segments.length === 1 && segments[0] === 'plans' && method === 'GET') return { operation: 'listPlans', subscriptionId: null }
   if (segments.length === 2 && segments[0] === 'memberships' && segments[1] === 'subscriptions' && method === 'GET') return { operation: 'list', subscriptionId: null }
   if (segments.length === 3 && segments[0] === 'memberships' && segments[1] === 'subscriptions' && method === 'GET') return { operation: 'get', subscriptionId: segments[2] }
   return null
@@ -83,6 +85,12 @@ export default {
       }
       const operation = toOperation(request.method, parseSegments(new URL(request.url).pathname))
       if (!operation) return new Response(null, { status: 404 })
+      if (operation.operation === 'listPlans') {
+        const url = new URL(request.url)
+        const requestedLimit = parseBoundedPositiveInt(url.searchParams.get('limit'), 20, 50)
+        const result = await listActiveMembershipPlans(env.D1_01, requestedLimit, url.searchParams.get('cursor'))
+        return json({ data: result, requestId: crypto.randomUUID() })
+      }
       if (operation.operation === 'list') {
         const url = new URL(request.url)
         const requestedLimit = parseBoundedPositiveInt(url.searchParams.get('limit'), 20, 50)
