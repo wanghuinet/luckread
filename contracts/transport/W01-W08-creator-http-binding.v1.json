@@ -65,7 +65,7 @@
     {
       "operationId": "resolveActiveCreatorIdentityForMembershipPlans",
       "method": "GET",
-      "publicPath": null,
+      "publicPath": "/api/v1/membership/plans",
       "internalPath": "/internal/creator/self",
       "principalRequired": true,
       "minimumGlobalLayer": "L3",
@@ -75,7 +75,7 @@
     {
       "operationId": "checkMembershipPlanPermission",
       "method": "POST",
-      "publicPath": null,
+      "publicPath": "/api/v1/membership/plans",
       "internalPath": "/internal/authz/check-permission",
       "principalRequired": true,
       "minimumGlobalLayer": "L3",
