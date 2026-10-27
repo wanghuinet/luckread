@@ -102,7 +102,8 @@ async function readStoredPostBody(
       headers: { 'content-length': String(object.size) },
     }), POST_BODY_MAX_BYTES)
     if (body.ok === false) {
-      return { ok: false, status: body.reason === 'unavailable' ? 503 : 422 }
+      const failureStatus = body.reason === 'unavailable' ? 503 : 422
+      return { ok: false, status: failureStatus }
     }
     return { ok: true, body: body.body }
   }
@@ -147,7 +148,8 @@ async function readStoredPostBody(
   }
   const body = await readBoundedUtf8(response, POST_BODY_MAX_BYTES)
   if (body.ok === false) {
-    return { ok: false, status: body.reason === 'unavailable' ? 503 : 422 }
+    const failureStatus = body.reason === 'unavailable' ? 503 : 422
+    return { ok: false, status: failureStatus }
   }
   return { ok: true, body: body.body }
 }
