@@ -150,7 +150,7 @@ jobs:
         id: version
         env:
           BETA_VERSION_NAME: ${{ inputs.version_name && inputs.version_name != 'AUTO' && inputs.version_name || format('1.0.0-beta.{0}', github.run_number) }}
-          BETA_VERSION_CODE: ${{ inputs.version_code || github.run_number }}
+          BETA_VERSION_CODE: ${{ inputs.version_code > 0 && inputs.version_code || github.run_number }}
         run: |
           node <<'NODE'
           const fs = require("node:fs");
