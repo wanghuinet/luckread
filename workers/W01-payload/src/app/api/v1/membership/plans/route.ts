@@ -83,8 +83,20 @@ export async function POST(request: Request): Promise<Response> {
     if (denied) return denied
     const creatorId = await resolveActiveCreatorId(request)
     if (creatorId instanceof Response) return creatorId
+    const declaredLength = Number(request.headers.get('content-length') ?? '0')
+    if (Number.isFinite(declaredLength) && declaredLength > 16_384) {
+      return errorResponse(400, 'VALIDATION_FAILED', 'Plan request is too large')
+    }
     let body: unknown
-    try { body = await request.json() } catch { return errorResponse(400, 'VALIDATION_FAILED', 'A valid JSON plan body is required') }
+    try {
+      const raw = await request.text()
+      if (new TextEncoder().encode(raw).byteLength > 16_384) {
+        return errorResponse(400, 'VALIDATION_FAILED', 'Plan request is too large')
+      }
+      body = JSON.parse(raw) as unknown
+    } catch {
+      return errorResponse(400, 'VALIDATION_FAILED', 'A valid JSON plan body is required')
+    }
     return await callW07Subscription({
       request,
       pathname: '/membership/plans',
