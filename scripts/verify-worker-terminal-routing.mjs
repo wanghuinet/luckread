@@ -22,6 +22,7 @@ const content = route('content')
 const moderation = route('moderation')
 const auth = route('auth')
 const creator = route('creator')
+const membership = route('membership')
 
 if (contract.topology.workerCount !== 12 || contract.topology.d1Count !== 5 || contract.topology.taskCount !== 25) {
   throw new Error('Terminal routing contract topology drift')
@@ -36,6 +37,9 @@ if (!auth || auth.ingressWorker !== 'W01') throw new Error('Auth ingress routing
 if (!creator || creator.ingressWorker !== 'W01' || creator.terminalWorker !== 'W08') {
   throw new Error('Creator terminal routing mismatch')
 }
+if (!membership || membership.ingressWorker !== 'W01' || membership.terminalWorker !== 'W07') {
+  throw new Error('Membership commerce terminal routing mismatch')
+}
 
 const service = (config, binding) => (config.services ?? []).find((x) => x.binding === binding)
 if (service(w01, 'W03_CONTENT')?.service !== 'luckread-w03') {
@@ -49,6 +53,9 @@ if (service(w01, 'W06_MODERATION')?.service !== 'luckread-w06') {
 }
 if (service(w01, 'W08_CREATOR')?.service !== 'luckread-w08-creator') {
   throw new Error('W01 W08_CREATOR binding mismatch')
+}
+if (service(w01, 'W07_SUBSCRIPTION')?.service !== 'luckread-w07') {
+  throw new Error('W01 W07_SUBSCRIPTION binding mismatch')
 }
 if (service(w08, 'W02_AUTH')?.service !== 'luckread-w02') {
   throw new Error('W08 W02_AUTH binding mismatch')
@@ -71,11 +78,13 @@ console.log(JSON.stringify({
   content: { ingress: content.ingressWorker, terminal: content.terminalWorker },
   moderation: { ingress: moderation.ingressWorker, terminal: moderation.terminalWorker },
   creator: { ingress: creator.ingressWorker, terminal: creator.terminalWorker },
+  membership: { ingress: membership.ingressWorker, terminal: membership.terminalWorker },
   bindings: {
     W03_CONTENT: service(w01, 'W03_CONTENT')?.service,
     W05_W03_CONTENT: service(w05, 'W03_CONTENT')?.service,
     W06_MODERATION: service(w01, 'W06_MODERATION')?.service,
     W08_CREATOR: service(w01, 'W08_CREATOR')?.service,
+    W07_SUBSCRIPTION: service(w01, 'W07_SUBSCRIPTION')?.service,
     W08_W02_AUTH: service(w08, 'W02_AUTH')?.service,
   },
 }, null, 2))
