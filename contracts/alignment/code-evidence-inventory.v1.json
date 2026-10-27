@@ -4485,14 +4485,26 @@
       "subjectType": "FIELD",
       "subjectId": "ENT-SUBSCRIPTION-F-VERSION",
       "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
+      "implementationRefs": [
+        "workers/W07-subscription-commerce/src/subscription-runtime.ts",
+        "workers/W07-subscription-commerce/src/index.ts"
+      ],
+      "testRefs": [
+        "workers/W07-subscription-commerce/src/subscription-runtime.test.ts",
+        ".github/workflows/w07-subscription-runtime-ci.yml"
+      ],
+      "schemaEvidenceRefs": [
+        "contracts/entity/SUBSCRIPTION-ENTITY-CONTRACT.v1.json",
+        "contracts/persistence/SUBSCRIPTION-D1-01-persistence.v1.json",
+        "workers/W07-subscription-commerce/migrations/0002_subscription_version_cas.sql"
+      ],
       "sourceRefs": [
         "contracts/entity/entity-field-contract.v1.json"
       ],
       "blockers": [
-        "Field implementation evidence is incomplete"
+        "Implementation candidate and automated tests are present on an unmerged PR; W07 Subscription Runtime CI passes for its tested revision, but this is not proof of main or production execution.",
+        "D1-01 migration 0002 has not been executed remotely; production schema, migration history, artifact hash, and deployed W07 revision are not verified.",
+        "Field remains UNRESOLVED until the PR is merged, exact D1-01 schema/migration evidence is collected, and production runtime/concurrency evidence is admitted."
       ]
     },
     {
