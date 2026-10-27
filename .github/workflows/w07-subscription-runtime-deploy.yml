@@ -157,8 +157,9 @@ jobs:
           } else {
             throw new Error('READ_ONLY_PREFLIGHT_FAILED: migration history/schema combination is unexpected; refusing migration and deploy')
           }
-          core = process.env.GITHUB_OUTPUT
-          fs.appendFileSync(core, 'migration_action=' + migrationAction + '\n')
+          const outputPath = process.env.GITHUB_OUTPUT
+          if (!outputPath) throw new Error('GITHUB_OUTPUT is unavailable')
+          fs.appendFileSync(outputPath, 'migration_action=' + migrationAction + '\n')
           console.log(JSON.stringify({
             readOnlyPreflight: 'PASS',
             targetDatabase: 'luckread',
