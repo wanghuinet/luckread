@@ -492,7 +492,7 @@ describe('subscription runtime', () => {
     expect(workflow).toContain('PRAGMA foreign_key_list("membership_subscriptions")')
     expect(workflow).toContain('PRAGMA table_info("membership_plans")')
     expect(workflow).toContain('PRAGMA table_info("membership_plan_versions")')
-    expect(workflow).toContain('membership_plans_current_version_forward_only')
+    expect(workflow).toContain("tbl_name IN ('membership_plans','membership_plan_versions')")
     expect(workflow).toContain('SELECT COUNT(*) AS invalid_versions')
     expect(workflow).toContain('invalid_current_plan_versions')
     expect(workflow).toContain('node scripts/verify-remote-preflight.mjs preflight')
