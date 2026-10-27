@@ -82,8 +82,8 @@ describe('Commerce Order Idempotency-Key candidate header', () => {
 
   it('trims surrounding whitespace and keeps the normalized key bounded', () => {
     expect(validateOrderCreateIdempotencyKey('  idem-123  ')).toEqual({ ok: true, value: 'idem-123' })
-    expect(validateOrderCreateIdempotencyKey('x'.repeat(255))).toEqual({ ok: true, value: 'x'.repeat(255) })
-    expect(validateOrderCreateIdempotencyKey('x'.repeat(256))).toEqual({
+    expect(validateOrderCreateIdempotencyKey('x'.repeat(256))).toEqual({ ok: true, value: 'x'.repeat(256) })
+    expect(validateOrderCreateIdempotencyKey('x'.repeat(257))).toEqual({
       ok: false,
       error: { code: 'VALIDATION_FAILED', status: 400, field: 'Idempotency-Key' },
     })
@@ -98,22 +98,52 @@ describe('Commerce Order Idempotency-Key candidate header', () => {
 })
 
 
-describe('PAY-002 API candidate admission boundary', () => {
-  it('keeps proposed order routes and permission IDs out of canonical OpenAPI/authz until admission', () => {
+describe('PAY-002 API contract admission boundary', () => {
+  it('admits canonical API, permission and role contracts while keeping runtime blocked', () => {
     const candidate = JSON.parse(readFileSync(new URL('../../../contracts/candidates/PAY-002/order-commerce-api.v1.json', import.meta.url), 'utf8'))
     const gate = JSON.parse(readFileSync(new URL('../../../contracts/candidates/PAY-002/order-api-admission.v1.json', import.meta.url), 'utf8'))
     const openapi = readFileSync(new URL('../../../contracts/openapi/v1/openapi.yaml', import.meta.url), 'utf8')
     const permissions = JSON.parse(readFileSync(new URL('../../../contracts/authz/permissions.json', import.meta.url), 'utf8'))
+    const policy = JSON.parse(readFileSync(new URL('../../../contracts/openapi/v1/operation-policy.json', import.meta.url), 'utf8'))
+    const inventory = JSON.parse(readFileSync(new URL('../../../contracts/api/api-inventory.v1.json', import.meta.url), 'utf8'))
+    const persistence = JSON.parse(readFileSync(new URL('../../../contracts/persistence/ORDER-D1-04-persistence.v1.json', import.meta.url), 'utf8'))
 
-    expect(candidate.status).toBe('CONTRACT_CANDIDATE_NOT_ADMITTED')
+    expect(candidate.status).toBe('CONTRACT_ADMITTED_RUNTIME_PENDING')
     expect(candidate.operations.map((operation: { operationId: string }) => operation.operationId)).toEqual(['createCommerceOrder', 'getCommerceOrder'])
-    expect(candidate.operations.every((operation: { candidateStatus: string }) => operation.candidateStatus === 'NOT_PUBLISHED_IN_CANONICAL_OPENAPI')).toBe(true)
-    expect(gate.status).toBe('BLOCKED_ON_CANONICAL_OPENAPI_ALIGNMENT')
-    expect(gate.requiredEvidence.every((item: { status: string }) => item.status === 'PENDING')).toBe(true)
-    expect(openapi).not.toContain('operationId: createCommerceOrder')
-    expect(openapi).not.toContain('operationId: getCommerceOrder')
-    const registeredPermissions = (permissions['x-permissions'] ?? []).map((permission: { name: string }) => permission.name)
-    expect(registeredPermissions).not.toContain('order.create.own')
-    expect(registeredPermissions).not.toContain('order.read.own')
+    expect(candidate.operations.every((operation: { candidateStatus: string }) => operation.candidateStatus === 'CONTRACTED_PENDING_RUNTIME')).toBe(true)
+    expect(candidate.dtoSchemas.CommerceOrderResponse.required).toEqual(['data', 'requestId'])
+    expect(gate.status).toBe('BLOCKED_ON_RUNTIME_PERSISTENCE_AND_SECURITY_EVIDENCE')
+    expect(gate.requiredEvidence.filter((item: { id: string }) => ['API-OPENAPI-01', 'AUTH-PERMISSION-01'].includes(item.id)).every((item: { status: string }) => item.status === 'ADMITTED')).toBe(true)
+    expect(gate.requiredEvidence.filter((item: { status: string }) => item.status === 'PENDING').length).toBeGreaterThan(0)
+
+    expect(openapi).toContain('/commerce/orders:')
+    expect(openapi).toContain('/commerce/orders/{orderId}:')
+    expect(openapi).toContain('operationId: createCommerceOrder')
+    expect(openapi).toContain('operationId: getCommerceOrder')
+    expect(openapi).toContain('x-luckread-runtime-status: BLOCKED_PENDING_PAY002_EVIDENCE')
+    expect(openapi).toContain('x-luckread-max-body-bytes: 16384')
+    expect(openapi).toContain('maxLength: 256')
+
+    const registeredPermissions = new Map((permissions['x-permissions'] ?? []).map((p: { name: string; scope?: string; minLayer: string }) => [p.name, p]))
+    for (const name of ['order.create', 'order.read']) {
+      expect(registeredPermissions.has(name)).toBe(true)
+      expect((registeredPermissions.get(name) as { scope?: string; minLayer: string }).scope).toBe('own')
+      expect((registeredPermissions.get(name) as { scope?: string; minLayer: string }).minLayer).toBe('L2')
+    }
+    const roles = permissions['x-role-permissions'].roles
+    for (const roleName of ['verified_user', 'admin', 'super_admin']) {
+      const role = roles.find((r: { role: string }) => r.role === roleName)
+      expect(role.permissions).toContain('order.create')
+      expect(role.permissions).toContain('order.read')
+    }
+    const byId = new Map(policy.operations.map((op: { operationId: string }) => [op.operationId, op]))
+    expect((byId.get('createCommerceOrder') as any).permissions).toEqual(['order.create'])
+    expect((byId.get('createCommerceOrder') as any).idempotencyRequired).toBe(true)
+    expect((byId.get('getCommerceOrder') as any).permissions).toEqual(['order.read'])
+    const inventoryPaths = inventory.domains.subscription_entitlement_payment.endpoint_groups
+    expect(inventoryPaths).toContain('POST /v1/commerce/orders')
+    expect(inventoryPaths).toContain('GET /v1/commerce/orders/{orderId}')
+    expect(persistence.tables.order_create_idempotency.columns.operation_key.allowed).toEqual(['POST /v1/commerce/orders'])
+    expect(persistence.tables.order_create_idempotency.columns.idempotency_key.maxLength).toBe(256)
   })
 })

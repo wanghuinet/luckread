@@ -3,19 +3,19 @@
   "$id": "https://luckread.com/candidates/pay-002/order-api-admission.v1.json",
   "title": "PAY-002 Commerce Order API Candidate Admission Gate",
   "version": "1.0.0",
-  "status": "BLOCKED_ON_CANONICAL_OPENAPI_ALIGNMENT",
-  "purpose": "Admission gate for the candidate Commerce Order create/read DTOs; it is not a canonical evidence registry entry and does not enable public routes.",
+  "status": "BLOCKED_ON_RUNTIME_PERSISTENCE_AND_SECURITY_EVIDENCE",
+  "purpose": "Tracks admission and implementation evidence for the Commerce Order create/read API; contract admission does not enable public runtime routes.",
   "contract": "contracts/candidates/PAY-002/order-commerce-api.v1.json",
   "requiredEvidence": [
     {
       "id": "API-OPENAPI-01",
-      "requirement": "Both candidate methods and exact paths are added to Canonical OpenAPI with closed request/response DTO schemas, common error envelopes and body size limits.",
-      "status": "PENDING"
+      "requirement": "Canonical OpenAPI contains both operations with closed DTO schemas, common error envelopes and an explicit request-body budget.",
+      "status": "ADMITTED"
     },
     {
       "id": "AUTH-PERMISSION-01",
-      "requirement": "order.create.own and order.read.own are admitted to contracts/authz/permissions.json and CASL/role policy with owner scope; unauthorized and cross-owner reads are rejected.",
-      "status": "PENDING"
+      "requirement": "order.create and order.read are admitted to the canonical permission catalog with own scope, L2 minimum layer, and explicit verified_user/admin/super_admin grants; runtime owner-isolation tests remain separately required.",
+      "status": "ADMITTED"
     },
     {
       "id": "ITEM-RESOLUTION-01",
@@ -53,6 +53,6 @@
       "status": "PENDING"
     }
   ],
-  "greenRule": "This candidate gate cannot be GREEN while any evidence is PENDING; route publication and implementation admission are separate from a valid candidate DTO.",
-  "nextAction": "Admit permission identifiers and canonical OpenAPI/operation-policy mapping, then implement through W01 public API boundary to W07."
+  "greenRule": "This gate cannot be GREEN while any implementation evidence is PENDING; canonical contract admission is distinct from runtime/production admission, and PAY-002 remains unresolved.",
+  "nextAction": "Implement the W01 public API boundary and W07 order handler only after confirming authoritative item/offer ownership, D1-04 physical identity and migration safety; preserve disabled writes until exact-commit persistence and security evidence pass."
 }

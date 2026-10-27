@@ -3,7 +3,7 @@
   "$id": "https://luckread.com/candidates/pay-002/order-commerce-api.v1.json",
   "title": "Commerce Purchase Order Create / Read API Candidate",
   "version": "1.0.0",
-  "status": "CONTRACT_CANDIDATE_NOT_ADMITTED",
+  "status": "CONTRACT_ADMITTED_RUNTIME_PENDING",
   "operations": [
     {
       "operationId": "createCommerceOrder",
@@ -11,16 +11,16 @@
       "path": "/commerce/orders",
       "auth": {
         "required": true,
-        "permission": "order.create.own",
+        "permission": "order.create",
         "scope": "own",
-        "permissionStatus": "PROPOSED_NOT_ADMITTED"
+        "permissionStatus": "ADMITTED"
       },
       "request": {
         "headers": {
           "Idempotency-Key": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 255,
+            "maxLength": 256,
             "required": true
           }
         },
@@ -87,7 +87,7 @@
       "concurrency": {
         "strategy": "ATOMIC_CREATE_AND_IDEMPOTENCY_RECORD_IN_D1_04"
       },
-      "candidateStatus": "NOT_PUBLISHED_IN_CANONICAL_OPENAPI"
+      "candidateStatus": "CONTRACTED_PENDING_RUNTIME"
     },
     {
       "operationId": "getCommerceOrder",
@@ -95,9 +95,9 @@
       "path": "/commerce/orders/{orderId}",
       "auth": {
         "required": true,
-        "permission": "order.read.own",
-        "scope": "owner-only",
-        "permissionStatus": "PROPOSED_NOT_ADMITTED"
+        "permission": "order.read",
+        "scope": "own",
+        "permissionStatus": "ADMITTED"
       },
       "request": {
         "path": {
@@ -125,11 +125,60 @@
         "Resource owner is bound to the authenticated server principal.",
         "An inaccessible order is returned as RESOURCE_NOT_FOUND to avoid cross-owner resource enumeration."
       ],
-      "candidateStatus": "NOT_PUBLISHED_IN_CANONICAL_OPENAPI"
+      "candidateStatus": "CONTRACTED_PENDING_RUNTIME"
     }
   ],
   "dtoSchemas": {
-    "CommerceOrderResponse": {
+    "CommerceOrderLineResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "itemRef",
+        "quantity",
+        "unitAmountMinor",
+        "lineSubtotalMinor",
+        "lineDiscountMinor",
+        "lineTaxMinor",
+        "lineTotalMinor"
+      ],
+      "properties": {
+        "itemRef": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255
+        },
+        "quantity": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000
+        },
+        "unitAmountMinor": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "lineSubtotalMinor": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "lineDiscountMinor": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "lineTaxMinor": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "lineTotalMinor": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "invariants": [
+        "lineSubtotalMinor = unitAmountMinor * quantity",
+        "lineTotalMinor = lineSubtotalMinor - lineDiscountMinor + lineTaxMinor"
+      ]
+    },
+    "CommerceOrderData": {
       "type": "object",
       "additionalProperties": false,
       "required": [
@@ -208,58 +257,26 @@
         "All amounts use integer minor units and one explicit currency."
       ]
     },
-    "CommerceOrderLineResponse": {
+    "CommerceOrderResponse": {
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "itemRef",
-        "quantity",
-        "unitAmountMinor",
-        "lineSubtotalMinor",
-        "lineDiscountMinor",
-        "lineTaxMinor",
-        "lineTotalMinor"
+        "data",
+        "requestId"
       ],
       "properties": {
-        "itemRef": {
+        "data": {
+          "$ref": "#/dtoSchemas/CommerceOrderData"
+        },
+        "requestId": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 255
-        },
-        "quantity": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 10000
-        },
-        "unitAmountMinor": {
-          "type": "integer",
-          "minimum": 0
-        },
-        "lineSubtotalMinor": {
-          "type": "integer",
-          "minimum": 0
-        },
-        "lineDiscountMinor": {
-          "type": "integer",
-          "minimum": 0
-        },
-        "lineTaxMinor": {
-          "type": "integer",
-          "minimum": 0
-        },
-        "lineTotalMinor": {
-          "type": "integer",
-          "minimum": 0
+          "minLength": 1
         }
-      },
-      "invariants": [
-        "lineSubtotalMinor = unitAmountMinor * quantity",
-        "lineTotalMinor = lineSubtotalMinor - lineDiscountMinor + lineTaxMinor"
-      ]
+      }
     }
   },
   "globalInvariants": [
-    "These operations are candidates only and must not be published or routed until canonical OpenAPI, operation policy and permission registry admission pass.",
+    "Canonical OpenAPI, operation policy and permission/role mapping are admitted; public runtime handlers remain disabled until PAY-002 item-resolution, persistence, idempotency and security evidence pass.",
     "The /commerce/orders namespace intentionally separates purchase Orders from the existing OrderExecution confirm/cancel/execution routes defined by docs/127-COMMERCE-ORDER-FULFILLMENT-API-CONTRACT-v1.0.md.",
     "D1-04 is the Order and financial-fact domain; D1-01 remains subscription and entitlement authority.",
     "Provider references, raw webhook payloads, customerId, internal D1 columns, ledger rows and entitlement snapshots never appear in public DTOs.",
@@ -278,10 +295,10 @@
     "evidenceRegistry": "required"
   },
   "nonGoals": [
-    "No public route is published by this candidate.",
+    "Canonical OpenAPI is contractually admitted, but no public runtime route is enabled or deployed by this PR.",
     "No database migration or remote D1 mutation.",
     "No payment confirmation/capture, financial posting, refund, subscription mutation or entitlement grant.",
     "No new Worker, D1, Queue, Service Binding, dependency or Payload Core modification.",
-    "This candidate is intentionally stored outside contracts/api so it is not counted as a canonical API operation before permission/OpenAPI admission."
+    "This candidate remains outside executable route code; contract admission does not authorize runtime implementation or production writes."
   ]
 }
