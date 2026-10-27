@@ -173,6 +173,11 @@ describe('Hyperswitch payment webhook semantic validation', () => {
       envelope('payment_succeeded', { resource: resource({ updated: 'yesterday' }) }),
       baseReference,
     )).toMatchObject({ outcome: 'RECONCILIATION_REQUIRED', reason: 'INVALID_PROVIDER_UPDATED' });
+
+    expect(validateHyperswitchPaymentWebhook(
+      envelope('payment_succeeded', { resource: resource({ updated: '2026-02-31T10:00:00Z' }) }),
+      baseReference,
+    )).toMatchObject({ outcome: 'RECONCILIATION_REQUIRED', reason: 'INVALID_PROVIDER_UPDATED' });
   });
 
   it('marks equal-timestamp and older events stale, preventing duplicate/out-of-order state regression', () => {
