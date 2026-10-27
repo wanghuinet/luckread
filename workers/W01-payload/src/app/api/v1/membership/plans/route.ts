@@ -4,6 +4,7 @@ import {
   W07SubscriptionClientError,
 } from '../../../../../subscription/w07-subscription-client.js'
 import { callW08Creator, W08CreatorClientError } from '../../../../../auth/w08-creator-client.js'
+import { callW06MembershipPlanAudit, W06ModerationClientError } from '../../../../../moderation/w06-moderation-client.js'
 
 const errorResponse = (status: number, code: string, message: string) =>
   Response.json(
@@ -118,6 +119,7 @@ export async function GET(request: Request): Promise<Response> {
   } catch (error) {
     if (error instanceof W07SubscriptionClientError) return errorResponse(error.status, error.code, error.message)
     if (error instanceof W08CreatorClientError) return errorResponse(error.status, 'CREATOR_SERVICE_UNAVAILABLE', 'Creator authorization service unavailable')
+    if (error instanceof W06ModerationClientError) return errorResponse(error.status, 'AUDIT_UNAVAILABLE', 'Membership audit service unavailable')
     return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Membership plan service unavailable')
   }
 }
@@ -133,7 +135,7 @@ export async function POST(request: Request): Promise<Response> {
     const bodyResult = await readBoundedPlanBody(request)
     if (!bodyResult.ok) return bodyResult.response
     const body = bodyResult.value
-    return await callW07Subscription({
+    const w07Response = await callW07Subscription({
       request,
       pathname: '/membership/plans',
       method: 'POST',
@@ -141,6 +143,54 @@ export async function POST(request: Request): Promise<Response> {
       verifiedCreatorId: creatorId,
       body,
     })
+    if (!w07Response.ok) return w07Response
+
+    const responseEnvelope: unknown = await w07Response.clone().json().catch(() => null)
+    const plan = responseEnvelope && typeof responseEnvelope === 'object'
+      ? (responseEnvelope as { data?: Record<string, unknown> }).data
+      : undefined
+    if (
+      !plan ||
+      typeof plan.planId !== 'string' || !/^plan_[a-f0-9]{64}$/.test(plan.planId) ||
+      plan.creatorId !== creatorId ||
+      plan.planVersion !== 1 ||
+      plan.status !== 'DRAFT' ||
+      plan.visibility !== 'PRIVATE' ||
+      typeof plan.createdAt !== 'string' ||
+      Number.isNaN(Date.parse(plan.createdAt))
+    ) {
+      return errorResponse(503, 'PLAN_RESPONSE_INVALID', 'Membership plan result could not be verified')
+    }
+
+    let auditResponse: Response
+    try {
+      auditResponse = await callW06MembershipPlanAudit({
+        request,
+        principal,
+        body: {
+          eventId: 'evt_mpl_created_' + plan.planId,
+          planId: plan.planId,
+          creatorId,
+          planVersion: 1,
+          status: 'DRAFT',
+          visibility: 'PRIVATE',
+          occurredAt: plan.createdAt,
+        },
+      })
+    } catch {
+      return errorResponse(503, 'AUDIT_UNAVAILABLE', 'Membership audit service unavailable')
+    }
+    const auditResult: unknown = await auditResponse.json().catch(() => null)
+    if (
+      (auditResponse.status !== 200 && auditResponse.status !== 201) ||
+      !auditResult || typeof auditResult !== 'object' ||
+      (auditResult as { eventId?: unknown }).eventId !== 'evt_mpl_created_' + plan.planId ||
+      (auditResult as { action?: unknown }).action !== 'membership.plan.created' ||
+      (auditResult as { targetId?: unknown }).targetId !== plan.planId
+    ) {
+      return errorResponse(503, 'AUDIT_UNAVAILABLE', 'Membership plan audit was not durably confirmed')
+    }
+    return w07Response
   } catch (error) {
     if (error instanceof W07SubscriptionClientError) return errorResponse(error.status, error.code, error.message)
     if (error instanceof W08CreatorClientError) return errorResponse(error.status, 'CREATOR_SERVICE_UNAVAILABLE', 'Creator authorization service unavailable')
