@@ -17,6 +17,7 @@ on:
       - 'lib/**'
       - 'routes/**'
       - '.github/workflows/security-hardening.yml'
+      - '.github/workflows/w07-d1-04-binding-preflight.yml'
   pull_request:
     paths:
       - 'contracts/authz/**'
@@ -32,6 +33,7 @@ on:
       - 'lib/**'
       - 'routes/**'
       - '.github/workflows/security-hardening.yml'
+      - '.github/workflows/w07-d1-04-binding-preflight.yml'
   workflow_dispatch:
 
 permissions:
