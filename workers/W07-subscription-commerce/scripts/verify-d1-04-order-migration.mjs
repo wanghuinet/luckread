@@ -7,24 +7,24 @@ export const ORDER_MIGRATION_ID = '0001_order_commerce'
 
 const REQUIRED_COLUMNS = {
   orders: [
-    ['order_id', 'TEXT', 1], ['customer_id', 'TEXT', 0], ['status', 'TEXT', 0],
-    ['version', 'INTEGER', 0], ['currency', 'TEXT', 0], ['subtotal_minor', 'INTEGER', 0],
-    ['discount_minor', 'INTEGER', 0], ['tax_minor', 'INTEGER', 0], ['total_minor', 'INTEGER', 0],
-    ['created_at', 'TEXT', 0], ['updated_at', 'TEXT', 0], ['confirmed_at', 'TEXT', 0],
-    ['cancelled_at', 'TEXT', 0], ['failure_code', 'TEXT', 0],
+    ['order_id', 'TEXT', 1, 1], ['customer_id', 'TEXT', 1, 0], ['status', 'TEXT', 1, 0],
+    ['version', 'INTEGER', 1, 0], ['currency', 'TEXT', 1, 0], ['subtotal_minor', 'INTEGER', 1, 0],
+    ['discount_minor', 'INTEGER', 1, 0], ['tax_minor', 'INTEGER', 1, 0], ['total_minor', 'INTEGER', 1, 0],
+    ['created_at', 'TEXT', 1, 0], ['updated_at', 'TEXT', 1, 0], ['confirmed_at', 'TEXT', 0, 0],
+    ['cancelled_at', 'TEXT', 0, 0], ['failure_code', 'TEXT', 0, 0],
   ],
   order_lines: [
-    ['order_line_id', 'TEXT', 1], ['order_id', 'TEXT', 0], ['item_type', 'TEXT', 0],
-    ['item_ref', 'TEXT', 0], ['item_version', 'TEXT', 0], ['quantity', 'INTEGER', 0],
-    ['unit_amount_minor', 'INTEGER', 0], ['line_subtotal_minor', 'INTEGER', 0],
-    ['line_discount_minor', 'INTEGER', 0], ['line_tax_minor', 'INTEGER', 0],
-    ['line_total_minor', 'INTEGER', 0], ['item_snapshot_json', 'TEXT', 0], ['created_at', 'TEXT', 0],
+    ['order_line_id', 'TEXT', 1, 1], ['order_id', 'TEXT', 1, 0], ['item_type', 'TEXT', 1, 0],
+    ['item_ref', 'TEXT', 1, 0], ['item_version', 'TEXT', 1, 0], ['quantity', 'INTEGER', 1, 0],
+    ['unit_amount_minor', 'INTEGER', 1, 0], ['line_subtotal_minor', 'INTEGER', 1, 0],
+    ['line_discount_minor', 'INTEGER', 1, 0], ['line_tax_minor', 'INTEGER', 1, 0],
+    ['line_total_minor', 'INTEGER', 1, 0], ['item_snapshot_json', 'TEXT', 1, 0], ['created_at', 'TEXT', 1, 0],
   ],
   order_create_idempotency: [
-    ['id', 'TEXT', 1], ['customer_id', 'TEXT', 0], ['operation_key', 'TEXT', 0],
-    ['idempotency_key', 'TEXT', 0], ['request_hash', 'TEXT', 0], ['state', 'TEXT', 0],
-    ['response_status', 'INTEGER', 0], ['response_json', 'TEXT', 0],
-    ['created_at', 'TEXT', 0], ['expires_at', 'TEXT', 0],
+    ['id', 'TEXT', 1, 1], ['customer_id', 'TEXT', 1, 0], ['operation_key', 'TEXT', 1, 0],
+    ['idempotency_key', 'TEXT', 1, 0], ['request_hash', 'TEXT', 1, 0], ['state', 'TEXT', 1, 0],
+    ['response_status', 'INTEGER', 0, 0], ['response_json', 'TEXT', 0, 0],
+    ['created_at', 'TEXT', 1, 0], ['expires_at', 'TEXT', 1, 0],
   ],
 }
 
@@ -165,7 +165,7 @@ export function inspectD1_04OrderMigrationPreflight({ schemaSnapshot, migrationS
 function tableColumns(input, tableName) {
   const columns = collectObjects(input)
     .filter((row) => Number.isInteger(row.cid) && typeof row.name === 'string' && typeof row.type === 'string')
-    .map((row) => ({ cid: row.cid, name: row.name, type: row.type.toUpperCase(), pk: Number(row.pk ?? 0) }))
+    .map((row) => ({ cid: row.cid, name: row.name, type: row.type.toUpperCase(), notnull: Number(row.notnull ?? 0), pk: Number(row.pk ?? 0) }))
     .sort((a, b) => a.cid - b.cid)
   if (columns.length === 0) fail('remote PRAGMA table_info returned no columns for ' + tableName)
   return columns
@@ -205,14 +205,16 @@ export function verifyD1_04OrderMigrationPostflight({
   }
   for (const [tableName, expectedColumns] of Object.entries(REQUIRED_COLUMNS)) {
     const actual = tableColumns(tableInfoByName[tableName], tableName)
-    const actualShape = actual.map((column) => [column.name, column.type])
-    const expectedShape = expectedColumns.map((column) => [column[0], column[1]])
+    const actualShape = actual.map((column) => [column.name, column.type, column.notnull])
+    const expectedShape = expectedColumns.map((column) => [column[0], column[1], column[2]])
     if (JSON.stringify(actualShape) !== JSON.stringify(expectedShape)) {
       fail('remote column layout differs from the reviewed migration for ' + tableName +
         '; expected ' + JSON.stringify(expectedShape) + ', received ' + JSON.stringify(actualShape))
     }
-    if (actual[0].pk !== 1 || actual.filter((column) => column.pk === 1).length !== 1) {
-      fail('expected exactly one primary-key column on ' + tableName)
+    const actualPrimaryKeys = actual.filter((column) => column.pk === 1).map((column) => column.name)
+    const expectedPrimaryKeys = expectedColumns.filter((column) => column[3] === 1).map((column) => column[0])
+    if (JSON.stringify(actualPrimaryKeys) !== JSON.stringify(expectedPrimaryKeys)) {
+      fail('remote primary-key layout differs from the reviewed migration for ' + tableName)
     }
   }
 
