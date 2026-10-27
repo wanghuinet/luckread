@@ -275,6 +275,217 @@
       }
     }
   },
+  "entityMappings": {
+    "version": "1.0.0",
+    "CommerceOrderResponse": {
+      "data": {
+        "kind": "nested-dto",
+        "dtoSchema": "CommerceOrderData"
+      },
+      "requestId": {
+        "kind": "transport-generated",
+        "source": "W07 response envelope",
+        "persisted": false
+      }
+    },
+    "CommerceOrderData": {
+      "orderId": {
+        "kind": "entity-field",
+        "entityId": "ENT-ORDER",
+        "fieldId": "ENT-ORDER-F-ORDER-ID",
+        "table": "orders",
+        "column": "order_id"
+      },
+      "status": {
+        "kind": "entity-field",
+        "entityId": "ENT-ORDER",
+        "fieldId": "ENT-ORDER-F-STATUS",
+        "table": "orders",
+        "column": "status"
+      },
+      "version": {
+        "kind": "entity-field",
+        "entityId": "ENT-ORDER",
+        "fieldId": "ENT-ORDER-F-VERSION",
+        "table": "orders",
+        "column": "version"
+      },
+      "currency": {
+        "kind": "entity-field",
+        "entityId": "ENT-ORDER",
+        "fieldId": "ENT-ORDER-F-CURRENCY",
+        "table": "orders",
+        "column": "currency"
+      },
+      "subtotalMinor": {
+        "kind": "entity-field",
+        "entityId": "ENT-ORDER",
+        "fieldId": "ENT-ORDER-F-SUBTOTAL-MINOR",
+        "table": "orders",
+        "column": "subtotal_minor"
+      },
+      "discountMinor": {
+        "kind": "entity-field",
+        "entityId": "ENT-ORDER",
+        "fieldId": "ENT-ORDER-F-DISCOUNT-MINOR",
+        "table": "orders",
+        "column": "discount_minor"
+      },
+      "taxMinor": {
+        "kind": "entity-field",
+        "entityId": "ENT-ORDER",
+        "fieldId": "ENT-ORDER-F-TAX-MINOR",
+        "table": "orders",
+        "column": "tax_minor"
+      },
+      "totalMinor": {
+        "kind": "entity-field",
+        "entityId": "ENT-ORDER",
+        "fieldId": "ENT-ORDER-F-TOTAL-MINOR",
+        "table": "orders",
+        "column": "total_minor"
+      },
+      "items": {
+        "kind": "related-entity-collection",
+        "entityId": "ENT-ORDER-LINE",
+        "table": "order_lines",
+        "parentTable": "orders",
+        "parentColumn": "order_id",
+        "childColumn": "order_id",
+        "dtoSchema": "CommerceOrderLineResponse",
+        "ordering": "order_line_id ASC"
+      }
+    },
+    "CommerceOrderLineResponse": {
+      "itemRef": {
+        "kind": "entity-field",
+        "entityId": "ENT-ORDER-LINE",
+        "fieldId": "ENT-ORDER-LINE-F-ITEM-REF",
+        "table": "order_lines",
+        "column": "item_ref"
+      },
+      "quantity": {
+        "kind": "entity-field",
+        "entityId": "ENT-ORDER-LINE",
+        "fieldId": "ENT-ORDER-LINE-F-QUANTITY",
+        "table": "order_lines",
+        "column": "quantity"
+      },
+      "unitAmountMinor": {
+        "kind": "entity-field",
+        "entityId": "ENT-ORDER-LINE",
+        "fieldId": "ENT-ORDER-LINE-F-UNIT-AMOUNT-MINOR",
+        "table": "order_lines",
+        "column": "unit_amount_minor"
+      },
+      "lineSubtotalMinor": {
+        "kind": "entity-field",
+        "entityId": "ENT-ORDER-LINE",
+        "fieldId": "ENT-ORDER-LINE-F-LINE-SUBTOTAL-MINOR",
+        "table": "order_lines",
+        "column": "line_subtotal_minor"
+      },
+      "lineDiscountMinor": {
+        "kind": "entity-field",
+        "entityId": "ENT-ORDER-LINE",
+        "fieldId": "ENT-ORDER-LINE-F-LINE-DISCOUNT-MINOR",
+        "table": "order_lines",
+        "column": "line_discount_minor"
+      },
+      "lineTaxMinor": {
+        "kind": "entity-field",
+        "entityId": "ENT-ORDER-LINE",
+        "fieldId": "ENT-ORDER-LINE-F-LINE-TAX-MINOR",
+        "table": "order_lines",
+        "column": "line_tax_minor"
+      },
+      "lineTotalMinor": {
+        "kind": "entity-field",
+        "entityId": "ENT-ORDER-LINE",
+        "fieldId": "ENT-ORDER-LINE-F-LINE-TOTAL-MINOR",
+        "table": "order_lines",
+        "column": "line_total_minor"
+      }
+    },
+    "createRequest": {
+      "items[].itemRef": {
+        "kind": "authoritative-offer-resolution",
+        "source": "client DTO",
+        "entityId": "ENT-ORDER-LINE",
+        "fieldId": "ENT-ORDER-LINE-F-ITEM-REF",
+        "table": "order_lines",
+        "column": "item_ref",
+        "persistedDirectly": false,
+        "requirement": "Resolve the current purchasable offer and immutable version before creating an OrderLine."
+      },
+      "items[].quantity": {
+        "kind": "validated-input",
+        "source": "client DTO",
+        "entityId": "ENT-ORDER-LINE",
+        "fieldId": "ENT-ORDER-LINE-F-QUANTITY",
+        "table": "order_lines",
+        "column": "quantity",
+        "persistedAfterResolution": true
+      },
+      "Idempotency-Key": {
+        "kind": "idempotency-scope-key",
+        "source": "request header",
+        "table": "order_create_idempotency",
+        "customerScope": "authenticated principal",
+        "operationColumn": "operation_key",
+        "operationValue": "POST /v1/commerce/orders",
+        "keyColumn": "idempotency_key"
+      },
+      "customerId": {
+        "kind": "server-derived",
+        "source": "authenticated W01 principal",
+        "entityId": "ENT-ORDER",
+        "fieldId": "ENT-ORDER-F-CUSTOMER-ID",
+        "table": "orders",
+        "column": "customer_id",
+        "clientSupplied": false,
+        "publicResponse": false
+      }
+    },
+    "excludedPersistenceFields": [
+      {
+        "source": "orders.customer_id",
+        "reason": "Server-side owner isolation only; never included in public Order DTOs."
+      },
+      {
+        "source": "orders.confirmed_at",
+        "reason": "Lifecycle audit field not included in the admitted response DTO."
+      },
+      {
+        "source": "orders.cancelled_at",
+        "reason": "Lifecycle audit field not included in the admitted response DTO."
+      },
+      {
+        "source": "orders.failure_code",
+        "reason": "Internal failure classification not included in the admitted response DTO."
+      },
+      {
+        "source": "order_lines.order_line_id",
+        "reason": "Internal persistence identity; the response DTO exposes no physical row identifier."
+      },
+      {
+        "source": "order_lines.item_type",
+        "reason": "Internal item classification; not exposed until a separate DTO admission."
+      },
+      {
+        "source": "order_lines.item_version",
+        "reason": "Immutable commercial version is kept as internal snapshot evidence."
+      },
+      {
+        "source": "order_lines.item_snapshot_json",
+        "reason": "Bounded internal commercial snapshot; not exposed as raw persistence JSON."
+      },
+      {
+        "source": "order_create_idempotency.*",
+        "reason": "Internal replay/recovery metadata; never returned as an entity or direct DTO field."
+      }
+    ]
+  },
   "globalInvariants": [
     "Canonical OpenAPI, operation policy and permission/role mapping are admitted; public runtime handlers remain disabled until PAY-002 item-resolution, persistence, idempotency and security evidence pass.",
     "The /commerce/orders namespace intentionally separates purchase Orders from the existing OrderExecution confirm/cancel/execution routes defined by docs/127-COMMERCE-ORDER-FULFILLMENT-API-CONTRACT-v1.0.md.",

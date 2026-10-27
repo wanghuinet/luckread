@@ -506,9 +506,11 @@ async function checkOrderContractCandidate() {
   const line = await readContract('contracts/entity/ORDER-LINE-ENTITY-CONTRACT.v1.json');
   const persistence = await readContract('contracts/persistence/ORDER-D1-04-persistence.v1.json');
   const state = await readContract('contracts/state-machines/order.json');
+  const apiCandidate = await readContract('contracts/candidates/PAY-002/order-commerce-api.v1.json');
+  const apiAdmission = await readContract('contracts/candidates/PAY-002/order-api-admission.v1.json');
   const boundary = await readContract('contracts/transport/worker-d1-access-boundary.v1.json');
   const batch = await readContract('contracts/alignment/mapping-batches/B13-B15-creator-membership-commerce.v1.json');
-  if (![catalog, fields, order, line, persistence, state, boundary, batch].every(Boolean)) return;
+  if (![catalog, fields, order, line, persistence, state, apiCandidate, apiAdmission, boundary, batch].every(Boolean)) return;
   const entityById = new Map((catalog.records ?? []).map((r) => [r.entityId, r]));
   const fieldsById = new Map((fields.records ?? []).map((r) => [r.entityId, r]));
   const expected = [
@@ -528,9 +530,106 @@ async function checkOrderContractCandidate() {
   if (persistence.status !== 'CONTRACTED_NOT_VERIFIED') fail('ORDER-D1-04-persistence must remain CONTRACTED_NOT_VERIFIED');
   if (persistence.authoritativeDomain !== 'D1-04' || persistence.primaryWorker !== 'W07') fail('Order persistence authority must be D1-04 / W07');
   if (persistence.physicalResource?.binding !== 'D1_04' || persistence.physicalResource?.databaseUuid !== boundary.physicalD1Registry?.['D1-04']) fail('Order persistence candidate must use registered D1-04 UUID and binding');
-  if (persistence.physicalResource?.remoteNamePreflightRequired !== true || persistence.physicalResource?.databaseName !== null) fail('Order persistence candidate must not claim an unverified D1-04 display name');
+  const physical = persistence.physicalResource;
+  const preflight = physical?.preflightEvidence;
+  if (physical?.remoteNamePreflightRequired !== true) fail('Order persistence must require a fresh read-only name preflight before future deployment/mutation');
+  if (physical?.databaseName !== 'unimportant' ||
+      preflight?.databaseUuid !== boundary.physicalD1Registry?.['D1-04'] ||
+      preflight?.configuredName !== physical.databaseName ||
+      preflight?.liveName !== physical.databaseName ||
+      preflight?.displayNameMatches !== true ||
+      preflight?.readOnly !== true ||
+      preflight?.sourceSha !== '115c7165f3a618fb9527be8030db378476d3740d' ||
+      preflight?.result !== 'SCHEMA_SNAPSHOT_COLLECTED' ||
+      preflight?.workflowRunUrl !== 'https://github.com/wanghuinet/luckread/actions/runs/40576180128' ||
+      preflight?.artifactUrl !== 'https://github.com/wanghuinet/luckread/actions/runs/40576180128/artifacts/12767836622') {
+    fail('Order persistence must bind its physical name claim to exact read-only D1-04 preflight evidence');
+  }
   if (persistence.migration?.status !== 'NOT_CREATED') fail('PAY-002 candidate must not claim or ship a physical migration');
   const validFieldIds = new Set([...(order.fields ?? []).map((f) => f.fieldId), ...(line.fields ?? []).map((f) => f.fieldId)]);
+  const validEntityFields = new Map([
+    ...(order.fields ?? []).map((f) => [f.fieldId, { entityId: 'ENT-ORDER', field: f }]),
+    ...(line.fields ?? []).map((f) => [f.fieldId, { entityId: 'ENT-ORDER-LINE', field: f }]),
+  ]);
+  const validateDtoMappings = (schemaName, expectedEntityId) => {
+    const schema = apiCandidate.dtoSchemas?.[schemaName];
+    const mappings = apiCandidate.entityMappings?.[schemaName];
+    if (!schema || !mappings || typeof mappings !== 'object') {
+      fail('PAY-002 missing explicit DTO-to-entity mapping for ' + schemaName);
+      return;
+    }
+    const propertyNames = Object.keys(schema.properties ?? []).sort();
+    const mappedNames = Object.keys(mappings).sort();
+    if (JSON.stringify(propertyNames) !== JSON.stringify(mappedNames)) {
+      fail('PAY-002 DTO mapping properties do not exactly match ' + schemaName);
+    }
+    for (const [propertyName, mapping] of Object.entries(mappings)) {
+      if (schemaName === 'CommerceOrderData' && propertyName === 'items') {
+        if (mapping?.kind !== 'related-entity-collection' ||
+            mapping.entityId !== 'ENT-ORDER-LINE' ||
+            mapping.table !== 'order_lines' ||
+            mapping.parentTable !== 'orders' ||
+            mapping.parentColumn !== 'order_id' ||
+            mapping.childColumn !== 'order_id' ||
+            mapping.dtoSchema !== 'CommerceOrderLineResponse') {
+          fail('PAY-002 CommerceOrderData.items must map to the same-D1-04 OrderLine relation');
+        }
+        continue;
+      }
+      if (mapping?.kind !== 'entity-field' ||
+          mapping.entityId !== expectedEntityId ||
+          !validEntityFields.has(mapping.fieldId)) {
+        fail('PAY-002 DTO property ' + schemaName + '.' + propertyName + ' must map to one canonical entity field');
+        continue;
+      }
+      const canonicalField = validEntityFields.get(mapping.fieldId);
+      if (canonicalField?.entityId !== expectedEntityId) {
+        fail('PAY-002 DTO property ' + schemaName + '.' + propertyName + ' maps to the wrong entity field');
+      }
+      const column = persistence.tables?.[mapping.table]?.columns?.[mapping.column];
+      if (!column || column.fieldId !== mapping.fieldId) {
+        fail('PAY-002 DTO property ' + schemaName + '.' + propertyName + ' does not match the persistence fieldId');
+      }
+    }
+  };
+  validateDtoMappings('CommerceOrderData', 'ENT-ORDER');
+  validateDtoMappings('CommerceOrderLineResponse', 'ENT-ORDER-LINE');
+  const responseWrapper = apiCandidate.entityMappings?.CommerceOrderResponse;
+  if (JSON.stringify(Object.keys(apiCandidate.dtoSchemas?.CommerceOrderResponse?.properties ?? {}).sort()) !==
+      JSON.stringify(Object.keys(responseWrapper ?? {}).sort()) ||
+      responseWrapper?.data?.kind !== 'nested-dto' ||
+      responseWrapper?.data?.dtoSchema !== 'CommerceOrderData' ||
+      responseWrapper?.requestId?.kind !== 'transport-generated' ||
+      responseWrapper?.requestId?.persisted !== false) {
+    fail('PAY-002 CommerceOrderResponse wrapper mapping is incomplete');
+  }
+  const requestMapping = apiCandidate.entityMappings?.createRequest;
+  if (requestMapping?.['items[].itemRef']?.kind !== 'authoritative-offer-resolution' ||
+      requestMapping?.['items[].itemRef']?.persistedDirectly !== false ||
+      requestMapping?.['items[].quantity']?.kind !== 'validated-input' ||
+      requestMapping?.['Idempotency-Key']?.table !== 'order_create_idempotency' ||
+      requestMapping?.['Idempotency-Key']?.operationValue !== 'POST /v1/commerce/orders' ||
+      requestMapping?.customerId?.kind !== 'server-derived' ||
+      requestMapping?.customerId?.clientSupplied !== false ||
+      requestMapping?.customerId?.publicResponse !== false) {
+    fail('PAY-002 request-to-persistence mapping must preserve offer authority, idempotency scope and principal-derived customer ownership');
+  }
+  const excluded = new Set((apiCandidate.entityMappings?.excludedPersistenceFields ?? []).map((entry) => entry.source));
+  for (const required of ['orders.customer_id', 'order_lines.item_snapshot_json', 'order_create_idempotency.*']) {
+    if (!excluded.has(required)) fail('PAY-002 response mapping must explicitly exclude ' + required);
+  }
+  const mappingEvidence = (apiAdmission.requiredEvidence ?? []).find((entry) => entry.id === 'ENTITY-MAPPING-01');
+  if (!mappingEvidence || mappingEvidence.status !== 'ADMITTED') {
+    fail('PAY-002 ENTITY-MAPPING-01 must be admitted only with the executable DTO mapping checks above');
+  }
+  const bindingEvidence = (apiAdmission.requiredEvidence ?? []).find((entry) => entry.id === 'D1-04-BINDING-01');
+  if (!bindingEvidence || bindingEvidence.status !== 'ADMITTED') {
+    fail('PAY-002 D1-04-BINDING-01 must match the verified physical identity evidence');
+  }
+  const schemaEvidence = (apiAdmission.requiredEvidence ?? []).find((entry) => entry.id === 'D1-04-SCHEMA-01');
+  if (!schemaEvidence || schemaEvidence.status !== 'PENDING') {
+    fail('PAY-002 D1-04-SCHEMA-01 must remain pending until migration and postflight evidence pass');
+  }
   for (const tableName of ['orders', 'order_lines']) {
     const table = persistence.tables?.[tableName];
     if (!table) { fail('Order persistence candidate missing table ' + tableName); continue; }

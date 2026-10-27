@@ -24,12 +24,17 @@
     },
     {
       "id": "ENTITY-MAPPING-01",
-      "requirement": "Create/read response DTO fields map deterministically to ENT-ORDER and ENT-ORDER-LINE without exposing customerId, internal columns, raw provider data, ledger rows or entitlement snapshots.",
-      "status": "PENDING"
+      "requirement": "The closed create/read response DTO properties map to canonical ENT-ORDER and ENT-ORDER-LINE fields or explicit transport/relation sources; customerId, internal persistence columns, raw snapshot JSON, provider data, ledger rows and entitlement snapshots are excluded.",
+      "status": "ADMITTED"
     },
     {
       "id": "D1-04-BINDING-01",
-      "requirement": "Read-only D1-04 UUID/display-name preflight and reviewed physical schema/migration evidence pass before runtime writes are enabled.",
+      "requirement": "The canonical D1-04 UUID and Wrangler display name matched current read-only Cloudflare inventory; a source-commit schema snapshot was collected. This is identity/schema discovery evidence only and does not authorize any migration or runtime write.",
+      "status": "ADMITTED"
+    },
+    {
+      "id": "D1-04-SCHEMA-01",
+      "requirement": "A separately reviewed D1-04 migration candidate and exact post-migration schema/constraint evidence must pass before runtime writes are enabled.",
       "status": "PENDING"
     },
     {

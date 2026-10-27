@@ -145,5 +145,36 @@ describe('PAY-002 API contract admission boundary', () => {
     expect(inventoryPaths).toContain('GET /v1/commerce/orders/{orderId}')
     expect(persistence.tables.order_create_idempotency.columns.operation_key.allowed).toEqual(['POST /v1/commerce/orders'])
     expect(persistence.tables.order_create_idempotency.columns.idempotency_key.maxLength).toBe(256)
+    const entityMapping = candidate.entityMappings
+    const orderEntity = JSON.parse(readFileSync(new URL('../../../contracts/entity/ORDER-ENTITY-CONTRACT.v1.json', import.meta.url), 'utf8'))
+    const lineEntity = JSON.parse(readFileSync(new URL('../../../contracts/entity/ORDER-LINE-ENTITY-CONTRACT.v1.json', import.meta.url), 'utf8'))
+    const fieldIds = new Set([...orderEntity.fields, ...lineEntity.fields].map((field: { fieldId: string }) => field.fieldId))
+    for (const schemaName of ['CommerceOrderData', 'CommerceOrderLineResponse']) {
+      const schema = candidate.dtoSchemas[schemaName]
+      const mappings = entityMapping[schemaName]
+      expect(Object.keys(mappings).sort()).toEqual(Object.keys(schema.properties).sort())
+      for (const [property, map] of Object.entries(mappings) as [string, any][]) {
+        if (schemaName === 'CommerceOrderData' && property === 'items') {
+          expect(map).toMatchObject({ kind: 'related-entity-collection', entityId: 'ENT-ORDER-LINE', table: 'order_lines', parentColumn: 'order_id', childColumn: 'order_id', dtoSchema: 'CommerceOrderLineResponse' })
+          continue
+        }
+        expect(map.kind).toBe('entity-field')
+        expect(fieldIds.has(map.fieldId)).toBe(true)
+        expect(persistence.tables[map.table]?.columns[map.column]?.fieldId).toBe(map.fieldId)
+      }
+    }
+    expect(Object.keys(entityMapping.CommerceOrderResponse).sort()).toEqual(Object.keys(candidate.dtoSchemas.CommerceOrderResponse.properties).sort())
+    expect(entityMapping.CommerceOrderResponse.data).toEqual({ kind: 'nested-dto', dtoSchema: 'CommerceOrderData' })
+    expect(entityMapping.CommerceOrderResponse.requestId).toMatchObject({ kind: 'transport-generated', persisted: false })
+    expect(entityMapping.createRequest['items[].itemRef']).toMatchObject({ kind: 'authoritative-offer-resolution', persistedDirectly: false })
+    expect(entityMapping.createRequest['items[].quantity']).toMatchObject({ kind: 'validated-input', persistedAfterResolution: true })
+    expect(entityMapping.createRequest['Idempotency-Key']).toMatchObject({ table: 'order_create_idempotency', operationValue: 'POST /v1/commerce/orders', keyColumn: 'idempotency_key' })
+    expect(entityMapping.createRequest.customerId).toMatchObject({ kind: 'server-derived', clientSupplied: false, publicResponse: false })
+    expect(entityMapping.excludedPersistenceFields.map((field: { source: string }) => field.source)).toEqual(expect.arrayContaining(['orders.customer_id', 'order_lines.item_snapshot_json', 'order_create_idempotency.*']))
+    expect(gate.requiredEvidence.find((item: { id: string }) => item.id === 'ENTITY-MAPPING-01').status).toBe('ADMITTED')
+    expect(gate.requiredEvidence.find((item: { id: string }) => item.id === 'D1-04-BINDING-01').status).toBe('ADMITTED')
+    expect(gate.requiredEvidence.find((item: { id: string }) => item.id === 'D1-04-SCHEMA-01').status).toBe('PENDING')
+    expect(persistence.physicalResource.databaseName).toBe('unimportant')
+    expect(persistence.physicalResource.preflightEvidence).toMatchObject({ result: 'SCHEMA_SNAPSHOT_COLLECTED', sourceSha: '115c7165f3a618fb9527be8030db378476d3740d', displayNameMatches: true, migrationTablePresent: false, migrationApplied: false, deploymentPerformed: false })
   })
 })
