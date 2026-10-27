@@ -212,7 +212,7 @@ export async function bindPreflightToStoredPost(
 
   const canonicalBody = await readStoredPostBody(bodyUrl, requestUrl.origin, request)
   if (canonicalBody === null || !canonicalBody.trim()) {
-    return makeErrorResponse(422, 'VALIDATION_FAILED', 'Stored post body is empty or exceeds the verification limit')
+    return makeErrorResponse(422, 'VALIDATION_FAILED', 'Stored post body could not be verified, is empty, or exceeds the verification limit')
   }
 
   const preflight = mutation.preflight as Record<string, unknown>
