@@ -64,8 +64,20 @@ assert(typeof playback.data?.url === 'string' && playback.data.url.trim() === pl
 // Payload/R2 adapters can return an absolute CDN URL or a path relative to the W01 API origin.
 const deliveryUrl = new URL(playback.data.url, baseUrl)
 assert(['https:', 'http:'].includes(deliveryUrl.protocol), 'Playback URL used an unsupported protocol')
-const delivery = await fetch(deliveryUrl)
-assert(delivery.ok, 'Media delivery URL failed: HTTP ' + delivery.status)
+
+// The synthetic asset is not attached to published content, so delivery must
+// remain private: anonymous and other-account requests are denied, while the
+// authenticated owner can fetch and verify the exact uploaded object.
+const anonymousDelivery = await fetch(deliveryUrl)
+assert([401, 403, 404].includes(anonymousDelivery.status), 'Private media was delivered without owner authentication: HTTP ' + anonymousDelivery.status)
+const nonOwnerDelivery = await fetch(deliveryUrl, {
+  headers: { authorization: 'Bearer ' + otherToken },
+})
+assert([401, 403, 404].includes(nonOwnerDelivery.status), 'Private media was delivered to a non-owner: HTTP ' + nonOwnerDelivery.status)
+const delivery = await fetch(deliveryUrl, {
+  headers: { authorization: 'Bearer ' + ownerToken },
+})
+assert(delivery.ok, 'Owner media delivery failed: HTTP ' + delivery.status)
 const bytes = Buffer.from(await delivery.arrayBuffer())
 const pngSignature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
 assert(bytes.length > 8, 'Media delivery returned an empty or truncated object')
