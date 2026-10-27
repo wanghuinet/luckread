@@ -563,7 +563,7 @@ describe('read-only D1 subscription migration preflight', () => {
 
   it('lists only the verified creator-owned plans, including private drafts', async () => {
     const db = fakeDb([], [
-      activePlan('plan_active', { creator_id: undefined }),
+      activePlan('plan_active'),
       activePlan('plan_private', { status: 'DRAFT', visibility: 'PRIVATE', owner_id: 'creator_1', created_at: '2026-10-03T12:00:00.000Z' }),
       activePlan('plan_other_creator', { owner_id: 'creator_2' }),
     ])
