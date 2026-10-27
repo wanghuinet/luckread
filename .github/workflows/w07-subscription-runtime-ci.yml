@@ -85,6 +85,9 @@ jobs:
       - name: Test D1-04 binding preflight
         working-directory: workers/W01-payload
         run: node --test ../../workers/W07-subscription-commerce/scripts/verify-d1-04-binding.test.mjs
+      - name: Typecheck PAY-002 membership offer resolver
+        working-directory: workers/W01-payload
+        run: pnpm exec tsc --noEmit --strict --skipLibCheck --target ES2022 --module ESNext --moduleResolution Bundler --lib ES2022,DOM --types @cloudflare/workers-types ../../workers/W07-subscription-commerce/src/order-item-resolution.ts
       - name: Run Subscription runtime and adapter tests
         working-directory: workers/W01-payload
         run: pnpm exec vitest run --config ./vitest.config.mts ../../workers/W07-subscription-commerce/src/subscription-runtime.test.ts ../../workers/W07-subscription-commerce/src/d1-traffic-guard.test.ts ../../workers/W07-subscription-commerce/src/hyperswitch-webhook-signature.test.ts ../../workers/W07-subscription-commerce/src/hyperswitch-webhook-payment-validation.test.ts ../../workers/W07-subscription-commerce/src/order-request-validation.test.ts ../../workers/W07-subscription-commerce/src/order-item-resolution.test.ts tests/int/subscription-v1-adapter.int.spec.ts
