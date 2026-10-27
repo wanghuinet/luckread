@@ -171,14 +171,15 @@ describe('subscription runtime', () => {
     expect(parseBoundedPositiveInt('50', 20, 50)).toBe(50)
     expect(parseBoundedPositiveInt('10000', 1, 10000)).toBe(10000)
   })
-  it('fails closed on W07 POST before routing or subscription writes', () => {
+  it('keeps subscription lifecycle POST disabled while admitting only creator draft creation', () => {
     const index = readFileSync(new URL('./index.ts', import.meta.url), 'utf8')
-    const guard = index.indexOf("if (request.method === 'POST')")
-    const routeResolution = index.indexOf('const operation = toOperation')
-    expect(guard).toBeGreaterThan(index.indexOf('requireLayer(request)'))
-    expect(guard).toBeLessThan(routeResolution)
+    const operationResolution = index.indexOf('const operation = toOperation')
+    const guard = index.indexOf("if (request.method === 'POST' && operation?.operation !== 'createPlan')")
+    expect(operationResolution).toBeGreaterThan(index.indexOf('requireLayer(request)'))
+    expect(guard).toBeGreaterThan(operationResolution)
     expect(index).toContain("'SERVICE_UNAVAILABLE'")
     expect(index).toContain('verified payment-provider synchronization is available')
+    expect(index).toContain('createMembershipPlanDraft(')
     expect(index).not.toContain('createSubscription(')
     expect(index).not.toContain('transitionSubscription(')
     expect(index).not.toContain('changeSubscriptionPlan(')
@@ -206,6 +207,74 @@ describe('subscription runtime', () => {
     expect(response.status).toBe(200)
     expect(body.data?.docs).toHaveLength(1)
     expect(body.data?.docs?.[0]).toMatchObject({ planId: 'plan_catalog', planVersion: 3, priceMinor: 500 })
+  })
+
+  it('creates creator plan drafts only with a trusted creator identity and idempotent key', async () => {
+    const allowLimiter = { limit: async () => ({ success: true }) }
+    const input = {
+      name: 'Supporter', tier: 'supporter', billingInterval: 'MONTHLY',
+      priceMinor: 500, currency: 'USD', benefits: ['member posts'],
+    }
+    const makeRequest = (layer = 'L3', creatorId = 'creator_1') => new Request('https://luckread-w07.internal/membership/plans', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'X-LuckRead-Caller': 'W01',
+        'X-LuckRead-Transport-Version': '1.0',
+        'X-LuckRead-Correlation-Id': 'creator-plan-create',
+        'X-LuckRead-Principal-User-Id': 'user_1',
+        'X-LuckRead-Principal-Layer': layer,
+        ...(creatorId ? { 'X-LuckRead-Verified-Creator-Id': creatorId } : {}),
+        'Idempotency-Key': 'plan-draft-create-1',
+      },
+      body: JSON.stringify(input),
+    })
+    const db = fakeDb([])
+    const env = {
+      D1_01: db,
+      SUBSCRIPTION_ORIGIN_GLOBAL_LIMITER: allowLimiter,
+      SUBSCRIPTION_READ_LIMITER: allowLimiter,
+      SUBSCRIPTION_WRITE_LIMITER: allowLimiter,
+    }
+    const first = await w07.fetch(makeRequest(), env)
+    const firstBody = await first.json() as { data?: { planId?: string; status?: string; visibility?: string; replayed?: boolean } }
+    expect(first.status).toBe(201)
+    expect(firstBody.data).toMatchObject({ status: 'DRAFT', visibility: 'PRIVATE', replayed: false })
+
+    const replay = await w07.fetch(makeRequest(), env)
+    const replayBody = await replay.json() as { data?: { planId?: string; replayed?: boolean } }
+    expect(replay.status).toBe(200)
+    expect(replayBody.data).toMatchObject({ planId: firstBody.data?.planId, replayed: true })
+
+    const lowerLayer = await w07.fetch(makeRequest('L2'), env)
+    expect(lowerLayer.status).toBe(403)
+  })
+
+  it('denies plan creation if W01 did not provide the W08-verified creator identity', async () => {
+    const allowLimiter = { limit: async () => ({ success: true }) }
+    const db = {
+      batch() { throw new Error('creator identity must be checked before D1 writes') },
+      prepare() { throw new Error('creator identity must be checked before D1 writes') },
+    } as unknown as D1Database
+    const response = await w07.fetch(new Request('https://luckread-w07.internal/membership/plans', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'X-LuckRead-Caller': 'W01',
+        'X-LuckRead-Transport-Version': '1.0',
+        'X-LuckRead-Correlation-Id': 'missing-creator-id',
+        'X-LuckRead-Principal-User-Id': 'user_1',
+        'X-LuckRead-Principal-Layer': 'L3',
+        'Idempotency-Key': 'plan-draft-create-2',
+      },
+      body: JSON.stringify({ name: 'Supporter', tier: 'supporter', billingInterval: 'MONTHLY', priceMinor: 500, currency: 'USD', benefits: [] }),
+    }), {
+      D1_01: db,
+      SUBSCRIPTION_ORIGIN_GLOBAL_LIMITER: allowLimiter,
+      SUBSCRIPTION_READ_LIMITER: allowLimiter,
+      SUBSCRIPTION_WRITE_LIMITER: allowLimiter,
+    })
+    expect(response.status).toBe(403)
   })
 
   it('returns 503 for authenticated W07 POST without touching D1', async () => {
