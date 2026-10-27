@@ -97,7 +97,20 @@
       "auditRequired": true,
       "idempotency": "Event ID is stable across retries. W06 returns 200 only after confirming the same existing durable event.",
       "successPolicy": "W01 must not return plan creation success unless W06 confirms event persistence or exact idempotent replay.",
-      "cache": "NO_STORE"
+      "cache": "NO_STORE",
+      "auditedFields": [
+        "planId",
+        "creatorId",
+        "planVersion",
+        "status",
+        "visibility",
+        "name",
+        "tier",
+        "billingInterval",
+        "priceMinor",
+        "currency",
+        "occurredAt"
+      ]
     }
   ],
   "headers": {
