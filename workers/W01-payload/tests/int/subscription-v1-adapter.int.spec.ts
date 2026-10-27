@@ -11,6 +11,8 @@ describe('v1 subscription adapter', () => {
   const creatorPlansRoute = readFileSync(resolve(process.cwd(), 'src/app/api/v1/membership/plans/route.ts'), 'utf8')
   const w08CreatorClient = readFileSync(resolve(process.cwd(), 'src/auth/w08-creator-client.ts'), 'utf8')
   const w08Worker = readFileSync(resolve(process.cwd(), '../W08-creator/src/worker.ts'), 'utf8')
+  const w06Worker = readFileSync(resolve(process.cwd(), '../W06-governance/src/index.ts'), 'utf8')
+  const w06Client = readFileSync(resolve(process.cwd(), 'src/moderation/w06-moderation-client.ts'), 'utf8')
   const client = readFileSync(resolve(process.cwd(), 'src/subscription/w07-subscription-client.ts'), 'utf8')
   const wrangler = readFileSync(resolve(process.cwd(), 'wrangler.jsonc'), 'utf8')
 
@@ -41,6 +43,17 @@ describe('v1 subscription adapter', () => {
     expect(creatorPlansRoute).toContain('byteLength > 16_384')
     expect(creatorPlansRoute).toContain("new TextDecoder('utf-8', { fatal: true })")
     expect(creatorPlansRoute).not.toContain('await request.text()')
+  })
+
+  it('does not return plan creation success until W06 confirms the immutable audit event', () => {
+    expect(creatorPlansRoute).toContain('callW06MembershipPlanAudit')
+    expect(creatorPlansRoute).toContain("eventId: 'evt_mpl_created_' + plan.planId")
+    expect(creatorPlansRoute).toContain("action?: unknown }).action !== 'membership.plan.created'")
+    expect(creatorPlansRoute).toContain('Membership plan audit was not durably confirmed')
+    expect(w06Client).toContain("'/internal/audit-events/membership-plan-created'")
+    expect(w06Worker).toContain("action: 'membership.plan.created'")
+    expect(w06Worker).toContain('AUDIT_EVENT_PERSISTENCE_FAILED')
+    expect(w06Worker).toContain('AUDIT_EVENT_CONFLICT')
   })
 
   it('contracts creator plan permissions and server-controlled draft fields', () => {
