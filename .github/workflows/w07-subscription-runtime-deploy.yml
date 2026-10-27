@@ -62,9 +62,14 @@ jobs:
           const c = JSON.parse(fs.readFileSync('wrangler.jsonc','utf8'))
           if (c.name !== 'luckread-w07') throw new Error('W07 worker name mismatch')
           if (c.main !== 'src/index.ts') throw new Error('W07 entrypoint mismatch')
+          const registry = JSON.parse(fs.readFileSync('../../contracts/transport/worker-d1-access-boundary.v1.json','utf8'))
           const d1 = (c.d1_databases || []).find(x => x.binding === 'D1_01')
           if (!d1 || d1.database_id !== '2f80471e-3756-49f9-8db1-7707a433ad64' || d1.database_name !== 'luckread') throw new Error('D1-01 physical binding mismatch')
-          console.log(JSON.stringify({worker:c.name, main:c.main, d1Binding:d1}))
+          const d104 = (c.d1_databases || []).find(x => x.binding === 'D1_04')
+          const expectedD104 = registry.physicalD1Registry?.['D1-04']
+          if (!expectedD104 || expectedD104 !== '9bfb89a5-fbb5-45b1-a2ee-eab674b0d736') throw new Error('D1-04 physical identity is not admitted in the canonical registry')
+          if (!d104 || d104.database_id !== expectedD104 || typeof d104.database_name !== 'string' || !d104.database_name.trim()) throw new Error('D1-04 physical binding mismatch')
+          console.log(JSON.stringify({worker:c.name, main:c.main, d1Bindings:{D1_01:d1,D1_04:d104}}))
           NODE
           test -f migrations/0001_membership_subscriptions.sql
           test -f migrations/0002_subscription_version_cas.sql
@@ -72,6 +77,8 @@ jobs:
           test -f src/subscription-runtime.ts
       - name: Typecheck W07
         run: npx tsc --noEmit --strict --skipLibCheck --target ES2022 --module ESNext --moduleResolution Bundler --lib ES2022,DOM --types @cloudflare/workers-types workers/W07-subscription-commerce/src/subscription-runtime.ts workers/W07-subscription-commerce/src/index.ts
+      - name: Test D1-04 binding preflight
+        run: node --test workers/W07-subscription-commerce/scripts/verify-d1-04-binding.test.mjs
       - name: Run W07 tests
         run: npx vitest@3.2.4 run workers/W07-subscription-commerce/src/subscription-runtime.test.ts
       - name: Verify W07 traffic guard bindings
@@ -95,6 +102,7 @@ jobs:
         run: |
           set -euo pipefail
           npx --yes wrangler@4.116.0 d1 list --json --config wrangler.jsonc > /tmp/w07-d1-list.json
+          node scripts/verify-d1-04-binding.mjs /tmp/w07-d1-list.json
           npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command="SELECT name FROM d1_migrations WHERE name IN ('0001_membership_subscriptions','0002_subscription_version_cas') ORDER BY name" --json > /tmp/w07-d1-migrations.json
           npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA table_info("membership_subscriptions")' --json > /tmp/w07-subscription-schema.json
           npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA index_list("membership_subscriptions")' --json > /tmp/w07-subscription-indexes.json
@@ -121,6 +129,7 @@ jobs:
         run: |
           set -euo pipefail
           npx --yes wrangler@4.116.0 d1 list --json --config wrangler.jsonc > /tmp/w07-post-d1-list.json
+          node scripts/verify-d1-04-binding.mjs /tmp/w07-post-d1-list.json
           npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command="SELECT name FROM d1_migrations WHERE name IN ('0001_membership_subscriptions','0002_subscription_version_cas') ORDER BY name" --json > /tmp/w07-post-d1-migrations.json
           npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA table_info("membership_subscriptions")' --json > /tmp/w07-post-subscription-schema.json
           npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA index_list("membership_subscriptions")' --json > /tmp/w07-post-subscription-indexes.json
@@ -157,6 +166,10 @@ jobs:
             "worker": "luckread-w07",
             "databaseUuid": "2f80471e-3756-49f9-8db1-7707a433ad64",
             "databaseName": "luckread",
+            "additionalVerifiedBinding": {
+              "domain": "D1-04",
+              "databaseUuid": "9bfb89a5-fbb5-45b1-a2ee-eab674b0d736"
+            },
             "migrations": ["0001_membership_subscriptions", "0002_subscription_version_cas"],
             "migrationAction": "$MIGRATION_ACTION",
             "remoteMigration": $REMOTE_MIGRATION,
