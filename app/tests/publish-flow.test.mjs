@@ -17,6 +17,15 @@ test('native publisher uses the shared media API helpers and existing W01 state 
   expect(composer).not.toMatch(/\bfetch\s*\(/);
 });
 
+test('publishing and editing failures surface the backend HTTP status, error code and request ID', () => {
+  expect(composer).toContain('apiFailureDiagnostic(result, \'Unable to load this post for editing.\')');
+  expect(composer).toContain('apiFailureDiagnostic(result, \'Unable to save post changes.\')');
+  expect(composer).toContain('apiFailureDiagnostic(created, \'Unable to create the post.\')');
+  expect(composer).toMatch(/apiFailureDiagnostic\(\s*pollResult\s*,/);
+  expect(composer).toMatch(/apiFailureDiagnostic\(\s*transitioned\s*,/);
+  expect(composer).not.toContain('getApiErrorMessage');
+});
+
 test('publisher uses permanent server media references and stable per-operation idempotency keys', () => {
   expect(composer).toContain('uploadKey: createIdempotencyKey()');
   expect(composer).toContain('mediaRefs,');
