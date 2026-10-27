@@ -281,13 +281,13 @@
           "type": "TEXT",
           "required": true,
           "allowed": [
-            "POST /v1/orders"
+            "POST /v1/commerce/orders"
           ]
         },
         "idempotency_key": {
           "type": "TEXT",
           "required": true,
-          "maxLength": 255
+          "maxLength": 256
         },
         "request_hash": {
           "type": "TEXT",
@@ -325,7 +325,7 @@
         }
       },
       "constraints": [
-        "Idempotency scope is authenticated customer + operation + client key.",
+        "Idempotency scope is authenticated customer + canonical operation key (POST /v1/commerce/orders) + client key.",
         "Request hash is computed over canonical semantic DTO JSON.",
         "Same key/payload replays the first completed response; same key/different payload fails deterministically.",
         "Order, lines and initial idempotency record commit atomically in D1-04.",
