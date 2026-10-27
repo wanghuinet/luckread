@@ -188,21 +188,50 @@ type MediaUploadRecord = {
   uploadFingerprint?: string | null
 }
 
+const publicMediaFields = (media: MediaUploadRecord) => ({
+  id: media.id ?? null,
+  url: media.url ?? null,
+  filename: media.filename ?? null,
+  mimeType: media.mimeType ?? null,
+  filesize: media.filesize ?? null,
+  width: media.width ?? null,
+  height: media.height ?? null,
+  alt: media.alt ?? null,
+})
+
+/**
+ * Payload's native upload response contains owner and idempotency internals.
+ * Return only the stable public media projection; never forward the raw body.
+ */
+async function projectSuccessfulMediaUploadResponse(response: Response): Promise<Response | null> {
+  const value: unknown = await response.clone().json().catch((): null => null)
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+
+  const envelope = value as Record<string, unknown>
+  const mediaValue = envelope.doc && typeof envelope.doc === 'object' && !Array.isArray(envelope.doc)
+    ? envelope.doc
+    : value
+  const media = mediaValue as MediaUploadRecord
+  if (media.id === undefined || media.id === null) return null
+
+  return new Response(JSON.stringify({
+    doc: publicMediaFields(media),
+    message: typeof envelope.message === 'string' ? envelope.message : 'Media successfully created.',
+  }), {
+    status: response.status,
+    headers: {
+      'content-type': 'application/json; charset=utf-8',
+      'cache-control': 'no-store',
+    },
+  })
+}
+
 const uploadConflict = () =>
   apiErrorResponse(409, 'IDEMPOTENCY_KEY_REUSE_CONFLICT', 'Idempotency-Key cannot be reused with a different upload')
 
 const replayUploadedMedia = async (media: MediaUploadRecord): Promise<Response> =>
   appendRequestIdToJsonResponse(Response.json({
-    doc: {
-      id: media.id ?? null,
-      url: media.url ?? null,
-      filename: media.filename ?? null,
-      mimeType: media.mimeType ?? null,
-      filesize: media.filesize ?? null,
-      width: media.width ?? null,
-      height: media.height ?? null,
-      alt: media.alt ?? null,
-    },
+    doc: publicMediaFields(media),
     message: 'Media upload already completed',
   }, {
     status: 201,
@@ -305,7 +334,16 @@ export async function POST(request: Request): Promise<Response> {
     const response = await payloadMediaPost(new Request(target, request.clone()), context)
     if (response.ok) {
       failureStage = 'response_enrichment'
-      return await appendRequestIdToJsonResponse(response)
+      const projectedResponse = await projectSuccessfulMediaUploadResponse(response)
+      if (!projectedResponse) {
+        return await mediaServiceUnavailable(
+          'response_enrichment',
+          new Error('Payload returned an invalid media response'),
+          'Media service unavailable',
+          { upstreamStatus: response.status },
+        )
+      }
+      return await appendRequestIdToJsonResponse(projectedResponse)
     }
 
     upstreamStatus = response.status
