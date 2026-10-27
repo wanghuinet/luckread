@@ -9,6 +9,7 @@ import {
   type AuthoritativelyPricedOrder,
 } from './order-persistence.js';
 import { SubscriptionRuntimeError } from './subscription-runtime.js';
+import { validateCreateCommerceOrderRequest, validateOrderCreateIdempotencyKey } from './order-request-validation.js';
 
 type OrderRuntimeEnv = Readonly<{
   D1_01: D1Database;
@@ -143,6 +144,22 @@ export async function handleCommerceOrderRequest(
     if (route.operation === 'create') {
       const body = await readBoundedJson(request);
       if (isResponse(body)) return body;
+
+      const requestValidation = validateCreateCommerceOrderRequest(body);
+      if (!requestValidation.ok) {
+        return errorResponse(
+          requestValidation.error.status,
+          requestValidation.error.code,
+          'Order request validation failed',
+        );
+      }
+      const keyValidation = validateOrderCreateIdempotencyKey(request.headers.get('Idempotency-Key'));
+      if (!keyValidation.ok) {
+        const message = keyValidation.error.code === 'PRECONDITION_REQUIRED'
+          ? 'Idempotency-Key is required'
+          : 'Idempotency-Key is invalid';
+        return errorResponse(keyValidation.error.status, keyValidation.error.code, message);
+      }
 
       // No admitted discount/tax assessment integration is wired into the production
       // handler yet. Never silently synthesize zero discount or zero tax, even
