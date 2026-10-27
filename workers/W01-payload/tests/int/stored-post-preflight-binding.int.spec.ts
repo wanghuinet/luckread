@@ -173,7 +173,10 @@ describe('bind direct social post publishing to the stored body asset', () => {
       bodyRef: '/api/media/file/post-body.txt',
     })), { status: 200 }))
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response('authoritative body stored in private media', { status: 200 }),
+      new Response('authoritative body stored in private media', {
+        status: 200,
+        headers: { 'content-type': 'text/plain;charset=utf-8' },
+      }),
     )
     const request = makeRequest({
       authorization: 'Bearer creator-session-token',
