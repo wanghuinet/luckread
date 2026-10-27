@@ -141,7 +141,7 @@ describe('subscription runtime', () => {
   })
   it('changes plan only for mutable lifecycle states', async () => {
     const db = fakeDb([baseRow()]); const before = await getSubscription(db, 'user_1', 'sub_existing'); const after = await changeSubscriptionPlan(db, 'user_1', 'sub_existing', 'plan_pro', before.etag)
-    expect(after.planId).toBe('plan_pro'); expect(after.status).toBe('ACTIVE')
+    expect(after.planId).toBe('plan_pro'); expect(after.status).toBe('ACTIVE'); expect(after.version).toBe(before.version + 1); expect(after.etag).toBe(etagForVersion(2))
   })
 
   it('treats a repeated plan change with a stale If-Match as an idempotent success when the plan already converged', async () => {
