@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://luckread.com/contracts/v1/transport/W01-W06-moderation-http-binding.v1.json",
   "title": "W01 to W06 Moderation Internal HTTP Binding",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "status": "CONTRACTED_AUTHORITY_ADMITTED",
   "caller": {
     "logicalWorker": "W01",
@@ -84,6 +84,20 @@
       "d1WriteTransactionMax": 1,
       "cache": "NO_STORE",
       "auditRequired": true
+    },
+    {
+      "operationId": "auditMembershipPlanCreation",
+      "method": "POST",
+      "publicPath": "/api/v1/membership/plans",
+      "internalPath": "/internal/audit-events/membership-plan-created",
+      "principalRequired": true,
+      "actorAuthority": "W06 derives actor userId and layer from the required W01 private transport headers; body cannot set actor identity.",
+      "eventId": "Deterministic evt_mpl_created_{planId}; one immutable D1-03 audit_events row per plan creation.",
+      "targetType": "MembershipPlan",
+      "auditRequired": true,
+      "idempotency": "Event ID is stable across retries. W06 returns 200 only after confirming the same existing durable event.",
+      "successPolicy": "W01 must not return plan creation success unless W06 confirms event persistence or exact idempotent replay.",
+      "cache": "NO_STORE"
     }
   ],
   "headers": {
