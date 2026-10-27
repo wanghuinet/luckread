@@ -118,6 +118,10 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: npx --yes wrangler@4.116.0 deploy --config wrangler.jsonc
       - name: Write deployment provenance
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          MIGRATION_ACTION: ${{ steps.d1_preflight.outputs.migration_action }}
+          REMOTE_MIGRATION: ${{ steps.d1_preflight.outputs.migration_action == 'apply' }}
         run: |
           set -euo pipefail
           mkdir -p artifacts/w07-subscription
@@ -126,13 +130,13 @@ jobs:
             "workflow": "W07 Subscription Runtime Deploy",
             "runId": "$GITHUB_RUN_ID",
             "runAttempt": "$GITHUB_RUN_ATTEMPT",
-            "sourceSha": "${{ inputs.source_sha }}",
+            "sourceSha": "$SOURCE_SHA",
             "worker": "luckread-w07",
             "databaseUuid": "2f80471e-3756-49f9-8db1-7707a433ad64",
             "databaseName": "luckread",
             "migrations": ["0001_membership_subscriptions", "0002_subscription_version_cas"],
-            "migrationAction": "${{ steps.d1_preflight.outputs.migration_action }}",
-            "remoteMigration": ${{ steps.d1_preflight.outputs.migration_action == 'apply' }},
+            "migrationAction": "$MIGRATION_ACTION",
+            "remoteMigration": $REMOTE_MIGRATION,
             "confirmation": "DEPLOY_W07_SUBSCRIPTION",
             "migrationConfirmation": "APPLY_W07_SUBSCRIPTION_MIGRATION"
           }
