@@ -22,7 +22,7 @@ test('publishing and editing failures surface the backend HTTP status, error cod
   expect(composer).toContain('apiFailureDiagnostic(result, \'Unable to save post changes.\')');
   expect(composer).toContain('apiFailureDiagnostic(created, \'Unable to create the post.\')');
   expect(composer).toMatch(/apiFailureDiagnostic\(\s*pollResult\s*,/);
-  expect(composer).toContain('apiFailureDiagnostic(transitioned,');
+  expect(composer).toMatch(/apiFailureDiagnostic\(\s*transitioned\s*,/);
   expect(composer).not.toContain('getApiErrorMessage');
 });
 
