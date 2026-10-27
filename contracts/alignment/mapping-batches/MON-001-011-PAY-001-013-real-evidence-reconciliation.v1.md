@@ -36,7 +36,7 @@ Inventory source: `contracts/alignment/mapping-batches/B13-B15-creator-membershi
 | MON-010 | CONTRACT EVIDENCE FOUND | purchase/bundle/order/entitlement binding incomplete |
 | MON-011 | CONTRACT EVIDENCE FOUND | purchased-content library persistence/API/evidence incomplete |
 | PAY-001 | CONTRACT EVIDENCE FOUND | provider abstraction, callback/event verification, API/DTO/runtime/test evidence incomplete |
-| PAY-002 | CONTRACT EVIDENCE FOUND | Order authoritative entity/API/fields/persistence/lifecycle/evidence incomplete |
+| PAY-002 | CONTRACT EVIDENCE FOUND | Order/OrderLine entity, field and logical D1-04 persistence candidates are registered but remain unadmitted; API/DTO, permissions, executable runtime/tests and Evidence Registry evidence remain missing |
 | PAY-003 | CONTRACT EVIDENCE FOUND | invoice authority/API/financial-record persistence/evidence incomplete |
 | PAY-004 | CONTRACT EVIDENCE FOUND | refund lifecycle, provider event idempotency and financial evidence incomplete |
 | PAY-005 | CONTRACT EVIDENCE FOUND | wallet/ledger boundary and executable API/persistence evidence incomplete |

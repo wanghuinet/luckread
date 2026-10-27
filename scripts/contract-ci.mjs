@@ -496,6 +496,56 @@ async function checkEvents() {
   if (auth013.doc['x-luckread']?.destinations?.audit?.['dead-letter-queue'] !== 'luckread-auth013-account-state-dlq') fail('events/identity-account-state-changed.v1.json: audit DLQ binding is not canonical')
 }
 
+
+/* ---------------------------------------------------- PAY-002 candidate model */
+async function checkOrderContractCandidate() {
+  const readContract = async (rel) => loadJson(resolve(rel));
+  const catalog = await readContract('contracts/entity/entity-catalog.v1.json');
+  const fields = await readContract('contracts/entity/entity-field-contract.v1.json');
+  const order = await readContract('contracts/entity/ORDER-ENTITY-CONTRACT.v1.json');
+  const line = await readContract('contracts/entity/ORDER-LINE-ENTITY-CONTRACT.v1.json');
+  const persistence = await readContract('contracts/persistence/ORDER-D1-04-persistence.v1.json');
+  const state = await readContract('contracts/state-machines/order.json');
+  const boundary = await readContract('contracts/transport/worker-d1-access-boundary.v1.json');
+  const batch = await readContract('contracts/alignment/mapping-batches/B13-B15-creator-membership-commerce.v1.json');
+  if (![catalog, fields, order, line, persistence, state, boundary, batch].every(Boolean)) return;
+  const entityById = new Map((catalog.records ?? []).map((r) => [r.entityId, r]));
+  const fieldsById = new Map((fields.records ?? []).map((r) => [r.entityId, r]));
+  const expected = [
+    { id: 'ENT-ORDER', contract: order },
+    { id: 'ENT-ORDER-LINE', contract: line },
+  ];
+  for (const item of expected) {
+    const entity = entityById.get(item.id);
+    const fieldRecord = fieldsById.get(item.id);
+    if (!entity || entity.status !== 'PROPOSED' || entity.domainId !== 'D1-04') fail(item.id + ': must remain a D1-04 PROPOSED entity during PAY-002 admission');
+    if (item.contract.status !== 'CONTRACTED_NOT_VERIFIED') fail(item.id + ': entity contract must remain CONTRACTED_NOT_VERIFIED until evidence is admitted');
+    if (!fieldRecord || fieldRecord.status !== 'CONTRACTED_NOT_VERIFIED') { fail(item.id + ': missing non-green field contract record'); continue; }
+    const contractFieldIds = new Set((item.contract.fields ?? []).map((f) => f.fieldId));
+    const registryFieldIds = new Set((fieldRecord.fields ?? []).map((f) => f.fieldId));
+    if (contractFieldIds.size !== registryFieldIds.size || [...contractFieldIds].some((id) => !registryFieldIds.has(id))) fail(item.id + ': entity fields do not match canonical field registry');
+  }
+  if (persistence.status !== 'CONTRACTED_NOT_VERIFIED') fail('ORDER-D1-04-persistence must remain CONTRACTED_NOT_VERIFIED');
+  if (persistence.authoritativeDomain !== 'D1-04' || persistence.primaryWorker !== 'W07') fail('Order persistence authority must be D1-04 / W07');
+  if (persistence.physicalResource?.binding !== 'D1_04' || persistence.physicalResource?.databaseUuid !== boundary.physicalD1Registry?.['D1-04']) fail('Order persistence candidate must use registered D1-04 UUID and binding');
+  if (persistence.physicalResource?.remoteNamePreflightRequired !== true || persistence.physicalResource?.databaseName !== null) fail('Order persistence candidate must not claim an unverified D1-04 display name');
+  if (persistence.migration?.status !== 'NOT_CREATED') fail('PAY-002 candidate must not claim or ship a physical migration');
+  const validFieldIds = new Set([...(order.fields ?? []).map((f) => f.fieldId), ...(line.fields ?? []).map((f) => f.fieldId)]);
+  for (const tableName of ['orders', 'order_lines']) {
+    const table = persistence.tables?.[tableName];
+    if (!table) { fail('Order persistence candidate missing table ' + tableName); continue; }
+    for (const [columnName, column] of Object.entries(table.columns ?? {})) {
+      if (!column.fieldId || !validFieldIds.has(column.fieldId)) fail('Order persistence ' + tableName + '.' + columnName + ': fieldId must resolve to a candidate entity field');
+    }
+  }
+  const states = new Set(state['x-luckread']?.states ?? []);
+  if (state['x-luckread']?.['state-field'] !== 'status' || state['x-luckread']?.['version-field'] !== 'version' || state['x-luckread']?.['requires-optimistic-lock'] !== true) fail('Order state machine must require status + version compare-and-set');
+  for (const transition of state['x-transitions'] ?? []) if (!states.has(transition.from) || !states.has(transition.to)) fail('Order state machine references unknown state ' + transition.from + '->' + transition.to);
+  const pay002 = (batch.records ?? []).find((r) => r.featureId === 'PAY-002');
+  if (!pay002 || pay002.status !== 'UNRESOLVED') fail('PAY-002 must remain UNRESOLVED until full API/runtime/evidence admission');
+  if (!pay002?.evidenceRefs?.includes('contracts/entity/ORDER-ENTITY-CONTRACT.v1.json')) fail('PAY-002 mapping batch must link candidate entity evidence');
+}
+
 /* ----------------------------------------------------------------- openapi */
 async function checkOpenApi() {
   const file = join(CONTRACTS_ROOT, 'openapi', 'v1', 'openapi.yaml')
@@ -535,6 +585,7 @@ await checkUpstreamImmutabilityContract()
 const common = runAll || domain === 'common' ? await checkCommon() : null
 const { enumValues } = runAll || domain === 'enums' ? await checkEnums() : { enumValues: {} }
 if (runAll || domain === 'state-machines') await checkStateMachines(enumValues)
+if (runAll || domain === 'state-machines') await checkOrderContractCandidate()
 if (runAll || domain === 'authz') await checkAuthz()
 if (runAll || domain === 'events') await checkEvents()
 if (runAll || domain === 'openapi') await checkOpenApi()
