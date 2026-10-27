@@ -52,8 +52,8 @@ BEGIN
 END;
 
 CREATE TRIGGER IF NOT EXISTS membership_plans_owner_immutable_update
-BEFORE UPDATE OF owner_type, owner_id, created_at ON membership_plans
-WHEN NEW.owner_type <> OLD.owner_type OR NEW.owner_id <> OLD.owner_id OR NEW.created_at <> OLD.created_at
+BEFORE UPDATE OF plan_id, owner_type, owner_id, created_at ON membership_plans
+WHEN NEW.plan_id <> OLD.plan_id OR NEW.owner_type <> OLD.owner_type OR NEW.owner_id <> OLD.owner_id OR NEW.created_at <> OLD.created_at
 BEGIN
   SELECT RAISE(ABORT, 'membership plan owner and identity are immutable');
 END;
