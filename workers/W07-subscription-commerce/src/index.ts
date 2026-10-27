@@ -10,22 +10,33 @@ interface Env {
   SUBSCRIPTION_WRITE_LIMITER?: RateLimitBinding
 }
 
-const getRateKey = (request: Request): string =>
-  request.headers.get('X-LuckRead-Principal-User-Id')?.trim() ||
-  request.headers.get('X-LuckRead-Client-IP')?.trim() ||
-  'transport:W01'
+const getRateKey = (request: Request): string => {
+  const principal = request.headers.get('X-LuckRead-Principal-User-Id')?.trim() ?? ''
+  if (principal.length > 0 && principal.length <= 256) return 'principal:' + principal
+  const clientIp = request.headers.get('X-LuckRead-Client-IP')?.trim() ?? ''
+  if (clientIp.length > 0 && clientIp.length <= 128) return 'client:' + clientIp
+  return 'transport:W01'
+}
+
+const applyRateLimit = async (limiter: RateLimitBinding, key: string): Promise<void> => {
+  try {
+    const result = await limiter.limit({ key })
+    if (!result.success) throw new SubscriptionRuntimeError('RATE_LIMITED', 429)
+  } catch (error) {
+    if (error instanceof SubscriptionRuntimeError) throw error
+    throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
+  }
+}
 
 const enforceRateLimit = async (request: Request, env: Env): Promise<void> => {
   const operation = request.method === 'GET' ? 'read' : 'write'
   const originLimiter = env.SUBSCRIPTION_ORIGIN_GLOBAL_LIMITER
   if (!originLimiter) throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
-  const originResult = await originLimiter.limit({ key: 'origin:' + operation })
-  if (!originResult.success) throw new SubscriptionRuntimeError('RATE_LIMITED', 429)
+  await applyRateLimit(originLimiter, 'origin:' + operation)
 
   const actorLimiter = operation === 'read' ? env.SUBSCRIPTION_READ_LIMITER : env.SUBSCRIPTION_WRITE_LIMITER
   if (!actorLimiter) throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
-  const actorResult = await actorLimiter.limit({ key: operation + ':' + getRateKey(request) })
-  if (!actorResult.success) throw new SubscriptionRuntimeError('RATE_LIMITED', 429)
+  await applyRateLimit(actorLimiter, operation + ':' + getRateKey(request))
 }
 
 const json = (body: unknown, status = 200, etag?: string) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', ...(etag ? { ETag: etag } : {}) } })
