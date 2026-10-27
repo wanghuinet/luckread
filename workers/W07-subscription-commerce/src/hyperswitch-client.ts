@@ -163,8 +163,8 @@ function normalizePayment(value: unknown): HyperswitchPayment {
     !PAYMENT_ID_PATTERN.test(paymentId) ||
     typeof merchantId !== 'string' ||
     merchantId.length === 0 ||
-    !Number.isSafeInteger(amount) ||
     typeof amount !== 'number' ||
+    !Number.isSafeInteger(amount) ||
     typeof currency !== 'string' ||
     !CURRENCY_PATTERN.test(currency) ||
     typeof status !== 'string' ||
@@ -193,15 +193,14 @@ async function requestPayment(
   const { baseUrl, apiKey } = resolveConfig(config);
   let response: Response;
   try {
+    const headers = new Headers(init.headers);
+    headers.set('api-key', apiKey);
+    headers.set('accept', 'application/json');
     response = await fetchImpl(new URL(path, baseUrl), {
       ...init,
       redirect: 'error',
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-      headers: {
-        'api-key': apiKey,
-        accept: 'application/json',
-        ...init.headers,
-      },
+      headers,
     });
   } catch {
     throw new HyperswitchClientError('UPSTREAM_UNAVAILABLE', 'Hyperswitch request failed or timed out.');
