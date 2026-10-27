@@ -1,4 +1,4 @@
-import { apiRequest } from './api-client';
+import { apiRequest, createIdempotencyKey } from './api-client';
 
 export type SubscriptionStatus =
   | 'PENDING'
@@ -83,7 +83,7 @@ export function transitionMySubscription(
       // W01's current command adapter requires a JSON object for POST transitions.
       body: JSON.stringify({}),
       headers: { 'If-Match': etag },
-      idempotencyKey: ['native-subscription', operation, subscriptionId, etag].join(':'),
+      idempotencyKey: createIdempotencyKey(),
     },
   );
 }
