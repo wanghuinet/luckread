@@ -69,7 +69,7 @@ export const etagForVersion = (version: number): string => {
 }
 
 const versionFromEtag = (etag: string): number => {
-  const match = /^"lr-v([1-9]\\d*)"$/.exec(etag)
+  const match = /^"lr-v([1-9]\d*)"$/.exec(etag)
   if (!match?.[1]) throw new SubscriptionRuntimeError('PRECONDITION_FAILED', 412)
   const version = Number(match[1])
   if (!Number.isSafeInteger(version) || version < 1) throw new SubscriptionRuntimeError('PRECONDITION_FAILED', 412)
