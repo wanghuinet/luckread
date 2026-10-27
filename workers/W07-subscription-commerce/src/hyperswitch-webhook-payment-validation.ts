@@ -63,7 +63,7 @@ export type HyperswitchPaymentWebhookDecision =
 
 const PAYMENT_ID_PATTERN = /^pay_[A-Za-z0-9]{26}$/;
 const CURRENCY_PATTERN = /^[A-Z]{3}$/;
-const ISO_TIMESTAMP_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/;
+const ISO_TIMESTAMP_PATTERN = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(Z|([+-])(\d{2}):(\d{2}))$/;
 
 /**
  * Only events with an unambiguous event-to-status correspondence are eligible
@@ -89,7 +89,39 @@ function isNonBlankString(value: unknown): value is string {
 }
 
 function parseTimestamp(value: unknown): number | null {
-  if (typeof value !== 'string' || !ISO_TIMESTAMP_PATTERN.test(value)) return null;
+  if (typeof value !== 'string') return null;
+  const match = ISO_TIMESTAMP_PATTERN.exec(value);
+  if (!match) return null;
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const hour = Number(match[4]);
+  const minute = Number(match[5]);
+  const second = Number(match[6]);
+  if (
+    year < 1 ||
+    month < 1 ||
+    month > 12 ||
+    day < 1 ||
+    hour > 23 ||
+    minute > 59 ||
+    second > 59
+  ) return null;
+
+  // Check the calendar date explicitly; Date.parse alone normalizes some
+  // impossible dates (for example, day 31 in a 30-day month).
+  const monthEnd = new Date(0);
+  monthEnd.setUTCFullYear(year, month, 0);
+  monthEnd.setUTCHours(0, 0, 0, 0);
+  if (day > monthEnd.getUTCDate()) return null;
+
+  if (match[8] !== undefined) {
+    const offsetHours = Number(match[9]);
+    const offsetMinutes = Number(match[10]);
+    if (offsetHours > 23 || offsetMinutes > 59) return null;
+  }
+
   const parsed = Date.parse(value);
   return Number.isFinite(parsed) ? parsed : null;
 }
@@ -167,7 +199,8 @@ export function validateHyperswitchPaymentWebhook(
     return { outcome: 'REJECT', reason: 'CURRENCY_MISMATCH' };
   }
 
-  if (!isHyperswitchPaymentStatus(resource.status)) {
+  const rawProviderStatus = resource.status;
+  if (!isHyperswitchPaymentStatus(rawProviderStatus)) {
     return {
       outcome: 'RECONCILIATION_REQUIRED',
       reason: 'UNKNOWN_PROVIDER_STATUS',
@@ -175,6 +208,7 @@ export function validateHyperswitchPaymentWebhook(
       paymentId: reference.paymentId,
     };
   }
+  const providerStatus = rawProviderStatus;
 
   const providerUpdatedAt = parseTimestamp(resource.updated);
   if (resource.updated === undefined || resource.updated === null || resource.updated === '') {
@@ -224,7 +258,7 @@ export function validateHyperswitchPaymentWebhook(
       paymentId: reference.paymentId,
     };
   }
-  if (!expectedStatuses.includes(resource.status)) {
+  if (!expectedStatuses.includes(providerStatus)) {
     return { outcome: 'REJECT', reason: 'EVENT_STATUS_MISMATCH' };
   }
 
@@ -233,7 +267,7 @@ export function validateHyperswitchPaymentWebhook(
     eventId,
     paymentId: reference.paymentId,
     eventType,
-    providerStatus: resource.status,
+    providerStatus,
     providerUpdatedAt: resource.updated as string,
   };
 }
