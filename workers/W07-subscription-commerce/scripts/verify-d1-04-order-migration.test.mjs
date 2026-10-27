@@ -45,8 +45,8 @@ const targetObjects = [
 
 const columns = (names) => ({
   success: true,
-  results: [{ results: names.map(([name, type], cid) => ({
-    cid, name, type, notnull: 1, dflt_value: null, pk: cid === 0 ? 1 : 0,
+  results: [{ results: names.map(([name, type, notnull = 1], cid) => ({
+    cid, name, type, notnull, dflt_value: null, pk: cid === 0 ? 1 : 0,
   })) }],
 })
 
@@ -55,7 +55,7 @@ const tableInfo = {
     ['order_id', 'TEXT'], ['customer_id', 'TEXT'], ['status', 'TEXT'], ['version', 'INTEGER'],
     ['currency', 'TEXT'], ['subtotal_minor', 'INTEGER'], ['discount_minor', 'INTEGER'],
     ['tax_minor', 'INTEGER'], ['total_minor', 'INTEGER'], ['created_at', 'TEXT'],
-    ['updated_at', 'TEXT'], ['confirmed_at', 'TEXT'], ['cancelled_at', 'TEXT'], ['failure_code', 'TEXT'],
+    ['updated_at', 'TEXT'], ['confirmed_at', 'TEXT', 0], ['cancelled_at', 'TEXT', 0], ['failure_code', 'TEXT', 0],
   ]),
   orderLines: columns([
     ['order_line_id', 'TEXT'], ['order_id', 'TEXT'], ['item_type', 'TEXT'], ['item_ref', 'TEXT'],
@@ -65,7 +65,7 @@ const tableInfo = {
   ]),
   idempotency: columns([
     ['id', 'TEXT'], ['customer_id', 'TEXT'], ['operation_key', 'TEXT'], ['idempotency_key', 'TEXT'],
-    ['request_hash', 'TEXT'], ['state', 'TEXT'], ['response_status', 'INTEGER'], ['response_json', 'TEXT'],
+    ['request_hash', 'TEXT'], ['state', 'TEXT'], ['response_status', 'INTEGER', 0], ['response_json', 'TEXT', 0],
     ['created_at', 'TEXT'], ['expires_at', 'TEXT'],
   ]),
 }
