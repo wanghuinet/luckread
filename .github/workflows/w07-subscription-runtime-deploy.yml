@@ -74,6 +74,7 @@ jobs:
           test -f migrations/0001_membership_subscriptions.sql
           test -f migrations/0002_subscription_version_cas.sql
           test -f migrations/0003_membership_plans.sql
+          test -f migrations-d1-04/0001_order_commerce.sql
           test -f src/index.ts
           test -f src/subscription-runtime.ts
       - name: Typecheck W07

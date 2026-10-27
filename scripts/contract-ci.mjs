@@ -545,7 +545,26 @@ async function checkOrderContractCandidate() {
       preflight?.artifactUrl !== 'https://github.com/wanghuinet/luckread/actions/runs/40576180128/artifacts/12767836622') {
     fail('Order persistence must bind its physical name claim to exact read-only D1-04 preflight evidence');
   }
-  if (persistence.migration?.status !== 'NOT_CREATED') fail('PAY-002 candidate must not claim or ship a physical migration');
+  if (persistence.migration?.status !== 'PROPOSED_NOT_APPLIED' ||
+      persistence.migration?.targetBinding !== 'D1_04' ||
+      persistence.migration?.file !== 'workers/W07-subscription-commerce/migrations-d1-04/0001_order_commerce.sql' ||
+      persistence.migration?.id !== '0001_order_commerce' ||
+      persistence.migration?.appliedRemotely !== false) {
+    fail('PAY-002 D1-04 migration must be an isolated source candidate and remain unapplied');
+  }
+  const w07Config = await readContract('workers/W07-subscription-commerce/wrangler.jsonc');
+  const configuredD101 = (w07Config?.d1_databases ?? []).find((db) => db.binding === 'D1_01');
+  const configuredD104 = (w07Config?.d1_databases ?? []).find((db) => db.binding === 'D1_04');
+  if (configuredD101?.migrations_dir !== 'migrations' ||
+      configuredD104?.migrations_dir !== 'migrations-d1-04') {
+    fail('PAY-002 must keep D1-01 migrations separate from the D1-04 order migration directory');
+  }
+  if (!await fileExists(resolve('workers/W07-subscription-commerce/migrations-d1-04/0001_order_commerce.sql'))) {
+    fail('PAY-002 source candidate migration file is missing');
+  }
+  if (persistence.runtimeGates?.migrationExecution !== 'CANDIDATE_ONLY_NOT_APPLIED') {
+    fail('PAY-002 migration evidence must not imply a remote schema change');
+  }
   const validFieldIds = new Set([...(order.fields ?? []).map((f) => f.fieldId), ...(line.fields ?? []).map((f) => f.fieldId)]);
   const validEntityFields = new Map([
     ...(order.fields ?? []).map((f) => [f.fieldId, { entityId: 'ENT-ORDER', field: f }]),
