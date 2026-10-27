@@ -64,7 +64,7 @@ const toOperation = (method: string, segments: string[]): Operation | null => {
   if (segments.length === 2 && segments[0] === 'memberships' && segments[1] === 'subscriptions' && method === 'GET') return { operation: 'list', subscriptionId: null }
   if (segments.length === 2 && segments[0] === 'memberships' && segments[1] === 'subscriptions' && method === 'POST') return { operation: 'create', subscriptionId: null }
   if (segments.length === 3 && segments[0] === 'memberships' && segments[1] === 'subscriptions' && method === 'GET') return { operation: 'get', subscriptionId: segments[2] }
-  if (segments.length === 4 && segments[0] === 'memberships' && segments[1] === 'subscriptions' && method === 'POST' && isMutationOperation(segments[3])) return { operation: segments[3], subscriptionId: segments[2] }
+  if (segments.length === 4 && segments[0] === 'memberships' && segments[1] === 'subscriptions' && method === 'POST' && ['cancel', 'pause', 'resume', 'change-plan'].includes(segments[3]!)) return { operation: segments[3], subscriptionId: segments[2] }
   return null
 }
 
