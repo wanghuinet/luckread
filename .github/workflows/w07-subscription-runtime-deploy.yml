@@ -52,6 +52,7 @@ jobs:
           console.log(JSON.stringify({worker:c.name, main:c.main, d1Binding:d1}))
           NODE
           test -f migrations/0001_membership_subscriptions.sql
+          test -f migrations/0002_subscription_version_cas.sql
           test -f src/index.ts
           test -f src/subscription-runtime.ts
       - name: Typecheck W07
@@ -95,7 +96,7 @@ jobs:
             "worker": "luckread-w07",
             "databaseUuid": "2f80471e-3756-49f9-8db1-7707a433ad64",
             "databaseName": "luckread",
-            "migration": "0001_membership_subscriptions",
+            "migrations": ["0001_membership_subscriptions", "0002_subscription_version_cas"],
             "remoteMigration": true,
             "confirmation": "DEPLOY_W07_SUBSCRIPTION",
             "migrationConfirmation": "APPLY_W07_SUBSCRIPTION_MIGRATION"
