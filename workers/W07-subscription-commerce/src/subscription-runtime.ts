@@ -425,7 +425,7 @@ export function normalizeMembershipPlanDraft(value: unknown): MembershipPlanDraf
   if (!/^[a-z][a-z0-9_-]{0,63}$/.test(tier)) throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
   if (billingInterval !== 'MONTHLY' && billingInterval !== 'YEARLY') throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
   if (!/^[A-Z]{3}$/.test(currency)) throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
-  if (!Number.isSafeInteger(priceMinor) || (priceMinor as number) < 0 || (priceMinor as number) > 2_147_483_647) {
+  if (typeof priceMinor !== 'number' || !Number.isSafeInteger(priceMinor) || priceMinor < 0 || priceMinor > 2_147_483_647) {
     throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
   }
   if (!Array.isArray(rawBenefits) || rawBenefits.length > 20 ||
@@ -447,7 +447,7 @@ const membershipPlanIdFromIdempotency = async (creatorId: string, idempotencyKey
   return 'plan_' + hex
 }
 
-const mapMembershipPlan = (row: MembershipPlanStoredRow, replayed = false) => {
+const mapMembershipPlan = (row: MembershipPlanStoredRow, replayed?: boolean) => {
   let benefits: unknown
   try {
     benefits = JSON.parse(row.benefits_json) as unknown
@@ -474,7 +474,7 @@ const mapMembershipPlan = (row: MembershipPlanStoredRow, replayed = false) => {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     etag: '"lr-plan-v' + row.version + '"',
-    ...(replayed ? { replayed: true } : {}),
+    ...(replayed === undefined ? {} : { replayed }),
   }
 }
 
@@ -489,7 +489,7 @@ export async function createMembershipPlanDraft(
   verifiedCreatorId: string,
   input: unknown,
   key: string | null,
-): Promise<ReturnType<typeof mapMembershipPlan> & { replayed?: boolean }> {
+): Promise<ReturnType<typeof mapMembershipPlan>> {
   const actor = validatePrincipal(actorUserId)
   const creatorId = validatePrincipal(verifiedCreatorId)
   const idempotencyKey = validateIdempotencyKey(key)
