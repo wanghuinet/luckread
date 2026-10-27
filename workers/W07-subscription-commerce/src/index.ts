@@ -17,15 +17,15 @@ const getRateKey = (request: Request): string =>
 
 const enforceRateLimit = async (request: Request, env: Env): Promise<void> => {
   const operation = request.method === 'GET' ? 'read' : 'write'
-  if (env.SUBSCRIPTION_ORIGIN_GLOBAL_LIMITER) {
-    const result = await env.SUBSCRIPTION_ORIGIN_GLOBAL_LIMITER.limit({ key: 'origin:' + operation })
-    if (!result.success) throw new SubscriptionRuntimeError('RATE_LIMITED', 429)
-  }
+  const originLimiter = env.SUBSCRIPTION_ORIGIN_GLOBAL_LIMITER
+  if (!originLimiter) throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
+  const originResult = await originLimiter.limit({ key: 'origin:' + operation })
+  if (!originResult.success) throw new SubscriptionRuntimeError('RATE_LIMITED', 429)
+
   const actorLimiter = operation === 'read' ? env.SUBSCRIPTION_READ_LIMITER : env.SUBSCRIPTION_WRITE_LIMITER
-  if (actorLimiter) {
-    const result = await actorLimiter.limit({ key: operation + ':' + getRateKey(request) })
-    if (!result.success) throw new SubscriptionRuntimeError('RATE_LIMITED', 429)
-  }
+  if (!actorLimiter) throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
+  const actorResult = await actorLimiter.limit({ key: operation + ':' + getRateKey(request) })
+  if (!actorResult.success) throw new SubscriptionRuntimeError('RATE_LIMITED', 429)
 }
 
 const json = (body: unknown, status = 200, etag?: string) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', ...(etag ? { ETag: etag } : {}) } })
