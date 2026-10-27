@@ -210,6 +210,14 @@ describe('subscription runtime', () => {
     expect(runtime).not.toContain('AND updated_at = ?')
   })
 
+  it('restricts manual deployment to an already-reviewed main commit and avoids shell interpolation', () => {
+    const workflow = readFileSync(new URL('../../../../.github/workflows/w07-subscription-runtime-deploy.yml', import.meta.url), 'utf8')
+    expect(workflow).toContain('git merge-base --is-ancestor "$SOURCE_SHA" origin/main')
+    expect(workflow).toContain('SOURCE_SHA: ${{ inputs.source_sha }}')
+    expect(workflow).not.toContain('ref: ${{ inputs.source_sha }}')
+    expect(workflow).not.toContain('[[ "${{ inputs.source_sha }}"')
+  })
+
   it('rejects invalid version ETag values', async () => {
     expect(() => etagForVersion(0)).toThrowError(expect.objectContaining({ code: 'INTEGRITY_VIOLATION', status: 500 }))
     const db = fakeDb([baseRow()])
