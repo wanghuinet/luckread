@@ -60,7 +60,7 @@ function fakeDb(rows: SubscriptionRow[], plans: MembershipPlanRow[] = []): D1Dat
             const row = state.get(String(values[4]))
             const plan = planState.get(String(values[7]))
             if (!row || row.subscriber_id !== String(values[5]) || row.version !== Number(values[6])) return { meta: { changes: 0 } }
-            if (!plan || plan.owner_type !== 'CREATOR' || plan.status !== 'ACTIVE' || plan.visibility !== 'PUBLIC') return { meta: { changes: 0 } }
+            if (!plan || plan.owner_type !== 'CREATOR' || plan.status !== 'ACTIVE' || plan.visibility !== 'PUBLIC' || plan.owner_id !== String(values[8])) return { meta: { changes: 0 } }
             row.plan_id = plan.plan_id; row.plan_version = plan.current_version; row.creator_id = plan.owner_id; row.updated_at = String(values[3]); row.version += 1
             return { meta: { changes: 1 } }
           }
@@ -204,7 +204,7 @@ describe('subscription runtime', () => {
     expect(Date.parse(after.updatedAt)).toBe(Date.parse(before.updatedAt) + 1)
   })
   it('changes plan only to an active authoritative version and updates the creator reference', async () => {
-    const db = fakeDb([baseRow()], [activePlan('plan_pro', { current_version: 7, owner_id: 'creator_pro' })]); const before = await getSubscription(db, 'user_1', 'sub_existing'); const after = await changeSubscriptionPlan(db, 'user_1', 'sub_existing', 'plan_pro', before.etag)
+    const db = fakeDb([baseRow({ creator_id: 'creator_1' })], [activePlan('plan_pro', { current_version: 7, owner_id: 'creator_1' })]); const before = await getSubscription(db, 'user_1', 'sub_existing'); const after = await changeSubscriptionPlan(db, 'user_1', 'sub_existing', 'plan_pro', before.etag)
     expect(after.planId).toBe('plan_pro'); expect(after.planVersion).toBe(7); expect(after.creatorId).toBe('creator_pro'); expect(after.status).toBe('ACTIVE'); expect(after.version).toBe(before.version + 1); expect(after.etag).toBe(etagForVersion(2))
   })
 
@@ -213,6 +213,17 @@ describe('subscription runtime', () => {
     await expect(changeSubscriptionPlan(db, 'user_1', 'sub_existing', 'plan_unavailable', before.etag)).rejects.toMatchObject({ code: 'PLAN_NOT_ACTIVE', status: 409 })
     const after = await getSubscription(db, 'user_1', 'sub_existing')
     expect(after.planId).toBe('plan_basic')
+    expect(after.version).toBe(before.version)
+  })
+
+  it('does not allow changing a subscription to another creator\'s plan', async () => {
+    const db = fakeDb([baseRow({ creator_id: 'creator_1' })], [activePlan('plan_other_creator', { owner_id: 'creator_2' })])
+    const before = await getSubscription(db, 'user_1', 'sub_existing')
+    await expect(changeSubscriptionPlan(db, 'user_1', 'sub_existing', 'plan_other_creator', before.etag))
+      .rejects.toMatchObject({ code: 'PLAN_NOT_ACTIVE', status: 409 })
+    const after = await getSubscription(db, 'user_1', 'sub_existing')
+    expect(after.planId).toBe('plan_basic')
+    expect(after.creatorId).toBe('creator_1')
     expect(after.version).toBe(before.version)
   })
 
