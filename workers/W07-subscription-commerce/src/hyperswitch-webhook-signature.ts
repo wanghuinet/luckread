@@ -130,14 +130,17 @@ function isNonBlankString(value: unknown): value is string {
  * Decode only the documented Hyperswitch v1 outgoing webhook envelope.
  * Call only after verifyHyperswitchWebhookSignature succeeds.
  *
- * This is structural validation, not payment authorization: callers must
- * still verify the configured merchant, bind the event to a known local
+ * The expected merchant ID is required to prevent a structurally valid event
+ * from another merchant being treated as a LuckRead event. This is still not
+ * payment authorization: callers must bind the event to a known local
  * payment/order, persist event_id idempotently, and enforce event ordering
  * before updating financial or entitlement state.
  */
 export function parseHyperswitchWebhookEnvelope(
   rawBody: ArrayBuffer,
+  expectedMerchantId: string | null | undefined,
 ): HyperswitchWebhookEnvelope | null {
+  if (!isNonBlankString(expectedMerchantId)) return null;
   let decoded: unknown;
   try {
     const text = new TextDecoder('utf-8', { fatal: true }).decode(rawBody);
@@ -147,7 +150,7 @@ export function parseHyperswitchWebhookEnvelope(
   }
 
   if (!isRecord(decoded)) return null;
-  if (!isNonBlankString(decoded.merchant_id)) return null;
+  if (!isNonBlankString(decoded.merchant_id) || decoded.merchant_id !== expectedMerchantId) return null;
   if (!isNonBlankString(decoded.event_id)) return null;
   if (!isNonBlankString(decoded.event_type)) return null;
   if (!(HYPERSWITCH_EVENT_TYPES as readonly string[]).includes(decoded.event_type)) return null;
