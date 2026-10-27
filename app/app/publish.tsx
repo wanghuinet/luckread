@@ -16,8 +16,9 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 
-import { apiRequest, createIdempotencyKey, getApiErrorMessage } from '~/lib/api-client';
+import { apiRequest, createIdempotencyKey } from '~/lib/api-client';
 import {
+  apiFailureDiagnostic,
   getMediaPlayback,
   uploadMediaFile,
   uploadTextBody,
@@ -138,7 +139,7 @@ export default function PublishScreen() {
         { method: 'GET' },
       );
       if (!result.response.ok) {
-        throw new Error(getApiErrorMessage(result.data, 'Unable to load this post for editing.', result.response.status));
+        throw new Error(apiFailureDiagnostic(result, 'Unable to load this post for editing.'));
       }
       const record = unwrapContent(result.data);
       if (!record) throw new Error('The server returned an incomplete content record.');
@@ -424,7 +425,7 @@ export default function PublishScreen() {
           },
         );
         if (!result.response.ok) {
-          throw new Error(getApiErrorMessage(result.data, 'Unable to save post changes.', result.response.status));
+          throw new Error(apiFailureDiagnostic(result, 'Unable to save post changes.'));
         }
         router.replace(('/?published=' + encodeURIComponent(contentId) + '&refresh=' + Date.now()) as never);
         return;
@@ -447,7 +448,7 @@ export default function PublishScreen() {
         }
         if (!created.response.ok) {
           if (created.response.status === 408 || created.response.status >= 500) setPublishPending(true);
-          throw new Error(getApiErrorMessage(created.data, 'Unable to create the post.', created.response.status));
+          throw new Error(apiFailureDiagnostic(created, 'Unable to create the post.'));
         }
         draft = unwrapContent(created.data) || null;
         if (!draft?.id) {
@@ -504,10 +505,9 @@ export default function PublishScreen() {
         }
         if (!pollResult.response.ok) {
           setPublishPending(true);
-          throw new Error(getApiErrorMessage(
-            pollResult.data,
+          throw new Error(apiFailureDiagnostic(
+            pollResult,
             'The post draft exists, but its poll could not be saved. Retry to finish the same post.',
-            pollResult.response.status,
           ));
         }
       }
@@ -532,10 +532,9 @@ export default function PublishScreen() {
       );
       if (!transitioned.response.ok) {
         setPublishPending(true);
-        throw new Error(getApiErrorMessage(
-          transitioned.data,
+        throw new Error(apiFailureDiagnostic(
+          transitioned,
           'The post was created but could not be published yet. Retry to finish publishing this same post.',
-          transitioned.response.status,
         ));
       }
 
