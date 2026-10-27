@@ -494,6 +494,22 @@ describe('subscription runtime', () => {
     expect(JSON.stringify(result)).not.toContain('plan_other_creator')
   })
 
+  it('fails closed when persisted creator plan commercial fields are malformed', async () => {
+    const invalidBenefits = fakeDb([], [
+      activePlan('plan_corrupt_benefits', { benefits_json: '[1]' }),
+    ])
+    await expect(listCreatorMembershipPlans(invalidBenefits, 'creator_1'))
+      .rejects.toMatchObject({ code: 'INTEGRITY_VIOLATION', status: 500 })
+    await expect(listActiveMembershipPlans(invalidBenefits, 20))
+      .rejects.toMatchObject({ code: 'INTEGRITY_VIOLATION', status: 500 })
+
+    const invalidPrice = fakeDb([], [
+      activePlan('plan_corrupt_price', { price_minor: 12.5 }),
+    ])
+    await expect(listCreatorMembershipPlans(invalidPrice, 'creator_1'))
+      .rejects.toMatchObject({ code: 'INTEGRITY_VIOLATION', status: 500 })
+  })
+
   it('uses version CAS rather than updated_at as the concurrency authority', async () => {
     const runtime = readFileSync(new URL('./subscription-runtime.ts', import.meta.url), 'utf8')
     expect(runtime).toContain('version = version + 1')
