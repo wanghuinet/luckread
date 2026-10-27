@@ -221,7 +221,7 @@ export async function bindPreflightToStoredPost(
   }
 
   const bodyRead = await readStoredPostBody(bodyUrl, requestUrl.origin, request)
-  if (!bodyRead.ok) {
+  if ('status' in bodyRead) {
     return bodyRead.status === 503
       ? makeErrorResponse(503, 'SERVICE_UNAVAILABLE', 'Content service unavailable')
       : makeErrorResponse(422, 'VALIDATION_FAILED', 'Stored post body could not be verified, is empty, or exceeds the verification limit')
