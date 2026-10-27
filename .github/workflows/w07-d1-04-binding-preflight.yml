@@ -61,7 +61,7 @@ jobs:
         run: |
           set -euo pipefail
           if [[ -f /tmp/w07-d1-04-live-name-report.json ]]; then
-            node - <<'NODE' >> "$GITHUB_STEP_SUMMARY"
+            node --input-type=commonjs - <<'NODE' >> "$GITHUB_STEP_SUMMARY"
           const r = require('/tmp/w07-d1-04-live-name-report.json')
           console.log('# W07 D1-04 read-only binding preflight')
           console.log('')
