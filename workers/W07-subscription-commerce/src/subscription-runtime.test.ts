@@ -248,6 +248,10 @@ describe('subscription runtime', () => {
 
     const lowerLayer = await w07.fetch(makeRequest('L2'), env)
     expect(lowerLayer.status).toBe(403)
+
+    // The API contract specifies minimum L3; higher layers must not be rejected by an exact L3/L4 allowlist.
+    const higherLayer = await w07.fetch(makeRequest('L5'), env)
+    expect(higherLayer.status).toBe(200)
   })
 
   it('denies plan creation if W01 did not provide the W08-verified creator identity', async () => {
