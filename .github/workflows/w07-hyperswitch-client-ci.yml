@@ -5,7 +5,7 @@ on:
     paths:
       - 'workers/W07-subscription-commerce/src/hyperswitch-client.ts'
       - 'workers/W07-subscription-commerce/src/hyperswitch-client.test.ts'
-      - 'workers/W07-subscription-commerce/vitest.config.mts'
+      - 'workers/W01-payload/vitest.w07.config.mts'
       - '.github/workflows/w07-hyperswitch-client-ci.yml'
       - 'workers/W01-payload/package.json'
       - 'workers/W01-payload/pnpm-lock.yaml'
@@ -41,4 +41,4 @@ jobs:
         run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Run Hyperswitch payment-client tests
         working-directory: workers/W01-payload
-        run: pnpm exec vitest run --config ../../workers/W07-subscription-commerce/vitest.config.mts ../../workers/W07-subscription-commerce/src/hyperswitch-client.test.ts
+        run: pnpm exec vitest run --config ./vitest.w07.config.mts ../../workers/W07-subscription-commerce/src/hyperswitch-client.test.ts
