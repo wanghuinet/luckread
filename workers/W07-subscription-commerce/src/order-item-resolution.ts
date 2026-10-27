@@ -1,3 +1,5 @@
+/// <reference types="@cloudflare/workers-types" />
+
 import {
   validateCreateCommerceOrderRequest,
   type CreateCommerceOrderItem,
@@ -58,7 +60,8 @@ export async function resolveCommerceOrderItems(
 
   const planIds = toPlanIds(validated.value.items);
   const plans = await resolvePurchasableMembershipPlanOffers(db, planIds);
-  const planById = new Map(plans.map((plan) => [plan.planId, plan]));
+  const planById = new Map<string, (typeof plans)[number]>();
+  for (const plan of plans) planById.set(plan.planId, plan);
   const resolved: ResolvedCommerceOrderItem[] = [];
 
   for (const item of validated.value.items) {
