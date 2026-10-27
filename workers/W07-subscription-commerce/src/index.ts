@@ -56,7 +56,9 @@ const parseSegments = (pathname: string): string[] => pathname.split('/').filter
 
 const requireCreatorLayer = (request: Request): void => {
   const layer = request.headers.get('X-LuckRead-Principal-Layer')?.trim() ?? ''
-  if (layer !== 'L3' && layer !== 'L4') throw new SubscriptionRuntimeError('PERMISSION_DENIED', 403)
+  if (!/^L[0-8]$/.test(layer) || Number(layer.slice(1)) < 3) {
+    throw new SubscriptionRuntimeError('PERMISSION_DENIED', 403)
+  }
 }
 
 const requireVerifiedCreatorId = (request: Request): string => {
