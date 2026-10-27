@@ -19,10 +19,10 @@ on:
   workflow_dispatch:
     inputs:
       version_name:
-        description: Android versionName for this Beta build
+        description: Android versionName (AUTO uses 1.0.0-beta.<Actions run number>)
         required: true
         type: string
-        default: "1.0.0-beta.1"
+        default: "AUTO"
       version_code:
         description: Android versionCode (0 uses the Actions run number; published releases must exceed every prior Beta code)
         required: true
@@ -149,7 +149,7 @@ jobs:
       - name: Set requested app version and Android versionCode
         id: version
         env:
-          BETA_VERSION_NAME: ${{ inputs.version_name || format('1.0.0-beta.{0}', github.run_number) }}
+          BETA_VERSION_NAME: ${{ inputs.version_name == 'AUTO' && format('1.0.0-beta.{0}', github.run_number) || inputs.version_name }}
           BETA_VERSION_CODE: ${{ inputs.version_code || github.run_number }}
         run: |
           node <<'NODE'
@@ -258,7 +258,7 @@ jobs:
           overwrite_files: true
           fail_on_unmatched_files: true
           files: |
-            dist/LuckRead-Android-Beta-${{ inputs.version_name }}-signed-code${{ inputs.version_code }}.apk
-            dist/LuckRead-Android-Beta-${{ inputs.version_name }}-signed-code${{ inputs.version_code }}.apk.sha256
+            dist/LuckRead-Android-Beta-${{ steps.version.outputs.version_name }}-signed-code${{ steps.version.outputs.version_code }}.apk
+            dist/LuckRead-Android-Beta-${{ steps.version.outputs.version_name }}-signed-code${{ steps.version.outputs.version_code }}.apk.sha256
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
