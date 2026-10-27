@@ -1,0 +1,287 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/candidates/pay-002/order-commerce-api.v1.json",
+  "title": "Commerce Purchase Order Create / Read API Candidate",
+  "version": "1.0.0",
+  "status": "CONTRACT_CANDIDATE_NOT_ADMITTED",
+  "operations": [
+    {
+      "operationId": "createCommerceOrder",
+      "method": "POST",
+      "path": "/commerce/orders",
+      "auth": {
+        "required": true,
+        "permission": "order.create.own",
+        "scope": "own",
+        "permissionStatus": "PROPOSED_NOT_ADMITTED"
+      },
+      "request": {
+        "headers": {
+          "Idempotency-Key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "required": true
+          }
+        },
+        "body": {
+          "type": "object",
+          "required": [
+            "items"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "items": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 50,
+              "items": {
+                "type": "object",
+                "required": [
+                  "itemRef",
+                  "quantity"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "itemRef": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255,
+                    "description": "Opaque item/offer reference. W07 must resolve item kind, version and current eligibility through the authoritative owner; client claims do not prove an item is purchasable."
+                  },
+                  "quantity": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 10000
+                  }
+                }
+              }
+            }
+          },
+          "rules": [
+            "customerId, itemType, itemVersion, currency, prices, discount, tax, totals, payment status and provider identifiers are not accepted from the client.",
+            "Repeated itemRef entries in one request are rejected; clients must send one line with the combined quantity.",
+            "The same authenticated customer + operation + Idempotency-Key + semantic request hash replays the first completed response; key reuse with a different request hash is rejected.",
+            "Item kind, immutable item version, currency, unit price, discounts and tax are server-resolved. Unsupported or unresolved items fail closed."
+          ]
+        }
+      },
+      "success": {
+        "status": 201,
+        "idempotent": true,
+        "responseDTO": "CommerceOrderResponse"
+      },
+      "errors": [
+        "AUTH_REQUIRED",
+        "PERMISSION_DENIED",
+        "RESOURCE_NOT_FOUND",
+        "VALIDATION_FAILED",
+        "RATE_LIMITED",
+        "PRECONDITION_REQUIRED",
+        "IDEMPOTENCY_KEY_REUSE_CONFLICT",
+        "IDEMPOTENCY_IN_PROGRESS",
+        "CONFLICT",
+        "SERVICE_UNAVAILABLE"
+      ],
+      "auditRequired": true,
+      "concurrency": {
+        "strategy": "ATOMIC_CREATE_AND_IDEMPOTENCY_RECORD_IN_D1_04"
+      },
+      "candidateStatus": "NOT_PUBLISHED_IN_CANONICAL_OPENAPI"
+    },
+    {
+      "operationId": "getCommerceOrder",
+      "method": "GET",
+      "path": "/commerce/orders/{orderId}",
+      "auth": {
+        "required": true,
+        "permission": "order.read.own",
+        "scope": "owner-only",
+        "permissionStatus": "PROPOSED_NOT_ADMITTED"
+      },
+      "request": {
+        "path": {
+          "orderId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "required": true
+          }
+        }
+      },
+      "success": {
+        "status": 200,
+        "responseDTO": "CommerceOrderResponse"
+      },
+      "errors": [
+        "AUTH_REQUIRED",
+        "PERMISSION_DENIED",
+        "RESOURCE_NOT_FOUND",
+        "VALIDATION_FAILED",
+        "RATE_LIMITED"
+      ],
+      "auditRequired": false,
+      "scopeRules": [
+        "Resource owner is bound to the authenticated server principal.",
+        "An inaccessible order is returned as RESOURCE_NOT_FOUND to avoid cross-owner resource enumeration."
+      ],
+      "candidateStatus": "NOT_PUBLISHED_IN_CANONICAL_OPENAPI"
+    }
+  ],
+  "dtoSchemas": {
+    "CommerceOrderResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "orderId",
+        "status",
+        "version",
+        "currency",
+        "subtotalMinor",
+        "discountMinor",
+        "taxMinor",
+        "totalMinor",
+        "items",
+        "createdAt",
+        "updatedAt"
+      ],
+      "properties": {
+        "orderId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "CREATED",
+            "PENDING_PAYMENT",
+            "CONFIRMED",
+            "PROCESSING",
+            "COMPLETED",
+            "CANCELLED",
+            "FAILED"
+          ]
+        },
+        "version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "currency": {
+          "type": "string",
+          "pattern": "^[A-Z]{3}$"
+        },
+        "subtotalMinor": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "discountMinor": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "taxMinor": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "totalMinor": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "items": {
+          "type": "array",
+          "maxItems": 50,
+          "items": {
+            "$ref": "#/dtoSchemas/CommerceOrderLineResponse"
+          }
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "invariants": [
+        "totalMinor = subtotalMinor - discountMinor + taxMinor",
+        "All amounts use integer minor units and one explicit currency."
+      ]
+    },
+    "CommerceOrderLineResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "itemRef",
+        "quantity",
+        "unitAmountMinor",
+        "lineSubtotalMinor",
+        "lineDiscountMinor",
+        "lineTaxMinor",
+        "lineTotalMinor"
+      ],
+      "properties": {
+        "itemRef": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255
+        },
+        "quantity": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000
+        },
+        "unitAmountMinor": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "lineSubtotalMinor": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "lineDiscountMinor": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "lineTaxMinor": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "lineTotalMinor": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "invariants": [
+        "lineSubtotalMinor = unitAmountMinor * quantity",
+        "lineTotalMinor = lineSubtotalMinor - lineDiscountMinor + lineTaxMinor"
+      ]
+    }
+  },
+  "globalInvariants": [
+    "These operations are candidates only and must not be published or routed until canonical OpenAPI, operation policy and permission registry admission pass.",
+    "The /commerce/orders namespace intentionally separates purchase Orders from the existing OrderExecution confirm/cancel/execution routes defined by docs/127-COMMERCE-ORDER-FULFILLMENT-API-CONTRACT-v1.0.md.",
+    "D1-04 is the Order and financial-fact domain; D1-01 remains subscription and entitlement authority.",
+    "Provider references, raw webhook payloads, customerId, internal D1 columns, ledger rows and entitlement snapshots never appear in public DTOs.",
+    "No order is marked paid from client input. A paid state requires the admitted PAY-001 provider reconciliation contract.",
+    "No order create is admitted until W07 can resolve an authoritative purchasable item/offer and immutable price version."
+  ],
+  "greenEvidence": {
+    "canonicalOpenAPI": "required",
+    "operationPolicy": "required",
+    "permissionRegistry": "required",
+    "itemCatalogResolution": "required",
+    "entityFieldPersistenceMapping": "required",
+    "idempotencyReplayAndConflict": "required",
+    "antiAbuseAndBodyLimit": "required",
+    "runtimeSecurityConcurrencyE2E": "required",
+    "evidenceRegistry": "required"
+  },
+  "nonGoals": [
+    "No public route is published by this candidate.",
+    "No database migration or remote D1 mutation.",
+    "No payment confirmation/capture, financial posting, refund, subscription mutation or entitlement grant.",
+    "No new Worker, D1, Queue, Service Binding, dependency or Payload Core modification.",
+    "This candidate is intentionally stored outside contracts/api so it is not counted as a canonical API operation before permission/OpenAPI admission."
+  ]
+}
