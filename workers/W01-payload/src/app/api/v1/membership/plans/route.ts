@@ -42,8 +42,10 @@ async function resolveActiveCreatorId(request: Request): Promise<string | Respon
   const response = await callW08Creator(request, '/internal/creator/self', 'GET')
   if (!response.ok) return response
   const value: unknown = await response.json().catch(() => null)
+  // W08's internal creator-self response is a direct object, unlike
+  // the public W01 envelope. Accept only that documented authoritative shape.
   const creatorId = value && typeof value === 'object'
-    ? (value as { data?: { creatorId?: unknown } }).data?.creatorId
+    ? (value as { creatorId?: unknown }).creatorId
     : null
   if (typeof creatorId !== 'string' || !creatorId.trim() || creatorId.length > 256) {
     return errorResponse(503, 'CREATOR_IDENTITY_UNAVAILABLE', 'Creator identity unavailable')
