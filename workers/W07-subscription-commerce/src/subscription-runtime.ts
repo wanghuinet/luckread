@@ -457,8 +457,20 @@ const mapMembershipPlan = (row: MembershipPlanStoredRow, replayed?: boolean) => 
   } catch {
     throw new SubscriptionRuntimeError('INTEGRITY_VIOLATION', 500)
   }
-  if (!Array.isArray(benefits) || !Number.isSafeInteger(row.current_version) || row.current_version < 1 ||
-    !Number.isSafeInteger(row.version) || row.version < 1 || !Number.isSafeInteger(row.price_minor) || row.price_minor < 0) {
+  if (
+    !Array.isArray(benefits) ||
+    benefits.length > 20 ||
+    benefits.some((item) => typeof item !== 'string' || item.length < 1 || item.length > 180) ||
+    new Set(benefits).size !== benefits.length ||
+    row.benefits_json.length > 8192 ||
+    !Number.isSafeInteger(row.current_version) || row.current_version < 1 ||
+    !Number.isSafeInteger(row.version) || row.version < 1 ||
+    !Number.isSafeInteger(row.price_minor) || row.price_minor < 0 || row.price_minor > 2_147_483_647 ||
+    !/^[A-Z]{3}$/.test(row.currency) ||
+    (row.billing_interval !== 'MONTHLY' && row.billing_interval !== 'YEARLY') ||
+    !/^[a-z][a-z0-9_-]{0,63}$/.test(row.tier) ||
+    typeof row.name !== 'string' || row.name.trim().length < 1 || row.name.length > 120
+  ) {
     throw new SubscriptionRuntimeError('INTEGRITY_VIOLATION', 500)
   }
   return {
