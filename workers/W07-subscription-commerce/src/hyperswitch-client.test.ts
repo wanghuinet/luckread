@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import {
   createHyperswitchPaymentIntent,
   HyperswitchClientError,
@@ -39,9 +39,6 @@ function fakeFetch(responseOrThrow: Response | Error) {
     return responseOrThrow
   }) as typeof fetch
   return { fetcher, captured }
-}
-function assertClientError(code: HyperswitchClientError['code']) {
-  return (error: unknown) => error instanceof HyperswitchClientError && error.code === code
 }
 
 describe('Hyperswitch server-side payment intent client', () => {
@@ -88,7 +85,7 @@ describe('Hyperswitch server-side payment intent client', () => {
     ]) {
       const fake = fakeFetch(jsonResponse(responsePayment()))
       await expect(createHyperswitchPaymentIntent(invalid, input, fake.fetcher))
-        .rejects.toSatisfy(assertClientError('CONFIGURATION_INVALID'))
+        .rejects.toMatchObject({ code: 'CONFIGURATION_INVALID' })
       expect(fake.captured).toHaveLength(0)
     }
   })
@@ -107,7 +104,7 @@ describe('Hyperswitch server-side payment intent client', () => {
     for (const invalid of invalidInputs) {
       const fake = fakeFetch(jsonResponse(responsePayment()))
       await expect(createHyperswitchPaymentIntent(config, invalid, fake.fetcher))
-        .rejects.toSatisfy(assertClientError('REQUEST_INVALID'))
+        .rejects.toMatchObject({ code: 'REQUEST_INVALID' })
       expect(fake.captured).toHaveLength(0)
     }
   })
@@ -122,7 +119,7 @@ describe('Hyperswitch server-side payment intent client', () => {
     ]) {
       const fake = fakeFetch(jsonResponse(responsePayment(mismatch)))
       await expect(createHyperswitchPaymentIntent(config, input, fake.fetcher))
-        .rejects.toSatisfy(assertClientError('UPSTREAM_INVALID_RESPONSE'))
+        .rejects.toMatchObject({ code: 'UPSTREAM_INVALID_RESPONSE' })
     }
   })
 
@@ -143,7 +140,7 @@ describe('Hyperswitch server-side payment intent client', () => {
   it('normalizes transport failures without leaking exception details', async () => {
     const fake = fakeFetch(new Error('provider URL leaked secret value'))
     await expect(createHyperswitchPaymentIntent(config, input, fake.fetcher))
-      .rejects.toSatisfy(assertClientError('UPSTREAM_UNAVAILABLE'))
+      .rejects.toMatchObject({ code: 'UPSTREAM_UNAVAILABLE' })
   })
 
   it('rejects malformed or oversized successful responses', async () => {
