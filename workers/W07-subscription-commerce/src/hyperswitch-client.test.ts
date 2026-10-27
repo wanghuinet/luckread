@@ -158,6 +158,18 @@ describe('Hyperswitch server-side payment intent client', () => {
     }))
     await expect(createHyperswitchPaymentIntent(config, input, oversized.fetcher))
       .rejects.toMatchObject({ code: 'UPSTREAM_INVALID_RESPONSE' })
+
+    const oversizedStream = new Response(new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new Uint8Array(32 * 1024))
+        controller.enqueue(new Uint8Array(32 * 1024))
+        controller.enqueue(new Uint8Array(1))
+        controller.close()
+      },
+    }), { status: 200 })
+    const streamed = fakeFetch(oversizedStream)
+    await expect(createHyperswitchPaymentIntent(config, input, streamed.fetcher))
+      .rejects.toMatchObject({ code: 'UPSTREAM_INVALID_RESPONSE' })
   })
 
   it('retrieves a provider payment by stable ID and accepts a final status for reconciliation', async () => {
