@@ -26,12 +26,15 @@ describe('v1 subscription adapter', () => {
     expect(route).toContain('callW07Subscription')
   })
 
-  it('enforces mutation preconditions at the public adapter', () => {
-    expect(route).toContain("requireHeader(request, 'Idempotency-Key')")
-    expect(route).toContain("requireHeader(request, 'If-Match')")
-    expect(route).toContain("segments.length === 2")
-    expect(route).toContain("PRECONDITION_REQUIRED")
-    expect(route).toContain("PRECONDITION_FAILED")
+  it('fails closed on subscription writes until verified billing synchronization is available', () => {
+    const writeGuard = route.indexOf("if (request.method === 'POST')")
+    const transportCall = route.indexOf('callW07Subscription({ request, pathname, method:')
+    expect(writeGuard).toBeGreaterThan(-1)
+    expect(transportCall).toBeGreaterThan(writeGuard)
+    expect(route).toContain("'SERVICE_UNAVAILABLE'")
+    expect(route).toContain('verified payment-provider synchronization flow')
+    expect(route).not.toContain("requireHeader(request, 'Idempotency-Key')")
+    expect(route).not.toContain("requireHeader(request, 'If-Match')")
   })
 
   it('declares the existing subscription collection list operation', () => {
