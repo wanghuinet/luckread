@@ -114,3 +114,30 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: pnpm run deploy:app
+
+      - name: Record W01-only deployment provenance
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          mkdir -p artifacts/mapping-0/w01-payload-app-deployment
+          cat > artifacts/mapping-0/w01-payload-app-deployment/provenance.json <<EOF
+          {
+            "workflow": "W01 Payload Application Deploy",
+            "sourceSha": "$SOURCE_SHA",
+            "worker": "luckread-w01-payload",
+            "deploymentScope": "W01_ONLY",
+            "databaseMutation": false,
+            "newWorker": false,
+            "newDatabase": false
+          }
+          EOF
+          cat artifacts/mapping-0/w01-payload-app-deployment/provenance.json
+
+      - name: Upload W01-only deployment evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: w01-payload-app-deployment-${{ inputs.source_sha }}
+          path: artifacts/mapping-0/w01-payload-app-deployment/provenance.json
+          retention-days: 30
