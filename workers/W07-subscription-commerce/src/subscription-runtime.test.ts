@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { changeSubscriptionPlan, createSubscription, etagForVersion, getSubscription, listSubscriptions, parseBoundedPositiveInt, transitionSubscription, type SubscriptionRow, type SubscriptionStatus } from './subscription-runtime.js'
 import w07 from './index.js'
+import { verifyD1SubscriptionPreflight } from '../scripts/verify-remote-preflight.mjs'
 
 type Statement = { bind: (...values: unknown[]) => Statement; first: <T>() => Promise<T | null>; all: <T>() => Promise<{ results: T[] }>; run: () => Promise<{ meta: { changes: number } }> }
 
@@ -238,3 +239,75 @@ describe('subscription runtime', () => {
 })
 
 afterEach(() => vi.useRealTimers())
+
+const preflightDatabaseList = [{ name: 'luckread', uuid: '2f80471e-3756-49f9-8db1-7707a433ad64' }]
+const preflightIndexes = [{
+  results: [
+    { seq: 0, name: 'ix_membership_subscriptions_subscriber_status_period' },
+    { seq: 1, name: 'ix_membership_subscriptions_plan_version' },
+    { seq: 2, name: 'ix_membership_subscriptions_creator_status' },
+    { seq: 3, name: 'ix_membership_subscriptions_updated_at' },
+  ],
+}]
+const legacySchemaNames = [
+  ['subscription_id','TEXT',1,1], ['subscriber_id','TEXT',1,0], ['plan_id','TEXT',1,0],
+  ['plan_version','INTEGER',1,0], ['creator_id','TEXT',0,0], ['status','TEXT',1,0],
+  ['started_at','TEXT',1,0], ['current_period_start','TEXT',1,0], ['current_period_end','TEXT',1,0],
+  ['cancel_at','TEXT',0,0], ['entitlement_snapshot_ref','TEXT',0,0],
+  ['created_at','TEXT',1,0], ['updated_at','TEXT',1,0],
+]
+const preflightSchema = (withVersion = false, versionDefault = '1') => [{
+  results: [...legacySchemaNames, ...(withVersion ? [['version','INTEGER',1,0]] : [])]
+    .map(([name,type,notnull,pk],cid) => ({
+      cid, name, type, notnull, pk,
+      dflt_value: name === 'version' ? versionDefault : null,
+    })),
+}]
+const preflightInput = (withVersion = false, versionDefault = '1') => ({
+  databaseList: preflightDatabaseList,
+  migrationState: [{ results: withVersion
+    ? [{ name: '0001_membership_subscriptions' }, { name: '0002_subscription_version_cas' }]
+    : [{ name: '0001_membership_subscriptions' }] }],
+  subscriptionSchema: preflightSchema(withVersion,versionDefault),
+  subscriptionIndexes: preflightIndexes,
+})
+
+describe('read-only D1 subscription migration preflight', () => {
+  it('requests migration only for the exact legacy schema with migration 0001 applied', () => {
+    const result = verifyD1SubscriptionPreflight(preflightInput())
+    expect(result.migrationAction).toBe('apply')
+    expect(result.appliedMigrations).toEqual(['0001_membership_subscriptions'])
+    expect(result.columns.map((column) => column[0])).not.toContain('version')
+  })
+
+  it('skips migration when migration 0002 and the exact version schema are already present', () => {
+    const result = verifyD1SubscriptionPreflight(preflightInput(true))
+    expect(result.migrationAction).toBe('skip')
+    expect(result.appliedMigrations).toEqual(['0001_membership_subscriptions','0002_subscription_version_cas'])
+    expect(result.columns.at(-1)).toEqual(['version','INTEGER',1,0])
+  })
+
+  it('fails closed when the target D1 UUID does not match', () => {
+    expect(() => verifyD1SubscriptionPreflight({
+      ...preflightInput(),
+      databaseList: [{ name: 'luckread', uuid: 'wrong-database-id' }],
+    })).toThrow('exact D1-01 database name/UUID was not found')
+  })
+
+  it('fails closed on unexpected migration/schema combinations', () => {
+    expect(() => verifyD1SubscriptionPreflight({
+      ...preflightInput(true),
+      migrationState: [{ results: [{ name: '0001_membership_subscriptions' }] }],
+    })).toThrow('migration history and physical Subscription schema do not match')
+  })
+
+  it('fails closed when the version default or expected indexes are missing', () => {
+    expect(() => verifyD1SubscriptionPreflight(preflightInput(true, '0'))).toThrow(
+      'version column does not satisfy INTEGER NOT NULL DEFAULT 1',
+    )
+    expect(() => verifyD1SubscriptionPreflight({
+      ...preflightInput(),
+      subscriptionIndexes: [{ results: [{ seq: 0, name: 'only_some_index' }] }],
+    })).toThrow('missing expected index')
+  })
+})
