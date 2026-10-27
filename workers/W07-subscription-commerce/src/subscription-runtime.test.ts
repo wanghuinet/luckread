@@ -129,6 +129,30 @@ describe('subscription runtime', () => {
     expect(index).not.toContain('changeSubscriptionPlan(')
   })
 
+  it('routes authenticated GET /plans through the active-public plan query', async () => {
+    const allowLimiter = { limit: async () => ({ success: true }) }
+    const request = new Request('https://luckread-w07.internal/plans?limit=10', {
+      method: 'GET',
+      headers: {
+        'X-LuckRead-Caller': 'W01',
+        'X-LuckRead-Transport-Version': '1.0',
+        'X-LuckRead-Correlation-Id': 'plans-catalog-test',
+        'X-LuckRead-Principal-User-Id': 'user_1',
+        'X-LuckRead-Principal-Layer': 'L2',
+      },
+    })
+    const response = await w07.fetch(request, {
+      D1_01: fakeDb([], [activePlan('plan_catalog')]),
+      SUBSCRIPTION_ORIGIN_GLOBAL_LIMITER: allowLimiter,
+      SUBSCRIPTION_READ_LIMITER: allowLimiter,
+      SUBSCRIPTION_WRITE_LIMITER: allowLimiter,
+    })
+    const body = await response.json() as { data?: { docs?: Array<{ planId: string; planVersion: number; priceMinor: number }> } }
+    expect(response.status).toBe(200)
+    expect(body.data?.docs).toHaveLength(1)
+    expect(body.data?.docs?.[0]).toMatchObject({ planId: 'plan_catalog', planVersion: 3, priceMinor: 500 })
+  })
+
   it('returns 503 for authenticated W07 POST without touching D1', async () => {
     let databaseTouched = false
     const db = {
