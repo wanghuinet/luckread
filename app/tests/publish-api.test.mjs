@@ -15,6 +15,7 @@ mock.module('../lib/api-client.ts', () => ({
 }));
 
 const {
+  apiFailureDiagnostic,
   getMediaPlayback,
   normalizeUploadedMedia,
   uploadMediaFile,
@@ -32,6 +33,55 @@ beforeEach(() => {
 
 afterEach(() => {
   globalThis.FormData = originalFormData;
+});
+
+test('publish API failures include HTTP status, stable error code and request ID', () => {
+  const requestId = 'req_publish_denied_403';
+  const message = apiFailureDiagnostic({
+    response: new Response('{}', { status: 403 }),
+    data: {
+      error: { code: 'PERMISSION_DENIED', message: 'permission denied' },
+      requestId,
+    },
+    error: {
+      status: 403,
+      code: 'PERMISSION_DENIED',
+      message: 'permission denied',
+      requestId,
+    },
+  }, 'Unable to publish post.');
+
+  expect(message).toContain('permission denied');
+  expect(message).toContain('HTTP 403');
+  expect(message).toContain('PERMISSION_DENIED');
+  expect(message).toContain('Request ID ' + requestId);
+});
+
+test('publish diagnostics recover a request ID from the payload when normalized error metadata is absent', () => {
+  const message = apiFailureDiagnostic({
+    response: new Response('{}', { status: 503 }),
+    data: {
+      error: { code: 'SERVICE_UNAVAILABLE', message: 'Content service unavailable' },
+      requestId: 'req_publish_upstream_503',
+    },
+    error: null,
+  }, 'Unable to publish post.');
+
+  expect(message).toContain('HTTP 503');
+  expect(message).toContain('SERVICE_UNAVAILABLE');
+  expect(message).toContain('Request ID req_publish_upstream_503');
+});
+
+test('publish diagnostics never add private request data to an error message', () => {
+  const message = apiFailureDiagnostic({
+    response: new Response('{}', { status: 403 }),
+    data: { error: { code: 'PERMISSION_DENIED', message: 'permission denied' }, requestId: 'req_safe' },
+    error: null,
+  }, 'Unable to publish post.');
+
+  expect(message).not.toContain('Authorization');
+  expect(message).not.toContain('Bearer');
+  expect(message).not.toContain('password');
 });
 
 test('uploads a selected file as multipart and reuses its supplied idempotency key', async () => {
