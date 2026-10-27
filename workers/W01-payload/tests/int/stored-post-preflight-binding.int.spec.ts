@@ -162,6 +162,23 @@ describe('bind direct social post publishing to the stored body asset', () => {
     expect(headers.get('cookie')).toBe('better-auth.session_token=creator-session-cookie')
   })
 
+  it('rejects non-canonical media origins and video delivery URLs as post-body references', async () => {
+    for (const bodyRef of [
+      'https://img.luckread.com:8443/media/post-body.txt',
+      'https://video.luckread.com/media/post-body.txt',
+    ]) {
+      callW03ContentMock.mockResolvedValueOnce(new Response(JSON.stringify(storedPost({ bodyRef })), { status: 200 }))
+      const r2Get = vi.fn()
+      getCloudflareContextMock.mockResolvedValueOnce({ env: { R2: { get: r2Get } } })
+
+      const result = await bindPost()
+
+      expect(result).toBeInstanceOf(Response)
+      expect((result as Response).status).toBe(422)
+      expect(r2Get).not.toHaveBeenCalled()
+    }
+  })
+
   it('rejects an unapproved LuckRead subdomain without forwarding owner credentials', async () => {
     callW03ContentMock.mockResolvedValue(new Response(JSON.stringify(storedPost({
       bodyRef: 'https://unexpected.luckread.com/media/post-body.txt',
