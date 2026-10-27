@@ -32,7 +32,10 @@ async function authorizePlanPermission(
   const response = await callW08Creator(permissionRequest, '/internal/authz/check-permission', 'POST')
   if (!response.ok) return errorResponse(503, 'AUTHORIZATION_UNAVAILABLE', 'Creator authorization unavailable')
   const value: unknown = await response.json().catch(() => null)
-  if (!value || typeof value !== 'object' || (value as { decision?: unknown }).decision !== 'ALLOW') {
+  const decision = value && typeof value === 'object'
+    ? (value as { data?: { decision?: unknown } }).data?.decision
+    : undefined
+  if (decision !== 'ALLOW') {
     return errorResponse(403, 'PERMISSION_DENIED', 'Creator membership plan permission required')
   }
   return null
