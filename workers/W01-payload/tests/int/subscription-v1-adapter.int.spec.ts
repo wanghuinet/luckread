@@ -10,7 +10,7 @@ describe('v1 subscription adapter', () => {
   const plansRoute = readFileSync(resolve(process.cwd(), 'src/app/api/v1/plans/route.ts'), 'utf8')
   const creatorPlansRoute = readFileSync(resolve(process.cwd(), 'src/app/api/v1/membership/plans/route.ts'), 'utf8')
   const w08CreatorClient = readFileSync(resolve(process.cwd(), 'src/auth/w08-creator-client.ts'), 'utf8')
-  const w08Worker = readFileSync(resolve(process.cwd(), '../../W08-creator/src/worker.ts'), 'utf8')
+  const w08Worker = readFileSync(resolve(process.cwd(), '../W08-creator/src/worker.ts'), 'utf8')
   const client = readFileSync(resolve(process.cwd(), 'src/subscription/w07-subscription-client.ts'), 'utf8')
   const wrangler = readFileSync(resolve(process.cwd(), 'wrangler.jsonc'), 'utf8')
 
@@ -29,7 +29,7 @@ describe('v1 subscription adapter', () => {
     expect(creatorPlansRoute).toContain("membership.plan.read.own")
     expect(creatorPlansRoute).toContain("'/internal/authz/check-permission'")
     expect(creatorPlansRoute).toContain("'/internal/creator/self'")
-    expect(creatorPlansRoute).toContain('(value as { creatorId?: unknown }).creatorId')
+    expect(creatorPlansRoute).toContain('(value as { data?: { creatorId?: unknown } }).data?.creatorId')
     expect(w08Worker).toContain('return json({ creatorId: creator.creator_id, status: \'ACTIVE\' })')
     expect(creatorPlansRoute).toContain("verifiedCreatorId: creatorId")
     expect(w08CreatorClient).toContain("'/internal/creator/self'")
