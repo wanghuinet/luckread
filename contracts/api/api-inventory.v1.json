@@ -231,6 +231,7 @@
       "required": true,
       "endpoint_groups": [
         "DELETE /v1/subscriptions/{subscriptionId}",
+        "GET /v1/commerce/orders/{orderId}",
         "GET /v1/entitlements",
         "GET /v1/entitlements/{subjectId}",
         "GET /v1/membership/plans",
@@ -239,6 +240,7 @@
         "GET /v1/payments/{paymentId}",
         "GET /v1/plans",
         "GET /v1/subscriptions",
+        "POST /v1/commerce/orders",
         "POST /v1/entitlements/check",
         "POST /v1/membership/plans",
         "POST /v1/memberships/subscriptions",
