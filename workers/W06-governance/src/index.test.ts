@@ -226,6 +226,21 @@ describe('W06 runtime', () => {
     expect(prepare).not.toHaveBeenCalled()
   })
 
+  it('accepts higher creator-capable layers and records the actual W01 layer', async () => {
+    const { db, rows } = createPlanAuditDb()
+    const runtime = await import('./index')
+    const response = await runtime.default.fetch(
+      planAuditRequest(planAuditInput, true, 'req_plan_audit_l7', 'L7'),
+      { D1_03: db },
+    )
+    expect(response.status).toBe(201)
+    expect(rows.get(planAuditInput.eventId)).toMatchObject({
+      actor_json: JSON.stringify({ actorId: 'creator_user_001', actorType: 'user', layer: 'L7' }),
+      action: 'membership.plan.created',
+      target_id: planId,
+    })
+  })
+
   it('persists a canonical membership-plan creation event using the W01 principal', async () => {
     const { db, prepare, rows } = createPlanAuditDb()
     const runtime = await import('./index')
