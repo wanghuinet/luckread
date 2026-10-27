@@ -110,8 +110,12 @@ describe('subscription runtime', () => {
     const db = fakeDb([baseRow()]); const before = await getSubscription(db, 'user_1', 'sub_existing'); const after = await transitionSubscription(db, 'user_1', 'sub_existing', 'pause', before.etag)
     expect(after.status).toBe('PAUSED'); expect(after.updatedAt).not.toBe(before.updatedAt); expect(after.version).toBe(before.version + 1); expect(after.etag).toBe(etagForVersion(2))
   })
-  it('fails stale If-Match without changing state when the requested transition has not converged', async () => {
-    const db = fakeDb([baseRow()]); await expect(transitionSubscription(db, 'user_1', 'sub_existing', 'pause', '"lr-stale"')).rejects.toMatchObject({ code: 'PRECONDITION_FAILED', status: 412 })
+  it('fails stale version If-Match without changing state when the requested transition has not converged', async () => {
+    const db = fakeDb([baseRow({ version: 2 })])
+    await expect(transitionSubscription(db, 'user_1', 'sub_existing', 'pause', etagForVersion(1))).rejects.toMatchObject({ code: 'PRECONDITION_FAILED', status: 412 })
+    const after = await getSubscription(db, 'user_1', 'sub_existing')
+    expect(after.status).toBe('ACTIVE')
+    expect(after.version).toBe(2)
   })
 
   it('treats a repeated pause with a stale If-Match as an idempotent success', async () => {
@@ -161,6 +165,19 @@ describe('subscription runtime', () => {
     expect(result.hasNextPage).toBe(true)
     expect(result.limit).toBe(1)
     expect(result.page).toBe(1)
+  })
+
+  it('uses version CAS rather than updated_at as the concurrency authority', async () => {
+    const runtime = readFileSync(new URL('./subscription-runtime.ts', import.meta.url), 'utf8')
+    expect(runtime).toContain('version = version + 1')
+    expect(runtime).toContain('AND version = ?')
+    expect(runtime).not.toContain('AND updated_at = ?')
+  })
+
+  it('rejects invalid version ETag values', async () => {
+    expect(() => etagForVersion(0)).toThrowError(expect.objectContaining({ code: 'INTEGRITY_VIOLATION', status: 500 }))
+    const db = fakeDb([baseRow()])
+    await expect(transitionSubscription(db, 'user_1', 'sub_existing', 'pause', '"lr-v9007199254740992"')).rejects.toMatchObject({ code: 'PRECONDITION_FAILED', status: 412 })
   })
 
   it('does not expose entitlementSnapshotRef', async () => {
