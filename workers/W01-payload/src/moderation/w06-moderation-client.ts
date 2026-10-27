@@ -25,6 +25,29 @@ const requestId = (request: Request): string => {
     : `req_${crypto.randomUUID().replaceAll('-', '')}`
 }
 
+/** Dedicated fixed route for the durable membership-plan audit record. */
+export async function callW06MembershipPlanAudit(input: {
+  request: Request
+  principal: ContentPrincipal
+  body: {
+    eventId: string
+    planId: string
+    creatorId: string
+    planVersion: 1
+    status: 'DRAFT'
+    visibility: 'PRIVATE'
+    occurredAt: string
+  }
+}): Promise<Response> {
+  return callW06Moderation({
+    request: input.request,
+    pathname: '/internal/audit-events/membership-plan-created',
+    method: 'POST',
+    principal: input.principal,
+    body: input.body,
+  })
+}
+
 export async function callW06Moderation(input: {
   request: Request
   pathname: string
