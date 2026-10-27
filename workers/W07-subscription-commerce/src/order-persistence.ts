@@ -379,9 +379,20 @@ const validatePricing = (
     discountMinor = checkedAdd(discountMinor, lineDiscount);
     taxMinor = checkedAdd(taxMinor, lineTax);
     totalMinor = checkedAdd(totalMinor, lineTotal);
+    const validatedItem: AuthoritativelyPricedOrderItem = {
+      itemType: item.itemType as AuthoritativelyPricedOrderItem['itemType'],
+      itemRef: item.itemRef as string,
+      itemVersion: item.itemVersion as string,
+      quantity: item.quantity as number,
+      unitAmountMinor: unit,
+      currency: item.currency as string,
+      lineDiscountMinor: lineDiscount,
+      lineTaxMinor: lineTax,
+      itemSnapshotJson: item.itemSnapshotJson as string,
+    };
     return {
       orderLineId: '',
-      item,
+      item: validatedItem,
       lineSubtotalMinor: lineSubtotal,
       lineTotalMinor: lineTotal,
     };
