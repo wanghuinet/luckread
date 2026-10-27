@@ -5,6 +5,7 @@ import {
   OrderPersistenceError,
   type CreateOrderResult,
   type CommerceOrderData,
+  type AuthoritativelyPricedOrder,
 } from './order-persistence.js';
 import { handleCommerceOrderRequest } from './order-http-runtime.js';
 
@@ -36,6 +37,23 @@ const orderData: CommerceOrderData = {
 };
 
 const createResult: CreateOrderResult = { data: orderData, status: 201, replayed: false };
+
+// Only supplied in tests. Production remains fail-closed until a reviewed
+// authoritative discount/tax assessment adapter is wired into W07.
+const explicitTestPricing: AuthoritativelyPricedOrder = {
+  currency: 'USD',
+  items: [{
+    itemType: 'MEMBERSHIP_PLAN',
+    itemRef: 'plan_' + 'a'.repeat(64),
+    itemVersion: '1',
+    quantity: 1,
+    unitAmountMinor: 1200,
+    currency: 'USD',
+    lineDiscountMinor: 0,
+    lineTaxMinor: 0,
+    itemSnapshotJson: JSON.stringify({ planId: 'plan_' + 'a'.repeat(64), planVersion: 1 }),
+  }],
+};
 
 function postRequest(body: unknown, headers: Record<string, string> = {}): Request {
   return new Request('https://luckread-w07.internal/commerce/orders', {
@@ -71,7 +89,7 @@ describe('private W07 commerce order HTTP handler', () => {
       }),
       'user_42',
       env,
-      { createOrder: mockCreate },
+      { createOrder: mockCreate, resolvePricing: async () => explicitTestPricing },
     );
 
     expect(response?.status).toBe(201);
@@ -83,6 +101,28 @@ describe('private W07 commerce order HTTP handler', () => {
     expect(envelope.requestId).toMatch(/^req_/);
     expect(JSON.stringify(envelope)).not.toContain('customerId');
     expect(JSON.stringify(envelope)).not.toContain('itemSnapshotJson');
+  });
+
+  it('keeps order creation disabled when no authoritative discount/tax pricing adapter is wired', async () => {
+    let writes = 0;
+    const mockCreate = (async () => {
+      writes += 1;
+      return createResult;
+    }) as unknown as typeof createCommerceOrder;
+    const response = await handleCommerceOrderRequest(
+      postRequest({ items: [{ itemRef: 'plan_' + 'a'.repeat(64), quantity: 1 }] }, {
+        'Idempotency-Key': 'purchase_attempt_02',
+      }),
+      'user_42',
+      env,
+      { createOrder: mockCreate },
+    );
+
+    expect(response?.status).toBe(503);
+    expect(await parseResponse(response!)).toMatchObject({
+      error: { code: 'SERVICE_UNAVAILABLE' },
+    });
+    expect(writes).toBe(0);
   });
 
   it('fails closed on missing Idempotency-Key before attempting any D1 access', async () => {
