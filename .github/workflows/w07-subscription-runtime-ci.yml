@@ -155,6 +155,11 @@ jobs:
           except sqlite3.IntegrityError:
             pass
           try:
+            db.execute("UPDATE membership_plans SET plan_id = 'plan_probe_renamed' WHERE plan_id = 'plan_probe'")
+            raise SystemExit('membership plan ID was not immutable')
+          except sqlite3.IntegrityError:
+            pass
+          try:
             db.execute("UPDATE membership_plans SET current_version = 2 WHERE plan_id = 'plan_probe'")
             raise SystemExit('membership plan current version advanced to a missing version')
           except sqlite3.IntegrityError:
