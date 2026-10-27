@@ -150,14 +150,14 @@ describe('Hyperswitch server-side payment intent client', () => {
   it('rejects malformed or oversized successful responses', async () => {
     const badJson = fakeFetch(new Response('{not-json', { status: 200 }))
     await expect(createHyperswitchPaymentIntent(config, input, badJson.fetcher))
-      .rejects.toSatisfy(assertClientError('UPSTREAM_INVALID_RESPONSE'))
+      .rejects.toMatchObject({ code: 'UPSTREAM_INVALID_RESPONSE' })
 
     const oversized = fakeFetch(new Response(JSON.stringify(responsePayment()), {
       status: 200,
       headers: { 'content-length': '999999' },
     }))
     await expect(createHyperswitchPaymentIntent(config, input, oversized.fetcher))
-      .rejects.toSatisfy(assertClientError('UPSTREAM_INVALID_RESPONSE'))
+      .rejects.toMatchObject({ code: 'UPSTREAM_INVALID_RESPONSE' })
   })
 
   it('retrieves a provider payment by stable ID and accepts a final status for reconciliation', async () => {
@@ -173,11 +173,11 @@ describe('Hyperswitch server-side payment intent client', () => {
   it('rejects invalid lookup IDs and a provider response for another payment', async () => {
     const invalid = fakeFetch(jsonResponse(responsePayment()))
     await expect(retrieveHyperswitchPayment(config, 'not-a-payment-id', invalid.fetcher))
-      .rejects.toSatisfy(assertClientError('REQUEST_INVALID'))
+      .rejects.toMatchObject({ code: 'REQUEST_INVALID' })
     expect(invalid.captured).toHaveLength(0)
 
     const mismatched = fakeFetch(jsonResponse(responsePayment({ payment_id: 'pay_aaaaaaaaaaaaaaaaaaaaaaaaaa' })))
     await expect(retrieveHyperswitchPayment(config, input.paymentId, mismatched.fetcher))
-      .rejects.toSatisfy(assertClientError('UPSTREAM_INVALID_RESPONSE'))
+      .rejects.toMatchObject({ code: 'UPSTREAM_INVALID_RESPONSE' })
   })
 })
