@@ -200,10 +200,22 @@
       "featureId": "PAY-002",
       "status": "UNRESOLVED",
       "evidenceRefs": [
-        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
+        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
+        "contracts/entity/ORDER-ENTITY-CONTRACT.v1.json",
+        "contracts/entity/ORDER-LINE-ENTITY-CONTRACT.v1.json",
+        "contracts/persistence/ORDER-D1-04-persistence.v1.json",
+        "contracts/state-machines/order.json",
+        "docs/change-control/CC-PAY-002-ORDER-ENTITY-MODEL-2026-10-27.md",
+        "docs/09-D1-DOMAIN-MASTER-v1.0.md",
+        "docs/65-MONETIZATION-COMMERCE-SYSTEM-CONTRACT-v1.0.md",
+        "docs/68-WALLET-LEDGER-AND-SETTLEMENT-CONTRACT-v1.0.md",
+        "docs/191-L5-L6-MEMBERSHIP-COMMERCE-ADVERTISING-WALLET-LEDGER-INSTANCE-REGISTRY-v1.0.md",
+        "docs/305-CONCURRENCY-ETAG-CONDITIONAL-REQUEST-AND-IDEMPOTENCY-CONTRACT-v1.0.md"
       ],
       "blockers": [
-        "Order authority/API/entity mapping not evidence-bound"
+        "Order and OrderLine entity/field definitions and a logical D1-04 persistence candidate are registered as PROPOSED / CONTRACTED_NOT_VERIFIED only.",
+        "Canonical public API/DTO, operation policy, entity-field-persistence-to-API binding, executable runtime/tests and Evidence Registry admission remain unresolved.",
+        "D1-04 remote display-name preflight and physical migration/schema evidence are not verified; no migration is prepared or executed."
       ]
     },
     {

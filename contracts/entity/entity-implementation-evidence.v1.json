@@ -296,6 +296,44 @@
         "Evidence Registry records EVD-AUTH007-MFA-LIVE-SECURITY-E2E-20261025-001 and EVD-AUTH007-W01-W02-PRODUCTION-RUNTIME-20261025-001 are VERIFIED only for their scoped claims under docs/change-control/CC-AUTH-007-MFA-RUNTIME-EVIDENCE-INHERITANCE-2026-10-25.md. EVD-AUTH007-MFA-D1-01-SCHEMA-READBACK-20261025-001 remains CREATED pending a corrected controlled migration/read-back run. Global Evidence Registry and final Mapping 0 acceptance remain open."
       ],
       "status": "BLOCKED"
+    },
+    {
+      "entityId": "ENT-ORDER",
+      "catalogStatus": "PROPOSED",
+      "implementationStatus": "CONTRACT_ONLY",
+      "implementationRefs": [],
+      "schemaEvidenceRefs": [
+        "contracts/entity/ORDER-ENTITY-CONTRACT.v1.json",
+        "contracts/persistence/ORDER-D1-04-persistence.v1.json",
+        "contracts/state-machines/order.json",
+        "docs/change-control/CC-PAY-002-ORDER-ENTITY-MODEL-2026-10-27.md"
+      ],
+      "migrationEvidenceRefs": [],
+      "payloadNativeEvidenceRefs": [],
+      "extensionEvidenceRefs": [],
+      "blockers": [
+        "Contract candidate only: no canonical API/DTO, physical migration, runtime handler, deployed schema, or exact-commit runtime evidence has been admitted."
+      ],
+      "status": "BLOCKED"
+    },
+    {
+      "entityId": "ENT-ORDER-LINE",
+      "catalogStatus": "PROPOSED",
+      "implementationStatus": "CONTRACT_ONLY",
+      "implementationRefs": [],
+      "schemaEvidenceRefs": [
+        "contracts/entity/ORDER-LINE-ENTITY-CONTRACT.v1.json",
+        "contracts/persistence/ORDER-D1-04-persistence.v1.json",
+        "contracts/state-machines/order.json",
+        "docs/change-control/CC-PAY-002-ORDER-ENTITY-MODEL-2026-10-27.md"
+      ],
+      "migrationEvidenceRefs": [],
+      "payloadNativeEvidenceRefs": [],
+      "extensionEvidenceRefs": [],
+      "blockers": [
+        "Contract candidate only: no canonical API/DTO, physical migration, runtime handler, deployed schema, or exact-commit runtime evidence has been admitted."
+      ],
+      "status": "BLOCKED"
     }
   ]
 }

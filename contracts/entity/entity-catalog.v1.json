@@ -177,6 +177,38 @@
         "workers/W02-identity/src/auth/better-auth.ts",
         "contracts/alignment/mapping-batches/AUTH-007-real-evidence-reconciliation.v1.md"
       ]
+    },
+    {
+      "entityId": "ENT-ORDER",
+      "name": "Order",
+      "domainId": "D1-04",
+      "classification": "AUTHORITATIVE",
+      "status": "PROPOSED",
+      "evidenceRefs": [
+        "contracts/entity/ORDER-ENTITY-CONTRACT.v1.json",
+        "contracts/persistence/ORDER-D1-04-persistence.v1.json",
+        "contracts/state-machines/order.json",
+        "docs/change-control/CC-PAY-002-ORDER-ENTITY-MODEL-2026-10-27.md",
+        "docs/09-D1-DOMAIN-MASTER-v1.0.md",
+        "docs/65-MONETIZATION-COMMERCE-SYSTEM-CONTRACT-v1.0.md",
+        "docs/305-CONCURRENCY-ETAG-CONDITIONAL-REQUEST-AND-IDEMPOTENCY-CONTRACT-v1.0.md"
+      ]
+    },
+    {
+      "entityId": "ENT-ORDER-LINE",
+      "name": "OrderLine",
+      "domainId": "D1-04",
+      "classification": "AUTHORITATIVE",
+      "status": "PROPOSED",
+      "evidenceRefs": [
+        "contracts/entity/ORDER-LINE-ENTITY-CONTRACT.v1.json",
+        "contracts/persistence/ORDER-D1-04-persistence.v1.json",
+        "contracts/state-machines/order.json",
+        "docs/change-control/CC-PAY-002-ORDER-ENTITY-MODEL-2026-10-27.md",
+        "docs/09-D1-DOMAIN-MASTER-v1.0.md",
+        "docs/65-MONETIZATION-COMMERCE-SYSTEM-CONTRACT-v1.0.md",
+        "docs/305-CONCURRENCY-ETAG-CONDITIONAL-REQUEST-AND-IDEMPOTENCY-CONTRACT-v1.0.md"
+      ]
     }
   ],
   "rules": {
