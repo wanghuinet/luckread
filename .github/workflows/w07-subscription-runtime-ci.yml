@@ -133,5 +133,15 @@ jobs:
           except sqlite3.IntegrityError:
             pass
           if db.execute("SELECT price_minor FROM membership_plan_versions WHERE plan_id = 'plan_probe' AND plan_version = 1").fetchone() != (100,): raise SystemExit('plan version was unexpectedly changed')
+          try:
+            db.execute("UPDATE membership_plans SET owner_id = 'creator_other' WHERE plan_id = 'plan_probe'")
+            raise SystemExit('membership plan owner identity was not immutable')
+          except sqlite3.IntegrityError:
+            pass
+          try:
+            db.execute("UPDATE membership_plans SET current_version = 2 WHERE plan_id = 'plan_probe'")
+            raise SystemExit('membership plan current version advanced to a missing version')
+          except sqlite3.IntegrityError:
+            pass
           print('SUBSCRIPTION_D1_01_AND_MEMBERSHIP_PLAN_MIGRATIONS_STATIC=PASS')
           PY
