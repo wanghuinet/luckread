@@ -552,6 +552,21 @@
       "auditRequired": true
     },
     {
+      "name": "order.create",
+      "resource": "order",
+      "action": "create",
+      "minLayer": "L2",
+      "scope": "own",
+      "auditRequired": true
+    },
+    {
+      "name": "order.read",
+      "resource": "order",
+      "action": "read",
+      "minLayer": "L2",
+      "scope": "own"
+    },
+    {
       "name": "org.billing.read.scope",
       "resource": "org",
       "action": "billing_read",
@@ -1008,6 +1023,8 @@
           "interaction.unlike",
           "notification.read.self",
           "notification.update.self",
+          "order.create",
+          "order.read",
           "report.create",
           "share.create",
           "social.follow",
@@ -1163,6 +1180,8 @@
           "moderation.read",
           "notification.read.self",
           "notification.update.self",
+          "order.create",
+          "order.read",
           "report.create",
           "revision.create.own",
           "role.assign",
@@ -1241,6 +1260,8 @@
           "moderation.read",
           "notification.read.self",
           "notification.update.self",
+          "order.create",
+          "order.read",
           "report.create",
           "revision.create.own",
           "role.assign",
