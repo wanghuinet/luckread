@@ -9,6 +9,7 @@ import {
 const config: HyperswitchClientConfig = {
   environment: 'sandbox',
   apiKey: 'snd_test_server_api_key',
+  expectedMerchantId: 'merchant_test',
 }
 const input = {
   paymentId: 'pay_mbabizu24mvu3mela5njyhpit4',
@@ -82,6 +83,8 @@ describe('Hyperswitch server-side payment intent client', () => {
       { ...config, apiKey: undefined },
       { ...config, apiKey: ' key\nInjected: yes' },
       { ...config, apiKey: ' key-with-leading-space' },
+      { ...config, expectedMerchantId: undefined },
+      { ...config, expectedMerchantId: ' merchant_test' },
     ]) {
       const fake = fakeFetch(jsonResponse(responsePayment()))
       await expect(createHyperswitchPaymentIntent(invalid, input, fake.fetcher))
@@ -114,6 +117,7 @@ describe('Hyperswitch server-side payment intent client', () => {
       { payment_id: 'pay_aaaaaaaaaaaaaaaaaaaaaaaaaa' },
       { amount: input.amount + 1 },
       { currency: 'EUR' },
+      { merchant_id: 'merchant_other' },
       { status: 'succeeded' },
       { status: 'requires_capture' },
     ]) {
