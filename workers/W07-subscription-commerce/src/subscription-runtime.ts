@@ -627,3 +627,82 @@ export async function listCreatorMembershipPlans(
   }
 }
 
+const RESOLVABLE_MEMBERSHIP_PLAN_ID_PATTERN = /^plan_[a-f0-9]{64}$/;
+
+/**
+ * Resolve public, active creator membership offers from their authoritative
+ * D1-01 plan + immutable current-version rows. This is read-only and deliberately
+ * does not create an order, contact a payment provider, or grant an entitlement.
+ */
+export async function resolvePurchasableMembershipPlanOffers(
+  db: D1Database,
+  planIds: readonly string[],
+): Promise<Array<ReturnType<typeof mapMembershipPlan>>> {
+  if (!Array.isArray(planIds) || planIds.length < 1 || planIds.length > 50) {
+    throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400);
+  }
+
+  const seen = new Set<string>();
+  for (const planId of planIds as readonly unknown[]) {
+    if (
+      typeof planId !== 'string' ||
+      !RESOLVABLE_MEMBERSHIP_PLAN_ID_PATTERN.test(planId) ||
+      planId.trim() !== planId
+    ) {
+      throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400);
+    }
+    if (seen.has(planId)) throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400);
+    seen.add(planId);
+  }
+
+  const placeholders = planIds.map(() => '?').join(', ');
+  const result = await db.prepare(
+    'SELECT p.plan_id, p.owner_id, p.current_version, p.status, p.visibility, p.version, p.created_at, p.updated_at, ' +
+    'v.name, v.tier, v.billing_interval, v.price_minor, v.currency, v.benefits_json ' +
+    'FROM membership_plans AS p ' +
+    'INNER JOIN membership_plan_versions AS v ON v.plan_id = p.plan_id AND v.plan_version = p.current_version ' +
+    "WHERE p.owner_type = 'CREATOR' AND p.status = 'ACTIVE' AND p.visibility = 'PUBLIC' " +
+    'AND p.plan_id IN (' + placeholders + ')',
+  ).bind(...planIds).all<MembershipPlanStoredRow>();
+
+  const rows: unknown = result.results ?? [];
+  if (!Array.isArray(rows) || rows.length > planIds.length) {
+    throw new SubscriptionRuntimeError('INTEGRITY_VIOLATION', 500);
+  }
+
+  const mappedById = new Map<string, ReturnType<typeof mapMembershipPlan>>();
+  for (const candidate of rows as unknown[]) {
+    if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) {
+      throw new SubscriptionRuntimeError('INTEGRITY_VIOLATION', 500);
+    }
+    const row = candidate as MembershipPlanStoredRow;
+    if (
+      typeof row.plan_id !== 'string' ||
+      !RESOLVABLE_MEMBERSHIP_PLAN_ID_PATTERN.test(row.plan_id) ||
+      !seen.has(row.plan_id) ||
+      mappedById.has(row.plan_id) ||
+      typeof row.owner_id !== 'string' ||
+      row.owner_id.trim() !== row.owner_id ||
+      row.owner_id.length < 1 ||
+      row.owner_id.length > MAX_ID ||
+      row.status !== 'ACTIVE' ||
+      row.visibility !== 'PUBLIC'
+    ) {
+      throw new SubscriptionRuntimeError('INTEGRITY_VIOLATION', 500);
+    }
+    mappedById.set(row.plan_id, mapMembershipPlan(row));
+  }
+
+  // Do not disclose whether an unavailable reference is private, draft, retired,
+  // belongs to a non-creator owner, or simply does not exist.
+  if (mappedById.size !== planIds.length) {
+    throw new SubscriptionRuntimeError('RESOURCE_NOT_FOUND', 404);
+  }
+
+  return planIds.map((planId) => {
+    const plan = mappedById.get(planId);
+    if (!plan) throw new SubscriptionRuntimeError('INTEGRITY_VIOLATION', 500);
+    return plan;
+  });
+}
+
