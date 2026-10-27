@@ -79,7 +79,9 @@
       "ingressWorker": "W01",
       "terminalWorker": "W07",
       "transportBinding": "W01-W07-membership-commerce-http-binding.v1",
-      "authorityNote": "W07 owns MembershipPlan and subscription commerce facts. W01 uses W08 CASL plus W08-resolved ACTIVE creator identity for owner-scoped plan management; payment/subscription writes remain fail-closed until trusted provider synchronization is admitted."
+      "authorityNote": "W07 owns MembershipPlan and subscription commerce facts. W01 uses W08 CASL plus W08-resolved ACTIVE creator identity for owner-scoped plan management; after W07 writes a plan draft, W01 must confirm its immutable creation audit through the existing W06_MODERATION binding to W06/D1-03 before returning success. Payment/subscription writes remain fail-closed until trusted provider synchronization is admitted.",
+      "auditWorker": "W06",
+      "auditTransportBinding": "W01-W06-moderation-http-binding.v1"
     }
   ],
   "workerToWorkerInvariant": {
