@@ -372,6 +372,7 @@ jobs:
           echo "PASS: preflight-only mode did not execute Payload migration"
 
       - name: Verify exact post-migration state
+        id: postcheck
         if: inputs.mode == 'apply' && always() && steps.preflight.outcome == 'success' && steps.binding_contract.outcome == 'success'
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -440,13 +441,37 @@ jobs:
           SOURCE_SHA: ${{ inputs.source_sha }}
           DATABASE_NAME: ${{ inputs.database_name }}
           MODE: ${{ inputs.mode }}
+          PREFLIGHT_OUTCOME: ${{ steps.preflight.outcome }}
+          EXECUTE_MIGRATION_OUTCOME: ${{ steps.execute_migration.outcome }}
+          POSTCHECK_OUTCOME: ${{ steps.postcheck.outcome }}
         run: |
           set -euo pipefail
           mkdir -p artifacts/evidence/w01-media-upload-idempotency
           node --input-type=module <<'NODE'
-          import { writeFileSync } from 'node:fs'
+          import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+          const dir = 'artifacts/evidence/w01-media-upload-idempotency'
+          const readJson = (name) => {
+            const path = dir + '/' + name
+            if (!existsSync(path)) return null
+            try {
+              return JSON.parse(readFileSync(path, 'utf8'))
+            } catch {
+              return null
+            }
+          }
+          const preflight = readJson('preflight-summary.json')
+          const postcheck = readJson('post-validation-summary.json')
+          const mode = process.env.MODE
+          const verifiedApplied = mode === 'apply'
+            && process.env.EXECUTE_MIGRATION_OUTCOME === 'success'
+            && process.env.POSTCHECK_OUTCOME === 'success'
+            && postcheck?.result === 'PASS'
+          const result = mode === 'preflight-only'
+            ? (process.env.PREFLIGHT_OUTCOME === 'success' && preflight?.result === 'PASS'
+              ? 'READ_ONLY_PREFLIGHT_PASS' : 'READ_ONLY_PREFLIGHT_FAILED')
+            : (verifiedApplied ? 'VERIFIED_APPLIED' : 'APPLY_NOT_VERIFIED')
           writeFileSync(
-            'artifacts/evidence/w01-media-upload-idempotency/provenance.json',
+            dir + '/provenance.json',
             JSON.stringify({
               repository: process.env.GITHUB_REPOSITORY,
               workflow: process.env.GITHUB_WORKFLOW,
@@ -455,8 +480,15 @@ jobs:
               databaseName: process.env.DATABASE_NAME,
               expectedDatabaseId: process.env.EXPECTED_DATABASE_ID,
               migration: process.env.TARGET_MIGRATION,
-              mode: process.env.MODE,
-              environment: process.env.MODE === 'apply' ? 'CONTROLLED_REMOTE_D1' : 'READ_ONLY_PREFLIGHT_ONLY',
+              mode,
+              result,
+              verifiedApplied,
+              preflightOutcome: process.env.PREFLIGHT_OUTCOME,
+              executeMigrationOutcome: process.env.EXECUTE_MIGRATION_OUTCOME,
+              postcheckOutcome: process.env.POSTCHECK_OUTCOME,
+              environment: verifiedApplied
+                ? 'CONTROLLED_REMOTE_D1'
+                : mode === 'apply' ? 'UNVERIFIED_APPLY' : 'READ_ONLY_PREFLIGHT_ONLY',
             }, null, 2) + '\n',
           )
           NODE
