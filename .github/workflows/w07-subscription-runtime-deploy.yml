@@ -86,7 +86,92 @@ jobs:
           console.log(JSON.stringify({rateLimitBindings:[...names].sort()}))
           NODE
 
+      - name: Read-only D1-01 migration and schema preflight
+        id: d1_preflight
+        working-directory: workers/W07-subscription-commerce
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          npx --yes wrangler@4.116.0 d1 list --json --config wrangler.jsonc > /tmp/w07-d1-list.json
+          npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command="SELECT name FROM d1_migrations WHERE name IN ('0001_membership_subscriptions','0002_subscription_version_cas') ORDER BY name" --json > /tmp/w07-d1-migrations.json
+          npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA table_info("membership_subscriptions")' --json > /tmp/w07-subscription-schema.json
+          npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA index_list("membership_subscriptions")' --json > /tmp/w07-subscription-indexes.json
+          node - <<'NODE'
+          const fs = require('node:fs')
+          const read = (file) => JSON.parse(fs.readFileSync(file, 'utf8'))
+          const objects = (value, out = []) => {
+            if (Array.isArray(value)) for (const item of value) objects(item, out)
+            else if (value && typeof value === 'object') {
+              out.push(value)
+              for (const item of Object.values(value)) objects(item, out)
+            }
+            return out
+          }
+          const databaseId = '2f80471e-3756-49f9-8db1-7707a433ad64'
+          const databases = objects(read('/tmp/w07-d1-list.json'))
+          if (!databases.some((item) => item.name === 'luckread' && (item.uuid === databaseId || item.database_id === databaseId))) {
+            throw new Error('READ_ONLY_PREFLIGHT_FAILED: exact D1-01 database UUID/name not found')
+          }
+          const migrationObjects = objects(read('/tmp/w07-d1-migrations.json'))
+          const applied = [...new Set(migrationObjects
+            .filter((item) => item.name === '0001_membership_subscriptions' || item.name === '0002_subscription_version_cas')
+            .map((item) => item.name))].sort()
+          const schemaObjects = objects(read('/tmp/w07-subscription-schema.json'))
+          const columns = schemaObjects.filter((item) =>
+            Number.isInteger(item.cid) && typeof item.name === 'string' && typeof item.type === 'string' &&
+            Object.prototype.hasOwnProperty.call(item, 'notnull') && Object.prototype.hasOwnProperty.call(item, 'pk'))
+            .sort((a, b) => a.cid - b.cid)
+          const indexObjects = objects(read('/tmp/w07-subscription-indexes.json'))
+          const indexNames = new Set(indexObjects
+            .filter((item) => Number.isInteger(item.seq) && typeof item.name === 'string')
+            .map((item) => item.name))
+          const expectedIndexes = [
+            'ix_membership_subscriptions_subscriber_status_period',
+            'ix_membership_subscriptions_plan_version',
+            'ix_membership_subscriptions_creator_status',
+            'ix_membership_subscriptions_updated_at'
+          ]
+          for (const name of expectedIndexes) if (!indexNames.has(name)) {
+            throw new Error('READ_ONLY_PREFLIGHT_FAILED: missing expected index ' + name)
+          }
+          const legacy = [
+            ['subscription_id','TEXT',1,1], ['subscriber_id','TEXT',1,0], ['plan_id','TEXT',1,0],
+            ['plan_version','INTEGER',1,0], ['creator_id','TEXT',0,0], ['status','TEXT',1,0],
+            ['started_at','TEXT',1,0], ['current_period_start','TEXT',1,0], ['current_period_end','TEXT',1,0],
+            ['cancel_at','TEXT',0,0], ['entitlement_snapshot_ref','TEXT',0,0],
+            ['created_at','TEXT',1,0], ['updated_at','TEXT',1,0]
+          ]
+          const current = [...legacy, ['version','INTEGER',1,0]]
+          const shape = columns.map((column) => [column.name, column.type, Number(column.notnull), Number(column.pk)])
+          const equals = (left, right) => JSON.stringify(left) === JSON.stringify(right)
+          if (!applied.includes('0001_membership_subscriptions')) {
+            throw new Error('READ_ONLY_PREFLIGHT_FAILED: baseline migration 0001 is not recorded as applied')
+          }
+          let migrationAction
+          if (equals(applied, ['0001_membership_subscriptions']) && equals(shape, legacy)) {
+            migrationAction = 'apply'
+          } else if (equals(applied, ['0001_membership_subscriptions','0002_subscription_version_cas']) && equals(shape, current)) {
+            migrationAction = 'skip'
+          } else {
+            throw new Error('READ_ONLY_PREFLIGHT_FAILED: migration history/schema combination is unexpected; refusing migration and deploy')
+          }
+          core = process.env.GITHUB_OUTPUT
+          fs.appendFileSync(core, 'migration_action=' + migrationAction + '\n')
+          console.log(JSON.stringify({
+            readOnlyPreflight: 'PASS',
+            targetDatabase: 'luckread',
+            databaseUuid: databaseId,
+            appliedSubscriptionMigrations: applied,
+            subscriptionColumns: shape.map((column) => column[0]),
+            expectedIndexes: [...expectedIndexes],
+            migrationAction
+          }))
+          NODE
+
       - name: Apply D1-01 Subscription migration
+        if: steps.d1_preflight.outputs.migration_action == 'apply'
         working-directory: workers/W07-subscription-commerce
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -112,7 +197,8 @@ jobs:
             "databaseUuid": "2f80471e-3756-49f9-8db1-7707a433ad64",
             "databaseName": "luckread",
             "migrations": ["0001_membership_subscriptions", "0002_subscription_version_cas"],
-            "remoteMigration": true,
+            "migrationAction": "${{ steps.d1_preflight.outputs.migration_action }}",
+            "remoteMigration": "${{ steps.d1_preflight.outputs.migration_action == 'apply' }}",
             "confirmation": "DEPLOY_W07_SUBSCRIPTION",
             "migrationConfirmation": "APPLY_W07_SUBSCRIPTION_MIGRATION"
           }
