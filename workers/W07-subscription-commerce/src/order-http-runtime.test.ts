@@ -225,7 +225,7 @@ describe('private W07 commerce order HTTP handler', () => {
       'user_42',
       env,
     );
-    expect(badShape).toBeNull(); // GET collection/list is not admitted by PAY-002.
+    expect(badShape?.status).toBe(404); // GET collection/list is not admitted by PAY-002.
   });
 
   it('maps an uninitialized remote schema to a generic unavailable response without leaking SQL details', async () => {
