@@ -236,9 +236,9 @@ export async function changeSubscriptionPlan(db: D1Database, subscriberId: strin
     "creator_id = (SELECT owner_id FROM membership_plans WHERE plan_id = ? AND owner_type = 'CREATOR' AND status = 'ACTIVE' AND visibility = 'PUBLIC'), " +
     "updated_at = ?, version = version + 1 " +
     "WHERE subscription_id = ? AND subscriber_id = ? AND version = ? " +
-    "AND EXISTS (SELECT 1 FROM membership_plans WHERE plan_id = ? AND owner_type = 'CREATOR' AND status = 'ACTIVE' AND visibility = 'PUBLIC' " +
+    "AND EXISTS (SELECT 1 FROM membership_plans WHERE plan_id = ? AND owner_type = 'CREATOR' AND owner_id = ? AND status = 'ACTIVE' AND visibility = 'PUBLIC' " +
     "AND EXISTS (SELECT 1 FROM membership_plan_versions WHERE plan_id = membership_plans.plan_id AND plan_version = membership_plans.current_version))",
-  ).bind(nextPlanId, nextPlanId, nextPlanId, updatedAt, row.subscription_id, subscriber, expectedVersion, nextPlanId).run()
+  ).bind(nextPlanId, nextPlanId, nextPlanId, updatedAt, row.subscription_id, subscriber, expectedVersion, nextPlanId, row.creator_id).run()
   if (Number(result.meta?.changes ?? 0) !== 1) {
     const latest = await readSubscriptionRow(db, row.subscription_id, subscriber)
     if (latest.version !== expectedVersion) throw new SubscriptionRuntimeError('PRECONDITION_FAILED', 412)
