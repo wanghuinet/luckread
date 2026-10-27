@@ -62,8 +62,24 @@
       "permission": "membership.plan.create.own",
       "minimumGlobalLayer": "L3",
       "idempotency": "Idempotency-Key",
-      "requestFields": ["name", "tier", "billingInterval", "priceMinor", "currency", "benefits"],
-      "serverControlledFields": ["planId", "creatorId", "planVersion", "status", "visibility", "version", "createdAt", "updatedAt"],
+      "requestFields": [
+        "name",
+        "tier",
+        "billingInterval",
+        "priceMinor",
+        "currency",
+        "benefits"
+      ],
+      "serverControlledFields": [
+        "planId",
+        "creatorId",
+        "planVersion",
+        "status",
+        "visibility",
+        "version",
+        "createdAt",
+        "updatedAt"
+      ],
       "initialState": {
         "status": "DRAFT",
         "visibility": "PRIVATE",
@@ -77,7 +93,10 @@
         "missingIdempotencyKey": "428",
         "keyReuseWithDifferentBody": "409"
       },
-      "cache": "NO_STORE"
+      "cache": "NO_STORE",
+      "auditRequired": true,
+      "successRule": "The W07 response is not a public success by itself. W01 must persist/confirm the stable membership.plan.created audit in W06 D1-03 before returning either a new 201 or idempotent replay 200 to the caller.",
+      "auditTransportBinding": "W01-W06-moderation-http-binding.v1"
     }
   ],
   "trustBoundary": {
