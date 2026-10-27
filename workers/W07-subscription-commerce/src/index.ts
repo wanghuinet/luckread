@@ -1,6 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 
-import { getSubscription, listActiveMembershipPlans, listSubscriptions, parseBoundedPositiveInt, SubscriptionRuntimeError, validatePrincipal } from './subscription-runtime.js'
+import { createMembershipPlanDraft, getSubscription, listActiveMembershipPlans, listCreatorMembershipPlans, listSubscriptions, parseBoundedPositiveInt, SubscriptionRuntimeError, validatePrincipal } from './subscription-runtime.js'
 
 interface RateLimitBinding { limit(input: { key: string }): Promise<{ success: boolean }> }
 interface Env {
@@ -54,13 +54,32 @@ const requireLayer = (request: Request): void => {
 
 const parseSegments = (pathname: string): string[] => pathname.split('/').filter(Boolean).map((segment) => { try { return decodeURIComponent(segment) } catch { throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400) } })
 
+const requireCreatorLayer = (request: Request): void => {
+  const layer = request.headers.get('X-LuckRead-Principal-Layer')?.trim() ?? ''
+  if (layer !== 'L3' && layer !== 'L4') throw new SubscriptionRuntimeError('PERMISSION_DENIED', 403)
+}
+
+const requireVerifiedCreatorId = (request: Request): string => {
+  const creatorId = request.headers.get('X-LuckRead-Verified-Creator-Id')?.trim() ?? ''
+  if (!creatorId || creatorId.length > 256) throw new SubscriptionRuntimeError('PERMISSION_DENIED', 403)
+  return validatePrincipal(creatorId)
+}
+
+const readJsonBody = async (request: Request): Promise<unknown> => {
+  try { return await request.json() } catch { throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400) }
+}
+
 type Operation =
   | { operation: 'listPlans'; subscriptionId: null }
+  | { operation: 'listOwnedPlans'; subscriptionId: null }
+  | { operation: 'createPlan'; subscriptionId: null }
   | { operation: 'list'; subscriptionId: null }
   | { operation: 'get'; subscriptionId: string }
 
 const toOperation = (method: string, segments: string[]): Operation | null => {
   if (segments.length === 1 && segments[0] === 'plans' && method === 'GET') return { operation: 'listPlans', subscriptionId: null }
+  if (segments.length === 2 && segments[0] === 'membership' && segments[1] === 'plans' && method === 'GET') return { operation: 'listOwnedPlans', subscriptionId: null }
+  if (segments.length === 2 && segments[0] === 'membership' && segments[1] === 'plans' && method === 'POST') return { operation: 'createPlan', subscriptionId: null }
   if (segments.length === 2 && segments[0] === 'memberships' && segments[1] === 'subscriptions' && method === 'GET') return { operation: 'list', subscriptionId: null }
   if (segments.length === 3 && segments[0] === 'memberships' && segments[1] === 'subscriptions' && method === 'GET') return { operation: 'get', subscriptionId: segments[2] }
   return null
@@ -73,7 +92,8 @@ export default {
       requireTransport(request)
       const principal = requirePrincipal(request)
       requireLayer(request)
-      if (request.method === 'POST') {
+      const operation = toOperation(request.method, parseSegments(new URL(request.url).pathname))
+      if (request.method === 'POST' && operation?.operation !== 'createPlan') {
         return json({
           error: {
             code: 'SERVICE_UNAVAILABLE',
@@ -83,8 +103,27 @@ export default {
           requestId: crypto.randomUUID(),
         }, 503)
       }
-      const operation = toOperation(request.method, parseSegments(new URL(request.url).pathname))
       if (!operation) return new Response(null, { status: 404 })
+      if (operation.operation === 'createPlan') {
+        requireCreatorLayer(request)
+        const creatorId = requireVerifiedCreatorId(request)
+        const result = await createMembershipPlanDraft(
+          env.D1_01,
+          principal,
+          creatorId,
+          await readJsonBody(request),
+          request.headers.get('Idempotency-Key'),
+        )
+        return json({ data: result, requestId: crypto.randomUUID() }, result.replayed ? 200 : 201, result.etag)
+      }
+      if (operation.operation === 'listOwnedPlans') {
+        requireCreatorLayer(request)
+        const creatorId = requireVerifiedCreatorId(request)
+        const url = new URL(request.url)
+        const requestedLimit = parseBoundedPositiveInt(url.searchParams.get('limit'), 20, 50)
+        const result = await listCreatorMembershipPlans(env.D1_01, creatorId, requestedLimit, url.searchParams.get('cursor'))
+        return json({ data: result, requestId: crypto.randomUUID() })
+      }
       if (operation.operation === 'listPlans') {
         const url = new URL(request.url)
         const requestedLimit = parseBoundedPositiveInt(url.searchParams.get('limit'), 20, 50)
