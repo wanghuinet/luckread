@@ -210,12 +210,20 @@ describe('subscription runtime', () => {
     expect(runtime).not.toContain('AND updated_at = ?')
   })
 
-  it('restricts manual deployment to an already-reviewed main commit and avoids shell interpolation', () => {
+  it('restricts manual deployment to reviewed main and requires read-only schema preflight', () => {
     const workflow = readFileSync(new URL('../../../../.github/workflows/w07-subscription-runtime-deploy.yml', import.meta.url), 'utf8')
     expect(workflow).toContain('git merge-base --is-ancestor "$SOURCE_SHA" origin/main')
     expect(workflow).toContain('SOURCE_SHA: ${{ inputs.source_sha }}')
     expect(workflow).not.toContain('ref: ${{ inputs.source_sha }}')
     expect(workflow).not.toContain('[[ "${{ inputs.source_sha }}"')
+    expect(workflow).toContain('Read-only D1-01 migration and schema preflight')
+    expect(workflow).toContain('SELECT name FROM d1_migrations')
+    expect(workflow).toContain('PRAGMA table_info("membership_subscriptions")')
+    expect(workflow).toContain('migrationAction = \'apply\'')
+    expect(workflow).toContain('migrationAction = \'skip\'')
+    expect(workflow).toContain("if: steps.d1_preflight.outputs.migration_action == 'apply'")
+    expect(workflow.indexOf('Read-only D1-01 migration and schema preflight'))
+      .toBeLessThan(workflow.indexOf('Apply D1-01 Subscription migration'))
   })
 
   it('rejects invalid version ETag values', async () => {
