@@ -24,10 +24,10 @@ on:
         type: string
         default: "1.0.0-beta.1"
       version_code:
-        description: Android versionCode (increase for every new release)
+        description: Android versionCode (0 uses the Actions run number; published releases must exceed every prior Beta code)
         required: true
         type: number
-        default: 1
+        default: 0
       publish_release:
         description: Publish the signed APK to GitHub Releases
         required: true
@@ -147,9 +147,10 @@ jobs:
         run: bun install
 
       - name: Set requested app version and Android versionCode
+        id: version
         env:
-          BETA_VERSION_NAME: ${{ inputs.version_name || format('1.0.0-beta.{0}', github.run_number) }}
-          BETA_VERSION_CODE: ${{ inputs.version_code || github.run_number }}
+          BETA_VERSION_NAME: \${{ inputs.version_name || format('1.0.0-beta.{0}', github.run_number) }}
+          BETA_VERSION_CODE: \${{ inputs.version_code || github.run_number }}
         run: |
           node <<'NODE'
           const fs = require("node:fs");
@@ -165,9 +166,39 @@ jobs:
           config.expo.version = version;
           config.expo.android = { ...config.expo.android, versionCode };
           fs.writeFileSync("app.json", JSON.stringify(config, null, 2) + "\n");
-          console.log(`Building LuckRead Android ${version} (versionCode ${versionCode})`);
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, "version_name=" + version + "\nversion_code=" + versionCode + "\n");
+          console.log("Building LuckRead Android " + version + " (versionCode " + versionCode + ")");
           NODE
           bunx expo config --type public
+
+      - name: Guard published Beta version monotonicity
+        if: \${{ inputs.publish_release == true }}
+        env:
+          RELEASE_VERSION_NAME: \${{ steps.version.outputs.version_name }}
+          RELEASE_VERSION_CODE: \${{ steps.version.outputs.version_code }}
+        run: |
+          node <<'NODE'
+          const { execFileSync } = require("node:child_process");
+          const versionName = process.env.RELEASE_VERSION_NAME ?? "";
+          const versionCode = Number(process.env.RELEASE_VERSION_CODE);
+          const expectedTag = "luckread-android-beta-v" + versionName + "-code" + versionCode;
+          // Fail closed when the remote tag query cannot be completed.
+          const refs = execFileSync("git", ["ls-remote", "--refs", "--tags", "origin"], { encoding: "utf8" });
+          const existing = [];
+          for (const line of refs.split(/\r?\n/)) {
+            const ref = line.trim().split(/\s+/)[1] ?? "";
+            const match = /^refs\/tags\/luckread-android-beta-v(.+)-code(\d+)$/.exec(ref);
+            if (match) existing.push({ tag: ref.slice("refs/tags/".length), code: Number(match[2]) });
+          }
+          if (existing.some((release) => release.tag === expectedTag)) {
+            throw new Error("Beta release tag already exists: " + expectedTag);
+          }
+          const highestCode = existing.reduce((highest, release) => Math.max(highest, release.code), 0);
+          if (versionCode <= highestCode) {
+            throw new Error("version_code " + versionCode + " must exceed the latest published Beta versionCode " + highestCode + "; choose a new code or use 0 for the Actions run number.");
+          }
+          console.log(JSON.stringify({ expectedTag, versionCode, previousHighestVersionCode: highestCode }));
+          NODE
 
       - name: Generate Android native project
         run: bunx expo prebuild --platform android --clean --no-install
@@ -181,6 +212,9 @@ jobs:
           ./gradlew :app:assembleRelease --no-daemon
 
       - name: Verify APK bundle and signing
+        env:
+          RELEASE_VERSION_NAME: ${{ steps.version.outputs.version_name }}
+          RELEASE_VERSION_CODE: ${{ steps.version.outputs.version_code }}
         run: |
           APK="android/app/build/outputs/apk/release/app-release.apk"
           test -s "$APK" || { echo "Release APK was not created" >&2; exit 1; }
@@ -192,8 +226,8 @@ jobs:
           test -n "$APKSIGNER" || { echo "Android apksigner was not found" >&2; exit 1; }
           "$APKSIGNER" verify --verbose --print-certs "$APK"
           mkdir -p "$GITHUB_WORKSPACE/dist"
-          VERSION_NAME="${{ inputs.version_name || format('1.0.0-beta.{0}', github.run_number) }}"
-          VERSION_CODE="${{ inputs.version_code || github.run_number }}"
+          VERSION_NAME="$RELEASE_VERSION_NAME"
+          VERSION_CODE="$RELEASE_VERSION_CODE"
           SIGNING_KIND="test"
           if [ "$LUCKREAD_STABLE_SIGNING" = "true" ]; then SIGNING_KIND="signed"; fi
           APK_NAME="LuckRead-Android-Beta-$VERSION_NAME-$SIGNING_KIND-code$VERSION_CODE.apk"
@@ -205,7 +239,7 @@ jobs:
       - name: Upload downloadable APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: luckread-android-beta-${{ inputs.version_name || format('1.0.0-beta.{0}', github.run_number) }}-code-${{ inputs.version_code || github.run_number }}
+          name: luckread-android-beta-${{ steps.version.outputs.version_name }}-code-${{ steps.version.outputs.version_code }}
           path: dist/*
           if-no-files-found: error
           retention-days: 30
@@ -214,9 +248,9 @@ jobs:
         if: ${{ inputs.publish_release && steps.signing.outputs.stable_signing == 'true' }}
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: luckread-android-beta-v${{ inputs.version_name }}-code${{ inputs.version_code }}
+          tag_name: luckread-android-beta-v${{ steps.version.outputs.version_name }}-code${{ steps.version.outputs.version_code }}
           target_commitish: ${{ github.sha }}
-          name: LuckRead Android Beta ${{ inputs.version_name }} (code ${{ inputs.version_code }})
+          name: LuckRead Android Beta ${{ steps.version.outputs.version_name }} (code ${{ steps.version.outputs.version_code }})
           prerelease: true
           draft: false
           make_latest: false
