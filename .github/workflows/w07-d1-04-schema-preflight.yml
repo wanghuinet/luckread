@@ -1,0 +1,130 @@
+name: W07 D1-04 Read-only Schema Preflight
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Exact main commit SHA to inspect
+        required: true
+        type: string
+      confirm:
+        description: Type READ_ONLY_D1_04_SCHEMA_PREFLIGHT; this workflow never writes to D1 or deploys
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  inspect-d1-04-schema:
+    if: ${{ inputs.confirm == 'READ_ONLY_D1_04_SCHEMA_PREFLIGHT' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout reviewed main history
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Validate explicit source SHA and read-only confirmation
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          PREFLIGHT_CONFIRM: ${{ inputs.confirm }}
+        run: |
+          set -euo pipefail
+          [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$PREFLIGHT_CONFIRM" == "READ_ONLY_D1_04_SCHEMA_PREFLIGHT" ]]
+          git cat-file -e "$SOURCE_SHA^{commit}"
+          git merge-base --is-ancestor "$SOURCE_SHA" origin/main
+          echo "Validated source SHA is an ancestor of reviewed main."
+      - name: Checkout validated source commit
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: git checkout --detach "$SOURCE_SHA"
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Verify current D1-04 identity and capture live name
+        id: binding
+        working-directory: workers/W07-subscription-commerce
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          test -n "$CLOUDFLARE_API_TOKEN"
+          npx --yes wrangler@4.116.0 d1 list --json --config wrangler.jsonc > /tmp/w07-d1-list.json
+          node scripts/report-d1-04-live-name.mjs /tmp/w07-d1-list.json /tmp/w07-d1-04-live-name-report.json
+          D1_04_NAME="$(node --input-type=commonjs - <<'NODE'
+          const report = require('/tmp/w07-d1-04-live-name-report.json')
+          if (report.result !== 'LIVE_NAME_IDENTIFIED' ||
+              report.binding !== 'D1_04' ||
+              report.databaseUuid !== '9bfb89a5-fbb5-45b1-a2ee-eab674b0d736' ||
+              report.displayNameMatches !== true ||
+              report.readOnly !== true ||
+              typeof report.liveDatabaseName !== 'string' ||
+              !/^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/.test(report.liveDatabaseName)) {
+            throw new Error('D1-04 identity/name does not pass the read-only binding gate')
+          }
+          process.stdout.write(report.liveDatabaseName)
+          NODE
+          )"
+          echo "database_name=$D1_04_NAME" >> "$GITHUB_OUTPUT"
+      - name: Read only SQLite schema and migration history
+        working-directory: workers/W07-subscription-commerce
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          D1_04_NAME: ${{ steps.binding.outputs.database_name }}
+        run: |
+          set -euo pipefail
+          test -n "$D1_04_NAME"
+          npx --yes wrangler@4.116.0 d1 execute "$D1_04_NAME" --remote --config wrangler.jsonc --command="SELECT type, name, tbl_name, sql FROM sqlite_master WHERE type IN ('table', 'view', 'index', 'trigger') AND name NOT LIKE 'sqlite_%' ORDER BY type, name" --json > /tmp/w07-d1-04-schema-objects.json
+          MIGRATION_TABLE_PRESENT="$(node scripts/report-d1-04-schema-snapshot.mjs has-migration-table /tmp/w07-d1-04-schema-objects.json)"
+          if [[ "$MIGRATION_TABLE_PRESENT" == "true" ]]; then
+            npx --yes wrangler@4.116.0 d1 execute "$D1_04_NAME" --remote --config wrangler.jsonc --command="SELECT name FROM d1_migrations ORDER BY name" --json > /tmp/w07-d1-04-migration-state.json
+          else
+            printf '{"querySkipped":"d1_migrations table not present"}\n' > /tmp/w07-d1-04-migration-state.json
+          fi
+          node scripts/report-d1-04-schema-snapshot.mjs report \
+            /tmp/w07-d1-04-live-name-report.json \
+            /tmp/w07-d1-04-schema-objects.json \
+            /tmp/w07-d1-04-migration-state.json \
+            /tmp/w07-d1-04-schema-preflight-report.json
+      - name: Summarize read-only result
+        if: always()
+        run: |
+          set -euo pipefail
+          if [[ -f /tmp/w07-d1-04-schema-preflight-report.json ]]; then
+            node --input-type=commonjs - <<'NODE' >> "$GITHUB_STEP_SUMMARY"
+          const report = require('/tmp/w07-d1-04-schema-preflight-report.json')
+          console.log('# W07 D1-04 read-only schema preflight')
+          console.log('')
+          console.log('- Result: ' + report.result)
+          console.log('- D1 UUID: ' + report.databaseUuid)
+          console.log('- Live name: ' + report.databaseName)
+          console.log('- Read-only: ' + report.readOnly)
+          console.log('- Database rows exported: ' + report.databaseRowsExported)
+          console.log('- Migration table present: ' + report.migrationTablePresent)
+          console.log('- Applied migrations: ' + (report.appliedMigrations.length ? report.appliedMigrations.join(', ') : '(none recorded / history table absent)'))
+          console.log('- Schema object counts: ' + JSON.stringify(report.objectCounts))
+          console.log('- Potential commerce objects: ' + (report.existingCommerceObjects.map(object => object.type + ':' + object.name).join(', ') || '(none detected by name)'))
+          console.log('- Writes performed: ' + report.writesPerformed)
+          console.log('- Migration applied: ' + report.migrationApplied)
+          console.log('- Deployment performed: ' + report.deploymentPerformed)
+          console.log('')
+          console.log(report.nextAction)
+          NODE
+          else
+            echo "D1-04 schema report was not produced. No migration or deployment was attempted." >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Upload read-only schema report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: w07-d1-04-schema-preflight-${{ inputs.source_sha }}
+          path: /tmp/w07-d1-04-schema-preflight-report.json
+          if-no-files-found: warn
+          retention-days: 90
