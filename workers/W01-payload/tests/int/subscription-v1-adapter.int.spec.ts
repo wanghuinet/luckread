@@ -48,6 +48,9 @@ describe('v1 subscription adapter', () => {
   it('does not return plan creation success until W06 confirms the immutable audit event', () => {
     expect(creatorPlansRoute).toContain('callW06MembershipPlanAudit')
     expect(creatorPlansRoute).toContain("eventId: 'evt_mpl_created_' + plan.planId")
+    expect(creatorPlansRoute).toContain('priceMinor: plan.priceMinor')
+    expect(creatorPlansRoute).toContain('currency: plan.currency')
+    expect(creatorPlansRoute).toContain('billingInterval: plan.billingInterval')
     expect(creatorPlansRoute).toContain("action?: unknown }).action !== 'membership.plan.created'")
     expect(creatorPlansRoute).toContain('Membership plan audit was not durably confirmed')
     expect(w06Client).toContain("'/internal/audit-events/membership-plan-created'")
