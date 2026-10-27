@@ -2,6 +2,7 @@ import { beforeEach, expect, mock, test } from 'bun:test';
 
 const calls = [];
 mock.module('../lib/api-client.ts', () => ({
+  createIdempotencyKey: () => 'test-subscription-idempotency-key',
   apiRequest: async (path, options) => {
     calls.push({ path, options });
     return { response: { ok: true, status: 200 }, data: { data: { docs: [] } }, error: null };
