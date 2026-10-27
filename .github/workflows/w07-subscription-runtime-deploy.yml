@@ -112,7 +112,7 @@ jobs:
           npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA table_info("membership_plan_versions")' --json > /tmp/w07-plan-version-schema.json
           npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA index_list("membership_plans")' --json > /tmp/w07-plan-indexes.json
           npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA index_list("membership_plan_versions")' --json > /tmp/w07-plan-version-indexes.json
-          npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command="SELECT name FROM sqlite_master WHERE type = 'trigger' AND name IN ('membership_plan_versions_immutable_update','membership_plan_versions_immutable_delete','membership_plans_owner_immutable_update','membership_plans_current_version_forward_only') ORDER BY name" --json > /tmp/w07-plan-triggers.json
+          npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command="SELECT name FROM sqlite_master WHERE type = 'trigger' AND tbl_name IN ('membership_plans','membership_plan_versions') ORDER BY name" --json > /tmp/w07-plan-triggers.json
           node scripts/verify-remote-preflight.mjs preflight \
             /tmp/w07-d1-list.json \
             /tmp/w07-d1-migrations.json \
@@ -149,7 +149,7 @@ jobs:
           npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA table_info("membership_plan_versions")' --json > /tmp/w07-post-plan-version-schema.json
           npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA index_list("membership_plans")' --json > /tmp/w07-post-plan-indexes.json
           npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA index_list("membership_plan_versions")' --json > /tmp/w07-post-plan-version-indexes.json
-          npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command="SELECT name FROM sqlite_master WHERE type = 'trigger' AND name IN ('membership_plan_versions_immutable_update','membership_plan_versions_immutable_delete','membership_plans_owner_immutable_update','membership_plans_current_version_forward_only') ORDER BY name" --json > /tmp/w07-post-plan-triggers.json
+          npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command="SELECT name FROM sqlite_master WHERE type = 'trigger' AND tbl_name IN ('membership_plans','membership_plan_versions') ORDER BY name" --json > /tmp/w07-post-plan-triggers.json
           npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command="SELECT COUNT(*) AS invalid_versions FROM membership_subscriptions WHERE version IS NULL OR version < 1 OR typeof(version) <> 'integer'" --json > /tmp/w07-post-subscription-version-integrity.json
           npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command="SELECT COUNT(*) AS invalid_current_plan_versions FROM membership_plans p LEFT JOIN membership_plan_versions pv ON pv.plan_id = p.plan_id AND pv.plan_version = p.current_version WHERE pv.plan_id IS NULL" --json > /tmp/w07-post-plan-integrity.json
           node scripts/verify-remote-preflight.mjs postflight \
