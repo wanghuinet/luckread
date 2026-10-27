@@ -15,6 +15,8 @@ export type HyperswitchEnvironment = 'sandbox' | 'production';
 export interface HyperswitchClientConfig {
   environment: HyperswitchEnvironment | string | null | undefined;
   apiKey: string | null | undefined;
+  /** Must match the merchant account that owns the server-side API key. */
+  expectedMerchantId: string | null | undefined;
 }
 
 export interface CreateHyperswitchPaymentIntentInput {
@@ -100,6 +102,7 @@ const PAYMENT_STATUSES = new Set<HyperswitchPaymentStatus>([
 function resolveConfig(config: HyperswitchClientConfig): {
   baseUrl: string;
   apiKey: string;
+  expectedMerchantId: string;
 } {
   if (config.environment !== 'sandbox' && config.environment !== 'production') {
     throw new HyperswitchClientError('CONFIGURATION_INVALID', 'Hyperswitch environment must be explicitly set to sandbox or production.');
@@ -107,7 +110,18 @@ function resolveConfig(config: HyperswitchClientConfig): {
   if (typeof config.apiKey !== 'string' || config.apiKey.length === 0 || config.apiKey.trim() !== config.apiKey || /[\r\n]/.test(config.apiKey)) {
     throw new HyperswitchClientError('CONFIGURATION_INVALID', 'Hyperswitch server API key is missing or malformed.');
   }
-  return { baseUrl: BASE_URLS[config.environment], apiKey: config.apiKey };
+  if (
+    typeof config.expectedMerchantId !== 'string' ||
+    config.expectedMerchantId.length === 0 ||
+    config.expectedMerchantId.trim() !== config.expectedMerchantId
+  ) {
+    throw new HyperswitchClientError('CONFIGURATION_INVALID', 'Expected Hyperswitch merchant ID is missing or malformed.');
+  }
+  return {
+    baseUrl: BASE_URLS[config.environment],
+    apiKey: config.apiKey,
+    expectedMerchantId: config.expectedMerchantId,
+  };
 }
 
 function validateCreateInput(input: CreateHyperswitchPaymentIntentInput): void {
@@ -190,7 +204,7 @@ async function requestPayment(
   init: RequestInit,
   fetchImpl: typeof fetch,
 ): Promise<HyperswitchPayment> {
-  const { baseUrl, apiKey } = resolveConfig(config);
+  const { baseUrl, apiKey, expectedMerchantId } = resolveConfig(config);
   let response: Response;
   try {
     const headers = new Headers(init.headers);
@@ -210,7 +224,11 @@ async function requestPayment(
     // Do not surface provider response bodies: they may contain sensitive details.
     throw new HyperswitchClientError('UPSTREAM_REJECTED', 'Hyperswitch rejected the payment request.', response.status);
   }
-  return normalizePayment(await readJsonResponse(response));
+  const payment = normalizePayment(await readJsonResponse(response));
+  if (payment.merchantId !== expectedMerchantId) {
+    throw new HyperswitchClientError('UPSTREAM_INVALID_RESPONSE', 'Hyperswitch returned a payment for a different merchant.');
+  }
+  return payment;
 }
 
 /**
