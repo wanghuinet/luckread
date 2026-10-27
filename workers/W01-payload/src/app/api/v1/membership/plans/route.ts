@@ -4,7 +4,7 @@ import {
   W07SubscriptionClientError,
 } from '../../../../../subscription/w07-subscription-client.js'
 import { callW08Creator, W08CreatorClientError } from '../../../../../auth/w08-creator-client.js'
-import { callW06MembershipPlanAudit, W06ModerationClientError } from '../../../../../moderation/w06-moderation-client.js'
+import { callW06MembershipPlanAudit } from '../../../../../moderation/w06-moderation-client.js'
 
 const errorResponse = (status: number, code: string, message: string) =>
   Response.json(
