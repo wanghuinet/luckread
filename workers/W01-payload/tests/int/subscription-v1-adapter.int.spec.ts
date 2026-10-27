@@ -28,6 +28,7 @@ describe('v1 subscription adapter', () => {
     expect(creatorPlansRoute).toContain("membership.plan.create.own")
     expect(creatorPlansRoute).toContain("membership.plan.read.own")
     expect(creatorPlansRoute).toContain("'/internal/authz/check-permission'")
+    expect(creatorPlansRoute).toContain('(value as { data?: { decision?: unknown } }).data?.decision')
     expect(creatorPlansRoute).toContain("'/internal/creator/self'")
     expect(creatorPlansRoute).toContain('(value as { data?: { creatorId?: unknown } }).data?.creatorId')
     expect(w08Worker).toContain('return json({ creatorId: creator.creator_id, status: \'ACTIVE\' })')
