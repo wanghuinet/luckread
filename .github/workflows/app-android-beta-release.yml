@@ -149,8 +149,8 @@ jobs:
       - name: Set requested app version and Android versionCode
         id: version
         env:
-          BETA_VERSION_NAME: \${{ inputs.version_name || format('1.0.0-beta.{0}', github.run_number) }}
-          BETA_VERSION_CODE: \${{ inputs.version_code || github.run_number }}
+          BETA_VERSION_NAME: ${{ inputs.version_name || format('1.0.0-beta.{0}', github.run_number) }}
+          BETA_VERSION_CODE: ${{ inputs.version_code || github.run_number }}
         run: |
           node <<'NODE'
           const fs = require("node:fs");
@@ -172,10 +172,10 @@ jobs:
           bunx expo config --type public
 
       - name: Guard published Beta version monotonicity
-        if: \${{ inputs.publish_release == true }}
+        if: ${{ inputs.publish_release == true }}
         env:
-          RELEASE_VERSION_NAME: \${{ steps.version.outputs.version_name }}
-          RELEASE_VERSION_CODE: \${{ steps.version.outputs.version_code }}
+          RELEASE_VERSION_NAME: ${{ steps.version.outputs.version_name }}
+          RELEASE_VERSION_CODE: ${{ steps.version.outputs.version_code }}
         run: |
           node <<'NODE'
           const { execFileSync } = require("node:child_process");
