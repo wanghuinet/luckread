@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { changeSubscriptionPlan, createSubscription, etagForVersion, getSubscription, listActiveMembershipPlans, listSubscriptions, parseBoundedPositiveInt, transitionSubscription, type ActiveMembershipPlanRow, type SubscriptionRow, type SubscriptionStatus } from './subscription-runtime.js'
+import { changeSubscriptionPlan, createSubscription, etagForVersion, getSubscription, listActiveMembershipPlans, listSubscriptions, parseBoundedPositiveInt, transitionSubscription, type SubscriptionRow, type SubscriptionStatus } from './subscription-runtime.js'
 import w07 from './index.js'
 import { verifyD1SubscriptionPostflight, verifyD1SubscriptionPreflight } from '../scripts/verify-remote-preflight.mjs'
 
