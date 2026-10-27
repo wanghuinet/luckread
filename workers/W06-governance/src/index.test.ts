@@ -243,6 +243,18 @@ describe('W06 runtime', () => {
     })
   })
 
+  it('rejects noncanonical plan commercial terms before any audit database access', async () => {
+    const { db, prepare } = createPlanAuditDb()
+    const runtime = await import('./index')
+    const response = await runtime.default.fetch(
+      planAuditRequest({ ...planAuditInput, priceMinor: -1 }),
+      { D1_03: db },
+    )
+    expect(response.status).toBe(400)
+    expect(await response.json()).toEqual({ error: 'INVALID_MEMBERSHIP_PLAN_AUDIT' })
+    expect(prepare).not.toHaveBeenCalled()
+  })
+
   it('replays the same durable audit event without a duplicate write', async () => {
     const { db, rows } = createPlanAuditDb()
     const runtime = await import('./index')
