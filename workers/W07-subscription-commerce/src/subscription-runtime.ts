@@ -418,9 +418,9 @@ export function normalizeMembershipPlanDraft(value: unknown): MembershipPlanDraf
   }
 
   const name = typeof source.name === 'string' ? source.name.trim() : ''
-  const tier = typeof source.tier === 'string' ? source.tier.trim().toLowerCase() : ''
-  const billingInterval = typeof source.billingInterval === 'string' ? source.billingInterval.trim().toUpperCase() : ''
-  const currency = typeof source.currency === 'string' ? source.currency.trim().toUpperCase() : ''
+  const tier = typeof source.tier === 'string' ? source.tier.trim() : ''
+  const billingInterval = typeof source.billingInterval === 'string' ? source.billingInterval.trim() : ''
+  const currency = typeof source.currency === 'string' ? source.currency.trim() : ''
   const priceMinor = source.priceMinor
   const rawBenefits = source.benefits
 
