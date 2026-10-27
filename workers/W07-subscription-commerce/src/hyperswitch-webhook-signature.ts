@@ -58,3 +58,128 @@ export async function verifyHyperswitchWebhookSignature(
     return false;
   }
 }
+
+
+const HYPERSWITCH_EVENT_TYPES = [
+  'payment_succeeded',
+  'payment_failed',
+  'payment_processing',
+  'payment_cancelled',
+  'payment_cancelled_post_capture',
+  'payment_authorized',
+  'payment_partially_authorized',
+  'payment_captured',
+  'payment_expired',
+  'action_required',
+  'refund_succeeded',
+  'refund_failed',
+  'refund_review',
+  'dispute_opened',
+  'dispute_expired',
+  'dispute_accepted',
+  'dispute_cancelled',
+  'dispute_challenged',
+  'dispute_won',
+  'dispute_lost',
+  'mandate_active',
+  'mandate_revoked',
+  'payout_success',
+  'payout_failed',
+  'payout_initiated',
+  'payout_processing',
+  'payout_cancelled',
+  'payout_expired',
+  'payout_reversed',
+  'payout_not_permitted',
+  'invoice_paid',
+  'surcharge_payment_succeeded',
+  'surcharge_refund_succeeded',
+] as const;
+
+const HYPERSWITCH_CONTENT_TYPES = [
+  'payment_details',
+  'refund_details',
+  'dispute_details',
+  'mandate_details',
+  'payout_details',
+  'subscription_details',
+] as const;
+
+export type HyperswitchWebhookEventType = (typeof HYPERSWITCH_EVENT_TYPES)[number];
+export type HyperswitchWebhookContentType = (typeof HYPERSWITCH_CONTENT_TYPES)[number];
+
+export type HyperswitchWebhookEnvelope = {
+  merchantId: string;
+  eventId: string;
+  eventType: HyperswitchWebhookEventType;
+  contentType: HyperswitchWebhookContentType;
+  resource: Record<string, unknown>;
+  timestamp?: string;
+  processorMerchantId?: string | null;
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isNonBlankString(value: unknown): value is string {
+  return typeof value === 'string' && value.length > 0 && value.trim() === value;
+}
+
+/**
+ * Decode only the documented Hyperswitch v1 outgoing webhook envelope.
+ * Call only after verifyHyperswitchWebhookSignature succeeds.
+ *
+ * This is structural validation, not payment authorization: callers must
+ * still verify the configured merchant, bind the event to a known local
+ * payment/order, persist event_id idempotently, and enforce event ordering
+ * before updating financial or entitlement state.
+ */
+export function parseHyperswitchWebhookEnvelope(
+  rawBody: ArrayBuffer,
+): HyperswitchWebhookEnvelope | null {
+  let decoded: unknown;
+  try {
+    const text = new TextDecoder('utf-8', { fatal: true }).decode(rawBody);
+    decoded = JSON.parse(text) as unknown;
+  } catch {
+    return null;
+  }
+
+  if (!isRecord(decoded)) return null;
+  if (!isNonBlankString(decoded.merchant_id)) return null;
+  if (!isNonBlankString(decoded.event_id)) return null;
+  if (!isNonBlankString(decoded.event_type)) return null;
+  if (!(HYPERSWITCH_EVENT_TYPES as readonly string[]).includes(decoded.event_type)) return null;
+
+  if (!isRecord(decoded.content)) return null;
+  if (typeof decoded.content.type !== 'string') return null;
+  if (!(HYPERSWITCH_CONTENT_TYPES as readonly string[]).includes(decoded.content.type)) return null;
+  if (!isRecord(decoded.content.object)) return null;
+
+  if (decoded.timestamp !== undefined) {
+    if (
+      typeof decoded.timestamp !== 'string' ||
+      !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(decoded.timestamp) ||
+      !Number.isFinite(Date.parse(decoded.timestamp))
+    ) return null;
+  }
+
+  if (
+    decoded.processor_merchant_id !== undefined &&
+    decoded.processor_merchant_id !== null &&
+    !isNonBlankString(decoded.processor_merchant_id)
+  ) return null;
+
+  return {
+    merchantId: decoded.merchant_id,
+    eventId: decoded.event_id,
+    eventType: decoded.event_type as HyperswitchWebhookEventType,
+    contentType: decoded.content.type as HyperswitchWebhookContentType,
+    resource: decoded.content.object,
+    ...(decoded.timestamp !== undefined ? { timestamp: decoded.timestamp } : {}),
+    ...(decoded.processor_merchant_id !== undefined
+      ? { processorMerchantId: decoded.processor_merchant_id as string | null }
+      : {}),
+  };
+}
