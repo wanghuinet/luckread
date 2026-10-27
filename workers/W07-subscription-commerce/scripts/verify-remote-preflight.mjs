@@ -70,6 +70,7 @@ export function verifyD1SubscriptionPreflight({
   migrationState,
   subscriptionSchema,
   subscriptionIndexes,
+  subscriptionForeignKeys = [],
   expectedDatabaseName = EXPECTED_DATABASE_NAME,
   expectedDatabaseId = EXPECTED_DATABASE_ID,
 }) {
@@ -88,6 +89,11 @@ export function verifyD1SubscriptionPreflight({
 
   const columns = columnsFrom(subscriptionSchema)
   const shape = columns.map(({ name, type, notnull, primaryKey }) => [name, type, notnull, primaryKey])
+  const foreignKeyRows = collectObjects(subscriptionForeignKeys)
+    .filter((item) => Object.prototype.hasOwnProperty.call(item, 'from') &&
+      Object.prototype.hasOwnProperty.call(item, 'table') &&
+      typeof item.from === 'string')
+  if (foreignKeyRows.length > 0) fail('physical foreign keys are forbidden for Subscription')
   const indexNames = indexNamesFrom(subscriptionIndexes)
   for (const name of EXPECTED_INDEXES) {
     if (!indexNames.has(name)) fail('missing expected index ' + name)
@@ -119,24 +125,58 @@ export function verifyD1SubscriptionPreflight({
     appliedMigrations,
     columns: shape,
     indexes: [...EXPECTED_INDEXES],
+    foreignKeyCount: foreignKeyRows.length,
   }
+}
+
+export function verifyD1SubscriptionPostflight(input) {
+  const report = verifyD1SubscriptionPreflight(input)
+  if (report.migrationAction !== 'skip') {
+    fail('post-migration verification requires 0001 and 0002 with the exact current schema')
+  }
+
+  const integrityRows = collectObjects(input.versionIntegrity)
+    .filter((item) => Object.prototype.hasOwnProperty.call(item, 'invalid_versions'))
+  if (integrityRows.length !== 1) fail('version integrity query did not return exactly one count')
+  const invalidVersions = Number(integrityRows[0].invalid_versions)
+  if (!Number.isSafeInteger(invalidVersions) || invalidVersions !== 0) {
+    fail('existing subscription versions include invalid or non-positive values')
+  }
+
+  return { ...report, invalidVersions, postflight: 'PASS' }
 }
 
 const readJson = (filePath) => JSON.parse(fs.readFileSync(filePath, 'utf8'))
 
 function main() {
-  const [databaseListPath, migrationStatePath, schemaPath, indexesPath] = process.argv.slice(2)
-  if (![databaseListPath, migrationStatePath, schemaPath, indexesPath].every(Boolean)) {
-    throw new Error('Usage: node scripts/verify-remote-preflight.mjs <database-list.json> <migration-state.json> <subscription-schema.json> <subscription-indexes.json>')
+  const [mode, ...filePaths] = process.argv.slice(2)
+  const isPostflight = mode === 'postflight'
+  if (!isPostflight && mode !== 'preflight') {
+    throw new Error('Usage: node scripts/verify-remote-preflight.mjs <preflight|postflight> <database-list.json> <migration-state.json> <subscription-schema.json> <subscription-indexes.json> <subscription-foreign-keys.json> [version-integrity.json]')
+  }
+  const requiredCount = isPostflight ? 6 : 5
+  if (filePaths.length !== requiredCount || filePaths.some((value) => !value)) {
+    throw new Error('Invalid arguments for D1 subscription preflight verification')
   }
 
-  const report = verifyD1SubscriptionPreflight({
+  const [databaseListPath, migrationStatePath, schemaPath, indexesPath, foreignKeysPath, versionIntegrityPath] = filePaths
+  const input = {
     databaseList: readJson(path.resolve(databaseListPath)),
     migrationState: readJson(path.resolve(migrationStatePath)),
     subscriptionSchema: readJson(path.resolve(schemaPath)),
     subscriptionIndexes: readJson(path.resolve(indexesPath)),
-  })
+    subscriptionForeignKeys: readJson(path.resolve(foreignKeysPath)),
+  }
+  if (isPostflight) {
+    const report = verifyD1SubscriptionPostflight({
+      ...input,
+      versionIntegrity: readJson(path.resolve(versionIntegrityPath)),
+    })
+    console.log(JSON.stringify({ readOnlyPostflight: 'PASS', ...report }))
+    return
+  }
 
+  const report = verifyD1SubscriptionPreflight(input)
   const outputPath = process.env.GITHUB_OUTPUT
   if (!outputPath) throw new Error('GITHUB_OUTPUT is unavailable; refusing to continue deployment')
   fs.appendFileSync(outputPath, 'migration_action=' + report.migrationAction + '\n')
