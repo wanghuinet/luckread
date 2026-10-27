@@ -139,6 +139,11 @@ describe('W06 runtime', () => {
     status: 'DRAFT',
     visibility: 'PRIVATE',
     occurredAt: '2026-10-27T13:00:00.000Z',
+    name: 'Supporter',
+    tier: 'supporter',
+    billingInterval: 'MONTHLY',
+    priceMinor: 500,
+    currency: 'USD',
   }
   const planAuditRequest = (body: unknown, withTransport = true, requestId = 'req_plan_audit_1') => new Request(
     'https://w06.internal/internal/audit-events/membership-plan-created',
@@ -228,6 +233,11 @@ describe('W06 runtime', () => {
         planVersion: 1,
         status: 'DRAFT',
         visibility: 'PRIVATE',
+        name: 'Supporter',
+        tier: 'supporter',
+        billingInterval: 'MONTHLY',
+        priceMinor: 500,
+        currency: 'USD',
       }),
       occurred_at: planAuditInput.occurredAt,
     })
