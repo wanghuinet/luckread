@@ -1,4 +1,5 @@
 import { beforeEach, expect, mock, test } from 'bun:test';
+import { readFileSync } from 'node:fs';
 
 const calls = [];
 mock.module('../lib/api-client.ts', () => ({
@@ -28,4 +29,16 @@ test('rejects invalid page bounds before making a request', () => {
   expect(() => fetchMySubscriptionsPage({ page: 0 })).toThrow('between 1 and 10000');
   expect(() => fetchMySubscriptionsPage({ limit: 51 })).toThrow('between 1 and 50');
   expect(calls).toHaveLength(0);
+});
+
+test('keeps subscription screen read-only until external billing synchronization is implemented', async () => {
+  const api = await import('../lib/subscriptions-api.ts');
+  const screen = readFileSync(new URL('../app/(drawer)/subscriptions.tsx', import.meta.url), 'utf8');
+
+  expect(Object.keys(api)).toEqual(['fetchMySubscriptionsPage']);
+  expect(screen).not.toContain('transitionMySubscription');
+  expect(screen).not.toContain('onTransition');
+  expect(screen).not.toContain('取消订阅');
+  expect(screen).not.toContain('暂停订阅');
+  expect(screen).not.toContain('恢复订阅');
 });
