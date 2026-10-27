@@ -30,19 +30,23 @@ type R2MediaEnvironment = { R2?: R2MediaBucket }
 
 const POST_BODY_MAX_BYTES = 16_384
 
+type StoredPostBodyReadResult =
+  | { ok: true; body: string }
+  | { ok: false; status: 422 | 503 }
+
 async function readStoredPostBody(
   bodyUrl: string,
   currentOrigin: string,
   request: Request,
-): Promise<string | null> {
+): Promise<StoredPostBodyReadResult> {
   let url: URL
   try {
     url = new URL(bodyUrl)
   } catch {
-    return null
+    return { ok: false, status: 422 }
   }
 
-  if (url.search || url.hash || url.username || url.password) return null
+  if (url.search || url.hash || url.username || url.password) return { ok: false, status: 422 }
 
   // Private draft media must not be fetched through img/video.luckread.com:
   // those delivery URLs intentionally require owner authentication until W03
@@ -59,26 +63,26 @@ async function readStoredPostBody(
         .map((segment) => decodeURIComponent(segment))
       key = resolveMediaObjectKey(segments)
     } catch {
-      return null
+      return { ok: false, status: 422 }
     }
-    if (!key) return null
+    if (!key) return { ok: false, status: 422 }
 
     let bucket: R2MediaBucket | undefined
     try {
       const cloudflare = await getCloudflareContext({ async: true })
       bucket = (cloudflare.env as unknown as R2MediaEnvironment).R2
     } catch {
-      return null
+      return { ok: false, status: 503 }
     }
-    if (!bucket) return null
+    if (!bucket) return { ok: false, status: 503 }
 
     let object: R2MediaObjectBody | null
     try {
       object = await bucket.get(key)
     } catch {
-      return null
+      return { ok: false, status: 503 }
     }
-    if (!object) return null
+    if (!object) return { ok: false, status: 422 }
 
     const contentType = (object.httpMetadata?.contentType ?? '')
       .split(';', 1)[0]!
@@ -91,23 +95,26 @@ async function readStoredPostBody(
       object.size > POST_BODY_MAX_BYTES
     ) {
       await object.body.cancel().catch((): undefined => undefined)
-      return null
+      return { ok: false, status: 422 }
     }
 
-    return readBoundedUtf8(new Response(object.body, {
+    const body = await readBoundedUtf8(new Response(object.body, {
       headers: { 'content-length': String(object.size) },
     }), POST_BODY_MAX_BYTES)
+    return body === null
+      ? { ok: false, status: 422 }
+      : { ok: true, body }
   }
 
-  // Retain same-origin local-development support; never send credentials to
-  // arbitrary LuckRead subdomains or third-party hosts.
+  // Retain authenticated same-origin reads for local development only; never
+  // send credentials to arbitrary LuckRead subdomains or third-party hosts.
   let current: URL
   try {
     current = new URL(currentOrigin)
   } catch {
-    return null
+    return { ok: false, status: 422 }
   }
-  if (url.origin !== current.origin) return null
+  if (url.origin !== current.origin) return { ok: false, status: 422 }
 
   const assetHeaders = new Headers({ accept: 'text/plain' })
   const authorization = request.headers.get('authorization')
@@ -123,11 +130,11 @@ async function readStoredPostBody(
       redirect: 'manual',
     })
   } catch {
-    return null
+    return { ok: false, status: 503 }
   }
   if (!response.ok || response.status >= 300) {
     await response.body?.cancel().catch((): undefined => undefined)
-    return null
+    return { ok: false, status: response.status >= 500 ? 503 : 422 }
   }
   const contentType = (response.headers.get('content-type') ?? '')
     .split(';', 1)[0]!
@@ -135,11 +142,13 @@ async function readStoredPostBody(
     .toLowerCase()
   if (contentType !== 'text/plain') {
     await response.body?.cancel().catch((): undefined => undefined)
-    return null
+    return { ok: false, status: 422 }
   }
-  return readBoundedUtf8(response, POST_BODY_MAX_BYTES)
+  const body = await readBoundedUtf8(response, POST_BODY_MAX_BYTES)
+  return body === null
+    ? { ok: false, status: 422 }
+    : { ok: true, body }
 }
-
 const readBoundedUtf8 = async (response: Response, maxBytes = 16_384): Promise<string | null> => {
   const reader = response.body?.getReader()
   if (!reader) return null
@@ -211,8 +220,14 @@ export async function bindPreflightToStoredPost(
     return makeErrorResponse(422, 'VALIDATION_FAILED', 'Stored post body reference is not a trusted LuckRead asset')
   }
 
-  const canonicalBody = await readStoredPostBody(bodyUrl, requestUrl.origin, request)
-  if (canonicalBody === null || !canonicalBody.trim()) {
+  const bodyRead = await readStoredPostBody(bodyUrl, requestUrl.origin, request)
+  if (!bodyRead.ok) {
+    return bodyRead.status === 503
+      ? makeErrorResponse(503, 'SERVICE_UNAVAILABLE', 'Content service unavailable')
+      : makeErrorResponse(422, 'VALIDATION_FAILED', 'Stored post body could not be verified, is empty, or exceeds the verification limit')
+  }
+  const canonicalBody = bodyRead.body
+  if (!canonicalBody.trim()) {
     return makeErrorResponse(422, 'VALIDATION_FAILED', 'Stored post body could not be verified, is empty, or exceeds the verification limit')
   }
 
