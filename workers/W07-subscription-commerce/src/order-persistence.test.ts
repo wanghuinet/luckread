@@ -189,7 +189,7 @@ describe('PAY-002 atomic D1-04 order persistence candidate', () => {
     let resolverCalls = 0;
     const error = await createCommerceOrder(db as unknown as D1Database, 'user_1', 'key_1',
       { items: [{ itemRef: 'plan_abc', quantity: 2 }] },
-      async () => { resolverCalls += 1; return await pricingFor(request.items); },
+      async () => { resolverCalls += 1; return await pricingFor(request); },
       deterministicDependencies('second')).then(() => null, (e: unknown) => e);
     expect(errorCode(error)).toBe('IDEMPOTENCY_KEY_REUSE_CONFLICT');
     expect(resolverCalls).toBe(0);

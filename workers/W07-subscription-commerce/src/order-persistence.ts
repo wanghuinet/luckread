@@ -336,7 +336,7 @@ const validatePricing = (
   taxMinor: number;
   totalMinor: number;
 }> => {
-  if (!isRecord(pricing) || !/^[A-Z]{3}$/.test(pricing.currency) ||
+  if (!isRecord(pricing) || typeof pricing.currency !== 'string' || !/^[A-Z]{3}$/.test(pricing.currency) ||
       !Array.isArray(pricing.items) || pricing.items.length !== request.items.length ||
       pricing.items.length < 1 || pricing.items.length > 50) {
     throw new OrderPersistenceError('INTEGRITY_VIOLATION', 500);
