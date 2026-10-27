@@ -90,18 +90,17 @@ describe('subscription runtime', () => {
     expect(parseBoundedPositiveInt('50', 20, 50)).toBe(50)
     expect(parseBoundedPositiveInt('10000', 1, 10000)).toBe(10000)
   })
-  it('fails closed on W07 POST before subscription state or plan writes', () => {
+  it('fails closed on W07 POST before routing or subscription writes', () => {
     const index = readFileSync(new URL('./index.ts', import.meta.url), 'utf8')
     const guard = index.indexOf("if (request.method === 'POST')")
-    const create = index.indexOf("if (operation.operation === 'create')")
-    const transition = index.indexOf('transitionSubscription(env.D1_01')
-    const changePlan = index.indexOf('changeSubscriptionPlan(env.D1_01')
+    const routeResolution = index.indexOf('const operation = toOperation')
     expect(guard).toBeGreaterThan(index.indexOf('requireLayer(request)'))
-    expect(guard).toBeLessThan(create)
-    expect(guard).toBeLessThan(transition)
-    expect(guard).toBeLessThan(changePlan)
+    expect(guard).toBeLessThan(routeResolution)
     expect(index).toContain("'SERVICE_UNAVAILABLE'")
     expect(index).toContain('verified payment-provider synchronization is available')
+    expect(index).not.toContain('createSubscription(')
+    expect(index).not.toContain('transitionSubscription(')
+    expect(index).not.toContain('changeSubscriptionPlan(')
   })
 
   it('returns 503 for authenticated W07 POST without touching D1', async () => {
