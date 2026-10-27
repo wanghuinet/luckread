@@ -7,17 +7,14 @@ on:
         description: Exact W07 source commit to deploy
         required: true
         type: string
-        default: 1316b223b6308575946afa298e2df0fbaf9cd161
       confirm:
         description: Type DEPLOY_W07_SUBSCRIPTION to permit W07 deployment
         required: true
         type: string
-        default: DEPLOY_W07_SUBSCRIPTION
       migration_confirm:
         description: Type APPLY_W07_SUBSCRIPTION_MIGRATION to permit D1-01 migration
         required: true
         type: string
-        default: APPLY_W07_SUBSCRIPTION_MIGRATION
 
 permissions:
   contents: read
@@ -28,10 +25,28 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - name: Checkout exact source commit
+      - name: Checkout reviewed main history
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.source_sha }}
+          ref: main
+          fetch-depth: 0
+      - name: Validate explicit deployment source and confirmations
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          DEPLOY_CONFIRM: ${{ inputs.confirm }}
+          MIGRATION_CONFIRM: ${{ inputs.migration_confirm }}
+        run: |
+          set -euo pipefail
+          [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$DEPLOY_CONFIRM" == "DEPLOY_W07_SUBSCRIPTION" ]]
+          [[ "$MIGRATION_CONFIRM" == "APPLY_W07_SUBSCRIPTION_MIGRATION" ]]
+          git cat-file -e "$SOURCE_SHA^{commit}"
+          git merge-base --is-ancestor "$SOURCE_SHA" origin/main
+          echo "Validated source SHA is an ancestor of reviewed main."
+      - name: Checkout validated source commit
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: git checkout --detach "$SOURCE_SHA"
       - name: Setup Node 24
         uses: actions/setup-node@v4
         with:
@@ -52,6 +67,7 @@ jobs:
           console.log(JSON.stringify({worker:c.name, main:c.main, d1Binding:d1}))
           NODE
           test -f migrations/0001_membership_subscriptions.sql
+          test -f migrations/0002_subscription_version_cas.sql
           test -f src/index.ts
           test -f src/subscription-runtime.ts
       - name: Typecheck W07
@@ -70,12 +86,54 @@ jobs:
           console.log(JSON.stringify({rateLimitBindings:[...names].sort()}))
           NODE
 
+      - name: Read-only D1-01 migration and schema preflight
+        id: d1_preflight
+        working-directory: workers/W07-subscription-commerce
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          npx --yes wrangler@4.116.0 d1 list --json --config wrangler.jsonc > /tmp/w07-d1-list.json
+          npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command="SELECT name FROM d1_migrations WHERE name IN ('0001_membership_subscriptions','0002_subscription_version_cas') ORDER BY name" --json > /tmp/w07-d1-migrations.json
+          npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA table_info("membership_subscriptions")' --json > /tmp/w07-subscription-schema.json
+          npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA index_list("membership_subscriptions")' --json > /tmp/w07-subscription-indexes.json
+          npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA foreign_key_list("membership_subscriptions")' --json > /tmp/w07-subscription-foreign-keys.json
+          node scripts/verify-remote-preflight.mjs preflight \
+            /tmp/w07-d1-list.json \
+            /tmp/w07-d1-migrations.json \
+            /tmp/w07-subscription-schema.json \
+            /tmp/w07-subscription-indexes.json \
+            /tmp/w07-subscription-foreign-keys.json
+
       - name: Apply D1-01 Subscription migration
+        if: steps.d1_preflight.outputs.migration_action == 'apply'
         working-directory: workers/W07-subscription-commerce
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: npx --yes wrangler@4.116.0 d1 migrations apply luckread --remote --config wrangler.jsonc
+      - name: Read-only D1-01 schema and version postflight
+        working-directory: workers/W07-subscription-commerce
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          npx --yes wrangler@4.116.0 d1 list --json --config wrangler.jsonc > /tmp/w07-post-d1-list.json
+          npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command="SELECT name FROM d1_migrations WHERE name IN ('0001_membership_subscriptions','0002_subscription_version_cas') ORDER BY name" --json > /tmp/w07-post-d1-migrations.json
+          npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA table_info("membership_subscriptions")' --json > /tmp/w07-post-subscription-schema.json
+          npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA index_list("membership_subscriptions")' --json > /tmp/w07-post-subscription-indexes.json
+          npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA foreign_key_list("membership_subscriptions")' --json > /tmp/w07-post-subscription-foreign-keys.json
+          npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command="SELECT COUNT(*) AS invalid_versions FROM membership_subscriptions WHERE version IS NULL OR version < 1 OR typeof(version) <> 'integer'" --json > /tmp/w07-post-subscription-version-integrity.json
+          node scripts/verify-remote-preflight.mjs postflight \
+            /tmp/w07-post-d1-list.json \
+            /tmp/w07-post-d1-migrations.json \
+            /tmp/w07-post-subscription-schema.json \
+            /tmp/w07-post-subscription-indexes.json \
+            /tmp/w07-post-subscription-foreign-keys.json \
+            /tmp/w07-post-subscription-version-integrity.json
+
       - name: Deploy W07
         working-directory: workers/W07-subscription-commerce
         env:
@@ -83,6 +141,10 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: npx --yes wrangler@4.116.0 deploy --config wrangler.jsonc
       - name: Write deployment provenance
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          MIGRATION_ACTION: ${{ steps.d1_preflight.outputs.migration_action }}
+          REMOTE_MIGRATION: ${{ steps.d1_preflight.outputs.migration_action == 'apply' }}
         run: |
           set -euo pipefail
           mkdir -p artifacts/w07-subscription
@@ -91,12 +153,13 @@ jobs:
             "workflow": "W07 Subscription Runtime Deploy",
             "runId": "$GITHUB_RUN_ID",
             "runAttempt": "$GITHUB_RUN_ATTEMPT",
-            "sourceSha": "${{ inputs.source_sha }}",
+            "sourceSha": "$SOURCE_SHA",
             "worker": "luckread-w07",
             "databaseUuid": "2f80471e-3756-49f9-8db1-7707a433ad64",
             "databaseName": "luckread",
-            "migration": "0001_membership_subscriptions",
-            "remoteMigration": true,
+            "migrations": ["0001_membership_subscriptions", "0002_subscription_version_cas"],
+            "migrationAction": "$MIGRATION_ACTION",
+            "remoteMigration": $REMOTE_MIGRATION,
             "confirmation": "DEPLOY_W07_SUBSCRIPTION",
             "migrationConfirmation": "APPLY_W07_SUBSCRIPTION_MIGRATION"
           }

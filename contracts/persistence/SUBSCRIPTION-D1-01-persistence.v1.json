@@ -179,8 +179,9 @@
     "status": "DECISION_REQUIRED"
   },
   "migration": {
-    "status": "NOT_CREATED",
-    "rule": "A physical migration requires a separate admitted migration contract, exact artifact hash, controlled target D1-01 execution and post-schema evidence."
+    "status": "PREPARED_NOT_APPLIED",
+    "candidateMigration": "workers/W07-subscription-commerce/migrations/0002_subscription_version_cas.sql",
+    "rule": "The version-column migration is prepared as a reviewed code candidate only. A physical migration still requires exact artifact hash, read-only confirmation of the target and migration history, controlled target D1-01 execution and post-schema evidence."
   },
   "runtime": {
     "w07Binding": "NOT_VERIFIED",

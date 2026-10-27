@@ -16,6 +16,7 @@ export type SubscriptionRow = {
   entitlement_snapshot_ref: string | null
   created_at: string
   updated_at: string
+  version: number
 }
 
 export class SubscriptionRuntimeError extends Error {
@@ -62,12 +63,17 @@ export const validateIfMatch = (value: string | null): string => {
   return normalized
 }
 
-export const etagForUpdatedAt = (updatedAt: string): string => '"lr-' + updatedAt + '"'
+export const etagForVersion = (version: number): string => {
+  if (!Number.isSafeInteger(version) || version < 1) throw new SubscriptionRuntimeError('INTEGRITY_VIOLATION', 500)
+  return '"lr-v' + version + '"'
+}
 
-const updatedAtFromEtag = (etag: string): string => {
-  const match = /^"lr-(.+)"$/.exec(etag)
+const versionFromEtag = (etag: string): number => {
+  const match = /^"lr-v([1-9]\d*)"$/.exec(etag)
   if (!match?.[1]) throw new SubscriptionRuntimeError('PRECONDITION_FAILED', 412)
-  return match[1]
+  const version = Number(match[1])
+  if (!Number.isSafeInteger(version) || version < 1) throw new SubscriptionRuntimeError('PRECONDITION_FAILED', 412)
+  return version
 }
 
 const nowIso = () => new Date().toISOString()
@@ -99,7 +105,8 @@ const toPublic = (row: SubscriptionRow) => ({
   cancelAt: row.cancel_at,
   createdAt: row.created_at,
   updatedAt: row.updated_at,
-  etag: etagForUpdatedAt(row.updated_at),
+  version: row.version,
+  etag: etagForVersion(row.version),
 })
 
 const readSubscriptionRow = async (db: D1Database, subscriptionId: string, subscriberId?: string): Promise<SubscriptionRow> => {
@@ -123,8 +130,8 @@ export async function createSubscription(db: D1Database, subscriberId: string, i
   }
   const now = nowIso()
   try {
-    await db.prepare('INSERT INTO membership_subscriptions (subscription_id, subscriber_id, plan_id, plan_version, creator_id, status, started_at, current_period_start, current_period_end, cancel_at, entitlement_snapshot_ref, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-      .bind(subscriptionId, subscriber, planId, 1, null, 'PENDING', now, now, now, null, null, now, now).run()
+    await db.prepare('INSERT INTO membership_subscriptions (subscription_id, subscriber_id, plan_id, plan_version, creator_id, status, started_at, current_period_start, current_period_end, cancel_at, entitlement_snapshot_ref, created_at, updated_at, version) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+      .bind(subscriptionId, subscriber, planId, 1, null, 'PENDING', now, now, now, null, null, now, now, 1).run()
   } catch (error) {
     if (!(error instanceof Error) || !error.message.toLowerCase().includes('unique')) throw error
   }
@@ -171,17 +178,17 @@ const nextState = (operation: 'cancel' | 'pause' | 'resume'): SubscriptionStatus
 export async function transitionSubscription(db: D1Database, subscriberId: string, subscriptionId: string, operation: 'cancel' | 'pause' | 'resume', ifMatch: string): Promise<ReturnType<typeof toPublic>> {
   const subscriber = validatePrincipal(subscriberId)
   const etag = validateIfMatch(ifMatch)
-  const expectedUpdatedAt = updatedAtFromEtag(etag)
+  const expectedVersion = versionFromEtag(etag)
   const row = await readSubscriptionRow(db, subscriptionId, subscriber)
-  if (etagForUpdatedAt(row.updated_at) !== etag) {
+  if (row.version !== expectedVersion) {
     const convergedState = nextState(operation)
     if (row.status === convergedState) return toPublic(row)
     throw new SubscriptionRuntimeError('PRECONDITION_FAILED', 412)
   }
   if (!transitionTargets[operation].includes(row.status)) throw new SubscriptionRuntimeError('INVALID_STATE', 409)
   const updatedAt = nextUpdatedAt(row.updated_at)
-  const result = await db.prepare('UPDATE membership_subscriptions SET status = ?, cancel_at = ?, updated_at = ? WHERE subscription_id = ? AND subscriber_id = ? AND updated_at = ?')
-    .bind(nextState(operation), operation === 'cancel' ? updatedAt : row.cancel_at, updatedAt, row.subscription_id, subscriber, expectedUpdatedAt).run()
+  const result = await db.prepare('UPDATE membership_subscriptions SET status = ?, cancel_at = ?, updated_at = ?, version = version + 1 WHERE subscription_id = ? AND subscriber_id = ? AND version = ?')
+    .bind(nextState(operation), operation === 'cancel' ? updatedAt : row.cancel_at, updatedAt, row.subscription_id, subscriber, expectedVersion).run()
   if (Number(result.meta?.changes ?? 0) !== 1) throw new SubscriptionRuntimeError('PRECONDITION_FAILED', 412)
   const updated = await readSubscriptionRow(db, row.subscription_id, subscriber)
   console.log(JSON.stringify({ event: 'membership.subscription.transitioned', operation: operation + 'Subscription', subscriptionId: updated.subscription_id, subscriberId: updated.subscriber_id, from: row.status, to: updated.status }))
@@ -192,17 +199,17 @@ export async function changeSubscriptionPlan(db: D1Database, subscriberId: strin
   const subscriber = validatePrincipal(subscriberId)
   const nextPlanId = ensureId(planId)
   const etag = validateIfMatch(ifMatch)
-  const expectedUpdatedAt = updatedAtFromEtag(etag)
+  const expectedVersion = versionFromEtag(etag)
   const row = await readSubscriptionRow(db, subscriptionId, subscriber)
-  if (etagForUpdatedAt(row.updated_at) !== etag) {
+  if (row.version !== expectedVersion) {
     if (row.plan_id === nextPlanId) return toPublic(row)
     throw new SubscriptionRuntimeError('PRECONDITION_FAILED', 412)
   }
   if (!['ACTIVE', 'PAUSED', 'PAST_DUE'].includes(row.status)) throw new SubscriptionRuntimeError('INVALID_STATE', 409)
   if (row.plan_id === nextPlanId) return toPublic(row)
   const updatedAt = nextUpdatedAt(row.updated_at)
-  const result = await db.prepare('UPDATE membership_subscriptions SET plan_id = ?, plan_version = ?, updated_at = ? WHERE subscription_id = ? AND subscriber_id = ? AND updated_at = ?')
-    .bind(nextPlanId, 1, updatedAt, row.subscription_id, subscriber, expectedUpdatedAt).run()
+  const result = await db.prepare('UPDATE membership_subscriptions SET plan_id = ?, plan_version = ?, updated_at = ?, version = version + 1 WHERE subscription_id = ? AND subscriber_id = ? AND version = ?')
+    .bind(nextPlanId, 1, updatedAt, row.subscription_id, subscriber, expectedVersion).run()
   if (Number(result.meta?.changes ?? 0) !== 1) throw new SubscriptionRuntimeError('PRECONDITION_FAILED', 412)
   const updated = await readSubscriptionRow(db, row.subscription_id, subscriber)
   console.log(JSON.stringify({ event: 'membership.subscription.plan_changed', operation: 'changeSubscriptionPlan', subscriptionId: updated.subscription_id, subscriberId: updated.subscriber_id, previousPlanId: row.plan_id, planId: updated.plan_id }))
