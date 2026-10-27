@@ -276,6 +276,11 @@ type MembershipPlanAuditInput = {
   status: 'DRAFT'
   visibility: 'PRIVATE'
   occurredAt: string
+  name: string
+  tier: string
+  billingInterval: 'MONTHLY' | 'YEARLY'
+  priceMinor: number
+  currency: string
 }
 
 type StoredAuditEvent = {
@@ -292,7 +297,7 @@ type StoredAuditEvent = {
 function parseMembershipPlanAuditInput(value: unknown): MembershipPlanAuditInput {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('INVALID_MEMBERSHIP_PLAN_AUDIT')
   const body = value as Record<string, unknown>
-  const allowed = new Set(['eventId', 'planId', 'creatorId', 'planVersion', 'status', 'visibility', 'occurredAt'])
+  const allowed = new Set(['eventId', 'planId', 'creatorId', 'planVersion', 'status', 'visibility', 'occurredAt', 'name', 'tier', 'billingInterval', 'priceMinor', 'currency'])
   if (Object.keys(body).some((key) => !allowed.has(key)) || Object.keys(body).length !== allowed.size) {
     throw new Error('INVALID_MEMBERSHIP_PLAN_AUDIT')
   }
@@ -301,7 +306,12 @@ function parseMembershipPlanAuditInput(value: unknown): MembershipPlanAuditInput
     body.eventId !== 'evt_mpl_created_' + body.planId ||
     typeof body.creatorId !== 'string' || !resourceIdPattern.test(body.creatorId) ||
     body.planVersion !== 1 || body.status !== 'DRAFT' || body.visibility !== 'PRIVATE' ||
-    typeof body.occurredAt !== 'string' || !body.occurredAt || Number.isNaN(Date.parse(body.occurredAt))
+    typeof body.occurredAt !== 'string' || !body.occurredAt || Number.isNaN(Date.parse(body.occurredAt)) ||
+    typeof body.name !== 'string' || body.name.trim().length < 1 || body.name.length > 120 ||
+    typeof body.tier !== 'string' || !/^[a-z][a-z0-9_-]{0,63}$/.test(body.tier) ||
+    (body.billingInterval !== 'MONTHLY' && body.billingInterval !== 'YEARLY') ||
+    typeof body.priceMinor !== 'number' || !Number.isSafeInteger(body.priceMinor) || body.priceMinor < 0 || body.priceMinor > 2_147_483_647 ||
+    typeof body.currency !== 'string' || !/^[A-Z]{3}$/.test(body.currency)
   ) throw new Error('INVALID_MEMBERSHIP_PLAN_AUDIT')
   return body as MembershipPlanAuditInput
 }
@@ -509,6 +519,11 @@ export default {
           planVersion: input.planVersion,
           status: input.status,
           visibility: input.visibility,
+          name: input.name,
+          tier: input.tier,
+          billingInterval: input.billingInterval,
+          priceMinor: input.priceMinor,
+          currency: input.currency,
         },
         occurredAt: input.occurredAt,
       }
