@@ -89,10 +89,18 @@ describe('subscription runtime', () => {
     expect(parseBoundedPositiveInt('50', 20, 50)).toBe(50)
     expect(parseBoundedPositiveInt('10000', 1, 10000)).toBe(10000)
   })
-  it('enforces idempotency at the W07 transport boundary for every mutation operation', () => {
+  it('fails closed on W07 POST before subscription state or plan writes', () => {
     const index = readFileSync(new URL('./index.ts', import.meta.url), 'utf8')
-    expect(index).toContain("if (isMutationOperation(operation.operation)) validateIdempotencyKey(request.headers.get('Idempotency-Key'))")
-    expect(index).toContain("const mutationOperations: readonly MutationOperation[] = ['cancel', 'pause', 'resume', 'change-plan']")
+    const guard = index.indexOf("if (request.method === 'POST')")
+    const create = index.indexOf("if (operation.operation === 'create')")
+    const transition = index.indexOf('transitionSubscription(env.D1_01')
+    const changePlan = index.indexOf('changeSubscriptionPlan(env.D1_01')
+    expect(guard).toBeGreaterThan(index.indexOf('requireLayer(request)'))
+    expect(guard).toBeLessThan(create)
+    expect(guard).toBeLessThan(transition)
+    expect(guard).toBeLessThan(changePlan)
+    expect(index).toContain("'SERVICE_UNAVAILABLE'")
+    expect(index).toContain('verified payment-provider synchronization is available')
   })
   it('creates an idempotent pending subscription', async () => {
     const db = fakeDb([]); const first = await createSubscription(db, 'user_1', { planId: 'plan_basic', idempotencyKey: 'create-1' });
