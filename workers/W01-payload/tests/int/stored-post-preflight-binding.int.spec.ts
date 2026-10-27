@@ -171,7 +171,13 @@ describe('bind direct social post publishing to the stored body asset', () => {
       const r2Get = vi.fn()
       getCloudflareContextMock.mockResolvedValueOnce({ env: { R2: { get: r2Get } } })
 
-      const result = await bindPost()
+      const result = await bindPreflightToStoredPost(
+        makeRequest(),
+        'post-1',
+        principal,
+        submitted,
+        makeErrorResponse,
+      )
 
       expect(result).toBeInstanceOf(Response)
       expect((result as Response).status).toBe(422)
