@@ -52,6 +52,8 @@ const expectedCreatorProxyPaths = [
   '/api/v1/creator-applications/me',
   '/api/v1/admin/creator-applications',
   '/api/v1/admin/creator-applications/decision',
+  '/internal/creator/self',
+  '/internal/authz/check-permission',
 ]
 for (const path of expectedCreatorProxyPaths) {
   if (!w01Client.includes("'"+path+"'")) failures.push('W01 W08 proxy path missing: '+path)
@@ -82,6 +84,8 @@ requireText('internal CASL endpoint must reject caller-supplied layer or state',
 if (!w08AuthzHandler.includes('/internal/auth/principal')) failures.push('internal CASL endpoint must resolve actor identity through W02 session binding')
 if (!w08AuthzHandler.includes("new Set(['action', 'resourceType', 'resourceAttributes'])")) failures.push('internal CASL endpoint must not accept body-supplied subjectId')
 requireText('W08 must independently resolve the W02 principal', w08Runtime, /internal\/auth\/principal/)
+requireText('W08 must return only an ACTIVE creator identity for creator plan management', w08Runtime, /handleActiveCreatorSelf[\s\S]*status = 'ACTIVE'[\s\S]*creator\.read\.self/)
+requireText('MembershipPlan is a CASL subject and own-scope plan permissions are granted', w08Casl, /'MembershipPlan'[\s\S]*membership\.plan\.create\.own[\s\S]*membership\.plan\.read\.own/)
 requireText('W08 must call the W02 RoleAssignment authority', w08Runtime, /internal\/authz\/role-assignment/)
 requireText('W08 must persist submission, decision and grant audit', w08Runtime, /CREATOR_APPLICATION_SUBMITTED[\s\S]*CREATOR_APPLICATION_APPROVED[\s\S]*CREATOR_ROLE_GRANTED/)
 requireText('creator audit table must exist', w08Migration, /CREATE TABLE IF NOT EXISTS creator_authorization_audit/)
