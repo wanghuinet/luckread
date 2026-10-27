@@ -2,7 +2,6 @@ import { getCloudflareContext } from '@opennextjs/cloudflare'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { getBetterAuthPrincipal, W02AuthClientError } from '../../../../auth/w02-session-client'
-import { GET as payloadMediaGet } from '../../../(payload)/api/[...slug]/route'
 import { callW03Content } from '../../../../content/w03-content-client'
 import {
   mediaHostKind,
@@ -11,7 +10,6 @@ import {
   resolveMediaObjectKey,
 } from '../../../../media/media-delivery'
 
-type PayloadRouteContext = Parameters<typeof payloadMediaGet>[1]
 type R2MediaObject = {
   size: number
   httpMetadata?: { contentType?: string }
