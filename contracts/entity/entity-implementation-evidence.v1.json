@@ -218,15 +218,22 @@
       "implementationStatus": "BLOCKED",
       "implementationRefs": [
         "workers/W07-subscription-commerce/src/index.ts",
-        "workers/W07-subscription-commerce/src/subscription-runtime.ts"
+        "workers/W07-subscription-commerce/src/subscription-runtime.ts",
+        "workers/W07-subscription-commerce/src/subscription-runtime.test.ts",
+        "workers/W07-subscription-commerce/migrations/0002_subscription_version_cas.sql",
+        "docs/change-control/CC-MON-SUBSCRIPTION-VERSION-CAS-IMPLEMENTATION-2026-10-27.md"
       ],
       "schemaEvidenceRefs": [
         "contracts/entity/SUBSCRIPTION-ENTITY-CONTRACT.v1.json",
         "contracts/persistence/SUBSCRIPTION-D1-01-persistence.v1.json",
-        "workers/W07-subscription-commerce/migrations/0001_membership_subscriptions.sql"
+        "workers/W07-subscription-commerce/migrations/0001_membership_subscriptions.sql",
+        "workers/W07-subscription-commerce/migrations/0002_subscription_version_cas.sql",
+        "docs/change-control/CC-MON-SUBSCRIPTION-VERSION-CAS-IMPLEMENTATION-2026-10-27.md"
       ],
       "migrationEvidenceRefs": [
-        "workers/W07-subscription-commerce/migrations/0001_membership_subscriptions.sql"
+        "workers/W07-subscription-commerce/migrations/0001_membership_subscriptions.sql",
+        "workers/W07-subscription-commerce/migrations/0002_subscription_version_cas.sql",
+        "docs/change-control/CC-MON-SUBSCRIPTION-VERSION-CAS-IMPLEMENTATION-2026-10-27.md"
       ],
       "payloadNativeEvidenceRefs": [],
       "extensionEvidenceRefs": [
@@ -234,11 +241,11 @@
         "workers/W01-payload/src/subscription/w07-subscription-client.ts"
       ],
       "blockers": [
-        "The W07 runtime and W01 Service Binding adapter exist in source, but source presence is not admitted production-runtime evidence.",
-        "Migration 0001 does not contain the contract-required non-null version column; controlled D1-01 schema/application evidence is absent.",
-        "The runtime uses updated_at as the If-Match compare-and-set authority, while the admitted entity/persistence contract requires monotonic version to be authoritative.",
-        "Subscription creation accepts a supplied planId and hardcodes plan_version=1 without validating an active authoritative plan definition.",
-        "Payment-confirmed subscription transitions and entitlement grant/revoke enforcement have no admitted runtime, integration, and Evidence Registry proof."
+        "The current PR candidate implements monotonic version CAS and has passing W07 Subscription Runtime CI, but the change is not merged and production-runtime evidence has not been admitted.",
+        "Migration 0001 is the historical baseline; migration 0002 adds version INTEGER NOT NULL DEFAULT 1 as a candidate only. The exact D1-01 migration history and post-migration schema have not been read-only verified, and no remote migration has been executed.",
+        "The version-CAS candidate has tests for version increments, stale-version rejection, and idempotent convergence; production concurrency E2E and deployed W07 revision evidence remain absent.",
+        "Subscription creation still accepts a supplied planId and hardcodes plan_version=1 without validating an active authoritative plan definition.",
+        "Payment-confirmed subscription transitions and entitlement grant/revoke enforcement still lack an admitted provider integration, runtime, and Evidence Registry proof."
       ],
       "status": "BLOCKED"
     },
