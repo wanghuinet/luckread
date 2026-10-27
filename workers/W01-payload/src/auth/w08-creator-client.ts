@@ -19,14 +19,16 @@ async function getW08Service(): Promise<W08CreatorService> {
 
 /** Proxy only fixed, caller-authored W08 paths; never accept a client path. */
 export async function callW08Creator(request: Request, path: string, method: 'GET' | 'POST'): Promise<Response> {
-  // Only the four contracted L2->L3 qualification operations may cross this
-  // proxy. Strip query/hash for route matching but retain query parameters for GET.
+  // Only fixed, reviewed creator identity, qualification, and CASL operations may cross this proxy.
+  // Strip query/hash for route matching but retain query parameters for GET.
   const pathname = path.split(/[?#]/, 1)[0]
   const allowedPaths = new Set([
     '/api/v1/creator-applications',
     '/api/v1/creator-applications/me',
     '/api/v1/admin/creator-applications',
     '/api/v1/admin/creator-applications/decision',
+    '/internal/creator/self',
+    '/internal/authz/check-permission',
   ])
   if (!allowedPaths.has(pathname)) {
     throw new W08CreatorClientError(400, 'invalid creator service path')
