@@ -141,6 +141,41 @@ describe('bind direct social post publishing to the stored body asset', () => {
     })
   })
 
+  it('returns SERVICE_UNAVAILABLE when the R2 body stream fails during read', async () => {
+    callW03ContentMock.mockResolvedValue(new Response(JSON.stringify(storedPost()), { status: 200 }))
+    const bytes = new TextEncoder().encode('stored body')
+    const failedBody = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(bytes)
+        controller.error(new Error('R2 body stream failed'))
+      },
+    })
+    getCloudflareContextMock.mockResolvedValue({
+      env: {
+        R2: {
+          get: vi.fn(async () => ({
+            size: bytes.byteLength,
+            httpMetadata: { contentType: 'text/plain;charset=utf-8' },
+            body: failedBody,
+          })),
+        },
+      },
+    })
+
+    const result = await bindPreflightToStoredPost(
+      makeRequest(),
+      'post-1',
+      principal,
+      submitted,
+      makeErrorResponse,
+    )
+    expect(result).toBeInstanceOf(Response)
+    expect((result as Response).status).toBe(503)
+    expect(await (result as Response).json()).toMatchObject({
+      error: { code: 'SERVICE_UNAVAILABLE' },
+    })
+  })
+
   it('rejects non-text and oversized R2 body objects before running publish preflight', async () => {
     callW03ContentMock.mockResolvedValue(new Response(JSON.stringify(storedPost()), { status: 200 }))
     const nonTextGet = vi.fn(async () => makeR2Object('<html>not the canonical post body</html>', 'text/html'))
