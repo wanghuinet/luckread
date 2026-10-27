@@ -62,6 +62,11 @@ describe('Hyperswitch webhook signature verification', () => {
     await expect(verifyHyperswitchWebhookSignature(rawBody, signature, '   ')).resolves.toBe(false)
   })
 
+  it('rejects request bodies larger than the 1 MiB verifier ceiling', async () => {
+    const oversizedBody = new Uint8Array(1024 * 1024 + 1).buffer
+    await expect(verifyHyperswitchWebhookSignature(oversizedBody, '0'.repeat(128), secret)).resolves.toBe(false)
+  })
+
   it('rejects a digest signed with a different secret', async () => {
     const rawBody = toArrayBuffer(new TextEncoder().encode(payload))
     const signature = await sign(rawBody, 'wrong-secret')
@@ -143,6 +148,10 @@ describe('Hyperswitch webhook envelope parsing', () => {
     expect(parseEnvelope(bytes(JSON.stringify({
       ...envelope, content: { ...envelope.content, object: [] },
     })))).toBeNull()
+  })
+
+  it('rejects request bodies larger than the 1 MiB parser ceiling', () => {
+    expect(parseEnvelope(new Uint8Array(1024 * 1024 + 1).buffer)).toBeNull()
   })
 
   it('rejects invalid timestamps and malformed optional processor merchant identifiers', () => {
