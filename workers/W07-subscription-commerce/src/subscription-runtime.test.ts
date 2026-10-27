@@ -125,7 +125,13 @@ describe('subscription runtime', () => {
       },
       body: JSON.stringify({ planId: 'plan_basic' }),
     })
-    const response = await w07.fetch(request, { D1_01: db })
+    const allowLimiter = { limit: async () => ({ success: true }) }
+    const response = await w07.fetch(request, {
+      D1_01: db,
+      SUBSCRIPTION_ORIGIN_GLOBAL_LIMITER: allowLimiter,
+      SUBSCRIPTION_READ_LIMITER: allowLimiter,
+      SUBSCRIPTION_WRITE_LIMITER: allowLimiter,
+    })
     const body = await response.json() as { error?: { code?: string } }
     expect(response.status).toBe(503)
     expect(body.error?.code).toBe('SERVICE_UNAVAILABLE')
