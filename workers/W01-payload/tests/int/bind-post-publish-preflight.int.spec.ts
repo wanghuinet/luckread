@@ -138,7 +138,7 @@ describe('W01 private draft body preflight', () => {
     expect(result).toBeInstanceOf(Response)
     expect((result as Response).status).toBe(422)
     expect(await (result as Response).json()).toMatchObject({
-      error: { code: 'VALIDATION_FAILED', message: 'Stored post body is empty or exceeds the verification limit' },
+      error: { code: 'VALIDATION_FAILED', message: 'Stored post body could not be verified, is empty, or exceeds the verification limit' },
     })
     expect(fetchSpy).not.toHaveBeenCalled()
   })
