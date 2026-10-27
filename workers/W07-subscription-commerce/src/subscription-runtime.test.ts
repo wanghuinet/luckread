@@ -1,16 +1,25 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { changeSubscriptionPlan, createSubscription, etagForVersion, getSubscription, listActiveMembershipPlans, listSubscriptions, parseBoundedPositiveInt, transitionSubscription, type SubscriptionRow, type SubscriptionStatus } from './subscription-runtime.js'
+import { changeSubscriptionPlan, createMembershipPlanDraft, createSubscription, etagForVersion, getSubscription, listActiveMembershipPlans, listCreatorMembershipPlans, listSubscriptions, normalizeMembershipPlanDraft, parseBoundedPositiveInt, transitionSubscription, type SubscriptionRow, type SubscriptionStatus } from './subscription-runtime.js'
 import w07 from './index.js'
 import { verifyD1SubscriptionPostflight, verifyD1SubscriptionPreflight } from '../scripts/verify-remote-preflight.mjs'
 
 type Statement = { bind: (...values: unknown[]) => Statement; first: <T>() => Promise<T | null>; all: <T>() => Promise<{ results: T[] }>; run: () => Promise<{ meta: { changes: number } }> }
-type MembershipPlanRow = { plan_id: string; owner_type: 'CREATOR' | 'COMMUNITY' | 'PLATFORM'; owner_id: string; current_version: number; status: 'DRAFT' | 'ACTIVE' | 'PAUSED' | 'RETIRED'; visibility: 'PRIVATE' | 'PUBLIC'; has_current_version: boolean; created_at: string; updated_at: string; name: string; tier: string; billing_interval: string; price_minor: number; currency: string; benefits_json: string }
+type MembershipPlanRow = { plan_id: string; owner_type: 'CREATOR' | 'COMMUNITY' | 'PLATFORM'; owner_id: string; current_version: number; status: 'DRAFT' | 'ACTIVE' | 'PAUSED' | 'RETIRED'; visibility: 'PRIVATE' | 'PUBLIC'; version: number; has_current_version: boolean; created_at: string; updated_at: string; name: string; tier: string; billing_interval: string; price_minor: number; currency: string; benefits_json: string }
+type PlanVersionRow = { plan_id: string; plan_version: number; name: string; tier: string; billing_interval: string; price_minor: number; currency: string; benefits_json: string; created_at: string }
 
 function fakeDb(rows: SubscriptionRow[], plans: MembershipPlanRow[] = []): D1Database {
   const state = new Map(rows.map((row) => [row.subscription_id, { ...row }]))
   const planState = new Map(plans.map((plan) => [plan.plan_id, { ...plan }]))
+  const planVersionState = new Map<string, PlanVersionRow>()
+  for (const plan of plans) {
+    if (plan.has_current_version) planVersionState.set(plan.plan_id + ':' + plan.current_version, {
+      plan_id: plan.plan_id, plan_version: plan.current_version, name: plan.name, tier: plan.tier,
+      billing_interval: plan.billing_interval, price_minor: plan.price_minor, currency: plan.currency,
+      benefits_json: plan.benefits_json, created_at: plan.created_at,
+    })
+  }
   return {
     prepare(sql: string) {
       let values: unknown[] = []
@@ -21,21 +30,34 @@ function fakeDb(rows: SubscriptionRow[], plans: MembershipPlanRow[] = []): D1Dat
             const row = state.get(String(values[0]))
             return (row && row.subscriber_id === String(values[1]) ? { ...row } : null) as T | null
           }
+          if (sql.includes('FROM membership_plans AS p')) {
+            const plan = planState.get(String(values[0]))
+            const version = planVersionState.get(String(values[0]) + ':1')
+            return (plan && version ? { ...plan, ...version } : null) as T | null
+          }
           const row = state.get(String(values[0]))
           return row ? { ...row } as T : null
         },
         async all<T>() {
           if (sql.includes('FROM membership_plans AS p')) {
             const hasCursor = sql.includes('p.created_at < ?')
+            const ownerQuery = sql.includes('p.owner_id = ?')
+            const cursorOffset = ownerQuery ? 1 : 0
             const limit = Number(values[values.length - 1])
-            const cursorCreatedAt = hasCursor ? String(values[0]) : null
-            const cursorPlanId = hasCursor ? String(values[2]) : null
+            const cursorCreatedAt = hasCursor ? String(values[cursorOffset]) : null
+            const cursorPlanId = hasCursor ? String(values[cursorOffset + 2]) : null
             const results = Array.from(planState.values())
-              .filter((plan) => plan.owner_type === 'CREATOR' && plan.status === 'ACTIVE' && plan.visibility === 'PUBLIC' && plan.has_current_version)
+              .filter((plan) => !ownerQuery || (plan.owner_type === 'CREATOR' && plan.owner_id === String(values[0])))
+              .filter((plan) => ownerQuery || (plan.owner_type === 'CREATOR' && plan.status === 'ACTIVE' && plan.visibility === 'PUBLIC'))
+              .filter((plan) => plan.has_current_version)
               .filter((plan) => !hasCursor || plan.created_at < cursorCreatedAt! || (plan.created_at === cursorCreatedAt && plan.plan_id < cursorPlanId!))
               .sort((left, right) => right.created_at.localeCompare(left.created_at) || right.plan_id.localeCompare(left.plan_id))
               .slice(0, limit)
-              .map((plan) => ({ ...plan, plan_version: plan.current_version }))
+              .map((plan) => {
+                const version = planVersionState.get(plan.plan_id + ':' + plan.current_version)
+                return version ? { ...plan, ...version, current_version: plan.current_version } : null
+              })
+              .filter((plan) => plan !== null)
             return { results: results as unknown as T[] }
           }
           if (sql.includes('WHERE subscriber_id = ?')) {
@@ -50,6 +72,34 @@ function fakeDb(rows: SubscriptionRow[], plans: MembershipPlanRow[] = []): D1Dat
           return { results: [] as T[] }
         },
         async run() {
+          if (sql.includes('INSERT OR IGNORE INTO membership_plans')) {
+            const planId = String(values[0])
+            if (planState.has(planId)) return { meta: { changes: 0 } }
+            planState.set(planId, {
+              plan_id: planId, owner_type: 'CREATOR', owner_id: String(values[1]), current_version: 1,
+              status: 'DRAFT', visibility: 'PRIVATE', version: 1, has_current_version: false,
+              created_at: String(values[2]), updated_at: String(values[3]),
+              name: '', tier: '', billing_interval: 'MONTHLY', price_minor: 0, currency: 'USD', benefits_json: '[]',
+            })
+            return { meta: { changes: 1 } }
+          }
+          if (sql.includes('INSERT OR IGNORE INTO membership_plan_versions')) {
+            const key = String(values[0]) + ':1'
+            if (planVersionState.has(key)) return { meta: { changes: 0 } }
+            const version: PlanVersionRow = {
+              plan_id: String(values[0]), plan_version: 1, name: String(values[1]), tier: String(values[2]),
+              billing_interval: String(values[3]), price_minor: Number(values[4]), currency: String(values[5]),
+              benefits_json: String(values[6]), created_at: String(values[7]),
+            }
+            planVersionState.set(key, version)
+            const plan = planState.get(version.plan_id)
+            if (plan) {
+              plan.name = version.name; plan.tier = version.tier; plan.billing_interval = version.billing_interval
+              plan.price_minor = version.price_minor; plan.currency = version.currency; plan.benefits_json = version.benefits_json
+              plan.has_current_version = true
+            }
+            return { meta: { changes: 1 } }
+          }
           if (sql.includes('INSERT INTO membership_subscriptions')) {
             const plan = planState.get(String(values[7]))
             if (!plan || plan.owner_type !== 'CREATOR' || plan.status !== 'ACTIVE' || plan.visibility !== 'PUBLIC') return { meta: { changes: 0 } }
@@ -82,11 +132,16 @@ function fakeDb(rows: SubscriptionRow[], plans: MembershipPlanRow[] = []): D1Dat
       }
       return statement as unknown as ReturnType<D1Database["prepare"]>
     },
+    async batch<T = unknown>(statements: D1PreparedStatement[]) {
+      const results = []
+      for (const item of statements) results.push(await (item as unknown as Statement).run())
+      return results as unknown as D1Result<T>[]
+    },
   } as unknown as D1Database
 }
 
 const activePlan = (planId = 'plan_basic', overrides: Partial<MembershipPlanRow> = {}): MembershipPlanRow => ({
-  plan_id: planId, owner_type: 'CREATOR', owner_id: 'creator_1', current_version: 3, status: 'ACTIVE', visibility: 'PUBLIC',
+  plan_id: planId, owner_type: 'CREATOR', owner_id: 'creator_1', current_version: 3, status: 'ACTIVE', visibility: 'PUBLIC', version: 1,
   has_current_version: true, created_at: '2026-10-02T12:00:00.000Z', updated_at: '2026-10-02T12:00:00.000Z',
   name: 'Creator Basic', tier: 'basic', billing_interval: 'MONTHLY', price_minor: 500, currency: 'USD', benefits_json: '["member-posts"]',
   ...overrides,
