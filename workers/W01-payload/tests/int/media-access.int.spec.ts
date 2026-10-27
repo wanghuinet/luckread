@@ -290,6 +290,33 @@ describe('Media upload access', () => {
     expect(guards.length).toBe(2)
   })
 
+  it('projects successful upload responses without exposing owner or idempotency internals', () => {
+    const route = read('src/app/api/v1/media/route.ts')
+    const projectionStart = route.indexOf('const publicMediaFields = (media: MediaUploadRecord) => ({')
+    const projectionEnd = route.indexOf('/**', projectionStart)
+    expect(projectionStart).toBeGreaterThanOrEqual(0)
+    expect(projectionEnd).toBeGreaterThan(projectionStart)
+    const projection = route.slice(projectionStart, projectionEnd)
+
+    expect(route).toContain('projectSuccessfulMediaUploadResponse')
+    expect(route).toContain('const projectedResponse = await projectSuccessfulMediaUploadResponse(response)')
+    expect(route).not.toContain('return await appendRequestIdToJsonResponse(response)')
+    for (const internalField of [
+      'ownerUserId',
+      'uploadIdempotencyKey',
+      'uploadFingerprint',
+      '_objectKey',
+      'updatedAt',
+      'createdAt',
+      'thumbnailURL',
+    ]) {
+      expect(projection).not.toContain(internalField)
+    }
+    expect(projection).toContain('id: media.id ?? null')
+    expect(projection).toContain('url: media.url ?? null')
+    expect(projection).toContain('alt: media.alt ?? null')
+  })
+
   it('persists upload idempotency metadata and replays completed uploads safely', () => {
     const media = read('src/collections/Media.ts')
     const route = read('src/app/api/v1/media/route.ts')
