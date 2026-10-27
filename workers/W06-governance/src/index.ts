@@ -487,7 +487,7 @@ export default {
       let principal: ReturnType<typeof requireW01Transport>
       try { principal = requireW01Transport(request) }
       catch (error) { return errorResponse(error, request.headers.get('X-LuckRead-Request-Id')?.trim()) }
-      if (principal.layer !== 'L3' && principal.layer !== 'L4') {
+      if (!/^L[3-8]$/.test(principal.layer)) {
         return json({ error: 'PERMISSION_DENIED' }, 403)
       }
 
