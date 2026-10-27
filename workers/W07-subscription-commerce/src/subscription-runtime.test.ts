@@ -378,6 +378,201 @@ describe('subscription runtime', () => {
       .rejects.toMatchObject({ code: 'VALIDATION_FAILED', status: 400 })
   })
 
+  it('creates private creator-owned plan drafts idempotently and rejects key reuse with changed data', async () => {
+    const db = fakeDb([])
+    const input = {
+      name: 'Supporter',
+      tier: 'supporter',
+      billingInterval: 'MONTHLY',
+      priceMinor: 500,
+      currency: 'USD',
+      benefits: ['member posts', 'supporter badge'],
+    }
+    const first = await createMembershipPlanDraft(db, 'user_1', 'creator_1', input, 'draft-create-1')
+    const replay = await createMembershipPlanDraft(db, 'user_1', 'creator_1', input, 'draft-create-1')
+    expect(first).toMatchObject({ creatorId: 'creator_1', planVersion: 1, status: 'DRAFT', visibility: 'PRIVATE', version: 1, replayed: false })
+    expect(replay).toMatchObject({ planId: first.planId, status: 'DRAFT', visibility: 'PRIVATE', version: 1, replayed: true })
+    await expect(createMembershipPlanDraft(db, 'user_1', 'creator_1', { ...input, priceMinor: 900 }, 'draft-create-1'))
+      .rejects.toMatchObject({ code: 'CONFLICT', status: 409 })
+  })
+
+  it('rejects client-controlled owner, lifecycle state, malformed currency, and unsafe price values', () => {
+    expect(() => normalizeMembershipPlanDraft({
+      name: 'Basic', tier: 'basic', billingInterval: 'MONTHLY', priceMinor: 500, currency: 'USD', benefits: [],
+      creatorId: 'creator_attacker',
+    })).toThrowError(expect.objectContaining({ code: 'VALIDATION_FAILED', status: 400 }))
+    expect(() => normalizeMembershipPlanDraft({
+      name: 'Basic', tier: 'basic', billingInterval: 'MONTHLY', priceMinor: 500, currency: 'US
+    const runtime = readFileSync(new URL('./subscription-runtime.ts', import.meta.url), 'utf8')
+    expect(runtime).toContain('version = version + 1')
+    expect(runtime).toContain('AND version = ?')
+    expect(runtime).not.toContain('AND updated_at = ?')
+  })
+
+  it('restricts manual deployment to reviewed main and requires read-only schema preflight', () => {
+    const workflow = readFileSync(new URL('../../../.github/workflows/w07-subscription-runtime-deploy.yml', import.meta.url), 'utf8')
+    expect(workflow).toContain('git merge-base --is-ancestor "$SOURCE_SHA" origin/main')
+    expect(workflow).toContain('SOURCE_SHA: ${{ inputs.source_sha }}')
+    expect(workflow).not.toContain('ref: ${{ inputs.source_sha }}')
+    expect(workflow).not.toContain('[[ "${{ inputs.source_sha }}"')
+    expect(workflow).toContain('"sourceSha": "$SOURCE_SHA"')
+    expect(workflow).not.toContain('"sourceSha": "${{ inputs.source_sha }}"')
+    expect(workflow).toContain('Read-only D1-01 migration and schema preflight')
+    expect(workflow).toContain('SELECT name FROM d1_migrations')
+    expect(workflow).toContain('PRAGMA table_info("membership_subscriptions")')
+    expect(workflow).toContain('PRAGMA foreign_key_list("membership_subscriptions")')
+    expect(workflow).toContain('node scripts/verify-remote-preflight.mjs preflight')
+    expect(workflow).toContain('node scripts/verify-remote-preflight.mjs postflight')
+    expect(workflow).toContain('SELECT COUNT(*) AS invalid_versions')
+    const preflight = readFileSync(new URL('../scripts/verify-remote-preflight.mjs', import.meta.url), 'utf8')
+    expect(preflight).toContain("migrationAction = 'apply'")
+    expect(preflight).toContain("migrationAction = 'skip'")
+    expect(workflow).toContain("if: steps.d1_preflight.outputs.migration_action == 'apply'")
+    expect(workflow.indexOf('Read-only D1-01 migration and schema preflight'))
+      .toBeLessThan(workflow.indexOf('Apply D1-01 Subscription migration'))
+    expect(workflow.indexOf('Apply D1-01 Subscription migration'))
+      .toBeLessThan(workflow.indexOf('Read-only D1-01 schema and version postflight'))
+    expect(workflow.indexOf('Read-only D1-01 schema and version postflight'))
+      .toBeLessThan(workflow.indexOf('Deploy W07'))
+  })
+
+  it('rejects invalid version ETag values', async () => {
+    expect(() => etagForVersion(0)).toThrowError(expect.objectContaining({ code: 'INTEGRITY_VIOLATION', status: 500 }))
+    const db = fakeDb([baseRow()])
+    await expect(transitionSubscription(db, 'user_1', 'sub_existing', 'pause', '"lr-v9007199254740992"')).rejects.toMatchObject({ code: 'PRECONDITION_FAILED', status: 412 })
+  })
+
+  it('does not expose entitlementSnapshotRef', async () => {
+    const db = fakeDb([baseRow({ entitlement_snapshot_ref: 'internal-ref' })]); const result = await getSubscription(db, 'user_1', 'sub_existing'); expect(result).not.toHaveProperty('entitlementSnapshotRef')
+  })
+})
+
+afterEach(() => vi.useRealTimers())
+
+const preflightDatabaseList = [{ name: 'luckread', uuid: '2f80471e-3756-49f9-8db1-7707a433ad64' }]
+const preflightIndexes = [{
+  results: [
+    { seq: 0, name: 'ix_membership_subscriptions_subscriber_status_period' },
+    { seq: 1, name: 'ix_membership_subscriptions_plan_version' },
+    { seq: 2, name: 'ix_membership_subscriptions_creator_status' },
+    { seq: 3, name: 'ix_membership_subscriptions_updated_at' },
+  ],
+}]
+const legacySchemaNames = [
+  ['subscription_id','TEXT',1,1], ['subscriber_id','TEXT',1,0], ['plan_id','TEXT',1,0],
+  ['plan_version','INTEGER',1,0], ['creator_id','TEXT',0,0], ['status','TEXT',1,0],
+  ['started_at','TEXT',1,0], ['current_period_start','TEXT',1,0], ['current_period_end','TEXT',1,0],
+  ['cancel_at','TEXT',0,0], ['entitlement_snapshot_ref','TEXT',0,0],
+  ['created_at','TEXT',1,0], ['updated_at','TEXT',1,0],
+]
+const preflightSchema = (withVersion = false, versionDefault = '1') => [{
+  results: [...legacySchemaNames, ...(withVersion ? [['version','INTEGER',1,0]] : [])]
+    .map(([name,type,notnull,pk],cid) => ({
+      cid, name, type, notnull, pk,
+      dflt_value: name === 'version' ? versionDefault : null,
+    })),
+}]
+const preflightInput = (withVersion = false, versionDefault = '1') => ({
+  databaseList: preflightDatabaseList,
+  migrationState: [{ results: withVersion
+    ? [{ name: '0001_membership_subscriptions' }, { name: '0002_subscription_version_cas' }]
+    : [{ name: '0001_membership_subscriptions' }] }],
+  subscriptionSchema: preflightSchema(withVersion,versionDefault),
+  subscriptionIndexes: preflightIndexes,
+})
+
+describe('read-only D1 subscription migration postflight', () => {
+  it('passes only when migration 0002, the exact current schema, and version integrity are verified', () => {
+    const result = verifyD1SubscriptionPostflight({
+      ...preflightInput(true),
+      versionIntegrity: [{ results: [{ invalid_versions: 0 }] }],
+    })
+    expect(result.migrationAction).toBe('skip')
+    expect(result.invalidVersions).toBe(0)
+    expect(result.postflight).toBe('PASS')
+    expect(result.appliedMigrations).toEqual(['0001_membership_subscriptions', '0002_subscription_version_cas'])
+  })
+
+  it('fails closed when any existing subscription has an invalid version', () => {
+    expect(() => verifyD1SubscriptionPostflight({
+      ...preflightInput(true),
+      versionIntegrity: [{ results: [{ invalid_versions: 1 }] }],
+    })).toThrow('existing subscription versions include invalid or non-positive values')
+  })
+
+  it('fails closed when migration 0002 is not applied after the migration step', () => {
+    expect(() => verifyD1SubscriptionPostflight({
+      ...preflightInput(),
+      versionIntegrity: [{ results: [{ invalid_versions: 0 }] }],
+    })).toThrow('post-migration verification requires 0001 and 0002 with the exact current schema')
+  })
+
+  it('fails closed when the version integrity query has no single result', () => {
+    expect(() => verifyD1SubscriptionPostflight({
+      ...preflightInput(true),
+      versionIntegrity: [{ results: [] }],
+    })).toThrow('version integrity query did not return exactly one count')
+  })
+})
+
+describe('read-only D1 subscription migration preflight', () => {
+  it('requests migration only for the exact legacy schema with migration 0001 applied', () => {
+    const result = verifyD1SubscriptionPreflight(preflightInput())
+    expect(result.migrationAction).toBe('apply')
+    expect(result.appliedMigrations).toEqual(['0001_membership_subscriptions'])
+    expect(result.columns.map((column) => column[0])).not.toContain('version')
+  })
+
+  it('skips migration when migration 0002 and the exact version schema are already present', () => {
+    const result = verifyD1SubscriptionPreflight(preflightInput(true))
+    expect(result.migrationAction).toBe('skip')
+    expect(result.appliedMigrations).toEqual(['0001_membership_subscriptions','0002_subscription_version_cas'])
+    expect(result.columns.at(-1)).toEqual(['version','INTEGER',1,0])
+  })
+
+  it('fails closed when the target D1 UUID does not match', () => {
+    expect(() => verifyD1SubscriptionPreflight({
+      ...preflightInput(),
+      databaseList: [{ name: 'luckread', uuid: 'wrong-database-id' }],
+    })).toThrow('exact D1-01 database name/UUID was not found')
+  })
+
+  it('fails closed on unexpected migration/schema combinations', () => {
+    expect(() => verifyD1SubscriptionPreflight({
+      ...preflightInput(true),
+      migrationState: [{ results: [{ name: '0001_membership_subscriptions' }] }],
+    })).toThrow('migration history and physical Subscription schema do not match')
+  })
+
+  it('fails closed when the version default or expected indexes are missing', () => {
+    expect(() => verifyD1SubscriptionPreflight(preflightInput(true, '0'))).toThrow(
+      'version column does not satisfy INTEGER NOT NULL DEFAULT 1',
+    )
+    expect(() => verifyD1SubscriptionPreflight({
+      ...preflightInput(),
+      subscriptionIndexes: [{ results: [{ seq: 0, name: 'only_some_index' }] }],
+    })).toThrow('missing expected index')
+  })
+})
+, benefits: [],
+    })).toThrowError(expect.objectContaining({ code: 'VALIDATION_FAILED', status: 400 }))
+    expect(() => normalizeMembershipPlanDraft({
+      name: 'Basic', tier: 'basic', billingInterval: 'MONTHLY', priceMinor: Number.MAX_SAFE_INTEGER, currency: 'USD', benefits: [],
+    })).toThrowError(expect.objectContaining({ code: 'VALIDATION_FAILED', status: 400 }))
+  })
+
+  it('lists only the verified creator-owned plans, including private drafts', async () => {
+    const db = fakeDb([], [
+      activePlan('plan_active', { creator_id: undefined }),
+      activePlan('plan_private', { status: 'DRAFT', visibility: 'PRIVATE', owner_id: 'creator_1', created_at: '2026-10-03T12:00:00.000Z' }),
+      activePlan('plan_other_creator', { owner_id: 'creator_2' }),
+    ])
+    const result = await listCreatorMembershipPlans(db, 'creator_1', 20)
+    expect(result.docs.map((plan) => plan.planId)).toEqual(['plan_private', 'plan_active'])
+    expect(result.docs.find((plan) => plan.planId === 'plan_private')).toMatchObject({ status: 'DRAFT', visibility: 'PRIVATE' })
+    expect(JSON.stringify(result)).not.toContain('plan_other_creator')
+  })
+
   it('uses version CAS rather than updated_at as the concurrency authority', async () => {
     const runtime = readFileSync(new URL('./subscription-runtime.ts', import.meta.url), 'utf8')
     expect(runtime).toContain('version = version + 1')
