@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { verifyHyperswitchWebhookSignature } from './hyperswitch-webhook-signature.js'
+import { parseHyperswitchWebhookEnvelope, verifyHyperswitchWebhookSignature } from './hyperswitch-webhook-signature.js'
 
 const toArrayBuffer = (bytes: Uint8Array): ArrayBuffer =>
   bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer
@@ -67,5 +67,78 @@ describe('Hyperswitch webhook signature verification', () => {
     const signature = await sign(rawBody, 'wrong-secret')
 
     await expect(verifyHyperswitchWebhookSignature(rawBody, signature, secret)).resolves.toBe(false)
+  })
+})
+
+
+describe('Hyperswitch webhook envelope parsing', () => {
+  const envelope = {
+    merchant_id: 'merchant_luckread_test',
+    event_id: 'evt_test_123',
+    event_type: 'payment_succeeded',
+    content: {
+      type: 'payment_details',
+      object: { payment_id: 'pay_test_123', status: 'succeeded', amount: 1200, currency: 'USD' },
+    },
+    timestamp: '2026-10-27T10:00:00Z',
+    processor_merchant_id: null,
+  }
+
+  const bytes = (value: string): ArrayBuffer => toArrayBuffer(new TextEncoder().encode(value))
+
+  it('parses a documented v1 envelope and exposes only normalized envelope fields', () => {
+    const parsed = parseHyperswitchWebhookEnvelope(bytes(JSON.stringify(envelope)))
+    expect(parsed).toEqual({
+      merchantId: 'merchant_luckread_test',
+      eventId: 'evt_test_123',
+      eventType: 'payment_succeeded',
+      contentType: 'payment_details',
+      resource: { payment_id: 'pay_test_123', status: 'succeeded', amount: 1200, currency: 'USD' },
+      timestamp: '2026-10-27T10:00:00Z',
+      processorMerchantId: null,
+    })
+  })
+
+  it('allows absent optional timestamp and processor merchant id', () => {
+    const { timestamp: _timestamp, processor_merchant_id: _processorMerchantId, ...withoutOptional } = envelope
+    expect(parseHyperswitchWebhookEnvelope(bytes(JSON.stringify(withoutOptional)))).toMatchObject({
+      merchantId: 'merchant_luckread_test',
+      eventId: 'evt_test_123',
+      eventType: 'payment_succeeded',
+      contentType: 'payment_details',
+    })
+  })
+
+  it('rejects invalid JSON, invalid UTF-8, and non-object JSON', () => {
+    expect(parseHyperswitchWebhookEnvelope(bytes('{'))).toBeNull()
+    expect(parseHyperswitchWebhookEnvelope(bytes('[]'))).toBeNull()
+    expect(parseHyperswitchWebhookEnvelope(toArrayBuffer(new Uint8Array([0xff, 0xfe])))).toBeNull()
+  })
+
+  it('rejects missing or whitespace-padded required identifiers', () => {
+    for (const modified of [
+      { ...envelope, merchant_id: '' },
+      { ...envelope, merchant_id: ' merchant_luckread_test' },
+      { ...envelope, event_id: '' },
+      { ...envelope, event_type: '' },
+    ]) {
+      expect(parseHyperswitchWebhookEnvelope(bytes(JSON.stringify(modified)))).toBeNull()
+    }
+  })
+
+  it('rejects event types and content variants not admitted by the documented v1 schema', () => {
+    expect(parseHyperswitchWebhookEnvelope(bytes(JSON.stringify({ ...envelope, event_type: 'payment_succeeded_fake' })))).toBeNull()
+    expect(parseHyperswitchWebhookEnvelope(bytes(JSON.stringify({
+      ...envelope, content: { ...envelope.content, type: 'unknown_details' },
+    })))).toBeNull()
+    expect(parseHyperswitchWebhookEnvelope(bytes(JSON.stringify({
+      ...envelope, content: { ...envelope.content, object: [] },
+    })))).toBeNull()
+  })
+
+  it('rejects invalid timestamps and malformed optional processor merchant identifiers', () => {
+    expect(parseHyperswitchWebhookEnvelope(bytes(JSON.stringify({ ...envelope, timestamp: 'yesterday' })))).toBeNull()
+    expect(parseHyperswitchWebhookEnvelope(bytes(JSON.stringify({ ...envelope, processor_merchant_id: 12 })))).toBeNull()
+    expect(parseHyperswitchWebhookEnvelope(bytes(JSON.stringify({ ...envelope, processor_merchant_id: ' merchant ' })))).toBeNull()
   })
 })
