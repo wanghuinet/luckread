@@ -37,6 +37,11 @@ export async function callW06MembershipPlanAudit(input: {
     status: 'DRAFT'
     visibility: 'PRIVATE'
     occurredAt: string
+    name: string
+    tier: string
+    billingInterval: 'MONTHLY' | 'YEARLY'
+    priceMinor: number
+    currency: string
   }
 }): Promise<Response> {
   return callW06Moderation({
