@@ -164,7 +164,7 @@ jobs:
           printf '%s' 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=' | base64 -d > /tmp/media-e2e.png
           status="$(curl --silent --show-error -o /tmp/media-upload.json -w '%{http_code}'             -X POST             -H "Authorization: Bearer $MEDIA_OWNER_TOKEN"             -H "Idempotency-Key: MEDIA-E2E-$GITHUB_RUN_ID-UPLOAD"             -F "file=@/tmp/media-e2e.png;type=image/png"             -F '_payload={"alt":"Media runtime E2E synthetic fixture"}'             "$W01_BASE_URL/v1/media")"
           echo "Media upload HTTP status: $status"
-          cat /tmp/media-upload.json
+          # Upload response bodies are intentionally not printed to Actions logs.
           case "$status" in 2*) ;; *) echo "Media upload failed: HTTP $status"; exit 1;; esac
           node --input-type=module <<'NODE'
           import {readFileSync,appendFileSync} from 'node:fs'
@@ -194,7 +194,8 @@ jobs:
             privateNoStore:cache==='private, no-store',
             noSharedCacheHeader:!headers.includes('x-luckread-cache:'),
             noOwnerUserId:!body.includes('ownerUserId'),
-            projectedFieldsOnly:Object.keys(doc??{}).every(k=>allowed.has(k)),
+            // requestId is an API envelope field added to root-level Payload documents, not a Media field.
+            projectedFieldsOnly:Object.keys(doc??{}).filter(k=>k!=='requestId').every(k=>allowed.has(k)),
             readyStatus:doc?.status==='READY'
           }
           for(const [k,ok] of Object.entries(checks)) if(!ok) throw new Error('owner Media check failed: '+k)
@@ -241,7 +242,7 @@ jobs:
               if [ "$status" != "204" ]; then echo "WARNING: fixture logout returned HTTP $status; continuing D1 cleanup"; fi
             fi
           done
-          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --yes --config deployed-source/workers/W01-payload/wrangler.jsonc --command "DELETE FROM role_assignments WHERE id IN ('$MEDIA_OWNER_ROLE_ID','$MEDIA_OTHER_ROLE_ID'); DELETE FROM \"session\" WHERE user_id IN ('$MEDIA_OWNER_USER_ID','$MEDIA_OTHER_USER_ID'); DELETE FROM consents WHERE CAST(actor_subject_id AS TEXT) IN ('$MEDIA_OWNER_USER_ID','$MEDIA_OTHER_USER_ID') OR CAST(owner_subject_id AS TEXT) IN ('$MEDIA_OWNER_USER_ID','$MEDIA_OTHER_USER_ID'); DELETE FROM auth_registration_envelopes WHERE idempotency_key IN ('$MEDIA_OWNER_REGISTER_KEY','$MEDIA_OTHER_REGISTER_KEY'); DELETE FROM users WHERE CAST(id AS TEXT) IN ('$MEDIA_OWNER_USER_ID','$MEDIA_OTHER_USER_ID'); DELETE FROM \"user\" WHERE id IN ('$MEDIA_OWNER_USER_ID','$MEDIA_OTHER_USER_ID');"
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --yes --config deployed-source/workers/W01-payload/wrangler.jsonc --command "DELETE FROM role_assignments WHERE id IN ('$MEDIA_OWNER_ROLE_ID','$MEDIA_OTHER_ROLE_ID') OR subject_id IN ('$MEDIA_OWNER_USER_ID','$MEDIA_OTHER_USER_ID'); DELETE FROM \"session\" WHERE user_id IN ('$MEDIA_OWNER_USER_ID','$MEDIA_OTHER_USER_ID'); DELETE FROM consents WHERE CAST(actor_subject_id AS TEXT) IN ('$MEDIA_OWNER_USER_ID','$MEDIA_OTHER_USER_ID') OR CAST(owner_subject_id AS TEXT) IN ('$MEDIA_OWNER_USER_ID','$MEDIA_OTHER_USER_ID'); DELETE FROM auth_registration_envelopes WHERE idempotency_key IN ('$MEDIA_OWNER_REGISTER_KEY','$MEDIA_OTHER_REGISTER_KEY'); DELETE FROM users WHERE CAST(id AS TEXT) IN ('$MEDIA_OWNER_USER_ID','$MEDIA_OTHER_USER_ID'); DELETE FROM \"user\" WHERE id IN ('$MEDIA_OWNER_USER_ID','$MEDIA_OTHER_USER_ID');"
 
       - name: Verify fixture cleanup
         if: always()
