@@ -6,9 +6,11 @@ import w07 from './index.js'
 import { verifyD1SubscriptionPostflight, verifyD1SubscriptionPreflight } from '../scripts/verify-remote-preflight.mjs'
 
 type Statement = { bind: (...values: unknown[]) => Statement; first: <T>() => Promise<T | null>; all: <T>() => Promise<{ results: T[] }>; run: () => Promise<{ meta: { changes: number } }> }
+type MembershipPlanRow = { plan_id: string; owner_type: 'CREATOR' | 'COMMUNITY' | 'PLATFORM'; owner_id: string; current_version: number; status: 'DRAFT' | 'ACTIVE' | 'PAUSED' | 'RETIRED'; visibility: 'PRIVATE' | 'PUBLIC' }
 
-function fakeDb(rows: SubscriptionRow[]): D1Database {
+function fakeDb(rows: SubscriptionRow[], plans: MembershipPlanRow[] = []): D1Database {
   const state = new Map(rows.map((row) => [row.subscription_id, { ...row }]))
+  const planState = new Map(plans.map((plan) => [plan.plan_id, { ...plan }]))
   return {
     prepare(sql: string) {
       let values: unknown[] = []
@@ -35,13 +37,14 @@ function fakeDb(rows: SubscriptionRow[]): D1Database {
           return { results: [] as T[] }
         },
         async run() {
-          if (sql.includes('INSERT INTO')) {
+          if (sql.includes('INSERT INTO membership_subscriptions')) {
+            const plan = planState.get(String(values[7]))
+            if (!plan || plan.owner_type !== 'CREATOR' || plan.status !== 'ACTIVE' || plan.visibility !== 'PUBLIC') return { meta: { changes: 0 } }
             const row: SubscriptionRow = {
-              subscription_id: String(values[0]), subscriber_id: String(values[1]), plan_id: String(values[2]),
-              plan_version: Number(values[3]), creator_id: values[4] as string | null, status: values[5] as SubscriptionStatus,
-              started_at: String(values[6]), current_period_start: String(values[7]), current_period_end: String(values[8]),
-              cancel_at: values[9] as string | null, entitlement_snapshot_ref: values[10] as string | null,
-              created_at: String(values[11]), updated_at: String(values[12]), version: Number(values[13]),
+              subscription_id: String(values[0]), subscriber_id: String(values[1]), plan_id: plan.plan_id,
+              plan_version: plan.current_version, creator_id: plan.owner_id, status: 'PENDING',
+              started_at: String(values[2]), current_period_start: String(values[3]), current_period_end: String(values[4]),
+              cancel_at: null, entitlement_snapshot_ref: null, created_at: String(values[5]), updated_at: String(values[6]), version: 1,
             }
             if (state.has(row.subscription_id)) throw new Error('UNIQUE constraint failed')
             state.set(row.subscription_id, row)
@@ -54,9 +57,11 @@ function fakeDb(rows: SubscriptionRow[]): D1Database {
             return { meta: { changes: 1 } }
           }
           if (sql.includes('SET plan_id =')) {
-            const row = state.get(String(values[3]))
-            if (!row || row.subscriber_id !== String(values[4]) || row.version !== Number(values[5])) return { meta: { changes: 0 } }
-            row.plan_id = String(values[0]); row.plan_version = Number(values[1]); row.updated_at = String(values[2]); row.version += 1
+            const row = state.get(String(values[4]))
+            const plan = planState.get(String(values[7]))
+            if (!row || row.subscriber_id !== String(values[5]) || row.version !== Number(values[6])) return { meta: { changes: 0 } }
+            if (!plan || plan.owner_type !== 'CREATOR' || plan.status !== 'ACTIVE' || plan.visibility !== 'PUBLIC') return { meta: { changes: 0 } }
+            row.plan_id = plan.plan_id; row.plan_version = plan.current_version; row.creator_id = plan.owner_id; row.updated_at = String(values[3]); row.version += 1
             return { meta: { changes: 1 } }
           }
           throw new Error('unexpected query')
@@ -66,6 +71,10 @@ function fakeDb(rows: SubscriptionRow[]): D1Database {
     },
   } as unknown as D1Database
 }
+
+const activePlan = (planId = 'plan_basic', overrides: Partial<MembershipPlanRow> = {}): MembershipPlanRow => ({
+  plan_id: planId, owner_type: 'CREATOR', owner_id: 'creator_1', current_version: 3, status: 'ACTIVE', visibility: 'PUBLIC', ...overrides,
+})
 
 const baseRow = (overrides: Partial<SubscriptionRow> = {}): SubscriptionRow => ({
   subscription_id: 'sub_existing', subscriber_id: 'user_1', plan_id: 'plan_basic', plan_version: 1, creator_id: null, status: 'ACTIVE',
@@ -137,13 +146,25 @@ describe('subscription runtime', () => {
     expect(body.error?.code).toBe('SERVICE_UNAVAILABLE')
     expect(databaseTouched).toBe(false)
   })
-  it('creates an idempotent pending subscription', async () => {
-    const db = fakeDb([]); const first = await createSubscription(db, 'user_1', { planId: 'plan_basic', idempotencyKey: 'create-1' });
+  it('creates an idempotent pending subscription from the current authoritative plan version', async () => {
+    const db = fakeDb([], [activePlan('plan_basic', { current_version: 3, owner_id: 'creator_1' })]); const first = await createSubscription(db, 'user_1', { planId: 'plan_basic', idempotencyKey: 'create-1' });
     const second = await createSubscription(db, 'user_1', { planId: 'plan_basic', idempotencyKey: 'create-1' });
-    expect(first.subscriptionId).toBe(second.subscriptionId); expect(first.status).toBe('PENDING'); expect(first.planVersion).toBe(1); expect(first.version).toBe(1); expect(first.etag).toBe(etagForVersion(1))
+    expect(first.subscriptionId).toBe(second.subscriptionId); expect(first.status).toBe('PENDING'); expect(first.planVersion).toBe(3); expect(first.creatorId).toBe('creator_1'); expect(first.version).toBe(1); expect(first.etag).toBe(etagForVersion(1))
+  })
+  it('fails closed for missing, inactive, private, or non-creator plans', async () => {
+    const cases: MembershipPlanRow[][] = [
+      [],
+      [activePlan('plan_basic', { status: 'DRAFT' })],
+      [activePlan('plan_basic', { visibility: 'PRIVATE' })],
+      [activePlan('plan_basic', { owner_type: 'COMMUNITY' })],
+    ]
+    for (const plans of cases) {
+      await expect(createSubscription(fakeDb([], plans), 'user_1', { planId: 'plan_basic', idempotencyKey: 'create-1' }))
+        .rejects.toMatchObject({ code: 'PLAN_NOT_ACTIVE', status: 409 })
+    }
   })
   it('rejects idempotency-key reuse for a different plan', async () => {
-    const db = fakeDb([]); await createSubscription(db, 'user_1', { planId: 'plan_basic', idempotencyKey: 'create-1' })
+    const db = fakeDb([], [activePlan()]); await createSubscription(db, 'user_1', { planId: 'plan_basic', idempotencyKey: 'create-1' })
     await expect(createSubscription(db, 'user_1', { planId: 'plan_pro', idempotencyKey: 'create-1' })).rejects.toMatchObject({ code: 'CONFLICT', status: 409 })
   })
   it('scopes reads to the subscriber', async () => {
@@ -182,9 +203,17 @@ describe('subscription runtime', () => {
     const after = await transitionSubscription(db, 'user_1', 'sub_existing', 'pause', before.etag)
     expect(Date.parse(after.updatedAt)).toBe(Date.parse(before.updatedAt) + 1)
   })
-  it('changes plan only for mutable lifecycle states', async () => {
-    const db = fakeDb([baseRow()]); const before = await getSubscription(db, 'user_1', 'sub_existing'); const after = await changeSubscriptionPlan(db, 'user_1', 'sub_existing', 'plan_pro', before.etag)
-    expect(after.planId).toBe('plan_pro'); expect(after.status).toBe('ACTIVE'); expect(after.version).toBe(before.version + 1); expect(after.etag).toBe(etagForVersion(2))
+  it('changes plan only to an active authoritative version and updates the creator reference', async () => {
+    const db = fakeDb([baseRow()], [activePlan('plan_pro', { current_version: 7, owner_id: 'creator_pro' })]); const before = await getSubscription(db, 'user_1', 'sub_existing'); const after = await changeSubscriptionPlan(db, 'user_1', 'sub_existing', 'plan_pro', before.etag)
+    expect(after.planId).toBe('plan_pro'); expect(after.planVersion).toBe(7); expect(after.creatorId).toBe('creator_pro'); expect(after.status).toBe('ACTIVE'); expect(after.version).toBe(before.version + 1); expect(after.etag).toBe(etagForVersion(2))
+  })
+
+  it('refuses a plan change to a missing or unavailable plan', async () => {
+    const db = fakeDb([baseRow()]); const before = await getSubscription(db, 'user_1', 'sub_existing')
+    await expect(changeSubscriptionPlan(db, 'user_1', 'sub_existing', 'plan_unavailable', before.etag)).rejects.toMatchObject({ code: 'PLAN_NOT_ACTIVE', status: 409 })
+    const after = await getSubscription(db, 'user_1', 'sub_existing')
+    expect(after.planId).toBe('plan_basic')
+    expect(after.version).toBe(before.version)
   })
 
   it('treats a repeated plan change with a stale If-Match as an idempotent success when the plan already converged', async () => {
