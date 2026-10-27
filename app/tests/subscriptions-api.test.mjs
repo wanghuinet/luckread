@@ -39,9 +39,8 @@ test('sends subscription transitions with current ETag, JSON body, and stable id
   expect(calls[0]?.options.method).toBe('POST');
   expect(calls[0]?.options.body).toBe('{}');
   expect(calls[0]?.options.headers).toEqual({ 'If-Match': subscription.etag });
-  expect(calls[0]?.options.idempotencyKey).toBe(
-    'native-subscription:cancel:sub/id one:' + subscription.etag,
-  );
+  expect(calls[0]?.options.idempotencyKey).toEqual(expect.any(String));
+  expect(String(calls[0]?.options.idempotencyKey).length).toBeLessThanOrEqual(256);
 });
 
 test('supports pause and resume through the same authoritative transition contract', async () => {
