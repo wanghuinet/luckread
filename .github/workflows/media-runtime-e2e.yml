@@ -4,16 +4,17 @@ on:
   workflow_run:
     workflows:
       - W01 W02 Auth Binding Deploy
+      - W01 Payload Application Deploy
     types: [completed]
   workflow_dispatch:
     inputs:
       tested_commit:
-        description: Exact W01 source commit used by the controlled binding deployment
+        description: Exact W01 source commit from the successful controlled deployment artifact
         required: true
         type: string
       deployment_run_id:
-        description: Optional successful W01 W02 Auth Binding Deploy run ID; resolved from source artifact when omitted
-        required: false
+        description: Successful W01-only or W01/W02 deployment run ID whose artifact proves the source commit
+        required: true
         type: string
       w01_base_url:
         description: Controlled public W01 API URL
@@ -73,24 +74,29 @@ jobs:
           import { appendFileSync, readFileSync } from 'node:fs'
           const run = JSON.parse(readFileSync('/tmp/deploy.json','utf8'))
           const artifacts = JSON.parse(readFileSync('/tmp/deploy-artifacts.json','utf8'))
-          if (run.name !== 'W01 W02 Auth Binding Deploy') throw new Error('wrong deployment workflow')
+          const prefixes = new Map([
+            ['W01 W02 Auth Binding Deploy', 'w01-w02-binding-deployment-'],
+            ['W01 Payload Application Deploy', 'w01-payload-app-deployment-'],
+          ])
+          const prefix = prefixes.get(run.name)
+          if (!prefix) throw new Error('unsupported deployment workflow: ' + run.name)
           if (run.conclusion !== 'success' || run.head_branch !== 'main') throw new Error('deployment is not a successful main run')
 
-          const prefix = 'w01-w02-binding-deployment-'
           const matches = (artifacts.artifacts ?? []).filter(
             (artifact) =>
               typeof artifact?.name === 'string' &&
               artifact.name.startsWith(prefix) &&
+              artifact?.expired !== true &&
               artifact?.expired_at == null,
           )
-          if (matches.length !== 1) throw new Error('expected exactly one live W01 deployment source artifact; found ' + matches.length)
+          if (matches.length !== 1) throw new Error('expected exactly one live artifact for ' + run.name + '; found ' + matches.length)
           const sourceSha = matches[0].name.slice(prefix.length)
           if (!/^[0-9a-f]{40}$/.test(sourceSha)) throw new Error('invalid deployed source SHA: ' + sourceSha)
           if (process.env.GITHUB_EVENT_NAME === 'workflow_dispatch' && process.env.TESTED_COMMIT !== sourceSha) {
             throw new Error('manual tested_commit does not match deployment artifact source SHA')
           }
           appendFileSync(process.env.GITHUB_ENV, 'TESTED_COMMIT=' + sourceSha + '\n')
-          console.log(JSON.stringify({deploymentRunId:run.id,workflowHeadSha:run.head_sha,deployedSourceSha:sourceSha,artifact:matches[0].name}))
+          console.log(JSON.stringify({deploymentRunId:run.id,deploymentWorkflow:run.name,workflowHeadSha:run.head_sha,deployedSourceSha:sourceSha,artifact:matches[0].name}))
           NODE
 
       - name: Checkout exact deployed source
