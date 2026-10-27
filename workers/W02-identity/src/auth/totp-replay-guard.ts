@@ -79,5 +79,10 @@ export async function consumeTotpTimeStep(
       'WHERE userId = ? AND (lastAcceptedTotpTimeStep IS NULL OR lastAcceptedTotpTimeStep < ?)',
   ).bind(timeStep, subjectId, timeStep).run()
 
-  return result.meta.changes === 1
+  // A row-count value is not proof of a successful D1 operation. Never accept
+  // a TOTP step unless D1 explicitly confirms the atomic reservation succeeded.
+  if (result.success !== true) {
+    throw new Error('TOTP_REPLAY_GUARD_PERSISTENCE_FAILED')
+  }
+  return result.meta?.changes === 1
 }
