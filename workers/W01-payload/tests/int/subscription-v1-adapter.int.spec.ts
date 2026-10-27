@@ -8,6 +8,8 @@ const apiInventory = JSON.parse(readFileSync(resolve(process.cwd(), '../../contr
 describe('v1 subscription adapter', () => {
   const route = readFileSync(resolve(process.cwd(), 'src/app/api/v1/memberships/subscriptions/[[...segments]]/route.ts'), 'utf8')
   const plansRoute = readFileSync(resolve(process.cwd(), 'src/app/api/v1/plans/route.ts'), 'utf8')
+  const creatorPlansRoute = readFileSync(resolve(process.cwd(), 'src/app/api/v1/membership/plans/route.ts'), 'utf8')
+  const w08CreatorClient = readFileSync(resolve(process.cwd(), 'src/auth/w08-creator-client.ts'), 'utf8')
   const client = readFileSync(resolve(process.cwd(), 'src/subscription/w07-subscription-client.ts'), 'utf8')
   const wrangler = readFileSync(resolve(process.cwd(), 'wrangler.jsonc'), 'utf8')
 
@@ -19,6 +21,27 @@ describe('v1 subscription adapter', () => {
     expect(plansRoute).toContain("method: 'GET'")
     expect(plansRoute).toContain('callW07Subscription')
     expect(plansRoute).not.toContain('export async function POST')
+  })
+
+  it('requires W08 CASL plus active creator identity before forwarding owner-scoped plan management', () => {
+    expect(creatorPlansRoute).toContain("membership.plan.create.own")
+    expect(creatorPlansRoute).toContain("membership.plan.read.own")
+    expect(creatorPlansRoute).toContain("'/internal/authz/check-permission'")
+    expect(creatorPlansRoute).toContain("'/internal/creator/self'")
+    expect(creatorPlansRoute).toContain("verifiedCreatorId: creatorId")
+    expect(w08CreatorClient).toContain("'/internal/creator/self'")
+    expect(w08CreatorClient).toContain("'/internal/authz/check-permission'")
+    expect(creatorPlansRoute).not.toContain('body.creatorId')
+    expect(creatorPlansRoute).not.toContain('body.ownerId')
+  })
+
+  it('contracts creator plan permissions and server-controlled draft fields', () => {
+    expect(openapi).toContain('operationId: listOwnMembershipPlans')
+    expect(openapi).toContain('operationId: createOwnMembershipPlanDraft')
+    expect(apiInventory.domains.subscription_entitlement_payment.endpoint_groups).toContain('GET /v1/membership/plans')
+    expect(apiInventory.domains.subscription_entitlement_payment.endpoint_groups).toContain('POST /v1/membership/plans')
+    expect(creatorPlansRoute).toContain("pathname: '/membership/plans' + url.search")
+    expect(creatorPlansRoute).toContain("pathname: '/membership/plans'")
   })
 
   it('binds W01 to the canonical W07 subscription authority', () => {
