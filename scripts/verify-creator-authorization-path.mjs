@@ -89,10 +89,10 @@ if (!w08AuthzHandler.includes("new Set(['action', 'resourceType', 'resourceAttri
 requireText('W08 must independently resolve the W02 principal', w08Runtime, /internal\/auth\/principal/)
 requireText('W08 must return only an ACTIVE creator identity for creator plan management', w08Runtime, /handleActiveCreatorSelf[\s\S]*creator\.read\.self[\s\S]*status = 'ACTIVE'/)
 requireText('MembershipPlan is a CASL subject and own-scope plan permissions are granted', w08Casl, /'MembershipPlan'[\s\S]*membership\.plan\.create\.own[\s\S]*membership\.plan\.read\.own/)
-requireText('creator plan creation must use existing W06 binding for durable audit', membershipPlanRoute, /callW06MembershipPlanAudit[\\s\\S]*Membership plan audit was not durably confirmed/)
-requireText('W01 must wait for W06 durable confirmation before returning plan success', membershipPlanRoute, /Membership plan audit was not durably confirmed[\\s\\S]*return w07Response/)
+requireText('creator plan creation must use existing W06 binding for durable audit', membershipPlanRoute, /callW06MembershipPlanAudit[\s\S]*Membership plan audit was not durably confirmed/)
+requireText('W01 must wait for W06 durable confirmation before returning plan success', membershipPlanRoute, /Membership plan audit was not durably confirmed[\s\S]*return w07Response/)
 requireText('W01 W06 client must use the fixed membership plan audit path', w06ModerationClient, /\/internal\/audit-events\/membership-plan-created/)
-requireText('W06 membership plan audit endpoint must require W01 transport', w06Runtime, /membership-plan-created[\\s\\S]*requireW01Transport/)
+requireText('W06 membership plan audit endpoint must require W01 transport', w06Runtime, /membership-plan-created[\s\S]*requireW01Transport/)
 
 requireText('W08 must call the W02 RoleAssignment authority', w08Runtime, /internal\/authz\/role-assignment/)
 requireText('W08 must persist submission, decision and grant audit', w08Runtime, /CREATOR_APPLICATION_SUBMITTED[\s\S]*CREATOR_APPLICATION_APPROVED[\s\S]*CREATOR_ROLE_GRANTED/)
