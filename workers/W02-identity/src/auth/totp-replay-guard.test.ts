@@ -32,7 +32,7 @@ const makeSqliteD1 = (userId = 'user-123') => {
         },
         async run() {
           const result = statement.run(...values)
-          return { meta: { changes: Number(result.changes) } }
+          return { success: true, meta: { changes: Number(result.changes) } }
         },
       }
     },
@@ -84,6 +84,19 @@ describe('TOTP time-step replay guard', () => {
     } finally {
       close()
     }
+  })
+
+  it('fails closed when D1 reports an unsuccessful reservation result', async () => {
+    const db = {
+      prepare: () => ({
+        bind: () => ({
+          run: async () => ({ success: false, meta: { changes: 1 } }),
+        }),
+      }),
+    } as unknown as D1Database
+
+    await expect(consumeTotpTimeStep(db, 'user-123', STEP))
+      .rejects.toThrow('TOTP_REPLAY_GUARD_PERSISTENCE_FAILED')
   })
 
   it('has one winner when concurrent duplicate calls target the actual SQLite conditional update', async () => {
