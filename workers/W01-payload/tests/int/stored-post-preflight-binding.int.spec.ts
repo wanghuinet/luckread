@@ -106,6 +106,42 @@ describe('bind direct social post publishing to the stored body asset', () => {
     expect(result.preflight.body).not.toBe(submitted.preflight.body)
   })
 
+  it('rejects non-text and oversized R2 body objects before running publish preflight', async () => {
+    callW03ContentMock.mockResolvedValue(new Response(JSON.stringify(storedPost()), { status: 200 }))
+    const nonTextGet = vi.fn(async () => makeR2Object('<html>not the canonical post body</html>', 'text/html'))
+    getCloudflareContextMock.mockResolvedValue({ env: { R2: { get: nonTextGet } } })
+
+    const nonText = await bindPreflightToStoredPost(
+      makeRequest(),
+      'post-1',
+      principal,
+      submitted,
+      makeErrorResponse,
+    )
+    expect(nonText).toBeInstanceOf(Response)
+    expect((nonText as Response).status).toBe(422)
+
+    callW03ContentMock.mockResolvedValue(new Response(JSON.stringify(storedPost()), { status: 200 }))
+    const cancel = vi.fn(async () => undefined)
+    const oversizedGet = vi.fn(async () => ({
+      size: 16_385,
+      httpMetadata: { contentType: 'text/plain;charset=utf-8' },
+      body: new ReadableStream<Uint8Array>({ cancel }),
+    }))
+    getCloudflareContextMock.mockResolvedValue({ env: { R2: { get: oversizedGet } } })
+
+    const oversized = await bindPreflightToStoredPost(
+      makeRequest(),
+      'post-1',
+      principal,
+      submitted,
+      makeErrorResponse,
+    )
+    expect(oversized).toBeInstanceOf(Response)
+    expect((oversized as Response).status).toBe(422)
+    expect(cancel).toHaveBeenCalled()
+  })
+
   it('rejects stored media references that no longer resolve to media owned by the author', async () => {
     callW03ContentMock.mockResolvedValue(new Response(JSON.stringify(storedPost()), { status: 200 }))
     validateMediaReferencesMock.mockResolvedValue({
