@@ -6,8 +6,8 @@ import {
   OrderPersistenceError,
   type CreateOrderResult,
   type CommerceOrderData,
+  type AuthoritativelyPricedOrder,
 } from './order-persistence.js';
-import { resolveCommerceOrderItems } from './order-item-resolution.js';
 import { SubscriptionRuntimeError } from './subscription-runtime.js';
 
 type OrderRuntimeEnv = Readonly<{
@@ -18,7 +18,8 @@ type OrderRuntimeEnv = Readonly<{
 type OrderRuntimeDependencies = Readonly<{
   createOrder?: typeof createCommerceOrder;
   getOrder?: typeof getCommerceOrder;
-  resolveItems?: typeof resolveCommerceOrderItems;
+  /** Must be an admitted pricing authority that returns immutable offer versions, discounts, and tax decisions. */
+  resolvePricing?: (request: unknown) => Promise<AuthoritativelyPricedOrder>;
 }>;
 
 type OrderRoute =
@@ -143,14 +144,20 @@ export async function handleCommerceOrderRequest(
       const body = await readBoundedJson(request);
       if (isResponse(body)) return body;
 
+      // No admitted discount/tax assessment integration is wired into the production
+      // handler yet. Never silently synthesize zero discount or zero tax, even
+      // though the generic persistence helper requires those explicit decisions.
+      if (!dependencies.resolvePricing) {
+        return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Order creation is disabled until the authoritative pricing and tax decision is admitted');
+      }
+
       const createOrder = dependencies.createOrder ?? createCommerceOrder;
-      const resolveItems = dependencies.resolveItems ?? resolveCommerceOrderItems;
       const result: CreateOrderResult = await createOrder(
         env.D1_04,
         customerId,
         request.headers.get('Idempotency-Key'),
         body,
-        (validatedRequest) => resolveItems(env.D1_01, validatedRequest),
+        (validatedRequest) => dependencies.resolvePricing!(validatedRequest),
       );
       return Response.json(
         { data: result.data, requestId: 'req_' + crypto.randomUUID() },
