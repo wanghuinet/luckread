@@ -36,3 +36,17 @@ CREATE TABLE IF NOT EXISTS membership_plan_versions (
 
 CREATE INDEX IF NOT EXISTS ix_membership_plan_versions_created
   ON membership_plan_versions (plan_id, created_at);
+
+-- Plan versions are immutable so subscriptions and orders can continue to
+-- reference the exact commercial definition that was accepted.
+CREATE TRIGGER IF NOT EXISTS membership_plan_versions_immutable_update
+BEFORE UPDATE ON membership_plan_versions
+BEGIN
+  SELECT RAISE(ABORT, 'membership plan versions are immutable');
+END;
+
+CREATE TRIGGER IF NOT EXISTS membership_plan_versions_immutable_delete
+BEFORE DELETE ON membership_plan_versions
+BEGIN
+  SELECT RAISE(ABORT, 'membership plan versions are retained');
+END;
