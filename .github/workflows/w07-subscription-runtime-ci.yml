@@ -159,5 +159,21 @@ jobs:
             raise SystemExit('membership plan current version advanced to a missing version')
           except sqlite3.IntegrityError:
             pass
+          invalid_versions = [
+            (2, 'Basic', 'MONTHLY', 100, 'USD', '[]'),
+            (3, 'basic', 'DAILY', 100, 'USD', '[]'),
+            (4, 'basic', 'MONTHLY', 12.5, 'USD', '[]'),
+            (5, 'basic', 'MONTHLY', 100, 'usd', '[]'),
+            (6, 'basic', 'MONTHLY', 100, 'USD', '{}'),
+          ]
+          for plan_version, tier, interval, price, currency, benefits in invalid_versions:
+            try:
+              db.execute(
+                "INSERT INTO membership_plan_versions(plan_id,plan_version,name,tier,billing_interval,price_minor,currency,benefits_json,created_at) VALUES ('plan_probe',?,?,?,?,?,?,?,?)",
+                (plan_version, 'Probe', tier, interval, price, currency, benefits, '2026-10-27T00:00:00.000Z'),
+              )
+              raise SystemExit(f'invalid membership plan version was accepted: {plan_version}')
+            except sqlite3.IntegrityError:
+              pass
           print('SUBSCRIPTION_D1_01_AND_MEMBERSHIP_PLAN_MIGRATIONS_STATIC=PASS')
           PY
