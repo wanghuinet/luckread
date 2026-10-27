@@ -21,25 +21,6 @@ const resolveOperation = (method: string, segments: string[] | undefined): { pat
   return null
 }
 
-const requireHeader = (request: Request, name: 'Idempotency-Key' | 'If-Match'): Response | null => {
-  const value = request.headers.get(name)?.trim() ?? ''
-  if (!value) return errorResponse(428, 'PRECONDITION_REQUIRED', name + ' required')
-  if (value.length > 256) return errorResponse(422, 'VALIDATION_FAILED', 'Invalid ' + name + ' header')
-  if (name === 'If-Match' && value === '*') {
-    return errorResponse(412, 'PRECONDITION_FAILED', 'If-Match precondition failed')
-  }
-  return null
-}
-
-const parseBody = async (request: Request): Promise<unknown | Response> => {
-  try {
-    const body = await request.json()
-    if (!body || typeof body !== 'object' || Array.isArray(body)) throw new Error('invalid')
-    return body
-  } catch {
-    return errorResponse(422, 'VALIDATION_FAILED', 'Invalid subscription request')
-  }
-}
 
 async function forward(request: Request, context: RouteContext): Promise<Response> {
   try {
@@ -51,21 +32,16 @@ async function forward(request: Request, context: RouteContext): Promise<Respons
     if (principal instanceof Response) return principal
 
     if (request.method === 'POST') {
-      const idempotencyError = requireHeader(request, 'Idempotency-Key')
-      if (idempotencyError) return idempotencyError
-      const segments = params.segments ?? []
-      if (segments.length === 2) {
-        const ifMatchError = requireHeader(request, 'If-Match')
-        if (ifMatchError) return ifMatchError
-      }
+      return errorResponse(
+        503,
+        'SERVICE_UNAVAILABLE',
+        'Subscription writes are disabled until a verified payment-provider synchronization flow is available.',
+      )
     }
-
-    const body = request.method === 'POST' ? await parseBody(request) : undefined
-    if (body instanceof Response) return body
     const pathname = request.method === 'GET' && (params.segments ?? []).length === 0
       ? operation.pathname + new URL(request.url).search
       : operation.pathname
-    return await callW07Subscription({ request, pathname, method: request.method, principal, body })
+    return await callW07Subscription({ request, pathname, method: 'GET', principal })
   } catch (error) {
     if (error instanceof W07SubscriptionClientError) return errorResponse(error.status, error.code, error.message)
     return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Subscription service unavailable')
