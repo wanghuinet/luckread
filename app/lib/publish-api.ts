@@ -31,21 +31,40 @@ type MediaEnvelope = {
   error?: { message?: string };
 };
 
-type MediaApiResult = {
-  response: Response;
+export type ApiFailureDiagnosticResult = {
+  response: Pick<Response, 'status'>;
   data: unknown;
-  error: { message: string; code?: string; requestId?: string } | null;
+  error?: { message?: string; code?: string; requestId?: string } | null;
 };
 
-/** Preserve server correlation details so a failed media write can be traced in W01 logs. */
-function apiFailureMessage(result: MediaApiResult, fallback: string): string {
+/**
+ * Preserve non-secret server correlation details for failed writes. The
+ * request ID is safe to show to the user and is the key for matching W01/W03
+ * diagnostics; never include request headers, tokens, or payload contents.
+ */
+export function apiFailureDiagnostic(result: ApiFailureDiagnosticResult, fallback: string): string {
+  const root = result.data && typeof result.data === 'object' && !Array.isArray(result.data)
+    ? result.data as Record<string, unknown>
+    : null;
+  const payloadError = root?.error && typeof root.error === 'object' && !Array.isArray(root.error)
+    ? root.error as Record<string, unknown>
+    : null;
   const message = result.error?.message ||
-    getApiErrorMessage(result.data, fallback, result.response.status);
+    (typeof payloadError?.message === 'string'
+      ? payloadError.message
+      : getApiErrorMessage(result.data, fallback, result.response.status));
+  const code = result.error?.code ||
+    (typeof payloadError?.code === 'string' ? payloadError.code : undefined);
+  const requestId = result.error?.requestId ||
+    (typeof root?.requestId === 'string' ? root.requestId : undefined);
   const diagnostic = ['HTTP ' + result.response.status];
-  if (result.error?.code) diagnostic.push(result.error.code);
-  if (result.error?.requestId) diagnostic.push('Request ID ' + result.error.requestId);
+  if (code) diagnostic.push(code);
+  if (requestId) diagnostic.push('Request ID ' + requestId);
   return message + ' (' + diagnostic.join('; ') + ')';
 }
+
+type MediaApiResult = ApiFailureDiagnosticResult;
+const apiFailureMessage = apiFailureDiagnostic;
 
 function record(value: unknown): Record<string, unknown> | null {
   return value && typeof value === 'object' && !Array.isArray(value)
