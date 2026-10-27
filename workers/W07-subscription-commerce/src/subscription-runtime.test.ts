@@ -218,7 +218,7 @@ describe('subscription runtime', () => {
   })
 
   it('restricts manual deployment to reviewed main and requires read-only schema preflight', () => {
-    const workflow = readFileSync(new URL('../../../../.github/workflows/w07-subscription-runtime-deploy.yml', import.meta.url), 'utf8')
+    const workflow = readFileSync(new URL('../../../.github/workflows/w07-subscription-runtime-deploy.yml', import.meta.url), 'utf8')
     expect(workflow).toContain('git merge-base --is-ancestor "$SOURCE_SHA" origin/main')
     expect(workflow).toContain('SOURCE_SHA: ${{ inputs.source_sha }}')
     expect(workflow).not.toContain('ref: ${{ inputs.source_sha }}')
@@ -232,8 +232,9 @@ describe('subscription runtime', () => {
     expect(workflow).toContain('node scripts/verify-remote-preflight.mjs preflight')
     expect(workflow).toContain('node scripts/verify-remote-preflight.mjs postflight')
     expect(workflow).toContain('SELECT COUNT(*) AS invalid_versions')
-    expect(workflow).toContain('migrationAction = \'apply\'')
-    expect(workflow).toContain('migrationAction = \'skip\'')
+    const preflight = readFileSync(new URL('../scripts/verify-remote-preflight.mjs', import.meta.url), 'utf8')
+    expect(preflight).toContain("migrationAction = 'apply'")
+    expect(preflight).toContain("migrationAction = 'skip'")
     expect(workflow).toContain("if: steps.d1_preflight.outputs.migration_action == 'apply'")
     expect(workflow.indexOf('Read-only D1-01 migration and schema preflight'))
       .toBeLessThan(workflow.indexOf('Apply D1-01 Subscription migration'))
