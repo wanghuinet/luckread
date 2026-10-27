@@ -301,7 +301,7 @@ jobs:
           if (errors.length) throw new Error('W01_PAYLOAD_D1_CONFIG_CONTRACT_PREFLIGHT_BLOCKED')
           NODE
 
-      - name: Execute the single admitted migration
+      - name: Execute the single admitted migration against the explicit remote D1 binding
         id: execute_migration
         if: inputs.mode == 'apply' && steps.preflight.outputs.decision == 'RUN_REQUIRED' && steps.binding_contract.outcome == 'success'
         env:
@@ -314,7 +314,52 @@ jobs:
         run: |
           set -euo pipefail
           unset CLOUDFLARE_ENV
-          echo "CLOUDFLARE_ENV unset; Payload migration must resolve base wrangler.jsonc D1 binding"
+
+          # getPlatformProxy honours remote resource mode per binding. Merely
+          # setting remoteBindings=true does not turn a local D1 binding into
+          # a remote one. Override only D1 for this one-shot migration process,
+          # then restore the committed config even when the CLI exits nonzero.
+          CONFIG_PATH=wrangler.jsonc
+          CONFIG_BACKUP="$RUNNER_TEMP/w01-wrangler-jsonc.original"
+          cp "$CONFIG_PATH" "$CONFIG_BACKUP"
+          restore_wrangler_config() {
+            cp "$CONFIG_BACKUP" "$CONFIG_PATH"
+          }
+          trap restore_wrangler_config EXIT
+
+          node --input-type=module <<'NODE'
+          import { readFileSync, writeFileSync } from 'node:fs'
+          const path = 'wrangler.jsonc'
+          const config = JSON.parse(readFileSync(path, 'utf8'))
+          const id = process.env.EXPECTED_DATABASE_ID
+          const name = process.env.DATABASE_NAME
+          const bindings = Array.isArray(config.d1_databases) ? config.d1_databases : []
+          const target = bindings.filter((entry) => entry && entry.binding === 'D1')
+          if (target.length !== 1 || target[0].database_id !== id || target[0].database_name !== name) {
+            throw new Error('Refusing migration: exact admitted production D1 binding was not found')
+          }
+          target[0].remote = true
+          writeFileSync(path, JSON.stringify(config, null, 2))
+          console.log(JSON.stringify({
+            event: 'w01.media.migration.binding_override',
+            databaseName: name,
+            databaseId: id,
+            binding: 'D1',
+            remote: target[0].remote,
+            scope: 'temporary; wrangler.jsonc restored on process exit',
+          }))
+          NODE
+
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs'
+          const config = JSON.parse(readFileSync('wrangler.jsonc', 'utf8'))
+          const target = (config.d1_databases ?? []).filter((entry) => entry?.binding === 'D1')
+          if (target.length !== 1 || target[0].remote !== true) {
+            throw new Error('Remote D1 binding override did not persist; refusing to run Payload migration')
+          }
+          NODE
+
+          echo "Running Payload migration with the exact admitted D1 binding explicitly marked remote"
           pnpm exec payload migrate
 
       - name: Assert read-only preflight did not invoke migration
@@ -327,6 +372,7 @@ jobs:
           echo "PASS: preflight-only mode did not execute Payload migration"
 
       - name: Verify exact post-migration state
+        id: postcheck
         if: inputs.mode == 'apply' && always() && steps.preflight.outcome == 'success' && steps.binding_contract.outcome == 'success'
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -395,13 +441,37 @@ jobs:
           SOURCE_SHA: ${{ inputs.source_sha }}
           DATABASE_NAME: ${{ inputs.database_name }}
           MODE: ${{ inputs.mode }}
+          PREFLIGHT_OUTCOME: ${{ steps.preflight.outcome }}
+          EXECUTE_MIGRATION_OUTCOME: ${{ steps.execute_migration.outcome }}
+          POSTCHECK_OUTCOME: ${{ steps.postcheck.outcome }}
         run: |
           set -euo pipefail
           mkdir -p artifacts/evidence/w01-media-upload-idempotency
           node --input-type=module <<'NODE'
-          import { writeFileSync } from 'node:fs'
+          import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+          const dir = 'artifacts/evidence/w01-media-upload-idempotency'
+          const readJson = (name) => {
+            const path = dir + '/' + name
+            if (!existsSync(path)) return null
+            try {
+              return JSON.parse(readFileSync(path, 'utf8'))
+            } catch {
+              return null
+            }
+          }
+          const preflight = readJson('preflight-summary.json')
+          const postcheck = readJson('post-validation-summary.json')
+          const mode = process.env.MODE
+          const verifiedApplied = mode === 'apply'
+            && process.env.EXECUTE_MIGRATION_OUTCOME === 'success'
+            && process.env.POSTCHECK_OUTCOME === 'success'
+            && postcheck?.result === 'PASS'
+          const result = mode === 'preflight-only'
+            ? (process.env.PREFLIGHT_OUTCOME === 'success' && preflight?.result === 'PASS'
+              ? 'READ_ONLY_PREFLIGHT_PASS' : 'READ_ONLY_PREFLIGHT_FAILED')
+            : (verifiedApplied ? 'VERIFIED_APPLIED' : 'APPLY_NOT_VERIFIED')
           writeFileSync(
-            'artifacts/evidence/w01-media-upload-idempotency/provenance.json',
+            dir + '/provenance.json',
             JSON.stringify({
               repository: process.env.GITHUB_REPOSITORY,
               workflow: process.env.GITHUB_WORKFLOW,
@@ -410,8 +480,15 @@ jobs:
               databaseName: process.env.DATABASE_NAME,
               expectedDatabaseId: process.env.EXPECTED_DATABASE_ID,
               migration: process.env.TARGET_MIGRATION,
-              mode: process.env.MODE,
-              environment: process.env.MODE === 'apply' ? 'CONTROLLED_REMOTE_D1' : 'READ_ONLY_PREFLIGHT_ONLY',
+              mode,
+              result,
+              verifiedApplied,
+              preflightOutcome: process.env.PREFLIGHT_OUTCOME,
+              executeMigrationOutcome: process.env.EXECUTE_MIGRATION_OUTCOME,
+              postcheckOutcome: process.env.POSTCHECK_OUTCOME,
+              environment: verifiedApplied
+                ? 'CONTROLLED_REMOTE_D1'
+                : mode === 'apply' ? 'UNVERIFIED_APPLY' : 'READ_ONLY_PREFLIGHT_ONLY',
             }, null, 2) + '\n',
           )
           NODE
