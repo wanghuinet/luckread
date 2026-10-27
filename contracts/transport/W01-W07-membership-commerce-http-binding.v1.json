@@ -95,7 +95,7 @@
       },
       "cache": "NO_STORE",
       "auditRequired": true,
-      "successRule": "The W07 response is not a public success by itself. W01 must persist/confirm the stable membership.plan.created audit in W06 D1-03 before returning either a new 201 or idempotent replay 200 to the caller.",
+      "successRule": "W01 validates the W07 draft response and durably persists/confirm the stable membership.plan.created audit in W06 D1-03, including planVersion, status, visibility, name, tier, billingInterval, priceMinor, and currency, before returning either a new 201 or idempotent replay 200 to the caller.",
       "auditTransportBinding": "W01-W06-moderation-http-binding.v1"
     }
   ],
