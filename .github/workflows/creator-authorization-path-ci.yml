@@ -5,6 +5,11 @@ on:
     paths:
       - 'workers/W01-payload/src/auth/w08-creator-client.ts'
       - 'workers/W01-payload/src/app/api/v1/creator-applications/**'
+      - 'workers/W01-payload/src/app/api/v1/membership/plans/**'
+      - 'contracts/authz/permissions.json'
+      - 'contracts/transport/W01-W07-membership-commerce-http-binding.v1.json'
+      - 'contracts/openapi/v1/openapi.yaml'
+      - 'contracts/api/api-inventory.v1.json'
       - 'workers/W01-payload/src/app/api/v1/admin/creator-applications/**'
       - 'workers/W01-payload/src/app/api/v1/admin/bootstrap/super-admin/**'
       - 'workers/W01-payload/tests/int/admin-l8-bootstrap-readiness-route.int.spec.ts'
