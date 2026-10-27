@@ -22,7 +22,7 @@ export type OrderRequestValidationResult<T> =
 export const MAX_ORDER_ITEMS = 50
 export const MAX_ORDER_QUANTITY = 10000
 export const MAX_ORDER_ITEM_REF_LENGTH = 255
-export const MAX_ORDER_IDEMPOTENCY_KEY_LENGTH = 255
+export const MAX_ORDER_IDEMPOTENCY_KEY_LENGTH = 256
 
 const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f]/
 
