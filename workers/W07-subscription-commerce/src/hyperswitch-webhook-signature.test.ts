@@ -85,9 +85,12 @@ describe('Hyperswitch webhook envelope parsing', () => {
   }
 
   const bytes = (value: string): ArrayBuffer => toArrayBuffer(new TextEncoder().encode(value))
+  const EXPECTED_MERCHANT_ID = 'merchant_luckread_test'
+  const parseEnvelope = (rawBody: ArrayBuffer, expectedMerchantId: string | null = EXPECTED_MERCHANT_ID) =>
+    parseHyperswitchWebhookEnvelope(rawBody, expectedMerchantId)
 
   it('parses a documented v1 envelope and exposes only normalized envelope fields', () => {
-    const parsed = parseHyperswitchWebhookEnvelope(bytes(JSON.stringify(envelope)))
+    const parsed = parseEnvelope(bytes(JSON.stringify(envelope)))
     expect(parsed).toEqual({
       merchantId: 'merchant_luckread_test',
       eventId: 'evt_test_123',
@@ -101,7 +104,7 @@ describe('Hyperswitch webhook envelope parsing', () => {
 
   it('allows absent optional timestamp and processor merchant id', () => {
     const { timestamp: _timestamp, processor_merchant_id: _processorMerchantId, ...withoutOptional } = envelope
-    expect(parseHyperswitchWebhookEnvelope(bytes(JSON.stringify(withoutOptional)))).toMatchObject({
+    expect(parseEnvelope(bytes(JSON.stringify(withoutOptional)))).toMatchObject({
       merchantId: 'merchant_luckread_test',
       eventId: 'evt_test_123',
       eventType: 'payment_succeeded',
@@ -110,9 +113,15 @@ describe('Hyperswitch webhook envelope parsing', () => {
   })
 
   it('rejects invalid JSON, invalid UTF-8, and non-object JSON', () => {
-    expect(parseHyperswitchWebhookEnvelope(bytes('{'))).toBeNull()
-    expect(parseHyperswitchWebhookEnvelope(bytes('[]'))).toBeNull()
-    expect(parseHyperswitchWebhookEnvelope(toArrayBuffer(new Uint8Array([0xff, 0xfe])))).toBeNull()
+    expect(parseEnvelope(bytes('{'))).toBeNull()
+    expect(parseEnvelope(bytes('[]'))).toBeNull()
+    expect(parseEnvelope(toArrayBuffer(new Uint8Array([0xff, 0xfe])))).toBeNull()
+  })
+
+  it('rejects events for a different merchant or when the expected merchant is missing', () => {
+    expect(parseEnvelope(bytes(JSON.stringify({ ...envelope, merchant_id: 'merchant_other' })))).toBeNull()
+    expect(parseEnvelope(bytes(JSON.stringify(envelope)), null)).toBeNull()
+    expect(parseEnvelope(bytes(JSON.stringify(envelope)), '   ')).toBeNull()
   })
 
   it('rejects missing or whitespace-padded required identifiers', () => {
@@ -122,23 +131,23 @@ describe('Hyperswitch webhook envelope parsing', () => {
       { ...envelope, event_id: '' },
       { ...envelope, event_type: '' },
     ]) {
-      expect(parseHyperswitchWebhookEnvelope(bytes(JSON.stringify(modified)))).toBeNull()
+      expect(parseEnvelope(bytes(JSON.stringify(modified)))).toBeNull()
     }
   })
 
   it('rejects event types and content variants not admitted by the documented v1 schema', () => {
-    expect(parseHyperswitchWebhookEnvelope(bytes(JSON.stringify({ ...envelope, event_type: 'payment_succeeded_fake' })))).toBeNull()
-    expect(parseHyperswitchWebhookEnvelope(bytes(JSON.stringify({
+    expect(parseEnvelope(bytes(JSON.stringify({ ...envelope, event_type: 'payment_succeeded_fake' })))).toBeNull()
+    expect(parseEnvelope(bytes(JSON.stringify({
       ...envelope, content: { ...envelope.content, type: 'unknown_details' },
     })))).toBeNull()
-    expect(parseHyperswitchWebhookEnvelope(bytes(JSON.stringify({
+    expect(parseEnvelope(bytes(JSON.stringify({
       ...envelope, content: { ...envelope.content, object: [] },
     })))).toBeNull()
   })
 
   it('rejects invalid timestamps and malformed optional processor merchant identifiers', () => {
-    expect(parseHyperswitchWebhookEnvelope(bytes(JSON.stringify({ ...envelope, timestamp: 'yesterday' })))).toBeNull()
-    expect(parseHyperswitchWebhookEnvelope(bytes(JSON.stringify({ ...envelope, processor_merchant_id: 12 })))).toBeNull()
-    expect(parseHyperswitchWebhookEnvelope(bytes(JSON.stringify({ ...envelope, processor_merchant_id: ' merchant ' })))).toBeNull()
+    expect(parseEnvelope(bytes(JSON.stringify({ ...envelope, timestamp: 'yesterday' })))).toBeNull()
+    expect(parseEnvelope(bytes(JSON.stringify({ ...envelope, processor_merchant_id: 12 })))).toBeNull()
+    expect(parseEnvelope(bytes(JSON.stringify({ ...envelope, processor_merchant_id: ' merchant ' })))).toBeNull()
   })
 })
