@@ -160,6 +160,24 @@ describe('W01 private draft body preflight', () => {
     expect(fetchSpy).not.toHaveBeenCalled()
   })
 
+  it('rejects non-canonical media origins and video delivery URLs as post-body references', async () => {
+    for (const bodyRef of [
+      'https://img.luckread.com:8443/media/body%20one.txt',
+      'https://video.luckread.com/media/body%20one.txt',
+    ]) {
+      mocks.callW03Content.mockResolvedValueOnce(Response.json({ ...storedPost, bodyRef }))
+      const get = vi.fn()
+      mocks.getCloudflareContext.mockResolvedValueOnce({ env: { R2: { get } } })
+
+      const result = await runBinding()
+
+      expect(result).toBeInstanceOf(Response)
+      expect((result as Response).status).toBe(422)
+      expect(get).not.toHaveBeenCalled()
+      expect(fetchSpy).not.toHaveBeenCalled()
+    }
+  })
+
   it('never forwards user credentials to an unapproved LuckRead subdomain', async () => {
     mocks.callW03Content.mockResolvedValue(Response.json({
       ...storedPost,
