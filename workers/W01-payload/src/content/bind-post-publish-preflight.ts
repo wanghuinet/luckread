@@ -1,6 +1,7 @@
 import { getCloudflareContext } from '@opennextjs/cloudflare'
 import { resolvePublicArticleBodyUrl } from '../lib/article-summary-preview.js'
-import { mediaHostKind, resolveMediaObjectKey } from '../media/media-delivery.js'
+import { resolveMediaObjectKey } from '../media/media-delivery.js'
+import { PUBLIC_IMAGE_MEDIA_ORIGIN } from '../media/public-media-url.js'
 import { validateOwnedPostMediaReferences } from './validate-owned-post-media-references.js'
 import { callW03Content, type ContentPrincipal } from './w03-content-client.js'
 
@@ -49,7 +50,7 @@ async function readStoredPostBody(
   // the exact Payload Media record belongs to this identity, read the same
   // object through W01's existing R2 binding. No bearer token or cookie leaves
   // the API origin and the public-media access policy is not weakened.
-  if (mediaHostKind(url.hostname)) {
+  if (url.origin === PUBLIC_IMAGE_MEDIA_ORIGIN) {
     let key: string | null = null
     try {
       const segments = url.pathname
