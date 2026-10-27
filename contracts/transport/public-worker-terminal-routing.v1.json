@@ -67,6 +67,19 @@
       "terminalWorker": "W08",
       "transportBinding": "W01-W08-creator-http-binding.v1",
       "authorityNote": "W08 owns creator qualification applications and creator identity facts in D1-01; W02 alone assigns the L3 role."
+    },
+    {
+      "operationIdFamily": "membership",
+      "publicPaths": [
+        "/api/v1/plans",
+        "/api/v1/membership/plans",
+        "/api/v1/memberships/subscriptions",
+        "/api/v1/memberships/subscriptions/*"
+      ],
+      "ingressWorker": "W01",
+      "terminalWorker": "W07",
+      "transportBinding": "W01-W07-membership-commerce-http-binding.v1",
+      "authorityNote": "W07 owns MembershipPlan and subscription commerce facts. W01 uses W08 CASL plus W08-resolved ACTIVE creator identity for owner-scoped plan management; payment/subscription writes remain fail-closed until trusted provider synchronization is admitted."
     }
   ],
   "workerToWorkerInvariant": {
