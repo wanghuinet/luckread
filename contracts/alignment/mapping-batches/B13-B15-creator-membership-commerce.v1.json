@@ -112,6 +112,8 @@
         "workers/W01-payload/src/subscription/w07-subscription-client.ts",
         "workers/W01-payload/tests/int/subscription-v1-adapter.int.spec.ts",
         "workers/W07-subscription-commerce/migrations/0001_membership_subscriptions.sql",
+        "workers/W07-subscription-commerce/migrations/0002_subscription_version_cas.sql",
+        "docs/change-control/CC-MON-SUBSCRIPTION-VERSION-CAS-IMPLEMENTATION-2026-10-27.md",
         "workers/W07-subscription-commerce/src/index.ts",
         "workers/W07-subscription-commerce/src/subscription-runtime.test.ts",
         "workers/W07-subscription-commerce/src/subscription-runtime.ts"
@@ -119,8 +121,8 @@
       "blockers": [
         "The existing subscription list route is now declared in OpenAPI, the source endpoint registry, operation policy and the canonical membership API contract; the implementation/test are being checked on this PR.",
         "Renewal is part of MON-005 but has no execution path or verified payment-renewal transition.",
-        "Migration 0001 lacks the required version column; production D1-01 schema/migration evidence remains absent.",
-        "Runtime still uses updated_at CAS rather than the contracted monotonic version CAS.",
+        "Migration 0001 remains the historical baseline; candidate migration 0002 adds the required version column with DEFAULT 1. Production D1-01 migration history/schema evidence remains absent, and migration 0002 has not been executed remotely.",
+        "The implementation candidate changes runtime writes to monotonic version CAS; PR CI and concurrency E2E remain pending, and production deployment verification is absent.",
         "This record remains UNRESOLVED; source traceability does not constitute production Evidence Registry admission."
       ]
     },
