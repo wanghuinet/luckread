@@ -492,8 +492,7 @@
       "resource": "membership_plan",
       "action": "create",
       "minLayer": "L3",
-      "scope": "own",
-      "auditRequired": true
+      "scope": "own"
     },
     {
       "name": "membership.plan.read.own",
