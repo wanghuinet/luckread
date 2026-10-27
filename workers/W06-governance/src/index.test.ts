@@ -129,6 +129,12 @@ describe('W06 moderation queue pagination scope', () => {
   })
 })
 
+type PlanAuditTestStatement = {
+  bind(...args: unknown[]): PlanAuditTestStatement
+  first<T>(): Promise<T | null>
+  run(): Promise<{ success: boolean; meta?: { changes: number } }>
+}
+
 describe('W06 runtime', () => {
   const planId = 'plan_' + 'a'.repeat(64)
   const planAuditInput = {
@@ -167,7 +173,7 @@ describe('W06 runtime', () => {
     const rows = new Map<string, Record<string, unknown>>()
     const prepare = vi.fn((sql: string) => {
       let values: unknown[] = []
-      const statement = {
+      const statement: PlanAuditTestStatement = {
         bind(...args: unknown[]) { values = args; return statement },
         async first<T>() {
           if (sql.includes('FROM audit_events WHERE event_id = ?')) {
