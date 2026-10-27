@@ -159,6 +159,7 @@ export function verifyD1SubscriptionPreflight({
     JSON.stringify(planVersionShape) === JSON.stringify(EXPECTED_PLAN_VERSION_COLUMNS) &&
     EXPECTED_PLAN_INDEXES.every((name) => planIndexNames.has(name)) &&
     EXPECTED_PLAN_VERSION_INDEXES.every((name) => planVersionIndexNames.has(name)) &&
+    planTriggerNames.size === EXPECTED_PLAN_TRIGGERS.length &&
     EXPECTED_PLAN_TRIGGERS.every((name) => planTriggerNames.has(name))
 
   const legacySubscriptionShape = JSON.stringify(shape) === JSON.stringify(LEGACY_COLUMNS)
@@ -233,7 +234,7 @@ function main() {
   const [mode, ...filePaths] = process.argv.slice(2)
   const isPostflight = mode === 'postflight'
   if (!isPostflight && mode !== 'preflight') {
-    throw new Error('Usage: node scripts/verify-remote-preflight.mjs <preflight|postflight> <database-list.json> <migration-state.json> <subscription-schema.json> <subscription-indexes.json> <subscription-foreign-keys.json> <plan-schema.json> <plan-version-schema.json> <plan-indexes.json> <plan-version-indexes.json> <plan-triggers.json> [version-integrity.json> <plan-integrity.json]')
+    throw new Error('Usage: node scripts/verify-remote-preflight.mjs <preflight|postflight> <database-list.json> <migration-state.json> <subscription-schema.json> <subscription-indexes.json> <subscription-foreign-keys.json> <plan-schema.json> <plan-version-schema.json> <plan-indexes.json> <plan-version-indexes.json> <plan-triggers.json> [version-integrity.json plan-integrity.json]')
   }
   const requiredCount = isPostflight ? 12 : 10
   if (filePaths.length !== requiredCount || filePaths.some((value) => !value)) {
