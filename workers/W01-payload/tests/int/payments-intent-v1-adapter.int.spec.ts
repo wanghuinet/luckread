@@ -47,6 +47,10 @@ describe('public Hyperswitch payment intent adapter', () => {
   it('uses Hyperswitch-hosted secure payment fields and its explicit saved-method checkbox instead of collecting card data locally', () => {
     expect(checkout).toContain('https://beta.hyperswitch.io/v1/HyperLoader.js')
     expect(checkout).toContain('https://checkout.hyperswitch.io/v0/HyperLoader.js')
+    expect(checkout).toContain('NEXT_PUBLIC_HYPERSWITCH_ENVIRONMENT')
+    expect(checkout).toContain("import { apiFetch } from '../../../lib/client-api.js'")
+    expect(checkout).toContain("apiFetch('/api/v1/payments/intents'")
+    expect(checkout).not.toMatch(/\bfetch\s*\(/)
     expect(checkout).toContain("widgetSet.create('payment', { layout: 'tabs', displaySavedPaymentMethodsCheckbox: true })")
     expect(checkout).toContain("hyper.confirmPayment({")
     expect(checkout).toContain("redirect: 'if_required'")
