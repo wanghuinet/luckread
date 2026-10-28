@@ -7,6 +7,7 @@ const apiInventory = JSON.parse(readFileSync(resolve(process.cwd(), '../../contr
 
 describe('v1 subscription adapter', () => {
   const route = readFileSync(resolve(process.cwd(), 'src/app/api/v1/memberships/subscriptions/[[...segments]]/route.ts'), 'utf8')
+  const mySubscriptionsPage = readFileSync(resolve(process.cwd(), 'src/app/(frontend)/me/subscriptions/MySubscriptionsPage.tsx'), 'utf8')
   const plansRoute = readFileSync(resolve(process.cwd(), 'src/app/api/v1/plans/route.ts'), 'utf8')
   const creatorPlansRoute = readFileSync(resolve(process.cwd(), 'src/app/api/v1/membership/plans/route.ts'), 'utf8')
   const creatorMembershipPlans = readFileSync(resolve(process.cwd(), 'src/app/(frontend)/creator-center/CreatorMembershipPlans.tsx'), 'utf8')
@@ -178,6 +179,16 @@ describe('v1 subscription adapter', () => {
     expect(route).toContain('verified payment-provider synchronization flow')
     expect(route).not.toContain("requireHeader(request, 'Idempotency-Key')")
     expect(route).not.toContain("requireHeader(request, 'If-Match')")
+  })
+
+  it('keeps subscription management read-only while verified provider synchronization is gated', () => {
+    expect(route).toContain('Subscription writes are disabled until a verified payment-provider synchronization flow is available.')
+    expect(mySubscriptionsPage).toContain('mutationsUnavailable')
+    expect(mySubscriptionsPage).not.toContain("transition(item, 'pause')")
+    expect(mySubscriptionsPage).not.toContain("transition(item, 'resume')")
+    expect(mySubscriptionsPage).not.toContain("transition(item, 'cancel')")
+    expect(mySubscriptionsPage).toContain('payment-provider synchronization')
+    expect(mySubscriptionsPage).toContain("fetchJson<ListResponse>('/api/v1/memberships/subscriptions?limit=20&page='")
   })
 
   it('declares the existing subscription collection list operation', () => {
