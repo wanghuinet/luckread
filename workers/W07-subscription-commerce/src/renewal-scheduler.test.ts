@@ -47,7 +47,7 @@ describe('W07 renewal scheduler completion status', () => {
     const result = await runRenewalScheduledBatch(env, dependencies());
 
     expect(result.status).toBe('COMPLETED');
-    if (result.status === 'COMPLETED' || result.status === 'PARTIAL') {
+    if ('afterRecovery' in result) {
       expect(result.processFailures).toBe(0);
       expect(result.afterRecovery?.reconciliationRequired).toBe(0);
       expect(result.afterRecovery?.pendingRetry).toBe(0);
