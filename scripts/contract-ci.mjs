@@ -683,9 +683,31 @@ async function checkOpenApi() {
   if (pathCount === 0) {
     fail('openapi: no paths declared — API contract is empty and cannot admit implementation')
   }
-  for (const required of ['openapi:', 'info:', 'paths:', 'components:']) {
-    if (!raw.includes(required)) fail(`openapi: missing top-level key '${required}'`)
+  for (const required of ['openapi', 'info', 'paths', 'components']) {
+    const count = (raw.match(new RegExp('^' + required + ':', 'gm')) ?? []).length
+    if (count === 0) fail(`openapi: missing top-level key '${required}:'`)
+    if (count > 1) fail(`openapi: duplicate top-level key '${required}:' (${count} occurrences)`)
   }
+  const pathsIndex = raw.search(/^paths:\s*$/m)
+  const componentsIndex = raw.search(/^components:\s*$/m)
+  if (pathsIndex < 0 || componentsIndex < 0 || pathsIndex >= componentsIndex) {
+    fail('openapi: paths must be declared before the single top-level components section')
+  } else {
+    const pathDocument = raw.slice(pathsIndex, componentsIndex)
+    const publishPath = '  /membership/plans/{planId}/publish:'
+    const publishStart = pathDocument.indexOf(publishPath)
+    const nextPath = publishStart < 0
+      ? null
+      : pathDocument.slice(publishStart + publishPath.length).match(/^  \/[^ ].*:\s*$/m)
+    const publishEnd = nextPath?.index === undefined
+      ? pathDocument.length
+      : publishStart + publishPath.length + nextPath.index
+    const publishBlock = publishStart < 0 ? '' : pathDocument.slice(publishStart, publishEnd)
+    if (publishStart < 0 || !/operationId:\s*publishOwnMembershipPlan\b/.test(publishBlock)) {
+      fail('openapi: /membership/plans/{planId}/publish must declare publishOwnMembershipPlan under paths')
+    }
+  }
+  if (/^\s*\}\s*$/m.test(raw)) fail('openapi: stray standalone closing brace is not valid YAML')
   counts.openapi = pathCount
 }
 
