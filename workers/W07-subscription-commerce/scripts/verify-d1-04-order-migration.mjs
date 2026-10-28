@@ -42,6 +42,14 @@ export const REQUIRED_COLUMNS = {
     ['payload_sha256', 'TEXT', 1, 0], ['state', 'TEXT', 1, 0], ['received_at', 'TEXT', 1, 0],
     ['processed_at', 'TEXT', 0, 0], ['outcome_code', 'TEXT', 0, 0],
   ],
+  payment_provider_event_conflicts: [
+    ['conflict_id', 'TEXT', 1, 1], ['provider', 'TEXT', 1, 0], ['merchant_id', 'TEXT', 1, 0],
+    ['event_id', 'TEXT', 1, 0], ['existing_payload_sha256', 'TEXT', 1, 0],
+    ['incoming_payload_sha256', 'TEXT', 1, 0], ['state', 'TEXT', 1, 0],
+    ['occurrence_count', 'INTEGER', 1, 0], ['version', 'INTEGER', 1, 0],
+    ['first_seen_at', 'TEXT', 1, 0], ['last_seen_at', 'TEXT', 1, 0],
+    ['resolved_at', 'TEXT', 0, 0], ['resolution_code', 'TEXT', 0, 0],
+  ],
 }
 
 export const REQUIRED_INDEXES = {
@@ -50,6 +58,10 @@ export const REQUIRED_INDEXES = {
   order_create_idempotency: ['ix_order_create_idempotency_customer_created', 'ix_order_create_idempotency_expiration'],
   payments: ['ix_payments_customer_created_payment', 'ix_payments_order_created_payment', 'ix_payments_status_updated_payment'],
   payment_provider_events: ['ix_payment_provider_events_state_received', 'ix_payment_provider_events_payment_received'],
+  payment_provider_event_conflicts: [
+    'ix_payment_provider_event_conflicts_state_last_seen',
+    'ix_payment_provider_event_conflicts_identity',
+  ],
 }
 
 export const REQUIRED_TRIGGERS = {
@@ -71,13 +83,19 @@ export const REQUIRED_TRIGGERS = {
     'payment_provider_events_terminal_immutable',
     'payment_provider_events_retained',
   ],
+  payment_provider_event_conflicts: [
+    'payment_provider_event_conflicts_identity_immutable',
+    'payment_provider_event_conflicts_version_guard',
+    'payment_provider_event_conflicts_resolved_immutable',
+    'payment_provider_event_conflicts_retained',
+  ],
 }
 
 const targetNamesFor = (migrationId) => {
   const tables = migrationId === ORDER_MIGRATION_ID
     ? ['orders', 'order_lines', 'order_create_idempotency']
     : migrationId === PAYMENT_MIGRATION_ID
-      ? ['payments', 'payment_provider_events']
+      ? ['payments', 'payment_provider_events', 'payment_provider_event_conflicts']
       : []
   return new Set([
     ...tables,
@@ -228,6 +246,7 @@ export function verifyD1_04OrderMigrationPostflight({
   idempotencyTableInfo,
   paymentsTableInfo,
   paymentProviderEventsTableInfo,
+  paymentProviderEventConflictsTableInfo,
 }) {
   const before = schemaObjects(preflightSchema)
   const after = schemaObjects(postflightSchema)
@@ -251,6 +270,7 @@ export function verifyD1_04OrderMigrationPostflight({
     order_create_idempotency: idempotencyTableInfo,
     payments: paymentsTableInfo,
     payment_provider_events: paymentProviderEventsTableInfo,
+    payment_provider_event_conflicts: paymentProviderEventConflictsTableInfo,
   }
   for (const [tableName, expectedColumns] of Object.entries(REQUIRED_COLUMNS)) {
     const actual = tableColumns(tableInfoByName[tableName], tableName)
@@ -335,7 +355,7 @@ function main() {
     return
   }
   if (mode === 'postflight') {
-    if (args.length !== 9) throw new Error('Usage: verify-d1-04-order-migration.mjs postflight <preflight-schema.json> <postflight-schema.json> <migration-state.json> <orders-info.json> <order-lines-info.json> <idempotency-info.json> <payments-info.json> <provider-events-info.json> <output.json>')
+    if (args.length !== 10) throw new Error('Usage: verify-d1-04-order-migration.mjs postflight <preflight-schema.json> <postflight-schema.json> <migration-state.json> <orders-info.json> <order-lines-info.json> <idempotency-info.json> <payments-info.json> <provider-events-info.json> <event-conflicts-info.json> <output.json>')
     const report = verifyD1_04OrderMigrationPostflight({
       preflightSchema: readJson(args[0]),
       postflightSchema: readJson(args[1]),
@@ -345,8 +365,9 @@ function main() {
       idempotencyTableInfo: readJson(args[5]),
       paymentsTableInfo: readJson(args[6]),
       paymentProviderEventsTableInfo: readJson(args[7]),
+      paymentProviderEventConflictsTableInfo: readJson(args[8]),
     })
-    writeReport(args[8], report)
+    writeReport(args[9], report)
     console.log(JSON.stringify(report, null, 2))
     return
   }
