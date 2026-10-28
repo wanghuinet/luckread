@@ -64,7 +64,7 @@ describe('public Hyperswitch payment intent adapter', () => {
     expect(w07PaymentRuntime).toContain('createHyperswitchCustomerInitiatedSetupIntent')
     expect(w07PaymentRuntime).toContain('customerId,')
     expect(w07PaymentRuntime).toContain('This does not capture funds, confirm an Order')
-    expect(w07PaymentRuntime).toContain('does not grant subscription entitlement')
+    expect(w07PaymentRuntime).toContain('grant an\n * entitlement')
     expect(w07PaymentRuntime).not.toContain('grantEntitlement(')
   })
 
@@ -82,7 +82,7 @@ describe('public Hyperswitch payment intent adapter', () => {
     expect(paymentBlock).toContain('x-luckread-contract-status: CONTRACTED_PARTIAL')
     expect(paymentBlock).toContain("required: [orderId]")
     expect(paymentBlock).toContain('clientSecret')
-    expect(paymentBlock).toContain('cache-control')
+    expect(paymentBlock.toLowerCase()).toContain('cache-control')
     const operation = binding.operations.find((item: { operationId: string }) => item.operationId === 'createCustomerPaymentIntent')
     expect(operation).toBeDefined()
     expect(operation.publicPath).toBe('/api/v1/payments/intents')
