@@ -274,7 +274,14 @@ export async function syncRenewalCycleOutcomeForPayment(
     row = await env.D1_04.prepare(
       'SELECT cycle_id FROM subscription_renewal_cycles WHERE provider = ? AND merchant_id = ? AND payment_id = ? LIMIT 1',
     ).bind(PROVIDER, expectedMerchantIdInput, paymentIdInput).first<{ cycle_id: string }>();
-  } catch {
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    // Before candidate migration 0004 is applied there can be no renewal-cycle
+    // rows. Ordinary customer-present payments must still receive a normal
+    // webhook acknowledgement; only non-missing-table D1 failures are retried.
+    if (/no such table:\s*subscription_renewal_cycles/i.test(message)) {
+      return { cycleId: '', outcome: 'NO_RENEWAL_CYCLE' };
+    }
     throw new RenewalOutcomeSyncError('SERVICE_UNAVAILABLE', 503);
   }
   if (!row) return { cycleId: '', outcome: 'NO_RENEWAL_CYCLE' };
