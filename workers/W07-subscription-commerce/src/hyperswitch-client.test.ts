@@ -197,7 +197,7 @@ describe('Hyperswitch server-side payment intent client', () => {
   })
 
   it('rejects invalid setup customer references and mismatched provider setup responses before accepting them', async () => {
-    for (const customerId of ['', ' cust_user_42', 'cust_user_42\\nInjected: yes', 'x'.repeat(257)]) {
+    for (const customerId of ['', ' cust_user_42', 'cust_user_42\nInjected: yes', 'x'.repeat(257)]) {
       const fake = fakeFetch(jsonResponse(responsePayment()))
       await expect(createHyperswitchCustomerInitiatedSetupIntent(config, {
         ...input,
