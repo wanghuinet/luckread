@@ -2,6 +2,7 @@
 
 import Script from 'next/script'
 import { useEffect, useState } from 'react'
+import { apiFetch } from '../../../lib/client-api.js'
 
 type PaymentIntentData = {
   paymentId: string
@@ -37,9 +38,12 @@ declare global {
 }
 
 const publishableKey = process.env.NEXT_PUBLIC_HYPERSWITCH_PUBLISHABLE_KEY ?? ''
-const hyperScriptUrl = publishableKey.startsWith('pk_prd_')
+const hyperswitchEnvironment = process.env.NEXT_PUBLIC_HYPERSWITCH_ENVIRONMENT ?? ''
+const hyperScriptUrl = hyperswitchEnvironment === 'production'
   ? 'https://checkout.hyperswitch.io/v0/HyperLoader.js'
-  : 'https://beta.hyperswitch.io/v1/HyperLoader.js'
+  : hyperswitchEnvironment === 'sandbox'
+    ? 'https://beta.hyperswitch.io/v1/HyperLoader.js'
+    : ''
 const validOrderId = (value: string) => /^ord_[A-Za-z0-9_-]{1,90}$/.test(value)
 
 function readPaymentIntent(value: unknown, orderId: string): PaymentIntentData | null {
@@ -89,8 +93,8 @@ export default function CheckoutClient({ orderId }: { orderId: string }) {
         setLoading(false)
         return
       }
-      if (!publishableKey) {
-        setError('Hyperswitch 公钥尚未配置，支付入口已安全关闭。')
+      if (!publishableKey || (hyperswitchEnvironment !== 'sandbox' && hyperswitchEnvironment !== 'production')) {
+        setError('Hyperswitch 公钥或明确的 sandbox/production 环境配置缺失，支付入口已安全关闭。')
         setLoading(false)
         return
       }
@@ -108,7 +112,7 @@ export default function CheckoutClient({ orderId }: { orderId: string }) {
         return
       }
       try {
-        const response = await fetch('/api/v1/payments/intents', {
+        const response = await apiFetch('/api/v1/payments/intents', {
           method: 'POST',
           credentials: 'include',
           cache: 'no-store',
