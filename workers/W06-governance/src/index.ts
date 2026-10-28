@@ -285,6 +285,16 @@ type MembershipPlanAuditInput = {
 
 
 
+
+type MembershipPlanPublishRequestAuditInput = {
+  eventId: string
+  planId: string
+  creatorId: string
+  expectedVersion: number
+  requestedStatus: 'ACTIVE'
+  requestedVisibility: 'PUBLIC'
+}
+
 type MembershipPlanPublishAuditInput = {
   eventId: string
   planId: string
@@ -433,6 +443,74 @@ function parseMembershipPlanPublishAuditInput(value: unknown): MembershipPlanPub
     typeof body.currency !== 'string' || !/^[A-Z]{3}$/.test(body.currency)
   ) throw new Error('INVALID_MEMBERSHIP_PLAN_PUBLISH_AUDIT')
   return body as MembershipPlanPublishAuditInput
+}
+
+
+function parseMembershipPlanPublishRequestAuditInput(value: unknown): MembershipPlanPublishRequestAuditInput {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('INVALID_MEMBERSHIP_PLAN_PUBLISH_REQUEST_AUDIT')
+  const body = value as Record<string, unknown>
+  const allowed = new Set(['eventId', 'planId', 'creatorId', 'expectedVersion', 'requestedStatus', 'requestedVisibility'])
+  if (Object.keys(body).some((key) => !allowed.has(key)) || Object.keys(body).length !== allowed.size) {
+    throw new Error('INVALID_MEMBERSHIP_PLAN_PUBLISH_REQUEST_AUDIT')
+  }
+  if (
+    typeof body.planId !== 'string' || !/^plan_[a-f0-9]{64}$/.test(body.planId) ||
+    typeof body.creatorId !== 'string' || !resourceIdPattern.test(body.creatorId) ||
+    typeof body.expectedVersion !== 'number' || !Number.isSafeInteger(body.expectedVersion) || body.expectedVersion < 1 ||
+    body.requestedStatus !== 'ACTIVE' || body.requestedVisibility !== 'PUBLIC' ||
+    body.eventId !== 'evt_mpl_publish_requested_' + body.planId + '_v' + body.expectedVersion
+  ) throw new Error('INVALID_MEMBERSHIP_PLAN_PUBLISH_REQUEST_AUDIT')
+  return body as MembershipPlanPublishRequestAuditInput
+}
+
+function matchesMembershipPlanPublishRequestAudit(existing: StoredAuditEvent, expected: AuditEvent): boolean {
+  try {
+    const storedActor = JSON.parse(existing.actor_json) as Record<string, unknown>
+    const expectedActor = expected.actor as unknown as Record<string, unknown>
+    return existing.event_id === expected.eventId &&
+      storedActor.actorId === expectedActor.actorId &&
+      storedActor.actorType === expectedActor.actorType &&
+      storedActor.layer === expectedActor.layer &&
+      existing.action === expected.action &&
+      existing.target_type === expected.targetType &&
+      existing.target_id === expected.targetId &&
+      existing.before_json === JSON.stringify(expected.before) &&
+      existing.after_json === JSON.stringify(expected.after)
+  } catch {
+    return false
+  }
+}
+
+/**
+ * The event time is assigned by W06, not sent by W01. An exact semantic retry
+ * therefore ignores only the newly generated timestamp and confirms that the
+ * first immutable request-intent event is already durable.
+ */
+async function persistMembershipPlanPublishRequestAudit(env: Env, event: AuditEvent): Promise<Response> {
+  let existing: StoredAuditEvent | null
+  try {
+    existing = await findAuditEvent(env.D1_03, event.eventId)
+  } catch {
+    return json({ error: 'AUDIT_EVENT_LOOKUP_FAILED' }, 503)
+  }
+  if (existing) {
+    if (!matchesMembershipPlanPublishRequestAudit(existing, event)) return json({ error: 'AUDIT_EVENT_CONFLICT' }, 409)
+    return json({ eventId: event.eventId, action: event.action, targetType: event.targetType, targetId: event.targetId, replayed: true }, 200)
+  }
+  try {
+    await persistAuditEvent(env.D1_03, event)
+    return json({ eventId: event.eventId, action: event.action, targetType: event.targetType, targetId: event.targetId, replayed: false }, 201)
+  } catch {
+    try {
+      const raced = await findAuditEvent(env.D1_03, event.eventId)
+      if (raced && matchesMembershipPlanPublishRequestAudit(raced, event)) {
+        return json({ eventId: event.eventId, action: event.action, targetType: event.targetType, targetId: event.targetId, replayed: true }, 200)
+      }
+    } catch {
+      // Keep the mutation closed if the durable result remains uncertain.
+    }
+    return json({ error: 'AUDIT_EVENT_PERSISTENCE_FAILED' }, 503)
+  }
 }
 
 async function findAuditEvent(db: D1Database, eventId: string): Promise<StoredAuditEvent | null> {
@@ -695,6 +773,49 @@ export default {
       return persistImmutableAuditEvent(env, event)
     }
 
+
+
+    if (request.method === 'POST' && url.pathname === '/internal/audit-events/membership-plan-publish-requested') {
+      let principal: ReturnType<typeof requireW01Transport>
+      try { principal = requireW01Transport(request) }
+      catch (error) { return errorResponse(error, request.headers.get('X-LuckRead-Request-Id')?.trim()) }
+      if (!/^L[3-8]$/.test(principal.layer)) {
+        return json({ error: 'PERMISSION_DENIED' }, 403)
+      }
+      let input: MembershipPlanPublishRequestAuditInput
+      try {
+        input = parseMembershipPlanPublishRequestAuditInput(await readBoundedAuditJson(request, 2048))
+      } catch {
+        return json({ error: 'INVALID_MEMBERSHIP_PLAN_PUBLISH_REQUEST_AUDIT' }, 400)
+      }
+      const event: AuditEvent = {
+        eventId: input.eventId,
+        requestId: principal.requestId,
+        traceId: principal.correlationId,
+        actor: {
+          actorId: principal.userId,
+          actorType: 'user',
+          layer: principal.layer as AuditEvent['actor']['layer'],
+        },
+        action: 'membership.plan.publish_requested',
+        targetType: 'MembershipPlan',
+        targetId: input.planId,
+        before: {
+          creatorId: input.creatorId,
+          status: 'DRAFT',
+          visibility: 'PRIVATE',
+          version: input.expectedVersion,
+        },
+        after: {
+          creatorId: input.creatorId,
+          expectedVersion: input.expectedVersion,
+          requestedStatus: input.requestedStatus,
+          requestedVisibility: input.requestedVisibility,
+        },
+        occurredAt: new Date().toISOString(),
+      }
+      return persistMembershipPlanPublishRequestAudit(env, event)
+    }
 
     if (request.method === 'POST' && url.pathname === '/internal/audit-events/membership-plan-published') {
       let principal: ReturnType<typeof requireW01Transport>
