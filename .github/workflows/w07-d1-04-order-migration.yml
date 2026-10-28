@@ -160,6 +160,7 @@ jobs:
           npx --yes wrangler@4.116.0 d1 execute "$D1_04_NAME" --remote --config wrangler.jsonc --command='PRAGMA table_info("order_create_idempotency")' --json > /tmp/w07-d1-04-idempotency-columns.json
           npx --yes wrangler@4.116.0 d1 execute "$D1_04_NAME" --remote --config wrangler.jsonc --command='PRAGMA table_info("payments")' --json > /tmp/w07-d1-04-payments-columns.json
           npx --yes wrangler@4.116.0 d1 execute "$D1_04_NAME" --remote --config wrangler.jsonc --command='PRAGMA table_info("payment_provider_events")' --json > /tmp/w07-d1-04-payment-provider-events-columns.json
+          npx --yes wrangler@4.116.0 d1 execute "$D1_04_NAME" --remote --config wrangler.jsonc --command='PRAGMA table_info("payment_provider_event_conflicts")' --json > /tmp/w07-d1-04-payment-provider-event-conflicts-columns.json
           node scripts/verify-d1-04-order-migration.mjs postflight \
             /tmp/w07-d1-04-preflight-schema.json \
             /tmp/w07-d1-04-postflight-schema.json \
@@ -169,6 +170,7 @@ jobs:
             /tmp/w07-d1-04-idempotency-columns.json \
             /tmp/w07-d1-04-payments-columns.json \
             /tmp/w07-d1-04-payment-provider-events-columns.json \
+            /tmp/w07-d1-04-payment-provider-event-conflicts-columns.json \
             /tmp/w07-d1-04-postflight-report.json
 
       - name: Summarize migration and schema verification
