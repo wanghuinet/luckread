@@ -4471,15 +4471,7 @@ components:
       required: [code]
       additionalProperties: false
       properties:
-        code: { type: string, pattern: '^\\d{6}      type: object
-      required: [id, email, emailVerified]
-      additionalProperties: false
-      properties:
-        id: { $ref: '#/components/schemas/ResourceId' }
-        email: { type: string, format: email }
-        name: { type: [string, 'null'] }
-        emailVerified: { type: boolean }
-        image: { type: [string, 'null'], format: uri }
+        code: { type: string, pattern: '^[0-9]{6}$', writeOnly: true }
     HyperswitchWebhookReceiptResponse:
       type: object
       required: [data, requestId]
@@ -4815,8 +4807,6 @@ components:
         version: { type: integer, minimum: 1 }
         effectiveAt: { type: string, format: date-time }
         requestId: { $ref: '#/components/schemas/RequestId' }
- }
-, writeOnly: true }
     AuthMfaChallengeVerifyRequest:
       type: object
       required: [code, method]
@@ -4842,15 +4832,7 @@ components:
       additionalProperties: false
       properties:
         currentPassword: { type: string, minLength: 1, writeOnly: true }
-        code: { type: string, pattern: '^\\d{6}      type: object
-      required: [id, email, emailVerified]
-      additionalProperties: false
-      properties:
-        id: { $ref: '#/components/schemas/ResourceId' }
-        email: { type: string, format: email }
-        name: { type: [string, 'null'] }
-        emailVerified: { type: boolean }
-        image: { type: [string, 'null'], format: uri }
+        code: { type: string, pattern: '^[0-9]{6}$', writeOnly: true }
     ResourceId:
       type: string
       minLength: 1
@@ -5093,23 +5075,13 @@ components:
         version: { type: integer, minimum: 1 }
         effectiveAt: { type: string, format: date-time }
         requestId: { $ref: '#/components/schemas/RequestId' }
- }
-, writeOnly: true }
     AuthMfaRecoveryCodesRotateRequest:
       type: object
       required: [currentPassword, code]
       additionalProperties: false
       properties:
         currentPassword: { type: string, minLength: 1, writeOnly: true }
-        code: { type: string, pattern: '^\\d{6}      type: object
-      required: [id, email, emailVerified]
-      additionalProperties: false
-      properties:
-        id: { $ref: '#/components/schemas/ResourceId' }
-        email: { type: string, format: email }
-        name: { type: [string, 'null'] }
-        emailVerified: { type: boolean }
-        image: { type: [string, 'null'], format: uri }
+        code: { type: string, pattern: '^[0-9]{6}$', writeOnly: true }
     ResourceId:
       type: string
       minLength: 1
@@ -5352,8 +5324,6 @@ components:
         version: { type: integer, minimum: 1 }
         effectiveAt: { type: string, format: date-time }
         requestId: { $ref: '#/components/schemas/RequestId' }
- }
-, writeOnly: true }
     AuthMfaRecoveryCodesRotateResponse:
       type: object
       required: [recoveryCodes]
@@ -5615,4 +5585,3 @@ components:
         version: { type: integer, minimum: 1 }
         effectiveAt: { type: string, format: date-time }
         requestId: { $ref: '#/components/schemas/RequestId' }
- }
