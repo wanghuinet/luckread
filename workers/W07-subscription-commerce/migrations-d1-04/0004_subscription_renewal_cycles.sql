@@ -1,7 +1,7 @@
--- PAY-004 recurring membership renewal-cycle ledger for the existing D1-04 commerce authority.
--- Candidate only. Remote application remains behind the exact-SHA manual migration workflow.
--- The cycle row stores provider/request references only; it never grants entitlement.
--- Reuse the existing orders/payments tables, and never persist card data or provider secrets.
+-- PAY-004 recurring membership cycle ledger for existing D1-04 commerce authority.
+-- Candidate only; not remotely applied. No new Worker, database, queue or binding.
+-- Only an explicit, provider-verified active mandate can enter the payable/submitting states.
+-- This migration records billing/charge references and never grants subscription entitlement.
 
 CREATE TABLE subscription_renewal_cycles (
   cycle_id TEXT PRIMARY KEY NOT NULL
@@ -15,13 +15,26 @@ CREATE TABLE subscription_renewal_cycles (
   cycle_start TEXT NOT NULL CHECK (length(cycle_start) BETWEEN 1 AND 64),
   cycle_end TEXT NOT NULL CHECK (length(cycle_end) BETWEEN 1 AND 64 AND cycle_end > cycle_start),
   billing_interval TEXT NOT NULL CHECK (billing_interval IN ('MONTHLY','YEARLY')),
-  amount_minor INTEGER NOT NULL CHECK (typeof(amount_minor) = 'integer' AND amount_minor BETWEEN 1 AND 9007199254740991),
   currency TEXT NOT NULL CHECK (length(currency) = 3 AND currency GLOB '[A-Z][A-Z][A-Z]'),
-  payment_method_id TEXT NOT NULL CHECK (length(payment_method_id) BETWEEN 1 AND 255 AND payment_method_id NOT GLOB '*[^!-~]*'),
-  mandate_record_id TEXT NOT NULL CHECK (length(mandate_record_id) = 30 AND substr(mandate_record_id, 1, 4) = 'mnd_' AND substr(mandate_record_id, 5) NOT GLOB '*[^A-Za-z0-9]*'),
+  offer_snapshot_json TEXT NOT NULL CHECK (
+    length(offer_snapshot_json) BETWEEN 2 AND 65536 AND json_valid(offer_snapshot_json) AND json_type(offer_snapshot_json) = 'object'
+  ),
+  amount_minor INTEGER CHECK (amount_minor IS NULL OR (typeof(amount_minor) = 'integer' AND amount_minor BETWEEN 1 AND 9007199254740991)),
+  pricing_snapshot_json TEXT CHECK (
+    pricing_snapshot_json IS NULL OR (
+      length(pricing_snapshot_json) BETWEEN 2 AND 65536 AND json_valid(pricing_snapshot_json) AND json_type(pricing_snapshot_json) = 'object'
+    )
+  ),
+  payment_method_id TEXT CHECK (payment_method_id IS NULL OR (length(payment_method_id) BETWEEN 1 AND 255 AND payment_method_id NOT GLOB '*[^!-~]*')),
+  mandate_record_id TEXT CHECK (mandate_record_id IS NULL OR (
+    length(mandate_record_id) = 30 AND substr(mandate_record_id, 1, 4) = 'mnd_' AND substr(mandate_record_id, 5) NOT GLOB '*[^A-Za-z0-9]*'
+  )),
   order_id TEXT CHECK (order_id IS NULL OR length(order_id) BETWEEN 1 AND 255),
   payment_id TEXT CHECK (payment_id IS NULL OR (length(payment_id) = 30 AND substr(payment_id, 1, 4) = 'pay_' AND substr(payment_id, 5) NOT GLOB '*[^A-Za-z0-9]*')),
-  state TEXT NOT NULL CHECK (state IN ('PREPARED','PAYMENT_READY','SUBMITTING','SUBMITTED','SUCCEEDED','FAILED','RECONCILIATION_REQUIRED')),
+  state TEXT NOT NULL CHECK (state IN (
+    'AWAITING_PRICING','AWAITING_MANDATE','PREPARED','PAYMENT_READY','SUBMITTING','SUBMITTED',
+    'SUCCEEDED','FAILED','RECONCILIATION_REQUIRED'
+  )),
   provider_response_status TEXT CHECK (provider_response_status IS NULL OR provider_response_status IN (
     'requires_payment_method','requires_confirmation','requires_customer_action','requires_merchant_action',
     'requires_capture','processing','succeeded','failed','cancelled','cancelled_post_capture',
@@ -33,13 +46,19 @@ CREATE TABLE subscription_renewal_cycles (
   created_at TEXT NOT NULL CHECK (length(created_at) BETWEEN 1 AND 64),
   updated_at TEXT NOT NULL CHECK (length(updated_at) BETWEEN 1 AND 64 AND updated_at >= created_at),
   CHECK (
+    (state = 'AWAITING_PRICING' AND amount_minor IS NULL AND pricing_snapshot_json IS NULL)
+    OR (state <> 'AWAITING_PRICING' AND amount_minor IS NOT NULL AND pricing_snapshot_json IS NOT NULL)
+  ),
+  CHECK (
+    (state IN ('PAYMENT_READY','SUBMITTING','SUBMITTED','SUCCEEDED','FAILED') AND
+      payment_method_id IS NOT NULL AND mandate_record_id IS NOT NULL AND order_id IS NOT NULL AND payment_id IS NOT NULL)
+    OR state NOT IN ('PAYMENT_READY','SUBMITTING','SUBMITTED','SUCCEEDED','FAILED')
+  ),
+  CHECK (
     (state = 'SUBMITTING' AND lease_token IS NOT NULL AND lease_expires_at IS NOT NULL)
     OR (state <> 'SUBMITTING' AND lease_token IS NULL AND lease_expires_at IS NULL)
   ),
-  CHECK (
-    state NOT IN ('PAYMENT_READY','SUBMITTING','SUBMITTED','SUCCEEDED','FAILED')
-    OR (order_id IS NOT NULL AND payment_id IS NOT NULL)
-  )
+  CHECK ((payment_method_id IS NULL) = (mandate_record_id IS NULL))
 );
 
 CREATE UNIQUE INDEX ux_subscription_renewal_cycles_subscription_cycle
@@ -54,7 +73,7 @@ CREATE INDEX ix_subscription_renewal_cycles_subscriber_cycle
 
 CREATE TRIGGER subscription_renewal_cycles_identity_immutable
 BEFORE UPDATE OF cycle_id, provider, merchant_id, subscription_id, subscriber_id, plan_id, plan_version,
-  cycle_start, cycle_end, billing_interval, amount_minor, currency, payment_method_id, mandate_record_id, created_at
+  cycle_start, cycle_end, billing_interval, currency, offer_snapshot_json, created_at
 ON subscription_renewal_cycles
 WHEN NEW.cycle_id IS NOT OLD.cycle_id
   OR NEW.provider IS NOT OLD.provider
@@ -66,12 +85,19 @@ WHEN NEW.cycle_id IS NOT OLD.cycle_id
   OR NEW.cycle_start IS NOT OLD.cycle_start
   OR NEW.cycle_end IS NOT OLD.cycle_end
   OR NEW.billing_interval IS NOT OLD.billing_interval
-  OR NEW.amount_minor IS NOT OLD.amount_minor
   OR NEW.currency IS NOT OLD.currency
-  OR NEW.payment_method_id IS NOT OLD.payment_method_id
-  OR NEW.mandate_record_id IS NOT OLD.mandate_record_id
+  OR NEW.offer_snapshot_json IS NOT OLD.offer_snapshot_json
   OR NEW.created_at IS NOT OLD.created_at
-BEGIN SELECT RAISE(ABORT, 'renewal cycle commercial and mandate snapshot is immutable'); END;
+BEGIN SELECT RAISE(ABORT, 'renewal cycle identity and offer snapshot are immutable'); END;
+
+CREATE TRIGGER subscription_renewal_cycles_resolved_snapshot_immutable
+BEFORE UPDATE OF amount_minor, pricing_snapshot_json, payment_method_id, mandate_record_id
+ON subscription_renewal_cycles
+WHEN (OLD.amount_minor IS NOT NULL AND NEW.amount_minor IS NOT OLD.amount_minor)
+  OR (OLD.pricing_snapshot_json IS NOT NULL AND NEW.pricing_snapshot_json IS NOT OLD.pricing_snapshot_json)
+  OR (OLD.payment_method_id IS NOT NULL AND NEW.payment_method_id IS NOT OLD.payment_method_id)
+  OR (OLD.mandate_record_id IS NOT NULL AND NEW.mandate_record_id IS NOT OLD.mandate_record_id)
+BEGIN SELECT RAISE(ABORT, 'resolved renewal amount, price decision and mandate identity are immutable'); END;
 
 CREATE TRIGGER subscription_renewal_cycles_version_guard
 BEFORE UPDATE ON subscription_renewal_cycles
@@ -81,9 +107,11 @@ BEGIN SELECT RAISE(ABORT, 'renewal-cycle update requires version CAS and increas
 CREATE TRIGGER subscription_renewal_cycles_state_transition_guard
 BEFORE UPDATE OF state ON subscription_renewal_cycles
 WHEN NOT (
-  (OLD.state = 'PREPARED' AND NEW.state IN ('PREPARED','PAYMENT_READY','RECONCILIATION_REQUIRED'))
+  (OLD.state = 'AWAITING_PRICING' AND NEW.state IN ('AWAITING_PRICING','AWAITING_MANDATE','PREPARED','RECONCILIATION_REQUIRED'))
+  OR (OLD.state = 'AWAITING_MANDATE' AND NEW.state IN ('AWAITING_MANDATE','PREPARED','RECONCILIATION_REQUIRED'))
+  OR (OLD.state = 'PREPARED' AND NEW.state IN ('PREPARED','AWAITING_MANDATE','PAYMENT_READY','RECONCILIATION_REQUIRED'))
   OR (OLD.state = 'PAYMENT_READY' AND NEW.state IN ('PAYMENT_READY','SUBMITTING','RECONCILIATION_REQUIRED'))
-  OR (OLD.state = 'SUBMITTING' AND NEW.state IN ('SUBMITTING','PAYMENT_READY','SUBMITTED','RECONCILIATION_REQUIRED'))
+  OR (OLD.state = 'SUBMITTING' AND NEW.state IN ('SUBMITTING','PAYMENT_READY','SUBMITTED','SUCCEEDED','FAILED','RECONCILIATION_REQUIRED'))
   OR (OLD.state = 'SUBMITTED' AND NEW.state IN ('SUBMITTED','SUCCEEDED','FAILED','RECONCILIATION_REQUIRED'))
   OR (OLD.state IN ('SUCCEEDED','FAILED','RECONCILIATION_REQUIRED') AND NEW.state = OLD.state)
 )
@@ -111,7 +139,7 @@ WHEN NEW.order_id IS NOT NULL AND (
       AND json_extract(l.item_snapshot_json, '$.subscriptionRenewal.cycleEnd') = NEW.cycle_end
   )
 )
-BEGIN SELECT RAISE(ABORT, 'renewal cycle Order must match the subscription, cycle and commercial snapshot'); END;
+BEGIN SELECT RAISE(ABORT, 'renewal cycle Order must match subscription, cycle and commercial snapshot'); END;
 
 CREATE TRIGGER subscription_renewal_cycles_payment_binding_guard
 BEFORE UPDATE OF payment_id ON subscription_renewal_cycles
@@ -127,19 +155,35 @@ WHEN NEW.payment_id IS NOT NULL AND NOT EXISTS (
 )
 BEGIN SELECT RAISE(ABORT, 'renewal cycle Payment must match its Order and immutable commercial snapshot'); END;
 
+CREATE TRIGGER subscription_renewal_cycles_requires_active_mandate
+BEFORE UPDATE OF state ON subscription_renewal_cycles
+WHEN NEW.state IN ('PAYMENT_READY','SUBMITTING') AND NOT EXISTS (
+  SELECT 1 FROM payment_mandates m
+  JOIN saved_payment_methods s
+    ON s.provider = m.provider AND s.merchant_id = m.merchant_id
+   AND s.customer_id = m.customer_id AND s.payment_method_id = m.payment_method_id
+  WHERE m.mandate_record_id = NEW.mandate_record_id
+    AND m.provider = NEW.provider AND m.merchant_id = NEW.merchant_id
+    AND m.customer_id = NEW.subscriber_id
+    AND m.payment_method_id = NEW.payment_method_id AND m.status = 'ACTIVE'
+)
+BEGIN SELECT RAISE(ABORT, 'recurring charge requires a matching currently-active provider mandate'); END;
+
 CREATE TRIGGER subscription_renewal_cycles_retained
 BEFORE DELETE ON subscription_renewal_cycles
 BEGIN SELECT RAISE(ABORT, 'renewal cycle audit records are retained'); END;
 
 CREATE TABLE subscription_renewal_scheduler_state (
   state_id TEXT PRIMARY KEY NOT NULL CHECK (state_id = 'subscription-renewals'),
+  cursor_period_end TEXT CHECK (cursor_period_end IS NULL OR length(cursor_period_end) BETWEEN 1 AND 64),
   cursor_subscription_id TEXT CHECK (cursor_subscription_id IS NULL OR length(cursor_subscription_id) BETWEEN 1 AND 256),
   version INTEGER NOT NULL DEFAULT 1 CHECK (typeof(version) = 'integer' AND version >= 1),
-  updated_at TEXT NOT NULL CHECK (length(updated_at) BETWEEN 1 AND 64)
+  updated_at TEXT NOT NULL CHECK (length(updated_at) BETWEEN 1 AND 64),
+  CHECK ((cursor_period_end IS NULL) = (cursor_subscription_id IS NULL))
 );
 
-INSERT INTO subscription_renewal_scheduler_state(state_id, cursor_subscription_id, version, updated_at)
-VALUES ('subscription-renewals', NULL, 1, '1970-01-01T00:00:00.000Z');
+INSERT INTO subscription_renewal_scheduler_state(state_id, cursor_period_end, cursor_subscription_id, version, updated_at)
+VALUES ('subscription-renewals', NULL, NULL, 1, '1970-01-01T00:00:00.000Z');
 
 CREATE TRIGGER subscription_renewal_scheduler_state_identity_immutable
 BEFORE UPDATE OF state_id ON subscription_renewal_scheduler_state
