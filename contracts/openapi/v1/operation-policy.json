@@ -2674,14 +2674,14 @@
     {
       "operationId": "receiveHyperswitchPaymentWebhook",
       "auth": {
-        "mode": "authenticated"
+        "mode": "public"
       },
       "permissions": [],
       "auditRequired": false,
       "optimisticLockRequired": false,
       "idempotencyRequired": false,
       "stateMachine": "none",
-      "x-luckread-authentication": "HMAC-SHA512 provider signature verified by W07",
+      "x-luckread-authentication": "Provider-originated callback; W07 verifies HMAC-SHA512 over the original raw body against the configured Hyperswitch secret and merchant ID",
       "x-luckread-idempotency": "provider + merchant_id + event_id + payload SHA-256; enforced by the unique D1-04 webhook receipt identity and immutable payload-conflict record, not by an HTTP Idempotency-Key header"
     }
   ]
