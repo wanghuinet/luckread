@@ -99,7 +99,7 @@ export async function POST(request: Request, context: RouteContext): Promise<Res
     }
     const ifMatch = request.headers.get('If-Match')
     if (!ifMatch) return errorResponse(428, 'PRECONDITION_REQUIRED', 'If-Match is required to publish a plan')
-    const ifMatchVersion = /^"lr-plan-v([1-9]\\d*)"$/.exec(ifMatch)
+    const ifMatchVersion = /^"lr-plan-v([1-9]\d*)"$/.exec(ifMatch)
     const expectedVersion = ifMatchVersion?.[1] ? Number(ifMatchVersion[1]) : Number.NaN
     if (!Number.isSafeInteger(expectedVersion) || expectedVersion < 1) {
       return errorResponse(412, 'PRECONDITION_FAILED', 'Membership plan version does not match')
