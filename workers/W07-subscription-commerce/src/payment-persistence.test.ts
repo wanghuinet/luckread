@@ -224,9 +224,14 @@ describe('PAY-001 payment attempt persistence candidate', () => {
     const db = new MemoryPaymentD1();
     seedOrder(db);
     const created = await createPaymentAttempt(db as unknown as D1Database, CUSTOMER, 'ord_1', 'key_1', MERCHANT, fixedDeps());
+    // Simulate the successful purchase lifecycle completing before a retry of
+    // the original create request reaches W07.
+    db.orders[0]!.status = 'COMPLETED';
+    db.payments[0]!.status = 'succeeded';
+    db.payments[0]!.version = 3;
     const replay = await createPaymentAttempt(db as unknown as D1Database, CUSTOMER, 'ord_1', 'key_1', MERCHANT, fixedDeps(LATER));
     expect(created).toMatchObject({ replayed: false, payment: { paymentId: PAYMENT_ID, status: 'INITIATING', version: 1 } });
-    expect(replay).toMatchObject({ replayed: true, payment: { paymentId: PAYMENT_ID, status: 'INITIATING', version: 1 } });
+    expect(replay).toMatchObject({ replayed: true, payment: { paymentId: PAYMENT_ID, status: 'succeeded', version: 3 } });
     expect(db.payments).toHaveLength(1);
     expect(JSON.stringify(created)).not.toContain('merchant_test');
     expect(JSON.stringify(created)).not.toContain('request_hash');
