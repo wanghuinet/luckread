@@ -28,15 +28,10 @@ type ListResponse = {
   error?: { code?: string; message?: string }
 }
 
-type MutationResponse = {
-  data?: Subscription
-  error?: { code?: string; message?: string }
-}
-
 const copy = (locale: PublicLocale) => locale === 'en'
   ? {
       eyebrow: 'LUCKREAD · MEMBERSHIP',
-      description: 'Review subscription status and billing periods. Subscription records do not, by themselves, prove payment completion or access entitlement. Plan changes remain unavailable until the official plan catalog is connected.',
+      description: 'Review subscription status and billing periods. Subscription records do not prove payment completion or access entitlement. Pause, resume, and cancellation are temporarily unavailable until verified payment-provider synchronization is admitted.',
       discover: 'Explore content',
       refresh: 'Refresh',
       refreshing: 'Refreshing…',
@@ -50,16 +45,9 @@ const copy = (locale: PublicLocale) => locale === 'en'
       id: 'Subscription ID',
       period: 'Current period',
       cancelAt: 'Cancellation date',
-      pause: 'Pause subscription',
-      resume: 'Resume subscription',
-      cancel: 'Cancel subscription',
-      processing: 'Working…',
+      mutationsUnavailable: 'Subscription changes are temporarily unavailable while verified payment-provider synchronization is being admitted. Your status and billing-period records remain available.',
       loadMore: 'Load more subscriptions',
       loadingMore: 'Loading more…',
-      cancelConfirm: 'Cancel this subscription?',
-      cancelSuccess: 'Subscription canceled.',
-      pauseSuccess: 'Subscription paused.',
-      resumeSuccess: 'Subscription resumed.',
       loadError: 'Could not load subscriptions.',
       updateError: 'Could not update subscription.',
       sessionExpired: 'Your session has expired. Sign in again.',
@@ -75,7 +63,7 @@ const copy = (locale: PublicLocale) => locale === 'en'
   : locale === 'tw'
     ? {
         eyebrow: 'LUCKREAD · 會員訂閱',
-        description: '查看訂閱狀態與週期。訂閱記錄本身不代表付款完成或已取得內容權益；方案變更將在正式方案目錄接入後開放。',
+        description: '查看訂閱狀態與週期。訂閱記錄本身不代表付款完成或已取得內容權益；暫停、恢復及取消操作將在付款服務商同步驗證通過後開放。',
         discover: '探索內容',
         refresh: '重新整理',
         refreshing: '正在重新整理…',
@@ -89,16 +77,9 @@ const copy = (locale: PublicLocale) => locale === 'en'
         id: '訂閱 ID',
         period: '目前週期',
         cancelAt: '取消時間',
-        pause: '暫停訂閱',
-        resume: '恢復訂閱',
-        cancel: '取消訂閱',
-        processing: '處理中…',
+        mutationsUnavailable: '付款服務商同步驗證尚未通過，暫時無法變更訂閱；目前仍可查看狀態與週期記錄。',
         loadMore: '載入更多訂閱',
         loadingMore: '載入中…',
-        cancelConfirm: '確定取消這個訂閱嗎？',
-        cancelSuccess: '訂閱已取消。',
-        pauseSuccess: '訂閱已暫停。',
-        resumeSuccess: '訂閱已恢復。',
         loadError: '無法讀取訂閱。',
         updateError: '無法更新訂閱狀態。',
         sessionExpired: '登入已失效，請重新登入。',
@@ -113,7 +94,7 @@ const copy = (locale: PublicLocale) => locale === 'en'
       }
     : {
         eyebrow: 'LUCKREAD · 会员订阅',
-        description: '查看订阅状态与周期。权益和支付状态仍由各自权威域负责；方案变更将在正式方案目录接入后开放。',
+        description: '查看订阅状态与周期。订阅记录不代表付款完成或内容权益；暂停、恢复与取消操作将在付款服务商同步验证通过后开放。',
         discover: '发现内容',
         refresh: '刷新',
         refreshing: '刷新中…',
@@ -127,16 +108,9 @@ const copy = (locale: PublicLocale) => locale === 'en'
         id: '订阅 ID',
         period: '当前周期',
         cancelAt: '取消时间',
-        pause: '暂停订阅',
-        resume: '恢复订阅',
-        cancel: '取消订阅',
-        processing: '处理中…',
+        mutationsUnavailable: '付款服务商同步验证尚未通过，暂时无法变更订阅；目前仍可查看状态与周期记录。',
         loadMore: '加载更多订阅',
         loadingMore: '加载中…',
-        cancelConfirm: '确定取消这个订阅吗？',
-        cancelSuccess: '订阅已取消。',
-        pauseSuccess: '订阅已暂停。',
-        resumeSuccess: '订阅已恢复。',
         loadError: '订阅读取失败。',
         updateError: '订阅状态更新失败。',
         sessionExpired: '登录已失效，请重新登录。',
@@ -169,8 +143,6 @@ export default function MySubscriptionsPage() {
   const [items, setItems] = useState<Subscription[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [busyId, setBusyId] = useState<string | null>(null)
-  const [message, setMessage] = useState('')
   const [pageNumber, setPageNumber] = useState(1)
   const [hasNextPage, setHasNextPage] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -209,44 +181,6 @@ export default function MySubscriptionsPage() {
     return () => window.clearTimeout(timer)
   }, [])
 
-  async function transition(item: Subscription, operation: 'cancel' | 'pause' | 'resume') {
-    if (operation === 'cancel' && !window.confirm(labels.cancelConfirm)) return
-    setBusyId(item.subscriptionId)
-    setError('')
-    setMessage('')
-    try {
-      const { response, data } = await fetchJson<MutationResponse>(
-        '/api/v1/memberships/subscriptions/' + encodeURIComponent(item.subscriptionId) + '/' + operation,
-        {
-          method: 'POST',
-          credentials: 'include',
-          cache: 'no-store',
-          headers: {
-            accept: 'application/json',
-            'If-Match': item.etag,
-            'Idempotency-Key': operation + ':' + item.subscriptionId + ':' + item.etag,
-          },
-        },
-      )
-      if (response.status === 401) {
-        const returnTo = window.location.pathname + window.location.search + window.location.hash
-        window.location.assign('/login?returnTo=' + encodeURIComponent(returnTo))
-        return
-      }
-      if (!response.ok || !data?.data?.subscriptionId) {
-        throw new Error(getApiErrorMessage(data, labels.updateError))
-      }
-      setItems((current) => current.map((currentItem) =>
-        currentItem.subscriptionId === item.subscriptionId ? data.data! : currentItem,
-      ))
-      setMessage(operation === 'cancel' ? labels.cancelSuccess : operation === 'pause' ? labels.pauseSuccess : labels.resumeSuccess)
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : labels.updateError)
-    } finally {
-      setBusyId(null)
-    }
-  }
-
   return (
     <section className="flex flex-col" aria-busy={loading || loadingMore}>
       <header className="flex items-start justify-between gap-4 border-b border-light-border px-4 py-4 dark:border-dark-border">
@@ -264,7 +198,6 @@ export default function MySubscriptionsPage() {
         </button>
       </header>
 
-      {message ? <p className="border-b border-light-border px-4 py-3 text-sm text-emerald-700 dark:border-dark-border dark:text-emerald-300" role="status">{message}</p> : null}
       {error ? <p className="border-b border-light-border px-4 py-3 text-sm text-rose-700 dark:border-dark-border dark:text-rose-300" role="alert">{error}</p> : null}
 
       {loading && items.length === 0 ? (
@@ -280,7 +213,6 @@ export default function MySubscriptionsPage() {
       ) : null}
 
       {items.map((item) => {
-        const busy = busyId === item.subscriptionId
         return (
           <article className="border-b border-light-border px-4 py-4 dark:border-dark-border" key={item.subscriptionId}>
             <div className="flex items-start justify-between gap-3">
@@ -315,17 +247,11 @@ export default function MySubscriptionsPage() {
               ) : null}
             </dl>
 
-            <div className="mt-4 flex flex-wrap gap-2">
-              {['ACTIVE', 'PAST_DUE'].includes(item.status) ? (
-                <button className="rounded-full border border-light-border px-4 py-2 text-sm font-bold hover:bg-light-primary/10 disabled:opacity-50 dark:border-dark-border dark:hover:bg-dark-primary/10" disabled={busy} onClick={() => void transition(item, 'pause')} type="button">{busy ? labels.processing : labels.pause}</button>
-              ) : null}
-              {item.status === 'PAUSED' ? (
-                <button className="rounded-full border border-light-border px-4 py-2 text-sm font-bold hover:bg-light-primary/10 disabled:opacity-50 dark:border-dark-border dark:hover:bg-dark-primary/10" disabled={busy} onClick={() => void transition(item, 'resume')} type="button">{busy ? labels.processing : labels.resume}</button>
-              ) : null}
-              {['ACTIVE', 'PAST_DUE', 'PAUSED'].includes(item.status) ? (
-                <button className="rounded-full border border-rose-300 px-4 py-2 text-sm font-bold text-rose-700 hover:bg-rose-50 disabled:opacity-50 dark:border-rose-900 dark:text-rose-300 dark:hover:bg-rose-950" disabled={busy} onClick={() => void transition(item, 'cancel')} type="button">{busy ? labels.processing : labels.cancel}</button>
-              ) : null}
-            </div>
+            {['ACTIVE', 'PAST_DUE', 'PAUSED'].includes(item.status) ? (
+              <p className="mt-4 rounded-xl border border-light-border px-4 py-3 text-xs leading-5 text-light-secondary dark:border-dark-border dark:text-dark-secondary">
+                {labels.mutationsUnavailable}
+              </p>
+            ) : null}
           </article>
         )
       })}
