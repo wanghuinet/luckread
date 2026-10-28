@@ -1,0 +1,247 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/persistence/SAVED-PAYMENT-METHOD-D1-04-persistence.v1.json",
+  "title": "LuckRead Saved Payment Method and Mandate D1-04 Persistence Candidate",
+  "version": "1.0.0",
+  "status": "CONTRACTED_NOT_VERIFIED",
+  "featureIds": [
+    "PAY-003"
+  ],
+  "authoritativeDomain": "D1-04",
+  "primaryWorker": "W07",
+  "physicalResource": {
+    "binding": "D1_04",
+    "migrationDirectory": "migrations-d1-04",
+    "migrationFile": "workers/W07-subscription-commerce/migrations-d1-04/0003_saved_payment_methods_mandates.sql",
+    "migrationId": "0003_saved_payment_methods_mandates",
+    "remoteApplied": false
+  },
+  "tables": {
+    "saved_payment_methods": {
+      "purpose": "Internal opaque Hyperswitch payment-method token bound to one merchant and customer after a provider-signed successful setup-compatible payment with online acceptance evidence.",
+      "primaryKey": "saved_payment_method_id",
+      "columns": {
+        "saved_payment_method_id": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false,
+          "immutable": true
+        },
+        "provider": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false,
+          "allowedValues": [
+            "hyperswitch"
+          ],
+          "immutable": true
+        },
+        "merchant_id": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false,
+          "apiExposure": "NONE",
+          "immutable": true
+        },
+        "customer_id": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false,
+          "apiExposure": "NONE",
+          "immutable": true
+        },
+        "payment_method_id": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false,
+          "sensitive": "PROVIDER_OPAQUE_TOKEN",
+          "apiExposure": "NONE",
+          "immutable": true
+        },
+        "source_payment_id": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false,
+          "immutable": true
+        },
+        "source_event_id": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false,
+          "immutable": true
+        },
+        "created_at": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false,
+          "immutable": true
+        }
+      },
+      "invariants": [
+        "A token is uniquely scoped to provider and merchant and cannot be rebound across customers.",
+        "Insert requires a succeeded payment with matching customer and merchant and a signed provider event still RECEIVED in the same D1-04 batch.",
+        "A payment method row stores only a provider opaque reference; no PAN, CVC, browser client secret, provider API key or raw webhook body is stored.",
+        "Rows are immutable and retained for audit."
+      ]
+    },
+    "payment_mandates": {
+      "purpose": "Audit record of explicit online consent for future off-session recurring use and provider mandate lifecycle; does not itself grant subscription access.",
+      "primaryKey": "mandate_record_id",
+      "columns": {
+        "mandate_record_id": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false,
+          "immutable": true
+        },
+        "provider": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false,
+          "allowedValues": [
+            "hyperswitch"
+          ],
+          "immutable": true
+        },
+        "merchant_id": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false,
+          "apiExposure": "NONE",
+          "immutable": true
+        },
+        "customer_id": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false,
+          "apiExposure": "NONE",
+          "immutable": true
+        },
+        "payment_method_id": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false,
+          "apiExposure": "NONE",
+          "immutable": true
+        },
+        "source_payment_id": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false,
+          "immutable": true
+        },
+        "source_event_id": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false,
+          "immutable": true
+        },
+        "consent_accepted_at": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false,
+          "immutable": true
+        },
+        "consent_acceptance_type": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false,
+          "allowedValues": [
+            "online"
+          ],
+          "immutable": true
+        },
+        "consent_scope": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false,
+          "allowedValues": [
+            "OFF_SESSION_RECURRING"
+          ],
+          "immutable": true
+        },
+        "consent_terms_version": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false,
+          "allowedValues": [
+            "luckread-recurring-consent-v1"
+          ],
+          "immutable": true
+        },
+        "provider_mandate_id": {
+          "type": "TEXT",
+          "required": false,
+          "nullable": true,
+          "immutableAfterSet": true
+        },
+        "status": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false,
+          "allowedValues": [
+            "PENDING_PROVIDER_CONFIRMATION",
+            "ACTIVE",
+            "REVOKED",
+            "FAILED",
+            "EXPIRED"
+          ],
+          "stateMachine": "provider event/reconciliation required to activate"
+        },
+        "version": {
+          "type": "INTEGER",
+          "required": true,
+          "nullable": false,
+          "optimisticConcurrency": true
+        },
+        "provider_updated_at": {
+          "type": "TEXT",
+          "required": false,
+          "nullable": true,
+          "orderingAuthority": true
+        },
+        "created_at": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false,
+          "immutable": true
+        },
+        "updated_at": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false
+        }
+      },
+      "invariants": [
+        "New mandate records start PENDING_PROVIDER_CONFIRMATION; a payment success or UI redirect is not evidence that the mandate is active.",
+        "Mandate creation requires a matching saved method, successful customer/merchant-bound payment and provider event receipt in the same D1-04 batch.",
+        "Consent evidence fields and source identities are immutable; updates require version CAS and monotonic provider timestamps.",
+        "Mandate revocation or other terminal status transitions are handled by a later signed mandate webhook/reconciliation module.",
+        "No cross-D1 foreign keys or distributed transactions are used; D1-01 continues to own subscription entitlements."
+      ]
+    }
+  },
+  "mutationBudgets": {
+    "d1ReadMax": 0,
+    "d1WriteTransactionMax": 1,
+    "distributedTransactions": false,
+    "providerNetworkCallsInsideD1Transaction": false
+  },
+  "runtimeGates": {
+    "migrationExecution": "CANDIDATE_ONLY_NOT_APPLIED",
+    "signedProviderConsentEvidence": "REQUIRED",
+    "paymentCustomerMerchantAmountCurrencyBinding": "REQUIRED",
+    "providerMandateActivation": "NOT_IMPLEMENTED_IN_THIS_MODULE",
+    "savedMethodTokenApiExposure": "NONE",
+    "runtimePositive": "REQUIRED",
+    "runtimeNegative": "REQUIRED",
+    "remoteRuntimeEvidence": "REQUIRED"
+  },
+  "nonGoals": [
+    "No additional Worker, D1, Queue or Service Binding.",
+    "No storage of raw card data, raw webhook bodies or provider secrets.",
+    "No mandate activation, recurring charge, subscription entitlement grant or renewal scheduling in this module.",
+    "No remote schema mutation or Worker deployment is authorized by this candidate."
+  ],
+  "promotionRule": "Remain CONTRACTED_NOT_VERIFIED until the exact D1-04 migration schema, signed provider-consent positive/negative tests, mandate lifecycle reconciliation, concurrency/idempotency tests and exact-commit evidence admission pass."
+}
