@@ -53,6 +53,8 @@ BEGIN SELECT RAISE(ABORT, 'payment requires a matching positive payable order');
 CREATE INDEX ix_payments_customer_created_payment ON payments(customer_id, created_at, payment_id);
 CREATE INDEX ix_payments_order_created_payment ON payments(order_id, created_at, payment_id);
 CREATE INDEX ix_payments_status_updated_payment ON payments(status, updated_at, payment_id);
+CREATE UNIQUE INDEX ux_payments_single_live_or_successful_per_order ON payments(order_id)
+WHERE status NOT IN ('failed','cancelled','cancelled_post_capture','expired');
 
 CREATE TRIGGER payments_snapshot_immutable
 BEFORE UPDATE OF payment_id, order_id, customer_id, provider, merchant_id, amount_minor, currency, idempotency_key, request_hash, created_at ON payments
