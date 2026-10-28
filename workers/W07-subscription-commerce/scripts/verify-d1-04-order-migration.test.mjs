@@ -26,7 +26,7 @@ function targetObjectsFor(migrationIds) {
   const tables = migrationIds.flatMap((id) => id === ORDER_MIGRATION_ID
     ? ['orders', 'order_lines', 'order_create_idempotency']
     : id === PAYMENT_MIGRATION_ID
-      ? ['payments', 'payment_provider_events']
+      ? ['payments', 'payment_provider_events', 'payment_provider_event_conflicts']
       : [])
   const objects = tables.map((tableName) => ({
     type: 'table',
@@ -84,6 +84,7 @@ const tableInfo = {
   idempotency: tableInfoFor('order_create_idempotency'),
   payments: tableInfoFor('payments'),
   paymentProviderEvents: tableInfoFor('payment_provider_events'),
+  paymentProviderEventConflicts: tableInfoFor('payment_provider_event_conflicts'),
 }
 
 function verifyCompletePostflight({ preflightSchema = schemaWithMigrations([]), postflightSchema = schemaWithMigrations(REQUIRED_MIGRATION_IDS), migrationState = wrapMigrationState(REQUIRED_MIGRATION_IDS) } = {}) {
@@ -96,6 +97,7 @@ function verifyCompletePostflight({ preflightSchema = schemaWithMigrations([]), 
     idempotencyTableInfo: tableInfo.idempotency,
     paymentsTableInfo: tableInfo.payments,
     paymentProviderEventsTableInfo: tableInfo.paymentProviderEvents,
+    paymentProviderEventConflictsTableInfo: tableInfo.paymentProviderEventConflicts,
   })
 }
 
@@ -158,9 +160,9 @@ test('postflight validates both migrations, all tables/columns/indexes/triggers,
   assert.equal(report.result, 'POSTFLIGHT_PASS')
   assert.equal(report.baselineSchemaPreserved, true)
   assert.deepEqual(report.appliedMigrations, REQUIRED_MIGRATION_IDS)
-  assert.equal(report.verifiedTables.length, 5)
-  assert.equal(report.verifiedIndexes.length, 11)
-  assert.equal(report.verifiedTriggers.length, 19)
+  assert.equal(report.verifiedTables.length, 6)
+  assert.equal(report.verifiedIndexes.length, 13)
+  assert.equal(report.verifiedTriggers.length, 23)
   assert.equal(report.databaseRowsExported, false)
 })
 
@@ -198,5 +200,6 @@ test('workflow is manual-only, gates exact SHA/name/confirmation, and never depl
   assert.match(workflow, /0002_payment_provider_events\.sql/)
   assert.match(workflow, /PRAGMA table_info\("payments"\)/)
   assert.match(workflow, /PRAGMA table_info\("payment_provider_events"\)/)
+  assert.match(workflow, /PRAGMA table_info\("payment_provider_event_conflicts"\)/)
   assert.doesNotMatch(workflow, /wrangler(?:@[\w.]+)?\s+deploy/)
 })
