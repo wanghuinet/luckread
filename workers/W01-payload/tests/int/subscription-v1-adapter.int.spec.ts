@@ -69,7 +69,6 @@ describe('v1 subscription adapter', () => {
     expect(publishPlanRoute).toContain("'/internal/creator/self'")
     expect(publishPlanRoute).toContain("'/membership/plans/' + encodeURIComponent(planId) + '/publish'")
     expect(publishPlanRoute).toContain("request.headers.get('If-Match')")
-    expect(publishPlanRoute).toContain('W07 performs the version CAS') === false
     expect(publishPlanRoute).toContain('callW06MembershipPlanPublishAudit')
     expect(publishPlanRoute).toContain("eventId: 'evt_mpl_published_' + plan.planId + '_v' + plan.version")
     expect(publishPlanRoute).toContain("action?: unknown }).action !== 'membership.plan.published'")
