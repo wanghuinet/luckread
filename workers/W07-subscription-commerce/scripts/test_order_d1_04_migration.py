@@ -507,9 +507,14 @@ class D104OrderMigrationTests(unittest.TestCase):
                    updated_at=? WHERE cycle_id=?""", (LATER, cycle_id)
             )
         self.assertEqual(
-            self.db.execute("SELECT state, amount_minor, version FROM subscription_renewal_cycles WHERE cycle_id=?", (cycle_id,)).fetchone(),
-            ("AWAITING_PRICING", None, 1),
+            self.db.execute("SELECT state, amount_minor, version, subscription_sync_state, subscription_sync_updated_at, subscription_sync_error_code FROM subscription_renewal_cycles WHERE cycle_id=?", (cycle_id,)).fetchone(),
+            ("AWAITING_PRICING", None, 1, "PENDING", None, None),
         )
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute(
+                "UPDATE subscription_renewal_cycles SET subscription_sync_state='APPLIED', version=2, updated_at=? WHERE cycle_id=?",
+                (LATER, cycle_id),
+            )
 
     def test_renewal_cycle_requires_active_mandate_before_payment_ready_and_keeps_cursor_cas(self):
         offer = json.dumps({"subscriptionId":"sub_renewal","planId":"plan_basic","planVersion":1}, separators=(",",":"))
