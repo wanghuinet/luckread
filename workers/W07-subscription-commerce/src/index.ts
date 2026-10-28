@@ -193,12 +193,12 @@ export default {
         if (!value || typeof value !== 'object' || Array.isArray(value) ||
             Object.keys(value as Record<string, unknown>).length !== 1 ||
             !Object.hasOwn(value, 'action') ||
-            !['pause', 'resume'].includes(String((value as Record<string, unknown>).action))) {
+            !['pause', 'resume', 'retire'].includes(String((value as Record<string, unknown>).action))) {
           throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
         }
         const result = await transitionMembershipPlanLifecycle(
           env.D1_01, creatorId, segments[2]!, request.headers.get('If-Match'),
-          (value as { action: 'pause' | 'resume' }).action,
+          (value as { action: 'pause' | 'resume' | 'retire' }).action,
         )
         return json({ data: result, requestId: crypto.randomUUID() }, 200, result.etag)
       }
