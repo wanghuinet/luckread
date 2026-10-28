@@ -9,6 +9,7 @@ type PaymentIntentData = {
   orderId: string
   amountMinor: number
   currency: string
+  pricingMode: 'live' | 'demo'
   status: 'requires_payment_method' | 'requires_confirmation'
   version: number
   clientSecret: string
@@ -54,11 +55,12 @@ function readPaymentIntent(value: unknown, orderId: string): PaymentIntentData |
   if (!data || typeof data !== 'object' || Array.isArray(data)) return null
   const intent = data as Record<string, unknown>
   if (
-    Object.keys(intent).length !== 7 ||
+    Object.keys(intent).length !== 8 ||
     typeof intent.paymentId !== 'string' || !/^pay_[a-f0-9]{26}$/.test(intent.paymentId) ||
     intent.orderId !== orderId ||
     typeof intent.amountMinor !== 'number' || !Number.isSafeInteger(intent.amountMinor) || intent.amountMinor <= 0 ||
     typeof intent.currency !== 'string' || !/^[A-Z]{3}$/.test(intent.currency) ||
+    (intent.pricingMode !== 'live' && intent.pricingMode !== 'demo') ||
     (intent.status !== 'requires_payment_method' && intent.status !== 'requires_confirmation') ||
     typeof intent.version !== 'number' || !Number.isSafeInteger(intent.version) || intent.version < 1 ||
     typeof intent.clientSecret !== 'string' || intent.clientSecret.length < 1 ||
@@ -205,6 +207,11 @@ export default function CheckoutClient({ orderId }: { orderId: string }) {
         onError={() => setError('无法加载 Hyperswitch 官方支付 SDK。')}
       />
       <h1>安全支付</h1>
+      {intent.pricingMode === 'demo' ? (
+        <p role="alert" aria-live="polite">
+          Demo 税务模式：本订单税额使用固定模拟税率，仅供 sandbox 流程测试，不代表真实税额，不能用于正式税务申报或生产扣款。
+        </p>
+      ) : null}
       <p>订单金额：{money(intent.amountMinor, intent.currency)}</p>
       <p>订单：{intent.orderId}</p>
       <div id="luckread-payment-element" aria-label="Hyperswitch 安全支付表单" />

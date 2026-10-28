@@ -166,6 +166,36 @@ describe('PAY-002 atomic D1-04 order persistence candidate', () => {
     expect(JSON.stringify(db.state.idempotency[0]?.response_json)).not.toContain('customerId');
   });
 
+  it('stores and reads Demo pricing mode from immutable line snapshots', async () => {
+    const db = new MemoryD1();
+    const demoPricing: typeof pricingFor = async (req) => ({
+      currency: 'USD',
+      pricingMode: 'demo',
+      items: req.items.map((item) => ({
+        itemType: 'MEMBERSHIP_PLAN',
+        itemRef: item.itemRef,
+        itemVersion: '1',
+        quantity: item.quantity,
+        unitAmountMinor: 1200,
+        currency: 'USD',
+        lineDiscountMinor: 0,
+        lineTaxMinor: 60,
+        itemSnapshotJson: JSON.stringify({
+          planId: item.itemRef,
+          planVersion: 1,
+          luckreadPricing: { mode: 'demo', taxProvider: 'luckread-demo-fixed-rate', taxMinor: 60 },
+        }),
+      })),
+    });
+    const result = await createCommerceOrder(db as unknown as D1Database, 'user_1', 'demo_key', request,
+      demoPricing, deterministicDependencies('demo'));
+    expect(result.data.pricingMode).toBe('demo');
+    expect(result.data.taxMinor).toBe(60);
+    const fetched = await getCommerceOrder(db as unknown as D1Database, 'user_1', result.data.orderId);
+    expect(fetched.pricingMode).toBe('demo');
+    expect(fetched.taxMinor).toBe(60);
+  });
+
   it('replays a completed request without resolving a now-retired offer or writing again', async () => {
     const db = new MemoryD1();
     const first = await createCommerceOrder(db as unknown as D1Database, 'user_1', 'key_1', request,

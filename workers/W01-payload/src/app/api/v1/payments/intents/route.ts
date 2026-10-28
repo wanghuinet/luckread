@@ -20,12 +20,13 @@ function validatePaymentIntentEnvelope(value: unknown, expectedOrderId: string):
       !Object.hasOwn(value, 'data') || !Object.hasOwn(value, 'requestId')) return false
   if (typeof value.requestId !== 'string' || !/^req_[A-Za-z0-9_-]{1,123}$/.test(value.requestId)) return false
   const data = value.data
-  if (!isRecord(data) || Object.keys(data).length !== 7) return false
+  if (!isRecord(data) || Object.keys(data).length !== 8) return false
   if (
     typeof data.paymentId !== 'string' || !/^pay_[a-f0-9]{26}$/.test(data.paymentId) ||
     data.orderId !== expectedOrderId ||
     typeof data.amountMinor !== 'number' || !Number.isSafeInteger(data.amountMinor) || data.amountMinor <= 0 ||
     typeof data.currency !== 'string' || !/^[A-Z]{3}$/.test(data.currency) ||
+    (data.pricingMode !== 'live' && data.pricingMode !== 'demo') ||
     (data.status !== 'requires_payment_method' && data.status !== 'requires_confirmation') ||
     typeof data.version !== 'number' || !Number.isSafeInteger(data.version) || data.version < 1 ||
     typeof data.clientSecret !== 'string' || data.clientSecret.length < 1 || data.clientSecret.length > 4096 ||

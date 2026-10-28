@@ -18,7 +18,7 @@ const METHOD_ID = 'pm_hyperswitch_test_123';
 const PROVIDER_MANDATE_ID = 'mandate_hyperswitch_test_123';
 
 type Row = Record<string, unknown>;
-type Order = { order_id: string; customer_id: string; status: string; version: number; currency: string; total_minor: number; updated_at: string; confirmed_at: string | null };
+type Order = { order_id: string; customer_id: string; status: string; version: number; currency: string; total_minor: number; has_demo_pricing: number; updated_at: string; confirmed_at: string | null };
 type Payment = {
   payment_id: string; order_id: string; customer_id: string; provider: string; merchant_id: string;
   amount_minor: number; currency: string; status: PaymentAttemptStatus; version: number;
@@ -394,7 +394,7 @@ const fixedDeps = (time = NOW) => ({
 function seedOrder(db: MemoryPaymentD1, overrides: Partial<Order> = {}) {
   db.orders.push({
     order_id: 'ord_1', customer_id: CUSTOMER, status: 'CREATED', version: 1,
-    currency: 'USD', total_minor: 1200, updated_at: NOW, confirmed_at: null, ...overrides,
+    currency: 'USD', total_minor: 1200, has_demo_pricing: 0, updated_at: NOW, confirmed_at: null, ...overrides,
   });
 }
 
@@ -516,6 +516,27 @@ async function signedBody(text: string, secret = SECRET): Promise<{ rawBody: Arr
 }
 
 describe('PAY-001 payment attempt persistence candidate', () => {
+  it('blocks Demo-priced orders in production even when a previous payment attempt exists', async () => {
+    const db = new MemoryPaymentD1();
+    seedOrder(db, { has_demo_pricing: 1 });
+    seedPayment(db);
+    await expect(createPaymentAttempt(
+      db as unknown as D1Database, CUSTOMER, 'ord_1', 'payment_key_1', MERCHANT, fixedDeps(),
+    )).rejects.toMatchObject({ code: 'CONFLICT', status: 409 });
+    expect(db.payments).toHaveLength(1);
+  });
+
+  it('allows Demo-priced orders only in sandbox and records the pricing mode', async () => {
+    const db = new MemoryPaymentD1();
+    seedOrder(db, { has_demo_pricing: 1 });
+    const created = await createPaymentAttempt(
+      db as unknown as D1Database, CUSTOMER, 'ord_1', 'demo_key_1', MERCHANT,
+      { ...fixedDeps(), paymentEnvironment: 'sandbox' },
+    );
+    expect(created.pricingMode).toBe('demo');
+    expect(db.payments).toHaveLength(1);
+  });
+
   it('creates a stable unconfirmed attempt and replays the same idempotency key without a second write', async () => {
     const db = new MemoryPaymentD1();
     seedOrder(db);

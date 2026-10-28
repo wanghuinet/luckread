@@ -152,6 +152,7 @@ export async function handleCommercePaymentIntentRequest(
       route.orderId,
       request.headers.get('Idempotency-Key'),
       providerConfig.expectedMerchantId,
+      { paymentEnvironment: providerConfig.environment },
     );
 
     if (!['INITIATING', 'requires_payment_method', 'requires_confirmation'].includes(attempt.payment.status)) {
@@ -196,6 +197,7 @@ export async function handleCommercePaymentIntentRequest(
           orderId: persisted.orderId,
           amountMinor: persisted.amountMinor,
           currency: persisted.currency,
+          pricingMode: attempt.pricingMode,
           status: persisted.status,
           version: persisted.version,
           clientSecret: providerPayment.clientSecret,

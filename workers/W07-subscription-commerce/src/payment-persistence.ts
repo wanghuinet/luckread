@@ -62,6 +62,7 @@ type OrderRow = {
   status: string;
   currency: string;
   total_minor: number;
+  has_demo_pricing: number;
 };
 
 type PaymentRow = {
@@ -151,11 +152,13 @@ export type PaymentPersistenceDependencies = Readonly<{
   createConflictId?: () => string;
   createSavedPaymentMethodId?: () => string;
   createPaymentMandateId?: () => string;
+  paymentEnvironment?: 'sandbox' | 'production';
 }>;
 
 export type PaymentAttemptCreation = Readonly<{
   payment: PaymentAttemptDto;
   replayed: boolean;
+  pricingMode: 'live' | 'demo';
 }>;
 
 export type WebhookReceiptResult = Readonly<{
@@ -265,11 +268,12 @@ async function readPaymentByOrder(
 function replayOrConflict(
   existing: PaymentRow,
   requestHash: string,
+  pricingMode: 'live' | 'demo',
 ): PaymentAttemptCreation {
   if (existing.request_hash !== requestHash) {
     throw new PaymentPersistenceError('IDEMPOTENCY_KEY_REUSE_CONFLICT', 409);
   }
-  return { payment: toDto(existing), replayed: true };
+  return { payment: toDto(existing), replayed: true, pricingMode };
 }
 
 /**
@@ -316,28 +320,17 @@ export async function createPaymentAttempt(
       currency,
     })));
 
-  // Replays must be resolved before checking the Order's current lifecycle
-  // state. A retry after the Order moved to CONFIRMED/COMPLETED still returns
-  // the original Payment attempt; it must not create or conflict on a second
-  // attempt simply because the business lifecycle advanced after the request.
-  try {
-    const existing = await readPaymentByCustomerAndKey(db, customerIdInput, idempotencyKeyInput);
-    if (existing) {
-      return replayOrConflict(
-        existing,
-        await hashRequest(orderIdInput, existing.amount_minor, existing.currency),
-      );
-    }
-  } catch (error) {
-    if (error instanceof PaymentPersistenceError) throw error;
-    throw new PaymentPersistenceError('SERVICE_UNAVAILABLE', 503);
-  }
-
+  // Read the immutable tax-mode marker before resolving a payment replay. This
+  // prevents a Demo attempt from being retried after switching to production,
+  // while preserving normal idempotency after the Order lifecycle advances.
   let order: OrderRow | null;
   try {
     order = await db.prepare(
-      'SELECT order_id, customer_id, status, currency, total_minor FROM orders ' +
-      'WHERE order_id = ? AND customer_id = ? LIMIT 1',
+      'SELECT order_id, customer_id, status, currency, total_minor, ' +
+      "CASE WHEN EXISTS (SELECT 1 FROM order_lines AS demo_lines WHERE demo_lines.order_id = orders.order_id " +
+      "AND json_valid(demo_lines.item_snapshot_json) AND json_extract(demo_lines.item_snapshot_json, '$.luckreadPricing.mode') = 'demo') " +
+      'THEN 1 ELSE 0 END AS has_demo_pricing ' +
+      'FROM orders WHERE order_id = ? AND customer_id = ? LIMIT 1',
     ).bind(orderIdInput, customerIdInput).first<OrderRow>();
   } catch {
     // Missing migration/schema and transient D1 errors must never become a
@@ -345,6 +338,29 @@ export async function createPaymentAttempt(
     throw new PaymentPersistenceError('SERVICE_UNAVAILABLE', 503);
   }
   if (!order) throw new PaymentPersistenceError('RESOURCE_NOT_FOUND', 404);
+  if (order.has_demo_pricing !== 0 && order.has_demo_pricing !== 1) {
+    throw new PaymentPersistenceError('INTEGRITY_VIOLATION', 500);
+  }
+  const pricingMode = order.has_demo_pricing === 1 ? 'demo' : 'live';
+  if (pricingMode === 'demo' && dependencies.paymentEnvironment !== 'sandbox') {
+    throw new PaymentPersistenceError('CONFLICT', 409);
+  }
+
+  // Lifecycle checks remain after idempotency resolution, preserving retries.
+  try {
+    const existing = await readPaymentByCustomerAndKey(db, customerIdInput, idempotencyKeyInput);
+    if (existing) {
+      return replayOrConflict(
+        existing,
+        await hashRequest(orderIdInput, existing.amount_minor, existing.currency),
+        pricingMode,
+      );
+    }
+  } catch (error) {
+    if (error instanceof PaymentPersistenceError) throw error;
+    throw new PaymentPersistenceError('SERVICE_UNAVAILABLE', 503);
+  }
+
   if (
     !['CREATED', 'PENDING_PAYMENT'].includes(order.status) ||
     !safeMinor(order.total_minor) ||
@@ -390,6 +406,7 @@ export async function createPaymentAttempt(
         updatedAt: createdAt,
       },
       replayed: false,
+      pricingMode,
     };
   } catch (error) {
     if (error instanceof PaymentPersistenceError) throw error;
@@ -397,7 +414,7 @@ export async function createPaymentAttempt(
     // semantic key reuse, and a second live attempt for the same Order.
     try {
       const raced = await readPaymentByCustomerAndKey(db, customerIdInput, idempotencyKeyInput);
-      if (raced) return replayOrConflict(raced, requestHash);
+      if (raced) return replayOrConflict(raced, requestHash, pricingMode);
       const live = await readPaymentByOrder(db, customerIdInput, order.order_id);
       if (live) throw new PaymentPersistenceError('CONFLICT', 409);
     } catch (recoveryError) {

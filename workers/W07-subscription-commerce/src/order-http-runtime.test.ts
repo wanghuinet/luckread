@@ -18,6 +18,7 @@ const orderData: CommerceOrderData = {
   orderId: 'ord_test_1',
   status: 'CREATED',
   version: 1,
+  pricingMode: 'live',
   currency: 'USD',
   subtotalMinor: 1200,
   discountMinor: 0,
