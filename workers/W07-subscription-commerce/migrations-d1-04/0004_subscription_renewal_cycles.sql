@@ -42,6 +42,9 @@ CREATE TABLE subscription_renewal_cycles (
     'partially_captured','partially_captured_and_capturable','expired'
   )),
   outcome_code TEXT CHECK (outcome_code IS NULL OR length(outcome_code) BETWEEN 1 AND 128),
+  subscription_sync_state TEXT NOT NULL DEFAULT 'PENDING' CHECK (subscription_sync_state IN ('PENDING','APPLIED','RECONCILIATION_REQUIRED')),
+  subscription_sync_updated_at TEXT CHECK (subscription_sync_updated_at IS NULL OR length(subscription_sync_updated_at) BETWEEN 1 AND 64),
+  subscription_sync_error_code TEXT CHECK (subscription_sync_error_code IS NULL OR length(subscription_sync_error_code) BETWEEN 1 AND 128),
   lease_token TEXT CHECK (lease_token IS NULL OR length(lease_token) BETWEEN 1 AND 128),
   lease_expires_at TEXT CHECK (lease_expires_at IS NULL OR length(lease_expires_at) BETWEEN 1 AND 64),
   version INTEGER NOT NULL DEFAULT 1 CHECK (typeof(version) = 'integer' AND version >= 1),
@@ -60,7 +63,16 @@ CREATE TABLE subscription_renewal_cycles (
     (state = 'SUBMITTING' AND lease_token IS NOT NULL AND lease_expires_at IS NOT NULL)
     OR (state <> 'SUBMITTING' AND lease_token IS NULL AND lease_expires_at IS NULL)
   ),
-  CHECK ((payment_method_id IS NULL) = (mandate_record_id IS NULL))
+  CHECK ((payment_method_id IS NULL) = (mandate_record_id IS NULL)),
+  CHECK (
+    (subscription_sync_state = 'PENDING' AND subscription_sync_updated_at IS NULL AND subscription_sync_error_code IS NULL)
+    OR (subscription_sync_state = 'APPLIED' AND subscription_sync_updated_at IS NOT NULL AND subscription_sync_error_code IS NULL)
+    OR (subscription_sync_state = 'RECONCILIATION_REQUIRED' AND subscription_sync_updated_at IS NOT NULL AND subscription_sync_error_code IS NOT NULL)
+  ),
+  CHECK (
+    (state IN ('SUCCEEDED','FAILED') AND subscription_sync_state IN ('PENDING','APPLIED','RECONCILIATION_REQUIRED'))
+    OR (state NOT IN ('SUCCEEDED','FAILED') AND subscription_sync_state = 'PENDING')
+  )
 );
 
 CREATE UNIQUE INDEX ux_subscription_renewal_cycles_subscription_cycle
