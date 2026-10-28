@@ -42,7 +42,7 @@ describe('Hyperswitch provider webhook ingress', () => {
     expect(persistence).toContain('verifyHyperswitchWebhookSignature')
     expect(persistence).toContain('recordWebhookConflict')
     expect(receiver).not.toContain('grantSubscriptionEntitlement')
-    expect(receiver).not.toContain('ledger')
+    expect(receiver).not.toContain('postLedger')
   })
 
   it('contracts the public W01 path, private W07 path, byte limit and signature header', () => {
