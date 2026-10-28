@@ -7,6 +7,7 @@ import {
 } from './payment-persistence.js';
 import {
   syncRenewalCycleOutcomeForPayment,
+  syncPendingRenewalOutcomes,
   type RenewalOutcomeSyncResult,
 } from './subscription-renewal-outcome.js';
 
@@ -17,6 +18,13 @@ type HyperswitchWebhookRuntimeEnv = Readonly<{
   HYPERSWITCH_MERCHANT_ID?: string | null;
 }>;
 
+type RenewalPendingRecoveryResult = Readonly<{
+  scanned: number;
+  applied: number;
+  reconciliationRequired: number;
+  pendingRetry: number;
+}>;
+
 type HyperswitchWebhookRuntimeDependencies = Readonly<{
   receive?: typeof receiveHyperswitchWebhook;
   syncRenewalOutcome?: (
@@ -24,6 +32,10 @@ type HyperswitchWebhookRuntimeDependencies = Readonly<{
     paymentId: string,
     merchantId: string,
   ) => Promise<RenewalOutcomeSyncResult>;
+  syncPendingOutcomes?: (
+    env: Readonly<{ D1_01: D1Database; D1_04: D1Database }>,
+    options?: Readonly<{ limit?: number }>,
+  ) => Promise<RenewalPendingRecoveryResult>;
 }>;
 
 const MAX_WEBHOOK_BODY_BYTES = 1024 * 1024;
@@ -90,13 +102,16 @@ async function readBoundedRawBody(request: Request): Promise<ArrayBuffer | Respo
 function receiptResponse(
   result: WebhookReceiptResult,
   subscriptionSync?: RenewalOutcomeSyncResult,
+  pendingRecovery?: RenewalPendingRecoveryResult,
 ): Response {
   // D1-04 receipt application and D1-01 subscription synchronization are a
   // retryable saga. A durable receipt can be acknowledged as 202 when the
-  // entitlement-affecting Subscription state still needs reconciliation.
+  // entitlement-affecting Subscription state or bounded recovery batch needs work.
   const subscriptionSyncNeedsWork = subscriptionSync?.outcome === 'RECONCILIATION_REQUIRED' ||
     subscriptionSync?.outcome === 'PENDING_RETRY';
-  const status = !subscriptionSyncNeedsWork &&
+  const pendingRecoveryNeedsWork = (pendingRecovery?.reconciliationRequired ?? 0) > 0 ||
+    (pendingRecovery?.pendingRetry ?? 0) > 0;
+  const status = !subscriptionSyncNeedsWork && !pendingRecoveryNeedsWork &&
     (result.outcome === 'APPLIED' || result.outcome === 'DUPLICATE') ? 200 : 202;
   return Response.json(
     {
@@ -112,6 +127,7 @@ function receiptResponse(
           ...(subscriptionSync.reasonCode ? { subscriptionSyncReason: subscriptionSync.reasonCode } : {}),
           ...(subscriptionSync.subscriptionId ? { subscriptionId: subscriptionSync.subscriptionId } : {}),
         } : {}),
+        ...(pendingRecovery ? { pendingRenewalRecovery: pendingRecovery } : {}),
       },
       requestId: 'req_' + crypto.randomUUID(),
     },
@@ -187,18 +203,29 @@ export async function handleHyperswitchWebhookRequest(
     // commits the D1-04 event/payment/cycle outcome before this point. Only then
     // may the same signed payload identify a renewal cycle for D1-01 sync.
     let subscriptionSync: RenewalOutcomeSyncResult | undefined;
+    let pendingRecovery: RenewalPendingRecoveryResult | undefined;
     const paymentId = (result.outcome === 'APPLIED' || result.outcome === 'DUPLICATE')
       ? paymentIdFromSignedPayload(rawBody)
       : null;
     if (paymentId) {
       const sync = dependencies.syncRenewalOutcome ?? syncRenewalCycleOutcomeForPayment;
+      const renewalEnv = { D1_01: env.D1_01, D1_04: env.D1_04 };
       subscriptionSync = await sync(
-        { D1_01: env.D1_01, D1_04: env.D1_04 },
+        renewalEnv,
         paymentId,
         env.HYPERSWITCH_MERCHANT_ID,
       );
+
+      // A verified terminal renewal payment is an existing, trusted execution
+      // opportunity to drain a small bounded batch of older D1-04 -> D1-01
+      // outcome-sync work. This is recovery only: it does not schedule new
+      // charges, and it is skipped for ordinary payments before migration 0004.
+      if (subscriptionSync.outcome === 'APPLIED' || subscriptionSync.outcome === 'ALREADY_APPLIED') {
+        const recover = dependencies.syncPendingOutcomes ?? syncPendingRenewalOutcomes;
+        pendingRecovery = await recover(renewalEnv, { limit: 10 });
+      }
     }
-    return receiptResponse(result, subscriptionSync);
+    return receiptResponse(result, subscriptionSync, pendingRecovery);
   } catch (error) {
     if (error instanceof PaymentPersistenceError) {
       if (error.code === 'INVALID_SIGNATURE') {
