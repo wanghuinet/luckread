@@ -2425,6 +2425,19 @@
       "stateMachine": "none"
     },
     {
+      "operationId": "updateOwnMembershipPlan",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "membership.plan.update.own"
+      ],
+      "auditRequired": true,
+      "optimisticLockRequired": true,
+      "idempotencyRequired": false,
+      "stateMachine": "none"
+    },
+    {
       "operationId": "createSubscription",
       "auth": {
         "mode": "permission"

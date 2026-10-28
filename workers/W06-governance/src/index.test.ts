@@ -232,6 +232,71 @@ describe('W06 runtime', () => {
     },
   )
 
+
+  const updateAuditTerms = {
+    name: 'Creator Plus',
+    tier: 'plus',
+    billingInterval: 'MONTHLY',
+    priceMinor: 900,
+    currency: 'USD',
+    benefits: ['member-posts', 'monthly-live'],
+  }
+  const planUpdateRequestAuditInput = {
+    eventId: 'evt_mpl_update_requested_' + planId + '_v2',
+    planId,
+    creatorId: 'creator_001',
+    expectedVersion: 2,
+    ...updateAuditTerms,
+  }
+  const planUpdateRequestAuditRequest = (body: unknown, withTransport = true, requestId = 'req_plan_update_intent_1', layer = 'L3') => new Request(
+    'https://w06.internal/internal/audit-events/membership-plan-update-requested',
+    {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        ...(withTransport ? {
+          'X-LuckRead-Caller': 'W01',
+          'X-LuckRead-Transport-Version': '1.0',
+          'X-LuckRead-Principal-User-Id': 'creator_user_001',
+          'X-LuckRead-Principal-Layer': layer,
+          'X-LuckRead-Correlation-Id': 'plan-update-intent-correlation',
+          'X-LuckRead-Request-Id': requestId,
+        } : {}),
+      },
+      body: JSON.stringify(body),
+    },
+  )
+  const planUpdatedAuditInput = {
+    eventId: 'evt_mpl_updated_' + planId + '_v3',
+    planId,
+    creatorId: 'creator_001',
+    expectedVersion: 2,
+    planVersion: 2,
+    status: 'ACTIVE',
+    visibility: 'PUBLIC',
+    version: 3,
+    occurredAt: '2026-10-28T04:00:02.000Z',
+    ...updateAuditTerms,
+  }
+  const planUpdatedAuditRequest = (body: unknown, withTransport = true, requestId = 'req_plan_updated_audit_1', layer = 'L3') => new Request(
+    'https://w06.internal/internal/audit-events/membership-plan-updated',
+    {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        ...(withTransport ? {
+          'X-LuckRead-Caller': 'W01',
+          'X-LuckRead-Transport-Version': '1.0',
+          'X-LuckRead-Principal-User-Id': 'creator_user_001',
+          'X-LuckRead-Principal-Layer': layer,
+          'X-LuckRead-Correlation-Id': 'plan-updated-audit-correlation',
+          'X-LuckRead-Request-Id': requestId,
+        } : {}),
+      },
+      body: JSON.stringify(body),
+    },
+  )
+
   const orderId = 'ord_test_1'
   const orderAuditInput = {
     eventId: 'evt_order_created_' + orderId,
@@ -513,6 +578,66 @@ describe('W06 runtime', () => {
     )
     expect(tooLow.status).toBe(403)
     expect(prepare).not.toHaveBeenCalled()
+  })
+
+
+  it('durably records membership plan update intent and idempotently confirms semantic retries', async () => {
+    const { db, prepare, rows } = createPlanAuditDb()
+    const runtime = await import('./index')
+    const first = await runtime.default.fetch(planUpdateRequestAuditRequest(planUpdateRequestAuditInput), { D1_03: db })
+    const replay = await runtime.default.fetch(
+      planUpdateRequestAuditRequest(planUpdateRequestAuditInput, true, 'req_plan_update_intent_retry'),
+      { D1_03: db },
+    )
+    expect(first.status).toBe(201)
+    expect(replay.status).toBe(200)
+    expect(await replay.json()).toMatchObject({
+      eventId: planUpdateRequestAuditInput.eventId,
+      action: 'membership.plan.update_requested',
+      targetId: planId,
+      replayed: true,
+    })
+    const conflict = await runtime.default.fetch(
+      planUpdateRequestAuditRequest({ ...planUpdateRequestAuditInput, priceMinor: 999 }),
+      { D1_03: db },
+    )
+    expect(conflict.status).toBe(409)
+    expect(rows.size).toBe(1)
+    expect(prepare).toHaveBeenCalled()
+  })
+
+  it('rejects malformed update-intent facts and missing private transport before D1-03 access', async () => {
+    const malformed = { ...planUpdateRequestAuditInput, priceMinor: -1 }
+    const { db, prepare } = createPlanAuditDb()
+    const runtime = await import('./index')
+    const bad = await runtime.default.fetch(planUpdateRequestAuditRequest(malformed), { D1_03: db })
+    const noTransport = await runtime.default.fetch(planUpdateRequestAuditRequest(planUpdateRequestAuditInput, false), { D1_03: db })
+    expect(bad.status).toBe(400)
+    expect(noTransport.status).toBe(403)
+    expect(prepare).not.toHaveBeenCalled()
+  })
+
+  it('persists membership plan updated event with exact version and new commercial terms', async () => {
+    const { db, rows } = createPlanAuditDb()
+    const runtime = await import('./index')
+    const response = await runtime.default.fetch(planUpdatedAuditRequest(planUpdatedAuditInput), { D1_03: db })
+    expect(response.status).toBe(201)
+    expect(await response.json()).toMatchObject({
+      eventId: planUpdatedAuditInput.eventId,
+      action: 'membership.plan.updated',
+      targetId: planId,
+      replayed: false,
+    })
+    expect(rows.get(planUpdatedAuditInput.eventId)).toMatchObject({
+      action: 'membership.plan.updated',
+      target_type: 'MembershipPlan',
+      target_id: planId,
+      before_json: JSON.stringify({ creatorId: 'creator_001', expectedVersion: 2, planVersion: 1 }),
+      after_json: JSON.stringify({
+        creatorId: 'creator_001', expectedVersion: 2, planVersion: 2, version: 3,
+        status: 'ACTIVE', visibility: 'PUBLIC', ...updateAuditTerms,
+      }),
+    })
   })
 
   it('persists membership plan publication with immutable before/after lifecycle facts', async () => {
