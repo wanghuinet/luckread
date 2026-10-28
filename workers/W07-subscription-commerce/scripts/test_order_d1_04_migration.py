@@ -473,8 +473,32 @@ class D104OrderMigrationTests(unittest.TestCase):
                 """INSERT INTO saved_payment_methods(saved_payment_method_id,provider,merchant_id,customer_id,
                    payment_method_id,source_payment_id,source_event_id,created_at)
                    VALUES(?,?,?,?,?,?,?,?)""",
-                ("spm_" + "s"*26, "hyperswitch", "merchant_1", "user_1", "pm_missing_event",
+                ("spm_" + "x"*26, "hyperswitch", "merchant_1", "user_1", "pm_missing_event",
                  "pay_" + "a"*26, "evt_missing", NOW),
+            )
+
+        shared_method_id = "pm_customer_bound_token"
+        self.provider_event(event_id="evt_owner", payment_id="pay_" + "a"*26)
+        self.db.execute(
+            """INSERT INTO saved_payment_methods(saved_payment_method_id,provider,merchant_id,customer_id,
+               payment_method_id,source_payment_id,source_event_id,created_at)
+               VALUES(?,?,?,?,?,?,?,?)""",
+            ("spm_" + "s"*26, "hyperswitch", "merchant_1", "user_1", shared_method_id,
+             "pay_" + "a"*26, "evt_owner", NOW),
+        )
+
+        self.order(order_id="ord_2", customer="user_2")
+        other_payment_id = "pay_" + "b"*26
+        self.payment(payment_id=other_payment_id, order_id="ord_2", customer="user_2",
+                     idempotency_key="payment_key_2", status="succeeded", provider_updated_at=NOW)
+        self.provider_event(event_id="evt_other_customer", payment_id=other_payment_id)
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute(
+                """INSERT INTO saved_payment_methods(saved_payment_method_id,provider,merchant_id,customer_id,
+                   payment_method_id,source_payment_id,source_event_id,created_at)
+                   VALUES(?,?,?,?,?,?,?,?)""",
+                ("spm_" + "t"*26, "hyperswitch", "merchant_1", "user_2", shared_method_id,
+                 other_payment_id, "evt_other_customer", NOW),
             )
 
 if __name__ == "__main__":
