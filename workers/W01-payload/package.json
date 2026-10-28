@@ -39,9 +39,7 @@
     "next": "16.3.3",
     "payload": "3.90.2",
     "react": "19.2.6",
-    "react-dom": "19.2.6",
-    "@juspay-tech/hyper-js": "2.2.0",
-    "@juspay-tech/react-hyper-js": "2.10.0"
+    "react-dom": "19.2.6"
   },
   "devDependencies": {
     "@playwright/test": "1.63.0",
