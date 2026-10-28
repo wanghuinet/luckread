@@ -135,7 +135,11 @@ BEGIN SELECT RAISE(ABORT, 'forbidden renewal-cycle state transition'); END;
 CREATE TRIGGER subscription_renewal_cycles_sync_state_transition_guard
 BEFORE UPDATE OF subscription_sync_state ON subscription_renewal_cycles
 WHEN NOT (
-  OLD.subscription_sync_state = NEW.subscription_sync_state
+  (
+    OLD.subscription_sync_state = NEW.subscription_sync_state
+    AND OLD.subscription_sync_updated_at IS NEW.subscription_sync_updated_at
+    AND OLD.subscription_sync_error_code IS NEW.subscription_sync_error_code
+  )
   OR (
     OLD.subscription_sync_state = 'PENDING'
     AND NEW.subscription_sync_state IN ('APPLIED','RECONCILIATION_REQUIRED')
