@@ -133,7 +133,7 @@ WHEN NOT (
 BEGIN SELECT RAISE(ABORT, 'forbidden renewal-cycle state transition'); END;
 
 CREATE TRIGGER subscription_renewal_cycles_sync_state_transition_guard
-BEFORE UPDATE OF subscription_sync_state ON subscription_renewal_cycles
+BEFORE UPDATE ON subscription_renewal_cycles
 WHEN NOT (
   (
     OLD.subscription_sync_state = NEW.subscription_sync_state
