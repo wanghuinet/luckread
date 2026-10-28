@@ -130,7 +130,7 @@ const copy = (locale: StudioLocale) => locale === 'en-US' ? {
   revisionHeading: '创建不可变方案版本',
   successRevision: '方案新版本已保存，现有订阅仍保留原方案版本。',
   revisionValidation: '请输入有效的名称、小写等级标识，以及最多两位小数的价格。',
-  revisionBenefitsError: '权益最多 20 项，不得重复，每项最多 180 个字符。
+  revisionBenefitsError: '权益最多 20 项，不得重复，每项最多 180 个字符。',
   name: '方案名称',
   namePlaceholder: '支持者会员',
   tier: '等级标识',
