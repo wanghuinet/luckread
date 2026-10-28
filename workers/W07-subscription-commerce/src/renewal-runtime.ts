@@ -838,6 +838,40 @@ async function prepareFailedCycleRetry(
 }
 
 /**
+ * Prepare a bounded, idempotent retry after a durable failed-cycle outcome was
+ * synchronized to D1-01. The caller still separately invokes processSubscriptionRenewalCycle
+ * after this function returns PREPARED; retry preparation alone never charges a provider.
+ */
+export async function prepareFailedRenewalCycleRetry(
+  env: RenewalRuntimeEnv,
+  cycleIdInput: string,
+  dependencies: Pick<RenewalRuntimeDependencies, 'now'> = {},
+): Promise<RenewalProcessResult> {
+  if (!/^rcy_[A-Za-z0-9]{26}$/.test(cycleIdInput)) {
+    throw new RenewalRuntimeError('VALIDATION_FAILED', 400);
+  }
+  const now = nowIso(dependencies.now ?? (() => new Date()));
+  const cycle = await readCycleById(env.D1_04, cycleIdInput);
+  const preparation = await prepareFailedCycleRetry(env, cycle, now);
+  const latest = preparation === 'PREPARED'
+    ? await readCycleById(env.D1_04, cycleIdInput)
+    : cycle;
+  const action = preparation === 'PREPARED'
+    ? 'PREPARED'
+    : preparation === 'AWAITING_OUTCOME_SYNC'
+      ? 'AWAITING_OUTCOME_SYNC'
+      : preparation === 'AWAITING_RETRY'
+        ? 'AWAITING_RETRY'
+        : 'TERMINAL';
+  return {
+    cycleId: cycleIdInput,
+    state: latest.state,
+    action,
+    ...(latest.payment_id ? { paymentId: latest.payment_id } : {}),
+  };
+}
+
+/**
  * Processes one durable cycle. It cannot start a provider charge without both an
  * admitted price/tax decision and a currently-active customer-bound mandate.
  * Payment success/entitlement are not inferred from the synchronous API response.
