@@ -253,6 +253,55 @@
       "cache": "NO_STORE"
     },
     {
+      "operationId": "createCustomerPaymentIntent",
+      "method": "POST",
+      "publicPath": "/api/v1/payments/intents",
+      "internalPath": "/commerce/orders/{orderId}/payment-intent",
+      "principalRequired": true,
+      "permission": "order.read",
+      "minimumGlobalLayer": "L2",
+      "idempotency": "Idempotency-Key",
+      "maximumBodyBytes": 16384,
+      "requestBody": {
+        "required": [
+          "orderId"
+        ],
+        "additionalProperties": false,
+        "orderId": "Existing Order identifier; no totals or provider fields accepted"
+      },
+      "customerId": "Derived only from the W01 session principal; W07 independently verifies customer ownership against D1-04",
+      "amountAndCurrency": "Read from the customer-owned Order and persisted payment attempt in W07 D1-04; never accepted from the browser",
+      "provider": "Hyperswitch payment intent with customer_id and setup_future_usage=off_session; browser confirmation is handled only by the official hosted Payment Element",
+      "consent": "Hyperswitch-hosted checkout must present its explicit save-method choice when supported. This operation does not persist mandate or consent facts; reusable-method storage remains gated on verified provider evidence and the following D1-04 module.",
+      "responseFields": [
+        "paymentId",
+        "orderId",
+        "amountMinor",
+        "currency",
+        "status",
+        "version",
+        "clientSecret"
+      ],
+      "responsePolicy": "Return only an unconfirmed, owner-matched intent and the scoped clientSecret needed by the hosted SDK. Cache-Control no-store; never return provider API keys or raw payment credentials.",
+      "failurePolicy": {
+        "missingPrincipal": "401",
+        "CASLDeny": "403",
+        "missingOrderOrForeignOwner": "404",
+        "missingIdempotencyKey": "428",
+        "keyReuseWithDifferentOrder": "409",
+        "invalidProviderResponse": "503"
+      },
+      "successRule": "W01 validates the bounded W07 response and order identity before returning the scoped SDK clientSecret. W07 D1-04 remains authoritative for payment attempts; neither client confirmation nor redirect grants subscription entitlement.",
+      "cache": "NO_STORE",
+      "topologyConstraints": {
+        "newWorker": false,
+        "newDatabase": false,
+        "newQueue": false,
+        "newServiceBinding": false,
+        "crossD1Transactions": 0
+      }
+    },
+    {
       "operationId": "receiveHyperswitchPaymentWebhook",
       "method": "POST",
       "publicPath": "/api/v1/webhooks/hyperswitch",
