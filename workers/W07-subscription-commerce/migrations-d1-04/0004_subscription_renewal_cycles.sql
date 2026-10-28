@@ -132,6 +132,27 @@ WHEN NOT (
 )
 BEGIN SELECT RAISE(ABORT, 'forbidden renewal-cycle state transition'); END;
 
+CREATE TRIGGER subscription_renewal_cycles_sync_state_transition_guard
+BEFORE UPDATE OF subscription_sync_state ON subscription_renewal_cycles
+WHEN NOT (
+  OLD.subscription_sync_state = NEW.subscription_sync_state
+  OR (
+    OLD.subscription_sync_state = 'PENDING'
+    AND NEW.subscription_sync_state IN ('APPLIED','RECONCILIATION_REQUIRED')
+    AND OLD.state IN ('SUCCEEDED','FAILED')
+    AND NEW.state = OLD.state
+  )
+  OR (
+    OLD.subscription_sync_state = 'APPLIED'
+    AND NEW.subscription_sync_state = 'PENDING'
+    AND OLD.state = 'FAILED'
+    AND NEW.state = 'PREPARED'
+    AND NEW.subscription_sync_updated_at IS NULL
+    AND NEW.subscription_sync_error_code IS NULL
+  )
+)
+BEGIN SELECT RAISE(ABORT, 'renewal outcome sync state is monotonic except an explicit failed-cycle retry reset'); END;
+
 CREATE TRIGGER subscription_renewal_cycles_order_binding_guard
 BEFORE UPDATE OF order_id ON subscription_renewal_cycles
 WHEN NEW.order_id IS NOT NULL AND (
