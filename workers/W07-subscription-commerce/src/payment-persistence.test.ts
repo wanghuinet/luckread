@@ -251,6 +251,27 @@ function seedOrder(db: MemoryPaymentD1, overrides: Partial<Order> = {}) {
   });
 }
 
+function seedPayment(db: MemoryPaymentD1, overrides: Partial<Payment> = {}) {
+  db.payments.push({
+    payment_id: PAYMENT_ID,
+    order_id: 'ord_1',
+    customer_id: CUSTOMER,
+    provider: 'hyperswitch',
+    merchant_id: MERCHANT,
+    amount_minor: 1200,
+    currency: 'USD',
+    status: 'INITIATING',
+    version: 1,
+    idempotency_key: 'payment_key_1',
+    request_hash: 'a'.repeat(64),
+    provider_updated_at: null,
+    failure_code: null,
+    created_at: NOW,
+    updated_at: NOW,
+    ...overrides,
+  });
+}
+
 function expectPaymentError(promise: Promise<unknown>, code: string) {
   return expect(promise).rejects.toMatchObject({ code, status: expect.any(Number) });
 }
@@ -376,12 +397,95 @@ describe('PAY-001 payment attempt persistence candidate', () => {
     const input = { ...signed, webhookSecret: SECRET, expectedMerchantId: MERCHANT };
     const first = await receiveHyperswitchWebhook(db as unknown as D1Database, input, fixedDeps());
     const duplicate = await receiveHyperswitchWebhook(db as unknown as D1Database, input, fixedDeps(LATER));
-    expect(first).toMatchObject({ outcome: 'ACCEPTED', eventId: 'evt_1', state: 'RECEIVED' });
+    expect(first).toMatchObject({ outcome: 'RECONCILIATION_REQUIRED', eventId: 'evt_1', state: 'RECONCILIATION_REQUIRED' });
     expect(duplicate).toMatchObject({ outcome: 'DUPLICATE', receiptId: first.receiptId });
     expect(db.events).toHaveLength(1);
     expect(db.conflicts).toHaveLength(0);
     expect(JSON.stringify(db.events)).not.toContain(bodyText('evt_1'));
     expect(JSON.stringify(db.events)).not.toContain(SECRET);
+  });
+
+
+  it('atomically applies a signed, newer, identity-matched payment success and keeps the Order untouched', async () => {
+    const db = new MemoryPaymentD1();
+    seedOrder(db);
+    seedPayment(db);
+    const signed = await signedBody(bodyText('evt_success'));
+    const input = { ...signed, webhookSecret: SECRET, expectedMerchantId: MERCHANT };
+
+    const applied = await receiveHyperswitchWebhook(db as unknown as D1Database, input, fixedDeps());
+    expect(applied).toMatchObject({
+      outcome: 'APPLIED',
+      eventId: 'evt_success',
+      state: 'APPLIED',
+    });
+    expect(db.payments[0]).toMatchObject({
+      payment_id: PAYMENT_ID,
+      status: 'succeeded',
+      version: 2,
+      provider_updated_at: NOW,
+      updated_at: '2026-10-28T12:00:00.001Z',
+    });
+    expect(db.events[0]).toMatchObject({
+      event_id: 'evt_success',
+      state: 'APPLIED',
+      outcome_code: 'PAYMENT_STATUS_APPLIED',
+      processed_at: NOW,
+    });
+    expect(db.orders[0]?.status).toBe('CREATED');
+
+    const duplicate = await receiveHyperswitchWebhook(db as unknown as D1Database, input, fixedDeps(LATER));
+    expect(duplicate).toMatchObject({ outcome: 'DUPLICATE', receiptId: applied.receiptId });
+    expect(db.payments[0]?.version).toBe(2);
+    expect(db.events).toHaveLength(1);
+  });
+
+  it('retains stale signed provider observations for reconciliation without regressing Payment state', async () => {
+    const db = new MemoryPaymentD1();
+    seedOrder(db);
+    seedPayment(db, {
+      status: 'processing',
+      version: 3,
+      provider_updated_at: '2026-10-28T12:00:05.000Z',
+      updated_at: '2026-10-28T12:00:06.000Z',
+    });
+    const signed = await signedBody(bodyText('evt_stale', NOW));
+    const result = await receiveHyperswitchWebhook(
+      db as unknown as D1Database,
+      { ...signed, webhookSecret: SECRET, expectedMerchantId: MERCHANT },
+      fixedDeps(LATER),
+    );
+    expect(result).toMatchObject({ outcome: 'RECONCILIATION_REQUIRED', state: 'RECONCILIATION_REQUIRED' });
+    expect(db.payments[0]).toMatchObject({
+      status: 'processing',
+      version: 3,
+      provider_updated_at: '2026-10-28T12:00:05.000Z',
+    });
+    expect(db.events[0]?.outcome_code).toBe('STALE_PROVIDER_TIMESTAMP');
+  });
+
+  it('does not reopen a terminal Payment even when a later signed event claims success', async () => {
+    const db = new MemoryPaymentD1();
+    seedOrder(db);
+    seedPayment(db, {
+      status: 'failed',
+      version: 2,
+      provider_updated_at: '2026-10-28T12:00:00.000Z',
+      updated_at: '2026-10-28T12:00:01.000Z',
+    });
+    const signed = await signedBody(bodyText('evt_reopen', '2026-10-28T12:00:03.000Z'));
+    const result = await receiveHyperswitchWebhook(
+      db as unknown as D1Database,
+      { ...signed, webhookSecret: SECRET, expectedMerchantId: MERCHANT },
+      fixedDeps('2026-10-28T12:00:04.000Z'),
+    );
+    expect(result).toMatchObject({ outcome: 'RECONCILIATION_REQUIRED', state: 'RECONCILIATION_REQUIRED' });
+    expect(db.payments[0]).toMatchObject({
+      status: 'failed',
+      version: 2,
+      provider_updated_at: '2026-10-28T12:00:00.000Z',
+    });
+    expect(db.events[0]?.outcome_code).toBe('FORBIDDEN_PAYMENT_TRANSITION');
   });
 
   it('records a different payload for the same event id as a conflict without overwriting first receipt', async () => {
