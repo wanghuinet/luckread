@@ -23,7 +23,7 @@ export async function POST(request: Request): Promise<Response> {
     if (idempotencyKey instanceof Response) return idempotencyKey
 
     const parsed = await readBoundedOrderBody(request)
-    if (!parsed.ok) return parsed.response
+    if (parsed.ok === false) return parsed.response
 
     const w07Response = await callW07Subscription({
       request,
