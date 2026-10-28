@@ -183,11 +183,12 @@
         "action": {
           "enum": [
             "pause",
-            "resume"
+            "resume",
+            "retire"
           ]
         }
       },
-      "lifecycle": "pause ACTIVE/PUBLIC to PAUSED/PRIVATE; resume PAUSED/PRIVATE to ACTIVE/PUBLIC. RETIRED plans cannot transition.",
+      "lifecycle": "pause ACTIVE/PUBLIC to PAUSED/PRIVATE; resume PAUSED/PRIVATE to ACTIVE/PUBLIC; retire PAUSED/PRIVATE to RETIRED/PRIVATE. An ACTIVE/PUBLIC plan must be paused before retirement. RETIRED plans cannot transition.",
       "effect": "Controls future catalog visibility/new sales only; existing subscriptions and accepted plan_version remain unchanged.",
       "cache": "NO_STORE",
       "auditRequired": true,
