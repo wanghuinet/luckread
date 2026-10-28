@@ -450,9 +450,7 @@ describe('W06 runtime', () => {
       target_id: planId,
       before_json: JSON.stringify({
         creatorId: 'creator_001',
-        status: 'DRAFT',
-        visibility: 'PRIVATE',
-        version: 1,
+        expectedVersion: 1,
       }),
       after_json: JSON.stringify({
         creatorId: 'creator_001',
