@@ -807,18 +807,20 @@ export async function reviseMembershipPlan(
 }
 
 
-/** Pause/resume sales with lifecycle CAS; existing subscribers keep their accepted plan_version. */
+/** Pause/resume new sales or permanently retire a paused plan with lifecycle CAS; existing subscribers keep their accepted plan_version. */
 export async function transitionMembershipPlanLifecycle(
   db: D1Database, verifiedCreatorId: string, planIdInput: string, ifMatchInput: string | null,
-  action: 'pause' | 'resume',
+  action: 'pause' | 'resume' | 'retire',
 ): Promise<ReturnType<typeof mapMembershipPlan>> {
   const creatorId = validatePrincipal(verifiedCreatorId)
   const planId = ensureId(planIdInput)
   const expectedVersion = planVersionFromEtag(validateIfMatch(ifMatchInput))
-  if (action !== 'pause' && action !== 'resume') throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
+  if (action !== 'pause' && action !== 'resume' && action !== 'retire') throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
   const target = action === 'pause'
     ? { status: 'PAUSED' as const, visibility: 'PRIVATE' as const, fromStatus: 'ACTIVE' as const, fromVisibility: 'PUBLIC' as const }
-    : { status: 'ACTIVE' as const, visibility: 'PUBLIC' as const, fromStatus: 'PAUSED' as const, fromVisibility: 'PRIVATE' as const }
+    : action === 'resume'
+      ? { status: 'ACTIVE' as const, visibility: 'PUBLIC' as const, fromStatus: 'PAUSED' as const, fromVisibility: 'PRIVATE' as const }
+      : { status: 'RETIRED' as const, visibility: 'PRIVATE' as const, fromStatus: 'PAUSED' as const, fromVisibility: 'PRIVATE' as const }
   const readOwnedPlan = async (): Promise<MembershipPlanStoredRow | null> =>
     db.prepare(
       'SELECT p.plan_id, p.owner_id, p.current_version, p.status, p.visibility, p.version, p.created_at, p.updated_at, ' +
@@ -829,12 +831,16 @@ export async function transitionMembershipPlanLifecycle(
     ).bind(planId, creatorId).first<MembershipPlanStoredRow>()
   const current = await readOwnedPlan()
   if (!current) throw new SubscriptionRuntimeError('RESOURCE_NOT_FOUND', 404)
-  if (current.status === 'RETIRED') throw new SubscriptionRuntimeError('INVALID_STATE', 409)
+  // Exact retries of a completed retirement converge without reopening the plan.
   if (current.version !== expectedVersion) {
     if (current.version === expectedVersion + 1 && current.status === target.status && current.visibility === target.visibility) {
       return mapMembershipPlan(current, true)
     }
     throw new SubscriptionRuntimeError('PRECONDITION_FAILED', 412)
+  }
+  if (current.status === 'RETIRED') {
+    if (action === 'retire') return mapMembershipPlan(current, true)
+    throw new SubscriptionRuntimeError('INVALID_STATE', 409)
   }
   if (current.status === target.status && current.visibility === target.visibility) return mapMembershipPlan(current, true)
   if (current.status !== target.fromStatus || current.visibility !== target.fromVisibility) {
@@ -867,7 +873,7 @@ export async function transitionMembershipPlanLifecycle(
     throw new SubscriptionRuntimeError('INTEGRITY_VIOLATION', 500)
   }
   console.log(JSON.stringify({
-    event: action === 'pause' ? 'membership.plan.paused' : 'membership.plan.activated',
+    event: action === 'pause' ? 'membership.plan.paused' : action === 'resume' ? 'membership.plan.activated' : 'membership.plan.retired',
     operation: 'transitionMembershipPlanLifecycle', action, planId, creatorId,
     planVersion: transitioned.current_version, version: transitioned.version,
   }))
