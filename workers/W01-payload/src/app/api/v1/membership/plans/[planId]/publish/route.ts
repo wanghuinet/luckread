@@ -89,7 +89,7 @@ function validPublishedPlan(value: unknown, expectedPlanId: string, expectedCrea
 export async function POST(request: Request, context: RouteContext): Promise<Response> {
   try {
     if (request.body !== null) {
-      await request.body.cancel().catch(() => undefined)
+      await request.body.cancel().catch((): void => {})
       return errorResponse(400, 'VALIDATION_FAILED', 'Plan publish does not accept a request body')
     }
     const { planId } = await context.params
