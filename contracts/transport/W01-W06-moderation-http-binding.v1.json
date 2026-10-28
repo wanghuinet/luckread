@@ -113,6 +113,32 @@
       ]
     },
     {
+      "operationId": "auditMembershipPlanPublishRequest",
+      "method": "POST",
+      "publicPath": "/api/v1/membership/plans/{planId}/publish",
+      "internalPath": "/internal/audit-events/membership-plan-publish-requested",
+      "principalRequired": true,
+      "actorAuthority": "W06 derives actor userId and layer from trusted W01 private transport headers; body cannot supply actor identity.",
+      "eventId": "Deterministic evt_mpl_publish_requested_{planId}_v{expectedVersion}; one immutable D1-03 event per owner-scoped publish attempt/version.",
+      "targetType": "MembershipPlan",
+      "auditRequired": true,
+      "idempotency": "W06 generates occurredAt once. Exact semantic replay ignores only the newly generated attempt timestamp, confirms the same durable actor/target/before/after facts, and rejects conflicting facts.",
+      "successPolicy": "W01 must confirm the durable publish-request intent before invoking W07's D1-01 visibility transition. W06 failure prevents the plan from becoming public.",
+      "cache": "NO_STORE",
+      "auditedFields": [
+        "planId",
+        "creatorId",
+        "expectedVersion",
+        "requestedStatus",
+        "requestedVisibility"
+      ],
+      "sensitiveDataExcluded": [
+        "client credentials",
+        "payment credentials",
+        "raw request body"
+      ]
+    },
+    {
       "operationId": "auditMembershipPlanPublish",
       "method": "POST",
       "publicPath": "/api/v1/membership/plans/{planId}/publish",
