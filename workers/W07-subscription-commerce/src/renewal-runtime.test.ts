@@ -391,7 +391,7 @@ describe('W07 scheduled renewal batch', () => {
     const readTableNames = vi.fn(async (db: D1Database, expected: readonly string[]) =>
       new Set(expected.filter((name) =>
         !(db === d1_04 && missing.includes('D1-04.' + name)) &&
-        !(db === d1_01 && missing.includes('D1-01.' + name))));
+        !(db === d1_01 && missing.includes('D1-01.' + name)))));
     const syncPending = vi.fn(async () => syncResult);
     const scanDue = vi.fn(async () => ({
       scanned: 2,
