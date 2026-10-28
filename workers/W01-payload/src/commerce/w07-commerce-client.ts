@@ -47,7 +47,7 @@ export async function readBoundedOrderBody(request: Request): Promise<BoundedOrd
     return { ok: false, response: errorResponse(400, 'VALIDATION_FAILED', 'A JSON order body is required') }
   }
   const declaredLength = request.headers.get('content-length')
-  if (declaredLength !== null && (!/^\\d+$/.test(declaredLength) || Number(declaredLength) > maxBytes)) {
+  if (declaredLength !== null && (!/^\d+$/.test(declaredLength) || Number(declaredLength) > maxBytes)) {
     return { ok: false, response: errorResponse(400, 'VALIDATION_FAILED', 'Order request is too large or malformed') }
   }
   if (!request.body) return { ok: false, response: errorResponse(400, 'VALIDATION_FAILED', 'A JSON order body is required') }
