@@ -75,6 +75,28 @@ CREATE TABLE subscription_renewal_cycles (
   )
 );
 
+-- A cycle is created only as a not-yet-priced record. Financial/provider states
+-- must be reached through the versioned runtime transitions and verified evidence.
+CREATE TRIGGER subscription_renewal_cycles_initial_state_guard
+BEFORE INSERT ON subscription_renewal_cycles
+WHEN NEW.state <> 'AWAITING_PRICING'
+  OR NEW.amount_minor IS NOT NULL
+  OR NEW.pricing_snapshot_json IS NOT NULL
+  OR NEW.payment_method_id IS NOT NULL
+  OR NEW.mandate_record_id IS NOT NULL
+  OR NEW.order_id IS NOT NULL
+  OR NEW.payment_id IS NOT NULL
+  OR NEW.attempt_number <> 0
+  OR NEW.provider_response_status IS NOT NULL
+  OR NEW.outcome_code IS NOT NULL
+  OR NEW.subscription_sync_state <> 'PENDING'
+  OR NEW.subscription_sync_updated_at IS NOT NULL
+  OR NEW.subscription_sync_error_code IS NOT NULL
+  OR NEW.lease_token IS NOT NULL
+  OR NEW.lease_expires_at IS NOT NULL
+  OR NEW.version <> 1
+BEGIN SELECT RAISE(ABORT, 'new renewal cycles must start awaiting authoritative pricing'); END;
+
 CREATE UNIQUE INDEX ux_subscription_renewal_cycles_subscription_cycle
   ON subscription_renewal_cycles(subscription_id, cycle_start);
 CREATE UNIQUE INDEX ux_subscription_renewal_cycles_payment
