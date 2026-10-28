@@ -11,7 +11,7 @@ test('W07 cannot execute renewal scheduling before an admitted asynchronous path
   assert.equal(wrangler.main, 'src/index.ts');
   assert.equal(wrangler.triggers?.crons, undefined, 'renewal Cron must stay disabled until execution contract admission');
   assert.equal(wrangler.queues, undefined, 'no renewal Queue binding has been admitted for W07');
-  assert.doesNotMatch(workerEntry, /scheduled\\s*\\(controller:\\s*ScheduledController/, 'W07 must not expose a live scheduled handler');
+  assert.doesNotMatch(workerEntry, /scheduled\s*\(controller:\s*ScheduledController/, 'W07 must not expose a live scheduled handler');
   assert.doesNotMatch(workerEntry, /runRenewalScheduledBatch/, 'scheduler must not be reachable from the deployed Worker entrypoint');
 });
 
