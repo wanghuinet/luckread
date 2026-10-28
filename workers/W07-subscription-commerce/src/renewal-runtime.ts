@@ -552,13 +552,20 @@ export async function scanDueSubscriptionRenewals(
   for (const row of rows) {
     try {
       const cycle = await insertOrReadCycle(env, row, String(config.expectedMerchantId), now);
-      if (
-        cycle.state === 'AWAITING_PRICING' ||
-        cycle.state === 'AWAITING_MANDATE' ||
+      if (cycle.state === 'AWAITING_PRICING' && dependencies.resolvePricing) {
+        cycleIds.push(cycle.cycle_id);
+      } else if (cycle.state === 'AWAITING_MANDATE') {
+        const activeMandate = await readActiveMandate(
+          env.D1_04, String(config.expectedMerchantId), cycle.subscriber_id,
+        );
+        if (activeMandate) cycleIds.push(cycle.cycle_id);
+      } else if (
         cycle.state === 'PREPARED' ||
         cycle.state === 'PAYMENT_READY' ||
         (cycle.state === 'SUBMITTING' && cycle.lease_expires_at !== null && cycle.lease_expires_at <= now)
-      ) cycleIds.push(cycle.cycle_id);
+      ) {
+        cycleIds.push(cycle.cycle_id);
+      }
     } catch (error) {
       console.error(JSON.stringify({
         event: 'membership.renewal.scan_candidate_failed',
