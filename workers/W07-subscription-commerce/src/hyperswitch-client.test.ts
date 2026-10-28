@@ -4,6 +4,7 @@ import {
   createHyperswitchMerchantInitiatedPayment,
   createHyperswitchPaymentIntent,
   HyperswitchClientError,
+  retrieveCustomerBoundHyperswitchPaymentMethod,
   retrieveHyperswitchPayment,
   type HyperswitchClientConfig,
 } from './hyperswitch-client.js'
@@ -300,6 +301,50 @@ describe('Hyperswitch server-side payment intent client', () => {
       await expect(retrieveHyperswitchPayment(config, input.paymentId, malformed.fetcher))
         .rejects.toMatchObject({ code: 'UPSTREAM_INVALID_RESPONSE' })
     }
+  })
+
+  it('returns a saved method only for a succeeded provider payment bound to the expected customer and commercial terms', async () => {
+    const fetchInput = {
+      paymentId: input.paymentId,
+      customerId: 'cust_user_42',
+      amount: input.amount,
+      currency: input.currency,
+    }
+    const valid = fakeFetch(jsonResponse(responsePayment({
+      status: 'succeeded',
+      customer_id: fetchInput.customerId,
+      payment_method_id: 'pm_saved_123',
+    })))
+    await expect(retrieveCustomerBoundHyperswitchPaymentMethod(config, fetchInput, valid.fetcher))
+      .resolves.toEqual({
+        paymentId: input.paymentId,
+        customerId: fetchInput.customerId,
+        paymentMethodId: 'pm_saved_123',
+      })
+
+    for (const mismatch of [
+      { status: 'processing' },
+      { customer_id: 'cust_other_user' },
+      { amount: input.amount + 1 },
+      { currency: 'EUR' },
+      { payment_method_id: null },
+    ]) {
+      const invalid = fakeFetch(jsonResponse(responsePayment({
+        status: 'succeeded',
+        customer_id: fetchInput.customerId,
+        payment_method_id: 'pm_saved_123',
+        ...mismatch,
+      })))
+      await expect(retrieveCustomerBoundHyperswitchPaymentMethod(config, fetchInput, invalid.fetcher))
+        .rejects.toMatchObject({ code: 'UPSTREAM_INVALID_RESPONSE' })
+    }
+
+    const invalidInput = fakeFetch(jsonResponse(responsePayment()))
+    await expect(retrieveCustomerBoundHyperswitchPaymentMethod(config, {
+      ...fetchInput,
+      amount: 0,
+    }, invalidInput.fetcher)).rejects.toMatchObject({ code: 'REQUEST_INVALID' })
+    expect(invalidInput.captured).toHaveLength(0)
   })
 
   it('rejects invalid lookup IDs and a provider response for another payment', async () => {
