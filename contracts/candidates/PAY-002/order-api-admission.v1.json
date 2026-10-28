@@ -59,5 +59,5 @@
     }
   ],
   "greenRule": "This gate cannot be GREEN while any implementation evidence is PENDING; canonical contract admission is distinct from runtime/production admission, and PAY-002 remains unresolved.",
-  "nextAction": "Implement the W01 public API boundary and W07 order handler only after confirming authoritative item/offer ownership, D1-04 physical identity and migration safety; preserve disabled writes until exact-commit persistence and security evidence pass."
+  "nextAction": "Reconcile the new W01 owner-scoped order create/read adapters and W06 immutable order-audit path against exact-source evidence, then close the remaining PAY-002 gates: authoritative item/price/discount/tax admission, D1-04 production schema/migration/read-back proof, atomic idempotency and concurrency/security evidence, and verified payment-to-entitlement fulfillment. Keep W07 order writes fail-closed until every required gate is admitted."
 }
