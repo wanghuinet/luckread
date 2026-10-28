@@ -525,15 +525,12 @@ export async function scanDueSubscriptionRenewals(
       'pv.currency, pv.name, pv.tier, pv.benefits_json ' +
       'FROM membership_subscriptions s ' +
       'JOIN membership_plan_versions pv ON pv.plan_id = s.plan_id AND pv.plan_version = s.plan_version ' +
-      'LEFT JOIN subscription_renewal_cycles c ON c.subscription_id = s.subscription_id AND c.cycle_start = s.current_period_end ' +
       "WHERE s.status = 'ACTIVE' AND s.current_period_end <= ? " +
       'AND (s.cancel_at IS NULL OR s.cancel_at > s.current_period_end) ' +
-      "AND (c.cycle_id IS NULL OR c.state IN ('AWAITING_PRICING','AWAITING_MANDATE','PREPARED','PAYMENT_READY') " +
-      "OR (c.state = 'SUBMITTING' AND c.lease_expires_at <= ?)) " +
       'AND (? IS NULL OR s.current_period_end > ? OR (s.current_period_end = ? AND s.subscription_id > ?)) ' +
       'ORDER BY s.current_period_end ASC, s.subscription_id ASC LIMIT ?',
     ).bind(
-      now, now, cursor.cursor_period_end, cursor.cursor_period_end, cursor.cursor_period_end,
+      now, cursor.cursor_period_end, cursor.cursor_period_end, cursor.cursor_period_end,
       cursor.cursor_subscription_id, limit,
     ).all<RenewalSubscriptionRow>()).results ?? [];
   } catch {
