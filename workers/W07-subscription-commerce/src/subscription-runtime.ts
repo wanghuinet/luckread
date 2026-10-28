@@ -880,6 +880,90 @@ export async function transitionMembershipPlanLifecycle(
   return mapMembershipPlan(transitioned, false)
 }
 
+export type CreatorMembershipSummary = Readonly<{
+  plans: Readonly<{
+    total: number
+    draft: number
+    active: number
+    paused: number
+    retired: number
+  }>
+  subscriptions: Readonly<{
+    total: number
+    pending: number
+    active: number
+    pastDue: number
+    paused: number
+    canceled: number
+    expired: number
+    activeSubscribers: number
+  }>
+}>
+
+function summaryCount(row: Record<string, unknown>, key: string): number {
+  const value = row[key]
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0) {
+    throw new SubscriptionRuntimeError('INTEGRITY_VIOLATION', 500)
+  }
+  return value
+}
+
+/**
+ * Read-only owner-scoped metrics from W07's authoritative D1-01 membership rows.
+ * No subscriber identifiers, payment amounts, or derived analytics are returned.
+ */
+export async function getCreatorMembershipSummary(
+  db: D1Database,
+  verifiedCreatorId: string,
+): Promise<CreatorMembershipSummary> {
+  const creatorId = validatePrincipal(verifiedCreatorId)
+  const planRow = await db.prepare(
+    "SELECT COUNT(*) AS total, " +
+    "COALESCE(SUM(CASE WHEN status = 'DRAFT' THEN 1 ELSE 0 END), 0) AS draft, " +
+    "COALESCE(SUM(CASE WHEN status = 'ACTIVE' THEN 1 ELSE 0 END), 0) AS active, " +
+    "COALESCE(SUM(CASE WHEN status = 'PAUSED' THEN 1 ELSE 0 END), 0) AS paused, " +
+    "COALESCE(SUM(CASE WHEN status = 'RETIRED' THEN 1 ELSE 0 END), 0) AS retired " +
+    "FROM membership_plans WHERE owner_type = 'CREATOR' AND owner_id = ?",
+  ).bind(creatorId).first<Record<string, unknown>>()
+  const subscriptionRow = await db.prepare(
+    "SELECT COUNT(*) AS total, " +
+    "COALESCE(SUM(CASE WHEN status = 'PENDING' THEN 1 ELSE 0 END), 0) AS pending, " +
+    "COALESCE(SUM(CASE WHEN status = 'ACTIVE' THEN 1 ELSE 0 END), 0) AS active, " +
+    "COALESCE(SUM(CASE WHEN status = 'PAST_DUE' THEN 1 ELSE 0 END), 0) AS pastDue, " +
+    "COALESCE(SUM(CASE WHEN status = 'PAUSED' THEN 1 ELSE 0 END), 0) AS paused, " +
+    "COALESCE(SUM(CASE WHEN status = 'CANCELED' THEN 1 ELSE 0 END), 0) AS canceled, " +
+    "COALESCE(SUM(CASE WHEN status = 'EXPIRED' THEN 1 ELSE 0 END), 0) AS expired, " +
+    "COUNT(DISTINCT CASE WHEN status = 'ACTIVE' THEN subscriber_id END) AS activeSubscribers " +
+    "FROM membership_subscriptions WHERE creator_id = ?",
+  ).bind(creatorId).first<Record<string, unknown>>()
+
+  if (!planRow || !subscriptionRow) throw new SubscriptionRuntimeError('INTEGRITY_VIOLATION', 500)
+  const plans = {
+    total: summaryCount(planRow, 'total'),
+    draft: summaryCount(planRow, 'draft'),
+    active: summaryCount(planRow, 'active'),
+    paused: summaryCount(planRow, 'paused'),
+    retired: summaryCount(planRow, 'retired'),
+  }
+  const subscriptions = {
+    total: summaryCount(subscriptionRow, 'total'),
+    pending: summaryCount(subscriptionRow, 'pending'),
+    active: summaryCount(subscriptionRow, 'active'),
+    pastDue: summaryCount(subscriptionRow, 'pastDue'),
+    paused: summaryCount(subscriptionRow, 'paused'),
+    canceled: summaryCount(subscriptionRow, 'canceled'),
+    expired: summaryCount(subscriptionRow, 'expired'),
+    activeSubscribers: summaryCount(subscriptionRow, 'activeSubscribers'),
+  }
+  if (
+    plans.total !== plans.draft + plans.active + plans.paused + plans.retired ||
+    subscriptions.total !== subscriptions.pending + subscriptions.active + subscriptions.pastDue +
+      subscriptions.paused + subscriptions.canceled + subscriptions.expired
+  ) throw new SubscriptionRuntimeError('INTEGRITY_VIOLATION', 500)
+
+  return { plans, subscriptions }
+}
+
 /** Owner-scoped plan list for the authenticated creator, including private drafts. */
 export async function listCreatorMembershipPlans(
   db: D1Database,
