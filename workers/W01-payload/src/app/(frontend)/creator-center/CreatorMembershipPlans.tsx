@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import type { FormEvent } from 'react'
 
 import { fetchJson, getApiErrorMessage } from '../../../lib/client-api.js'
 
@@ -199,7 +200,7 @@ export default function CreatorMembershipPlans({ locale = 'zh-CN' }: { locale?: 
 
   useEffect(() => { void loadPlans(false, null) }, [loadPlans])
 
-  async function createPlan(event: React.FormEvent<HTMLFormElement>) {
+  async function createPlan(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setError('')
     setMessage('')
