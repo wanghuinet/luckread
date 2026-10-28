@@ -204,6 +204,34 @@ describe('W06 runtime', () => {
     },
   )
 
+
+  const publishRequestAuditInput = {
+    eventId: 'evt_mpl_publish_requested_' + planId + '_v1',
+    planId,
+    creatorId: 'creator_001',
+    expectedVersion: 1,
+    requestedStatus: 'ACTIVE',
+    requestedVisibility: 'PUBLIC',
+  }
+  const planPublishRequestAuditRequest = (body: unknown, withTransport = true, requestId = 'req_plan_publish_intent_1', layer = 'L3') => new Request(
+    'https://w06.internal/internal/audit-events/membership-plan-publish-requested',
+    {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        ...(withTransport ? {
+          'X-LuckRead-Caller': 'W01',
+          'X-LuckRead-Transport-Version': '1.0',
+          'X-LuckRead-Principal-User-Id': 'creator_user_001',
+          'X-LuckRead-Principal-Layer': layer,
+          'X-LuckRead-Correlation-Id': 'plan-publish-intent-correlation',
+          'X-LuckRead-Request-Id': requestId,
+        } : {}),
+      },
+      body: JSON.stringify(body),
+    },
+  )
+
   const orderId = 'ord_test_1'
   const orderAuditInput = {
     eventId: 'evt_order_created_' + orderId,
@@ -384,6 +412,95 @@ describe('W06 runtime', () => {
     expect(await response.json()).toEqual({ error: 'AUDIT_EVENT_PERSISTENCE_FAILED' })
   })
 
+
+
+  it('requires the private W01 transport and creator-capable layer for publish intent audit', async () => {
+    const { db, prepare } = createPlanAuditDb()
+    const runtime = await import('./index')
+    const noTransport = await runtime.default.fetch(planPublishRequestAuditRequest(publishRequestAuditInput, false), { D1_03: db })
+    expect(noTransport.status).toBe(403)
+    expect(prepare).not.toHaveBeenCalled()
+
+    const tooLow = await runtime.default.fetch(
+      planPublishRequestAuditRequest(publishRequestAuditInput, true, 'req_plan_publish_intent_l2', 'L2'),
+      { D1_03: db },
+    )
+    expect(tooLow.status).toBe(403)
+    expect(prepare).not.toHaveBeenCalled()
+  })
+
+  it('persists publish intent before lifecycle mutation using W01-derived actor and a stable request identity', async () => {
+    const { db, prepare, rows } = createPlanAuditDb()
+    const runtime = await import('./index')
+    const response = await runtime.default.fetch(planPublishRequestAuditRequest(publishRequestAuditInput), { D1_03: db })
+    expect(response.status).toBe(201)
+    expect(await response.json()).toMatchObject({
+      eventId: publishRequestAuditInput.eventId,
+      action: 'membership.plan.publish_requested',
+      targetType: 'MembershipPlan',
+      targetId: planId,
+      replayed: false,
+    })
+    expect(prepare).toHaveBeenCalledTimes(2)
+    const row = rows.get(publishRequestAuditInput.eventId)
+    expect(row).toMatchObject({
+      actor_json: JSON.stringify({ actorId: 'creator_user_001', actorType: 'user', layer: 'L3' }),
+      action: 'membership.plan.publish_requested',
+      target_type: 'MembershipPlan',
+      target_id: planId,
+      before_json: JSON.stringify({
+        creatorId: 'creator_001',
+        status: 'DRAFT',
+        visibility: 'PRIVATE',
+        version: 1,
+      }),
+      after_json: JSON.stringify({
+        creatorId: 'creator_001',
+        expectedVersion: 1,
+        requestedStatus: 'ACTIVE',
+        requestedVisibility: 'PUBLIC',
+      }),
+    })
+    expect(typeof row?.occurred_at).toBe('string')
+    expect(Number.isNaN(Date.parse(String(row?.occurred_at)))).toBe(false)
+  })
+
+  it('confirms an exact semantic intent replay despite a new request timestamp and rejects conflicting facts', async () => {
+    const { db, rows } = createPlanAuditDb()
+    const runtime = await import('./index')
+    const first = await runtime.default.fetch(planPublishRequestAuditRequest(publishRequestAuditInput), { D1_03: db })
+    const replay = await runtime.default.fetch(
+      planPublishRequestAuditRequest(publishRequestAuditInput, true, 'req_plan_publish_intent_retry'),
+      { D1_03: db },
+    )
+    expect(first.status).toBe(201)
+    expect(replay.status).toBe(200)
+    expect(await replay.json()).toMatchObject({ eventId: publishRequestAuditInput.eventId, replayed: true })
+    const conflict = await runtime.default.fetch(
+      planPublishRequestAuditRequest({ ...publishRequestAuditInput, creatorId: 'creator_002' }),
+      { D1_03: db },
+    )
+    expect(conflict.status).toBe(409)
+    expect(await conflict.json()).toEqual({ error: 'AUDIT_EVENT_CONFLICT' })
+    expect(rows.size).toBe(1)
+  })
+
+  it('rejects malformed publish intent facts before D1-03 access', async () => {
+    const cases = [
+      { ...publishRequestAuditInput, expectedVersion: 0 },
+      { ...publishRequestAuditInput, requestedStatus: 'DRAFT' },
+      { ...publishRequestAuditInput, eventId: 'evt_mpl_publish_requested_' + planId + '_v2' },
+      { ...publishRequestAuditInput, actorId: 'spoofed-actor' },
+    ]
+    for (const input of cases) {
+      const { db, prepare } = createPlanAuditDb()
+      const runtime = await import('./index')
+      const response = await runtime.default.fetch(planPublishRequestAuditRequest(input), { D1_03: db })
+      expect(response.status).toBe(400)
+      expect(await response.json()).toEqual({ error: 'INVALID_MEMBERSHIP_PLAN_PUBLISH_REQUEST_AUDIT' })
+      expect(prepare).not.toHaveBeenCalled()
+    }
+  })
 
   it('requires the private W01 transport and creator-capable layer for plan publish audits', async () => {
     const { db, prepare } = createPlanAuditDb()
