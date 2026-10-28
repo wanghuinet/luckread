@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/state-machines/payment.json",
+  "title": "D1-04 Payment State Machine Candidate",
+  "type": "object",
+  "x-luckread": {
+    "entity": "Payment",
+    "domain": "D1-04",
+    "state-field": "status",
+    "version-field": "version",
+    "requires-optimistic-lock": true,
+    "initial-state": "INITIATING",
+    "states": [
+      "INITIATING",
+      "requires_payment_method",
+      "requires_confirmation",
+      "requires_customer_action",
+      "requires_merchant_action",
+      "requires_capture",
+      "processing",
+      "succeeded",
+      "failed",
+      "cancelled",
+      "cancelled_post_capture",
+      "partially_captured",
+      "partially_captured_and_capturable",
+      "expired"
+    ],
+    "terminal-states": [
+      "succeeded",
+      "failed",
+      "cancelled",
+      "cancelled_post_capture",
+      "expired"
+    ],
+    "admissionStatus": "CANDIDATE_NOT_GREEN",
+    "note": "Provider resource.updated, not envelope timestamp, orders provider state. Unknown statuses and unsupported event semantics require reconciliation."
+  },
+  "x-transitions": [
+    {
+      "from": "INITIATING",
+      "to": "requires_payment_method|requires_confirmation|requires_customer_action|requires_merchant_action|requires_capture|processing|succeeded|failed|cancelled|cancelled_post_capture|partially_captured|partially_captured_and_capturable|expired",
+      "actor": "system|payment-provider",
+      "precondition": "Stable local Payment intent exists; response belongs to expected merchant, payment ID, amount and currency."
+    },
+    {
+      "from": "requires_payment_method|requires_confirmation|requires_customer_action|requires_merchant_action|requires_capture|processing|partially_captured|partially_captured_and_capturable",
+      "to": "requires_payment_method|requires_confirmation|requires_customer_action|requires_merchant_action|requires_capture|processing|succeeded|failed|cancelled|cancelled_post_capture|partially_captured|partially_captured_and_capturable|expired",
+      "actor": "system|payment-provider",
+      "precondition": "Signed and parsed webhook validated against local payment identity, merchant, amount, currency and strictly newer provider resource.updated timestamp; local version CAS succeeds."
+    }
+  ],
+  "x-forbidden": [
+    {
+      "from": "succeeded",
+      "to": "failed|cancelled|processing|requires_payment_method",
+      "reason": "Terminal success cannot be rewritten by a delayed or duplicate provider event; refunds/reversals are separate facts."
+    },
+    {
+      "from": "failed|cancelled|cancelled_post_capture|expired",
+      "to": "succeeded|processing|requires_payment_method|requires_confirmation",
+      "reason": "A terminal payment attempt is never reopened; create a new Payment attempt or reconcile a documented provider correction."
+    },
+    {
+      "from": "partially_captured",
+      "to": "succeeded",
+      "reason": "Capture settlement semantics require a dedicated admitted reconciliation/financial fact, not an inferred success."
+    }
+  ],
+  "reconciliation": {
+    "changeControl": "CC-PAY-001-PAYMENT-ENTITY-MODEL-2026-10-28",
+    "sourceRefs": [
+      "docs/09-D1-DOMAIN-MASTER-v1.0.md",
+      "docs/65-MONETIZATION-COMMERCE-SYSTEM-CONTRACT-v1.0.md",
+      "docs/68-WALLET-LEDGER-AND-SETTLEMENT-CONTRACT-v1.0.md",
+      "docs/change-control/CC-PAY-001-PAYMENT-ENTITY-MODEL-2026-10-28.md"
+    ],
+    "note": "Candidate state machine only; it does not authorize payment confirmation, ledger posting, refund processing or entitlement grant."
+  }
+}
