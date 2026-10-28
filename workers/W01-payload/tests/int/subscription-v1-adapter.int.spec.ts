@@ -9,6 +9,7 @@ describe('v1 subscription adapter', () => {
   const route = readFileSync(resolve(process.cwd(), 'src/app/api/v1/memberships/subscriptions/[[...segments]]/route.ts'), 'utf8')
   const plansRoute = readFileSync(resolve(process.cwd(), 'src/app/api/v1/plans/route.ts'), 'utf8')
   const creatorPlansRoute = readFileSync(resolve(process.cwd(), 'src/app/api/v1/membership/plans/route.ts'), 'utf8')
+  const publishPlanRoute = readFileSync(resolve(process.cwd(), 'src/app/api/v1/membership/plans/[planId]/publish/route.ts'), 'utf8')
   const w08CreatorClient = readFileSync(resolve(process.cwd(), 'src/auth/w08-creator-client.ts'), 'utf8')
   const w08Worker = readFileSync(resolve(process.cwd(), '../W08-creator/src/worker.ts'), 'utf8')
   const w06Worker = readFileSync(resolve(process.cwd(), '../W06-governance/src/index.ts'), 'utf8')
@@ -57,6 +58,26 @@ describe('v1 subscription adapter', () => {
     expect(w06Worker).toContain("action: 'membership.plan.created'")
     expect(w06Worker).toContain('AUDIT_EVENT_PERSISTENCE_FAILED')
     expect(w06Worker).toContain('AUDIT_EVENT_CONFLICT')
+  })
+
+  it('publishes membership plans through CASL, W07 version CAS, and a durable W06 audit', () => {
+    expect(openapi).toContain('operationId: publishOwnMembershipPlan')
+    expect(apiInventory.domains.subscription_entitlement_payment.endpoint_groups)
+      .toContain('POST /v1/membership/plans/{planId}/publish')
+    expect(publishPlanRoute).toContain("'membership.plan.publish.own'")
+    expect(publishPlanRoute).toContain("'/internal/authz/check-permission'")
+    expect(publishPlanRoute).toContain("'/internal/creator/self'")
+    expect(publishPlanRoute).toContain("'/membership/plans/' + encodeURIComponent(planId) + '/publish'")
+    expect(publishPlanRoute).toContain("request.headers.get('If-Match')")
+    expect(publishPlanRoute).toContain('W07 performs the version CAS') === false
+    expect(publishPlanRoute).toContain('callW06MembershipPlanPublishAudit')
+    expect(publishPlanRoute).toContain("eventId: 'evt_mpl_published_' + plan.planId + '_v' + plan.version")
+    expect(publishPlanRoute).toContain("action?: unknown }).action !== 'membership.plan.published'")
+    expect(publishPlanRoute).toContain('Membership plan publish audit was not durably confirmed')
+    expect(w06Client).toContain("'/internal/audit-events/membership-plan-published'")
+    expect(w06Worker).toContain("url.pathname === '/internal/audit-events/membership-plan-published'")
+    expect(w06Worker).toContain("action: 'membership.plan.published'")
+    expect(w08Worker).toContain("'membership.plan.publish.own'")
   })
 
   it('contracts creator plan permissions and server-controlled draft fields', () => {
