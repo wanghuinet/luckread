@@ -3369,9 +3369,9 @@ paths:
         return does not confirm payment or grant membership. Checkout is only
         available for an existing eligible order; order creation remains
         fail-closed until authoritative pricing and tax are admitted.
-      operationId: createCustomerPaymentIntent
+      operationId: postPaymentsIntents
       x-luckread-contract-status: CONTRACTED_PARTIAL
-      x-luckread-runtime-status: IMPLEMENTED_ON_FEATURE_BRANCH_NOT_RELEASED
+      x-luckread-runtime-status: IMPLEMENTED_SOURCE_ONLY_PENDING_D1_04_MIGRATION_AND_SECRETS
       x-luckread-source: contracts/api/api-inventory.v1.json
       x-luckread-max-body-bytes: 16384
       security:
