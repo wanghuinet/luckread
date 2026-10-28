@@ -7,6 +7,7 @@ import {
   ORDER_MIGRATION_ID,
   PAYMENT_MIGRATION_ID,
   SAVED_METHOD_MIGRATION_ID,
+  RENEWAL_MIGRATION_ID,
   REQUIRED_MIGRATION_IDS,
   REQUIRED_COLUMNS,
   REQUIRED_INDEXES,
@@ -140,13 +141,13 @@ test('fails closed when saved-method migration history exists without both earli
   }), /saved-method migration is recorded without its required Order and Payment migrations/)
 })
 
-test('an applied Order migration can advance pending Payment and saved-method migrations', () => {
+test('an applied Order migration can advance pending Payment, mandate and renewal migrations', () => {
   const result = inspectD1_04OrderMigrationPreflight({
     schemaSnapshot: schemaWithMigrations([ORDER_MIGRATION_ID]),
     migrationState: wrapMigrationState([ORDER_MIGRATION_ID]),
   })
   assert.equal(result.action, 'APPLY')
-  assert.deepEqual(result.pendingMigrationIds, [PAYMENT_MIGRATION_ID, SAVED_METHOD_MIGRATION_ID])
+  assert.deepEqual(result.pendingMigrationIds, [PAYMENT_MIGRATION_ID, SAVED_METHOD_MIGRATION_ID, RENEWAL_MIGRATION_ID])
   assert.equal(result.writesPerformed, false)
 })
 
