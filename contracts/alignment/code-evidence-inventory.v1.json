@@ -2520,7 +2520,7 @@
       "implementationStatus": "IMPLEMENTED",
       "implementationRefs": [
         "workers/W01-payload/src/app/api/v1/payments/intents/route.ts",
-        "workers/W01-payload/src/commerce/w07-commerce-client.js",
+        "workers/W01-payload/src/commerce/w07-commerce-client.ts",
         "workers/W01-payload/src/subscription/w07-subscription-client.ts",
         "workers/W07-subscription-commerce/src/index.ts",
         "workers/W07-subscription-commerce/src/payment-intent-http-runtime.ts",
