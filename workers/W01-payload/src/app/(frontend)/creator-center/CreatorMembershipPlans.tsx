@@ -493,7 +493,44 @@ export default function CreatorMembershipPlans({ locale = 'zh-CN' }: { locale?: 
                 <p className="text-xs font-semibold text-light-secondary dark:text-dark-secondary">{labels.benefitsLabel}</p>
                 {plan.benefits.length ? <ul className="mt-1 list-disc pl-5 text-sm">{plan.benefits.map((benefit) => <li key={benefit}>{benefit}</li>)}</ul> : <p className="mt-1 text-sm text-light-secondary dark:text-dark-secondary">{labels.noBenefits}</p>}
               </div>
+              {editingPlanId === plan.planId ? (
+                <form onSubmit={(event) => void saveRevision(event, plan)} className="grid grid-cols-1 gap-3 rounded-xl border border-light-border p-4 dark:border-dark-border md:grid-cols-2" aria-busy={savingPlanId === plan.planId}>
+                  <h4 className="text-sm font-bold md:col-span-2">{labels.revisionHeading}</h4>
+                  <label className="flex flex-col gap-1 text-sm font-semibold">
+                    {labels.name}
+                    <input required maxLength={120} value={editName} onChange={(event) => setEditName(event.target.value)} className="rounded-xl border border-light-border bg-transparent px-3 py-2 font-normal dark:border-dark-border" />
+                  </label>
+                  <label className="flex flex-col gap-1 text-sm font-semibold">
+                    {labels.tier}
+                    <input required maxLength={64} pattern="[a-z][a-z0-9_-]{0,63}" value={editTier} onChange={(event) => setEditTier(event.target.value)} className="rounded-xl border border-light-border bg-transparent px-3 py-2 font-normal dark:border-dark-border" />
+                  </label>
+                  <label className="flex flex-col gap-1 text-sm font-semibold">
+                    {labels.priceLabel} ({plan.currency})
+                    <input required inputMode="decimal" value={editPrice} onChange={(event) => setEditPrice(event.target.value)} pattern="(0|[1-9][0-9]*)(\\.[0-9]{1,2})?" className="rounded-xl border border-light-border bg-transparent px-3 py-2 font-normal dark:border-dark-border" />
+                  </label>
+                  <label className="flex flex-col gap-1 text-sm font-semibold">
+                    {labels.interval}
+                    <select value={editInterval} onChange={(event) => setEditInterval(event.target.value as 'MONTHLY' | 'YEARLY')} className="rounded-xl border border-light-border bg-transparent px-3 py-2 font-normal dark:border-dark-border">
+                      <option value="MONTHLY">{labels.monthly}</option>
+                      <option value="YEARLY">{labels.yearly}</option>
+                    </select>
+                  </label>
+                  <label className="flex flex-col gap-1 text-sm font-semibold md:col-span-2">
+                    {labels.benefits}
+                    <textarea rows={3} value={editBenefitsText} onChange={(event) => setEditBenefitsText(event.target.value)} className="rounded-xl border border-light-border bg-transparent px-3 py-2 font-normal dark:border-dark-border" />
+                  </label>
+                  <div className="flex flex-wrap gap-2 md:col-span-2">
+                    <button type="submit" disabled={savingPlanId === plan.planId || busyPlanId !== null} className="rounded-full bg-main-accent px-4 py-2 text-sm font-bold text-white disabled:opacity-50">
+                      {savingPlanId === plan.planId ? labels.savingTerms : labels.saveTerms}
+                    </button>
+                    <button type="button" disabled={savingPlanId !== null} onClick={() => { setEditingPlanId(null); setEditKey('') }} className="rounded-full border border-light-border px-4 py-2 text-sm font-bold disabled:opacity-50 dark:border-dark-border">
+                      {labels.cancelEdit}
+                    </button>
+                  </div>
+                </form>
+              ) : null}
               <div className="flex flex-wrap gap-2">
+                {plan.status !== 'RETIRED' ? <button type="button" disabled={busy || savingPlanId !== null} onClick={() => beginRevision(plan)} className="rounded-full border border-light-border px-4 py-2 text-sm font-bold disabled:opacity-50 dark:border-dark-border">{labels.editTerms}</button> : null}
                 {plan.status === 'DRAFT' ? <button type="button" disabled={busy} onClick={() => void transition(plan, 'publish')} className="rounded-full bg-main-accent px-4 py-2 text-sm font-bold text-white disabled:opacity-50">{busy ? labels.actionBusy : labels.publish}</button> : null}
                 {plan.status === 'ACTIVE' ? <button type="button" disabled={busy} onClick={() => void transition(plan, 'pause')} className="rounded-full border border-light-border px-4 py-2 text-sm font-bold disabled:opacity-50 dark:border-dark-border">{busy ? labels.actionBusy : labels.pause}</button> : null}
                 {plan.status === 'PAUSED' ? <>
