@@ -605,6 +605,19 @@
       "stateMachine": "none"
     },
     {
+      "operationId": "getCommerceOrder",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "order.read"
+      ],
+      "auditRequired": false,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none"
+    },
+    {
       "operationId": "getContentContentId",
       "auth": {
         "mode": "permission"
@@ -1078,6 +1091,19 @@
       "stateMachine": "none",
       "x-luckread-contract-status": "DISCOVERY_DRAFT",
       "x-luckread-source": "contracts/api/media-operation-policy.v1.json"
+    },
+    {
+      "operationId": "listOwnMembershipPlans",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "membership.plan.read.own"
+      ],
+      "auditRequired": false,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none"
     },
     {
       "operationId": "listMembershipSubscriptions",
@@ -1913,6 +1939,19 @@
       "x-luckread-source": "contracts/api/api-inventory.v1.json"
     },
     {
+      "operationId": "createCommerceOrder",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "order.create"
+      ],
+      "auditRequired": true,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": true,
+      "stateMachine": "none"
+    },
+    {
       "operationId": "postContent",
       "auth": {
         "mode": "permission"
@@ -2360,6 +2399,19 @@
       "x-luckread-source": "contracts/api/media-operation-policy.v1.json"
     },
     {
+      "operationId": "createOwnMembershipPlanDraft",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "membership.plan.create.own"
+      ],
+      "auditRequired": true,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": true,
+      "stateMachine": "none"
+    },
+    {
       "operationId": "createSubscription",
       "auth": {
         "mode": "permission"
@@ -2605,6 +2657,19 @@
       "x-luckread-source": "contracts/api/api-inventory.v1.json"
     },
     {
+      "operationId": "receiveHyperswitchPaymentWebhook",
+      "auth": {
+        "mode": "public"
+      },
+      "permissions": [],
+      "auditRequired": false,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none",
+      "x-luckread-authentication": "Public provider callback ingress authenticated by W07 HMAC-SHA512 verification over exact raw request bytes; no browser session",
+      "x-luckread-idempotency": "provider + merchant_id + event_id + payload SHA-256; enforced by the unique D1-04 webhook receipt identity and immutable payload-conflict record, not by an HTTP Idempotency-Key header"
+    },
+    {
       "operationId": "authCredentialReplace",
       "auth": {
         "mode": "permission"
@@ -2618,71 +2683,6 @@
       "stateMachine": "none",
       "x-luckread-contract-status": "DISCOVERY_DRAFT",
       "x-luckread-source": "contracts/api/api-inventory.v1.json"
-    },
-    {
-      "operationId": "createCommerceOrder",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "order.create"
-      ],
-      "auditRequired": true,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": true,
-      "stateMachine": "none"
-    },
-    {
-      "operationId": "getCommerceOrder",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "order.read"
-      ],
-      "auditRequired": false,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": false,
-      "stateMachine": "none"
-    },
-    {
-      "operationId": "listOwnMembershipPlans",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "membership.plan.read.own"
-      ],
-      "auditRequired": false,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": false,
-      "stateMachine": "none"
-    },
-    {
-      "operationId": "createOwnMembershipPlanDraft",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "membership.plan.create.own"
-      ],
-      "auditRequired": true,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": true,
-      "stateMachine": "none"
-    },
-    {
-      "operationId": "receiveHyperswitchPaymentWebhook",
-      "auth": {
-        "mode": "public"
-      },
-      "permissions": [],
-      "auditRequired": false,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": false,
-      "stateMachine": "none",
-      "x-luckread-authentication": "Public provider callback ingress authenticated by W07 HMAC-SHA512 verification over exact raw request bytes; no browser session",
-      "x-luckread-idempotency": "provider + merchant_id + event_id + payload SHA-256; enforced by the unique D1-04 webhook receipt identity and immutable payload-conflict record, not by an HTTP Idempotency-Key header"
     }
   ]
 }
