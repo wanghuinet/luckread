@@ -42,6 +42,7 @@ export type RenewalScheduledBatchResult =
   | Readonly<{
       status: 'PARTIAL';
       phase: 'OUTCOME_SYNC_BEFORE' | 'DUE_SCAN' | 'OUTCOME_SYNC_AFTER';
+      beforeRecovery?: OutcomeBatch;
     }>
   | Readonly<{
       status: 'COMPLETED' | 'PARTIAL';
@@ -111,6 +112,17 @@ export async function runRenewalScheduledBatch(
     // Do not start new provider-side work when prior cross-D1 outcome recovery
     // is failing. The next Cron tick can retry the bounded reconciliation.
     return { status: 'PARTIAL', phase: 'OUTCOME_SYNC_BEFORE' };
+  }
+
+  // The batch helper reports per-cycle failures as counts instead of throwing.
+  // Treat unresolved pre-existing cross-D1 outcomes as a stop condition so a
+  // later provider charge cannot race ahead of subscription-state recovery.
+  if (beforeRecovery.pendingRetry > 0 || beforeRecovery.reconciliationRequired > 0) {
+    return {
+      status: 'PARTIAL',
+      phase: 'OUTCOME_SYNC_BEFORE',
+      beforeRecovery,
+    };
   }
 
   let dueScan: RenewalScanResult;
