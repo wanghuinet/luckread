@@ -640,7 +640,7 @@ async function isSubscriptionChargeableForCycle(
   } catch {
     throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
   }
-  const retryingPastDue = cycle.outcome_code === 'RETRY_PREPARED';
+  const retryingPastDue = cycle.outcome_code === 'RETRY_PREPARED' || cycle.attempt_number > 1;
   return !!subscription &&
     subscription.subscription_id === cycle.subscription_id &&
     subscription.subscriber_id === cycle.subscriber_id &&
