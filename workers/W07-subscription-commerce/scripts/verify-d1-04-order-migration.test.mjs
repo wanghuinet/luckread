@@ -161,7 +161,7 @@ test('postflight validates both migrations, all tables/columns/indexes/triggers,
   assert.equal(report.baselineSchemaPreserved, true)
   assert.deepEqual(report.appliedMigrations, REQUIRED_MIGRATION_IDS)
   assert.equal(report.verifiedTables.length, 6)
-  assert.equal(report.verifiedIndexes.length, 13)
+  assert.equal(report.verifiedIndexes.length, 14)
   assert.equal(report.verifiedTriggers.length, 23)
   assert.equal(report.databaseRowsExported, false)
 })
