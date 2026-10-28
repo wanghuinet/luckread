@@ -211,8 +211,6 @@ function addL2Rules(
   grant('report.create', 'Report')
   grant('notification.read.self', 'Notification', selfOwnerCondition(subjectId))
   grant('notification.update.self', 'Notification', selfOwnerCondition(subjectId))
-  grant('order.create', 'Order', selfOwnerCondition(subjectId))
-  grant('order.read', 'Order', selfOwnerCondition(subjectId))
 }
 
 function addL3Rules(
@@ -343,6 +341,13 @@ function buildLayerAbility(input: CaslPermissionInput) {
   const { cannot, build } = builder
 
   addPublicAndSelfRules(grant, input.subjectId)
+
+  // Commerce permissions require a verified L2+ identity but are independent
+  // of platform-management capabilities granted at higher layers.
+  if (input.layer !== 'L0' && input.layer !== 'L1' && input.subjectId) {
+    grant('order.create', 'Order', selfOwnerCondition(input.subjectId))
+    grant('order.read', 'Order', selfOwnerCondition(input.subjectId))
+  }
 
   // Creator application creation is deliberately L2-only; it is not inherited
   // by L3+ simply because higher layers have broader general capabilities.
