@@ -93,7 +93,7 @@
       "entityIds": [
         "ENT-PAYMENT"
       ],
-      "persistenceMode": "D1_NATIVE",
+      "persistenceMode": "MIXED",
       "owner": "D1-04",
       "status": "BLOCKED",
       "evidenceRefs": [
