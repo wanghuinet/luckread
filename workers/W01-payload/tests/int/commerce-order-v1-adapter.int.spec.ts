@@ -22,7 +22,7 @@ describe('v1 commerce order adapter', () => {
     expect(client).toContain("callW08Creator(permissionRequest, '/internal/authz/check-permission', 'POST')")
     expect(createRoute).toContain("pathname: '/commerce/orders'")
     expect(createRoute).toContain("method: 'POST'")
-    expect(createRoute.indexOf('authorizeOrderPermission')).toBeLessThan(createRoute.indexOf('const w07Response = await callW07Subscription'))
+    expect(createRoute.indexOf("const denied = await authorizeOrderPermission(request, principal, 'order.create')")).toBeLessThan(createRoute.indexOf('const w07Response = await callW07Subscription'))
   })
 
   it('bounds order requests and rejects missing or malformed idempotency keys before forwarding', () => {
@@ -31,7 +31,7 @@ describe('v1 commerce order adapter', () => {
     expect(client).toContain('request.body.getReader()')
     expect(createRoute).toContain("validateOrderIdempotencyKey(request.headers.get('Idempotency-Key'))")
     expect(client).toContain('key.length > 256')
-    expect(createRoute).toContain('Idempotency-Key is required')
+    expect(client).toContain('Idempotency-Key is required')
   })
 
   it('reads only the authenticated customer order through W07 owner-scoped persistence', () => {
@@ -47,7 +47,7 @@ describe('v1 commerce order adapter', () => {
     expect(client).toContain('expectedTotal')
     expect(client).toContain('subtotal !== order.subtotalMinor')
     expect(client).toContain('order.discountMinor > order.subtotalMinor')
-    expect(createRoute.indexOf('const order = validateCreatedCommerceOrderEnvelope')).toBeLessThan(createRoute.indexOf('callW06CommerceOrderAudit'))
+    expect(createRoute.indexOf('const order = validateCreatedCommerceOrderEnvelope')).toBeLessThan(createRoute.lastIndexOf('callW06CommerceOrderAudit({'))
   })
 
   it('never returns a successful order response until W06 confirms the durable immutable audit', () => {
@@ -55,8 +55,8 @@ describe('v1 commerce order adapter', () => {
     expect(createRoute).toContain("action?: unknown }).action !== 'commerce.order.created'")
     expect(createRoute).toContain("targetType?: unknown }).targetType !== 'Order'")
     expect(createRoute).toContain('Order audit was not durably confirmed')
-    expect(createRoute.indexOf('const w07Response = await callW07Subscription')).toBeLessThan(createRoute.indexOf('callW06CommerceOrderAudit'))
-    expect(createRoute.indexOf('callW06CommerceOrderAudit')).toBeLessThan(createRoute.lastIndexOf('return w07Response'))
+    expect(createRoute.indexOf('const w07Response = await callW07Subscription')).toBeLessThan(createRoute.lastIndexOf('callW06CommerceOrderAudit({'))
+    expect(createRoute.lastIndexOf('callW06CommerceOrderAudit({')).toBeLessThan(createRoute.lastIndexOf('return w07Response'))
     expect(w06Client).toContain("'/internal/audit-events/commerce-order-created'")
     expect(w06Runtime).toContain("action: 'commerce.order.created'")
     expect(w06Runtime).toContain('persistImmutableAuditEvent(env, event)')
