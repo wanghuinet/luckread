@@ -22,6 +22,7 @@ const cleanRecovery = {
 type TestOptions = Readonly<{
   recoveryResults?: Array<typeof cleanRecovery>;
   cycleResult?: RenewalProcessResult;
+  scanCalls?: { count: number };
 }>;
 
 function dependencies(options: TestOptions = {}): RenewalScheduledDependencies {
@@ -31,12 +32,15 @@ function dependencies(options: TestOptions = {}): RenewalScheduledDependencies {
   return {
     readTableNames: async (_db, expected) => new Set(expected),
     syncPending: async () => recoveryResults[Math.min(recoveryCall++, recoveryResults.length - 1)],
-    scanDue: async (): Promise<RenewalScanResult> => ({
-      scanned: 1,
-      cycleIds: ['rcy_' + 'a'.repeat(26)],
-      cursorAdvanced: false,
-      cursorReset: false,
-    }),
+    scanDue: async (): Promise<RenewalScanResult> => {
+      if (options.scanCalls) options.scanCalls.count += 1;
+      return {
+        scanned: 1,
+        cycleIds: ['rcy_' + 'a'.repeat(26)],
+        cursorAdvanced: false,
+        cursorReset: false,
+      };
+    },
     processCycle: async (_env, cycleId): Promise<RenewalProcessResult> =>
       options.cycleResult ?? { cycleId, state: 'PREPARED', action: 'PREPARED' },
   };
@@ -63,6 +67,42 @@ describe('W07 renewal scheduler completion status', () => {
     }));
 
     expect(result.status).toBe('PARTIAL');
+  });
+
+  it('does not scan or initiate new provider work when pre-scan recovery has a retryable outcome', async () => {
+    const scanCalls = { count: 0 };
+    const result = await runRenewalScheduledBatch(env, dependencies({
+      scanCalls,
+      recoveryResults: [
+        { scanned: 1, applied: 0, reconciliationRequired: 0, pendingRetry: 1 },
+        cleanRecovery,
+      ],
+    }));
+
+    expect(result).toMatchObject({
+      status: 'PARTIAL',
+      phase: 'OUTCOME_SYNC_BEFORE',
+      beforeRecovery: { pendingRetry: 1 },
+    });
+    expect(scanCalls.count).toBe(0);
+  });
+
+  it('does not scan when pre-scan recovery identifies a reconciliation conflict', async () => {
+    const scanCalls = { count: 0 };
+    const result = await runRenewalScheduledBatch(env, dependencies({
+      scanCalls,
+      recoveryResults: [
+        { scanned: 1, applied: 0, reconciliationRequired: 1, pendingRetry: 0 },
+        cleanRecovery,
+      ],
+    }));
+
+    expect(result).toMatchObject({
+      status: 'PARTIAL',
+      phase: 'OUTCOME_SYNC_BEFORE',
+      beforeRecovery: { reconciliationRequired: 1 },
+    });
+    expect(scanCalls.count).toBe(0);
   });
 
   it('reports PARTIAL when a processed cycle is already in reconciliation state', async () => {
