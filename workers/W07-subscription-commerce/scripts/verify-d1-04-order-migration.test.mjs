@@ -30,7 +30,9 @@ function targetObjectsFor(migrationIds) {
       ? ['payments', 'payment_provider_events', 'payment_provider_event_conflicts']
       : id === SAVED_METHOD_MIGRATION_ID
         ? ['saved_payment_methods', 'payment_mandates']
-        : [])
+        : id === '0004_subscription_renewal_cycles'
+          ? ['subscription_renewal_cycles', 'subscription_renewal_scheduler_state']
+          : [])
   const objects = tables.map((tableName) => ({
     type: 'table',
     name: tableName,
@@ -90,6 +92,8 @@ const tableInfo = {
   paymentProviderEventConflicts: tableInfoFor('payment_provider_event_conflicts'),
   savedPaymentMethods: tableInfoFor('saved_payment_methods'),
   paymentMandates: tableInfoFor('payment_mandates'),
+  renewalCycles: tableInfoFor('subscription_renewal_cycles'),
+  renewalSchedulerState: tableInfoFor('subscription_renewal_scheduler_state'),
 }
 
 function verifyCompletePostflight({ preflightSchema = schemaWithMigrations([]), postflightSchema = schemaWithMigrations(REQUIRED_MIGRATION_IDS), migrationState = wrapMigrationState(REQUIRED_MIGRATION_IDS) } = {}) {
@@ -105,6 +109,8 @@ function verifyCompletePostflight({ preflightSchema = schemaWithMigrations([]), 
     paymentProviderEventConflictsTableInfo: tableInfo.paymentProviderEventConflicts,
     savedPaymentMethodsTableInfo: tableInfo.savedPaymentMethods,
     paymentMandatesTableInfo: tableInfo.paymentMandates,
+    renewalCyclesTableInfo: tableInfo.renewalCycles,
+    renewalSchedulerStateTableInfo: tableInfo.renewalSchedulerState,
   })
 }
 
@@ -181,9 +187,9 @@ test('postflight validates both migrations, all tables/columns/indexes/triggers,
   assert.equal(report.result, 'POSTFLIGHT_PASS')
   assert.equal(report.baselineSchemaPreserved, true)
   assert.deepEqual(report.appliedMigrations, REQUIRED_MIGRATION_IDS)
-  assert.equal(report.verifiedTables.length, 8)
-  assert.equal(report.verifiedIndexes.length, 18)
-  assert.equal(report.verifiedTriggers.length, 36)
+  assert.equal(report.verifiedTables.length, 10)
+  assert.equal(report.verifiedIndexes.length, 22)
+  assert.equal(report.verifiedTriggers.length, 47)
   assert.equal(report.databaseRowsExported, false)
 })
 
@@ -220,8 +226,11 @@ test('workflow is manual-only, gates exact SHA/name/confirmation, and never depl
   assert.match(workflow, /Capture read-only D1-04 schema after candidate migrations/)
   assert.match(workflow, /0002_payment_provider_events\.sql/)
   assert.match(workflow, /0003_saved_payment_methods_mandates\.sql/)
+  assert.match(workflow, /0004_subscription_renewal_cycles\.sql/)
   assert.match(workflow, /PRAGMA table_info\("saved_payment_methods"\)/)
   assert.match(workflow, /PRAGMA table_info\("payment_mandates"\)/)
+  assert.match(workflow, /PRAGMA table_info\("subscription_renewal_cycles"\)/)
+  assert.match(workflow, /PRAGMA table_info\("subscription_renewal_scheduler_state"\)/)
   assert.match(workflow, /PRAGMA table_info\("payments"\)/)
   assert.match(workflow, /PRAGMA table_info\("payment_provider_events"\)/)
   assert.match(workflow, /PRAGMA table_info\("payment_provider_event_conflicts"\)/)
