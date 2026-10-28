@@ -106,7 +106,7 @@ class MemoryD1 {
     }
     throw new Error('Unexpected run query: ' + sql);
   }
-  async all<T>(sql: string): Promise<D1Result<T>> {
+  async all<T>(sql: string, _values: unknown[] = []): Promise<D1Result<T>> {
     if (sql.includes('FROM subscription_renewal_cycles') && this.cycle &&
         this.cycle.subscription_sync_state === 'PENDING' &&
         ['SUCCEEDED', 'FAILED'].includes(this.cycle.state)) {
