@@ -802,9 +802,7 @@ export default {
         targetId: input.planId,
         before: {
           creatorId: input.creatorId,
-          status: 'DRAFT',
-          visibility: 'PRIVATE',
-          version: input.expectedVersion,
+          expectedVersion: input.expectedVersion,
         },
         after: {
           creatorId: input.creatorId,
