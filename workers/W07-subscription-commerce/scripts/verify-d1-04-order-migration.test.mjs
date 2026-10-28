@@ -203,7 +203,7 @@ test('workflow is manual-only, gates exact SHA/name/confirmation, and never depl
   assert.match(workflow, /--remote/)
   assert.match(workflow, /id: schema_preflight/)
   assert.match(workflow, /steps\.schema_preflight\.outputs\.action == 'APPLY'/)
-  assert.match(workflow, /Capture read-only D1-04 schema after migration/)
+  assert.match(workflow, /Capture read-only D1-04 schema after candidate migrations/)
   assert.match(workflow, /0002_payment_provider_events\.sql/)
   assert.match(workflow, /PRAGMA table_info\("payments"\)/)
   assert.match(workflow, /PRAGMA table_info\("payment_provider_events"\)/)
