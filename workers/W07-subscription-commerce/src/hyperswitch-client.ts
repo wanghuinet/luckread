@@ -30,6 +30,14 @@ export interface CreateHyperswitchPaymentIntentInput {
   idempotencyKey: string;
 }
 
+/** Server-authoritative data for a customer-approved recurring-payment charge (MIT). */
+export interface CreateHyperswitchMerchantInitiatedPaymentInput extends CreateHyperswitchPaymentIntentInput {
+  /** Must be the same Hyperswitch customer ID bound to the stored payment method. */
+  customerId: string;
+  /** Hyperswitch payment_method_id returned by an earlier customer-authorized CIT/mandate setup. */
+  paymentMethodId: string;
+}
+
 export type HyperswitchPaymentStatus =
   | 'requires_payment_method'
   | 'requires_confirmation'
@@ -146,6 +154,18 @@ function validateCreateInput(input: CreateHyperswitchPaymentIntentInput): void {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function validateProviderReference(value: unknown, field: string): asserts value is string {
+  if (
+    typeof value !== 'string' ||
+    value.length === 0 ||
+    value.length > 256 ||
+    value.trim() !== value ||
+    /[\u0000-\u001f\u007f]/.test(value)
+  ) {
+    throw new HyperswitchClientError('REQUEST_INVALID', field + ' is missing or malformed.');
+  }
 }
 
 async function readJsonResponse(response: Response): Promise<unknown> {
@@ -289,6 +309,61 @@ export async function createHyperswitchPaymentIntent(
     !['requires_payment_method', 'requires_confirmation'].includes(payment.status)
   ) {
     throw new HyperswitchClientError('UPSTREAM_INVALID_RESPONSE', 'Hyperswitch payment intent did not match the unconfirmed request.');
+  }
+  return payment;
+}
+
+/**
+ * Execute a merchant-initiated recurring charge through Hyperswitch's existing
+ * payment orchestration API. Billing cadence/retries remain the subscription
+ * provider's responsibility; this function performs one charge only.
+ *
+ * The caller must load customerId/paymentMethodId from trusted server-side
+ * records, create a durable local attempt first, and reuse its paymentId and
+ * idempotencyKey on retry. The returned status is not, by itself, fulfillment
+ * evidence: the caller must persist it and apply the verified webhook/reconciliation
+ * contract before confirming an order or granting access.
+ */
+export async function createHyperswitchMerchantInitiatedPayment(
+  config: HyperswitchClientConfig,
+  input: CreateHyperswitchMerchantInitiatedPaymentInput,
+  fetchImpl: typeof fetch = fetch,
+): Promise<HyperswitchPayment> {
+  validateCreateInput(input);
+  validateProviderReference(input.customerId, 'Customer ID');
+  validateProviderReference(input.paymentMethodId, 'Payment method ID');
+
+  const payment = await requestPayment(config, '/payments', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'Idempotency-Key': input.idempotencyKey,
+    },
+    body: JSON.stringify({
+      payment_id: input.paymentId,
+      amount: input.amount,
+      currency: input.currency,
+      customer_id: input.customerId,
+      confirm: true,
+      capture_method: 'automatic',
+      off_session: true,
+      recurring_details: {
+        type: 'payment_method_id',
+        data: input.paymentMethodId,
+      },
+      mit_category: 'recurring',
+    }),
+  }, fetchImpl);
+
+  if (
+    payment.paymentId !== input.paymentId ||
+    payment.amount !== input.amount ||
+    payment.currency !== input.currency
+  ) {
+    throw new HyperswitchClientError(
+      'UPSTREAM_INVALID_RESPONSE',
+      'Hyperswitch recurring payment did not match the authoritative request.',
+    );
   }
   return payment;
 }
