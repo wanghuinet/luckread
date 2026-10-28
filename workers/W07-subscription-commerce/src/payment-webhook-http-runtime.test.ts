@@ -7,6 +7,7 @@ import {
   type WebhookReceiptResult,
 } from './payment-persistence.js';
 import type { ReceiveHyperswitchWebhookInput } from './payment-persistence.js';
+import type { RenewalOutcomeSyncResult } from './subscription-renewal-outcome.js';
 
 const SECRET = 'hyperswitch-webhook-test-secret';
 const MERCHANT = 'merchant_test';
@@ -29,19 +30,30 @@ type Receiver = NonNullable<Parameters<typeof handleHyperswitchWebhookRequest>[2
 function fixture(options: {
   result?: WebhookReceiptResult;
   error?: Error;
+  syncResult?: RenewalOutcomeSyncResult;
 } = {}) {
   const calls: Array<{ db: unknown; input: ReceiveHyperswitchWebhookInput }> = [];
+  const syncCalls: Array<{ env: unknown; paymentId: string; merchantId: string }> = [];
   const receive: Receiver = async (db, input) => {
     calls.push({ db, input });
     if (options.error) throw options.error;
     return options.result ?? receipt();
   };
+  const syncRenewalOutcome = async (
+    env: { D1_01: D1Database; D1_04: D1Database },
+    paymentId: string,
+    merchantId: string,
+  ): Promise<RenewalOutcomeSyncResult> => {
+    syncCalls.push({ env, paymentId, merchantId });
+    return options.syncResult ?? { cycleId: '', outcome: 'NO_RENEWAL_CYCLE' };
+  };
   const env = {
+    D1_01: { marker: 'd1-01' } as unknown as D1Database,
     D1_04: { marker: 'd1-04' } as unknown as D1Database,
     HYPERSWITCH_WEBHOOK_SECRET: SECRET,
     HYPERSWITCH_MERCHANT_ID: MERCHANT,
   };
-  return { env, calls, dependencies: { receive } };
+  return { env, calls, syncCalls, dependencies: { receive, syncRenewalOutcome } };
 }
 
 function request(options: {
@@ -110,6 +122,66 @@ describe('W07 Hyperswitch webhook HTTP receiver', () => {
     expect(f.calls[0]!.input.expectedMerchantId).toBe(MERCHANT);
     expect(f.calls[0]!.db).toBe(f.env.D1_04);
     expect(await response?.json()).toMatchObject({ data: { outcome: 'APPLIED', state: 'APPLIED' } });
+  });
+
+  it('synchronizes a signed, applied renewal payment into D1-01 and reports reconciliation when needed', async () => {
+    const f = fixture({
+      result: receipt('APPLIED'),
+      syncResult: {
+        cycleId: 'rcy_' + 'a'.repeat(26),
+        subscriptionId: 'sub_test',
+        outcome: 'RECONCILIATION_REQUIRED',
+        reasonCode: 'SUBSCRIPTION_PERIOD_CAS_MISMATCH',
+      },
+    });
+    const paymentId = 'pay_' + 'b'.repeat(26);
+    const body = JSON.stringify({
+      event_id: 'evt_test_001',
+      merchant_id: MERCHANT,
+      content_type: 'payment_details',
+      resource: { payment_id: paymentId },
+    });
+    const response = await handleHyperswitchWebhookRequest(
+      request({ body, signature: 'signed-provider-event' }),
+      f.env,
+      f.dependencies,
+    );
+    expect(response?.status).toBe(202);
+    expect(f.syncCalls).toHaveLength(1);
+    expect(f.syncCalls[0]).toMatchObject({
+      env: { D1_01: f.env.D1_01, D1_04: f.env.D1_04 },
+      paymentId,
+      merchantId: MERCHANT,
+    });
+    expect(await response?.json()).toMatchObject({
+      data: {
+        outcome: 'APPLIED',
+        subscriptionSync: 'RECONCILIATION_REQUIRED',
+        subscriptionSyncReason: 'SUBSCRIPTION_PERIOD_CAS_MISMATCH',
+        subscriptionId: 'sub_test',
+      },
+    });
+  });
+
+  it('retries subscription outcome synchronization on a duplicate signed provider event', async () => {
+    const f = fixture({
+      result: receipt('DUPLICATE'),
+      syncResult: { cycleId: 'rcy_' + 'a'.repeat(26), outcome: 'APPLIED', subscriptionId: 'sub_test' },
+    });
+    const body = JSON.stringify({
+      event_id: 'evt_test_001',
+      merchant_id: MERCHANT,
+      content_type: 'payment_details',
+      resource: { payment_id: 'pay_' + 'b'.repeat(26) },
+    });
+    const response = await handleHyperswitchWebhookRequest(
+      request({ body, signature: 'signed-provider-event' }),
+      f.env,
+      f.dependencies,
+    );
+    expect(response?.status).toBe(200);
+    expect(f.syncCalls).toHaveLength(1);
+    expect(await response?.json()).toMatchObject({ data: { outcome: 'DUPLICATE', subscriptionSync: 'APPLIED' } });
   });
 
   it('returns 202 for a durable reconciliation outcome rather than causing blind provider retries', async () => {
