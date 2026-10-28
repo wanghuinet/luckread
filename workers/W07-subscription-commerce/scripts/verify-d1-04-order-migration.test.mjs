@@ -113,6 +113,13 @@ test('clean empty D1-04 schema is eligible for explicitly confirmed pending migr
   assert.equal(result.writesPerformed, false)
 })
 
+test('fails closed when Payment migration history exists without its Order prerequisite', () => {
+  assert.throws(() => inspectD1_04OrderMigrationPreflight({
+    schemaSnapshot: schemaWithMigrations([PAYMENT_MIGRATION_ID]),
+    migrationState: wrapMigrationState([PAYMENT_MIGRATION_ID]),
+  }), /payment migration is recorded without its required prior Order migration/)
+})
+
 test('an applied Order migration can advance only the pending Payment migration', () => {
   const result = inspectD1_04OrderMigrationPreflight({
     schemaSnapshot: schemaWithMigrations([ORDER_MIGRATION_ID]),
