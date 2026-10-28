@@ -516,33 +516,36 @@ class D104OrderMigrationTests(unittest.TestCase):
                 (LATER, cycle_id),
             )
 
-    def test_applied_renewal_sync_metadata_is_immutable(self):
-        offer = json.dumps({"subscriptionId":"sub_audit","planId":"plan_basic","planVersion":1}, separators=(",",":"))
-        pricing = json.dumps({"currency":"USD","items":[{"itemType":"MEMBERSHIP_PLAN"}]}, separators=(",",":"))
-        cycle_id = "rcy_" + "d" * 26
-        payment_id = "pay_" + "e" * 26
-        self.db.execute(
-            """INSERT INTO subscription_renewal_cycles
-               (cycle_id,provider,merchant_id,subscription_id,subscriber_id,plan_id,plan_version,
-                cycle_start,cycle_end,billing_interval,currency,offer_snapshot_json,amount_minor,
-                pricing_snapshot_json,payment_method_id,mandate_record_id,order_id,payment_id,state,
-                attempt_number,provider_response_status,version,created_at,updated_at)
-               VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'FAILED',1,'failed',1,?,?)""",
-            (cycle_id,"hyperswitch","merchant_test","sub_audit","user_1","plan_basic",1,
-             NOW,LATER,"MONTHLY","USD",offer,100,pricing,"pm_hyperswitch_test","mnd_"+"f"*26,
-             "ord_renewal_audit",payment_id,NOW,NOW),
-        )
-        self.db.execute(
-            """UPDATE subscription_renewal_cycles SET subscription_sync_state='APPLIED',
-               subscription_sync_updated_at=?,version=2,updated_at=? WHERE cycle_id=? AND version=1""",
-            (LATER,LATER,cycle_id),
-        )
-        with self.assertRaises(sqlite3.IntegrityError):
-            self.db.execute(
-                """UPDATE subscription_renewal_cycles SET subscription_sync_updated_at=?,
-                   version=3,updated_at=? WHERE cycle_id=? AND version=2""",
-                ("2026-10-28T00:00:02.000Z","2026-10-28T00:00:02.000Z",cycle_id),
-            )
+    def test_renewal_cycles_cannot_be_inserted_past_the_initial_state(self):
+        offer = json.dumps({
+            "subscriptionId": "sub_guard", "planId": "plan_basic", "planVersion": 1,
+            "priceMinor": 1000, "currency": "USD",
+        }, separators=(",", ":"))
+        pricing = json.dumps({"currency": "USD", "items": []}, separators=(",", ":"))
+        attempted_states = [
+            "AWAITING_MANDATE", "PREPARED", "PAYMENT_READY", "SUBMITTING",
+            "SUBMITTED", "SUCCEEDED", "FAILED", "RECONCILIATION_REQUIRED",
+        ]
+        for index, state in enumerate(attempted_states):
+            with self.subTest(state=state), self.assertRaises(sqlite3.IntegrityError):
+                lease_token = "lease_test" if state == "SUBMITTING" else None
+                lease_expires = LATER if state == "SUBMITTING" else None
+                provider_status = "succeeded" if state == "SUCCEEDED" else "failed" if state == "FAILED" else None
+                self.db.execute(
+                    """INSERT INTO subscription_renewal_cycles
+                       (cycle_id,provider,merchant_id,subscription_id,subscriber_id,plan_id,plan_version,
+                        cycle_start,cycle_end,billing_interval,currency,offer_snapshot_json,amount_minor,
+                        pricing_snapshot_json,payment_method_id,mandate_record_id,order_id,payment_id,state,
+                        attempt_number,provider_response_status,outcome_code,lease_token,lease_expires_at,
+                        version,created_at,updated_at)
+                       VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, ?,1,?,?)""",
+                    ("rcy_" + chr(ord("a") + index) * 26, "hyperswitch", "merchant_test",
+                     "sub_guard_" + str(index), "user_1", "plan_basic", 1, NOW, LATER,
+                     "MONTHLY", "USD", offer, 1000, pricing, "pm_guard_" + str(index),
+                     "mnd_" + chr(ord("a") + index) * 26, "ord_guard_" + str(index),
+                     "pay_" + chr(ord("a") + index) * 26, state, 1, provider_status, None,
+                     lease_token, lease_expires, NOW, NOW),
+                )
 
     def test_renewal_cycle_requires_active_mandate_before_payment_ready_and_keeps_cursor_cas(self):
         offer = json.dumps({"subscriptionId":"sub_renewal","planId":"plan_basic","planVersion":1}, separators=(",",":"))
@@ -553,14 +556,20 @@ class D104OrderMigrationTests(unittest.TestCase):
                (cycle_id,provider,merchant_id,subscription_id,subscriber_id,plan_id,plan_version,
                 cycle_start,cycle_end,billing_interval,currency,offer_snapshot_json,amount_minor,
                 pricing_snapshot_json,state,attempt_number,version,created_at,updated_at)
-               VALUES(?,?,?,?,?,?,?,?,?,?,?,?,? ,?,'PREPARED',0,1,?,?)""",
+               VALUES(?,?,?,?,?,?,?,?,?,?,?,?,NULL,NULL,'AWAITING_PRICING',0,1,?,?)""",
             (cycle_id,"hyperswitch","merchant_test","sub_renewal","user_1","plan_basic",1,
-             NOW,LATER,"MONTHLY","USD",offer,1000,pricing,NOW,NOW),
+             NOW,LATER,"MONTHLY","USD",offer,NOW,NOW),
+        )
+        self.db.execute(
+            """UPDATE subscription_renewal_cycles
+               SET amount_minor=?,pricing_snapshot_json=?,state='PREPARED',version=2,updated_at=?
+               WHERE cycle_id=? AND version=1""",
+            (1000,pricing,LATER,cycle_id),
         )
         with self.assertRaises(sqlite3.IntegrityError):
             self.db.execute(
-                "UPDATE subscription_renewal_cycles SET state='PAYMENT_READY',version=2,updated_at=? WHERE cycle_id=?",
-                (LATER,cycle_id),
+                "UPDATE subscription_renewal_cycles SET state='PAYMENT_READY',version=3,updated_at=? WHERE cycle_id=?",
+                ("2026-10-28T00:00:02.000Z",cycle_id),
             )
         with self.assertRaises(sqlite3.IntegrityError):
             self.db.execute(
