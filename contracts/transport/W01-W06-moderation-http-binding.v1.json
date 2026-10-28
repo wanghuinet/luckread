@@ -192,7 +192,8 @@
     },
     "forwarded": [
       "If-Match on decideModerationCase",
-      "Idempotency-Key on decideModerationCase"
+      "Idempotency-Key on decideModerationCase",
+      "If-Match on membership plan publish"
     ],
     "forbidden": [
       "Authorization bearer credential",
