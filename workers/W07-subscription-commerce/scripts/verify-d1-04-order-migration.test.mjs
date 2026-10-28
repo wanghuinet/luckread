@@ -134,13 +134,13 @@ test('fails closed when saved-method migration history exists without both earli
   }), /saved-method migration is recorded without its required Order and Payment migrations/)
 })
 
-test('an applied Order migration can advance only the pending Payment migration', () => {
+test('an applied Order migration can advance pending Payment and saved-method migrations', () => {
   const result = inspectD1_04OrderMigrationPreflight({
     schemaSnapshot: schemaWithMigrations([ORDER_MIGRATION_ID]),
     migrationState: wrapMigrationState([ORDER_MIGRATION_ID]),
   })
   assert.equal(result.action, 'APPLY')
-  assert.deepEqual(result.pendingMigrationIds, [PAYMENT_MIGRATION_ID])
+  assert.deepEqual(result.pendingMigrationIds, [PAYMENT_MIGRATION_ID, SAVED_METHOD_MIGRATION_ID])
   assert.equal(result.writesPerformed, false)
 })
 
@@ -211,7 +211,7 @@ test('workflow is manual-only, gates exact SHA/name/confirmation, and never depl
   assert.doesNotMatch(workflow, /^\s{2}(push|pull_request):/m)
   assert.match(workflow, /source_sha:/)
   assert.match(workflow, /target_database_name:/)
-  assert.match(workflow, /APPLY_W07_D1_04_ORDER_MIGRATION/)
+  assert.match(workflow, /APPLY_W07_D1_04_COMMERCE_MIGRATIONS/)
   assert.match(workflow, /SOURCE_SHA.*GITHUB_SHA/s)
   assert.match(workflow, /d1 migrations apply/)
   assert.match(workflow, /--remote/)
