@@ -123,7 +123,7 @@ export default function CheckoutClient({ orderId }: { orderId: string }) {
           },
           body: JSON.stringify({ orderId }),
         })
-        const result: unknown = await response.json().catch(() => null)
+        const result: unknown = await response.json().catch((): null => null)
         const envelope = result && typeof result === 'object' ? result as ApiEnvelope : null
         const parsed = response.ok ? readPaymentIntent(result, orderId) : null
         if (!response.ok || !parsed) {
