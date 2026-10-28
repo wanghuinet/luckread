@@ -119,6 +119,12 @@
           "type": "TEXT",
           "required": true,
           "nullable": false
+        },
+        "single_live_or_successful_attempt_per_order": {
+          "type": "UNIQUE_INDEX",
+          "required": true,
+          "where": "status NOT IN ('failed','cancelled','cancelled_post_capture','expired')",
+          "invariant": "An order cannot own two active or successful payment attempts; a new attempt is allowed after a terminal failure/cancel/expiry."
         }
       },
       "invariants": [
@@ -126,7 +132,8 @@
         "UNIQUE(customer_id, order_id, idempotency_key) prevents duplicate same-key Payment attempts.",
         "Provider request runs outside a D1 transaction, using the same stable payment_id and idempotency_key on retries.",
         "Provider resource.updated is monotonic; every stored mutation advances local version exactly once.",
-        "Terminal payment attempts are not reopened."
+        "Terminal payment attempts are not reopened.",
+        "A partial unique index permits only one non-failed/non-cancelled/non-expired payment attempt per order; a confirmed successful payment cannot be double-charged by a second attempt."
       ]
     },
     "payment_provider_events": {
