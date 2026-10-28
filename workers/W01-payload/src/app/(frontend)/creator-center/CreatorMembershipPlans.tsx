@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
+import { useRouter } from 'next/navigation'
 
 import { fetchJson, getApiErrorMessage } from '../../../lib/client-api.js'
 
@@ -49,11 +50,6 @@ const isPlan = (value: unknown): value is MembershipPlan => {
     typeof plan.createdAt === 'string' && !Number.isNaN(Date.parse(plan.createdAt)) &&
     typeof plan.updatedAt === 'string' && !Number.isNaN(Date.parse(plan.updatedAt)) &&
     typeof plan.replayed === 'boolean'
-}
-
-function goToMembershipLogin(): void {
-  const returnTo = window.location.pathname + window.location.search + '#membership-plans'
-  window.location.assign('/login?returnTo=' + encodeURIComponent(returnTo))
 }
 
 function formatPrice(priceMinor: number, currency: string, locale: StudioLocale): string {
@@ -156,6 +152,11 @@ const copy = (locale: StudioLocale) => locale === 'en-US' ? {
 
 export default function CreatorMembershipPlans({ locale = 'zh-CN' }: { locale?: StudioLocale }) {
   const labels = copy(locale)
+  const router = useRouter()
+  const redirectToLogin = useCallback(() => {
+    const returnTo = window.location.pathname + window.location.search + '#membership-plans'
+    router.push('/login?returnTo=' + encodeURIComponent(returnTo))
+  }, [router])
   const [plans, setPlans] = useState<MembershipPlan[]>([])
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -173,9 +174,6 @@ export default function CreatorMembershipPlans({ locale = 'zh-CN' }: { locale?: 
   const [createKey, setCreateKey] = useState('')
 
   const loadPlans = useCallback(async (append = false, cursorValue: string | null = null) => {
-    if (append) setLoadingMore(true)
-    else setLoading(true)
-    setError('')
     try {
       const query = new URLSearchParams({ limit: '20' })
       if (cursorValue) query.set('cursor', cursorValue)
@@ -183,10 +181,11 @@ export default function CreatorMembershipPlans({ locale = 'zh-CN' }: { locale?: 
         '/api/v1/membership/plans?' + query.toString(),
         { credentials: 'include', cache: 'no-store', headers: { accept: 'application/json' } },
       )
-      if (response.status === 401) { goToMembershipLogin(); return }
+      if (response.status === 401) { redirectToLogin(); return }
       if (!response.ok || !Array.isArray(data?.data?.docs) || !data.data.docs.every(isPlan)) {
         throw new Error(getApiErrorMessage(data, labels.loadError))
       }
+      setError('')
       setPlans((current) => append ? [...current, ...data.data!.docs!] : data.data!.docs!)
       setNextCursor(typeof data.data.nextCursor === 'string' ? data.data.nextCursor : null)
       setHasMore(data.data.hasMore === true && typeof data.data.nextCursor === 'string')
@@ -196,7 +195,7 @@ export default function CreatorMembershipPlans({ locale = 'zh-CN' }: { locale?: 
       setLoading(false)
       setLoadingMore(false)
     }
-  }, [labels.loadError])
+  }, [labels.loadError, redirectToLogin])
 
   useEffect(() => { void loadPlans(false, null) }, [loadPlans])
 
@@ -237,7 +236,7 @@ export default function CreatorMembershipPlans({ locale = 'zh-CN' }: { locale?: 
           priceMinor, currency: 'USD', benefits: rawBenefits,
         }),
       })
-      if (response.status === 401) { goToMembershipLogin(); return }
+      if (response.status === 401) { redirectToLogin(); return }
       if (!response.ok || !isPlan(data?.data) || data.data.status !== 'DRAFT') {
         throw new Error(getApiErrorMessage(data, labels.actionError))
       }
@@ -273,7 +272,7 @@ export default function CreatorMembershipPlans({ locale = 'zh-CN' }: { locale?: 
         },
         ...(lifecycle ? { body: JSON.stringify({ action }) } : {}),
       })
-      if (response.status === 401) { goToMembershipLogin(); return }
+      if (response.status === 401) { redirectToLogin(); return }
       if (response.status === 412) throw new Error(labels.stale)
       if (!response.ok || !isPlan(data?.data)) throw new Error(getApiErrorMessage(data, labels.actionError))
       setPlans((current) => current.map((item) => item.planId === plan.planId ? data.data! : item))
@@ -293,7 +292,7 @@ export default function CreatorMembershipPlans({ locale = 'zh-CN' }: { locale?: 
           <h2 className="mt-2 text-xl font-bold">{labels.title}</h2>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-light-secondary dark:text-dark-secondary">{labels.intro}</p>
         </div>
-        <button type="button" disabled={loading || loadingMore} onClick={() => void loadPlans(false, null)}
+        <button type="button" disabled={loading || loadingMore} onClick={() => { setLoading(true); setError(''); void loadPlans(false, null) }}
           className="shrink-0 rounded-full border border-light-border px-4 py-2 text-sm font-bold hover:bg-light-primary/10 disabled:opacity-50 dark:border-dark-border dark:hover:bg-dark-primary/10">
           {labels.reload}
         </button>
@@ -375,7 +374,7 @@ export default function CreatorMembershipPlans({ locale = 'zh-CN' }: { locale?: 
         })}
       </div>
       {hasMore && nextCursor ? <div className="border-t border-light-border p-5 text-center dark:border-dark-border">
-        <button type="button" disabled={loadingMore} onClick={() => void loadPlans(true, nextCursor)} className="rounded-full border border-light-border px-5 py-2 text-sm font-bold disabled:opacity-50 dark:border-dark-border">
+        <button type="button" disabled={loadingMore} onClick={() => { setLoadingMore(true); setError(''); void loadPlans(true, nextCursor) }} className="rounded-full border border-light-border px-5 py-2 text-sm font-bold disabled:opacity-50 dark:border-dark-border">
           {loadingMore ? labels.loading : (locale === 'en-US' ? 'Load more plans' : '加载更多方案')}
         </button>
       </div> : null}
