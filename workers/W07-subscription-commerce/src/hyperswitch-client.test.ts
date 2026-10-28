@@ -284,7 +284,7 @@ describe('Hyperswitch server-side payment intent client', () => {
       { ...base, paymentToken: '' },
       { ...base, customerAcceptance: { ...base.customerAcceptance, acceptedAt: 'not-a-date' } },
       { ...base, customerAcceptance: { ...base.customerAcceptance, ipAddress: '' } },
-      { ...base, customerAcceptance: { ...base.customerAcceptance, userAgent: 'bad\\nheader' } },
+      { ...base, customerAcceptance: { ...base.customerAcceptance, userAgent: 'bad\nheader' } },
     ]) {
       const fake = fakeFetch(jsonResponse(responsePayment()))
       await expect(confirmHyperswitchCustomerInitiatedSetupPayment(config, invalid, fake.fetcher))
