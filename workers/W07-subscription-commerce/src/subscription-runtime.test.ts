@@ -191,7 +191,7 @@ describe('subscription runtime', () => {
     expect(parseBoundedPositiveInt('50', 20, 50)).toBe(50)
     expect(parseBoundedPositiveInt('10000', 1, 10000)).toBe(10000)
   })
-  it('keeps subscription lifecycle POST disabled while admitting only creator draft creation', () => {
+  it('keeps subscription lifecycle POST disabled while admitting guarded creator-plan lifecycle operations', () => {
     const index = readFileSync(new URL('./index.ts', import.meta.url), 'utf8')
     const operationResolution = index.indexOf('const operation = toOperation')
     const guard = index.indexOf("if (request.method === 'POST' && operation?.operation !== 'createPlan')")
@@ -200,6 +200,8 @@ describe('subscription runtime', () => {
     expect(index).toContain("'SERVICE_UNAVAILABLE'")
     expect(index).toContain('verified payment-provider synchronization is available')
     expect(index).toContain('createMembershipPlanDraft(')
+    expect(index).toContain('publishPathMatch')
+    expect(index).toContain('publishMembershipPlan(')
     expect(index).not.toContain('createSubscription(')
     expect(index).not.toContain('transitionSubscription(')
     expect(index).not.toContain('changeSubscriptionPlan(')
@@ -272,6 +274,67 @@ describe('subscription runtime', () => {
     // The API contract specifies minimum L3; higher layers must not be rejected by an exact L3/L4 allowlist.
     const higherLayer = await w07.fetch(makeRequest('L5'), env)
     expect(higherLayer.status).toBe(200)
+  })
+
+  it('publishes only the verified creator-owned plan draft with If-Match CAS and exact retry replay', async () => {
+    const allowLimiter = { limit: async () => ({ success: true }) }
+    const planId = 'plan_' + 'a'.repeat(64)
+    const db = fakeDb([], [activePlan(planId, {
+      current_version: 1,
+      status: 'DRAFT',
+      visibility: 'PRIVATE',
+      version: 1,
+    })])
+    const env = {
+      D1_01: db,
+      SUBSCRIPTION_ORIGIN_GLOBAL_LIMITER: allowLimiter,
+      SUBSCRIPTION_READ_LIMITER: allowLimiter,
+      SUBSCRIPTION_WRITE_LIMITER: allowLimiter,
+    }
+    const makeRequest = (options: { layer?: string; creatorId?: string; ifMatch?: string | null } = {}) => {
+      const headers = new Headers({
+        'X-LuckRead-Caller': 'W01',
+        'X-LuckRead-Transport-Version': '1.0',
+        'X-LuckRead-Correlation-Id': 'plan-publish-route-test',
+        'X-LuckRead-Principal-User-Id': 'user_1',
+        'X-LuckRead-Principal-Layer': options.layer ?? 'L3',
+        'X-LuckRead-Verified-Creator-Id': options.creatorId ?? 'creator_1',
+      })
+      if (options.ifMatch !== null) headers.set('If-Match', options.ifMatch ?? '"lr-plan-v1"')
+      return new Request('https://luckread-w07.internal/membership/plans/' + planId + '/publish', {
+        method: 'POST',
+        headers,
+      })
+    }
+
+    const first = await w07.fetch(makeRequest(), env)
+    const firstBody = await first.json() as { data?: { planId?: string; status?: string; visibility?: string; version?: number; etag?: string; replayed?: boolean } }
+    expect(first.status).toBe(200)
+    expect(firstBody.data).toMatchObject({
+      planId,
+      status: 'ACTIVE',
+      visibility: 'PUBLIC',
+      version: 2,
+      etag: '"lr-plan-v2"',
+      replayed: false,
+    })
+
+    const replay = await w07.fetch(makeRequest({ ifMatch: '"lr-plan-v1"' }), env)
+    const replayBody = await replay.json() as { data?: { planId?: string; version?: number; replayed?: boolean } }
+    expect(replay.status).toBe(200)
+    expect(replayBody.data).toMatchObject({ planId, version: 2, replayed: true })
+
+    const stale = await w07.fetch(makeRequest({ ifMatch: '"lr-plan-v9"' }), env)
+    expect(stale.status).toBe(412)
+
+    const otherOwner = await w07.fetch(makeRequest({ creatorId: 'creator_2' }), env)
+    expect(otherOwner.status).toBe(404)
+
+    const lowerLayer = await w07.fetch(makeRequest({ layer: 'L2' }), env)
+    expect(lowerLayer.status).toBe(403)
+
+    const missingEtag = await w07.fetch(makeRequest({ ifMatch: null }), env)
+    expect(missingEtag.status).toBe(428)
   })
 
   it('denies plan creation if W01 did not provide the W08-verified creator identity', async () => {
