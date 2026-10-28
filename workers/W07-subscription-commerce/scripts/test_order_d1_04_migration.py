@@ -8,6 +8,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[3]
 WORKER = ROOT / "workers" / "W07-subscription-commerce"
 MIGRATION = WORKER / "migrations-d1-04" / "0001_order_commerce.sql"
+PAYMENT_MIGRATION = WORKER / "migrations-d1-04" / "0002_payment_provider_events.sql"
 CONFIG = WORKER / "wrangler.jsonc"
 NOW = "2026-10-28T00:00:00.000Z"
 LATER = "2026-10-28T00:00:01.000Z"
@@ -17,6 +18,7 @@ class D104OrderMigrationTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.sql = MIGRATION.read_text(encoding="utf-8")
+        cls.payment_sql = PAYMENT_MIGRATION.read_text(encoding="utf-8")
         config = json.loads(CONFIG.read_text(encoding="utf-8"))
         bindings = {item["binding"]: item for item in config["d1_databases"]}
         if bindings["D1_01"]["migrations_dir"] != "migrations":
@@ -29,6 +31,7 @@ class D104OrderMigrationTests(unittest.TestCase):
     def setUp(self):
         self.db = sqlite3.connect(":memory:")
         self.db.executescript(self.sql)
+        self.db.executescript(self.payment_sql)
 
     def tearDown(self):
         self.db.close()
@@ -73,16 +76,49 @@ class D104OrderMigrationTests(unittest.TestCase):
              response_status, response, NOW, "2026-10-29T00:00:00.000Z"),
         )
 
+    def payment(self, payment_id="pay_" + "a"*26, order_id="ord_1", customer="user_1",
+                provider="hyperswitch", merchant="merchant_1", amount=1000, currency="USD",
+                status="INITIATING", version=1, idempotency_key="payment_key_1",
+                request_hash="b"*64, provider_updated_at=None, failure_code=None,
+                created=NOW, updated=NOW):
+        self.db.execute(
+            """INSERT INTO payments(payment_id,order_id,customer_id,provider,merchant_id,
+               amount_minor,currency,status,version,idempotency_key,request_hash,
+               provider_updated_at,failure_code,created_at,updated_at)
+               VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (payment_id, order_id, customer, provider, merchant, amount, currency, status,
+             version, idempotency_key, request_hash, provider_updated_at, failure_code, created, updated),
+        )
+
+    def provider_event(self, row_id="evtrow_1", merchant="merchant_1", event_id="evt_1",
+                       event_type="payment_succeeded", payment_id="pay_" + "a"*26,
+                       payload_hash="c"*64, state="RECEIVED", received=NOW,
+                       processed=None, outcome=None):
+        self.db.execute(
+            """INSERT INTO payment_provider_events(event_row_id,provider,merchant_id,event_id,
+               event_type,payment_id,payload_sha256,state,received_at,processed_at,outcome_code)
+               VALUES(?,?,?,?,?,?,?,?,?,?,?)""",
+            (row_id, "hyperswitch", merchant, event_id, event_type, payment_id,
+             payload_hash, state, received, processed, outcome),
+        )
+
     def test_only_expected_tables_and_indexes_exist(self):
         tables = {row[0] for row in self.db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
-        self.assertEqual(tables, {"orders", "order_lines", "order_create_idempotency"})
+        self.assertEqual(tables, {
+            "orders", "order_lines", "order_create_idempotency", "payments", "payment_provider_events",
+        })
         indexes = {row[0] for row in self.db.execute("SELECT name FROM sqlite_master WHERE type='index' AND sql IS NOT NULL")}
         self.assertTrue({
             "ix_orders_customer_created_order", "ix_orders_status_created_order",
             "ix_order_lines_order_id", "ix_order_lines_item_ref_version",
             "ix_order_create_idempotency_customer_created", "ix_order_create_idempotency_expiration",
+            "ix_payments_customer_created_payment", "ix_payments_order_created_payment",
+            "ix_payments_status_updated_payment", "ix_payment_provider_events_state_received",
+            "ix_payment_provider_events_payment_received",
         }.issubset(indexes))
-        self.assertFalse(tables.intersection({"payments", "payment_intents", "ledger_entries", "refunds", "entitlements"}))
+        self.assertFalse(tables.intersection({"payment_intents", "ledger_entries", "refunds", "entitlements"}))
+        self.assertNotIn("client_secret", {r[1] for r in self.db.execute('PRAGMA table_info("payments")')})
+        self.assertNotIn("raw_body", {r[1] for r in self.db.execute('PRAGMA table_info("payment_provider_events")')})
 
     def test_order_insert_requires_matching_completed_idempotency_result(self):
         with self.assertRaises(sqlite3.IntegrityError):
@@ -188,6 +224,106 @@ class D104OrderMigrationTests(unittest.TestCase):
         )
         with self.assertRaises(sqlite3.IntegrityError):
             self.db.execute("UPDATE order_create_idempotency SET response_json=? WHERE id='idem_pending'", ('{"data":2}',))
+
+
+    def test_payment_must_match_an_owned_positive_order_snapshot(self):
+        self.order()
+        invalid = [
+            {"payment_id":"pay_" + "z"*26, "customer":"other_user"},
+            {"payment_id":"pay_" + "y"*26, "amount":999},
+            {"payment_id":"pay_" + "x"*26, "currency":"EUR"},
+            {"payment_id":"pay_short"},
+            {"payment_id":"pay_" + "bad!" + "a"*22},
+        ]
+        for i, kwargs in enumerate(invalid):
+            with self.subTest(i=i), self.assertRaises(sqlite3.IntegrityError):
+                self.payment(payment_id="pay_" + chr(ord("b")+i)*26,
+                             **{k:v for k,v in kwargs.items() if k != "payment_id"})
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.payment(order_id="missing")
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.payment(provider="unknown_gateway")
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.payment(amount=0)
+        self.payment()
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.payment(payment_id="pay_" + "d"*26, idempotency_key="payment_key_1")
+
+    def test_payment_snapshot_cas_provider_timestamp_and_terminal_status_guards(self):
+        self.order()
+        self.payment()
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute("UPDATE payments SET amount_minor=900 WHERE payment_id=?", ("pay_" + "a"*26,))
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute(
+                "UPDATE payments SET status='requires_payment_method',updated_at=? WHERE payment_id=?",
+                (LATER, "pay_" + "a"*26),
+            )
+        self.db.execute(
+            """UPDATE payments SET status='requires_payment_method',version=2,
+               provider_updated_at=?,updated_at=? WHERE payment_id=? AND version=1""",
+            (LATER, LATER, "pay_" + "a"*26),
+        )
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute(
+                """UPDATE payments SET status='processing',version=3,
+                   provider_updated_at=?,updated_at=? WHERE payment_id=? AND version=2""",
+                (LATER, "2026-10-28T00:00:02.000Z", "pay_" + "a"*26),
+            )
+        self.db.execute(
+            """UPDATE payments SET status='succeeded',version=3,
+               provider_updated_at=?,updated_at=? WHERE payment_id=? AND version=2""",
+            ("2026-10-28T00:00:02.000Z", "2026-10-28T00:00:02.000Z", "pay_" + "a"*26),
+        )
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute(
+                """UPDATE payments SET status='processing',version=4,
+                   provider_updated_at=?,updated_at=? WHERE payment_id=? AND version=3""",
+                ("2026-10-28T00:00:03.000Z", "2026-10-28T00:00:03.000Z", "pay_" + "a"*26),
+            )
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute("DELETE FROM payments WHERE payment_id=?", ("pay_" + "a"*26,))
+
+    def test_webhook_inbox_enforces_deduplication_and_terminal_immutability(self):
+        self.provider_event()
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.provider_event(row_id="evtrow_dup", payload_hash="d"*64)
+        self.db.execute(
+            """UPDATE payment_provider_events SET state='APPLIED',processed_at=?,outcome_code='APPLIED'
+               WHERE event_row_id='evtrow_1'""",
+            (LATER,),
+        )
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute(
+                "UPDATE payment_provider_events SET outcome_code='RECONCILIATION_REQUIRED' WHERE event_row_id='evtrow_1'"
+            )
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute("DELETE FROM payment_provider_events WHERE event_row_id='evtrow_1'")
+
+    def test_webhook_inbox_rejects_incomplete_or_malformed_deduplication_facts(self):
+        invalid = [
+            {"event_id":""},
+            {"payload_hash":"g"*64},
+            {"state":"APPLIED", "processed":None},
+            {"state":"RECEIVED", "processed":LATER},
+        ]
+        for i, kwargs in enumerate(invalid):
+            with self.subTest(i=i), self.assertRaises(sqlite3.IntegrityError):
+                self.provider_event(
+                    row_id="bad_evt_"+str(i),
+                    event_id=kwargs.get("event_id","evt_"+str(i)),
+                    payload_hash=kwargs.get("payload_hash","c"*64),
+                    state=kwargs.get("state","RECEIVED"),
+                    processed=kwargs.get("processed"),
+                )
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute(
+                """INSERT INTO payment_provider_events(event_row_id,provider,merchant_id,event_id,
+                   event_type,payment_id,payload_sha256,state,received_at)
+                   VALUES('bad_provider','another_provider','merchant_1','evt_provider',
+                   'payment_succeeded',NULL,?,'RECEIVED',?)""",
+                ("c"*64, NOW),
+            )
 
 
 if __name__ == "__main__":
