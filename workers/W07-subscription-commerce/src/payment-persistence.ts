@@ -877,15 +877,31 @@ async function persistAndApplyProviderStatus(
 
   let renewalCycleOutcomeRequired: { cycleId: string; targetState: 'SUCCEEDED' | 'FAILED' | 'RECONCILIATION_REQUIRED' } | null = null;
   if (renewalCycleTarget !== null) {
-    const renewalCycle = await db.prepare(
-      'SELECT cycle_id, state, version, updated_at FROM subscription_renewal_cycles ' +
-      'WHERE payment_id = ? AND provider = ? AND merchant_id = ? LIMIT 1',
-    ).bind(payment.payment_id, PROVIDER, payment.merchant_id).first<{
+    let renewalCycle: {
       cycle_id: string;
       state: 'SUBMITTING' | 'SUBMITTED' | RenewalCycleWebhookState;
       version: number;
       updated_at: string;
-    }>();
+    } | null = null;
+    try {
+      renewalCycle = await db.prepare(
+        'SELECT cycle_id, state, version, updated_at FROM subscription_renewal_cycles ' +
+        'WHERE payment_id = ? AND provider = ? AND merchant_id = ? LIMIT 1',
+      ).bind(payment.payment_id, PROVIDER, payment.merchant_id).first<{
+        cycle_id: string;
+        state: 'SUBMITTING' | 'SUBMITTED' | RenewalCycleWebhookState;
+        version: number;
+        updated_at: string;
+      }>();
+    } catch (error) {
+      // Before migration 0004 is applied there cannot be any durable renewal
+      // cycle rows. Do not let this new optional capability break ordinary
+      // customer-present checkout webhooks; all other D1 read failures retry.
+      const message = error instanceof Error ? error.message : String(error);
+      if (!/no such table:\s*subscription_renewal_cycles/i.test(message)) {
+        throw new PaymentPersistenceError('SERVICE_UNAVAILABLE', 503);
+      }
+    }
     if (renewalCycle && ['SUBMITTING', 'SUBMITTED'].includes(renewalCycle.state)) {
       renewalCycleOutcomeRequired = { cycleId: renewalCycle.cycle_id, targetState: renewalCycleTarget };
       const cycleUpdatedAt = strictlyAfter(now, renewalCycle.updated_at);
