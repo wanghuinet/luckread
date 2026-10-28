@@ -641,16 +641,24 @@ function readVerifiedSetupConsent(
     resource.amount !== payment.amount_minor ||
     resource.currency !== payment.currency ||
     resource.status !== 'succeeded' ||
-    resource.setup_future_usage !== 'off_session' ||
     typeof resource.payment_method_id !== 'string' ||
     !nonBlank(resource.payment_method_id, 255) ||
     !/^[\\x21-\\x7e]{1,255}$/.test(resource.payment_method_id)
   ) return null;
 
-  const acceptance = resource.customer_acceptance;
+  // Hyperswitch's documented outgoing payment webhook nests acceptance under
+  // mandate_data.customer_acceptance; unlike the confirmation request, this
+  // response shape does not require an acceptance_type field.
+  const mandateData = resource.mandate_data;
+  if (typeof mandateData !== 'object' || mandateData === null || Array.isArray(mandateData)) return null;
+  const mandate = mandateData as Record<string, unknown>;
+  const acceptance = mandate.customer_acceptance;
   if (typeof acceptance !== 'object' || acceptance === null || Array.isArray(acceptance)) return null;
   const accepted = acceptance as Record<string, unknown>;
-  if (accepted.acceptance_type !== 'online' || typeof accepted.accepted_at !== 'string') return null;
+  if (
+    (accepted.acceptance_type !== undefined && accepted.acceptance_type !== 'online') ||
+    typeof accepted.accepted_at !== 'string'
+  ) return null;
   const online = accepted.online;
   if (typeof online !== 'object' || online === null || Array.isArray(online)) return null;
   const onlineFacts = online as Record<string, unknown>;
