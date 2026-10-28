@@ -39,9 +39,13 @@ jobs:
           set -euo pipefail
           [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
           [[ "$DEPLOY_CONFIRM" == "DEPLOY_W07_CRON_ONLY" ]]
+          MAIN_SHA="$(git rev-parse origin/main)"
+          if [[ "$SOURCE_SHA" != "$MAIN_SHA" ]]; then
+            echo "::error::source_sha must equal the current reviewed main HEAD ($MAIN_SHA); refusing to deploy an older Worker snapshot."
+            exit 1
+          fi
           git cat-file -e "$SOURCE_SHA^{commit}"
-          git merge-base --is-ancestor "$SOURCE_SHA" origin/main
-          echo "Validated source SHA is an ancestor of reviewed main."
+          echo "Validated source SHA exactly matches the reviewed main HEAD."
 
       - name: Checkout validated source commit
         env:
