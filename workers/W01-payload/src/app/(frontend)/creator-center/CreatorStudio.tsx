@@ -2,6 +2,7 @@ import Link from 'next/link'
 import React from 'react'
 
 import CreatorLanguageToggle from './CreatorLanguageToggle'
+import CreatorMembershipPlans from './CreatorMembershipPlans'
 
 import CreatorContentList from '../../(payload)/v1beta/CreatorContentList'
 import CreatorCenterAssistant from '../../(payload)/v1beta/CreatorCenterAssistant'
@@ -48,6 +49,7 @@ const navigationByLocale: Record<StudioLocale, {
       { label: '内容管理', href: '#content', icon: 'fa-list-check' },
       { label: '审核与发布', href: '#quality', icon: 'fa-shield-halved' },
       { label: '素材库', href: '#assets', icon: 'fa-photo-film' },
+      { label: '会员方案', href: '#membership-plans', icon: 'fa-gem' },
     ],
     operate: [
       { label: '粉丝与关注', href: '#audience', icon: 'fa-users' },
@@ -73,6 +75,7 @@ const navigationByLocale: Record<StudioLocale, {
       { label: 'Content', href: '#content', icon: 'fa-list-check' },
       { label: 'Review & publish', href: '#quality', icon: 'fa-shield-halved' },
       { label: 'Media library', href: '#assets', icon: 'fa-photo-film' },
+      { label: 'Membership plans', href: '#membership-plans', icon: 'fa-gem' },
     ],
     operate: [
       { label: 'Audience', href: '#audience', icon: 'fa-users' },
@@ -337,6 +340,8 @@ export function CreatorStudio({
               </section>
 
               {adminMode ? <CreatorModerationQueue /> : null}
+
+              {!adminMode ? <CreatorMembershipPlans locale={locale} /> : null}
 
               <CreatorAudienceSummary userId={String(userId)} loginPath={adminMode ? '/admin/login' : '/login'} />
 
