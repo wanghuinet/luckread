@@ -253,7 +253,7 @@
       "cache": "NO_STORE"
     },
     {
-      "operationId": "createCustomerPaymentIntent",
+      "operationId": "postPaymentsIntents",
       "method": "POST",
       "publicPath": "/api/v1/payments/intents",
       "internalPath": "/commerce/orders/{orderId}/payment-intent",
