@@ -53,6 +53,59 @@ export async function callW06MembershipPlanAudit(input: {
   })
 }
 
+
+
+/** Durable intent record written before a membership plan becomes public. */
+export async function callW06MembershipPlanPublishRequestAudit(input: {
+  request: Request
+  principal: ContentPrincipal
+  body: {
+    eventId: string
+    planId: string
+    creatorId: string
+    expectedVersion: number
+    requestedStatus: 'ACTIVE'
+    requestedVisibility: 'PUBLIC'
+  }
+}): Promise<Response> {
+  return callW06Moderation({
+    request: input.request,
+    pathname: '/internal/audit-events/membership-plan-publish-requested',
+    method: 'POST',
+    principal: input.principal,
+    body: input.body,
+  })
+}
+
+/** Dedicated durable audit path for publishing an owned membership plan. */
+export async function callW06MembershipPlanPublishAudit(input: {
+  request: Request
+  principal: ContentPrincipal
+  body: {
+    eventId: string
+    planId: string
+    creatorId: string
+    planVersion: number
+    status: 'ACTIVE'
+    visibility: 'PUBLIC'
+    version: number
+    occurredAt: string
+    name: string
+    tier: string
+    billingInterval: 'MONTHLY' | 'YEARLY'
+    priceMinor: number
+    currency: string
+  }
+}): Promise<Response> {
+  return callW06Moderation({
+    request: input.request,
+    pathname: '/internal/audit-events/membership-plan-published',
+    method: 'POST',
+    principal: input.principal,
+    body: input.body,
+  })
+}
+
 /** Dedicated durable audit path for a validated, newly created W07 Order DTO. */
 export async function callW06CommerceOrderAudit(input: {
   request: Request

@@ -243,6 +243,7 @@
         "POST /v1/commerce/orders",
         "POST /v1/entitlements/check",
         "POST /v1/membership/plans",
+        "POST /v1/membership/plans/{planId}/publish",
         "POST /v1/memberships/subscriptions",
         "POST /v1/memberships/subscriptions/{subscriptionId}/cancel",
         "POST /v1/memberships/subscriptions/{subscriptionId}/change-plan",

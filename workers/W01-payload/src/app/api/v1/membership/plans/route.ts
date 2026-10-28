@@ -15,7 +15,7 @@ const errorResponse = (status: number, code: string, message: string) =>
 async function authorizePlanPermission(
   request: Request,
   principalUserId: string,
-  action: 'membership.plan.create.own' | 'membership.plan.read.own',
+  action: 'membership.plan.create.own' | 'membership.plan.read.own' | 'membership.plan.publish.own',
 ): Promise<Response | null> {
   const headers = new Headers(request.headers)
   headers.delete('host')

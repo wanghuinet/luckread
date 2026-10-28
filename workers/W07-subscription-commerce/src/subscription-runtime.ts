@@ -69,7 +69,7 @@ export const etagForVersion = (version: number): string => {
 }
 
 const versionFromEtag = (etag: string): number => {
-  const match = /^"lr-v([1-9]\d*)"$/.exec(etag)
+  const match = /^"lr-plan-v([1-9]\d*)"$/.exec(etag)
   if (!match?.[1]) throw new SubscriptionRuntimeError('PRECONDITION_FAILED', 412)
   const version = Number(match[1])
   if (!Number.isSafeInteger(version) || version < 1) throw new SubscriptionRuntimeError('PRECONDITION_FAILED', 412)
@@ -587,6 +587,106 @@ export async function createMembershipPlanDraft(
     etag: '"lr-plan-v1"',
     replayed: false,
   }
+}
+
+
+
+const planVersionFromEtag = (etag: string): number => {
+  const match = /^"lr-plan-v([1-9]\\d*)"$/.exec(etag)
+  if (!match?.[1]) throw new SubscriptionRuntimeError('PRECONDITION_FAILED', 412)
+  const version = Number(match[1])
+  if (!Number.isSafeInteger(version) || version < 1) throw new SubscriptionRuntimeError('PRECONDITION_FAILED', 412)
+  return version
+}
+
+/**
+ * Publish an owner's plan draft using an optimistic version precondition.
+ * Publishing only changes the existing D1-01 MembershipPlan lifecycle; it
+ * does not create a subscription, order, payment, or entitlement.
+ */
+export async function publishMembershipPlan(
+  db: D1Database,
+  verifiedCreatorId: string,
+  planIdInput: string,
+  ifMatchInput: string | null,
+): Promise<ReturnType<typeof mapMembershipPlan>> {
+  const creatorId = validatePrincipal(verifiedCreatorId)
+  const planId = ensureId(planIdInput)
+  const ifMatch = validateIfMatch(ifMatchInput)
+  const expectedVersion = planVersionFromEtag(ifMatch)
+
+  const readOwnedPlan = async (): Promise<MembershipPlanStoredRow | null> =>
+    db.prepare(
+      'SELECT p.plan_id, p.owner_id, p.current_version, p.status, p.visibility, p.version, p.created_at, p.updated_at, ' +
+      'v.name, v.tier, v.billing_interval, v.price_minor, v.currency, v.benefits_json ' +
+      'FROM membership_plans AS p INNER JOIN membership_plan_versions AS v ' +
+      'ON v.plan_id = p.plan_id AND v.plan_version = p.current_version ' +
+      "WHERE p.plan_id = ? AND p.owner_type = 'CREATOR' AND p.owner_id = ? LIMIT 1",
+    ).bind(planId, creatorId).first<MembershipPlanStoredRow>()
+
+  const current = await readOwnedPlan()
+  if (!current) throw new SubscriptionRuntimeError('RESOURCE_NOT_FOUND', 404)
+
+  if (current.version !== expectedVersion) {
+    // A retry after the exact state transition converged must produce the same
+    // result; any later mutation still requires the current ETag.
+    if (
+      current.status === 'ACTIVE' &&
+      current.visibility === 'PUBLIC' &&
+      current.version === expectedVersion + 1
+    ) return mapMembershipPlan(current, true)
+    throw new SubscriptionRuntimeError('PRECONDITION_FAILED', 412)
+  }
+
+  if (current.status === 'ACTIVE' && current.visibility === 'PUBLIC') {
+    return mapMembershipPlan(current, true)
+  }
+  if (current.status !== 'DRAFT' || current.visibility !== 'PRIVATE') {
+    throw new SubscriptionRuntimeError('INVALID_STATE', 409)
+  }
+
+  const updatedAt = nextUpdatedAt(current.updated_at)
+  let updated: { meta?: { changes?: number } }
+  try {
+    updated = await db.prepare(
+      "UPDATE membership_plans SET status = 'ACTIVE', visibility = 'PUBLIC', updated_at = ?, version = version + 1 " +
+      "WHERE plan_id = ? AND owner_type = 'CREATOR' AND owner_id = ? " +
+      "AND status = 'DRAFT' AND visibility = 'PRIVATE' AND version = ? " +
+      'AND EXISTS (SELECT 1 FROM membership_plan_versions AS v ' +
+      'WHERE v.plan_id = membership_plans.plan_id AND v.plan_version = membership_plans.current_version)',
+    ).bind(updatedAt, planId, creatorId, expectedVersion).run()
+  } catch {
+    throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
+  }
+
+  if (Number(updated.meta?.changes ?? 0) !== 1) {
+    const raced = await readOwnedPlan()
+    if (!raced) throw new SubscriptionRuntimeError('RESOURCE_NOT_FOUND', 404)
+    if (
+      raced.status === 'ACTIVE' &&
+      raced.visibility === 'PUBLIC' &&
+      raced.version === expectedVersion + 1
+    ) return mapMembershipPlan(raced, true)
+    throw new SubscriptionRuntimeError('PRECONDITION_FAILED', 412)
+  }
+
+  const published = await readOwnedPlan()
+  if (
+    !published ||
+    published.status !== 'ACTIVE' ||
+    published.visibility !== 'PUBLIC' ||
+    published.version !== expectedVersion + 1
+  ) throw new SubscriptionRuntimeError('INTEGRITY_VIOLATION', 500)
+
+  console.log(JSON.stringify({
+    event: 'membership.plan.published',
+    operation: 'publishMembershipPlan',
+    planId,
+    creatorId,
+    planVersion: published.current_version,
+    version: published.version,
+  }))
+  return mapMembershipPlan(published, false)
 }
 
 /** Owner-scoped plan list for the authenticated creator, including private drafts. */

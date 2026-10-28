@@ -99,6 +99,29 @@
       "auditTransportBinding": "W01-W06-moderation-http-binding.v1"
     },
     {
+      "operationId": "publishOwnMembershipPlan",
+      "method": "POST",
+      "publicPath": "/api/v1/membership/plans/{planId}/publish",
+      "internalPath": "/membership/plans/{planId}/publish",
+      "principalRequired": true,
+      "permission": "membership.plan.publish.own",
+      "minimumGlobalLayer": "L3",
+      "precondition": "If-Match",
+      "ownerId": "W08-resolved ACTIVE creator ID only; never taken from public query or body",
+      "requestBody": "NONE",
+      "cache": "NO_STORE",
+      "auditRequired": true,
+      "successRule": "W01 first validates owner authorization and obtains a durable W06 membership.plan.publish_requested intent event for the expected version; only then may W07 perform the owner-scoped DRAFT/PRIVATE to ACTIVE/PUBLIC version-CAS. W01 validates the W07 DTO and waits for W06 immutable membership.plan.published confirmation before returning success.",
+      "auditTransportBinding": "W01-W06-moderation-http-binding.v1",
+      "failurePolicy": {
+        "missingIfMatch": "428",
+        "staleVersion": "412",
+        "nonDraftState": "409",
+        "missingOrForeignOwnerPlan": "404",
+        "missingW06AuditConfirmation": "503; publish intent is written before W07 mutation, and final published event is retried/reconciled using the deterministic plan-version event ID"
+      }
+    },
+    {
       "operationId": "createCommerceOrder",
       "method": "POST",
       "publicPath": "/api/v1/commerce/orders",
