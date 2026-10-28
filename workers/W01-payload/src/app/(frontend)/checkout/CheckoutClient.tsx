@@ -148,7 +148,7 @@ export default function CheckoutClient({ orderId }: { orderId: string }) {
     try {
       const hyperClient = window.Hyper(publishableKey)
       const widgetSet = hyperClient.elements({ clientSecret: intent.clientSecret, locale: 'auto' })
-      paymentElement = widgetSet.create('payment', { layout: 'tabs', displaySavedPaymentMethodsCheckbox: true })
+      paymentElement = widgetSet.create('payment', { layout: 'tabs', displaySavedPaymentMethodsCheckbox: true, savedPaymentMethodsCheckboxCheckedByDefault: false })
       paymentElement.on('ready', () => { if (active) setReadyPaymentId(intent.paymentId) })
       paymentElement.mount('#luckread-payment-element')
       hyperRef.current = hyperClient
