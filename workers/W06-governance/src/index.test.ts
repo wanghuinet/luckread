@@ -656,7 +656,7 @@ describe('W06 runtime', () => {
     expect(replay.status).toBe(200)
     expect(await replay.json()).toMatchObject({ eventId: planLifecycleRequestAuditInput.eventId, action: 'membership.plan.lifecycle_requested', replayed: true })
     const conflict = await runtime.default.fetch(
-      planLifecycleRequestAuditRequest({ ...planLifecycleRequestAuditInput, requestedVisibility: 'PUBLIC' }), { D1_03: db },
+      planLifecycleRequestAuditRequest({ ...planLifecycleRequestAuditInput, creatorId: 'creator_002' }), { D1_03: db },
     )
     expect(conflict.status).toBe(409)
     expect(rows.size).toBe(1)
