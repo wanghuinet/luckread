@@ -67,7 +67,7 @@ export interface HyperswitchPayment {
   /** Sensitive provider value; keep server-side until an authorized checkout response needs it. */
   clientSecret: string | null;
   /** Opaque Hyperswitch vault reference; not consent evidence and not a fulfillment signal. */
-  paymentMethodId: string | null;
+  paymentMethodId?: string | null;
 }
 
 export type HyperswitchClientErrorCode =
@@ -251,7 +251,7 @@ function normalizePayment(value: unknown): HyperswitchPayment {
       paymentMethodId.length === 0 ||
       paymentMethodId.length > 256 ||
       paymentMethodId.trim() !== paymentMethodId ||
-      /[\\u0000-\\u001f\\u007f]/.test(paymentMethodId)
+      /[\u0000-\u001f\u007f]/.test(paymentMethodId)
     ))
   ) {
     throw new HyperswitchClientError('UPSTREAM_INVALID_RESPONSE', 'Hyperswitch returned a malformed payment object.');
