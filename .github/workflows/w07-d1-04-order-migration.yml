@@ -63,6 +63,8 @@ jobs:
           test -f migrations-d1-04/0001_order_commerce.sql
           test -f migrations-d1-04/0002_payment_provider_events.sql
           test -f migrations-d1-04/0003_saved_payment_methods_mandates.sql
+          test -f migrations-d1-04/0004_subscription_renewal_cycles.sql
+          python scripts/test_order_d1_04_migration.py
           test -f scripts/verify-d1-04-order-migration.mjs
           node - <<'NODE'
           const fs = require('node:fs')
@@ -164,6 +166,8 @@ jobs:
           npx --yes wrangler@4.116.0 d1 execute "$D1_04_NAME" --remote --config wrangler.jsonc --command='PRAGMA table_info("payment_provider_event_conflicts")' --json > /tmp/w07-d1-04-payment-provider-event-conflicts-columns.json
           npx --yes wrangler@4.116.0 d1 execute "$D1_04_NAME" --remote --config wrangler.jsonc --command='PRAGMA table_info("saved_payment_methods")' --json > /tmp/w07-d1-04-saved-payment-methods-columns.json
           npx --yes wrangler@4.116.0 d1 execute "$D1_04_NAME" --remote --config wrangler.jsonc --command='PRAGMA table_info("payment_mandates")' --json > /tmp/w07-d1-04-payment-mandates-columns.json
+          npx --yes wrangler@4.116.0 d1 execute "$D1_04_NAME" --remote --config wrangler.jsonc --command='PRAGMA table_info("subscription_renewal_cycles")' --json > /tmp/w07-d1-04-renewal-cycles-columns.json
+          npx --yes wrangler@4.116.0 d1 execute "$D1_04_NAME" --remote --config wrangler.jsonc --command='PRAGMA table_info("subscription_renewal_scheduler_state")' --json > /tmp/w07-d1-04-renewal-scheduler-state-columns.json
           node scripts/verify-d1-04-order-migration.mjs postflight \
             /tmp/w07-d1-04-preflight-schema.json \
             /tmp/w07-d1-04-postflight-schema.json \
@@ -176,6 +180,8 @@ jobs:
             /tmp/w07-d1-04-payment-provider-event-conflicts-columns.json \
             /tmp/w07-d1-04-saved-payment-methods-columns.json \
             /tmp/w07-d1-04-payment-mandates-columns.json \
+            /tmp/w07-d1-04-renewal-cycles-columns.json \
+            /tmp/w07-d1-04-renewal-scheduler-state-columns.json \
             /tmp/w07-d1-04-postflight-report.json
 
       - name: Summarize migration and schema verification
@@ -199,6 +205,7 @@ jobs:
               echo '- Postflight: not completed; inspect the failed step before any retry.'
             fi
             echo '- Worker deployment: not performed by this workflow.'
+            echo '- Recurring renewal scheduling requires the existing W10 queue runtime and an admitted pricing/tax authority; this migration alone does not enable live charges.'
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload migration evidence
