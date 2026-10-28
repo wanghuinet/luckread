@@ -37,6 +37,19 @@ CREATE TABLE payments (
   updated_at TEXT NOT NULL CHECK (length(updated_at) BETWEEN 1 AND 64 AND updated_at >= created_at),
   UNIQUE (customer_id, order_id, idempotency_key)
 );
+CREATE TRIGGER payments_require_payable_order
+BEFORE INSERT ON payments
+WHEN NOT EXISTS (
+  SELECT 1 FROM orders
+  WHERE order_id = NEW.order_id
+    AND customer_id = NEW.customer_id
+    AND currency = NEW.currency
+    AND total_minor = NEW.amount_minor
+    AND total_minor > 0
+    AND status IN ('CREATED','PENDING_PAYMENT')
+)
+BEGIN SELECT RAISE(ABORT, 'payment requires a matching positive payable order'); END;
+
 CREATE INDEX ix_payments_customer_created_payment ON payments(customer_id, created_at, payment_id);
 CREATE INDEX ix_payments_order_created_payment ON payments(order_id, created_at, payment_id);
 CREATE INDEX ix_payments_status_updated_payment ON payments(status, updated_at, payment_id);
