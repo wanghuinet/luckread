@@ -122,6 +122,8 @@ type ProviderEventConflictRow = {
   resolution_code: string | null;
 };
 
+type RenewalCycleWebhookState = 'AWAITING_PRICING' | 'AWAITING_MANDATE' | 'PREPARED' | 'PAYMENT_READY' | 'SUCCEEDED' | 'FAILED' | 'RECONCILIATION_REQUIRED';
+
 type PaymentMandateRow = {
   mandate_record_id: string;
   provider: string;
@@ -852,6 +854,57 @@ async function persistAndApplyProviderStatus(
       payment.payment_id, canonicalProviderUpdatedAt,
       PROVIDER, envelope.merchantId, envelope.eventId, payloadSha256,
     ));
+  }
+
+  // The verified payment event is also the durable cycle outcome signal.
+  // Only a matched renewal Order can close a cycle as paid; an unknown/mismatched
+  // Order becomes reconciliation-required and never grants D1-01 entitlement.
+  const renewalCycleTarget: 'SUCCEEDED' | 'FAILED' | 'RECONCILIATION_REQUIRED' | null =
+    providerStatus === 'succeeded'
+      ? (order !== null &&
+          order.order_id === payment.order_id &&
+          order.customer_id === payment.customer_id &&
+          order.currency === payment.currency &&
+          order.total_minor === payment.amount_minor &&
+          ['CREATED', 'PENDING_PAYMENT', 'CONFIRMED', 'PROCESSING', 'COMPLETED'].includes(order.status))
+        ? 'SUCCEEDED'
+        : 'RECONCILIATION_REQUIRED'
+      : ['failed', 'cancelled', 'expired'].includes(providerStatus)
+        ? 'FAILED'
+        : providerStatus === 'cancelled_post_capture'
+          ? 'RECONCILIATION_REQUIRED'
+          : null;
+
+  if (renewalCycleTarget !== null) {
+    const renewalCycle = await db.prepare(
+      'SELECT cycle_id, state, version, updated_at FROM subscription_renewal_cycles ' +
+      'WHERE payment_id = ? AND provider = ? AND merchant_id = ? LIMIT 1',
+    ).bind(payment.payment_id, PROVIDER, payment.merchant_id).first<{
+      cycle_id: string;
+      state: 'SUBMITTING' | 'SUBMITTED' | RenewalCycleWebhookState;
+      version: number;
+      updated_at: string;
+    }>();
+    if (renewalCycle && ['SUBMITTING', 'SUBMITTED'].includes(renewalCycle.state)) {
+      const cycleUpdatedAt = strictlyAfter(now, renewalCycle.updated_at);
+      const renewalOutcomeCode = renewalCycleTarget === 'RECONCILIATION_REQUIRED'
+        ? (providerStatus === 'succeeded' ? 'SUCCEEDED_PAYMENT_ORDER_BINDING_REQUIRED' : 'POST_CAPTURE_CANCELLATION_REQUIRES_RECONCILIATION')
+        : null;
+      statements.push(db.prepare(
+        'UPDATE subscription_renewal_cycles SET state = ?, provider_response_status = ?, outcome_code = ?, ' +
+        'lease_token = NULL, lease_expires_at = NULL, version = version + 1, updated_at = ? ' +
+        'WHERE cycle_id = ? AND version = ? AND state = ? ' +
+        'AND EXISTS (SELECT 1 FROM payments p WHERE p.payment_id = ? AND p.provider = ? AND p.merchant_id = ? ' +
+        'AND p.status = ? AND p.provider_updated_at = ?) ' +
+        'AND EXISTS (SELECT 1 FROM payment_provider_events e WHERE e.provider = ? AND e.merchant_id = ? ' +
+        'AND e.event_id = ? AND e.payload_sha256 = ? AND e.state = "RECEIVED")',
+      ).bind(
+        renewalCycleTarget, providerStatus, renewalOutcomeCode, cycleUpdatedAt,
+        renewalCycle.cycle_id, renewalCycle.version, renewalCycle.state,
+        payment.payment_id, PROVIDER, payment.merchant_id, providerStatus, canonicalProviderUpdatedAt,
+        PROVIDER, envelope.merchantId, envelope.eventId, payloadSha256,
+      ));
+    }
   }
 
   if (setupConsent) {
