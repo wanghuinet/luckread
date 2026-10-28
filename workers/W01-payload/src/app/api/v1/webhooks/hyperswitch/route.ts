@@ -32,13 +32,13 @@ async function readBoundedRawBody(request: Request): Promise<ArrayBuffer | Respo
       if (part.done) break
       length += part.value.byteLength
       if (length > MAX_WEBHOOK_BODY_BYTES) {
-        await reader.cancel().catch(() => undefined)
+        await reader.cancel().catch((): undefined => undefined)
         return errorResponse(413, 'WEBHOOK_REJECTED', 'Webhook request is too large')
       }
       chunks.push(part.value)
     }
   } catch {
-    await reader.cancel().catch(() => undefined)
+    await reader.cancel().catch((): undefined => undefined)
     return errorResponse(400, 'WEBHOOK_REJECTED', 'Webhook body could not be read')
   } finally {
     reader.releaseLock()
