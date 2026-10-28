@@ -194,10 +194,8 @@ describe('Hyperswitch server-side payment intent client', () => {
       currency: input.currency,
       customer_id: mitInput.customerId,
       confirm: true,
-      capture_method: 'automatic',
       off_session: true,
       recurring_details: { type: 'payment_method_id', data: mitInput.paymentMethodId },
-      mit_category: 'recurring',
     })
     expect(payment.status).toBe('succeeded')
   })
