@@ -94,10 +94,13 @@ class MemoryPaymentD1 {
 
   async run<T>(sql: string, values: unknown[]): Promise<D1Result<T>> {
     if (sql.startsWith('INSERT INTO payments')) {
-      const [paymentId, orderId, customerId, provider, merchantId, amount, currency, status,
-        version, key, requestHash, providerUpdatedAt, failureCode, createdAt, updatedAt] = values as
-        [string, string, string, string, string, number, string, PaymentAttemptStatus, number, string,
-          string, string | null, string | null, string, string];
+      const [paymentId, orderId, customerId, merchantId, amount, currency, key, requestHash, createdAt, updatedAt] = values as
+        [string, string, string, string, number, string, string, string, string, string];
+      const provider = 'hyperswitch';
+      const status: PaymentAttemptStatus = 'INITIATING';
+      const version = 1;
+      const providerUpdatedAt: string | null = null;
+      const failureCode: string | null = null;
       const order = this.orders.find(o => o.order_id === orderId && o.customer_id === customerId &&
         o.currency === currency && o.total_minor === amount && amount > 0 &&
         ['CREATED', 'PENDING_PAYMENT'].includes(o.status));
@@ -285,14 +288,14 @@ describe('PAY-001 payment attempt persistence candidate', () => {
         db as unknown as D1Database, CUSTOMER, PAYMENT_ID, 'another_merchant',
         { ...providerPayment, merchantId: 'another_merchant' }, { now: () => new Date(LATER) },
       ),
-      'SERVICE_UNAVAILABLE',
-    ).catch(() => undefined);
+      'WEBHOOK_REJECTED',
+    );
     await expectPaymentError(
       recordUnconfirmedHyperswitchIntent(
         db as unknown as D1Database, CUSTOMER, PAYMENT_ID, MERCHANT,
         { ...providerPayment, amount: 1199 }, { now: () => new Date(LATER) },
       ),
-      'CONFLICT',
+      'WEBHOOK_REJECTED',
     );
   });
 
