@@ -6,6 +6,7 @@ import {
   verifyD1_04OrderMigrationPostflight,
   ORDER_MIGRATION_ID,
   PAYMENT_MIGRATION_ID,
+  SAVED_METHOD_MIGRATION_ID,
   REQUIRED_MIGRATION_IDS,
   REQUIRED_COLUMNS,
   REQUIRED_INDEXES,
@@ -27,7 +28,9 @@ function targetObjectsFor(migrationIds) {
     ? ['orders', 'order_lines', 'order_create_idempotency']
     : id === PAYMENT_MIGRATION_ID
       ? ['payments', 'payment_provider_events', 'payment_provider_event_conflicts']
-      : [])
+      : id === SAVED_METHOD_MIGRATION_ID
+        ? ['saved_payment_methods', 'payment_mandates']
+        : [])
   const objects = tables.map((tableName) => ({
     type: 'table',
     name: tableName,
@@ -85,6 +88,8 @@ const tableInfo = {
   payments: tableInfoFor('payments'),
   paymentProviderEvents: tableInfoFor('payment_provider_events'),
   paymentProviderEventConflicts: tableInfoFor('payment_provider_event_conflicts'),
+  savedPaymentMethods: tableInfoFor('saved_payment_methods'),
+  paymentMandates: tableInfoFor('payment_mandates'),
 }
 
 function verifyCompletePostflight({ preflightSchema = schemaWithMigrations([]), postflightSchema = schemaWithMigrations(REQUIRED_MIGRATION_IDS), migrationState = wrapMigrationState(REQUIRED_MIGRATION_IDS) } = {}) {
@@ -98,6 +103,8 @@ function verifyCompletePostflight({ preflightSchema = schemaWithMigrations([]), 
     paymentsTableInfo: tableInfo.payments,
     paymentProviderEventsTableInfo: tableInfo.paymentProviderEvents,
     paymentProviderEventConflictsTableInfo: tableInfo.paymentProviderEventConflicts,
+    savedPaymentMethodsTableInfo: tableInfo.savedPaymentMethods,
+    paymentMandatesTableInfo: tableInfo.paymentMandates,
   })
 }
 
@@ -118,6 +125,13 @@ test('fails closed when Payment migration history exists without its Order prere
     schemaSnapshot: schemaWithMigrations([PAYMENT_MIGRATION_ID]),
     migrationState: wrapMigrationState([PAYMENT_MIGRATION_ID]),
   }), /payment migration is recorded without its required prior Order migration/)
+})
+
+test('fails closed when saved-method migration history exists without both earlier migrations', () => {
+  assert.throws(() => inspectD1_04OrderMigrationPreflight({
+    schemaSnapshot: schemaWithMigrations([SAVED_METHOD_MIGRATION_ID]),
+    migrationState: wrapMigrationState([SAVED_METHOD_MIGRATION_ID]),
+  }), /saved-method migration is recorded without its required Order and Payment migrations/)
 })
 
 test('an applied Order migration can advance only the pending Payment migration', () => {
@@ -167,9 +181,9 @@ test('postflight validates both migrations, all tables/columns/indexes/triggers,
   assert.equal(report.result, 'POSTFLIGHT_PASS')
   assert.equal(report.baselineSchemaPreserved, true)
   assert.deepEqual(report.appliedMigrations, REQUIRED_MIGRATION_IDS)
-  assert.equal(report.verifiedTables.length, 6)
-  assert.equal(report.verifiedIndexes.length, 14)
-  assert.equal(report.verifiedTriggers.length, 24)
+  assert.equal(report.verifiedTables.length, 8)
+  assert.equal(report.verifiedIndexes.length, 18)
+  assert.equal(report.verifiedTriggers.length, 36)
   assert.equal(report.databaseRowsExported, false)
 })
 
@@ -205,6 +219,9 @@ test('workflow is manual-only, gates exact SHA/name/confirmation, and never depl
   assert.match(workflow, /steps\.schema_preflight\.outputs\.action == 'APPLY'/)
   assert.match(workflow, /Capture read-only D1-04 schema after candidate migrations/)
   assert.match(workflow, /0002_payment_provider_events\.sql/)
+  assert.match(workflow, /0003_saved_payment_methods_mandates\.sql/)
+  assert.match(workflow, /PRAGMA table_info\("saved_payment_methods"\)/)
+  assert.match(workflow, /PRAGMA table_info\("payment_mandates"\)/)
   assert.match(workflow, /PRAGMA table_info\("payments"\)/)
   assert.match(workflow, /PRAGMA table_info\("payment_provider_events"\)/)
   assert.match(workflow, /PRAGMA table_info\("payment_provider_event_conflicts"\)/)
