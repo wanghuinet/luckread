@@ -280,7 +280,7 @@ describe('PAY-001 payment attempt persistence candidate', () => {
     const saved = await recordUnconfirmedHyperswitchIntent(
       db as unknown as D1Database, CUSTOMER, PAYMENT_ID, MERCHANT, providerPayment, { now: () => new Date(NOW) },
     );
-    expect(saved).toMatchObject({ status: 'requires_payment_method', version: 2, updatedAt: LATER });
+    expect(saved).toMatchObject({ status: 'requires_payment_method', version: 2, updatedAt: '2026-10-28T12:00:00.001Z' });
     expect(JSON.stringify(db.payments)).not.toContain('secret_must_not_persist');
 
     await expectPaymentError(
