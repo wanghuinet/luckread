@@ -359,6 +359,18 @@ describe('CASL L0-L8 authorization policy', () => {
       resourceType: 'Order',
       resourceAttributes: { ownerId: 'user-1' },
     })).toMatchObject({ decision: 'ALLOW' })
+    expect(evaluate({
+      layer: 'L3',
+      action: 'order.create',
+      resourceType: 'Order',
+      resourceAttributes: { ownerId: 'user-1' },
+    })).toMatchObject({ decision: 'ALLOW' })
+    expect(evaluate({
+      layer: 'L7',
+      action: 'order.read',
+      resourceType: 'Order',
+      resourceAttributes: { ownerId: 'user-1' },
+    })).toMatchObject({ decision: 'ALLOW' })
 
     for (const action of ['order.create', 'order.read']) {
       expect(evaluate({
