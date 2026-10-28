@@ -217,7 +217,10 @@
         "Mandate creation requires a matching saved method, successful customer/merchant-bound payment and provider event receipt in the same D1-04 batch.",
         "Consent evidence fields and source identities are immutable; updates require version CAS and monotonic provider timestamps.",
         "Mandate revocation or other terminal status transitions are handled by a later signed mandate webhook/reconciliation module.",
-        "No cross-D1 foreign keys or distributed transactions are used; D1-01 continues to own subscription entitlements."
+        "No cross-D1 foreign keys or distributed transactions are used; D1-01 continues to own subscription entitlements.",
+        "Only signature-verified mandate_active/mandate_revoked events with matching merchant, provider mandate ID, payment method ID and status may update mandate state.",
+        "Mandate webhook event IDs are durably deduplicated in payment_provider_events; stale timestamps, missing local identity, and forbidden reactivation are stored as reconciliation-required evidence.",
+        "A revoked mandate cannot be reactivated by an out-of-order mandate_active event."
       ]
     }
   },
@@ -231,11 +234,13 @@
     "migrationExecution": "CANDIDATE_ONLY_NOT_APPLIED",
     "signedProviderConsentEvidence": "REQUIRED",
     "paymentCustomerMerchantAmountCurrencyBinding": "REQUIRED",
-    "providerMandateActivation": "NOT_IMPLEMENTED_IN_THIS_MODULE",
+    "providerMandateActivation": "SOURCE_IMPLEMENTED_PENDING_CURRENT_HEAD_CI_AND_LIVE_WEBHOOK_EVIDENCE",
     "savedMethodTokenApiExposure": "NONE",
     "runtimePositive": "REQUIRED",
     "runtimeNegative": "REQUIRED",
-    "remoteRuntimeEvidence": "REQUIRED"
+    "remoteRuntimeEvidence": "REQUIRED",
+    "signedMandateWebhookProcessing": "REQUIRED",
+    "mandateReplayAndOutOfOrderHandling": "REQUIRED"
   },
   "nonGoals": [
     "No additional Worker, D1, Queue or Service Binding.",
