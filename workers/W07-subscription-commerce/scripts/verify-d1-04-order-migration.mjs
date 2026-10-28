@@ -56,7 +56,7 @@ export const REQUIRED_INDEXES = {
   orders: ['ix_orders_customer_created_order', 'ix_orders_status_created_order'],
   order_lines: ['ix_order_lines_order_id', 'ix_order_lines_item_ref_version'],
   order_create_idempotency: ['ix_order_create_idempotency_customer_created', 'ix_order_create_idempotency_expiration'],
-  payments: ['ix_payments_customer_created_payment', 'ix_payments_order_created_payment', 'ix_payments_status_updated_payment'],
+  payments: ['ix_payments_customer_created_payment', 'ix_payments_order_created_payment', 'ix_payments_status_updated_payment', 'ux_payments_single_live_or_successful_per_order'],
   payment_provider_events: ['ix_payment_provider_events_state_received', 'ix_payment_provider_events_payment_received'],
   payment_provider_event_conflicts: [
     'ix_payment_provider_event_conflicts_state_last_seen',
