@@ -262,6 +262,34 @@ export async function createPaymentAttempt(
     throw new PaymentPersistenceError('SERVICE_UNAVAILABLE', 503);
   }
 
+  const hashRequest = async (orderId: string, amountMinor: number, currency: string) =>
+    sha256Hex(new TextEncoder().encode(JSON.stringify({
+      operation: 'createPaymentAttempt',
+      customerId: customerIdInput,
+      orderId,
+      provider: PROVIDER,
+      merchantId: expectedMerchantIdInput,
+      amountMinor,
+      currency,
+    })));
+
+  // Replays must be resolved before checking the Order's current lifecycle
+  // state. A retry after the Order moved to CONFIRMED/COMPLETED still returns
+  // the original Payment attempt; it must not create or conflict on a second
+  // attempt simply because the business lifecycle advanced after the request.
+  try {
+    const existing = await readPaymentByCustomerAndKey(db, customerIdInput, idempotencyKeyInput);
+    if (existing) {
+      return replayOrConflict(
+        existing,
+        await hashRequest(orderIdInput, existing.amount_minor, existing.currency),
+      );
+    }
+  } catch (error) {
+    if (error instanceof PaymentPersistenceError) throw error;
+    throw new PaymentPersistenceError('SERVICE_UNAVAILABLE', 503);
+  }
+
   let order: OrderRow | null;
   try {
     order = await db.prepare(
@@ -283,23 +311,7 @@ export async function createPaymentAttempt(
     throw new PaymentPersistenceError('CONFLICT', 409);
   }
 
-  const requestHash = await sha256Hex(new TextEncoder().encode(JSON.stringify({
-    operation: 'createPaymentAttempt',
-    customerId: customerIdInput,
-    orderId: order.order_id,
-    provider: PROVIDER,
-    merchantId: expectedMerchantIdInput,
-    amountMinor: order.total_minor,
-    currency: order.currency,
-  })));
-
-  try {
-    const existing = await readPaymentByCustomerAndKey(db, customerIdInput, idempotencyKeyInput);
-    if (existing) return replayOrConflict(existing, requestHash);
-  } catch (error) {
-    if (error instanceof PaymentPersistenceError) throw error;
-    throw new PaymentPersistenceError('SERVICE_UNAVAILABLE', 503);
-  }
+  const requestHash = await hashRequest(order.order_id, order.total_minor, order.currency);
 
   const nowFn = dependencies.now ?? (() => new Date());
   const createdAt = parseDate(nowFn);
