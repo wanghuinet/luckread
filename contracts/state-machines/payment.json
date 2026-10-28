@@ -437,18 +437,113 @@
   "x-forbidden": [
     {
       "from": "succeeded",
-      "to": "failed|cancelled|processing|requires_payment_method",
-      "reason": "Terminal success cannot be rewritten by a delayed or duplicate provider event; refunds/reversals are separate facts."
+      "to": "failed",
+      "reason": "Successful Payment is immutable; refunds, reversals and chargebacks are separate financial facts."
     },
     {
-      "from": "failed|cancelled|cancelled_post_capture|expired",
-      "to": "succeeded|processing|requires_payment_method|requires_confirmation",
-      "reason": "A terminal payment attempt is never reopened; create a new Payment attempt or reconcile a documented provider correction."
+      "from": "succeeded",
+      "to": "cancelled",
+      "reason": "Successful Payment is immutable; refunds, reversals and chargebacks are separate financial facts."
+    },
+    {
+      "from": "succeeded",
+      "to": "cancelled_post_capture",
+      "reason": "Successful Payment is immutable; refunds, reversals and chargebacks are separate financial facts."
+    },
+    {
+      "from": "succeeded",
+      "to": "processing",
+      "reason": "Successful Payment is immutable; refunds, reversals and chargebacks are separate financial facts."
+    },
+    {
+      "from": "succeeded",
+      "to": "requires_payment_method",
+      "reason": "Successful Payment is immutable; refunds, reversals and chargebacks are separate financial facts."
+    },
+    {
+      "from": "failed",
+      "to": "succeeded",
+      "reason": "Terminal provider payment attempts cannot be reopened; corrections require explicit reconciliation and a new attempt."
+    },
+    {
+      "from": "cancelled",
+      "to": "succeeded",
+      "reason": "Terminal provider payment attempts cannot be reopened; corrections require explicit reconciliation and a new attempt."
+    },
+    {
+      "from": "cancelled_post_capture",
+      "to": "succeeded",
+      "reason": "Terminal provider payment attempts cannot be reopened; corrections require explicit reconciliation and a new attempt."
+    },
+    {
+      "from": "expired",
+      "to": "succeeded",
+      "reason": "Terminal provider payment attempts cannot be reopened; corrections require explicit reconciliation and a new attempt."
+    },
+    {
+      "from": "failed",
+      "to": "processing",
+      "reason": "Terminal provider payment attempts cannot be reopened; corrections require explicit reconciliation and a new attempt."
+    },
+    {
+      "from": "cancelled",
+      "to": "processing",
+      "reason": "Terminal provider payment attempts cannot be reopened; corrections require explicit reconciliation and a new attempt."
+    },
+    {
+      "from": "cancelled_post_capture",
+      "to": "processing",
+      "reason": "Terminal provider payment attempts cannot be reopened; corrections require explicit reconciliation and a new attempt."
+    },
+    {
+      "from": "expired",
+      "to": "processing",
+      "reason": "Terminal provider payment attempts cannot be reopened; corrections require explicit reconciliation and a new attempt."
+    },
+    {
+      "from": "failed",
+      "to": "requires_payment_method",
+      "reason": "Terminal provider payment attempts cannot be reopened; corrections require explicit reconciliation and a new attempt."
+    },
+    {
+      "from": "cancelled",
+      "to": "requires_payment_method",
+      "reason": "Terminal provider payment attempts cannot be reopened; corrections require explicit reconciliation and a new attempt."
+    },
+    {
+      "from": "cancelled_post_capture",
+      "to": "requires_payment_method",
+      "reason": "Terminal provider payment attempts cannot be reopened; corrections require explicit reconciliation and a new attempt."
+    },
+    {
+      "from": "expired",
+      "to": "requires_payment_method",
+      "reason": "Terminal provider payment attempts cannot be reopened; corrections require explicit reconciliation and a new attempt."
+    },
+    {
+      "from": "failed",
+      "to": "requires_confirmation",
+      "reason": "Terminal provider payment attempts cannot be reopened; corrections require explicit reconciliation and a new attempt."
+    },
+    {
+      "from": "cancelled",
+      "to": "requires_confirmation",
+      "reason": "Terminal provider payment attempts cannot be reopened; corrections require explicit reconciliation and a new attempt."
+    },
+    {
+      "from": "cancelled_post_capture",
+      "to": "requires_confirmation",
+      "reason": "Terminal provider payment attempts cannot be reopened; corrections require explicit reconciliation and a new attempt."
+    },
+    {
+      "from": "expired",
+      "to": "requires_confirmation",
+      "reason": "Terminal provider payment attempts cannot be reopened; corrections require explicit reconciliation and a new attempt."
     },
     {
       "from": "partially_captured",
       "to": "succeeded",
-      "reason": "Capture settlement semantics require a dedicated admitted reconciliation/financial fact, not an inferred success."
+      "reason": "Partial capture does not imply final capture settlement; reconcile remaining captures and final provider state."
     }
   ],
   "reconciliation": {
