@@ -124,7 +124,7 @@ export async function PUT(request: Request, context: RouteContext): Promise<Resp
     }
     const ifMatch = request.headers.get('If-Match')
     if (!ifMatch) return errorResponse(428, 'PRECONDITION_REQUIRED', 'If-Match is required to update a plan')
-    const match = /^"lr-plan-v([1-9]\\d*)"$/.exec(ifMatch)
+    const match = /^"lr-plan-v([1-9]\d*)"$/.exec(ifMatch)
     const expectedVersion = match?.[1] ? Number(match[1]) : Number.NaN
     if (!Number.isSafeInteger(expectedVersion) || expectedVersion < 1) {
       return errorResponse(412, 'PRECONDITION_FAILED', 'Membership plan version does not match')
@@ -145,13 +145,32 @@ export async function PUT(request: Request, context: RouteContext): Promise<Resp
       Object.keys(fields).length !== 6 ||
       !['name', 'tier', 'billingInterval', 'priceMinor', 'currency', 'benefits'].every((key) => Object.hasOwn(fields, key))
     ) return errorResponse(400, 'VALIDATION_FAILED', 'Only plan commercial terms may be updated')
+    if (
+      typeof fields.name !== 'string' || fields.name !== fields.name.trim() || fields.name.length < 1 || fields.name.length > 120 ||
+      typeof fields.tier !== 'string' || !/^[a-z][a-z0-9_-]{0,63}$/.test(fields.tier) ||
+      (fields.billingInterval !== 'MONTHLY' && fields.billingInterval !== 'YEARLY') ||
+      typeof fields.priceMinor !== 'number' || !Number.isSafeInteger(fields.priceMinor) || fields.priceMinor < 0 || fields.priceMinor > 2_147_483_647 ||
+      typeof fields.currency !== 'string' || !/^[A-Z]{3}$/.test(fields.currency) ||
+      !Array.isArray(fields.benefits) || fields.benefits.length > 20 ||
+      fields.benefits.some((item) => typeof item !== 'string' || item !== item.trim() || item.length < 1 || item.length > 180) ||
+      new Set(fields.benefits).size !== fields.benefits.length ||
+      JSON.stringify(fields.benefits).length > 8192
+    ) return errorResponse(400, 'VALIDATION_FAILED', 'Membership plan terms are invalid')
+    const terms = {
+      name: fields.name,
+      tier: fields.tier,
+      billingInterval: fields.billingInterval as 'MONTHLY' | 'YEARLY',
+      priceMinor: fields.priceMinor,
+      currency: fields.currency,
+      benefits: fields.benefits as string[],
+    }
 
     const intentEventId = 'evt_mpl_update_requested_' + planId + '_v' + expectedVersion
     let intentResponse: Response
     try {
       intentResponse = await callW06MembershipPlanUpdateRequestAudit({
         request, principal,
-        body: { eventId: intentEventId, planId, creatorId, expectedVersion, ...fields },
+        body: { eventId: intentEventId, planId, creatorId, expectedVersion, ...terms },
       })
     } catch {
       return errorResponse(503, 'AUDIT_UNAVAILABLE', 'Membership plan update intent could not be durably recorded')
