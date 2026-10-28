@@ -206,7 +206,7 @@ describe('Hyperswitch server-side payment intent client', () => {
     for (const bad of [
       { customerId: '', paymentMethodId: 'pm_saved_123' },
       { customerId: 'cust_user_42', paymentMethodId: ' pm_saved_123' },
-      { customerId: 'cust_user_42\\nInjected: yes', paymentMethodId: 'pm_saved_123' },
+      { customerId: 'cust_user_42\nInjected: yes', paymentMethodId: 'pm_saved_123' },
       { customerId: 'cust_user_42', paymentMethodId: 'pm_saved_123'.repeat(30) },
     ]) {
       const fake = fakeFetch(jsonResponse(responsePayment()))
