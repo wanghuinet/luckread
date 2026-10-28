@@ -1,11 +1,11 @@
 /**
  * Minimal server-only Hyperswitch Payments API adapter.
  *
- * This deliberately creates an unconfirmed payment intent only. It is not
- * wired to a route and cannot activate subscriptions or write financial
- * state. A caller must supply amount/currency/payment ID from an admitted
- * authoritative order, retain the same ID/key for retries, and wait for a
- * verified provider event before considering a payment successful.
+ * Server-only Hyperswitch payment adapter: unconfirmed checkout intents,
+ * customer-present save-for-off-session setup intents, and one MIT charge.
+ * It is not wired to a route and cannot activate subscriptions or write
+ * financial state. Callers must persist stable IDs before provider I/O and
+ * wait for verified provider evidence before considering payment successful.
  *
  * Upstream API: https://api-reference.hyperswitch.io/v1/payments/payments--create
  */
@@ -28,6 +28,11 @@ export interface CreateHyperswitchPaymentIntentInput {
   currency: string;
   /** LuckRead idempotency contract key; must be reused for semantic retries. */
   idempotencyKey: string;
+}
+
+/** Server-authoritative data for a customer-present setup intent that may be used off-session later. */
+export interface CreateHyperswitchCustomerInitiatedSetupInput extends CreateHyperswitchPaymentIntentInput {
+  customerId: string;
 }
 
 /** Server-authoritative data for a customer-approved recurring-payment charge (MIT). */
@@ -309,6 +314,55 @@ export async function createHyperswitchPaymentIntent(
     !['requires_payment_method', 'requires_confirmation'].includes(payment.status)
   ) {
     throw new HyperswitchClientError('UPSTREAM_INVALID_RESPONSE', 'Hyperswitch payment intent did not match the unconfirmed request.');
+  }
+  return payment;
+}
+
+/**
+ * Create an unconfirmed customer-present payment intent prepared for future
+ * off-session use. This flag is not proof of customer consent: the caller must
+ * complete the customer-present confirmation flow with genuine customer
+ * acceptance, then persist a returned payment_method_id only after verifying
+ * provider evidence and binding it to this customer on the server.
+ *
+ * This function does not capture a payment method, store consent, or grant
+ * subscription access. It shares the existing validated adapter and stable
+ * payment/idempotency contract.
+ */
+export async function createHyperswitchCustomerInitiatedSetupIntent(
+  config: HyperswitchClientConfig,
+  input: CreateHyperswitchCustomerInitiatedSetupInput,
+  fetchImpl: typeof fetch = fetch,
+): Promise<HyperswitchPayment> {
+  validateCreateInput(input);
+  validateProviderReference(input.customerId, 'Customer ID');
+
+  const payment = await requestPayment(config, '/payments', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'Idempotency-Key': input.idempotencyKey,
+    },
+    body: JSON.stringify({
+      payment_id: input.paymentId,
+      amount: input.amount,
+      currency: input.currency,
+      customer_id: input.customerId,
+      setup_future_usage: 'off_session',
+      confirm: false,
+    }),
+  }, fetchImpl);
+
+  if (
+    payment.paymentId !== input.paymentId ||
+    payment.amount !== input.amount ||
+    payment.currency !== input.currency ||
+    !['requires_payment_method', 'requires_confirmation'].includes(payment.status)
+  ) {
+    throw new HyperswitchClientError(
+      'UPSTREAM_INVALID_RESPONSE',
+      'Hyperswitch customer-initiated setup intent did not match the unconfirmed request.',
+    );
   }
   return payment;
 }
