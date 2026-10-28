@@ -101,6 +101,9 @@ type RenewalCycleRow = {
   order_id: string | null;
   payment_id: string | null;
   state: RenewalCycleState;
+  subscription_sync_state: 'PENDING' | 'APPLIED' | 'RECONCILIATION_REQUIRED';
+  subscription_sync_updated_at: string | null;
+  subscription_sync_error_code: string | null;
   attempt_number: number;
   provider_response_status: HyperswitchPaymentStatus | null;
   outcome_code: string | null;
@@ -150,6 +153,8 @@ export type RenewalProcessResult = Readonly<{
     | 'CREATED'
     | 'AWAITING_PRICING'
     | 'AWAITING_MANDATE'
+    | 'AWAITING_RETRY'
+    | 'AWAITING_OUTCOME_SYNC'
     | 'PREPARED'
     | 'PAYMENT_READY'
     | 'SUBMISSION_IN_PROGRESS'
@@ -166,6 +171,20 @@ const MAX_ATTEMPTS = 20;
 const LEASE_MS = 120_000;
 const MAX_SAFE_MINOR = Number.MAX_SAFE_INTEGER;
 const PERMANENT_ORDER_IDEMPOTENCY_EXPIRY = '9999-12-31T23:59:59.999Z';
+const FIRST_RETRY_DELAY_MS = 5 * 60 * 1000;
+const MAX_RETRY_DELAY_MS = 6 * 60 * 60 * 1000;
+
+function renewalRetryDelayMs(attemptNumber: number): number {
+  const exponent = Math.min(Math.max(attemptNumber - 1, 0), 7);
+  return Math.min(FIRST_RETRY_DELAY_MS * (2 ** exponent), MAX_RETRY_DELAY_MS);
+}
+
+function renewalRetryDue(cycle: RenewalCycleRow, now: string): boolean {
+  const failedAt = Date.parse(cycle.updated_at);
+  const nowAt = Date.parse(now);
+  return Number.isFinite(failedAt) && Number.isFinite(nowAt) &&
+    nowAt >= failedAt + renewalRetryDelayMs(cycle.attempt_number);
+}
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -411,7 +430,7 @@ async function insertOrReadCycle(
   merchantId: string,
   now: string,
 ): Promise<RenewalCycleRow> {
-  if (subscription.status !== 'ACTIVE' ||
+  if (!['ACTIVE', 'PAST_DUE'].includes(subscription.status) ||
       !isBoundedText(subscription.subscription_id) ||
       !isBoundedText(subscription.subscriber_id) ||
       !isBoundedText(subscription.plan_id) ||
@@ -426,6 +445,19 @@ async function insertOrReadCycle(
   const cycleStart = subscription.current_period_end;
   const cycleEnd = addBillingPeriod(cycleStart, subscription.billing_interval);
   const cycleId = await renewalCycleIdFor(subscription.subscription_id, cycleStart, cycleEnd);
+
+  // PAST_DUE may only resume a previously recorded cycle; never synthesize a
+  // second cycle to "repair" a missing paid-cycle record.
+  if (subscription.status === 'PAST_DUE') {
+    const existing = await readCycleByPeriod(env.D1_04, subscription.subscription_id, cycleStart);
+    if (!existing || existing.cycle_id !== cycleId || existing.cycle_end !== cycleEnd ||
+        existing.plan_id !== subscription.plan_id || existing.plan_version !== subscription.plan_version ||
+        existing.subscriber_id !== subscription.subscriber_id) {
+      throw new RenewalRuntimeError('PAST_DUE_CYCLE_MISSING_OR_MISMATCHED', 503);
+    }
+    return existing;
+  }
+
   let benefits: unknown;
   try {
     benefits = JSON.parse(subscription.benefits_json) as unknown;
@@ -525,7 +557,7 @@ export async function scanDueSubscriptionRenewals(
       'pv.currency, pv.name, pv.tier, pv.benefits_json ' +
       'FROM membership_subscriptions s ' +
       'JOIN membership_plan_versions pv ON pv.plan_id = s.plan_id AND pv.plan_version = s.plan_version ' +
-      "WHERE s.status = 'ACTIVE' AND s.current_period_end <= ? " +
+      "WHERE s.status IN ('ACTIVE','PAST_DUE') AND s.current_period_end <= ? " +
       'AND (s.cancel_at IS NULL OR s.cancel_at > s.current_period_end) ' +
       'AND (? IS NULL OR s.current_period_end > ? OR (s.current_period_end = ? AND s.subscription_id > ?)) ' +
       'ORDER BY s.current_period_end ASC, s.subscription_id ASC LIMIT ?',
@@ -556,6 +588,12 @@ export async function scanDueSubscriptionRenewals(
           env.D1_04, String(config.expectedMerchantId), cycle.subscriber_id,
         );
         if (activeMandate) cycleIds.push(cycle.cycle_id);
+      } else if (cycle.state === 'FAILED' &&
+        cycle.subscription_sync_state === 'APPLIED' &&
+        cycle.attempt_number < MAX_ATTEMPTS &&
+        renewalRetryDue(cycle, now) &&
+        await isExactMandateActive(env.D1_04, cycle)) {
+        cycleIds.push(cycle.cycle_id);
       } else if (
         cycle.state === 'PREPARED' ||
         cycle.state === 'PAYMENT_READY' ||
@@ -700,6 +738,69 @@ async function acquireSubmissionLease(
   return readCycleById(env.D1_04, cycle.cycle_id);
 }
 
+type FailedCycleRetryPreparation = 'PREPARED' | 'AWAITING_RETRY' | 'AWAITING_OUTCOME_SYNC' | 'TERMINAL';
+
+async function prepareFailedCycleRetry(
+  env: RenewalRuntimeEnv,
+  cycle: RenewalCycleRow,
+  now: string,
+): Promise<FailedCycleRetryPreparation> {
+  if (cycle.state !== 'FAILED') return 'TERMINAL';
+  if (cycle.subscription_sync_state !== 'APPLIED') return 'AWAITING_OUTCOME_SYNC';
+  if (!['failed', 'expired'].includes(cycle.provider_response_status ?? '') ||
+      cycle.attempt_number >= MAX_ATTEMPTS) return 'TERMINAL';
+  if (!renewalRetryDue(cycle, now)) return 'AWAITING_RETRY';
+
+  let subscription: {
+    subscription_id: string; subscriber_id: string; plan_id: string; plan_version: number;
+    status: string; current_period_end: string; cancel_at: string | null;
+  } | null;
+  try {
+    subscription = await env.D1_01.prepare(
+      'SELECT subscription_id, subscriber_id, plan_id, plan_version, status, current_period_end, cancel_at ' +
+      'FROM membership_subscriptions WHERE subscription_id = ? AND subscriber_id = ? LIMIT 1',
+    ).bind(cycle.subscription_id, cycle.subscriber_id).first();
+  } catch {
+    throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
+  }
+  if (!subscription ||
+      subscription.subscription_id !== cycle.subscription_id ||
+      subscription.subscriber_id !== cycle.subscriber_id ||
+      subscription.plan_id !== cycle.plan_id ||
+      subscription.plan_version !== cycle.plan_version ||
+      subscription.status !== 'PAST_DUE' ||
+      subscription.current_period_end !== cycle.cycle_start ||
+      (subscription.cancel_at !== null &&
+        (!isCanonicalIso(subscription.cancel_at) || subscription.cancel_at <= cycle.cycle_start))) {
+    return 'TERMINAL';
+  }
+  // A retry may reuse only the exact same still-active saved method/mandate.
+  // A revoked mandate requires a new customer-present consent flow and is never
+  // silently replaced with another token during off-session recovery.
+  if (!(await isExactMandateActive(env.D1_04, cycle))) return 'TERMINAL';
+
+  const retryCutoff = new Date(Date.parse(now) - renewalRetryDelayMs(cycle.attempt_number)).toISOString();
+  const updatedAt = strictlyAfter(now, cycle.updated_at);
+  let result: D1Result;
+  try {
+    result = await env.D1_04.prepare(
+      "UPDATE subscription_renewal_cycles SET state = 'PREPARED', payment_id = NULL, " +
+      "provider_response_status = NULL, outcome_code = 'RETRY_PREPARED', " +
+      "subscription_sync_state = 'PENDING', subscription_sync_updated_at = NULL, subscription_sync_error_code = NULL, " +
+      'lease_token = NULL, lease_expires_at = NULL, version = version + 1, updated_at = ? ' +
+      "WHERE cycle_id = ? AND version = ? AND state = 'FAILED' AND subscription_sync_state = 'APPLIED' " +
+      'AND attempt_number < ? AND updated_at <= ?',
+    ).bind(updatedAt, cycle.cycle_id, cycle.version, MAX_ATTEMPTS, retryCutoff).run();
+  } catch {
+    throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
+  }
+  if (Number(result.meta?.changes ?? 0) === 1) return 'PREPARED';
+  const latest = await readCycleById(env.D1_04, cycle.cycle_id);
+  if (latest.state === 'PREPARED') return 'PREPARED';
+  if (latest.state === 'FAILED' && latest.subscription_sync_state !== 'APPLIED') return 'AWAITING_OUTCOME_SYNC';
+  return 'AWAITING_RETRY';
+}
+
 /**
  * Processes one durable cycle. It cannot start a provider charge without both an
  * admitted price/tax decision and a currently-active customer-bound mandate.
@@ -713,8 +814,20 @@ export async function processSubscriptionRenewalCycle(
   const nowFn = dependencies.now ?? (() => new Date());
   let now = nowIso(nowFn);
   let cycle = await readCycleById(env.D1_04, cycleId);
-  if (cycle.state === 'SUCCEEDED' || cycle.state === 'FAILED' ||
-      cycle.state === 'SUBMITTED' || cycle.state === 'RECONCILIATION_REQUIRED') {
+  if (cycle.state === 'FAILED') {
+    const retry = await prepareFailedCycleRetry(env, cycle, now);
+    if (retry !== 'PREPARED') {
+      const action = retry === 'AWAITING_OUTCOME_SYNC'
+        ? 'AWAITING_OUTCOME_SYNC'
+        : retry === 'AWAITING_RETRY'
+          ? 'AWAITING_RETRY'
+          : 'TERMINAL';
+      return { cycleId, state: cycle.state, action, ...(cycle.payment_id ? { paymentId: cycle.payment_id } : {}) };
+    }
+    cycle = await readCycleById(env.D1_04, cycleId);
+  }
+  if (cycle.state === 'SUCCEEDED' || cycle.state === 'SUBMITTED' ||
+      cycle.state === 'RECONCILIATION_REQUIRED') {
     return { cycleId, state: cycle.state, action: 'TERMINAL', ...(cycle.payment_id ? { paymentId: cycle.payment_id } : {}) };
   }
 
