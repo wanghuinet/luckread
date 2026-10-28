@@ -66,6 +66,8 @@ export interface HyperswitchPayment {
   status: HyperswitchPaymentStatus;
   /** Sensitive provider value; keep server-side until an authorized checkout response needs it. */
   clientSecret: string | null;
+  /** Customer reference returned by Hyperswitch; absent on endpoints that do not include it. */
+  customerId?: string | null;
   /** Opaque Hyperswitch vault reference; not consent evidence and not a fulfillment signal. */
   paymentMethodId?: string | null;
 }
@@ -233,6 +235,7 @@ function normalizePayment(value: unknown): HyperswitchPayment {
     currency,
     status,
     client_secret: clientSecret,
+    customer_id: customerId,
     payment_method_id: paymentMethodId,
   } = value;
   if (
@@ -246,6 +249,13 @@ function normalizePayment(value: unknown): HyperswitchPayment {
     !CURRENCY_PATTERN.test(currency) ||
     !isHyperswitchPaymentStatus(status) ||
     (clientSecret !== undefined && clientSecret !== null && typeof clientSecret !== 'string') ||
+    (customerId !== undefined && customerId !== null && (
+      typeof customerId !== 'string' ||
+      customerId.length === 0 ||
+      customerId.length > 256 ||
+      customerId.trim() !== customerId ||
+      /[\u0000-\u001f\u007f]/.test(customerId)
+    )) ||
     (paymentMethodId !== undefined && paymentMethodId !== null && (
       typeof paymentMethodId !== 'string' ||
       paymentMethodId.length === 0 ||
@@ -264,6 +274,7 @@ function normalizePayment(value: unknown): HyperswitchPayment {
     currency,
     status: status as HyperswitchPaymentStatus,
     clientSecret: typeof clientSecret === 'string' ? clientSecret : null,
+    ...(typeof customerId === 'string' ? { customerId } : {}),
     paymentMethodId: typeof paymentMethodId === 'string' ? paymentMethodId : null,
   };
 }
@@ -454,4 +465,54 @@ export async function retrieveHyperswitchPayment(
     throw new HyperswitchClientError('UPSTREAM_INVALID_RESPONSE', 'Hyperswitch returned a different payment ID.');
   }
   return payment;
+}
+
+
+export type CustomerBoundHyperswitchPaymentMethod = Readonly<{
+  paymentId: string;
+  customerId: string;
+  paymentMethodId: string;
+}>;
+
+/**
+ * Retrieve a reusable provider vault reference only after the initial customer-present
+ * payment is succeeded and the provider response is bound to the expected customer,
+ * amount and currency. This does NOT prove customer consent by itself: the caller must
+ * have completed and durably recorded Hyperswitch's customer-acceptance confirmation
+ * flow before storing or using this reference for MIT charges.
+ */
+export async function retrieveCustomerBoundHyperswitchPaymentMethod(
+  config: HyperswitchClientConfig,
+  input: Readonly<{
+    paymentId: string;
+    customerId: string;
+    amount: number;
+    currency: string;
+  }>,
+  fetchImpl: typeof fetch = fetch,
+): Promise<CustomerBoundHyperswitchPaymentMethod> {
+  validateProviderReference(input.customerId, 'Customer ID');
+  if (!Number.isSafeInteger(input.amount) || input.amount <= 0 || typeof input.currency !== 'string' || !CURRENCY_PATTERN.test(input.currency)) {
+    throw new HyperswitchClientError('REQUEST_INVALID', 'Expected amount or currency is malformed.');
+  }
+
+  const payment = await retrieveHyperswitchPayment(config, input.paymentId, fetchImpl);
+  if (
+    payment.status !== 'succeeded' ||
+    payment.customerId !== input.customerId ||
+    payment.amount !== input.amount ||
+    payment.currency !== input.currency ||
+    typeof payment.paymentMethodId !== 'string' ||
+    payment.paymentMethodId.length === 0
+  ) {
+    throw new HyperswitchClientError(
+      'UPSTREAM_INVALID_RESPONSE',
+      'Hyperswitch payment is not a successful customer-bound saved-method transaction.',
+    );
+  }
+  return {
+    paymentId: payment.paymentId,
+    customerId: payment.customerId,
+    paymentMethodId: payment.paymentMethodId,
+  };
 }
