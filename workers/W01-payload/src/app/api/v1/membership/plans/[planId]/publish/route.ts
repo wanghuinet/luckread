@@ -6,6 +6,7 @@ import {
 import { callW08Creator, W08CreatorClientError } from '../../../../../../../auth/w08-creator-client.js'
 import {
   callW06MembershipPlanPublishAudit,
+  callW06MembershipPlanPublishRequestAudit,
   W06ModerationClientError,
 } from '../../../../../../../moderation/w06-moderation-client.js'
 
@@ -98,7 +99,9 @@ export async function POST(request: Request, context: RouteContext): Promise<Res
     }
     const ifMatch = request.headers.get('If-Match')
     if (!ifMatch) return errorResponse(428, 'PRECONDITION_REQUIRED', 'If-Match is required to publish a plan')
-    if (!/^"lr-plan-v[1-9]\d*"$/.test(ifMatch)) {
+    const ifMatchVersion = /^"lr-plan-v([1-9]\\d*)"$/.exec(ifMatch)
+    const expectedVersion = ifMatchVersion?.[1] ? Number(ifMatchVersion[1]) : Number.NaN
+    if (!Number.isSafeInteger(expectedVersion) || expectedVersion < 1) {
       return errorResponse(412, 'PRECONDITION_FAILED', 'Membership plan version does not match')
     }
 
@@ -108,6 +111,35 @@ export async function POST(request: Request, context: RouteContext): Promise<Res
     if (denied) return denied
     const creatorId = await resolveActiveCreatorId(request)
     if (creatorId instanceof Response) return creatorId
+
+    const publishRequestEventId = 'evt_mpl_publish_requested_' + planId + '_v' + expectedVersion
+    let publishRequestAudit: Response
+    try {
+      publishRequestAudit = await callW06MembershipPlanPublishRequestAudit({
+        request,
+        principal,
+        body: {
+          eventId: publishRequestEventId,
+          planId,
+          creatorId,
+          expectedVersion,
+          requestedStatus: 'ACTIVE',
+          requestedVisibility: 'PUBLIC',
+        },
+      })
+    } catch {
+      return errorResponse(503, 'AUDIT_UNAVAILABLE', 'Membership plan publish intent could not be durably recorded')
+    }
+    const publishRequestAuditValue: unknown = await publishRequestAudit.json().catch((): null => null)
+    if (
+      (publishRequestAudit.status !== 200 && publishRequestAudit.status !== 201) ||
+      !publishRequestAuditValue || typeof publishRequestAuditValue !== 'object' ||
+      (publishRequestAuditValue as { eventId?: unknown }).eventId !== publishRequestEventId ||
+      (publishRequestAuditValue as { action?: unknown }).action !== 'membership.plan.publish_requested' ||
+      (publishRequestAuditValue as { targetId?: unknown }).targetId !== planId
+    ) {
+      return errorResponse(503, 'AUDIT_UNAVAILABLE', 'Membership plan publish intent was not durably confirmed')
+    }
 
     const w07Response = await callW07Subscription({
       request,
