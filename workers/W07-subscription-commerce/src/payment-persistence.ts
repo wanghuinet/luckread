@@ -494,6 +494,85 @@ export async function recordUnconfirmedHyperswitchIntent(
   throw new PaymentPersistenceError('CONFLICT', 409);
 }
 
+/**
+ * Record that a previously persisted MIT payment was submitted to Hyperswitch.
+ * The synchronous provider response is not payment evidence; preserve the local
+ * processing state and wait for the signed webhook/reconciliation path.
+ */
+export async function recordHyperswitchMerchantInitiatedSubmission(
+  db: D1Database,
+  customerIdInput: string,
+  paymentIdInput: string,
+  expectedMerchantIdInput: string,
+  expectedPaymentMethodIdInput: string,
+  providerPayment: HyperswitchPayment,
+  dependencies: Pick<PaymentPersistenceDependencies, 'now'> = {},
+): Promise<PaymentAttemptDto> {
+  if (!nonBlank(customerIdInput, 256) ||
+      !PAYMENT_ID_PATTERN.test(paymentIdInput) ||
+      !nonBlank(expectedMerchantIdInput, 256) ||
+      !nonBlank(expectedPaymentMethodIdInput, 255)) {
+    throw new PaymentPersistenceError('VALIDATION_FAILED', 400);
+  }
+  if (
+    providerPayment.paymentId !== paymentIdInput ||
+    providerPayment.merchantId !== expectedMerchantIdInput ||
+    providerPayment.amount <= 0 ||
+    !Number.isSafeInteger(providerPayment.amount) ||
+    !CURRENCY_PATTERN.test(providerPayment.currency) ||
+    (providerPayment.customerId != null && providerPayment.customerId !== customerIdInput) ||
+    (providerPayment.paymentMethodId != null && providerPayment.paymentMethodId !== expectedPaymentMethodIdInput)
+  ) {
+    throw new PaymentPersistenceError('WEBHOOK_REJECTED', 400);
+  }
+
+  const selectById = () => db.prepare(
+    'SELECT payment_id, order_id, customer_id, provider, merchant_id, amount_minor, currency, status, version, ' +
+    'idempotency_key, request_hash, provider_updated_at, failure_code, created_at, updated_at ' +
+    'FROM payments WHERE payment_id = ? AND customer_id = ? LIMIT 1',
+  ).bind(paymentIdInput, customerIdInput).first<PaymentRow>();
+
+  let existing: PaymentRow | null;
+  try {
+    existing = await selectById();
+  } catch {
+    throw new PaymentPersistenceError('SERVICE_UNAVAILABLE', 503);
+  }
+  if (!existing) throw new PaymentPersistenceError('RESOURCE_NOT_FOUND', 404);
+  if (
+    existing.provider !== PROVIDER ||
+    existing.merchant_id !== expectedMerchantIdInput ||
+    existing.amount_minor !== providerPayment.amount ||
+    existing.currency !== providerPayment.currency
+  ) {
+    throw new PaymentPersistenceError('WEBHOOK_REJECTED', 400);
+  }
+
+  // If a verified webhook arrived before this response was persisted, it wins.
+  // Never regress an already advanced payment or mark fulfillment from this API call.
+  if (existing.status !== 'INITIATING' || existing.version !== 1) {
+    return toDto(existing);
+  }
+
+  const updatedAt = strictlyAfter(parseDate(dependencies.now ?? (() => new Date())), existing.updated_at);
+  try {
+    await db.prepare(
+      "UPDATE payments SET status = 'processing', version = version + 1, updated_at = ? " +
+      "WHERE payment_id = ? AND customer_id = ? AND provider = 'hyperswitch' AND merchant_id = ? " +
+      "AND amount_minor = ? AND currency = ? AND status = 'INITIATING' AND version = 1",
+    ).bind(
+      updatedAt, paymentIdInput, customerIdInput, expectedMerchantIdInput,
+      providerPayment.amount, providerPayment.currency,
+    ).run();
+    const latest = await selectById();
+    if (!latest) throw new PaymentPersistenceError('RESOURCE_NOT_FOUND', 404);
+    return toDto(latest);
+  } catch (error) {
+    if (error instanceof PaymentPersistenceError) throw error;
+    throw new PaymentPersistenceError('SERVICE_UNAVAILABLE', 503);
+  }
+}
+
 export type ReceiveHyperswitchWebhookInput = Readonly<{
   rawBody: ArrayBuffer;
   signatureHeader: string | null | undefined;
@@ -1084,7 +1163,7 @@ async function receiveHyperswitchMandateWebhook(
 export async function receiveHyperswitchWebhook(
   db: D1Database,
   input: ReceiveHyperswitchWebhookInput,
-  dependencies: Pick<PaymentPersistenceDependencies, 'now' | 'createEventRowId' | 'createConflictId'> = {},
+  dependencies: Pick<PaymentPersistenceDependencies, 'now' | 'createEventRowId' | 'createConflictId' | 'createSavedPaymentMethodId' | 'createPaymentMandateId'> = {},
 ): Promise<WebhookReceiptResult> {
   if (!(input.rawBody instanceof ArrayBuffer) || input.rawBody.byteLength > MAX_WEBHOOK_BODY_BYTES) {
     throw new PaymentPersistenceError('WEBHOOK_REJECTED', 400);
