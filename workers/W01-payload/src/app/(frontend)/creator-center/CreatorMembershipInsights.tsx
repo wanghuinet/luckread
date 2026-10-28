@@ -6,18 +6,6 @@ import { useRouter } from 'next/navigation'
 import { fetchJson, getApiErrorMessage } from '../../../lib/client-api.js'
 
 type StudioLocale = 'zh-CN' | 'en-US'
-type Counts = {
-  total: number
-  draft?: number
-  active: number
-  paused: number
-  retired?: number
-  pending?: number
-  pastDue?: number
-  canceled?: number
-  expired?: number
-  activeSubscribers?: number
-}
 type MembershipSummary = {
   plans: { total: number; draft: number; active: number; paused: number; retired: number }
   subscriptions: {
