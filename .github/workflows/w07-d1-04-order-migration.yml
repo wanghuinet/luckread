@@ -42,9 +42,13 @@ jobs:
           [[ "$SOURCE_SHA" == "$GITHUB_SHA" ]]
           [[ "$TARGET_DATABASE_NAME" =~ ^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$ ]]
           [[ "$APPLY_CONFIRM" == "APPLY_W07_D1_04_COMMERCE_MIGRATIONS" ]]
+          MAIN_SHA="$(git rev-parse origin/main)"
+          if [[ "$SOURCE_SHA" != "$MAIN_SHA" ]]; then
+            echo "::error::source_sha must equal the current main HEAD ($MAIN_SHA); refusing to migrate from an older workflow snapshot."
+            exit 1
+          fi
           git cat-file -e "$SOURCE_SHA^{commit}"
-          git merge-base --is-ancestor "$SOURCE_SHA" origin/main
-          echo "Validated exact main source SHA and explicit migration confirmation."
+          echo "Validated exact current main source SHA and explicit migration confirmation."
 
       - name: Checkout validated source commit
         env:
