@@ -152,7 +152,7 @@ export default {
       if (commerceOrderResponse) return commerceOrderResponse
       const pathname = new URL(request.url).pathname
       const operation = toOperation(request.method, parseSegments(pathname))
-      const publishPathMatch = /^\\/membership\\/plans\\/([^/]+)\\/publish$/.exec(pathname)
+      const publishPathMatch = /^\/membership\/plans\/([^/]+)\/publish$/.exec(pathname)
       if (request.method === 'POST' && publishPathMatch) {
         const segments = parseSegments(pathname)
         if (segments.length !== 4 || segments[0] !== 'membership' || segments[1] !== 'plans' || segments[3] !== 'publish') {
