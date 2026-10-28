@@ -58,3 +58,44 @@ export async function callW07Subscription(input: {
     },
   })
 }
+
+
+/**
+ * Relay a provider callback to W07 without parsing or re-serializing the signed
+ * payload. Only the exact raw bytes, signature and generated transport
+ * metadata cross the Service Binding; browser credentials and arbitrary
+ * request headers are not forwarded.
+ */
+export async function forwardW07HyperswitchWebhook(input: {
+  request: Request
+  rawBody: ArrayBuffer
+}): Promise<Response> {
+  const service = await getW07Service()
+  const suppliedCorrelation = input.request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? ''
+  const correlationId = suppliedCorrelation.length > 0 &&
+    suppliedCorrelation.length <= 128 &&
+    !/[\u0000-\u001f\u007f]/.test(suppliedCorrelation)
+    ? suppliedCorrelation
+    : crypto.randomUUID()
+  const headers = new Headers({
+    'X-LuckRead-Caller': 'W01',
+    'X-LuckRead-Transport-Version': '1.0',
+    'X-LuckRead-Correlation-Id': correlationId,
+    'content-type': 'application/json',
+  })
+  const signature = input.request.headers.get('X-Webhook-Signature-512')
+  if (signature !== null) headers.set('X-Webhook-Signature-512', signature)
+
+  const response = await service.fetch(new Request('https://luckread-w07.internal/internal/webhooks/hyperswitch', {
+    method: 'POST',
+    headers,
+    body: input.rawBody,
+  }))
+  return new Response(await response.arrayBuffer(), {
+    status: response.status,
+    headers: {
+      'content-type': response.headers.get('content-type') ?? 'application/json; charset=utf-8',
+      'cache-control': 'no-store',
+    },
+  })
+}
