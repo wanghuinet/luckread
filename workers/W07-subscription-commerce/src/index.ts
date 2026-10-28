@@ -1,6 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 
-import { createMembershipPlanDraft, getSubscription, listActiveMembershipPlans, listCreatorMembershipPlans, listSubscriptions, parseBoundedPositiveInt, SubscriptionRuntimeError, validatePrincipal } from './subscription-runtime.js'
+import { createMembershipPlanDraft, getSubscription, listActiveMembershipPlans, listCreatorMembershipPlans, listSubscriptions, parseBoundedPositiveInt, publishMembershipPlan, SubscriptionRuntimeError, validatePrincipal } from './subscription-runtime.js'
 import { handleCommerceOrderRequest } from './order-http-runtime.js'
 import { handleCommercePaymentIntentRequest } from './payment-intent-http-runtime.js'
 import { handleHyperswitchWebhookRequest } from './payment-webhook-http-runtime.js'
@@ -150,7 +150,23 @@ export default {
       if (paymentIntentResponse) return paymentIntentResponse
       const commerceOrderResponse = await handleCommerceOrderRequest(request, principal, env)
       if (commerceOrderResponse) return commerceOrderResponse
-      const operation = toOperation(request.method, parseSegments(new URL(request.url).pathname))
+      const pathname = new URL(request.url).pathname
+      const operation = toOperation(request.method, parseSegments(pathname))
+      const publishPathMatch = /^\\/membership\\/plans\\/([^/]+)\\/publish$/.exec(pathname)
+      if (request.method === 'POST' && publishPathMatch) {
+        const segments = parseSegments(pathname)
+        if (segments.length !== 4 || segments[0] !== 'membership' || segments[1] !== 'plans' || segments[3] !== 'publish') {
+          return new Response(null, { status: 404 })
+        }
+        if (request.body !== null) {
+          await request.body.cancel().catch(() => undefined)
+          return json({ error: { code: 'VALIDATION_FAILED', message: 'Plan publish does not accept a request body', details: {} }, requestId: crypto.randomUUID() }, 400)
+        }
+        requireCreatorLayer(request)
+        const creatorId = requireVerifiedCreatorId(request)
+        const result = await publishMembershipPlan(env.D1_01, creatorId, segments[2]!, request.headers.get('If-Match'))
+        return json({ data: result, requestId: crypto.randomUUID() }, 200, result.etag)
+      }
       if (request.method === 'POST' && operation?.operation !== 'createPlan') {
         return json({
           error: {
