@@ -1,21 +1,45 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
-import { loadHyper } from '@juspay-tech/hyper-js'
-import { HyperElements, PaymentElement, useHyper, useWidgets } from '@juspay-tech/react-hyper-js'
+import Script from 'next/script'
+import { useEffect, useState } from 'react'
 
 type PaymentIntentData = {
   paymentId: string
   orderId: string
   amountMinor: number
-  currency: string
+  currency: 'USD' | string
   status: 'requires_payment_method' | 'requires_confirmation'
   version: number
   clientSecret: string
 }
 type ApiEnvelope = { data?: unknown; error?: { message?: unknown }; requestId?: unknown }
+type HyperswitchPaymentElement = {
+  mount: (selector: string) => void
+  destroy?: () => void
+  on: (event: string, handler: (event: unknown) => void) => void
+}
+type HyperswitchElements = {
+  create: (type: 'payment', options?: Record<string, unknown>) => HyperswitchPaymentElement
+}
+type HyperswitchClient = {
+  elements: (options: { clientSecret: string; locale?: string }) => HyperswitchElements
+  confirmPayment: (options: {
+    elements: HyperswitchElements
+    confirmParams: { return_url: string }
+    redirect: 'if_required'
+  }) => Promise<unknown>
+}
+
+declare global {
+  interface Window {
+    Hyper?: (publishableKey: string) => HyperswitchClient
+  }
+}
 
 const publishableKey = process.env.NEXT_PUBLIC_HYPERSWITCH_PUBLISHABLE_KEY ?? ''
+const hyperScriptUrl = publishableKey.startsWith('pk_prd_')
+  ? 'https://checkout.hyperswitch.io/v0/HyperLoader.js'
+  : 'https://beta.hyperswitch.io/v1/HyperLoader.js'
 const validOrderId = (value: string) => /^ord_[A-Za-z0-9_-]{1,90}$/.test(value)
 
 function readPaymentIntent(value: unknown, orderId: string): PaymentIntentData | null {
@@ -44,58 +68,16 @@ function money(amountMinor: number, currency: string): string {
   return new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(amountMinor / 100)
 }
 
-function ConfirmPaymentForm({ paymentId }: { paymentId: string }) {
-  const hyper = useHyper()
-  const widgets = useWidgets()
-  const [ready, setReady] = useState(false)
-  const [busy, setBusy] = useState(false)
-  const [message, setMessage] = useState('')
-
-  async function confirmPayment() {
-    if (busy || !ready) return
-    setBusy(true)
-    setMessage('')
-    try {
-      const returnUrl = new URL('/checkout/result', window.location.origin).toString()
-      const result: unknown = await hyper.confirmPayment({
-        elements: widgets,
-        confirmParams: { return_url: returnUrl },
-        redirect: 'if_required',
-      })
-      const payload = result && typeof result === 'object' ? result as { error?: { message?: unknown } } : {}
-      if (payload.error) {
-        setMessage(typeof payload.error.message === 'string' ? payload.error.message : '支付未完成，请核对支付方式后重试。')
-      } else {
-        setMessage('支付已提交，最终状态仍需服务器核验；此页面不会直接开通会员权益。')
-      }
-    } catch {
-      setMessage('暂时无法提交支付，请稍后重新检查订单状态。')
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  return (
-    <form onSubmit={(event) => { event.preventDefault(); void confirmPayment() }}>
-      <PaymentElement id="luckread-payment-element" options={{}} onReady={() => setReady(true)} />
-      <p>
-        后续周期扣款所需的保存支付方式授权由 Hyperswitch 托管支付表单处理。
-        仅在表单明确征得同意时才可继续保存；不需要时请勿勾选保存选项。
-      </p>
-      <button type="submit" disabled={!ready || busy}>
-        {busy ? '正在提交…' : '确认支付'}
-      </button>
-      {message ? <p role="status" aria-live="polite">{message}</p> : null}
-      <small>支付引用：{paymentId}</small>
-    </form>
-  )
-}
-
 export default function CheckoutClient({ orderId }: { orderId: string }) {
   const [intent, setIntent] = useState<PaymentIntentData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const hyperPromise = useMemo(() => publishableKey ? loadHyper(publishableKey) : null, [])
+  const [sdkReady, setSdkReady] = useState(false)
+  const [elementReady, setElementReady] = useState(false)
+  const [confirming, setConfirming] = useState(false)
+  const [statusMessage, setStatusMessage] = useState('')
+  const [elements, setElements] = useState<HyperswitchElements | null>(null)
+  const [hyper, setHyper] = useState<HyperswitchClient | null>(null)
 
   useEffect(() => {
     let active = true
@@ -105,7 +87,7 @@ export default function CheckoutClient({ orderId }: { orderId: string }) {
         setLoading(false)
         return
       }
-      if (!publishableKey || !hyperPromise) {
+      if (!publishableKey) {
         setError('Hyperswitch 公钥尚未配置，支付入口已安全关闭。')
         setLoading(false)
         return
@@ -151,20 +133,81 @@ export default function CheckoutClient({ orderId }: { orderId: string }) {
     }
     void createIntent()
     return () => { active = false }
-  }, [orderId, hyperPromise])
+  }, [orderId])
+
+  useEffect(() => {
+    if (!sdkReady || !intent || !publishableKey || typeof window.Hyper !== 'function') return
+    let active = true
+    let paymentElement: HyperswitchPaymentElement | null = null
+    try {
+      const hyperClient = window.Hyper(publishableKey)
+      const widgetSet = hyperClient.elements({ clientSecret: intent.clientSecret, locale: 'auto' })
+      paymentElement = widgetSet.create('payment', { layout: 'tabs' })
+      paymentElement.on('ready', () => { if (active) setElementReady(true) })
+      paymentElement.mount('#luckread-payment-element')
+      setHyper(hyperClient)
+      setElements(widgetSet)
+    } catch {
+      setError('Hyperswitch 支付表单初始化失败。')
+    }
+    return () => {
+      active = false
+      paymentElement?.destroy?.()
+      setHyper(null)
+      setElements(null)
+      setElementReady(false)
+    }
+  }, [sdkReady, intent])
+
+  async function confirmPayment() {
+    if (!hyper || !elements || !intent || !elementReady || confirming) return
+    setConfirming(true)
+    setStatusMessage('')
+    try {
+      const returnUrl = new URL('/checkout/result', window.location.origin).toString()
+      const result: unknown = await hyper.confirmPayment({
+        elements,
+        confirmParams: { return_url: returnUrl },
+        redirect: 'if_required',
+      })
+      const payload = result && typeof result === 'object' ? result as { error?: { message?: unknown } } : {}
+      if (payload.error) {
+        setStatusMessage(typeof payload.error.message === 'string' ? payload.error.message : '支付未完成，请核对支付方式后重试。')
+      } else {
+        setStatusMessage('支付已提交，最终状态仍需服务器核验；此页面不会直接开通会员权益。')
+      }
+    } catch {
+      setStatusMessage('暂时无法提交支付，请稍后重新检查订单状态。')
+    } finally {
+      setConfirming(false)
+    }
+  }
 
   if (loading) return <p role="status">正在安全地准备支付…</p>
   if (error) return <section><h1>无法启动支付</h1><p role="alert">{error}</p></section>
-  if (!intent || !hyperPromise) return <p role="alert">支付初始化失败，暂未创建可支付表单。</p>
+  if (!intent) return <p role="alert">支付初始化失败，暂未创建可支付表单。</p>
 
   return (
     <section>
+      <Script
+        src={hyperScriptUrl}
+        strategy="afterInteractive"
+        onReady={() => setSdkReady(true)}
+        onError={() => setError('无法加载 Hyperswitch 官方支付 SDK。')}
+      />
       <h1>安全支付</h1>
       <p>订单金额：{money(intent.amountMinor, intent.currency)}</p>
       <p>订单：{intent.orderId}</p>
-      <HyperElements hyper={hyperPromise} options={{ clientSecret: intent.clientSecret, locale: 'auto' }}>
-        <ConfirmPaymentForm paymentId={intent.paymentId} />
-      </HyperElements>
+      <div id="luckread-payment-element" aria-label="Hyperswitch 安全支付表单" />
+      <p>
+        后续周期扣款所需的保存支付方式授权由 Hyperswitch 托管支付表单处理。
+        仅在表单明确征得同意时才可继续保存；不需要时请勿勾选保存选项。
+      </p>
+      <button type="button" disabled={!elementReady || confirming} onClick={() => { void confirmPayment() }}>
+        {confirming ? '正在提交…' : '确认支付'}
+      </button>
+      {statusMessage ? <p role="status" aria-live="polite">{statusMessage}</p> : null}
+      <small>支付引用：{intent.paymentId}</small>
     </section>
   )
 }
