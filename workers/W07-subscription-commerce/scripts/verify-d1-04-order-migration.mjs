@@ -5,7 +5,8 @@ import { pathToFileURL } from 'node:url'
 export const ADMITTED_D1_04_UUID = '9bfb89a5-fbb5-45b1-a2ee-eab674b0d736'
 export const ORDER_MIGRATION_ID = '0001_order_commerce'
 export const PAYMENT_MIGRATION_ID = '0002_payment_provider_events'
-export const REQUIRED_MIGRATION_IDS = [ORDER_MIGRATION_ID, PAYMENT_MIGRATION_ID]
+export const SAVED_METHOD_MIGRATION_ID = '0003_saved_payment_methods_mandates'
+export const REQUIRED_MIGRATION_IDS = [ORDER_MIGRATION_ID, PAYMENT_MIGRATION_ID, SAVED_METHOD_MIGRATION_ID]
 
 export const REQUIRED_COLUMNS = {
   orders: [
@@ -50,6 +51,23 @@ export const REQUIRED_COLUMNS = {
     ['first_seen_at', 'TEXT', 1, 0], ['last_seen_at', 'TEXT', 1, 0],
     ['resolved_at', 'TEXT', 0, 0], ['resolution_code', 'TEXT', 0, 0],
   ],
+  saved_payment_methods: [
+    ['saved_payment_method_id', 'TEXT', 1, 1], ['provider', 'TEXT', 1, 0],
+    ['merchant_id', 'TEXT', 1, 0], ['customer_id', 'TEXT', 1, 0],
+    ['payment_method_id', 'TEXT', 1, 0], ['source_payment_id', 'TEXT', 1, 0],
+    ['source_event_id', 'TEXT', 1, 0], ['created_at', 'TEXT', 1, 0],
+  ],
+  payment_mandates: [
+    ['mandate_record_id', 'TEXT', 1, 1], ['provider', 'TEXT', 1, 0],
+    ['merchant_id', 'TEXT', 1, 0], ['customer_id', 'TEXT', 1, 0],
+    ['payment_method_id', 'TEXT', 1, 0], ['source_payment_id', 'TEXT', 1, 0],
+    ['source_event_id', 'TEXT', 1, 0], ['consent_accepted_at', 'TEXT', 1, 0],
+    ['consent_acceptance_type', 'TEXT', 1, 0], ['consent_scope', 'TEXT', 1, 0],
+    ['consent_terms_version', 'TEXT', 1, 0], ['provider_mandate_id', 'TEXT', 0, 0],
+    ['status', 'TEXT', 1, 0], ['version', 'INTEGER', 1, 0],
+    ['provider_updated_at', 'TEXT', 0, 0], ['created_at', 'TEXT', 1, 0],
+    ['updated_at', 'TEXT', 1, 0],
+  ],
 }
 
 export const REQUIRED_INDEXES = {
@@ -61,6 +79,12 @@ export const REQUIRED_INDEXES = {
   payment_provider_event_conflicts: [
     'ix_payment_provider_event_conflicts_state_last_seen',
     'ix_payment_provider_event_conflicts_identity',
+  ],
+  saved_payment_methods: ['ix_saved_payment_methods_customer_created'],
+  payment_mandates: [
+    'ux_payment_mandates_provider_mandate_id',
+    'ix_payment_mandates_customer_status_created',
+    'ix_payment_mandates_method_status',
   ],
 }
 
@@ -90,6 +114,22 @@ export const REQUIRED_TRIGGERS = {
     'payment_provider_event_conflicts_resolved_immutable',
     'payment_provider_event_conflicts_retained',
   ],
+  saved_payment_methods: [
+    'saved_payment_methods_require_succeeded_payment',
+    'saved_payment_methods_customer_binding_guard',
+    'saved_payment_methods_identity_immutable',
+    'saved_payment_methods_retained',
+  ],
+  payment_mandates: [
+    'payment_mandates_require_saved_method',
+    'payment_mandates_start_pending',
+    'payment_mandates_identity_immutable',
+    'payment_mandates_version_guard',
+    'payment_mandates_transition_guard',
+    'payment_mandates_provider_id_immutable',
+    'payment_mandates_provider_timestamp_monotonic',
+    'payment_mandates_retained',
+  ],
 }
 
 const targetNamesFor = (migrationId) => {
@@ -97,7 +137,9 @@ const targetNamesFor = (migrationId) => {
     ? ['orders', 'order_lines', 'order_create_idempotency']
     : migrationId === PAYMENT_MIGRATION_ID
       ? ['payments', 'payment_provider_events', 'payment_provider_event_conflicts']
-      : []
+      : migrationId === SAVED_METHOD_MIGRATION_ID
+        ? ['saved_payment_methods', 'payment_mandates']
+        : []
   return new Set([
     ...tables,
     ...tables.flatMap((table) => REQUIRED_INDEXES[table] ?? []),
@@ -187,6 +229,10 @@ export function inspectD1_04OrderMigrationPreflight({ schemaSnapshot, migrationS
   if (state.names.includes(PAYMENT_MIGRATION_ID) && !state.names.includes(ORDER_MIGRATION_ID)) {
     fail('payment migration is recorded without its required prior Order migration; manual schema reconciliation is required')
   }
+  if (state.names.includes(SAVED_METHOD_MIGRATION_ID) &&
+      (!state.names.includes(ORDER_MIGRATION_ID) || !state.names.includes(PAYMENT_MIGRATION_ID))) {
+    fail('saved-method migration is recorded without its required Order and Payment migrations; manual schema reconciliation is required')
+  }
   const byName = new Set(objects.map((object) => object.name))
 
   for (const migrationId of state.names.filter((name) => REQUIRED_MIGRATION_IDS.includes(name))) {
@@ -251,6 +297,8 @@ export function verifyD1_04OrderMigrationPostflight({
   paymentsTableInfo,
   paymentProviderEventsTableInfo,
   paymentProviderEventConflictsTableInfo,
+  savedPaymentMethodsTableInfo,
+  paymentMandatesTableInfo,
 }) {
   const before = schemaObjects(preflightSchema)
   const after = schemaObjects(postflightSchema)
@@ -275,6 +323,8 @@ export function verifyD1_04OrderMigrationPostflight({
     payments: paymentsTableInfo,
     payment_provider_events: paymentProviderEventsTableInfo,
     payment_provider_event_conflicts: paymentProviderEventConflictsTableInfo,
+    saved_payment_methods: savedPaymentMethodsTableInfo,
+    payment_mandates: paymentMandatesTableInfo,
   }
   for (const [tableName, expectedColumns] of Object.entries(REQUIRED_COLUMNS)) {
     const actual = tableColumns(tableInfoByName[tableName], tableName)
@@ -359,7 +409,7 @@ function main() {
     return
   }
   if (mode === 'postflight') {
-    if (args.length !== 10) throw new Error('Usage: verify-d1-04-order-migration.mjs postflight <preflight-schema.json> <postflight-schema.json> <migration-state.json> <orders-info.json> <order-lines-info.json> <idempotency-info.json> <payments-info.json> <provider-events-info.json> <event-conflicts-info.json> <output.json>')
+    if (args.length !== 12) throw new Error('Usage: verify-d1-04-order-migration.mjs postflight <preflight-schema.json> <postflight-schema.json> <migration-state.json> <orders-info.json> <order-lines-info.json> <idempotency-info.json> <payments-info.json> <provider-events-info.json> <event-conflicts-info.json> <saved-methods-info.json> <mandates-info.json> <output.json>')
     const report = verifyD1_04OrderMigrationPostflight({
       preflightSchema: readJson(args[0]),
       postflightSchema: readJson(args[1]),
@@ -370,8 +420,10 @@ function main() {
       paymentsTableInfo: readJson(args[6]),
       paymentProviderEventsTableInfo: readJson(args[7]),
       paymentProviderEventConflictsTableInfo: readJson(args[8]),
+      savedPaymentMethodsTableInfo: readJson(args[9]),
+      paymentMandatesTableInfo: readJson(args[10]),
     })
-    writeReport(args[9], report)
+    writeReport(args[11], report)
     console.log(JSON.stringify(report, null, 2))
     return
   }
