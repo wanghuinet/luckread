@@ -35,6 +35,20 @@ export interface CreateHyperswitchCustomerInitiatedSetupInput extends CreateHype
   customerId: string;
 }
 
+/** Server-derived online consent evidence for Hyperswitch's documented confirm API. */
+export interface HyperswitchOnlineCustomerAcceptance {
+  acceptedAt: string;
+  ipAddress: string;
+  userAgent: string;
+}
+
+/** Confirm a customer-present setup intent using a provider-issued token, never raw card data. */
+export interface ConfirmHyperswitchCustomerInitiatedSetupInput extends CreateHyperswitchPaymentIntentInput {
+  customerId: string;
+  paymentToken: string;
+  customerAcceptance: HyperswitchOnlineCustomerAcceptance;
+}
+
 /** Server-authoritative data for a customer-approved recurring-payment charge (MIT). */
 export interface CreateHyperswitchMerchantInitiatedPaymentInput extends CreateHyperswitchPaymentIntentInput {
   /** Must be the same Hyperswitch customer ID bound to the stored payment method. */
@@ -165,11 +179,11 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function validateProviderReference(value: unknown, field: string): asserts value is string {
+function validateProviderReference(value: unknown, field: string, maxLength = 256): asserts value is string {
   if (
     typeof value !== 'string' ||
     value.length === 0 ||
-    value.length > 256 ||
+    value.length > maxLength ||
     value.trim() !== value ||
     /[\u0000-\u001f\u007f]/.test(value)
   ) {
@@ -391,6 +405,73 @@ export async function createHyperswitchCustomerInitiatedSetupIntent(
     throw new HyperswitchClientError(
       'UPSTREAM_INVALID_RESPONSE',
       'Hyperswitch customer-initiated setup intent did not match the unconfirmed request.',
+    );
+  }
+  return payment;
+}
+
+/**
+ * Confirm the customer-present setup intent with Hyperswitch's documented
+ * customer_acceptance payload. The caller must call this only after the
+ * authenticated customer explicitly opts in to saving the method for future
+ * off-session charges, and must derive timestamp/IP from trusted server-side
+ * request context. The provider-issued payment token avoids handling PAN/CVC.
+ *
+ * This call does not by itself establish that a saved method is reusable or
+ * grant access; callers still need verified provider success and a customer-
+ * bound retrieve/reconciliation step before recording a reusable reference.
+ */
+export async function confirmHyperswitchCustomerInitiatedSetupPayment(
+  config: HyperswitchClientConfig,
+  input: ConfirmHyperswitchCustomerInitiatedSetupInput,
+  fetchImpl: typeof fetch = fetch,
+): Promise<HyperswitchPayment> {
+  validateCreateInput(input);
+  validateProviderReference(input.customerId, 'Customer ID');
+  validateProviderReference(input.paymentToken, 'Payment token');
+  if (!input.customerAcceptance || typeof input.customerAcceptance !== 'object') {
+    throw new HyperswitchClientError('REQUEST_INVALID', 'Customer acceptance evidence is required.');
+  }
+  const { acceptedAt, ipAddress, userAgent } = input.customerAcceptance;
+  if (
+    typeof acceptedAt !== 'string' ||
+    acceptedAt.length > 64 ||
+    acceptedAt.trim() !== acceptedAt ||
+    !/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,9})?(?:Z|[+-]\\d{2}:\\d{2})$/.test(acceptedAt) ||
+    !Number.isFinite(Date.parse(acceptedAt))
+  ) {
+    throw new HyperswitchClientError('REQUEST_INVALID', 'Customer acceptance timestamp is invalid.');
+  }
+  validateProviderReference(ipAddress, 'Customer IP address');
+  validateProviderReference(userAgent, 'Customer user agent', 1024);
+
+  const payment = await requestPayment(config, '/payments/' + encodeURIComponent(input.paymentId) + '/confirm', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      payment_token: input.paymentToken,
+      customer_acceptance: {
+        acceptance_type: 'online',
+        accepted_at: acceptedAt,
+        online: {
+          ip_address: ipAddress,
+          user_agent: userAgent,
+        },
+      },
+    }),
+  }, fetchImpl);
+
+  if (
+    payment.paymentId !== input.paymentId ||
+    payment.customerId !== input.customerId ||
+    payment.amount !== input.amount ||
+    payment.currency !== input.currency
+  ) {
+    throw new HyperswitchClientError(
+      'UPSTREAM_INVALID_RESPONSE',
+      'Hyperswitch setup confirmation did not match the authoritative customer and payment.',
     );
   }
   return payment;
