@@ -43,12 +43,12 @@ test('deployed Cron schedule is read back from Cloudflare and compared exactly',
 
 test('Cron-only D1-04 preflight uses a checked, persisted inventory file', () => {
   const preflight = deployWorkflow.match(
-    /- name: Verify D1-04 physical binding against Cloudflare([\\s\\S]*?)(?=\\n      - name: Deploy W07 worker and Cron config only)/,
+    /- name: Verify D1-04 physical binding against Cloudflare([\s\S]*?)(?=\n      - name: Deploy W07 worker and Cron config only)/,
   )?.[1];
 
   assert.ok(preflight, 'D1-04 read-only preflight step must exist');
-  assert.match(preflight, /run:\\s*\\|\\s*\\n\\s+set -euo pipefail/);
-  assert.match(preflight, /wrangler@4\\.116\\.0 d1 list --json --config wrangler\\.jsonc > \\/tmp\\/w07-d1-list\\.json/);
-  assert.match(preflight, /node scripts\\/verify-d1-04-binding\\.mjs \\/tmp\\/w07-d1-list\\.json/);
-  assert.doesNotMatch(preflight, /<\\(/, 'preflight must not contain a malformed process substitution');
+  assert.match(preflight, /run:\s*\|\s*\n\s+set -euo pipefail/);
+  assert.match(preflight, /wrangler@4\.116\.0 d1 list --json --config wrangler\.jsonc > \/tmp\/w07-d1-list\.json/);
+  assert.match(preflight, /node scripts\/verify-d1-04-binding\.mjs \/tmp\/w07-d1-list\.json/);
+  assert.doesNotMatch(preflight, /<\(/, 'preflight must not contain a malformed process substitution');
 });
