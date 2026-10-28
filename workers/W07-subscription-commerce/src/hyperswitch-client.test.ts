@@ -69,6 +69,7 @@ describe('Hyperswitch server-side payment intent client', () => {
       currency: 'USD',
       status: 'requires_payment_method',
       clientSecret: 'pay_test_secret_only',
+      paymentMethodId: null,
     })
   })
 
@@ -278,6 +279,27 @@ describe('Hyperswitch server-side payment intent client', () => {
     expect(fake.captured[0].init.method).toBe('GET')
     expect(new Headers(fake.captured[0].init.headers).get('api-key')).toBe(config.apiKey)
     expect(payment.status).toBe('succeeded')
+  })
+
+  it('exposes a validated opaque payment_method_id from provider reconciliation responses', async () => {
+    const saved = fakeFetch(jsonResponse(responsePayment({
+      status: 'succeeded',
+      payment_method_id: 'pm_saved_123',
+    })))
+    const payment = await retrieveHyperswitchPayment(config, input.paymentId, saved.fetcher)
+    expect(payment.paymentMethodId).toBe('pm_saved_123')
+
+    for (const invalidReference of [
+      '',
+      ' pm_saved_123',
+      'pm_saved_123\\nInjected: yes',
+      'x'.repeat(257),
+      42,
+    ]) {
+      const malformed = fakeFetch(jsonResponse(responsePayment({ payment_method_id: invalidReference })))
+      await expect(retrieveHyperswitchPayment(config, input.paymentId, malformed.fetcher))
+        .rejects.toMatchObject({ code: 'UPSTREAM_INVALID_RESPONSE' })
+    }
   })
 
   it('rejects invalid lookup IDs and a provider response for another payment', async () => {
