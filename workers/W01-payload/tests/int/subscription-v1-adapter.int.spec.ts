@@ -97,6 +97,7 @@ describe('v1 subscription adapter', () => {
     expect(updatePlanRoute).toContain("'/internal/creator/self'")
     expect(updatePlanRoute).toContain("method: 'PUT'")
     expect(updatePlanRoute).toContain("request.headers.get('If-Match')")
+    expect(updatePlanRoute).toContain("request.headers.get('Idempotency-Key')")
     expect(updatePlanRoute).toContain('callW06MembershipPlanUpdateRequestAudit')
     expect(w06Client).toContain("'/internal/audit-events/membership-plan-update-requested'")
     expect(updatePlanRoute.indexOf('const intentValue')).toBeLessThan(updatePlanRoute.indexOf('const w07Response = await callW07Subscription'))

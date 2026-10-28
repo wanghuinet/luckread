@@ -2707,7 +2707,7 @@
       ],
       "auditRequired": true,
       "optimisticLockRequired": true,
-      "idempotencyRequired": false,
+      "idempotencyRequired": true,
       "stateMachine": "none"
     }
   ]

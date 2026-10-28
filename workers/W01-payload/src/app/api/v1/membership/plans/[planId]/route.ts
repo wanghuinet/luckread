@@ -124,6 +124,11 @@ export async function PUT(request: Request, context: RouteContext): Promise<Resp
     }
     const ifMatch = request.headers.get('If-Match')
     if (!ifMatch) return errorResponse(428, 'PRECONDITION_REQUIRED', 'If-Match is required to update a plan')
+    const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
+    if (!idempotencyKey) return errorResponse(428, 'PRECONDITION_REQUIRED', 'Idempotency-Key is required to update a plan')
+    if (!/^[A-Za-z0-9_-]{1,128}$/.test(idempotencyKey)) {
+      return errorResponse(400, 'VALIDATION_FAILED', 'Idempotency-Key is invalid')
+    }
     const match = /^"lr-plan-v([1-9]\d*)"$/.exec(ifMatch)
     const expectedVersion = match?.[1] ? Number(match[1]) : Number.NaN
     if (!Number.isSafeInteger(expectedVersion) || expectedVersion < 1) {
@@ -165,12 +170,12 @@ export async function PUT(request: Request, context: RouteContext): Promise<Resp
       benefits: fields.benefits as string[],
     }
 
-    const intentEventId = 'evt_mpl_update_requested_' + planId + '_v' + expectedVersion
+    const intentEventId = 'evt_mpl_update_requested_' + planId + '_' + idempotencyKey
     let intentResponse: Response
     try {
       intentResponse = await callW06MembershipPlanUpdateRequestAudit({
         request, principal,
-        body: { eventId: intentEventId, planId, creatorId, expectedVersion, ...terms },
+        body: { eventId: intentEventId, planId, creatorId, expectedVersion, idempotencyKey, ...terms },
       })
     } catch {
       return errorResponse(503, 'AUDIT_UNAVAILABLE', 'Membership plan update intent could not be durably recorded')
@@ -199,6 +204,7 @@ export async function PUT(request: Request, context: RouteContext): Promise<Resp
       !validUpdatedPlan(envelope.data, planId, creatorId)
     ) return errorResponse(503, 'PLAN_RESPONSE_INVALID', 'Updated membership plan result could not be verified')
     const plan = envelope.data
+    if (plan.version === expectedVersion && plan.replayed === true) return w07Response
     let auditResponse: Response
     try {
       auditResponse = await callW06MembershipPlanUpdateAudit({

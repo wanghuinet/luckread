@@ -317,6 +317,7 @@ type MembershipPlanUpdateRequestAuditInput = {
   planId: string
   creatorId: string
   expectedVersion: number
+  idempotencyKey: string
   name: string
   tier: string
   billingInterval: 'MONTHLY' | 'YEARLY'
@@ -472,7 +473,7 @@ function parseMembershipPlanUpdateTerms(body: Record<string, unknown>): void {
 function parseMembershipPlanUpdateRequestAuditInput(value: unknown): MembershipPlanUpdateRequestAuditInput {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('INVALID_MEMBERSHIP_PLAN_UPDATE_REQUEST_AUDIT')
   const body = value as Record<string, unknown>
-  const allowed = new Set(['eventId', 'planId', 'creatorId', 'expectedVersion', 'name', 'tier', 'billingInterval', 'priceMinor', 'currency', 'benefits'])
+  const allowed = new Set(['eventId', 'planId', 'creatorId', 'expectedVersion', 'idempotencyKey', 'name', 'tier', 'billingInterval', 'priceMinor', 'currency', 'benefits'])
   if (Object.keys(body).some((key) => !allowed.has(key)) || Object.keys(body).length !== allowed.size) {
     throw new Error('INVALID_MEMBERSHIP_PLAN_UPDATE_REQUEST_AUDIT')
   }
@@ -480,7 +481,8 @@ function parseMembershipPlanUpdateRequestAuditInput(value: unknown): MembershipP
     typeof body.planId !== 'string' || !/^plan_[a-f0-9]{64}$/.test(body.planId) ||
     typeof body.creatorId !== 'string' || !resourceIdPattern.test(body.creatorId) ||
     typeof body.expectedVersion !== 'number' || !Number.isSafeInteger(body.expectedVersion) || body.expectedVersion < 1 ||
-    body.eventId !== 'evt_mpl_update_requested_' + body.planId + '_v' + body.expectedVersion
+    typeof body.idempotencyKey !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(body.idempotencyKey) ||
+    body.eventId !== 'evt_mpl_update_requested_' + body.planId + '_' + body.idempotencyKey
   ) throw new Error('INVALID_MEMBERSHIP_PLAN_UPDATE_REQUEST_AUDIT')
   parseMembershipPlanUpdateTerms(body)
   return body as MembershipPlanUpdateRequestAuditInput
@@ -923,6 +925,7 @@ export default {
         after: {
           creatorId: input.creatorId,
           expectedVersion: input.expectedVersion,
+          idempotencyKey: input.idempotencyKey,
           name: input.name,
           tier: input.tier,
           billingInterval: input.billingInterval,

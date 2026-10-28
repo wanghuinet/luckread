@@ -152,7 +152,9 @@
         "staleVersion": "412",
         "retiredPlan": "409",
         "missingOrForeignOwnerPlan": "404",
-        "missingW06AuditConfirmation": "503; durable intent precedes mutation and final audit has a deterministic version ID"
+        "missingW06AuditConfirmation": "503; durable intent precedes mutation and final audit has a deterministic version ID",
+        "missingIdempotencyKey": "428",
+        "keyReuseWithDifferentBody": "409"
       },
       "topologyConstraints": {
         "newWorker": false,
@@ -160,7 +162,8 @@
         "newQueue": false,
         "newServiceBinding": false,
         "crossD1Transactions": 0
-      }
+      },
+      "idempotency": "Idempotency-Key"
     },
     {
       "operationId": "createCommerceOrder",

@@ -242,10 +242,11 @@ describe('W06 runtime', () => {
     benefits: ['member-posts', 'monthly-live'],
   }
   const planUpdateRequestAuditInput = {
-    eventId: 'evt_mpl_update_requested_' + planId + '_v2',
+    eventId: 'evt_mpl_update_requested_' + planId + '_update_key_1',
     planId,
     creatorId: 'creator_001',
     expectedVersion: 2,
+    idempotencyKey: 'update_key_1',
     ...updateAuditTerms,
   }
   const planUpdateRequestAuditRequest = (body: unknown, withTransport = true, requestId = 'req_plan_update_intent_1', layer = 'L3') => new Request(
@@ -261,6 +262,7 @@ describe('W06 runtime', () => {
           'X-LuckRead-Principal-Layer': layer,
           'X-LuckRead-Correlation-Id': 'plan-update-intent-correlation',
           'X-LuckRead-Request-Id': requestId,
+          'Idempotency-Key': String((body as { idempotencyKey?: unknown }).idempotencyKey ?? ''),
         } : {}),
       },
       body: JSON.stringify(body),
