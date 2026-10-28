@@ -129,7 +129,7 @@
       },
       "invariants": [
         "A Payment must reference an owned Order in CREATED/PENDING_PAYMENT with the same positive total and currency.",
-        "UNIQUE(customer_id, order_id, idempotency_key) prevents duplicate same-key Payment attempts.",
+        "UNIQUE(customer_id, idempotency_key) scopes the payment creation key to a customer; key reuse for a different order/request conflicts.",
         "Provider request runs outside a D1 transaction, using the same stable payment_id and idempotency_key on retries.",
         "Provider resource.updated is monotonic; every stored mutation advances local version exactly once.",
         "Terminal payment attempts are not reopened.",
