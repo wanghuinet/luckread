@@ -283,6 +283,83 @@ type MembershipPlanAuditInput = {
   currency: string
 }
 
+
+type CommerceOrderAuditInput = {
+  eventId: string
+  orderId: string
+  occurredAt: string
+  status: 'CREATED'
+  version: number
+  currency: string
+  subtotalMinor: number
+  discountMinor: number
+  taxMinor: number
+  totalMinor: number
+}
+
+async function readBoundedAuditJson(request: Request, maxBytes: number): Promise<unknown> {
+  const declaredLength = request.headers.get('content-length')
+  if (declaredLength !== null && (!/^\d+$/.test(declaredLength) || Number(declaredLength) > maxBytes)) {
+    throw new Error('INVALID_COMMERCE_ORDER_AUDIT')
+  }
+  if (!request.body) throw new Error('INVALID_COMMERCE_ORDER_AUDIT')
+
+  const reader = request.body.getReader()
+  const chunks: Uint8Array[] = []
+  let length = 0
+  try {
+    while (true) {
+      const part = await reader.read()
+      if (part.done) break
+      length += part.value.byteLength
+      if (length > maxBytes) {
+        await reader.cancel()
+        throw new Error('INVALID_COMMERCE_ORDER_AUDIT')
+      }
+      chunks.push(part.value)
+    }
+  } catch {
+    throw new Error('INVALID_COMMERCE_ORDER_AUDIT')
+  }
+
+  const bytes = new Uint8Array(length)
+  let offset = 0
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset)
+    offset += chunk.byteLength
+  }
+  try {
+    return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes)) as unknown
+  } catch {
+    throw new Error('INVALID_COMMERCE_ORDER_AUDIT')
+  }
+}
+
+function parseCommerceOrderAuditInput(value: unknown): CommerceOrderAuditInput {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('INVALID_COMMERCE_ORDER_AUDIT')
+  const body = value as Record<string, unknown>
+  const allowed = new Set(['eventId', 'orderId', 'occurredAt', 'status', 'version', 'currency', 'subtotalMinor', 'discountMinor', 'taxMinor', 'totalMinor'])
+  if (Object.keys(body).some((key) => !allowed.has(key)) || Object.keys(body).length !== allowed.size) {
+    throw new Error('INVALID_COMMERCE_ORDER_AUDIT')
+  }
+  const safeMinor = (input: unknown): input is number =>
+    typeof input === 'number' && Number.isSafeInteger(input) && input >= 0
+  if (
+    typeof body.orderId !== 'string' || !/^ord_[A-Za-z0-9_-]{1,90}$/.test(body.orderId) ||
+    body.eventId !== 'evt_order_created_' + body.orderId ||
+    typeof body.occurredAt !== 'string' || Number.isNaN(Date.parse(body.occurredAt)) ||
+    body.status !== 'CREATED' ||
+    typeof body.version !== 'number' || !Number.isSafeInteger(body.version) || body.version < 1 ||
+    typeof body.currency !== 'string' || !/^[A-Z]{3}$/.test(body.currency) ||
+    !safeMinor(body.subtotalMinor) || !safeMinor(body.discountMinor) ||
+    !safeMinor(body.taxMinor) || !safeMinor(body.totalMinor) ||
+    body.discountMinor > body.subtotalMinor ||
+    !Number.isSafeInteger(body.subtotalMinor - body.discountMinor + body.taxMinor) ||
+    body.totalMinor !== body.subtotalMinor - body.discountMinor + body.taxMinor
+  ) throw new Error('INVALID_COMMERCE_ORDER_AUDIT')
+  return body as CommerceOrderAuditInput
+}
+
 type StoredAuditEvent = {
   event_id: string
   actor_json: string
@@ -323,13 +400,14 @@ async function findAuditEvent(db: D1Database, eventId: string): Promise<StoredAu
   ).bind(eventId).first<StoredAuditEvent>()
 }
 
-function matchesMembershipPlanAudit(existing: StoredAuditEvent, expected: AuditEvent): boolean {
+function matchesImmutableAuditEvent(existing: StoredAuditEvent, expected: AuditEvent): boolean {
   try {
     const storedActor = JSON.parse(existing.actor_json) as Record<string, unknown>
     const expectedActor = expected.actor as unknown as Record<string, unknown>
     return existing.event_id === expected.eventId &&
       storedActor.actorId === expectedActor.actorId &&
       storedActor.actorType === expectedActor.actorType &&
+      storedActor.layer === expectedActor.layer &&
       existing.action === expected.action &&
       existing.target_type === expected.targetType &&
       existing.target_id === expected.targetId &&
@@ -341,7 +419,7 @@ function matchesMembershipPlanAudit(existing: StoredAuditEvent, expected: AuditE
   }
 }
 
-async function persistMembershipPlanAudit(env: Env, event: AuditEvent): Promise<Response> {
+async function persistImmutableAuditEvent(env: Env, event: AuditEvent): Promise<Response> {
   let existing: StoredAuditEvent | null
   try {
     existing = await findAuditEvent(env.D1_03, event.eventId)
@@ -349,7 +427,7 @@ async function persistMembershipPlanAudit(env: Env, event: AuditEvent): Promise<
     return json({ error: 'AUDIT_EVENT_LOOKUP_FAILED' }, 503)
   }
   if (existing) {
-    if (!matchesMembershipPlanAudit(existing, event)) return json({ error: 'AUDIT_EVENT_CONFLICT' }, 409)
+    if (!matchesImmutableAuditEvent(existing, event)) return json({ error: 'AUDIT_EVENT_CONFLICT' }, 409)
     return json({ eventId: event.eventId, action: event.action, targetType: event.targetType, targetId: event.targetId, replayed: true }, 200)
   }
 
@@ -361,7 +439,7 @@ async function persistMembershipPlanAudit(env: Env, event: AuditEvent): Promise<
     // durable row before treating this request as an idempotent success.
     try {
       const raced = await findAuditEvent(env.D1_03, event.eventId)
-      if (raced && matchesMembershipPlanAudit(raced, event)) {
+      if (raced && matchesImmutableAuditEvent(raced, event)) {
         return json({ eventId: event.eventId, action: event.action, targetType: event.targetType, targetId: event.targetId, replayed: true }, 200)
       }
     } catch {
@@ -483,6 +561,48 @@ export default {
       }
     }
 
+    if (request.method === 'POST' && url.pathname === '/internal/audit-events/commerce-order-created') {
+      let principal: ReturnType<typeof requireW01Transport>
+      try { principal = requireW01Transport(request) }
+      catch (error) { return errorResponse(error, request.headers.get('X-LuckRead-Request-Id')?.trim()) }
+      if (!/^L[2-8]$/.test(principal.layer)) {
+        return json({ error: 'PERMISSION_DENIED' }, 403)
+      }
+
+      let input: CommerceOrderAuditInput
+      try {
+        input = parseCommerceOrderAuditInput(await readBoundedAuditJson(request, 4096))
+      } catch {
+        return json({ error: 'INVALID_COMMERCE_ORDER_AUDIT' }, 400)
+      }
+
+      const event: AuditEvent = {
+        eventId: input.eventId,
+        requestId: principal.requestId,
+        traceId: principal.correlationId,
+        actor: {
+          actorId: principal.userId,
+          actorType: 'user',
+          layer: principal.layer as AuditEvent['actor']['layer'],
+        },
+        action: 'commerce.order.created',
+        targetType: 'Order',
+        targetId: input.orderId,
+        before: {},
+        after: {
+          status: input.status,
+          version: input.version,
+          currency: input.currency,
+          subtotalMinor: input.subtotalMinor,
+          discountMinor: input.discountMinor,
+          taxMinor: input.taxMinor,
+          totalMinor: input.totalMinor,
+        },
+        occurredAt: input.occurredAt,
+      }
+      return persistImmutableAuditEvent(env, event)
+    }
+
     if (request.method === 'POST' && url.pathname === '/internal/audit-events/membership-plan-created') {
       let principal: ReturnType<typeof requireW01Transport>
       try { principal = requireW01Transport(request) }
@@ -530,7 +650,7 @@ export default {
         },
         occurredAt: input.occurredAt,
       }
-      return persistMembershipPlanAudit(env, event)
+      return persistImmutableAuditEvent(env, event)
     }
 
     if (request.method === 'POST' && url.pathname === '/internal/audit-events/account-state-changed') {

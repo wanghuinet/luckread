@@ -5,6 +5,13 @@ on:
     paths:
       - 'workers/W07-subscription-commerce/**'
       - 'workers/W01-payload/src/subscription/**'
+      - 'workers/W01-payload/src/commerce/**'
+      - 'workers/W01-payload/src/app/api/v1/commerce/orders/**'
+      - 'workers/W01-payload/src/moderation/w06-moderation-client.ts'
+      - 'workers/W01-payload/tests/int/commerce-order-v1-adapter.int.spec.ts'
+      - 'workers/W06-governance/src/index.ts'
+      - 'workers/W06-governance/src/index.test.ts'
+      - 'contracts/transport/W01-W06-moderation-http-binding.v1.json'
       - 'workers/W01-payload/src/app/api/v1/plans/**'
       - 'workers/W01-payload/src/app/api/v1/membership/plans/**'
       - 'workers/W01-payload/src/auth/w08-creator-client.ts'
@@ -38,6 +45,13 @@ on:
     paths:
       - 'workers/W07-subscription-commerce/**'
       - 'workers/W01-payload/src/subscription/**'
+      - 'workers/W01-payload/src/commerce/**'
+      - 'workers/W01-payload/src/app/api/v1/commerce/orders/**'
+      - 'workers/W01-payload/src/moderation/w06-moderation-client.ts'
+      - 'workers/W01-payload/tests/int/commerce-order-v1-adapter.int.spec.ts'
+      - 'workers/W06-governance/src/index.ts'
+      - 'workers/W06-governance/src/index.test.ts'
+      - 'contracts/transport/W01-W06-moderation-http-binding.v1.json'
       - 'workers/W01-payload/src/app/api/v1/plans/**'
       - 'workers/W01-payload/src/app/api/v1/membership/plans/**'
       - 'workers/W01-payload/src/auth/w08-creator-client.ts'
@@ -95,7 +109,7 @@ jobs:
         run: npx tsc --noEmit --strict --skipLibCheck --target ES2022 --module ESNext --moduleResolution Bundler --lib ES2022,DOM --types @cloudflare/workers-types workers/W07-subscription-commerce/src/order-item-resolution.ts workers/W07-subscription-commerce/src/order-persistence.ts workers/W07-subscription-commerce/src/order-http-runtime.ts workers/W07-subscription-commerce/src/payment-persistence.ts workers/W07-subscription-commerce/src/index.ts
       - name: Run Subscription runtime and adapter tests
         working-directory: workers/W01-payload
-        run: pnpm exec vitest run --config ./vitest.config.mts ../../workers/W07-subscription-commerce/src/subscription-runtime.test.ts ../../workers/W07-subscription-commerce/src/d1-traffic-guard.test.ts ../../workers/W07-subscription-commerce/src/hyperswitch-webhook-signature.test.ts ../../workers/W07-subscription-commerce/src/hyperswitch-webhook-payment-validation.test.ts ../../workers/W07-subscription-commerce/src/order-request-validation.test.ts ../../workers/W07-subscription-commerce/src/order-item-resolution.test.ts ../../workers/W07-subscription-commerce/src/order-persistence.test.ts ../../workers/W07-subscription-commerce/src/order-http-runtime.test.ts ../../workers/W07-subscription-commerce/src/payment-persistence.test.ts tests/int/subscription-v1-adapter.int.spec.ts
+        run: pnpm exec vitest run --config ./vitest.config.mts ../../workers/W07-subscription-commerce/src/subscription-runtime.test.ts ../../workers/W07-subscription-commerce/src/d1-traffic-guard.test.ts ../../workers/W07-subscription-commerce/src/hyperswitch-webhook-signature.test.ts ../../workers/W07-subscription-commerce/src/hyperswitch-webhook-payment-validation.test.ts ../../workers/W07-subscription-commerce/src/order-request-validation.test.ts ../../workers/W07-subscription-commerce/src/order-item-resolution.test.ts ../../workers/W07-subscription-commerce/src/order-persistence.test.ts ../../workers/W07-subscription-commerce/src/order-http-runtime.test.ts ../../workers/W07-subscription-commerce/src/payment-persistence.test.ts tests/int/subscription-v1-adapter.int.spec.ts tests/int/commerce-order-v1-adapter.int.spec.ts
       - name: Verify Subscription migration shape
         run: |
           set -euo pipefail

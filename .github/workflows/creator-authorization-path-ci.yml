@@ -4,6 +4,9 @@ on:
   pull_request:
     paths:
       - 'workers/W01-payload/src/auth/w08-creator-client.ts'
+      - 'workers/W01-payload/src/commerce/**'
+      - 'workers/W01-payload/src/app/api/v1/commerce/orders/**'
+      - 'workers/W01-payload/tests/int/commerce-order-v1-adapter.int.spec.ts'
       - 'workers/W01-payload/src/app/api/v1/creator-applications/**'
       - 'workers/W01-payload/src/app/api/v1/membership/plans/**'
       - 'workers/W01-payload/src/moderation/w06-moderation-client.ts'
