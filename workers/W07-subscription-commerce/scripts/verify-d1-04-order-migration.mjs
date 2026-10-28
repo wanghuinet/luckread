@@ -159,6 +159,7 @@ export const REQUIRED_TRIGGERS = {
     'subscription_renewal_cycles_resolved_snapshot_immutable',
     'subscription_renewal_cycles_version_guard',
     'subscription_renewal_cycles_state_transition_guard',
+    'subscription_renewal_cycles_sync_state_transition_guard',
     'subscription_renewal_cycles_order_binding_guard',
     'subscription_renewal_cycles_payment_binding_guard',
     'subscription_renewal_cycles_requires_active_mandate',
