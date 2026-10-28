@@ -2422,7 +2422,7 @@
       "auditRequired": true,
       "optimisticLockRequired": true,
       "idempotencyRequired": false,
-      "stateMachine": "membership-plan"
+      "stateMachine": "none"
     },
     {
       "operationId": "createSubscription",
