@@ -43,7 +43,7 @@ export interface HyperswitchOnlineCustomerAcceptance {
 }
 
 /** Confirm a customer-present setup intent using a provider-issued token, never raw card data. */
-export interface ConfirmHyperswitchCustomerInitiatedSetupInput extends CreateHyperswitchPaymentIntentInput {
+export interface ConfirmHyperswitchCustomerInitiatedSetupInput extends Pick<CreateHyperswitchPaymentIntentInput, 'paymentId' | 'amount' | 'currency'> {
   customerId: string;
   paymentToken: string;
   customerAcceptance: HyperswitchOnlineCustomerAcceptance;
@@ -426,7 +426,18 @@ export async function confirmHyperswitchCustomerInitiatedSetupPayment(
   input: ConfirmHyperswitchCustomerInitiatedSetupInput,
   fetchImpl: typeof fetch = fetch,
 ): Promise<HyperswitchPayment> {
-  validateCreateInput(input);
+  if (!input || typeof input !== 'object') {
+    throw new HyperswitchClientError('REQUEST_INVALID', 'Setup confirmation input is required.');
+  }
+  if (typeof input.paymentId !== 'string' || !PAYMENT_ID_PATTERN.test(input.paymentId)) {
+    throw new HyperswitchClientError('REQUEST_INVALID', 'Payment ID must be the stable 30-character Hyperswitch payment identifier.');
+  }
+  if (!Number.isSafeInteger(input.amount) || input.amount <= 0) {
+    throw new HyperswitchClientError('REQUEST_INVALID', 'Amount must be a positive safe integer in the currency smallest unit.');
+  }
+  if (typeof input.currency !== 'string' || !CURRENCY_PATTERN.test(input.currency)) {
+    throw new HyperswitchClientError('REQUEST_INVALID', 'Currency must be a three-letter uppercase code.');
+  }
   validateProviderReference(input.customerId, 'Customer ID');
   validateProviderReference(input.paymentToken, 'Payment token');
   if (!input.customerAcceptance || typeof input.customerAcceptance !== 'object') {
@@ -437,7 +448,7 @@ export async function confirmHyperswitchCustomerInitiatedSetupPayment(
     typeof acceptedAt !== 'string' ||
     acceptedAt.length > 64 ||
     acceptedAt.trim() !== acceptedAt ||
-    !/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,9})?(?:Z|[+-]\\d{2}:\\d{2})$/.test(acceptedAt) ||
+    !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})$/.test(acceptedAt) ||
     !Number.isFinite(Date.parse(acceptedAt))
   ) {
     throw new HyperswitchClientError('REQUEST_INVALID', 'Customer acceptance timestamp is invalid.');
