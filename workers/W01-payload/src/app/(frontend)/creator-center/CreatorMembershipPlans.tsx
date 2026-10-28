@@ -506,7 +506,7 @@ export default function CreatorMembershipPlans({ locale = 'zh-CN' }: { locale?: 
                   </label>
                   <label className="flex flex-col gap-1 text-sm font-semibold">
                     {labels.priceLabel} ({plan.currency})
-                    <input required inputMode="decimal" value={editPrice} onChange={(event) => setEditPrice(event.target.value)} pattern="(0|[1-9][0-9]*)(\\.[0-9]{1,2})?" className="rounded-xl border border-light-border bg-transparent px-3 py-2 font-normal dark:border-dark-border" />
+                    <input required inputMode="decimal" value={editPrice} onChange={(event) => setEditPrice(event.target.value)} pattern="(0|[1-9][0-9]*)(\.[0-9]{1,2})?" className="rounded-xl border border-light-border bg-transparent px-3 py-2 font-normal dark:border-dark-border" />
                   </label>
                   <label className="flex flex-col gap-1 text-sm font-semibold">
                     {labels.interval}
