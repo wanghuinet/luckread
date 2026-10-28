@@ -106,7 +106,8 @@ jobs:
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        run: node scripts/verify-d1-04-binding.mjs <(npx --yes wrangler@4.116.0 d1 list --json --config wrangler.jsonc)
+        run: node scripts/verify-d1-04-binding.mjs <(npx --yes wrangler@4.116.0 d1 list --json --config wrangler.jsonc > /tmp/w07-d1-list.json
+          node scripts/verify-d1-04-binding.mjs /tmp/w07-d1-list.json
 
       # Intentionally no 'wrangler d1 migrations apply' or remote SQL statements in this workflow.
       - name: Deploy W07 worker and Cron config only
@@ -122,7 +123,7 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
           set -euo pipefail
-          node - <<'NODE'
+          node --input-type=module - <<'NODE'
           const accountId = process.env.CLOUDFLARE_ACCOUNT_ID
           const token = process.env.CLOUDFLARE_API_TOKEN
           if (!accountId || !token) throw new Error('Required Cloudflare deployment secrets are missing')
