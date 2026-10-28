@@ -214,6 +214,7 @@ test('postflight rejects changed existing schema objects', () => {
 
 test('workflow is manual-only, gates exact SHA/name/confirmation, and never deploys a Worker', () => {
   const workflow = fs.readFileSync(new URL('../../../.github/workflows/w07-d1-04-order-migration.yml', import.meta.url), 'utf8')
+  const migration = fs.readFileSync(new URL('../migrations-d1-04/0004_subscription_renewal_cycles.sql', import.meta.url), 'utf8')
   assert.match(workflow, /workflow_dispatch:/)
   assert.doesNotMatch(workflow, /^\s{2}(push|pull_request):/m)
   assert.match(workflow, /source_sha:/)
