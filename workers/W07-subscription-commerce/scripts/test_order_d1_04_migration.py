@@ -229,16 +229,18 @@ class D104OrderMigrationTests(unittest.TestCase):
     def test_payment_must_match_an_owned_positive_order_snapshot(self):
         self.order()
         invalid = [
-            {"payment_id":"pay_" + "z"*26, "customer":"other_user"},
-            {"payment_id":"pay_" + "y"*26, "amount":999},
-            {"payment_id":"pay_" + "x"*26, "currency":"EUR"},
-            {"payment_id":"pay_short"},
-            {"payment_id":"pay_" + "bad!" + "a"*22},
+            {"customer":"other_user"},
+            {"amount":999},
+            {"currency":"EUR"},
         ]
         for i, kwargs in enumerate(invalid):
             with self.subTest(i=i), self.assertRaises(sqlite3.IntegrityError):
                 self.payment(payment_id="pay_" + chr(ord("b")+i)*26,
                              **{k:v for k,v in kwargs.items() if k != "payment_id"})
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.payment(payment_id="pay_short")
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.payment(payment_id="pay_" + "bad!" + "a"*22)
         with self.assertRaises(sqlite3.IntegrityError):
             self.payment(order_id="missing")
         with self.assertRaises(sqlite3.IntegrityError):
