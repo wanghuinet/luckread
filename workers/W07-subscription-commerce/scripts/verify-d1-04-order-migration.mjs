@@ -85,6 +85,7 @@ export const REQUIRED_TRIGGERS = {
   ],
   payment_provider_event_conflicts: [
     'payment_provider_event_conflicts_identity_immutable',
+    'payment_provider_event_conflicts_reference_first_receipt',
     'payment_provider_event_conflicts_version_guard',
     'payment_provider_event_conflicts_resolved_immutable',
     'payment_provider_event_conflicts_retained',
