@@ -299,6 +299,34 @@ describe('W06 runtime', () => {
     },
   )
 
+  const planLifecycleRequestAuditInput = {
+    eventId: 'evt_mpl_lifecycle_requested_pause_' + planId + '_v2',
+    planId, creatorId: 'creator_001', expectedVersion: 2, action: 'pause',
+    requestedStatus: 'PAUSED', requestedVisibility: 'PRIVATE',
+  }
+  const planLifecycleRequestAuditRequest = (body: unknown, withTransport = true, requestId = 'req_plan_lifecycle_intent_1', layer = 'L3') => new Request(
+    'https://w06.internal/internal/audit-events/membership-plan-lifecycle-requested',
+    { method: 'POST', headers: { 'content-type': 'application/json', ...(withTransport ? {
+      'X-LuckRead-Caller': 'W01', 'X-LuckRead-Transport-Version': '1.0',
+      'X-LuckRead-Principal-User-Id': 'creator_user_001', 'X-LuckRead-Principal-Layer': layer,
+      'X-LuckRead-Correlation-Id': 'plan-lifecycle-intent-correlation', 'X-LuckRead-Request-Id': requestId,
+    } : {}) }, body: JSON.stringify(body) },
+  )
+  const planLifecycleAuditInput = {
+    eventId: 'evt_mpl_plan_paused_' + planId + '_v3',
+    planId, creatorId: 'creator_001', expectedVersion: 2, planVersion: 2,
+    action: 'pause', status: 'PAUSED', visibility: 'PRIVATE', version: 3,
+    occurredAt: '2026-10-28T06:00:00.000Z',
+  }
+  const planLifecycleAuditRequest = (body: unknown, withTransport = true, requestId = 'req_plan_lifecycle_audit_1', layer = 'L3') => new Request(
+    'https://w06.internal/internal/audit-events/membership-plan-lifecycle-changed',
+    { method: 'POST', headers: { 'content-type': 'application/json', ...(withTransport ? {
+      'X-LuckRead-Caller': 'W01', 'X-LuckRead-Transport-Version': '1.0',
+      'X-LuckRead-Principal-User-Id': 'creator_user_001', 'X-LuckRead-Principal-Layer': layer,
+      'X-LuckRead-Correlation-Id': 'plan-lifecycle-correlation', 'X-LuckRead-Request-Id': requestId,
+    } : {}) }, body: JSON.stringify(body) },
+  )
+
   const orderId = 'ord_test_1'
   const orderAuditInput = {
     eventId: 'evt_order_created_' + orderId,
@@ -617,6 +645,46 @@ describe('W06 runtime', () => {
     expect(bad.status).toBe(400)
     expect(noTransport.status).toBe(403)
     expect(prepare).not.toHaveBeenCalled()
+  })
+
+  it('durably records lifecycle intent and rejects conflicting semantic replay', async () => {
+    const { db, rows } = createPlanAuditDb()
+    const runtime = await import('./index')
+    const first = await runtime.default.fetch(planLifecycleRequestAuditRequest(planLifecycleRequestAuditInput), { D1_03: db })
+    const replay = await runtime.default.fetch(planLifecycleRequestAuditRequest(planLifecycleRequestAuditInput, true, 'req_plan_lifecycle_retry'), { D1_03: db })
+    expect(first.status).toBe(201)
+    expect(replay.status).toBe(200)
+    expect(await replay.json()).toMatchObject({ eventId: planLifecycleRequestAuditInput.eventId, action: 'membership.plan.lifecycle_requested', replayed: true })
+    const conflict = await runtime.default.fetch(
+      planLifecycleRequestAuditRequest({ ...planLifecycleRequestAuditInput, requestedVisibility: 'PUBLIC' }), { D1_03: db },
+    )
+    expect(conflict.status).toBe(409)
+    expect(rows.size).toBe(1)
+  })
+
+  it('rejects malformed lifecycle intent and requires private W01 transport', async () => {
+    const { db, prepare } = createPlanAuditDb()
+    const runtime = await import('./index')
+    const malformed = await runtime.default.fetch(
+      planLifecycleRequestAuditRequest({ ...planLifecycleRequestAuditInput, requestedStatus: 'ACTIVE' }), { D1_03: db },
+    )
+    const noTransport = await runtime.default.fetch(planLifecycleRequestAuditRequest(planLifecycleRequestAuditInput, false), { D1_03: db })
+    expect(malformed.status).toBe(400)
+    expect(noTransport.status).toBe(403)
+    expect(prepare).not.toHaveBeenCalled()
+  })
+
+  it('persists an immutable plan pause event with before and after state', async () => {
+    const { db, rows } = createPlanAuditDb()
+    const runtime = await import('./index')
+    const response = await runtime.default.fetch(planLifecycleAuditRequest(planLifecycleAuditInput), { D1_03: db })
+    expect(response.status).toBe(201)
+    expect(await response.json()).toMatchObject({ eventId: planLifecycleAuditInput.eventId, action: 'membership.plan.paused', targetId: planId, replayed: false })
+    expect(rows.get(planLifecycleAuditInput.eventId)).toMatchObject({
+      action: 'membership.plan.paused', target_type: 'MembershipPlan', target_id: planId,
+      before_json: JSON.stringify({ creatorId: 'creator_001', planVersion: 2, status: 'ACTIVE', visibility: 'PUBLIC', version: 2 }),
+      after_json: JSON.stringify({ creatorId: 'creator_001', planVersion: 2, status: 'PAUSED', visibility: 'PRIVATE', version: 3 }),
+    })
   })
 
   it('persists membership plan updated event with exact version and new commercial terms', async () => {
