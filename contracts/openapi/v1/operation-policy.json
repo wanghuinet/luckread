@@ -2681,7 +2681,7 @@
       "optimisticLockRequired": false,
       "idempotencyRequired": false,
       "stateMachine": "none",
-      "x-luckread-authentication": "Provider-originated callback; W07 verifies HMAC-SHA512 over the original raw body against the configured Hyperswitch secret and merchant ID",
+      "x-luckread-authentication": "Public provider callback ingress authenticated by W07 HMAC-SHA512 verification over exact raw request bytes; no browser session",
       "x-luckread-idempotency": "provider + merchant_id + event_id + payload SHA-256; enforced by the unique D1-04 webhook receipt identity and immutable payload-conflict record, not by an HTTP Idempotency-Key header"
     }
   ]
