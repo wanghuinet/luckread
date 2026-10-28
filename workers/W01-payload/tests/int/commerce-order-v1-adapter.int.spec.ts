@@ -37,7 +37,7 @@ describe('v1 commerce order adapter', () => {
   it('reads only the authenticated customer order through W07 owner-scoped persistence', () => {
     expect(getRoute).toContain("authorizeOrderPermission(request, principal, 'order.read')")
     expect(getRoute).toContain("pathname: '/commerce/orders/' + encodeURIComponent(orderId)")
-    expect(w07OrderRuntime).toContain('getCommerceOrder(env.D1_04, customerId, route.orderId)')
+    expect(w07OrderRuntime).toContain('getOrder(env.D1_04, customerId, route.orderId)')
     expect(getRoute).toContain("method: 'GET'")
   })
 
