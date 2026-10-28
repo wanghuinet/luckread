@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { changeSubscriptionPlan, createMembershipPlanDraft, createSubscription, etagForVersion, getSubscription, listActiveMembershipPlans, listCreatorMembershipPlans, listSubscriptions, normalizeMembershipPlanDraft, parseBoundedPositiveInt, publishMembershipPlan, reviseMembershipPlan, transitionSubscription, type SubscriptionRow, type SubscriptionStatus } from './subscription-runtime.js'
+import { changeSubscriptionPlan, createMembershipPlanDraft, createSubscription, etagForVersion, getSubscription, listActiveMembershipPlans, listCreatorMembershipPlans, listSubscriptions, normalizeMembershipPlanDraft, parseBoundedPositiveInt, publishMembershipPlan, reviseMembershipPlan, transitionMembershipPlanLifecycle, transitionSubscription, type SubscriptionRow, type SubscriptionStatus } from './subscription-runtime.js'
 import w07 from './index.js'
 import { verifyD1SubscriptionPostflight, verifyD1SubscriptionPreflight } from '../scripts/verify-remote-preflight.mjs'
 
@@ -151,6 +151,16 @@ function fakeDb(rows: SubscriptionRow[], plans: MembershipPlanRow[] = []): D1Dat
             plan.has_current_version = true
             return { meta: { changes: 1 } }
           }
+          if (sql.includes('UPDATE membership_plans SET status = ?') && sql.includes('visibility = ?')) {
+            const [status, visibility, updatedAt, planId, ownerId, expectedVersion, fromStatus, fromVisibility] = values as
+              [MembershipPlanRow['status'], MembershipPlanRow['visibility'], string, string, string, number, MembershipPlanRow['status'], MembershipPlanRow['visibility']]
+            const plan = planState.get(planId)
+            if (!plan || plan.owner_type !== 'CREATOR' || plan.owner_id !== ownerId || plan.version !== expectedVersion ||
+                plan.status !== fromStatus || plan.visibility !== fromVisibility ||
+                !planVersionState.has(plan.plan_id + ':' + plan.current_version)) return { meta: { changes: 0 } }
+            plan.status = status; plan.visibility = visibility; plan.updated_at = updatedAt; plan.version += 1
+            return { meta: { changes: 1 } }
+          }
           if (sql.includes("UPDATE membership_plans SET status = 'ACTIVE'")) {
             const plan = planState.get(String(values[1]))
             if (
@@ -238,6 +248,8 @@ describe('subscription runtime', () => {
     expect(index).toContain('createMembershipPlanDraft(')
     expect(index).toContain('publishPathMatch')
     expect(index).toContain('publishMembershipPlan(')
+    expect(index).toContain('transitionMembershipPlanLifecycle(')
+    expect(index.indexOf('transitionMembershipPlanLifecycle(')).toBeLessThan(guard)
     expect(index).not.toContain('createSubscription(')
     expect(index).not.toContain('transitionSubscription(')
     expect(index).not.toContain('changeSubscriptionPlan(')
@@ -685,6 +697,31 @@ describe('subscription runtime', () => {
       .rejects.toMatchObject({ code: 'RESOURCE_NOT_FOUND', status: 404 })
     const retired = fakeDb([], [activePlan('plan_retired', { status: 'RETIRED', current_version: 1 })])
     await expect(reviseMembershipPlan(retired, 'creator_1', 'plan_retired', '"lr-plan-v1"', input))
+      .rejects.toMatchObject({ code: 'INVALID_STATE', status: 409 })
+  })
+
+  it('pauses and resumes a plan without changing its immutable commercial version', async () => {
+    const db = fakeDb([], [activePlan('plan_lifecycle', { current_version: 3, version: 4 })])
+    const paused = await transitionMembershipPlanLifecycle(db, 'creator_1', 'plan_lifecycle', '"lr-plan-v4"', 'pause')
+    expect(paused).toMatchObject({ status: 'PAUSED', visibility: 'PRIVATE', planVersion: 3, version: 5, etag: '"lr-plan-v5"', replayed: false })
+    const replay = await transitionMembershipPlanLifecycle(db, 'creator_1', 'plan_lifecycle', '"lr-plan-v4"', 'pause')
+    expect(replay).toMatchObject({ status: 'PAUSED', version: 5, planVersion: 3, replayed: true })
+    expect((await listActiveMembershipPlans(db, 20)).docs.map(x => x.planId)).not.toContain('plan_lifecycle')
+    const resumed = await transitionMembershipPlanLifecycle(db, 'creator_1', 'plan_lifecycle', '"lr-plan-v5"', 'resume')
+    expect(resumed).toMatchObject({ status: 'ACTIVE', visibility: 'PUBLIC', planVersion: 3, version: 6, etag: '"lr-plan-v6"', replayed: false })
+    expect((await listActiveMembershipPlans(db, 20)).docs.map(x => x.planId)).toContain('plan_lifecycle')
+  })
+
+  it('rejects foreign owners, stale ETags, invalid source states, and retired plans', async () => {
+    const db = fakeDb([], [activePlan('plan_lifecycle_scope', { current_version: 1, status: 'DRAFT', visibility: 'PRIVATE', version: 2 })])
+    await expect(transitionMembershipPlanLifecycle(db, 'creator_other', 'plan_lifecycle_scope', '"lr-plan-v2"', 'pause'))
+      .rejects.toMatchObject({ code: 'RESOURCE_NOT_FOUND', status: 404 })
+    await expect(transitionMembershipPlanLifecycle(db, 'creator_1', 'plan_lifecycle_scope', '"lr-plan-v1"', 'pause'))
+      .rejects.toMatchObject({ code: 'PRECONDITION_FAILED', status: 412 })
+    await expect(transitionMembershipPlanLifecycle(db, 'creator_1', 'plan_lifecycle_scope', '"lr-plan-v2"', 'pause'))
+      .rejects.toMatchObject({ code: 'INVALID_STATE', status: 409 })
+    const retired = fakeDb([], [activePlan('plan_lifecycle_retired', { status: 'RETIRED', version: 3 })])
+    await expect(transitionMembershipPlanLifecycle(retired, 'creator_1', 'plan_lifecycle_retired', '"lr-plan-v3"', 'pause'))
       .rejects.toMatchObject({ code: 'INVALID_STATE', status: 409 })
   })
 

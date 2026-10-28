@@ -1,6 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 
-import { createMembershipPlanDraft, reviseMembershipPlan, getSubscription, listActiveMembershipPlans, listCreatorMembershipPlans, listSubscriptions, parseBoundedPositiveInt, publishMembershipPlan, SubscriptionRuntimeError, validatePrincipal } from './subscription-runtime.js'
+import { createMembershipPlanDraft, reviseMembershipPlan, getSubscription, listActiveMembershipPlans, listCreatorMembershipPlans, listSubscriptions, parseBoundedPositiveInt, publishMembershipPlan, transitionMembershipPlanLifecycle, SubscriptionRuntimeError, validatePrincipal } from './subscription-runtime.js'
 import { handleCommerceOrderRequest } from './order-http-runtime.js'
 import { handleCommercePaymentIntentRequest } from './payment-intent-http-runtime.js'
 import { handleHyperswitchWebhookRequest } from './payment-webhook-http-runtime.js'
@@ -178,6 +178,27 @@ export default {
         const input = await readJsonBody(request)
         const result = await reviseMembershipPlan(
           env.D1_01, creatorId, segments[2]!, request.headers.get('If-Match'), input,
+        )
+        return json({ data: result, requestId: crypto.randomUUID() }, 200, result.etag)
+      }
+      const planLifecycleMatch = /^\/membership\/plans\/([^/]+)\/lifecycle$/.exec(pathname)
+      if (request.method === 'POST' && planLifecycleMatch) {
+        const segments = parseSegments(pathname)
+        if (segments.length !== 4 || segments[0] !== 'membership' || segments[1] !== 'plans' || segments[3] !== 'lifecycle') {
+          return new Response(null, { status: 404 })
+        }
+        requireCreatorLayer(request)
+        const creatorId = requireVerifiedCreatorId(request)
+        const value = await readJsonBody(request)
+        if (!value || typeof value !== 'object' || Array.isArray(value) ||
+            Object.keys(value as Record<string, unknown>).length !== 1 ||
+            !Object.hasOwn(value, 'action') ||
+            !['pause', 'resume'].includes(String((value as Record<string, unknown>).action))) {
+          throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
+        }
+        const result = await transitionMembershipPlanLifecycle(
+          env.D1_01, creatorId, segments[2]!, request.headers.get('If-Match'),
+          (value as { action: 'pause' | 'resume' }).action,
         )
         return json({ data: result, requestId: crypto.randomUUID() }, 200, result.etag)
       }

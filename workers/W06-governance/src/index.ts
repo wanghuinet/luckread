@@ -344,6 +344,16 @@ type MembershipPlanUpdateAuditInput = {
   benefits: string[]
 }
 
+type MembershipPlanLifecycleRequestAuditInput = {
+  eventId: string; planId: string; creatorId: string; expectedVersion: number
+  action: 'pause' | 'resume'; requestedStatus: 'PAUSED' | 'ACTIVE'; requestedVisibility: 'PRIVATE' | 'PUBLIC'
+}
+type MembershipPlanLifecycleAuditInput = {
+  eventId: string; planId: string; creatorId: string; expectedVersion: number
+  planVersion: number; action: 'pause' | 'resume'; status: 'PAUSED' | 'ACTIVE'
+  visibility: 'PRIVATE' | 'PUBLIC'; version: number; occurredAt: string
+}
+
 type CommerceOrderAuditInput = {
   eventId: string
   orderId: string
@@ -486,6 +496,43 @@ function parseMembershipPlanUpdateRequestAuditInput(value: unknown): MembershipP
   ) throw new Error('INVALID_MEMBERSHIP_PLAN_UPDATE_REQUEST_AUDIT')
   parseMembershipPlanUpdateTerms(body)
   return body as MembershipPlanUpdateRequestAuditInput
+}
+
+function parseMembershipPlanLifecycleRequestAuditInput(value: unknown): MembershipPlanLifecycleRequestAuditInput {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('INVALID_MEMBERSHIP_PLAN_LIFECYCLE_REQUEST_AUDIT')
+  const body = value as Record<string, unknown>
+  const allowed = new Set(['eventId', 'planId', 'creatorId', 'expectedVersion', 'action', 'requestedStatus', 'requestedVisibility'])
+  if (Object.keys(body).some((key) => !allowed.has(key)) || Object.keys(body).length !== allowed.size) throw new Error('INVALID_MEMBERSHIP_PLAN_LIFECYCLE_REQUEST_AUDIT')
+  if (
+    typeof body.planId !== 'string' || !/^plan_[a-f0-9]{64}$/.test(body.planId) ||
+    typeof body.creatorId !== 'string' || !resourceIdPattern.test(body.creatorId) ||
+    typeof body.expectedVersion !== 'number' || !Number.isSafeInteger(body.expectedVersion) || body.expectedVersion < 1 ||
+    (body.action !== 'pause' && body.action !== 'resume') ||
+    body.requestedStatus !== (body.action === 'pause' ? 'PAUSED' : 'ACTIVE') ||
+    body.requestedVisibility !== (body.action === 'pause' ? 'PRIVATE' : 'PUBLIC') ||
+    body.eventId !== 'evt_mpl_lifecycle_requested_' + body.action + '_' + body.planId + '_v' + body.expectedVersion
+  ) throw new Error('INVALID_MEMBERSHIP_PLAN_LIFECYCLE_REQUEST_AUDIT')
+  return body as MembershipPlanLifecycleRequestAuditInput
+}
+
+function parseMembershipPlanLifecycleAuditInput(value: unknown): MembershipPlanLifecycleAuditInput {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('INVALID_MEMBERSHIP_PLAN_LIFECYCLE_AUDIT')
+  const body = value as Record<string, unknown>
+  const allowed = new Set(['eventId', 'planId', 'creatorId', 'expectedVersion', 'planVersion', 'action', 'status', 'visibility', 'version', 'occurredAt'])
+  if (Object.keys(body).some((key) => !allowed.has(key)) || Object.keys(body).length !== allowed.size) throw new Error('INVALID_MEMBERSHIP_PLAN_LIFECYCLE_AUDIT')
+  if (
+    typeof body.planId !== 'string' || !/^plan_[a-f0-9]{64}$/.test(body.planId) ||
+    typeof body.creatorId !== 'string' || !resourceIdPattern.test(body.creatorId) ||
+    typeof body.expectedVersion !== 'number' || !Number.isSafeInteger(body.expectedVersion) || body.expectedVersion < 1 ||
+    typeof body.planVersion !== 'number' || !Number.isSafeInteger(body.planVersion) || body.planVersion < 1 ||
+    (body.action !== 'pause' && body.action !== 'resume') ||
+    body.status !== (body.action === 'pause' ? 'PAUSED' : 'ACTIVE') ||
+    body.visibility !== (body.action === 'pause' ? 'PRIVATE' : 'PUBLIC') ||
+    typeof body.version !== 'number' || !Number.isSafeInteger(body.version) || body.version !== body.expectedVersion + 1 ||
+    body.eventId !== 'evt_mpl_plan_' + (body.action === 'pause' ? 'paused' : 'activated') + '_' + body.planId + '_v' + body.version ||
+    typeof body.occurredAt !== 'string' || !body.occurredAt || Number.isNaN(Date.parse(body.occurredAt))
+  ) throw new Error('INVALID_MEMBERSHIP_PLAN_LIFECYCLE_AUDIT')
+  return body as MembershipPlanLifecycleAuditInput
 }
 
 function parseMembershipPlanUpdateAuditInput(value: unknown): MembershipPlanUpdateAuditInput {
@@ -905,6 +952,26 @@ export default {
     }
 
 
+    if (request.method === 'POST' && url.pathname === '/internal/audit-events/membership-plan-lifecycle-requested') {
+      let principal: ReturnType<typeof requireW01Transport>
+      try { principal = requireW01Transport(request) }
+      catch (error) { return errorResponse(error, request.headers.get('X-LuckRead-Request-Id')?.trim()) }
+      if (!/^L[3-8]$/.test(principal.layer)) return json({ error: 'PERMISSION_DENIED' }, 403)
+      let input: MembershipPlanLifecycleRequestAuditInput
+      try { input = parseMembershipPlanLifecycleRequestAuditInput(await readBoundedAuditJson(request, 2048)) }
+      catch { return json({ error: 'INVALID_MEMBERSHIP_PLAN_LIFECYCLE_REQUEST_AUDIT' }, 400) }
+      const event: AuditEvent = {
+        eventId: input.eventId, requestId: principal.requestId, traceId: principal.correlationId,
+        actor: { actorId: principal.userId, actorType: 'user', layer: principal.layer as AuditEvent['actor']['layer'] },
+        action: 'membership.plan.lifecycle_requested', targetType: 'MembershipPlan', targetId: input.planId,
+        before: { creatorId: input.creatorId, expectedVersion: input.expectedVersion },
+        after: { creatorId: input.creatorId, expectedVersion: input.expectedVersion, action: input.action,
+          requestedStatus: input.requestedStatus, requestedVisibility: input.requestedVisibility },
+        occurredAt: new Date().toISOString(),
+      }
+      return persistMembershipPlanMutationRequestAudit(env, event)
+    }
+
     if (request.method === 'POST' && url.pathname === '/internal/audit-events/membership-plan-update-requested') {
       let principal: ReturnType<typeof requireW01Transport>
       try { principal = requireW01Transport(request) }
@@ -936,6 +1003,29 @@ export default {
         occurredAt: new Date().toISOString(),
       }
       return persistMembershipPlanMutationRequestAudit(env, event)
+    }
+
+    if (request.method === 'POST' && url.pathname === '/internal/audit-events/membership-plan-lifecycle-changed') {
+      let principal: ReturnType<typeof requireW01Transport>
+      try { principal = requireW01Transport(request) }
+      catch (error) { return errorResponse(error, request.headers.get('X-LuckRead-Request-Id')?.trim()) }
+      if (!/^L[3-8]$/.test(principal.layer)) return json({ error: 'PERMISSION_DENIED' }, 403)
+      let input: MembershipPlanLifecycleAuditInput
+      try { input = parseMembershipPlanLifecycleAuditInput(await readBoundedAuditJson(request, 2048)) }
+      catch { return json({ error: 'INVALID_MEMBERSHIP_PLAN_LIFECYCLE_AUDIT' }, 400) }
+      const event: AuditEvent = {
+        eventId: input.eventId, requestId: principal.requestId, traceId: principal.correlationId,
+        actor: { actorId: principal.userId, actorType: 'user', layer: principal.layer as AuditEvent['actor']['layer'] },
+        action: input.action === 'pause' ? 'membership.plan.paused' : 'membership.plan.activated',
+        targetType: 'MembershipPlan', targetId: input.planId,
+        before: { creatorId: input.creatorId, planVersion: input.planVersion,
+          status: input.action === 'pause' ? 'ACTIVE' : 'PAUSED',
+          visibility: input.action === 'pause' ? 'PUBLIC' : 'PRIVATE', version: input.expectedVersion },
+        after: { creatorId: input.creatorId, planVersion: input.planVersion,
+          status: input.status, visibility: input.visibility, version: input.version },
+        occurredAt: input.occurredAt,
+      }
+      return persistImmutableAuditEvent(env, event)
     }
 
     if (request.method === 'POST' && url.pathname === '/internal/audit-events/membership-plan-updated') {

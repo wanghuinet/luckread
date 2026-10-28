@@ -267,6 +267,63 @@
         "raw request body",
         "order line snapshots"
       ]
+    },
+    {
+      "operationId": "auditMembershipPlanLifecycleRequest",
+      "method": "POST",
+      "publicPath": "/api/v1/membership/plans/{planId}/lifecycle",
+      "internalPath": "/internal/audit-events/membership-plan-lifecycle-requested",
+      "principalRequired": true,
+      "actorAuthority": "W06 derives actor identity and layer from trusted W01 private transport headers.",
+      "eventId": "Deterministic evt_mpl_lifecycle_requested_{action}_{planId}_v{expectedVersion}.",
+      "targetType": "MembershipPlan",
+      "auditRequired": true,
+      "idempotency": "Exact semantic replay confirms durable intent; conflicting action/owner/version/state facts conflict.",
+      "successPolicy": "W01 must confirm durable lifecycle intent before invoking W07; missing audit prevents the mutation.",
+      "cache": "NO_STORE",
+      "auditedFields": [
+        "planId",
+        "creatorId",
+        "expectedVersion",
+        "action",
+        "requestedStatus",
+        "requestedVisibility"
+      ],
+      "sensitiveDataExcluded": [
+        "client credentials",
+        "payment credentials",
+        "raw request body"
+      ]
+    },
+    {
+      "operationId": "auditMembershipPlanLifecycle",
+      "method": "POST",
+      "publicPath": "/api/v1/membership/plans/{planId}/lifecycle",
+      "internalPath": "/internal/audit-events/membership-plan-lifecycle-changed",
+      "principalRequired": true,
+      "actorAuthority": "W06 derives actor identity and layer from trusted W01 private transport headers.",
+      "eventId": "Deterministic evt_mpl_plan_paused_{planId}_v{version} or evt_mpl_plan_activated_{planId}_v{version}.",
+      "targetType": "MembershipPlan",
+      "auditRequired": true,
+      "idempotency": "Stable event ID per lifecycle version; exact replay confirms immutable facts.",
+      "successPolicy": "W01 returns success only after W07 CAS and W06 final audit confirmation.",
+      "cache": "NO_STORE",
+      "auditedFields": [
+        "planId",
+        "creatorId",
+        "expectedVersion",
+        "planVersion",
+        "action",
+        "status",
+        "visibility",
+        "version",
+        "occurredAt"
+      ],
+      "sensitiveDataExcluded": [
+        "client credentials",
+        "payment credentials",
+        "raw request body"
+      ]
     }
   ],
   "headers": {

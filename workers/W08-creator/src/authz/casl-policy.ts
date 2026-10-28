@@ -103,6 +103,7 @@ const RESTRICTED_ACCOUNT_WRITE_DENIES = new Set([
   'membership.plan.create.own',
   'membership.plan.publish.own',
   'membership.plan.update.own',
+  'membership.plan.lifecycle.own',
   'org.billing.read.scope',
 ])
 
@@ -238,6 +239,7 @@ function addL3Rules(
   grant('membership.plan.read.own', 'MembershipPlan', selfOwnerCondition(subjectId))
   grant('membership.plan.publish.own', 'MembershipPlan', selfOwnerCondition(subjectId))
   grant('membership.plan.update.own', 'MembershipPlan', selfOwnerCondition(subjectId))
+  grant('membership.plan.lifecycle.own', 'MembershipPlan', selfOwnerCondition(subjectId))
 }
 
 function addL5Rules(grant: (action: string, subject: string, conditions?: Record<string, unknown>) => void): void {
