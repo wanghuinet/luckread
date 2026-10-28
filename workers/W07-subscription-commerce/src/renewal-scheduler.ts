@@ -142,8 +142,19 @@ export async function runRenewalScheduledBatch(
     return { status: 'PARTIAL', phase: 'OUTCOME_SYNC_AFTER' };
   }
 
+  // Report PARTIAL whenever this tick leaves an unresolved reconciliation,
+  // including outcomes that are returned as data rather than thrown exceptions.
+  // A terminal reconciliation state is not a successful scheduler completion.
+  const reconciliationRequired =
+    beforeRecovery.reconciliationRequired > 0 ||
+    afterRecovery.reconciliationRequired > 0 ||
+    cycleResults.some((result) => result.state === 'RECONCILIATION_REQUIRED');
+  const outcomeSyncPending = afterRecovery.pendingRetry > 0;
+
   return {
-    status: processFailures === 0 ? 'COMPLETED' : 'PARTIAL',
+    status: processFailures === 0 && !reconciliationRequired && !outcomeSyncPending
+      ? 'COMPLETED'
+      : 'PARTIAL',
     dueScan,
     processed: cycleResults.length,
     processFailures,
