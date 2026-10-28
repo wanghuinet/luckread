@@ -1,6 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 
-import { createMembershipPlanDraft, reviseMembershipPlan, getSubscription, listActiveMembershipPlans, listCreatorMembershipPlans, listSubscriptions, parseBoundedPositiveInt, publishMembershipPlan, transitionMembershipPlanLifecycle, SubscriptionRuntimeError, validatePrincipal } from './subscription-runtime.js'
+import { createMembershipPlanDraft, reviseMembershipPlan, getCreatorMembershipSummary, getSubscription, listActiveMembershipPlans, listCreatorMembershipPlans, listSubscriptions, parseBoundedPositiveInt, publishMembershipPlan, transitionMembershipPlanLifecycle, SubscriptionRuntimeError, validatePrincipal } from './subscription-runtime.js'
 import { handleCommerceOrderRequest } from './order-http-runtime.js'
 import { handleCommercePaymentIntentRequest } from './payment-intent-http-runtime.js'
 import { handleHyperswitchWebhookRequest } from './payment-webhook-http-runtime.js'
@@ -115,6 +115,7 @@ const readJsonBody = async (request: Request): Promise<unknown> => {
 type Operation =
   | { operation: 'listPlans'; subscriptionId: null }
   | { operation: 'listOwnedPlans'; subscriptionId: null }
+  | { operation: 'creatorSummary'; subscriptionId: null }
   | { operation: 'createPlan'; subscriptionId: null }
   | { operation: 'list'; subscriptionId: null }
   | { operation: 'get'; subscriptionId: string }
@@ -122,6 +123,7 @@ type Operation =
 const toOperation = (method: string, segments: string[]): Operation | null => {
   if (segments.length === 1 && segments[0] === 'plans' && method === 'GET') return { operation: 'listPlans', subscriptionId: null }
   if (segments.length === 2 && segments[0] === 'membership' && segments[1] === 'plans' && method === 'GET') return { operation: 'listOwnedPlans', subscriptionId: null }
+  if (segments.length === 2 && segments[0] === 'membership' && segments[1] === 'creator-summary' && method === 'GET') return { operation: 'creatorSummary', subscriptionId: null }
   if (segments.length === 2 && segments[0] === 'membership' && segments[1] === 'plans' && method === 'POST') return { operation: 'createPlan', subscriptionId: null }
   if (segments.length === 2 && segments[0] === 'memberships' && segments[1] === 'subscriptions' && method === 'GET') return { operation: 'list', subscriptionId: null }
   if (segments.length === 3 && segments[0] === 'memberships' && segments[1] === 'subscriptions' && method === 'GET') return { operation: 'get', subscriptionId: segments[2] }
@@ -231,6 +233,12 @@ export default {
         const url = new URL(request.url)
         const requestedLimit = parseBoundedPositiveInt(url.searchParams.get('limit'), 20, 50)
         const result = await listCreatorMembershipPlans(env.D1_01, creatorId, requestedLimit, url.searchParams.get('cursor'))
+        return json({ data: result, requestId: crypto.randomUUID() })
+      }
+      if (operation.operation === 'creatorSummary') {
+        requireCreatorLayer(request)
+        const creatorId = requireVerifiedCreatorId(request)
+        const result = await getCreatorMembershipSummary(env.D1_01, creatorId)
         return json({ data: result, requestId: crypto.randomUUID() })
       }
       if (operation.operation === 'listPlans') {
