@@ -2670,6 +2670,19 @@
       "optimisticLockRequired": false,
       "idempotencyRequired": true,
       "stateMachine": "none"
+    },
+    {
+      "operationId": "receiveHyperswitchPaymentWebhook",
+      "auth": {
+        "mode": "authenticated"
+      },
+      "permissions": [],
+      "auditRequired": false,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": true,
+      "stateMachine": "none",
+      "x-luckread-authentication": "HMAC-SHA512 provider signature verified by W07",
+      "x-luckread-idempotency": "provider + merchant_id + event_id + payload SHA-256"
     }
   ]
 }
