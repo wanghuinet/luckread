@@ -82,6 +82,16 @@ type PaymentRow = {
   updated_at: string;
 };
 
+type OrderForWebhookRow = {
+  order_id: string;
+  customer_id: string;
+  status: string;
+  version: number;
+  currency: string;
+  total_minor: number;
+  updated_at: string;
+};
+
 type ProviderEventRow = {
   event_row_id: string;
   provider: string;
@@ -518,6 +528,16 @@ async function readPaymentForWebhook(
   ).bind(PROVIDER, paymentId).first<PaymentRow>();
 }
 
+async function readOrderForWebhook(
+  db: D1Database,
+  payment: PaymentRow,
+): Promise<OrderForWebhookRow | null> {
+  return db.prepare(
+    'SELECT order_id, customer_id, status, version, currency, total_minor, updated_at ' +
+    'FROM orders WHERE order_id = ? AND customer_id = ? LIMIT 1',
+  ).bind(payment.order_id, payment.customer_id).first<OrderForWebhookRow>();
+}
+
 function resultFromProviderEvent(
   row: ProviderEventRow,
   incomingHash: string,
@@ -589,6 +609,7 @@ async function persistAndApplyProviderStatus(
   db: D1Database,
   envelope: NonNullable<ReturnType<typeof parseHyperswitchWebhookEnvelope>>,
   payment: PaymentRow,
+  order: OrderForWebhookRow | null,
   providerStatus: PaymentAttemptStatus,
   providerUpdatedAt: string,
   payloadSha256: string,
@@ -596,7 +617,7 @@ async function persistAndApplyProviderStatus(
   now: string,
 ): Promise<WebhookReceiptResult> {
   const canonicalProviderUpdatedAt = new Date(Date.parse(providerUpdatedAt)).toISOString();
-  const updatedAt = strictlyAfter(now, payment.updated_at);
+  const paymentUpdatedAt = strictlyAfter(now, payment.updated_at);
   const insertEvent = db.prepare(
     'INSERT INTO payment_provider_events ' +
     '(event_row_id, provider, merchant_id, event_id, event_type, payment_id, payload_sha256, state, received_at, processed_at, outcome_code) ' +
@@ -612,33 +633,87 @@ async function persistAndApplyProviderStatus(
     'AND version = ? AND status = ? AND (provider_updated_at IS NULL OR provider_updated_at < ?) ' +
     "AND EXISTS (SELECT 1 FROM payment_provider_events e WHERE e.provider = ? AND e.merchant_id = ? AND e.event_id = ? AND e.payload_sha256 = ? AND e.state = 'RECEIVED')",
   ).bind(
-    providerStatus, canonicalProviderUpdatedAt, updatedAt,
+    providerStatus, canonicalProviderUpdatedAt, paymentUpdatedAt,
     payment.payment_id, PROVIDER, payment.merchant_id, payment.amount_minor, payment.currency,
     payment.version, payment.status, canonicalProviderUpdatedAt,
     PROVIDER, envelope.merchantId, envelope.eventId, payloadSha256,
   );
-  const targetExists = 'EXISTS (' +
+
+  const statements: D1PreparedStatement[] = [insertEvent, updatePayment];
+  const confirmableOrder = providerStatus === 'succeeded' &&
+    order !== null &&
+    order.order_id === payment.order_id &&
+    order.customer_id === payment.customer_id &&
+    order.currency === payment.currency &&
+    order.total_minor === payment.amount_minor &&
+    ['CREATED', 'PENDING_PAYMENT'].includes(order.status);
+
+  if (confirmableOrder && order) {
+    const orderUpdatedAt = strictlyAfter(now, order.updated_at);
+    statements.push(db.prepare(
+      "UPDATE orders SET status = 'CONFIRMED', version = version + 1, confirmed_at = ?, updated_at = ? " +
+      'WHERE order_id = ? AND customer_id = ? AND currency = ? AND total_minor = ? AND status = ? AND version = ? ' +
+      "AND EXISTS (SELECT 1 FROM payments p WHERE p.payment_id = ? AND p.order_id = orders.order_id " +
+      "AND p.customer_id = orders.customer_id AND p.provider = 'hyperswitch' AND p.status = 'succeeded' " +
+      "AND p.provider_updated_at = ? AND EXISTS (SELECT 1 FROM payment_provider_events e " +
+      "WHERE e.provider = ? AND e.merchant_id = ? AND e.event_id = ? AND e.payload_sha256 = ? AND e.state = 'RECEIVED'))",
+    ).bind(
+      orderUpdatedAt, orderUpdatedAt,
+      order.order_id, order.customer_id, order.currency, order.total_minor, order.status, order.version,
+      payment.payment_id, canonicalProviderUpdatedAt,
+      PROVIDER, envelope.merchantId, envelope.eventId, payloadSha256,
+    ));
+  }
+
+  const paymentMatches = 'EXISTS (' +
     'SELECT 1 FROM payments p ' +
     'WHERE p.payment_id = ? AND p.provider = ? AND p.merchant_id = ? ' +
     'AND p.amount_minor = ? AND p.currency = ? AND p.status = ? ' +
     'AND p.provider_updated_at = ?)';
-  const updateEvent = db.prepare(
-    'UPDATE payment_provider_events SET state = CASE WHEN ' + targetExists +
-    " THEN 'APPLIED' ELSE 'RECONCILIATION_REQUIRED' END, processed_at = ?, outcome_code = CASE WHEN " +
-    targetExists + " THEN 'PAYMENT_STATUS_APPLIED' ELSE 'PAYMENT_STATUS_CAS_LOST' END " +
-    "WHERE provider = ? AND merchant_id = ? AND event_id = ? AND payload_sha256 = ? AND state = 'RECEIVED'",
-  ).bind(
-    payment.payment_id, PROVIDER, payment.merchant_id, payment.amount_minor, payment.currency,
-    providerStatus, canonicalProviderUpdatedAt,
+  const confirmedOrderMatches = 'EXISTS (' +
+    'SELECT 1 FROM orders o ' +
+    'WHERE o.order_id = ? AND o.customer_id = ? AND o.currency = ? ' +
+    "AND o.total_minor = ? AND o.status = 'CONFIRMED')";
+  const eventAppliedCondition = providerStatus === 'succeeded'
+    ? paymentMatches + ' AND ' + confirmedOrderMatches
+    : paymentMatches;
+  const outcomeExpression = providerStatus === 'succeeded'
+    ? 'CASE WHEN ' + eventAppliedCondition +
+      " THEN 'PAYMENT_STATUS_APPLIED_AND_ORDER_CONFIRMED' WHEN " + paymentMatches +
+      " THEN 'ORDER_CONFIRMATION_REQUIRED' ELSE 'PAYMENT_STATUS_CAS_LOST' END"
+    : 'CASE WHEN ' + paymentMatches +
+      " THEN 'PAYMENT_STATUS_APPLIED' ELSE 'PAYMENT_STATUS_CAS_LOST' END";
+
+  const bindPaymentMatch = () => [
+    payment.payment_id, PROVIDER, payment.merchant_id, payment.amount_minor,
+    payment.currency, providerStatus, canonicalProviderUpdatedAt,
+  ];
+  const bindOrderMatch = () => [
+    payment.order_id, payment.customer_id, payment.currency, payment.amount_minor,
+  ];
+  const eventUpdateSql =
+    'UPDATE payment_provider_events SET state = CASE WHEN ' + eventAppliedCondition +
+    " THEN 'APPLIED' ELSE 'RECONCILIATION_REQUIRED' END, processed_at = ?, outcome_code = " +
+    outcomeExpression +
+    " WHERE provider = ? AND merchant_id = ? AND event_id = ? AND payload_sha256 = ? AND state = 'RECEIVED'";
+  const updateEventValues: unknown[] = [
+    ...bindPaymentMatch(),
+    ...(providerStatus === 'succeeded' ? bindOrderMatch() : []),
     now,
-    payment.payment_id, PROVIDER, payment.merchant_id, payment.amount_minor, payment.currency,
-    providerStatus, canonicalProviderUpdatedAt,
+    ...bindPaymentMatch(),
+    ...(providerStatus === 'succeeded' ? bindOrderMatch() : []),
+    ...(providerStatus === 'succeeded' ? bindPaymentMatch() : []),
     PROVIDER, envelope.merchantId, envelope.eventId, payloadSha256,
-  );
+  ];
+  statements.push(db.prepare(eventUpdateSql).bind(...updateEventValues));
 
   let batchResults: D1Result[];
   try {
-    batchResults = await db.batch([insertEvent, updatePayment, updateEvent]);
+    // Event receipt, provider Payment fact, optional Order confirmation and
+    // terminal inbox outcome commit or roll back in one D1 batch. When a
+    // provider confirms a payment for a non-confirmable Order, retain the
+    // Payment fact but mark the event for reconciliation and do not confirm.
+    batchResults = await db.batch(statements);
   } catch {
     const raced = await readProviderEvent(db, envelope.merchantId, envelope.eventId).catch(() => null);
     if (!raced) throw new PaymentPersistenceError('SERVICE_UNAVAILABLE', 503);
@@ -675,7 +750,9 @@ async function persistAndApplyProviderStatus(
     };
   }
   if (stored.state === 'RECEIVED') throw new PaymentPersistenceError('SERVICE_UNAVAILABLE', 503);
-  if (stored.state === 'APPLIED' && Number(batchResults[1]?.meta?.changes ?? 0) === 1) {
+  const eventResultIndex = statements.length - 1;
+  if (stored.state === 'APPLIED' && Number(batchResults[1]?.meta?.changes ?? 0) === 1 &&
+      Number(batchResults[eventResultIndex]?.meta?.changes ?? 0) === 1) {
     return resultFromProviderEvent(stored, payloadSha256, 'APPLIED');
   }
   return resultFromProviderEvent(stored, payloadSha256, stored.state === 'APPLIED' ? 'DUPLICATE' : undefined);
@@ -802,8 +879,17 @@ export async function receiveHyperswitchWebhook(
     );
   }
 
+  let order: OrderForWebhookRow | null = null;
+  if (decision.providerStatus === 'succeeded') {
+    try {
+      order = await readOrderForWebhook(db, payment);
+    } catch {
+      throw new PaymentPersistenceError('SERVICE_UNAVAILABLE', 503);
+    }
+  }
+
   return persistAndApplyProviderStatus(
-    db, envelope, payment, decision.providerStatus, decision.providerUpdatedAt,
+    db, envelope, payment, order, decision.providerStatus, decision.providerUpdatedAt,
     payloadSha256, eventRowId, now,
   );
 }
