@@ -216,7 +216,7 @@ class MemoryPaymentD1 {
         const orderValues = values.slice(7, 11) as [string, string, string, number];
         const [orderId, customerId, currency, amount] = orderValues;
         orderConfirmed = this.orders.some(o => o.order_id === orderId && o.customer_id === customerId &&
-          o.currency === currency && o.total_minor === amount && o.status === 'CONFIRMED');
+          o.currency === currency && o.total_minor === amount && ['CONFIRMED', 'PROCESSING', 'COMPLETED'].includes(o.status));
       }
 
       const applied = Boolean(payment) && (!succeededEvent || orderConfirmed);
@@ -469,6 +469,38 @@ describe('PAY-001 payment attempt persistence candidate', () => {
     expect(duplicate).toMatchObject({ outcome: 'DUPLICATE', receiptId: applied.receiptId });
     expect(db.payments[0]?.version).toBe(2);
     expect(db.events).toHaveLength(1);
+  });
+
+  it('applies later signed success events when the paid Order has already advanced through fulfillment', async () => {
+    for (const status of ['CONFIRMED', 'PROCESSING', 'COMPLETED'] as const) {
+      const db = new MemoryPaymentD1();
+      seedOrder(db, {
+        status,
+        version: status === 'CONFIRMED' ? 2 : status === 'PROCESSING' ? 3 : 4,
+        updated_at: LATER,
+        confirmed_at: '2026-10-28T12:00:00.001Z',
+      });
+      seedPayment(db, {
+        status: 'succeeded',
+        version: 2,
+        provider_updated_at: NOW,
+        updated_at: '2026-10-28T12:00:00.001Z',
+      });
+      const signed = await signedBody(bodyText('evt_success_after_' + status.toLowerCase(), '2026-10-28T12:00:02.000Z'));
+      const result = await receiveHyperswitchWebhook(
+        db as unknown as D1Database,
+        { ...signed, webhookSecret: SECRET, expectedMerchantId: MERCHANT },
+        fixedDeps('2026-10-28T12:00:03.000Z'),
+      );
+
+      expect(result).toMatchObject({ outcome: 'APPLIED', state: 'APPLIED' });
+      expect(db.events[0]).toMatchObject({
+        state: 'APPLIED',
+        outcome_code: 'PAYMENT_STATUS_APPLIED_AND_ORDER_CONFIRMED',
+      });
+      expect(db.payments[0]).toMatchObject({ status: 'succeeded', version: 3 });
+      expect(db.orders[0]).toMatchObject({ status, confirmed_at: '2026-10-28T12:00:00.001Z' });
+    }
   });
 
   it('retains provider success but does not confirm a cancelled Order; event requires reconciliation', async () => {
