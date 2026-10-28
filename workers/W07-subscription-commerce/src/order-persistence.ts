@@ -134,6 +134,8 @@ export type CreateOrderResult = Readonly<{
 export type OrderPersistenceDependencies = Readonly<{
   now?: () => Date;
   createId?: (kind: 'order' | 'line' | 'idempotency') => string;
+  /** Internal recurring-cycle orders use a durable key beyond the default 24h interactive-order window. */
+  idempotencyExpiresAt?: string;
 }>;
 
 const defaultId = (kind: 'order' | 'line' | 'idempotency'): string =>
@@ -442,7 +444,10 @@ export async function createCommerceOrder(
   const orderId = requireIdentifier(createId('order'), 'orderId', 255);
   const idempotencyId = requireIdentifier(createId('idempotency'), 'idempotencyId', 255);
   const createdAt = now;
-  const expiresAt = new Date(nowDate.getTime() + IDEMPOTENCY_RETENTION_MS).toISOString();
+  const expiresAt = dependencies.idempotencyExpiresAt ?? new Date(nowDate.getTime() + IDEMPOTENCY_RETENTION_MS).toISOString();
+  if (!isFiniteIsoDate(expiresAt) || Date.parse(expiresAt) <= nowDate.getTime()) {
+    throw new OrderPersistenceError('VALIDATION_FAILED', 400);
+  }
 
   const lineRecords = pricing.lines.map((line) => ({
     ...line,
