@@ -484,7 +484,11 @@ export async function receiveHyperswitchWebhook(
   const now = parseDate(dependencies.now ?? (() => new Date()));
   const payloadSha256 = await sha256Hex(input.rawBody);
   const resourcePaymentId = envelope.resource.payment_id;
-  const paymentId = typeof resourcePaymentId === 'string' && resourcePaymentId.length <= 255
+  // Only payment_details resources carry the provider Payment identity we can
+  // bind locally. Refund, payout, dispute, mandate and subscription resources
+  // are still retained for reconciliation but are not mislabeled as payments.
+  const paymentId = envelope.contentType === 'payment_details' &&
+    typeof resourcePaymentId === 'string' && PAYMENT_ID_PATTERN.test(resourcePaymentId)
     ? resourcePaymentId
     : null;
 
