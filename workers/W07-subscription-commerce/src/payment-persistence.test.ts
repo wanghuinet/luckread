@@ -14,6 +14,8 @@ const CUSTOMER = 'user_1';
 const MERCHANT = 'merchant_test';
 const SECRET = 'webhook_test_secret';
 const PAYMENT_ID = 'pay_' + 'a'.repeat(26);
+const METHOD_ID = 'pm_hyperswitch_test_123';
+const PROVIDER_MANDATE_ID = 'mandate_hyperswitch_test_123';
 
 type Row = Record<string, unknown>;
 type Order = { order_id: string; customer_id: string; status: string; version: number; currency: string; total_minor: number; updated_at: string; confirmed_at: string | null };
@@ -103,6 +105,10 @@ class MemoryPaymentD1 {
       const [provider, merchantId, eventId, incomingHash] = values;
       row = this.conflicts.find(c => c.provider === provider && c.merchant_id === merchantId &&
         c.event_id === eventId && c.incoming_payload_sha256 === incomingHash);
+    } else if (sql.includes('FROM payment_mandates')) {
+      const [provider, merchantId, mandateId, methodId] = values;
+      row = this.mandates.find(m => m.provider === provider && m.merchant_id === merchantId &&
+        m.provider_mandate_id === mandateId && m.payment_method_id === methodId);
     } else {
       throw new Error('Unexpected first query: ' + sql);
     }
@@ -212,6 +218,49 @@ class MemoryPaymentD1 {
         event_type: eventType, payment_id: paymentId, payload_sha256: hash, state: 'RECEIVED',
         received_at: receivedAt, processed_at: null, outcome_code: null,
       });
+      return result(1) as D1Result<T>;
+    }
+    if (sql.startsWith('UPDATE payment_provider_events SET state = CASE WHEN EXISTS') &&
+        sql.includes('FROM payment_mandates m')) {
+      const [mandateId, provider, merchantId, providerMandateId, methodId, status, providerTimestamp,
+        processedAt] = values.slice(0, 8) as
+        [string, string, string, string, string, Mandate['status'], string, string];
+      const eventValues = values.slice(-4) as [string, string, string, string];
+      const [eventProvider, eventMerchant, eventId, payloadHash] = eventValues;
+      const mandate = this.mandates.find(m => m.mandate_record_id === mandateId && m.provider === provider &&
+        m.merchant_id === merchantId && m.provider_mandate_id === providerMandateId &&
+        m.payment_method_id === methodId && m.status === status && m.provider_updated_at === providerTimestamp);
+      const receipt = this.events.find(e => e.provider === eventProvider && e.merchant_id === eventMerchant &&
+        e.event_id === eventId && e.payload_sha256 === payloadHash && e.state === 'RECEIVED');
+      if (!receipt) return result(0) as D1Result<T>;
+      const applied = Boolean(mandate);
+      receipt.state = applied ? 'APPLIED' : 'RECONCILIATION_REQUIRED';
+      receipt.processed_at = processedAt;
+      receipt.outcome_code = applied ? 'MANDATE_STATUS_APPLIED' : 'MANDATE_STATUS_CAS_LOST_OR_OUT_OF_ORDER';
+      return result(1) as D1Result<T>;
+    }
+    if (sql.startsWith('UPDATE payment_mandates SET status = ?')) {
+      const [status, providerUpdatedAt, updatedAt, mandateId, provider, merchantId, providerMandateId,
+        methodId, version, oldStatus, timestampGuard, activeStatus, revokedStatus, eventProvider,
+        eventMerchant, eventId, payloadHash] = values as
+        [Mandate['status'], string, string, string, string, string, string, string, number, Mandate['status'],
+         string, Mandate['status'], Mandate['status'], string, string, string, string];
+      const mandate = this.mandates.find(m => m.mandate_record_id === mandateId && m.provider === provider &&
+        m.merchant_id === merchantId && m.provider_mandate_id === providerMandateId &&
+        m.payment_method_id === methodId && m.version === version && m.status === oldStatus &&
+        (m.provider_updated_at === null || m.provider_updated_at < timestampGuard));
+      const receipt = this.events.find(e => e.provider === eventProvider && e.merchant_id === eventMerchant &&
+        e.event_id === eventId && e.payload_sha256 === payloadHash && e.state === 'RECEIVED');
+      const transitionAllowed = activeStatus === 'ACTIVE'
+        ? ['PENDING_PROVIDER_CONFIRMATION', 'ACTIVE'].includes(oldStatus)
+        : revokedStatus === 'REVOKED'
+          ? ['PENDING_PROVIDER_CONFIRMATION', 'ACTIVE', 'REVOKED'].includes(oldStatus)
+          : false;
+      if (!mandate || !receipt || !transitionAllowed) return result(0) as D1Result<T>;
+      mandate.status = status;
+      mandate.provider_updated_at = providerUpdatedAt;
+      mandate.updated_at = updatedAt;
+      mandate.version += 1;
       return result(1) as D1Result<T>;
     }
     if (sql.startsWith('UPDATE payment_provider_events SET state = CASE WHEN EXISTS')) {
@@ -365,6 +414,51 @@ function seedPayment(db: MemoryPaymentD1, overrides: Partial<Payment> = {}) {
     ...overrides,
   });
 }
+
+function seedMandate(db: MemoryPaymentD1, overrides: Partial<Mandate> = {}) {
+  db.mandates.push({
+    mandate_record_id: 'mnd_' + 'm'.repeat(26),
+    provider: 'hyperswitch',
+    merchant_id: MERCHANT,
+    customer_id: CUSTOMER,
+    payment_method_id: METHOD_ID,
+    source_payment_id: PAYMENT_ID,
+    source_event_id: 'evt_saved_method',
+    consent_accepted_at: NOW,
+    consent_acceptance_type: 'online',
+    consent_scope: 'OFF_SESSION_RECURRING',
+    consent_terms_version: 'luckread-recurring-consent-v1',
+    provider_mandate_id: PROVIDER_MANDATE_ID,
+    status: 'PENDING_PROVIDER_CONFIRMATION',
+    version: 1,
+    provider_updated_at: null,
+    created_at: NOW,
+    updated_at: NOW,
+    ...overrides,
+  });
+}
+
+const mandateBody = (
+  eventId: string,
+  eventType: 'mandate_active' | 'mandate_revoked',
+  status: 'active' | 'revoked',
+  timestamp = NOW,
+  overrides: Record<string, unknown> = {},
+) => JSON.stringify({
+  merchant_id: MERCHANT,
+  event_id: eventId,
+  event_type: eventType,
+  content: {
+    type: 'mandate_details',
+    object: {
+      mandate_id: PROVIDER_MANDATE_ID,
+      payment_method_id: METHOD_ID,
+      status,
+      ...overrides,
+    },
+  },
+  timestamp,
+});
 
 function expectPaymentError(promise: Promise<unknown>, code: string) {
   return expect(promise).rejects.toMatchObject({ code, status: expect.any(Number) });
@@ -664,6 +758,129 @@ describe('PAY-001 payment attempt persistence candidate', () => {
     expect(applied.outcome).toBe('APPLIED');
     expect(db.savedMethods).toHaveLength(0);
     expect(db.mandates).toHaveLength(0);
+  });
+
+
+  it('applies a signed mandate_active event only to the matching pending mandate and deduplicates it', async () => {
+    const db = new MemoryPaymentD1();
+    seedMandate(db);
+    const signed = await signedBody(mandateBody('evt_mandate_active', 'mandate_active', 'active'));
+    const applied = await receiveHyperswitchWebhook(
+      db as unknown as D1Database,
+      { ...signed, webhookSecret: SECRET, expectedMerchantId: MERCHANT },
+      fixedDeps(),
+    );
+
+    expect(applied).toMatchObject({ outcome: 'APPLIED', eventId: 'evt_mandate_active', state: 'APPLIED' });
+    expect(db.mandates[0]).toMatchObject({
+      status: 'ACTIVE',
+      version: 2,
+      provider_updated_at: NOW,
+      updated_at: '2026-10-28T12:00:00.001Z',
+    });
+    expect(db.events[0]).toMatchObject({
+      event_type: 'mandate_active',
+      payment_id: null,
+      state: 'APPLIED',
+      outcome_code: 'MANDATE_STATUS_APPLIED',
+    });
+
+    const replay = await receiveHyperswitchWebhook(
+      db as unknown as D1Database,
+      { ...signed, webhookSecret: SECRET, expectedMerchantId: MERCHANT },
+      fixedDeps(LATER),
+    );
+    expect(replay).toMatchObject({ outcome: 'DUPLICATE', receiptId: applied.receiptId });
+    expect(db.mandates[0]?.version).toBe(2);
+    expect(db.events).toHaveLength(1);
+  });
+
+  it('revokes an active mandate with a newer signed provider event', async () => {
+    const db = new MemoryPaymentD1();
+    seedMandate(db, {
+      status: 'ACTIVE',
+      version: 2,
+      provider_updated_at: '2026-10-28T11:59:00.000Z',
+      updated_at: '2026-10-28T11:59:00.000Z',
+    });
+    const signed = await signedBody(mandateBody(
+      'evt_mandate_revoked', 'mandate_revoked', 'revoked', NOW,
+    ));
+    const result = await receiveHyperswitchWebhook(
+      db as unknown as D1Database,
+      { ...signed, webhookSecret: SECRET, expectedMerchantId: MERCHANT },
+      fixedDeps(),
+    );
+    expect(result).toMatchObject({ outcome: 'APPLIED', state: 'APPLIED' });
+    expect(db.mandates[0]).toMatchObject({ status: 'REVOKED', version: 3, provider_updated_at: NOW });
+  });
+
+  it('never reactivates a revoked mandate on an out-of-order mandate_active event', async () => {
+    const db = new MemoryPaymentD1();
+    seedMandate(db, {
+      status: 'REVOKED',
+      version: 3,
+      provider_updated_at: NOW,
+      updated_at: NOW,
+    });
+    const signed = await signedBody(mandateBody(
+      'evt_mandate_active_late', 'mandate_active', 'active', LATER,
+    ));
+    const result = await receiveHyperswitchWebhook(
+      db as unknown as D1Database,
+      { ...signed, webhookSecret: SECRET, expectedMerchantId: MERCHANT },
+      fixedDeps(LATER),
+    );
+    expect(result).toMatchObject({ outcome: 'RECONCILIATION_REQUIRED', state: 'RECONCILIATION_REQUIRED' });
+    expect(db.mandates[0]).toMatchObject({ status: 'REVOKED', version: 3, provider_updated_at: NOW });
+    expect(db.events[0]?.outcome_code).toBe('MANDATE_STATUS_CAS_LOST_OR_OUT_OF_ORDER');
+  });
+
+  it('routes mismatched mandate status or an unknown local mandate to reconciliation, never activation', async () => {
+    const db = new MemoryPaymentD1();
+    seedMandate(db);
+    const badStatus = await signedBody(mandateBody(
+      'evt_mandate_bad_status', 'mandate_active', 'revoked', NOW,
+    ));
+    const rejected = await receiveHyperswitchWebhook(
+      db as unknown as D1Database,
+      { ...badStatus, webhookSecret: SECRET, expectedMerchantId: MERCHANT },
+      fixedDeps(),
+    );
+    expect(rejected.state).toBe('RECONCILIATION_REQUIRED');
+    expect(db.mandates[0]?.status).toBe('PENDING_PROVIDER_CONFIRMATION');
+
+    const unknown = await signedBody(mandateBody(
+      'evt_mandate_unknown', 'mandate_active', 'active', NOW,
+      { mandate_id: 'mandate_unknown' },
+    ));
+    const needsReconciliation = await receiveHyperswitchWebhook(
+      db as unknown as D1Database,
+      { ...unknown, webhookSecret: SECRET, expectedMerchantId: MERCHANT },
+      fixedDeps(LATER),
+    );
+    expect(needsReconciliation.state).toBe('RECONCILIATION_REQUIRED');
+    expect(db.mandates[0]?.status).toBe('PENDING_PROVIDER_CONFIRMATION');
+  });
+
+  it('does not apply stale mandate webhook timestamps', async () => {
+    const db = new MemoryPaymentD1();
+    seedMandate(db, {
+      status: 'ACTIVE',
+      version: 2,
+      provider_updated_at: LATER,
+      updated_at: LATER,
+    });
+    const signed = await signedBody(mandateBody(
+      'evt_mandate_stale', 'mandate_revoked', 'revoked', NOW,
+    ));
+    const result = await receiveHyperswitchWebhook(
+      db as unknown as D1Database,
+      { ...signed, webhookSecret: SECRET, expectedMerchantId: MERCHANT },
+      fixedDeps(LATER),
+    );
+    expect(result.state).toBe('RECONCILIATION_REQUIRED');
+    expect(db.mandates[0]).toMatchObject({ status: 'ACTIVE', version: 2, provider_updated_at: LATER });
   });
 
   it('retains provider success but does not confirm a cancelled Order; event requires reconciliation', async () => {
