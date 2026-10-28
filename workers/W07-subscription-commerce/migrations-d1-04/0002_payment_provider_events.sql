@@ -4,7 +4,7 @@
 
 CREATE TABLE payments (
   payment_id TEXT PRIMARY KEY NOT NULL
-    CHECK (length(payment_id) = 30 AND payment_id GLOB 'pay_[A-Za-z0-9]*'),
+    CHECK (length(payment_id) = 30 AND substr(payment_id, 1, 4) = 'pay_' AND substr(payment_id, 5) NOT GLOB '*[^A-Za-z0-9]*'),
   order_id TEXT NOT NULL CHECK (length(order_id) BETWEEN 1 AND 255),
   customer_id TEXT NOT NULL CHECK (length(customer_id) BETWEEN 1 AND 256),
   provider TEXT NOT NULL CHECK (provider = 'hyperswitch'),
