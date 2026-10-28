@@ -29,7 +29,7 @@ describe('v1 commerce order adapter', () => {
     expect(client).toContain('const maxBytes = 16_384')
     expect(client).toContain("application\\/json")
     expect(client).toContain('request.body.getReader()')
-    expect(client).toContain("validateOrderIdempotencyKey(request.headers.get('Idempotency-Key'))")
+    expect(createRoute).toContain("validateOrderIdempotencyKey(request.headers.get('Idempotency-Key'))")
     expect(client).toContain('key.length > 256')
     expect(createRoute).toContain('Idempotency-Key is required')
   })
@@ -47,7 +47,7 @@ describe('v1 commerce order adapter', () => {
     expect(client).toContain('expectedTotal')
     expect(client).toContain('subtotal !== order.subtotalMinor')
     expect(client).toContain('order.discountMinor > order.subtotalMinor')
-    expect(createRoute.indexOf('validateCreatedCommerceOrderEnvelope')).toBeLessThan(createRoute.indexOf('callW06CommerceOrderAudit'))
+    expect(createRoute.indexOf('const order = validateCreatedCommerceOrderEnvelope')).toBeLessThan(createRoute.indexOf('callW06CommerceOrderAudit'))
   })
 
   it('never returns a successful order response until W06 confirms the durable immutable audit', () => {
