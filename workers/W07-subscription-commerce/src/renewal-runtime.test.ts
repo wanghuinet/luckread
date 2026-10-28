@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { runRenewalScheduledBatch, type RenewalScheduledDependencies } from './renewal-scheduler.js';
 import {
   processSubscriptionRenewalCycle,
   renewalCycleIdFor,
@@ -371,5 +372,81 @@ describe('due subscription renewal scan', () => {
     await expect(scanDueSubscriptionRenewals(f.env, {}, f.dependencies))
       .rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE', status: 503 });
     expect(f.d1_04.cursor).toMatchObject({ cursor_period_end: null, cursor_subscription_id: null, version: 1 });
+  });
+});
+
+
+describe('W07 scheduled renewal batch', () => {
+  const syncResult = { scanned: 0, applied: 0, reconciliationRequired: 0, pendingRetry: 0 };
+
+  function scheduledSetup(missing: string[] = []) {
+    const d1_01 = { marker: 'D1-01' } as unknown as D1Database;
+    const d1_04 = { marker: 'D1-04' } as unknown as D1Database;
+    const env: RenewalRuntimeEnv = {
+      D1_01: d1_01, D1_04: d1_04,
+      HYPERSWITCH_ENVIRONMENT: 'sandbox',
+      HYPERSWITCH_API_KEY: 'test',
+      HYPERSWITCH_MERCHANT_ID: 'merchant_test',
+    };
+    const readTableNames = vi.fn(async (db: D1Database, expected: readonly string[]) =>
+      new Set(expected.filter((name) =>
+        !(db === d1_04 && missing.includes('D1-04.' + name)) &&
+        !(db === d1_01 && missing.includes('D1-01.' + name))));
+    const syncPending = vi.fn(async () => syncResult);
+    const scanDue = vi.fn(async () => ({
+      scanned: 2,
+      cycleIds: ['rcy_' + 'a'.repeat(26), 'rcy_' + 'b'.repeat(26)],
+      cursorAdvanced: true,
+      cursorReset: false,
+    }));
+    const processCycle = vi.fn(async (_env: RenewalRuntimeEnv, cycleId: string) => ({
+      cycleId,
+      state: 'PREPARED' as const,
+      action: 'PREPARED' as const,
+    }));
+    const dependencies: RenewalScheduledDependencies = { readTableNames, syncPending, scanDue, processCycle };
+    return { env, dependencies, readTableNames, syncPending, scanDue, processCycle };
+  }
+
+  it('does not access renewal rows until the D1 schemas are ready', async () => {
+    const f = scheduledSetup(['D1-04.subscription_renewal_cycles']);
+    const result = await runRenewalScheduledBatch(f.env, f.dependencies);
+    expect(result).toMatchObject({
+      status: 'SCHEMA_NOT_READY',
+      reason: 'REQUIRED_TABLES_MISSING',
+      missingTables: ['D1-04.subscription_renewal_cycles'],
+    });
+    expect(f.syncPending).not.toHaveBeenCalled();
+    expect(f.scanDue).not.toHaveBeenCalled();
+    expect(f.processCycle).not.toHaveBeenCalled();
+  });
+
+  it('reconciles outcomes before and after a bounded due scan', async () => {
+    const f = scheduledSetup();
+    const result = await runRenewalScheduledBatch(f.env, f.dependencies);
+    expect(result).toMatchObject({ status: 'COMPLETED', processed: 2, processFailures: 0 });
+    expect(f.syncPending).toHaveBeenCalledTimes(2);
+    expect(f.syncPending).toHaveBeenNthCalledWith(1, f.env, { limit: 10 });
+    expect(f.syncPending).toHaveBeenNthCalledWith(2, f.env, { limit: 10 });
+    expect(f.scanDue).toHaveBeenCalledWith(f.env, { limit: 5 });
+    expect(f.processCycle).toHaveBeenCalledTimes(2);
+  });
+
+  it('stops before scanning when existing cross-D1 recovery fails', async () => {
+    const f = scheduledSetup();
+    f.syncPending.mockRejectedValueOnce(new Error('D1-01 unavailable'));
+    const result = await runRenewalScheduledBatch(f.env, f.dependencies);
+    expect(result).toEqual({ status: 'PARTIAL', phase: 'OUTCOME_SYNC_BEFORE' });
+    expect(f.scanDue).not.toHaveBeenCalled();
+    expect(f.processCycle).not.toHaveBeenCalled();
+  });
+
+  it('continues other cycles after one bounded cycle fails and reports a partial tick', async () => {
+    const f = scheduledSetup();
+    f.processCycle.mockRejectedValueOnce(new Error('provider timeout'));
+    const result = await runRenewalScheduledBatch(f.env, f.dependencies);
+    expect(result).toMatchObject({ status: 'PARTIAL', processed: 1, processFailures: 1 });
+    expect(f.processCycle).toHaveBeenCalledTimes(2);
+    expect(f.syncPending).toHaveBeenCalledTimes(2);
   });
 });
