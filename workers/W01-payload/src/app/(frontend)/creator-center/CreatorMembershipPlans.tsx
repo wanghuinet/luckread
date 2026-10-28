@@ -50,6 +50,11 @@ const isPlan = (value: unknown): value is MembershipPlan => {
     typeof plan.replayed === 'boolean'
 }
 
+function goToMembershipLogin(): void {
+  const returnTo = window.location.pathname + window.location.search + '#membership-plans'
+  window.location.assign('/login?returnTo=' + encodeURIComponent(returnTo))
+}
+
 function formatPrice(priceMinor: number, currency: string, locale: StudioLocale): string {
   try {
     return new Intl.NumberFormat(locale === 'en-US' ? 'en-US' : 'zh-CN', {
@@ -166,11 +171,6 @@ export default function CreatorMembershipPlans({ locale = 'zh-CN' }: { locale?: 
   const [benefitsText, setBenefitsText] = useState('')
   const [createKey, setCreateKey] = useState('')
 
-  const goToLogin = () => {
-    const returnTo = window.location.pathname + window.location.search + '#membership-plans'
-    window.location.assign('/login?returnTo=' + encodeURIComponent(returnTo))
-  }
-
   const loadPlans = useCallback(async (append = false, cursorValue: string | null = null) => {
     if (append) setLoadingMore(true)
     else setLoading(true)
@@ -182,7 +182,7 @@ export default function CreatorMembershipPlans({ locale = 'zh-CN' }: { locale?: 
         '/api/v1/membership/plans?' + query.toString(),
         { credentials: 'include', cache: 'no-store', headers: { accept: 'application/json' } },
       )
-      if (response.status === 401) { goToLogin(); return }
+      if (response.status === 401) { goToMembershipLogin(); return }
       if (!response.ok || !Array.isArray(data?.data?.docs) || !data.data.docs.every(isPlan)) {
         throw new Error(getApiErrorMessage(data, labels.loadError))
       }
@@ -236,7 +236,7 @@ export default function CreatorMembershipPlans({ locale = 'zh-CN' }: { locale?: 
           priceMinor, currency: 'USD', benefits: rawBenefits,
         }),
       })
-      if (response.status === 401) { goToLogin(); return }
+      if (response.status === 401) { goToMembershipLogin(); return }
       if (!response.ok || !isPlan(data?.data) || data.data.status !== 'DRAFT') {
         throw new Error(getApiErrorMessage(data, labels.actionError))
       }
@@ -272,7 +272,7 @@ export default function CreatorMembershipPlans({ locale = 'zh-CN' }: { locale?: 
         },
         ...(lifecycle ? { body: JSON.stringify({ action }) } : {}),
       })
-      if (response.status === 401) { goToLogin(); return }
+      if (response.status === 401) { goToMembershipLogin(); return }
       if (response.status === 412) throw new Error(labels.stale)
       if (!response.ok || !isPlan(data?.data)) throw new Error(getApiErrorMessage(data, labels.actionError))
       setPlans((current) => current.map((item) => item.planId === plan.planId ? data.data! : item))
