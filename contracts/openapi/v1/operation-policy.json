@@ -1106,6 +1106,19 @@
       "stateMachine": "none"
     },
     {
+      "operationId": "getOwnMembershipSummary",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "membership.analytics.read.own"
+      ],
+      "auditRequired": false,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none"
+    },
+    {
       "operationId": "listMembershipSubscriptions",
       "auth": {
         "mode": "permission"
