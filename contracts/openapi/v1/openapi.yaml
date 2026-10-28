@@ -3295,6 +3295,56 @@ paths:
         default:
           description: Discovery-only operation; detailed response contract remains to be closed.
 
+  /webhooks/hyperswitch:
+    post:
+      tags: [Commerce]
+      summary: Receive a signed Hyperswitch provider webhook
+      description: >-
+        Provider callback ingress has no browser-session authentication. W01
+        preserves the bounded raw payload and signature; W07 validates
+        X-Webhook-Signature-512 using HMAC-SHA512 and durably deduplicates the
+        provider event before acknowledging it. A recorded event does not by
+        itself activate a subscription entitlement.
+      security: []
+      operationId: receiveHyperswitchPaymentWebhook
+      x-luckread-runtime-status: IMPLEMENTED_SOURCE_ONLY_PENDING_D1_04_MIGRATION_AND_SECRETS
+      x-luckread-max-body-bytes: 1048576
+      parameters:
+        - name: X-Webhook-Signature-512
+          in: header
+          required: true
+          description: HMAC-SHA512 hexadecimal digest for the exact raw request bytes.
+          schema:
+            type: string
+            pattern: '^[0-9a-fA-F]{128}$'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Provider envelope; W01 forwards exact serialized bytes without parsing or re-serialization.
+              additionalProperties: true
+      responses:
+        '200':
+          description: Event receipt was applied or a previously processed event was recognized as a duplicate.
+          headers:
+            Cache-Control:
+              schema: { type: string, const: no-store }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HyperswitchWebhookReceiptResponse' }
+        '202':
+          description: Event was durably recorded but was semantically rejected, requires reconciliation, or contains a payload conflict.
+          headers:
+            Cache-Control:
+              schema: { type: string, const: no-store }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HyperswitchWebhookReceiptResponse' }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
   /payments/{paymentId}:
     get:
       tags: [Users]
@@ -4271,6 +4321,27 @@ components:
         name: { type: [string, 'null'] }
         emailVerified: { type: boolean }
         image: { type: [string, 'null'], format: uri }
+    HyperswitchWebhookReceiptResponse:
+      type: object
+      required: [data, requestId]
+      additionalProperties: false
+      properties:
+        data:
+          type: object
+          required: [outcome, eventId, receiptId, state, payloadSha256]
+          additionalProperties: false
+          properties:
+            outcome:
+              type: string
+              enum: [APPLIED, RECONCILIATION_REQUIRED, REJECTED, DUPLICATE, PAYLOAD_CONFLICT]
+            eventId: { type: string, minLength: 1, maxLength: 255 }
+            receiptId: { type: string, minLength: 1, maxLength: 255 }
+            state:
+              type: string
+              enum: [RECEIVED, APPLIED, RECONCILIATION_REQUIRED, REJECTED]
+            payloadSha256: { type: string, pattern: '^[0-9a-f]{64}$' }
+            conflictId: { type: string, minLength: 1, maxLength: 255 }
+        requestId: { type: string, minLength: 1, maxLength: 256 }
     CommerceOrderCreateRequest:
       type: object
       required: [items]

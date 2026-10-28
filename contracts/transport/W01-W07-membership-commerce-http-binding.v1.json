@@ -97,6 +97,35 @@
       "auditRequired": true,
       "successRule": "W01 validates the W07 draft response and durably persists/confirm the stable membership.plan.created audit in W06 D1-03, including planVersion, status, visibility, name, tier, billingInterval, priceMinor, and currency, before returning either a new 201 or idempotent replay 200 to the caller.",
       "auditTransportBinding": "W01-W06-moderation-http-binding.v1"
+    },
+    {
+      "operationId": "receiveHyperswitchPaymentWebhook",
+      "method": "POST",
+      "publicPath": "/api/v1/webhooks/hyperswitch",
+      "internalPath": "/internal/webhooks/hyperswitch",
+      "principalRequired": false,
+      "authentication": "W07 verifies X-Webhook-Signature-512 with the configured Hyperswitch HMAC-SHA512 secret against the exact raw request bytes.",
+      "provider": "hyperswitch",
+      "maximumBodyBytes": 1048576,
+      "requiredHeaders": [
+        "X-Webhook-Signature-512"
+      ],
+      "forwardedHeaders": [
+        "X-Webhook-Signature-512",
+        "X-LuckRead-Caller",
+        "X-LuckRead-Transport-Version",
+        "X-LuckRead-Correlation-Id"
+      ],
+      "forbiddenForwarding": [
+        "cookie",
+        "authorization",
+        "arbitrary client headers",
+        "parsed or re-serialized body"
+      ],
+      "rawBodyPreserved": true,
+      "deduplication": "W07 D1-04 unique provider + merchant + event ID; differing payload SHA-256 is recorded as a conflict.",
+      "acknowledgement": "200 for applied/duplicate receipts; 202 for durably recorded reconciliation; 4xx for invalid signatures/transport; 503 when durable receipt cannot be persisted.",
+      "cache": "NO_STORE"
     }
   ],
   "trustBoundary": {
@@ -104,7 +133,7 @@
     "authorization": "W08 CASL evaluates membership.plan.create.own or membership.plan.read.own from W02-resolved identity, current account state, and persisted L0-L8 role context.",
     "creatorIdentity": "W08 loads creators.creator_id where user_id matches the W02 principal and status is ACTIVE. W01 sends that resolved identity over the private W07 Service Binding. Public client-supplied creator IDs are ignored/rejected.",
     "planData": "W07 D1-01 owns plan and immutable plan-version rows. New plans start private and DRAFT; public catalog exposes only ACTIVE + PUBLIC plans with an existing current immutable version.",
-    "billing": "This binding does not enable subscription creation, payment intents, payment capture, webhook trust, or entitlement grants. Existing subscription POST paths remain fail-closed."
+    "billing": "Public user payment-intent and commerce operations remain separately permissioned. For provider callbacks, W01 relays bounded raw bytes/signature only; W07 performs HMAC verification and owns durable event/payment state. A provider callback does not itself grant D1-01 entitlement."
   },
   "security": {
     "privateResponsesNoStore": true,

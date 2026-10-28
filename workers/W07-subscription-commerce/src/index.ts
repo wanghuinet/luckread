@@ -3,6 +3,7 @@
 import { createMembershipPlanDraft, getSubscription, listActiveMembershipPlans, listCreatorMembershipPlans, listSubscriptions, parseBoundedPositiveInt, SubscriptionRuntimeError, validatePrincipal } from './subscription-runtime.js'
 import { handleCommerceOrderRequest } from './order-http-runtime.js'
 import { handleCommercePaymentIntentRequest } from './payment-intent-http-runtime.js'
+import { handleHyperswitchWebhookRequest } from './payment-webhook-http-runtime.js'
 
 interface RateLimitBinding { limit(input: { key: string }): Promise<{ success: boolean }> }
 interface Env {
@@ -11,6 +12,7 @@ interface Env {
   HYPERSWITCH_ENVIRONMENT?: string
   HYPERSWITCH_API_KEY?: string
   HYPERSWITCH_MERCHANT_ID?: string
+  HYPERSWITCH_WEBHOOK_SECRET?: string
   SUBSCRIPTION_ORIGIN_GLOBAL_LIMITER?: RateLimitBinding
   SUBSCRIPTION_READ_LIMITER?: RateLimitBinding
   SUBSCRIPTION_WRITE_LIMITER?: RateLimitBinding
@@ -129,6 +131,17 @@ const toOperation = (method: string, segments: string[]): Operation | null => {
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     try {
+      // Provider webhooks have no user session. Apply the existing global write
+      // limiter and validate the private W01 transport before normal principal
+      // and layer checks; do not introduce a new rate-limit namespace.
+      if (new URL(request.url).pathname === '/internal/webhooks/hyperswitch') {
+        const originLimiter = env.SUBSCRIPTION_ORIGIN_GLOBAL_LIMITER
+        if (!originLimiter) throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
+        await applyRateLimit(originLimiter, 'origin:webhook')
+        const webhookResponse = await handleHyperswitchWebhookRequest(request, env)
+        if (webhookResponse) return webhookResponse
+      }
+
       await enforceRateLimit(request, env)
       requireTransport(request)
       const principal = requirePrincipal(request)
