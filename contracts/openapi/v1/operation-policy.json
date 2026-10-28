@@ -2425,19 +2425,6 @@
       "stateMachine": "none"
     },
     {
-      "operationId": "updateOwnMembershipPlan",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "membership.plan.update.own"
-      ],
-      "auditRequired": true,
-      "optimisticLockRequired": true,
-      "idempotencyRequired": false,
-      "stateMachine": "none"
-    },
-    {
       "operationId": "createSubscription",
       "auth": {
         "mode": "permission"
@@ -2709,6 +2696,19 @@
       "stateMachine": "none",
       "x-luckread-contract-status": "DISCOVERY_DRAFT",
       "x-luckread-source": "contracts/api/api-inventory.v1.json"
+    },
+    {
+      "operationId": "updateOwnMembershipPlan",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "membership.plan.update.own"
+      ],
+      "auditRequired": true,
+      "optimisticLockRequired": true,
+      "idempotencyRequired": false,
+      "stateMachine": "none"
     }
   ]
 }
