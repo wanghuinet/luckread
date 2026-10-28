@@ -965,7 +965,7 @@ async function persistAndApplyProviderStatus(
       " THEN 'PAYMENT_STATUS_APPLIED_AND_ORDER_CONFIRMED' WHEN " + paymentMatches +
       (renewalCycleOutcomeRequired ? ' AND ' + renewalCycleAppliedMatches : '') +
       " THEN 'ORDER_CONFIRMATION_REQUIRED' ELSE 'PAYMENT_STATUS_CAS_LOST' END"
-    : 'CASE WHEN ' + paymentMatches +
+    : 'CASE WHEN ' + eventAppliedCondition +
       " THEN 'PAYMENT_STATUS_APPLIED' ELSE 'PAYMENT_STATUS_CAS_LOST' END";
 
   const bindPaymentMatch = () => [
