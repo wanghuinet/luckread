@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 
-import { fetchJson, getApiErrorMessage } from '../../lib/client-api.js'
+import { fetchJson, getApiErrorMessage } from '../../../lib/client-api.js'
 
 type StudioLocale = 'zh-CN' | 'en-US'
 type PlanStatus = 'DRAFT' | 'ACTIVE' | 'PAUSED' | 'RETIRED'
