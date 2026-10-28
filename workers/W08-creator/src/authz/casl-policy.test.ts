@@ -348,6 +348,46 @@ describe('CASL L0-L8 authorization policy', () => {
     }).decision).toBe('DENY')
   })
 
+  it('authorizes owner-scoped commerce orders for L2+ and fails closed for unsafe accounts', () => {
+    expect(evaluate({
+      action: 'order.create',
+      resourceType: 'Order',
+      resourceAttributes: { ownerId: 'user-1' },
+    })).toMatchObject({ decision: 'ALLOW' })
+    expect(evaluate({
+      action: 'order.read',
+      resourceType: 'Order',
+      resourceAttributes: { ownerId: 'user-1' },
+    })).toMatchObject({ decision: 'ALLOW' })
+
+    for (const action of ['order.create', 'order.read']) {
+      expect(evaluate({
+        action,
+        resourceType: 'Order',
+        resourceAttributes: { ownerId: 'user-2' },
+      })).toMatchObject({ decision: 'DENY', reasonCode: 'PERMISSION_DENIED' })
+    }
+
+    expect(evaluate({
+      layer: 'L1',
+      action: 'order.create',
+      resourceType: 'Order',
+      resourceAttributes: { ownerId: 'user-1' },
+    }).decision).toBe('DENY')
+    expect(evaluate({
+      accountState: 'RESTRICTED',
+      action: 'order.create',
+      resourceType: 'Order',
+      resourceAttributes: { ownerId: 'user-1' },
+    })).toMatchObject({ decision: 'DENY', reasonCode: 'ACCOUNT_RESTRICTED' })
+    expect(evaluate({
+      accountState: 'FROZEN',
+      action: 'order.create',
+      resourceType: 'Order',
+      resourceAttributes: { ownerId: 'user-1' },
+    })).toMatchObject({ decision: 'DENY', reasonCode: 'ACCOUNT_FROZEN_READ_ONLY' })
+  })
+
   it('denies unknown permissions, unsupported subjects, and malformed attributes', () => {
     expect(evaluate({ action: 'permission.not.registered' })).toMatchObject({ decision: 'DENY', reasonCode: 'UNKNOWN_PERMISSION' })
     expect(evaluate({
