@@ -3,6 +3,7 @@ import React from 'react'
 
 import CreatorLanguageToggle from './CreatorLanguageToggle'
 import CreatorMembershipPlans from './CreatorMembershipPlans'
+import CreatorMembershipInsights from './CreatorMembershipInsights'
 
 import CreatorContentList from '../../(payload)/v1beta/CreatorContentList'
 import CreatorCenterAssistant from '../../(payload)/v1beta/CreatorCenterAssistant'
@@ -341,6 +342,7 @@ export function CreatorStudio({
 
               {adminMode ? <CreatorModerationQueue /> : null}
 
+              {!adminMode ? <CreatorMembershipInsights locale={locale} /> : null}
               {!adminMode ? <CreatorMembershipPlans locale={locale} /> : null}
 
               <CreatorAudienceSummary userId={String(userId)} loginPath={adminMode ? '/admin/login' : '/login'} />
