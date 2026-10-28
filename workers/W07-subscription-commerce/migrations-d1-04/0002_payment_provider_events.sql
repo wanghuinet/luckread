@@ -35,7 +35,7 @@ CREATE TABLE payments (
   failure_code TEXT CHECK (failure_code IS NULL OR length(failure_code) BETWEEN 1 AND 128),
   created_at TEXT NOT NULL CHECK (length(created_at) BETWEEN 1 AND 64),
   updated_at TEXT NOT NULL CHECK (length(updated_at) BETWEEN 1 AND 64 AND updated_at >= created_at),
-  UNIQUE (customer_id, order_id, idempotency_key)
+  UNIQUE (customer_id, idempotency_key)
 );
 CREATE TRIGGER payments_require_payable_order
 BEFORE INSERT ON payments
