@@ -95,6 +95,8 @@ requireText('W01 must wait for W06 durable confirmation before returning plan su
 requireText('membership plan publish permission is owner-scoped in CASL', w08Casl, /membership\.plan\.publish\.own/)
 requireText('W01 publish route resolves CASL before forwarding to W07', membershipPlanPublishRoute, /membership\.plan\.publish\.own[\s\S]*callW07Subscription/)
 requireText('W01 publish route requires the plan ETag', membershipPlanPublishRoute, /If-Match is required to publish a plan/)
+requireText('W01 publish route persists the request intent before W07 can make the plan public', membershipPlanPublishRoute, /callW06MembershipPlanPublishRequestAudit[\\s\\S]*callW07Subscription/)
+requireText('W06 records membership publish request intent before the final publication event', w06Runtime, /membership-plan-publish-requested[\\s\\S]*action: 'membership\\.plan\\.publish_requested'[\\s\\S]*membership-plan-published/)
 requireText('W01 publish route waits for W06 durable audit before success', membershipPlanPublishRoute, /callW06MembershipPlanPublishAudit[\s\S]*Membership plan publish audit was not durably confirmed[\s\S]*return w07Response/)
 requireText('W06 has private membership plan publish audit route', w06Runtime, /membership-plan-published/)
 requireText('W06 membership plan publish audit uses immutable event persistence', w06Runtime, /action: 'membership\.plan\.published'[\s\S]*persistImmutableAuditEvent/)
