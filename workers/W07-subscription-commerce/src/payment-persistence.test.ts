@@ -857,7 +857,7 @@ describe('PAY-001 payment attempt persistence candidate', () => {
     const needsReconciliation = await receiveHyperswitchWebhook(
       db as unknown as D1Database,
       { ...unknown, webhookSecret: SECRET, expectedMerchantId: MERCHANT },
-      fixedDeps(LATER),
+      { ...fixedDeps(LATER), createEventRowId: () => 'evtrow_mandate_unknown' },
     );
     expect(needsReconciliation.state).toBe('RECONCILIATION_REQUIRED');
     expect(db.mandates[0]?.status).toBe('PENDING_PROVIDER_CONFIRMATION');
