@@ -1,10 +1,12 @@
 /// <reference types="@cloudflare/workers-types" />
 
 import { createMembershipPlanDraft, getSubscription, listActiveMembershipPlans, listCreatorMembershipPlans, listSubscriptions, parseBoundedPositiveInt, SubscriptionRuntimeError, validatePrincipal } from './subscription-runtime.js'
+import { handleCommerceOrderRequest } from './order-http-runtime.js'
 
 interface RateLimitBinding { limit(input: { key: string }): Promise<{ success: boolean }> }
 interface Env {
   D1_01: D1Database
+  D1_04: D1Database
   SUBSCRIPTION_ORIGIN_GLOBAL_LIMITER?: RateLimitBinding
   SUBSCRIPTION_READ_LIMITER?: RateLimitBinding
   SUBSCRIPTION_WRITE_LIMITER?: RateLimitBinding
@@ -127,6 +129,8 @@ export default {
       requireTransport(request)
       const principal = requirePrincipal(request)
       requireLayer(request)
+      const commerceOrderResponse = await handleCommerceOrderRequest(request, principal, env)
+      if (commerceOrderResponse) return commerceOrderResponse
       const operation = toOperation(request.method, parseSegments(new URL(request.url).pathname))
       if (request.method === 'POST' && operation?.operation !== 'createPlan') {
         return json({
