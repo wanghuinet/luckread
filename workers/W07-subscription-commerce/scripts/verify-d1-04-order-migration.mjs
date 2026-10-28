@@ -183,6 +183,9 @@ function writeReport(outputPath, report) {
 export function inspectD1_04OrderMigrationPreflight({ schemaSnapshot, migrationState }) {
   const objects = schemaObjects(schemaSnapshot)
   const state = resolveMigrationState(objects, migrationState)
+  if (state.names.includes(PAYMENT_MIGRATION_ID) && !state.names.includes(ORDER_MIGRATION_ID)) {
+    fail('payment migration is recorded without its required prior Order migration; manual schema reconciliation is required')
+  }
   const byName = new Set(objects.map((object) => object.name))
 
   for (const migrationId of state.names.filter((name) => REQUIRED_MIGRATION_IDS.includes(name))) {
