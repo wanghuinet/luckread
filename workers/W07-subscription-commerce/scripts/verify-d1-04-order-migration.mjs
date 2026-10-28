@@ -6,7 +6,8 @@ export const ADMITTED_D1_04_UUID = '9bfb89a5-fbb5-45b1-a2ee-eab674b0d736'
 export const ORDER_MIGRATION_ID = '0001_order_commerce'
 export const PAYMENT_MIGRATION_ID = '0002_payment_provider_events'
 export const SAVED_METHOD_MIGRATION_ID = '0003_saved_payment_methods_mandates'
-export const REQUIRED_MIGRATION_IDS = [ORDER_MIGRATION_ID, PAYMENT_MIGRATION_ID, SAVED_METHOD_MIGRATION_ID]
+export const RENEWAL_MIGRATION_ID = '0004_subscription_renewal_cycles'
+export const REQUIRED_MIGRATION_IDS = [ORDER_MIGRATION_ID, PAYMENT_MIGRATION_ID, SAVED_METHOD_MIGRATION_ID, RENEWAL_MIGRATION_ID]
 
 export const REQUIRED_COLUMNS = {
   orders: [
@@ -68,6 +69,22 @@ export const REQUIRED_COLUMNS = {
     ['provider_updated_at', 'TEXT', 0, 0], ['created_at', 'TEXT', 1, 0],
     ['updated_at', 'TEXT', 1, 0],
   ],
+  subscription_renewal_cycles: [
+    ['cycle_id', 'TEXT', 1, 1], ['provider', 'TEXT', 1, 0], ['merchant_id', 'TEXT', 1, 0],
+    ['subscription_id', 'TEXT', 1, 0], ['subscriber_id', 'TEXT', 1, 0], ['plan_id', 'TEXT', 1, 0],
+    ['plan_version', 'INTEGER', 1, 0], ['cycle_start', 'TEXT', 1, 0], ['cycle_end', 'TEXT', 1, 0],
+    ['billing_interval', 'TEXT', 1, 0], ['currency', 'TEXT', 1, 0], ['offer_snapshot_json', 'TEXT', 1, 0],
+    ['amount_minor', 'INTEGER', 0, 0], ['pricing_snapshot_json', 'TEXT', 0, 0],
+    ['payment_method_id', 'TEXT', 0, 0], ['mandate_record_id', 'TEXT', 0, 0],
+    ['order_id', 'TEXT', 0, 0], ['payment_id', 'TEXT', 0, 0], ['state', 'TEXT', 1, 0],
+    ['provider_response_status', 'TEXT', 0, 0], ['lease_token', 'TEXT', 0, 0],
+    ['lease_expires_at', 'TEXT', 0, 0], ['version', 'INTEGER', 1, 0],
+    ['created_at', 'TEXT', 1, 0], ['updated_at', 'TEXT', 1, 0],
+  ],
+  subscription_renewal_scheduler_state: [
+    ['state_id', 'TEXT', 1, 1], ['cursor_period_end', 'TEXT', 0, 0],
+    ['cursor_subscription_id', 'TEXT', 0, 0], ['version', 'INTEGER', 1, 0], ['updated_at', 'TEXT', 1, 0],
+  ],
 }
 
 export const REQUIRED_INDEXES = {
@@ -85,6 +102,12 @@ export const REQUIRED_INDEXES = {
     'ux_payment_mandates_provider_mandate_id',
     'ix_payment_mandates_customer_status_created',
     'ix_payment_mandates_method_status',
+  ],
+  subscription_renewal_cycles: [
+    'ux_subscription_renewal_cycles_subscription_cycle',
+    'ux_subscription_renewal_cycles_payment',
+    'ix_subscription_renewal_cycles_state_updated',
+    'ix_subscription_renewal_cycles_subscriber_cycle',
   ],
 }
 
@@ -130,6 +153,21 @@ export const REQUIRED_TRIGGERS = {
     'payment_mandates_provider_timestamp_monotonic',
     'payment_mandates_retained',
   ],
+  subscription_renewal_cycles: [
+    'subscription_renewal_cycles_identity_immutable',
+    'subscription_renewal_cycles_resolved_snapshot_immutable',
+    'subscription_renewal_cycles_version_guard',
+    'subscription_renewal_cycles_state_transition_guard',
+    'subscription_renewal_cycles_order_binding_guard',
+    'subscription_renewal_cycles_payment_binding_guard',
+    'subscription_renewal_cycles_requires_active_mandate',
+    'subscription_renewal_cycles_retained',
+  ],
+  subscription_renewal_scheduler_state: [
+    'subscription_renewal_scheduler_state_identity_immutable',
+    'subscription_renewal_scheduler_state_version_guard',
+    'subscription_renewal_scheduler_state_retained',
+  ],
 }
 
 const targetNamesFor = (migrationId) => {
@@ -139,7 +177,9 @@ const targetNamesFor = (migrationId) => {
       ? ['payments', 'payment_provider_events', 'payment_provider_event_conflicts']
       : migrationId === SAVED_METHOD_MIGRATION_ID
         ? ['saved_payment_methods', 'payment_mandates']
-        : []
+        : migrationId === RENEWAL_MIGRATION_ID
+          ? ['subscription_renewal_cycles', 'subscription_renewal_scheduler_state']
+          : []
   return new Set([
     ...tables,
     ...tables.flatMap((table) => REQUIRED_INDEXES[table] ?? []),
@@ -233,6 +273,10 @@ export function inspectD1_04OrderMigrationPreflight({ schemaSnapshot, migrationS
       (!state.names.includes(ORDER_MIGRATION_ID) || !state.names.includes(PAYMENT_MIGRATION_ID))) {
     fail('saved-method migration is recorded without its required Order and Payment migrations; manual schema reconciliation is required')
   }
+  if (state.names.includes(RENEWAL_MIGRATION_ID) &&
+      (!state.names.includes(ORDER_MIGRATION_ID) || !state.names.includes(PAYMENT_MIGRATION_ID) || !state.names.includes(SAVED_METHOD_MIGRATION_ID))) {
+    fail('renewal migration is recorded without its required Order, Payment and mandate migrations; manual schema reconciliation is required')
+  }
   const byName = new Set(objects.map((object) => object.name))
 
   for (const migrationId of state.names.filter((name) => REQUIRED_MIGRATION_IDS.includes(name))) {
@@ -299,6 +343,8 @@ export function verifyD1_04OrderMigrationPostflight({
   paymentProviderEventConflictsTableInfo,
   savedPaymentMethodsTableInfo,
   paymentMandatesTableInfo,
+  renewalCyclesTableInfo,
+  renewalSchedulerStateTableInfo,
 }) {
   const before = schemaObjects(preflightSchema)
   const after = schemaObjects(postflightSchema)
@@ -325,6 +371,8 @@ export function verifyD1_04OrderMigrationPostflight({
     payment_provider_event_conflicts: paymentProviderEventConflictsTableInfo,
     saved_payment_methods: savedPaymentMethodsTableInfo,
     payment_mandates: paymentMandatesTableInfo,
+    subscription_renewal_cycles: renewalCyclesTableInfo,
+    subscription_renewal_scheduler_state: renewalSchedulerStateTableInfo,
   }
   for (const [tableName, expectedColumns] of Object.entries(REQUIRED_COLUMNS)) {
     const actual = tableColumns(tableInfoByName[tableName], tableName)
@@ -409,7 +457,7 @@ function main() {
     return
   }
   if (mode === 'postflight') {
-    if (args.length !== 12) throw new Error('Usage: verify-d1-04-order-migration.mjs postflight <preflight-schema.json> <postflight-schema.json> <migration-state.json> <orders-info.json> <order-lines-info.json> <idempotency-info.json> <payments-info.json> <provider-events-info.json> <event-conflicts-info.json> <saved-methods-info.json> <mandates-info.json> <output.json>')
+    if (args.length !== 14) throw new Error('Usage: verify-d1-04-order-migration.mjs postflight <preflight-schema.json> <postflight-schema.json> <migration-state.json> <orders-info.json> <order-lines-info.json> <idempotency-info.json> <payments-info.json> <provider-events-info.json> <event-conflicts-info.json> <saved-methods-info.json> <mandates-info.json> <renewal-cycles-info.json> <renewal-scheduler-state-info.json> <output.json>')
     const report = verifyD1_04OrderMigrationPostflight({
       preflightSchema: readJson(args[0]),
       postflightSchema: readJson(args[1]),
@@ -422,8 +470,10 @@ function main() {
       paymentProviderEventConflictsTableInfo: readJson(args[8]),
       savedPaymentMethodsTableInfo: readJson(args[9]),
       paymentMandatesTableInfo: readJson(args[10]),
+      renewalCyclesTableInfo: readJson(args[11]),
+      renewalSchedulerStateTableInfo: readJson(args[12]),
     })
-    writeReport(args[11], report)
+    writeReport(args[13], report)
     console.log(JSON.stringify(report, null, 2))
     return
   }
