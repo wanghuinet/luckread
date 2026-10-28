@@ -345,13 +345,11 @@ export async function createHyperswitchMerchantInitiatedPayment(
       currency: input.currency,
       customer_id: input.customerId,
       confirm: true,
-      capture_method: 'automatic',
       off_session: true,
       recurring_details: {
         type: 'payment_method_id',
         data: input.paymentMethodId,
       },
-      mit_category: 'recurring',
     }),
   }, fetchImpl);
 
