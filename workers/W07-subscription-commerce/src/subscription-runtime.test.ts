@@ -700,7 +700,7 @@ describe('subscription runtime', () => {
       .rejects.toMatchObject({ code: 'INVALID_STATE', status: 409 })
   })
 
-  it('pauses and resumes a plan without changing its immutable commercial version', async () => {
+  it('pauses, resumes, and retires a paused plan without changing its immutable commercial version', async () => {
     const db = fakeDb([], [activePlan('plan_lifecycle', { current_version: 3, version: 4 })])
     const paused = await transitionMembershipPlanLifecycle(db, 'creator_1', 'plan_lifecycle', '"lr-plan-v4"', 'pause')
     expect(paused).toMatchObject({ status: 'PAUSED', visibility: 'PRIVATE', planVersion: 3, version: 5, etag: '"lr-plan-v5"', replayed: false })
@@ -710,6 +710,21 @@ describe('subscription runtime', () => {
     const resumed = await transitionMembershipPlanLifecycle(db, 'creator_1', 'plan_lifecycle', '"lr-plan-v5"', 'resume')
     expect(resumed).toMatchObject({ status: 'ACTIVE', visibility: 'PUBLIC', planVersion: 3, version: 6, etag: '"lr-plan-v6"', replayed: false })
     expect((await listActiveMembershipPlans(db, 20)).docs.map(x => x.planId)).toContain('plan_lifecycle')
+    const pausedAgain = await transitionMembershipPlanLifecycle(db, 'creator_1', 'plan_lifecycle', '"lr-plan-v6"', 'pause')
+    expect(pausedAgain).toMatchObject({ status: 'PAUSED', visibility: 'PRIVATE', version: 7, planVersion: 3 })
+    const retired = await transitionMembershipPlanLifecycle(db, 'creator_1', 'plan_lifecycle', '"lr-plan-v7"', 'retire')
+    expect(retired).toMatchObject({ status: 'RETIRED', visibility: 'PRIVATE', planVersion: 3, version: 8, etag: '"lr-plan-v8"', replayed: false })
+    expect((await listActiveMembershipPlans(db, 20)).docs.map(x => x.planId)).not.toContain('plan_lifecycle')
+    const retireReplay = await transitionMembershipPlanLifecycle(db, 'creator_1', 'plan_lifecycle', '"lr-plan-v7"', 'retire')
+    expect(retireReplay).toMatchObject({ status: 'RETIRED', visibility: 'PRIVATE', version: 8, planVersion: 3, replayed: true })
+    await expect(transitionMembershipPlanLifecycle(db, 'creator_1', 'plan_lifecycle', '"lr-plan-v8"', 'resume'))
+      .rejects.toMatchObject({ code: 'INVALID_STATE', status: 409 })
+  })
+
+  it('requires a plan to be paused before retirement', async () => {
+    const db = fakeDb([], [activePlan('plan_retire_active', { version: 4 })])
+    await expect(transitionMembershipPlanLifecycle(db, 'creator_1', 'plan_retire_active', '"lr-plan-v4"', 'retire'))
+      .rejects.toMatchObject({ code: 'INVALID_STATE', status: 409 })
   })
 
   it('rejects foreign owners, stale ETags, invalid source states, and retired plans', async () => {
