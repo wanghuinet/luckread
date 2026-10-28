@@ -112,7 +112,7 @@ export async function callW06MembershipPlanUpdateRequestAudit(input: {
   request: Request
   principal: ContentPrincipal
   body: {
-    eventId: string; planId: string; creatorId: string; expectedVersion: number
+    eventId: string; planId: string; creatorId: string; expectedVersion: number; idempotencyKey: string
     name: string; tier: string; billingInterval: 'MONTHLY' | 'YEARLY'
     priceMinor: number; currency: string; benefits: string[]
   }
