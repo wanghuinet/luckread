@@ -78,6 +78,7 @@ export const REQUIRED_COLUMNS = {
     ['payment_method_id', 'TEXT', 0, 0], ['mandate_record_id', 'TEXT', 0, 0],
     ['order_id', 'TEXT', 0, 0], ['payment_id', 'TEXT', 0, 0], ['state', 'TEXT', 1, 0],
     ['attempt_number', 'INTEGER', 1, 0], ['provider_response_status', 'TEXT', 0, 0], ['outcome_code', 'TEXT', 0, 0],
+    ['subscription_sync_state', 'TEXT', 1, 0], ['subscription_sync_updated_at', 'TEXT', 0, 0], ['subscription_sync_error_code', 'TEXT', 0, 0],
     ['lease_token', 'TEXT', 0, 0], ['lease_expires_at', 'TEXT', 0, 0], ['version', 'INTEGER', 1, 0],
     ['created_at', 'TEXT', 1, 0], ['updated_at', 'TEXT', 1, 0],
   ],
