@@ -3334,6 +3334,12 @@
             "docs/change-control/CC-PAY-001-PAYMENT-ENTITY-MODEL-2026-10-28.md"
           ]
         }
+      ],
+      "evidenceRefs": [
+        "contracts/entity/PAYMENT-ENTITY-CONTRACT.v1.json",
+        "contracts/persistence/PAYMENT-D1-04-persistence.v1.json",
+        "contracts/state-machines/payment.json",
+        "docs/change-control/CC-PAY-001-PAYMENT-ENTITY-MODEL-2026-10-28.md"
       ]
     }
   ],
