@@ -35,7 +35,8 @@ describe('Hyperswitch provider webhook ingress', () => {
   it('requires the W01 binding envelope and verifies the provider signature in W07', () => {
     expect(receiver).toContain("request.headers.get('X-LuckRead-Caller') !== 'W01'")
     expect(receiver).toContain("request.headers.get('X-LuckRead-Transport-Version') !== '1.0'")
-    expect(receiver).toContain("request.headers.get('X-Webhook-Signature-512')")
+    expect(receiver).toContain("const SIGNATURE_HEADER = 'X-Webhook-Signature-512'")
+    expect(receiver).toContain('signatureHeader: request.headers.get(SIGNATURE_HEADER)')
     expect(receiver).toContain('receiveHyperswitchWebhook')
     expect(receiver).toContain('HYPERSWITCH_WEBHOOK_SECRET')
     expect(receiver).toContain('HYPERSWITCH_MERCHANT_ID')
