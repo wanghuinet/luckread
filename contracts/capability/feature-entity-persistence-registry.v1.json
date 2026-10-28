@@ -86,6 +86,23 @@
         "docs/change-control/CC-MAPPING-0-AUTH-004-EVIDENCE-REGISTRY-BINDING-2026-09-28.md",
         "https://github.com/wanghuinet/luckread/actions/runs/36288319530"
       ]
+    },
+    {
+      "featureId": "PAY-001",
+      "domainId": "D1-04",
+      "entityIds": [
+        "ENT-PAYMENT"
+      ],
+      "persistenceMode": "MIXED",
+      "owner": "D1-04",
+      "status": "BLOCKED",
+      "evidenceRefs": [
+        "contracts/entity/PAYMENT-ENTITY-CONTRACT.v1.json",
+        "contracts/persistence/PAYMENT-D1-04-persistence.v1.json",
+        "contracts/state-machines/payment.json",
+        "workers/W07-subscription-commerce/migrations-d1-04/0002_payment_provider_events.sql",
+        "docs/change-control/CC-PAY-001-PAYMENT-ENTITY-MODEL-2026-10-28.md"
+      ]
     }
   ]
 }

@@ -334,6 +334,26 @@
         "Contract candidate only: no canonical API/DTO, physical migration, runtime handler, deployed schema, or exact-commit runtime evidence has been admitted."
       ],
       "status": "BLOCKED"
+    },
+    {
+      "entityId": "ENT-PAYMENT",
+      "catalogStatus": "PROPOSED",
+      "implementationStatus": "CONTRACT_ONLY",
+      "implementationRefs": [],
+      "schemaEvidenceRefs": [
+        "contracts/entity/PAYMENT-ENTITY-CONTRACT.v1.json",
+        "contracts/persistence/PAYMENT-D1-04-persistence.v1.json",
+        "contracts/state-machines/payment.json"
+      ],
+      "migrationEvidenceRefs": [],
+      "payloadNativeEvidenceRefs": [],
+      "extensionEvidenceRefs": [],
+      "blockers": [
+        "D1-04 payment migration is a reviewed source candidate only; remote schema and exact postflight evidence have not been collected.",
+        "Payment-intent persistence, provider retry/reconciliation, verified webhook deduplication, and exact-commit security/runtime evidence are not yet implemented/admitted.",
+        "No ledger posting, Order confirmation, or entitlement grant is authorized by this candidate."
+      ],
+      "status": "BLOCKED"
     }
   ]
 }

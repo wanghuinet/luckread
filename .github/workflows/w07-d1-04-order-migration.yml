@@ -1,4 +1,4 @@
-name: W07 D1-04 Order Migration (Explicit Manual Gate)
+name: W07 D1-04 Order and Payment Migrations (Explicit Manual Gate)
 
 on:
   workflow_dispatch:
@@ -61,6 +61,7 @@ jobs:
         run: |
           set -euo pipefail
           test -f migrations-d1-04/0001_order_commerce.sql
+          test -f migrations-d1-04/0002_payment_provider_events.sql
           test -f scripts/verify-d1-04-order-migration.mjs
           node - <<'NODE'
           const fs = require('node:fs')
@@ -105,7 +106,7 @@ jobs:
           )"
           echo "database_name=$D1_04_NAME" >> "$GITHUB_OUTPUT"
 
-      - name: Capture read-only D1-04 schema before migration
+      - name: Capture read-only D1-04 schema before candidate migrations
         id: schema_preflight
         working-directory: workers/W07-subscription-commerce
         env:
@@ -131,7 +132,7 @@ jobs:
           echo "migration_action=$ACTION"
           echo "No D1 writes were performed in this step."
 
-      - name: Apply the isolated D1-04 order migration
+      - name: Apply only pending isolated D1-04 order and payment migrations
         if: steps.schema_preflight.outputs.action == 'APPLY'
         working-directory: workers/W07-subscription-commerce
         env:
@@ -143,7 +144,7 @@ jobs:
           test -n "$D1_04_NAME"
           npx --yes wrangler@4.116.0 d1 migrations apply "$D1_04_NAME" --remote --config wrangler.jsonc
 
-      - name: Capture read-only D1-04 schema after migration
+      - name: Capture read-only D1-04 schema after candidate migrations
         working-directory: workers/W07-subscription-commerce
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -157,6 +158,9 @@ jobs:
           npx --yes wrangler@4.116.0 d1 execute "$D1_04_NAME" --remote --config wrangler.jsonc --command='PRAGMA table_info("orders")' --json > /tmp/w07-d1-04-orders-columns.json
           npx --yes wrangler@4.116.0 d1 execute "$D1_04_NAME" --remote --config wrangler.jsonc --command='PRAGMA table_info("order_lines")' --json > /tmp/w07-d1-04-order-lines-columns.json
           npx --yes wrangler@4.116.0 d1 execute "$D1_04_NAME" --remote --config wrangler.jsonc --command='PRAGMA table_info("order_create_idempotency")' --json > /tmp/w07-d1-04-idempotency-columns.json
+          npx --yes wrangler@4.116.0 d1 execute "$D1_04_NAME" --remote --config wrangler.jsonc --command='PRAGMA table_info("payments")' --json > /tmp/w07-d1-04-payments-columns.json
+          npx --yes wrangler@4.116.0 d1 execute "$D1_04_NAME" --remote --config wrangler.jsonc --command='PRAGMA table_info("payment_provider_events")' --json > /tmp/w07-d1-04-payment-provider-events-columns.json
+          npx --yes wrangler@4.116.0 d1 execute "$D1_04_NAME" --remote --config wrangler.jsonc --command='PRAGMA table_info("payment_provider_event_conflicts")' --json > /tmp/w07-d1-04-payment-provider-event-conflicts-columns.json
           node scripts/verify-d1-04-order-migration.mjs postflight \
             /tmp/w07-d1-04-preflight-schema.json \
             /tmp/w07-d1-04-postflight-schema.json \
@@ -164,6 +168,9 @@ jobs:
             /tmp/w07-d1-04-orders-columns.json \
             /tmp/w07-d1-04-order-lines-columns.json \
             /tmp/w07-d1-04-idempotency-columns.json \
+            /tmp/w07-d1-04-payments-columns.json \
+            /tmp/w07-d1-04-payment-provider-events-columns.json \
+            /tmp/w07-d1-04-payment-provider-event-conflicts-columns.json \
             /tmp/w07-d1-04-postflight-report.json
 
       - name: Summarize migration and schema verification
@@ -171,7 +178,7 @@ jobs:
         run: |
           set -euo pipefail
           {
-            echo '# W07 D1-04 Order Migration'
+            echo '# W07 D1-04 Order and Payment Migrations'
             echo
             echo '- Source SHA: ${{ inputs.source_sha }}'
             echo '- Expected database name: ${{ inputs.target_database_name }}'

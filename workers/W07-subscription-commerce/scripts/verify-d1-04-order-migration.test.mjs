@@ -5,6 +5,11 @@ import {
   inspectD1_04OrderMigrationPreflight,
   verifyD1_04OrderMigrationPostflight,
   ORDER_MIGRATION_ID,
+  PAYMENT_MIGRATION_ID,
+  REQUIRED_MIGRATION_IDS,
+  REQUIRED_COLUMNS,
+  REQUIRED_INDEXES,
+  REQUIRED_TRIGGERS,
 } from './verify-d1-04-order-migration.mjs'
 
 const baseSchema = [
@@ -17,82 +22,128 @@ const migrationTable = {
 const wrapSchema = (objects) => ({ success: true, results: [{ results: objects }] })
 const wrapMigrationState = (names) => ({ success: true, results: [{ results: names.map((name) => ({ name })) }] })
 
-const targetObjects = [
-  { type: 'table', name: 'orders', tbl_name: 'orders', sql: 'CREATE TABLE orders (order_id TEXT PRIMARY KEY)' },
-  { type: 'table', name: 'order_lines', tbl_name: 'order_lines', sql: 'CREATE TABLE order_lines (order_line_id TEXT PRIMARY KEY)' },
-  { type: 'table', name: 'order_create_idempotency', tbl_name: 'order_create_idempotency', sql: 'CREATE TABLE order_create_idempotency (id TEXT PRIMARY KEY)' },
-  { type: 'index', name: 'ix_orders_customer_created_order', tbl_name: 'orders', sql: 'CREATE INDEX ix_orders_customer_created_order ON orders(customer_id, created_at, order_id)' },
-  { type: 'index', name: 'ix_orders_status_created_order', tbl_name: 'orders', sql: 'CREATE INDEX ix_orders_status_created_order ON orders(status, created_at, order_id)' },
-  { type: 'index', name: 'ix_order_lines_order_id', tbl_name: 'order_lines', sql: 'CREATE INDEX ix_order_lines_order_id ON order_lines(order_id)' },
-  { type: 'index', name: 'ix_order_lines_item_ref_version', tbl_name: 'order_lines', sql: 'CREATE INDEX ix_order_lines_item_ref_version ON order_lines(item_ref, item_version)' },
-  { type: 'index', name: 'ix_order_create_idempotency_customer_created', tbl_name: 'order_create_idempotency', sql: 'CREATE INDEX ix_order_create_idempotency_customer_created ON order_create_idempotency(customer_id, created_at)' },
-  { type: 'index', name: 'ix_order_create_idempotency_expiration', tbl_name: 'order_create_idempotency', sql: 'CREATE INDEX ix_order_create_idempotency_expiration ON order_create_idempotency(expires_at)' },
-  ...[
-    ['orders_commercial_snapshot_immutable', 'orders'],
-    ['orders_version_must_advance', 'orders'],
-    ['orders_status_transition_guard', 'orders'],
-    ['orders_retained', 'orders'],
-    ['order_lines_require_order', 'order_lines'],
-    ['order_lines_immutable_update', 'order_lines'],
-    ['order_lines_retained', 'order_lines'],
-    ['order_create_idempotency_identity_immutable', 'order_create_idempotency'],
-    ['order_create_idempotency_terminal_immutable', 'order_create_idempotency'],
-  ].map(([name, table]) => ({
-    type: 'trigger', name, tbl_name: table,
-    sql: 'CREATE TRIGGER ' + name + ' BEFORE UPDATE ON ' + table + ' BEGIN SELECT 1; END',
-  })),
-]
-
-const columns = (names) => ({
-  success: true,
-  results: [{ results: names.map(([name, type, notnull = 1], cid) => ({
-    cid, name, type, notnull, dflt_value: null, pk: cid === 0 ? 1 : 0,
-  })) }],
-})
-
-const tableInfo = {
-  orders: columns([
-    ['order_id', 'TEXT'], ['customer_id', 'TEXT'], ['status', 'TEXT'], ['version', 'INTEGER'],
-    ['currency', 'TEXT'], ['subtotal_minor', 'INTEGER'], ['discount_minor', 'INTEGER'],
-    ['tax_minor', 'INTEGER'], ['total_minor', 'INTEGER'], ['created_at', 'TEXT'],
-    ['updated_at', 'TEXT'], ['confirmed_at', 'TEXT', 0], ['cancelled_at', 'TEXT', 0], ['failure_code', 'TEXT', 0],
-  ]),
-  orderLines: columns([
-    ['order_line_id', 'TEXT'], ['order_id', 'TEXT'], ['item_type', 'TEXT'], ['item_ref', 'TEXT'],
-    ['item_version', 'TEXT'], ['quantity', 'INTEGER'], ['unit_amount_minor', 'INTEGER'],
-    ['line_subtotal_minor', 'INTEGER'], ['line_discount_minor', 'INTEGER'], ['line_tax_minor', 'INTEGER'],
-    ['line_total_minor', 'INTEGER'], ['item_snapshot_json', 'TEXT'], ['created_at', 'TEXT'],
-  ]),
-  idempotency: columns([
-    ['id', 'TEXT'], ['customer_id', 'TEXT'], ['operation_key', 'TEXT'], ['idempotency_key', 'TEXT'],
-    ['request_hash', 'TEXT'], ['state', 'TEXT'], ['response_status', 'INTEGER', 0], ['response_json', 'TEXT', 0],
-    ['created_at', 'TEXT'], ['expires_at', 'TEXT'],
-  ]),
+function targetObjectsFor(migrationIds) {
+  const tables = migrationIds.flatMap((id) => id === ORDER_MIGRATION_ID
+    ? ['orders', 'order_lines', 'order_create_idempotency']
+    : id === PAYMENT_MIGRATION_ID
+      ? ['payments', 'payment_provider_events', 'payment_provider_event_conflicts']
+      : [])
+  const objects = tables.map((tableName) => ({
+    type: 'table',
+    name: tableName,
+    tbl_name: tableName,
+    sql: 'CREATE TABLE ' + tableName + ' (probe TEXT)',
+  }))
+  for (const [tableName, names] of Object.entries(REQUIRED_INDEXES)) {
+    for (const name of names) {
+      if (!tables.includes(tableName)) continue
+      objects.push({
+        type: 'index',
+        name,
+        tbl_name: tableName,
+        sql: 'CREATE INDEX ' + name + ' ON ' + tableName + '(probe)',
+      })
+    }
+  }
+  for (const [tableName, names] of Object.entries(REQUIRED_TRIGGERS)) {
+    for (const name of names) {
+      if (!tables.includes(tableName)) continue
+      objects.push({
+        type: 'trigger',
+        name,
+        tbl_name: tableName,
+        sql: 'CREATE TRIGGER ' + name + ' BEFORE UPDATE ON ' + tableName + ' BEGIN SELECT 1; END',
+      })
+    }
+  }
+  return objects
 }
 
-test('clean empty D1-04 schema is eligible for explicit migration only', () => {
+function schemaWithMigrations(migrationIds) {
+  return wrapSchema([
+    ...baseSchema,
+    ...(migrationIds.length > 0 ? [migrationTable] : []),
+    ...targetObjectsFor(migrationIds),
+  ])
+}
+
+function tableInfoFor(tableName) {
+  return {
+    success: true,
+    results: [{
+      results: REQUIRED_COLUMNS[tableName].map(([name, type, notnull, pk], cid) => ({
+        cid, name, type, notnull, dflt_value: null, pk,
+      })),
+    }],
+  }
+}
+
+const tableInfo = {
+  orders: tableInfoFor('orders'),
+  orderLines: tableInfoFor('order_lines'),
+  idempotency: tableInfoFor('order_create_idempotency'),
+  payments: tableInfoFor('payments'),
+  paymentProviderEvents: tableInfoFor('payment_provider_events'),
+  paymentProviderEventConflicts: tableInfoFor('payment_provider_event_conflicts'),
+}
+
+function verifyCompletePostflight({ preflightSchema = schemaWithMigrations([]), postflightSchema = schemaWithMigrations(REQUIRED_MIGRATION_IDS), migrationState = wrapMigrationState(REQUIRED_MIGRATION_IDS) } = {}) {
+  return verifyD1_04OrderMigrationPostflight({
+    preflightSchema,
+    postflightSchema,
+    migrationState,
+    ordersTableInfo: tableInfo.orders,
+    orderLinesTableInfo: tableInfo.orderLines,
+    idempotencyTableInfo: tableInfo.idempotency,
+    paymentsTableInfo: tableInfo.payments,
+    paymentProviderEventsTableInfo: tableInfo.paymentProviderEvents,
+    paymentProviderEventConflictsTableInfo: tableInfo.paymentProviderEventConflicts,
+  })
+}
+
+test('clean empty D1-04 schema is eligible for explicitly confirmed pending migrations only', () => {
   const result = inspectD1_04OrderMigrationPreflight({
     schemaSnapshot: wrapSchema(baseSchema),
     migrationState: { querySkipped: 'd1_migrations table not present' },
   })
-  assert.equal(result.result, 'PREFLIGHT_PASS_CLEAN_TARGET')
+  assert.equal(result.result, 'PREFLIGHT_PASS_PENDING_MIGRATIONS')
   assert.equal(result.action, 'APPLY')
+  assert.deepEqual(result.pendingMigrationIds, REQUIRED_MIGRATION_IDS)
   assert.equal(result.databaseUuid, '9bfb89a5-fbb5-45b1-a2ee-eab674b0d736')
   assert.equal(result.writesPerformed, false)
 })
 
-test('already applied migration proceeds only to postflight verification', () => {
+test('fails closed when Payment migration history exists without its Order prerequisite', () => {
+  assert.throws(() => inspectD1_04OrderMigrationPreflight({
+    schemaSnapshot: schemaWithMigrations([PAYMENT_MIGRATION_ID]),
+    migrationState: wrapMigrationState([PAYMENT_MIGRATION_ID]),
+  }), /payment migration is recorded without its required prior Order migration/)
+})
+
+test('an applied Order migration can advance only the pending Payment migration', () => {
   const result = inspectD1_04OrderMigrationPreflight({
-    schemaSnapshot: wrapSchema([...baseSchema, migrationTable, ...targetObjects]),
+    schemaSnapshot: schemaWithMigrations([ORDER_MIGRATION_ID]),
     migrationState: wrapMigrationState([ORDER_MIGRATION_ID]),
   })
+  assert.equal(result.action, 'APPLY')
+  assert.deepEqual(result.pendingMigrationIds, [PAYMENT_MIGRATION_ID])
+  assert.equal(result.writesPerformed, false)
+})
+
+test('all reviewed migrations already applied proceeds only to postflight verification', () => {
+  const result = inspectD1_04OrderMigrationPreflight({
+    schemaSnapshot: schemaWithMigrations(REQUIRED_MIGRATION_IDS),
+    migrationState: wrapMigrationState(REQUIRED_MIGRATION_IDS),
+  })
+  assert.equal(result.result, 'PREFLIGHT_PASS_ALREADY_APPLIED')
   assert.equal(result.action, 'VERIFY_ONLY')
+  assert.deepEqual(result.pendingMigrationIds, [])
   assert.equal(result.writesPerformed, false)
 })
 
 test('fails closed if any target object exists without matching migration history', () => {
   assert.throws(() => inspectD1_04OrderMigrationPreflight({
-    schemaSnapshot: wrapSchema([...baseSchema, targetObjects[0]]),
+    schemaSnapshot: wrapSchema([...baseSchema, targetObjectsFor([PAYMENT_MIGRATION_ID])[0]]),
     migrationState: { querySkipped: 'd1_migrations table not present' },
   }), /target commerce objects already exist/)
 })
@@ -104,49 +155,43 @@ test('fails closed when migration history exists but was not readable', () => {
   }), /history query was skipped/)
 })
 
-test('postflight validates exact tables, columns, indexes, triggers, and migration history', () => {
-  const baseline = wrapSchema([...baseSchema])
-  const remote = wrapSchema([...baseSchema, migrationTable, ...targetObjects])
-  const report = verifyD1_04OrderMigrationPostflight({
-    preflightSchema: baseline,
-    postflightSchema: remote,
+test('fails closed when migration history claims Order is applied but its table is missing', () => {
+  assert.throws(() => inspectD1_04OrderMigrationPreflight({
+    schemaSnapshot: wrapSchema([...baseSchema, migrationTable]),
     migrationState: wrapMigrationState([ORDER_MIGRATION_ID]),
-    ordersTableInfo: tableInfo.orders,
-    orderLinesTableInfo: tableInfo.orderLines,
-    idempotencyTableInfo: tableInfo.idempotency,
-  })
+  }), /migration history records .* target schema objects are missing/)
+})
+
+test('postflight validates both migrations, all tables/columns/indexes/triggers, and preserves baseline', () => {
+  const report = verifyCompletePostflight()
   assert.equal(report.result, 'POSTFLIGHT_PASS')
   assert.equal(report.baselineSchemaPreserved, true)
-  assert.equal(report.verifiedTables.length, 3)
-  assert.equal(report.verifiedIndexes.length, 6)
-  assert.equal(report.verifiedTriggers.length, 9)
+  assert.deepEqual(report.appliedMigrations, REQUIRED_MIGRATION_IDS)
+  assert.equal(report.verifiedTables.length, 6)
+  assert.equal(report.verifiedIndexes.length, 14)
+  assert.equal(report.verifiedTriggers.length, 24)
   assert.equal(report.databaseRowsExported, false)
 })
 
-test('postflight rejects missing migration history', () => {
-  assert.throws(() => verifyD1_04OrderMigrationPostflight({
-    preflightSchema: wrapSchema(baseSchema),
-    postflightSchema: wrapSchema([...baseSchema, migrationTable, ...targetObjects]),
-    migrationState: wrapMigrationState([]),
-    ordersTableInfo: tableInfo.orders,
-    orderLinesTableInfo: tableInfo.orderLines,
-    idempotencyTableInfo: tableInfo.idempotency,
-  }), /does not contain/)
+test('postflight rejects a missing Payment migration record', () => {
+  assert.throws(() => verifyCompletePostflight({
+    postflightSchema: schemaWithMigrations([ORDER_MIGRATION_ID]),
+    migrationState: wrapMigrationState([ORDER_MIGRATION_ID]),
+  }), /does not contain required migrations/)
 })
 
 test('postflight rejects changed existing schema objects', () => {
   const changedBase = wrapSchema([{ ...baseSchema[0], sql: 'CREATE TABLE _cf_KV (key TEXT, value TEXT)' }])
-  assert.throws(() => verifyD1_04OrderMigrationPostflight({
-    preflightSchema: wrapSchema(baseSchema),
-    postflightSchema: wrapSchema([...changedBase.results[0].results, migrationTable, ...targetObjects]),
-    migrationState: wrapMigrationState([ORDER_MIGRATION_ID]),
-    ordersTableInfo: tableInfo.orders,
-    orderLinesTableInfo: tableInfo.orderLines,
-    idempotencyTableInfo: tableInfo.idempotency,
+  assert.throws(() => verifyCompletePostflight({
+    postflightSchema: wrapSchema([
+      ...changedBase.results[0].results,
+      migrationTable,
+      ...targetObjectsFor(REQUIRED_MIGRATION_IDS),
+    ]),
   }), /pre-existing schema object was removed or changed/)
 })
 
-test('workflow is manual-only, requires exact SHA/name/confirmation, and has no deploy command', () => {
+test('workflow is manual-only, gates exact SHA/name/confirmation, and never deploys a Worker', () => {
   const workflow = fs.readFileSync(new URL('../../../.github/workflows/w07-d1-04-order-migration.yml', import.meta.url), 'utf8')
   assert.match(workflow, /workflow_dispatch:/)
   assert.doesNotMatch(workflow, /^\s{2}(push|pull_request):/m)
@@ -158,6 +203,10 @@ test('workflow is manual-only, requires exact SHA/name/confirmation, and has no 
   assert.match(workflow, /--remote/)
   assert.match(workflow, /id: schema_preflight/)
   assert.match(workflow, /steps\.schema_preflight\.outputs\.action == 'APPLY'/)
-  assert.match(workflow, /Capture read-only D1-04 schema after migration/)
+  assert.match(workflow, /Capture read-only D1-04 schema after candidate migrations/)
+  assert.match(workflow, /0002_payment_provider_events\.sql/)
+  assert.match(workflow, /PRAGMA table_info\("payments"\)/)
+  assert.match(workflow, /PRAGMA table_info\("payment_provider_events"\)/)
+  assert.match(workflow, /PRAGMA table_info\("payment_provider_event_conflicts"\)/)
   assert.doesNotMatch(workflow, /wrangler(?:@[\w.]+)?\s+deploy/)
 })
