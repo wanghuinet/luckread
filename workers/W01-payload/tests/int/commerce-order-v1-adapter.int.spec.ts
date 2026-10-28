@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { readBoundedOrderBody } from '../../src/commerce/w07-commerce-client.js'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
@@ -15,6 +16,38 @@ const w07OrderRuntime = read('../W07-subscription-commerce/src/order-http-runtim
 const wrangler = read('wrangler.jsonc')
 
 describe('v1 commerce order adapter', () => {
+  it('accepts a valid decimal Content-Length for a bounded JSON order request', async () => {
+    const body = JSON.stringify({ items: [{ itemRef: 'plan_' + 'a'.repeat(64), quantity: 1 }] })
+    const request = new Request('https://luckread.example/api/v1/commerce/orders', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'content-length': String(new TextEncoder().encode(body).byteLength),
+      },
+      body,
+    })
+
+    const parsed = await readBoundedOrderBody(request)
+    expect(parsed.ok).toBe(true)
+    if (parsed.ok) expect(parsed.value).toEqual(JSON.parse(body))
+  })
+
+  it('rejects malformed or over-limit declared Content-Length before parsing the body', async () => {
+    const makeRequest = (contentLength: string) => new Request('https://luckread.example/api/v1/commerce/orders', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'content-length': contentLength },
+      body: JSON.stringify({ items: [] }),
+    })
+
+    const malformed = await readBoundedOrderBody(makeRequest('12x'))
+    expect(malformed.ok).toBe(false)
+    if (!malformed.ok) expect(malformed.response.status).toBe(400)
+
+    const oversized = await readBoundedOrderBody(makeRequest('16385'))
+    expect(oversized.ok).toBe(false)
+    if (!oversized.ok) expect(oversized.response.status).toBe(400)
+  })
+
   it('authorizes order creation using the W02-backed W08 CASL decision before calling W07', () => {
     expect(createRoute).toContain("authorizeOrderPermission(request, principal, 'order.create')")
     expect(client).toContain("resourceType: 'Order'")
