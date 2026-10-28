@@ -56,6 +56,9 @@ class MemoryStatement {
 }
 
 class MemoryD1 {
+  pendingScanLimit: number | null = null;
+  failPendingScan = false;
+
   constructor(
     public cycle: Cycle | null,
     public subscription: Subscription | null,
@@ -114,11 +117,14 @@ class MemoryD1 {
     }
     throw new Error('Unexpected run query: ' + sql);
   }
-  async all<T>(sql: string, _values: unknown[] = []): Promise<D1Result<T>> {
-    if (sql.includes('FROM subscription_renewal_cycles') && this.cycle &&
-        this.cycle.subscription_sync_state === 'PENDING' &&
-        ['SUCCEEDED', 'FAILED'].includes(this.cycle.state)) {
-      return { success: true, results: [{ cycle_id: this.cycle.cycle_id } as T] } as D1Result<T>;
+  async all<T>(sql: string, values: unknown[] = []): Promise<D1Result<T>> {
+    if (sql.includes('FROM subscription_renewal_cycles')) {
+      this.pendingScanLimit = Number(values[0]);
+      if (this.failPendingScan) throw new Error('temporary D1-04 pending-cycle scan failure');
+      if (this.cycle && this.cycle.subscription_sync_state === 'PENDING' &&
+          ['SUCCEEDED', 'FAILED'].includes(this.cycle.state)) {
+        return { success: true, results: [{ cycle_id: this.cycle.cycle_id } as T] } as D1Result<T>;
+      }
     }
     return { success: true, results: [] } as D1Result<T>;
   }
@@ -196,5 +202,25 @@ describe('D1-04 renewal outcome to D1-01 Subscription synchronization', () => {
     const result = await import('./subscription-renewal-outcome.js').then(({ syncPendingRenewalOutcomes }) =>
       syncPendingRenewalOutcomes(e.value, { limit: 10 }, { now: () => new Date(NOW) }));
     expect(result).toEqual({ scanned: 1, applied: 1, reconciliationRequired: 0, pendingRetry: 0 });
+    expect(e.d1_04.pendingScanLimit).toBe(10);
+  });
+
+  it('caps an oversized pending outcome batch to the runtime maximum', async () => {
+    const e = env();
+    const { syncPendingRenewalOutcomes } = await import('./subscription-renewal-outcome.js');
+    const result = await syncPendingRenewalOutcomes(e.value, { limit: 100_000 }, { now: () => new Date(NOW) });
+
+    expect(e.d1_04.pendingScanLimit).toBe(50);
+    expect(result).toEqual({ scanned: 1, applied: 1, reconciliationRequired: 0, pendingRetry: 0 });
+  });
+
+  it('fails closed when D1-04 cannot read the pending outcome batch', async () => {
+    const e = env();
+    e.d1_04.failPendingScan = true;
+    const { syncPendingRenewalOutcomes } = await import('./subscription-renewal-outcome.js');
+
+    await expect(syncPendingRenewalOutcomes(e.value, { limit: 20 }, { now: () => new Date(NOW) }))
+      .rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE', status: 503 });
+    expect(e.d1_04.pendingScanLimit).toBe(20);
   });
 });
