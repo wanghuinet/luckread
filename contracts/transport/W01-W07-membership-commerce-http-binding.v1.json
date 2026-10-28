@@ -54,6 +54,25 @@
       "cache": "NO_STORE"
     },
     {
+      "operationId": "getOwnMembershipSummary",
+      "method": "GET",
+      "publicPath": "/api/v1/membership/creator-summary",
+      "internalPath": "/membership/creator-summary",
+      "principalRequired": true,
+      "permission": "membership.analytics.read.own",
+      "minimumGlobalLayer": "L3",
+      "ownerId": "W08-resolved ACTIVE creator ID only; never accepted from a public query or body.",
+      "responseAuthority": "W07 aggregate counts from creator-owned membership_plans and membership_subscriptions rows in D1-01; no subscriber identifiers, payments, or revenue fields.",
+      "cache": "NO_STORE",
+      "topologyConstraints": {
+        "newWorker": false,
+        "newDatabase": false,
+        "newQueue": false,
+        "newServiceBinding": false,
+        "crossD1Transactions": 0
+      }
+    },
+    {
       "operationId": "createOwnMembershipPlanDraft",
       "method": "POST",
       "publicPath": "/api/v1/membership/plans",
