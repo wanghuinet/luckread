@@ -149,15 +149,15 @@ export async function callW06MembershipPlanUpdateAudit(input: {
 /** Durable intent record written before changing a plan's sale-availability state. */
 export async function callW06MembershipPlanLifecycleRequestAudit(input: {
   request: Request; principal: ContentPrincipal
-  body: { eventId: string; planId: string; creatorId: string; expectedVersion: number; action: 'pause' | 'resume'; requestedStatus: 'PAUSED' | 'ACTIVE'; requestedVisibility: 'PRIVATE' | 'PUBLIC' }
+  body: { eventId: string; planId: string; creatorId: string; expectedVersion: number; action: 'pause' | 'resume' | 'retire'; requestedStatus: 'PAUSED' | 'ACTIVE' | 'RETIRED'; requestedVisibility: 'PRIVATE' | 'PUBLIC' }
 }): Promise<Response> {
   return callW06Moderation({ request: input.request, pathname: '/internal/audit-events/membership-plan-lifecycle-requested', method: 'POST', principal: input.principal, body: input.body })
 }
 
-/** Immutable audit for pausing or resuming new sales for a membership plan. */
+/** Immutable audit for pausing/resuming sales or retiring a paused membership plan. */
 export async function callW06MembershipPlanLifecycleAudit(input: {
   request: Request; principal: ContentPrincipal
-  body: { eventId: string; planId: string; creatorId: string; expectedVersion: number; planVersion: number; action: 'pause' | 'resume'; status: 'PAUSED' | 'ACTIVE'; visibility: 'PRIVATE' | 'PUBLIC'; version: number; occurredAt: string }
+  body: { eventId: string; planId: string; creatorId: string; expectedVersion: number; planVersion: number; action: 'pause' | 'resume' | 'retire'; status: 'PAUSED' | 'ACTIVE' | 'RETIRED'; visibility: 'PRIVATE' | 'PUBLIC'; version: number; occurredAt: string }
 }): Promise<Response> {
   return callW06Moderation({ request: input.request, pathname: '/internal/audit-events/membership-plan-lifecycle-changed', method: 'POST', principal: input.principal, body: input.body })
 }
