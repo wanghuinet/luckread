@@ -1,7 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
 import {
-  createHyperswitchPaymentIntent,
+  createHyperswitchCustomerInitiatedSetupIntent,
   HyperswitchClientError,
 } from './hyperswitch-client.js';
 import {
@@ -27,7 +27,7 @@ type PaymentIntentRuntimeEnv = Readonly<{
 
 type PaymentIntentRuntimeDependencies = Readonly<{
   createAttempt?: typeof createPaymentAttempt;
-  createProviderIntent?: typeof createHyperswitchPaymentIntent;
+  createProviderIntent?: typeof createHyperswitchCustomerInitiatedSetupIntent;
   recordIntent?: typeof recordUnconfirmedHyperswitchIntent;
 }>;
 
@@ -106,14 +106,15 @@ function mapPersistenceError(error: PaymentPersistenceError): Response {
 }
 
 /**
- * Internal W01 -> W07 checkout-intent operation. The customer identity is
+ * Internal W01 -> W07 checkout-intent operation. The trusted customer identity is
  * derived by W01; amount and currency are read from the customer-owned D1-04
  * Order. Provider network I/O is deliberately outside D1 writes. Only the
  * server-generated payment ID and a deterministic provider idempotency key are
  * sent upstream; provider secrets and client_secret are never persisted.
  *
  * This does not capture funds, confirm an Order, post a ledger entry, grant an
- * entitlement, or add a public API route.
+ * entitlement. The customer-present Hyperswitch SDK is responsible for showing
+ * the explicit save-method consent choice; this operation alone does not imply consent.
  */
 export async function handleCommercePaymentIntentRequest(
   request: Request,
@@ -161,12 +162,13 @@ export async function handleCommercePaymentIntentRequest(
     // idempotency namespace. The stable, locally unique payment ID gives every
     // retry of this persisted attempt exactly the same upstream key.
     const providerIdempotencyKey = 'lr_' + attempt.payment.paymentId;
-    const createProviderIntent = dependencies.createProviderIntent ?? createHyperswitchPaymentIntent;
+    const createProviderIntent = dependencies.createProviderIntent ?? createHyperswitchCustomerInitiatedSetupIntent;
     const providerPayment = await createProviderIntent(providerConfig, {
       paymentId: attempt.payment.paymentId,
       amount: attempt.payment.amountMinor,
       currency: attempt.payment.currency,
       idempotencyKey: providerIdempotencyKey,
+      customerId,
     });
 
     const recordIntent = dependencies.recordIntent ?? recordUnconfirmedHyperswitchIntent;
