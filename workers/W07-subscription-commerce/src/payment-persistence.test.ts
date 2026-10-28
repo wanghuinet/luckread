@@ -35,6 +35,18 @@ type Conflict = {
   occurrence_count: number; version: number; first_seen_at: string; last_seen_at: string;
   resolved_at: string | null; resolution_code: string | null;
 };
+type SavedMethod = {
+  saved_payment_method_id: string; provider: string; merchant_id: string; customer_id: string;
+  payment_method_id: string; source_payment_id: string; source_event_id: string; created_at: string;
+};
+type Mandate = {
+  mandate_record_id: string; provider: string; merchant_id: string; customer_id: string;
+  payment_method_id: string; source_payment_id: string; source_event_id: string;
+  consent_accepted_at: string; consent_acceptance_type: 'online'; consent_scope: 'OFF_SESSION_RECURRING';
+  consent_terms_version: 'luckread-recurring-consent-v1'; provider_mandate_id: string | null;
+  status: 'PENDING_PROVIDER_CONFIRMATION' | 'ACTIVE' | 'REVOKED' | 'FAILED' | 'EXPIRED';
+  version: number; provider_updated_at: string | null; created_at: string; updated_at: string;
+};
 
 const clone = <T>(value: T): T => structuredClone(value);
 function result(changes: number): D1Result {
@@ -61,6 +73,8 @@ class MemoryPaymentD1 {
   payments: Payment[] = [];
   events: Event[] = [];
   conflicts: Conflict[] = [];
+  savedMethods: SavedMethod[] = [];
+  mandates: Mandate[] = [];
   prepare(sql: string): D1PreparedStatement {
     return new MemoryPaymentStatement(this, sql) as unknown as D1PreparedStatement;
   }
@@ -96,7 +110,7 @@ class MemoryPaymentD1 {
   }
 
   async batch(statements: D1PreparedStatement[]): Promise<D1Result[]> {
-    const snapshot = clone({ orders: this.orders, payments: this.payments, events: this.events, conflicts: this.conflicts });
+    const snapshot = clone({ orders: this.orders, payments: this.payments, events: this.events, conflicts: this.conflicts, savedMethods: this.savedMethods, mandates: this.mandates });
     try {
       const results: D1Result[] = [];
       for (const statement of statements as unknown as MemoryPaymentStatement[]) {
@@ -108,6 +122,8 @@ class MemoryPaymentD1 {
       this.payments = snapshot.payments;
       this.events = snapshot.events;
       this.conflicts = snapshot.conflicts;
+      this.savedMethods = snapshot.savedMethods;
+      this.mandates = snapshot.mandates;
       throw error;
     }
   }
@@ -238,6 +254,51 @@ class MemoryPaymentD1 {
       row.outcome_code = outcomeCode;
       return result(1) as D1Result<T>;
     }
+    if (sql.startsWith('INSERT INTO saved_payment_methods')) {
+      const [id, merchantId, customerId, methodId, paymentId, eventId, createdAt] = values as
+        [string, string, string, string, string, string, string];
+      const payment = this.payments.find(p => p.payment_id === paymentId && p.provider === 'hyperswitch' &&
+        p.merchant_id === merchantId && p.customer_id === customerId && p.status === 'succeeded');
+      const event = this.events.find(e => e.provider === 'hyperswitch' && e.merchant_id === merchantId &&
+        e.event_id === eventId && e.payment_id === paymentId && e.event_type === 'payment_succeeded' && e.state === 'RECEIVED');
+      if (!payment || !event) throw new Error('constraint: verified succeeded payment required for saved method');
+      const existing = this.savedMethods.find(m => m.provider === 'hyperswitch' &&
+        m.merchant_id === merchantId && m.payment_method_id === methodId);
+      if (existing && existing.customer_id !== customerId) throw new Error('constraint: saved method customer binding');
+      if (existing) return result(0) as D1Result<T>;
+      this.savedMethods.push({
+        saved_payment_method_id: id, provider: 'hyperswitch', merchant_id: merchantId,
+        customer_id: customerId, payment_method_id: methodId, source_payment_id: paymentId,
+        source_event_id: eventId, created_at: createdAt,
+      });
+      return result(1) as D1Result<T>;
+    }
+    if (sql.startsWith('INSERT INTO payment_mandates')) {
+      const [id, merchantId, customerId, methodId, paymentId, eventId, acceptedAt,
+        providerMandateId, createdAt, updatedAt] = values as
+        [string, string, string, string, string, string, string, string | null, string, string];
+      const saved = this.savedMethods.find(m => m.provider === 'hyperswitch' && m.merchant_id === merchantId &&
+        m.customer_id === customerId && m.payment_method_id === methodId);
+      const payment = this.payments.find(p => p.payment_id === paymentId && p.provider === 'hyperswitch' &&
+        p.merchant_id === merchantId && p.customer_id === customerId && p.status === 'succeeded');
+      const event = this.events.find(e => e.provider === 'hyperswitch' && e.merchant_id === merchantId &&
+        e.event_id === eventId && e.payment_id === paymentId && e.event_type === 'payment_succeeded' && e.state === 'RECEIVED');
+      if (!saved || !payment || !event) throw new Error('constraint: mandate requires saved method and verified payment');
+      if (this.mandates.some(m => m.provider === 'hyperswitch' && m.merchant_id === merchantId && m.source_payment_id === paymentId)) {
+        return result(0) as D1Result<T>;
+      }
+      if (providerMandateId && this.mandates.some(m => m.provider === 'hyperswitch' &&
+        m.merchant_id === merchantId && m.provider_mandate_id === providerMandateId)) throw new Error('constraint: provider mandate uniqueness');
+      this.mandates.push({
+        mandate_record_id: id, provider: 'hyperswitch', merchant_id: merchantId, customer_id: customerId,
+        payment_method_id: methodId, source_payment_id: paymentId, source_event_id: eventId,
+        consent_accepted_at: acceptedAt, consent_acceptance_type: 'online', consent_scope: 'OFF_SESSION_RECURRING',
+        consent_terms_version: 'luckread-recurring-consent-v1', provider_mandate_id: providerMandateId,
+        status: 'PENDING_PROVIDER_CONFIRMATION', version: 1, provider_updated_at: null,
+        created_at: createdAt, updated_at: updatedAt,
+      });
+      return result(1) as D1Result<T>;
+    }
     if (sql.startsWith('INSERT INTO payment_provider_event_conflicts')) {
       const [conflictId, provider, merchantId, eventId, oldHash, newHash, state, count, version, firstAt, lastAt] = values as
         [string, string, string, string, string, string, Conflict['state'], number, number, string, string];
@@ -273,6 +334,8 @@ const fixedDeps = (time = NOW) => ({
   createPaymentId: () => PAYMENT_ID,
   createEventRowId: () => 'evtrow_test_1',
   createConflictId: () => 'evtconf_test_1',
+  createSavedPaymentMethodId: () => 'spm_' + 's'.repeat(26),
+  createPaymentMandateId: () => 'mnd_' + 'm'.repeat(26),
 });
 
 function seedOrder(db: MemoryPaymentD1, overrides: Partial<Order> = {}) {
@@ -307,22 +370,39 @@ function expectPaymentError(promise: Promise<unknown>, code: string) {
   return expect(promise).rejects.toMatchObject({ code, status: expect.any(Number) });
 }
 
-const bodyText = (eventId: string, updated = '2026-10-28T12:00:00.000Z') => JSON.stringify({
-  merchant_id: MERCHANT,
-  event_id: eventId,
-  event_type: 'payment_succeeded',
-  content: {
-    type: 'payment_details',
-    object: {
-      payment_id: PAYMENT_ID,
-      merchant_id: MERCHANT,
-      amount: 1200,
-      currency: 'USD',
-      status: 'succeeded',
-      updated,
-    },
-  },
-});
+const bodyText = (
+  eventId: string,
+  updated = '2026-10-28T12:00:00.000Z',
+  includeSavedMethodConsent = false,
+) => {
+  const resource: Record<string, unknown> = {
+    payment_id: PAYMENT_ID,
+    merchant_id: MERCHANT,
+    amount: 1200,
+    currency: 'USD',
+    status: 'succeeded',
+    updated,
+  };
+  if (includeSavedMethodConsent) {
+    Object.assign(resource, {
+      customer_id: CUSTOMER,
+      setup_future_usage: 'off_session',
+      payment_method_id: 'pm_hyperswitch_test_123',
+      mandate_id: 'mandate_hyperswitch_test_123',
+      customer_acceptance: {
+        acceptance_type: 'online',
+        accepted_at: NOW,
+        online: { ip_address: '192.0.2.1', user_agent: 'LuckRead test client' },
+      },
+    });
+  }
+  return JSON.stringify({
+    merchant_id: MERCHANT,
+    event_id: eventId,
+    event_type: 'payment_succeeded',
+    content: { type: 'payment_details', object: resource },
+  });
+};
 
 async function signedBody(text: string, secret = SECRET): Promise<{ rawBody: ArrayBuffer; signature: string }> {
   const bytes = new TextEncoder().encode(text);
@@ -464,6 +544,8 @@ describe('PAY-001 payment attempt persistence candidate', () => {
       processed_at: NOW,
     });
     expect(db.orders[0]).toMatchObject({ status: 'CONFIRMED', version: 2, confirmed_at: '2026-10-28T12:00:00.001Z' });
+    expect(db.savedMethods).toHaveLength(0);
+    expect(db.mandates).toHaveLength(0);
 
     const duplicate = await receiveHyperswitchWebhook(db as unknown as D1Database, input, fixedDeps(LATER));
     expect(duplicate).toMatchObject({ outcome: 'DUPLICATE', receiptId: applied.receiptId });
@@ -501,6 +583,68 @@ describe('PAY-001 payment attempt persistence candidate', () => {
       expect(db.payments[0]).toMatchObject({ status: 'succeeded', version: 3 });
       expect(db.orders[0]).toMatchObject({ status, confirmed_at: '2026-10-28T12:00:00.001Z' });
     }
+  });
+
+
+  it('persists only provider-signed customer-bound off-session consent and leaves mandate pending', async () => {
+    const db = new MemoryPaymentD1();
+    seedOrder(db);
+    seedPayment(db);
+    const signed = await signedBody(bodyText('evt_saved_method', NOW, true));
+    const applied = await receiveHyperswitchWebhook(
+      db as unknown as D1Database,
+      { ...signed, webhookSecret: SECRET, expectedMerchantId: MERCHANT },
+      fixedDeps(),
+    );
+
+    expect(applied).toMatchObject({ outcome: 'APPLIED', state: 'APPLIED' });
+    expect(db.savedMethods).toEqual([{
+      saved_payment_method_id: 'spm_' + 's'.repeat(26),
+      provider: 'hyperswitch',
+      merchant_id: MERCHANT,
+      customer_id: CUSTOMER,
+      payment_method_id: 'pm_hyperswitch_test_123',
+      source_payment_id: PAYMENT_ID,
+      source_event_id: 'evt_saved_method',
+      created_at: NOW,
+    }]);
+    expect(db.mandates).toEqual([expect.objectContaining({
+      mandate_record_id: 'mnd_' + 'm'.repeat(26),
+      provider: 'hyperswitch',
+      merchant_id: MERCHANT,
+      customer_id: CUSTOMER,
+      payment_method_id: 'pm_hyperswitch_test_123',
+      source_payment_id: PAYMENT_ID,
+      source_event_id: 'evt_saved_method',
+      consent_accepted_at: NOW,
+      consent_acceptance_type: 'online',
+      consent_scope: 'OFF_SESSION_RECURRING',
+      consent_terms_version: 'luckread-recurring-consent-v1',
+      provider_mandate_id: 'mandate_hyperswitch_test_123',
+      status: 'PENDING_PROVIDER_CONFIRMATION',
+      version: 1,
+      provider_updated_at: null,
+      created_at: NOW,
+      updated_at: NOW,
+    })]);
+    expect(JSON.stringify(db.savedMethods)).not.toContain('192.0.2.1');
+    expect(JSON.stringify(db.mandates)).not.toContain('LuckRead test client');
+    expect(JSON.stringify(db.mandates)).not.toContain(SECRET);
+  });
+
+  it('fails closed on an unbound or missing provider consent receipt', async () => {
+    const db = new MemoryPaymentD1();
+    seedOrder(db);
+    seedPayment(db);
+    const signed = await signedBody(bodyText('evt_no_consent'));
+    const applied = await receiveHyperswitchWebhook(
+      db as unknown as D1Database,
+      { ...signed, webhookSecret: SECRET, expectedMerchantId: MERCHANT },
+      fixedDeps(),
+    );
+    expect(applied.outcome).toBe('APPLIED');
+    expect(db.savedMethods).toHaveLength(0);
+    expect(db.mandates).toHaveLength(0);
   });
 
   it('retains provider success but does not confirm a cancelled Order; event requires reconciliation', async () => {
