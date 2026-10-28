@@ -111,6 +111,39 @@
         "currency",
         "occurredAt"
       ]
+    },
+    {
+      "operationId": "auditCommerceOrderCreation",
+      "method": "POST",
+      "publicPath": "/api/v1/commerce/orders",
+      "internalPath": "/internal/audit-events/commerce-order-created",
+      "principalRequired": true,
+      "actorAuthority": "W06 derives actor userId and layer from trusted W01 private transport headers; body does not accept actor identity or ownership claims.",
+      "eventId": "Deterministic evt_order_created_{orderId}; one immutable D1-03 audit_events row per created W07 Order.",
+      "targetType": "Order",
+      "auditRequired": true,
+      "idempotency": "Event ID is stable across retries. W06 returns 200 only after confirming the same existing durable event and rejects conflicting immutable facts.",
+      "successPolicy": "W01 must validate the complete W07 Order DTO and must not return order-create success until W06 confirms event persistence or exact idempotent replay.",
+      "cache": "NO_STORE",
+      "auditedFields": [
+        "orderId",
+        "status",
+        "version",
+        "currency",
+        "subtotalMinor",
+        "discountMinor",
+        "taxMinor",
+        "totalMinor",
+        "occurredAt"
+      ],
+      "sensitiveDataExcluded": [
+        "customerId",
+        "payment provider identifiers",
+        "payment credentials",
+        "client secrets",
+        "raw request body",
+        "order line snapshots"
+      ]
     }
   ],
   "headers": {
