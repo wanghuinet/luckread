@@ -323,7 +323,7 @@ export default function CreatorMembershipPlans({ locale = 'zh-CN' }: { locale?: 
     const normalizedPrice = editPrice.trim()
     if (!editName.trim() || editName.trim().length > 120 ||
         !/^[a-z][a-z0-9_-]{0,63}$/.test(normalizedTier) ||
-        !/^(0|[1-9]\\d*)(\\.\\d{1,2})?$/.test(normalizedPrice)) {
+        !/^(0|[1-9]\d*)(\.\d{1,2})?$/.test(normalizedPrice)) {
       setError(labels.revisionValidation)
       return
     }
