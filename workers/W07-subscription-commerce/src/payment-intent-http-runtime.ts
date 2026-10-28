@@ -3,7 +3,6 @@
 import {
   createHyperswitchPaymentIntent,
   HyperswitchClientError,
-  type HyperswitchClientConfig,
 } from './hyperswitch-client.js';
 import {
   createPaymentAttempt,
@@ -12,6 +11,12 @@ import {
   type PaymentAttemptCreation,
   type PaymentAttemptDto,
 } from './payment-persistence.js';
+
+type ResolvedProviderConfig = Readonly<{
+  environment: 'sandbox' | 'production';
+  apiKey: string;
+  expectedMerchantId: string;
+}>;
 
 type PaymentIntentRuntimeEnv = Readonly<{
   D1_04: D1Database;
@@ -43,7 +48,7 @@ function validBoundedText(value: unknown, maxLength: number): value is string {
     !/[\u0000-\u001f\u007f]/.test(value);
 }
 
-function resolveProviderConfig(env: PaymentIntentRuntimeEnv): HyperswitchClientConfig | null {
+function resolveProviderConfig(env: PaymentIntentRuntimeEnv): ResolvedProviderConfig | null {
   const environment = env.HYPERSWITCH_ENVIRONMENT;
   const apiKey = env.HYPERSWITCH_API_KEY;
   const expectedMerchantId = env.HYPERSWITCH_MERCHANT_ID;
