@@ -1,0 +1,353 @@
+import { describe, expect, it } from 'vitest';
+import {
+  createPaymentAttempt,
+  recordUnconfirmedHyperswitchIntent,
+  receiveHyperswitchWebhook,
+  PaymentPersistenceError,
+  type PaymentAttemptStatus,
+} from './payment-persistence.js';
+import type { HyperswitchPayment } from './hyperswitch-client.js';
+
+const NOW = '2026-10-28T12:00:00.000Z';
+const LATER = '2026-10-28T12:00:01.000Z';
+const CUSTOMER = 'user_1';
+const MERCHANT = 'merchant_test';
+const SECRET = 'webhook_test_secret';
+const PAYMENT_ID = 'pay_' + 'a'.repeat(26);
+
+type Row = Record<string, unknown>;
+type Order = { order_id: string; customer_id: string; status: string; currency: string; total_minor: number };
+type Payment = {
+  payment_id: string; order_id: string; customer_id: string; provider: string; merchant_id: string;
+  amount_minor: number; currency: string; status: PaymentAttemptStatus; version: number;
+  idempotency_key: string; request_hash: string; provider_updated_at: string | null;
+  failure_code: string | null; created_at: string; updated_at: string;
+};
+type Event = {
+  event_row_id: string; provider: string; merchant_id: string; event_id: string;
+  event_type: string; payment_id: string | null; payload_sha256: string;
+  state: 'RECEIVED' | 'APPLIED' | 'RECONCILIATION_REQUIRED' | 'REJECTED';
+  received_at: string; processed_at: string | null; outcome_code: string | null;
+};
+type Conflict = {
+  conflict_id: string; provider: string; merchant_id: string; event_id: string;
+  existing_payload_sha256: string; incoming_payload_sha256: string; state: 'OPEN' | 'RESOLVED';
+  occurrence_count: number; version: number; first_seen_at: string; last_seen_at: string;
+  resolved_at: string | null; resolution_code: string | null;
+};
+
+const clone = <T>(value: T): T => structuredClone(value);
+function result(changes: number): D1Result {
+  return { success: true, meta: { changes } } as D1Result;
+}
+
+class MemoryPaymentStatement {
+  values: unknown[] = [];
+  constructor(readonly db: MemoryPaymentD1, readonly sql: string) {}
+  bind(...values: unknown[]): D1PreparedStatement {
+    this.values = values;
+    return this as unknown as D1PreparedStatement;
+  }
+  async first<T>(): Promise<T | null> {
+    return this.db.first<T>(this.sql, this.values);
+  }
+  async run<T>(): Promise<D1Result<T>> {
+    return this.db.run<T>(this.sql, this.values);
+  }
+}
+
+class MemoryPaymentD1 {
+  orders: Order[] = [];
+  payments: Payment[] = [];
+  events: Event[] = [];
+  conflicts: Conflict[] = [];
+  prepare(sql: string): D1PreparedStatement {
+    return new MemoryPaymentStatement(this, sql) as unknown as D1PreparedStatement;
+  }
+  async first<T>(sql: string, values: unknown[]): Promise<T | null> {
+    let row: Row | undefined;
+    if (sql.includes('FROM orders')) {
+      const [orderId, customerId] = values;
+      row = this.orders.find(o => o.order_id === orderId && o.customer_id === customerId);
+    } else if (sql.includes('FROM payments') && sql.includes('idempotency_key = ?')) {
+      const [customerId, key] = values;
+      row = this.payments.find(p => p.customer_id === customerId && p.idempotency_key === key);
+    } else if (sql.includes('FROM payments') && sql.includes('order_id = ?')) {
+      const [customerId, orderId] = values;
+      row = this.payments.find(p => p.customer_id === customerId && p.order_id === orderId &&
+        !['failed', 'cancelled', 'cancelled_post_capture', 'expired'].includes(p.status));
+    } else if (sql.includes('FROM payments') && sql.includes('payment_id = ?')) {
+      const [paymentId, customerId] = values;
+      row = this.payments.find(p => p.payment_id === paymentId && p.customer_id === customerId);
+    } else if (sql.includes('FROM payment_provider_events')) {
+      const [provider, merchantId, eventId] = values;
+      row = this.events.find(e => e.provider === provider && e.merchant_id === merchantId && e.event_id === eventId);
+    } else if (sql.includes('FROM payment_provider_event_conflicts')) {
+      const [provider, merchantId, eventId, incomingHash] = values;
+      row = this.conflicts.find(c => c.provider === provider && c.merchant_id === merchantId &&
+        c.event_id === eventId && c.incoming_payload_sha256 === incomingHash);
+    } else {
+      throw new Error('Unexpected first query: ' + sql);
+    }
+    return row ? clone(row) as T : null;
+  }
+
+  async run<T>(sql: string, values: unknown[]): Promise<D1Result<T>> {
+    if (sql.startsWith('INSERT INTO payments')) {
+      const [paymentId, orderId, customerId, provider, merchantId, amount, currency, status,
+        version, key, requestHash, providerUpdatedAt, failureCode, createdAt, updatedAt] = values as
+        [string, string, string, string, string, number, string, PaymentAttemptStatus, number, string,
+          string, string | null, string | null, string, string];
+      const order = this.orders.find(o => o.order_id === orderId && o.customer_id === customerId &&
+        o.currency === currency && o.total_minor === amount && amount > 0 &&
+        ['CREATED', 'PENDING_PAYMENT'].includes(o.status));
+      if (!order || provider !== 'hyperswitch') throw new Error('constraint: payable order');
+      if (this.payments.some(p => p.customer_id === customerId && p.idempotency_key === key)) throw new Error('constraint: idem');
+      if (this.payments.some(p => p.order_id === orderId &&
+        !['failed', 'cancelled', 'cancelled_post_capture', 'expired'].includes(p.status))) throw new Error('constraint: live payment');
+      this.payments.push({
+        payment_id: paymentId, order_id: orderId, customer_id: customerId, provider,
+        merchant_id: merchantId, amount_minor: amount, currency, status, version,
+        idempotency_key: key, request_hash: requestHash, provider_updated_at: providerUpdatedAt,
+        failure_code: failureCode, created_at: createdAt, updated_at: updatedAt,
+      });
+      return result(1) as D1Result<T>;
+    }
+    if (sql.startsWith('UPDATE payments SET status = ?')) {
+      const [status, updatedAt, paymentId, customerId, merchantId, amount, currency] = values as
+        [PaymentAttemptStatus, string, string, string, string, number, string];
+      const row = this.payments.find(p => p.payment_id === paymentId && p.customer_id === customerId &&
+        p.merchant_id === merchantId && p.amount_minor === amount && p.currency === currency &&
+        p.status === 'INITIATING' && p.version === 1);
+      if (!row) return result(0) as D1Result<T>;
+      row.status = status;
+      row.version += 1;
+      row.updated_at = updatedAt;
+      return result(1) as D1Result<T>;
+    }
+    if (sql.startsWith('INSERT INTO payment_provider_events')) {
+      const [rowId, provider, merchantId, eventId, eventType, paymentId, hash, state, receivedAt] = values as
+        [string, string, string, string, string, string | null, string, Event['state'], string];
+      if (this.events.some(e => e.provider === provider && e.merchant_id === merchantId && e.event_id === eventId)) {
+        throw new Error('constraint: event uniqueness');
+      }
+      this.events.push({
+        event_row_id: rowId, provider, merchant_id: merchantId, event_id: eventId,
+        event_type: eventType, payment_id: paymentId, payload_sha256: hash, state,
+        received_at: receivedAt, processed_at: null, outcome_code: null,
+      });
+      return result(1) as D1Result<T>;
+    }
+    if (sql.startsWith('INSERT INTO payment_provider_event_conflicts')) {
+      const [conflictId, provider, merchantId, eventId, oldHash, newHash, state, count, version, firstAt, lastAt] = values as
+        [string, string, string, string, string, string, Conflict['state'], number, number, string, string];
+      const firstReceipt = this.events.find(e => e.provider === provider && e.merchant_id === merchantId &&
+        e.event_id === eventId && e.payload_sha256 === oldHash);
+      if (!firstReceipt || oldHash === newHash) throw new Error('constraint: first receipt evidence');
+      if (this.conflicts.some(c => c.provider === provider && c.merchant_id === merchantId &&
+        c.event_id === eventId && c.incoming_payload_sha256 === newHash)) throw new Error('constraint: conflict uniqueness');
+      this.conflicts.push({
+        conflict_id: conflictId, provider, merchant_id: merchantId, event_id: eventId,
+        existing_payload_sha256: oldHash, incoming_payload_sha256: newHash, state,
+        occurrence_count: count, version, first_seen_at: firstAt, last_seen_at: lastAt,
+        resolved_at: null, resolution_code: null,
+      });
+      return result(1) as D1Result<T>;
+    }
+    if (sql.startsWith('UPDATE payment_provider_event_conflicts SET occurrence_count')) {
+      const [lastSeen, conflictId, version, count] = values as [string, string, number, number];
+      const row = this.conflicts.find(c => c.conflict_id === conflictId && c.state === 'OPEN' &&
+        c.version === version && c.occurrence_count === count);
+      if (!row) return result(0) as D1Result<T>;
+      row.occurrence_count += 1;
+      row.version += 1;
+      row.last_seen_at = lastSeen;
+      return result(1) as D1Result<T>;
+    }
+    throw new Error('Unexpected run query: ' + sql);
+  }
+}
+
+const fixedDeps = (time = NOW) => ({
+  now: () => new Date(time),
+  createPaymentId: () => PAYMENT_ID,
+  createEventRowId: () => 'evtrow_test_1',
+  createConflictId: () => 'evtconf_test_1',
+});
+
+function seedOrder(db: MemoryPaymentD1, overrides: Partial<Order> = {}) {
+  db.orders.push({
+    order_id: 'ord_1', customer_id: CUSTOMER, status: 'CREATED',
+    currency: 'USD', total_minor: 1200, ...overrides,
+  });
+}
+
+function expectPaymentError(promise: Promise<unknown>, code: string) {
+  return expect(promise).rejects.toMatchObject({ code, status: expect.any(Number) });
+}
+
+const bodyText = (eventId: string, updated = '2026-10-28T12:00:00.000Z') => JSON.stringify({
+  merchant_id: MERCHANT,
+  event_id: eventId,
+  event_type: 'payment_succeeded',
+  content: {
+    type: 'payment_details',
+    object: {
+      payment_id: PAYMENT_ID,
+      merchant_id: MERCHANT,
+      amount: 1200,
+      currency: 'USD',
+      status: 'succeeded',
+      updated,
+    },
+  },
+});
+
+async function signedBody(text: string, secret = SECRET): Promise<{ rawBody: ArrayBuffer; signature: string }> {
+  const bytes = new TextEncoder().encode(text);
+  const key = await crypto.subtle.importKey(
+    'raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-512' }, false, ['sign'],
+  );
+  const signatureBytes = new Uint8Array(await crypto.subtle.sign('HMAC', key, bytes));
+  const signature = Array.from(signatureBytes, b => b.toString(16).padStart(2, '0')).join('');
+  return {
+    rawBody: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer,
+    signature,
+  };
+}
+
+describe('PAY-001 payment attempt persistence candidate', () => {
+  it('creates a stable unconfirmed attempt and replays the same idempotency key without a second write', async () => {
+    const db = new MemoryPaymentD1();
+    seedOrder(db);
+    const created = await createPaymentAttempt(db as unknown as D1Database, CUSTOMER, 'ord_1', 'key_1', MERCHANT, fixedDeps());
+    const replay = await createPaymentAttempt(db as unknown as D1Database, CUSTOMER, 'ord_1', 'key_1', MERCHANT, fixedDeps(LATER));
+    expect(created).toMatchObject({ replayed: false, payment: { paymentId: PAYMENT_ID, status: 'INITIATING', version: 1 } });
+    expect(replay).toMatchObject({ replayed: true, payment: { paymentId: PAYMENT_ID, status: 'INITIATING', version: 1 } });
+    expect(db.payments).toHaveLength(1);
+    expect(JSON.stringify(created)).not.toContain('merchant_test');
+    expect(JSON.stringify(created)).not.toContain('request_hash');
+  });
+
+  it('rejects reuse of the same customer key for a different order or commercial snapshot', async () => {
+    const db = new MemoryPaymentD1();
+    seedOrder(db);
+    await createPaymentAttempt(db as unknown as D1Database, CUSTOMER, 'ord_1', 'key_1', MERCHANT, fixedDeps());
+    seedOrder(db, { order_id: 'ord_2', total_minor: 2500 });
+    await expectPaymentError(
+      createPaymentAttempt(db as unknown as D1Database, CUSTOMER, 'ord_2', 'key_1', MERCHANT, fixedDeps()),
+      'IDEMPOTENCY_KEY_REUSE_CONFLICT',
+    );
+    expect(db.payments).toHaveLength(1);
+  });
+
+  it('returns not-found for nonexistent and foreign-owned orders without leaking ownership', async () => {
+    const db = new MemoryPaymentD1();
+    seedOrder(db, { customer_id: 'other_user' });
+    await expectPaymentError(
+      createPaymentAttempt(db as unknown as D1Database, CUSTOMER, 'ord_1', 'key_1', MERCHANT, fixedDeps()),
+      'RESOURCE_NOT_FOUND',
+    );
+    await expectPaymentError(
+      createPaymentAttempt(db as unknown as D1Database, CUSTOMER, 'missing_order', 'key_2', MERCHANT, fixedDeps()),
+      'RESOURCE_NOT_FOUND',
+    );
+  });
+
+  it('rejects a second live payment attempt for the same order when a different key is supplied', async () => {
+    const db = new MemoryPaymentD1();
+    seedOrder(db);
+    await createPaymentAttempt(db as unknown as D1Database, CUSTOMER, 'ord_1', 'key_1', MERCHANT, fixedDeps());
+    await expectPaymentError(
+      createPaymentAttempt(db as unknown as D1Database, CUSTOMER, 'ord_1', 'key_2', MERCHANT,
+        { ...fixedDeps(LATER), createPaymentId: () => 'pay_' + 'b'.repeat(26) }),
+      'CONFLICT',
+    );
+    expect(db.payments).toHaveLength(1);
+  });
+
+  it('accepts the existing provider intent only after strict merchant, amount and currency matching', async () => {
+    const db = new MemoryPaymentD1();
+    seedOrder(db);
+    await createPaymentAttempt(db as unknown as D1Database, CUSTOMER, 'ord_1', 'key_1', MERCHANT, fixedDeps());
+    const providerPayment: HyperswitchPayment = {
+      paymentId: PAYMENT_ID, merchantId: MERCHANT, amount: 1200, currency: 'USD',
+      status: 'requires_payment_method', clientSecret: 'secret_must_not_persist',
+    };
+    const saved = await recordUnconfirmedHyperswitchIntent(
+      db as unknown as D1Database, CUSTOMER, PAYMENT_ID, MERCHANT, providerPayment, { now: () => new Date(NOW) },
+    );
+    expect(saved).toMatchObject({ status: 'requires_payment_method', version: 2, updatedAt: LATER });
+    expect(JSON.stringify(db.payments)).not.toContain('secret_must_not_persist');
+
+    await expectPaymentError(
+      recordUnconfirmedHyperswitchIntent(
+        db as unknown as D1Database, CUSTOMER, PAYMENT_ID, 'another_merchant',
+        { ...providerPayment, merchantId: 'another_merchant' }, { now: () => new Date(LATER) },
+      ),
+      'SERVICE_UNAVAILABLE',
+    ).catch(() => undefined);
+    await expectPaymentError(
+      recordUnconfirmedHyperswitchIntent(
+        db as unknown as D1Database, CUSTOMER, PAYMENT_ID, MERCHANT,
+        { ...providerPayment, amount: 1199 }, { now: () => new Date(LATER) },
+      ),
+      'CONFLICT',
+    );
+  });
+
+  it('verifies signatures before storing and deduplicates identical provider events', async () => {
+    const db = new MemoryPaymentD1();
+    const signed = await signedBody(bodyText('evt_1'));
+    const input = { ...signed, webhookSecret: SECRET, expectedMerchantId: MERCHANT };
+    const first = await receiveHyperswitchWebhook(db as unknown as D1Database, input, fixedDeps());
+    const duplicate = await receiveHyperswitchWebhook(db as unknown as D1Database, input, fixedDeps(LATER));
+    expect(first).toMatchObject({ outcome: 'ACCEPTED', eventId: 'evt_1', state: 'RECEIVED' });
+    expect(duplicate).toMatchObject({ outcome: 'DUPLICATE', receiptId: first.receiptId });
+    expect(db.events).toHaveLength(1);
+    expect(db.conflicts).toHaveLength(0);
+    expect(JSON.stringify(db.events)).not.toContain(bodyText('evt_1'));
+    expect(JSON.stringify(db.events)).not.toContain(SECRET);
+  });
+
+  it('records a different payload for the same event id as a conflict without overwriting first receipt', async () => {
+    const db = new MemoryPaymentD1();
+    const signed1 = await signedBody(bodyText('evt_1', NOW));
+    const first = await receiveHyperswitchWebhook(db as unknown as D1Database,
+      { ...signed1, webhookSecret: SECRET, expectedMerchantId: MERCHANT }, fixedDeps());
+    const signed2 = await signedBody(bodyText('evt_1', '2026-10-28T12:00:03.000Z'));
+    const conflict = await receiveHyperswitchWebhook(db as unknown as D1Database,
+      { ...signed2, webhookSecret: SECRET, expectedMerchantId: MERCHANT }, fixedDeps('2026-10-28T12:00:04.000Z'));
+    const repeated = await receiveHyperswitchWebhook(db as unknown as D1Database,
+      { ...signed2, webhookSecret: SECRET, expectedMerchantId: MERCHANT }, fixedDeps('2026-10-28T12:00:05.000Z'));
+    expect(conflict).toMatchObject({ outcome: 'PAYLOAD_CONFLICT', eventId: 'evt_1', conflictId: expect.any(String) });
+    expect(repeated.conflictId).toBe(conflict.conflictId);
+    expect(db.events).toHaveLength(1);
+    expect(db.events[0].payload_sha256).toBe(first.payloadSha256);
+    expect(db.conflicts).toHaveLength(1);
+    expect(db.conflicts[0].occurrence_count).toBe(2);
+    expect(db.conflicts[0].version).toBe(2);
+  });
+
+  it('fails closed on invalid signature, malformed envelope, and merchant mismatch', async () => {
+    const db = new MemoryPaymentD1();
+    const signed = await signedBody(bodyText('evt_1'));
+    await expectPaymentError(
+      receiveHyperswitchWebhook(db as unknown as D1Database,
+        { ...signed, signatureHeader: '0'.repeat(128), webhookSecret: SECRET, expectedMerchantId: MERCHANT }, fixedDeps()),
+      'INVALID_SIGNATURE',
+    );
+    await expectPaymentError(
+      receiveHyperswitchWebhook(db as unknown as D1Database,
+        { ...signed, webhookSecret: SECRET, expectedMerchantId: 'another_merchant' }, fixedDeps()),
+      'WEBHOOK_REJECTED',
+    );
+    const malformed = await signedBody('{"merchant_id":');
+    await expectPaymentError(
+      receiveHyperswitchWebhook(db as unknown as D1Database,
+        { ...malformed, webhookSecret: SECRET, expectedMerchantId: MERCHANT }, fixedDeps()),
+      'WEBHOOK_REJECTED',
+    );
+    expect(db.events).toHaveLength(0);
+  });
+});
