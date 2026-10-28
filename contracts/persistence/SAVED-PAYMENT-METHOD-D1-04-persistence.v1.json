@@ -5,14 +5,14 @@
   "version": "1.0.0",
   "status": "CONTRACTED_NOT_VERIFIED",
   "featureIds": [
-    "PAY-003"
+    "PAY-001"
   ],
   "authoritativeDomain": "D1-04",
   "primaryWorker": "W07",
   "physicalResource": {
     "binding": "D1_04",
     "migrationDirectory": "migrations-d1-04",
-    "migrationFile": "workers/W07-subscription-commerce/migrations-d1-04/0003_saved_payment_methods_mandates.sql",
+    "migrationFile": "0003_saved_payment_methods_mandates.sql",
     "migrationId": "0003_saved_payment_methods_mandates",
     "remoteApplied": false
   },
@@ -243,5 +243,9 @@
     "No mandate activation, recurring charge, subscription entitlement grant or renewal scheduling in this module.",
     "No remote schema mutation or Worker deployment is authorized by this candidate."
   ],
-  "promotionRule": "Remain CONTRACTED_NOT_VERIFIED until the exact D1-04 migration schema, signed provider-consent positive/negative tests, mandate lifecycle reconciliation, concurrency/idempotency tests and exact-commit evidence admission pass."
+  "promotionRule": "Remain CONTRACTED_NOT_VERIFIED until the exact D1-04 migration schema, signed provider-consent positive/negative tests, mandate lifecycle reconciliation, concurrency/idempotency tests and exact-commit evidence admission pass.",
+  "entityId": "ENT-PAYMENT",
+  "relatedEntityIds": [],
+  "entityFieldContract": "contracts/entity/PAYMENT-ENTITY-CONTRACT.v1.json",
+  "sourceOfTruth": "contracts/entity/PAYMENT-ENTITY-CONTRACT.v1.json"
 }
