@@ -73,6 +73,7 @@
       "publicPaths": [
         "/api/v1/plans",
         "/api/v1/membership/plans",
+        "/api/v1/membership/plans/*",
         "/api/v1/memberships/subscriptions",
         "/api/v1/memberships/subscriptions/*",
         "/api/v1/commerce/orders",
@@ -81,7 +82,7 @@
       "ingressWorker": "W01",
       "terminalWorker": "W07",
       "transportBinding": "W01-W07-membership-commerce-http-binding.v1",
-      "authorityNote": "W07 owns MembershipPlan, subscription and commerce Order facts. W01 uses W08 CASL for creator-plan and owner-scoped Order permissions; all public order and payment operations cross the existing W07_SUBSCRIPTION binding. After W07 returns an Order creation result, W01 validates the complete DTO and waits for immutable W06/D1-03 order-creation audit confirmation before returning success. W07 order creation remains fail-closed until authoritative pricing and tax decisions are admitted; subscription entitlement activation remains gated on verified provider reconciliation and fulfillment.",
+      "authorityNote": "W07 owns MembershipPlan, subscription and commerce Order facts. W01 uses W08 CASL for creator-plan and owner-scoped Order permissions; all public order and payment operations cross the existing W07_SUBSCRIPTION binding. After W07 returns an Order creation result, W01 validates the complete DTO and waits for immutable W06/D1-03 order-creation audit confirmation before returning success. W07 order creation remains fail-closed until authoritative pricing and tax decisions are admitted; subscription entitlement activation remains gated on verified provider reconciliation and fulfillment. Creator plan publishing also passes W01→W08 owner CASL, W07 D1-01 version-CAS lifecycle transition, and W06 durable audit before public success.",
       "auditWorker": "W06",
       "auditTransportBinding": "W01-W06-moderation-http-binding.v1"
     }
