@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  confirmHyperswitchCustomerInitiatedSetupPayment,
   createHyperswitchCustomerInitiatedSetupIntent,
   createHyperswitchMerchantInitiatedPayment,
   createHyperswitchPaymentIntent,
@@ -219,6 +220,92 @@ describe('Hyperswitch server-side payment intent client', () => {
         ...input,
         customerId: 'cust_user_42',
       }, fake.fetcher)).rejects.toMatchObject({ code: 'UPSTREAM_INVALID_RESPONSE' })
+    }
+  })
+
+  it('confirms a setup intent through Hyperswitch with explicit online customer acceptance and provider token', async () => {
+    const acceptedAt = '2026-10-28T15:30:00.000Z'
+    const confirmationInput = {
+      paymentId: input.paymentId,
+      customerId: 'cust_user_42',
+      amount: input.amount,
+      currency: input.currency,
+      paymentToken: 'provider_token_123',
+      customerAcceptance: {
+        acceptedAt,
+        ipAddress: '192.0.2.12',
+        userAgent: 'LuckRead-Test/1.0',
+      },
+    }
+    const fake = fakeFetch(jsonResponse(responsePayment({
+      status: 'succeeded',
+      customer_id: confirmationInput.customerId,
+      payment_method_id: 'pm_saved_123',
+    })))
+    const payment = await confirmHyperswitchCustomerInitiatedSetupPayment(config, confirmationInput, fake.fetcher)
+
+    expect(fake.captured).toHaveLength(1)
+    expect(fake.captured[0].url).toBe(`https://sandbox.hyperswitch.io/payments/${input.paymentId}/confirm`)
+    expect(fake.captured[0].init.method).toBe('POST')
+    const headers = new Headers(fake.captured[0].init.headers)
+    expect(headers.get('api-key')).toBe(config.apiKey)
+    const body = JSON.parse(String(fake.captured[0].init.body))
+    expect(body).toEqual({
+      payment_token: confirmationInput.paymentToken,
+      customer_acceptance: {
+        acceptance_type: 'online',
+        accepted_at: acceptedAt,
+        online: {
+          ip_address: confirmationInput.customerAcceptance.ipAddress,
+          user_agent: confirmationInput.customerAcceptance.userAgent,
+        },
+      },
+    })
+    expect(JSON.stringify(body)).not.toContain('card_number')
+    expect(payment.status).toBe('succeeded')
+    expect(payment.customerId).toBe(confirmationInput.customerId)
+    expect(payment.paymentMethodId).toBe('pm_saved_123')
+  })
+
+  it('rejects invalid online acceptance and provider responses not bound to the setup customer before accepting confirmation', async () => {
+    const base = {
+      paymentId: input.paymentId,
+      customerId: 'cust_user_42',
+      amount: input.amount,
+      currency: input.currency,
+      paymentToken: 'provider_token_123',
+      customerAcceptance: {
+        acceptedAt: '2026-10-28T15:30:00.000Z',
+        ipAddress: '192.0.2.12',
+        userAgent: 'LuckRead-Test/1.0',
+      },
+    }
+    for (const invalid of [
+      { ...base, paymentToken: '' },
+      { ...base, customerAcceptance: { ...base.customerAcceptance, acceptedAt: 'not-a-date' } },
+      { ...base, customerAcceptance: { ...base.customerAcceptance, ipAddress: '' } },
+      { ...base, customerAcceptance: { ...base.customerAcceptance, userAgent: 'bad\\nheader' } },
+    ]) {
+      const fake = fakeFetch(jsonResponse(responsePayment()))
+      await expect(confirmHyperswitchCustomerInitiatedSetupPayment(config, invalid, fake.fetcher))
+        .rejects.toMatchObject({ code: 'REQUEST_INVALID' })
+      expect(fake.captured).toHaveLength(0)
+    }
+
+    for (const mismatch of [
+      { customer_id: 'cust_another_user' },
+      { payment_id: 'pay_aaaaaaaaaaaaaaaaaaaaaaaaaa' },
+      { amount: input.amount + 1 },
+      { currency: 'EUR' },
+    ]) {
+      const fake = fakeFetch(jsonResponse(responsePayment({
+        status: 'succeeded',
+        customer_id: base.customerId,
+        payment_method_id: 'pm_saved_123',
+        ...mismatch,
+      })))
+      await expect(confirmHyperswitchCustomerInitiatedSetupPayment(config, base, fake.fetcher))
+        .rejects.toMatchObject({ code: 'UPSTREAM_INVALID_RESPONSE' })
     }
   })
 
