@@ -127,6 +127,8 @@ export type PaymentPersistenceDependencies = Readonly<{
   createPaymentId?: () => string;
   createEventRowId?: () => string;
   createConflictId?: () => string;
+  createSavedPaymentMethodId?: () => string;
+  createPaymentMandateId?: () => string;
 }>;
 
 export type PaymentAttemptCreation = Readonly<{
@@ -185,6 +187,14 @@ function defaultEventRowId(): string {
 
 function defaultConflictId(): string {
   return 'evtconf_' + crypto.randomUUID();
+}
+
+function defaultSavedPaymentMethodId(): string {
+  return 'spm_' + crypto.randomUUID().replace(/-/g, '').slice(0, 26);
+}
+
+function defaultPaymentMandateId(): string {
+  return 'mnd_' + crypto.randomUUID().replace(/-/g, '').slice(0, 26);
 }
 
 async function sha256Hex(input: BufferSource): Promise<string> {
@@ -605,6 +615,76 @@ async function persistNonApplicableWebhook(
   return resultFromProviderEvent(stored, payloadSha256);
 }
 
+
+type VerifiedSetupConsent = Readonly<{
+  paymentMethodId: string;
+  acceptedAt: string;
+  providerMandateId: string | null;
+}>;
+
+/**
+ * Accept recurring-consent evidence only from the signature-verified provider
+ * resource. Browser flags are not accepted as consent evidence. No token is
+ * persisted when the provider resource omits or malforms the acceptance facts.
+ */
+function readVerifiedSetupConsent(
+  resource: Record<string, unknown>,
+  payment: PaymentRow,
+  eventType: string,
+  now: string,
+): VerifiedSetupConsent | null {
+  if (
+    eventType !== 'payment_succeeded' ||
+    resource.payment_id !== payment.payment_id ||
+    resource.merchant_id !== payment.merchant_id ||
+    resource.customer_id !== payment.customer_id ||
+    resource.amount !== payment.amount_minor ||
+    resource.currency !== payment.currency ||
+    resource.status !== 'succeeded' ||
+    resource.setup_future_usage !== 'off_session' ||
+    typeof resource.payment_method_id !== 'string' ||
+    !nonBlank(resource.payment_method_id, 255) ||
+    !/^[\\x21-\\x7e]{1,255}$/.test(resource.payment_method_id)
+  ) return null;
+
+  const acceptance = resource.customer_acceptance;
+  if (typeof acceptance !== 'object' || acceptance === null || Array.isArray(acceptance)) return null;
+  const accepted = acceptance as Record<string, unknown>;
+  if (accepted.acceptance_type !== 'online' || typeof accepted.accepted_at !== 'string') return null;
+  const online = accepted.online;
+  if (typeof online !== 'object' || online === null || Array.isArray(online)) return null;
+  const onlineFacts = online as Record<string, unknown>;
+  if (
+    typeof onlineFacts.ip_address !== 'string' ||
+    !nonBlank(onlineFacts.ip_address, 128) ||
+    typeof onlineFacts.user_agent !== 'string' ||
+    !nonBlank(onlineFacts.user_agent, 1024)
+  ) return null;
+
+  const acceptedMillis = Date.parse(accepted.accepted_at);
+  const paymentCreatedMillis = Date.parse(payment.created_at);
+  const nowMillis = Date.parse(now);
+  if (
+    !Number.isFinite(acceptedMillis) ||
+    !Number.isFinite(paymentCreatedMillis) ||
+    !Number.isFinite(nowMillis) ||
+    acceptedMillis < paymentCreatedMillis ||
+    acceptedMillis > nowMillis
+  ) return null;
+
+  let providerMandateId: string | null = null;
+  if (resource.mandate_id !== undefined && resource.mandate_id !== null) {
+    if (!nonBlank(resource.mandate_id, 255)) return null;
+    providerMandateId = resource.mandate_id;
+  }
+
+  return {
+    paymentMethodId: resource.payment_method_id,
+    acceptedAt: new Date(acceptedMillis).toISOString(),
+    providerMandateId,
+  };
+}
+
 async function persistAndApplyProviderStatus(
   db: D1Database,
   envelope: NonNullable<ReturnType<typeof parseHyperswitchWebhookEnvelope>>,
@@ -615,6 +695,8 @@ async function persistAndApplyProviderStatus(
   payloadSha256: string,
   eventRowId: string,
   now: string,
+  setupConsent: VerifiedSetupConsent | null,
+  dependencies: Pick<PaymentPersistenceDependencies, 'createSavedPaymentMethodId' | 'createPaymentMandateId'>,
 ): Promise<WebhookReceiptResult> {
   const canonicalProviderUpdatedAt = new Date(Date.parse(providerUpdatedAt)).toISOString();
   const paymentUpdatedAt = strictlyAfter(now, payment.updated_at);
@@ -662,6 +744,38 @@ async function persistAndApplyProviderStatus(
       order.order_id, order.customer_id, order.currency, order.total_minor, order.status, order.version,
       payment.payment_id, canonicalProviderUpdatedAt,
       PROVIDER, envelope.merchantId, envelope.eventId, payloadSha256,
+    ));
+  }
+
+  if (setupConsent) {
+    const savedPaymentMethodId = (dependencies.createSavedPaymentMethodId ?? defaultSavedPaymentMethodId)();
+    const mandateRecordId = (dependencies.createPaymentMandateId ?? defaultPaymentMandateId)();
+    if (!/^spm_[A-Za-z0-9]{26}$/.test(savedPaymentMethodId) || !/^mnd_[A-Za-z0-9]{26}$/.test(mandateRecordId)) {
+      throw new PaymentPersistenceError('INTEGRITY_VIOLATION', 500);
+    }
+    // Persist only provider-issued opaque references and minimal consent evidence.
+    // The provider event stays RECEIVED until the rest of this same D1 batch completes.
+    statements.push(db.prepare(
+      'INSERT INTO saved_payment_methods ' +
+      '(saved_payment_method_id, provider, merchant_id, customer_id, payment_method_id, source_payment_id, source_event_id, created_at) ' +
+      "VALUES (?, 'hyperswitch', ?, ?, ?, ?, ?, ?) " +
+      'ON CONFLICT(provider, merchant_id, payment_method_id) DO NOTHING',
+    ).bind(
+      savedPaymentMethodId, payment.merchant_id, payment.customer_id,
+      setupConsent.paymentMethodId, payment.payment_id, envelope.eventId, now,
+    ));
+    statements.push(db.prepare(
+      'INSERT INTO payment_mandates ' +
+      '(mandate_record_id, provider, merchant_id, customer_id, payment_method_id, source_payment_id, source_event_id, ' +
+      'consent_accepted_at, consent_acceptance_type, consent_scope, consent_terms_version, provider_mandate_id, status, version, ' +
+      'provider_updated_at, created_at, updated_at) ' +
+      "VALUES (?, 'hyperswitch', ?, ?, ?, ?, ?, ?, 'online', 'OFF_SESSION_RECURRING', " +
+      "'luckread-recurring-consent-v1', ?, 'PENDING_PROVIDER_CONFIRMATION', 1, NULL, ?, ?) " +
+      'ON CONFLICT(provider, merchant_id, source_payment_id) DO NOTHING',
+    ).bind(
+      mandateRecordId, payment.merchant_id, payment.customer_id, setupConsent.paymentMethodId,
+      payment.payment_id, envelope.eventId, setupConsent.acceptedAt, setupConsent.providerMandateId,
+      now, now,
     ));
   }
 
@@ -888,9 +1002,13 @@ export async function receiveHyperswitchWebhook(
     }
   }
 
+  const setupConsent = decision.providerStatus === 'succeeded'
+    ? readVerifiedSetupConsent(envelope.resource, payment, envelope.eventType, now)
+    : null;
+
   return persistAndApplyProviderStatus(
     db, envelope, payment, order, decision.providerStatus, decision.providerUpdatedAt,
-    payloadSha256, eventRowId, now,
+    payloadSha256, eventRowId, now, setupConsent, dependencies,
   );
 }
 
