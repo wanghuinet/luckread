@@ -73,6 +73,14 @@ const copy = (locale: StudioLocale) => locale === 'en-US' ? {
   empty: 'No membership plans yet. Create a draft to get started.',
   create: 'Create draft',
   creating: 'Creating…',
+  editTerms: 'Edit terms',
+  cancelEdit: 'Cancel',
+  saveTerms: 'Save new version',
+  savingTerms: 'Saving…',
+  revisionHeading: 'Create an immutable plan version',
+  successRevision: 'Plan version saved. Existing subscriptions keep their previous version.',
+  revisionValidation: 'Enter a valid name, lowercase tier key, and price with up to two decimal places.',
+  revisionBenefitsError: 'Add no more than 20 unique benefits, each at most 180 characters.',
   name: 'Plan name',
   namePlaceholder: 'Supporter membership',
   tier: 'Tier key',
@@ -115,6 +123,14 @@ const copy = (locale: StudioLocale) => locale === 'en-US' ? {
   empty: '还没有会员方案，先创建一个草稿。',
   create: '新建草稿',
   creating: '正在创建…',
+  editTerms: '编辑方案',
+  cancelEdit: '取消',
+  saveTerms: '保存新版本',
+  savingTerms: '正在保存…',
+  revisionHeading: '创建不可变方案版本',
+  successRevision: '方案新版本已保存，现有订阅仍保留原方案版本。',
+  revisionValidation: '请输入有效的名称、小写等级标识，以及最多两位小数的价格。',
+  revisionBenefitsError: '权益最多 20 项，不得重复，每项最多 180 个字符。
   name: '方案名称',
   namePlaceholder: '支持者会员',
   tier: '等级标识',
@@ -172,6 +188,14 @@ export default function CreatorMembershipPlans({ locale = 'zh-CN' }: { locale?: 
   const [interval, setInterval] = useState<'MONTHLY' | 'YEARLY'>('MONTHLY')
   const [benefitsText, setBenefitsText] = useState('')
   const [createKey, setCreateKey] = useState('')
+  const [editingPlanId, setEditingPlanId] = useState<string | null>(null)
+  const [editName, setEditName] = useState('')
+  const [editTier, setEditTier] = useState('')
+  const [editPrice, setEditPrice] = useState('')
+  const [editInterval, setEditInterval] = useState<'MONTHLY' | 'YEARLY'>('MONTHLY')
+  const [editBenefitsText, setEditBenefitsText] = useState('')
+  const [editKey, setEditKey] = useState('')
+  const [savingPlanId, setSavingPlanId] = useState<string | null>(null)
 
   const loadPlans = useCallback(async (append = false, cursorValue: string | null = null) => {
     try {
