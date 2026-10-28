@@ -2940,7 +2940,7 @@
     },
     {
       "entityId": "ENT-PAYMENT",
-      "status": "CONTRACTED_NOT_VERIFIED",
+      "status": "BLOCKED",
       "fields": [
         {
           "fieldId": "ENT-PAYMENT-F-PAYMENT-ID",
