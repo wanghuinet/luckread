@@ -663,7 +663,7 @@ function readVerifiedSetupConsent(
     resource.status !== 'succeeded' ||
     typeof resource.payment_method_id !== 'string' ||
     !nonBlank(resource.payment_method_id, 255) ||
-    !/^[\\x21-\\x7e]{1,255}$/.test(resource.payment_method_id)
+    !/^[\x21-\x7e]{1,255}$/.test(resource.payment_method_id)
   ) return null;
 
   // Hyperswitch's documented outgoing payment webhook nests acceptance under
@@ -950,7 +950,7 @@ async function receiveHyperswitchMandateWebhook(
     expectedStatus === null ||
     !nonBlank(providerMandateId, 255) ||
     !nonBlank(paymentMethodId, 255) ||
-    !/^[\\x21-\\x7e]{1,255}$/.test(paymentMethodId) ||
+    !/^[\x21-\x7e]{1,255}$/.test(paymentMethodId) ||
     (providerStatus !== 'active' && providerStatus !== 'revoked') ||
     providerStatus !== expectedStatus.toLowerCase() ||
     (resource.merchant_id !== undefined && resource.merchant_id !== envelope.merchantId)
