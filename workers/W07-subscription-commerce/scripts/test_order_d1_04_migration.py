@@ -539,9 +539,9 @@ class D104OrderMigrationTests(unittest.TestCase):
         )
         with self.assertRaises(sqlite3.IntegrityError):
             self.db.execute(
-                """UPDATE subscription_renewal_cycles SET subscription_sync_error_code='tampered',
+                """UPDATE subscription_renewal_cycles SET subscription_sync_updated_at=?,
                    version=3,updated_at=? WHERE cycle_id=? AND version=2""",
-                ("2026-10-28T00:00:02.000Z",cycle_id),
+                ("2026-10-28T00:00:02.000Z","2026-10-28T00:00:02.000Z",cycle_id),
             )
 
     def test_renewal_cycle_requires_active_mandate_before_payment_ready_and_keeps_cursor_cas(self):
