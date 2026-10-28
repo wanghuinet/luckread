@@ -234,6 +234,7 @@
         "GET /v1/commerce/orders/{orderId}",
         "GET /v1/entitlements",
         "GET /v1/entitlements/{subjectId}",
+        "GET /v1/membership/creator-summary",
         "GET /v1/membership/plans",
         "GET /v1/memberships/subscriptions",
         "GET /v1/memberships/subscriptions/{subscriptionId}",
