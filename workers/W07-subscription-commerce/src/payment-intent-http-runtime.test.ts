@@ -4,7 +4,7 @@ import {
 } from './payment-intent-http-runtime.js';
 import {
   HyperswitchClientError,
-  type CreateHyperswitchPaymentIntentInput,
+  type CreateHyperswitchCustomerInitiatedSetupInput,
   type HyperswitchClientConfig,
   type HyperswitchPayment,
 } from './hyperswitch-client.js';
@@ -160,7 +160,8 @@ describe('W07 internal payment-intent runtime', () => {
       amount: 1299,
       currency: 'USD',
       idempotencyKey: 'lr_' + PAYMENT_ID,
-    } satisfies CreateHyperswitchPaymentIntentInput);
+      customerId: CUSTOMER_ID,
+    } satisfies CreateHyperswitchCustomerInitiatedSetupInput);
     expect(fixture.calls.recordIntent).toHaveLength(1);
 
     const body = await response!.json() as { data: Record<string, unknown>; requestId: string };
@@ -195,6 +196,7 @@ describe('W07 internal payment-intent runtime', () => {
     expect(fixture.calls.createProviderIntent[0]?.[1]).toMatchObject({
       paymentId: PAYMENT_ID,
       idempotencyKey: 'lr_' + PAYMENT_ID,
+      customerId: CUSTOMER_ID,
     });
   });
 
