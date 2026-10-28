@@ -268,6 +268,9 @@ class D104OrderMigrationTests(unittest.TestCase):
         self.payment()
         with self.assertRaises(sqlite3.IntegrityError):
             self.payment(payment_id="pay_" + "d"*26, idempotency_key="payment_key_1")
+        self.order(order_id="ord_2", customer="user_1")
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.payment(payment_id="pay_" + "e"*26, order_id="ord_2", idempotency_key="payment_key_1")
 
     def test_order_cannot_have_two_live_or_successful_payment_attempts(self):
         self.order()
