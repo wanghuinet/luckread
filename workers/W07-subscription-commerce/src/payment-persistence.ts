@@ -670,12 +670,12 @@ async function persistAndApplyProviderStatus(
     'WHERE p.payment_id = ? AND p.provider = ? AND p.merchant_id = ? ' +
     'AND p.amount_minor = ? AND p.currency = ? AND p.status = ? ' +
     'AND p.provider_updated_at = ?)';
-  const confirmedOrFulfilledOrderMatches = 'EXISTS (' +
+  const confirmedOrderMatches = 'EXISTS (' +
     'SELECT 1 FROM orders o ' +
     'WHERE o.order_id = ? AND o.customer_id = ? AND o.currency = ? ' +
-    "AND o.total_minor = ? AND o.status IN ('CONFIRMED','PROCESSING','COMPLETED'))";
+    "AND o.total_minor = ? AND o.status = 'CONFIRMED')";
   const eventAppliedCondition = providerStatus === 'succeeded'
-    ? paymentMatches + ' AND ' + confirmedOrFulfilledOrderMatches
+    ? paymentMatches + ' AND ' + confirmedOrderMatches
     : paymentMatches;
   const outcomeExpression = providerStatus === 'succeeded'
     ? 'CASE WHEN ' + eventAppliedCondition +

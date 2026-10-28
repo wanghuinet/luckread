@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { changeSubscriptionPlan, createMembershipPlanDraft, createSubscription, etagForVersion, getSubscription, listActiveMembershipPlans, listCreatorMembershipPlans, listSubscriptions, normalizeMembershipPlanDraft, parseBoundedPositiveInt, publishMembershipPlan, transitionSubscription, type SubscriptionRow, type SubscriptionStatus } from './subscription-runtime.js'
+import { changeSubscriptionPlan, createMembershipPlanDraft, createSubscription, etagForVersion, getSubscription, listActiveMembershipPlans, listCreatorMembershipPlans, listSubscriptions, normalizeMembershipPlanDraft, parseBoundedPositiveInt, publishMembershipPlan, reviseMembershipPlan, transitionSubscription, type SubscriptionRow, type SubscriptionStatus } from './subscription-runtime.js'
 import w07 from './index.js'
 import { verifyD1SubscriptionPostflight, verifyD1SubscriptionPreflight } from '../scripts/verify-remote-preflight.mjs'
 
@@ -85,6 +85,20 @@ function fakeDb(rows: SubscriptionRow[], plans: MembershipPlanRow[] = []): D1Dat
             })
             return { meta: { changes: 1 } }
           }
+          if (sql.includes('INSERT OR IGNORE INTO membership_plan_versions') && sql.includes('SELECT')) {
+            const [planId, planVersion, name, tier, billingInterval, priceMinor, currency, benefitsJson, createdAt,
+              guardPlanId, ownerId, currentVersion, lifecycleVersion] = values as
+              [string, number, string, string, string, number, string, string, string, string, string, number, number]
+            const plan = planState.get(guardPlanId)
+            if (!plan || planId !== guardPlanId || plan.owner_type !== 'CREATOR' || plan.owner_id !== ownerId ||
+                !['DRAFT', 'ACTIVE', 'PAUSED'].includes(plan.status) || plan.current_version !== currentVersion ||
+                plan.version !== lifecycleVersion) return { meta: { changes: 0 } }
+            const key = planId + ':' + planVersion
+            if (planVersionState.has(key)) return { meta: { changes: 0 } }
+            planVersionState.set(key, { plan_id: planId, plan_version: planVersion, name, tier,
+              billing_interval: billingInterval, price_minor: priceMinor, currency, benefits_json: benefitsJson, created_at: createdAt })
+            return { meta: { changes: 1 } }
+          }
           if (sql.includes('INSERT OR IGNORE INTO membership_plan_versions')) {
             const key = String(values[0]) + ':1'
             if (planVersionState.has(key)) return { meta: { changes: 0 } }
@@ -113,6 +127,28 @@ function fakeDb(rows: SubscriptionRow[], plans: MembershipPlanRow[] = []): D1Dat
             }
             if (state.has(row.subscription_id)) throw new Error('UNIQUE constraint failed')
             state.set(row.subscription_id, row)
+            return { meta: { changes: 1 } }
+          }
+          if (sql.includes('UPDATE membership_plans SET current_version = ?')) {
+            const [nextVersion, updatedAt, planId, ownerId, currentVersion, lifecycleVersion,
+              versionForCheck, name, tier, billingInterval, priceMinor, currency, benefitsJson] = values as
+              [number, string, string, string, number, number, number, string, string, string, number, string, string]
+            const plan = planState.get(planId)
+            const target = planVersionState.get(planId + ':' + versionForCheck)
+            if (!plan || plan.owner_type !== 'CREATOR' || plan.owner_id !== ownerId ||
+                !['DRAFT', 'ACTIVE', 'PAUSED'].includes(plan.status) || plan.current_version !== currentVersion ||
+                plan.version !== lifecycleVersion || nextVersion !== currentVersion + 1 ||
+                !target || target.name !== name || target.tier !== tier || target.billing_interval !== billingInterval ||
+                target.price_minor !== priceMinor || target.currency !== currency || target.benefits_json !== benefitsJson) {
+              return { meta: { changes: 0 } }
+            }
+            plan.current_version = nextVersion
+            plan.updated_at = updatedAt
+            plan.version += 1
+            const latest = planVersionState.get(plan.plan_id + ':' + nextVersion)!
+            plan.name = latest.name; plan.tier = latest.tier; plan.billing_interval = latest.billing_interval
+            plan.price_minor = latest.price_minor; plan.currency = latest.currency; plan.benefits_json = latest.benefits_json
+            plan.has_current_version = true
             return { meta: { changes: 1 } }
           }
           if (sql.includes("UPDATE membership_plans SET status = 'ACTIVE'")) {
@@ -611,6 +647,45 @@ describe('subscription runtime', () => {
     ])
     await expect(publishMembershipPlan(laterVersion, 'creator_1', 'plan_already_changed', '"lr-plan-v1"'))
       .rejects.toMatchObject({ code: 'PRECONDITION_FAILED', status: 412 })
+  })
+
+  it('revises an owned plan by creating an immutable version and preserves earlier subscription snapshots', async () => {
+    const plan = activePlan('plan_revision', { current_version: 1, version: 2 })
+    const db = fakeDb([baseRow({ subscription_id: 'sub_old_version', plan_id: 'plan_revision', plan_version: 1 })], [plan])
+    const updated = await reviseMembershipPlan(db, 'creator_1', 'plan_revision', '"lr-plan-v2"', {
+      name: 'Creator Plus', tier: 'plus', billingInterval: 'MONTHLY', priceMinor: 900,
+      currency: 'USD', benefits: ['member-posts', 'monthly-live'],
+    })
+    expect(updated).toMatchObject({
+      planId: 'plan_revision', planVersion: 2, name: 'Creator Plus', tier: 'plus',
+      priceMinor: 900, benefits: ['member-posts', 'monthly-live'], status: 'ACTIVE',
+      visibility: 'PUBLIC', version: 3, etag: '"lr-plan-v3"', replayed: false,
+    })
+    const subscriptions = await listSubscriptions(db, 'user_1', 20, 1)
+    expect(subscriptions.docs[0]).toMatchObject({ subscriptionId: 'sub_old_version', planVersion: 1 })
+    const list = await listActiveMembershipPlans(db, 20)
+    expect(list.docs.find((item) => item.planId === 'plan_revision')).toMatchObject({
+      planVersion: 2, priceMinor: 900, name: 'Creator Plus',
+    })
+  })
+
+  it('replays an exact plan revision and denies stale, foreign-owner, or retired-plan updates', async () => {
+    const plan = activePlan('plan_revision_replay', { current_version: 1, version: 2 })
+    const db = fakeDb([], [plan])
+    const input = { name: 'Creator Plus', tier: 'plus', billingInterval: 'YEARLY', priceMinor: 7500,
+      currency: 'USD', benefits: ['member-posts'] }
+    const first = await reviseMembershipPlan(db, 'creator_1', 'plan_revision_replay', '"lr-plan-v2"', input)
+    const replay = await reviseMembershipPlan(db, 'creator_1', 'plan_revision_replay', '"lr-plan-v2"', input)
+    expect(first).toMatchObject({ version: 3, planVersion: 2, replayed: false })
+    expect(replay).toMatchObject({ version: 3, planVersion: 2, replayed: true })
+    await expect(reviseMembershipPlan(db, 'creator_1', 'plan_revision_replay', '"lr-plan-v2"', {
+      ...input, priceMinor: 7800,
+    })).rejects.toMatchObject({ code: 'PRECONDITION_FAILED', status: 412 })
+    await expect(reviseMembershipPlan(db, 'creator_other', 'plan_revision_replay', '"lr-plan-v3"', input))
+      .rejects.toMatchObject({ code: 'RESOURCE_NOT_FOUND', status: 404 })
+    const retired = fakeDb([], [activePlan('plan_retired', { status: 'RETIRED', current_version: 1 })])
+    await expect(reviseMembershipPlan(retired, 'creator_1', 'plan_retired', '"lr-plan-v1"', input))
+      .rejects.toMatchObject({ code: 'INVALID_STATE', status: 409 })
   })
 
   it('rejects client-controlled owner, lifecycle state, malformed currency, and unsafe price values', () => {
