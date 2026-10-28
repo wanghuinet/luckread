@@ -7,7 +7,7 @@ type PaymentIntentData = {
   paymentId: string
   orderId: string
   amountMinor: number
-  currency: 'USD' | string
+  currency: string
   status: 'requires_payment_method' | 'requires_confirmation'
   version: number
   clientSecret: string
@@ -65,7 +65,9 @@ function readPaymentIntent(value: unknown, orderId: string): PaymentIntentData |
 }
 
 function money(amountMinor: number, currency: string): string {
-  return new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(amountMinor / 100)
+  const formatter = new Intl.NumberFormat(undefined, { style: 'currency', currency })
+  const fractionDigits = formatter.resolvedOptions().maximumFractionDigits
+  return formatter.format(amountMinor / (10 ** fractionDigits))
 }
 
 export default function CheckoutClient({ orderId }: { orderId: string }) {
@@ -142,7 +144,7 @@ export default function CheckoutClient({ orderId }: { orderId: string }) {
     try {
       const hyperClient = window.Hyper(publishableKey)
       const widgetSet = hyperClient.elements({ clientSecret: intent.clientSecret, locale: 'auto' })
-      paymentElement = widgetSet.create('payment', { layout: 'tabs' })
+      paymentElement = widgetSet.create('payment', { layout: 'tabs', displaySavedPaymentMethodsCheckbox: true })
       paymentElement.on('ready', () => { if (active) setElementReady(true) })
       paymentElement.mount('#luckread-payment-element')
       setHyper(hyperClient)
@@ -200,8 +202,8 @@ export default function CheckoutClient({ orderId }: { orderId: string }) {
       <p>订单：{intent.orderId}</p>
       <div id="luckread-payment-element" aria-label="Hyperswitch 安全支付表单" />
       <p>
-        后续周期扣款所需的保存支付方式授权由 Hyperswitch 托管支付表单处理。
-        仅在表单明确征得同意时才可继续保存；不需要时请勿勾选保存选项。
+        如需将支付方式用于后续周期扣款，请只在 Hyperswitch 托管支付表单明确显示的“保存支付方式”选项中主动勾选授权。
+        不勾选即不表示您同意保存；LuckRead 不会用自制复选框代替支付服务商的授权流程。
       </p>
       <button type="button" disabled={!elementReady || confirming} onClick={() => { void confirmPayment() }}>
         {confirming ? '正在提交…' : '确认支付'}
