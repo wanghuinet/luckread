@@ -66,6 +66,8 @@ export interface HyperswitchPayment {
   status: HyperswitchPaymentStatus;
   /** Sensitive provider value; keep server-side until an authorized checkout response needs it. */
   clientSecret: string | null;
+  /** Opaque Hyperswitch vault reference; not consent evidence and not a fulfillment signal. */
+  paymentMethodId: string | null;
 }
 
 export type HyperswitchClientErrorCode =
@@ -224,7 +226,15 @@ function normalizePayment(value: unknown): HyperswitchPayment {
   if (!isRecord(value)) {
     throw new HyperswitchClientError('UPSTREAM_INVALID_RESPONSE', 'Hyperswitch returned an invalid payment object.');
   }
-  const { payment_id: paymentId, merchant_id: merchantId, amount, currency, status, client_secret: clientSecret } = value;
+  const {
+    payment_id: paymentId,
+    merchant_id: merchantId,
+    amount,
+    currency,
+    status,
+    client_secret: clientSecret,
+    payment_method_id: paymentMethodId,
+  } = value;
   if (
     typeof paymentId !== 'string' ||
     !PAYMENT_ID_PATTERN.test(paymentId) ||
@@ -235,7 +245,14 @@ function normalizePayment(value: unknown): HyperswitchPayment {
     typeof currency !== 'string' ||
     !CURRENCY_PATTERN.test(currency) ||
     !isHyperswitchPaymentStatus(status) ||
-    (clientSecret !== undefined && clientSecret !== null && typeof clientSecret !== 'string')
+    (clientSecret !== undefined && clientSecret !== null && typeof clientSecret !== 'string') ||
+    (paymentMethodId !== undefined && paymentMethodId !== null && (
+      typeof paymentMethodId !== 'string' ||
+      paymentMethodId.length === 0 ||
+      paymentMethodId.length > 256 ||
+      paymentMethodId.trim() !== paymentMethodId ||
+      /[\\u0000-\\u001f\\u007f]/.test(paymentMethodId)
+    ))
   ) {
     throw new HyperswitchClientError('UPSTREAM_INVALID_RESPONSE', 'Hyperswitch returned a malformed payment object.');
   }
@@ -247,6 +264,7 @@ function normalizePayment(value: unknown): HyperswitchPayment {
     currency,
     status: status as HyperswitchPaymentStatus,
     clientSecret: typeof clientSecret === 'string' ? clientSecret : null,
+    paymentMethodId: typeof paymentMethodId === 'string' ? paymentMethodId : null,
   };
 }
 
