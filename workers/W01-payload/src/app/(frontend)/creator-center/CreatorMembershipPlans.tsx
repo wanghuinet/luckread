@@ -301,6 +301,89 @@ export default function CreatorMembershipPlans({ locale = 'zh-CN' }: { locale?: 
     }
   }
 
+  function beginRevision(plan: MembershipPlan) {
+    setEditingPlanId(plan.planId)
+    setEditName(plan.name)
+    setEditTier(plan.tier)
+    setEditPrice(String(Math.floor(plan.priceMinor / 100)) + '.' + String(plan.priceMinor % 100).padStart(2, '0'))
+    setEditInterval(plan.billingInterval)
+    setEditBenefitsText(plan.benefits.join('\n'))
+    setEditKey(crypto.randomUUID())
+    setError('')
+    setMessage('')
+  }
+
+  async function saveRevision(event: FormEvent<HTMLFormElement>, plan: MembershipPlan) {
+    event.preventDefault()
+    if (editingPlanId !== plan.planId) return
+    setError('')
+    setMessage('')
+    const normalizedTier = editTier.trim()
+    const rawBenefits = editBenefitsText.split('\n').map((value) => value.trim()).filter(Boolean)
+    const normalizedPrice = editPrice.trim()
+    if (!editName.trim() || editName.trim().length > 120 ||
+        !/^[a-z][a-z0-9_-]{0,63}$/.test(normalizedTier) ||
+        !/^(0|[1-9]\\d*)(\\.\\d{1,2})?$/.test(normalizedPrice)) {
+      setError(labels.revisionValidation)
+      return
+    }
+    if (rawBenefits.length > 20 || rawBenefits.some((value) => value.length > 180) ||
+        new Set(rawBenefits).size !== rawBenefits.length) {
+      setError(labels.revisionBenefitsError)
+      return
+    }
+    const [whole, fraction = ''] = normalizedPrice.split('.')
+    const priceMinor = Number(whole) * 100 + Number(fraction.padEnd(2, '0'))
+    if (!Number.isSafeInteger(priceMinor) || priceMinor < 0 || priceMinor > 2_147_483_647) {
+      setError(labels.revisionValidation)
+      return
+    }
+    const key = editKey || crypto.randomUUID()
+    setEditKey(key)
+    setSavingPlanId(plan.planId)
+    try {
+      const { response, data } = await fetchJson<PlanEnvelope>(
+        '/api/v1/membership/plans/' + encodeURIComponent(plan.planId),
+        {
+          method: 'PUT',
+          credentials: 'include',
+          cache: 'no-store',
+          headers: {
+            accept: 'application/json',
+            'content-type': 'application/json',
+            'If-Match': plan.etag,
+            'Idempotency-Key': key,
+          },
+          body: JSON.stringify({
+            name: editName.trim(),
+            tier: normalizedTier,
+            billingInterval: editInterval,
+            priceMinor,
+            currency: plan.currency,
+            benefits: rawBenefits,
+          }),
+        },
+      )
+      if (response.status === 401) { redirectToLogin(); return }
+      if (response.status === 412) throw new Error(labels.stale)
+      if (!response.ok || !isPlan(data?.data) ||
+          data.data.planId !== plan.planId || data.data.creatorId !== plan.creatorId ||
+          data.data.status !== plan.status ||
+          ![plan.version, plan.version + 1].includes(data.data.version) ||
+          ![plan.planVersion, plan.planVersion + 1].includes(data.data.planVersion)) {
+        throw new Error(getApiErrorMessage(data, labels.actionError))
+      }
+      setPlans((current) => current.map((item) => item.planId === plan.planId ? data.data! : item))
+      setMessage(labels.successRevision)
+      setEditingPlanId(null)
+      setEditKey('')
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : labels.actionError)
+    } finally {
+      setSavingPlanId(null)
+    }
+  }
+
   async function transition(plan: MembershipPlan, action: 'publish' | 'pause' | 'resume' | 'retire') {
     if (action === 'retire' && !window.confirm(labels.confirmRetire)) return
     setBusyPlanId(plan.planId)
