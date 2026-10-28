@@ -9,6 +9,7 @@ ROOT = Path(__file__).resolve().parents[3]
 WORKER = ROOT / "workers" / "W07-subscription-commerce"
 MIGRATION = WORKER / "migrations-d1-04" / "0001_order_commerce.sql"
 PAYMENT_MIGRATION = WORKER / "migrations-d1-04" / "0002_payment_provider_events.sql"
+SAVED_METHOD_MIGRATION = WORKER / "migrations-d1-04" / "0003_saved_payment_methods_mandates.sql"
 CONFIG = WORKER / "wrangler.jsonc"
 NOW = "2026-10-28T00:00:00.000Z"
 LATER = "2026-10-28T00:00:01.000Z"
@@ -19,6 +20,7 @@ class D104OrderMigrationTests(unittest.TestCase):
     def setUpClass(cls):
         cls.sql = MIGRATION.read_text(encoding="utf-8")
         cls.payment_sql = PAYMENT_MIGRATION.read_text(encoding="utf-8")
+        cls.saved_method_sql = SAVED_METHOD_MIGRATION.read_text(encoding="utf-8")
         config = json.loads(CONFIG.read_text(encoding="utf-8"))
         bindings = {item["binding"]: item for item in config["d1_databases"]}
         if bindings["D1_01"]["migrations_dir"] != "migrations":
@@ -32,6 +34,7 @@ class D104OrderMigrationTests(unittest.TestCase):
         self.db = sqlite3.connect(":memory:")
         self.db.executescript(self.sql)
         self.db.executescript(self.payment_sql)
+        self.db.executescript(self.saved_method_sql)
 
     def tearDown(self):
         self.db.close()
@@ -118,7 +121,8 @@ class D104OrderMigrationTests(unittest.TestCase):
     def test_only_expected_tables_and_indexes_exist(self):
         tables = {row[0] for row in self.db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
         self.assertEqual(tables, {
-            "orders", "order_lines", "order_create_idempotency", "payments", "payment_provider_events", "payment_provider_event_conflicts",
+            "orders", "order_lines", "order_create_idempotency", "payments", "payment_provider_events",
+            "payment_provider_event_conflicts", "saved_payment_methods", "payment_mandates",
         })
         indexes = {row[0] for row in self.db.execute("SELECT name FROM sqlite_master WHERE type='index' AND sql IS NOT NULL")}
         self.assertTrue({
@@ -128,13 +132,16 @@ class D104OrderMigrationTests(unittest.TestCase):
             "ix_payments_customer_created_payment", "ix_payments_order_created_payment",
             "ix_payments_status_updated_payment", "ux_payments_single_live_or_successful_per_order", "ix_payment_provider_events_state_received",
             "ix_payment_provider_events_payment_received", "ix_payment_provider_event_conflicts_state_last_seen",
-            "ix_payment_provider_event_conflicts_identity",
+            "ix_payment_provider_event_conflicts_identity", "ix_saved_payment_methods_customer_created",
+            "ux_payment_mandates_provider_mandate_id", "ix_payment_mandates_customer_status_created",
+            "ix_payment_mandates_method_status",
         }.issubset(indexes))
         self.assertFalse(tables.intersection({"payment_intents", "ledger_entries", "refunds", "entitlements"}))
         self.assertNotIn("client_secret", {r[1] for r in self.db.execute('PRAGMA table_info("payments")')})
         self.assertNotIn("raw_body", {r[1] for r in self.db.execute('PRAGMA table_info("payment_provider_events")')})
         for table in ("orders", "order_lines", "order_create_idempotency", "payments",
-                      "payment_provider_events", "payment_provider_event_conflicts"):
+                      "payment_provider_events", "payment_provider_event_conflicts",
+                      "saved_payment_methods", "payment_mandates"):
             self.assertEqual(self.db.execute(f'PRAGMA foreign_key_list("{table}")').fetchall(), [])
 
 
@@ -407,6 +414,68 @@ class D104OrderMigrationTests(unittest.TestCase):
                 (LATER,),
             )
 
+
+    def test_saved_method_and_mandate_require_provider_verified_payment_and_start_pending(self):
+        self.order()
+        self.payment(status="succeeded", provider_updated_at=NOW)
+        self.provider_event(event_id="evt_saved", event_type="payment_succeeded",
+                            payment_id="pay_" + "a"*26, state="RECEIVED")
+
+        saved_id = "spm_" + "s"*26
+        method_id = "pm_hyperswitch_test_123"
+        self.db.execute(
+            """INSERT INTO saved_payment_methods(saved_payment_method_id,provider,merchant_id,customer_id,
+               payment_method_id,source_payment_id,source_event_id,created_at)
+               VALUES(?,?,?,?,?,?,?,?)""",
+            (saved_id, "hyperswitch", "merchant_1", "user_1", method_id,
+             "pay_" + "a"*26, "evt_saved", NOW),
+        )
+        mandate_id = "mnd_" + "m"*26
+        self.db.execute(
+            """INSERT INTO payment_mandates(mandate_record_id,provider,merchant_id,customer_id,payment_method_id,
+               source_payment_id,source_event_id,consent_accepted_at,consent_acceptance_type,consent_scope,
+               consent_terms_version,provider_mandate_id,status,version,provider_updated_at,created_at,updated_at)
+               VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (mandate_id, "hyperswitch", "merchant_1", "user_1", method_id,
+             "pay_" + "a"*26, "evt_saved", NOW, "online", "OFF_SESSION_RECURRING",
+             "luckread-recurring-consent-v1", "mandate_1", "PENDING_PROVIDER_CONFIRMATION",
+             1, None, NOW, NOW),
+        )
+        stored = self.db.execute(
+            "SELECT status, version, provider_updated_at, consent_acceptance_type, consent_scope FROM payment_mandates WHERE mandate_record_id=?",
+            (mandate_id,),
+        ).fetchone()
+        self.assertEqual(stored, ("PENDING_PROVIDER_CONFIRMATION", 1, None, "online", "OFF_SESSION_RECURRING"))
+
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute(
+                """INSERT INTO payment_mandates(mandate_record_id,provider,merchant_id,customer_id,payment_method_id,
+                   source_payment_id,source_event_id,consent_accepted_at,consent_acceptance_type,consent_scope,
+                   consent_terms_version,provider_mandate_id,status,version,provider_updated_at,created_at,updated_at)
+                   VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                ("mnd_" + "n"*26, "hyperswitch", "merchant_1", "user_1", method_id,
+                 "pay_" + "a"*26, "evt_saved", NOW, "online", "OFF_SESSION_RECURRING",
+                 "luckread-recurring-consent-v1", "mandate_2", "ACTIVE", 1, NOW, NOW, NOW),
+            )
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute(
+                "UPDATE saved_payment_methods SET payment_method_id=? WHERE saved_payment_method_id=?",
+                ("pm_changed", saved_id),
+            )
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute("DELETE FROM payment_mandates WHERE mandate_record_id=?", (mandate_id,))
+
+    def test_saved_method_rejects_missing_provider_event_and_cross_customer_token_binding(self):
+        self.order()
+        self.payment(status="succeeded", provider_updated_at=NOW)
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute(
+                """INSERT INTO saved_payment_methods(saved_payment_method_id,provider,merchant_id,customer_id,
+                   payment_method_id,source_payment_id,source_event_id,created_at)
+                   VALUES(?,?,?,?,?,?,?,?)""",
+                ("spm_" + "s"*26, "hyperswitch", "merchant_1", "user_1", "pm_missing_event",
+                 "pay_" + "a"*26, "evt_missing", NOW),
+            )
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
