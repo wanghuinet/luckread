@@ -5472,8 +5472,9 @@ components:
         Requires membership.plan.publish.own and an ACTIVE creator identity.
         If-Match must match the current plan ETag. W07 performs an owner-scoped
         version-CAS transition from DRAFT/PRIVATE to ACTIVE/PUBLIC only when an
-        immutable current plan version exists. W01 returns success only after
-        validating the W07 result and W06 confirms durable immutable audit.
+        immutable current plan version exists. W01 first confirms a durable W06
+        publish-intent audit before calling W07, then returns success only after
+        validating the W07 result and confirming W06's immutable published event.
         Publishing does not create a subscription, order, payment, or entitlement.
       security:
         - sessionCookieAuth: []
