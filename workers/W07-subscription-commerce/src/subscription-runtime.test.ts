@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { changeSubscriptionPlan, createMembershipPlanDraft, createSubscription, etagForVersion, getSubscription, listActiveMembershipPlans, listCreatorMembershipPlans, listSubscriptions, normalizeMembershipPlanDraft, parseBoundedPositiveInt, transitionSubscription, type SubscriptionRow, type SubscriptionStatus } from './subscription-runtime.js'
+import { changeSubscriptionPlan, createMembershipPlanDraft, createSubscription, etagForVersion, getSubscription, listActiveMembershipPlans, listCreatorMembershipPlans, listSubscriptions, normalizeMembershipPlanDraft, parseBoundedPositiveInt, publishMembershipPlan, transitionSubscription, type SubscriptionRow, type SubscriptionStatus } from './subscription-runtime.js'
 import w07 from './index.js'
 import { verifyD1SubscriptionPostflight, verifyD1SubscriptionPreflight } from '../scripts/verify-remote-preflight.mjs'
 
@@ -32,8 +32,10 @@ function fakeDb(rows: SubscriptionRow[], plans: MembershipPlanRow[] = []): D1Dat
           }
           if (sql.includes('FROM membership_plans AS p')) {
             const plan = planState.get(String(values[0]))
-            const version = planVersionState.get(String(values[0]) + ':1')
-            return (plan && version ? { ...plan, ...version } : null) as T | null
+            const ownerScoped = sql.includes('p.owner_id = ?')
+            if (ownerScoped && plan?.owner_id !== String(values[1])) return null
+            const version = plan ? planVersionState.get(plan.plan_id + ':' + plan.current_version) : undefined
+            return (plan && version ? { ...plan, ...version, current_version: plan.current_version } : null) as T | null
           }
           const row = state.get(String(values[0]))
           return row ? { ...row } as T : null
@@ -111,6 +113,24 @@ function fakeDb(rows: SubscriptionRow[], plans: MembershipPlanRow[] = []): D1Dat
             }
             if (state.has(row.subscription_id)) throw new Error('UNIQUE constraint failed')
             state.set(row.subscription_id, row)
+            return { meta: { changes: 1 } }
+          }
+          if (sql.includes("UPDATE membership_plans SET status = 'ACTIVE'")) {
+            const plan = planState.get(String(values[1]))
+            if (
+              !plan ||
+              plan.owner_type !== 'CREATOR' ||
+              plan.owner_id !== String(values[2]) ||
+              plan.status !== 'DRAFT' ||
+              plan.visibility !== 'PRIVATE' ||
+              plan.version !== Number(values[3]) ||
+              !plan.has_current_version ||
+              !planVersionState.has(plan.plan_id + ':' + plan.current_version)
+            ) return { meta: { changes: 0 } }
+            plan.status = 'ACTIVE'
+            plan.visibility = 'PUBLIC'
+            plan.updated_at = String(values[0])
+            plan.version += 1
             return { meta: { changes: 1 } }
           }
           if (sql.includes('SET status =')) {
@@ -468,6 +488,66 @@ describe('subscription runtime', () => {
     expect(replay).toMatchObject({ planId: first.planId, status: 'DRAFT', visibility: 'PRIVATE', version: 1, replayed: true })
     await expect(createMembershipPlanDraft(db, 'user_1', 'creator_1', { ...input, priceMinor: 900 }, 'draft-create-1'))
       .rejects.toMatchObject({ code: 'CONFLICT', status: 409 })
+  })
+
+  it('publishes only an owner-scoped private draft and converges safely on an idempotent retry', async () => {
+    const db = fakeDb([], [
+      activePlan('plan_publish', {
+        current_version: 1,
+        status: 'DRAFT',
+        visibility: 'PRIVATE',
+        version: 1,
+      }),
+    ])
+
+    const first = await publishMembershipPlan(db, 'creator_1', 'plan_publish', '"lr-plan-v1"')
+    expect(first).toMatchObject({
+      planId: 'plan_publish',
+      creatorId: 'creator_1',
+      status: 'ACTIVE',
+      visibility: 'PUBLIC',
+      planVersion: 1,
+      version: 2,
+      etag: '"lr-plan-v2"',
+      replayed: false,
+    })
+
+    const replay = await publishMembershipPlan(db, 'creator_1', 'plan_publish', '"lr-plan-v1"')
+    expect(replay).toMatchObject({
+      planId: 'plan_publish',
+      status: 'ACTIVE',
+      visibility: 'PUBLIC',
+      version: 2,
+      replayed: true,
+    })
+    const publicPlans = await listActiveMembershipPlans(db, 20)
+    expect(publicPlans.docs.map((plan) => plan.planId)).toContain('plan_publish')
+  })
+
+  it('requires If-Match and denies cross-owner publish and stale ETags', async () => {
+    const draft = fakeDb([], [
+      activePlan('plan_publish_owner', {
+        current_version: 1,
+        status: 'DRAFT',
+        visibility: 'PRIVATE',
+        version: 1,
+      }),
+    ])
+    await expect(publishMembershipPlan(draft, 'creator_1', 'plan_publish_owner', null))
+      .rejects.toMatchObject({ code: 'PRECONDITION_REQUIRED', status: 428 })
+    await expect(publishMembershipPlan(draft, 'creator_other', 'plan_publish_owner', '"lr-plan-v1"'))
+      .rejects.toMatchObject({ code: 'RESOURCE_NOT_FOUND', status: 404 })
+
+    const laterVersion = fakeDb([], [
+      activePlan('plan_already_changed', {
+        current_version: 1,
+        status: 'ACTIVE',
+        visibility: 'PUBLIC',
+        version: 4,
+      }),
+    ])
+    await expect(publishMembershipPlan(laterVersion, 'creator_1', 'plan_already_changed', '"lr-plan-v1"'))
+      .rejects.toMatchObject({ code: 'PRECONDITION_FAILED', status: 412 })
   })
 
   it('rejects client-controlled owner, lifecycle state, malformed currency, and unsafe price values', () => {
