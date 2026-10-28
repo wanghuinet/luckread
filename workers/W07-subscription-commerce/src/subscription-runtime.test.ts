@@ -713,7 +713,7 @@ describe('subscription runtime', () => {
   })
 
   it('rejects foreign owners, stale ETags, invalid source states, and retired plans', async () => {
-    const db = fakeDb([], [activePlan('plan_lifecycle_scope', { current_version: 1, version: 2 })])
+    const db = fakeDb([], [activePlan('plan_lifecycle_scope', { current_version: 1, status: 'DRAFT', visibility: 'PRIVATE', version: 2 })])
     await expect(transitionMembershipPlanLifecycle(db, 'creator_other', 'plan_lifecycle_scope', '"lr-plan-v2"', 'pause'))
       .rejects.toMatchObject({ code: 'RESOURCE_NOT_FOUND', status: 404 })
     await expect(transitionMembershipPlanLifecycle(db, 'creator_1', 'plan_lifecycle_scope', '"lr-plan-v1"', 'pause'))
