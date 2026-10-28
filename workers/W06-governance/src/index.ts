@@ -299,7 +299,7 @@ type CommerceOrderAuditInput = {
 
 async function readBoundedAuditJson(request: Request, maxBytes: number): Promise<unknown> {
   const declaredLength = request.headers.get('content-length')
-  if (declaredLength !== null && (!/^\\d+$/.test(declaredLength) || Number(declaredLength) > maxBytes)) {
+  if (declaredLength !== null && (!/^\d+$/.test(declaredLength) || Number(declaredLength) > maxBytes)) {
     throw new Error('INVALID_COMMERCE_ORDER_AUDIT')
   }
   if (!request.body) throw new Error('INVALID_COMMERCE_ORDER_AUDIT')
@@ -407,6 +407,7 @@ function matchesImmutableAuditEvent(existing: StoredAuditEvent, expected: AuditE
     return existing.event_id === expected.eventId &&
       storedActor.actorId === expectedActor.actorId &&
       storedActor.actorType === expectedActor.actorType &&
+      storedActor.layer === expectedActor.layer &&
       existing.action === expected.action &&
       existing.target_type === expected.targetType &&
       existing.target_id === expected.targetId &&
