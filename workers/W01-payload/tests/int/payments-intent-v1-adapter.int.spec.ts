@@ -81,7 +81,9 @@ describe('public Hyperswitch payment intent adapter', () => {
   })
 
   it('keeps public OpenAPI and private W07 transport/routing contracts aligned without topology growth', () => {
-    const paymentBlock = openapi.slice(openapi.indexOf('  /payments/intents:'), openapi.indexOf('  /plans:'))
+    const paymentStart = openapi.indexOf('  /payments/intents:')
+    const paymentEnd = openapi.indexOf('\n  /', paymentStart + 1)
+    const paymentBlock = openapi.slice(paymentStart, paymentEnd)
     expect(paymentBlock).toContain('operationId: postPaymentsIntents')
     expect(paymentBlock).toContain('x-luckread-contract-status: CONTRACTED_PARTIAL')
     expect(paymentBlock).toContain("required: [orderId]")
