@@ -516,6 +516,34 @@ class D104OrderMigrationTests(unittest.TestCase):
                 (LATER, cycle_id),
             )
 
+    def test_applied_renewal_sync_metadata_is_immutable(self):
+        offer = json.dumps({"subscriptionId":"sub_audit","planId":"plan_basic","planVersion":1}, separators=(",",":"))
+        pricing = json.dumps({"currency":"USD","items":[{"itemType":"MEMBERSHIP_PLAN"}]}, separators=(",",":"))
+        cycle_id = "rcy_" + "d" * 26
+        payment_id = "pay_" + "e" * 26
+        self.db.execute(
+            """INSERT INTO subscription_renewal_cycles
+               (cycle_id,provider,merchant_id,subscription_id,subscriber_id,plan_id,plan_version,
+                cycle_start,cycle_end,billing_interval,currency,offer_snapshot_json,amount_minor,
+                pricing_snapshot_json,payment_method_id,mandate_record_id,order_id,payment_id,state,
+                attempt_number,provider_response_status,version,created_at,updated_at)
+               VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'FAILED',1,'failed',1,?,?)""",
+            (cycle_id,"hyperswitch","merchant_test","sub_audit","user_1","plan_basic",1,
+             NOW,LATER,"MONTHLY","USD",offer,100,pricing,"pm_hyperswitch_test","mnd_"+"f"*26,
+             "ord_renewal_audit",payment_id,NOW,NOW),
+        )
+        self.db.execute(
+            """UPDATE subscription_renewal_cycles SET subscription_sync_state='APPLIED',
+               subscription_sync_updated_at=?,version=2,updated_at=? WHERE cycle_id=? AND version=1""",
+            (LATER,LATER,cycle_id),
+        )
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute(
+                """UPDATE subscription_renewal_cycles SET subscription_sync_error_code='tampered',
+                   version=3,updated_at=? WHERE cycle_id=? AND version=2""",
+                ("2026-10-28T00:00:02.000Z",cycle_id),
+            )
+
     def test_renewal_cycle_requires_active_mandate_before_payment_ready_and_keeps_cursor_cas(self):
         offer = json.dumps({"subscriptionId":"sub_renewal","planId":"plan_basic","planVersion":1}, separators=(",",":"))
         pricing = json.dumps({"currency":"USD","items":[]}, separators=(",",":"))
