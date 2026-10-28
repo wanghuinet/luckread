@@ -589,6 +589,7 @@ export async function scanDueSubscriptionRenewals(
         );
         if (activeMandate) cycleIds.push(cycle.cycle_id);
       } else if (cycle.state === 'FAILED' &&
+        ['failed', 'expired'].includes(cycle.provider_response_status ?? '') &&
         cycle.subscription_sync_state === 'APPLIED' &&
         cycle.attempt_number < MAX_ATTEMPTS &&
         renewalRetryDue(cycle, now) &&
@@ -614,6 +615,41 @@ export async function scanDueSubscriptionRenewals(
     env.D1_04, cursor, last.current_period_end, last.subscription_id, now,
   );
   return { scanned: rows.length, cycleIds: [...new Set(cycleIds)], cursorAdvanced, cursorReset: false };
+}
+
+type ChargeSubscriptionRow = Readonly<{
+  subscription_id: string;
+  subscriber_id: string;
+  plan_id: string;
+  plan_version: number;
+  status: string;
+  current_period_end: string;
+  cancel_at: string | null;
+}>;
+
+async function isSubscriptionChargeableForCycle(
+  env: RenewalRuntimeEnv,
+  cycle: RenewalCycleRow,
+): Promise<boolean> {
+  let subscription: ChargeSubscriptionRow | null;
+  try {
+    subscription = await env.D1_01.prepare(
+      'SELECT subscription_id, subscriber_id, plan_id, plan_version, status, current_period_end, cancel_at ' +
+      'FROM membership_subscriptions WHERE subscription_id = ? AND subscriber_id = ? LIMIT 1',
+    ).bind(cycle.subscription_id, cycle.subscriber_id).first<ChargeSubscriptionRow>();
+  } catch {
+    throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
+  }
+  const retryingPastDue = cycle.outcome_code === 'RETRY_PREPARED';
+  return !!subscription &&
+    subscription.subscription_id === cycle.subscription_id &&
+    subscription.subscriber_id === cycle.subscriber_id &&
+    subscription.plan_id === cycle.plan_id &&
+    subscription.plan_version === cycle.plan_version &&
+    subscription.current_period_end === cycle.cycle_start &&
+    (subscription.status === 'ACTIVE' || (retryingPastDue && subscription.status === 'PAST_DUE')) &&
+    (subscription.cancel_at === null ||
+      (isCanonicalIso(subscription.cancel_at) && subscription.cancel_at > cycle.cycle_start));
 }
 
 async function writeCycleReconciliation(
@@ -863,6 +899,10 @@ export async function processSubscriptionRenewalCycle(
       cycle = await writeCycleReconciliation(env.D1_04, cycle, 'PREPARED_SNAPSHOT_INCOMPLETE', now);
       return { cycleId, state: cycle.state, action: 'RECONCILIATION_REQUIRED' };
     }
+    if (!(await isSubscriptionChargeableForCycle(env, cycle))) {
+      cycle = await writeCycleReconciliation(env.D1_04, cycle, 'SUBSCRIPTION_NOT_CHARGEABLE_BEFORE_ORDER', now);
+      return { cycleId, state: cycle.state, action: 'RECONCILIATION_REQUIRED' };
+    }
     if (!(await isExactMandateActive(env.D1_04, cycle))) {
       cycle = await writeCycleReconciliation(env.D1_04, cycle, 'MANDATE_NOT_ACTIVE', now);
       return { cycleId, state: cycle.state, action: 'RECONCILIATION_REQUIRED' };
@@ -961,6 +1001,11 @@ export async function processSubscriptionRenewalCycle(
         [],
       );
       return { cycleId, state: cycle.state, action: 'SUBMITTED', ...(cycle.payment_id ? { paymentId: cycle.payment_id } : {}) };
+    }
+
+    if (!(await isSubscriptionChargeableForCycle(env, cycle))) {
+      cycle = await writeCycleReconciliation(env.D1_04, cycle, 'SUBSCRIPTION_NOT_CHARGEABLE_AT_SUBMISSION', now);
+      return { cycleId, state: cycle.state, action: 'RECONCILIATION_REQUIRED' };
     }
 
     const createCharge = dependencies.createProviderCharge ?? createHyperswitchMerchantInitiatedPayment;
