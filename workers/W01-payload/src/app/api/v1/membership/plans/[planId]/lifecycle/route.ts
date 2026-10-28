@@ -11,7 +11,7 @@ import {
 } from '../../../../../../../moderation/w06-moderation-client.js'
 
 type RouteContext = { params: Promise<{ planId: string }> }
-type LifecycleAction = 'pause' | 'resume'
+type LifecycleAction = 'pause' | 'resume' | 'retire'
 const errorResponse = (status: number, code: string, message: string) =>
   Response.json({ error: { code, message, details: {} }, requestId: 'req_' + crypto.randomUUID() }, { status, headers: { 'cache-control': 'no-store' } })
 
@@ -43,7 +43,7 @@ async function resolveActiveCreatorId(request: Request): Promise<string | Respon
 async function readLifecycleAction(request: Request): Promise<LifecycleAction | Response> {
   const declaredLength = Number(request.headers.get('content-length') ?? '0')
   if (Number.isFinite(declaredLength) && declaredLength > 1024) return errorResponse(400, 'VALIDATION_FAILED', 'Plan lifecycle body is too large')
-  if (!request.body) return errorResponse(400, 'VALIDATION_FAILED', 'A pause or resume action is required')
+  if (!request.body) return errorResponse(400, 'VALIDATION_FAILED', 'A pause, resume, or retire action is required')
   const reader = request.body.getReader()
   const chunks: Uint8Array[] = []
   let byteLength = 0
@@ -65,8 +65,8 @@ async function readLifecycleAction(request: Request): Promise<LifecycleAction | 
   if (!value || typeof value !== 'object' || Array.isArray(value) ||
       Object.keys(value as Record<string, unknown>).length !== 1 ||
       !Object.hasOwn(value, 'action') ||
-      !['pause', 'resume'].includes(String((value as Record<string, unknown>).action))) {
-    return errorResponse(400, 'VALIDATION_FAILED', 'Only pause or resume is accepted')
+      !['pause', 'resume', 'retire'].includes(String((value as Record<string, unknown>).action))) {
+    return errorResponse(400, 'VALIDATION_FAILED', 'Only pause, resume, or retire is accepted')
   }
   return (value as { action: LifecycleAction }).action
 }
@@ -74,8 +74,8 @@ async function readLifecycleAction(request: Request): Promise<LifecycleAction | 
 function validLifecyclePlan(value: unknown, planId: string, creatorId: string, action: LifecycleAction, expectedVersion: number): value is Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false
   const plan = value as Record<string, unknown>
-  const status = action === 'pause' ? 'PAUSED' : 'ACTIVE'
-  const visibility = action === 'pause' ? 'PRIVATE' : 'PUBLIC'
+  const status = action === 'pause' ? 'PAUSED' : action === 'resume' ? 'ACTIVE' : 'RETIRED'
+  const visibility = action === 'resume' ? 'PUBLIC' : 'PRIVATE'
   return plan.planId === planId && plan.creatorId === creatorId &&
     Number.isSafeInteger(plan.planVersion) && Number(plan.planVersion) >= 1 &&
     plan.status === status && plan.visibility === visibility &&
@@ -115,8 +115,8 @@ export async function POST(request: Request, context: RouteContext): Promise<Res
     const creatorId = await resolveActiveCreatorId(request)
     if (creatorId instanceof Response) return creatorId
 
-    const requestedStatus = action === 'pause' ? 'PAUSED' : 'ACTIVE'
-    const requestedVisibility = action === 'pause' ? 'PRIVATE' : 'PUBLIC'
+    const requestedStatus = action === 'pause' ? 'PAUSED' : action === 'resume' ? 'ACTIVE' : 'RETIRED'
+    const requestedVisibility = action === 'resume' ? 'PUBLIC' : 'PRIVATE'
     const intentEventId = 'evt_mpl_lifecycle_requested_' + action + '_' + planId + '_v' + expectedVersion
     let intentResponse: Response
     try {
@@ -148,7 +148,7 @@ export async function POST(request: Request, context: RouteContext): Promise<Res
     const plan = envelope.data
     if (Number(plan.version) === expectedVersion && plan.replayed === true) return w07Response
 
-    const eventAction = action === 'pause' ? 'paused' : 'activated'
+    const eventAction = action === 'pause' ? 'paused' : action === 'resume' ? 'activated' : 'retired'
     const finalEventId = 'evt_mpl_plan_' + eventAction + '_' + planId + '_v' + plan.version
     let auditResponse: Response
     try {
@@ -162,7 +162,7 @@ export async function POST(request: Request, context: RouteContext): Promise<Res
     if ((auditResponse.status !== 200 && auditResponse.status !== 201) ||
         !auditValue || typeof auditValue !== 'object' ||
         (auditValue as { eventId?: unknown }).eventId !== finalEventId ||
-        (auditValue as { action?: unknown }).action !== (action === 'pause' ? 'membership.plan.paused' : 'membership.plan.activated') ||
+        (auditValue as { action?: unknown }).action !== (action === 'pause' ? 'membership.plan.paused' : action === 'resume' ? 'membership.plan.activated' : 'membership.plan.retired') ||
         (auditValue as { targetId?: unknown }).targetId !== planId) {
       return errorResponse(503, 'AUDIT_UNAVAILABLE', 'Membership plan lifecycle audit was not durably confirmed')
     }

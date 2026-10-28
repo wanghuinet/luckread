@@ -318,6 +318,12 @@ describe('W06 runtime', () => {
     action: 'pause', status: 'PAUSED', visibility: 'PRIVATE', version: 3,
     occurredAt: '2026-10-28T06:00:00.000Z',
   }
+  const planLifecycleRetireAuditInput = {
+    eventId: 'evt_mpl_plan_retired_' + planId + '_v4',
+    planId, creatorId: 'creator_001', expectedVersion: 3, planVersion: 2,
+    action: 'retire', status: 'RETIRED', visibility: 'PRIVATE', version: 4,
+    occurredAt: '2026-10-28T06:01:00.000Z',
+  }
   const planLifecycleAuditRequest = (body: unknown, withTransport = true, requestId = 'req_plan_lifecycle_audit_1', layer = 'L3') => new Request(
     'https://w06.internal/internal/audit-events/membership-plan-lifecycle-changed',
     { method: 'POST', headers: { 'content-type': 'application/json', ...(withTransport ? {
@@ -684,6 +690,27 @@ describe('W06 runtime', () => {
       action: 'membership.plan.paused', target_type: 'MembershipPlan', target_id: planId,
       before_json: JSON.stringify({ creatorId: 'creator_001', planVersion: 2, status: 'ACTIVE', visibility: 'PUBLIC', version: 2 }),
       after_json: JSON.stringify({ creatorId: 'creator_001', planVersion: 2, status: 'PAUSED', visibility: 'PRIVATE', version: 3 }),
+    })
+  })
+
+  it('persists a permanent plan retirement audit from PAUSED/PRIVATE to RETIRED/PRIVATE', async () => {
+    const { db, rows } = createPlanAuditDb()
+    const runtime = await import('./index')
+    const response = await runtime.default.fetch(planLifecycleAuditRequest(planLifecycleRetireAuditInput), { D1_03: db })
+    expect(response.status).toBe(201)
+    expect(await response.json()).toMatchObject({
+      eventId: planLifecycleRetireAuditInput.eventId,
+      action: 'membership.plan.retired',
+      targetType: 'MembershipPlan',
+      targetId: planId,
+      replayed: false,
+    })
+    expect(rows.get(planLifecycleRetireAuditInput.eventId)).toMatchObject({
+      action: 'membership.plan.retired',
+      target_type: 'MembershipPlan',
+      target_id: planId,
+      before_json: JSON.stringify({ creatorId: 'creator_001', planVersion: 2, status: 'PAUSED', visibility: 'PRIVATE', version: 3 }),
+      after_json: JSON.stringify({ creatorId: 'creator_001', planVersion: 2, status: 'RETIRED', visibility: 'PRIVATE', version: 4 }),
     })
   })
 

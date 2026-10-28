@@ -346,11 +346,11 @@ type MembershipPlanUpdateAuditInput = {
 
 type MembershipPlanLifecycleRequestAuditInput = {
   eventId: string; planId: string; creatorId: string; expectedVersion: number
-  action: 'pause' | 'resume'; requestedStatus: 'PAUSED' | 'ACTIVE'; requestedVisibility: 'PRIVATE' | 'PUBLIC'
+  action: 'pause' | 'resume' | 'retire'; requestedStatus: 'PAUSED' | 'ACTIVE' | 'RETIRED'; requestedVisibility: 'PRIVATE' | 'PUBLIC'
 }
 type MembershipPlanLifecycleAuditInput = {
   eventId: string; planId: string; creatorId: string; expectedVersion: number
-  planVersion: number; action: 'pause' | 'resume'; status: 'PAUSED' | 'ACTIVE'
+  planVersion: number; action: 'pause' | 'resume' | 'retire'; status: 'PAUSED' | 'ACTIVE' | 'RETIRED'
   visibility: 'PRIVATE' | 'PUBLIC'; version: number; occurredAt: string
 }
 
@@ -507,9 +507,9 @@ function parseMembershipPlanLifecycleRequestAuditInput(value: unknown): Membersh
     typeof body.planId !== 'string' || !/^plan_[a-f0-9]{64}$/.test(body.planId) ||
     typeof body.creatorId !== 'string' || !resourceIdPattern.test(body.creatorId) ||
     typeof body.expectedVersion !== 'number' || !Number.isSafeInteger(body.expectedVersion) || body.expectedVersion < 1 ||
-    (body.action !== 'pause' && body.action !== 'resume') ||
-    body.requestedStatus !== (body.action === 'pause' ? 'PAUSED' : 'ACTIVE') ||
-    body.requestedVisibility !== (body.action === 'pause' ? 'PRIVATE' : 'PUBLIC') ||
+    (body.action !== 'pause' && body.action !== 'resume' && body.action !== 'retire') ||
+    body.requestedStatus !== (body.action === 'pause' ? 'PAUSED' : body.action === 'resume' ? 'ACTIVE' : 'RETIRED') ||
+    body.requestedVisibility !== (body.action === 'resume' ? 'PUBLIC' : 'PRIVATE') ||
     body.eventId !== 'evt_mpl_lifecycle_requested_' + body.action + '_' + body.planId + '_v' + body.expectedVersion
   ) throw new Error('INVALID_MEMBERSHIP_PLAN_LIFECYCLE_REQUEST_AUDIT')
   return body as MembershipPlanLifecycleRequestAuditInput
@@ -525,11 +525,11 @@ function parseMembershipPlanLifecycleAuditInput(value: unknown): MembershipPlanL
     typeof body.creatorId !== 'string' || !resourceIdPattern.test(body.creatorId) ||
     typeof body.expectedVersion !== 'number' || !Number.isSafeInteger(body.expectedVersion) || body.expectedVersion < 1 ||
     typeof body.planVersion !== 'number' || !Number.isSafeInteger(body.planVersion) || body.planVersion < 1 ||
-    (body.action !== 'pause' && body.action !== 'resume') ||
-    body.status !== (body.action === 'pause' ? 'PAUSED' : 'ACTIVE') ||
-    body.visibility !== (body.action === 'pause' ? 'PRIVATE' : 'PUBLIC') ||
+    (body.action !== 'pause' && body.action !== 'resume' && body.action !== 'retire') ||
+    body.status !== (body.action === 'pause' ? 'PAUSED' : body.action === 'resume' ? 'ACTIVE' : 'RETIRED') ||
+    body.visibility !== (body.action === 'resume' ? 'PUBLIC' : 'PRIVATE') ||
     typeof body.version !== 'number' || !Number.isSafeInteger(body.version) || body.version !== body.expectedVersion + 1 ||
-    body.eventId !== 'evt_mpl_plan_' + (body.action === 'pause' ? 'paused' : 'activated') + '_' + body.planId + '_v' + body.version ||
+    body.eventId !== 'evt_mpl_plan_' + (body.action === 'pause' ? 'paused' : body.action === 'resume' ? 'activated' : 'retired') + '_' + body.planId + '_v' + body.version ||
     typeof body.occurredAt !== 'string' || !body.occurredAt || Number.isNaN(Date.parse(body.occurredAt))
   ) throw new Error('INVALID_MEMBERSHIP_PLAN_LIFECYCLE_AUDIT')
   return body as MembershipPlanLifecycleAuditInput
@@ -1016,7 +1016,7 @@ export default {
       const event: AuditEvent = {
         eventId: input.eventId, requestId: principal.requestId, traceId: principal.correlationId,
         actor: { actorId: principal.userId, actorType: 'user', layer: principal.layer as AuditEvent['actor']['layer'] },
-        action: input.action === 'pause' ? 'membership.plan.paused' : 'membership.plan.activated',
+        action: input.action === 'pause' ? 'membership.plan.paused' : input.action === 'resume' ? 'membership.plan.activated' : 'membership.plan.retired',
         targetType: 'MembershipPlan', targetId: input.planId,
         before: { creatorId: input.creatorId, planVersion: input.planVersion,
           status: input.action === 'pause' ? 'ACTIVE' : 'PAUSED',

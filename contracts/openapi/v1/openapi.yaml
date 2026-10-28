@@ -4230,15 +4230,16 @@ paths:
         schema: { type: string, pattern: '^plan_[a-f0-9]{64}$' }
     post:
       tags: [Creators]
-      summary: Pause or resume an owned membership plan
+      summary: Pause, resume, or permanently retire an owned membership plan
       operationId: transitionOwnMembershipPlanLifecycle
       description: >-
         Requires membership.plan.lifecycle.own and an ACTIVE creator identity.
         If-Match must match the lifecycle ETag. Pause hides the plan from new
-        sales; resume restores ACTIVE/PUBLIC visibility. Neither action changes
-        existing subscriptions or grants/revokes access. W01 confirms a durable
-        W06 intent before W07's owner-scoped D1-01 CAS and confirms W06's
-        immutable final audit before returning success.
+        sales; resume restores ACTIVE/PUBLIC visibility; retire permanently
+        sets a PAUSED/PRIVATE plan to RETIRED/PRIVATE. An active plan must first
+        be paused. No lifecycle action changes existing subscriptions or grants
+        or revokes access. W01 confirms a durable W06 intent before W07's
+        owner-scoped D1-01 CAS and confirms W06's immutable final audit.
       security:
         - sessionCookieAuth: []
         - bearerAuth: []
@@ -4253,7 +4254,7 @@ paths:
               additionalProperties: false
               required: [action]
               properties:
-                action: { type: string, enum: [pause, resume] }
+                action: { type: string, enum: [pause, resume, retire] }
       responses:
         '200':
           description: Plan lifecycle changed or exact retry/no-op was confirmed.
@@ -4275,7 +4276,7 @@ paths:
                       planId: { type: string, pattern: '^plan_[a-f0-9]{64}$' }
                       creatorId: { type: string }
                       planVersion: { type: integer, minimum: 1 }
-                      status: { type: string, enum: [ACTIVE, PAUSED] }
+                      status: { type: string, enum: [ACTIVE, PAUSED, RETIRED] }
                       visibility: { type: string, enum: [PUBLIC, PRIVATE] }
                       version: { type: integer, minimum: 1 }
                       etag: { $ref: '#/components/schemas/ETag' }
