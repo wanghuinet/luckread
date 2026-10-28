@@ -41,11 +41,11 @@ describe('v1 commerce order adapter', () => {
 
     const malformed = await readBoundedOrderBody(makeRequest('12x'))
     expect(malformed.ok).toBe(false)
-    if (!malformed.ok) expect(malformed.response.status).toBe(400)
+    if (malformed.ok === false) expect(malformed.response.status).toBe(400)
 
     const oversized = await readBoundedOrderBody(makeRequest('16385'))
     expect(oversized.ok).toBe(false)
-    if (!oversized.ok) expect(oversized.response.status).toBe(400)
+    if (oversized.ok === false) expect(oversized.response.status).toBe(400)
   })
 
   it('authorizes order creation using the W02-backed W08 CASL decision before calling W07', () => {
