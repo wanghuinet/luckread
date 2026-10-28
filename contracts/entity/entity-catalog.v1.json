@@ -209,6 +209,22 @@
         "docs/65-MONETIZATION-COMMERCE-SYSTEM-CONTRACT-v1.0.md",
         "docs/305-CONCURRENCY-ETAG-CONDITIONAL-REQUEST-AND-IDEMPOTENCY-CONTRACT-v1.0.md"
       ]
+    },
+    {
+      "entityId": "ENT-PAYMENT",
+      "name": "Payment",
+      "domainId": "D1-04",
+      "classification": "AUTHORITATIVE",
+      "status": "PROPOSED",
+      "evidenceRefs": [
+        "contracts/entity/PAYMENT-ENTITY-CONTRACT.v1.json",
+        "contracts/persistence/PAYMENT-D1-04-persistence.v1.json",
+        "contracts/state-machines/payment.json",
+        "docs/change-control/CC-PAY-001-PAYMENT-ENTITY-MODEL-2026-10-28.md",
+        "docs/09-D1-DOMAIN-MASTER-v1.0.md",
+        "docs/65-MONETIZATION-COMMERCE-SYSTEM-CONTRACT-v1.0.md",
+        "docs/68-WALLET-LEDGER-AND-SETTLEMENT-CONTRACT-v1.0.md"
+      ]
     }
   ],
   "rules": {
