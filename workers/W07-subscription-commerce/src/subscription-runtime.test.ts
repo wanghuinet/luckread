@@ -30,6 +30,31 @@ function fakeDb(rows: SubscriptionRow[], plans: MembershipPlanRow[] = []): D1Dat
             const row = state.get(String(values[0]))
             return (row && row.subscriber_id === String(values[1]) ? { ...row } : null) as T | null
           }
+          if (sql.includes("FROM membership_plans WHERE owner_type = 'CREATOR' AND owner_id = ?")) {
+            const ownedPlans = Array.from(planState.values()).filter((plan) =>
+              plan.owner_type === 'CREATOR' && plan.owner_id === String(values[0]))
+            return {
+              total: ownedPlans.length,
+              draft: ownedPlans.filter((plan) => plan.status === 'DRAFT').length,
+              active: ownedPlans.filter((plan) => plan.status === 'ACTIVE').length,
+              paused: ownedPlans.filter((plan) => plan.status === 'PAUSED').length,
+              retired: ownedPlans.filter((plan) => plan.status === 'RETIRED').length,
+            } as T
+          }
+          if (sql.includes('FROM membership_subscriptions WHERE creator_id = ?')) {
+            const ownedSubscriptions = Array.from(state.values()).filter((row) => row.creator_id === String(values[0]))
+            const countStatus = (status: SubscriptionStatus) => ownedSubscriptions.filter((row) => row.status === status).length
+            return {
+              total: ownedSubscriptions.length,
+              pending: countStatus('PENDING'),
+              active: countStatus('ACTIVE'),
+              pastDue: countStatus('PAST_DUE'),
+              paused: countStatus('PAUSED'),
+              canceled: countStatus('CANCELED'),
+              expired: countStatus('EXPIRED'),
+              activeSubscribers: new Set(ownedSubscriptions.filter((row) => row.status === 'ACTIVE').map((row) => row.subscriber_id)).size,
+            } as T
+          }
           if (sql.includes('FROM membership_plans AS p')) {
             const plan = planState.get(String(values[0]))
             const ownerScoped = sql.includes('p.owner_id = ?')
@@ -277,6 +302,39 @@ describe('subscription runtime', () => {
     expect(response.status).toBe(200)
     expect(body.data?.docs).toHaveLength(1)
     expect(body.data?.docs?.[0]).toMatchObject({ planId: 'plan_catalog', planVersion: 3, priceMinor: 500 })
+  })
+
+  it('routes creator membership summary through the verified creator scope and returns counts only', async () => {
+    const allowLimiter = { limit: async () => ({ success: true }) }
+    const request = new Request('https://luckread-w07.internal/membership/creator-summary', {
+      method: 'GET',
+      headers: {
+        'X-LuckRead-Caller': 'W01',
+        'X-LuckRead-Transport-Version': '1.0',
+        'X-LuckRead-Correlation-Id': 'creator-membership-summary-test',
+        'X-LuckRead-Principal-User-Id': 'user_1',
+        'X-LuckRead-Principal-Layer': 'L3',
+        'X-LuckRead-Verified-Creator-Id': 'creator_1',
+      },
+    })
+    const db = fakeDb([
+      baseRow({ subscription_id: 'sub_summary', creator_id: 'creator_1', status: 'ACTIVE' }),
+      baseRow({ subscription_id: 'sub_foreign', subscriber_id: 'user_2', creator_id: 'creator_2', status: 'ACTIVE' }),
+    ], [activePlan('plan_summary'), activePlan('plan_foreign', { owner_id: 'creator_2' })])
+    const response = await w07.fetch(request, {
+      D1_01: db,
+      SUBSCRIPTION_ORIGIN_GLOBAL_LIMITER: allowLimiter,
+      SUBSCRIPTION_READ_LIMITER: allowLimiter,
+      SUBSCRIPTION_WRITE_LIMITER: allowLimiter,
+    })
+    const body = await response.json() as { data?: { plans?: Record<string, number>; subscriptions?: Record<string, number> } }
+    expect(response.status).toBe(200)
+    expect(body.data?.plans).toEqual({ total: 1, draft: 0, active: 1, paused: 0, retired: 0 })
+    expect(body.data?.subscriptions).toEqual({
+      total: 1, pending: 0, active: 1, pastDue: 0, paused: 0, canceled: 0, expired: 0, activeSubscribers: 1,
+    })
+    expect(JSON.stringify(body.data)).not.toContain('sub_summary')
+    expect(JSON.stringify(body.data)).not.toContain('user_1')
   })
 
   it('creates creator plan drafts only with a trusted creator identity and idempotent key', async () => {
