@@ -73,6 +73,14 @@ const copy = (locale: StudioLocale) => locale === 'en-US' ? {
   empty: 'No membership plans yet. Create a draft to get started.',
   create: 'Create draft',
   creating: 'Creating…',
+  editTerms: 'Edit terms',
+  cancelEdit: 'Cancel',
+  saveTerms: 'Save new version',
+  savingTerms: 'Saving…',
+  revisionHeading: 'Create an immutable plan version',
+  successRevision: 'Plan version saved. Existing subscriptions keep their previous version.',
+  revisionValidation: 'Enter a valid name, lowercase tier key, and price with up to two decimal places.',
+  revisionBenefitsError: 'Add no more than 20 unique benefits, each at most 180 characters.',
   name: 'Plan name',
   namePlaceholder: 'Supporter membership',
   tier: 'Tier key',
@@ -115,6 +123,14 @@ const copy = (locale: StudioLocale) => locale === 'en-US' ? {
   empty: '还没有会员方案，先创建一个草稿。',
   create: '新建草稿',
   creating: '正在创建…',
+  editTerms: '编辑方案',
+  cancelEdit: '取消',
+  saveTerms: '保存新版本',
+  savingTerms: '正在保存…',
+  revisionHeading: '创建不可变方案版本',
+  successRevision: '方案新版本已保存，现有订阅仍保留原方案版本。',
+  revisionValidation: '请输入有效的名称、小写等级标识，以及最多两位小数的价格。',
+  revisionBenefitsError: '权益最多 20 项，不得重复，每项最多 180 个字符。',
   name: '方案名称',
   namePlaceholder: '支持者会员',
   tier: '等级标识',
@@ -172,6 +188,14 @@ export default function CreatorMembershipPlans({ locale = 'zh-CN' }: { locale?: 
   const [interval, setInterval] = useState<'MONTHLY' | 'YEARLY'>('MONTHLY')
   const [benefitsText, setBenefitsText] = useState('')
   const [createKey, setCreateKey] = useState('')
+  const [editingPlanId, setEditingPlanId] = useState<string | null>(null)
+  const [editName, setEditName] = useState('')
+  const [editTier, setEditTier] = useState('')
+  const [editPrice, setEditPrice] = useState('')
+  const [editInterval, setEditInterval] = useState<'MONTHLY' | 'YEARLY'>('MONTHLY')
+  const [editBenefitsText, setEditBenefitsText] = useState('')
+  const [editKey, setEditKey] = useState('')
+  const [savingPlanId, setSavingPlanId] = useState<string | null>(null)
 
   const loadPlans = useCallback(async (append = false, cursorValue: string | null = null) => {
     try {
@@ -274,6 +298,89 @@ export default function CreatorMembershipPlans({ locale = 'zh-CN' }: { locale?: 
       setError(caught instanceof Error ? caught.message : labels.actionError)
     } finally {
       setCreating(false)
+    }
+  }
+
+  function beginRevision(plan: MembershipPlan) {
+    setEditingPlanId(plan.planId)
+    setEditName(plan.name)
+    setEditTier(plan.tier)
+    setEditPrice(String(Math.floor(plan.priceMinor / 100)) + '.' + String(plan.priceMinor % 100).padStart(2, '0'))
+    setEditInterval(plan.billingInterval)
+    setEditBenefitsText(plan.benefits.join('\n'))
+    setEditKey(crypto.randomUUID())
+    setError('')
+    setMessage('')
+  }
+
+  async function saveRevision(event: FormEvent<HTMLFormElement>, plan: MembershipPlan) {
+    event.preventDefault()
+    if (editingPlanId !== plan.planId) return
+    setError('')
+    setMessage('')
+    const normalizedTier = editTier.trim()
+    const rawBenefits = editBenefitsText.split('\n').map((value) => value.trim()).filter(Boolean)
+    const normalizedPrice = editPrice.trim()
+    if (!editName.trim() || editName.trim().length > 120 ||
+        !/^[a-z][a-z0-9_-]{0,63}$/.test(normalizedTier) ||
+        !/^(0|[1-9]\d*)(\.\d{1,2})?$/.test(normalizedPrice)) {
+      setError(labels.revisionValidation)
+      return
+    }
+    if (rawBenefits.length > 20 || rawBenefits.some((value) => value.length > 180) ||
+        new Set(rawBenefits).size !== rawBenefits.length) {
+      setError(labels.revisionBenefitsError)
+      return
+    }
+    const [whole, fraction = ''] = normalizedPrice.split('.')
+    const priceMinor = Number(whole) * 100 + Number(fraction.padEnd(2, '0'))
+    if (!Number.isSafeInteger(priceMinor) || priceMinor < 0 || priceMinor > 2_147_483_647) {
+      setError(labels.revisionValidation)
+      return
+    }
+    const key = editKey || crypto.randomUUID()
+    setEditKey(key)
+    setSavingPlanId(plan.planId)
+    try {
+      const { response, data } = await fetchJson<PlanEnvelope>(
+        '/api/v1/membership/plans/' + encodeURIComponent(plan.planId),
+        {
+          method: 'PUT',
+          credentials: 'include',
+          cache: 'no-store',
+          headers: {
+            accept: 'application/json',
+            'content-type': 'application/json',
+            'If-Match': plan.etag,
+            'Idempotency-Key': key,
+          },
+          body: JSON.stringify({
+            name: editName.trim(),
+            tier: normalizedTier,
+            billingInterval: editInterval,
+            priceMinor,
+            currency: plan.currency,
+            benefits: rawBenefits,
+          }),
+        },
+      )
+      if (response.status === 401) { redirectToLogin(); return }
+      if (response.status === 412) throw new Error(labels.stale)
+      if (!response.ok || !isPlan(data?.data) ||
+          data.data.planId !== plan.planId || data.data.creatorId !== plan.creatorId ||
+          data.data.status !== plan.status ||
+          ![plan.version, plan.version + 1].includes(data.data.version) ||
+          ![plan.planVersion, plan.planVersion + 1].includes(data.data.planVersion)) {
+        throw new Error(getApiErrorMessage(data, labels.actionError))
+      }
+      setPlans((current) => current.map((item) => item.planId === plan.planId ? data.data! : item))
+      setMessage(labels.successRevision)
+      setEditingPlanId(null)
+      setEditKey('')
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : labels.actionError)
+    } finally {
+      setSavingPlanId(null)
     }
   }
 
@@ -386,7 +493,44 @@ export default function CreatorMembershipPlans({ locale = 'zh-CN' }: { locale?: 
                 <p className="text-xs font-semibold text-light-secondary dark:text-dark-secondary">{labels.benefitsLabel}</p>
                 {plan.benefits.length ? <ul className="mt-1 list-disc pl-5 text-sm">{plan.benefits.map((benefit) => <li key={benefit}>{benefit}</li>)}</ul> : <p className="mt-1 text-sm text-light-secondary dark:text-dark-secondary">{labels.noBenefits}</p>}
               </div>
+              {editingPlanId === plan.planId ? (
+                <form onSubmit={(event) => void saveRevision(event, plan)} className="grid grid-cols-1 gap-3 rounded-xl border border-light-border p-4 dark:border-dark-border md:grid-cols-2" aria-busy={savingPlanId === plan.planId}>
+                  <h4 className="text-sm font-bold md:col-span-2">{labels.revisionHeading}</h4>
+                  <label className="flex flex-col gap-1 text-sm font-semibold">
+                    {labels.name}
+                    <input required maxLength={120} value={editName} onChange={(event) => setEditName(event.target.value)} className="rounded-xl border border-light-border bg-transparent px-3 py-2 font-normal dark:border-dark-border" />
+                  </label>
+                  <label className="flex flex-col gap-1 text-sm font-semibold">
+                    {labels.tier}
+                    <input required maxLength={64} pattern="[a-z][a-z0-9_-]{0,63}" value={editTier} onChange={(event) => setEditTier(event.target.value)} className="rounded-xl border border-light-border bg-transparent px-3 py-2 font-normal dark:border-dark-border" />
+                  </label>
+                  <label className="flex flex-col gap-1 text-sm font-semibold">
+                    {labels.priceLabel} ({plan.currency})
+                    <input required inputMode="decimal" value={editPrice} onChange={(event) => setEditPrice(event.target.value)} pattern="(0|[1-9][0-9]*)(\.[0-9]{1,2})?" className="rounded-xl border border-light-border bg-transparent px-3 py-2 font-normal dark:border-dark-border" />
+                  </label>
+                  <label className="flex flex-col gap-1 text-sm font-semibold">
+                    {labels.interval}
+                    <select value={editInterval} onChange={(event) => setEditInterval(event.target.value as 'MONTHLY' | 'YEARLY')} className="rounded-xl border border-light-border bg-transparent px-3 py-2 font-normal dark:border-dark-border">
+                      <option value="MONTHLY">{labels.monthly}</option>
+                      <option value="YEARLY">{labels.yearly}</option>
+                    </select>
+                  </label>
+                  <label className="flex flex-col gap-1 text-sm font-semibold md:col-span-2">
+                    {labels.benefits}
+                    <textarea rows={3} value={editBenefitsText} onChange={(event) => setEditBenefitsText(event.target.value)} className="rounded-xl border border-light-border bg-transparent px-3 py-2 font-normal dark:border-dark-border" />
+                  </label>
+                  <div className="flex flex-wrap gap-2 md:col-span-2">
+                    <button type="submit" disabled={savingPlanId === plan.planId || busyPlanId !== null} className="rounded-full bg-main-accent px-4 py-2 text-sm font-bold text-white disabled:opacity-50">
+                      {savingPlanId === plan.planId ? labels.savingTerms : labels.saveTerms}
+                    </button>
+                    <button type="button" disabled={savingPlanId !== null} onClick={() => { setEditingPlanId(null); setEditKey('') }} className="rounded-full border border-light-border px-4 py-2 text-sm font-bold disabled:opacity-50 dark:border-dark-border">
+                      {labels.cancelEdit}
+                    </button>
+                  </div>
+                </form>
+              ) : null}
               <div className="flex flex-wrap gap-2">
+                {plan.status !== 'RETIRED' ? <button type="button" disabled={busy || savingPlanId !== null} onClick={() => beginRevision(plan)} className="rounded-full border border-light-border px-4 py-2 text-sm font-bold disabled:opacity-50 dark:border-dark-border">{labels.editTerms}</button> : null}
                 {plan.status === 'DRAFT' ? <button type="button" disabled={busy} onClick={() => void transition(plan, 'publish')} className="rounded-full bg-main-accent px-4 py-2 text-sm font-bold text-white disabled:opacity-50">{busy ? labels.actionBusy : labels.publish}</button> : null}
                 {plan.status === 'ACTIVE' ? <button type="button" disabled={busy} onClick={() => void transition(plan, 'pause')} className="rounded-full border border-light-border px-4 py-2 text-sm font-bold disabled:opacity-50 dark:border-dark-border">{busy ? labels.actionBusy : labels.pause}</button> : null}
                 {plan.status === 'PAUSED' ? <>
