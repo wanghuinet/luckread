@@ -1,0 +1,246 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/persistence/PAYMENT-D1-04-persistence.v1.json",
+  "title": "LuckRead Payment and Provider Event Inbox D1-04 Persistence Candidate",
+  "version": "1.0.0",
+  "status": "CONTRACTED_NOT_VERIFIED",
+  "featureIds": [
+    "PAY-001"
+  ],
+  "entityId": "ENT-PAYMENT",
+  "relatedEntityIds": [
+    "ENT-ORDER"
+  ],
+  "entityFieldContract": "contracts/entity/PAYMENT-ENTITY-CONTRACT.v1.json",
+  "sourceOfTruth": "contracts/entity/PAYMENT-ENTITY-CONTRACT.v1.json",
+  "authoritativeDomain": "D1-04",
+  "primaryWorker": "W07",
+  "physicalResource": {
+    "binding": "D1_04",
+    "migrationDirectory": "migrations-d1-04",
+    "migrationFile": "0002_payment_provider_events.sql",
+    "migrationId": "0002_payment_provider_events",
+    "remoteApplied": false
+  },
+  "tables": {
+    "payments": {
+      "purpose": "Durable provider-backed payment attempt state and immutable request/commercial snapshot; not a ledger or entitlement store.",
+      "primaryKey": "payment_id",
+      "entityId": "ENT-PAYMENT",
+      "columns": {
+        "payment_id": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false,
+          "immutable": true
+        },
+        "order_id": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false,
+          "immutable": true
+        },
+        "customer_id": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false,
+          "immutable": true,
+          "apiExposure": "NONE"
+        },
+        "provider": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false,
+          "immutable": true
+        },
+        "merchant_id": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false,
+          "immutable": true,
+          "apiExposure": "NONE"
+        },
+        "amount_minor": {
+          "type": "INTEGER",
+          "required": true,
+          "nullable": false,
+          "immutable": true
+        },
+        "currency": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false,
+          "immutable": true
+        },
+        "status": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false,
+          "stateMachineRef": "contracts/state-machines/payment.json"
+        },
+        "version": {
+          "type": "INTEGER",
+          "required": true,
+          "nullable": false,
+          "optimisticConcurrency": true
+        },
+        "idempotency_key": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false,
+          "immutable": true,
+          "apiExposure": "NONE"
+        },
+        "request_hash": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false,
+          "immutable": true,
+          "apiExposure": "NONE"
+        },
+        "provider_updated_at": {
+          "type": "TEXT",
+          "required": false,
+          "nullable": true,
+          "orderingAuthority": true
+        },
+        "failure_code": {
+          "type": "TEXT",
+          "required": false,
+          "nullable": true
+        },
+        "created_at": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false,
+          "immutable": true
+        },
+        "updated_at": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false
+        }
+      },
+      "invariants": [
+        "A Payment must reference an owned Order in CREATED/PENDING_PAYMENT with the same positive total and currency.",
+        "UNIQUE(customer_id, order_id, idempotency_key) prevents duplicate same-key Payment attempts.",
+        "Provider request runs outside a D1 transaction, using the same stable payment_id and idempotency_key on retries.",
+        "Provider resource.updated is monotonic; every stored mutation advances local version exactly once.",
+        "Terminal payment attempts are not reopened."
+      ]
+    },
+    "payment_provider_events": {
+      "purpose": "Durable deduplication/reconciliation inbox for authenticated, signature-verified provider events; never raw event payload storage.",
+      "primaryKey": "event_row_id",
+      "columns": {
+        "event_row_id": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false,
+          "immutable": true
+        },
+        "provider": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false,
+          "immutable": true
+        },
+        "merchant_id": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false,
+          "immutable": true,
+          "apiExposure": "NONE"
+        },
+        "event_id": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false,
+          "immutable": true
+        },
+        "event_type": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false,
+          "immutable": true
+        },
+        "payment_id": {
+          "type": "TEXT",
+          "required": false,
+          "nullable": true,
+          "immutable": true
+        },
+        "payload_sha256": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false,
+          "immutable": true
+        },
+        "state": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false,
+          "allowedValues": [
+            "RECEIVED",
+            "APPLIED",
+            "RECONCILIATION_REQUIRED",
+            "REJECTED"
+          ]
+        },
+        "received_at": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false,
+          "immutable": true
+        },
+        "processed_at": {
+          "type": "TEXT",
+          "required": false,
+          "nullable": true
+        },
+        "outcome_code": {
+          "type": "TEXT",
+          "required": false,
+          "nullable": true
+        }
+      },
+      "invariants": [
+        "UNIQUE(provider, merchant_id, event_id) is the durable webhook deduplication key.",
+        "A duplicate event ID with the same payload hash is a replay; different payload hash requires reconciliation.",
+        "Only RECEIVED can transition to a terminal processing outcome; processed events cannot be rewritten or deleted.",
+        "Raw webhook body, provider secret, client secret, card data, and entitlement information are never stored."
+      ]
+    }
+  },
+  "mutationBudgets": {
+    "d1ReadMax": 3,
+    "d1WriteTransactionMax": 1,
+    "distributedTransactions": false,
+    "providerNetworkCallsInsideD1Transaction": false
+  },
+  "runtimeGates": {
+    "physicalD1Binding": "UUID_REGISTERED_REMOTE_NAME_PREFLIGHT_REQUIRED",
+    "migrationExecution": "CANDIDATE_ONLY_NOT_APPLIED",
+    "optimisticConcurrency": "REQUIRED",
+    "providerIdempotency": "REQUIRED",
+    "signedWebhookDeduplication": "REQUIRED",
+    "runtimePositive": "REQUIRED",
+    "runtimeNegative": "REQUIRED",
+    "remoteRuntimeEvidence": "REQUIRED"
+  },
+  "migration": {
+    "status": "PROPOSED_NOT_APPLIED",
+    "file": "workers/W07-subscription-commerce/migrations-d1-04/0002_payment_provider_events.sql",
+    "id": "0002_payment_provider_events",
+    "targetBinding": "D1_04",
+    "appliedRemotely": false,
+    "rule": "Reviewed source only; no remote D1 mutation, Worker deployment or provider event application is authorized by this contract."
+  },
+  "nonGoals": [
+    "No new Worker, D1, Queue or Service Binding.",
+    "No raw webhook payload, client secret, API key, or card data persistence.",
+    "No ledger posting, refund, settlement, payout, order confirmation or entitlement grant.",
+    "No cross-D1 foreign key or distributed transaction."
+  ],
+  "promotionRule": "Remain CONTRACTED_NOT_VERIFIED until exact migration/schema evidence, provider retry and webhook idempotency runtime tests, security negatives, and exact-commit Evidence Registry admission pass."
+}
