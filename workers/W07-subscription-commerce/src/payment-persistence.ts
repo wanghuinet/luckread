@@ -122,6 +122,26 @@ type ProviderEventConflictRow = {
   resolution_code: string | null;
 };
 
+type PaymentMandateRow = {
+  mandate_record_id: string;
+  provider: string;
+  merchant_id: string;
+  customer_id: string;
+  payment_method_id: string;
+  source_payment_id: string;
+  source_event_id: string;
+  consent_accepted_at: string;
+  consent_acceptance_type: 'online';
+  consent_scope: 'OFF_SESSION_RECURRING';
+  consent_terms_version: 'luckread-recurring-consent-v1';
+  provider_mandate_id: string | null;
+  status: 'PENDING_PROVIDER_CONFIRMATION' | 'ACTIVE' | 'REVOKED' | 'FAILED' | 'EXPIRED';
+  version: number;
+  provider_updated_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type PaymentPersistenceDependencies = Readonly<{
   now?: () => Date;
   createPaymentId?: () => string;
@@ -880,6 +900,178 @@ async function persistAndApplyProviderStatus(
   return resultFromProviderEvent(stored, payloadSha256, stored.state === 'APPLIED' ? 'DUPLICATE' : undefined);
 }
 
+
+async function readMandateForWebhook(
+  db: D1Database,
+  merchantId: string,
+  providerMandateId: string,
+  paymentMethodId: string,
+): Promise<PaymentMandateRow | null> {
+  return db.prepare(
+    'SELECT mandate_record_id, provider, merchant_id, customer_id, payment_method_id, source_payment_id, source_event_id, ' +
+    'consent_accepted_at, consent_acceptance_type, consent_scope, consent_terms_version, provider_mandate_id, status, version, ' +
+    'provider_updated_at, created_at, updated_at FROM payment_mandates ' +
+    'WHERE provider = ? AND merchant_id = ? AND provider_mandate_id = ? AND payment_method_id = ? LIMIT 1',
+  ).bind(PROVIDER, merchantId, providerMandateId, paymentMethodId).first<PaymentMandateRow>();
+}
+
+/**
+ * Apply only the signed, merchant-bound Hyperswitch mandate lifecycle events.
+ * Hyperswitch's MandateResponse has no resource update timestamp in the
+ * documented schema, so use the provider envelope timestamp as notification
+ * ordering evidence and fail closed if neither a resource nor envelope event
+ * timestamp is present. A revoked mandate can never be re-activated.
+ */
+async function receiveHyperswitchMandateWebhook(
+  db: D1Database,
+  envelope: NonNullable<ReturnType<typeof parseHyperswitchWebhookEnvelope>>,
+  payloadSha256: string,
+  eventRowId: string,
+  now: string,
+  createConflictId: () => string,
+): Promise<WebhookReceiptResult> {
+  if (envelope.contentType !== 'mandate_details') {
+    return persistNonApplicableWebhook(
+      db, envelope, payloadSha256, eventRowId, now, 'RECONCILIATION_REQUIRED',
+      'MANDATE_EVENT_CONTENT_TYPE_MISMATCH', createConflictId,
+    );
+  }
+
+  const expectedStatus = envelope.eventType === 'mandate_active'
+    ? 'ACTIVE'
+    : envelope.eventType === 'mandate_revoked'
+      ? 'REVOKED'
+      : null;
+  const resource = envelope.resource;
+  const providerMandateId = resource.mandate_id;
+  const paymentMethodId = resource.payment_method_id;
+  const providerStatus = resource.status;
+  if (
+    expectedStatus === null ||
+    !nonBlank(providerMandateId, 255) ||
+    !nonBlank(paymentMethodId, 255) ||
+    !/^[\\x21-\\x7e]{1,255}$/.test(paymentMethodId) ||
+    (providerStatus !== 'active' && providerStatus !== 'revoked') ||
+    providerStatus !== expectedStatus.toLowerCase() ||
+    (resource.merchant_id !== undefined && resource.merchant_id !== envelope.merchantId)
+  ) {
+    return persistNonApplicableWebhook(
+      db, envelope, payloadSha256, eventRowId, now, 'RECONCILIATION_REQUIRED',
+      'MANDATE_RESOURCE_MISMATCH', createConflictId,
+    );
+  }
+
+  const resourceUpdatedAt = resource.updated_at ?? resource.modified_at ?? resource.updated;
+  const providerEventAt = typeof resourceUpdatedAt === 'string'
+    ? resourceUpdatedAt
+    : envelope.timestamp;
+  if (typeof providerEventAt !== 'string' || !Number.isFinite(Date.parse(providerEventAt))) {
+    return persistNonApplicableWebhook(
+      db, envelope, payloadSha256, eventRowId, now, 'RECONCILIATION_REQUIRED',
+      'MANDATE_PROVIDER_TIMESTAMP_MISSING', createConflictId,
+    );
+  }
+  const canonicalProviderTimestamp = new Date(Date.parse(providerEventAt)).toISOString();
+
+  let mandate: PaymentMandateRow | null;
+  try {
+    mandate = await readMandateForWebhook(db, envelope.merchantId, providerMandateId, paymentMethodId);
+  } catch {
+    throw new PaymentPersistenceError('SERVICE_UNAVAILABLE', 503);
+  }
+  if (!mandate) {
+    return persistNonApplicableWebhook(
+      db, envelope, payloadSha256, eventRowId, now, 'RECONCILIATION_REQUIRED',
+      'UNKNOWN_LOCAL_MANDATE', createConflictId,
+    );
+  }
+
+  const updatedAt = strictlyAfter(now, mandate.updated_at);
+  const insertEvent = db.prepare(
+    'INSERT INTO payment_provider_events ' +
+    '(event_row_id, provider, merchant_id, event_id, event_type, payment_id, payload_sha256, state, received_at, processed_at, outcome_code) ' +
+    "VALUES (?, ?, ?, ?, ?, NULL, ?, 'RECEIVED', ?, NULL, NULL) " +
+    'ON CONFLICT(provider, merchant_id, event_id) DO NOTHING',
+  ).bind(eventRowId, PROVIDER, envelope.merchantId, envelope.eventId, envelope.eventType, payloadSha256, now);
+
+  const updateMandate = db.prepare(
+    'UPDATE payment_mandates SET status = ?, provider_updated_at = ?, version = version + 1, updated_at = ? ' +
+    'WHERE mandate_record_id = ? AND provider = ? AND merchant_id = ? AND provider_mandate_id = ? ' +
+    'AND payment_method_id = ? AND version = ? AND status = ? ' +
+    'AND (provider_updated_at IS NULL OR provider_updated_at < ?) ' +
+    "AND ((? = 'ACTIVE' AND status IN ('PENDING_PROVIDER_CONFIRMATION','ACTIVE')) " +
+    "OR (? = 'REVOKED' AND status IN ('PENDING_PROVIDER_CONFIRMATION','ACTIVE','REVOKED'))) " +
+    "AND EXISTS (SELECT 1 FROM payment_provider_events e WHERE e.provider = ? AND e.merchant_id = ? " +
+    "AND e.event_id = ? AND e.payload_sha256 = ? AND e.state = 'RECEIVED')",
+  ).bind(
+    expectedStatus, canonicalProviderTimestamp, updatedAt,
+    mandate.mandate_record_id, PROVIDER, envelope.merchantId, providerMandateId,
+    paymentMethodId, mandate.version, mandate.status, canonicalProviderTimestamp,
+    expectedStatus, expectedStatus,
+    PROVIDER, envelope.merchantId, envelope.eventId, payloadSha256,
+  );
+
+  const updateReceipt = db.prepare(
+    'UPDATE payment_provider_events SET state = CASE WHEN EXISTS (' +
+    'SELECT 1 FROM payment_mandates m WHERE m.mandate_record_id = ? AND m.provider = ? AND m.merchant_id = ? ' +
+    'AND m.provider_mandate_id = ? AND m.payment_method_id = ? AND m.status = ? AND m.provider_updated_at = ?) ' +
+    "THEN 'APPLIED' ELSE 'RECONCILIATION_REQUIRED' END, processed_at = ?, " +
+    'outcome_code = CASE WHEN EXISTS (' +
+    'SELECT 1 FROM payment_mandates m WHERE m.mandate_record_id = ? AND m.provider = ? AND m.merchant_id = ? ' +
+    'AND m.provider_mandate_id = ? AND m.payment_method_id = ? AND m.status = ? AND m.provider_updated_at = ?) ' +
+    "THEN 'MANDATE_STATUS_APPLIED' ELSE 'MANDATE_STATUS_CAS_LOST_OR_OUT_OF_ORDER' END " +
+    "WHERE provider = ? AND merchant_id = ? AND event_id = ? AND payload_sha256 = ? AND state = 'RECEIVED'",
+  ).bind(
+    mandate.mandate_record_id, PROVIDER, envelope.merchantId, providerMandateId, paymentMethodId,
+    expectedStatus, canonicalProviderTimestamp, now,
+    mandate.mandate_record_id, PROVIDER, envelope.merchantId, providerMandateId, paymentMethodId,
+    expectedStatus, canonicalProviderTimestamp,
+    PROVIDER, envelope.merchantId, envelope.eventId, payloadSha256,
+  );
+
+  let batchResults: D1Result[];
+  try {
+    batchResults = await db.batch([insertEvent, updateMandate, updateReceipt]);
+  } catch {
+    const raced = await readProviderEvent(db, envelope.merchantId, envelope.eventId).catch(() => null);
+    if (!raced) throw new PaymentPersistenceError('SERVICE_UNAVAILABLE', 503);
+    if (raced.payload_sha256 !== payloadSha256) {
+      const conflictId = await recordWebhookConflict(db, raced, payloadSha256, now, createConflictId);
+      return {
+        outcome: 'PAYLOAD_CONFLICT',
+        eventId: raced.event_id,
+        receiptId: raced.event_row_id,
+        state: raced.state,
+        payloadSha256,
+        conflictId,
+      };
+    }
+    if (raced.state !== 'RECEIVED') return resultFromProviderEvent(raced, payloadSha256, 'DUPLICATE');
+    throw new PaymentPersistenceError('SERVICE_UNAVAILABLE', 503);
+  }
+
+  const stored = await readProviderEvent(db, envelope.merchantId, envelope.eventId).catch(() => null);
+  if (!stored) throw new PaymentPersistenceError('SERVICE_UNAVAILABLE', 503);
+  if (stored.payload_sha256 !== payloadSha256) {
+    const conflictId = await recordWebhookConflict(db, stored, payloadSha256, now, createConflictId);
+    return {
+      outcome: 'PAYLOAD_CONFLICT',
+      eventId: stored.event_id,
+      receiptId: stored.event_row_id,
+      state: stored.state,
+      payloadSha256,
+      conflictId,
+    };
+  }
+  if (stored.state === 'RECEIVED') throw new PaymentPersistenceError('SERVICE_UNAVAILABLE', 503);
+  if (
+    stored.state === 'APPLIED' &&
+    Number(batchResults[1]?.meta?.changes ?? 0) === 1 &&
+    Number(batchResults[2]?.meta?.changes ?? 0) === 1
+  ) return resultFromProviderEvent(stored, payloadSha256, 'APPLIED');
+  return resultFromProviderEvent(stored, payloadSha256, stored.state === 'APPLIED' ? 'DUPLICATE' : undefined);
+}
+
 /**
  * Verify the exact raw-body signature, bind provider facts to the local Payment
  * snapshot, and atomically record the event outcome with any allowed Payment
@@ -939,6 +1131,12 @@ export async function receiveHyperswitchWebhook(
 
   const eventRowId = existing?.event_row_id ?? (dependencies.createEventRowId ?? defaultEventRowId)();
   const createConflictId = dependencies.createConflictId ?? defaultConflictId;
+
+  if (envelope.eventType === 'mandate_active' || envelope.eventType === 'mandate_revoked') {
+    return receiveHyperswitchMandateWebhook(
+      db, envelope, payloadSha256, eventRowId, now, createConflictId,
+    );
+  }
 
   if (envelope.contentType !== 'payment_details') {
     return persistNonApplicableWebhook(
