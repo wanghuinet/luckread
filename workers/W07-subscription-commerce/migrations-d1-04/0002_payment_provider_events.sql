@@ -122,3 +122,53 @@ BEGIN SELECT RAISE(ABORT, 'processed provider webhook events are immutable'); EN
 CREATE TRIGGER payment_provider_events_retained
 BEFORE DELETE ON payment_provider_events
 BEGIN SELECT RAISE(ABORT, 'provider webhook deduplication evidence is retained'); END;
+
+
+-- Durable evidence for a cryptographically valid event ID that is replayed with
+-- a different payload hash. Keep it separate from the immutable first receipt.
+CREATE TABLE payment_provider_event_conflicts (
+  conflict_id TEXT PRIMARY KEY NOT NULL CHECK (length(conflict_id) BETWEEN 1 AND 255),
+  provider TEXT NOT NULL CHECK (provider = 'hyperswitch'),
+  merchant_id TEXT NOT NULL CHECK (length(merchant_id) BETWEEN 1 AND 256),
+  event_id TEXT NOT NULL CHECK (length(event_id) BETWEEN 1 AND 255),
+  existing_payload_sha256 TEXT NOT NULL CHECK (length(existing_payload_sha256) = 64 AND existing_payload_sha256 NOT GLOB '*[^0-9a-f]*'),
+  incoming_payload_sha256 TEXT NOT NULL CHECK (length(incoming_payload_sha256) = 64 AND incoming_payload_sha256 NOT GLOB '*[^0-9a-f]*'),
+  state TEXT NOT NULL DEFAULT 'OPEN' CHECK (state IN ('OPEN','RESOLVED')),
+  occurrence_count INTEGER NOT NULL DEFAULT 1 CHECK (typeof(occurrence_count) = 'integer' AND occurrence_count >= 1),
+  version INTEGER NOT NULL DEFAULT 1 CHECK (typeof(version) = 'integer' AND version >= 1),
+  first_seen_at TEXT NOT NULL CHECK (length(first_seen_at) BETWEEN 1 AND 64),
+  last_seen_at TEXT NOT NULL CHECK (length(last_seen_at) BETWEEN 1 AND 64 AND last_seen_at >= first_seen_at),
+  resolved_at TEXT CHECK (resolved_at IS NULL OR length(resolved_at) BETWEEN 1 AND 64),
+  resolution_code TEXT CHECK (resolution_code IS NULL OR length(resolution_code) BETWEEN 1 AND 128),
+  UNIQUE (provider, merchant_id, event_id, incoming_payload_sha256),
+  CHECK (existing_payload_sha256 <> incoming_payload_sha256),
+  CHECK (
+    (state = 'OPEN' AND resolved_at IS NULL AND resolution_code IS NULL)
+    OR (state = 'RESOLVED' AND resolved_at IS NOT NULL AND resolution_code IS NOT NULL)
+  )
+);
+CREATE INDEX ix_payment_provider_event_conflicts_state_last_seen ON payment_provider_event_conflicts(state, last_seen_at, conflict_id);
+CREATE INDEX ix_payment_provider_event_conflicts_identity ON payment_provider_event_conflicts(provider, merchant_id, event_id);
+
+CREATE TRIGGER payment_provider_event_conflicts_identity_immutable
+BEFORE UPDATE OF conflict_id, provider, merchant_id, event_id, existing_payload_sha256, incoming_payload_sha256, first_seen_at ON payment_provider_event_conflicts
+WHEN NEW.conflict_id IS NOT OLD.conflict_id OR NEW.provider IS NOT OLD.provider
+  OR NEW.merchant_id IS NOT OLD.merchant_id OR NEW.event_id IS NOT OLD.event_id
+  OR NEW.existing_payload_sha256 IS NOT OLD.existing_payload_sha256
+  OR NEW.incoming_payload_sha256 IS NOT OLD.incoming_payload_sha256 OR NEW.first_seen_at IS NOT OLD.first_seen_at
+BEGIN SELECT RAISE(ABORT, 'provider event conflict identity is immutable'); END;
+
+CREATE TRIGGER payment_provider_event_conflicts_version_guard
+BEFORE UPDATE ON payment_provider_event_conflicts
+WHEN NEW.version <> OLD.version + 1 OR NEW.last_seen_at < OLD.last_seen_at
+  OR NEW.occurrence_count < OLD.occurrence_count OR NEW.occurrence_count > OLD.occurrence_count + 1
+BEGIN SELECT RAISE(ABORT, 'provider event conflict update requires version CAS and monotonic observation'); END;
+
+CREATE TRIGGER payment_provider_event_conflicts_resolved_immutable
+BEFORE UPDATE ON payment_provider_event_conflicts
+WHEN OLD.state = 'RESOLVED'
+BEGIN SELECT RAISE(ABORT, 'resolved provider event conflicts are immutable'); END;
+
+CREATE TRIGGER payment_provider_event_conflicts_retained
+BEFORE DELETE ON payment_provider_event_conflicts
+BEGIN SELECT RAISE(ABORT, 'provider event conflict evidence is retained'); END;
