@@ -1,11 +1,13 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { fileURLToPath, pathToFileURL } from 'node:url'
+import { pathToFileURL } from 'node:url'
 
 export const ADMITTED_D1_04_UUID = '9bfb89a5-fbb5-45b1-a2ee-eab674b0d736'
 export const ORDER_MIGRATION_ID = '0001_order_commerce'
+export const PAYMENT_MIGRATION_ID = '0002_payment_provider_events'
+export const REQUIRED_MIGRATION_IDS = [ORDER_MIGRATION_ID, PAYMENT_MIGRATION_ID]
 
-const REQUIRED_COLUMNS = {
+export const REQUIRED_COLUMNS = {
   orders: [
     ['order_id', 'TEXT', 1, 1], ['customer_id', 'TEXT', 1, 0], ['status', 'TEXT', 1, 0],
     ['version', 'INTEGER', 1, 0], ['currency', 'TEXT', 1, 0], ['subtotal_minor', 'INTEGER', 1, 0],
@@ -26,33 +28,66 @@ const REQUIRED_COLUMNS = {
     ['response_status', 'INTEGER', 0, 0], ['response_json', 'TEXT', 0, 0],
     ['created_at', 'TEXT', 1, 0], ['expires_at', 'TEXT', 1, 0],
   ],
+  payments: [
+    ['payment_id', 'TEXT', 1, 1], ['order_id', 'TEXT', 1, 0], ['customer_id', 'TEXT', 1, 0],
+    ['provider', 'TEXT', 1, 0], ['merchant_id', 'TEXT', 1, 0], ['amount_minor', 'INTEGER', 1, 0],
+    ['currency', 'TEXT', 1, 0], ['status', 'TEXT', 1, 0], ['version', 'INTEGER', 1, 0],
+    ['idempotency_key', 'TEXT', 1, 0], ['request_hash', 'TEXT', 1, 0],
+    ['provider_updated_at', 'TEXT', 0, 0], ['failure_code', 'TEXT', 0, 0],
+    ['created_at', 'TEXT', 1, 0], ['updated_at', 'TEXT', 1, 0],
+  ],
+  payment_provider_events: [
+    ['event_row_id', 'TEXT', 1, 1], ['provider', 'TEXT', 1, 0], ['merchant_id', 'TEXT', 1, 0],
+    ['event_id', 'TEXT', 1, 0], ['event_type', 'TEXT', 1, 0], ['payment_id', 'TEXT', 0, 0],
+    ['payload_sha256', 'TEXT', 1, 0], ['state', 'TEXT', 1, 0], ['received_at', 'TEXT', 1, 0],
+    ['processed_at', 'TEXT', 0, 0], ['outcome_code', 'TEXT', 0, 0],
+  ],
 }
 
-const REQUIRED_INDEXES = {
+export const REQUIRED_INDEXES = {
   orders: ['ix_orders_customer_created_order', 'ix_orders_status_created_order'],
   order_lines: ['ix_order_lines_order_id', 'ix_order_lines_item_ref_version'],
   order_create_idempotency: ['ix_order_create_idempotency_customer_created', 'ix_order_create_idempotency_expiration'],
+  payments: ['ix_payments_customer_created_payment', 'ix_payments_order_created_payment', 'ix_payments_status_updated_payment'],
+  payment_provider_events: ['ix_payment_provider_events_state_received', 'ix_payment_provider_events_payment_received'],
 }
 
-const REQUIRED_TRIGGERS = {
+export const REQUIRED_TRIGGERS = {
   orders: [
     'orders_commercial_snapshot_immutable', 'orders_version_must_advance',
     'orders_status_transition_guard', 'orders_retained',
+    'orders_require_matching_completed_idempotency',
   ],
   order_lines: ['order_lines_require_order', 'order_lines_immutable_update', 'order_lines_retained'],
   order_create_idempotency: [
     'order_create_idempotency_identity_immutable', 'order_create_idempotency_terminal_immutable',
   ],
+  payments: [
+    'payments_require_payable_order', 'payments_snapshot_immutable', 'payments_version_must_advance',
+    'payments_terminal_status_guard', 'payments_provider_timestamp_monotonic', 'payments_retained',
+  ],
+  payment_provider_events: [
+    'payment_provider_events_identity_immutable',
+    'payment_provider_events_terminal_immutable',
+    'payment_provider_events_retained',
+  ],
 }
 
-const TARGET_OBJECT_NAMES = new Set([
-  ...Object.keys(REQUIRED_COLUMNS),
-  ...Object.values(REQUIRED_INDEXES).flat(),
-  ...Object.values(REQUIRED_TRIGGERS).flat(),
-])
+const targetNamesFor = (migrationId) => {
+  const tables = migrationId === ORDER_MIGRATION_ID
+    ? ['orders', 'order_lines', 'order_create_idempotency']
+    : migrationId === PAYMENT_MIGRATION_ID
+      ? ['payments', 'payment_provider_events']
+      : []
+  return new Set([
+    ...tables,
+    ...tables.flatMap((table) => REQUIRED_INDEXES[table] ?? []),
+    ...tables.flatMap((table) => REQUIRED_TRIGGERS[table] ?? []),
+  ])
+}
 
 function fail(message) {
-  throw new Error('W07_D1_04_ORDER_MIGRATION_GATE_FAILED: ' + message)
+  throw new Error('W07_D1_04_MIGRATION_GATE_FAILED: ' + message)
 }
 
 function collectObjects(value, output = [], seen = new Set()) {
@@ -81,11 +116,12 @@ function schemaObjects(input) {
     .sort((a, b) => a.type.localeCompare(b.type) || a.name.localeCompare(b.name))
   const unique = new Map()
   for (const object of objects) {
-    const previous = unique.get(object.type + '\u0000' + object.name)
+    const key = object.type + '\u0000' + object.name
+    const previous = unique.get(key)
     if (previous && JSON.stringify(previous) !== JSON.stringify(object)) {
       fail('conflicting schema definitions for ' + object.type + ':' + object.name)
     }
-    unique.set(object.type + '\u0000' + object.name, object)
+    unique.set(key, object)
   }
   return [...unique.values()]
 }
@@ -122,41 +158,43 @@ function writeReport(outputPath, report) {
 }
 
 /**
- * Return APPLY only for a clean target schema. An already-applied migration
- * proceeds to postflight validation; partial or colliding schemas fail closed.
+ * Determine exactly which reviewed migrations are pending. An already-applied
+ * migration is not treated as a collision; a target object for a missing
+ * migration is a partial/manual-intervention condition and fails closed.
  */
 export function inspectD1_04OrderMigrationPreflight({ schemaSnapshot, migrationState }) {
   const objects = schemaObjects(schemaSnapshot)
   const state = resolveMigrationState(objects, migrationState)
-  if (state.names.includes(ORDER_MIGRATION_ID)) {
-    return {
-      result: 'PREFLIGHT_PASS_ALREADY_APPLIED',
-      action: 'VERIFY_ONLY',
-      binding: 'D1_04',
-      databaseUuid: ADMITTED_D1_04_UUID,
-      migrationId: ORDER_MIGRATION_ID,
-      existingObjectNames: objects.map((object) => object.name),
-      writesPerformed: false,
-      deploymentPerformed: false,
+  const byName = new Set(objects.map((object) => object.name))
+
+  for (const migrationId of state.names.filter((name) => REQUIRED_MIGRATION_IDS.includes(name))) {
+    const missingObjects = [...targetNamesFor(migrationId)].filter((name) => !byName.has(name))
+    if (missingObjects.length > 0) {
+      fail('migration history records ' + migrationId + ' but target schema objects are missing: ' + missingObjects.join(', '))
     }
   }
 
+  const pendingMigrationIds = REQUIRED_MIGRATION_IDS.filter((migrationId) => !state.names.includes(migrationId))
+  const pendingObjectNames = new Set(pendingMigrationIds.flatMap((migrationId) => [...targetNamesFor(migrationId)]))
   const collisions = objects
-    .filter((object) => TARGET_OBJECT_NAMES.has(object.name))
+    .filter((object) => pendingObjectNames.has(object.name))
     .map((object) => object.type + ':' + object.name)
   if (collisions.length > 0) {
-    fail('target commerce objects already exist while migration history does not record ' +
-      ORDER_MIGRATION_ID + ': ' + collisions.join(', '))
+    fail('target commerce objects already exist while migration history does not record pending migration(s) ' +
+      pendingMigrationIds.join(', ') + ': ' + collisions.join(', '))
   }
 
+  const allTargetObjectNames = [...REQUIRED_MIGRATION_IDS.flatMap((id) => [...targetNamesFor(id)])]
   return {
-    result: 'PREFLIGHT_PASS_CLEAN_TARGET',
-    action: 'APPLY',
+    result: pendingMigrationIds.length === 0 ? 'PREFLIGHT_PASS_ALREADY_APPLIED' : 'PREFLIGHT_PASS_PENDING_MIGRATIONS',
+    action: pendingMigrationIds.length === 0 ? 'VERIFY_ONLY' : 'APPLY',
     binding: 'D1_04',
     databaseUuid: ADMITTED_D1_04_UUID,
-    migrationId: ORDER_MIGRATION_ID,
-    migrationTablePresent: state.tablePresent,
+    migrationId: pendingMigrationIds.at(-1) ?? REQUIRED_MIGRATION_IDS.at(-1),
+    migrationIds: REQUIRED_MIGRATION_IDS,
+    pendingMigrationIds,
     existingObjectNames: objects.map((object) => object.name),
+    targetObjectNames: allTargetObjectNames,
     writesPerformed: false,
     deploymentPerformed: false,
   }
@@ -165,15 +203,21 @@ export function inspectD1_04OrderMigrationPreflight({ schemaSnapshot, migrationS
 function tableColumns(input, tableName) {
   const columns = collectObjects(input)
     .filter((row) => Number.isInteger(row.cid) && typeof row.name === 'string' && typeof row.type === 'string')
-    .map((row) => ({ cid: row.cid, name: row.name, type: row.type.toUpperCase(), notnull: Number(row.notnull ?? 0), pk: Number(row.pk ?? 0) }))
+    .map((row) => ({
+      cid: row.cid,
+      name: row.name,
+      type: row.type.toUpperCase(),
+      notnull: Number(row.notnull ?? 0),
+      pk: Number(row.pk ?? 0),
+    }))
     .sort((a, b) => a.cid - b.cid)
   if (columns.length === 0) fail('remote PRAGMA table_info returned no columns for ' + tableName)
   return columns
 }
 
 /**
- * Admit postflight only when migration history, exact table columns, all named
- * indexes/triggers, and every pre-existing schema definition are preserved.
+ * Admit postflight only when all reviewed migration IDs, exact table columns,
+ * all named indexes/triggers, and every pre-existing schema definition match.
  */
 export function verifyD1_04OrderMigrationPostflight({
   preflightSchema,
@@ -182,12 +226,15 @@ export function verifyD1_04OrderMigrationPostflight({
   ordersTableInfo,
   orderLinesTableInfo,
   idempotencyTableInfo,
+  paymentsTableInfo,
+  paymentProviderEventsTableInfo,
 }) {
   const before = schemaObjects(preflightSchema)
   const after = schemaObjects(postflightSchema)
   const state = resolveMigrationState(after, migrationState)
-  if (!state.names.includes(ORDER_MIGRATION_ID)) {
-    fail('d1_migrations does not contain ' + ORDER_MIGRATION_ID)
+  const missingMigrations = REQUIRED_MIGRATION_IDS.filter((migrationId) => !state.names.includes(migrationId))
+  if (missingMigrations.length > 0) {
+    fail('d1_migrations does not contain required migrations: ' + missingMigrations.join(', '))
   }
 
   const present = new Map(after.map((object) => [object.type + '\u0000' + object.name, object]))
@@ -202,6 +249,8 @@ export function verifyD1_04OrderMigrationPostflight({
     orders: ordersTableInfo,
     order_lines: orderLinesTableInfo,
     order_create_idempotency: idempotencyTableInfo,
+    payments: paymentsTableInfo,
+    payment_provider_events: paymentProviderEventsTableInfo,
   }
   for (const [tableName, expectedColumns] of Object.entries(REQUIRED_COLUMNS)) {
     const actual = tableColumns(tableInfoByName[tableName], tableName)
@@ -242,7 +291,7 @@ export function verifyD1_04OrderMigrationPostflight({
   }
 
   const beforeKeys = new Set(before.map((object) => object.type + '\u0000' + object.name))
-  const allowedNewNames = new Set([...TARGET_OBJECT_NAMES, 'd1_migrations'])
+  const allowedNewNames = new Set([...REQUIRED_MIGRATION_IDS.flatMap((id) => [...targetNamesFor(id)]), 'd1_migrations'])
   const unexpectedNew = after.filter((object) =>
     !beforeKeys.has(object.type + '\u0000' + object.name) && !allowedNewNames.has(object.name))
   if (unexpectedNew.length > 0) {
@@ -254,8 +303,7 @@ export function verifyD1_04OrderMigrationPostflight({
     result: 'POSTFLIGHT_PASS',
     binding: 'D1_04',
     databaseUuid: ADMITTED_D1_04_UUID,
-    migrationId: ORDER_MIGRATION_ID,
-    appliedMigrations: state.names,
+    appliedMigrations: REQUIRED_MIGRATION_IDS,
     verifiedTables: Object.keys(REQUIRED_COLUMNS),
     verifiedIndexes: Object.values(REQUIRED_INDEXES).flat(),
     verifiedTriggers: Object.values(REQUIRED_TRIGGERS).flat(),
@@ -287,7 +335,7 @@ function main() {
     return
   }
   if (mode === 'postflight') {
-    if (args.length !== 7) throw new Error('Usage: verify-d1-04-order-migration.mjs postflight <preflight-schema.json> <postflight-schema.json> <migration-state.json> <orders-info.json> <order-lines-info.json> <idempotency-info.json> <output.json>')
+    if (args.length !== 9) throw new Error('Usage: verify-d1-04-order-migration.mjs postflight <preflight-schema.json> <postflight-schema.json> <migration-state.json> <orders-info.json> <order-lines-info.json> <idempotency-info.json> <payments-info.json> <provider-events-info.json> <output.json>')
     const report = verifyD1_04OrderMigrationPostflight({
       preflightSchema: readJson(args[0]),
       postflightSchema: readJson(args[1]),
@@ -295,8 +343,10 @@ function main() {
       ordersTableInfo: readJson(args[3]),
       orderLinesTableInfo: readJson(args[4]),
       idempotencyTableInfo: readJson(args[5]),
+      paymentsTableInfo: readJson(args[6]),
+      paymentProviderEventsTableInfo: readJson(args[7]),
     })
-    writeReport(args[6], report)
+    writeReport(args[8], report)
     console.log(JSON.stringify(report, null, 2))
     return
   }
