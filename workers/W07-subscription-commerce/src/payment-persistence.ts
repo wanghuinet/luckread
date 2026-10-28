@@ -897,7 +897,7 @@ async function persistAndApplyProviderStatus(
         'AND EXISTS (SELECT 1 FROM payments p WHERE p.payment_id = ? AND p.provider = ? AND p.merchant_id = ? ' +
         'AND p.status = ? AND p.provider_updated_at = ?) ' +
         'AND EXISTS (SELECT 1 FROM payment_provider_events e WHERE e.provider = ? AND e.merchant_id = ? ' +
-        'AND e.event_id = ? AND e.payload_sha256 = ? AND e.state = 'RECEIVED')',
+        "AND e.event_id = ? AND e.payload_sha256 = ? AND e.state = 'RECEIVED')",
       ).bind(
         renewalCycleTarget, providerStatus, renewalOutcomeCode, cycleUpdatedAt,
         renewalCycle.cycle_id, renewalCycle.version, renewalCycle.state,
