@@ -307,7 +307,8 @@
         "existing_payload_sha256 and incoming_payload_sha256 must differ; a same-hash replay belongs to the normal idempotent inbox path.",
         "Occurrence count may advance by at most one per version-CAS update; last_seen_at cannot regress.",
         "Resolution is explicit and terminal; resolved anomaly facts cannot be reopened or deleted.",
-        "No raw webhook body, API key, client secret or cardholder data is stored."
+        "No raw webhook body, API key, client secret or cardholder data is stored.",
+        "A conflict row can be inserted only when an immutable provider event receipt exists for the same provider, merchant, event ID, and existing payload hash."
       ]
     }
   },
