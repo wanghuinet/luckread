@@ -4222,6 +4222,71 @@ paths:
         '429': { $ref: '#/components/responses/RateLimited' }
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
+  /membership/plans/{planId}/lifecycle:
+    parameters:
+      - name: planId
+        in: path
+        required: true
+        schema: { type: string, pattern: '^plan_[a-f0-9]{64}$' }
+    post:
+      tags: [Creators]
+      summary: Pause or resume an owned membership plan
+      operationId: transitionOwnMembershipPlanLifecycle
+      description: >-
+        Requires membership.plan.lifecycle.own and an ACTIVE creator identity.
+        If-Match must match the lifecycle ETag. Pause hides the plan from new
+        sales; resume restores ACTIVE/PUBLIC visibility. Neither action changes
+        existing subscriptions or grants/revokes access. W01 confirms a durable
+        W06 intent before W07's owner-scoped D1-01 CAS and confirms W06's
+        immutable final audit before returning success.
+      security:
+        - sessionCookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IfMatchRequired'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [action]
+              properties:
+                action: { type: string, enum: [pause, resume] }
+      responses:
+        '200':
+          description: Plan lifecycle changed or exact retry/no-op was confirmed.
+          headers:
+            ETag:
+              schema: { $ref: '#/components/schemas/ETag' }
+            Cache-Control:
+              schema: { type: string, const: no-store }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, requestId]
+                properties:
+                  data:
+                    type: object
+                    required: [planId, creatorId, planVersion, status, visibility, version, etag, replayed]
+                    properties:
+                      planId: { type: string, pattern: '^plan_[a-f0-9]{64}$' }
+                      creatorId: { type: string }
+                      planVersion: { type: integer, minimum: 1 }
+                      status: { type: string, enum: [ACTIVE, PAUSED] }
+                      visibility: { type: string, enum: [PUBLIC, PRIVATE] }
+                      version: { type: integer, minimum: 1 }
+                      etag: { $ref: '#/components/schemas/ETag' }
+                      replayed: { type: boolean }
+                  requestId: { $ref: '#/components/schemas/RequestId' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
   /membership/plans/{planId}/publish:
     parameters:
       - name: planId

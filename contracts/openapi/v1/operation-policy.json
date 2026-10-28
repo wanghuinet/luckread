@@ -2709,6 +2709,19 @@
       "optimisticLockRequired": true,
       "idempotencyRequired": true,
       "stateMachine": "none"
+    },
+    {
+      "operationId": "transitionOwnMembershipPlanLifecycle",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "membership.plan.lifecycle.own"
+      ],
+      "auditRequired": true,
+      "optimisticLockRequired": true,
+      "idempotencyRequired": false,
+      "stateMachine": "none"
     }
   ]
 }

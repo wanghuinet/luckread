@@ -10,6 +10,7 @@ describe('v1 subscription adapter', () => {
   const plansRoute = readFileSync(resolve(process.cwd(), 'src/app/api/v1/plans/route.ts'), 'utf8')
   const creatorPlansRoute = readFileSync(resolve(process.cwd(), 'src/app/api/v1/membership/plans/route.ts'), 'utf8')
   const publishPlanRoute = readFileSync(resolve(process.cwd(), 'src/app/api/v1/membership/plans/[planId]/publish/route.ts'), 'utf8')
+  const lifecyclePlanRoute = readFileSync(resolve(process.cwd(), 'src/app/api/v1/membership/plans/[planId]/lifecycle/route.ts'), 'utf8')
   const updatePlanRoute = readFileSync(resolve(process.cwd(), 'src/app/api/v1/membership/plans/[planId]/route.ts'), 'utf8')
   const w08CreatorClient = readFileSync(resolve(process.cwd(), 'src/auth/w08-creator-client.ts'), 'utf8')
   const w08Worker = readFileSync(resolve(process.cwd(), '../W08-creator/src/worker.ts'), 'utf8')
@@ -107,6 +108,25 @@ describe('v1 subscription adapter', () => {
     expect(w06Worker).toContain("action: 'membership.plan.update_requested'")
     expect(w06Worker).toContain("action: 'membership.plan.updated'")
     expect(w08Casl).toContain("grant('membership.plan.update.own', 'MembershipPlan', selfOwnerCondition(subjectId))")
+  })
+
+  it('pauses/resumes an owned plan through CASL, W07 lifecycle CAS and W06 audits', () => {
+    expect(openapi).toContain('operationId: transitionOwnMembershipPlanLifecycle')
+    expect(apiInventory.domains.subscription_entitlement_payment.endpoint_groups)
+      .toContain('POST /v1/membership/plans/{planId}/lifecycle')
+    expect(lifecyclePlanRoute).toContain("'membership.plan.lifecycle.own'")
+    expect(lifecyclePlanRoute).toContain("'/internal/authz/check-permission'")
+    expect(lifecyclePlanRoute).toContain("'/internal/creator/self'")
+    expect(lifecyclePlanRoute).toContain('callW06MembershipPlanLifecycleRequestAudit')
+    expect(lifecyclePlanRoute.indexOf('callW06MembershipPlanLifecycleRequestAudit'))
+      .toBeLessThan(lifecyclePlanRoute.indexOf('const w07Response = await callW07Subscription'))
+    expect(lifecyclePlanRoute).toContain("'/membership/plans/' + encodeURIComponent(planId) + '/lifecycle'")
+    expect(lifecyclePlanRoute).toContain('callW06MembershipPlanLifecycleAudit')
+    expect(w06Client).toContain("'/internal/audit-events/membership-plan-lifecycle-requested'")
+    expect(w06Client).toContain("'/internal/audit-events/membership-plan-lifecycle-changed'")
+    expect(w06Worker).toContain("url.pathname === '/internal/audit-events/membership-plan-lifecycle-requested'")
+    expect(w06Worker).toContain("url.pathname === '/internal/audit-events/membership-plan-lifecycle-changed'")
+    expect(w08Casl).toContain("grant('membership.plan.lifecycle.own', 'MembershipPlan', selfOwnerCondition(subjectId))")
   })
 
   it('contracts creator plan permissions and server-controlled draft fields', () => {

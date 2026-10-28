@@ -166,6 +166,49 @@
       "idempotency": "Idempotency-Key"
     },
     {
+      "operationId": "transitionOwnMembershipPlanLifecycle",
+      "method": "POST",
+      "publicPath": "/api/v1/membership/plans/{planId}/lifecycle",
+      "internalPath": "/membership/plans/{planId}/lifecycle",
+      "principalRequired": true,
+      "permission": "membership.plan.lifecycle.own",
+      "minimumGlobalLayer": "L3",
+      "precondition": "If-Match",
+      "ownerId": "W08-resolved ACTIVE creator ID only; never taken from public body.",
+      "requestBody": {
+        "required": [
+          "action"
+        ],
+        "additionalProperties": false,
+        "action": {
+          "enum": [
+            "pause",
+            "resume"
+          ]
+        }
+      },
+      "lifecycle": "pause ACTIVE/PUBLIC to PAUSED/PRIVATE; resume PAUSED/PRIVATE to ACTIVE/PUBLIC. RETIRED plans cannot transition.",
+      "effect": "Controls future catalog visibility/new sales only; existing subscriptions and accepted plan_version remain unchanged.",
+      "cache": "NO_STORE",
+      "auditRequired": true,
+      "successRule": "W01 confirms durable W06 intent before W07 owner-scoped D1-01 If-Match CAS and confirms the immutable W06 final event before success.",
+      "auditTransportBinding": "W01-W06-moderation-http-binding.v1",
+      "failurePolicy": {
+        "missingIfMatch": "428",
+        "staleVersion": "412",
+        "invalidSourceState": "409",
+        "missingOrForeignOwnerPlan": "404",
+        "missingW06AuditConfirmation": "503"
+      },
+      "topologyConstraints": {
+        "newWorker": false,
+        "newDatabase": false,
+        "newQueue": false,
+        "newServiceBinding": false,
+        "crossD1Transactions": 0
+      }
+    },
+    {
       "operationId": "createCommerceOrder",
       "method": "POST",
       "publicPath": "/api/v1/commerce/orders",
