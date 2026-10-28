@@ -53,6 +53,32 @@ export async function callW06MembershipPlanAudit(input: {
   })
 }
 
+/** Dedicated durable audit path for a validated, newly created W07 Order DTO. */
+export async function callW06CommerceOrderAudit(input: {
+  request: Request
+  principal: ContentPrincipal
+  body: {
+    eventId: string
+    orderId: string
+    occurredAt: string
+    status: 'CREATED'
+    version: number
+    currency: string
+    subtotalMinor: number
+    discountMinor: number
+    taxMinor: number
+    totalMinor: number
+  }
+}): Promise<Response> {
+  return callW06Moderation({
+    request: input.request,
+    pathname: '/internal/audit-events/commerce-order-created',
+    method: 'POST',
+    principal: input.principal,
+    body: input.body,
+  })
+}
+
 export async function callW06Moderation(input: {
   request: Request
   pathname: string
