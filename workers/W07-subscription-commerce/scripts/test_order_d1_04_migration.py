@@ -126,7 +126,7 @@ class D104OrderMigrationTests(unittest.TestCase):
             "ix_order_lines_order_id", "ix_order_lines_item_ref_version",
             "ix_order_create_idempotency_customer_created", "ix_order_create_idempotency_expiration",
             "ix_payments_customer_created_payment", "ix_payments_order_created_payment",
-            "ix_payments_status_updated_payment", "ix_payment_provider_events_state_received",
+            "ix_payments_status_updated_payment", "ux_payments_single_live_or_successful_per_order", "ix_payment_provider_events_state_received",
             "ix_payment_provider_events_payment_received", "ix_payment_provider_event_conflicts_state_last_seen",
             "ix_payment_provider_event_conflicts_identity",
         }.issubset(indexes))
@@ -268,6 +268,19 @@ class D104OrderMigrationTests(unittest.TestCase):
         self.payment()
         with self.assertRaises(sqlite3.IntegrityError):
             self.payment(payment_id="pay_" + "d"*26, idempotency_key="payment_key_1")
+
+    def test_order_cannot_have_two_live_or_successful_payment_attempts(self):
+        self.order()
+        self.payment()
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.payment(payment_id="pay_" + "f"*26, idempotency_key="another_key")
+        # Once a previous attempt has durably failed, the same order may have a new attempt.
+        self.db.execute(
+            """UPDATE payments SET status='failed',version=2,
+               provider_updated_at=?,updated_at=? WHERE payment_id=? AND version=1""",
+            (LATER, LATER, "pay_" + "a"*26),
+        )
+        self.payment(payment_id="pay_" + "f"*26, idempotency_key="another_key", created=LATER, updated=LATER)
 
     def test_payment_snapshot_cas_provider_timestamp_and_terminal_status_guards(self):
         self.order()
