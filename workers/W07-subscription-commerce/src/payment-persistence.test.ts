@@ -647,6 +647,25 @@ describe('PAY-001 payment attempt persistence candidate', () => {
     expect(db.mandates).toHaveLength(0);
   });
 
+  it('does not persist a token when signed provider consent belongs to another customer', async () => {
+    const db = new MemoryPaymentD1();
+    seedOrder(db);
+    seedPayment(db);
+    const payload = JSON.parse(bodyText('evt_foreign_consent', NOW, true)) as {
+      content: { object: Record<string, unknown> };
+    };
+    payload.content.object.customer_id = 'user_foreign';
+    const signed = await signedBody(JSON.stringify(payload));
+    const applied = await receiveHyperswitchWebhook(
+      db as unknown as D1Database,
+      { ...signed, webhookSecret: SECRET, expectedMerchantId: MERCHANT },
+      fixedDeps(),
+    );
+    expect(applied.outcome).toBe('APPLIED');
+    expect(db.savedMethods).toHaveLength(0);
+    expect(db.mandates).toHaveLength(0);
+  });
+
   it('retains provider success but does not confirm a cancelled Order; event requires reconciliation', async () => {
     const db = new MemoryPaymentD1();
     seedOrder(db, { status: 'CANCELLED', version: 2, updated_at: LATER });
