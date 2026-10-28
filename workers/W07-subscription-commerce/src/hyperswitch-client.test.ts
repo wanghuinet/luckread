@@ -292,7 +292,7 @@ describe('Hyperswitch server-side payment intent client', () => {
     for (const invalidReference of [
       '',
       ' pm_saved_123',
-      'pm_saved_123\\nInjected: yes',
+      'pm_saved_123\nInjected: yes',
       'x'.repeat(257),
       42,
     ]) {
