@@ -1,4 +1,4 @@
-name: W07 D1-04 Order Migration (Explicit Manual Gate)
+name: W07 D1-04 Order and Payment Migrations (Explicit Manual Gate)
 
 on:
   workflow_dispatch:
@@ -106,7 +106,7 @@ jobs:
           )"
           echo "database_name=$D1_04_NAME" >> "$GITHUB_OUTPUT"
 
-      - name: Capture read-only D1-04 schema before migration
+      - name: Capture read-only D1-04 schema before candidate migrations
         id: schema_preflight
         working-directory: workers/W07-subscription-commerce
         env:
@@ -132,7 +132,7 @@ jobs:
           echo "migration_action=$ACTION"
           echo "No D1 writes were performed in this step."
 
-      - name: Apply the isolated D1-04 order migration
+      - name: Apply only pending isolated D1-04 order and payment migrations
         if: steps.schema_preflight.outputs.action == 'APPLY'
         working-directory: workers/W07-subscription-commerce
         env:
@@ -144,7 +144,7 @@ jobs:
           test -n "$D1_04_NAME"
           npx --yes wrangler@4.116.0 d1 migrations apply "$D1_04_NAME" --remote --config wrangler.jsonc
 
-      - name: Capture read-only D1-04 schema after migration
+      - name: Capture read-only D1-04 schema after candidate migrations
         working-directory: workers/W07-subscription-commerce
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -178,7 +178,7 @@ jobs:
         run: |
           set -euo pipefail
           {
-            echo '# W07 D1-04 Order Migration'
+            echo '# W07 D1-04 Order and Payment Migrations'
             echo
             echo '- Source SHA: ${{ inputs.source_sha }}'
             echo '- Expected database name: ${{ inputs.target_database_name }}'
