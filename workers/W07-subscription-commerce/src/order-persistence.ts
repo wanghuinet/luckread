@@ -34,7 +34,6 @@ export type CommerceOrderData = Readonly<{
   orderId: string;
   status: CommerceOrderStatus;
   version: number;
-  pricingMode: 'live' | 'demo';
   currency: string;
   subtotalMinor: number;
   discountMinor: number;
@@ -298,7 +297,6 @@ const parseStoredOrderData = (raw: string): CommerceOrderData => {
     orderId: value.orderId,
     status: value.status,
     version: value.version as number,
-    pricingMode,
     currency: value.currency,
     subtotalMinor: subtotal,
     discountMinor: discount,
@@ -507,7 +505,6 @@ export async function createCommerceOrder(
     orderId,
     status: 'CREATED',
     version: 1,
-    pricingMode: pricing.pricingMode,
     currency: pricing.currency,
     subtotalMinor: pricing.subtotalMinor,
     discountMinor: pricing.discountMinor,
@@ -603,15 +600,14 @@ export async function getCommerceOrder(
     'FROM order_lines WHERE order_id = ? ORDER BY order_line_id ASC',
   ).bind(orderId).all<OrderLineRow>();
   const lineModes = (result.results ?? []).map((line) => readSnapshotPricingMode(line.item_snapshot_json))
-  const pricingMode = lineModes[0] ?? 'live'
-  if (lineModes.some((mode) => mode !== pricingMode)) {
+  const firstLineMode = lineModes[0] ?? 'live'
+  if (lineModes.some((mode) => mode !== firstLineMode)) {
     throw new OrderPersistenceError('INTEGRITY_VIOLATION', 500)
   }
   const publicData: unknown = {
     orderId: order.order_id,
     status: order.status,
     version: order.version,
-    pricingMode,
     currency: order.currency,
     subtotalMinor: order.subtotal_minor,
     discountMinor: order.discount_minor,

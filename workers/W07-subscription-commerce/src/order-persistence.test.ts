@@ -189,10 +189,13 @@ describe('PAY-002 atomic D1-04 order persistence candidate', () => {
     });
     const result = await createCommerceOrder(db as unknown as D1Database, 'user_1', 'demo_key', request,
       demoPricing, deterministicDependencies('demo'));
-    expect(result.data.pricingMode).toBe('demo');
+    expect(result.data).not.toHaveProperty('pricingMode');
     expect(result.data.taxMinor).toBe(60);
+    expect(db.state.lines).toHaveLength(1);
+    const storedSnapshot = JSON.parse(String(db.state.lines[0]?.item_snapshot_json)) as Record<string, any>;
+    expect(storedSnapshot.luckreadPricing).toMatchObject({ mode: 'demo', taxProvider: 'luckread-demo-fixed-rate', taxMinor: 60 });
     const fetched = await getCommerceOrder(db as unknown as D1Database, 'user_1', result.data.orderId);
-    expect(fetched.pricingMode).toBe('demo');
+    expect(fetched).not.toHaveProperty('pricingMode');
     expect(fetched.taxMinor).toBe(60);
   });
 

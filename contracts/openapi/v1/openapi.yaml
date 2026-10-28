@@ -3402,12 +3402,13 @@ paths:
                   data:
                     type: object
                     additionalProperties: false
-                    required: [paymentId, orderId, amountMinor, currency, status, version, clientSecret]
+                    required: [paymentId, orderId, amountMinor, currency, pricingMode, status, version, clientSecret]
                     properties:
                       paymentId: { type: string, pattern: '^pay_[a-f0-9]{26}$' }
                       orderId: { type: string, pattern: '^ord_[A-Za-z0-9_-]{1,90}$' }
                       amountMinor: { type: integer, minimum: 1, maximum: 2147483647 }
                       currency: { type: string, pattern: '^[A-Z]{3}$' }
+                      pricingMode: { type: string, enum: [live, demo] }
                       status: { type: string, enum: [requires_payment_method, requires_confirmation] }
                       version: { type: integer, minimum: 1 }
                       clientSecret: { type: string, minLength: 1, maxLength: 4096 }
@@ -3427,12 +3428,13 @@ paths:
                   data:
                     type: object
                     additionalProperties: false
-                    required: [paymentId, orderId, amountMinor, currency, status, version, clientSecret]
+                    required: [paymentId, orderId, amountMinor, currency, pricingMode, status, version, clientSecret]
                     properties:
                       paymentId: { type: string, pattern: '^pay_[a-f0-9]{26}$' }
                       orderId: { type: string, pattern: '^ord_[A-Za-z0-9_-]{1,90}$' }
                       amountMinor: { type: integer, minimum: 1, maximum: 2147483647 }
                       currency: { type: string, pattern: '^[A-Z]{3}$' }
+                      pricingMode: { type: string, enum: [live, demo] }
                       status: { type: string, enum: [requires_payment_method, requires_confirmation] }
                       version: { type: integer, minimum: 1 }
                       clientSecret: { type: string, minLength: 1, maxLength: 4096 }

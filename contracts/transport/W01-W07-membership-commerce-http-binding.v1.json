@@ -271,6 +271,7 @@
       },
       "customerId": "Derived only from the W01 session principal; W07 independently verifies customer ownership against D1-04",
       "amountAndCurrency": "Read from the customer-owned Order and persisted payment attempt in W07 D1-04; never accepted from the browser",
+      "pricingMode": "Demo mode is derived from the immutable server-owned OrderLine snapshot; demo orders are payable only against an explicitly configured Hyperswitch sandbox. Live mode requires the admitted production pricing/tax adapter.",
       "provider": "Hyperswitch payment intent with customer_id and setup_future_usage=off_session; browser confirmation is handled only by the official hosted Payment Element",
       "consent": "Hyperswitch-hosted checkout must present its explicit save-method choice when supported. This operation does not persist mandate or consent facts; reusable-method storage remains gated on verified provider evidence and the following D1-04 module.",
       "responseFields": [
@@ -278,6 +279,7 @@
         "orderId",
         "amountMinor",
         "currency",
+        "pricingMode",
         "status",
         "version",
         "clientSecret"
