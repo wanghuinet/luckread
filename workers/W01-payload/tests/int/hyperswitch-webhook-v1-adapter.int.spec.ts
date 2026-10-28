@@ -59,6 +59,7 @@ describe('Hyperswitch provider webhook ingress', () => {
       maximumBodyBytes: 1048576,
     })
     const policyOperation = policy.operations.find((item: { operationId: string }) => item.operationId === 'receiveHyperswitchPaymentWebhook')
-    expect(policyOperation).toMatchObject({ idempotencyRequired: true, permissions: [] })
+    expect(policyOperation).toMatchObject({ auth: { mode: 'public' }, idempotencyRequired: false, permissions: [] })
+    expect(policyOperation['x-luckread-idempotency']).toContain('event_id')
   })
 })
