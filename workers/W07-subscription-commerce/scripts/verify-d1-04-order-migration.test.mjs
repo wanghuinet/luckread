@@ -190,7 +190,7 @@ test('postflight validates both migrations, all tables/columns/indexes/triggers,
   assert.deepEqual(report.appliedMigrations, REQUIRED_MIGRATION_IDS)
   assert.equal(report.verifiedTables.length, 10)
   assert.equal(report.verifiedIndexes.length, 22)
-  assert.equal(report.verifiedTriggers.length, 47)
+  assert.equal(report.verifiedTriggers.length, 48)
   assert.equal(report.databaseRowsExported, false)
 })
 
@@ -232,6 +232,7 @@ test('workflow is manual-only, gates exact SHA/name/confirmation, and never depl
   assert.match(workflow, /PRAGMA table_info\("payment_mandates"\)/)
   assert.match(workflow, /PRAGMA table_info\("subscription_renewal_cycles"\)/)
   assert.match(workflow, /PRAGMA table_info\("subscription_renewal_scheduler_state"\)/)
+  assert.match(migration, /subscription_renewal_cycles_sync_state_transition_guard/)
   assert.match(workflow, /PRAGMA table_info\("payments"\)/)
   assert.match(workflow, /PRAGMA table_info\("payment_provider_events"\)/)
   assert.match(workflow, /PRAGMA table_info\("payment_provider_event_conflicts"\)/)
