@@ -311,6 +311,39 @@ type MembershipPlanPublishAuditInput = {
   currency: string
 }
 
+
+type MembershipPlanUpdateRequestAuditInput = {
+  eventId: string
+  planId: string
+  creatorId: string
+  expectedVersion: number
+  idempotencyKey: string
+  name: string
+  tier: string
+  billingInterval: 'MONTHLY' | 'YEARLY'
+  priceMinor: number
+  currency: string
+  benefits: string[]
+}
+
+type MembershipPlanUpdateAuditInput = {
+  eventId: string
+  planId: string
+  creatorId: string
+  expectedVersion: number
+  planVersion: number
+  status: 'DRAFT' | 'ACTIVE' | 'PAUSED'
+  visibility: 'PRIVATE' | 'PUBLIC'
+  version: number
+  occurredAt: string
+  name: string
+  tier: string
+  billingInterval: 'MONTHLY' | 'YEARLY'
+  priceMinor: number
+  currency: string
+  benefits: string[]
+}
+
 type CommerceOrderAuditInput = {
   eventId: string
   orderId: string
@@ -421,6 +454,62 @@ function parseMembershipPlanAuditInput(value: unknown): MembershipPlanAuditInput
 }
 
 
+
+function parseMembershipPlanUpdateTerms(body: Record<string, unknown>): void {
+  if (
+    typeof body.name !== 'string' || body.name.trim().length < 1 || body.name.length > 120 ||
+    typeof body.tier !== 'string' || !/^[a-z][a-z0-9_-]{0,63}$/.test(body.tier) ||
+    (body.billingInterval !== 'MONTHLY' && body.billingInterval !== 'YEARLY') ||
+    typeof body.priceMinor !== 'number' || !Number.isSafeInteger(body.priceMinor) ||
+    body.priceMinor < 0 || body.priceMinor > 2_147_483_647 ||
+    typeof body.currency !== 'string' || !/^[A-Z]{3}$/.test(body.currency) ||
+    !Array.isArray(body.benefits) || body.benefits.length > 20 ||
+    body.benefits.some((item) => typeof item !== 'string' || item.trim() !== item || item.length < 1 || item.length > 180) ||
+    new Set(body.benefits).size !== body.benefits.length ||
+    JSON.stringify(body.benefits).length > 8192
+  ) throw new Error('INVALID_MEMBERSHIP_PLAN_UPDATE_AUDIT')
+}
+
+function parseMembershipPlanUpdateRequestAuditInput(value: unknown): MembershipPlanUpdateRequestAuditInput {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('INVALID_MEMBERSHIP_PLAN_UPDATE_REQUEST_AUDIT')
+  const body = value as Record<string, unknown>
+  const allowed = new Set(['eventId', 'planId', 'creatorId', 'expectedVersion', 'idempotencyKey', 'name', 'tier', 'billingInterval', 'priceMinor', 'currency', 'benefits'])
+  if (Object.keys(body).some((key) => !allowed.has(key)) || Object.keys(body).length !== allowed.size) {
+    throw new Error('INVALID_MEMBERSHIP_PLAN_UPDATE_REQUEST_AUDIT')
+  }
+  if (
+    typeof body.planId !== 'string' || !/^plan_[a-f0-9]{64}$/.test(body.planId) ||
+    typeof body.creatorId !== 'string' || !resourceIdPattern.test(body.creatorId) ||
+    typeof body.expectedVersion !== 'number' || !Number.isSafeInteger(body.expectedVersion) || body.expectedVersion < 1 ||
+    typeof body.idempotencyKey !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(body.idempotencyKey) ||
+    body.eventId !== 'evt_mpl_update_requested_' + body.planId + '_' + body.idempotencyKey
+  ) throw new Error('INVALID_MEMBERSHIP_PLAN_UPDATE_REQUEST_AUDIT')
+  parseMembershipPlanUpdateTerms(body)
+  return body as MembershipPlanUpdateRequestAuditInput
+}
+
+function parseMembershipPlanUpdateAuditInput(value: unknown): MembershipPlanUpdateAuditInput {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('INVALID_MEMBERSHIP_PLAN_UPDATE_AUDIT')
+  const body = value as Record<string, unknown>
+  const allowed = new Set(['eventId', 'planId', 'creatorId', 'expectedVersion', 'planVersion', 'status', 'visibility', 'version', 'occurredAt', 'name', 'tier', 'billingInterval', 'priceMinor', 'currency', 'benefits'])
+  if (Object.keys(body).some((key) => !allowed.has(key)) || Object.keys(body).length !== allowed.size) {
+    throw new Error('INVALID_MEMBERSHIP_PLAN_UPDATE_AUDIT')
+  }
+  if (
+    typeof body.planId !== 'string' || !/^plan_[a-f0-9]{64}$/.test(body.planId) ||
+    typeof body.creatorId !== 'string' || !resourceIdPattern.test(body.creatorId) ||
+    typeof body.expectedVersion !== 'number' || !Number.isSafeInteger(body.expectedVersion) || body.expectedVersion < 1 ||
+    typeof body.planVersion !== 'number' || !Number.isSafeInteger(body.planVersion) || body.planVersion < 2 ||
+    (body.status !== 'DRAFT' && body.status !== 'ACTIVE' && body.status !== 'PAUSED') ||
+    (body.visibility !== 'PRIVATE' && body.visibility !== 'PUBLIC') ||
+    typeof body.version !== 'number' || !Number.isSafeInteger(body.version) || body.version !== body.expectedVersion + 1 ||
+    body.eventId !== 'evt_mpl_updated_' + body.planId + '_v' + body.version ||
+    typeof body.occurredAt !== 'string' || !body.occurredAt || Number.isNaN(Date.parse(body.occurredAt))
+  ) throw new Error('INVALID_MEMBERSHIP_PLAN_UPDATE_AUDIT')
+  parseMembershipPlanUpdateTerms(body)
+  return body as MembershipPlanUpdateAuditInput
+}
+
 function parseMembershipPlanPublishAuditInput(value: unknown): MembershipPlanPublishAuditInput {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('INVALID_MEMBERSHIP_PLAN_PUBLISH_AUDIT')
   const body = value as Record<string, unknown>
@@ -463,7 +552,7 @@ function parseMembershipPlanPublishRequestAuditInput(value: unknown): Membership
   return body as MembershipPlanPublishRequestAuditInput
 }
 
-function matchesMembershipPlanPublishRequestAudit(existing: StoredAuditEvent, expected: AuditEvent): boolean {
+function matchesMembershipPlanMutationRequestAudit(existing: StoredAuditEvent, expected: AuditEvent): boolean {
   try {
     const storedActor = JSON.parse(existing.actor_json) as Record<string, unknown>
     const expectedActor = expected.actor as unknown as Record<string, unknown>
@@ -486,7 +575,7 @@ function matchesMembershipPlanPublishRequestAudit(existing: StoredAuditEvent, ex
  * therefore ignores only the newly generated timestamp and confirms that the
  * first immutable request-intent event is already durable.
  */
-async function persistMembershipPlanPublishRequestAudit(env: Env, event: AuditEvent): Promise<Response> {
+async function persistMembershipPlanMutationRequestAudit(env: Env, event: AuditEvent): Promise<Response> {
   let existing: StoredAuditEvent | null
   try {
     existing = await findAuditEvent(env.D1_03, event.eventId)
@@ -494,7 +583,7 @@ async function persistMembershipPlanPublishRequestAudit(env: Env, event: AuditEv
     return json({ error: 'AUDIT_EVENT_LOOKUP_FAILED' }, 503)
   }
   if (existing) {
-    if (!matchesMembershipPlanPublishRequestAudit(existing, event)) return json({ error: 'AUDIT_EVENT_CONFLICT' }, 409)
+    if (!matchesMembershipPlanMutationRequestAudit(existing, event)) return json({ error: 'AUDIT_EVENT_CONFLICT' }, 409)
     return json({ eventId: event.eventId, action: event.action, targetType: event.targetType, targetId: event.targetId, replayed: true }, 200)
   }
   try {
@@ -503,7 +592,7 @@ async function persistMembershipPlanPublishRequestAudit(env: Env, event: AuditEv
   } catch {
     try {
       const raced = await findAuditEvent(env.D1_03, event.eventId)
-      if (raced && matchesMembershipPlanPublishRequestAudit(raced, event)) {
+      if (raced && matchesMembershipPlanMutationRequestAudit(raced, event)) {
         return json({ eventId: event.eventId, action: event.action, targetType: event.targetType, targetId: event.targetId, replayed: true }, 200)
       }
     } catch {
@@ -812,7 +901,81 @@ export default {
         },
         occurredAt: new Date().toISOString(),
       }
-      return persistMembershipPlanPublishRequestAudit(env, event)
+      return persistMembershipPlanMutationRequestAudit(env, event)
+    }
+
+
+    if (request.method === 'POST' && url.pathname === '/internal/audit-events/membership-plan-update-requested') {
+      let principal: ReturnType<typeof requireW01Transport>
+      try { principal = requireW01Transport(request) }
+      catch (error) { return errorResponse(error, request.headers.get('X-LuckRead-Request-Id')?.trim()) }
+      if (!/^L[3-8]$/.test(principal.layer)) return json({ error: 'PERMISSION_DENIED' }, 403)
+      let input: MembershipPlanUpdateRequestAuditInput
+      try { input = parseMembershipPlanUpdateRequestAuditInput(await readBoundedAuditJson(request, 4096)) }
+      catch { return json({ error: 'INVALID_MEMBERSHIP_PLAN_UPDATE_REQUEST_AUDIT' }, 400) }
+      const event: AuditEvent = {
+        eventId: input.eventId,
+        requestId: principal.requestId,
+        traceId: principal.correlationId,
+        actor: { actorId: principal.userId, actorType: 'user', layer: principal.layer as AuditEvent['actor']['layer'] },
+        action: 'membership.plan.update_requested',
+        targetType: 'MembershipPlan',
+        targetId: input.planId,
+        before: { creatorId: input.creatorId, expectedVersion: input.expectedVersion },
+        after: {
+          creatorId: input.creatorId,
+          expectedVersion: input.expectedVersion,
+          idempotencyKey: input.idempotencyKey,
+          name: input.name,
+          tier: input.tier,
+          billingInterval: input.billingInterval,
+          priceMinor: input.priceMinor,
+          currency: input.currency,
+          benefits: input.benefits,
+        },
+        occurredAt: new Date().toISOString(),
+      }
+      return persistMembershipPlanMutationRequestAudit(env, event)
+    }
+
+    if (request.method === 'POST' && url.pathname === '/internal/audit-events/membership-plan-updated') {
+      let principal: ReturnType<typeof requireW01Transport>
+      try { principal = requireW01Transport(request) }
+      catch (error) { return errorResponse(error, request.headers.get('X-LuckRead-Request-Id')?.trim()) }
+      if (!/^L[3-8]$/.test(principal.layer)) return json({ error: 'PERMISSION_DENIED' }, 403)
+      let input: MembershipPlanUpdateAuditInput
+      try { input = parseMembershipPlanUpdateAuditInput(await readBoundedAuditJson(request, 6144)) }
+      catch { return json({ error: 'INVALID_MEMBERSHIP_PLAN_UPDATE_AUDIT' }, 400) }
+      const event: AuditEvent = {
+        eventId: input.eventId,
+        requestId: principal.requestId,
+        traceId: principal.correlationId,
+        actor: { actorId: principal.userId, actorType: 'user', layer: principal.layer as AuditEvent['actor']['layer'] },
+        action: 'membership.plan.updated',
+        targetType: 'MembershipPlan',
+        targetId: input.planId,
+        before: {
+          creatorId: input.creatorId,
+          expectedVersion: input.expectedVersion,
+          planVersion: input.planVersion - 1,
+        },
+        after: {
+          creatorId: input.creatorId,
+          expectedVersion: input.expectedVersion,
+          planVersion: input.planVersion,
+          version: input.version,
+          status: input.status,
+          visibility: input.visibility,
+          name: input.name,
+          tier: input.tier,
+          billingInterval: input.billingInterval,
+          priceMinor: input.priceMinor,
+          currency: input.currency,
+          benefits: input.benefits,
+        },
+        occurredAt: input.occurredAt,
+      }
+      return persistImmutableAuditEvent(env, event)
     }
 
     if (request.method === 'POST' && url.pathname === '/internal/audit-events/membership-plan-published') {

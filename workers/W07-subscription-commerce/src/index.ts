@@ -1,6 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 
-import { createMembershipPlanDraft, getSubscription, listActiveMembershipPlans, listCreatorMembershipPlans, listSubscriptions, parseBoundedPositiveInt, publishMembershipPlan, SubscriptionRuntimeError, validatePrincipal } from './subscription-runtime.js'
+import { createMembershipPlanDraft, reviseMembershipPlan, getSubscription, listActiveMembershipPlans, listCreatorMembershipPlans, listSubscriptions, parseBoundedPositiveInt, publishMembershipPlan, SubscriptionRuntimeError, validatePrincipal } from './subscription-runtime.js'
 import { handleCommerceOrderRequest } from './order-http-runtime.js'
 import { handleCommercePaymentIntentRequest } from './payment-intent-http-runtime.js'
 import { handleHyperswitchWebhookRequest } from './payment-webhook-http-runtime.js'
@@ -165,6 +165,20 @@ export default {
         requireCreatorLayer(request)
         const creatorId = requireVerifiedCreatorId(request)
         const result = await publishMembershipPlan(env.D1_01, creatorId, segments[2]!, request.headers.get('If-Match'))
+        return json({ data: result, requestId: crypto.randomUUID() }, 200, result.etag)
+      }
+      const planRevisionMatch = /^\/membership\/plans\/([^/]+)$/.exec(pathname)
+      if (request.method === 'PUT' && planRevisionMatch) {
+        const segments = parseSegments(pathname)
+        if (segments.length !== 3 || segments[0] !== 'membership' || segments[1] !== 'plans') {
+          return new Response(null, { status: 404 })
+        }
+        requireCreatorLayer(request)
+        const creatorId = requireVerifiedCreatorId(request)
+        const input = await readJsonBody(request)
+        const result = await reviseMembershipPlan(
+          env.D1_01, creatorId, segments[2]!, request.headers.get('If-Match'), input,
+        )
         return json({ data: result, requestId: crypto.randomUUID() }, 200, result.etag)
       }
       if (request.method === 'POST' && operation?.operation !== 'createPlan') {

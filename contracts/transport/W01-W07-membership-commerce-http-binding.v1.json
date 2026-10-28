@@ -122,6 +122,50 @@
       }
     },
     {
+      "operationId": "updateOwnMembershipPlan",
+      "method": "PUT",
+      "publicPath": "/api/v1/membership/plans/{planId}",
+      "internalPath": "/membership/plans/{planId}",
+      "principalRequired": true,
+      "permission": "membership.plan.update.own",
+      "minimumGlobalLayer": "L3",
+      "precondition": "If-Match",
+      "ownerId": "W08-resolved ACTIVE creator ID only; never taken from public query or body",
+      "requestBody": {
+        "required": [
+          "name",
+          "tier",
+          "billingInterval",
+          "priceMinor",
+          "currency",
+          "benefits"
+        ],
+        "additionalProperties": false
+      },
+      "immutableVersioning": "Append plan_version=current_version+1; never update/delete existing membership_plan_versions rows. Existing subscriptions retain the exact prior plan version accepted.",
+      "cache": "NO_STORE",
+      "auditRequired": true,
+      "successRule": "W01 confirms a durable W06 update-request intent before W07 appends a version and CAS-updates the current pointer in D1-01. W01 validates the full W07 DTO and confirms the immutable W06 membership.plan.updated event before returning success.",
+      "auditTransportBinding": "W01-W06-moderation-http-binding.v1",
+      "failurePolicy": {
+        "missingIfMatch": "428",
+        "staleVersion": "412",
+        "retiredPlan": "409",
+        "missingOrForeignOwnerPlan": "404",
+        "missingW06AuditConfirmation": "503; durable intent precedes mutation and final audit has a deterministic version ID",
+        "missingIdempotencyKey": "428",
+        "keyReuseWithDifferentBody": "409"
+      },
+      "topologyConstraints": {
+        "newWorker": false,
+        "newDatabase": false,
+        "newQueue": false,
+        "newServiceBinding": false,
+        "crossD1Transactions": 0
+      },
+      "idempotency": "Idempotency-Key"
+    },
+    {
       "operationId": "createCommerceOrder",
       "method": "POST",
       "publicPath": "/api/v1/commerce/orders",

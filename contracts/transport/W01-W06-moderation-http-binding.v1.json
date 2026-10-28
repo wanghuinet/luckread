@@ -172,6 +172,70 @@
       ]
     },
     {
+      "operationId": "auditMembershipPlanUpdateRequest",
+      "method": "POST",
+      "publicPath": "/api/v1/membership/plans/{planId}",
+      "internalPath": "/internal/audit-events/membership-plan-update-requested",
+      "principalRequired": true,
+      "actorAuthority": "W06 derives actor identity and layer from trusted W01 private transport headers; request body cannot supply actor identity.",
+      "eventId": "Deterministic evt_mpl_update_requested_{planId}_{idempotencyKey}; one immutable D1-03 intent record per idempotent requested change.",
+      "targetType": "MembershipPlan",
+      "auditRequired": true,
+      "idempotency": "Idempotency-Key is required. Same key with identical expected version and terms is an exact semantic replay; changed facts conflict. A different key permits a different request without mutating the prior intent.",
+      "successPolicy": "W01 must confirm this intent event before calling W07 to append a new immutable MembershipPlanVersion.",
+      "auditedFields": [
+        "planId",
+        "creatorId",
+        "expectedVersion",
+        "idempotencyKey",
+        "name",
+        "tier",
+        "billingInterval",
+        "priceMinor",
+        "currency",
+        "benefits"
+      ],
+      "sensitiveDataExcluded": [
+        "client credentials",
+        "payment credentials",
+        "raw request body"
+      ]
+    },
+    {
+      "operationId": "auditMembershipPlanUpdate",
+      "method": "POST",
+      "publicPath": "/api/v1/membership/plans/{planId}",
+      "internalPath": "/internal/audit-events/membership-plan-updated",
+      "principalRequired": true,
+      "actorAuthority": "W06 derives actor identity and layer from trusted W01 private transport headers; request body cannot supply actor identity.",
+      "eventId": "Deterministic evt_mpl_updated_{planId}_v{version}; one immutable D1-03 audit per selected commercial plan version.",
+      "targetType": "MembershipPlan",
+      "auditRequired": true,
+      "idempotency": "Stable event ID; exact immutable replay returns success, changed facts conflict.",
+      "successPolicy": "W01 only returns success after W07 DTO validation and durable W06 confirmation of the selected immutable plan version.",
+      "auditedFields": [
+        "planId",
+        "creatorId",
+        "expectedVersion",
+        "planVersion",
+        "status",
+        "visibility",
+        "version",
+        "name",
+        "tier",
+        "billingInterval",
+        "priceMinor",
+        "currency",
+        "benefits",
+        "occurredAt"
+      ],
+      "sensitiveDataExcluded": [
+        "client credentials",
+        "payment credentials",
+        "raw request body"
+      ]
+    },
+    {
       "operationId": "auditCommerceOrderCreation",
       "method": "POST",
       "publicPath": "/api/v1/commerce/orders",

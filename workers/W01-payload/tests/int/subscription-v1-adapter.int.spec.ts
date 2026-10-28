@@ -10,6 +10,7 @@ describe('v1 subscription adapter', () => {
   const plansRoute = readFileSync(resolve(process.cwd(), 'src/app/api/v1/plans/route.ts'), 'utf8')
   const creatorPlansRoute = readFileSync(resolve(process.cwd(), 'src/app/api/v1/membership/plans/route.ts'), 'utf8')
   const publishPlanRoute = readFileSync(resolve(process.cwd(), 'src/app/api/v1/membership/plans/[planId]/publish/route.ts'), 'utf8')
+  const updatePlanRoute = readFileSync(resolve(process.cwd(), 'src/app/api/v1/membership/plans/[planId]/route.ts'), 'utf8')
   const w08CreatorClient = readFileSync(resolve(process.cwd(), 'src/auth/w08-creator-client.ts'), 'utf8')
   const w08Worker = readFileSync(resolve(process.cwd(), '../W08-creator/src/worker.ts'), 'utf8')
   const w08Casl = readFileSync(resolve(process.cwd(), '../W08-creator/src/authz/casl-policy.ts'), 'utf8')
@@ -84,6 +85,28 @@ describe('v1 subscription adapter', () => {
     expect(w06Worker).toContain("url.pathname === '/internal/audit-events/membership-plan-published'")
     expect(w06Worker).toContain("action: 'membership.plan.published'")
     expect(w08Casl).toContain("grant('membership.plan.publish.own', 'MembershipPlan', selfOwnerCondition(subjectId))")
+  })
+
+
+  it('updates creator plan terms through owner authorization, immutable W07 version CAS, and durable W06 audits', () => {
+    expect(openapi).toContain('operationId: updateOwnMembershipPlan')
+    expect(apiInventory.domains.subscription_entitlement_payment.endpoint_groups)
+      .toContain('PUT /v1/membership/plans/{planId}')
+    expect(updatePlanRoute).toContain("'membership.plan.update.own'")
+    expect(updatePlanRoute).toContain("'/internal/authz/check-permission'")
+    expect(updatePlanRoute).toContain("'/internal/creator/self'")
+    expect(updatePlanRoute).toContain("method: 'PUT'")
+    expect(updatePlanRoute).toContain("request.headers.get('If-Match')")
+    expect(updatePlanRoute).toContain("request.headers.get('Idempotency-Key')")
+    expect(updatePlanRoute).toContain('callW06MembershipPlanUpdateRequestAudit')
+    expect(w06Client).toContain("'/internal/audit-events/membership-plan-update-requested'")
+    expect(updatePlanRoute.indexOf('const intentValue')).toBeLessThan(updatePlanRoute.indexOf('const w07Response = await callW07Subscription'))
+    expect(updatePlanRoute).toContain('callW06MembershipPlanUpdateAudit')
+    expect(updatePlanRoute).toContain("'evt_mpl_updated_' + planId + '_v' + plan.version")
+    expect(w06Client).toContain("'/internal/audit-events/membership-plan-updated'")
+    expect(w06Worker).toContain("action: 'membership.plan.update_requested'")
+    expect(w06Worker).toContain("action: 'membership.plan.updated'")
+    expect(w08Casl).toContain("grant('membership.plan.update.own', 'MembershipPlan', selfOwnerCondition(subjectId))")
   })
 
   it('contracts creator plan permissions and server-controlled draft fields', () => {

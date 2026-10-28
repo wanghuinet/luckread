@@ -106,6 +106,46 @@ export async function callW06MembershipPlanPublishAudit(input: {
   })
 }
 
+
+/** Durable intent event written before membership plan commercial terms change. */
+export async function callW06MembershipPlanUpdateRequestAudit(input: {
+  request: Request
+  principal: ContentPrincipal
+  body: {
+    eventId: string; planId: string; creatorId: string; expectedVersion: number; idempotencyKey: string
+    name: string; tier: string; billingInterval: 'MONTHLY' | 'YEARLY'
+    priceMinor: number; currency: string; benefits: string[]
+  }
+}): Promise<Response> {
+  return callW06Moderation({
+    request: input.request,
+    pathname: '/internal/audit-events/membership-plan-update-requested',
+    method: 'POST',
+    principal: input.principal,
+    body: input.body,
+  })
+}
+
+/** Immutable audit of a newly selected commercial plan version. */
+export async function callW06MembershipPlanUpdateAudit(input: {
+  request: Request
+  principal: ContentPrincipal
+  body: {
+    eventId: string; planId: string; creatorId: string; expectedVersion: number
+    planVersion: number; status: 'DRAFT' | 'ACTIVE' | 'PAUSED'; visibility: 'PRIVATE' | 'PUBLIC'
+    version: number; occurredAt: string; name: string; tier: string
+    billingInterval: 'MONTHLY' | 'YEARLY'; priceMinor: number; currency: string; benefits: string[]
+  }
+}): Promise<Response> {
+  return callW06Moderation({
+    request: input.request,
+    pathname: '/internal/audit-events/membership-plan-updated',
+    method: 'POST',
+    principal: input.principal,
+    body: input.body,
+  })
+}
+
 /** Dedicated durable audit path for a validated, newly created W07 Order DTO. */
 export async function callW06CommerceOrderAudit(input: {
   request: Request

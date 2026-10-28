@@ -689,6 +689,123 @@ export async function publishMembershipPlan(
   return mapMembershipPlan(published, false)
 }
 
+
+/**
+ * Create a new immutable commercial plan version and CAS the plan's current
+ * pointer. Existing subscriptions keep their original plan_version snapshot.
+ * Replaying the same expected ETag and exact terms after a successful write
+ * returns the current version; changed terms or a newer lifecycle version fail.
+ */
+export async function reviseMembershipPlan(
+  db: D1Database,
+  verifiedCreatorId: string,
+  planIdInput: string,
+  ifMatchInput: string | null,
+  input: unknown,
+): Promise<ReturnType<typeof mapMembershipPlan>> {
+  const creatorId = validatePrincipal(verifiedCreatorId)
+  const planId = ensureId(planIdInput)
+  const expectedVersion = planVersionFromEtag(validateIfMatch(ifMatchInput))
+  const revision = normalizeMembershipPlanDraft(input)
+  const benefitsJson = canonicalBenefitsJson(revision.benefits)
+
+  const readOwnedPlan = async (): Promise<MembershipPlanStoredRow | null> =>
+    db.prepare(
+      'SELECT p.plan_id, p.owner_id, p.current_version, p.status, p.visibility, p.version, p.created_at, p.updated_at, ' +
+      'v.name, v.tier, v.billing_interval, v.price_minor, v.currency, v.benefits_json ' +
+      'FROM membership_plans AS p INNER JOIN membership_plan_versions AS v ' +
+      'ON v.plan_id = p.plan_id AND v.plan_version = p.current_version ' +
+      "WHERE p.plan_id = ? AND p.owner_type = 'CREATOR' AND p.owner_id = ? LIMIT 1",
+    ).bind(planId, creatorId).first<MembershipPlanStoredRow>()
+
+  const current = await readOwnedPlan()
+  if (!current) throw new SubscriptionRuntimeError('RESOURCE_NOT_FOUND', 404)
+  if (current.status === 'RETIRED') throw new SubscriptionRuntimeError('INVALID_STATE', 409)
+
+  const matchesRevision = (row: MembershipPlanStoredRow): boolean =>
+    row.name === revision.name &&
+    row.tier === revision.tier &&
+    row.billing_interval === revision.billingInterval &&
+    row.price_minor === revision.priceMinor &&
+    row.currency === revision.currency &&
+    row.benefits_json === benefitsJson
+
+  if (current.version !== expectedVersion) {
+    if (current.version === expectedVersion + 1 && current.current_version > 1 && matchesRevision(current)) {
+      return mapMembershipPlan(current, true)
+    }
+    throw new SubscriptionRuntimeError('PRECONDITION_FAILED', 412)
+  }
+
+  if (matchesRevision(current)) return mapMembershipPlan(current, true)
+
+  const nextPlanVersion = current.current_version + 1
+  if (!Number.isSafeInteger(nextPlanVersion) || nextPlanVersion < 2) {
+    throw new SubscriptionRuntimeError('INTEGRITY_VIOLATION', 500)
+  }
+  const updatedAt = nextUpdatedAt(current.updated_at)
+
+  let results: D1Result[]
+  try {
+    results = await db.batch([
+      db.prepare(
+        'INSERT OR IGNORE INTO membership_plan_versions ' +
+        '(plan_id, plan_version, name, tier, billing_interval, price_minor, currency, benefits_json, created_at) ' +
+        'SELECT ?, ?, ?, ?, ?, ?, ?, ?, ? WHERE EXISTS (' +
+        "SELECT 1 FROM membership_plans p WHERE p.plan_id = ? AND p.owner_type = 'CREATOR' AND p.owner_id = ? " +
+        "AND p.status IN ('DRAFT','ACTIVE','PAUSED') AND p.current_version = ? AND p.version = ?)",
+      ).bind(
+        planId, nextPlanVersion, revision.name, revision.tier, revision.billingInterval,
+        revision.priceMinor, revision.currency, benefitsJson, updatedAt,
+        planId, creatorId, current.current_version, expectedVersion,
+      ),
+      db.prepare(
+        'UPDATE membership_plans SET current_version = ?, updated_at = ?, version = version + 1 ' +
+        "WHERE plan_id = ? AND owner_type = 'CREATOR' AND owner_id = ? AND status IN ('DRAFT','ACTIVE','PAUSED') " +
+        'AND current_version = ? AND version = ? AND EXISTS (' +
+        'SELECT 1 FROM membership_plan_versions v WHERE v.plan_id = membership_plans.plan_id ' +
+        'AND v.plan_version = ? AND v.name = ? AND v.tier = ? AND v.billing_interval = ? ' +
+        'AND v.price_minor = ? AND v.currency = ? AND v.benefits_json = ?)',
+      ).bind(
+        nextPlanVersion, updatedAt, planId, creatorId, current.current_version, expectedVersion,
+        nextPlanVersion, revision.name, revision.tier, revision.billingInterval,
+        revision.priceMinor, revision.currency, benefitsJson,
+      ),
+    ])
+  } catch {
+    throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
+  }
+
+  if (Number(results[1]?.meta?.changes ?? 0) !== 1) {
+    const raced = await readOwnedPlan()
+    if (!raced) throw new SubscriptionRuntimeError('RESOURCE_NOT_FOUND', 404)
+    if (raced.version === expectedVersion + 1 && raced.current_version === nextPlanVersion && matchesRevision(raced)) {
+      return mapMembershipPlan(raced, true)
+    }
+    if (raced.version !== expectedVersion) throw new SubscriptionRuntimeError('PRECONDITION_FAILED', 412)
+    throw new SubscriptionRuntimeError('CONFLICT', 409)
+  }
+
+  const revised = await readOwnedPlan()
+  if (
+    !revised ||
+    revised.current_version !== nextPlanVersion ||
+    revised.version !== expectedVersion + 1 ||
+    !matchesRevision(revised)
+  ) throw new SubscriptionRuntimeError('INTEGRITY_VIOLATION', 500)
+
+  console.log(JSON.stringify({
+    event: 'membership.plan.updated',
+    operation: 'reviseMembershipPlan',
+    planId,
+    creatorId,
+    previousPlanVersion: current.current_version,
+    planVersion: revised.current_version,
+    version: revised.version,
+  }))
+  return mapMembershipPlan(revised, false)
+}
+
 /** Owner-scoped plan list for the authenticated creator, including private drafts. */
 export async function listCreatorMembershipPlans(
   db: D1Database,
