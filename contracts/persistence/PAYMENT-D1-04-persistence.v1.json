@@ -210,6 +210,98 @@
         "Only RECEIVED can transition to a terminal processing outcome; processed events cannot be rewritten or deleted.",
         "Raw webhook body, provider secret, client secret, card data, and entitlement information are never stored."
       ]
+    },
+    "payment_provider_event_conflicts": {
+      "purpose": "Durable anomaly/reconciliation facts when an authenticated provider reuses an event ID with a different payload hash; the first verified receipt remains immutable.",
+      "primaryKey": "conflict_id",
+      "columns": {
+        "conflict_id": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false,
+          "immutable": true
+        },
+        "provider": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false,
+          "immutable": true
+        },
+        "merchant_id": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false,
+          "immutable": true,
+          "apiExposure": "NONE"
+        },
+        "event_id": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false,
+          "immutable": true
+        },
+        "existing_payload_sha256": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false,
+          "immutable": true
+        },
+        "incoming_payload_sha256": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false,
+          "immutable": true
+        },
+        "state": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false,
+          "allowedValues": [
+            "OPEN",
+            "RESOLVED"
+          ]
+        },
+        "occurrence_count": {
+          "type": "INTEGER",
+          "required": true,
+          "nullable": false,
+          "monotonic": true
+        },
+        "version": {
+          "type": "INTEGER",
+          "required": true,
+          "nullable": false,
+          "optimisticConcurrency": true
+        },
+        "first_seen_at": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false,
+          "immutable": true
+        },
+        "last_seen_at": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false
+        },
+        "resolved_at": {
+          "type": "TEXT",
+          "required": false,
+          "nullable": true
+        },
+        "resolution_code": {
+          "type": "TEXT",
+          "required": false,
+          "nullable": true
+        }
+      },
+      "invariants": [
+        "Unique provider + merchant ID + event ID + incoming payload hash deduplicates repeated observation of the same conflict variant.",
+        "existing_payload_sha256 and incoming_payload_sha256 must differ; a same-hash replay belongs to the normal idempotent inbox path.",
+        "Occurrence count may advance by at most one per version-CAS update; last_seen_at cannot regress.",
+        "Resolution is explicit and terminal; resolved anomaly facts cannot be reopened or deleted.",
+        "No raw webhook body, API key, client secret or cardholder data is stored."
+      ]
     }
   },
   "mutationBudgets": {
@@ -226,7 +318,8 @@
     "signedWebhookDeduplication": "REQUIRED",
     "runtimePositive": "REQUIRED",
     "runtimeNegative": "REQUIRED",
-    "remoteRuntimeEvidence": "REQUIRED"
+    "remoteRuntimeEvidence": "REQUIRED",
+    "webhookConflictEvidence": "REQUIRED"
   },
   "migration": {
     "status": "PROPOSED_NOT_APPLIED",
@@ -240,7 +333,8 @@
     "No new Worker, D1, Queue or Service Binding.",
     "No raw webhook payload, client secret, API key, or card data persistence.",
     "No ledger posting, refund, settlement, payout, order confirmation or entitlement grant.",
-    "No cross-D1 foreign key or distributed transaction."
+    "No cross-D1 foreign key or distributed transaction.",
+    "No provider event with the same event ID but a different payload hash can overwrite the first receipt; mismatch is recorded as a separate reconciliation conflict."
   ],
   "promotionRule": "Remain CONTRACTED_NOT_VERIFIED until exact migration/schema evidence, provider retry and webhook idempotency runtime tests, security negatives, and exact-commit Evidence Registry admission pass."
 }
