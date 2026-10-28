@@ -395,6 +395,7 @@ class D104OrderMigrationTests(unittest.TestCase):
             self.provider_event_conflict(existing_hash="c"*64, incoming_hash="c"*64)
         with self.assertRaises(sqlite3.IntegrityError):
             self.provider_event_conflict(conflict_id="conflict_bad_hash", incoming_hash="g"*64)
+        self.provider_event()
         self.provider_event_conflict()
         with self.assertRaises(sqlite3.IntegrityError):
             self.db.execute(
