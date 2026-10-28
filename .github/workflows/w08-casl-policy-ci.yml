@@ -38,7 +38,7 @@ jobs:
         run: npm install --prefix workers/W08-creator --no-save --ignore-scripts --no-package-lock
 
       - name: Run W08 authorization tests
-        run: npx vitest run workers/W08-creator/src/authorization.test.ts
+        run: npx vitest run workers/W08-creator/src/authorization.test.ts workers/W08-creator/src/authz/casl-policy.test.ts
 
       - name: Type-check W08 authorization module
         run: >-
@@ -48,3 +48,4 @@ jobs:
           workers/W08-creator/src/authorization.ts
           workers/W08-creator/src/index.ts
           workers/W08-creator/src/authorization.test.ts
+          workers/W08-creator/src/authz/casl-policy.test.ts
