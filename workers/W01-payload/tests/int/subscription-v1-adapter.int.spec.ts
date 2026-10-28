@@ -198,8 +198,8 @@ describe('v1 subscription adapter', () => {
     expect(creatorMembershipPlans).toContain("'Idempotency-Key': key")
     expect(creatorMembershipPlans).toContain("action: 'publish' | 'pause' | 'resume' | 'retire'")
     expect(creatorMembershipPlans).toContain('paid checkout stays unavailable')
-    expect(creatorMembershipPlans).toContain("status === 'PAUSED'")
-    expect(creatorMembershipPlans).toContain("status === 'RETIRED'")
+    expect(creatorMembershipPlans).toContain("plan.status === 'PAUSED'")
+    expect(creatorMembershipPlans).toContain("RETIRED: '已退役'")
   })
 
   it('exposes only the canonical subscription lifecycle paths', () => {
