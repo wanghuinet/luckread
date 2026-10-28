@@ -10,6 +10,7 @@ WORKER = ROOT / "workers" / "W07-subscription-commerce"
 MIGRATION = WORKER / "migrations-d1-04" / "0001_order_commerce.sql"
 PAYMENT_MIGRATION = WORKER / "migrations-d1-04" / "0002_payment_provider_events.sql"
 SAVED_METHOD_MIGRATION = WORKER / "migrations-d1-04" / "0003_saved_payment_methods_mandates.sql"
+RENEWAL_MIGRATION = WORKER / "migrations-d1-04" / "0004_subscription_renewal_cycles.sql"
 CONFIG = WORKER / "wrangler.jsonc"
 NOW = "2026-10-28T00:00:00.000Z"
 LATER = "2026-10-28T00:00:01.000Z"
@@ -21,6 +22,7 @@ class D104OrderMigrationTests(unittest.TestCase):
         cls.sql = MIGRATION.read_text(encoding="utf-8")
         cls.payment_sql = PAYMENT_MIGRATION.read_text(encoding="utf-8")
         cls.saved_method_sql = SAVED_METHOD_MIGRATION.read_text(encoding="utf-8")
+        cls.renewal_sql = RENEWAL_MIGRATION.read_text(encoding="utf-8")
         config = json.loads(CONFIG.read_text(encoding="utf-8"))
         bindings = {item["binding"]: item for item in config["d1_databases"]}
         if bindings["D1_01"]["migrations_dir"] != "migrations":
@@ -35,6 +37,7 @@ class D104OrderMigrationTests(unittest.TestCase):
         self.db.executescript(self.sql)
         self.db.executescript(self.payment_sql)
         self.db.executescript(self.saved_method_sql)
+        self.db.executescript(self.renewal_sql)
 
     def tearDown(self):
         self.db.close()
@@ -123,6 +126,7 @@ class D104OrderMigrationTests(unittest.TestCase):
         self.assertEqual(tables, {
             "orders", "order_lines", "order_create_idempotency", "payments", "payment_provider_events",
             "payment_provider_event_conflicts", "saved_payment_methods", "payment_mandates",
+            "subscription_renewal_cycles", "subscription_renewal_scheduler_state",
         })
         indexes = {row[0] for row in self.db.execute("SELECT name FROM sqlite_master WHERE type='index' AND sql IS NOT NULL")}
         self.assertTrue({
@@ -135,13 +139,16 @@ class D104OrderMigrationTests(unittest.TestCase):
             "ix_payment_provider_event_conflicts_identity", "ix_saved_payment_methods_customer_created",
             "ux_payment_mandates_provider_mandate_id", "ix_payment_mandates_customer_status_created",
             "ix_payment_mandates_method_status",
+            "ux_subscription_renewal_cycles_subscription_cycle", "ux_subscription_renewal_cycles_payment",
+            "ix_subscription_renewal_cycles_state_updated", "ix_subscription_renewal_cycles_subscriber_cycle",
         }.issubset(indexes))
         self.assertFalse(tables.intersection({"payment_intents", "ledger_entries", "refunds", "entitlements"}))
         self.assertNotIn("client_secret", {r[1] for r in self.db.execute('PRAGMA table_info("payments")')})
         self.assertNotIn("raw_body", {r[1] for r in self.db.execute('PRAGMA table_info("payment_provider_events")')})
         for table in ("orders", "order_lines", "order_create_idempotency", "payments",
                       "payment_provider_events", "payment_provider_event_conflicts",
-                      "saved_payment_methods", "payment_mandates"):
+                      "saved_payment_methods", "payment_mandates", "subscription_renewal_cycles",
+                      "subscription_renewal_scheduler_state"):
             self.assertEqual(self.db.execute(f'PRAGMA foreign_key_list("{table}")').fetchall(), [])
 
 
@@ -464,6 +471,77 @@ class D104OrderMigrationTests(unittest.TestCase):
             )
         with self.assertRaises(sqlite3.IntegrityError):
             self.db.execute("DELETE FROM payment_mandates WHERE mandate_record_id=?", (mandate_id,))
+
+    def test_renewal_cycle_is_unique_by_subscription_period_and_requires_pricing_before_preparation(self):
+        offer = json.dumps({
+            "subscriptionId": "sub_renewal", "planId": "plan_basic", "planVersion": 1,
+            "priceMinor": 1000, "currency": "USD",
+        }, separators=(",", ":"))
+        cycle_id = "rcy_" + "a" * 26
+        self.db.execute(
+            """INSERT INTO subscription_renewal_cycles
+               (cycle_id,provider,merchant_id,subscription_id,subscriber_id,plan_id,plan_version,
+                cycle_start,cycle_end,billing_interval,currency,offer_snapshot_json,amount_minor,
+                pricing_snapshot_json,payment_method_id,mandate_record_id,order_id,payment_id,state,
+                attempt_number,provider_response_status,outcome_code,lease_token,lease_expires_at,
+                version,created_at,updated_at)
+               VALUES(?,?,?,?,?,?,?,?,?,?,?, ?,NULL,NULL,NULL,NULL,NULL,NULL,'AWAITING_PRICING',
+                      0,NULL,NULL,NULL,NULL,1,?,?)""",
+            (cycle_id, "hyperswitch", "merchant_test", "sub_renewal", "user_1", "plan_basic", 1,
+             NOW, LATER, "MONTHLY", "USD", offer, NOW, NOW),
+        )
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute(
+                """INSERT INTO subscription_renewal_cycles
+                   (cycle_id,provider,merchant_id,subscription_id,subscriber_id,plan_id,plan_version,
+                    cycle_start,cycle_end,billing_interval,currency,offer_snapshot_json,amount_minor,
+                    pricing_snapshot_json,payment_method_id,mandate_record_id,order_id,payment_id,state,
+                    attempt_number,version,created_at,updated_at)
+                   VALUES(?,?,?,?,?,?,?,?,?,?,?, ?,NULL,NULL,NULL,NULL,NULL,NULL,'AWAITING_PRICING',0,1,?,?)""",
+                ("rcy_" + "b" * 26, "hyperswitch", "merchant_test", "sub_renewal", "user_1",
+                 "plan_basic", 1, NOW, LATER, "MONTHLY", "USD", offer, NOW, NOW),
+            )
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute(
+                """UPDATE subscription_renewal_cycles SET state='PAYMENT_READY', version=2,
+                   updated_at=? WHERE cycle_id=?""", (LATER, cycle_id)
+            )
+        self.assertEqual(
+            self.db.execute("SELECT state, amount_minor, version FROM subscription_renewal_cycles WHERE cycle_id=?", (cycle_id,)).fetchone(),
+            ("AWAITING_PRICING", None, 1),
+        )
+
+    def test_renewal_cycle_requires_active_mandate_before_payment_ready_and_keeps_cursor_cas(self):
+        offer = json.dumps({"subscriptionId":"sub_renewal","planId":"plan_basic","planVersion":1}, separators=(",",":"))
+        pricing = json.dumps({"currency":"USD","items":[]}, separators=(",",":"))
+        cycle_id = "rcy_" + "c" * 26
+        self.db.execute(
+            """INSERT INTO subscription_renewal_cycles
+               (cycle_id,provider,merchant_id,subscription_id,subscriber_id,plan_id,plan_version,
+                cycle_start,cycle_end,billing_interval,currency,offer_snapshot_json,amount_minor,
+                pricing_snapshot_json,state,attempt_number,version,created_at,updated_at)
+               VALUES(?,?,?,?,?,?,?,?,?,?,?,?,? ,?,'PREPARED',0,1,?,?)""",
+            (cycle_id,"hyperswitch","merchant_test","sub_renewal","user_1","plan_basic",1,
+             NOW,LATER,"MONTHLY","USD",offer,1000,pricing,NOW,NOW),
+        )
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute(
+                "UPDATE subscription_renewal_cycles SET state='PAYMENT_READY',version=2,updated_at=? WHERE cycle_id=?",
+                (LATER,cycle_id),
+            )
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute(
+                "UPDATE subscription_renewal_scheduler_state SET cursor_period_end=?,cursor_subscription_id=?,updated_at=? WHERE state_id=?",
+                (NOW,"sub_renewal",NOW,"subscription-renewals"),
+            )
+        self.db.execute(
+            "UPDATE subscription_renewal_scheduler_state SET cursor_period_end=?,cursor_subscription_id=?,updated_at=?,version=version+1 WHERE state_id=? AND version=1",
+            (NOW,"sub_renewal",LATER,"subscription-renewals"),
+        )
+        self.assertEqual(
+            self.db.execute("SELECT cursor_period_end,cursor_subscription_id,version FROM subscription_renewal_scheduler_state WHERE state_id='subscription-renewals'").fetchone(),
+            (NOW,"sub_renewal",2),
+        )
 
     def test_saved_method_rejects_missing_provider_event_and_cross_customer_token_binding(self):
         self.order()
