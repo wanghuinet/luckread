@@ -152,6 +152,18 @@ CREATE TABLE payment_provider_event_conflicts (
 CREATE INDEX ix_payment_provider_event_conflicts_state_last_seen ON payment_provider_event_conflicts(state, last_seen_at, conflict_id);
 CREATE INDEX ix_payment_provider_event_conflicts_identity ON payment_provider_event_conflicts(provider, merchant_id, event_id);
 
+CREATE TRIGGER payment_provider_event_conflicts_reference_first_receipt
+BEFORE INSERT ON payment_provider_event_conflicts
+WHEN NOT EXISTS (
+  SELECT 1
+  FROM payment_provider_events
+  WHERE provider = NEW.provider
+    AND merchant_id = NEW.merchant_id
+    AND event_id = NEW.event_id
+    AND payload_sha256 = NEW.existing_payload_sha256
+)
+BEGIN SELECT RAISE(ABORT, 'provider event conflict must reference the immutable first receipt'); END;
+
 CREATE TRIGGER payment_provider_event_conflicts_identity_immutable
 BEFORE UPDATE OF conflict_id, provider, merchant_id, event_id, existing_payload_sha256, incoming_payload_sha256, first_seen_at ON payment_provider_event_conflicts
 WHEN NEW.conflict_id IS NOT OLD.conflict_id OR NEW.provider IS NOT OLD.provider
