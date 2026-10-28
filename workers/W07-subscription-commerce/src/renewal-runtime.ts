@@ -820,9 +820,14 @@ export async function processSubscriptionRenewalCycle(
       'SELECT payment_id, order_id, customer_id, provider, merchant_id, amount_minor, currency, status, version, ' +
       'idempotency_key, request_hash, provider_updated_at, failure_code, created_at, updated_at ' +
       'FROM payments WHERE payment_id = ? AND customer_id = ? LIMIT 1',
-    ).bind(cycle.payment_id, cycle.subscriber_id).first<PaymentAttemptDto & { customer_id: string; merchant_id: string; provider: string; failure_code: string | null }>();
+    ).bind(cycle.payment_id, cycle.subscriber_id).first<{
+      payment_id: string; order_id: string; customer_id: string; provider: string; merchant_id: string;
+      amount_minor: number; currency: string; status: PaymentAttemptDto['status']; version: number;
+      idempotency_key: string; request_hash: string; provider_updated_at: string | null;
+      failure_code: string | null; created_at: string; updated_at: string;
+    }>();
     if (!payment || payment.merchant_id !== cycle.merchant_id || payment.provider !== PROVIDER ||
-        payment.order_id !== cycle.order_id || payment.amountMinor !== cycle.amount_minor ||
+        payment.order_id !== cycle.order_id || payment.amount_minor !== cycle.amount_minor ||
         payment.currency !== cycle.currency) {
       cycle = await writeCycleReconciliation(env.D1_04, cycle, 'PAYMENT_ATTEMPT_BINDING_MISMATCH', now);
       return { cycleId, state: cycle.state, action: 'RECONCILIATION_REQUIRED' };
