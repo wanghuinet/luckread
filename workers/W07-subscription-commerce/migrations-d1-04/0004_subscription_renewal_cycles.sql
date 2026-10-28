@@ -19,7 +19,7 @@ CREATE TABLE subscription_renewal_cycles (
   offer_snapshot_json TEXT NOT NULL CHECK (
     length(offer_snapshot_json) BETWEEN 2 AND 65536 AND json_valid(offer_snapshot_json) AND json_type(offer_snapshot_json) = 'object'
   ),
-  amount_minor INTEGER CHECK (amount_minor IS NULL OR (typeof(amount_minor) = 'integer' AND amount_minor BETWEEN 1 AND 9007199254740991)),
+  amount_minor INTEGER CHECK (amount_minor IS NULL OR (typeof(amount_minor) = 'integer' AND amount_minor BETWEEN 0 AND 9007199254740991)),
   pricing_snapshot_json TEXT CHECK (
     pricing_snapshot_json IS NULL OR (
       length(pricing_snapshot_json) BETWEEN 2 AND 65536 AND json_valid(pricing_snapshot_json) AND json_type(pricing_snapshot_json) = 'object'
@@ -35,11 +35,13 @@ CREATE TABLE subscription_renewal_cycles (
     'AWAITING_PRICING','AWAITING_MANDATE','PREPARED','PAYMENT_READY','SUBMITTING','SUBMITTED',
     'SUCCEEDED','FAILED','RECONCILIATION_REQUIRED'
   )),
+  attempt_number INTEGER NOT NULL DEFAULT 0 CHECK (typeof(attempt_number) = 'integer' AND attempt_number BETWEEN 0 AND 20),
   provider_response_status TEXT CHECK (provider_response_status IS NULL OR provider_response_status IN (
     'requires_payment_method','requires_confirmation','requires_customer_action','requires_merchant_action',
     'requires_capture','processing','succeeded','failed','cancelled','cancelled_post_capture',
     'partially_captured','partially_captured_and_capturable','expired'
   )),
+  outcome_code TEXT CHECK (outcome_code IS NULL OR length(outcome_code) BETWEEN 1 AND 128),
   lease_token TEXT CHECK (lease_token IS NULL OR length(lease_token) BETWEEN 1 AND 128),
   lease_expires_at TEXT CHECK (lease_expires_at IS NULL OR length(lease_expires_at) BETWEEN 1 AND 64),
   version INTEGER NOT NULL DEFAULT 1 CHECK (typeof(version) = 'integer' AND version >= 1),
@@ -62,7 +64,7 @@ CREATE TABLE subscription_renewal_cycles (
 );
 
 CREATE UNIQUE INDEX ux_subscription_renewal_cycles_subscription_cycle
-  ON subscription_renewal_cycles(subscription_id, cycle_start, cycle_end);
+  ON subscription_renewal_cycles(subscription_id, cycle_start);
 CREATE UNIQUE INDEX ux_subscription_renewal_cycles_payment
   ON subscription_renewal_cycles(provider, merchant_id, payment_id)
   WHERE payment_id IS NOT NULL;
@@ -113,7 +115,8 @@ WHEN NOT (
   OR (OLD.state = 'PAYMENT_READY' AND NEW.state IN ('PAYMENT_READY','SUBMITTING','RECONCILIATION_REQUIRED'))
   OR (OLD.state = 'SUBMITTING' AND NEW.state IN ('SUBMITTING','PAYMENT_READY','SUBMITTED','SUCCEEDED','FAILED','RECONCILIATION_REQUIRED'))
   OR (OLD.state = 'SUBMITTED' AND NEW.state IN ('SUBMITTED','SUCCEEDED','FAILED','RECONCILIATION_REQUIRED'))
-  OR (OLD.state IN ('SUCCEEDED','FAILED','RECONCILIATION_REQUIRED') AND NEW.state = OLD.state)
+  OR (OLD.state = 'FAILED' AND NEW.state IN ('FAILED','PREPARED','RECONCILIATION_REQUIRED'))
+  OR (OLD.state IN ('SUCCEEDED','RECONCILIATION_REQUIRED') AND NEW.state = OLD.state)
 )
 BEGIN SELECT RAISE(ABORT, 'forbidden renewal-cycle state transition'); END;
 
