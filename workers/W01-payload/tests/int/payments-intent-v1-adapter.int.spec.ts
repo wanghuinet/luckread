@@ -13,6 +13,7 @@ const openapi = read('../../contracts/openapi/v1/openapi.yaml')
 const binding = JSON.parse(read('../../contracts/transport/W01-W07-membership-commerce-http-binding.v1.json'))
 const routing = JSON.parse(read('../../contracts/transport/public-worker-terminal-routing.v1.json'))
 const apiInventory = JSON.parse(read('../../contracts/api/api-inventory.v1.json'))
+const operationPolicy = JSON.parse(read('../../contracts/openapi/v1/operation-policy.json'))
 
 describe('public Hyperswitch payment intent adapter', () => {
   it('authenticates and checks current order access before dispatching through the existing W07 service binding', () => {
@@ -104,6 +105,13 @@ describe('public Hyperswitch payment intent adapter', () => {
       .publicPaths).toContain('/api/v1/payments/intents')
     expect(apiInventory.domains.subscription_entitlement_payment.endpoint_groups)
       .toContain('POST /v1/payments/intents')
+    const policy = operationPolicy.operations.find((item: { operationId: string }) => item.operationId === 'postPaymentsIntents')
+    expect(policy).toMatchObject({
+      permissions: ['order.read'],
+      auditRequired: true,
+      idempotencyRequired: true,
+      'x-luckread-contract-status': 'CONTRACTED_PARTIAL',
+    })
   })
 
   it('does not bypass the existing closed order-pricing admission gate', () => {
