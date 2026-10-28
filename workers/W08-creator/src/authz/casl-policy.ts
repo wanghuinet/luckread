@@ -66,6 +66,7 @@ export const SUPPORTED_AUTHZ_SUBJECTS = [
   'RoleAssignment',
   'Subscription',
   'MembershipPlan',
+  'Order',
   'PlatformConfig',
   'FeatureFlag',
   'Secret',
@@ -98,6 +99,7 @@ const RESTRICTED_ACCOUNT_WRITE_DENIES = new Set([
   'media.upload',
   'comment.create',
   'subscription.manage.any',
+  'order.create',
   'membership.plan.create.own',
   'org.billing.read.scope',
 ])
@@ -209,6 +211,8 @@ function addL2Rules(
   grant('report.create', 'Report')
   grant('notification.read.self', 'Notification', selfOwnerCondition(subjectId))
   grant('notification.update.self', 'Notification', selfOwnerCondition(subjectId))
+  grant('order.create', 'Order', selfOwnerCondition(subjectId))
+  grant('order.read', 'Order', selfOwnerCondition(subjectId))
 }
 
 function addL3Rules(
