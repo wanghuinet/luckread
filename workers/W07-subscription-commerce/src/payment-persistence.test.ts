@@ -386,13 +386,13 @@ const bodyText = (
   if (includeSavedMethodConsent) {
     Object.assign(resource, {
       customer_id: CUSTOMER,
-      setup_future_usage: 'off_session',
       payment_method_id: 'pm_hyperswitch_test_123',
       mandate_id: 'mandate_hyperswitch_test_123',
-      customer_acceptance: {
-        acceptance_type: 'online',
-        accepted_at: NOW,
-        online: { ip_address: '192.0.2.1', user_agent: 'LuckRead test client' },
+      mandate_data: {
+        customer_acceptance: {
+          accepted_at: NOW,
+          online: { ip_address: '192.0.2.1', user_agent: 'LuckRead test client' },
+        },
       },
     });
   }
