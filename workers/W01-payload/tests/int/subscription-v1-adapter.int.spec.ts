@@ -71,7 +71,7 @@ describe('v1 subscription adapter', () => {
     expect(publishPlanRoute).toContain("'/membership/plans/' + encodeURIComponent(planId) + '/publish'")
     expect(publishPlanRoute).toContain("request.headers.get('If-Match')")
     expect(publishPlanRoute).toContain('callW06MembershipPlanPublishRequestAudit')
-    expect(publishPlanRoute).toContain("'/internal/audit-events/membership-plan-publish-requested'")
+    expect(w06Client).toContain("'/internal/audit-events/membership-plan-publish-requested'")
     expect(publishPlanRoute.indexOf('callW06MembershipPlanPublishRequestAudit'))
       .toBeLessThan(publishPlanRoute.indexOf('const w07Response = await callW07Subscription'))
     expect(publishPlanRoute).toContain('callW06MembershipPlanPublishAudit')
