@@ -113,6 +113,39 @@
       ]
     },
     {
+      "operationId": "auditMembershipPlanPublish",
+      "method": "POST",
+      "publicPath": "/api/v1/membership/plans/{planId}/publish",
+      "internalPath": "/internal/audit-events/membership-plan-published",
+      "principalRequired": true,
+      "actorAuthority": "W06 derives the actor userId and layer from trusted W01 private transport headers; body cannot supply actor identity.",
+      "eventId": "Deterministic evt_mpl_published_{planId}_v{version}; one immutable D1-03 audit_events row per published plan version.",
+      "targetType": "MembershipPlan",
+      "auditRequired": true,
+      "idempotency": "Stable event ID per plan/version; exact replay returns 200 only after confirming the same durable immutable event; changed facts conflict.",
+      "successPolicy": "W01 returns publish success only after W07 DTO validation and W06 durable audit confirmation. Missing audit confirmation fails closed.",
+      "cache": "NO_STORE",
+      "auditedFields": [
+        "planId",
+        "creatorId",
+        "planVersion",
+        "status",
+        "visibility",
+        "version",
+        "name",
+        "tier",
+        "billingInterval",
+        "priceMinor",
+        "currency",
+        "occurredAt"
+      ],
+      "sensitiveDataExcluded": [
+        "client credentials",
+        "payment credentials",
+        "raw request body"
+      ]
+    },
+    {
       "operationId": "auditCommerceOrderCreation",
       "method": "POST",
       "publicPath": "/api/v1/commerce/orders",
