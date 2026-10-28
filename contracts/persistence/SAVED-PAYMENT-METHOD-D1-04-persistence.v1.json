@@ -222,7 +222,7 @@
     }
   },
   "mutationBudgets": {
-    "d1ReadMax": 0,
+    "d1ReadMax": 3,
     "d1WriteTransactionMax": 1,
     "distributedTransactions": false,
     "providerNetworkCallsInsideD1Transaction": false
