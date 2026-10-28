@@ -56,9 +56,17 @@ class MemoryStatement {
 }
 
 class MemoryD1 {
-  constructor(public cycle: Cycle | null, public subscription: Subscription | null, public failSubscriptionRead = false) {}
+  constructor(
+    public cycle: Cycle | null,
+    public subscription: Subscription | null,
+    public failSubscriptionRead = false,
+    public missingRenewalCycleTable = false,
+  ) {}
   prepare(sql: string) { return new MemoryStatement(this, sql) as unknown as D1PreparedStatement; }
   async first<T>(sql: string, values: unknown[]): Promise<T | null> {
+    if (this.missingRenewalCycleTable && sql.includes('FROM subscription_renewal_cycles')) {
+      throw new Error('D1_ERROR: no such table: subscription_renewal_cycles');
+    }
     if (sql.includes('FROM subscription_renewal_cycles') && sql.includes('WHERE cycle_id = ?')) {
       return this.cycle ? structuredClone(this.cycle) as T : null;
     }
@@ -169,6 +177,18 @@ describe('D1-04 renewal outcome to D1-01 Subscription synchronization', () => {
     await expect(syncTerminalRenewalCycleToSubscription(e.value, CYCLE_ID, { now: () => new Date(NOW) }))
       .rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE', status: 503 });
     expect(e.d1_04.cycle?.subscription_sync_state).toBe('PENDING');
+  });
+
+  it('keeps ordinary payments valid before the renewal-cycle migration exists', async () => {
+    const d1_01 = new MemoryD1(null, null) as unknown as D1Database;
+    const d1_04 = new MemoryD1(null, null, false, true) as unknown as D1Database;
+    const result = await syncRenewalCycleOutcomeForPayment(
+      { D1_01: d1_01, D1_04: d1_04 },
+      PAYMENT_ID,
+      'merchant_test',
+      { now: () => new Date(NOW) },
+    );
+    expect(result).toEqual({ cycleId: '', outcome: 'NO_RENEWAL_CYCLE' });
   });
 
   it('bounds the pending outcome reconciliation scan', async () => {
