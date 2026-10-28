@@ -1,0 +1,140 @@
+name: W07 Subscription Cron-Only Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Exact reviewed main commit containing the W07 scheduled handler and Cron config
+        required: true
+        type: string
+      confirm:
+        description: Type DEPLOY_W07_CRON_ONLY to deploy W07 without running any D1 migration
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: w07-subscription-cron-only-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy-cron:
+    if: ${{ inputs.confirm == 'DEPLOY_W07_CRON_ONLY' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout reviewed main history
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Validate exact reviewed source and confirmation
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          DEPLOY_CONFIRM: ${{ inputs.confirm }}
+        run: |
+          set -euo pipefail
+          [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$DEPLOY_CONFIRM" == "DEPLOY_W07_CRON_ONLY" ]]
+          git cat-file -e "$SOURCE_SHA^{commit}"
+          git merge-base --is-ancestor "$SOURCE_SHA" origin/main
+          echo "Validated source SHA is an ancestor of reviewed main."
+
+      - name: Checkout validated source commit
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: git checkout --detach "$SOURCE_SHA"
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install repository dependencies
+        run: npm ci
+
+      - name: Validate W07 worker, Cron schedule, and physical bindings
+        working-directory: workers/W07-subscription-commerce
+        run: |
+          set -euo pipefail
+          node - <<'NODE'
+          const fs = require('node:fs')
+          const c = JSON.parse(fs.readFileSync('wrangler.jsonc', 'utf8'))
+          if (c.name !== 'luckread-w07') throw new Error('W07 worker name mismatch')
+          if (c.main !== 'src/index.ts') throw new Error('W07 entrypoint mismatch')
+          const crons = c.triggers?.crons
+          if (!Array.isArray(crons) || crons.length !== 1 || crons[0] !== '*/5 * * * *') {
+            throw new Error('Expected the bounded W07 Cron schedule */5 * * * *')
+          }
+          const d1 = (c.d1_databases || []).find((x) => x.binding === 'D1_01')
+          if (!d1 || d1.database_id !== '2f80471e-3756-49f9-8db1-7707a433ad64' || d1.database_name !== 'luckread') {
+            throw new Error('D1-01 physical binding mismatch')
+          }
+          const d104 = (c.d1_databases || []).find((x) => x.binding === 'D1_04')
+          if (!d104 || d104.database_id !== '9bfb89a5-fbb5-45b1-a2ee-eab674b0d736') {
+            throw new Error('D1-04 physical binding mismatch')
+          }
+          const entry = fs.readFileSync('src/index.ts', 'utf8')
+          if (!/scheduled\s*\(/.test(entry) || !fs.existsSync('src/renewal-scheduler.ts')) {
+            throw new Error('W07 scheduled handler/runtime is missing')
+          }
+          console.log(JSON.stringify({ worker: c.name, cronTriggers: crons, d1BindingsValidated: true }))
+          NODE
+          test -f src/renewal-runtime.test.ts
+          test -f src/subscription-runtime.test.ts
+
+      - name: Typecheck W07 runtime and scheduler
+        run: >-
+          npx tsc --noEmit --strict --skipLibCheck --target ES2022 --module ESNext
+          --moduleResolution Bundler --lib ES2022,DOM --types @cloudflare/workers-types
+          workers/W07-subscription-commerce/src/renewal-runtime.ts
+          workers/W07-subscription-commerce/src/renewal-scheduler.ts
+          workers/W07-subscription-commerce/src/subscription-runtime.ts
+          workers/W07-subscription-commerce/src/index.ts
+
+      - name: Test W07 renewal scheduler and subscription runtime
+        run: >-
+          npx vitest@3.2.4 run
+          workers/W07-subscription-commerce/src/renewal-runtime.test.ts
+          workers/W07-subscription-commerce/src/subscription-runtime.test.ts
+
+      - name: Verify D1-04 physical binding against Cloudflare
+        working-directory: workers/W07-subscription-commerce
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: node scripts/verify-d1-04-binding.mjs <(npx --yes wrangler@4.116.0 d1 list --json --config wrangler.jsonc)
+
+      # Intentionally no 'wrangler d1 migrations apply' or remote SQL statements in this workflow.
+      - name: Deploy W07 worker and Cron config only
+        working-directory: workers/W07-subscription-commerce
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: npx --yes wrangler@4.116.0 deploy --config wrangler.jsonc
+
+      - name: Verify live Cloudflare Cron Trigger
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          node - <<'NODE'
+          const accountId = process.env.CLOUDFLARE_ACCOUNT_ID
+          const token = process.env.CLOUDFLARE_API_TOKEN
+          if (!accountId || !token) throw new Error('Required Cloudflare deployment secrets are missing')
+          const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/workers/scripts/luckread-w07/schedules`
+          const response = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+          const body = await response.json()
+          if (!response.ok || body.success !== true) {
+            throw new Error(`Cloudflare Cron verification failed (HTTP ${response.status}); response not logged to avoid leaking data`)
+          }
+          const crons = (body.result?.schedules || []).map((entry) => entry.cron).sort()
+          if (crons.length !== 1 || crons[0] !== '*/5 * * * *') {
+            throw new Error('Live Cron schedule does not exactly match the reviewed W07 config')
+          }
+          console.log(JSON.stringify({ worker: 'luckread-w07', cronTriggers: crons, verified: true }))
+          NODE
