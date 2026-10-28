@@ -221,6 +221,8 @@ test('workflow is manual-only, gates exact SHA/name/confirmation, and never depl
   assert.match(workflow, /target_database_name:/)
   assert.match(workflow, /APPLY_W07_D1_04_COMMERCE_MIGRATIONS/)
   assert.match(workflow, /SOURCE_SHA.*GITHUB_SHA/s)
+  assert.match(workflow, /MAIN_SHA="\$\(git rev-parse origin\/main\)"/)
+  assert.match(workflow, /SOURCE_SHA"\s*!=\s*"\$MAIN_SHA"/)
   assert.match(workflow, /d1 migrations apply/)
   assert.match(workflow, /--remote/)
   assert.match(workflow, /id: schema_preflight/)
