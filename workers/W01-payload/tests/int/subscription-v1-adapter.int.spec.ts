@@ -9,6 +9,8 @@ describe('v1 subscription adapter', () => {
   const route = readFileSync(resolve(process.cwd(), 'src/app/api/v1/memberships/subscriptions/[[...segments]]/route.ts'), 'utf8')
   const plansRoute = readFileSync(resolve(process.cwd(), 'src/app/api/v1/plans/route.ts'), 'utf8')
   const creatorPlansRoute = readFileSync(resolve(process.cwd(), 'src/app/api/v1/membership/plans/route.ts'), 'utf8')
+  const creatorMembershipPlans = readFileSync(resolve(process.cwd(), 'src/app/(frontend)/creator-center/CreatorMembershipPlans.tsx'), 'utf8')
+  const creatorStudio = readFileSync(resolve(process.cwd(), 'src/app/(frontend)/creator-center/CreatorStudio.tsx'), 'utf8')
   const publishPlanRoute = readFileSync(resolve(process.cwd(), 'src/app/api/v1/membership/plans/[planId]/publish/route.ts'), 'utf8')
   const lifecyclePlanRoute = readFileSync(resolve(process.cwd(), 'src/app/api/v1/membership/plans/[planId]/lifecycle/route.ts'), 'utf8')
   const updatePlanRoute = readFileSync(resolve(process.cwd(), 'src/app/api/v1/membership/plans/[planId]/route.ts'), 'utf8')
@@ -183,6 +185,21 @@ describe('v1 subscription adapter', () => {
     expect(apiInventory.domains.subscription_entitlement_payment.endpoint_groups)
       .toContain('GET /v1/memberships/subscriptions')
     expect(route).toContain("parts.length === 0 && method === 'GET'")
+  })
+
+  it('connects creator studio to owner-scoped membership plan management without claiming paid checkout is live', () => {
+    expect(creatorStudio).toContain("import CreatorMembershipPlans from './CreatorMembershipPlans'")
+    expect(creatorStudio).toContain('<CreatorMembershipPlans locale={locale} />')
+    expect(creatorMembershipPlans).toContain("'/api/v1/membership/plans?'")
+    expect(creatorMembershipPlans).toContain("'/api/v1/membership/plans'")
+    expect(creatorMembershipPlans).toContain("'/publish'")
+    expect(creatorMembershipPlans).toContain("'/lifecycle'")
+    expect(creatorMembershipPlans).toContain("'If-Match': plan.etag")
+    expect(creatorMembershipPlans).toContain("'Idempotency-Key': key")
+    expect(creatorMembershipPlans).toContain("action: 'publish' | 'pause' | 'resume' | 'retire'")
+    expect(creatorMembershipPlans).toContain('paid checkout stays unavailable')
+    expect(creatorMembershipPlans).toContain("status === 'PAUSED'")
+    expect(creatorMembershipPlans).toContain("status === 'RETIRED'")
   })
 
   it('exposes only the canonical subscription lifecycle paths', () => {
