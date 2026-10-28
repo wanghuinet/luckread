@@ -12,6 +12,7 @@ describe('v1 subscription adapter', () => {
   const publishPlanRoute = readFileSync(resolve(process.cwd(), 'src/app/api/v1/membership/plans/[planId]/publish/route.ts'), 'utf8')
   const w08CreatorClient = readFileSync(resolve(process.cwd(), 'src/auth/w08-creator-client.ts'), 'utf8')
   const w08Worker = readFileSync(resolve(process.cwd(), '../W08-creator/src/worker.ts'), 'utf8')
+  const w08Casl = readFileSync(resolve(process.cwd(), '../W08-creator/src/authz/casl-policy.ts'), 'utf8')
   const w06Worker = readFileSync(resolve(process.cwd(), '../W06-governance/src/index.ts'), 'utf8')
   const w06Client = readFileSync(resolve(process.cwd(), 'src/moderation/w06-moderation-client.ts'), 'utf8')
   const client = readFileSync(resolve(process.cwd(), 'src/subscription/w07-subscription-client.ts'), 'utf8')
@@ -76,7 +77,7 @@ describe('v1 subscription adapter', () => {
     expect(w06Client).toContain("'/internal/audit-events/membership-plan-published'")
     expect(w06Worker).toContain("url.pathname === '/internal/audit-events/membership-plan-published'")
     expect(w06Worker).toContain("action: 'membership.plan.published'")
-    expect(w08Worker).toContain("'membership.plan.publish.own'")
+    expect(w08Casl).toContain("grant('membership.plan.publish.own', 'MembershipPlan', selfOwnerCondition(subjectId))")
   })
 
   it('contracts creator plan permissions and server-controlled draft fields', () => {
