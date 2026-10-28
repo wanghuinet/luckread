@@ -102,10 +102,23 @@ class D104OrderMigrationTests(unittest.TestCase):
              payload_hash, state, received, processed, outcome),
         )
 
+    def provider_event_conflict(self, conflict_id="conflict_1", merchant="merchant_1",
+                                event_id="evt_1", existing_hash="c"*64, incoming_hash="d"*64,
+                                state="OPEN", count=1, version=1, first_seen=NOW,
+                                last_seen=NOW, resolved_at=None, resolution_code=None):
+        self.db.execute(
+            """INSERT INTO payment_provider_event_conflicts(conflict_id,provider,merchant_id,event_id,
+               existing_payload_sha256,incoming_payload_sha256,state,occurrence_count,version,
+               first_seen_at,last_seen_at,resolved_at,resolution_code)
+               VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (conflict_id, "hyperswitch", merchant, event_id, existing_hash, incoming_hash,
+             state, count, version, first_seen, last_seen, resolved_at, resolution_code),
+        )
+
     def test_only_expected_tables_and_indexes_exist(self):
         tables = {row[0] for row in self.db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
         self.assertEqual(tables, {
-            "orders", "order_lines", "order_create_idempotency", "payments", "payment_provider_events",
+            "orders", "order_lines", "order_create_idempotency", "payments", "payment_provider_events", "payment_provider_event_conflicts",
         })
         indexes = {row[0] for row in self.db.execute("SELECT name FROM sqlite_master WHERE type='index' AND sql IS NOT NULL")}
         self.assertTrue({
@@ -114,11 +127,16 @@ class D104OrderMigrationTests(unittest.TestCase):
             "ix_order_create_idempotency_customer_created", "ix_order_create_idempotency_expiration",
             "ix_payments_customer_created_payment", "ix_payments_order_created_payment",
             "ix_payments_status_updated_payment", "ix_payment_provider_events_state_received",
-            "ix_payment_provider_events_payment_received",
+            "ix_payment_provider_events_payment_received", "ix_payment_provider_event_conflicts_state_last_seen",
+            "ix_payment_provider_event_conflicts_identity",
         }.issubset(indexes))
         self.assertFalse(tables.intersection({"payment_intents", "ledger_entries", "refunds", "entitlements"}))
         self.assertNotIn("client_secret", {r[1] for r in self.db.execute('PRAGMA table_info("payments")')})
         self.assertNotIn("raw_body", {r[1] for r in self.db.execute('PRAGMA table_info("payment_provider_events")')})
+        for table in ("orders", "order_lines", "order_create_idempotency", "payments",
+                      "payment_provider_events", "payment_provider_event_conflicts"):
+            self.assertEqual(self.db.execute(f'PRAGMA foreign_key_list("{table}")').fetchall(), [])
+
 
     def test_order_insert_requires_matching_completed_idempotency_result(self):
         with self.assertRaises(sqlite3.IntegrityError):
@@ -325,6 +343,51 @@ class D104OrderMigrationTests(unittest.TestCase):
                    VALUES('bad_provider','another_provider','merchant_1','evt_provider',
                    'payment_succeeded',NULL,?,'RECEIVED',?)""",
                 ("c"*64, NOW),
+            )
+
+
+    def test_mismatched_webhook_replay_has_durable_conflict_and_reconciliation_lifecycle(self):
+        self.provider_event()
+        self.provider_event_conflict()
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.provider_event_conflict(conflict_id="conflict_duplicate")
+        # Another payload hash for the same upstream event creates a separately
+        # auditable conflict record; no raw event body is persisted.
+        self.provider_event_conflict(
+            conflict_id="conflict_payload_2",
+            incoming_hash="e"*64,
+        )
+        self.db.execute(
+            """UPDATE payment_provider_event_conflicts
+               SET occurrence_count=2,version=2,last_seen_at=? WHERE conflict_id='conflict_1'""",
+            (LATER,),
+        )
+        self.db.execute(
+            """UPDATE payment_provider_event_conflicts
+               SET state='RESOLVED',version=3,resolved_at=?,resolution_code='MANUAL_RECONCILIATION'
+               WHERE conflict_id='conflict_1'""",
+            ("2026-10-28T00:00:02.000Z",),
+        )
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute(
+                """UPDATE payment_provider_event_conflicts
+                   SET state='OPEN',version=4,last_seen_at=? WHERE conflict_id='conflict_1'""",
+                ("2026-10-28T00:00:03.000Z",),
+            )
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute("DELETE FROM payment_provider_event_conflicts WHERE conflict_id='conflict_1'")
+
+    def test_webhook_conflict_requires_distinct_valid_hashes_and_version_cas(self):
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.provider_event_conflict(existing_hash="c"*64, incoming_hash="c"*64)
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.provider_event_conflict(conflict_id="conflict_bad_hash", incoming_hash="g"*64)
+        self.provider_event_conflict()
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute(
+                """UPDATE payment_provider_event_conflicts
+                   SET occurrence_count=2,last_seen_at=? WHERE conflict_id='conflict_1'""",
+                (LATER,),
             )
 
 
