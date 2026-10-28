@@ -4133,6 +4133,17 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ErrorResponse' }
 
+  /membership/plans/{planId}/publish:
+    post:
+      tags: [Users]
+      summary: Discovery draft for POST undefined
+      operationId: postMembershipPlansPlanIdPublish
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
 components:
   securitySchemes:
     bearerAuth:
