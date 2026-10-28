@@ -340,6 +340,10 @@ describe('CASL L0-L8 authorization policy', () => {
       resourceAttributes: { ownerId: 'user-1' },
     }).decision).toBe('ALLOW')
     expect(evaluate({ layer: 'L3', action: 'membership.plan.lifecycle.own', resourceType: 'MembershipPlan', resourceAttributes: { ownerId: 'user-1' } }).decision).toBe('ALLOW')
+    expect(evaluate({ layer: 'L3', action: 'membership.analytics.read.own', resourceType: 'MembershipPlan', resourceAttributes: { ownerId: 'user-1' } }).decision).toBe('ALLOW')
+    expect(evaluate({ layer: 'L3', action: 'membership.analytics.read.own', resourceType: 'MembershipPlan', resourceAttributes: { ownerId: 'user-2' } }).decision).toBe('DENY')
+    expect(evaluate({ layer: 'L2', action: 'membership.analytics.read.own', resourceType: 'MembershipPlan', resourceAttributes: { ownerId: 'user-1' } }).decision).toBe('DENY')
+    expect(evaluate({ layer: 'L3', accountState: 'FROZEN', action: 'membership.analytics.read.own', resourceType: 'MembershipPlan', resourceAttributes: { ownerId: 'user-1' } }).decision).toBe('DENY')
     expect(evaluate({
       layer: 'L3',
       action: 'membership.plan.update.own',
