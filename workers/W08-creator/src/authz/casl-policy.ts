@@ -240,6 +240,7 @@ function addL3Rules(
   grant('membership.plan.publish.own', 'MembershipPlan', selfOwnerCondition(subjectId))
   grant('membership.plan.update.own', 'MembershipPlan', selfOwnerCondition(subjectId))
   grant('membership.plan.lifecycle.own', 'MembershipPlan', selfOwnerCondition(subjectId))
+  grant('membership.analytics.read.own', 'MembershipPlan', selfOwnerCondition(subjectId))
 }
 
 function addL5Rules(grant: (action: string, subject: string, conditions?: Record<string, unknown>) => void): void {
