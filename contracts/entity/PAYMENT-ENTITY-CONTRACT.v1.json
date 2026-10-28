@@ -418,7 +418,7 @@
   "constraints": [
     "customerId is server-derived from the authenticated principal and never accepted from a client request.",
     "The payment snapshot must match an owned positive payable Order's amount and currency at creation time.",
-    "Provider calls occur outside D1 transactions and reuse the same payment ID and Idempotency-Key for retries.",
+    "Provider calls occur outside D1 transactions and reuse the same payment ID and Idempotency-Key for retries. A given customer's key cannot be reused for a different order/request.",
     "Provider success is trusted only after verified provider evidence is validated against the local Payment and persisted with monotonic provider timestamp and local version CAS.",
     "No client secret, API key, card data, raw webhook body, ledger line or entitlement snapshot is persisted in this entity."
   ],
