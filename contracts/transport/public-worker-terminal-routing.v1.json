@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://luckread.cn/contracts/v1/public-worker-terminal-routing.v1.json",
+  "$id": "https://luckread.com/contracts/v1/public-worker-terminal-routing.v1.json",
   "title": "LuckRead Public Ingress and Business Terminal Worker Boundary",
   "version": "1.0.0",
   "status": "CONTRACTED_PARTIAL",
@@ -74,12 +74,14 @@
         "/api/v1/plans",
         "/api/v1/membership/plans",
         "/api/v1/memberships/subscriptions",
-        "/api/v1/memberships/subscriptions/*"
+        "/api/v1/memberships/subscriptions/*",
+        "/api/v1/commerce/orders",
+        "/api/v1/commerce/orders/*"
       ],
       "ingressWorker": "W01",
       "terminalWorker": "W07",
       "transportBinding": "W01-W07-membership-commerce-http-binding.v1",
-      "authorityNote": "W07 owns MembershipPlan and subscription commerce facts. W01 uses W08 CASL plus W08-resolved ACTIVE creator identity for owner-scoped plan management; after W07 writes a plan draft, W01 must confirm its immutable creation audit through the existing W06_MODERATION binding to W06/D1-03 before returning success. Payment/subscription writes remain fail-closed until trusted provider synchronization is admitted.",
+      "authorityNote": "W07 owns MembershipPlan, subscription and commerce Order facts. W01 uses W08 CASL for creator-plan and owner-scoped Order permissions; all public order and payment operations cross the existing W07_SUBSCRIPTION binding. After W07 returns an Order creation result, W01 validates the complete DTO and waits for immutable W06/D1-03 order-creation audit confirmation before returning success. W07 order creation remains fail-closed until authoritative pricing and tax decisions are admitted; subscription entitlement activation remains gated on verified provider reconciliation and fulfillment.",
       "auditWorker": "W06",
       "auditTransportBinding": "W01-W06-moderation-http-binding.v1"
     }
