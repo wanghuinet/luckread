@@ -99,6 +99,29 @@
       "auditTransportBinding": "W01-W06-moderation-http-binding.v1"
     },
     {
+      "operationId": "publishOwnMembershipPlan",
+      "method": "POST",
+      "publicPath": "/api/v1/membership/plans/{planId}/publish",
+      "internalPath": "/membership/plans/{planId}/publish",
+      "principalRequired": true,
+      "permission": "membership.plan.publish.own",
+      "minimumGlobalLayer": "L3",
+      "precondition": "If-Match",
+      "ownerId": "W08-resolved ACTIVE creator ID only; never taken from public query or body",
+      "requestBody": "NONE",
+      "cache": "NO_STORE",
+      "auditRequired": true,
+      "successRule": "W07 changes only the owner-scoped DRAFT/PRIVATE MembershipPlan to ACTIVE/PUBLIC with a conditional version-CAS update and an existing immutable current plan version. W01 validates the result and waits for W06 immutable audit confirmation before returning success.",
+      "auditTransportBinding": "W01-W06-moderation-http-binding.v1",
+      "failurePolicy": {
+        "missingIfMatch": "428",
+        "staleVersion": "412",
+        "nonDraftState": "409",
+        "missingOrForeignOwnerPlan": "404",
+        "missingW06AuditConfirmation": "503"
+      }
+    },
+    {
       "operationId": "createCommerceOrder",
       "method": "POST",
       "publicPath": "/api/v1/commerce/orders",
