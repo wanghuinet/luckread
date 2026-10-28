@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  createHyperswitchCustomerInitiatedSetupIntent,
   createHyperswitchMerchantInitiatedPayment,
   createHyperswitchPaymentIntent,
   HyperswitchClientError,
@@ -171,6 +172,52 @@ describe('Hyperswitch server-side payment intent client', () => {
     const streamed = fakeFetch(oversizedStream)
     await expect(createHyperswitchPaymentIntent(config, input, streamed.fetcher))
       .rejects.toMatchObject({ code: 'UPSTREAM_INVALID_RESPONSE' })
+  })
+
+  it('creates an unconfirmed customer-present setup intent for later off-session use without claiming consent', async () => {
+    const fake = fakeFetch(jsonResponse(responsePayment()))
+    const setupInput = { ...input, customerId: 'cust_user_42' }
+    const payment = await createHyperswitchCustomerInitiatedSetupIntent(config, setupInput, fake.fetcher)
+
+    expect(fake.captured).toHaveLength(1)
+    expect(fake.captured[0].url).toBe('https://sandbox.hyperswitch.io/payments')
+    expect(fake.captured[0].init.method).toBe('POST')
+    const headers = new Headers(fake.captured[0].init.headers)
+    expect(headers.get('api-key')).toBe(config.apiKey)
+    expect(headers.get('Idempotency-Key')).toBe(input.idempotencyKey)
+    expect(JSON.parse(String(fake.captured[0].init.body))).toEqual({
+      payment_id: input.paymentId,
+      amount: input.amount,
+      currency: input.currency,
+      customer_id: setupInput.customerId,
+      setup_future_usage: 'off_session',
+      confirm: false,
+    })
+    expect(payment.status).toBe('requires_payment_method')
+  })
+
+  it('rejects invalid setup customer references and mismatched provider setup responses before accepting them', async () => {
+    for (const customerId of ['', ' cust_user_42', 'cust_user_42\\nInjected: yes', 'x'.repeat(257)]) {
+      const fake = fakeFetch(jsonResponse(responsePayment()))
+      await expect(createHyperswitchCustomerInitiatedSetupIntent(config, {
+        ...input,
+        customerId,
+      }, fake.fetcher)).rejects.toMatchObject({ code: 'REQUEST_INVALID' })
+      expect(fake.captured).toHaveLength(0)
+    }
+
+    for (const mismatch of [
+      { payment_id: 'pay_aaaaaaaaaaaaaaaaaaaaaaaaaa' },
+      { amount: input.amount + 1 },
+      { currency: 'EUR' },
+      { status: 'succeeded' },
+    ]) {
+      const fake = fakeFetch(jsonResponse(responsePayment(mismatch)))
+      await expect(createHyperswitchCustomerInitiatedSetupIntent(config, {
+        ...input,
+        customerId: 'cust_user_42',
+      }, fake.fetcher)).rejects.toMatchObject({ code: 'UPSTREAM_INVALID_RESPONSE' })
+    }
   })
 
   it('creates a customer-bound off-session recurring charge through Hyperswitch with a stable idempotency key', async () => {
