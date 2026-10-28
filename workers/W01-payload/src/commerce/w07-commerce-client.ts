@@ -43,7 +43,7 @@ export type BoundedOrderBody = { ok: true; value: unknown } | { ok: false; respo
 
 export async function readBoundedOrderBody(request: Request): Promise<BoundedOrderBody> {
   const maxBytes = 16_384
-  if (!/^application\\/json(?:\\s*;|$)/i.test(request.headers.get('content-type') ?? '')) {
+  if (!/^application\/json(?:\s*;|$)/i.test(request.headers.get('content-type') ?? '')) {
     return { ok: false, response: errorResponse(400, 'VALIDATION_FAILED', 'A JSON order body is required') }
   }
   const declaredLength = request.headers.get('content-length')
@@ -86,7 +86,7 @@ export async function readBoundedOrderBody(request: Request): Promise<BoundedOrd
 export function validateOrderIdempotencyKey(value: string | null): string | Response {
   const key = value?.trim() ?? ''
   if (!key) return errorResponse(428, 'PRECONDITION_REQUIRED', 'Idempotency-Key is required')
-  if (key.length > 256 || key !== value || /[\\u0000-\\u001f\\u007f]/.test(key)) {
+  if (key.length > 256 || key !== value || /[\u0000-\u001f\u007f]/.test(key)) {
     return errorResponse(400, 'VALIDATION_FAILED', 'Idempotency-Key is invalid')
   }
   return key
@@ -150,7 +150,7 @@ export function validateCreatedCommerceOrderEnvelope(value: unknown): CreatedCom
     ])) return null
     if (
       typeof entry.itemRef !== 'string' || entry.itemRef.length < 1 || entry.itemRef.length > 255 ||
-      entry.itemRef !== entry.itemRef.trim() || /[\\u0000-\\u001f\\u007f]/.test(entry.itemRef) ||
+      entry.itemRef !== entry.itemRef.trim() || /[\u0000-\u001f\u007f]/.test(entry.itemRef) ||
       typeof entry.quantity !== 'number' || !Number.isSafeInteger(entry.quantity) || entry.quantity < 1 || entry.quantity > 10_000 ||
       !safeMinor(entry.unitAmountMinor) || !safeMinor(entry.lineSubtotalMinor) ||
       !safeMinor(entry.lineDiscountMinor) || !safeMinor(entry.lineTaxMinor) || !safeMinor(entry.lineTotalMinor)
