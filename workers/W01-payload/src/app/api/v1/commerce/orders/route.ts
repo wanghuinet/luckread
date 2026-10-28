@@ -1,0 +1,68 @@
+import {
+  authorizeOrderPermission,
+  mapOrderAdapterError,
+  orderAdapterError,
+  readBoundedOrderBody,
+  validateCreatedCommerceOrderEnvelope,
+  validateOrderIdempotencyKey,
+} from '../../../../../commerce/w07-commerce-client.js'
+import { resolveCookieSubscriptionPrincipal, callW07Subscription, W07SubscriptionClientError } from '../../../../../subscription/w07-subscription-client.js'
+import { callW06CommerceOrderAudit, W06ModerationClientError } from '../../../../../moderation/w06-moderation-client.js'
+import { W08CreatorClientError } from '../../../../../auth/w08-creator-client.js'
+
+/** W01 authenticates and authorizes order creation, then requires W06 durable audit confirmation for every successful W07 result. */
+export async function POST(request: Request): Promise<Response> {
+  try {
+    const principal = await resolveCookieSubscriptionPrincipal(request)
+    if (principal instanceof Response) return principal
+
+    const denied = await authorizeOrderPermission(request, principal, 'order.create')
+    if (denied) return denied
+
+    const idempotencyKey = validateOrderIdempotencyKey(request.headers.get('Idempotency-Key'))
+    if (idempotencyKey instanceof Response) return idempotencyKey
+
+    const parsed = await readBoundedOrderBody(request)
+    if (!parsed.ok) return parsed.response
+
+    const w07Response = await callW07Subscription({
+      request,
+      pathname: '/commerce/orders',
+      method: 'POST',
+      principal,
+      body: parsed.value,
+    })
+    if (!w07Response.ok) return w07Response
+    if (w07Response.status !== 200 && w07Response.status !== 201) {
+      return orderAdapterError(503, 'ORDER_RESPONSE_INVALID', 'Order result could not be verified')
+    }
+
+    const order = validateCreatedCommerceOrderEnvelope(await w07Response.clone().json().catch((): null => null))
+    if (!order) return orderAdapterError(503, 'ORDER_RESPONSE_INVALID', 'Order result could not be verified')
+
+    const auditResponse = await callW06CommerceOrderAudit({ request, principal, body: order })
+    const auditResult: unknown = await auditResponse.json().catch((): null => null)
+    if (
+      (auditResponse.status !== 200 && auditResponse.status !== 201) ||
+      !auditResult || typeof auditResult !== 'object' ||
+      (auditResult as { eventId?: unknown }).eventId !== order.eventId ||
+      (auditResult as { action?: unknown }).action !== 'commerce.order.created' ||
+      (auditResult as { targetType?: unknown }).targetType !== 'Order' ||
+      (auditResult as { targetId?: unknown }).targetId !== order.orderId
+    ) {
+      return orderAdapterError(503, 'AUDIT_UNAVAILABLE', 'Order audit was not durably confirmed')
+    }
+    return w07Response
+  } catch (error) {
+    if (error instanceof W07SubscriptionClientError) {
+      return orderAdapterError(error.status, error.code, error.message)
+    }
+    if (error instanceof W06ModerationClientError) {
+      return orderAdapterError(503, 'AUDIT_UNAVAILABLE', 'Order audit service unavailable')
+    }
+    if (error instanceof W08CreatorClientError) {
+      return orderAdapterError(503, 'AUTHORIZATION_UNAVAILABLE', 'Order authorization unavailable')
+    }
+    return mapOrderAdapterError(error)
+  }
+}
