@@ -4,7 +4,6 @@ import { createMembershipPlanDraft, reviseMembershipPlan, getSubscription, listA
 import { handleCommerceOrderRequest } from './order-http-runtime.js'
 import { handleCommercePaymentIntentRequest } from './payment-intent-http-runtime.js'
 import { handleHyperswitchWebhookRequest } from './payment-webhook-http-runtime.js'
-import { runRenewalScheduledBatch } from './renewal-scheduler.js'
 
 interface RateLimitBinding { limit(input: { key: string }): Promise<{ success: boolean }> }
 interface Env {
@@ -257,22 +256,5 @@ export default {
       console.error(error)
       return json({ error: { code: 'INTERNAL_ERROR', message: 'Internal error', details: {} }, requestId: crypto.randomUUID() }, 500)
     }
-  },
-  scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext): void {
-    ctx.waitUntil(runRenewalScheduledBatch(env).then((result) => {
-      console.log(JSON.stringify({
-        event: 'membership.renewal.cron_tick',
-        cron: controller.cron,
-        scheduledTime: new Date(controller.scheduledTime).toISOString(),
-        ...result,
-      }));
-    }).catch((error: unknown) => {
-      console.error(JSON.stringify({
-        event: 'membership.renewal.cron_tick_failed',
-        cron: controller.cron,
-        scheduledTime: new Date(controller.scheduledTime).toISOString(),
-        errorCode: error instanceof Error ? error.name : 'UNKNOWN_ERROR',
-      }));
-    }));
   },
 }

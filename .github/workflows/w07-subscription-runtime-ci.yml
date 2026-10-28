@@ -27,7 +27,6 @@ on:
       - 'workers/W01-payload/tests/int/subscription-v1-adapter.int.spec.ts'
       - 'workers/W01-payload/wrangler.jsonc'
       - '.github/workflows/w07-subscription-runtime-ci.yml'
-      - '.github/workflows/w07-subscription-cron-only-deploy.yml'
       - '.github/workflows/w07-d1-04-binding-preflight.yml'
       - '.github/workflows/w07-d1-04-order-migration.yml'
       - 'contracts/alignment/cross-system-mapping.v1.json'
@@ -71,7 +70,6 @@ on:
       - 'workers/W01-payload/tests/int/subscription-v1-adapter.int.spec.ts'
       - 'workers/W01-payload/wrangler.jsonc'
       - '.github/workflows/w07-subscription-runtime-ci.yml'
-      - '.github/workflows/w07-subscription-cron-only-deploy.yml'
       - '.github/workflows/w07-d1-04-binding-preflight.yml'
       - '.github/workflows/w07-d1-04-order-migration.yml'
       - 'contracts/alignment/cross-system-mapping.v1.json'
@@ -103,8 +101,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 24
-      - name: Verify W07 Cron-only deploy safety contract
-        run: node --test workers/W07-subscription-commerce/scripts/verify-cron-only-deploy-workflow.test.mjs
+      - name: Verify renewal execution remains disabled until async contract admission
+        run: node --test workers/W07-subscription-commerce/scripts/verify-renewal-activation-gate.test.mjs
       - name: Enable Corepack
         run: corepack enable
       - name: Install W01 test dependencies from committed lockfile
