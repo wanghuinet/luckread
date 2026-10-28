@@ -1,7 +1,7 @@
 'use client'
 
 import Script from 'next/script'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { apiFetch } from '../../../lib/client-api.js'
 
 type PaymentIntentData = {
@@ -79,11 +79,11 @@ export default function CheckoutClient({ orderId }: { orderId: string }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [sdkReady, setSdkReady] = useState(false)
-  const [elementReady, setElementReady] = useState(false)
+  const [readyPaymentId, setReadyPaymentId] = useState<string | null>(null)
   const [confirming, setConfirming] = useState(false)
   const [statusMessage, setStatusMessage] = useState('')
-  const [elements, setElements] = useState<HyperswitchElements | null>(null)
-  const [hyper, setHyper] = useState<HyperswitchClient | null>(null)
+  const hyperRef = useRef<HyperswitchClient | null>(null)
+  const elementsRef = useRef<HyperswitchElements | null>(null)
 
   useEffect(() => {
     let active = true
@@ -149,24 +149,27 @@ export default function CheckoutClient({ orderId }: { orderId: string }) {
       const hyperClient = window.Hyper(publishableKey)
       const widgetSet = hyperClient.elements({ clientSecret: intent.clientSecret, locale: 'auto' })
       paymentElement = widgetSet.create('payment', { layout: 'tabs', displaySavedPaymentMethodsCheckbox: true })
-      paymentElement.on('ready', () => { if (active) setElementReady(true) })
+      paymentElement.on('ready', () => { if (active) setReadyPaymentId(intent.paymentId) })
       paymentElement.mount('#luckread-payment-element')
-      setHyper(hyperClient)
-      setElements(widgetSet)
+      hyperRef.current = hyperClient
+      elementsRef.current = widgetSet
     } catch {
-      setError('Hyperswitch 支付表单初始化失败。')
+      void Promise.resolve().then(() => {
+        if (active) setError('Hyperswitch 支付表单初始化失败。')
+      })
     }
     return () => {
       active = false
       paymentElement?.destroy?.()
-      setHyper(null)
-      setElements(null)
-      setElementReady(false)
+      hyperRef.current = null
+      elementsRef.current = null
     }
   }, [sdkReady, intent])
 
   async function confirmPayment() {
-    if (!hyper || !elements || !intent || !elementReady || confirming) return
+    const hyper = hyperRef.current
+    const elements = elementsRef.current
+    if (!hyper || !elements || !intent || readyPaymentId !== intent.paymentId || confirming) return
     setConfirming(true)
     setStatusMessage('')
     try {
@@ -209,7 +212,7 @@ export default function CheckoutClient({ orderId }: { orderId: string }) {
         如需将支付方式用于后续周期扣款，请只在 Hyperswitch 托管支付表单明确显示的“保存支付方式”选项中主动勾选授权。
         不勾选即不表示您同意保存；LuckRead 不会用自制复选框代替支付服务商的授权流程。
       </p>
-      <button type="button" disabled={!elementReady || confirming} onClick={() => { void confirmPayment() }}>
+      <button type="button" disabled={!intent || readyPaymentId !== intent.paymentId || confirming} onClick={() => { void confirmPayment() }}>
         {confirming ? '正在提交…' : '确认支付'}
       </button>
       {statusMessage ? <p role="status" aria-live="polite">{statusMessage}</p> : null}
