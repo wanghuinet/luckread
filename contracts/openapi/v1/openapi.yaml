@@ -3335,7 +3335,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/HyperswitchWebhookReceiptResponse' }
         '202':
-          description: Event was durably recorded but requires reconciliation or contains a payload conflict.
+          description: Event was durably recorded but was semantically rejected, requires reconciliation, or contains a payload conflict.
           headers:
             Cache-Control:
               schema: { type: string, const: no-store }
