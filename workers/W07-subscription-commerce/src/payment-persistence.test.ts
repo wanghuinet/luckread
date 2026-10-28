@@ -16,7 +16,7 @@ const SECRET = 'webhook_test_secret';
 const PAYMENT_ID = 'pay_' + 'a'.repeat(26);
 
 type Row = Record<string, unknown>;
-type Order = { order_id: string; customer_id: string; status: string; currency: string; total_minor: number };
+type Order = { order_id: string; customer_id: string; status: string; version: number; currency: string; total_minor: number; updated_at: string; confirmed_at: string | null };
 type Payment = {
   payment_id: string; order_id: string; customer_id: string; provider: string; merchant_id: string;
   amount_minor: number; currency: string; status: PaymentAttemptStatus; version: number;
@@ -136,6 +136,25 @@ class MemoryPaymentD1 {
       });
       return result(1) as D1Result<T>;
     }
+    if (sql.startsWith("UPDATE orders SET status = 'CONFIRMED'")) {
+      const [confirmedAt, updatedAt, orderId, customerId, currency, amount, oldStatus, version,
+        paymentId, providerUpdatedAt, eventProvider, eventMerchant, eventId, payloadHash] = values as
+        [string, string, string, string, string, number, string, number, string, string, string, string, string, string];
+      const order = this.orders.find(o => o.order_id === orderId && o.customer_id === customerId &&
+        o.currency === currency && o.total_minor === amount && o.status === oldStatus && o.version === version &&
+        ['CREATED', 'PENDING_PAYMENT'].includes(o.status));
+      const payment = this.payments.find(p => p.payment_id === paymentId && p.order_id === orderId &&
+        p.customer_id === customerId && p.provider === 'hyperswitch' && p.status === 'succeeded' &&
+        p.provider_updated_at === providerUpdatedAt);
+      const receipt = this.events.find(e => e.provider === eventProvider && e.merchant_id === eventMerchant &&
+        e.event_id === eventId && e.payload_sha256 === payloadHash && e.state === 'RECEIVED');
+      if (!order || !payment || !receipt) return result(0) as D1Result<T>;
+      order.status = 'CONFIRMED';
+      order.version += 1;
+      order.confirmed_at = confirmedAt;
+      order.updated_at = updatedAt;
+      return result(1) as D1Result<T>;
+    }
     if (sql.startsWith('UPDATE payments SET status = ?') && sql.includes('provider_updated_at = ?')) {
       const [status, providerUpdatedAt, updatedAt, paymentId, provider, merchantId, amount, currency,
         version, oldStatus, timestampGuard, eventProvider, eventMerchant, eventId, payloadHash] = values as
@@ -180,20 +199,32 @@ class MemoryPaymentD1 {
       return result(1) as D1Result<T>;
     }
     if (sql.startsWith('UPDATE payment_provider_events SET state = CASE WHEN EXISTS')) {
-      const [targetPaymentId, targetProvider, targetMerchant, targetAmount, targetCurrency, targetStatus, targetTimestamp,
-        processedAt, secondPaymentId, secondProvider, secondMerchant, secondAmount, secondCurrency, secondStatus, secondTimestamp,
-        provider, merchantId, eventId, payloadHash] = values as
-        [string, string, string, number, string, PaymentAttemptStatus, string, string,
-          string, string, string, number, string, PaymentAttemptStatus, string, string, string, string, string];
+      const succeededEvent = sql.includes('FROM orders o');
+      const eventIdentity = values.slice(-4) as [string, string, string, string];
+      const [provider, merchantId, eventId, payloadHash] = eventIdentity;
+      const [targetPaymentId, targetProvider, targetMerchant, targetAmount, targetCurrency, targetStatus, targetTimestamp] =
+        values.slice(0, 7) as [string, string, string, number, string, PaymentAttemptStatus, string];
       const payment = this.payments.find(p => p.payment_id === targetPaymentId && p.provider === targetProvider &&
         p.merchant_id === targetMerchant && p.amount_minor === targetAmount && p.currency === targetCurrency &&
         p.status === targetStatus && p.provider_updated_at === targetTimestamp);
       const receipt = this.events.find(e => e.provider === provider && e.merchant_id === merchantId &&
         e.event_id === eventId && e.payload_sha256 === payloadHash && e.state === 'RECEIVED');
       if (!receipt) return result(0) as D1Result<T>;
-      receipt.state = payment ? 'APPLIED' : 'RECONCILIATION_REQUIRED';
-      receipt.processed_at = processedAt;
-      receipt.outcome_code = payment ? 'PAYMENT_STATUS_APPLIED' : 'PAYMENT_STATUS_CAS_LOST';
+
+      let orderConfirmed = true;
+      if (succeededEvent) {
+        const orderValues = values.slice(7, 11) as [string, string, string, number];
+        const [orderId, customerId, currency, amount] = orderValues;
+        orderConfirmed = this.orders.some(o => o.order_id === orderId && o.customer_id === customerId &&
+          o.currency === currency && o.total_minor === amount && o.status === 'CONFIRMED');
+      }
+
+      const applied = Boolean(payment) && (!succeededEvent || orderConfirmed);
+      receipt.state = applied ? 'APPLIED' : 'RECONCILIATION_REQUIRED';
+      receipt.processed_at = values[succeededEvent ? 11 : 7] as string;
+      receipt.outcome_code = applied
+        ? (succeededEvent ? 'PAYMENT_STATUS_APPLIED_AND_ORDER_CONFIRMED' : 'PAYMENT_STATUS_APPLIED')
+        : (payment && succeededEvent ? 'ORDER_CONFIRMATION_REQUIRED' : 'PAYMENT_STATUS_CAS_LOST');
       return result(1) as D1Result<T>;
     }
     if (sql.startsWith('UPDATE payment_provider_events SET state = ?')) {
@@ -246,8 +277,8 @@ const fixedDeps = (time = NOW) => ({
 
 function seedOrder(db: MemoryPaymentD1, overrides: Partial<Order> = {}) {
   db.orders.push({
-    order_id: 'ord_1', customer_id: CUSTOMER, status: 'CREATED',
-    currency: 'USD', total_minor: 1200, ...overrides,
+    order_id: 'ord_1', customer_id: CUSTOMER, status: 'CREATED', version: 1,
+    currency: 'USD', total_minor: 1200, updated_at: NOW, confirmed_at: null, ...overrides,
   });
 }
 
@@ -406,7 +437,7 @@ describe('PAY-001 payment attempt persistence candidate', () => {
   });
 
 
-  it('atomically applies a signed, newer, identity-matched payment success and keeps the Order untouched', async () => {
+  it('atomically applies a signed payment success and confirms the matching Order', async () => {
     const db = new MemoryPaymentD1();
     seedOrder(db);
     seedPayment(db);
@@ -429,15 +460,32 @@ describe('PAY-001 payment attempt persistence candidate', () => {
     expect(db.events[0]).toMatchObject({
       event_id: 'evt_success',
       state: 'APPLIED',
-      outcome_code: 'PAYMENT_STATUS_APPLIED',
+      outcome_code: 'PAYMENT_STATUS_APPLIED_AND_ORDER_CONFIRMED',
       processed_at: NOW,
     });
-    expect(db.orders[0]?.status).toBe('CREATED');
+    expect(db.orders[0]).toMatchObject({ status: 'CONFIRMED', version: 2, confirmed_at: '2026-10-28T12:00:00.001Z' });
 
     const duplicate = await receiveHyperswitchWebhook(db as unknown as D1Database, input, fixedDeps(LATER));
     expect(duplicate).toMatchObject({ outcome: 'DUPLICATE', receiptId: applied.receiptId });
     expect(db.payments[0]?.version).toBe(2);
     expect(db.events).toHaveLength(1);
+  });
+
+  it('retains provider success but does not confirm a cancelled Order; event requires reconciliation', async () => {
+    const db = new MemoryPaymentD1();
+    seedOrder(db, { status: 'CANCELLED', version: 2, updated_at: LATER });
+    seedPayment(db);
+    const signed = await signedBody(bodyText('evt_success_cancelled_order'));
+    const result = await receiveHyperswitchWebhook(
+      db as unknown as D1Database,
+      { ...signed, webhookSecret: SECRET, expectedMerchantId: MERCHANT },
+      fixedDeps('2026-10-28T12:00:02.000Z'),
+    );
+
+    expect(result).toMatchObject({ outcome: 'RECONCILIATION_REQUIRED', state: 'RECONCILIATION_REQUIRED' });
+    expect(db.payments[0]).toMatchObject({ status: 'succeeded', version: 2, provider_updated_at: NOW });
+    expect(db.orders[0]).toMatchObject({ status: 'CANCELLED', version: 2, confirmed_at: null });
+    expect(db.events[0]?.outcome_code).toBe('ORDER_CONFIRMATION_REQUIRED');
   });
 
   it('retains stale signed provider observations for reconciliation without regressing Payment state', async () => {
