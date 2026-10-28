@@ -169,6 +169,37 @@ describe('W06 runtime', () => {
       body: JSON.stringify(body),
     },
   )
+  const orderId = 'ord_test_1'
+  const orderAuditInput = {
+    eventId: 'evt_order_created_' + orderId,
+    orderId,
+    occurredAt: '2026-10-28T03:00:00.000Z',
+    status: 'CREATED',
+    version: 1,
+    currency: 'USD',
+    subtotalMinor: 1200,
+    discountMinor: 100,
+    taxMinor: 88,
+    totalMinor: 1188,
+  }
+  const orderAuditRequest = (body: unknown, withTransport = true, requestId = 'req_order_audit_1', layer = 'L2') => new Request(
+    'https://w06.internal/internal/audit-events/commerce-order-created',
+    {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        ...(withTransport ? {
+          'X-LuckRead-Caller': 'W01',
+          'X-LuckRead-Transport-Version': '1.0',
+          'X-LuckRead-Principal-User-Id': 'buyer_user_001',
+          'X-LuckRead-Principal-Layer': layer,
+          'X-LuckRead-Correlation-Id': 'order-audit-correlation',
+          'X-LuckRead-Request-Id': requestId,
+        } : {}),
+      },
+      body: JSON.stringify(body),
+    },
+  )
   const createPlanAuditDb = (writeSuccess = true) => {
     const rows = new Map<string, Record<string, unknown>>()
     const prepare = vi.fn((sql: string) => {
@@ -314,6 +345,105 @@ describe('W06 runtime', () => {
     const { db } = createPlanAuditDb(false)
     const runtime = await import('./index')
     const response = await runtime.default.fetch(planAuditRequest(planAuditInput), { D1_03: db })
+    expect(response.status).toBe(503)
+    expect(await response.json()).toEqual({ error: 'AUDIT_EVENT_PERSISTENCE_FAILED' })
+  })
+
+  it('requires the private W01 transport for commerce order audit writes', async () => {
+    const { db, prepare } = createPlanAuditDb()
+    const runtime = await import('./index')
+    const response = await runtime.default.fetch(orderAuditRequest(orderAuditInput, false), { D1_03: db })
+    expect(response.status).toBe(403)
+    expect(prepare).not.toHaveBeenCalled()
+  })
+
+  it('rejects L1 order audit writes before touching D1-03', async () => {
+    const { db, prepare } = createPlanAuditDb()
+    const runtime = await import('./index')
+    const response = await runtime.default.fetch(
+      orderAuditRequest(orderAuditInput, true, 'req_order_audit_l1', 'L1'),
+      { D1_03: db },
+    )
+    expect(response.status).toBe(403)
+    expect(await response.json()).toEqual({ error: 'PERMISSION_DENIED' })
+    expect(prepare).not.toHaveBeenCalled()
+  })
+
+  it('persists commerce order facts using the W01-derived actor and immutable audit identity', async () => {
+    const { db, prepare, rows } = createPlanAuditDb()
+    const runtime = await import('./index')
+    const response = await runtime.default.fetch(orderAuditRequest(orderAuditInput), { D1_03: db })
+    expect(response.status).toBe(201)
+    expect(await response.json()).toMatchObject({
+      eventId: orderAuditInput.eventId,
+      action: 'commerce.order.created',
+      targetType: 'Order',
+      targetId: orderId,
+      replayed: false,
+    })
+    expect(prepare).toHaveBeenCalledTimes(2)
+    expect(rows.get(orderAuditInput.eventId)).toMatchObject({
+      actor_json: JSON.stringify({ actorId: 'buyer_user_001', actorType: 'user', layer: 'L2' }),
+      action: 'commerce.order.created',
+      target_type: 'Order',
+      target_id: orderId,
+      before_json: '{}',
+      after_json: JSON.stringify({
+        status: 'CREATED',
+        version: 1,
+        currency: 'USD',
+        subtotalMinor: 1200,
+        discountMinor: 100,
+        taxMinor: 88,
+        totalMinor: 1188,
+      }),
+      occurred_at: orderAuditInput.occurredAt,
+    })
+  })
+
+  it('rejects inconsistent order totals and caller-supplied audit fields before any D1 access', async () => {
+    const { db, prepare } = createPlanAuditDb()
+    const runtime = await import('./index')
+    const badTotal = await runtime.default.fetch(
+      orderAuditRequest({ ...orderAuditInput, totalMinor: 1 }),
+      { D1_03: db },
+    )
+    expect(badTotal.status).toBe(400)
+    expect(await badTotal.json()).toEqual({ error: 'INVALID_COMMERCE_ORDER_AUDIT' })
+    expect(prepare).not.toHaveBeenCalled()
+
+    const spoofedActor = await runtime.default.fetch(
+      orderAuditRequest({ ...orderAuditInput, actorId: 'attacker', userId: 'attacker' }),
+      { D1_03: db },
+    )
+    expect(spoofedActor.status).toBe(400)
+    expect(prepare).not.toHaveBeenCalled()
+  })
+
+  it('replays an identical commerce order audit and rejects conflicting facts', async () => {
+    const { db, rows } = createPlanAuditDb()
+    const runtime = await import('./index')
+    const first = await runtime.default.fetch(orderAuditRequest(orderAuditInput), { D1_03: db })
+    const replay = await runtime.default.fetch(
+      orderAuditRequest(orderAuditInput, true, 'req_order_audit_retry'),
+      { D1_03: db },
+    )
+    expect(first.status).toBe(201)
+    expect(replay.status).toBe(200)
+    expect(await replay.json()).toMatchObject({ eventId: orderAuditInput.eventId, replayed: true })
+    expect(rows.size).toBe(1)
+
+    const conflicting = { ...orderAuditInput, currency: 'EUR' }
+    const conflict = await runtime.default.fetch(orderAuditRequest(conflicting), { D1_03: db })
+    expect(conflict.status).toBe(409)
+    expect(await conflict.json()).toEqual({ error: 'AUDIT_EVENT_CONFLICT' })
+    expect(rows.size).toBe(1)
+  })
+
+  it('fails closed when the commerce order audit write cannot be confirmed', async () => {
+    const { db } = createPlanAuditDb(false)
+    const runtime = await import('./index')
+    const response = await runtime.default.fetch(orderAuditRequest(orderAuditInput), { D1_03: db })
     expect(response.status).toBe(503)
     expect(await response.json()).toEqual({ error: 'AUDIT_EVENT_PERSISTENCE_FAILED' })
   })
