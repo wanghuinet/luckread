@@ -2412,17 +2412,17 @@
       "stateMachine": "none"
     },
     {
-      "operationId": "postMembershipPlansPlanIdPublish",
+      "operationId": "publishOwnMembershipPlan",
       "auth": {
         "mode": "permission"
       },
-      "permissions": [],
+      "permissions": [
+        "membership.plan.publish.own"
+      ],
       "auditRequired": true,
-      "optimisticLockRequired": false,
+      "optimisticLockRequired": true,
       "idempotencyRequired": false,
-      "stateMachine": "none",
-      "x-luckread-contract-status": "DISCOVERY_DRAFT",
-      "x-luckread-source": "contracts/api/api-inventory.v1.json"
+      "stateMachine": "membership-plan"
     },
     {
       "operationId": "createSubscription",
