@@ -875,6 +875,7 @@ async function persistAndApplyProviderStatus(
           ? 'RECONCILIATION_REQUIRED'
           : null;
 
+  let renewalCycleOutcomeRequired: { cycleId: string; targetState: 'SUCCEEDED' | 'FAILED' | 'RECONCILIATION_REQUIRED' } | null = null;
   if (renewalCycleTarget !== null) {
     const renewalCycle = await db.prepare(
       'SELECT cycle_id, state, version, updated_at FROM subscription_renewal_cycles ' +
@@ -886,6 +887,7 @@ async function persistAndApplyProviderStatus(
       updated_at: string;
     }>();
     if (renewalCycle && ['SUBMITTING', 'SUBMITTED'].includes(renewalCycle.state)) {
+      renewalCycleOutcomeRequired = { cycleId: renewalCycle.cycle_id, targetState: renewalCycleTarget };
       const cycleUpdatedAt = strictlyAfter(now, renewalCycle.updated_at);
       const renewalOutcomeCode = renewalCycleTarget === 'RECONCILIATION_REQUIRED'
         ? (providerStatus === 'succeeded' ? 'SUCCEEDED_PAYMENT_ORDER_BINDING_REQUIRED' : 'POST_CAPTURE_CANCELLATION_REQUIRES_RECONCILIATION')
@@ -948,12 +950,20 @@ async function persistAndApplyProviderStatus(
     'SELECT 1 FROM orders o ' +
     'WHERE o.order_id = ? AND o.customer_id = ? AND o.currency = ? ' +
     "AND o.total_minor = ? AND o.status IN ('CONFIRMED','PROCESSING','COMPLETED'))";
-  const eventAppliedCondition = providerStatus === 'succeeded'
+  const renewalCycleAppliedMatches = renewalCycleOutcomeRequired
+    ? 'EXISTS (SELECT 1 FROM subscription_renewal_cycles rc WHERE rc.cycle_id = ? AND rc.payment_id = ? AND rc.state = ?)'
+    : '';
+  const bindRenewalCycleMatch = (): unknown[] => renewalCycleOutcomeRequired
+    ? [renewalCycleOutcomeRequired.cycleId, payment.payment_id, renewalCycleOutcomeRequired.targetState]
+    : [];
+  const eventAppliedCondition = (providerStatus === 'succeeded'
     ? paymentMatches + ' AND ' + confirmedOrFulfilledOrderMatches
-    : paymentMatches;
+    : paymentMatches) +
+    (renewalCycleOutcomeRequired ? ' AND ' + renewalCycleAppliedMatches : '');
   const outcomeExpression = providerStatus === 'succeeded'
     ? 'CASE WHEN ' + eventAppliedCondition +
       " THEN 'PAYMENT_STATUS_APPLIED_AND_ORDER_CONFIRMED' WHEN " + paymentMatches +
+      (renewalCycleOutcomeRequired ? ' AND ' + renewalCycleAppliedMatches : '') +
       " THEN 'ORDER_CONFIRMATION_REQUIRED' ELSE 'PAYMENT_STATUS_CAS_LOST' END"
     : 'CASE WHEN ' + paymentMatches +
       " THEN 'PAYMENT_STATUS_APPLIED' ELSE 'PAYMENT_STATUS_CAS_LOST' END";
@@ -973,10 +983,13 @@ async function persistAndApplyProviderStatus(
   const updateEventValues: unknown[] = [
     ...bindPaymentMatch(),
     ...(providerStatus === 'succeeded' ? bindOrderMatch() : []),
+    ...bindRenewalCycleMatch(),
     now,
     ...bindPaymentMatch(),
     ...(providerStatus === 'succeeded' ? bindOrderMatch() : []),
+    ...bindRenewalCycleMatch(),
     ...(providerStatus === 'succeeded' ? bindPaymentMatch() : []),
+    ...(providerStatus === 'succeeded' ? bindRenewalCycleMatch() : []),
     PROVIDER, envelope.merchantId, envelope.eventId, payloadSha256,
   ];
   statements.push(db.prepare(eventUpdateSql).bind(...updateEventValues));
