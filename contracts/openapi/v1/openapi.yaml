@@ -3388,7 +3388,9 @@ paths:
               additionalProperties: false
               required: [orderId]
               properties:
-                orderId: { type: string, pattern: '^ord_[A-Za-z0-9_-]{1,90}
+                orderId:
+                  type: string
+                  pattern: '^ord_[A-Za-z0-9_-]{1,90}
   /plans:
     get:
       tags: [Creators]
@@ -5673,10 +5675,10 @@ components:
         version: { type: integer, minimum: 1 }
         effectiveAt: { type: string, format: date-time }
         requestId: { $ref: '#/components/schemas/RequestId' }
- }
+
       responses:
         '201':
-          description: New unconfirmed payment intent, ready for Hyperswitch hosted checkout.
+          description: New unconfirmed payment intent ready for hosted checkout.
           headers:
             Cache-Control:
               schema: { type: string, const: no-store }
@@ -5692,7 +5694,9 @@ components:
                     additionalProperties: false
                     required: [paymentId, orderId, amountMinor, currency, status, version, clientSecret]
                     properties:
-                      paymentId: { type: string, pattern: '^pay_[a-f0-9]{26}
+                      paymentId:
+                        type: string
+                        pattern: '^pay_[a-f0-9]{26}
   /plans:
     get:
       tags: [Creators]
@@ -7977,8 +7981,10 @@ components:
         version: { type: integer, minimum: 1 }
         effectiveAt: { type: string, format: date-time }
         requestId: { $ref: '#/components/schemas/RequestId' }
- }
-                      orderId: { type: string, pattern: '^ord_[A-Za-z0-9_-]{1,90}
+
+                      orderId:
+                        type: string
+                        pattern: '^ord_[A-Za-z0-9_-]{1,90}
   /plans:
     get:
       tags: [Creators]
@@ -10263,9 +10269,14 @@ components:
         version: { type: integer, minimum: 1 }
         effectiveAt: { type: string, format: date-time }
         requestId: { $ref: '#/components/schemas/RequestId' }
- }
-                      amountMinor: { type: integer, minimum: 1, maximum: 2147483647 }
-                      currency: { type: string, pattern: '^[A-Z]{3}
+
+                      amountMinor:
+                        type: integer
+                        minimum: 1
+                        maximum: 2147483647
+                      currency:
+                        type: string
+                        pattern: '^[A-Z]{3}
   /plans:
     get:
       tags: [Creators]
@@ -12550,10 +12561,17 @@ components:
         version: { type: integer, minimum: 1 }
         effectiveAt: { type: string, format: date-time }
         requestId: { $ref: '#/components/schemas/RequestId' }
- }
-                      status: { type: string, enum: [requires_payment_method, requires_confirmation] }
-                      version: { type: integer, minimum: 1 }
-                      clientSecret: { type: string, minLength: 1, maxLength: 4096 }
+
+                      status:
+                        type: string
+                        enum: [requires_payment_method, requires_confirmation]
+                      version:
+                        type: integer
+                        minimum: 1
+                      clientSecret:
+                        type: string
+                        minLength: 1
+                        maxLength: 4096
                   requestId: { $ref: '#/components/schemas/RequestId' }
         '200':
           description: Idempotent replay of the same unconfirmed payment intent.
@@ -12572,7 +12590,9 @@ components:
                     additionalProperties: false
                     required: [paymentId, orderId, amountMinor, currency, status, version, clientSecret]
                     properties:
-                      paymentId: { type: string, pattern: '^pay_[a-f0-9]{26}
+                      paymentId:
+                        type: string
+                        pattern: '^pay_[a-f0-9]{26}
   /plans:
     get:
       tags: [Creators]
@@ -14857,8 +14877,10 @@ components:
         version: { type: integer, minimum: 1 }
         effectiveAt: { type: string, format: date-time }
         requestId: { $ref: '#/components/schemas/RequestId' }
- }
-                      orderId: { type: string, pattern: '^ord_[A-Za-z0-9_-]{1,90}
+
+                      orderId:
+                        type: string
+                        pattern: '^ord_[A-Za-z0-9_-]{1,90}
   /plans:
     get:
       tags: [Creators]
@@ -17143,9 +17165,14 @@ components:
         version: { type: integer, minimum: 1 }
         effectiveAt: { type: string, format: date-time }
         requestId: { $ref: '#/components/schemas/RequestId' }
- }
-                      amountMinor: { type: integer, minimum: 1, maximum: 2147483647 }
-                      currency: { type: string, pattern: '^[A-Z]{3}
+
+                      amountMinor:
+                        type: integer
+                        minimum: 1
+                        maximum: 2147483647
+                      currency:
+                        type: string
+                        pattern: '^[A-Z]{3}
   /plans:
     get:
       tags: [Creators]
@@ -19430,17 +19457,24 @@ components:
         version: { type: integer, minimum: 1 }
         effectiveAt: { type: string, format: date-time }
         requestId: { $ref: '#/components/schemas/RequestId' }
- }
-                      status: { type: string, enum: [requires_payment_method, requires_confirmation] }
-                      version: { type: integer, minimum: 1 }
-                      clientSecret: { type: string, minLength: 1, maxLength: 4096 }
+
+                      status:
+                        type: string
+                        enum: [requires_payment_method, requires_confirmation]
+                      version:
+                        type: integer
+                        minimum: 1
+                      clientSecret:
+                        type: string
+                        minLength: 1
+                        maxLength: 4096
                   requestId: { $ref: '#/components/schemas/RequestId' }
         '400': { $ref: '#/components/responses/ValidationFailed' }
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '403': { $ref: '#/components/responses/PermissionDenied' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/InvalidState' }
-        '428': { $ref: '#/components/responses/IdempotencyKeyRequired' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
         '429': { $ref: '#/components/responses/RateLimited' }
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
