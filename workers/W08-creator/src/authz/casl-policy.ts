@@ -66,6 +66,7 @@ export const SUPPORTED_AUTHZ_SUBJECTS = [
   'RoleAssignment',
   'Subscription',
   'MembershipPlan',
+  'Order',
   'PlatformConfig',
   'FeatureFlag',
   'Secret',
@@ -98,6 +99,7 @@ const RESTRICTED_ACCOUNT_WRITE_DENIES = new Set([
   'media.upload',
   'comment.create',
   'subscription.manage.any',
+  'order.create',
   'membership.plan.create.own',
   'org.billing.read.scope',
 ])
@@ -339,6 +341,13 @@ function buildLayerAbility(input: CaslPermissionInput) {
   const { cannot, build } = builder
 
   addPublicAndSelfRules(grant, input.subjectId)
+
+  // Commerce permissions require a verified L2+ identity but are independent
+  // of platform-management capabilities granted at higher layers.
+  if (input.layer !== 'L0' && input.layer !== 'L1' && input.subjectId) {
+    grant('order.create', 'Order', selfOwnerCondition(input.subjectId))
+    grant('order.read', 'Order', selfOwnerCondition(input.subjectId))
+  }
 
   // Creator application creation is deliberately L2-only; it is not inherited
   // by L3+ simply because higher layers have broader general capabilities.
