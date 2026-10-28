@@ -210,9 +210,7 @@
         "The postPaymentsIntents public adapter and W07 payment-intent/Hyperswitch source plus automated tests are now linked; these establish code traceability only.",
         "OpenAPI still marks this flow source-only pending the D1-04 migration and production secrets; live Hyperswitch payment E2E and postflight evidence are not admitted.",
         "Provider-event, mandate, reconciliation, and successful-payment evidence remain separate acceptance gates. A payment intent or browser callback does not grant subscription entitlement."
-      ],
-      "codeEvidenceRefs": [],
-      "evidence": []
+      ]
     },
     {
       "featureId": "PAY-002",
