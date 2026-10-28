@@ -99,6 +99,49 @@
       "auditTransportBinding": "W01-W06-moderation-http-binding.v1"
     },
     {
+      "operationId": "createCommerceOrder",
+      "method": "POST",
+      "publicPath": "/api/v1/commerce/orders",
+      "internalPath": "/commerce/orders",
+      "principalRequired": true,
+      "permission": "order.create",
+      "minimumGlobalLayer": "L2",
+      "idempotency": "Idempotency-Key",
+      "maximumBodyBytes": 16384,
+      "clientWritableFields": [
+        "items[].itemRef",
+        "items[].quantity"
+      ],
+      "serverControlledFields": [
+        "customerId",
+        "itemType",
+        "itemVersion",
+        "currency",
+        "unitAmountMinor",
+        "discountMinor",
+        "taxMinor",
+        "lineTotalMinor",
+        "orderId",
+        "paymentStatus",
+        "providerReferences"
+      ],
+      "successRule": "W07 creates the Order atomically in D1-04 only after authoritative item, immutable version, price, discount and tax decisions are admitted. W01 validates the complete response and waits for W06 D1-03 durable audit confirmation before returning any 2xx response. Until the pricing/tax adapter is admitted, W07 must return 503 without order writes.",
+      "auditTransportBinding": "W01-W06-moderation-http-binding.v1",
+      "cache": "NO_STORE"
+    },
+    {
+      "operationId": "getCommerceOrder",
+      "method": "GET",
+      "publicPath": "/api/v1/commerce/orders/{orderId}",
+      "internalPath": "/commerce/orders/{orderId}",
+      "principalRequired": true,
+      "permission": "order.read",
+      "minimumGlobalLayer": "L2",
+      "ownerScope": "W01 authorizes order.read for the W02-authenticated principal; W07 independently queries D1-04 by both orderId and the same server-derived customerId. Cross-owner requests return RESOURCE_NOT_FOUND.",
+      "responseAuthority": "W07 D1-04 Order and OrderLine rows only; DTO excludes customerId, provider fields, payment credentials and internal snapshots.",
+      "cache": "NO_STORE"
+    },
+    {
       "operationId": "receiveHyperswitchPaymentWebhook",
       "method": "POST",
       "publicPath": "/api/v1/webhooks/hyperswitch",
