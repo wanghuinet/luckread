@@ -110,7 +110,7 @@ describe('v1 subscription adapter', () => {
     expect(w08Casl).toContain("grant('membership.plan.update.own', 'MembershipPlan', selfOwnerCondition(subjectId))")
   })
 
-  it('pauses/resumes an owned plan through CASL, W07 lifecycle CAS and W06 audits', () => {
+  it('pauses/resumes/retires an owned plan through CASL, W07 lifecycle CAS and W06 audits', () => {
     expect(openapi).toContain('operationId: transitionOwnMembershipPlanLifecycle')
     expect(apiInventory.domains.subscription_entitlement_payment.endpoint_groups)
       .toContain('POST /v1/membership/plans/{planId}/lifecycle')
@@ -122,6 +122,8 @@ describe('v1 subscription adapter', () => {
       .toBeLessThan(lifecyclePlanRoute.indexOf('const w07Response = await callW07Subscription'))
     expect(lifecyclePlanRoute).toContain("'/membership/plans/' + encodeURIComponent(planId) + '/lifecycle'")
     expect(lifecyclePlanRoute).toContain('callW06MembershipPlanLifecycleAudit')
+    expect(lifecyclePlanRoute).toContain("['pause', 'resume', 'retire']")
+    expect(lifecyclePlanRoute).toContain("'membership.plan.retired'")
     expect(w06Client).toContain("'/internal/audit-events/membership-plan-lifecycle-requested'")
     expect(w06Client).toContain("'/internal/audit-events/membership-plan-lifecycle-changed'")
     expect(w06Worker).toContain("url.pathname === '/internal/audit-events/membership-plan-lifecycle-requested'")
