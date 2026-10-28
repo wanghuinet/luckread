@@ -197,7 +197,32 @@ export default function CreatorMembershipPlans({ locale = 'zh-CN' }: { locale?: 
     }
   }, [labels.loadError, redirectToLogin])
 
-  useEffect(() => { void loadPlans(false, null) }, [loadPlans])
+  useEffect(() => {
+    let active = true
+    const loadInitialPlans = async () => {
+      try {
+        const { response, data } = await fetchJson<PlanListEnvelope>(
+          '/api/v1/membership/plans?limit=20',
+          { credentials: 'include', cache: 'no-store', headers: { accept: 'application/json' } },
+        )
+        if (!active) return
+        if (response.status === 401) { redirectToLogin(); return }
+        if (!response.ok || !Array.isArray(data?.data?.docs) || !data.data.docs.every(isPlan)) {
+          throw new Error(getApiErrorMessage(data, labels.loadError))
+        }
+        setError('')
+        setPlans(data.data.docs)
+        setNextCursor(typeof data.data.nextCursor === 'string' ? data.data.nextCursor : null)
+        setHasMore(data.data.hasMore === true && typeof data.data.nextCursor === 'string')
+      } catch (caught) {
+        if (active) setError(caught instanceof Error ? caught.message : labels.loadError)
+      } finally {
+        if (active) setLoading(false)
+      }
+    }
+    void loadInitialPlans()
+    return () => { active = false }
+  }, [labels.loadError, redirectToLogin])
 
   async function createPlan(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
