@@ -5,6 +5,7 @@ import {
   parseHyperswitchWebhookEnvelope,
 } from './hyperswitch-webhook-signature.js';
 import type { HyperswitchPayment } from './hyperswitch-client.js';
+import { validateHyperswitchPaymentWebhook } from './hyperswitch-webhook-payment-validation.js';
 
 export type PaymentAttemptStatus =
   | 'INITIATING'
@@ -124,7 +125,7 @@ export type PaymentAttemptCreation = Readonly<{
 }>;
 
 export type WebhookReceiptResult = Readonly<{
-  outcome: 'ACCEPTED' | 'DUPLICATE' | 'PAYLOAD_CONFLICT';
+  outcome: 'APPLIED' | 'RECONCILIATION_REQUIRED' | 'REJECTED' | 'DUPLICATE' | 'PAYLOAD_CONFLICT';
   eventId: string;
   receiptId: string;
   state: ProviderEventRow['state'];
