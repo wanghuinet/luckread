@@ -46,6 +46,9 @@ const hyperScriptUrl = hyperswitchEnvironment === 'production'
     ? 'https://beta.hyperswitch.io/v1/HyperLoader.js'
     : ''
 const validOrderId = (value: string) => /^ord_[A-Za-z0-9_-]{1,90}$/.test(value)
+const validContentId = (value: string | undefined): value is string =>
+  typeof value === 'string' && value.length > 0 && value.length <= 256 &&
+  value.trim() === value && /^[A-Za-z0-9][A-Za-z0-9._~-]{0,255}$/.test(value)
 
 function readPaymentIntent(value: unknown, orderId: string): PaymentIntentData | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null
@@ -76,7 +79,7 @@ function money(amountMinor: number, currency: string): string {
   return formatter.format(amountMinor / (10 ** fractionDigits))
 }
 
-export default function CheckoutClient({ orderId }: { orderId: string }) {
+export default function CheckoutClient({ orderId, contentId }: { orderId: string; contentId?: string }) {
   const [intent, setIntent] = useState<PaymentIntentData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -175,7 +178,10 @@ export default function CheckoutClient({ orderId }: { orderId: string }) {
     setConfirming(true)
     setStatusMessage('')
     try {
-      const returnUrl = new URL('/checkout/result', window.location.origin).toString()
+      const resultUrl = new URL('/checkout/result', window.location.origin)
+      resultUrl.searchParams.set('orderId', intent.orderId)
+      if (validContentId(contentId)) resultUrl.searchParams.set('contentId', contentId)
+      const returnUrl = resultUrl.toString()
       const result: unknown = await hyper.confirmPayment({
         elements,
         confirmParams: { return_url: returnUrl },
@@ -185,7 +191,10 @@ export default function CheckoutClient({ orderId }: { orderId: string }) {
       if (payload.error) {
         setStatusMessage(typeof payload.error.message === 'string' ? payload.error.message : '支付未完成，请核对支付方式后重试。')
       } else {
-        setStatusMessage('支付已提交，最终状态仍需服务器核验；此页面不会直接开通会员权益。')
+        // Always enter the server-verification page after a non-error SDK result.
+        // With redirect:'if_required', successful confirmation does not always
+        // trigger the provider's return redirect automatically.
+        window.location.assign(returnUrl)
       }
     } catch {
       setStatusMessage('暂时无法提交支付，请稍后重新检查订单状态。')
