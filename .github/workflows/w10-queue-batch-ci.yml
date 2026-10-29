@@ -43,3 +43,5 @@ jobs:
           workers/W10-async/src/queue-batch.test.ts
           workers/W10-async/src/retry-policy.ts
           workers/W10-async/src/retry-policy.test.ts
+          workers/W10-async/src/event-envelope.ts
+          workers/W10-async/src/event-envelope.test.ts
