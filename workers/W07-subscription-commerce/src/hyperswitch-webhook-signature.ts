@@ -217,7 +217,8 @@ export function parseHyperswitchWebhookEnvelope(
   if (!isRecord(decoded.content.object)) return null;
 
   if (decoded.timestamp !== undefined &&
-      parseHyperswitchRfc3339Timestamp(decoded.timestamp) === null) return null;
+      (typeof decoded.timestamp !== 'string' ||
+        parseHyperswitchRfc3339Timestamp(decoded.timestamp) === null)) return null;
 
   if (
     decoded.processor_merchant_id !== undefined &&
