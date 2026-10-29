@@ -92,10 +92,15 @@ export default function ContentDetailPage({
   const [followBusy, setFollowBusy] = useState(false)
   const [retryKey, setRetryKey] = useState(0)
   const [membershipPlans, setMembershipPlans] = useState<MembershipPlan[]>([])
+  const [membershipPlansCreatorId, setMembershipPlansCreatorId] = useState<string | null>(null)
   const [membershipPlansLoading, setMembershipPlansLoading] = useState(false)
   const [membershipPurchasePlanId, setMembershipPurchasePlanId] = useState<string | null>(null)
   const [membershipPurchaseError, setMembershipPurchaseError] = useState('')
   const membershipLocked = content?.accessMode === 'MEMBERS_ONLY' && content.accessGranted !== true
+  const membershipPlansMatchContent = membershipPlansCreatorId !== null && membershipPlansCreatorId === content?.creatorId
+  const visibleMembershipPlans = membershipPlansMatchContent ? membershipPlans : []
+  const visibleMembershipPlansLoading = membershipLocked && (!membershipPlansMatchContent || membershipPlansLoading)
+  const visibleMembershipPurchaseError = membershipPlansMatchContent ? membershipPurchaseError : ''
   const [socialTopics, setSocialTopics] = useState<Array<{ topicId: string; name: string; displayName: string }>>([])
   const [socialMentions, setSocialMentions] = useState<Array<{ userId: string; handle: string }>>([])
   const structuredArticle = useMemo(
@@ -219,17 +224,19 @@ export default function ContentDetailPage({
   }, [initialContent, params, retryKey])
 
   useEffect(() => {
-    if (!membershipLocked || !content?.creatorId) {
-      setMembershipPlans([])
-      setMembershipPlansLoading(false)
-      setMembershipPurchaseError('')
-      return
-    }
+    if (!membershipLocked || !content?.creatorId) return
+    const creatorId = content.creatorId
     const controller = new AbortController()
     let active = true
-    setMembershipPlansLoading(true)
-    setMembershipPurchaseError('')
     void (async () => {
+      // Move state transitions off the synchronous effect call stack; this
+      // also lets render derive a loading shell while creator IDs differ.
+      await Promise.resolve()
+      if (!active || controller.signal.aborted) return
+      setMembershipPlansCreatorId(creatorId)
+      setMembershipPlans([])
+      setMembershipPlansLoading(true)
+      setMembershipPurchaseError('')
       try {
         const { response, data } = await fetchJson<{ data?: { docs?: unknown[] }; error?: { message?: unknown } }>('/api/v1/plans?limit=50', {
           credentials: 'include',
@@ -254,7 +261,7 @@ export default function ContentDetailPage({
           const plan = value as Record<string, unknown>
           return typeof plan.planId === 'string' &&
             /^plan_[a-f0-9]{64}$/.test(plan.planId) &&
-            plan.creatorId === content.creatorId &&
+            plan.creatorId === creatorId &&
             Number.isSafeInteger(plan.planVersion) && (plan.planVersion as number) > 0 &&
             typeof plan.name === 'string' &&
             (plan.billingInterval === 'MONTHLY' || plan.billingInterval === 'YEARLY') &&
@@ -649,11 +656,11 @@ export default function ContentDetailPage({
                   ? '訂閱此創作者即可解鎖全文、圖片和影片。付款後由 LuckRead 伺服器確認會員資格。'
                   : '订阅该创作者即可解锁全文、图片和视频。付款后由 LuckRead 服务器确认会员资格。'}
             </p>
-            {membershipPlansLoading ? (
+            {visibleMembershipPlansLoading ? (
               <p className="mt-4 text-sm" role="status">{locale === 'en' ? 'Loading membership offers…' : locale === 'tw' ? '正在載入會員方案…' : '正在加载会员套餐…'}</p>
-            ) : membershipPlans.length > 0 ? (
+            ) : visibleMembershipPlans.length > 0 ? (
               <div className="mt-4 grid gap-3">
-                {membershipPlans.map((plan) => (
+                {visibleMembershipPlans.map((plan) => (
                   <div className="rounded-xl border border-light-border p-4 dark:border-dark-border" key={plan.planId}>
                     <div className="flex flex-wrap items-start justify-between gap-2">
                       <div>
@@ -685,8 +692,8 @@ export default function ContentDetailPage({
                 ))}
               </div>
             ) : null}
-            {membershipPurchaseError ? (
-              <p className="mt-3 text-sm text-light-secondary dark:text-dark-secondary" role="status">{membershipPurchaseError}</p>
+            {visibleMembershipPurchaseError ? (
+              <p className="mt-3 text-sm text-light-secondary dark:text-dark-secondary" role="status">{visibleMembershipPurchaseError}</p>
             ) : null}
             {!viewerUserId ? (
               <Link className="mt-4 inline-flex rounded-full border border-light-border px-4 py-2 text-sm font-bold hover:bg-light-primary/10 dark:border-dark-border dark:hover:bg-dark-primary/10"
