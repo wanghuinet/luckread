@@ -336,10 +336,13 @@ export default function ContentDetailPage({
       if (!response.ok || typeof orderId !== 'string' || !/^ord_[A-Za-z0-9_-]{1,90}$/.test(orderId)) {
         setMembershipPurchaseError(getApiErrorMessage(
           data,
-          locale === 'en'
-            ? 'Checkout is temporarily unavailable. No membership has been activated.'
-            : locale === 'tw' ? '結帳暫時無法使用，尚未開通會員資格。' : '结账暂时不可用，尚未开通会员资格。',
-          response.status,
+          response.status === 503
+            ? (locale === 'en'
+              ? 'Checkout is not available yet. No membership has been activated.'
+              : locale === 'tw' ? '結帳尚未開放，會員資格尚未啟用。' : '结账尚未开放，会员资格尚未启用。')
+            : (locale === 'en'
+              ? 'Checkout failed. No membership has been activated.'
+              : locale === 'tw' ? '結帳失敗，會員資格尚未啟用。' : '结账失败，会员资格尚未启用。'),
         ))
         return
       }
