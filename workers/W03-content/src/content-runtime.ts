@@ -285,6 +285,7 @@ export async function isPublishedPublicPostMediaReference(
     'SELECT id',
     'FROM contents',
     "WHERE state = 'PUBLISHED'",
+    "  AND access_mode = 'PUBLIC'",
     "  AND content_type = 'post'",
     '  AND (',
     '    body_ref IN (' + placeholders + ')',
@@ -438,11 +439,11 @@ const normalizeCorrelationId = (value: string): string => {
 const insertRevision = (db: ContentD1, revision: ContentRevision): D1PreparedStatement =>
   db.prepare(`INSERT INTO content_revisions
     (id, content_id, revision, content_version, actor_user_id, source_revision, operation,
-     state, slug, title, body_ref, media_refs_json, cover_ref, etag, reason, correlation_id, created_at)
-   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).bind(
+     state, access_mode, slug, title, body_ref, media_refs_json, cover_ref, etag, reason, correlation_id, created_at)
+   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).bind(
     revision.id, revision.contentId, revision.revision, revision.contentVersion,
     revision.actorUserId, revision.sourceRevision, revision.operation, revision.state,
-    revision.slug, revision.title, revision.bodyRef, JSON.stringify(revision.mediaRefs), revision.coverRef,
+    revision.accessMode ?? 'PUBLIC', revision.slug, revision.title, revision.bodyRef, JSON.stringify(revision.mediaRefs), revision.coverRef,
     revision.etag, revision.reason, revision.correlationId, revision.createdAt,
   )
 const emptyIdempotency = (): IdempotencyRow => ({
@@ -464,7 +465,7 @@ const loadMutationRow = async (
 ): Promise<{ content: ContentRecord | null; idempotency: IdempotencyRow }> => {
   const row = await db.prepare(
     `SELECT
-        c.id, c.content_type, c.owner_user_id, c.creator_id, c.ip_id, c.state, c.scheduled_at, c.version, c.revision,
+        c.id, c.content_type, c.owner_user_id, c.creator_id, c.ip_id, c.state, c.scheduled_at, c.access_mode, c.version, c.revision,
         c.slug, c.title, c.body_ref, c.media_refs_json, c.cover_ref, c.etag, c.created_at, c.updated_at,
         i.id AS idem_id,
         i.owner_user_id AS idem_owner_user_id,
@@ -567,21 +568,36 @@ const batchMutation = async (
   }
 }
 
+export type CreatorMembershipAccessResolver = (creatorId: string) => Promise<boolean>
+
 export async function getContent(
   db: ContentD1,
   contentId: string,
   principalUserId: string | null,
+  resolveCreatorMembershipAccess?: CreatorMembershipAccessResolver,
 ): Promise<ContentRecord> {
   assertContentReference(contentId)
   const row = await db.prepare(
-    `SELECT id, content_type, owner_user_id, creator_id, ip_id, state, scheduled_at, version, revision,
+    `SELECT id, content_type, owner_user_id, creator_id, ip_id, state, scheduled_at, access_mode, version, revision,
             slug, title, body_ref, media_refs_json, cover_ref, etag, created_at, updated_at
        FROM contents
       WHERE (id = ? OR slug = ?)
         AND (state = 'PUBLISHED' OR owner_user_id = ?)`,
   ).bind(contentId, contentId, principalUserId ?? '').first<ContentRow>()
   if (!row) throw new ContentRuntimeError('NOT_FOUND', 404)
-  return toContent(row)
+  const content = toContent(row)
+  if (content.accessMode !== 'MEMBERS_ONLY' ||
+      (principalUserId !== null && principalUserId === content.ownerUserId)) {
+    return { ...content, accessGranted: true }
+  }
+  let allowed = false
+  if (principalUserId && content.creatorId && resolveCreatorMembershipAccess) {
+    allowed = await resolveCreatorMembershipAccess(content.creatorId)
+  }
+  if (allowed) return { ...content, accessGranted: true }
+  // Keep a discoverable paywall shell, but never expose body or private media
+  // references to anonymous or non-member readers.
+  return { ...content, accessGranted: false, bodyRef: '', mediaRefs: [], coverRef: null }
 }
 
 export type OwnedPostContext = {
@@ -787,7 +803,7 @@ export async function listContentRevisions(
   const cursorBindings = decoded ? [decoded.updatedAt, decoded.updatedAt, decoded.id] : []
   const rows = await db.prepare(`
     SELECT r.id, r.content_id, r.revision, r.content_version, r.actor_user_id,
-           r.source_revision, r.operation, r.state, r.slug, r.title, r.body_ref,
+           r.source_revision, r.operation, r.state, r.access_mode, r.slug, r.title, r.body_ref,
            r.media_refs_json, r.cover_ref, r.etag, r.reason, r.correlation_id, r.created_at
       FROM content_revisions r
       JOIN contents c ON c.id = r.content_id
@@ -811,7 +827,7 @@ export async function getContentRevision(
   assertResourceId(revisionId)
   const row = await db.prepare(`
     SELECT r.id, r.content_id, r.revision, r.content_version, r.actor_user_id,
-           r.source_revision, r.operation, r.state, r.slug, r.title, r.body_ref,
+           r.source_revision, r.operation, r.state, r.access_mode, r.slug, r.title, r.body_ref,
            r.media_refs_json, r.cover_ref, r.etag, r.reason, r.correlation_id, r.created_at
       FROM content_revisions r
       JOIN contents c ON c.id = r.content_id
@@ -867,7 +883,7 @@ export async function listCreatorContents(
     bindings.push(decoded.updatedAt, decoded.updatedAt, decoded.id)
   }
   const rows = await db.prepare(
-    `SELECT id, content_type, owner_user_id, creator_id, ip_id, state, scheduled_at, version, revision,
+    `SELECT id, content_type, owner_user_id, creator_id, ip_id, state, scheduled_at, access_mode, version, revision,
             slug, title, body_ref, media_refs_json, cover_ref, etag, created_at, updated_at
        FROM contents
       WHERE ${conditions.join(' AND ')}
@@ -900,7 +916,7 @@ export async function listPublishedContentsByIds(
 
   const rows = await db.prepare(
     `SELECT c.id, c.content_type, c.owner_user_id, c.creator_id, c.ip_id, c.state,
-            c.scheduled_at, c.version, c.revision, c.slug, c.title, c.body_ref,
+            c.scheduled_at, c.access_mode, c.version, c.revision, c.slug, c.title, c.body_ref,
             c.media_refs_json, c.cover_ref, c.etag, c.created_at, c.updated_at
        FROM json_each(?) AS requested
        INNER JOIN contents AS c ON c.id = requested.value
@@ -944,7 +960,7 @@ export async function listContents(
   }
 
   const rows = await db.prepare(
-    `SELECT id, content_type, owner_user_id, creator_id, ip_id, state, scheduled_at, version, revision,
+    `SELECT id, content_type, owner_user_id, creator_id, ip_id, state, scheduled_at, access_mode, version, revision,
             slug, title, body_ref, media_refs_json, cover_ref, etag, created_at, updated_at
        FROM contents
       WHERE ${conditions.join(' AND ')}
@@ -1096,7 +1112,7 @@ export async function listFollowingOwnerContents(
   const ownerIdsJson = JSON.stringify(ownerIds)
   const rows = await db.prepare(`
     SELECT c.id, c.content_type, c.owner_user_id, c.creator_id, c.ip_id, c.state,
-           c.scheduled_at, c.version, c.revision, c.slug, c.title, c.body_ref,
+           c.scheduled_at, c.access_mode, c.version, c.revision, c.slug, c.title, c.body_ref,
            c.media_refs_json, c.cover_ref, c.etag, c.created_at, c.updated_at
       FROM contents c
      WHERE c.state = 'PUBLISHED'
@@ -1226,7 +1242,7 @@ export async function createContent(
     insertCompletedIdempotency(db, ownerUserId, operationId, idempotencyKey, hash, 201, JSON.stringify(createdContent), createdAt, expiresAt),
     db.prepare(
       `INSERT INTO contents
-        (id, content_type, owner_user_id, creator_id, ip_id, state, scheduled_at, version, revision, slug, title, body_ref, media_refs_json, cover_ref, etag, created_at, updated_at)
+        (id, content_type, owner_user_id, creator_id, ip_id, state, scheduled_at, access_mode, version, revision, slug, title, body_ref, media_refs_json, cover_ref, etag, created_at, updated_at)
        VALUES (?, ?, ?, ?, NULL, 'DRAFT', NULL, 1, 1, ?, ?, ?, ?, ?, ?, ?, ?) `,
     ).bind(contentId, normalized.contentType, ownerUserId, ownerUserId, slug, normalized.title, normalized.bodyRef, JSON.stringify(normalized.mediaRefs), normalized.coverRef, createdContent.etag, createdAt, createdAt),
     atomicGuard(db),
@@ -1375,7 +1391,7 @@ export async function rollbackContentRevision(
   }
 
   const source = await db.prepare(`SELECT id, content_id, revision, content_version, actor_user_id, source_revision, operation,
-       state, slug, title, body_ref, media_refs_json, cover_ref, etag, reason, correlation_id, created_at
+       state, access_mode, slug, title, body_ref, media_refs_json, cover_ref, etag, reason, correlation_id, created_at
   FROM content_revisions
  WHERE id = ? AND content_id = ?`).bind(revisionId, contentId).first<ContentRevisionRow>()
   if (!source) throw new ContentRuntimeError('NOT_FOUND', 404)
