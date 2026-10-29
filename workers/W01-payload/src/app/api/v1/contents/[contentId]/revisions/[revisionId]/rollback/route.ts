@@ -1,6 +1,7 @@
 import {
   callW03Content,
   resolveCookieContentPrincipal,
+  resolveVerifiedContentCreatorId,
   W03ContentClientError,
 } from '@/content/w03-content-client.js'
 import {
@@ -37,12 +38,15 @@ export async function POST(
     const { contentId, revisionId } = await context.params
     const mutationError = requireMutationHeaders(request)
     if (mutationError) return mutationError
+    const verifiedCreatorId = await resolveVerifiedContentCreatorId(request, principal)
+    if (verifiedCreatorId instanceof Response) return verifiedCreatorId
     const response = await callW03Content({
       request,
       pathname: '/internal/content/contents/' + encodeURIComponent(contentId) + '/revisions/' + encodeURIComponent(revisionId) + '/rollback',
       method: 'POST',
       body: await request.json(),
       principal,
+      verifiedCreatorId,
     })
     if (response.ok) {
       await invalidatePublicContentComments(contentId)
