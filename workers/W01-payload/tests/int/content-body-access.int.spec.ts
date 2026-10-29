@@ -29,7 +29,7 @@ describe('content body access boundary', () => {
   it('uses only the same-origin body endpoint from detail and preview clients', () => {
     const detail = read('src/app/(frontend)/content/[contentId]/ContentDetailClient.tsx')
     const preview = read('src/components/ArticleSummaryPreview.tsx')
-    const nativeAdapter = read('../../../app/lib/content-adapter.ts')
+    const nativeAdapter = read('../../app/lib/content-adapter.ts')
 
     expect(detail).toContain('/api/v1/contents/')
     expect(detail).toContain('/body')
