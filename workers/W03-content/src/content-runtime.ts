@@ -1324,9 +1324,19 @@ export async function updateContent(
   }
   const currentAccessMode = content.accessMode ?? 'PUBLIC'
   const nextAccessMode = normalized.accessMode ?? currentAccessMode
-  if (normalized.accessMode !== undefined &&
-      (nextAccessMode !== currentAccessMode || nextAccessMode === 'MEMBERS_ONLY')) {
-    if (!verifiedCreatorId || verifiedCreatorId !== content.creatorId) {
+  let nextCreatorId = content.creatorId
+  if (normalized.accessMode !== undefined) {
+    if (!verifiedCreatorId) throw new ContentRuntimeError('PERMISSION_DENIED', 403)
+    if (nextAccessMode === 'MEMBERS_ONLY' && content.creatorId !== verifiedCreatorId) {
+      // Older public content stored the author user ID in creator_id. W08 has
+      // just verified that this same owner has an active canonical Creator ID;
+      // allow the one-way reference normalization as part of paywall activation.
+      if (currentAccessMode !== 'PUBLIC' ||
+          (content.creatorId !== content.ownerUserId && content.creatorId !== null)) {
+        throw new ContentRuntimeError('PERMISSION_DENIED', 403)
+      }
+      nextCreatorId = verifiedCreatorId
+    } else if (currentAccessMode === 'MEMBERS_ONLY' && content.creatorId !== verifiedCreatorId) {
       throw new ContentRuntimeError('PERMISSION_DENIED', 403)
     }
   }
@@ -1337,6 +1347,7 @@ export async function updateContent(
   const updatedAt = now.toISOString()
   const updated: ContentRecord = {
     ...content,
+    creatorId: nextCreatorId,
     scheduledAt: content.scheduledAt,
     accessMode: nextAccessMode,
     accessGranted: true,
@@ -1357,9 +1368,9 @@ export async function updateContent(
     insertCompletedIdempotency(db, principalUserId, operationId, idempotencyKey, hash, 200, idempotencyResponseBody, updatedAt, expiresAt),
     db.prepare(
       `UPDATE contents
-          SET title = ?, body_ref = ?, media_refs_json = ?, cover_ref = ?, access_mode = ?, version = ?, revision = ?, etag = ?, updated_at = ?
+          SET creator_id = ?, title = ?, body_ref = ?, media_refs_json = ?, cover_ref = ?, access_mode = ?, version = ?, revision = ?, etag = ?, updated_at = ?
         WHERE id = ? AND owner_user_id = ? AND version = ? AND etag = ?`,
-    ).bind(updated.title, updated.bodyRef, JSON.stringify(updated.mediaRefs), updated.coverRef, nextAccessMode, nextVersion, nextRevision, updated.etag, updatedAt, content.id, principalUserId, content.version, content.etag),
+    ).bind(nextCreatorId, updated.title, updated.bodyRef, JSON.stringify(updated.mediaRefs), updated.coverRef, nextAccessMode, nextVersion, nextRevision, updated.etag, updatedAt, content.id, principalUserId, content.version, content.etag),
     atomicGuard(db),
     insertRevision(db, {
       id: crypto.randomUUID(),
