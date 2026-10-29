@@ -48,7 +48,15 @@
     },
     "permissionContext": {
       "field": "permissionContext",
-      "source": "canonical authz permissions + server-derived reviewer scope",
+      "source": "W01 invokes the existing W08 CASL permission endpoint using the canonical W02 session and creates a server-derived context bound to the fixed operation permission, resource type, CASL policy version, subject, and layer.",
+      "headerFields": [
+        "X-LuckRead-Authz-Decision",
+        "X-LuckRead-Authz-Permission",
+        "X-LuckRead-Authz-Resource-Type",
+        "X-LuckRead-Authz-Policy-Version",
+        "X-LuckRead-Authz-Subject-Id",
+        "X-LuckRead-Authz-Layer"
+      ],
       "clientWritable": false,
       "required": true,
       "currentTransportEvidence": "CONTRACTED_NOT_VERIFIED"

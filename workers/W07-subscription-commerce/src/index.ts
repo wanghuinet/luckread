@@ -2,6 +2,8 @@
 
 import { createMembershipPlanDraft, reviseMembershipPlan, getSubscription, listActiveMembershipPlans, listCreatorMembershipPlans, listSubscriptions, parseBoundedPositiveInt, publishMembershipPlan, transitionMembershipPlanLifecycle, SubscriptionRuntimeError, validatePrincipal } from './subscription-runtime.js'
 import { handleCommerceOrderRequest } from './order-http-runtime.js'
+import { resolveCommerceOrderItems } from './order-item-resolution.js'
+import { applyDemoTaxPricing, isDemoPricingEnabled } from './demo-tax-pricing.js'
 import { handleCommercePaymentIntentRequest } from './payment-intent-http-runtime.js'
 import { handleHyperswitchWebhookRequest } from './payment-webhook-http-runtime.js'
 
@@ -10,6 +12,7 @@ interface Env {
   D1_01: D1Database
   D1_04: D1Database
   HYPERSWITCH_ENVIRONMENT?: string
+  COMMERCE_PRICING_MODE?: string
   HYPERSWITCH_API_KEY?: string
   HYPERSWITCH_MERCHANT_ID?: string
   HYPERSWITCH_WEBHOOK_SECRET?: string
@@ -148,7 +151,13 @@ export default {
       requireLayer(request)
       const paymentIntentResponse = await handleCommercePaymentIntentRequest(request, principal, env)
       if (paymentIntentResponse) return paymentIntentResponse
-      const commerceOrderResponse = await handleCommerceOrderRequest(request, principal, env)
+      const orderDependencies = isDemoPricingEnabled(env.COMMERCE_PRICING_MODE, env.HYPERSWITCH_ENVIRONMENT)
+        ? {
+            resolvePricing: async (input: unknown) =>
+              applyDemoTaxPricing(await resolveCommerceOrderItems(env.D1_01, input)),
+          }
+        : undefined
+      const commerceOrderResponse = await handleCommerceOrderRequest(request, principal, env, orderDependencies)
       if (commerceOrderResponse) return commerceOrderResponse
       const pathname = new URL(request.url).pathname
       const operation = toOperation(request.method, parseSegments(pathname))

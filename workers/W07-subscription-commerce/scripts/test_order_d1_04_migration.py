@@ -9,6 +9,8 @@ ROOT = Path(__file__).resolve().parents[3]
 WORKER = ROOT / "workers" / "W07-subscription-commerce"
 MIGRATION = WORKER / "migrations-d1-04" / "0001_order_commerce.sql"
 PAYMENT_MIGRATION = WORKER / "migrations-d1-04" / "0002_payment_provider_events.sql"
+SAVED_METHOD_MIGRATION = WORKER / "migrations-d1-04" / "0003_saved_payment_methods_mandates.sql"
+RENEWAL_MIGRATION = WORKER / "migrations-d1-04" / "0004_subscription_renewal_cycles.sql"
 CONFIG = WORKER / "wrangler.jsonc"
 NOW = "2026-10-28T00:00:00.000Z"
 LATER = "2026-10-28T00:00:01.000Z"
@@ -19,6 +21,8 @@ class D104OrderMigrationTests(unittest.TestCase):
     def setUpClass(cls):
         cls.sql = MIGRATION.read_text(encoding="utf-8")
         cls.payment_sql = PAYMENT_MIGRATION.read_text(encoding="utf-8")
+        cls.saved_method_sql = SAVED_METHOD_MIGRATION.read_text(encoding="utf-8")
+        cls.renewal_sql = RENEWAL_MIGRATION.read_text(encoding="utf-8")
         config = json.loads(CONFIG.read_text(encoding="utf-8"))
         bindings = {item["binding"]: item for item in config["d1_databases"]}
         if bindings["D1_01"]["migrations_dir"] != "migrations":
@@ -32,6 +36,8 @@ class D104OrderMigrationTests(unittest.TestCase):
         self.db = sqlite3.connect(":memory:")
         self.db.executescript(self.sql)
         self.db.executescript(self.payment_sql)
+        self.db.executescript(self.saved_method_sql)
+        self.db.executescript(self.renewal_sql)
 
     def tearDown(self):
         self.db.close()
@@ -118,7 +124,9 @@ class D104OrderMigrationTests(unittest.TestCase):
     def test_only_expected_tables_and_indexes_exist(self):
         tables = {row[0] for row in self.db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
         self.assertEqual(tables, {
-            "orders", "order_lines", "order_create_idempotency", "payments", "payment_provider_events", "payment_provider_event_conflicts",
+            "orders", "order_lines", "order_create_idempotency", "payments", "payment_provider_events",
+            "payment_provider_event_conflicts", "saved_payment_methods", "payment_mandates",
+            "subscription_renewal_cycles", "subscription_renewal_scheduler_state",
         })
         indexes = {row[0] for row in self.db.execute("SELECT name FROM sqlite_master WHERE type='index' AND sql IS NOT NULL")}
         self.assertTrue({
@@ -128,13 +136,19 @@ class D104OrderMigrationTests(unittest.TestCase):
             "ix_payments_customer_created_payment", "ix_payments_order_created_payment",
             "ix_payments_status_updated_payment", "ux_payments_single_live_or_successful_per_order", "ix_payment_provider_events_state_received",
             "ix_payment_provider_events_payment_received", "ix_payment_provider_event_conflicts_state_last_seen",
-            "ix_payment_provider_event_conflicts_identity",
+            "ix_payment_provider_event_conflicts_identity", "ix_saved_payment_methods_customer_created",
+            "ux_payment_mandates_provider_mandate_id", "ix_payment_mandates_customer_status_created",
+            "ix_payment_mandates_method_status",
+            "ux_subscription_renewal_cycles_subscription_cycle", "ux_subscription_renewal_cycles_payment",
+            "ix_subscription_renewal_cycles_state_updated", "ix_subscription_renewal_cycles_subscriber_cycle",
         }.issubset(indexes))
         self.assertFalse(tables.intersection({"payment_intents", "ledger_entries", "refunds", "entitlements"}))
         self.assertNotIn("client_secret", {r[1] for r in self.db.execute('PRAGMA table_info("payments")')})
         self.assertNotIn("raw_body", {r[1] for r in self.db.execute('PRAGMA table_info("payment_provider_events")')})
         for table in ("orders", "order_lines", "order_create_idempotency", "payments",
-                      "payment_provider_events", "payment_provider_event_conflicts"):
+                      "payment_provider_events", "payment_provider_event_conflicts",
+                      "saved_payment_methods", "payment_mandates", "subscription_renewal_cycles",
+                      "subscription_renewal_scheduler_state"):
             self.assertEqual(self.db.execute(f'PRAGMA foreign_key_list("{table}")').fetchall(), [])
 
 
@@ -407,6 +421,205 @@ class D104OrderMigrationTests(unittest.TestCase):
                 (LATER,),
             )
 
+
+    def test_saved_method_and_mandate_require_provider_verified_payment_and_start_pending(self):
+        self.order()
+        self.payment(status="succeeded", provider_updated_at=NOW)
+        self.provider_event(event_id="evt_saved", event_type="payment_succeeded",
+                            payment_id="pay_" + "a"*26, state="RECEIVED")
+
+        saved_id = "spm_" + "s"*26
+        method_id = "pm_hyperswitch_test_123"
+        self.db.execute(
+            """INSERT INTO saved_payment_methods(saved_payment_method_id,provider,merchant_id,customer_id,
+               payment_method_id,source_payment_id,source_event_id,created_at)
+               VALUES(?,?,?,?,?,?,?,?)""",
+            (saved_id, "hyperswitch", "merchant_1", "user_1", method_id,
+             "pay_" + "a"*26, "evt_saved", NOW),
+        )
+        mandate_id = "mnd_" + "m"*26
+        self.db.execute(
+            """INSERT INTO payment_mandates(mandate_record_id,provider,merchant_id,customer_id,payment_method_id,
+               source_payment_id,source_event_id,consent_accepted_at,consent_acceptance_type,consent_scope,
+               consent_terms_version,provider_mandate_id,status,version,provider_updated_at,created_at,updated_at)
+               VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (mandate_id, "hyperswitch", "merchant_1", "user_1", method_id,
+             "pay_" + "a"*26, "evt_saved", NOW, "online", "OFF_SESSION_RECURRING",
+             "luckread-recurring-consent-v1", "mandate_1", "PENDING_PROVIDER_CONFIRMATION",
+             1, None, NOW, NOW),
+        )
+        stored = self.db.execute(
+            "SELECT status, version, provider_updated_at, consent_acceptance_type, consent_scope FROM payment_mandates WHERE mandate_record_id=?",
+            (mandate_id,),
+        ).fetchone()
+        self.assertEqual(stored, ("PENDING_PROVIDER_CONFIRMATION", 1, None, "online", "OFF_SESSION_RECURRING"))
+
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute(
+                """INSERT INTO payment_mandates(mandate_record_id,provider,merchant_id,customer_id,payment_method_id,
+                   source_payment_id,source_event_id,consent_accepted_at,consent_acceptance_type,consent_scope,
+                   consent_terms_version,provider_mandate_id,status,version,provider_updated_at,created_at,updated_at)
+                   VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                ("mnd_" + "n"*26, "hyperswitch", "merchant_1", "user_1", method_id,
+                 "pay_" + "a"*26, "evt_saved", NOW, "online", "OFF_SESSION_RECURRING",
+                 "luckread-recurring-consent-v1", "mandate_2", "ACTIVE", 1, NOW, NOW, NOW),
+            )
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute(
+                "UPDATE saved_payment_methods SET payment_method_id=? WHERE saved_payment_method_id=?",
+                ("pm_changed", saved_id),
+            )
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute("DELETE FROM payment_mandates WHERE mandate_record_id=?", (mandate_id,))
+
+    def test_renewal_cycle_is_unique_by_subscription_period_and_requires_pricing_before_preparation(self):
+        offer = json.dumps({
+            "subscriptionId": "sub_renewal", "planId": "plan_basic", "planVersion": 1,
+            "priceMinor": 1000, "currency": "USD",
+        }, separators=(",", ":"))
+        cycle_id = "rcy_" + "a" * 26
+        self.db.execute(
+            """INSERT INTO subscription_renewal_cycles
+               (cycle_id,provider,merchant_id,subscription_id,subscriber_id,plan_id,plan_version,
+                cycle_start,cycle_end,billing_interval,currency,offer_snapshot_json,amount_minor,
+                pricing_snapshot_json,payment_method_id,mandate_record_id,order_id,payment_id,state,
+                attempt_number,provider_response_status,outcome_code,lease_token,lease_expires_at,
+                version,created_at,updated_at)
+               VALUES(?,?,?,?,?,?,?,?,?,?,?, ?,NULL,NULL,NULL,NULL,NULL,NULL,'AWAITING_PRICING',
+                      0,NULL,NULL,NULL,NULL,1,?,?)""",
+            (cycle_id, "hyperswitch", "merchant_test", "sub_renewal", "user_1", "plan_basic", 1,
+             NOW, LATER, "MONTHLY", "USD", offer, NOW, NOW),
+        )
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute(
+                """INSERT INTO subscription_renewal_cycles
+                   (cycle_id,provider,merchant_id,subscription_id,subscriber_id,plan_id,plan_version,
+                    cycle_start,cycle_end,billing_interval,currency,offer_snapshot_json,amount_minor,
+                    pricing_snapshot_json,payment_method_id,mandate_record_id,order_id,payment_id,state,
+                    attempt_number,version,created_at,updated_at)
+                   VALUES(?,?,?,?,?,?,?,?,?,?,?, ?,NULL,NULL,NULL,NULL,NULL,NULL,'AWAITING_PRICING',0,1,?,?)""",
+                ("rcy_" + "b" * 26, "hyperswitch", "merchant_test", "sub_renewal", "user_1",
+                 "plan_basic", 1, NOW, LATER, "MONTHLY", "USD", offer, NOW, NOW),
+            )
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute(
+                """UPDATE subscription_renewal_cycles SET state='PAYMENT_READY', version=2,
+                   updated_at=? WHERE cycle_id=?""", (LATER, cycle_id)
+            )
+        self.assertEqual(
+            self.db.execute("SELECT state, amount_minor, version, subscription_sync_state, subscription_sync_updated_at, subscription_sync_error_code FROM subscription_renewal_cycles WHERE cycle_id=?", (cycle_id,)).fetchone(),
+            ("AWAITING_PRICING", None, 1, "PENDING", None, None),
+        )
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute(
+                "UPDATE subscription_renewal_cycles SET subscription_sync_state='APPLIED', version=2, updated_at=? WHERE cycle_id=?",
+                (LATER, cycle_id),
+            )
+
+    def test_renewal_cycles_cannot_be_inserted_past_the_initial_state(self):
+        offer = json.dumps({
+            "subscriptionId": "sub_guard", "planId": "plan_basic", "planVersion": 1,
+            "priceMinor": 1000, "currency": "USD",
+        }, separators=(",", ":"))
+        pricing = json.dumps({"currency": "USD", "items": []}, separators=(",", ":"))
+        attempted_states = [
+            "AWAITING_MANDATE", "PREPARED", "PAYMENT_READY", "SUBMITTING",
+            "SUBMITTED", "SUCCEEDED", "FAILED", "RECONCILIATION_REQUIRED",
+        ]
+        for index, state in enumerate(attempted_states):
+            with self.subTest(state=state), self.assertRaises(sqlite3.IntegrityError):
+                lease_token = "lease_test" if state == "SUBMITTING" else None
+                lease_expires = LATER if state == "SUBMITTING" else None
+                provider_status = "succeeded" if state == "SUCCEEDED" else "failed" if state == "FAILED" else None
+                self.db.execute(
+                    """INSERT INTO subscription_renewal_cycles
+                       (cycle_id,provider,merchant_id,subscription_id,subscriber_id,plan_id,plan_version,
+                        cycle_start,cycle_end,billing_interval,currency,offer_snapshot_json,amount_minor,
+                        pricing_snapshot_json,payment_method_id,mandate_record_id,order_id,payment_id,state,
+                        attempt_number,provider_response_status,outcome_code,lease_token,lease_expires_at,
+                        version,created_at,updated_at)
+                       VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, ?,1,?,?)""",
+                    ("rcy_" + chr(ord("a") + index) * 26, "hyperswitch", "merchant_test",
+                     "sub_guard_" + str(index), "user_1", "plan_basic", 1, NOW, LATER,
+                     "MONTHLY", "USD", offer, 1000, pricing, "pm_guard_" + str(index),
+                     "mnd_" + chr(ord("a") + index) * 26, "ord_guard_" + str(index),
+                     "pay_" + chr(ord("a") + index) * 26, state, 1, provider_status, None,
+                     lease_token, lease_expires, NOW, NOW),
+                )
+
+    def test_renewal_cycle_requires_active_mandate_before_payment_ready_and_keeps_cursor_cas(self):
+        offer = json.dumps({"subscriptionId":"sub_renewal","planId":"plan_basic","planVersion":1}, separators=(",",":"))
+        pricing = json.dumps({"currency":"USD","items":[]}, separators=(",",":"))
+        cycle_id = "rcy_" + "c" * 26
+        self.db.execute(
+            """INSERT INTO subscription_renewal_cycles
+               (cycle_id,provider,merchant_id,subscription_id,subscriber_id,plan_id,plan_version,
+                cycle_start,cycle_end,billing_interval,currency,offer_snapshot_json,amount_minor,
+                pricing_snapshot_json,state,attempt_number,version,created_at,updated_at)
+               VALUES(?,?,?,?,?,?,?,?,?,?,?,?,NULL,NULL,'AWAITING_PRICING',0,1,?,?)""",
+            (cycle_id,"hyperswitch","merchant_test","sub_renewal","user_1","plan_basic",1,
+             NOW,LATER,"MONTHLY","USD",offer,NOW,NOW),
+        )
+        self.db.execute(
+            """UPDATE subscription_renewal_cycles
+               SET amount_minor=?,pricing_snapshot_json=?,state='PREPARED',version=2,updated_at=?
+               WHERE cycle_id=? AND version=1""",
+            (1000,pricing,LATER,cycle_id),
+        )
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute(
+                "UPDATE subscription_renewal_cycles SET state='PAYMENT_READY',version=3,updated_at=? WHERE cycle_id=?",
+                ("2026-10-28T00:00:02.000Z",cycle_id),
+            )
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute(
+                "UPDATE subscription_renewal_scheduler_state SET cursor_period_end=?,cursor_subscription_id=?,updated_at=? WHERE state_id=?",
+                (NOW,"sub_renewal",NOW,"subscription-renewals"),
+            )
+        self.db.execute(
+            "UPDATE subscription_renewal_scheduler_state SET cursor_period_end=?,cursor_subscription_id=?,updated_at=?,version=version+1 WHERE state_id=? AND version=1",
+            (NOW,"sub_renewal",LATER,"subscription-renewals"),
+        )
+        self.assertEqual(
+            self.db.execute("SELECT cursor_period_end,cursor_subscription_id,version FROM subscription_renewal_scheduler_state WHERE state_id='subscription-renewals'").fetchone(),
+            (NOW,"sub_renewal",2),
+        )
+
+    def test_saved_method_rejects_missing_provider_event_and_cross_customer_token_binding(self):
+        self.order()
+        self.payment(status="succeeded", provider_updated_at=NOW)
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute(
+                """INSERT INTO saved_payment_methods(saved_payment_method_id,provider,merchant_id,customer_id,
+                   payment_method_id,source_payment_id,source_event_id,created_at)
+                   VALUES(?,?,?,?,?,?,?,?)""",
+                ("spm_" + "x"*26, "hyperswitch", "merchant_1", "user_1", "pm_missing_event",
+                 "pay_" + "a"*26, "evt_missing", NOW),
+            )
+
+        shared_method_id = "pm_customer_bound_token"
+        self.provider_event(event_id="evt_owner", payment_id="pay_" + "a"*26)
+        self.db.execute(
+            """INSERT INTO saved_payment_methods(saved_payment_method_id,provider,merchant_id,customer_id,
+               payment_method_id,source_payment_id,source_event_id,created_at)
+               VALUES(?,?,?,?,?,?,?,?)""",
+            ("spm_" + "s"*26, "hyperswitch", "merchant_1", "user_1", shared_method_id,
+             "pay_" + "a"*26, "evt_owner", NOW),
+        )
+
+        self.order(order_id="ord_2", customer="user_2")
+        other_payment_id = "pay_" + "b"*26
+        self.payment(payment_id=other_payment_id, order_id="ord_2", customer="user_2",
+                     idempotency_key="payment_key_2", status="succeeded", provider_updated_at=NOW)
+        self.provider_event(row_id="evtrow_other_customer", event_id="evt_other_customer", payment_id=other_payment_id)
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute(
+                """INSERT INTO saved_payment_methods(saved_payment_method_id,provider,merchant_id,customer_id,
+                   payment_method_id,source_payment_id,source_event_id,created_at)
+                   VALUES(?,?,?,?,?,?,?,?)""",
+                ("spm_" + "t"*26, "hyperswitch", "merchant_1", "user_2", shared_method_id,
+                 other_payment_id, "evt_other_customer", NOW),
+            )
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

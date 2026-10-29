@@ -106,6 +106,12 @@ describe('W06 moderation queue pagination scope', () => {
           'X-LuckRead-Principal-Layer': 'L6',
           'X-LuckRead-Correlation-Id': 'correlation-' + reviewerId,
           'X-LuckRead-Request-Id': requestId,
+          'X-LuckRead-Authz-Decision': 'ALLOW',
+          'X-LuckRead-Authz-Permission': 'moderation.queue.read',
+          'X-LuckRead-Authz-Resource-Type': 'ModerationQueue',
+          'X-LuckRead-Authz-Policy-Version': 'casl-l0-l8-v1',
+          'X-LuckRead-Authz-Subject-Id': reviewerId,
+          'X-LuckRead-Authz-Layer': 'L6',
         },
       })
 
@@ -126,6 +132,40 @@ describe('W06 moderation queue pagination scope', () => {
       requestId: 'req_queue_second',
     })
     expect(prepare).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('W06 moderation permission proof', () => {
+  it('fails closed for queue, case-read, and decision routes when W01 has not attached an allowed W08 CASL decision', async () => {
+    const prepare = vi.fn()
+    const db = { prepare } as unknown as D1Database
+    const runtime = await import('./index')
+    const headers = {
+      'X-LuckRead-Caller': 'W01',
+      'X-LuckRead-Transport-Version': '1.0',
+      'X-LuckRead-Principal-User-Id': 'reviewer_1',
+      'X-LuckRead-Principal-Layer': 'L6',
+      'X-LuckRead-Correlation-Id': 'moderation-authz-negative',
+      'X-LuckRead-Request-Id': 'req_authz_negative',
+    }
+    const requests = [
+      new Request('https://w06.internal/admin/moderation/queue', { headers }),
+      new Request('https://w06.internal/admin/moderation/cases/case_1', { headers }),
+      new Request('https://w06.internal/admin/moderation/cases/case_1/decision', {
+        method: 'POST',
+        headers: { ...headers, 'content-type': 'application/json', 'If-Match': '"v1"', 'Idempotency-Key': 'idem_1' },
+        body: JSON.stringify({
+          decision: 'APPROVED', expectedVersion: 1, policyVersion: 'moderation-v1.0',
+          reasonCode: 'POLICY_MATCH', severity: 'medium', scope: 'content',
+          effectiveAt: '2026-10-01T00:00:00.000Z', expiresAt: null,
+        }),
+      }),
+    ]
+    for (const request of requests) {
+      const response = await runtime.default.fetch(request, { D1_03: db })
+      expect(response.status).toBe(403)
+    }
+    expect(prepare).not.toHaveBeenCalled()
   })
 })
 

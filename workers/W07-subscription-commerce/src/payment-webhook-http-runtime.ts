@@ -5,15 +5,37 @@ import {
   PaymentPersistenceError,
   type WebhookReceiptResult,
 } from './payment-persistence.js';
+import {
+  syncRenewalCycleOutcomeForPayment,
+  syncPendingRenewalOutcomes,
+  type RenewalOutcomeSyncResult,
+} from './subscription-renewal-outcome.js';
 
 type HyperswitchWebhookRuntimeEnv = Readonly<{
+  D1_01: D1Database;
   D1_04: D1Database;
   HYPERSWITCH_WEBHOOK_SECRET?: string | null;
   HYPERSWITCH_MERCHANT_ID?: string | null;
 }>;
 
+type RenewalPendingRecoveryResult = Readonly<{
+  scanned: number;
+  applied: number;
+  reconciliationRequired: number;
+  pendingRetry: number;
+}>;
+
 type HyperswitchWebhookRuntimeDependencies = Readonly<{
   receive?: typeof receiveHyperswitchWebhook;
+  syncRenewalOutcome?: (
+    env: Readonly<{ D1_01: D1Database; D1_04: D1Database }>,
+    paymentId: string,
+    merchantId: string,
+  ) => Promise<RenewalOutcomeSyncResult>;
+  syncPendingOutcomes?: (
+    env: Readonly<{ D1_01: D1Database; D1_04: D1Database }>,
+    options?: Readonly<{ limit?: number }>,
+  ) => Promise<RenewalPendingRecoveryResult>;
 }>;
 
 const MAX_WEBHOOK_BODY_BYTES = 1024 * 1024;
@@ -77,11 +99,20 @@ async function readBoundedRawBody(request: Request): Promise<ArrayBuffer | Respo
   return bytes.buffer as ArrayBuffer;
 }
 
-function receiptResponse(result: WebhookReceiptResult): Response {
-  // Signed events that are durably recorded as duplicates or requiring manual
-  // reconciliation are acknowledged. Returning 5xx would only cause useless
-  // provider retries; database failures still return 503 before a receipt exists.
-  const status = result.outcome === 'APPLIED' || result.outcome === 'DUPLICATE' ? 200 : 202;
+function receiptResponse(
+  result: WebhookReceiptResult,
+  subscriptionSync?: RenewalOutcomeSyncResult,
+  pendingRecovery?: RenewalPendingRecoveryResult,
+): Response {
+  // D1-04 receipt application and D1-01 subscription synchronization are a
+  // retryable saga. A durable receipt can be acknowledged as 202 when the
+  // entitlement-affecting Subscription state or bounded recovery batch needs work.
+  const subscriptionSyncNeedsWork = subscriptionSync?.outcome === 'RECONCILIATION_REQUIRED' ||
+    subscriptionSync?.outcome === 'PENDING_RETRY';
+  const pendingRecoveryNeedsWork = (pendingRecovery?.reconciliationRequired ?? 0) > 0 ||
+    (pendingRecovery?.pendingRetry ?? 0) > 0;
+  const status = !subscriptionSyncNeedsWork && !pendingRecoveryNeedsWork &&
+    (result.outcome === 'APPLIED' || result.outcome === 'DUPLICATE') ? 200 : 202;
   return Response.json(
     {
       data: {
@@ -91,11 +122,31 @@ function receiptResponse(result: WebhookReceiptResult): Response {
         state: result.state,
         payloadSha256: result.payloadSha256,
         ...(result.conflictId ? { conflictId: result.conflictId } : {}),
+        ...(subscriptionSync ? {
+          subscriptionSync: subscriptionSync.outcome,
+          ...(subscriptionSync.reasonCode ? { subscriptionSyncReason: subscriptionSync.reasonCode } : {}),
+          ...(subscriptionSync.subscriptionId ? { subscriptionId: subscriptionSync.subscriptionId } : {}),
+        } : {}),
+        ...(pendingRecovery ? { pendingRenewalRecovery: pendingRecovery } : {}),
       },
       requestId: 'req_' + crypto.randomUUID(),
     },
     { status, headers: { 'cache-control': 'no-store' } },
   );
+}
+
+function paymentIdFromSignedPayload(rawBody: ArrayBuffer): string | null {
+  try {
+    const parsed: unknown = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(rawBody));
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return null;
+    const envelope = parsed as Record<string, unknown>;
+    if (envelope.content_type !== 'payment_details' ||
+        typeof envelope.resource !== 'object' || envelope.resource === null || Array.isArray(envelope.resource)) return null;
+    const paymentId = (envelope.resource as Record<string, unknown>).payment_id;
+    return typeof paymentId === 'string' && /^pay_[A-Za-z0-9]{26}$/.test(paymentId) ? paymentId : null;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -147,7 +198,34 @@ export async function handleHyperswitchWebhookRequest(
       webhookSecret: env.HYPERSWITCH_WEBHOOK_SECRET,
       expectedMerchantId: env.HYPERSWITCH_MERCHANT_ID,
     });
-    return receiptResponse(result);
+
+    // receiveHyperswitchWebhook verifies the provider signature and durably
+    // commits the D1-04 event/payment/cycle outcome before this point. Only then
+    // may the same signed payload identify a renewal cycle for D1-01 sync.
+    let subscriptionSync: RenewalOutcomeSyncResult | undefined;
+    let pendingRecovery: RenewalPendingRecoveryResult | undefined;
+    const paymentId = (result.outcome === 'APPLIED' || result.outcome === 'DUPLICATE')
+      ? paymentIdFromSignedPayload(rawBody)
+      : null;
+    if (paymentId) {
+      const sync = dependencies.syncRenewalOutcome ?? syncRenewalCycleOutcomeForPayment;
+      const renewalEnv = { D1_01: env.D1_01, D1_04: env.D1_04 };
+      subscriptionSync = await sync(
+        renewalEnv,
+        paymentId,
+        env.HYPERSWITCH_MERCHANT_ID,
+      );
+
+      // A verified terminal renewal payment is an existing, trusted execution
+      // opportunity to drain a small bounded batch of older D1-04 -> D1-01
+      // outcome-sync work. This is recovery only: it does not schedule new
+      // charges, and it is skipped for ordinary payments before migration 0004.
+      if (subscriptionSync.outcome === 'APPLIED' || subscriptionSync.outcome === 'ALREADY_APPLIED') {
+        const recover = dependencies.syncPendingOutcomes ?? syncPendingRenewalOutcomes;
+        pendingRecovery = await recover(renewalEnv, { limit: 10 });
+      }
+    }
+    return receiptResponse(result, subscriptionSync, pendingRecovery);
   } catch (error) {
     if (error instanceof PaymentPersistenceError) {
       if (error.code === 'INVALID_SIGNATURE') {

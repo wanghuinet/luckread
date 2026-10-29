@@ -78,6 +78,27 @@ const versionFromEtag = (etag: string): number => {
 
 const nowIso = () => new Date().toISOString()
 
+/** Calendar-accurate billing period arithmetic: month-end and leap-day dates clamp, never overflow. */
+export function addBillingPeriod(start: string, interval: 'MONTHLY' | 'YEARLY'): string {
+  const parsed = new Date(start)
+  if (!Number.isFinite(parsed.getTime()) || parsed.toISOString() !== start ||
+      (interval !== 'MONTHLY' && interval !== 'YEARLY')) {
+    throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
+  }
+  const year = parsed.getUTCFullYear() + (interval === 'YEARLY' ? 1 : 0)
+  const month = parsed.getUTCMonth() + (interval === 'MONTHLY' ? 1 : 0)
+  const lastDay = new Date(Date.UTC(year, month + 1, 0)).getUTCDate()
+  return new Date(Date.UTC(
+    year,
+    month,
+    Math.min(parsed.getUTCDate(), lastDay),
+    parsed.getUTCHours(),
+    parsed.getUTCMinutes(),
+    parsed.getUTCSeconds(),
+    parsed.getUTCMilliseconds(),
+  )).toISOString()
+}
+
 const nextUpdatedAt = (previous: string): string => {
   const previousMs = Date.parse(previous)
   const nowMs = Date.now()
@@ -141,12 +162,14 @@ export async function createSubscription(db: D1Database, subscriberId: string, i
     result = await db.prepare(
       "INSERT INTO membership_subscriptions " +
       "(subscription_id, subscriber_id, plan_id, plan_version, creator_id, status, started_at, current_period_start, current_period_end, cancel_at, entitlement_snapshot_ref, created_at, updated_at, version) " +
-      "SELECT ?, ?, p.plan_id, p.current_version, p.owner_id, 'PENDING', ?, ?, ?, NULL, NULL, ?, ?, 1 " +
+      "SELECT ?, ?, p.plan_id, p.current_version, p.owner_id, 'PENDING', ?, ?, " +
+      "CASE pv.billing_interval WHEN 'MONTHLY' THEN ? WHEN 'YEARLY' THEN ? ELSE NULL END, " +
+      "NULL, NULL, ?, ?, 1 " +
       "FROM membership_plans AS p " +
+      "INNER JOIN membership_plan_versions AS pv ON pv.plan_id = p.plan_id AND pv.plan_version = p.current_version " +
       "WHERE p.plan_id = ? AND p.owner_type = 'CREATOR' AND p.status = 'ACTIVE' AND p.visibility = 'PUBLIC' " +
-      "AND EXISTS (SELECT 1 FROM membership_plan_versions AS pv WHERE pv.plan_id = p.plan_id AND pv.plan_version = p.current_version) " +
       "LIMIT 1",
-    ).bind(subscriptionId, subscriber, now, now, now, now, now, planId).run()
+    ).bind(subscriptionId, subscriber, now, now, addBillingPeriod(now, 'MONTHLY'), addBillingPeriod(now, 'YEARLY'), now, now, planId).run()
   } catch (error) {
     if (!(error instanceof Error) || !error.message.toLowerCase().includes('unique')) throw error
     const raced = await db.prepare('SELECT * FROM membership_subscriptions WHERE subscription_id = ? LIMIT 1').bind(subscriptionId).first<SubscriptionRow>()

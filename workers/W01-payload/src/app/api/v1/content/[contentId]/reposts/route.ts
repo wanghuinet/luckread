@@ -5,7 +5,10 @@ import {
 } from '../../../../../../social/w05-social-client.js'
 import {
   TrafficLimitError,
+  enforceW01WriteAccountRateLimit,
+  enforceW01WriteEndpointRateLimit,
   enforceW01WriteRateLimit,
+  enforceW01WriteResourceRateLimit,
   rateLimitResponse,
 } from '../../../../../../auth/traffic-limit.js'
 
@@ -27,6 +30,11 @@ async function mutateRepost(
     const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
     if (!idempotencyKey) return errorResponse(428, 'PRECONDITION_REQUIRED', 'Idempotency-Key is required')
     if (idempotencyKey.length > 256) return errorResponse(422, 'VALIDATION_FAILED', 'Invalid Idempotency-Key header')
+    await enforceW01WriteAccountRateLimit(principal.userId)
+    await enforceW01WriteEndpointRateLimit(
+      request.method === 'POST' ? 'postContentContentIdReposts' : 'deleteContentContentIdReposts',
+    )
+    await enforceW01WriteResourceRateLimit('content', contentId)
     return await callW05Social({
       request,
       pathname: '/internal/social/content/' + encodeURIComponent(contentId) + '/reposts',

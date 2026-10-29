@@ -2,6 +2,10 @@ import {
   callW06Moderation,
   W06ModerationClientError,
 } from '../../../../../../moderation/w06-moderation-client.js'
+import {
+  callW08Creator,
+  creatorServiceUnavailable,
+} from '../../../../../../auth/w08-creator-client.js'
 import { resolveCookieContentPrincipal } from '../../../../../../content/w03-content-client.js'
 
 const jsonError = (status: number, code: string, message: string) =>
@@ -10,18 +14,104 @@ const jsonError = (status: number, code: string, message: string) =>
     { status, headers: { 'cache-control': 'no-store' } },
   )
 
-const resolvePath = (segments: string[] | undefined): { pathname: string; needsBody: boolean } | null => {
+type RequiredModerationPermission = Readonly<{
+  permission: 'moderation.queue.read' | 'moderation.case.read' | 'moderation.decide'
+  resourceType: 'ModerationQueue' | 'ModerationCase'
+}>
+
+const resolvePath = (segments: string[] | undefined): {
+  pathname: string
+  needsBody: boolean
+  permission: RequiredModerationPermission
+} | null => {
   const parts = (segments ?? []).map((segment) => decodeURIComponent(segment))
   if (parts.length === 1 && parts[0] === 'queue') {
-    return { pathname: '/admin/moderation/queue', needsBody: false }
+    return {
+      pathname: '/admin/moderation/queue',
+      needsBody: false,
+      permission: { permission: 'moderation.queue.read', resourceType: 'ModerationQueue' },
+    }
   }
   if (parts.length === 2 && parts[0] === 'cases') {
-    return { pathname: `/admin/moderation/cases/${encodeURIComponent(parts[1])}`, needsBody: false }
+    return {
+      pathname: `/admin/moderation/cases/${encodeURIComponent(parts[1])}`,
+      needsBody: false,
+      permission: { permission: 'moderation.case.read', resourceType: 'ModerationCase' },
+    }
   }
   if (parts.length === 3 && parts[0] === 'cases' && parts[2] === 'decision') {
-    return { pathname: `/admin/moderation/cases/${encodeURIComponent(parts[1])}/decision`, needsBody: true }
+    return {
+      pathname: `/admin/moderation/cases/${encodeURIComponent(parts[1])}/decision`,
+      needsBody: true,
+      permission: { permission: 'moderation.decide', resourceType: 'ModerationCase' },
+    }
   }
   return null
+}
+
+type VerifiedModerationPermission = Readonly<{
+  decision: 'ALLOW'
+  permission: RequiredModerationPermission['permission']
+  resourceType: RequiredModerationPermission['resourceType']
+  policyVersion: 'casl-l0-l8-v1'
+  subjectId: string
+  layer: string
+}>
+
+async function authorizeModerationRequest(
+  request: Request,
+  principal: { userId: string; layer: string },
+  required: RequiredModerationPermission,
+): Promise<VerifiedModerationPermission | Response> {
+  let response: Response
+  try {
+    const authorizationRequest = new Request(request.url, {
+      method: 'POST',
+      headers: new Headers(request.headers),
+      body: JSON.stringify({
+        action: required.permission,
+        resourceType: required.resourceType,
+      }),
+    })
+    response = await callW08Creator(
+      authorizationRequest,
+      '/internal/authz/check-permission',
+      'POST',
+    )
+  } catch (error) {
+    return creatorServiceUnavailable(error)
+  }
+
+  if (!response.ok) {
+    return jsonError(503, 'SERVICE_UNAVAILABLE', 'Authorization service unavailable')
+  }
+
+  const value: unknown = await response.json().catch((): null => null)
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return jsonError(503, 'SERVICE_UNAVAILABLE', 'Authorization service unavailable')
+  }
+  const result = value as Record<string, unknown>
+  if (result.decision === 'DENY') {
+    return jsonError(403, 'PERMISSION_DENIED', 'Permission denied')
+  }
+  if (
+    result.decision !== 'ALLOW' ||
+    result.action !== required.permission ||
+    result.resourceType !== required.resourceType ||
+    result.policyVersion !== 'casl-l0-l8-v1' ||
+    result.layer !== principal.layer
+  ) {
+    return jsonError(503, 'SERVICE_UNAVAILABLE', 'Authorization service unavailable')
+  }
+
+  return {
+    decision: 'ALLOW',
+    permission: required.permission,
+    resourceType: required.resourceType,
+    policyVersion: 'casl-l0-l8-v1',
+    subjectId: principal.userId,
+    layer: principal.layer,
+  }
 }
 
 const run = async (request: Request, context: { params: Promise<{ path?: string[] }> }) => {
@@ -30,6 +120,12 @@ const run = async (request: Request, context: { params: Promise<{ path?: string[
 
   const principal = await resolveCookieContentPrincipal(request)
   if (principal instanceof Response) return principal
+  if (!principal.userId || !principal.layer) {
+    return jsonError(401, 'UNAUTHENTICATED', 'Authentication required')
+  }
+
+  const permissionContext = await authorizeModerationRequest(request, principal, resolved.permission)
+  if (permissionContext instanceof Response) return permissionContext
 
   let body: unknown = undefined
   if (resolved.needsBody) {
@@ -47,6 +143,7 @@ const run = async (request: Request, context: { params: Promise<{ path?: string[
       method: request.method,
       principal,
       body,
+      permissionContext,
     })
   } catch (error) {
     if (error instanceof W06ModerationClientError) {

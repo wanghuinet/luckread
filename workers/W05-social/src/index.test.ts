@@ -248,6 +248,8 @@ describe('W05 social query transport', () => {
       { DB: d, W03_CONTENT: binding },
     )
     expect(response.status).toBe(200)
+    expect(response.headers.get('cache-control')).toBe('no-store')
+    expect((d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare.mock.calls.some(([sql]) => String(sql).includes('FROM social_reposts WHERE content_id = ?'))).toBe(true)
     expect(binding.fetch).toHaveBeenCalledTimes(1)
     const forwarded = binding.fetch.mock.calls[0]?.[0] as Request
     expect(forwarded.url).toContain('/internal/content/contents/content-1/published-social-context')
@@ -1513,6 +1515,22 @@ describe('W05 social comment transport', () => {
     await expect(response.json()).resolves.toMatchObject({
       data: { repostId: 'repost-1', contentId: 'content-1', actorUserId: 'viewer-1' },
     })
+  })
+
+  it('returns a no-store 204 when removing the caller repost', async () => {
+    const d = dbFor()
+    const response = await worker.fetch(
+      requestWithMethod('/internal/social/content/content-1/reposts', 'DELETE', {
+        ...transportHeaders,
+        'Idempotency-Key': 'repost-remove-1',
+      }),
+      { DB: d },
+    )
+
+    expect(response.status).toBe(204)
+    expect(response.headers.get('cache-control')).toBe('no-store')
+    const prepare = (d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare
+    expect(String(prepare.mock.calls[0]?.[0])).toContain('DELETE FROM social_reposts WHERE actor_user_id = ? AND content_id = ?')
   })
 
   it('requires the minimum interaction layer and idempotency key for reposts', async () => {

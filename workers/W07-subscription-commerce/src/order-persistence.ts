@@ -63,6 +63,8 @@ export type AuthoritativelyPricedOrderItem = Readonly<{
 
 export type AuthoritativelyPricedOrder = Readonly<{
   currency: string;
+  /** Missing means the existing production adapter; Demo must opt in explicitly. */
+  pricingMode?: 'live' | 'demo';
   items: readonly AuthoritativelyPricedOrderItem[];
 }>;
 
@@ -134,6 +136,8 @@ export type CreateOrderResult = Readonly<{
 export type OrderPersistenceDependencies = Readonly<{
   now?: () => Date;
   createId?: (kind: 'order' | 'line' | 'idempotency') => string;
+  /** Internal recurring-cycle orders use a durable key beyond the default 24h interactive-order window. */
+  idempotencyExpiresAt?: string;
 }>;
 
 const defaultId = (kind: 'order' | 'line' | 'idempotency'): string =>
@@ -184,6 +188,21 @@ const sha256Hex = async (value: string): Promise<string> => {
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
+function readSnapshotPricingMode(raw: string): 'live' | 'demo' {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw) as unknown
+  } catch {
+    throw new OrderPersistenceError('INTEGRITY_VIOLATION', 500)
+  }
+  if (!isRecord(parsed)) throw new OrderPersistenceError('INTEGRITY_VIOLATION', 500)
+  if (!Object.prototype.hasOwnProperty.call(parsed, 'luckreadPricing')) return 'live'
+  if (!isRecord(parsed.luckreadPricing) || parsed.luckreadPricing.mode !== 'demo') {
+    throw new OrderPersistenceError('INTEGRITY_VIOLATION', 500)
+  }
+  return 'demo'
+}
+
 const exactKeys = (value: Record<string, unknown>, expected: readonly string[]): boolean => {
   const actual = Object.keys(value).sort();
   const wanted = [...expected].sort();
@@ -205,10 +224,18 @@ const parseStoredOrderData = (raw: string): CommerceOrderData => {
   } catch {
     throw new OrderPersistenceError('INTEGRITY_VIOLATION', 500);
   }
-  if (!isRecord(value) || !exactKeys(value, [
+  const legacyOrderKeys = [
     'orderId', 'status', 'version', 'currency', 'subtotalMinor', 'discountMinor',
     'taxMinor', 'totalMinor', 'items', 'createdAt', 'updatedAt',
-  ])) throw new OrderPersistenceError('INTEGRITY_VIOLATION', 500);
+  ] as const
+  if (!isRecord(value) || !(exactKeys(value, legacyOrderKeys) ||
+      exactKeys(value, [...legacyOrderKeys, 'pricingMode']))) {
+    throw new OrderPersistenceError('INTEGRITY_VIOLATION', 500)
+  }
+  const pricingMode = value.pricingMode === undefined ? 'live' : value.pricingMode
+  if (pricingMode !== 'live' && pricingMode !== 'demo') {
+    throw new OrderPersistenceError('INTEGRITY_VIOLATION', 500)
+  }
 
   if (typeof value.orderId !== 'string' || value.orderId.length < 1 || value.orderId.length > 255 ||
       !isValidOrderStatus(value.status) || !Number.isSafeInteger(value.version) || (value.version as number) < 1 ||
@@ -325,6 +352,7 @@ const validatePricing = (
   pricing: AuthoritativelyPricedOrder,
 ): Readonly<{
   currency: string;
+  pricingMode: 'live' | 'demo';
   lines: readonly Readonly<{
     orderLineId: string;
     item: AuthoritativelyPricedOrderItem;
@@ -340,6 +368,11 @@ const validatePricing = (
       !Array.isArray(pricing.items) || pricing.items.length !== request.items.length ||
       pricing.items.length < 1 || pricing.items.length > 50) {
     throw new OrderPersistenceError('INTEGRITY_VIOLATION', 500);
+  }
+
+  const pricingMode = pricing.pricingMode === undefined ? 'live' : pricing.pricingMode
+  if (pricingMode !== 'live' && pricingMode !== 'demo') {
+    throw new OrderPersistenceError('INTEGRITY_VIOLATION', 500)
   }
 
   let subtotalMinor = 0;
@@ -366,7 +399,13 @@ const validatePricing = (
     } catch {
       throw new OrderPersistenceError('INTEGRITY_VIOLATION', 500);
     }
-    if (!isRecord(snapshot)) throw new OrderPersistenceError('INTEGRITY_VIOLATION', 500);
+    if (!isRecord(snapshot)) throw new OrderPersistenceError('INTEGRITY_VIOLATION', 500)
+    const markerExists = Object.prototype.hasOwnProperty.call(snapshot, 'luckreadPricing')
+    const snapshotMode = readSnapshotPricingMode(item.itemSnapshotJson)
+    if ((pricingMode === 'demo' && snapshotMode !== 'demo') ||
+        (pricingMode === 'live' && markerExists)) {
+      throw new OrderPersistenceError('INTEGRITY_VIOLATION', 500)
+    }
 
     const unit = assertSafeMinor(item.unitAmountMinor, 'unitAmountMinor');
     const lineDiscount = assertSafeMinor(item.lineDiscountMinor, 'lineDiscountMinor');
@@ -401,7 +440,7 @@ const validatePricing = (
   if (totalMinor !== subtotalMinor - discountMinor + taxMinor) {
     throw new OrderPersistenceError('INTEGRITY_VIOLATION', 500);
   }
-  return { currency: pricing.currency, lines, subtotalMinor, discountMinor, taxMinor, totalMinor };
+  return { currency: pricing.currency, pricingMode, lines, subtotalMinor, discountMinor, taxMinor, totalMinor };
 };
 
 export async function createCommerceOrder(
@@ -442,7 +481,10 @@ export async function createCommerceOrder(
   const orderId = requireIdentifier(createId('order'), 'orderId', 255);
   const idempotencyId = requireIdentifier(createId('idempotency'), 'idempotencyId', 255);
   const createdAt = now;
-  const expiresAt = new Date(nowDate.getTime() + IDEMPOTENCY_RETENTION_MS).toISOString();
+  const expiresAt = dependencies.idempotencyExpiresAt ?? new Date(nowDate.getTime() + IDEMPOTENCY_RETENTION_MS).toISOString();
+  if (!isFiniteIsoDate(expiresAt) || Date.parse(expiresAt) <= nowDate.getTime()) {
+    throw new OrderPersistenceError('VALIDATION_FAILED', 400);
+  }
 
   const lineRecords = pricing.lines.map((line) => ({
     ...line,
@@ -557,6 +599,11 @@ export async function getCommerceOrder(
     'SELECT order_line_id, order_id, item_type, item_ref, item_version, quantity, unit_amount_minor, line_subtotal_minor, line_discount_minor, line_tax_minor, line_total_minor, item_snapshot_json, created_at ' +
     'FROM order_lines WHERE order_id = ? ORDER BY order_line_id ASC',
   ).bind(orderId).all<OrderLineRow>();
+  const lineModes = (result.results ?? []).map((line) => readSnapshotPricingMode(line.item_snapshot_json))
+  const firstLineMode = lineModes[0] ?? 'live'
+  if (lineModes.some((mode) => mode !== firstLineMode)) {
+    throw new OrderPersistenceError('INTEGRITY_VIOLATION', 500)
+  }
   const publicData: unknown = {
     orderId: order.order_id,
     status: order.status,

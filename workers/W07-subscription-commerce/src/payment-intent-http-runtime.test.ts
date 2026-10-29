@@ -4,7 +4,7 @@ import {
 } from './payment-intent-http-runtime.js';
 import {
   HyperswitchClientError,
-  type CreateHyperswitchPaymentIntentInput,
+  type CreateHyperswitchCustomerInitiatedSetupInput,
   type HyperswitchClientConfig,
   type HyperswitchPayment,
 } from './hyperswitch-client.js';
@@ -58,7 +58,7 @@ function createFixture(options: {
     recordIntent: [] as unknown[][],
   };
 
-  const attempt = options.attempt ?? { payment: paymentDto, replayed: false };
+  const attempt = options.attempt ?? { payment: paymentDto, replayed: false, pricingMode: 'live' };
   const remotePayment = options.providerPayment ?? providerPayment;
   const env = {
     D1_04: {} as D1Database,
@@ -148,6 +148,7 @@ describe('W07 internal payment-intent runtime', () => {
       ORDER_ID,
       CLIENT_IDEMPOTENCY_KEY,
       MERCHANT_ID,
+      { paymentEnvironment: 'sandbox' },
     ]);
     expect(fixture.calls.createProviderIntent).toHaveLength(1);
     expect(fixture.calls.createProviderIntent[0]?.[0]).toEqual({
@@ -160,7 +161,8 @@ describe('W07 internal payment-intent runtime', () => {
       amount: 1299,
       currency: 'USD',
       idempotencyKey: 'lr_' + PAYMENT_ID,
-    } satisfies CreateHyperswitchPaymentIntentInput);
+      customerId: CUSTOMER_ID,
+    } satisfies CreateHyperswitchCustomerInitiatedSetupInput);
     expect(fixture.calls.recordIntent).toHaveLength(1);
 
     const body = await response!.json() as { data: Record<string, unknown>; requestId: string };
@@ -183,6 +185,7 @@ describe('W07 internal payment-intent runtime', () => {
       attempt: {
         payment: { ...paymentDto, status: 'requires_payment_method', version: 2 },
         replayed: true,
+        pricingMode: 'live',
       },
     });
     const response = await handleCommercePaymentIntentRequest(
@@ -195,12 +198,13 @@ describe('W07 internal payment-intent runtime', () => {
     expect(fixture.calls.createProviderIntent[0]?.[1]).toMatchObject({
       paymentId: PAYMENT_ID,
       idempotencyKey: 'lr_' + PAYMENT_ID,
+      customerId: CUSTOMER_ID,
     });
   });
 
   it('does not re-open a payment attempt whose state has advanced', async () => {
     const fixture = createFixture({
-      attempt: { payment: { ...paymentDto, status: 'succeeded', version: 3 }, replayed: true },
+      attempt: { payment: { ...paymentDto, status: 'succeeded', version: 3 }, replayed: true, pricingMode: 'live' },
     });
     const response = await handleCommercePaymentIntentRequest(
       request({ idempotencyKey: CLIENT_IDEMPOTENCY_KEY }),

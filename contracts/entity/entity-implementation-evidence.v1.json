@@ -244,8 +244,8 @@
         "The current PR candidate implements monotonic version CAS and has passing W07 Subscription Runtime CI, but the change is not merged and production-runtime evidence has not been admitted.",
         "Migration 0001 is the historical baseline; migration 0002 adds version INTEGER NOT NULL DEFAULT 1 as a candidate only. The exact D1-01 migration history and post-migration schema have not been read-only verified, and no remote migration has been executed.",
         "The version-CAS candidate has tests for version increments, stale-version rejection, and idempotent convergence; production concurrency E2E and deployed W07 revision evidence remain absent.",
-        "Subscription creation still accepts a supplied planId and hardcodes plan_version=1 without validating an active authoritative plan definition.",
-        "Payment-confirmed subscription transitions and entitlement grant/revoke enforcement still lack an admitted provider integration, runtime, and Evidence Registry proof."
+        "Payment-confirmed subscription transitions and entitlement grant/revoke enforcement still lack an admitted provider integration, runtime, and Evidence Registry proof.",
+        "Current W07 source uses one INSERT...SELECT to bind only an ACTIVE, PUBLIC CREATOR-owned plan to its immutable current plan_version; runtime unit tests verify it snapshots current_version. This source-level evidence does not prove a production D1-01 migration or deployment."
       ],
       "status": "BLOCKED"
     },

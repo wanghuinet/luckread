@@ -11,6 +11,7 @@ import {
   enforceW01WriteRateLimit,
   enforceW01WriteAccountRateLimit,
   enforceW01WriteEndpointRateLimit,
+  enforceW01WriteResourceRateLimit,
   rateLimitResponse,
   TrafficLimitError,
 } from './traffic-limit.js'
@@ -241,6 +242,48 @@ describe('traffic limits', () => {
 
   it('rejects unbounded or user-controlled endpoint identifiers', async () => {
     await expect(enforceW01WriteEndpointRateLimit('/users/42/account-state')).rejects.toThrow('RATE_LIMIT_ENDPOINT_INVALID')
+    expect(contextMock).not.toHaveBeenCalled()
+  })
+  it('fails closed when resource-scope limiter context cannot be resolved', async () => {
+    contextMock.mockRejectedValue(new Error('Cloudflare context unavailable'))
+    await expect(enforceW01WriteResourceRateLimit('content', 'content-42')).rejects.toThrow(
+      'RATE_LIMIT_CONTEXT_UNAVAILABLE:W01_WRITE_LIMITER',
+    )
+  })
+
+  it('checks the stable W01 resource bucket', async () => {
+    const writeLimiter = { limit: vi.fn(async () => ({ success: true })) }
+    contextMock.mockResolvedValue({ env: { W01_WRITE_LIMITER: writeLimiter } } as never)
+
+    await expect(enforceW01WriteResourceRateLimit('content', 'content-42')).resolves.toBeUndefined()
+
+    expect(writeLimiter.limit).toHaveBeenCalledWith({
+      key: 'w01-write:resource:content:content-42',
+    })
+  })
+
+  it('rejects an exhausted W01 resource bucket', async () => {
+    const writeLimiter = { limit: vi.fn(async () => ({ success: false })) }
+    contextMock.mockResolvedValue({ env: { W01_WRITE_LIMITER: writeLimiter } } as never)
+
+    await expect(enforceW01WriteResourceRateLimit('content', 'content-42')).rejects.toBeInstanceOf(TrafficLimitError)
+  })
+
+  it('fails closed when the W01 resource limiter binding is missing', async () => {
+    contextMock.mockResolvedValue({ env: {} } as never)
+
+    await expect(enforceW01WriteResourceRateLimit('content', 'content-42')).rejects.toThrow(
+      'RATE_LIMIT_BINDING_UNAVAILABLE:W01_WRITE_LIMITER',
+    )
+  })
+
+  it('rejects unbounded or non-canonical resource identifiers before context lookup', async () => {
+    await expect(enforceW01WriteResourceRateLimit('../content', 'content-42')).rejects.toThrow(
+      'RATE_LIMIT_RESOURCE_SUBJECT_INVALID',
+    )
+    await expect(enforceW01WriteResourceRateLimit('content', '../content-42')).rejects.toThrow(
+      'RATE_LIMIT_RESOURCE_SUBJECT_INVALID',
+    )
     expect(contextMock).not.toHaveBeenCalled()
   })
 })

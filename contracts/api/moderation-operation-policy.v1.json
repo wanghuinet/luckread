@@ -85,7 +85,7 @@
       ],
       "evidence": {
         "openapi": "PASS",
-        "permission": "CONTRACTED_NOT_VERIFIED",
+        "permission": "PASS",
         "state": "MISSING",
         "resource": "CONTRACTED_NOT_VERIFIED",
         "cache": "CONTRACTED_NOT_VERIFIED",
@@ -166,7 +166,7 @@
       ],
       "evidence": {
         "openapi": "PASS",
-        "permission": "CONTRACTED_NOT_VERIFIED",
+        "permission": "PASS",
         "state": "MISSING",
         "resource": "CONTRACTED_NOT_VERIFIED",
         "cache": "CONTRACTED_NOT_VERIFIED",
@@ -278,7 +278,7 @@
       ],
       "evidence": {
         "openapi": "PASS",
-        "permission": "CONTRACTED_NOT_VERIFIED",
+        "permission": "PASS",
         "state": "MISSING",
         "resource": "CONTRACTED_NOT_VERIFIED",
         "cache": "N/A",

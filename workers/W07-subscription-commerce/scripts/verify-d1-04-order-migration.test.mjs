@@ -6,6 +6,8 @@ import {
   verifyD1_04OrderMigrationPostflight,
   ORDER_MIGRATION_ID,
   PAYMENT_MIGRATION_ID,
+  SAVED_METHOD_MIGRATION_ID,
+  RENEWAL_MIGRATION_ID,
   REQUIRED_MIGRATION_IDS,
   REQUIRED_COLUMNS,
   REQUIRED_INDEXES,
@@ -27,7 +29,11 @@ function targetObjectsFor(migrationIds) {
     ? ['orders', 'order_lines', 'order_create_idempotency']
     : id === PAYMENT_MIGRATION_ID
       ? ['payments', 'payment_provider_events', 'payment_provider_event_conflicts']
-      : [])
+      : id === SAVED_METHOD_MIGRATION_ID
+        ? ['saved_payment_methods', 'payment_mandates']
+        : id === '0004_subscription_renewal_cycles'
+          ? ['subscription_renewal_cycles', 'subscription_renewal_scheduler_state']
+          : [])
   const objects = tables.map((tableName) => ({
     type: 'table',
     name: tableName,
@@ -85,6 +91,10 @@ const tableInfo = {
   payments: tableInfoFor('payments'),
   paymentProviderEvents: tableInfoFor('payment_provider_events'),
   paymentProviderEventConflicts: tableInfoFor('payment_provider_event_conflicts'),
+  savedPaymentMethods: tableInfoFor('saved_payment_methods'),
+  paymentMandates: tableInfoFor('payment_mandates'),
+  renewalCycles: tableInfoFor('subscription_renewal_cycles'),
+  renewalSchedulerState: tableInfoFor('subscription_renewal_scheduler_state'),
 }
 
 function verifyCompletePostflight({ preflightSchema = schemaWithMigrations([]), postflightSchema = schemaWithMigrations(REQUIRED_MIGRATION_IDS), migrationState = wrapMigrationState(REQUIRED_MIGRATION_IDS) } = {}) {
@@ -98,6 +108,10 @@ function verifyCompletePostflight({ preflightSchema = schemaWithMigrations([]), 
     paymentsTableInfo: tableInfo.payments,
     paymentProviderEventsTableInfo: tableInfo.paymentProviderEvents,
     paymentProviderEventConflictsTableInfo: tableInfo.paymentProviderEventConflicts,
+    savedPaymentMethodsTableInfo: tableInfo.savedPaymentMethods,
+    paymentMandatesTableInfo: tableInfo.paymentMandates,
+    renewalCyclesTableInfo: tableInfo.renewalCycles,
+    renewalSchedulerStateTableInfo: tableInfo.renewalSchedulerState,
   })
 }
 
@@ -120,13 +134,20 @@ test('fails closed when Payment migration history exists without its Order prere
   }), /payment migration is recorded without its required prior Order migration/)
 })
 
-test('an applied Order migration can advance only the pending Payment migration', () => {
+test('fails closed when saved-method migration history exists without both earlier migrations', () => {
+  assert.throws(() => inspectD1_04OrderMigrationPreflight({
+    schemaSnapshot: schemaWithMigrations([SAVED_METHOD_MIGRATION_ID]),
+    migrationState: wrapMigrationState([SAVED_METHOD_MIGRATION_ID]),
+  }), /saved-method migration is recorded without its required Order and Payment migrations/)
+})
+
+test('an applied Order migration can advance pending Payment, mandate and renewal migrations', () => {
   const result = inspectD1_04OrderMigrationPreflight({
     schemaSnapshot: schemaWithMigrations([ORDER_MIGRATION_ID]),
     migrationState: wrapMigrationState([ORDER_MIGRATION_ID]),
   })
   assert.equal(result.action, 'APPLY')
-  assert.deepEqual(result.pendingMigrationIds, [PAYMENT_MIGRATION_ID])
+  assert.deepEqual(result.pendingMigrationIds, [PAYMENT_MIGRATION_ID, SAVED_METHOD_MIGRATION_ID, RENEWAL_MIGRATION_ID])
   assert.equal(result.writesPerformed, false)
 })
 
@@ -167,9 +188,9 @@ test('postflight validates both migrations, all tables/columns/indexes/triggers,
   assert.equal(report.result, 'POSTFLIGHT_PASS')
   assert.equal(report.baselineSchemaPreserved, true)
   assert.deepEqual(report.appliedMigrations, REQUIRED_MIGRATION_IDS)
-  assert.equal(report.verifiedTables.length, 6)
-  assert.equal(report.verifiedIndexes.length, 14)
-  assert.equal(report.verifiedTriggers.length, 24)
+  assert.equal(report.verifiedTables.length, 10)
+  assert.equal(report.verifiedIndexes.length, 22)
+  assert.equal(report.verifiedTriggers.length, 48)
   assert.equal(report.databaseRowsExported, false)
 })
 
@@ -193,18 +214,28 @@ test('postflight rejects changed existing schema objects', () => {
 
 test('workflow is manual-only, gates exact SHA/name/confirmation, and never deploys a Worker', () => {
   const workflow = fs.readFileSync(new URL('../../../.github/workflows/w07-d1-04-order-migration.yml', import.meta.url), 'utf8')
+  const migration = fs.readFileSync(new URL('../migrations-d1-04/0004_subscription_renewal_cycles.sql', import.meta.url), 'utf8')
   assert.match(workflow, /workflow_dispatch:/)
   assert.doesNotMatch(workflow, /^\s{2}(push|pull_request):/m)
   assert.match(workflow, /source_sha:/)
   assert.match(workflow, /target_database_name:/)
-  assert.match(workflow, /APPLY_W07_D1_04_ORDER_MIGRATION/)
+  assert.match(workflow, /APPLY_W07_D1_04_COMMERCE_MIGRATIONS/)
   assert.match(workflow, /SOURCE_SHA.*GITHUB_SHA/s)
+  assert.match(workflow, /MAIN_SHA="\$\(git rev-parse origin\/main\)"/)
+  assert.match(workflow, /SOURCE_SHA"\s*!=\s*"\$MAIN_SHA"/)
   assert.match(workflow, /d1 migrations apply/)
   assert.match(workflow, /--remote/)
   assert.match(workflow, /id: schema_preflight/)
   assert.match(workflow, /steps\.schema_preflight\.outputs\.action == 'APPLY'/)
   assert.match(workflow, /Capture read-only D1-04 schema after candidate migrations/)
   assert.match(workflow, /0002_payment_provider_events\.sql/)
+  assert.match(workflow, /0003_saved_payment_methods_mandates\.sql/)
+  assert.match(workflow, /0004_subscription_renewal_cycles\.sql/)
+  assert.match(workflow, /PRAGMA table_info\("saved_payment_methods"\)/)
+  assert.match(workflow, /PRAGMA table_info\("payment_mandates"\)/)
+  assert.match(workflow, /PRAGMA table_info\("subscription_renewal_cycles"\)/)
+  assert.match(workflow, /PRAGMA table_info\("subscription_renewal_scheduler_state"\)/)
+  assert.match(migration, /subscription_renewal_cycles_sync_state_transition_guard/)
   assert.match(workflow, /PRAGMA table_info\("payments"\)/)
   assert.match(workflow, /PRAGMA table_info\("payment_provider_events"\)/)
   assert.match(workflow, /PRAGMA table_info\("payment_provider_event_conflicts"\)/)

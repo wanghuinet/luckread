@@ -188,12 +188,28 @@
     },
     {
       "featureId": "PAY-001",
-      "status": "UNRESOLVED",
+      "status": "PARTIAL",
       "evidenceRefs": [
-        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
+        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json",
+        "contracts/alignment/api-inventory.v1.json",
+        "contracts/alignment/code-evidence-inventory.v1.json",
+        "contracts/transport/W01-W07-membership-commerce-http-binding.v1.json",
+        "workers/W01-payload/src/app/api/v1/payments/intents/route.ts",
+        "workers/W01-payload/src/commerce/w07-commerce-client.ts",
+        "workers/W01-payload/src/subscription/w07-subscription-client.ts",
+        "workers/W01-payload/tests/int/payments-intent-v1-adapter.int.spec.ts",
+        "workers/W07-subscription-commerce/src/index.ts",
+        "workers/W07-subscription-commerce/src/payment-intent-http-runtime.ts",
+        "workers/W07-subscription-commerce/src/payment-intent-http-runtime.test.ts",
+        "workers/W07-subscription-commerce/src/hyperswitch-client.ts",
+        "workers/W07-subscription-commerce/src/hyperswitch-client.test.ts"
       ],
       "blockers": [
-        "Payment provider abstraction API/provider-event mapping not evidence-bound"
+        "The postPaymentsIntents public adapter and W07 payment-intent/Hyperswitch source plus automated tests are now linked; these establish code traceability only.",
+        "OpenAPI still marks this flow source-only pending the D1-04 migration and production secrets; live Hyperswitch payment E2E and postflight evidence are not admitted.",
+        "Provider-event, mandate, reconciliation, and successful-payment evidence remain separate acceptance gates. A payment intent or browser callback does not grant subscription entitlement."
       ]
     },
     {

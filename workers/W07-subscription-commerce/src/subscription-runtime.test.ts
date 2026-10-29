@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { changeSubscriptionPlan, createMembershipPlanDraft, createSubscription, etagForVersion, getSubscription, listActiveMembershipPlans, listCreatorMembershipPlans, listSubscriptions, normalizeMembershipPlanDraft, parseBoundedPositiveInt, publishMembershipPlan, reviseMembershipPlan, transitionMembershipPlanLifecycle, transitionSubscription, type SubscriptionRow, type SubscriptionStatus } from './subscription-runtime.js'
+import { addBillingPeriod, changeSubscriptionPlan, createMembershipPlanDraft, createSubscription, etagForVersion, getSubscription, listActiveMembershipPlans, listCreatorMembershipPlans, listSubscriptions, normalizeMembershipPlanDraft, parseBoundedPositiveInt, publishMembershipPlan, reviseMembershipPlan, transitionMembershipPlanLifecycle, transitionSubscription, type SubscriptionRow, type SubscriptionStatus } from './subscription-runtime.js'
 import w07 from './index.js'
 import { verifyD1SubscriptionPostflight, verifyD1SubscriptionPreflight } from '../scripts/verify-remote-preflight.mjs'
 
@@ -117,13 +117,15 @@ function fakeDb(rows: SubscriptionRow[], plans: MembershipPlanRow[] = []): D1Dat
             return { meta: { changes: 1 } }
           }
           if (sql.includes('INSERT INTO membership_subscriptions')) {
-            const plan = planState.get(String(values[7]))
+            const plan = planState.get(String(values[8]))
             if (!plan || plan.owner_type !== 'CREATOR' || plan.status !== 'ACTIVE' || plan.visibility !== 'PUBLIC' || !plan.has_current_version) return { meta: { changes: 0 } }
+            const start = String(values[3])
             const row: SubscriptionRow = {
               subscription_id: String(values[0]), subscriber_id: String(values[1]), plan_id: plan.plan_id,
               plan_version: plan.current_version, creator_id: plan.owner_id, status: 'PENDING',
-              started_at: String(values[2]), current_period_start: String(values[3]), current_period_end: String(values[4]),
-              cancel_at: null, entitlement_snapshot_ref: null, created_at: String(values[5]), updated_at: String(values[6]), version: 1,
+              started_at: String(values[2]), current_period_start: start,
+              current_period_end: addBillingPeriod(start, plan.billing_interval as 'MONTHLY' | 'YEARLY'),
+              cancel_at: null, entitlement_snapshot_ref: null, created_at: String(values[6]), updated_at: String(values[7]), version: 1,
             }
             if (state.has(row.subscription_id)) throw new Error('UNIQUE constraint failed')
             state.set(row.subscription_id, row)
@@ -445,6 +447,13 @@ describe('subscription runtime', () => {
     expect(body.error?.code).toBe('SERVICE_UNAVAILABLE')
     expect(databaseTouched).toBe(false)
   })
+  it('calculates billing periods without month-end overflow or leap-day drift', () => {
+    expect(addBillingPeriod('2026-01-31T12:34:56.789Z', 'MONTHLY')).toBe('2026-02-28T12:34:56.789Z')
+    expect(addBillingPeriod('2024-02-29T00:00:00.000Z', 'YEARLY')).toBe('2025-02-28T00:00:00.000Z')
+    expect(addBillingPeriod('2026-10-28T12:00:00.000Z', 'YEARLY')).toBe('2027-10-28T12:00:00.000Z')
+    expect(() => addBillingPeriod('not-a-date', 'MONTHLY')).toThrow()
+  })
+
   it('creates an idempotent pending subscription from the current authoritative plan version', async () => {
     const db = fakeDb([], [activePlan('plan_basic', { current_version: 3, owner_id: 'creator_1' })]); const first = await createSubscription(db, 'user_1', { planId: 'plan_basic', idempotencyKey: 'create-1' });
     const second = await createSubscription(db, 'user_1', { planId: 'plan_basic', idempotencyKey: 'create-1' });
