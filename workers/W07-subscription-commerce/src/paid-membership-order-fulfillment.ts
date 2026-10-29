@@ -129,7 +129,7 @@ function parseSnapshot(raw: string, line: PaidOrderLineRow, orderCurrency: strin
     benefits.some((item) => typeof item !== 'string' || item.length < 1 || item.length > 180) ||
     new Set(benefits).size !== benefits.length ||
     !Number.isSafeInteger(line.quantity) || line.quantity !== 1 ||
-    !safeMinor(line.line_total_minor)
+    !safeMinor(line.line_total_minor) || line.line_total_minor < 1
   ) return failClosed();
 
   return {
