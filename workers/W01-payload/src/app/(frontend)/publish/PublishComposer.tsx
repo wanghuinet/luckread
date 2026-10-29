@@ -631,6 +631,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
 
       latestDraftRef.current = saved
       setDraft(saved)
+      setMemberOnly(saved.accessMode === 'MEMBERS_ONLY')
       setSavedBody(body)
       if (nextSavedArticleSerialized !== null) setSavedArticleSerialized(nextSavedArticleSerialized)
       autoSaveLastSavedAtRef.current = Date.now()
