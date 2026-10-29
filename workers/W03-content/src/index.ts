@@ -1196,7 +1196,7 @@ const worker = {
           let bodyReferenceAllowed = true
           if (content.bodyRef) {
             const protectedReferences = await env.D1_02.prepare(
-              "SELECT owner_user_id, creator_id FROM contents WHERE body_ref = ? AND access_mode = 'MEMBERS_ONLY' LIMIT 51",
+              "SELECT owner_user_id, creator_id FROM contents WHERE body_ref = ? AND state = 'PUBLISHED' AND access_mode = 'MEMBERS_ONLY' LIMIT 51",
             ).bind(content.bodyRef).all<{ owner_user_id: string; creator_id: string | null }>()
             const rows = protectedReferences.results ?? []
             if (rows.length > 50) throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
