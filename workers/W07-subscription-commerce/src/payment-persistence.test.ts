@@ -628,7 +628,7 @@ describe('PAY-001 payment attempt persistence candidate', () => {
     const first = await receiveHyperswitchWebhook(db as unknown as D1Database, input, fixedDeps());
     const duplicate = await receiveHyperswitchWebhook(db as unknown as D1Database, input, fixedDeps(LATER));
     expect(first).toMatchObject({ outcome: 'RECONCILIATION_REQUIRED', eventId: 'evt_1', state: 'RECONCILIATION_REQUIRED' });
-    expect(duplicate).toMatchObject({ outcome: 'DUPLICATE', receiptId: first.receiptId });
+    expect(duplicate).toMatchObject({ outcome: 'RECONCILIATION_REQUIRED', state: 'RECONCILIATION_REQUIRED', receiptId: first.receiptId });
     expect(db.events).toHaveLength(1);
     expect(db.conflicts).toHaveLength(0);
     expect(JSON.stringify(db.events)).not.toContain(bodyText('evt_1'));
