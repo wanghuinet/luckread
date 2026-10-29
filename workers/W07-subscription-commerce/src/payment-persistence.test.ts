@@ -503,7 +503,7 @@ const bodyText = (
   });
 };
 
-async function signedBody(text: string, secret = SECRET): Promise<{ rawBody: ArrayBuffer; signature: string }> {
+async function signedBody(text: string, secret = SECRET): Promise<{ rawBody: ArrayBuffer; signature: string; signatureHeader: string }> {
   const bytes = new TextEncoder().encode(text);
   const key = await crypto.subtle.importKey(
     'raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-512' }, false, ['sign'],
@@ -512,7 +512,10 @@ async function signedBody(text: string, secret = SECRET): Promise<{ rawBody: Arr
   const signature = Array.from(signatureBytes, b => b.toString(16).padStart(2, '0')).join('');
   return {
     rawBody: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer,
+    // Keep the cryptographic value named for both legacy test helpers and the
+    // production receive contract so spreading this object cannot omit the header.
     signature,
+    signatureHeader: signature,
   };
 }
 
