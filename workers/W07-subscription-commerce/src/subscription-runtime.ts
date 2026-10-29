@@ -107,7 +107,7 @@ const nextUpdatedAt = (previous: string): string => {
 }
 
 const subscriptionIdFromIdempotency = async (subscriberId: string, idempotencyKey: string): Promise<string> => {
-  const material = new TextEncoder().encode('subscription-create\\0' + subscriberId + '\\0' + idempotencyKey)
+  const material = new TextEncoder().encode('subscription-create\u0000' + subscriberId + '\u0000' + idempotencyKey)
   const digest = await crypto.subtle.digest('SHA-256', material)
   const hex = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('')
   return 'sub_' + hex
