@@ -66,6 +66,7 @@ type RateLimitBinding = { limit(input: { key: string }): Promise<{ success: bool
 
 interface Env {
   D1_02: D1Database
+  W07_SUBSCRIPTION?: { fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> }
   CONTENT_PUBLIC_READ_LIMITER?: RateLimitBinding
   CONTENT_MUTATION_LIMITER?: RateLimitBinding
   CONTENT_ORIGIN_GLOBAL_LIMITER?: RateLimitBinding
@@ -190,6 +191,51 @@ const decodePathSegment = (value: string): string => {
   } catch {
     throw new ContentRuntimeError('VALIDATION_FAILED', 400)
   }
+}
+
+const resolveCreatorMembershipAccess = async (
+  request: Request,
+  env: Env,
+  subscriberId: string,
+  creatorId: string,
+): Promise<boolean> => {
+  const service = env.W07_SUBSCRIPTION
+  if (!service) throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
+  const correlationId = request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? ''
+  const layer = request.headers.get('X-LuckRead-Principal-Layer')?.trim() ?? ''
+  if (!correlationId || !layer) throw new ContentRuntimeError('UNAUTHENTICATED', 401)
+  let response: Response
+  try {
+    response = await service.fetch(new Request('https://luckread-w07.internal/internal/entitlements/check-creator-membership', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json; charset=utf-8',
+        'X-LuckRead-Caller': 'W03',
+        'X-LuckRead-Transport-Version': '1.0',
+        'X-LuckRead-Correlation-Id': correlationId,
+        'X-LuckRead-Principal-User-Id': subscriberId,
+        'X-LuckRead-Principal-Layer': layer,
+      },
+      body: JSON.stringify({ creatorId }),
+    }))
+  } catch {
+    throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
+  }
+  if (!response.ok) throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
+  let payload: unknown
+  try { payload = await response.json() } catch {
+    throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
+  }
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
+  }
+  const data = (payload as { data?: unknown }).data
+  if (!data || typeof data !== 'object' || Array.isArray(data) ||
+      typeof (data as { allowed?: unknown }).allowed !== 'boolean' ||
+      !['ACTIVE_CREATOR_MEMBERSHIP', 'MEMBERSHIP_REQUIRED'].includes(String((data as { reason?: unknown }).reason))) {
+    throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
+  }
+  return (data as { allowed: boolean }).allowed
 }
 
 const getPath = (pathname: string): {id?: string; state?: boolean; preflight?: boolean; revisions?: boolean; relationships?: boolean; relationshipId?: string; revisionId?: string; rollback?: boolean; series?: boolean; seriesMembers?: boolean; seriesMemberContentId?: string; collections?: boolean; collectionMembers?: boolean; collectionMemberContentId?: string} | null => {
@@ -1095,13 +1141,22 @@ const worker = {
       if (request.method === 'GET' && path.id) {
         // Published content is publicly readable; unpublished content remains owner-scoped in getContent().
         const principalUserId = request.headers.get('X-LuckRead-Principal-User-Id')?.trim() || null
-        const content = await getContent(env.D1_02, path.id, principalUserId)
+        const content = await getContent(
+          env.D1_02,
+          path.id,
+          principalUserId,
+          principalUserId
+            ? (creatorId) => resolveCreatorMembershipAccess(request, env, principalUserId, creatorId)
+            : undefined,
+        )
         return json({
           id: content.id,
           slug: content.slug,
           creatorId: content.creatorId,
           contentType: content.contentType,
           state: content.state,
+          accessMode: content.accessMode ?? 'PUBLIC',
+          accessGranted: content.accessGranted ?? (content.accessMode !== 'MEMBERS_ONLY'),
           version: content.version,
           revision: content.revision,
           etag: content.etag,
