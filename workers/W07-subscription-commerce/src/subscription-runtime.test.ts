@@ -459,6 +459,25 @@ describe('subscription runtime', () => {
     const second = await createSubscription(db, 'user_1', { planId: 'plan_basic', idempotencyKey: 'create-1' });
     expect(first.subscriptionId).toBe(second.subscriptionId); expect(first.status).toBe('PENDING'); expect(first.planVersion).toBe(3); expect(first.creatorId).toBe('creator_1'); expect(first.version).toBe(1); expect(first.etag).toBe(etagForVersion(1))
   })
+  it('uses unambiguous separators for subscriber-scoped idempotency identities', async () => {
+    const db = fakeDb([], [activePlan('plan_basic', { owner_id: 'creator_1' })])
+
+    // These pairs collide if the delimiter is the two printable characters "\\0".
+    // Literal backslash-zero is valid input text, so the hash preimage must use NUL.
+    const first = await createSubscription(db, 'user_a\\0b', {
+      planId: 'plan_basic',
+      idempotencyKey: 'key',
+    })
+    const second = await createSubscription(db, 'user_a', {
+      planId: 'plan_basic',
+      idempotencyKey: 'b\\0key',
+    })
+
+    expect(first.subscriptionId).not.toBe(second.subscriptionId)
+    expect(first.subscriberId).toBe('user_a\\0b')
+    expect(second.subscriberId).toBe('user_a')
+  })
+
   it('fails closed for missing, inactive, private, or non-creator plans', async () => {
     const cases: MembershipPlanRow[][] = [
       [],
