@@ -204,11 +204,16 @@ export function mapContentToFeedContent(
   const parsedTime = createdAt ? Date.parse(createdAt) : Number.NaN;
   const postedTime = Number.isFinite(parsedTime) ? Math.floor(parsedTime / 1000) : 0;
   const title = item.title?.trim() || '';
-  const body = (bodyText ?? item.bodyText ?? item.body ?? item.text ?? item.excerpt ?? item.summary ?? item.description ?? '').trim();
+  const membershipLocked = item.accessMode === 'MEMBERS_ONLY' && item.accessGranted !== true;
+  // Treat the server decision as a hard boundary even if a future list/detail
+  // response accidentally carries private body or media fields.
+  const body = membershipLocked
+    ? ''
+    : (bodyText ?? item.bodyText ?? item.body ?? item.text ?? item.excerpt ?? item.summary ?? item.description ?? '').trim();
   const message = body && title && body !== title ? title + '\n\n' + body : body || title;
-  const cover = resolveMediaUrl(item.coverRef) ?? undefined;
+  const cover = membershipLocked ? undefined : resolveMediaUrl(item.coverRef) ?? undefined;
   const mediaCandidates = [
-    ...(Array.isArray(item.mediaRefs) ? item.mediaRefs : []),
+    ...(membershipLocked ? [] : Array.isArray(item.mediaRefs) ? item.mediaRefs : []),
     ...(cover ? [cover] : []),
   ]
     .map(resolveMediaUrl)
