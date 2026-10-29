@@ -274,11 +274,15 @@ export default function PublishComposer({
         }
         let recoveredBody = ''
         if (recovered.bodyRef) {
-          const bodyResponse = await apiFetch(recovered.bodyRef, {
-            method: 'GET',
-            credentials: 'same-origin',
-            signal: controller.signal,
-          })
+          const bodyResponse = await apiFetch(
+            `/api/v1/contents/${encodeURIComponent(recovered.id)}/body`,
+            {
+              method: 'GET',
+              credentials: 'include',
+              cache: 'no-store',
+              signal: controller.signal,
+            },
+          )
           if (bodyResponse.ok) recoveredBody = await bodyResponse.text()
         }
         let recoveredPoll: DraftPoll | null = null
