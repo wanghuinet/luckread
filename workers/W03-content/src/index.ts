@@ -998,6 +998,8 @@ const worker = {
           requireIdempotency(request),
           typeof body.reason === 'string' ? body.reason : undefined,
           request.headers.get('X-LuckRead-Correlation-Id')?.trim() || 'runtime',
+          new Date(),
+          request.headers.get('X-LuckRead-Verified-Creator-Id')?.trim() || undefined,
         )
         return json({
           ...result,
