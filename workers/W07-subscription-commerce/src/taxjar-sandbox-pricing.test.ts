@@ -40,14 +40,14 @@ describe('TaxJar sandbox demo pricing adapter', () => {
     const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       requestUrl = String(input);
       requestInit = init;
-      return Response.json({
+      return new Response(JSON.stringify({
         tax: {
           amount_to_collect: 0.96,
           has_nexus: true,
           rate: 0.08,
           breakdown: { line_items: [{ id: '1', tax_collectable: 0.96 }] },
         },
-      });
+      }), { status: 200, headers: { 'content-type': 'application/json' } });
     }) as unknown as typeof fetch;
 
     const priced = await applyTaxJarSandboxPricing(resolved, {
