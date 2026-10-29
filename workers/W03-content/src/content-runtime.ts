@@ -1153,6 +1153,7 @@ export async function createContent(
   idempotencyKey: string,
   now = new Date(),
   correlationId = 'runtime',
+  verifiedCreatorId?: string,
 ): Promise<ContentRecord> {
   assertResourceId(ownerUserId)
   if (!idempotencyKey || idempotencyKey.length > 256) {
@@ -1160,8 +1161,19 @@ export async function createContent(
   }
 
   const normalized = validateInput(input)
+  let creatorId = ownerUserId
+  if (normalized.accessMode === 'MEMBERS_ONLY') {
+    if (!verifiedCreatorId) throw new ContentRuntimeError('PERMISSION_DENIED', 403)
+    assertResourceId(verifiedCreatorId)
+    creatorId = verifiedCreatorId
+  }
   const operationId = 'createContent'
-  const hash = await requestHash(operationId, { ownerUserId, input: normalized })
+  // Keep old public-create idempotency material byte-for-byte compatible. A
+  // paid creator offer additionally binds the verified W08 creator identity.
+  const hashInput = normalized.accessMode === 'MEMBERS_ONLY'
+    ? { ownerUserId, input: normalized, verifiedCreatorId: creatorId }
+    : { ownerUserId, input: normalized }
+  const hash = await requestHash(operationId, hashInput)
 
   const existing = await db.prepare(
     `SELECT id AS idem_id, owner_user_id AS idem_owner_user_id, request_hash AS idem_request_hash,
@@ -1180,7 +1192,7 @@ export async function createContent(
       typeof parsed.id !== 'string' ||
       !['article', 'post', 'video'].includes(String(parsed.contentType)) ||
       parsed.ownerUserId !== ownerUserId ||
-      parsed.creatorId !== ownerUserId ||
+      parsed.creatorId !== creatorId ||
       parsed.ipId !== null ||
       !isState(parsed.state) ||
       typeof parsed.version !== 'number' ||
@@ -1224,7 +1236,7 @@ export async function createContent(
     id: contentId,
     contentType: normalized.contentType,
     ownerUserId,
-    creatorId: ownerUserId,
+    creatorId,
     ipId: null,
     state: 'DRAFT',
     scheduledAt: null,
@@ -1249,7 +1261,7 @@ export async function createContent(
       `INSERT INTO contents
         (id, content_type, owner_user_id, creator_id, ip_id, state, scheduled_at, access_mode, version, revision, slug, title, body_ref, media_refs_json, cover_ref, etag, created_at, updated_at)
        VALUES (?, ?, ?, ?, NULL, 'DRAFT', NULL, ?, 1, 1, ?, ?, ?, ?, ?, ?, ?, ?) `,
-    ).bind(contentId, normalized.contentType, ownerUserId, ownerUserId, normalized.accessMode ?? 'PUBLIC', slug, normalized.title, normalized.bodyRef, JSON.stringify(normalized.mediaRefs), normalized.coverRef, createdContent.etag, createdAt, createdAt),
+    ).bind(contentId, normalized.contentType, ownerUserId, creatorId, normalized.accessMode ?? 'PUBLIC', slug, normalized.title, normalized.bodyRef, JSON.stringify(normalized.mediaRefs), normalized.coverRef, createdContent.etag, createdAt, createdAt),
     atomicGuard(db),
     insertRevision(db, {
       id: crypto.randomUUID(),
@@ -1286,6 +1298,7 @@ export async function updateContent(
   now = new Date(),
   correlationId = 'runtime',
   principalLayer?: string,
+  verifiedCreatorId?: string,
 ): Promise<ContentRecord> {
   assertResourceId(principalUserId)
   assertResourceId(contentId)
@@ -1309,6 +1322,13 @@ export async function updateContent(
   if (content.contentType !== normalized.contentType) {
     throw new ContentRuntimeError('VALIDATION_FAILED', 400)
   }
+  const currentAccessMode = content.accessMode ?? 'PUBLIC'
+  const nextAccessMode = normalized.accessMode ?? currentAccessMode
+  if (nextAccessMode !== currentAccessMode || nextAccessMode === 'MEMBERS_ONLY') {
+    if (!verifiedCreatorId || verifiedCreatorId !== content.creatorId) {
+      throw new ContentRuntimeError('PERMISSION_DENIED', 403)
+    }
+  }
   if (!EDITABLE_STATES.has(content.state)) throw new ContentRuntimeError('INVALID_STATE', 409)
 
   const nextVersion = content.version + 1
@@ -1317,7 +1337,7 @@ export async function updateContent(
   const updated: ContentRecord = {
     ...content,
     scheduledAt: content.scheduledAt,
-    accessMode: normalized.accessMode ?? 'PUBLIC',
+    accessMode: nextAccessMode,
     accessGranted: true,
     title: normalized.title,
     bodyRef: normalized.bodyRef,
@@ -1338,7 +1358,7 @@ export async function updateContent(
       `UPDATE contents
           SET title = ?, body_ref = ?, media_refs_json = ?, cover_ref = ?, access_mode = ?, version = ?, revision = ?, etag = ?, updated_at = ?
         WHERE id = ? AND owner_user_id = ? AND version = ? AND etag = ?`,
-    ).bind(updated.title, updated.bodyRef, JSON.stringify(updated.mediaRefs), updated.coverRef, updated.accessMode ?? 'PUBLIC', nextVersion, nextRevision, updated.etag, updatedAt, content.id, principalUserId, content.version, content.etag),
+    ).bind(updated.title, updated.bodyRef, JSON.stringify(updated.mediaRefs), updated.coverRef, nextAccessMode, nextVersion, nextRevision, updated.etag, updatedAt, content.id, principalUserId, content.version, content.etag),
     atomicGuard(db),
     insertRevision(db, {
       id: crypto.randomUUID(),
