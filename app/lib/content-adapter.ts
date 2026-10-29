@@ -199,7 +199,7 @@ export function mapContentToFeedContent(
   sessionToken?: string | null,
 ): FeedContent {
   const creator = { ...(resolvedAuthor ?? {}), ...(item.creator ?? {}), ...(item.author ?? {}) };
-  const userId = item.creatorId || item.ownerUserId || creator?.id || creator?.userId || '';
+  const userId = item.ownerUserId || item.creatorId || creator?.id || creator?.userId || '';
   const createdAt = item.createdAt || item.updatedAt;
   const parsedTime = createdAt ? Date.parse(createdAt) : Number.NaN;
   const postedTime = Number.isFinite(parsedTime) ? Math.floor(parsedTime / 1000) : 0;
