@@ -1,7 +1,4 @@
 /**
-import {
-  parseHyperswitchRfc3339Timestamp,
-} from './hyperswitch-webhook-signature.js';
  * Minimal server-only Hyperswitch Payments API adapter.
  *
  * Server-only Hyperswitch payment adapter: unconfirmed checkout intents,
@@ -12,6 +9,8 @@ import {
  *
  * Upstream API: https://api-reference.hyperswitch.io/v1/payments/payments--create
  */
+
+import { parseHyperswitchRfc3339Timestamp } from './hyperswitch-webhook-signature.js';
 
 export type HyperswitchEnvironment = 'sandbox' | 'production';
 
