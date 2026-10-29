@@ -3,6 +3,7 @@
 import {
   verifyHyperswitchWebhookSignature,
   parseHyperswitchWebhookEnvelope,
+  parseHyperswitchRfc3339Timestamp,
 } from './hyperswitch-webhook-signature.js';
 import type { HyperswitchPayment } from './hyperswitch-client.js';
 import { validateHyperswitchPaymentWebhook } from './hyperswitch-webhook-payment-validation.js';
@@ -787,11 +788,11 @@ function readVerifiedSetupConsent(
     !nonBlank(onlineFacts.user_agent, 1024)
   ) return null;
 
-  const acceptedMillis = Date.parse(accepted.accepted_at);
+  const acceptedMillis = parseHyperswitchRfc3339Timestamp(accepted.accepted_at);
   const paymentCreatedMillis = Date.parse(payment.created_at);
   const nowMillis = Date.parse(now);
   if (
-    !Number.isFinite(acceptedMillis) ||
+    acceptedMillis === null ||
     !Number.isFinite(paymentCreatedMillis) ||
     !Number.isFinite(nowMillis) ||
     acceptedMillis < paymentCreatedMillis ||
