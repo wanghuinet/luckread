@@ -84,6 +84,9 @@ export function canonicalizeJsonForIdempotency(
 
     try {
       if (Array.isArray(current)) {
+        // Reject inherited numeric properties: a handler could read a value
+        // that the canonical JSON (and therefore the hash) would omit.
+        if (Object.getPrototypeOf(current) !== Array.prototype) return invalidValue()
         if (Object.getOwnPropertySymbols(current).length > 0) return invalidValue()
 
         const propertyNames = Object.getOwnPropertyNames(current)

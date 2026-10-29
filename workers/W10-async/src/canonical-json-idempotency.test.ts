@@ -58,6 +58,9 @@ describe('W10 canonical JSON idempotency fingerprint', () => {
 
     const sparse = new Array(2)
     const arrayWithExtra = Object.assign([1], { extra: true })
+    // This array has no own index 0, so JSON canonicalization would otherwise
+    // emit [] even though a handler reading payload[0] sees an inherited value.
+    const arrayWithInheritedIndex = Object.setPrototypeOf([], { 0: 'inherited' })
     const accessor = Object.defineProperty({}, 'secret', {
       enumerable: true,
       get() {
@@ -66,7 +69,7 @@ describe('W10 canonical JSON idempotency fingerprint', () => {
     })
     const symbolKey = { [Symbol('hidden')]: 'value' }
 
-    for (const value of [cyclic, sparse, arrayWithExtra, accessor, symbolKey]) {
+    for (const value of [cyclic, sparse, arrayWithExtra, arrayWithInheritedIndex, accessor, symbolKey]) {
       expect(() => canonicalizeJsonForIdempotency(value, 1024)).toThrowError(
         CanonicalJsonError,
       )
