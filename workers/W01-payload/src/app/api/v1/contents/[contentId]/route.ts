@@ -16,6 +16,7 @@ import {
   callW03Content,
   resolveContentPrincipal,
   resolveOptionalCookieContentPrincipal,
+  resolveVerifiedContentCreatorId,
   W03ContentClientError,
 } from '../../../../../content/w03-content-client.js'
 
@@ -91,12 +92,20 @@ export async function PATCH(
     const mediaValidation = await validateOwnedPostMediaReferences(principal.userId, body, new URL(request.url).origin)
     if ('status' in mediaValidation) return mediaReferenceValidationResponse(mediaValidation)
 
+    let verifiedCreatorId: string | undefined
+    if (body && typeof body === 'object' && !Array.isArray(body) && Object.hasOwn(body, 'accessMode')) {
+      const resolved = await resolveVerifiedContentCreatorId(request, principal)
+      if (resolved instanceof Response) return resolved
+      verifiedCreatorId = resolved
+    }
+
     const response = await callW03Content({
       request,
       pathname: contentPath(contentId),
       method: 'PATCH',
       body,
       principal,
+      verifiedCreatorId,
     })
     if (response.ok) {
       await invalidatePublicContentDetail(request, contentId)
