@@ -458,7 +458,38 @@ describe('subscription runtime', () => {
     const db = fakeDb([], [activePlan('plan_basic', { current_version: 3, owner_id: 'creator_1' })]); const first = await createSubscription(db, 'user_1', { planId: 'plan_basic', idempotencyKey: 'create-1' });
     const second = await createSubscription(db, 'user_1', { planId: 'plan_basic', idempotencyKey: 'create-1' });
     expect(first.subscriptionId).toBe(second.subscriptionId); expect(first.status).toBe('PENDING'); expect(first.planVersion).toBe(3); expect(first.creatorId).toBe('creator_1'); expect(first.version).toBe(1); expect(first.etag).toBe(etagForVersion(1))
+    const material = new TextEncoder().encode('subscription-create\\0user_1\\0create-1')
+    const digest = await crypto.subtle.digest('SHA-256', material)
+    const legacyStableId = 'sub_' + Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('')
+    expect(first.subscriptionId).toBe(legacyStableId)
   })
+  it('rejects inputs that could collide with legacy subscription ID delimiters', async () => {
+    const db = fakeDb([], [activePlan('plan_basic', { owner_id: 'creator_1' })])
+
+    await expect(createSubscription(db, 'user_a\\0b', {
+      planId: 'plan_basic',
+      idempotencyKey: 'key',
+    })).rejects.toMatchObject({ code: 'VALIDATION_FAILED', status: 400 })
+
+    await expect(createSubscription(db, 'user_a', {
+      planId: 'plan_basic',
+      idempotencyKey: 'b\\0key',
+    })).rejects.toMatchObject({ code: 'VALIDATION_FAILED', status: 400 })
+  })
+
+  it('keeps identities distinct when subscriber or idempotency inputs contain NUL', async () => {
+    const db = fakeDb([], [activePlan('plan_basic', { owner_id: 'creator_1' })])
+    const first = await createSubscription(db, 'user_a\u0000b', {
+      planId: 'plan_basic',
+      idempotencyKey: 'key',
+    })
+    const second = await createSubscription(db, 'user_a', {
+      planId: 'plan_basic',
+      idempotencyKey: 'b\u0000key',
+    })
+    expect(first.subscriptionId).not.toBe(second.subscriptionId)
+  })
+
   it('fails closed for missing, inactive, private, or non-creator plans', async () => {
     const cases: MembershipPlanRow[][] = [
       [],

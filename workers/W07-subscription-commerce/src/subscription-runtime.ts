@@ -107,6 +107,11 @@ const nextUpdatedAt = (previous: string): string => {
 }
 
 const subscriptionIdFromIdempotency = async (subscriberId: string, idempotencyKey: string): Promise<string> => {
+  // Preserve existing deterministic IDs for accepted inputs, but reject values
+  // containing the legacy delimiter so a component cannot impersonate a boundary.
+  if (subscriberId.includes('\\0') || idempotencyKey.includes('\\0')) {
+    throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
+  }
   const material = new TextEncoder().encode('subscription-create\\0' + subscriberId + '\\0' + idempotencyKey)
   const digest = await crypto.subtle.digest('SHA-256', material)
   const hex = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('')
