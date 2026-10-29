@@ -87,7 +87,35 @@ export async function POST(
       // Reuse the same W01 body route that enforces current W03/W07 access,
       // verifies the Payload asset owner, and streams a bounded no-store body.
       // Never re-fetch bodyRef directly from the public media hostname here.
-      const bodyResponse = await readAuthorizedContentBody(request, {
+      // Use a canonical body URL rather than the original /social URL:
+      // otherwise a caller-supplied ?preview=1 query would accidentally select
+      // the preview byte limit while the caller is requesting full social text.
+      const bodyUrl = new URL(
+        '/api/v1/contents/' + encodeURIComponent(contentId) + '/body',
+        request.url,
+      )
+      const bodyHeaders = new Headers()
+      for (const name of [
+        'authorization',
+        'cookie',
+        'cf-connecting-ip',
+        'x-forwarded-for',
+        'x-real-ip',
+        'user-agent',
+        'accept-language',
+        'x-luckread-correlation-id',
+      ]) {
+        const headerValue = request.headers.get(name)
+        if (headerValue) bodyHeaders.set(name, headerValue)
+      }
+      bodyHeaders.set('accept', 'text/plain, application/json;q=0.9')
+      const bodyRequest = new Request(bodyUrl, {
+        method: 'GET',
+        headers: bodyHeaders,
+        cache: 'no-store',
+        redirect: 'manual',
+      })
+      const bodyResponse = await readAuthorizedContentBody(bodyRequest, {
         params: Promise.resolve({ contentId }),
       })
       if (!bodyResponse.ok) {
