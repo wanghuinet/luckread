@@ -44,6 +44,12 @@ const splitBodyIntoParagraphs = (value: string): string[] =>
     .map((paragraph) => paragraph.trim())
     .filter(Boolean)
 
+const formatMembershipPrice = (amountMinor: number, currency: string, locale: string): string => {
+  const formatter = new Intl.NumberFormat(locale, { style: 'currency', currency })
+  const fractionDigits = formatter.resolvedOptions().maximumFractionDigits
+  return formatter.format(amountMinor / (10 ** fractionDigits))
+}
+
 export default function ContentDetailPage({
   params,
   initialContent,
@@ -628,7 +634,67 @@ export default function ContentDetailPage({
           ) : null}
         </header>
 
-        {content.contentType === 'video' && content.mediaRefs?.length ? (
+        {membershipLocked ? (
+          <section aria-labelledby="membership-paywall-title" className="m-4 rounded-2xl border border-light-border p-5 dark:border-dark-border">
+            <h2 className="text-lg font-bold" id="membership-paywall-title">
+              {locale === 'en' ? 'Members-only content' : locale === 'tw' ? '會員專屬內容' : '会员专属内容'}
+            </h2>
+            <p className="mt-2 text-sm text-light-secondary dark:text-dark-secondary">
+              {locale === 'en'
+                ? 'Subscribe to this creator to unlock the full text, images and video. Your access is verified by LuckRead after payment.'
+                : locale === 'tw'
+                  ? '訂閱此創作者即可解鎖全文、圖片和影片。付款後由 LuckRead 伺服器確認會員資格。'
+                  : '订阅该创作者即可解锁全文、图片和视频。付款后由 LuckRead 服务器确认会员资格。'}
+            </p>
+            {membershipPlansLoading ? (
+              <p className="mt-4 text-sm" role="status">{locale === 'en' ? 'Loading membership offers…' : locale === 'tw' ? '正在載入會員方案…' : '正在加载会员套餐…'}</p>
+            ) : membershipPlans.length > 0 ? (
+              <div className="mt-4 grid gap-3">
+                {membershipPlans.map((plan) => (
+                  <div className="rounded-xl border border-light-border p-4 dark:border-dark-border" key={plan.planId}>
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div>
+                        <h3 className="font-bold">{plan.name}</h3>
+                        <p className="mt-1 text-sm text-light-secondary dark:text-dark-secondary">
+                          {plan.billingInterval === 'YEARLY'
+                            ? (locale === 'en' ? 'Annual membership' : locale === 'tw' ? '年繳會員' : '年度会员')
+                            : (locale === 'en' ? 'Monthly membership' : locale === 'tw' ? '月繳會員' : '月度会员')}
+                        </p>
+                      </div>
+                      <strong className="text-base">{formatMembershipPrice(plan.priceMinor, plan.currency, dateLocale)}</strong>
+                    </div>
+                    {plan.benefits.length > 0 ? (
+                      <ul className="mt-3 list-disc pl-5 text-sm text-light-secondary dark:text-dark-secondary">
+                        {plan.benefits.map((benefit) => <li key={benefit}>{benefit}</li>)}
+                      </ul>
+                    ) : null}
+                    <button
+                      className="mt-4 rounded-full bg-main-accent px-4 py-2 text-sm font-bold text-white disabled:cursor-wait disabled:opacity-50"
+                      disabled={membershipPurchasePlanId !== null}
+                      onClick={() => void purchaseMembership(plan)}
+                      type="button"
+                    >
+                      {membershipPurchasePlanId === plan.planId
+                        ? (locale === 'en' ? 'Preparing checkout…' : locale === 'tw' ? '正在準備結帳…' : '正在准备结账…')
+                        : (locale === 'en' ? 'Subscribe and pay' : locale === 'tw' ? '訂閱並付款' : '订阅并付款')}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+            {membershipPurchaseError ? (
+              <p className="mt-3 text-sm text-light-secondary dark:text-dark-secondary" role="status">{membershipPurchaseError}</p>
+            ) : null}
+            {!viewerUserId ? (
+              <Link className="mt-4 inline-flex rounded-full border border-light-border px-4 py-2 text-sm font-bold hover:bg-light-primary/10 dark:border-dark-border dark:hover:bg-dark-primary/10"
+                href={'/login?returnTo=' + encodeURIComponent(typeof window === 'undefined' ? '/content/' + content.id : window.location.pathname + window.location.search)}>
+                {locale === 'en' ? 'Sign in to continue' : locale === 'tw' ? '登入後繼續' : '登录后继续'}
+              </Link>
+            ) : null}
+          </section>
+        ) : null}
+
+        {!membershipLocked && content.contentType === 'video' && content.mediaRefs?.length ? (
           <div className="grid gap-1">
             {content.mediaRefs.map((url, index) => (
               <video
@@ -645,7 +711,7 @@ export default function ContentDetailPage({
           </div>
         ) : null}
 
-        {content.contentType !== 'video' && (content.coverRef || (content.mediaRefs?.length && !structuredArticle)) ? (
+        {!membershipLocked && content.contentType !== 'video' && (content.coverRef || (content.mediaRefs?.length && !structuredArticle)) ? (
           <div className="grid gap-1">
             {content.coverRef ? (
               <img alt={content.title + ' ' + copy.detail.cover} className="block max-h-[720px] w-full object-cover" loading="eager" src={content.coverRef} />
@@ -658,7 +724,7 @@ export default function ContentDetailPage({
           </div>
         ) : null}
 
-        {socialTopics.length > 0 || socialMentions.length > 0 ? (
+        {!membershipLocked && (socialTopics.length > 0 || socialMentions.length > 0) ? (
           <section aria-label={copy.detail.tagAria} className="flex flex-wrap gap-2 border-b border-light-border px-4 py-3 dark:border-dark-border">
             {socialTopics.map((topic) => (
               <Link
@@ -681,7 +747,7 @@ export default function ContentDetailPage({
           </section>
         ) : null}
 
-        {!(content.contentType === 'post' && body.trim() === content.title.trim()) ? (
+        {!membershipLocked && !(content.contentType === 'post' && body.trim() === content.title.trim()) ? (
           <div className="px-4 py-4 sm:py-6">
             {structuredArticle ? (
               <ArticleStructuredRenderer document={structuredArticle} />
@@ -695,12 +761,14 @@ export default function ContentDetailPage({
           </div>
         ) : null}
       </article>
-      <ContentComments
-        contentId={content.id}
-        viewerUserId={viewerUserId}
-        interactionRestricted={interactionRestricted}
-        locale={locale}
-      />
+      {!membershipLocked ? (
+        <ContentComments
+          contentId={content.id}
+          viewerUserId={viewerUserId}
+          interactionRestricted={interactionRestricted}
+          locale={locale}
+        />
+      ) : null}
       {reportDialogOpen ? (
         <div
           className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 px-4 py-8"
