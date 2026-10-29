@@ -18,6 +18,7 @@ describe('renewal cycle runtime', () => {
     const next = await renewalCycleIdFor('sub_creator_monthly', CYCLE_END, '2026-12-28T00:00:00.000Z');
 
     expect(first).toMatch(/^rcy_[a-f0-9]{26}$/);
+    expect(first).toBe('rcy_bbae99b2fa87f365e01ecf0dae');
     expect(replay).toBe(first);
     expect(next).not.toBe(first);
     await expect(renewalCycleIdFor('', CYCLE_START, CYCLE_END)).rejects.toMatchObject({ code: 'VALIDATION_FAILED' });
