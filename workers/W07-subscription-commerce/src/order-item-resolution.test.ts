@@ -212,6 +212,18 @@ describe('PAY-002 read-only membership offer resolution', () => {
     expect(queries).toHaveLength(0);
   });
 
+  it('rejects multi-plan orders before charging because Beta fulfills one subscription per order', async () => {
+    const { db, queries } = fakeDb([fixture(planA), fixture(planB)]);
+    await expectRuntimeError(
+      () => resolveCommerceOrderItems(db, {
+        items: [{ itemRef: planA, quantity: 1 }, { itemRef: planB, quantity: 1 }],
+      }),
+      'VALIDATION_FAILED',
+      400,
+    );
+    expect(queries).toHaveLength(0);
+  });
+
   it('rejects client-supplied price, currency and unknown fields before reading D1', async () => {
     const { db, queries } = fakeDb([fixture(planA)]);
     await expectRuntimeError(
