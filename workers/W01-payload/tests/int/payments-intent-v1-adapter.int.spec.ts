@@ -6,6 +6,7 @@ const read = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8'
 const route = read('src/app/api/v1/payments/intents/route.ts')
 const checkout = read('src/app/(frontend)/checkout/CheckoutClient.tsx')
 const resultPage = read('src/app/(frontend)/checkout/result/page.tsx')
+const resultClient = read('src/app/(frontend)/checkout/result/CheckoutResultClient.tsx')
 const w07Client = read('../W07-subscription-commerce/src/hyperswitch-client.ts')
 const w07PaymentRuntime = read('../W07-subscription-commerce/src/payment-intent-http-runtime.ts')
 const w07OrderRuntime = read('../W07-subscription-commerce/src/order-http-runtime.ts')
@@ -75,11 +76,13 @@ describe('public Hyperswitch payment intent adapter', () => {
   })
 
   it('keeps return pages and payment result UI non-authoritative until the later webhook/reconciliation module', () => {
-    expect(checkout).toContain('最终状态仍需服务器核验')
-    expect(checkout).toContain('不会直接开通会员权益')
-    expect(resultPage).toContain('服务器尚需核验支付结果')
-    expect(resultPage).toContain('不会在此页面直接开通会员权益')
-    expect(resultPage).not.toContain('payment_succeeded')
+    expect(checkout).toContain('window.location.assign(returnUrl)')
+    expect(resultClient).toContain('支付 SDK 回调本身不会开通会员权益')
+    expect(resultClient).toContain("'/api/v1/contents/' + encodeURIComponent(contentId)")
+    expect(resultClient).toContain('accessGranted === true')
+    expect(resultClient).toContain('服务器仍未确认会员内容权限。请稍后重试；在 W03 明确授权前，内容会继续保持锁定。')
+    expect(resultPage).toContain('CheckoutResultClient')
+    expect(resultClient).not.toContain('payment_succeeded')
   })
 
   it('keeps public OpenAPI and private W07 transport/routing contracts aligned without topology growth', () => {
