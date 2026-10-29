@@ -59,6 +59,7 @@ describe('TaxJar sandbox demo pricing adapter', () => {
 
     expect(requestUrl).toBe('https://api.sandbox.taxjar.com/v2/taxes');
     expect(requestInit?.method).toBe('POST');
+    expect(requestInit?.redirect).toBe('error');
     const headers = new Headers(requestInit?.headers);
     expect(headers.get('authorization')).toBe('Bearer sandbox-token');
     expect(headers.get('x-api-version')).toBe('2022-01-24');
