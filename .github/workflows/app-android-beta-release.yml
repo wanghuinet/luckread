@@ -1,21 +1,8 @@
 name: LuckRead Android Beta Release
 
 on:
-  # Build a phone-test APK whenever the release workflow or mobile app code changes on main.
-  # This creates a standalone artifact without requiring a manual dispatch step.
-  push:
-    branches:
-      - main
-    paths:
-      - ".github/workflows/app-android-beta-release.yml"
-      - "app/**"
-  # Build a standalone APK for review before merge so the exact PR source has a testable artifact.
-  pull_request:
-    branches:
-      - main
-    paths:
-      - ".github/workflows/app-android-beta-release.yml"
-      - "app/**"
+  # APK compilation is expensive. Run only when explicitly requested; routine PRs
+  # and main pushes use the faster Native App CI and do not build a standalone APK.
   workflow_dispatch:
     inputs:
       version_name:
@@ -38,10 +25,9 @@ permissions:
   contents: write
 
 concurrency:
-  # PR builds are keyed by PR number and superseded commits are cancelled.
-  # Main/manual release builds stay serialized on their ref.
-  group: luckread-android-beta-release-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  # Explicit manual APK builds are serialized per selected ref.
+  group: luckread-android-beta-release-${{ github.ref }}
+  cancel-in-progress: false
 
 env:
   EXPO_NO_TELEMETRY: "1"
