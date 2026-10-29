@@ -469,8 +469,9 @@ export async function apiRequest<T>(
 
 
 /**
- * Fetch a trusted W03 body reference through the shared native transport boundary.
- * This is for content-body text only; ordinary API calls must use apiRequest.
+ * Fetch body bytes through W01's canonical content endpoint. W01 re-reads the
+ * content in W03 and only streams the opaque R2 body reference if the current
+ * caller is authorized. Raw bodyRef URLs are never dereferenced by this helper.
  */
 export async function fetchContentBodyById(
   contentId: string,
