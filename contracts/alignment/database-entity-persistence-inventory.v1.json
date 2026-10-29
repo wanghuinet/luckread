@@ -253,6 +253,32 @@
         "contracts/entity/ORDER-LINE-ENTITY-CONTRACT.v1.json",
         "workers/W01-payload/tests/int/commerce-order-v1-adapter.int.spec.ts"
       ]
+    },
+    {
+      "entityId": "ENT-PAYMENT",
+      "entityName": "Payment",
+      "domainId": "D1-04",
+      "entityStatus": "PROPOSED",
+      "implementationRef": "workers/W07-subscription-commerce/src/payment-persistence.ts; workers/W07-subscription-commerce/src/payment-intent-http-runtime.ts; workers/W07-subscription-commerce/src/payment-webhook-http-runtime.ts",
+      "persistenceStatus": "NOT_VERIFIED",
+      "adapter": "Cloudflare D1 (D1-04) / W07 D1_04 binding; candidate-only until the remote migration and read-back evidence are admitted",
+      "migrationRefs": [
+        "workers/W07-subscription-commerce/migrations-d1-04/0002_payment_provider_events.sql"
+      ],
+      "fieldContractRef": "contracts/entity/PAYMENT-ENTITY-CONTRACT.v1.json",
+      "persistenceContractRef": "contracts/persistence/PAYMENT-D1-04-persistence.v1.json",
+      "evidenceRefs": [
+        "contracts/entity/entity-catalog.v1.json",
+        "contracts/entity/PAYMENT-ENTITY-CONTRACT.v1.json",
+        "contracts/persistence/PAYMENT-D1-04-persistence.v1.json",
+        "contracts/state-machines/payment.json",
+        "workers/W07-subscription-commerce/migrations-d1-04/0002_payment_provider_events.sql",
+        "workers/W07-subscription-commerce/src/payment-persistence.ts",
+        "workers/W07-subscription-commerce/src/payment-persistence.test.ts",
+        "workers/W07-subscription-commerce/src/payment-intent-http-runtime.ts",
+        "workers/W07-subscription-commerce/src/payment-webhook-http-runtime.ts",
+        "workers/W07-subscription-commerce/src/payment-webhook-http-runtime.test.ts"
+      ]
     }
   ],
   "rules": {
@@ -272,6 +298,7 @@
     "Step 03 remains NOT_GREEN until implementation, migration, authority and completeness evidence are reconciled.",
     "ENT-IDENTITY remains PROPOSED because no production identity materialization/ownership implementation is independently evidenced; AUTH-003 credential runtime consumes pre-existing auth_identities rows.",
     "ModerationCase/ModerationDecision persistence is contract-defined but remains unexecuted and unverified until migration and runtime evidence are admitted.",
-    "ENT-ORDER and ENT-ORDER-LINE now have explicit D1-04 source/migration references, but the migration remains a repository candidate and remote schema/read-back evidence is absent; both persistence records remain NOT_VERIFIED."
+    "ENT-ORDER and ENT-ORDER-LINE now have explicit D1-04 source/migration references, but the migration remains a repository candidate and remote schema/read-back evidence is absent; both persistence records remain NOT_VERIFIED.",
+    "ENT-PAYMENT is now explicitly inventoried against the PAY-001 entity/persistence contracts and W07 source/tests; persistence remains NOT_VERIFIED because migration 0002 is candidate-only and exact remote D1-04 migration/schema/read-back evidence is absent."
   ]
 }
