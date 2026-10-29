@@ -99,8 +99,8 @@ const contentAuthorIds = (item: JsonRecord): string[] => {
   const creator = asRecord(item.creator)
   const author = asRecord(item.author)
   return [
-    item.creatorId,
     item.ownerUserId,
+    item.creatorId,
     creator?.id,
     creator?.userId,
     author?.id,
