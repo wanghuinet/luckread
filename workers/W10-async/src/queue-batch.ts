@@ -1,3 +1,5 @@
+import { calculateRetryDelaySeconds, classifyQueueFailure } from './retry-policy.js'
+
 /**
  * W10 queue batch execution primitive.
  *
@@ -12,8 +14,9 @@
 
 export interface QueueMessageLike<TBody> {
   readonly body: TBody
+  readonly attempts?: number
   ack(): void
-  retry(): void
+  retry(options?: { delaySeconds: number }): void
 }
 
 export interface QueueBatchLike<TBody> {
@@ -26,17 +29,23 @@ export interface QueueBatchResult {
   retried: number
 }
 
+export interface QueueBatchOptions {
+  /** Injectable only to make retry-delay tests deterministic. */
+  random?: () => number
+}
+
 /**
  * Execute messages serially in the order delivered by the Queue.
  *
  * A failed task is retried individually and does not prevent later messages in
- * the same batch from running. If Queue acknowledgement/retry control itself
- * throws, let that error escape so the platform can fail the batch rather than
- * accidentally treating an unhandled message as successfully processed.
+ * the same batch from running. Retry delay is derived from Cloudflare's attempt
+ * count and the explicit task failure class; the platform still enforces the
+ * configured retry limit and DLQ route. Queue control failures escape.
  */
 export async function processQueueBatch<TBody>(
   batch: QueueBatchLike<TBody>,
   execute: (body: TBody) => Promise<void>,
+  options: QueueBatchOptions = {},
 ): Promise<QueueBatchResult> {
   const result: QueueBatchResult = {
     attempted: 0,
@@ -49,8 +58,14 @@ export async function processQueueBatch<TBody>(
 
     try {
       await execute(message.body)
-    } catch {
-      message.retry()
+    } catch (error) {
+      const failureClass = classifyQueueFailure(error)
+      const delaySeconds = calculateRetryDelaySeconds(
+        message.attempts ?? 1,
+        failureClass,
+        options.random,
+      )
+      message.retry({ delaySeconds })
       result.retried += 1
       continue
     }
