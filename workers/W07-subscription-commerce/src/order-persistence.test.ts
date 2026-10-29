@@ -215,6 +215,35 @@ describe('PAY-002 atomic D1-04 order persistence candidate', () => {
     expect(db.state.orders).toHaveLength(1);
   });
 
+  it('replays the same basket when the client changes item array order', async () => {
+    const db = new MemoryD1();
+    const firstRequest = { items: [
+      { itemRef: 'plan_b', quantity: 1 },
+      { itemRef: 'plan_a', quantity: 2 },
+    ] };
+    const reorderedRequest = { items: [
+      { itemRef: 'plan_a', quantity: 2 },
+      { itemRef: 'plan_b', quantity: 1 },
+    ] };
+    let resolverCalls = 0;
+    const resolver = async (req: { items: readonly { itemRef: string; quantity: number }[] }) => {
+      resolverCalls += 1;
+      return pricingFor(req);
+    };
+
+    const first = await createCommerceOrder(db as unknown as D1Database, 'user_1', 'basket_order',
+      firstRequest, resolver, deterministicDependencies('first'));
+    const replay = await createCommerceOrder(db as unknown as D1Database, 'user_1', 'basket_order',
+      reorderedRequest, resolver, deterministicDependencies('retry'));
+
+    expect(replay.replayed).toBe(true);
+    expect(replay.data).toEqual(first.data);
+    expect(resolverCalls).toBe(1);
+    expect(db.batchCalls).toBe(1);
+    expect(db.state.orders).toHaveLength(1);
+    expect(db.state.lines).toHaveLength(2);
+  });
+
   it('rejects same-key semantic payload changes before authoritative resolution', async () => {
     const db = new MemoryD1();
     await createCommerceOrder(db as unknown as D1Database, 'user_1', 'key_1', request,
