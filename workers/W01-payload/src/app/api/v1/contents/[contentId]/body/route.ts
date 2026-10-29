@@ -1,4 +1,6 @@
 import { getCloudflareContext } from '@opennextjs/cloudflare'
+import { getPayload } from 'payload'
+import config from '@payload-config'
 import { TrafficLimitError, enforcePublicReadRateLimit, rateLimitResponse } from '@/auth/traffic-limit'
 import {
   callW03Content,
@@ -20,6 +22,51 @@ type ContentBodyR2Bucket = {
 
 const BODY_PREVIEW_MAX_BYTES = 40_000
 const BODY_DETAIL_MAX_BYTES = 1_048_576
+
+async function isBodyAssetOwnedByContentOwner(
+  bodyRef: string,
+  filename: string,
+  ownerIdentityId: string,
+): Promise<boolean> {
+  try {
+    const payload = await getPayload({ config })
+    const profileResult = await payload.find({
+      collection: 'users',
+      where: { identityId: { equals: ownerIdentityId } },
+      limit: 1,
+      page: 1,
+      depth: 0,
+      overrideAccess: true,
+    })
+    const profileId = profileResult.docs[0]?.id
+    if (profileId === undefined || profileId === null) return false
+    const ownerId = String(profileId)
+
+    const mediaResult = await payload.find({
+      collection: 'media',
+      where: {
+        and: [
+          { filename: { equals: filename } },
+          { ownerUserId: { equals: ownerId } },
+        ],
+      },
+      limit: 2,
+      page: 1,
+      depth: 0,
+      overrideAccess: true,
+    })
+    // Verify the exact generated URL, not just the filename. A content row must
+    // never point at another user's R2 object, even if the caller is a member.
+    return mediaResult.docs.some((doc) =>
+      String(doc.ownerUserId ?? '') === ownerId &&
+      String(doc.filename ?? '') === filename &&
+      typeof doc.url === 'string' &&
+      doc.url === bodyRef,
+    )
+  } catch {
+    return false
+  }
+}
 
 const privateError = (status: number, code: string) => Response.json({
   error: { code, message: 'Content body unavailable', details: {} },
@@ -81,7 +128,7 @@ export async function GET(
 
     const contentResponse = await callW03Content({
       request,
-      pathname: '/internal/content/contents/' + encodeURIComponent(contentId),
+      pathname: '/internal/content/contents/' + encodeURIComponent(contentId) + '?bodyContext=1',
       method: 'GET',
       principal,
     })
@@ -96,7 +143,10 @@ export async function GET(
       return privateError(503, 'SERVICE_UNAVAILABLE')
     }
     const content = value as Record<string, unknown>
-    if (typeof content.id !== 'string' ||
+    if (typeof content.contentId !== 'string' ||
+        typeof content.ownerUserId !== 'string' ||
+        !content.ownerUserId ||
+        (content.accessMode !== 'PUBLIC' && content.accessMode !== 'MEMBERS_ONLY') ||
         (content.accessMode === 'MEMBERS_ONLY' && content.accessGranted !== true) ||
         typeof content.bodyRef !== 'string' || !content.bodyRef) {
       // Use the same response for absent and denied bodies; do not reveal whether
@@ -106,6 +156,12 @@ export async function GET(
 
     const resolved = resolveBodyObjectKey(content.bodyRef)
     if (!resolved) return privateError(404, 'NOT_FOUND')
+    const filename = resolved.key.slice(resolved.key.lastIndexOf('/') + 1)
+    // W03 owns content authority; W01's existing Payload Media collection owns
+    // R2 asset ownership. Both checks are required before the body bytes are read.
+    if (!await isBodyAssetOwnedByContentOwner(content.bodyRef, filename, content.ownerUserId)) {
+      return privateError(404, 'NOT_FOUND')
+    }
 
     const url = new URL(request.url)
     const previewOnly = url.searchParams.get('preview') === '1'
