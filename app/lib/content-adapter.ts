@@ -27,6 +27,8 @@ export type ApiContentRecord = {
   creatorId?: string | null;
   contentType?: 'article' | 'post' | 'video' | string;
   state?: string;
+  accessMode?: 'PUBLIC' | 'MEMBERS_ONLY' | string;
+  accessGranted?: boolean;
   title?: string;
   body?: string | null;
   bodyText?: string | null;
@@ -229,6 +231,8 @@ export function mapContentToFeedContent(
   return {
     contentId: item.id,
     contentType: item.contentType,
+    accessMode: item.accessMode,
+    accessGranted: item.accessGranted,
     etag: item.etag,
     ownerUserId: item.ownerUserId,
     creatorId: item.creatorId,
