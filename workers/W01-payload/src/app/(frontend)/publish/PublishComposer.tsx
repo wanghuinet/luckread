@@ -579,6 +579,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
         setSavedArticleSerialized('')
       }
 
+      const accessModeChanged = memberOnly !== (currentDraft?.accessMode === 'MEMBERS_ONLY')
       const payload = {
         contentType: type,
         title: effectiveContentTitle(),
@@ -595,8 +596,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
         ),
         // Preserve backward-compatible public writes. Only Creator Center sends
         // accessMode to W03 when enabling or explicitly removing an existing paywall.
-        ...(contentBasePath === '/api/creator/contents' &&
-            (memberOnly || currentDraft?.accessMode === 'MEMBERS_ONLY')
+        ...(contentBasePath === '/api/creator/contents' && accessModeChanged
           ? { accessMode: memberOnly ? 'MEMBERS_ONLY' as const : 'PUBLIC' as const }
           : {}),
       }
