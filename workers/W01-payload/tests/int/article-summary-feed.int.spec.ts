@@ -104,10 +104,16 @@ describe('article summary card preview', () => {
     )).resolves.toBeNull()
   })
 
-  it('routes social-token body reads through the bounded trusted-reference reader', () => {
+  it('routes social-token body reads through the W03/W07-authorized body endpoint', () => {
     const route = read('src/app/api/v1/contents/[contentId]/social/route.ts')
-    expect(route).toContain('readTrustedArticleBodyForSocialTokens')
+    const bodyRoute = read('src/app/api/v1/contents/[contentId]/body/route.ts')
+    expect(route).toContain("import { GET as readAuthorizedContentBody } from '../body/route.js'")
+    expect(route).toContain('await readAuthorizedContentBody(request')
+    expect(route).not.toContain('readTrustedArticleBodyForSocialTokens')
     expect(route).not.toContain('fetch(record.bodyRef)')
+    expect(bodyRoute).toContain('await callW03Content(')
+    expect(bodyRoute).toContain('isBodyAssetOwnedByContentOwner')
+    expect(bodyRoute).toContain("'cache-control': 'private, no-store'")
   })
 
   it('adds the summary component to both home and discovery cards without replacing the content API', () => {
