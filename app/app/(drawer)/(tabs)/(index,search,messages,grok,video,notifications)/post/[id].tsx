@@ -1,5 +1,5 @@
 import React, { useState, useRef, useMemo, useCallback, useEffect } from 'react';
-import { Alert, View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import { Alert, Linking, View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { useLocalSearchParams, Stack, useRouter } from 'expo-router';
 import { FeedItem, FeedContent } from '~/components/FeedItem';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -267,7 +267,13 @@ export default function PostDetailScreen() {
 
                 const sessionToken = await readSessionToken().catch(() => null);
                 if (!active || controller.signal.aborted) return;
-                const body = await readContentBody(hydratedRecord, controller.signal, sessionToken);
+                const membershipLocked = hydratedRecord.accessMode === 'MEMBERS_ONLY' &&
+                    hydratedRecord.accessGranted !== true;
+                // Never attempt to resolve a protected body reference when the
+                // canonical W03->W07 decision denies access or is absent.
+                const body = membershipLocked
+                    ? ''
+                    : await readContentBody(hydratedRecord, controller.signal, sessionToken);
                 if (!active || controller.signal.aborted) return;
                 setFindPost(mapContentToFeedContent(hydratedRecord, body, social, null, sessionToken));
             } catch (error) {
@@ -318,24 +324,50 @@ export default function PostDetailScreen() {
                 contentContainerStyle={{ flexGrow: 1 }}
             >
                 <PostHeader username={authorHandle} targetUserId={findPost.creatorId || findPost.ownerUserId} contentId={postId} postId={postId} />
-                <FeedItem itemData={findPost} detailView onCommentPress={handleScrollToComments} />
-                <View
-                    className="px-4 mt-2"
-                    onLayout={(event) => {
-                        commentsOffsetRef.current = event.nativeEvent.layout.y;
-                    }}
-                >
-                    <TouchableOpacity
-                        onPress={handlePresentModalPress}
-                        className="flex-row items-center mb-3"
-                    >
-                        <Text className="text-base font-bold text-neutral-500 dark:text-blue-400 mr-1">
-                            {sortOptions[selectedSort]}
+                {findPost.accessMode === 'MEMBERS_ONLY' && findPost.accessGranted !== true ? (
+                    <View className="mx-4 mt-4 rounded-2xl border border-neutral-200 dark:border-neutral-800 p-5">
+                        <Feather name="lock" size={26} color="#0EA5E9" />
+                        <Text className="mt-3 text-xl font-bold text-black dark:text-white">
+                            {findPost.message.split('\n')[0] || '会员专属内容'}
                         </Text>
-                        <Feather name="chevron-down" size={18} color={'#536471'} />
-                    </TouchableOpacity>
-                    <Comments contentId={postId} sort={selectedSort} />
-                </View>
+                        <Text className="mt-2 text-sm leading-5 text-neutral-600 dark:text-neutral-300">
+                            {'此内容仅限该创作者的有效会员访问。付款后由 LuckRead 服务器确认订阅状态；没有确认前不会展示正文、图片或视频。'}
+                        </Text>
+                        <TouchableOpacity
+                            accessibilityRole="button"
+                            className="mt-5 items-center rounded-full bg-sky-500 px-5 py-3"
+                            onPress={() => {
+                                const url = 'https://luckread.com/content/' + encodeURIComponent(postId);
+                                void Linking.openURL(url).catch(() => {
+                                    Alert.alert('无法打开订阅页面', '请在浏览器访问 LuckRead.com 后重试。');
+                                });
+                            }}
+                        >
+                            <Text className="font-bold text-white">查看会员套餐并订阅</Text>
+                        </TouchableOpacity>
+                    </View>
+                ) : (
+                    <>
+                        <FeedItem itemData={findPost} detailView onCommentPress={handleScrollToComments} />
+                        <View
+                            className="px-4 mt-2"
+                            onLayout={(event) => {
+                                commentsOffsetRef.current = event.nativeEvent.layout.y;
+                            }}
+                        >
+                            <TouchableOpacity
+                                onPress={handlePresentModalPress}
+                                className="flex-row items-center mb-3"
+                            >
+                                <Text className="text-base font-bold text-neutral-500 dark:text-blue-400 mr-1">
+                                    {sortOptions[selectedSort]}
+                                </Text>
+                                <Feather name="chevron-down" size={18} color={'#536471'} />
+                            </TouchableOpacity>
+                            <Comments contentId={postId} sort={selectedSort} />
+                        </View>
+                    </>
+                )}
             </ScrollView>
 
             <BottomSheetModal
