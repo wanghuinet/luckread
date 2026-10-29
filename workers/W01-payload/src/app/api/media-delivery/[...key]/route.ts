@@ -1,6 +1,6 @@
 import { getCloudflareContext } from '@opennextjs/cloudflare'
 import { GET as payloadMediaGet } from '../../../(payload)/api/[...slug]/route'
-import { callW03Content } from '../../../../content/w03-content-client'
+import { callW03Content, resolveOptionalCookieContentPrincipal } from '../../../../content/w03-content-client'
 import {
   mediaHostKind,
   mediaTypeAllowed,
@@ -68,12 +68,24 @@ async function deliver(request: Request, context: { params: Promise<{ key: strin
   // W03 owns publication state and is the only authority that can authorize
   // anonymous delivery. A W03 error must not fall through to public R2 reads.
   const publicUrl = 'https://' + hostname + '/' + segments.map(encodeURIComponent).join('/')
+  let principal: Awaited<ReturnType<typeof resolveOptionalCookieContentPrincipal>> = null
+  try {
+    const resolved = await resolveOptionalCookieContentPrincipal(request)
+    // An expired/invalid session still behaves as anonymous. Other auth errors
+    // do not grant member access, but need not block genuinely public media.
+    if (!(resolved instanceof Response)) principal = resolved
+    else if (resolved.status !== 401) principal = null
+  } catch {
+    principal = null
+  }
+
   let visibility: Response
   try {
     visibility = await callW03Content({
       request,
       pathname: '/internal/content/public-media-reference?url=' + encodeURIComponent(publicUrl),
       method: 'GET',
+      principal,
     })
   } catch {
     return privateError(503, 'SERVICE_UNAVAILABLE')
@@ -92,8 +104,21 @@ async function deliver(request: Request, context: { params: Promise<{ key: strin
   const data = envelope?.data && typeof envelope.data === 'object'
     ? envelope.data as Record<string, unknown>
     : null
+  if (typeof data?.isPublic !== 'boolean' ||
+      typeof data?.isMemberContent !== 'boolean' ||
+      typeof data?.allowed !== 'boolean') {
+    return privateError(503, 'SERVICE_UNAVAILABLE')
+  }
 
-  if (data?.isPublic !== true) return privateOwnerDelivery(request, key, headOnly)
+  const memberOnlyDelivery = data.isMemberContent === true && data.allowed === true
+  if (data.isMemberContent === true && !memberOnlyDelivery) {
+    // Member-only media is never sent to the owner-only Payload fallback for
+    // a non-member reader. That path is reserved for standalone private assets.
+    return privateError(404, 'NOT_FOUND')
+  }
+  if (data.isPublic !== true && !memberOnlyDelivery) {
+    return privateOwnerDelivery(request, key, headOnly)
+  }
 
   let bucket: R2MediaBucket | undefined
   try {
@@ -140,9 +165,10 @@ async function deliver(request: Request, context: { params: Promise<{ key: strin
   headers.set('content-type', contentType)
   headers.set('x-content-type-options', 'nosniff')
   headers.set('accept-ranges', 'bytes')
-  // Keep cache lifetimes bounded until visibility-change cache invalidation is
-  // implemented; do not let an unpublished post leave a long-lived public copy.
-  headers.set('cache-control', 'public, max-age=0, must-revalidate')
+  // Member-gated media is always private and non-cacheable. Public media keeps
+  // the current revalidation policy and CDN no-store behavior until invalidation
+  // is admitted across the content outbox and edge cache.
+  headers.set('cache-control', memberOnlyDelivery ? 'private, no-store' : 'public, max-age=0, must-revalidate')
   headers.set('cdn-cache-control', 'no-store')
   headers.set('content-length', String(range?.length ?? metadata.size))
   if (object.httpEtag) headers.set('etag', object.httpEtag)
