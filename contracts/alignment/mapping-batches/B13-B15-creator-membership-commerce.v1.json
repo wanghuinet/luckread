@@ -214,7 +214,7 @@
     },
     {
       "featureId": "PAY-002",
-      "status": "UNRESOLVED",
+      "status": "PARTIAL",
       "evidenceRefs": [
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
         "contracts/entity/ORDER-ENTITY-CONTRACT.v1.json",
@@ -230,14 +230,28 @@
         "workers/W07-subscription-commerce/src/order-request-validation.ts",
         "workers/W07-subscription-commerce/src/order-request-validation.test.ts",
         "contracts/candidates/PAY-002/order-commerce-api.v1.json",
-        "contracts/candidates/PAY-002/order-api-admission.v1.json"
+        "contracts/candidates/PAY-002/order-api-admission.v1.json",
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/openapi/v1/operation-policy.json",
+        "contracts/alignment/api-inventory.v1.json",
+        "contracts/entity/entity-implementation-evidence.v1.json",
+        "workers/W01-payload/src/app/api/v1/commerce/orders/route.ts",
+        "workers/W01-payload/src/app/api/v1/commerce/orders/[orderId]/route.ts",
+        "workers/W01-payload/src/commerce/w07-commerce-client.ts",
+        "workers/W01-payload/tests/int/commerce-order-v1-adapter.int.spec.ts",
+        "workers/W07-subscription-commerce/src/order-http-runtime.ts",
+        "workers/W07-subscription-commerce/src/order-http-runtime.test.ts",
+        "workers/W07-subscription-commerce/src/order-persistence.ts",
+        "workers/W07-subscription-commerce/src/order-persistence.test.ts",
+        "workers/W07-subscription-commerce/src/order-item-resolution.ts",
+        "workers/W07-subscription-commerce/src/order-item-resolution.test.ts"
       ],
       "blockers": [
-        "The membership-plan resolver currently supports only active/public immutable-version MembershipPlan offers; CONTENT, DIGITAL_GOOD and BUNDLE remain fail-closed until their authoritative owner/price adapters are separately admitted.",
-        "The exact D1-04 UUID/display name and read-only schema snapshot are verified on main commit 115c7165f3a618fb9527be8030db378476d3740d. The isolated D1-04 order schema is only a source candidate; remote migration and post-migration schema evidence remain pending.",
-        "D1-04 Order/OrderLine persistence runtime and atomic order-create idempotency replay/key-conflict behavior are not implemented; public order runtime handlers remain disabled.",
-        "Exact-commit runtime evidence is still missing for positive/negative create/read, owner isolation, price spoofing, idempotency replay/conflict, concurrent duplicate requests, stale in-progress recovery, and failure handling.",
-        "PAY-002 remains UNRESOLVED until persistence, security, reconciliation and Evidence Registry evidence pass; no payment confirmation or entitlement grant may be inferred from order state."
+        "The W01 POST /commerce/orders and GET /commerce/orders/{orderId} adapters, W07 order HTTP runtime, D1-04 persistence candidate, request validation, pricing resolution, and automated source-level tests are present. These establish source/test traceability only, not production runtime admission.",
+        "D1-04 order and provider-event/mandate/renewal migrations are candidate files; production migration history and post-migration schema evidence remain pending. Do not execute remote migration without an explicit approved workflow address and parameters.",
+        "Order creation stays fail-closed unless an explicitly selected authoritative demo-pricing/tax adapter is configured. Production pricing/tax settings and provider secrets have not been verified in this review.",
+        "Exact-commit D1-backed integration/security evidence is still needed for create/read, owner isolation, price spoofing, idempotency replay/key conflict, concurrent duplicate requests, stale IN_PROGRESS recovery, and failure rollback.",
+        "The paid-membership fulfillment flow only admits single-line MembershipPlan orders in this Beta path. Unsupported item families must remain fail-closed."
       ]
     },
     {
