@@ -1,4 +1,7 @@
 /**
+import {
+  parseHyperswitchRfc3339Timestamp,
+} from './hyperswitch-webhook-signature.js';
  * Minimal server-only Hyperswitch Payments API adapter.
  *
  * Server-only Hyperswitch payment adapter: unconfirmed checkout intents,
@@ -448,8 +451,7 @@ export async function confirmHyperswitchCustomerInitiatedSetupPayment(
     typeof acceptedAt !== 'string' ||
     acceptedAt.length > 64 ||
     acceptedAt.trim() !== acceptedAt ||
-    !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})$/.test(acceptedAt) ||
-    !Number.isFinite(Date.parse(acceptedAt))
+    parseHyperswitchRfc3339Timestamp(acceptedAt) === null
   ) {
     throw new HyperswitchClientError('REQUEST_INVALID', 'Customer acceptance timestamp is invalid.');
   }
