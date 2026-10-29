@@ -4,12 +4,10 @@ import { useEffect, useRef, useState } from 'react'
 
 import { apiFetch } from '../lib/client-api.js'
 
-import {
-  extractArticleSummary,
-  resolvePublicArticleBodyUrl,
-} from '../lib/article-summary-preview.js'
+import { extractArticleSummary } from '../lib/article-summary-preview.js'
 
 type Props = {
+  contentId: string
   bodyRef?: string | null
   label: string
 }
@@ -18,14 +16,14 @@ type Props = {
  * Lazily loads an article's existing public body file only as its summary
  * preview approaches the viewport. It never mutates content or adds an API.
  */
-export default function ArticleSummaryPreview({ bodyRef, label }: Props) {
+export default function ArticleSummaryPreview({ contentId, bodyRef, label }: Props) {
   const rootRef = useRef<HTMLDivElement | null>(null)
   const [summary, setSummary] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [failed, setFailed] = useState(false)
 
   useEffect(() => {
-    if (!bodyRef) return
+    if (!bodyRef || !contentId) return
 
     const root = rootRef.current
     if (!root) return
@@ -36,18 +34,13 @@ export default function ArticleSummaryPreview({ bodyRef, label }: Props) {
     const load = async () => {
       if (started) return
       started = true
-      const url = resolvePublicArticleBodyUrl(bodyRef, window.location.origin)
-      if (!url) {
-        setFailed(true)
-        return
-      }
-
+      const url = `/api/v1/contents/${encodeURIComponent(contentId)}/body?preview=1`
       setLoading(true)
       try {
         const response = await apiFetch(url, {
           method: 'GET',
-          credentials: 'omit',
-          cache: 'force-cache',
+          credentials: 'include',
+          cache: 'no-store',
           referrerPolicy: 'no-referrer',
           signal: controller.signal,
         })
@@ -85,7 +78,7 @@ export default function ArticleSummaryPreview({ bodyRef, label }: Props) {
       observer.disconnect()
       controller.abort()
     }
-  }, [bodyRef])
+  }, [bodyRef, contentId])
 
   if (!bodyRef || (!loading && failed)) return null
 
