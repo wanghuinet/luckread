@@ -61,6 +61,7 @@
           "rules": [
             "customerId, itemType, itemVersion, currency, prices, discount, tax, totals, payment status and provider identifiers are not accepted from the client.",
             "Repeated itemRef entries in one request are rejected; clients must send one line with the combined quantity.",
+            "For idempotency hashing, unique items are sorted by itemRef using deterministic code-unit ordering; changing only the order of the items array does not change basket identity.",
             "The same authenticated customer + operation + Idempotency-Key + semantic request hash replays the first completed response; key reuse with a different request hash is rejected.",
             "Item kind, immutable item version, currency, unit price, discounts and tax are server-resolved. Unsupported or unresolved items fail closed."
           ]
