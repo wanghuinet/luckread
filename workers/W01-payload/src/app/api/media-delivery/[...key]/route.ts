@@ -1,6 +1,6 @@
 import { getCloudflareContext } from '@opennextjs/cloudflare'
 import { GET as payloadMediaGet } from '../../../(payload)/api/[...slug]/route'
-import { callW03Content, resolveOptionalCookieContentPrincipal } from '../../../../content/w03-content-client'
+import { callW03Content, resolveOptionalCookieContentPrincipal, type ContentPrincipal } from '../../../../content/w03-content-client'
 import {
   mediaHostKind,
   mediaTypeAllowed,
@@ -68,7 +68,7 @@ async function deliver(request: Request, context: { params: Promise<{ key: strin
   // W03 owns publication state and is the only authority that can authorize
   // anonymous delivery. A W03 error must not fall through to public R2 reads.
   const publicUrl = 'https://' + hostname + '/' + segments.map(encodeURIComponent).join('/')
-  let principal: Awaited<ReturnType<typeof resolveOptionalCookieContentPrincipal>> = null
+  let principal: ContentPrincipal | null = null
   try {
     const resolved = await resolveOptionalCookieContentPrincipal(request)
     // An expired/invalid session still behaves as anonymous. Other auth errors
