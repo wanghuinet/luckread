@@ -199,6 +199,58 @@ describe('PAY-002 atomic D1-04 order persistence candidate', () => {
     expect(fetched.taxMinor).toBe(60);
   });
 
+  it('rejects zero-priced lines and zero-total baskets before writing an Order', async () => {
+    const zeroPriceDb = new MemoryD1();
+    const zeroPrice: typeof pricingFor = async (req) => ({
+      currency: 'USD',
+      items: req.items.map((item) => ({
+        itemType: 'MEMBERSHIP_PLAN',
+        itemRef: item.itemRef,
+        itemVersion: '1',
+        quantity: item.quantity,
+        unitAmountMinor: 0,
+        currency: 'USD',
+        lineDiscountMinor: 0,
+        lineTaxMinor: 0,
+        itemSnapshotJson: JSON.stringify({ planId: item.itemRef, planVersion: 1 }),
+      })),
+    });
+    const zeroPriceError = await createCommerceOrder(
+      zeroPriceDb as unknown as D1Database, 'user_1', 'zero_price_key', request,
+      zeroPrice, deterministicDependencies('zero_price'),
+    ).then(() => null, (error: unknown) => error);
+    expect(errorCode(zeroPriceError)).toBe('CONFLICT');
+    expect(zeroPriceDb.batchCalls).toBe(0);
+    expect(zeroPriceDb.state.orders).toHaveLength(0);
+    expect(zeroPriceDb.state.lines).toHaveLength(0);
+    expect(zeroPriceDb.state.idempotency).toHaveLength(0);
+
+    const fullyDiscountedDb = new MemoryD1();
+    const fullyDiscounted: typeof pricingFor = async (req) => ({
+      currency: 'USD',
+      items: req.items.map((item) => ({
+        itemType: 'MEMBERSHIP_PLAN',
+        itemRef: item.itemRef,
+        itemVersion: '1',
+        quantity: item.quantity,
+        unitAmountMinor: 1200,
+        currency: 'USD',
+        lineDiscountMinor: 1200,
+        lineTaxMinor: 0,
+        itemSnapshotJson: JSON.stringify({ planId: item.itemRef, planVersion: 1 }),
+      })),
+    });
+    const discountedError = await createCommerceOrder(
+      fullyDiscountedDb as unknown as D1Database, 'user_1', 'zero_total_key', request,
+      fullyDiscounted, deterministicDependencies('zero_total'),
+    ).then(() => null, (error: unknown) => error);
+    expect(errorCode(discountedError)).toBe('CONFLICT');
+    expect(fullyDiscountedDb.batchCalls).toBe(0);
+    expect(fullyDiscountedDb.state.orders).toHaveLength(0);
+    expect(fullyDiscountedDb.state.lines).toHaveLength(0);
+    expect(fullyDiscountedDb.state.idempotency).toHaveLength(0);
+  });
+
   it('replays a completed request without resolving a now-retired offer or writing again', async () => {
     const db = new MemoryD1();
     const first = await createCommerceOrder(db as unknown as D1Database, 'user_1', 'key_1', request,

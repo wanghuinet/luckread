@@ -63,6 +63,7 @@
             "Repeated itemRef entries in one request are rejected; clients must send one line with the combined quantity.",
             "For idempotency hashing, unique items are sorted by itemRef using deterministic code-unit ordering; changing only the order of the items array does not change basket identity.",
             "The same authenticated customer + operation + Idempotency-Key + semantic request hash replays the first completed response; key reuse with a different request hash is rejected.",
+            "This paid-checkout path rejects any zero-priced item and any computed order total below one minor currency unit until a separate zero-charge fulfillment contract is admitted.",
             "Item kind, immutable item version, currency, unit price, discounts and tax are server-resolved. Unsupported or unresolved items fail closed."
           ]
         }
@@ -155,7 +156,7 @@
         },
         "unitAmountMinor": {
           "type": "integer",
-          "minimum": 0
+          "minimum": 1
         },
         "lineSubtotalMinor": {
           "type": "integer",
@@ -235,7 +236,7 @@
         },
         "totalMinor": {
           "type": "integer",
-          "minimum": 0
+          "minimum": 1
         },
         "items": {
           "type": "array",

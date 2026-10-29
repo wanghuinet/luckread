@@ -416,6 +416,10 @@ const validatePricing = (
     }
 
     const unit = assertSafeMinor(item.unitAmountMinor, 'unitAmountMinor');
+    // PAY-002 currently admits only paid checkout. A zero-priced line cannot
+    // rely on the payment flow to establish entitlements; that needs a separate
+    // zero-charge fulfillment contract and must fail before order persistence.
+    if (unit === 0) throw new OrderPersistenceError('CONFLICT', 409);
     const lineDiscount = assertSafeMinor(item.lineDiscountMinor, 'lineDiscountMinor');
     const lineTax = assertSafeMinor(item.lineTaxMinor, 'lineTaxMinor');
     const lineSubtotal = checkedMultiply(unit, item.quantity);
@@ -448,6 +452,10 @@ const validatePricing = (
   if (totalMinor !== subtotalMinor - discountMinor + taxMinor) {
     throw new OrderPersistenceError('INTEGRITY_VIOLATION', 500);
   }
+  // The existing payment-persistence contract only accepts positive payable
+  // orders. Reject 100%-discounted/zero-tax baskets instead of creating an
+  // order that cannot proceed through the admitted payment lifecycle.
+  if (totalMinor <= 0) throw new OrderPersistenceError('CONFLICT', 409);
   return { currency: pricing.currency, pricingMode, lines, subtotalMinor, discountMinor, taxMinor, totalMinor };
 };
 
