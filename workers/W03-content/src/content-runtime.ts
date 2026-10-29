@@ -17,6 +17,7 @@ export type ContentState =
   | 'RESTORED'
 
 export type ContentType = 'article' | 'post' | 'video'
+export type ContentAccessMode = 'PUBLIC' | 'MEMBERS_ONLY'
 
 export interface ContentInput {
   contentType: ContentType
@@ -24,6 +25,7 @@ export interface ContentInput {
   bodyRef: string
   mediaRefs: string[]
   coverRef: string | null
+  accessMode?: ContentAccessMode
 }
 
 export interface ContentRecord {
@@ -34,6 +36,9 @@ export interface ContentRecord {
   ipId: string | null
   state: ContentState
   scheduledAt?: string | null
+  accessMode?: ContentAccessMode
+  /** Read-time authorization result; never persisted. */
+  accessGranted?: boolean
   version: number
   revision: number
   slug: string
@@ -58,6 +63,7 @@ export interface ContentRevision {
   sourceRevision: number | null
   operation: ContentRevisionOperation
   state: ContentState
+  accessMode?: ContentAccessMode
   slug: string
   title: string
   bodyRef: string
@@ -82,6 +88,7 @@ interface ContentRow {
   ip_id: string | null
   state: ContentState
   scheduled_at: string | null
+  access_mode?: ContentAccessMode
   version: number
   revision: number
   slug: string
@@ -104,6 +111,7 @@ interface ContentRevisionRow {
   source_revision: number | null
   operation: ContentRevisionOperation
   state: ContentState
+  access_mode?: ContentAccessMode
   slug: string
   title: string
   body_ref: string
@@ -188,6 +196,7 @@ const toContent = (row: ContentRow): ContentRecord => ({
   ipId: row.ip_id,
   state: row.state,
   scheduledAt: row.scheduled_at ?? null,
+  accessMode: row.access_mode === 'MEMBERS_ONLY' ? 'MEMBERS_ONLY' : 'PUBLIC',
   version: row.version,
   revision: row.revision,
   slug: row.slug,
@@ -200,19 +209,24 @@ const toContent = (row: ContentRow): ContentRecord => ({
   updatedAt: row.updated_at,
 })
 
-export const publicContent = (content: ContentRecord) => ({
-  id: content.id,
-  creatorId: content.creatorId,
-  state: content.state,
-  scheduledAt: content.scheduledAt,
-  version: content.version,
-  etag: content.etag,
-  slug: content.slug,
-  title: content.title,
-  bodyRef: content.bodyRef,
-  mediaRefs: content.mediaRefs,
-  coverRef: content.coverRef,
-})
+export const publicContent = (content: ContentRecord) => {
+  const accessGranted = content.accessGranted ?? content.accessMode !== 'MEMBERS_ONLY'
+  return {
+    id: content.id,
+    creatorId: content.creatorId,
+    state: content.state,
+    scheduledAt: content.scheduledAt,
+    accessMode: content.accessMode ?? 'PUBLIC',
+    accessGranted,
+    version: content.version,
+    etag: content.etag,
+    slug: content.slug,
+    title: content.title,
+    bodyRef: accessGranted ? content.bodyRef : '',
+    mediaRefs: accessGranted ? content.mediaRefs : [],
+    coverRef: accessGranted ? content.coverRef : null,
+  }
+}
 
 const publicPostMediaReferenceCandidates = (value: string): string[] => {
   if (value.length === 0 || value.length > 2048) return []
@@ -319,11 +333,13 @@ export const validateInput = (input: unknown): ContentInput => {
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
     throw new ContentRuntimeError('VALIDATION_FAILED', 400)
   }
-  const candidate = input as { contentType?: unknown; title?: unknown; bodyRef?: unknown; mediaRefs?: unknown; coverRef?: unknown }
+  const candidate = input as { contentType?: unknown; title?: unknown; bodyRef?: unknown; mediaRefs?: unknown; coverRef?: unknown; accessMode?: unknown }
   const contentType = candidate.contentType === undefined ? 'article' : candidate.contentType
   const mediaRefs = candidate.mediaRefs === undefined ? [] : candidate.mediaRefs
+  const accessMode = candidate.accessMode === undefined ? 'PUBLIC' : candidate.accessMode
   if (
     !['article', 'post', 'video'].includes(String(contentType)) ||
+    !['PUBLIC', 'MEMBERS_ONLY'].includes(String(accessMode)) ||
     !Array.isArray(mediaRefs) || mediaRefs.length > 20 ||
     (contentType === 'video' && mediaRefs.length === 0) ||
     mediaRefs.some(ref => typeof ref !== 'string' || ref.trim().length === 0 || ref.length > 2048) ||
@@ -337,7 +353,7 @@ export const validateInput = (input: unknown): ContentInput => {
   ) {
     throw new ContentRuntimeError('VALIDATION_FAILED', 400)
   }
-  return { contentType: contentType as ContentType, title: candidate.title.trim(), bodyRef: candidate.bodyRef.trim(), mediaRefs: mediaRefs.map(ref => ref.trim()), coverRef: candidate.coverRef === undefined || candidate.coverRef === null ? null : candidate.coverRef.trim() }
+  return { contentType: contentType as ContentType, title: candidate.title.trim(), bodyRef: candidate.bodyRef.trim(), mediaRefs: mediaRefs.map(ref => ref.trim()), coverRef: candidate.coverRef === undefined || candidate.coverRef === null ? null : candidate.coverRef.trim(), accessMode: accessMode as ContentAccessMode }
 }
 
 const canonicalize = (value: unknown): unknown => {
@@ -398,6 +414,7 @@ const toRevision = (row: ContentRevisionRow): ContentRevision => ({
   sourceRevision: row.source_revision,
   operation: row.operation,
   state: row.state,
+  accessMode: row.access_mode === 'MEMBERS_ONLY' ? 'MEMBERS_ONLY' : 'PUBLIC',
   slug: row.slug,
   title: row.title,
   bodyRef: row.body_ref,
