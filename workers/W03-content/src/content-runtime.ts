@@ -1324,7 +1324,8 @@ export async function updateContent(
   }
   const currentAccessMode = content.accessMode ?? 'PUBLIC'
   const nextAccessMode = normalized.accessMode ?? currentAccessMode
-  if (nextAccessMode !== currentAccessMode || nextAccessMode === 'MEMBERS_ONLY') {
+  if (normalized.accessMode !== undefined &&
+      (nextAccessMode !== currentAccessMode || nextAccessMode === 'MEMBERS_ONLY')) {
     if (!verifiedCreatorId || verifiedCreatorId !== content.creatorId) {
       throw new ContentRuntimeError('PERMISSION_DENIED', 403)
     }
