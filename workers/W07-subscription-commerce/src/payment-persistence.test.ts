@@ -665,6 +665,13 @@ describe('PAY-001 payment attempt persistence candidate', () => {
     const signed = await signedBody(bodyText('evt_1'));
     const input = { ...signed, webhookSecret: SECRET, expectedMerchantId: MERCHANT };
     const first = await receiveHyperswitchWebhook(db as unknown as D1Database, input, fixedDeps());
+    const rawBodyDigest = await crypto.subtle.digest('SHA-256', input.rawBody);
+    const expectedPayloadHash = Array.from(
+      new Uint8Array(rawBodyDigest),
+      (byte) => byte.toString(16).padStart(2, '0'),
+    ).join('');
+    expect(first.payloadSha256).toBe(expectedPayloadHash);
+
     const duplicate = await receiveHyperswitchWebhook(db as unknown as D1Database, input, fixedDeps(LATER));
     expect(first).toMatchObject({ outcome: 'RECONCILIATION_REQUIRED', eventId: 'evt_1', state: 'RECONCILIATION_REQUIRED' });
     expect(duplicate).toMatchObject({ outcome: 'RECONCILIATION_REQUIRED', state: 'RECONCILIATION_REQUIRED', receiptId: first.receiptId });

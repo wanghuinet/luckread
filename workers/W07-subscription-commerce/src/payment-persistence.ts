@@ -1,7 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
 import { strictlyAfterCanonicalUtcTimestamp } from './canonical-utc-timestamp.js';
-import { CanonicalJsonError, sha256CanonicalJsonForIdempotency } from '../../W10-async/src/canonical-json-idempotency.js';
+import { CanonicalJsonError, sha256BytesToHex, sha256CanonicalJsonForIdempotency } from '../../W10-async/src/canonical-json-idempotency.js';
 
 import {
   verifyHyperswitchWebhookSignature,
@@ -228,9 +228,17 @@ function defaultPaymentMandateId(): string {
   return 'mnd_' + crypto.randomUUID().replace(/-/g, '').slice(0, 26);
 }
 
-async function sha256Hex(input: BufferSource): Promise<string> {
-  const digest = await crypto.subtle.digest('SHA-256', input);
-  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+/**
+ * Compatibility adapter only: W10 owns the shared SHA-256 implementation.
+ * Restrict inputs to the exact byte containers used here and preserve their
+ * byte range (especially the raw signed webhook body) without re-serialization.
+ */
+async function sha256Hex(input: ArrayBuffer | Uint8Array): Promise<string> {
+  try {
+    return await sha256BytesToHex(input instanceof ArrayBuffer ? new Uint8Array(input) : input);
+  } catch {
+    throw new PaymentPersistenceError('SERVICE_UNAVAILABLE', 503);
+  }
 }
 
 const MAX_PAYMENT_ATTEMPT_FINGERPRINT_BYTES = 8192;
