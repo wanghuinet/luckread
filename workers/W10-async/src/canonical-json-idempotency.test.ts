@@ -99,6 +99,20 @@ describe('W10 canonical JSON idempotency fingerprint', () => {
     )
   })
 
+  it('stops serialization at the byte limit before inspecting later fields', () => {
+    const payload: Record<string, unknown> = { a: 'x'.repeat(100) }
+    Object.defineProperty(payload, 'z', {
+      enumerable: true,
+      get() {
+        throw new Error('later fields must not be inspected after the byte budget is exceeded')
+      },
+    })
+
+    expect(() => canonicalizeJsonForIdempotency(payload, 32)).toThrowError(
+      expect.objectContaining({ code: 'PAYLOAD_TOO_LARGE' }),
+    )
+  })
+
   it('wraps cryptographic provider failures without leaking provider details', async () => {
     const digest = vi.fn(async () => {
       throw new Error('internal crypto implementation detail')
