@@ -1722,6 +1722,9 @@ describe('1.1 content revision history', () => {
     expect(w01Detail).toContain('export async function GET')
     expect(w01Detail).not.toContain("export async function POST")
     expect(w01Rollback).toContain("pathname: '/internal/content/contents/' + encodeURIComponent(contentId) + '/revisions/' + encodeURIComponent(revisionId) + '/rollback'")
+    expect(w01Rollback).toContain('resolveVerifiedContentCreatorId(request, principal)')
+    expect(w01Rollback).toContain('verifiedCreatorId,')
+    expect(index).toContain("request.headers.get('X-LuckRead-Verified-Creator-Id')?.trim() || undefined")
   })
 
   it('records create, update and rollback history after the authoritative CAS guard', () => {
@@ -1749,6 +1752,8 @@ describe('1.1 content revision history', () => {
     expect(runtime.indexOf("operation: 'ROLLBACK'", rollbackIndex)).toBeGreaterThan(
       runtime.indexOf('atomicGuard(db)', rollbackIndex),
     )
+    expect(runtime).toContain("sourceAccessMode !== currentAccessMode")
+    expect(runtime).toContain("verifiedCreatorId !== content.creatorId")
   })
 })
 
