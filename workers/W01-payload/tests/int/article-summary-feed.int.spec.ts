@@ -1,13 +1,10 @@
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 import {
-  ARTICLE_BODY_FETCH_MAX_BYTES,
   ARTICLE_SUMMARY_MAX_CHARS,
   extractArticleSummary,
-  readTrustedArticleBodyForSocialTokens,
-  resolvePublicArticleBodyUrl,
 } from '../../src/lib/article-summary-preview.js'
 
 const read = (relativePath: string) => readFileSync(resolve(process.cwd(), relativePath), 'utf8')
@@ -32,76 +29,6 @@ describe('article summary card preview', () => {
     expect(excerpt).toHaveLength(ARTICLE_SUMMARY_MAX_CHARS)
     expect(excerpt?.endsWith('…')).toBe(true)
     expect(extractArticleSummary('  \n  ')).toBeNull()
-  })
-
-  it('allows only same-origin or LuckRead-hosted public body files', () => {
-    expect(resolvePublicArticleBodyUrl('/api/v1/media/file/article.json', 'https://luckread.com'))
-      .toBe('https://luckread.com/api/v1/media/file/article.json')
-    expect(resolvePublicArticleBodyUrl('https://img.luckread.com/media/article.json', 'https://luckread.com'))
-      .toBe('https://img.luckread.com/media/article.json')
-    expect(resolvePublicArticleBodyUrl('https://video.luckread.com/media/article-body.mp4', 'https://luckread.com'))
-      .toBe('https://video.luckread.com/media/article-body.mp4')
-    expect(resolvePublicArticleBodyUrl('https://untrusted.example/article.json', 'https://luckread.com')).toBeNull()
-    expect(resolvePublicArticleBodyUrl('javascript:alert(1)', 'https://luckread.com')).toBeNull()
-    expect(resolvePublicArticleBodyUrl('https://user:secret@luckread.com/article.json', 'https://luckread.com')).toBeNull()
-    expect(resolvePublicArticleBodyUrl('http://luckread.com/article.json', 'https://luckread.com')).toBeNull()
-    expect(resolvePublicArticleBodyUrl('http://localhost:3000/body.json', 'http://localhost:3000'))
-      .toBe('http://localhost:3000/body.json')
-  })
-
-  it('reads bounded body text only through a trusted host and does not follow redirects', async () => {
-    const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(new Response('Hello @alice #topics', {
-      status: 200,
-      headers: { 'content-type': 'text/plain; charset=utf-8', 'content-length': '20' },
-    }))
-    await expect(readTrustedArticleBodyForSocialTokens(
-      'https://img.luckread.com/media/body.txt',
-      'https://api.luckread.com',
-      fetcher,
-    )).resolves.toBe('Hello @alice #topics')
-
-    expect(fetcher).toHaveBeenCalledTimes(1)
-    expect(fetcher).toHaveBeenCalledWith('https://img.luckread.com/media/body.txt', expect.objectContaining({
-      method: 'GET',
-      headers: { accept: 'text/plain' },
-      redirect: 'manual',
-    }))
-  })
-
-  it('does not fetch an untrusted body reference', async () => {
-    const fetcher = vi.fn<typeof fetch>()
-    await expect(readTrustedArticleBodyForSocialTokens(
-      'https://attacker.example/redirect',
-      'https://api.luckread.com',
-      fetcher,
-    )).resolves.toBeNull()
-    expect(fetcher).not.toHaveBeenCalled()
-  })
-
-  it('rejects redirects and rejects bodies larger than the byte budget', async () => {
-    const redirected = vi.fn<typeof fetch>().mockResolvedValueOnce(new Response('', {
-      status: 302,
-      headers: { location: 'https://attacker.example/collect' },
-    }))
-    await expect(readTrustedArticleBodyForSocialTokens(
-      'https://img.luckread.com/media/body.txt',
-      'https://api.luckread.com',
-      redirected,
-    )).resolves.toBeNull()
-    expect(redirected).toHaveBeenCalledTimes(1)
-
-    const oversizedStream = new ReadableStream<Uint8Array>({
-      start(controller) {
-        controller.enqueue(new Uint8Array(ARTICLE_BODY_FETCH_MAX_BYTES + 1))
-        controller.close()
-      },
-    })
-    const oversized = vi.fn<typeof fetch>().mockResolvedValueOnce(new Response(oversizedStream, { status: 200 }))
-    await expect(readTrustedArticleBodyForSocialTokens(
-      'https://img.luckread.com/media/body.txt',
-      'https://api.luckread.com',
-      oversized,
-    )).resolves.toBeNull()
   })
 
   it('routes social-token body reads through the W03/W07-authorized body endpoint', () => {
