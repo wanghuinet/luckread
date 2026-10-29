@@ -970,14 +970,21 @@ export async function resolvePurchasableMembershipPlanOffers(
   }
 
   const placeholders = planIds.map(() => '?').join(', ');
-  const result = await db.prepare(
-    'SELECT p.plan_id, p.owner_id, p.current_version, p.status, p.visibility, p.version, p.created_at, p.updated_at, ' +
-    'v.name, v.tier, v.billing_interval, v.price_minor, v.currency, v.benefits_json ' +
-    'FROM membership_plans AS p ' +
-    'INNER JOIN membership_plan_versions AS v ON v.plan_id = p.plan_id AND v.plan_version = p.current_version ' +
-    "WHERE p.owner_type = 'CREATOR' AND p.status = 'ACTIVE' AND p.visibility = 'PUBLIC' " +
-    'AND p.plan_id IN (' + placeholders + ')',
-  ).bind(...planIds).all<MembershipPlanStoredRow>();
+  let result: D1Result<MembershipPlanStoredRow>;
+  try {
+    result = await db.prepare(
+      'SELECT p.plan_id, p.owner_id, p.current_version, p.status, p.visibility, p.version, p.created_at, p.updated_at, ' +
+      'v.name, v.tier, v.billing_interval, v.price_minor, v.currency, v.benefits_json ' +
+      'FROM membership_plans AS p ' +
+      'INNER JOIN membership_plan_versions AS v ON v.plan_id = p.plan_id AND v.plan_version = p.current_version ' +
+      "WHERE p.owner_type = 'CREATOR' AND p.status = 'ACTIVE' AND p.visibility = 'PUBLIC' " +
+      'AND p.plan_id IN (' + placeholders + ')',
+    ).bind(...planIds).all<MembershipPlanStoredRow>();
+  } catch {
+    // Keep D1/schema failures inside the admitted service error contract. The
+    // caller must not log or return provider/database exception details.
+    throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
+  }
 
   const rows: unknown = result.results ?? [];
   if (!Array.isArray(rows) || rows.length > planIds.length) {

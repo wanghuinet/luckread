@@ -63,7 +63,7 @@ function fixture(
   };
 }
 
-function fakeDb(fixtures: PlanFixture[]) {
+function fakeDb(fixtures: PlanFixture[], readError?: Error) {
   const queries: CapturedQuery[] = [];
   const db = {
     prepare(sql: string) {
@@ -75,6 +75,7 @@ function fakeDb(fixtures: PlanFixture[]) {
           return statement;
         },
         async all<T>() {
+          if (readError) throw readError;
           const ids = new Set(captured.values.map(String));
           const results = fixtures
             .filter((plan) =>
@@ -160,6 +161,17 @@ describe('PAY-002 read-only membership offer resolution', () => {
     expect(queries[0]!.sql).toContain("p.status = 'ACTIVE'");
     expect(queries[0]!.sql).toContain("p.visibility = 'PUBLIC'");
     expect(queries[0]!.values).toEqual([planB, planA]);
+  });
+
+  it('normalizes D1/schema read failures without exposing database details', async () => {
+    const internalError = new Error('no such table: membership_plans; secret SQL fragment');
+    const { db } = fakeDb([fixture(planA)], internalError);
+
+    await expectRuntimeError(
+      () => resolveCommerceOrderItems(db, { items: [{ itemRef: planA, quantity: 1 }] }),
+      'SERVICE_UNAVAILABLE',
+      503,
+    ).then(() => undefined);
   });
 
   it('returns resource-not-found for unknown, draft, private or retired offers', async () => {
