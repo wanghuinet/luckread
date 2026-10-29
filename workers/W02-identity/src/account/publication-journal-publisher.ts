@@ -1,3 +1,5 @@
+import { parseEventEnvelopeMetadata } from '../../../W10-async/src/event-envelope.js'
+
 type PublicationJournalRow = {
   journalId: string
   payload: string
@@ -40,6 +42,13 @@ export async function publishPendingAccountStateEvents(
     let payload: unknown
     try {
       payload = JSON.parse(row.payload)
+      const envelope = parseEventEnvelopeMetadata(payload)
+      if (
+        envelope.eventType !== 'identity.account_state_changed' ||
+        envelope.schemaVersion !== '1.0' ||
+        envelope.producer !== 'W02' ||
+        envelope.resourceType !== 'User'
+      ) throw new Error('INVALID_AUTH_013_EVENT_ENVELOPE')
     } catch {
       await env.D1_01
         .prepare(
