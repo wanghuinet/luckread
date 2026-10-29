@@ -337,10 +337,12 @@ export const validateInput = (input: unknown): ContentInput => {
   const candidate = input as { contentType?: unknown; title?: unknown; bodyRef?: unknown; mediaRefs?: unknown; coverRef?: unknown; accessMode?: unknown }
   const contentType = candidate.contentType === undefined ? 'article' : candidate.contentType
   const mediaRefs = candidate.mediaRefs === undefined ? [] : candidate.mediaRefs
-  const accessMode = candidate.accessMode === undefined ? 'PUBLIC' : candidate.accessMode
+  // Keep omission backward-compatible in the canonical idempotency hash.
+  // Persistence and read-time defaults still resolve omitted accessMode to PUBLIC.
+  const accessMode = candidate.accessMode
   if (
     !['article', 'post', 'video'].includes(String(contentType)) ||
-    !['PUBLIC', 'MEMBERS_ONLY'].includes(String(accessMode)) ||
+    (accessMode !== undefined && !['PUBLIC', 'MEMBERS_ONLY'].includes(String(accessMode))) ||
     !Array.isArray(mediaRefs) || mediaRefs.length > 20 ||
     (contentType === 'video' && mediaRefs.length === 0) ||
     mediaRefs.some(ref => typeof ref !== 'string' || ref.trim().length === 0 || ref.length > 2048) ||
@@ -354,7 +356,7 @@ export const validateInput = (input: unknown): ContentInput => {
   ) {
     throw new ContentRuntimeError('VALIDATION_FAILED', 400)
   }
-  return { contentType: contentType as ContentType, title: candidate.title.trim(), bodyRef: candidate.bodyRef.trim(), mediaRefs: mediaRefs.map(ref => ref.trim()), coverRef: candidate.coverRef === undefined || candidate.coverRef === null ? null : candidate.coverRef.trim(), accessMode: accessMode as ContentAccessMode }
+  return { contentType: contentType as ContentType, title: candidate.title.trim(), bodyRef: candidate.bodyRef.trim(), mediaRefs: mediaRefs.map(ref => ref.trim()), coverRef: candidate.coverRef === undefined || candidate.coverRef === null ? null : candidate.coverRef.trim(), accessMode: accessMode as ContentAccessMode | undefined }
 }
 
 const canonicalize = (value: unknown): unknown => {
