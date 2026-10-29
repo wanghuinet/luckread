@@ -1055,7 +1055,7 @@ async function persistAndApplyProviderStatus(
         conflictId,
       };
     }
-    if (raced.state !== 'RECEIVED') return resultFromProviderEvent(raced, payloadSha256, 'DUPLICATE');
+    if (raced.state !== 'RECEIVED') return resultFromProviderEvent(raced, payloadSha256, raced.state === 'APPLIED' ? 'DUPLICATE' : undefined);
     throw new PaymentPersistenceError('SERVICE_UNAVAILABLE', 503);
   }
 
@@ -1229,7 +1229,7 @@ async function receiveHyperswitchMandateWebhook(
         conflictId,
       };
     }
-    if (raced.state !== 'RECEIVED') return resultFromProviderEvent(raced, payloadSha256, 'DUPLICATE');
+    if (raced.state !== 'RECEIVED') return resultFromProviderEvent(raced, payloadSha256, raced.state === 'APPLIED' ? 'DUPLICATE' : undefined);
     throw new PaymentPersistenceError('SERVICE_UNAVAILABLE', 503);
   }
 
@@ -1309,7 +1309,7 @@ export async function receiveHyperswitchWebhook(
     };
   }
   if (existing && existing.state !== 'RECEIVED') {
-    return resultFromProviderEvent(existing, payloadSha256, 'DUPLICATE');
+    return resultFromProviderEvent(existing, payloadSha256, existing.state === 'APPLIED' ? 'DUPLICATE' : undefined);
   }
 
   const eventRowId = existing?.event_row_id ?? (dependencies.createEventRowId ?? defaultEventRowId)();
