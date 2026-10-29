@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { sha256CanonicalJsonForIdempotency } from '../../W10-async/src/canonical-json-idempotency.js';
 import {
   createPaymentAttempt,
   recordUnconfirmedHyperswitchIntent,
@@ -552,6 +553,44 @@ describe('PAY-001 payment attempt persistence candidate', () => {
     expect(db.payments).toHaveLength(1);
     expect(JSON.stringify(created)).not.toContain('merchant_test');
     expect(JSON.stringify(created)).not.toContain('request_hash');
+  });
+
+  it('uses W10 canonical fingerprints for new payments and replays legacy hashes already stored in D1-04', async () => {
+    const db = new MemoryPaymentD1();
+    seedOrder(db);
+    const created = await createPaymentAttempt(
+      db as unknown as D1Database, CUSTOMER, 'ord_1', 'legacy_key_1', MERCHANT, fixedDeps(),
+    );
+
+    const payload = {
+      operation: 'createPaymentAttempt',
+      customerId: CUSTOMER,
+      orderId: 'ord_1',
+      provider: 'hyperswitch',
+      merchantId: MERCHANT,
+      amountMinor: 1200,
+      currency: 'USD',
+    };
+    const canonical = await sha256CanonicalJsonForIdempotency(payload, 8192);
+    expect(db.payments[0]!.request_hash).toBe(canonical.slice('sha256:'.length));
+    expect(db.payments[0]!.request_hash).toMatch(/^[0-9a-f]{64}$/);
+
+    const legacyBytes = new TextEncoder().encode(JSON.stringify(payload));
+    const legacyDigest = await crypto.subtle.digest('SHA-256', legacyBytes);
+    db.payments[0]!.request_hash = Array.from(
+      new Uint8Array(legacyDigest),
+      (byte) => byte.toString(16).padStart(2, '0'),
+    ).join('');
+
+    const replay = await createPaymentAttempt(
+      db as unknown as D1Database, CUSTOMER, 'ord_1', 'legacy_key_1', MERCHANT, fixedDeps(LATER),
+    );
+    expect(created.replayed).toBe(false);
+    expect(replay).toMatchObject({
+      replayed: true,
+      payment: { paymentId: PAYMENT_ID, status: 'INITIATING', version: 1 },
+    });
+    expect(db.payments).toHaveLength(1);
   });
 
   it('rejects reuse of the same customer key for a different order or commercial snapshot', async () => {
