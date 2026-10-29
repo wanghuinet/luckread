@@ -363,8 +363,9 @@ class MemoryPaymentD1 {
       return result(1) as D1Result<T>;
     }
     if (sql.startsWith('INSERT INTO payment_provider_event_conflicts')) {
-      const [conflictId, provider, merchantId, eventId, oldHash, newHash, state, count, version, firstAt, lastAt] = values as
-        [string, string, string, string, string, string, Conflict['state'], number, number, string, string];
+      // State/count/version are SQL literals ('OPEN', 1, 1), not bound values.
+      const [conflictId, provider, merchantId, eventId, oldHash, newHash, firstAt, lastAt] = values as
+        [string, string, string, string, string, string, string, string];
       const firstReceipt = this.events.find(e => e.provider === provider && e.merchant_id === merchantId &&
         e.event_id === eventId && e.payload_sha256 === oldHash);
       if (!firstReceipt || oldHash === newHash) throw new Error('constraint: first receipt evidence');
@@ -372,8 +373,8 @@ class MemoryPaymentD1 {
         c.event_id === eventId && c.incoming_payload_sha256 === newHash)) throw new Error('constraint: conflict uniqueness');
       this.conflicts.push({
         conflict_id: conflictId, provider, merchant_id: merchantId, event_id: eventId,
-        existing_payload_sha256: oldHash, incoming_payload_sha256: newHash, state,
-        occurrence_count: count, version, first_seen_at: firstAt, last_seen_at: lastAt,
+        existing_payload_sha256: oldHash, incoming_payload_sha256: newHash, state: 'OPEN',
+        occurrence_count: 1, version: 1, first_seen_at: firstAt, last_seen_at: lastAt,
         resolved_at: null, resolution_code: null,
       });
       return result(1) as D1Result<T>;
