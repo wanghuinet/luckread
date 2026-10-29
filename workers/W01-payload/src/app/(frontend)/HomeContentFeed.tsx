@@ -20,6 +20,7 @@ type PublicAuthor = {
 type ContentItem = {
   id: string
   slug?: string
+  ownerUserId?: string | null
   creatorId?: string | null
   creator?: PublicAuthor | null
   author?: PublicAuthor | null
@@ -245,7 +246,7 @@ export default function HomeContentFeed({
                 contentId={item.id}
                 slug={item.slug}
                 title={item.title}
-                creatorId={item.creatorId}
+                creatorId={item.ownerUserId || item.creatorId}
                 author={item.creator ?? item.author}
                 coverRef={item.coverRef}
                 mediaRefs={item.mediaRefs}
