@@ -970,7 +970,7 @@ export async function resolvePurchasableMembershipPlanOffers(
   }
 
   const placeholders = planIds.map(() => '?').join(', ');
-  let result: D1Result<MembershipPlanStoredRow[]>;
+  let result: D1Result<MembershipPlanStoredRow>;
   try {
     result = await db.prepare(
       'SELECT p.plan_id, p.owner_id, p.current_version, p.status, p.visibility, p.version, p.created_at, p.updated_at, ' +
