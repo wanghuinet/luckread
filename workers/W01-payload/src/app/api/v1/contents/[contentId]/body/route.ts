@@ -57,12 +57,20 @@ async function isBodyAssetOwnedByContentOwner(
     })
     // Verify the exact generated URL, not just the filename. A content row must
     // never point at another user's R2 object, even if the caller is a member.
-    return mediaResult.docs.some((doc) =>
-      String(doc.ownerUserId ?? '') === ownerId &&
-      String(doc.filename ?? '') === filename &&
-      typeof doc.url === 'string' &&
-      doc.url === bodyRef,
-    )
+    return mediaResult.docs.some((doc) => {
+      // Payload's generated Media type has not yet modeled the existing custom
+      // ownerUserId field. Keep the runtime check explicit without widening the
+      // collection's generated type or changing Payload Core.
+      const media = doc as unknown as {
+        ownerUserId?: unknown
+        filename?: unknown
+        url?: unknown
+      }
+      return String(media.ownerUserId ?? '') === ownerId &&
+        String(media.filename ?? '') === filename &&
+        typeof media.url === 'string' &&
+        media.url === bodyRef
+    })
   } catch {
     return false
   }
