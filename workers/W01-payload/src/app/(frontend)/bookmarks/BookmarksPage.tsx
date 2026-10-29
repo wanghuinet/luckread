@@ -272,7 +272,7 @@ export default function BookmarksPage() {
                     )
                   ) : null}
                   {item.contentType === 'article' ? (
-                    <ArticleSummaryPreview key={item.bodyRef || item.id} bodyRef={item.bodyRef} label={labels.summary} />
+                    <ArticleSummaryPreview key={item.bodyRef || item.id} contentId={item.id} bodyRef={item.bodyRef} label={labels.summary} />
                   ) : null}
                   <div className="mt-3 flex items-center justify-between gap-3">
                     <Link className="rounded-full px-3 py-2 text-sm font-bold text-main-accent hover:bg-light-primary/10 dark:hover:bg-dark-primary/10" href={href}>{labels.open}</Link>
