@@ -4,6 +4,7 @@ import { createMembershipPlanDraft, reviseMembershipPlan, getSubscription, listA
 import { handleCommerceOrderRequest } from './order-http-runtime.js'
 import { resolveCommerceOrderItems } from './order-item-resolution.js'
 import { applyDemoTaxPricing, isDemoPricingEnabled } from './demo-tax-pricing.js'
+import { applyTaxJarSandboxPricing } from './taxjar-sandbox-pricing.js'
 import { handleCommercePaymentIntentRequest } from './payment-intent-http-runtime.js'
 import { handleHyperswitchWebhookRequest } from './payment-webhook-http-runtime.js'
 
@@ -16,6 +17,16 @@ interface Env {
   HYPERSWITCH_API_KEY?: string
   HYPERSWITCH_MERCHANT_ID?: string
   HYPERSWITCH_WEBHOOK_SECRET?: string
+  COMMERCE_DEMO_TAX_PROVIDER?: string
+  TAXJAR_SANDBOX_API_KEY?: string
+  TAXJAR_DEMO_FROM_STREET?: string
+  TAXJAR_DEMO_FROM_CITY?: string
+  TAXJAR_DEMO_FROM_STATE?: string
+  TAXJAR_DEMO_FROM_ZIP?: string
+  TAXJAR_DEMO_TO_STREET?: string
+  TAXJAR_DEMO_TO_CITY?: string
+  TAXJAR_DEMO_TO_STATE?: string
+  TAXJAR_DEMO_TO_ZIP?: string
   SUBSCRIPTION_ORIGIN_GLOBAL_LIMITER?: RateLimitBinding
   SUBSCRIPTION_READ_LIMITER?: RateLimitBinding
   SUBSCRIPTION_WRITE_LIMITER?: RateLimitBinding
@@ -153,8 +164,36 @@ export default {
       if (paymentIntentResponse) return paymentIntentResponse
       const orderDependencies = isDemoPricingEnabled(env.COMMERCE_PRICING_MODE, env.HYPERSWITCH_ENVIRONMENT)
         ? {
-            resolvePricing: async (input: unknown) =>
-              applyDemoTaxPricing(await resolveCommerceOrderItems(env.D1_01, input)),
+            resolvePricing: async (input: unknown) => {
+              const resolved = await resolveCommerceOrderItems(env.D1_01, input)
+              if (env.COMMERCE_DEMO_TAX_PROVIDER === 'synthetic') {
+                return applyDemoTaxPricing(resolved)
+              }
+              if (env.COMMERCE_DEMO_TAX_PROVIDER === 'taxjar-sandbox') {
+                try {
+                  return await applyTaxJarSandboxPricing(resolved, {
+                    apiKey: env.TAXJAR_SANDBOX_API_KEY,
+                    fromAddress: {
+                      street: env.TAXJAR_DEMO_FROM_STREET ?? '',
+                      city: env.TAXJAR_DEMO_FROM_CITY ?? '',
+                      state: env.TAXJAR_DEMO_FROM_STATE ?? '',
+                      zip: env.TAXJAR_DEMO_FROM_ZIP ?? '',
+                    },
+                    toAddress: {
+                      street: env.TAXJAR_DEMO_TO_STREET ?? '',
+                      city: env.TAXJAR_DEMO_TO_CITY ?? '',
+                      state: env.TAXJAR_DEMO_TO_STATE ?? '',
+                      zip: env.TAXJAR_DEMO_TO_ZIP ?? '',
+                    },
+                  })
+                } catch {
+                  throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
+                }
+              }
+              // Tax provider must be selected explicitly; never silently substitute
+              // a synthetic tax amount when the provider is missing or misspelled.
+              throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
+            },
           }
         : undefined
       const commerceOrderResponse = await handleCommerceOrderRequest(request, principal, env, orderDependencies)
