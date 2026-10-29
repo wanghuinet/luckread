@@ -259,7 +259,7 @@ describe('PAY-002 read-only membership offer resolution', () => {
     );
   });
 
-  it('allows a zero-priced offer as pricing data only; it does not create or confirm anything', async () => {
+  it('rejects zero-priced offers on the paid checkout path because no positive payment can be confirmed', async () => {
     const free = fixture(planA, {
       versions: [{
         plan_version: 1,
@@ -273,11 +273,13 @@ describe('PAY-002 read-only membership offer resolution', () => {
       }],
     });
     const { db, queries } = fakeDb([free]);
-    const result = await resolveCommerceOrderItems(db, { items: [{ itemRef: planA, quantity: 1 }] });
-    expect(result.items[0]!.unitAmountMinor).toBe(0);
+    await expectRuntimeError(
+      () => resolveCommerceOrderItems(db, { items: [{ itemRef: planA, quantity: 1 }] }),
+      'VALIDATION_FAILED',
+      400,
+    );
     expect(queries).toHaveLength(1);
   });
-
   it('rejects mixed-currency items rather than silently converting or aggregating them', async () => {
     const eur = fixture(planB, {
       versions: [{
