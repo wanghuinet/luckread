@@ -1,5 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
+import { strictlyAfterCanonicalUtcTimestamp } from './canonical-utc-timestamp.js';
+
 export type RenewalSubscriptionSyncOutcome =
   | 'APPLIED' | 'ALREADY_APPLIED' | 'NO_RENEWAL_CYCLE' | 'NOT_TERMINAL'
   | 'RECONCILIATION_REQUIRED' | 'PENDING_RETRY';
@@ -62,7 +64,9 @@ function nowIso(now: () => Date): string {
 }
 
 function strictlyAfter(now: string, previous: string): string {
-  return now > previous ? now : new Date(Date.parse(previous) + 1).toISOString();
+  const next = strictlyAfterCanonicalUtcTimestamp(now, previous);
+  if (next === null) throw new RenewalOutcomeSyncError('SERVICE_UNAVAILABLE', 503);
+  return next;
 }
 
 async function readCycleById(db: D1Database, cycleId: string): Promise<RenewalOutcomeCycle | null> {
