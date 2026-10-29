@@ -345,6 +345,13 @@ export default function PostDetailScreen() {
                         >
                             <Text className="font-bold text-white">查看会员套餐并订阅</Text>
                         </TouchableOpacity>
+                        <TouchableOpacity
+                            accessibilityRole="button"
+                            className="mt-3 items-center rounded-full border border-neutral-300 dark:border-neutral-700 px-5 py-3"
+                            onPress={() => setRetryKey((value) => value + 1)}
+                        >
+                            <Text className="font-semibold text-neutral-700 dark:text-neutral-200">已订阅？刷新访问权限</Text>
+                        </TouchableOpacity>
                     </View>
                 ) : (
                     <>
