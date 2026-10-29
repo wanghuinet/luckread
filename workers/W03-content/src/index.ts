@@ -142,6 +142,14 @@ const requiredCreatorPrincipal = (request: Request): { userId: string; layer: st
   return principal
 }
 
+const requireVerifiedCreatorId = (request: Request): string => {
+  const creatorId = request.headers.get('X-LuckRead-Verified-Creator-Id')?.trim() ?? ''
+  if (!creatorId || creatorId.length > 256 || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,255}$/.test(creatorId)) {
+    throw new ContentRuntimeError('PERMISSION_DENIED', 403)
+  }
+  return creatorId
+}
+
 const requireIfMatch = (request: Request): string => {
   const value = request.headers.get('If-Match')?.trim() ?? ''
   if (!value) throw new ContentRuntimeError('PRECONDITION_REQUIRED', 428)
@@ -1111,9 +1119,13 @@ const worker = {
 
       if (request.method === 'POST' && path.id === undefined) {
         const body = await parseBody(request)
-        const principal = body.contentType === 'post'
-          ? requiredSocialPostPrincipal(request)
-          : requiredCreatorPrincipal(request)
+        const membersOnly = body.accessMode === 'MEMBERS_ONLY'
+        const principal = membersOnly
+          ? requiredCreatorPrincipal(request)
+          : body.contentType === 'post'
+            ? requiredSocialPostPrincipal(request)
+            : requiredCreatorPrincipal(request)
+        const verifiedCreatorId = membersOnly ? requireVerifiedCreatorId(request) : undefined
         const content = await createContent(
           env.D1_02,
           principal.userId,
@@ -1121,6 +1133,7 @@ const worker = {
           requireIdempotency(request),
           new Date(),
           request.headers.get('X-LuckRead-Correlation-Id')?.trim() || 'runtime',
+          verifiedCreatorId,
         )
         return json({
           id: content.id,
@@ -1128,6 +1141,8 @@ const worker = {
           creatorId: content.creatorId,
           contentType: content.contentType,
           state: content.state,
+          accessMode: content.accessMode ?? 'PUBLIC',
+          accessGranted: true,
           version: content.version,
           etag: content.etag,
           title: content.title,
@@ -1172,9 +1187,13 @@ const worker = {
 
       if (request.method === 'PATCH' && path.id) {
         const body = await parseBody(request)
-        const principal = body.contentType === 'post'
-          ? requiredSocialPostPrincipal(request)
-          : requiredCreatorPrincipal(request)
+        const explicitlyChangesAccessMode = Object.hasOwn(body, 'accessMode')
+        const principal = explicitlyChangesAccessMode
+          ? requiredCreatorPrincipal(request)
+          : body.contentType === 'post'
+            ? requiredSocialPostPrincipal(request)
+            : requiredCreatorPrincipal(request)
+        const verifiedCreatorId = explicitlyChangesAccessMode ? requireVerifiedCreatorId(request) : undefined
         const content = await updateContent(
           env.D1_02,
           principal.userId,
@@ -1185,11 +1204,14 @@ const worker = {
           new Date(),
           request.headers.get('X-LuckRead-Correlation-Id')?.trim() || 'runtime',
           principal.layer,
+          verifiedCreatorId,
         )
         return json({
           id: content.id,
           slug: content.slug,
           state: content.state,
+          accessMode: content.accessMode ?? 'PUBLIC',
+          accessGranted: true,
           version: content.version,
           etag: content.etag,
           title: content.title,
