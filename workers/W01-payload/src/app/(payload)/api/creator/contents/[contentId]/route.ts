@@ -87,14 +87,15 @@ export async function PATCH(
       return errorResponse(422, 'VALIDATION_FAILED', 'Invalid content request')
     }
 
+    const changesAccessMode = body && typeof body === 'object' && !Array.isArray(body) && Object.hasOwn(body, 'accessMode')
     let verifiedCreatorId: string | undefined
-    if (body && typeof body === 'object' && !Array.isArray(body) && Object.hasOwn(body, 'accessMode')) {
+    if (changesAccessMode) {
       const resolved = await resolveVerifiedContentCreatorId(request, principal)
       if (resolved instanceof Response) return resolved
       verifiedCreatorId = resolved
     }
 
-    return await callW03Content({
+    const response = await callW03Content({
       request,
       pathname: `/internal/content/contents/${encodeURIComponent(contentId)}`,
       method: 'PATCH',
@@ -102,6 +103,14 @@ export async function PATCH(
       principal,
       verifiedCreatorId,
     })
+    if (response.ok) {
+      if (changesAccessMode) {
+        await invalidatePublicContentVisibility(contentId)
+        await invalidatePublicContentList(request)
+      }
+      await invalidatePublicContentDetail(request, contentId)
+    }
+    return response
   } catch (error) {
     if (error instanceof W03ContentClientError) {
       return errorResponse(error.status, error.code, 'Content service unavailable')
