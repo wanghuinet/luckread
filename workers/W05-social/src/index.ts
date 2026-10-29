@@ -260,7 +260,7 @@ export default {
           }, 201)
         }
         await removeRepost(env.DB, actorUserId, contentId)
-        return new Response(null, { status: 204 })
+        return new Response(null, { status: 204, headers: { 'cache-control': 'no-store' } })
       }
 
       const pinMatch = /^\/internal\/social\/content\/([^/]+)\/pin$/.exec(url.pathname)
