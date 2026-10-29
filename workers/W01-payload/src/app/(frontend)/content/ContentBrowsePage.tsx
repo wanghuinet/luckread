@@ -230,6 +230,7 @@ export default function ContentBrowsePage() {
                   {item.contentType === 'article' ? (
                     <ArticleSummaryPreview
                       key={item.bodyRef || item.id}
+                      contentId={item.id}
                       bodyRef={item.bodyRef}
                       label={locale === 'en' ? 'Summary' : locale === 'tw' ? '文章摘要' : '文章摘要'}
                     />
