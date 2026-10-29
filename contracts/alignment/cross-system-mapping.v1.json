@@ -5248,18 +5248,52 @@
     },
     {
       "featureId": "PAY-002",
-      "status": "UNRESOLVED",
-      "apiOperationIds": [],
-      "entityIds": [],
+      "status": "PARTIAL",
+      "apiOperationIds": [
+        "createCommerceOrder",
+        "getCommerceOrder"
+      ],
+      "entityIds": [
+        "ENT-ORDER",
+        "ENT-ORDER-LINE"
+      ],
       "payloadCollections": [],
-      "codeEvidenceRefs": [],
+      "codeEvidenceRefs": [
+        "workers/W01-payload/src/app/api/v1/commerce/orders/route.ts",
+        "workers/W01-payload/src/app/api/v1/commerce/orders/[orderId]/route.ts",
+        "workers/W01-payload/src/commerce/w07-commerce-client.ts",
+        "workers/W01-payload/tests/int/commerce-order-v1-adapter.int.spec.ts",
+        "workers/W07-subscription-commerce/src/order-http-runtime.ts",
+        "workers/W07-subscription-commerce/src/order-http-runtime.test.ts",
+        "workers/W07-subscription-commerce/src/order-persistence.ts",
+        "workers/W07-subscription-commerce/src/order-persistence.test.ts",
+        "workers/W07-subscription-commerce/src/order-request-validation.ts",
+        "workers/W07-subscription-commerce/src/order-request-validation.test.ts",
+        "workers/W07-subscription-commerce/src/order-item-resolution.ts",
+        "workers/W07-subscription-commerce/src/order-item-resolution.test.ts",
+        "workers/W07-subscription-commerce/src/paid-membership-order-fulfillment.ts",
+        "workers/W07-subscription-commerce/src/paid-membership-order-fulfillment.test.ts"
+      ],
       "evidence": [
         "contracts/alignment/mapping-batches/B13-B15-creator-membership-commerce.v1.json",
         "contracts/alignment/mapping-batches/MON-001-011-PAY-001-013-real-evidence-reconciliation.v1.md",
-        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/openapi/v1/operation-policy.json",
+        "contracts/entity/ORDER-ENTITY-CONTRACT.v1.json",
+        "contracts/entity/ORDER-LINE-ENTITY-CONTRACT.v1.json",
+        "contracts/persistence/ORDER-D1-04-persistence.v1.json",
+        "contracts/state-machines/order.json",
+        "workers/W07-subscription-commerce/migrations-d1-04/0001_order_commerce.sql",
+        "workers/W07-subscription-commerce/src/order-persistence.test.ts",
+        "workers/W07-subscription-commerce/src/order-http-runtime.test.ts",
+        "workers/W01-payload/tests/int/commerce-order-v1-adapter.int.spec.ts"
       ],
       "blockers": [
-        "Canonical Mapping record is materialized; API/Entity/Field/Persistence/Runtime mapping remains unresolved and must be closed in downstream reconciliation."
+        "Order/OrderLine route, W07 runtime, D1 persistence candidate, validation, and automated tests are now explicitly traceable; this is source/test coverage, not proof of production admission.",
+        "D1-04 order migrations 0001-0004 are repository candidates; exact production migration history and post-migration schema evidence remain unverified, and no migration is authorized by this mapping change.",
+        "Order creation remains fail-closed unless the configured authoritative demo-pricing/tax adapter is explicitly enabled; production pricing/tax configuration and provider secrets have not been verified here.",
+        "Exact-commit persistence/integration evidence is still required for live D1 create/read, cross-customer denial, idempotent replay and key conflict, concurrent duplicate attempts, stale in-progress recovery, and rollback/failure behavior.",
+        "Membership-plan resolution is the currently admitted item family for this Beta path; unsupported item families must continue to fail closed."
       ]
     },
     {
