@@ -57,6 +57,13 @@ export async function resolveCommerceOrderItems(
   if (!validated.ok) {
     throw new SubscriptionRuntimeError(validated.error.code, validated.error.status);
   }
+  // Beta paid-membership fulfillment is intentionally a single subscription
+  // per Order. Reject multi-plan carts here rather than charging successfully
+  // and discovering after the signed webhook that the fulfillment contract
+  // cannot atomically authorize every line.
+  if (validated.value.items.length !== 1) {
+    throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400);
+  }
 
   const planIds = toPlanIds(validated.value.items);
   const plans = await resolvePurchasableMembershipPlanOffers(db, planIds);
