@@ -177,7 +177,11 @@ const checkedMultiply = (left: number, right: number): number => {
 
 const canonicalRequestJson = (request: CreateCommerceOrderRequest): string =>
   JSON.stringify({
-    items: request.items.map(({ itemRef, quantity }) => ({ itemRef, quantity })),
+    // Item order has no business meaning in this API; sort the closed DTO
+    // deterministically so retries for the same basket share one fingerprint.
+    items: request.items
+      .map(({ itemRef, quantity }) => ({ itemRef, quantity }))
+      .sort((left, right) => left.itemRef < right.itemRef ? -1 : left.itemRef > right.itemRef ? 1 : 0),
   });
 
 const sha256Hex = async (value: string): Promise<string> => {
