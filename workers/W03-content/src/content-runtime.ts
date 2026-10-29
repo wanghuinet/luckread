@@ -1015,20 +1015,26 @@ export async function listContents(
   limit: number,
   creatorId: string | null = null,
   contentType: ContentType | null = null,
+  ownerUserId: string | null = null,
 ): Promise<{ items: ContentRecord[]; nextCursor: string | null; hasMore: boolean }> {
   const pageSize = Math.min(Math.max(Number.isSafeInteger(limit) ? limit : 20, 1), 50)
   if (creatorId) assertResourceId(creatorId)
+  if (ownerUserId) assertResourceId(ownerUserId)
   if (contentType && !['article', 'post', 'video'].includes(contentType)) {
     throw new ContentRuntimeError('VALIDATION_FAILED', 400)
   }
 
-  const decoded = cursor ? decodeContentListCursor(cursor, creatorId, contentType) : null
+  const decoded = cursor ? decodeContentListCursor(cursor, creatorId, contentType, ownerUserId) : null
   const conditions = ["state = 'PUBLISHED'"]
   const bindings: unknown[] = []
 
   if (creatorId) {
     conditions.push('creator_id = ?')
     bindings.push(creatorId)
+  }
+  if (ownerUserId) {
+    conditions.push('owner_user_id = ?')
+    bindings.push(ownerUserId)
   }
   if (contentType) {
     conditions.push('content_type = ?')
@@ -1055,7 +1061,7 @@ export async function listContents(
   return {
     items: page,
     hasMore,
-    nextCursor: hasMore && last ? encodeContentListCursor(last.createdAt, last.id, creatorId, contentType) : null,
+    nextCursor: hasMore && last ? encodeContentListCursor(last.createdAt, last.id, creatorId, contentType, ownerUserId) : null,
   }
 }
 
@@ -1914,6 +1920,7 @@ type ContentListCursor = {
   createdAt: string
   id: string
   creatorId: string | null
+  ownerUserId?: string | null
   contentType: ContentType | null
 }
 
@@ -1922,8 +1929,9 @@ export function encodeContentListCursor(
   id: string,
   creatorId: string | null,
   contentType: ContentType | null,
+  ownerUserId: string | null = null,
 ): string {
-  const raw = JSON.stringify({ version: 1, createdAt, id, creatorId, contentType } satisfies ContentListCursor)
+  const raw = JSON.stringify({ version: 1, createdAt, id, creatorId, ownerUserId, contentType } satisfies ContentListCursor)
   const bytes = new TextEncoder().encode(raw)
   let binary = ''
   for (const byte of bytes) binary += String.fromCharCode(byte)
@@ -1934,6 +1942,7 @@ export function decodeContentListCursor(
   value: string,
   creatorId: string | null,
   contentType: ContentType | null,
+  ownerUserId: string | null = null,
 ): ContentListCursor {
   try {
     if (!value || value.length > 2048 || !/^[A-Za-z0-9_-]+$/.test(value)) throw new Error('INVALID')
@@ -1948,11 +1957,13 @@ export function decodeContentListCursor(
       typeof decoded.id !== 'string' ||
       !/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(decoded.id) ||
       (decoded.creatorId !== null && typeof decoded.creatorId !== 'string') ||
+      (decoded.ownerUserId !== undefined && decoded.ownerUserId !== null && typeof decoded.ownerUserId !== 'string') ||
       (decoded.contentType !== null && !['article', 'post', 'video'].includes(decoded.contentType as string)) ||
       decoded.creatorId !== creatorId ||
+      (decoded.ownerUserId ?? null) !== ownerUserId ||
       decoded.contentType !== contentType
     ) throw new Error('INVALID')
-    return decoded as ContentListCursor
+    return { ...decoded, ownerUserId: decoded.ownerUserId ?? null } as ContentListCursor
   } catch {
     throw new ContentRuntimeError('INVALID_CURSOR', 400)
   }
