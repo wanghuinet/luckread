@@ -1187,6 +1187,7 @@ export async function createContent(
       parsed.revision < 1 ||
       typeof parsed.slug !== 'string' ||
       typeof parsed.title !== 'string' ||
+      (parsed.accessMode !== undefined && !['PUBLIC', 'MEMBERS_ONLY'].includes(String(parsed.accessMode))) ||
       typeof parsed.bodyRef !== 'string' ||
       !Array.isArray(parsed.mediaRefs) ||
       parsed.mediaRefs.some(ref => typeof ref !== 'string') ||
@@ -1225,6 +1226,8 @@ export async function createContent(
     ipId: null,
     state: 'DRAFT',
     scheduledAt: null,
+    accessMode: normalized.accessMode ?? 'PUBLIC',
+    accessGranted: true,
     version: 1,
     revision: 1,
     slug,
@@ -1243,8 +1246,8 @@ export async function createContent(
     db.prepare(
       `INSERT INTO contents
         (id, content_type, owner_user_id, creator_id, ip_id, state, scheduled_at, access_mode, version, revision, slug, title, body_ref, media_refs_json, cover_ref, etag, created_at, updated_at)
-       VALUES (?, ?, ?, ?, NULL, 'DRAFT', NULL, 1, 1, ?, ?, ?, ?, ?, ?, ?, ?) `,
-    ).bind(contentId, normalized.contentType, ownerUserId, ownerUserId, slug, normalized.title, normalized.bodyRef, JSON.stringify(normalized.mediaRefs), normalized.coverRef, createdContent.etag, createdAt, createdAt),
+       VALUES (?, ?, ?, ?, NULL, 'DRAFT', NULL, ?, 1, 1, ?, ?, ?, ?, ?, ?, ?, ?) `,
+    ).bind(contentId, normalized.contentType, ownerUserId, ownerUserId, normalized.accessMode ?? 'PUBLIC', slug, normalized.title, normalized.bodyRef, JSON.stringify(normalized.mediaRefs), normalized.coverRef, createdContent.etag, createdAt, createdAt),
     atomicGuard(db),
     insertRevision(db, {
       id: crypto.randomUUID(),
@@ -1255,6 +1258,7 @@ export async function createContent(
       sourceRevision: null,
       operation: 'CREATE',
       state: 'DRAFT',
+      accessMode: createdContent.accessMode,
       slug,
       title: normalized.title,
       bodyRef: normalized.bodyRef,
@@ -1311,6 +1315,8 @@ export async function updateContent(
   const updated: ContentRecord = {
     ...content,
     scheduledAt: content.scheduledAt,
+    accessMode: normalized.accessMode ?? 'PUBLIC',
+    accessGranted: true,
     title: normalized.title,
     bodyRef: normalized.bodyRef,
     mediaRefs: normalized.mediaRefs,
@@ -1328,9 +1334,9 @@ export async function updateContent(
     insertCompletedIdempotency(db, principalUserId, operationId, idempotencyKey, hash, 200, idempotencyResponseBody, updatedAt, expiresAt),
     db.prepare(
       `UPDATE contents
-          SET title = ?, body_ref = ?, media_refs_json = ?, cover_ref = ?, version = ?, revision = ?, etag = ?, updated_at = ?
+          SET title = ?, body_ref = ?, media_refs_json = ?, cover_ref = ?, access_mode = ?, version = ?, revision = ?, etag = ?, updated_at = ?
         WHERE id = ? AND owner_user_id = ? AND version = ? AND etag = ?`,
-    ).bind(updated.title, updated.bodyRef, JSON.stringify(updated.mediaRefs), updated.coverRef, nextVersion, nextRevision, updated.etag, updatedAt, content.id, principalUserId, content.version, content.etag),
+    ).bind(updated.title, updated.bodyRef, JSON.stringify(updated.mediaRefs), updated.coverRef, updated.accessMode ?? 'PUBLIC', nextVersion, nextRevision, updated.etag, updatedAt, content.id, principalUserId, content.version, content.etag),
     atomicGuard(db),
     insertRevision(db, {
       id: crypto.randomUUID(),
@@ -1341,6 +1347,7 @@ export async function updateContent(
       sourceRevision: content.revision,
       operation: 'UPDATE',
       state: content.state,
+      accessMode: updated.accessMode,
       slug: updated.slug,
       title: updated.title,
       bodyRef: updated.bodyRef,
@@ -1402,6 +1409,8 @@ export async function rollbackContentRevision(
   const updated: ContentRecord = {
     ...content,
     scheduledAt: null,
+    accessMode: source.access_mode === 'MEMBERS_ONLY' ? 'MEMBERS_ONLY' : 'PUBLIC',
+    accessGranted: true,
     slug: source.slug,
     title: source.title,
     bodyRef: source.body_ref,
@@ -1418,9 +1427,9 @@ export async function rollbackContentRevision(
     expireMutationRow(db, principalUserId, operationId, idempotencyKey, updatedAt),
     insertCompletedIdempotency(db, principalUserId, operationId, idempotencyKey, hash, 200, JSON.stringify(result), updatedAt, expiresAt),
     db.prepare(`UPDATE contents
-   SET title = ?, body_ref = ?, media_refs_json = ?, cover_ref = ?, version = ?, revision = ?, etag = ?, updated_at = ?
+   SET title = ?, body_ref = ?, media_refs_json = ?, cover_ref = ?, access_mode = ?, version = ?, revision = ?, etag = ?, updated_at = ?
  WHERE id = ? AND owner_user_id = ? AND version = ? AND etag = ?`).bind(
-      updated.title, updated.bodyRef, JSON.stringify(updated.mediaRefs), updated.coverRef,
+      updated.title, updated.bodyRef, JSON.stringify(updated.mediaRefs), updated.coverRef, updated.accessMode ?? 'PUBLIC',
       nextVersion, nextRevision, updated.etag, updatedAt,
       content.id, principalUserId, content.version, content.etag,
     ),
@@ -1434,6 +1443,7 @@ export async function rollbackContentRevision(
       sourceRevision: source.revision,
       operation: 'ROLLBACK',
       state: content.state,
+      accessMode: updated.accessMode,
       slug: updated.slug,
       title: updated.title,
       bodyRef: updated.bodyRef,
