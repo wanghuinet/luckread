@@ -103,6 +103,27 @@
         "workers/W07-subscription-commerce/migrations-d1-04/0002_payment_provider_events.sql",
         "docs/change-control/CC-PAY-001-PAYMENT-ENTITY-MODEL-2026-10-28.md"
       ]
+    },
+    {
+      "featureId": "PAY-002",
+      "domainId": "D1-04",
+      "entityIds": [
+        "ENT-ORDER",
+        "ENT-ORDER-LINE"
+      ],
+      "persistenceMode": "LUCKREAD_EXTENSION",
+      "owner": "W07-subscription-commerce",
+      "status": "BLOCKED",
+      "evidenceRefs": [
+        "contracts/entity/ORDER-ENTITY-CONTRACT.v1.json",
+        "contracts/entity/ORDER-LINE-ENTITY-CONTRACT.v1.json",
+        "contracts/persistence/ORDER-D1-04-persistence.v1.json",
+        "workers/W07-subscription-commerce/migrations-d1-04/0001_order_commerce.sql",
+        "workers/W07-subscription-commerce/src/order-persistence.ts",
+        "workers/W07-subscription-commerce/src/order-persistence.test.ts",
+        "contracts/candidates/PAY-002/order-api-admission.v1.json",
+        "contracts/alignment/cross-system-mapping.v1.json"
+      ]
     }
   ]
 }
