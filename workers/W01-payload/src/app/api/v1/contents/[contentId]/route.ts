@@ -92,8 +92,9 @@ export async function PATCH(
     const mediaValidation = await validateOwnedPostMediaReferences(principal.userId, body, new URL(request.url).origin)
     if ('status' in mediaValidation) return mediaReferenceValidationResponse(mediaValidation)
 
+    const changesAccessMode = body && typeof body === 'object' && !Array.isArray(body) && Object.hasOwn(body, 'accessMode')
     let verifiedCreatorId: string | undefined
-    if (body && typeof body === 'object' && !Array.isArray(body) && Object.hasOwn(body, 'accessMode')) {
+    if (changesAccessMode) {
       const resolved = await resolveVerifiedContentCreatorId(request, principal)
       if (resolved instanceof Response) return resolved
       verifiedCreatorId = resolved
@@ -108,6 +109,10 @@ export async function PATCH(
       verifiedCreatorId,
     })
     if (response.ok) {
+      if (changesAccessMode) {
+        await invalidatePublicContentVisibility(contentId)
+        await invalidatePublicContentList(request)
+      }
       await invalidatePublicContentDetail(request, contentId)
     }
     return response
