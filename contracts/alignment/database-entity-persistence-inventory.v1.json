@@ -205,6 +205,54 @@
         "contracts/entity/MODERATION-DECISION-CONTRACT.v1.json",
         "contracts/persistence/MODERATION-QUEUE-FOUNDATION-persistence.v1.json"
       ]
+    },
+    {
+      "entityId": "ENT-ORDER",
+      "entityName": "Order",
+      "domainId": "D1-04",
+      "entityStatus": "PROPOSED",
+      "implementationRef": "workers/W07-subscription-commerce/src/order-persistence.ts",
+      "persistenceStatus": "NOT_VERIFIED",
+      "adapter": "Cloudflare D1 (D1-04) / W07 order persistence source candidate",
+      "migrationRefs": [
+        "workers/W07-subscription-commerce/migrations-d1-04/0001_order_commerce.sql"
+      ],
+      "fieldContractRef": "contracts/entity/ORDER-ENTITY-CONTRACT.v1.json",
+      "persistenceContractRef": "contracts/persistence/ORDER-D1-04-persistence.v1.json",
+      "evidenceRefs": [
+        "contracts/entity/entity-catalog.v1.json",
+        "contracts/persistence/ORDER-D1-04-persistence.v1.json",
+        "workers/W07-subscription-commerce/migrations-d1-04/0001_order_commerce.sql",
+        "workers/W07-subscription-commerce/src/order-persistence.ts",
+        "workers/W07-subscription-commerce/src/order-persistence.test.ts",
+        "contracts/candidates/PAY-002/order-api-admission.v1.json",
+        "contracts/entity/ORDER-ENTITY-CONTRACT.v1.json",
+        "workers/W01-payload/tests/int/commerce-order-v1-adapter.int.spec.ts"
+      ]
+    },
+    {
+      "entityId": "ENT-ORDER-LINE",
+      "entityName": "OrderLine",
+      "domainId": "D1-04",
+      "entityStatus": "PROPOSED",
+      "implementationRef": "workers/W07-subscription-commerce/src/order-persistence.ts",
+      "persistenceStatus": "NOT_VERIFIED",
+      "adapter": "Cloudflare D1 (D1-04) / W07 immutable order-line snapshot source candidate",
+      "migrationRefs": [
+        "workers/W07-subscription-commerce/migrations-d1-04/0001_order_commerce.sql"
+      ],
+      "fieldContractRef": "contracts/entity/ORDER-LINE-ENTITY-CONTRACT.v1.json",
+      "persistenceContractRef": "contracts/persistence/ORDER-D1-04-persistence.v1.json",
+      "evidenceRefs": [
+        "contracts/entity/entity-catalog.v1.json",
+        "contracts/persistence/ORDER-D1-04-persistence.v1.json",
+        "workers/W07-subscription-commerce/migrations-d1-04/0001_order_commerce.sql",
+        "workers/W07-subscription-commerce/src/order-persistence.ts",
+        "workers/W07-subscription-commerce/src/order-persistence.test.ts",
+        "contracts/candidates/PAY-002/order-api-admission.v1.json",
+        "contracts/entity/ORDER-LINE-ENTITY-CONTRACT.v1.json",
+        "workers/W01-payload/tests/int/commerce-order-v1-adapter.int.spec.ts"
+      ]
     }
   ],
   "rules": {
@@ -223,6 +271,7 @@
     "Entity completeness against the full Blueprint v2.0 domain inventory is not yet reconciled.",
     "Step 03 remains NOT_GREEN until implementation, migration, authority and completeness evidence are reconciled.",
     "ENT-IDENTITY remains PROPOSED because no production identity materialization/ownership implementation is independently evidenced; AUTH-003 credential runtime consumes pre-existing auth_identities rows.",
-    "ModerationCase/ModerationDecision persistence is contract-defined but remains unexecuted and unverified until migration and runtime evidence are admitted."
+    "ModerationCase/ModerationDecision persistence is contract-defined but remains unexecuted and unverified until migration and runtime evidence are admitted.",
+    "ENT-ORDER and ENT-ORDER-LINE now have explicit D1-04 source/migration references, but the migration remains a repository candidate and remote schema/read-back evidence is absent; both persistence records remain NOT_VERIFIED."
   ]
 }
