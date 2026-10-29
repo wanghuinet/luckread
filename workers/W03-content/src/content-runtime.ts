@@ -273,6 +273,89 @@ const publicPostMediaReferenceCandidates = (value: string): string[] => {
  * record yet, so the public resolver deliberately fails closed for those types.
  * W03 remains the authority for the live publication state.
  */
+export type PublishedMediaReferenceAccess = Readonly<{
+  isPublic: boolean
+  isMemberContent: boolean
+  allowed: boolean
+}>
+
+type PublishedMediaReferenceRow = Readonly<{
+  id: string
+  owner_user_id: string
+  creator_id: string | null
+  content_type: ContentType
+  access_mode: ContentAccessMode
+}>
+
+/**
+ * Resolves a delivery URL against currently published content references.
+ * Public media keeps the existing public-post-only rule. If a reference is used
+ * by any member-only content, the URL is protected and must pass a fresh
+ * subscription check; it cannot fall back to anonymous public delivery merely
+ * because the same object is also referenced by a public post.
+ */
+export async function resolvePublishedMediaReferenceAccess(
+  db: ContentD1,
+  mediaUrlValue: string,
+  viewerUserId: string | null,
+  hasCreatorMembership?: CreatorMembershipAccessResolver,
+): Promise<PublishedMediaReferenceAccess> {
+  const candidates = publicPostMediaReferenceCandidates(mediaUrlValue)
+  if (candidates.length === 0) {
+    return { isPublic: false, isMemberContent: false, allowed: false }
+  }
+  const placeholders = candidates.map(() => '?').join(', ')
+  const sql = [
+    'SELECT id, owner_user_id, creator_id, content_type, access_mode',
+    'FROM contents',
+    "WHERE state = 'PUBLISHED'",
+    '  AND (',
+    '    body_ref IN (' + placeholders + ')',
+    '    OR cover_ref IN (' + placeholders + ')',
+    '    OR EXISTS (',
+    '      SELECT 1',
+    '      FROM json_each(contents.media_refs_json) AS media_ref',
+    '      WHERE media_ref.value IN (' + placeholders + ')',
+    '    )',
+    '  )',
+    'ORDER BY id ASC',
+    'LIMIT 51',
+  ].join('\\n')
+  let rows: PublishedMediaReferenceRow[]
+  try {
+    const result = await db.prepare(sql)
+      .bind(...candidates, ...candidates, ...candidates)
+      .all<PublishedMediaReferenceRow>()
+    rows = result.results ?? []
+  } catch {
+    throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
+  }
+  if (rows.length > 50) throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
+  if (rows.length === 0) return { isPublic: false, isMemberContent: false, allowed: false }
+
+  const memberRows = rows.filter((row) => row.access_mode === 'MEMBERS_ONLY')
+  if (memberRows.length > 0) {
+    if (viewerUserId && memberRows.some((row) => row.owner_user_id === viewerUserId)) {
+      return { isPublic: false, isMemberContent: true, allowed: true }
+    }
+    if (!viewerUserId || !hasCreatorMembership) {
+      return { isPublic: false, isMemberContent: true, allowed: false }
+    }
+    const creatorIds = [...new Set(memberRows.map((row) => row.creator_id).filter(
+      (creatorId): creatorId is string => typeof creatorId === 'string' && creatorId.length > 0,
+    ))]
+    for (const creatorId of creatorIds) {
+      if (await hasCreatorMembership(creatorId)) {
+        return { isPublic: false, isMemberContent: true, allowed: true }
+      }
+    }
+    return { isPublic: false, isMemberContent: true, allowed: false }
+  }
+
+  const isPublic = rows.some((row) => row.content_type === 'post' && row.access_mode !== 'MEMBERS_ONLY')
+  return { isPublic, isMemberContent: false, allowed: isPublic }
+}
+
 export async function isPublishedPublicPostMediaReference(
   db: ContentD1,
   mediaUrlValue: string,
