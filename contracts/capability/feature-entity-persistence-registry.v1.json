@@ -88,6 +88,28 @@
       ]
     },
     {
+      "featureId": "MON-005",
+      "domainId": "D1-01",
+      "entityIds": [
+        "ENT-SUBSCRIPTION"
+      ],
+      "persistenceMode": "LUCKREAD_EXTENSION",
+      "owner": "W07-subscription-commerce via the admitted D1-01 Subscription authority boundary",
+      "status": "BLOCKED",
+      "evidenceRefs": [
+        "contracts/entity/SUBSCRIPTION-ENTITY-CONTRACT.v1.json",
+        "contracts/persistence/SUBSCRIPTION-D1-01-persistence.v1.json",
+        "contracts/state-machines/subscription.json",
+        "workers/W07-subscription-commerce/migrations/0001_membership_subscriptions.sql",
+        "workers/W07-subscription-commerce/migrations/0002_subscription_version_cas.sql",
+        "workers/W07-subscription-commerce/src/subscription-runtime.ts",
+        "workers/W07-subscription-commerce/src/subscription-runtime.test.ts",
+        "workers/W01-payload/src/app/api/v1/memberships/subscriptions/[[...segments]]/route.ts",
+        "workers/W01-payload/tests/int/subscription-v1-adapter.int.spec.ts",
+        "contracts/alignment/mapping-batches/MON-001-011-PAY-001-013-real-evidence-reconciliation.v1.md"
+      ]
+    },
+    {
       "featureId": "PAY-001",
       "domainId": "D1-04",
       "entityIds": [
