@@ -143,11 +143,11 @@ export async function GET(
       return privateError(503, 'SERVICE_UNAVAILABLE')
     }
     const content = value as Record<string, unknown>
-    if (typeof content.contentId !== 'string' ||
+    if (content.contentId !== contentId ||
         typeof content.ownerUserId !== 'string' ||
         !content.ownerUserId ||
         (content.accessMode !== 'PUBLIC' && content.accessMode !== 'MEMBERS_ONLY') ||
-        (content.accessMode === 'MEMBERS_ONLY' && content.accessGranted !== true) ||
+        content.accessGranted !== true ||
         typeof content.bodyRef !== 'string' || !content.bodyRef) {
       // Use the same response for absent and denied bodies; do not reveal whether
       // the private body object exists or whether the caller lacks membership.
