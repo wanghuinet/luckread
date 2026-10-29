@@ -246,7 +246,7 @@ export default function HomeContentFeed({
                 contentId={item.id}
                 slug={item.slug}
                 title={item.title}
-                creatorId={item.ownerUserId || item.creatorId}
+                creatorId={item.creatorId ?? item.ownerUserId}
                 author={item.creator ?? item.author}
                 coverRef={item.coverRef}
                 mediaRefs={item.mediaRefs}
