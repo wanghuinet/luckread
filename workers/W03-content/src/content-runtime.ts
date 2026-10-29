@@ -1090,7 +1090,7 @@ export async function searchPublishedContents(
     : []
 
   const rows = await db.prepare(`
-    SELECT id, content_type, owner_user_id, creator_id, ip_id, state, scheduled_at,
+    SELECT id, content_type, owner_user_id, creator_id, ip_id, state, scheduled_at, access_mode,
            version, revision, slug, title, body_ref, media_refs_json, cover_ref,
            etag, created_at, updated_at
       FROM contents
