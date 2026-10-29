@@ -172,28 +172,39 @@ jobs:
             const hasAccessMode = columns('contents').has('access_mode') || columns('content_revisions').has('access_mode');
             let state;
             if (applied.length === 13) {
-              const absent = missing({contents:['slug','scheduled_at','media_refs_json','access_mode'],
-                content_revisions:['id','content_id','revision','slug','etag','access_mode'],
-                content_relationships:['relationship_id','relation_type','position'],
-                content_series:['id','owner_user_id','state'],content_collections:['id','owner_user_id','state'],
-                content_id_snowflake_state:['id','last_timestamp_ms','sequence']});
-              if (absent.length) throw new Error('Ledger is current but schema is incomplete: ' + JSON.stringify(absent));
+              const absent = missing({
+                contents:['slug','scheduled_at','media_refs_json','access_mode'],
+                content_revisions:['id','content_id','revision','content_version','actor_user_id','operation','state','slug','title','body_ref','media_refs_json','etag','correlation_id','created_at','access_mode'],
+                content_relationships:['relationship_id','source_id','target_id','relation_type','position','status'],
+                content_series:['id','owner_user_id','creator_id','state'],
+                content_collections:['id','owner_user_id','creator_id','state'],
+                content_id_snowflake_state:['id','last_timestamp_ms','sequence']
+              });
+              if (absent.length || missingBaseTables.length || missingBaseTriggers.length) {
+                throw new Error('Ledger is current but schema is incomplete: ' + JSON.stringify({absent,missingBaseTables,missingBaseTriggers}));
+              }
               state = 'CURRENT_0001_0013';
             } else if (applied.length === 12) {
-              const absent = missing({contents:['slug','scheduled_at','media_refs_json'],
-                content_revisions:['id','content_id','revision','slug','etag'],
-                content_relationships:['relationship_id','relation_type','position'],
-                content_series:['id','owner_user_id','state'],content_collections:['id','owner_user_id','state'],
-                content_id_snowflake_state:['id','last_timestamp_ms','sequence']});
+              const absent = missing({
+                contents:['id','content_type','owner_user_id','creator_id','state','version','revision','slug','scheduled_at','title','body_ref','media_refs_json','etag','created_at','updated_at'],
+                content_revisions:['id','content_id','revision','content_version','actor_user_id','operation','state','slug','title','body_ref','media_refs_json','etag','correlation_id','created_at'],
+                content_relationships:['relationship_id','source_id','target_id','relation_type','position','status'],
+                content_series:['id','owner_user_id','creator_id','state'],
+                content_collections:['id','owner_user_id','creator_id','state'],
+                content_id_snowflake_state:['id','last_timestamp_ms','sequence']
+              });
               if (absent.length || missingBaseTables.length || missingBaseTriggers.length || hasAccessMode) {
                 throw new Error('Remote schema does not match post-0012 state: ' + JSON.stringify({absent,missingBaseTables,missingBaseTriggers,hasAccessMode}));
               }
               state = 'PENDING_0013';
             } else if (applied.length === 11) {
-              const absent = missing({contents:['slug','scheduled_at','media_refs_json'],
-                content_revisions:['id','content_id','revision','slug','etag'],
-                content_relationships:['relationship_id','relation_type','position'],
-                content_series:['id','owner_user_id','state'],content_collections:['id','owner_user_id','state']});
+              const absent = missing({
+                contents:['id','content_type','owner_user_id','creator_id','state','version','revision','slug','scheduled_at','title','body_ref','media_refs_json','etag','created_at','updated_at'],
+                content_revisions:['id','content_id','revision','content_version','actor_user_id','operation','state','slug','title','body_ref','media_refs_json','etag','correlation_id','created_at'],
+                content_relationships:['relationship_id','source_id','target_id','relation_type','position','status'],
+                content_series:['id','owner_user_id','creator_id','state'],
+                content_collections:['id','owner_user_id','creator_id','state']
+              });
               if (absent.length || missingBaseTables.length || missingBaseTriggers.length ||
                   tables.has('content_id_snowflake_state') || hasAccessMode) {
                 throw new Error('Remote schema does not match post-0011 state: ' + JSON.stringify({absent,missingBaseTables,missingBaseTriggers,hasAllocator:tables.has('content_id_snowflake_state'),hasAccessMode}));
