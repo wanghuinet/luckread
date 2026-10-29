@@ -50,6 +50,8 @@ describe('content body access boundary', () => {
   it('uses only the same-origin body endpoint from detail and preview clients', () => {
     const detail = read('src/app/(frontend)/content/[contentId]/ContentDetailClient.tsx')
     const preview = read('src/components/ArticleSummaryPreview.tsx')
+    const publisher = read('src/app/(frontend)/publish/PublishComposer.tsx')
+    const social = read('src/app/api/v1/contents/[contentId]/social/route.ts')
     const nativeAdapter = read('../../app/lib/content-adapter.ts')
 
     expect(detail).toContain('/api/v1/contents/')
@@ -58,6 +60,11 @@ describe('content body access boundary', () => {
     expect(preview).toContain('/api/v1/contents/')
     expect(preview).toContain('/body?preview=1')
     expect(preview).not.toContain('apiFetch(bodyRef')
+    expect(publisher).toContain('/api/v1/contents/')
+    expect(publisher).toContain('/body')
+    expect(publisher).not.toContain('apiFetch(recovered.bodyRef, {')
+    expect(social).toContain('readAuthorizedContentBody(request')
+    expect(social).not.toContain('readTrustedArticleBodyForSocialTokens')
     expect(nativeAdapter).toContain('fetchContentBodyById(item.id')
     expect(nativeAdapter).not.toContain('fetchContentBodyReference(url.toString()')
   })
