@@ -36,12 +36,20 @@
     },
     "permission": {
       "source": "Canonical moderation operation policy + permissions contract",
-      "resolution": "W06 maps operationId to required permission; client never supplies an authoritative permission",
+      "resolution": "W01 calls the existing W08_CREATOR CASL endpoint using the canonical W02 session; W01 forwards the server-derived ALLOW decision bound to the fixed operation permission, resource type, policy version, subject, and layer; W06 validates those headers against its fixed operation map; browser clients cannot supply authoritative permission context.",
       "requiredPermissions": {
         "listModerationQueue": "moderation.queue.read",
         "getModerationCase": "moderation.case.read",
         "decideModerationCase": "moderation.decide"
-      }
+      },
+      "authorizationContextHeaders": [
+        "X-LuckRead-Authz-Decision",
+        "X-LuckRead-Authz-Permission",
+        "X-LuckRead-Authz-Resource-Type",
+        "X-LuckRead-Authz-Policy-Version",
+        "X-LuckRead-Authz-Subject-Id",
+        "X-LuckRead-Authz-Layer"
+      ]
     },
     "reviewerScope": {
       "source": "W06 authoritative case/reviewer scope state",

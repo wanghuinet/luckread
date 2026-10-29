@@ -11,6 +11,15 @@ export class W06ModerationClientError extends Error {
   }
 }
 
+export type W06ModerationPermissionContext = Readonly<{
+  decision: 'ALLOW'
+  permission: 'moderation.queue.read' | 'moderation.case.read' | 'moderation.decide'
+  resourceType: 'ModerationQueue' | 'ModerationCase'
+  policyVersion: 'casl-l0-l8-v1'
+  subjectId: string
+  layer: string
+}>
+
 async function getW06Service(): Promise<W06ModerationService> {
   const context = await getCloudflareContext({ async: true })
   const service = (context.env as unknown as { W06_MODERATION?: W06ModerationService }).W06_MODERATION
@@ -194,6 +203,7 @@ export async function callW06Moderation(input: {
   method: string
   principal: ContentPrincipal
   body?: unknown
+  permissionContext?: W06ModerationPermissionContext
 }): Promise<Response> {
   if (!input.principal.userId || !input.principal.layer) {
     return Response.json(
@@ -212,6 +222,14 @@ export async function callW06Moderation(input: {
       input.request.headers.get('X-LuckRead-Correlation-Id')?.trim() || crypto.randomUUID(),
     'X-LuckRead-Request-Id': requestId(input.request),
   })
+  if (input.permissionContext) {
+    headers.set('X-LuckRead-Authz-Decision', input.permissionContext.decision)
+    headers.set('X-LuckRead-Authz-Permission', input.permissionContext.permission)
+    headers.set('X-LuckRead-Authz-Resource-Type', input.permissionContext.resourceType)
+    headers.set('X-LuckRead-Authz-Policy-Version', input.permissionContext.policyVersion)
+    headers.set('X-LuckRead-Authz-Subject-Id', input.permissionContext.subjectId)
+    headers.set('X-LuckRead-Authz-Layer', input.permissionContext.layer)
+  }
 
   const ifMatch = input.request.headers.get('If-Match')
   const idempotencyKey = input.request.headers.get('Idempotency-Key')
