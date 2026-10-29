@@ -341,7 +341,12 @@ describe('W03 content contract core', () => {
       bodyRef: '',
     })
     expect(entitlementChecks).toBe(1)
-    expect(queries.some((sql) => sql.includes("access_mode = 'MEMBERS_ONLY'"))).toBe(true)
+    expect(queries.some((sql) =>
+      sql.includes("state = 'PUBLISHED' AND access_mode = 'MEMBERS_ONLY'"),
+    )).toBe(true)
+    expect(queries.some((sql) =>
+      sql.includes("access_mode = 'MEMBERS_ONLY'") && !sql.includes("state = 'PUBLISHED'"),
+    )).toBe(false)
 
     allowed = true
     const entitled = await w03Worker.fetch(makeRequest(), env, {} as never)
