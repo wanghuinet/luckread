@@ -245,7 +245,7 @@ const parseStoredOrderData = (raw: string): CommerceOrderData => {
       !isValidOrderStatus(value.status) || !Number.isSafeInteger(value.version) || (value.version as number) < 1 ||
       typeof value.currency !== 'string' || !/^[A-Z]{3}$/.test(value.currency) ||
       !isFiniteIsoDate(value.createdAt) || !isFiniteIsoDate(value.updatedAt) ||
-      !Array.isArray(value.items) || value.items.length > 50) {
+      !Array.isArray(value.items) || value.items.length < 1 || value.items.length > 50) {
     throw new OrderPersistenceError('INTEGRITY_VIOLATION', 500);
   }
 
@@ -287,6 +287,10 @@ const parseStoredOrderData = (raw: string): CommerceOrderData => {
       lineTotalMinor: lineTotal,
     };
   });
+
+  if (new Set(items.map((item) => item.itemRef)).size !== items.length) {
+    throw new OrderPersistenceError('INTEGRITY_VIOLATION', 500);
+  }
 
   const sum = (selector: (item: CommerceOrderLineDto) => number): number =>
     items.reduce((totalSoFar, item) => checkedAdd(totalSoFar, selector(item)), 0);

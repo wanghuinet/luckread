@@ -268,6 +268,48 @@ describe('PAY-002 atomic D1-04 order persistence candidate', () => {
     expect(await getCommerceOrder(db as unknown as D1Database, 'user_1', created.data.orderId)).toEqual(created.data);
   });
 
+  it('rejects a persisted zero-value order whose order lines have disappeared', async () => {
+    const db = new MemoryD1();
+    const zeroPricing: typeof pricingFor = async (req) => ({
+      currency: 'USD',
+      items: req.items.map((item) => ({
+        itemType: 'MEMBERSHIP_PLAN',
+        itemRef: item.itemRef,
+        itemVersion: '1',
+        quantity: item.quantity,
+        unitAmountMinor: 0,
+        currency: 'USD',
+        lineDiscountMinor: 0,
+        lineTaxMinor: 0,
+        itemSnapshotJson: JSON.stringify({ planId: item.itemRef, planVersion: 1 }),
+      })),
+    });
+    const created = await createCommerceOrder(db as unknown as D1Database, 'user_1', 'zero_key',
+      request, zeroPricing, deterministicDependencies('zero'));
+    expect(created.data.totalMinor).toBe(0);
+    db.state.lines = [];
+
+    const error = await getCommerceOrder(db as unknown as D1Database, 'user_1', created.data.orderId)
+      .then(() => null, (e: unknown) => e);
+    expect(errorCode(error)).toBe('INTEGRITY_VIOLATION');
+  });
+
+  it('rejects duplicate item references in persisted order lines', async () => {
+    const db = new MemoryD1();
+    const twoItems = { items: [
+      { itemRef: 'plan_a', quantity: 1 },
+      { itemRef: 'plan_b', quantity: 1 },
+    ] };
+    const created = await createCommerceOrder(db as unknown as D1Database, 'user_1', 'duplicate_line_key',
+      twoItems, pricingFor, deterministicDependencies('duplicate'));
+    expect(db.state.lines).toHaveLength(2);
+    db.state.lines[1]!.item_ref = db.state.lines[0]!.item_ref;
+
+    const error = await getCommerceOrder(db as unknown as D1Database, 'user_1', created.data.orderId)
+      .then(() => null, (e: unknown) => e);
+    expect(errorCode(error)).toBe('INTEGRITY_VIOLATION');
+  });
+
   it('rolls back the claim and order if any line insert fails in the atomic batch', async () => {
     const db = new MemoryD1();
     db.failOnLineInsert = true;
