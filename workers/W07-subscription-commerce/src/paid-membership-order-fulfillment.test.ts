@@ -188,6 +188,7 @@ describe('paid membership order fulfillment', () => {
       { amount_minor: 499 },
       { payment_currency: 'EUR' },
       { order_status: 'CANCELLED' },
+      { order_status: 'PROCESSING' },
       { confirmed_at: null },
     ]) {
       const f = fixture({ order });
