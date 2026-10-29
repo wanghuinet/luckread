@@ -472,35 +472,26 @@ export async function apiRequest<T>(
  * Fetch a trusted W03 body reference through the shared native transport boundary.
  * This is for content-body text only; ordinary API calls must use apiRequest.
  */
-export async function fetchContentBodyReference(
-  value: string,
+export async function fetchContentBodyById(
+  contentId: string,
   options: { signal?: AbortSignal; sessionToken?: string | null } = {},
 ): Promise<Response> {
+  const id = typeof contentId === 'string' ? contentId.trim() : '';
+  if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(id)) {
+    throw new TypeError('Unsupported LuckRead content ID.');
+  }
+
   const base = new URL(getApiBaseUrl());
-  const target = new URL(value, base);
   const localDevelopmentHost = ['localhost', '127.0.0.1', '[::1]'].includes(base.hostname);
-  const protocolAllowed = target.protocol === 'https:' ||
-    (localDevelopmentHost && target.origin === base.origin && target.protocol === 'http:');
-  const trustedHost = target.origin === base.origin ||
-    target.hostname === 'luckread.com' || target.hostname.endsWith('.luckread.com');
-
-  if (
-    !protocolAllowed ||
-    !trustedHost ||
-    target.username ||
-    target.password ||
-    target.hash
-  ) {
-    throw new TypeError('Unsupported LuckRead content body reference.');
+  if (base.protocol !== 'https:' && !(localDevelopmentHost && base.protocol === 'http:')) {
+    throw new TypeError('Unsupported LuckRead API origin.');
   }
-
-  const headers = new Headers({ Accept: 'text/plain, application/json;q=0.9, */*;q=0.8' });
-  if (target.origin === base.origin) {
-    const token = options.sessionToken === undefined
-      ? await readSessionToken().catch(() => null)
-      : options.sessionToken;
-    if (token) headers.set('Authorization', 'Bearer ' + token);
-  }
+  const target = new URL('/v1/contents/' + encodeURIComponent(id) + '/body', base);
+  const headers = new Headers({ Accept: 'text/plain, application/json;q=0.9' });
+  const token = options.sessionToken === undefined
+    ? await readSessionToken().catch(() => null)
+    : options.sessionToken;
+  if (token) headers.set('Authorization', 'Bearer ' + token);
 
   let response: Response;
   try {
@@ -515,9 +506,8 @@ export async function fetchContentBodyReference(
     throw new LuckReadNetworkError();
   }
 
-  if (target.origin === base.origin) {
-    const renewedCredential = response.headers.get('X-LuckRead-Session-Token');
-    if (renewedCredential) await saveSessionToken(renewedCredential);
-  }
+  const renewedCredential = response.headers.get('X-LuckRead-Session-Token');
+  if (renewedCredential) await saveSessionToken(renewedCredential);
   return response;
 }
+
