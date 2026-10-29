@@ -1189,14 +1189,34 @@ const worker = {
             : undefined,
         )
         if (url.searchParams.get('bodyContext') === '1') {
-          // W01-only internal projection for the bounded body proxy. Keep the
-          // account owner and body reference off the public content response.
+          // A body object can be referenced by more than one content record.
+          // Apply the strictest current membership policy across every record
+          // that references these bytes, rather than letting a second PUBLIC
+          // record become a side door around a MEMBERS_ONLY article.
+          let bodyReferenceAllowed = true
+          if (content.bodyRef) {
+            const protectedReferences = await env.D1_02.prepare(
+              "SELECT owner_user_id, creator_id FROM contents WHERE body_ref = ? AND access_mode = 'MEMBERS_ONLY' LIMIT 51",
+            ).bind(content.bodyRef).all<{ owner_user_id: string; creator_id: string | null }>()
+            const rows = protectedReferences.results ?? []
+            if (rows.length > 50) throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
+            for (const row of rows) {
+              if (principalUserId && principalUserId === row.owner_user_id) continue
+              if (!principalUserId || !row.creator_id ||
+                  !(await resolveCreatorMembershipAccess(request, env, principalUserId, row.creator_id))) {
+                bodyReferenceAllowed = false
+                break
+              }
+            }
+          }
+          const accessGranted = (content.accessGranted ?? (content.accessMode !== 'MEMBERS_ONLY')) &&
+            bodyReferenceAllowed
           return json({
             contentId: content.id,
             ownerUserId: content.ownerUserId,
             accessMode: content.accessMode ?? 'PUBLIC',
-            accessGranted: content.accessGranted ?? (content.accessMode !== 'MEMBERS_ONLY'),
-            bodyRef: content.bodyRef,
+            accessGranted,
+            bodyRef: accessGranted ? content.bodyRef : '',
           })
         }
         return json({
