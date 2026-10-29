@@ -251,11 +251,11 @@ function matchesExistingSubscription(
   // purchase (renewal, pause, cancellation, expiration). Replay identity must
   // match only immutable order/subscription lineage and must never reactivate
   // or reset the current period.
+  // A subscription may legitimately change plan/version or billing period
+  // after purchase. The stable subscription ID is derived from this exact
+  // customer/order-line lineage, so replay compares only immutable lineage.
   return row.subscription_id === input.subscriptionId &&
     row.subscriber_id === input.subscriberId &&
-    row.plan_id === input.snapshot.planId &&
-    row.plan_version === input.snapshot.planVersion &&
-    row.creator_id === input.snapshot.creatorId &&
     row.started_at === input.periodStart &&
     row.entitlement_snapshot_ref === 'commerce-order:' + input.orderId + ':line:' + input.lineId;
 }
