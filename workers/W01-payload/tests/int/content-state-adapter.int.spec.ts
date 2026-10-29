@@ -225,3 +225,26 @@ describe('1.1 content lifecycle closeout', () => {
     expect(publisher).toContain("Idempotency-Key': crypto.randomUUID()")
   })
 })
+
+
+describe('Creator Center member-only publishing', () => {
+  it('persists paywall mode only through the verified Creator Center write paths', () => {
+    const publisher = read('src/app/(frontend)/publish/PublishComposer.tsx')
+    const creatorCreate = read('src/app/(payload)/api/creator/contents/route.ts')
+    const creatorDetail = read('src/app/(payload)/api/creator/contents/[contentId]/route.ts')
+    const runtime = readFileSync(resolve(process.cwd(), '../W03-content/src/content-runtime.ts'), 'utf8')
+
+    expect(publisher).toContain("contentBasePath === '/api/creator/contents'")
+    expect(publisher).toContain("accessMode: memberOnly ? 'MEMBERS_ONLY' as const : 'PUBLIC' as const")
+    expect(publisher).toContain("setMemberOnly(recovered.accessMode === 'MEMBERS_ONLY')")
+    expect(publisher).toContain('只有拥有该创作者有效会员订阅的用户可以读取正文和媒体')
+    expect(creatorCreate).toContain('resolveVerifiedContentCreatorId')
+    expect(creatorCreate).toContain("(body as { accessMode?: unknown }).accessMode === 'MEMBERS_ONLY'")
+    expect(creatorDetail).toContain('resolveVerifiedContentCreatorId')
+    expect(creatorDetail).toContain("Object.hasOwn(body, 'accessMode')")
+    expect(creatorDetail).toContain('verifiedCreatorId')
+    expect(runtime).toContain("access_mode")
+    expect(runtime).toContain('resolveCreatorMembershipAccess')
+    expect(runtime).toContain("content.accessMode !== 'MEMBERS_ONLY'")
+  })
+})
