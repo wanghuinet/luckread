@@ -31,6 +31,21 @@ describe('content body access boundary', () => {
     expect(route).not.toContain('fetch(content.bodyRef')
   })
 
+  it('keeps social token extraction on the full authorized body route even when /social has preview query params', () => {
+    const social = read('src/app/api/v1/contents/[contentId]/social/route.ts')
+
+    expect(social).toContain("import { GET as readAuthorizedContentBody } from '../body/route.js'")
+    expect(social).toContain("'/api/v1/contents/' + encodeURIComponent(contentId) + '/body'")
+    expect(social).toContain("const bodyRequest = new Request(bodyUrl, {")
+    expect(social).toContain("method: 'GET'")
+    expect(social).toContain("cache: 'no-store'")
+    expect(social).toContain("redirect: 'manual'")
+    expect(social).toContain("'authorization'")
+    expect(social).toContain("'cookie'")
+    expect(social).not.toContain('readAuthorizedContentBody(request,')
+    expect(social).not.toContain('readTrustedArticleBodyForSocialTokens')
+  })
+
   it('uses only the same-origin body endpoint from detail and preview clients', () => {
     const detail = read('src/app/(frontend)/content/[contentId]/ContentDetailClient.tsx')
     const preview = read('src/components/ArticleSummaryPreview.tsx')
