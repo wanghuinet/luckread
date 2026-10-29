@@ -192,7 +192,7 @@ it('uses the canonical public W01 API for server-rendered content detail and met
 
 it('rechecks member-only detail with the current session and never caches authorization decisions', () => {
   const page = read('src/app/(frontend)/content/[contentId]/ContentDetailClient.tsx')
-  const runtime = read('src/app/(frontend)/content/[contentId]/ContentDetailClient.tsx')
+  const runtime = read('../W03-content/src/content-runtime.ts')
   expect(page).toContain("initialContent?.accessMode === 'MEMBERS_ONLY'")
   expect(page).toContain("credentials: 'include'")
   expect(page).toContain("headers: { accept: 'application/json' }")
