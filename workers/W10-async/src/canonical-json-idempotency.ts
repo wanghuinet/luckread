@@ -157,6 +157,33 @@ export function canonicalizeJsonForIdempotency(
 }
 
 /**
+ * SHA-256 of already-serialized bytes as lowercase hexadecimal.
+ *
+ * Keep this primitive separate from canonical JSON serialization so callers
+ * with an existing stable byte representation can reuse the digest without
+ * changing persisted identities.
+ */
+export async function sha256BytesToHex(
+  bytes: Uint8Array,
+  subtle: Pick<SubtleCrypto, 'digest'> = globalThis.crypto.subtle,
+): Promise<string> {
+  // Copy to a definite ArrayBuffer-backed view for strict DOM BufferSource typings.
+  const digestInput = new Uint8Array(bytes.byteLength)
+  digestInput.set(bytes)
+
+  let digest: ArrayBuffer
+  try {
+    digest = await subtle.digest('SHA-256', digestInput.buffer)
+  } catch {
+    throw new CanonicalJsonError('HASH_UNAVAILABLE', 'SHA-256 payload hashing is unavailable')
+  }
+
+  return Array.from(new Uint8Array(digest), (byte) =>
+    byte.toString(16).padStart(2, '0'),
+  ).join('')
+}
+
+/**
  * SHA-256 of the canonical UTF-8 JSON, formatted as a lowercase hex digest.
  * A SubtleCrypto implementation can be injected for deterministic tests.
  */
@@ -168,16 +195,5 @@ export async function sha256CanonicalJsonForIdempotency(
   const canonical = canonicalizeJsonForIdempotency(value, maxBytes)
   const bytes = new TextEncoder().encode(canonical)
 
-  let digest: ArrayBuffer
-  try {
-    digest = await subtle.digest('SHA-256', bytes)
-  } catch {
-    throw new CanonicalJsonError('HASH_UNAVAILABLE', 'SHA-256 payload hashing is unavailable')
-  }
-
-  const hex = Array.from(new Uint8Array(digest), (byte) =>
-    byte.toString(16).padStart(2, '0'),
-  ).join('')
-
-  return 'sha256:' + hex
+  return 'sha256:' + await sha256BytesToHex(bytes, subtle)
 }

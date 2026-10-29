@@ -1,6 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
 import { strictlyAfterCanonicalUtcTimestamp } from './canonical-utc-timestamp.js';
+import { sha256BytesToHex } from '../../W10-async/src/canonical-json-idempotency.js';
 
 import {
   addBillingPeriod,
@@ -219,11 +220,6 @@ const strictlyAfter = (current: string, previous: string): string => {
 
 const defaultLeaseToken = (): string => crypto.randomUUID().replace(/-/g, '');
 
-const sha256Hex = async (value: string): Promise<string> => {
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
-  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
-};
-
 /** Stable identity: duplicate scans of the same subscription billing period produce the same cycle ID. */
 export async function renewalCycleIdFor(
   subscriptionId: string,
@@ -234,7 +230,14 @@ export async function renewalCycleIdFor(
       !isCanonicalIso(cycleEnd) || cycleEnd <= cycleStart) {
     throw new RenewalRuntimeError('VALIDATION_FAILED', 400);
   }
-  return 'rcy_' + (await sha256Hex(subscriptionId + '\u0000' + cycleStart + '\u0000' + cycleEnd)).slice(0, 26);
+  try {
+    const digest = await sha256BytesToHex(
+      new TextEncoder().encode(subscriptionId + '\u0000' + cycleStart + '\u0000' + cycleEnd),
+    );
+    return 'rcy_' + digest.slice(0, 26);
+  } catch {
+    throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
+  }
 }
 
 function resolveHyperswitchConfig(env: RenewalRuntimeEnv): HyperswitchClientConfig {

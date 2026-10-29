@@ -1,5 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
+import { sha256BytesToHex } from '../../W10-async/src/canonical-json-idempotency.js';
+
 export type SubscriptionStatus = 'PENDING' | 'ACTIVE' | 'PAST_DUE' | 'PAUSED' | 'CANCELED' | 'EXPIRED'
 
 export type SubscriptionRow = {
@@ -113,9 +115,11 @@ const subscriptionIdFromIdempotency = async (subscriberId: string, idempotencyKe
     throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
   }
   const material = new TextEncoder().encode('subscription-create\\0' + subscriberId + '\\0' + idempotencyKey)
-  const digest = await crypto.subtle.digest('SHA-256', material)
-  const hex = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('')
-  return 'sub_' + hex
+  try {
+    return 'sub_' + await sha256BytesToHex(material)
+  } catch {
+    throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
+  }
 }
 
 const toPublic = (row: SubscriptionRow) => ({

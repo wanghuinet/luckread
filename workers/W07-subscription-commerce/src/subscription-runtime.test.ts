@@ -462,6 +462,7 @@ describe('subscription runtime', () => {
     const digest = await crypto.subtle.digest('SHA-256', material)
     const legacyStableId = 'sub_' + Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('')
     expect(first.subscriptionId).toBe(legacyStableId)
+    expect(first.subscriptionId).toBe('sub_09509d9e66556f6b498f7aa8bf8727441d59b99eefe8f21cb2269f398082fdfa')
   })
   it('rejects inputs that could collide with legacy subscription ID delimiters', async () => {
     const db = fakeDb([], [activePlan('plan_basic', { owner_id: 'creator_1' })])
