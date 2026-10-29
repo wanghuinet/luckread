@@ -107,7 +107,8 @@ const nextUpdatedAt = (previous: string): string => {
 }
 
 const subscriptionIdFromIdempotency = async (subscriberId: string, idempotencyKey: string): Promise<string> => {
-  const material = new TextEncoder().encode('subscription-create\u0000' + subscriberId + '\u0000' + idempotencyKey)
+  // JSON tuple encoding is unambiguous even when an input contains NUL characters.
+  const material = new TextEncoder().encode(JSON.stringify(['subscription-create', subscriberId, idempotencyKey]))
   const digest = await crypto.subtle.digest('SHA-256', material)
   const hex = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('')
   return 'sub_' + hex
