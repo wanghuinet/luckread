@@ -5,7 +5,7 @@ mock.module('../lib/api-client.ts', () => ({
   apiRequest: async () => {
     throw new Error('Unexpected API request in media-reference test');
   },
-  fetchContentBodyReference: async () => {
+  fetchContentBodyById: async () => {
     throw new Error('Unexpected body fetch in media-reference test');
   },
 }));
