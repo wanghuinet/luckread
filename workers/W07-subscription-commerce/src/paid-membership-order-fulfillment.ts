@@ -356,7 +356,10 @@ export async function fulfillPaidMembershipOrder(
   if (membershipLines.length === 0) {
     return { outcome: 'NOT_APPLICABLE', fulfilledCount: 0 };
   }
-  if (membershipLines.length !== 1) return failClosed();
+  // Beta fulfillment admits a single-line membership order only. Do not grant
+  // one entitlement from a mixed cart: the other line family may require its
+  // own fulfillment/rollback contract and must be reconciled as one payment.
+  if (membershipLines.length !== 1 || lines.length !== 1) return failClosed();
 
   const line = membershipLines[0]!;
   if (!boundedId(line.order_line_id, 255) || !PLAN_ID_PATTERN.test(line.item_ref)) return failClosed();
