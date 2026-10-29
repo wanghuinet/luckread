@@ -154,8 +154,17 @@ describe('Hyperswitch webhook envelope parsing', () => {
     expect(parseEnvelope(new Uint8Array(1024 * 1024 + 1).buffer)).toBeNull()
   })
 
-  it('rejects invalid timestamps and malformed optional processor merchant identifiers', () => {
-    expect(parseEnvelope(bytes(JSON.stringify({ ...envelope, timestamp: 'yesterday' })))).toBeNull()
+  it('rejects invalid, impossible, or out-of-range timestamps and malformed optional processor merchant identifiers', () => {
+    for (const timestamp of [
+      'yesterday',
+      '2026-02-31T10:00:00Z',
+      '2026-02-29T10:00:00Z',
+      '2026-10-27T25:00:00Z',
+      '2026-10-27T10:00:00+99:00',
+      '2026-10-27',
+    ]) {
+      expect(parseEnvelope(bytes(JSON.stringify({ ...envelope, timestamp })))).toBeNull()
+    }
     expect(parseEnvelope(bytes(JSON.stringify({ ...envelope, processor_merchant_id: 12 })))).toBeNull()
     expect(parseEnvelope(bytes(JSON.stringify({ ...envelope, processor_merchant_id: ' merchant ' })))).toBeNull()
   })

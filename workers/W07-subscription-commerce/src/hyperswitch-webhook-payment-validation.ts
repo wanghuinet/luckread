@@ -4,6 +4,7 @@ import {
 } from './hyperswitch-client.js';
 import {
   isHyperswitchWebhookEventType,
+  parseHyperswitchRfc3339Timestamp,
   type HyperswitchWebhookEnvelope,
   type HyperswitchWebhookEventType,
 } from './hyperswitch-webhook-signature.js';
@@ -63,7 +64,6 @@ export type HyperswitchPaymentWebhookDecision =
 
 const PAYMENT_ID_PATTERN = /^pay_[A-Za-z0-9]{26}$/;
 const CURRENCY_PATTERN = /^[A-Z]{3}$/;
-const ISO_TIMESTAMP_PATTERN = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(Z|([+-])(\d{2}):(\d{2}))$/;
 
 /**
  * Only events with an unambiguous event-to-status correspondence are eligible
@@ -88,44 +88,6 @@ function isNonBlankString(value: unknown): value is string {
   return typeof value === 'string' && value.length > 0 && value.trim() === value;
 }
 
-function parseTimestamp(value: unknown): number | null {
-  // Provider timestamps are short RFC3339 values; cap length before regex and parsing.
-  if (typeof value !== 'string' || value.length > 64) return null;
-  const match = ISO_TIMESTAMP_PATTERN.exec(value);
-  if (!match) return null;
-
-  const year = Number(match[1]);
-  const month = Number(match[2]);
-  const day = Number(match[3]);
-  const hour = Number(match[4]);
-  const minute = Number(match[5]);
-  const second = Number(match[6]);
-  if (
-    year < 1 ||
-    month < 1 ||
-    month > 12 ||
-    day < 1 ||
-    hour > 23 ||
-    minute > 59 ||
-    second > 59
-  ) return null;
-
-  // Check the calendar date explicitly; Date.parse alone normalizes some
-  // impossible dates (for example, day 31 in a 30-day month).
-  const monthEnd = new Date(0);
-  monthEnd.setUTCFullYear(year, month, 0);
-  monthEnd.setUTCHours(0, 0, 0, 0);
-  if (day > monthEnd.getUTCDate()) return null;
-
-  if (match[8] !== undefined) {
-    const offsetHours = Number(match[9]);
-    const offsetMinutes = Number(match[10]);
-    if (offsetHours > 23 || offsetMinutes > 59) return null;
-  }
-
-  const parsed = Date.parse(value);
-  return Number.isFinite(parsed) ? parsed : null;
-}
 
 /**
  * Validate identity, commercial facts and event ordering before any caller
@@ -211,7 +173,7 @@ export function validateHyperswitchPaymentWebhook(
   }
   const providerStatus = rawProviderStatus;
 
-  const providerUpdatedAt = parseTimestamp(resource.updated);
+  const providerUpdatedAt = parseHyperswitchRfc3339Timestamp(resource.updated);
   if (resource.updated === undefined || resource.updated === null || resource.updated === '') {
     return {
       outcome: 'RECONCILIATION_REQUIRED',
@@ -230,7 +192,7 @@ export function validateHyperswitchPaymentWebhook(
   }
 
   if (reference.lastProviderUpdatedAt !== null) {
-    const storedUpdatedAt = parseTimestamp(reference.lastProviderUpdatedAt);
+    const storedUpdatedAt = parseHyperswitchRfc3339Timestamp(reference.lastProviderUpdatedAt);
     if (storedUpdatedAt === null) {
       return {
         outcome: 'RECONCILIATION_REQUIRED',

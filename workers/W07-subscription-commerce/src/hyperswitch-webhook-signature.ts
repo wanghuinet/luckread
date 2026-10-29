@@ -13,6 +13,49 @@ const SHA512_HEX_PATTERN = /^[0-9a-fA-F]{128}$/;
 // this limit while reading the request stream, before buffering it in memory.
 const MAX_WEBHOOK_BODY_BYTES = 1024 * 1024;
 
+const RFC3339_TIMESTAMP_PATTERN = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(Z|([+-])(\d{2}):(\d{2}))$/;
+
+/**
+ * Parse a bounded RFC3339 timestamp only when its calendar/time components
+ * are valid. Date.parse normalizes impossible dates such as February 31,
+ * which is unsafe for provider event ordering and signed consent evidence.
+ */
+export function parseHyperswitchRfc3339Timestamp(value: unknown): number | null {
+  if (typeof value !== 'string' || value.length > 64) return null;
+  const match = RFC3339_TIMESTAMP_PATTERN.exec(value);
+  if (!match) return null;
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const hour = Number(match[4]);
+  const minute = Number(match[5]);
+  const second = Number(match[6]);
+  if (
+    year < 1 ||
+    month < 1 ||
+    month > 12 ||
+    day < 1 ||
+    hour > 23 ||
+    minute > 59 ||
+    second > 59
+  ) return null;
+
+  const monthEnd = new Date(0);
+  monthEnd.setUTCFullYear(year, month, 0);
+  monthEnd.setUTCHours(0, 0, 0, 0);
+  if (day > monthEnd.getUTCDate()) return null;
+
+  if (match[8] !== undefined) {
+    const offsetHours = Number(match[9]);
+    const offsetMinutes = Number(match[10]);
+    if (offsetHours > 23 || offsetMinutes > 59) return null;
+  }
+
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 function constantTimeHexEqual(expected: string, supplied: string): boolean {
   if (expected.length !== SHA512_HEX_LENGTH || supplied.length !== SHA512_HEX_LENGTH) return false;
 
@@ -173,13 +216,9 @@ export function parseHyperswitchWebhookEnvelope(
   if (!(HYPERSWITCH_CONTENT_TYPES as readonly string[]).includes(decoded.content.type)) return null;
   if (!isRecord(decoded.content.object)) return null;
 
-  if (decoded.timestamp !== undefined) {
-    if (
-      typeof decoded.timestamp !== 'string' ||
-      !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(decoded.timestamp) ||
-      !Number.isFinite(Date.parse(decoded.timestamp))
-    ) return null;
-  }
+  if (decoded.timestamp !== undefined &&
+      (typeof decoded.timestamp !== 'string' ||
+        parseHyperswitchRfc3339Timestamp(decoded.timestamp) === null)) return null;
 
   if (
     decoded.processor_merchant_id !== undefined &&

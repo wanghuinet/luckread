@@ -10,6 +10,8 @@
  * Upstream API: https://api-reference.hyperswitch.io/v1/payments/payments--create
  */
 
+import { parseHyperswitchRfc3339Timestamp } from './hyperswitch-webhook-signature.js';
+
 export type HyperswitchEnvironment = 'sandbox' | 'production';
 
 export interface HyperswitchClientConfig {
@@ -448,8 +450,7 @@ export async function confirmHyperswitchCustomerInitiatedSetupPayment(
     typeof acceptedAt !== 'string' ||
     acceptedAt.length > 64 ||
     acceptedAt.trim() !== acceptedAt ||
-    !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})$/.test(acceptedAt) ||
-    !Number.isFinite(Date.parse(acceptedAt))
+    parseHyperswitchRfc3339Timestamp(acceptedAt) === null
   ) {
     throw new HyperswitchClientError('REQUEST_INVALID', 'Customer acceptance timestamp is invalid.');
   }
