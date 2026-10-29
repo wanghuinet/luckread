@@ -13,7 +13,7 @@ const SHA512_HEX_PATTERN = /^[0-9a-fA-F]{128}$/;
 // this limit while reading the request stream, before buffering it in memory.
 const MAX_WEBHOOK_BODY_BYTES = 1024 * 1024;
 
-const RFC3339_TIMESTAMP_PATTERN = /^(\\d{4})-(\\d{2})-(\\d{2})T(\\d{2}):(\\d{2}):(\\d{2})(?:\\.\\d+)?(Z|([+-])(\\d{2}):(\\d{2}))$/;
+const RFC3339_TIMESTAMP_PATTERN = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(Z|([+-])(\d{2}):(\d{2}))$/;
 
 /**
  * Parse a bounded RFC3339 timestamp only when its calendar/time components
