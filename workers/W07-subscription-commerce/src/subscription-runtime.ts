@@ -197,6 +197,42 @@ export async function getSubscription(db: D1Database, subscriberId: string, subs
   return toPublic(await readSubscriptionRow(db, subscriptionId, validatePrincipal(subscriberId)))
 }
 
+/**
+ * Authoritative Beta access decision for content whose creator offers
+ * member-only publication. D1-01 remains the source of subscription truth;
+ * W03 may ask this bounded operation, but cannot read/write membership rows.
+ *
+ * Period bounds are enforced at read time so a delayed scheduler cannot extend
+ * access after paid-through expiry. A future scheduled cancellation remains
+ * valid until cancel_at; an already-terminal CANCELED row is never accepted.
+ */
+export async function hasActiveCreatorMembership(
+  db: D1Database,
+  subscriberIdInput: string,
+  creatorIdInput: string,
+  now = new Date(),
+): Promise<boolean> {
+  const subscriberId = validatePrincipal(subscriberIdInput)
+  const creatorId = ensureId(creatorIdInput)
+  if (!(now instanceof Date) || !Number.isFinite(now.getTime())) {
+    throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
+  }
+  const nowValue = now.toISOString()
+  let row: { subscription_id: string } | null
+  try {
+    row = await db.prepare(
+      "SELECT subscription_id FROM membership_subscriptions " +
+      "WHERE subscriber_id = ? AND creator_id = ? AND status = 'ACTIVE' " +
+      "AND current_period_start <= ? AND current_period_end > ? " +
+      "AND (cancel_at IS NULL OR cancel_at > ?) " +
+      "ORDER BY current_period_end DESC, subscription_id ASC LIMIT 1",
+    ).bind(subscriberId, creatorId, nowValue, nowValue, nowValue).first<{ subscription_id: string }>()
+  } catch {
+    throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
+  }
+  return row !== null && typeof row.subscription_id === 'string' && row.subscription_id.length > 0
+}
+
 export async function listSubscriptions(
   db: D1Database,
   subscriberId: string,
