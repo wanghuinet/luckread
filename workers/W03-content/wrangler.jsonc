@@ -3,6 +3,12 @@
   "name": "luckread-w03",
   "main": "src/index.ts",
   "compatibility_date": "2025-08-15",
+  "services": [
+    {
+      "binding": "W07_SUBSCRIPTION",
+      "service": "luckread-w07"
+    }
+  ],
   "workers_dev": false,
   "ratelimits": [
     {
