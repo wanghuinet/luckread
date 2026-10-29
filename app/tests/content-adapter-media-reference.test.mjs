@@ -10,7 +10,7 @@ mock.module('../lib/api-client.ts', () => ({
   },
 }));
 
-const { resolveNativeMediaSource } = await import('../lib/content-adapter.ts');
+const { resolveNativeMediaSource, mapContentToFeedContent } = await import('../lib/content-adapter.ts');
 
 test('resolves same-origin media paths through the configured W01 API origin', () => {
   expect(resolveNativeMediaSource('/api/media/file/photo.webp')).toEqual({
@@ -37,6 +37,26 @@ test('does not resolve arbitrary external, lookalike, or protocol-relative media
 test('rejects embedded credentials and URL fragments for off-origin media', () => {
   expect(resolveNativeMediaSource('https://user:pass@img.luckread.com/photo.webp')).toBeNull();
   expect(resolveNativeMediaSource('https://video.luckread.com/clip.mp4#fragment')).toBeNull();
+});
+
+test('does not map body or media fields from a denied member-only response', () => {
+  const mapped = mapContentToFeedContent({
+    id: 'content_members_only',
+    title: 'Members-only title',
+    accessMode: 'MEMBERS_ONLY',
+    accessGranted: false,
+    body: 'private direct body',
+    bodyText: 'private bodyText',
+    bodyRef: 'https://luckread.com/private-body',
+    mediaRefs: ['https://img.luckread.com/private-image.webp'],
+    coverRef: 'https://img.luckread.com/private-cover.webp',
+  }, 'private resolved body', null, null, 'session-secret');
+
+  expect(mapped.accessMode).toBe('MEMBERS_ONLY');
+  expect(mapped.accessGranted).toBe(false);
+  expect(mapped.message).toBe('Members-only title');
+  expect(mapped.media_items).toEqual([]);
+  expect(mapped.media_url).toBeUndefined();
 });
 
 test('forwards session credentials only to the configured API and approved media delivery hosts', () => {
