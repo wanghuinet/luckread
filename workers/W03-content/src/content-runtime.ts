@@ -320,7 +320,7 @@ export async function resolvePublishedMediaReferenceAccess(
     '  )',
     'ORDER BY id ASC',
     'LIMIT 51',
-  ].join('\\n')
+  ].join('\n')
   let rows: PublishedMediaReferenceRow[]
   try {
     const result = await db.prepare(sql)
