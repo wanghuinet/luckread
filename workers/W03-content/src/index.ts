@@ -10,7 +10,7 @@ import {
   getPublishedOwnerPostContext,
   getPublishedContentSocialContext,
   getPublishedContentSocialContexts,
-  isPublishedPublicPostMediaReference,
+  resolvePublishedMediaReferenceAccess,
   listContents,
   searchPublishedContents,
   listFollowingOwnerContents,
@@ -614,8 +614,16 @@ const worker = {
         if (!mediaUrl || mediaUrl.length > 2048) {
           throw new ContentRuntimeError('VALIDATION_FAILED', 400)
         }
-        const isPublic = await isPublishedPublicPostMediaReference(env.D1_02, mediaUrl)
-        return json({ data: { isPublic }, requestId: createRequestId() })
+        const viewerUserId = request.headers.get('X-LuckRead-Principal-User-Id')?.trim() || null
+        const access = await resolvePublishedMediaReferenceAccess(
+          env.D1_02,
+          mediaUrl,
+          viewerUserId,
+          viewerUserId
+            ? (creatorId) => resolveCreatorMembershipAccess(request, env, viewerUserId, creatorId)
+            : undefined,
+        )
+        return json({ data: access, requestId: createRequestId() })
       }
 
       if (url.pathname === '/internal/content/bookmarked-items') {
