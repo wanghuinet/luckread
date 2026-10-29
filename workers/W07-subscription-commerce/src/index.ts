@@ -1,6 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 
-import { createMembershipPlanDraft, reviseMembershipPlan, getSubscription, listActiveMembershipPlans, listCreatorMembershipPlans, listSubscriptions, parseBoundedPositiveInt, publishMembershipPlan, transitionMembershipPlanLifecycle, SubscriptionRuntimeError, validatePrincipal } from './subscription-runtime.js'
+import { createMembershipPlanDraft, reviseMembershipPlan, getSubscription, hasActiveCreatorMembership, listActiveMembershipPlans, listCreatorMembershipPlans, listSubscriptions, parseBoundedPositiveInt, publishMembershipPlan, transitionMembershipPlanLifecycle, SubscriptionRuntimeError, validatePrincipal } from './subscription-runtime.js'
 import { handleCommerceOrderRequest } from './order-http-runtime.js'
 import { resolveCommerceOrderItems } from './order-item-resolution.js'
 import { applyDemoTaxPricing, isDemoPricingEnabled } from './demo-tax-pricing.js'
@@ -63,8 +63,8 @@ const enforceRateLimit = async (request: Request, env: Env): Promise<void> => {
 
 const json = (body: unknown, status = 200, etag?: string) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', ...(etag ? { ETag: etag } : {}) } })
 
-const requireTransport = (request: Request): void => {
-  if (request.headers.get('X-LuckRead-Caller') !== 'W01' || request.headers.get('X-LuckRead-Transport-Version') !== '1.0' || !request.headers.get('X-LuckRead-Correlation-Id')?.trim()) throw new SubscriptionRuntimeError('PERMISSION_DENIED', 403)
+const requireTransport = (request: Request, expectedCaller = 'W01'): void => {
+  if (request.headers.get('X-LuckRead-Caller') !== expectedCaller || request.headers.get('X-LuckRead-Transport-Version') !== '1.0' || !request.headers.get('X-LuckRead-Correlation-Id')?.trim()) throw new SubscriptionRuntimeError('PERMISSION_DENIED', 403)
 }
 
 const requirePrincipal = (request: Request): string => { requireTransport(request); return validatePrincipal(request.headers.get('X-LuckRead-Principal-User-Id')?.trim() ?? '') }
@@ -154,6 +154,29 @@ export default {
         await applyRateLimit(originLimiter, 'origin:webhook')
         const webhookResponse = await handleHyperswitchWebhookRequest(request, env)
         if (webhookResponse) return webhookResponse
+      }
+
+      // Internal access-policy query is callable only by W03 over its admitted
+      // Service Binding. It returns a decision, never subscription/payment rows.
+      if (new URL(request.url).pathname === '/internal/entitlements/check-creator-membership') {
+        if (request.method !== 'POST') return new Response(null, { status: 405, headers: { Allow: 'POST' } })
+        await enforceRateLimit(request, env)
+        requireTransport(request, 'W03')
+        const subscriberId = validatePrincipal(request.headers.get('X-LuckRead-Principal-User-Id')?.trim() ?? '')
+        requireLayer(request)
+        const input = await readJsonBody(request)
+        if (!input || typeof input !== 'object' || Array.isArray(input) ||
+            Object.keys(input as Record<string, unknown>).length !== 1 ||
+            !Object.hasOwn(input, 'creatorId') ||
+            typeof (input as { creatorId?: unknown }).creatorId !== 'string') {
+          throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
+        }
+        const creatorId = validatePrincipal((input as { creatorId: string }).creatorId)
+        const allowed = await hasActiveCreatorMembership(env.D1_01, subscriberId, creatorId)
+        return json({
+          data: { allowed, reason: allowed ? 'ACTIVE_CREATOR_MEMBERSHIP' : 'MEMBERSHIP_REQUIRED' },
+          requestId: crypto.randomUUID(),
+        })
       }
 
       await enforceRateLimit(request, env)
