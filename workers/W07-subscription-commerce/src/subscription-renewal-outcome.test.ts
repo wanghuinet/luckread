@@ -137,6 +137,26 @@ function env(cycle: Cycle | null = makeCycle(), subscription: Subscription | nul
 }
 
 describe('D1-04 renewal outcome to D1-01 Subscription synchronization', () => {
+  it('fails closed on a malformed D1-04 cycle timestamp before changing D1-01', async () => {
+    const e = env(makeCycle({ updated_at: '2026-02-31T12:00:00.000Z' }));
+    await expect(syncTerminalRenewalCycleToSubscription(e.value, CYCLE_ID, { now: () => new Date(NOW) }))
+      .rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE', status: 503 });
+    expect(e.d1_01.subscription).toMatchObject({
+      status: 'ACTIVE', current_period_start: START, current_period_end: CYCLE_START, version: 3,
+    });
+    expect(e.d1_04.cycle?.subscription_sync_state).toBe('PENDING');
+  });
+
+  it('requires canonical D1-01 updated_at and records reconciliation without changing the Subscription', async () => {
+    const e = env(makeCycle(), makeSubscription({ updated_at: '2026-02-31T12:00:00.000Z' }));
+    const result = await syncTerminalRenewalCycleToSubscription(e.value, CYCLE_ID, { now: () => new Date(NOW) });
+    expect(result).toMatchObject({ outcome: 'RECONCILIATION_REQUIRED', reasonCode: 'SUBSCRIPTION_UPDATED_AT_INVALID' });
+    expect(e.d1_01.subscription).toMatchObject({
+      status: 'ACTIVE', current_period_start: START, current_period_end: CYCLE_START, version: 3,
+    });
+    expect(e.d1_04.cycle?.subscription_sync_state).toBe('RECONCILIATION_REQUIRED');
+  });
+
   it('extends a subscription period on a signed succeeded cycle and is idempotent on replay', async () => {
     const e = env();
     const first = await syncTerminalRenewalCycleToSubscription(e.value, CYCLE_ID, { now: () => new Date(NOW) });
