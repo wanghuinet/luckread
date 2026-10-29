@@ -478,6 +478,19 @@ describe('subscription runtime', () => {
     expect(second.subscriberId).toBe('user_a')
   })
 
+  it('keeps identities distinct when subscriber or idempotency inputs contain NUL', async () => {
+    const db = fakeDb([], [activePlan('plan_basic', { owner_id: 'creator_1' })])
+    const first = await createSubscription(db, 'user_a\u0000b', {
+      planId: 'plan_basic',
+      idempotencyKey: 'key',
+    })
+    const second = await createSubscription(db, 'user_a', {
+      planId: 'plan_basic',
+      idempotencyKey: 'b\u0000key',
+    })
+    expect(first.subscriptionId).not.toBe(second.subscriptionId)
+  })
+
   it('fails closed for missing, inactive, private, or non-creator plans', async () => {
     const cases: MembershipPlanRow[][] = [
       [],
