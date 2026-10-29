@@ -1,5 +1,5 @@
 import type { FeedContent, FeedMediaAttachment } from '~/components/FeedItem';
-import { apiRequest, fetchContentBodyReference, getApiBaseUrl } from './api-client';
+import { apiRequest, fetchContentBodyById, getApiBaseUrl } from './api-client';
 
 export type ApiAuthor = {
   id?: string;
@@ -330,37 +330,25 @@ export async function readContentBody(
   signal?: AbortSignal,
   sessionToken?: string | null,
 ): Promise<string> {
+  const membershipLocked = item.accessMode === 'MEMBERS_ONLY' && item.accessGranted !== true;
+  if (membershipLocked) return '';
+
   const directBody = item.bodyText ?? item.body ?? item.text;
   if (typeof directBody === 'string' && directBody.trim()) return directBody.trim();
 
-  const bodyRef = item.bodyRef?.trim();
-  if (bodyRef) {
+  // The opaque bodyRef is metadata, not a delivery URL. The W01 body endpoint
+  // resolves the content in W03 first and only reads the referenced R2 object
+  // after the caller's current membership/access decision has passed.
+  if (item.bodyRef?.trim() && typeof item.id === 'string' && item.id.trim()) {
     try {
-      // Resolve only HTTP(S) references. Logical storage references such as
-      // r2:// are not public URLs and must never be guessed into a delivery URL.
-      const base = new URL(getApiBaseUrl());
-      const url = new URL(bodyRef, base);
-      const localDevelopmentHost = ['localhost', '127.0.0.1', '[::1]'].includes(base.hostname);
-      const protocolAllowed = url.protocol === 'https:' ||
-        (localDevelopmentHost && url.origin === base.origin && url.protocol === 'http:');
-      const trustedHost = url.origin === base.origin ||
-        url.hostname === 'luckread.com' || url.hostname.endsWith('.luckread.com');
-      if (
-        protocolAllowed &&
-        trustedHost &&
-        !url.username &&
-        !url.password &&
-        !url.hash
-      ) {
-        const response = await fetchContentBodyReference(url.toString(), { signal, sessionToken });
-        if (response.ok && response.status < 300) {
-          const text = (await response.text()).trim();
-          if (text) return text;
-        }
+      const response = await fetchContentBodyById(item.id, { signal, sessionToken });
+      if (response.ok && response.status < 300) {
+        const text = (await response.text()).trim();
+        if (text) return text;
       }
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') throw error;
-      // A bodyRef failure must not make valid metadata/media unavailable.
+      // A body read failure should not hide the canonical title/metadata.
     }
   }
 
