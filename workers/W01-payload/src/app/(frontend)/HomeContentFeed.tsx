@@ -278,6 +278,7 @@ export default function HomeContentFeed({
                 {item.contentType === 'article' ? (
                   <ArticleSummaryPreview
                     key={item.bodyRef || item.id}
+                    contentId={item.id}
                     bodyRef={item.bodyRef}
                     label={locale === 'en' ? 'Summary' : '文章摘要'}
                   />
