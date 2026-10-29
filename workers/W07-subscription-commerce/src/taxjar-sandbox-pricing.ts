@@ -176,9 +176,12 @@ export async function applyTaxJarSandboxPricing(
   const tax = raw.tax as unknown as TaxJarResponse['tax'];
   if (!tax) throw new TaxJarSandboxPricingError();
   const totalTaxMinor = toMinor(tax.amount_to_collect);
-  const nexus = typeof tax.has_nexus === 'boolean' ? tax.has_nexus : null;
-  const rate = typeof tax.rate === 'number' && Number.isFinite(tax.rate) &&
-      tax.rate >= 0 && tax.rate <= 1 ? tax.rate : null;
+  if (typeof tax.has_nexus !== 'boolean' || typeof tax.rate !== 'number' ||
+      !Number.isFinite(tax.rate) || tax.rate < 0 || tax.rate > 1) {
+    throw new TaxJarSandboxPricingError();
+  }
+  const nexus = tax.has_nexus;
+  const rate = tax.rate;
 
   const breakdown = tax.breakdown;
   if (!breakdown || !Array.isArray(breakdown.line_items)) {
