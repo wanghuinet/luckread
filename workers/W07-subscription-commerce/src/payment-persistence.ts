@@ -1,5 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
+import { strictlyAfterCanonicalUtcTimestamp } from './canonical-utc-timestamp.js';
+
 import {
   verifyHyperswitchWebhookSignature,
   parseHyperswitchWebhookEnvelope,
@@ -198,9 +200,11 @@ function parseDate(now: () => Date): string {
   return date.toISOString();
 }
 
-/** D1 text timestamps are UTC ISO-8601 values in these candidate schemas. */
+/** D1 text timestamps are canonical UTC ISO-8601 values in these candidate schemas. */
 function strictlyAfter(now: string, previous: string): string {
-  return now > previous ? now : new Date(Date.parse(previous) + 1).toISOString();
+  const next = strictlyAfterCanonicalUtcTimestamp(now, previous);
+  if (next === null) throw new PaymentPersistenceError('INTEGRITY_VIOLATION', 500);
+  return next;
 }
 
 function defaultPaymentId(): string {
