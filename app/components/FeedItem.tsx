@@ -340,7 +340,7 @@ export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailVie
         );
     };
 
-    const targetUserId = itemData.creatorId || itemData.ownerUserId || '';
+    const targetUserId = itemData.ownerUserId || itemData.creatorId || '';
 
     const muteAuthor = () => {
         if (!targetUserId || isOwnPost) {
