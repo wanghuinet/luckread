@@ -1188,6 +1188,17 @@ const worker = {
             ? (creatorId) => resolveCreatorMembershipAccess(request, env, principalUserId, creatorId)
             : undefined,
         )
+        if (url.searchParams.get('bodyContext') === '1') {
+          // W01-only internal projection for the bounded body proxy. Keep the
+          // account owner and body reference off the public content response.
+          return json({
+            contentId: content.id,
+            ownerUserId: content.ownerUserId,
+            accessMode: content.accessMode ?? 'PUBLIC',
+            accessGranted: content.accessGranted ?? (content.accessMode !== 'MEMBERS_ONLY'),
+            bodyRef: content.bodyRef,
+          })
+        }
         return json({
           id: content.id,
           slug: content.slug,
