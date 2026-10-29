@@ -13,6 +13,8 @@ const mocks = vi.hoisted(() => {
     MockTrafficLimitError,
     MockW05SocialClientError,
     enforceWriteRateLimit: vi.fn(async (_request: Request) => undefined),
+    enforceWriteAccountRateLimit: vi.fn(async (_accountId: string) => undefined),
+    enforceWriteEndpointRateLimit: vi.fn(async (_endpoint: string) => undefined),
     rateLimitResponse: vi.fn((_request: Request) => new Response('rate limited', { status: 429 })),
     resolvePrincipal: vi.fn(async (_request: Request) => ({ userId: 'user_test_01', layer: 'L2' })),
     callW05Social: vi.fn(async (_input: unknown) => Response.json({ data: { ok: true } }, { status: 200 })),
@@ -22,6 +24,8 @@ const mocks = vi.hoisted(() => {
 vi.mock('../../src/auth/traffic-limit.js', () => ({
   TrafficLimitError: mocks.MockTrafficLimitError,
   enforceW01WriteRateLimit: mocks.enforceWriteRateLimit,
+  enforceW01WriteAccountRateLimit: mocks.enforceWriteAccountRateLimit,
+  enforceW01WriteEndpointRateLimit: mocks.enforceWriteEndpointRateLimit,
   rateLimitResponse: mocks.rateLimitResponse,
 }))
 
@@ -50,6 +54,10 @@ const context = { params: Promise.resolve({ contentId: 'content-1' }) }
 beforeEach(() => {
   mocks.enforceWriteRateLimit.mockReset()
   mocks.enforceWriteRateLimit.mockResolvedValue(undefined)
+  mocks.enforceWriteAccountRateLimit.mockReset()
+  mocks.enforceWriteAccountRateLimit.mockResolvedValue(undefined)
+  mocks.enforceWriteEndpointRateLimit.mockReset()
+  mocks.enforceWriteEndpointRateLimit.mockResolvedValue(undefined)
   mocks.rateLimitResponse.mockClear()
   mocks.resolvePrincipal.mockReset()
   mocks.resolvePrincipal.mockResolvedValue({ userId: 'user_test_01', layer: 'L2' })
@@ -81,6 +89,14 @@ describe('v1 repost adapter', () => {
     expect(postResponse.status).toBe(200)
     expect(deleteResponse.status).toBe(200)
     expect(mocks.enforceWriteRateLimit).toHaveBeenCalledTimes(2)
+    expect(mocks.enforceWriteAccountRateLimit).toHaveBeenNthCalledWith(1, 'user_test_01')
+    expect(mocks.enforceWriteAccountRateLimit).toHaveBeenNthCalledWith(2, 'user_test_01')
+    expect(mocks.enforceWriteEndpointRateLimit).toHaveBeenNthCalledWith(1, 'postContentContentIdReposts')
+    expect(mocks.enforceWriteEndpointRateLimit).toHaveBeenNthCalledWith(2, 'deleteContentContentIdReposts')
+    expect(mocks.enforceWriteRateLimit.mock.invocationCallOrder[0]).toBeLessThan(mocks.resolvePrincipal.mock.invocationCallOrder[0])
+    expect(mocks.resolvePrincipal.mock.invocationCallOrder[0]).toBeLessThan(mocks.enforceWriteAccountRateLimit.mock.invocationCallOrder[0])
+    expect(mocks.enforceWriteAccountRateLimit.mock.invocationCallOrder[0]).toBeLessThan(mocks.enforceWriteEndpointRateLimit.mock.invocationCallOrder[0])
+    expect(mocks.enforceWriteEndpointRateLimit.mock.invocationCallOrder[0]).toBeLessThan(mocks.callW05Social.mock.invocationCallOrder[0])
     expect(mocks.callW05Social).toHaveBeenCalledTimes(2)
   })
 
@@ -99,6 +115,40 @@ describe('v1 repost adapter', () => {
       expect(mocks.callW05Social).not.toHaveBeenCalled()
       mocks.enforceWriteRateLimit.mockResolvedValue(undefined)
       mocks.rateLimitResponse.mockClear()
+    }
+  })
+  it('short-circuits authenticated repost writes when account or operation limits reject', async () => {
+    const handlers = [
+      ['POST', POST, 'postContentContentIdReposts'],
+      ['DELETE', DELETE, 'deleteContentContentIdReposts'],
+    ] as const
+
+    for (const [limiter, limitMock] of [
+      ['account', mocks.enforceWriteAccountRateLimit],
+      ['endpoint', mocks.enforceWriteEndpointRateLimit],
+    ] as const) {
+      for (const [method, handler, operation] of handlers) {
+        mocks.enforceWriteRateLimit.mockResolvedValue(undefined)
+        mocks.enforceWriteAccountRateLimit.mockResolvedValue(undefined)
+        mocks.enforceWriteEndpointRateLimit.mockResolvedValue(undefined)
+        mocks.callW05Social.mockClear()
+        limitMock.mockRejectedValueOnce(new mocks.MockTrafficLimitError())
+        const response = await handler(requestFor(method), context)
+
+        expect(response.status).toBe(429)
+        expect(mocks.rateLimitResponse).toHaveBeenCalled()
+        expect(mocks.callW05Social).not.toHaveBeenCalled()
+        if (limiter === 'account') {
+          expect(mocks.enforceWriteEndpointRateLimit).not.toHaveBeenCalled()
+        } else {
+          expect(limitMock).toHaveBeenCalledWith(operation)
+        }
+        mocks.rateLimitResponse.mockClear()
+        mocks.enforceWriteAccountRateLimit.mockReset()
+        mocks.enforceWriteAccountRateLimit.mockResolvedValue(undefined)
+        mocks.enforceWriteEndpointRateLimit.mockReset()
+        mocks.enforceWriteEndpointRateLimit.mockResolvedValue(undefined)
+      }
     }
   })
 })
