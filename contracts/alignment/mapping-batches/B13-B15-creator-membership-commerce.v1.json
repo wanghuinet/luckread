@@ -214,7 +214,7 @@
     },
     {
       "featureId": "PAY-002",
-      "status": "PARTIAL",
+      "status": "UNRESOLVED",
       "evidenceRefs": [
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
         "contracts/entity/ORDER-ENTITY-CONTRACT.v1.json",
