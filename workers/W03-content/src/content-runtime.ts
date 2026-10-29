@@ -1486,6 +1486,7 @@ export async function rollbackContentRevision(
   reason: string | undefined,
   correlationId: string,
   now = new Date(),
+  verifiedCreatorId?: string,
 ): Promise<{ content: ContentRecord; sourceRevision: number; resultingRevision: number }> {
   assertResourceId(principalUserId)
   assertResourceId(contentId)
@@ -1516,13 +1517,21 @@ export async function rollbackContentRevision(
  WHERE id = ? AND content_id = ?`).bind(revisionId, contentId).first<ContentRevisionRow>()
   if (!source) throw new ContentRuntimeError('NOT_FOUND', 404)
 
+  const sourceAccessMode = source.access_mode === 'MEMBERS_ONLY' ? 'MEMBERS_ONLY' : 'PUBLIC'
+  const currentAccessMode = content.accessMode ?? 'PUBLIC'
+  if (sourceAccessMode !== currentAccessMode &&
+      (sourceAccessMode === 'MEMBERS_ONLY' || currentAccessMode === 'MEMBERS_ONLY') &&
+      (!verifiedCreatorId || verifiedCreatorId !== content.creatorId)) {
+    throw new ContentRuntimeError('PERMISSION_DENIED', 403)
+  }
+
   const nextVersion = content.version + 1
   const nextRevision = content.revision + 1
   const updatedAt = now.toISOString()
   const updated: ContentRecord = {
     ...content,
     scheduledAt: null,
-    accessMode: source.access_mode === 'MEMBERS_ONLY' ? 'MEMBERS_ONLY' : 'PUBLIC',
+    accessMode: sourceAccessMode,
     accessGranted: true,
     slug: source.slug,
     title: source.title,
