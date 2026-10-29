@@ -283,6 +283,9 @@ describe('Hyperswitch server-side payment intent client', () => {
     for (const invalid of [
       { ...base, paymentToken: '' },
       { ...base, customerAcceptance: { ...base.customerAcceptance, acceptedAt: 'not-a-date' } },
+      { ...base, customerAcceptance: { ...base.customerAcceptance, acceptedAt: '2026-02-31T15:30:00.000Z' } },
+      { ...base, customerAcceptance: { ...base.customerAcceptance, acceptedAt: '2026-10-28T25:30:00.000Z' } },
+      { ...base, customerAcceptance: { ...base.customerAcceptance, acceptedAt: '2026-10-28T15:30:00+99:00' } },
       { ...base, customerAcceptance: { ...base.customerAcceptance, ipAddress: '' } },
       { ...base, customerAcceptance: { ...base.customerAcceptance, userAgent: 'bad\nheader' } },
     ]) {
