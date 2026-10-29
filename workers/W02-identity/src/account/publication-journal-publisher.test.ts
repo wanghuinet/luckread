@@ -135,4 +135,23 @@ describe('AUTH-013 durable journal publisher', () => {
     expect(auditSend).not.toHaveBeenCalled()
     expect(projectionSend).not.toHaveBeenCalled()
   })
+
+  it('quarantines invalid shared envelope metadata and a non-W02 event without publishing', async () => {
+    const invalidMetadata = { ...event, idempotencyKey: 'short' }
+    const wrongProducer = { ...event, producer: 'W06' }
+    const { env, auditSend, projectionSend, run, bind } = createEnv([
+      { journalId: 'journal-invalid-metadata', payload: JSON.stringify(invalidMetadata), attempt: 1 },
+      { journalId: 'journal-wrong-producer', payload: JSON.stringify(wrongProducer), attempt: 1 },
+    ])
+
+    await expect(
+      publishPendingAccountStateEvents(env, '2026-09-24T08:31:00.000Z'),
+    ).resolves.toEqual({ selected: 2, published: 0, failed: 2 })
+
+    expect(auditSend).not.toHaveBeenCalled()
+    expect(projectionSend).not.toHaveBeenCalled()
+    expect(run).toHaveBeenCalledTimes(2)
+    expect(bind).toHaveBeenCalledWith('FAILED', 'INVALID_EVENT_PAYLOAD', 'journal-invalid-metadata', 'PENDING')
+    expect(bind).toHaveBeenCalledWith('FAILED', 'INVALID_EVENT_PAYLOAD', 'journal-wrong-producer', 'PENDING')
+  })
 })
