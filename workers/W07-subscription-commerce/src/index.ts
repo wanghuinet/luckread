@@ -162,6 +162,9 @@ export default {
         if (request.method !== 'POST') return new Response(null, { status: 405, headers: { Allow: 'POST' } })
         await enforceRateLimit(request, env)
         requireTransport(request, 'W03')
+        if (request.headers.has('Authorization') || request.headers.has('Cookie')) {
+          throw new SubscriptionRuntimeError('PERMISSION_DENIED', 403)
+        }
         const subscriberId = validatePrincipal(request.headers.get('X-LuckRead-Principal-User-Id')?.trim() ?? '')
         requireLayer(request)
         const input = await readJsonBody(request)
