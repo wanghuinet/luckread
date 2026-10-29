@@ -227,6 +227,46 @@ describe('paid membership order fulfillment', () => {
     expect(f.state.insertCount).toBe(0);
   });
 
+  it('does not partially fulfill a paid order containing a membership and another item family', async () => {
+    const f = fixture({
+      order: {
+        amount_minor: 750,
+        total_minor: 750,
+      },
+      lines: [
+        {
+          order_line_id: 'line_01',
+          item_type: 'MEMBERSHIP_PLAN',
+          item_ref: planId,
+          item_version: '1',
+          quantity: 1,
+          unit_amount_minor: 500,
+          line_total_minor: 500,
+          item_snapshot_json: JSON.stringify({
+            planId, planVersion: 1, creatorId: 'creator_1', name: 'Supporter',
+            tier: 'supporter', billingInterval: 'MONTHLY', priceMinor: 500,
+            currency: 'USD', benefits,
+          }),
+        },
+        {
+          order_line_id: 'line_02',
+          item_type: 'DIGITAL_GOOD',
+          item_ref: 'digital_good_1',
+          item_version: '1',
+          quantity: 1,
+          unit_amount_minor: 250,
+          line_total_minor: 250,
+          item_snapshot_json: JSON.stringify({ itemId: 'digital_good_1' }),
+        },
+      ],
+    });
+
+    await expect(
+      fulfillPaidMembershipOrder(f.env, 'pay_' + 'b'.repeat(26), 'merchant_1'),
+    ).rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE', status: 503 });
+    expect(f.state.insertCount).toBe(0);
+  });
+
   it('does not partially fulfill an order with multiple membership lines', async () => {
     const f = fixture({ lines: [
       {
