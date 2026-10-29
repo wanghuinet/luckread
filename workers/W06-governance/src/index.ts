@@ -2,6 +2,7 @@ import { buildAccountStateChangedAuditEvent, type AccountStateChangedAuditInput,
 import { persistAuditEvent } from './audit-event-persistence'
 import { consumeAccountStateChanged } from './auth-013-queue-consumer'
 import { consumeMfaAuditEvent } from './mfa-audit-queue-consumer'
+import { parseEventEnvelopeMetadata } from '../../W10-async/src/event-envelope.js'
 import { processQueueBatch } from '../../W10-async/src/queue-batch.js'
 import { QueueTaskFailure } from '../../W10-async/src/retry-policy.js'
 import {
@@ -1161,6 +1162,7 @@ export default {
   async queue(batch: MessageBatch<unknown>, env: Env): Promise<void> {
     await processQueueBatch(batch, async (raw) => {
       try {
+        parseEventEnvelopeMetadata(raw)
         const body = raw && typeof raw === 'object'
           ? raw as Record<string, unknown>
           : null
