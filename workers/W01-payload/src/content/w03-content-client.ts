@@ -1,6 +1,7 @@
 import { getCloudflareContext } from '@opennextjs/cloudflare'
 import { TrafficLimitError, enforcePublicReadRateLimit, rateLimitResponse } from '../auth/traffic-limit.js'
 import { getBetterAuthPrincipal, W02AuthClientError } from '../auth/w02-session-client.js'
+import { callW08Creator, W08CreatorClientError } from '../auth/w08-creator-client.js'
 
 type W03ContentService = {
   fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response>
@@ -64,12 +65,46 @@ export async function resolveOptionalCookieContentPrincipal(request: Request): P
   return resolveOptionalContentPrincipal(request)
 }
 
+/**
+ * Resolve the authenticated caller's canonical W08 creator identity. The value
+ * is server-derived through W08 and must never be copied from a client payload.
+ */
+export async function resolveVerifiedContentCreatorId(
+  request: Request,
+  principal: ContentPrincipal,
+): Promise<string | Response> {
+  if (!principal.layer || !/^L[34]$/.test(principal.layer)) {
+    return errorResponse(403, 'PERMISSION_DENIED', 'Creator permission required')
+  }
+  try {
+    const response = await callW08Creator(request, '/internal/creator/self', 'GET')
+    if (response.status === 404) {
+      return errorResponse(403, 'PERMISSION_DENIED', 'An active creator identity is required')
+    }
+    if (!response.ok) {
+      return errorResponse(503, 'CREATOR_SERVICE_UNAVAILABLE', 'Creator identity service unavailable')
+    }
+    const envelope: unknown = await response.json().catch((): null => null)
+    const creatorId = envelope && typeof envelope === 'object' && !Array.isArray(envelope)
+      ? (envelope as { data?: { creatorId?: unknown } }).data?.creatorId
+      : undefined
+    if (typeof creatorId !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,255}$/.test(creatorId)) {
+      return errorResponse(503, 'CREATOR_IDENTITY_UNAVAILABLE', 'Creator identity could not be verified')
+    }
+    return creatorId
+  } catch (error) {
+    const status = error instanceof W08CreatorClientError ? error.status : 503
+    return errorResponse(status, 'CREATOR_SERVICE_UNAVAILABLE', 'Creator identity service unavailable')
+  }
+}
+
 export async function callW03Content(input: {
   request: Request
   pathname: string
   method: string
   body?: unknown
   principal?: ContentPrincipal | null
+  verifiedCreatorId?: string
 }): Promise<Response> {
   const service = await getW03Service()
   const headers = new Headers({
@@ -94,6 +129,12 @@ export async function callW03Content(input: {
   }
   if (input.principal) {
     headers.set('X-LuckRead-Principal-Verified', input.principal.verified === true ? 'true' : 'false')
+  }
+  if (input.verifiedCreatorId !== undefined) {
+    if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,255}$/.test(input.verifiedCreatorId)) {
+      throw new W03ContentClientError(403, 'PERMISSION_DENIED', 'Creator identity is invalid')
+    }
+    headers.set('X-LuckRead-Verified-Creator-Id', input.verifiedCreatorId)
   }
 
   const ifMatch = input.request.headers.get('If-Match')
