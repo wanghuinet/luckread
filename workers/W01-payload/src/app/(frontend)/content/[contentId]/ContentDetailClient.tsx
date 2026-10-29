@@ -200,10 +200,18 @@ export default function ContentDetailPage({
           }
           if (resolved.accessGranted !== false && resolved.bodyRef) {
             try {
-              const bodyResponse = await apiFetch(resolved.bodyRef, { cache: 'no-store', signal: controller.signal })
+              const bodyResponse = await apiFetch(
+                `/api/v1/contents/${encodeURIComponent(resolved.id)}/body`,
+                {
+                  method: 'GET',
+                  credentials: 'include',
+                  cache: 'no-store',
+                  signal: controller.signal,
+                },
+              )
               if (bodyResponse.ok && !cancelled) setBody(await bodyResponse.text())
             } catch {
-              // Body media is optional; metadata/media should still render.
+              // Metadata/media remain usable if the authorized body route is temporarily unavailable.
             }
           }
         } catch (cause) {
