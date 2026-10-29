@@ -133,13 +133,11 @@ jobs:
           node <<'NODE'
           const fs = require('node:fs');
           const reportPath = 'artifacts/mapping-0/w03-content-schema-preflight/report.json';
-          const expected = ['0001_content_core.sql','0002_content_2_0_types_media.sql','0003_content_pagination_index.sql',
+          const expected = ['0001_content_core.sql','0002_content_2_0_types_media.sql','0003_creator_list_pagination_index.sql',
             '0004_content_revision_history.sql','0005_content_stable_slug.sql','0006_content_relationships.sql',
             '0007_content_series.sql','0008_series_membership_ordering.sql','0009_content_collections.sql',
             '0010_collection_membership_ordering.sql','0011_content_scheduled_publish.sql',
             '0012_content_snowflake_id_allocator.sql','0013_content_access_mode.sql'];
-          // Keep the exact reviewed filenames in sync with source validation above.
-          expected[2] = '0003_creator_list_pagination_index.sql';
           const report = {result: 'PREFLIGHT_BLOCKED', sourceSha: process.env.SOURCE_SHA,
             databaseName: process.env.EXPECTED_DB_NAME, databaseId: process.env.EXPECTED_DB_ID,
             worker: process.env.EXPECTED_WORKER, binding: process.env.EXPECTED_BINDING,
