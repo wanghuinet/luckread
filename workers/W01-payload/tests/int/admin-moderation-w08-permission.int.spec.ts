@@ -45,7 +45,7 @@ const decisionBody = {
   severity: 'medium',
   scope: 'content',
   effectiveAt: '2026-10-01T00:00:00.000Z',
-  expiresAt: null,
+  expiresAt: null as string | null,
 }
 const cases = [
   { name: 'queue', method: 'GET' as const, path: ['queue'], url: 'https://www.luckread.com/api/v1/admin/moderation/queue?limit=10', permission: 'moderation.queue.read', resourceType: 'ModerationQueue' },

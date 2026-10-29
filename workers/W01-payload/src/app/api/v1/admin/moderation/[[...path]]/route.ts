@@ -86,7 +86,7 @@ async function authorizeModerationRequest(
     return jsonError(503, 'SERVICE_UNAVAILABLE', 'Authorization service unavailable')
   }
 
-  const value: unknown = await response.json().catch(() => null)
+  const value: unknown = await response.json().catch((): null => null)
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return jsonError(503, 'SERVICE_UNAVAILABLE', 'Authorization service unavailable')
   }
