@@ -365,7 +365,7 @@ export default function ContentDetailPage({
         return
       }
       try { window.sessionStorage.removeItem(storageKey) } catch { /* The server-side order remains authoritative. */ }
-      window.location.assign('/checkout?orderId=' + encodeURIComponent(orderId))
+      window.location.assign('/checkout?orderId=' + encodeURIComponent(orderId) + '&contentId=' + encodeURIComponent(content.id))
     } catch (cause) {
       setMembershipPurchaseError(cause instanceof Error ? cause.message : copy.detail.networkError)
     } finally {
