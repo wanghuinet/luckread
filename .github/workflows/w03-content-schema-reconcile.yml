@@ -8,8 +8,16 @@ on:
         required: false
         default: ""
         type: string
+      mode:
+        description: Read-only verification by default; apply is a separate explicit action
+        required: true
+        default: preflight-only
+        type: choice
+        options:
+          - preflight-only
+          - apply-confirmed
       confirm:
-        description: Explicitly authorize the controlled remote D1-02 migration
+        description: Type APPLY_W03_CONTENT_SCHEMA only when mode is apply-confirmed
         required: true
         default: STOP
         type: choice
@@ -29,7 +37,7 @@ env:
 
 jobs:
   reconcile:
-    if: ${{ inputs.confirm == 'APPLY_W03_CONTENT_SCHEMA' }}
+    if: ${{ inputs.mode == 'preflight-only' || (inputs.mode == 'apply-confirmed' && inputs.confirm == 'APPLY_W03_CONTENT_SCHEMA') }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -326,7 +334,7 @@ jobs:
           NODE
 
       - name: Apply admitted pending W03 D1-02 migrations
-        if: steps.gate_remote_drift.outputs.action == 'apply'
+        if: ${{ inputs.mode == 'apply-confirmed' && inputs.confirm == 'APPLY_W03_CONTENT_SCHEMA' && steps.gate_remote_drift.outputs.action == 'apply' }}
         working-directory: workers/W03-content
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -336,6 +344,7 @@ jobs:
           npx --yes "wrangler@$WRANGLER_VERSION" d1 migrations apply "$EXPECTED_DB_NAME" --remote --config wrangler.jsonc
 
       - name: Verify remote migration ledger, schema, and revision backfill
+        if: ${{ inputs.mode == 'apply-confirmed' && inputs.confirm == 'APPLY_W03_CONTENT_SCHEMA' }}
         working-directory: workers/W03-content
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -446,9 +455,10 @@ jobs:
           d1_binding=$EXPECTED_BINDING
           database_name=$EXPECTED_DB_NAME
           database_id=$EXPECTED_DB_ID
+          mode=${{ inputs.mode }}
           confirmation=${{ inputs.confirm }}
           migration_action=${W03_MIGRATION_ACTION:-not-reached}
-          migration_execution=confirmed-only
+          migration_execution=${{ inputs.mode == 'apply-confirmed' && inputs.confirm == 'APPLY_W03_CONTENT_SCHEMA' && 'explicitly-confirmed' || 'false' }}
           deployment_execution=false
           EOF
 
