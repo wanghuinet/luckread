@@ -39,12 +39,18 @@ test('rejects embedded credentials and URL fragments for off-origin media', () =
   expect(resolveNativeMediaSource('https://video.luckread.com/clip.mp4#fragment')).toBeNull();
 });
 
-test('never forwards a session token to the public media delivery hosts', () => {
+test('forwards session credentials only to the configured API and approved media delivery hosts', () => {
   expect(resolveNativeMediaSource('https://img.luckread.com/photo.webp', 'session-secret')).toEqual({
     uri: 'https://img.luckread.com/photo.webp',
+    headers: { Authorization: 'Bearer session-secret' },
+  });
+  expect(resolveNativeMediaSource('https://video.luckread.com/clip.mp4', 'session-secret')).toEqual({
+    uri: 'https://video.luckread.com/clip.mp4',
+    headers: { Authorization: 'Bearer session-secret' },
   });
   expect(resolveNativeMediaSource('/api/media/file/photo.webp', 'session-secret')).toEqual({
     uri: 'https://api.luckread.com/api/media/file/photo.webp',
     headers: { Authorization: 'Bearer session-secret' },
   });
+  expect(resolveNativeMediaSource('https://cdn.example.org/photo.webp', 'session-secret')).toBeNull();
 });
