@@ -231,7 +231,7 @@ export default function PostDetailScreen() {
                     throw new Error('The content service returned a different content ID.');
                 }
 
-                const creatorId = record.creatorId || record.ownerUserId || record.creator?.id || record.author?.id;
+                const creatorId = record.ownerUserId || record.creatorId || record.creator?.id || record.author?.id;
                 const tasks: Promise<unknown>[] = [
                     apiRequest<SocialResponse>(
                         '/contents/' + encodeURIComponent(postId) + '/social',
