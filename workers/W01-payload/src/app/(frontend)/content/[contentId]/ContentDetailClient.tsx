@@ -19,10 +19,23 @@ type Content = {
   contentType: ContentType
   state: string
   title: string
-  bodyRef?: string
+  accessMode?: 'PUBLIC' | 'MEMBERS_ONLY' | string
+  accessGranted?: boolean
+  bodyRef?: string | null
   mediaRefs?: string[]
   coverRef?: string | null
   updatedAt?: string
+}
+type MembershipPlan = {
+  planId: string
+  creatorId: string
+  planVersion: number
+  name: string
+  tier: string
+  billingInterval: 'MONTHLY' | 'YEARLY'
+  priceMinor: number
+  currency: string
+  benefits: string[]
 }
 
 const splitBodyIntoParagraphs = (value: string): string[] =>
@@ -72,6 +85,11 @@ export default function ContentDetailPage({
   const [followRestricted, setFollowRestricted] = useState(false)
   const [followBusy, setFollowBusy] = useState(false)
   const [retryKey, setRetryKey] = useState(0)
+  const [membershipPlans, setMembershipPlans] = useState<MembershipPlan[]>([])
+  const [membershipPlansLoading, setMembershipPlansLoading] = useState(false)
+  const [membershipPurchasePlanId, setMembershipPurchasePlanId] = useState<string | null>(null)
+  const [membershipPurchaseError, setMembershipPurchaseError] = useState('')
+  const membershipLocked = content?.accessMode === 'MEMBERS_ONLY' && content.accessGranted !== true
   const [socialTopics, setSocialTopics] = useState<Array<{ topicId: string; name: string; displayName: string }>>([])
   const [socialMentions, setSocialMentions] = useState<Array<{ userId: string; handle: string }>>([])
   const structuredArticle = useMemo(
@@ -89,10 +107,10 @@ export default function ContentDetailPage({
           let resolved = initialContent
           let viewerData: { id?: string } | null = null
 
-          if (!resolved || retryKey > 0) {
+          if (!resolved || retryKey > 0 || initialContent?.accessMode === 'MEMBERS_ONLY') {
             const [contentResult, viewerResult] = await Promise.all([
               fetchJson<Content>(`/api/v1/contents/${encodeURIComponent(contentId)}`, {
-                credentials: 'omit',
+                credentials: 'include',
                 headers: { accept: 'application/json' },
                 cache: 'no-store',
                 signal: controller.signal,
@@ -169,7 +187,7 @@ export default function ContentDetailPage({
               // Follow state is optional; content remains readable when the status query fails.
             }
           }
-          if (resolved.bodyRef) {
+          if (resolved.accessGranted !== false && resolved.bodyRef) {
             try {
               const bodyResponse = await apiFetch(resolved.bodyRef, { cache: 'no-store', signal: controller.signal })
               if (bodyResponse.ok && !cancelled) setBody(await bodyResponse.text())
@@ -194,6 +212,69 @@ export default function ContentDetailPage({
     }
   }, [initialContent, params, retryKey])
 
+  useEffect(() => {
+    if (!membershipLocked || !content?.creatorId) {
+      setMembershipPlans([])
+      setMembershipPlansLoading(false)
+      setMembershipPurchaseError('')
+      return
+    }
+    const controller = new AbortController()
+    let active = true
+    setMembershipPlansLoading(true)
+    setMembershipPurchaseError('')
+    void (async () => {
+      try {
+        const { response, data } = await fetchJson<{ data?: { docs?: unknown[] }; error?: { message?: unknown } }>('/api/v1/plans?limit=50', {
+          credentials: 'include',
+          cache: 'no-store',
+          headers: { accept: 'application/json' },
+          signal: controller.signal,
+        })
+        if (!active || controller.signal.aborted) return
+        if (response.status === 401) {
+          setMembershipPurchaseError(locale === 'en'
+            ? 'Sign in to view membership offers.'
+            : locale === 'tw' ? '登入後即可查看會員方案。' : '登录后即可查看会员套餐。')
+          return
+        }
+        if (!response.ok) {
+          setMembershipPurchaseError(getApiErrorMessage(data, copy.detail.networkError))
+          return
+        }
+        const docs = Array.isArray(data?.data?.docs) ? data.data.docs : []
+        const plans = docs.filter((value): value is MembershipPlan => {
+          if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+          const plan = value as Record<string, unknown>
+          return typeof plan.planId === 'string' &&
+            /^plan_[a-f0-9]{64}$/.test(plan.planId) &&
+            plan.creatorId === content.creatorId &&
+            Number.isSafeInteger(plan.planVersion) && (plan.planVersion as number) > 0 &&
+            typeof plan.name === 'string' &&
+            (plan.billingInterval === 'MONTHLY' || plan.billingInterval === 'YEARLY') &&
+            typeof plan.priceMinor === 'number' && Number.isSafeInteger(plan.priceMinor) && plan.priceMinor > 0 &&
+            typeof plan.currency === 'string' && /^[A-Z]{3}$/.test(plan.currency) &&
+            Array.isArray(plan.benefits) &&
+            plan.benefits.every((item) => typeof item === 'string')
+        }) as MembershipPlan[]
+        setMembershipPlans(plans)
+        if (plans.length === 0) {
+          setMembershipPurchaseError(locale === 'en'
+            ? 'This creator has no active public membership offer yet.'
+            : locale === 'tw' ? '此創作者目前沒有可購買的公開會員方案。' : '该创作者目前没有可购买的公开会员套餐。')
+        }
+      } catch {
+        if (active && !controller.signal.aborted) setMembershipPurchaseError(copy.detail.networkError)
+      } finally {
+        if (active) setMembershipPlansLoading(false)
+      }
+    })()
+    return () => {
+      active = false
+      controller.abort()
+    }
+  }, [membershipLocked, content?.creatorId, locale, copy.detail.networkError])
+
   if (loading) {
     return <Root aria-busy={loading} className="flex min-w-0 flex-col"><p className="flex min-h-40 items-center justify-center px-4 py-12 text-sm text-light-secondary dark:text-dark-secondary" role="status">{copy.detail.loading}</p></Root>
   }
@@ -210,6 +291,60 @@ export default function ContentDetailPage({
     )
   }
 
+
+  async function purchaseMembership(plan: MembershipPlan) {
+    if (membershipPurchasePlanId) return
+    setMembershipPurchasePlanId(plan.planId)
+    setMembershipPurchaseError('')
+    try {
+      const storageKey = 'luckread.membership-order.' + (content?.id ?? 'content') + '.' + plan.planId
+      let idempotencyKey = ''
+      try {
+        idempotencyKey = window.sessionStorage.getItem(storageKey) ?? ''
+        if (!/^[A-Za-z0-9_-]{1,128}$/.test(idempotencyKey)) {
+          idempotencyKey = window.crypto.randomUUID()
+          window.sessionStorage.setItem(storageKey, idempotencyKey)
+        }
+      } catch {
+        throw new Error(locale === 'en'
+          ? 'Secure retry storage is unavailable. Enable session storage and try again.'
+          : locale === 'tw' ? '無法安全保存重試識別碼，請啟用工作階段儲存後再試。' : '无法安全保存重试标识，请启用会话存储后重试。')
+      }
+      const { response, data } = await fetchJson<{ data?: { orderId?: unknown }; error?: { message?: unknown } }>('/api/v1/commerce/orders', {
+        method: 'POST',
+        credentials: 'include',
+        cache: 'no-store',
+        headers: {
+          accept: 'application/json',
+          'content-type': 'application/json',
+          'Idempotency-Key': idempotencyKey,
+        },
+        body: JSON.stringify({ items: [{ itemRef: plan.planId, quantity: 1 }] }),
+      })
+      if (response.status === 401) {
+        const returnTo = window.location.pathname + window.location.search + window.location.hash
+        window.location.assign('/login?returnTo=' + encodeURIComponent(returnTo))
+        return
+      }
+      const orderId = data?.data?.orderId
+      if (!response.ok || typeof orderId !== 'string' || !/^ord_[A-Za-z0-9_-]{1,90}$/.test(orderId)) {
+        setMembershipPurchaseError(getApiErrorMessage(
+          data,
+          locale === 'en'
+            ? 'Checkout is temporarily unavailable. No membership has been activated.'
+            : locale === 'tw' ? '結帳暫時無法使用，尚未開通會員資格。' : '结账暂时不可用，尚未开通会员资格。',
+          response.status,
+        ))
+        return
+      }
+      try { window.sessionStorage.removeItem(storageKey) } catch { /* The server-side order remains authoritative. */ }
+      window.location.assign('/checkout?orderId=' + encodeURIComponent(orderId))
+    } catch (cause) {
+      setMembershipPurchaseError(cause instanceof Error ? cause.message : copy.detail.networkError)
+    } finally {
+      setMembershipPurchasePlanId(null)
+    }
+  }
 
   async function toggleLike() {
     if (!content || likeBusy) return
