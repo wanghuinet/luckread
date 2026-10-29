@@ -170,7 +170,7 @@ async function readPaidOrder(
     !safeMinor(row.amount_minor) || row.amount_minor < 1 ||
     !/^[A-Z]{3}$/.test(row.payment_currency) ||
     row.payment_currency !== row.order_currency || row.amount_minor !== row.total_minor ||
-    !['CONFIRMED', 'PROCESSING', 'COMPLETED'].includes(row.order_status) ||
+    !['CONFIRMED', 'COMPLETED'].includes(row.order_status) ||
     !canonicalIso(row.confirmed_at)
   ) return failClosed();
   return row;
