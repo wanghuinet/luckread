@@ -119,7 +119,7 @@ jobs:
         run: npx tsc --noEmit --strict --skipLibCheck --target ES2022 --module ESNext --moduleResolution Bundler --lib ES2022,DOM --types @cloudflare/workers-types workers/W07-subscription-commerce/src/order-item-resolution.ts workers/W07-subscription-commerce/src/order-persistence.ts workers/W07-subscription-commerce/src/order-http-runtime.ts workers/W07-subscription-commerce/src/demo-tax-pricing.ts workers/W07-subscription-commerce/src/taxjar-sandbox-pricing.ts workers/W07-subscription-commerce/src/payment-persistence.ts workers/W07-subscription-commerce/src/payment-intent-http-runtime.ts workers/W07-subscription-commerce/src/renewal-runtime.ts workers/W07-subscription-commerce/src/subscription-renewal-outcome.ts workers/W07-subscription-commerce/src/payment-webhook-http-runtime.ts workers/W07-subscription-commerce/src/paid-membership-order-fulfillment.ts workers/W07-subscription-commerce/src/index.ts
       - name: Run W07 subscription-commerce unit tests
         working-directory: workers/W01-payload
-        run: LUCKREAD_VITEST_SCOPE=w07-unit pnpm exec vitest run --config ./vitest.config.mts --root ../..
+        run: LUCKREAD_VITEST_SCOPE=w07-unit pnpm exec vitest run --config workers/W01-payload/vitest.config.mts --root ../..
       - name: Run W01 commerce/subscription/payment adapter integration tests
         working-directory: workers/W01-payload
         run: pnpm exec vitest run --config ./vitest.config.mts tests/int/subscription-v1-adapter.int.spec.ts tests/int/commerce-order-v1-adapter.int.spec.ts tests/int/payments-intent-v1-adapter.int.spec.ts
