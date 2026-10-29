@@ -164,7 +164,7 @@ function resolveMediaUrl(value: unknown): string | null {
   }
 }
 
-/** Resolve a media reference for native image/video views without leaking auth off-origin. */
+/** Resolve media and attach a session token only to LuckRead-owned origins. */
 export function resolveNativeMediaSource(
   value: unknown,
   sessionToken?: string | null,
@@ -174,8 +174,15 @@ export function resolveNativeMediaSource(
   if (!sessionToken) return { uri };
 
   try {
-    const baseOrigin = new URL(getApiBaseUrl()).origin;
-    if (new URL(uri).origin !== baseOrigin) return { uri };
+    const base = new URL(getApiBaseUrl());
+    const resolved = new URL(uri);
+    const approvedDeliveryHost = resolved.protocol === 'https:' &&
+      !resolved.port &&
+      ['img.luckread.com', 'video.luckread.com'].includes(resolved.hostname);
+    // React Native Image/Video cannot rely on browser cookies. Forward the bearer
+    // only to the configured API origin or the two explicit first-party media
+    // hosts, where W01 performs the same runtime entitlement check as W03 detail.
+    if (resolved.origin !== base.origin && !approvedDeliveryHost) return { uri };
     return { uri, headers: { Authorization: 'Bearer ' + sessionToken } };
   } catch {
     return { uri };
