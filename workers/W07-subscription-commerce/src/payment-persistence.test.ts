@@ -213,8 +213,17 @@ class MemoryPaymentD1 {
       return result(1) as D1Result<T>;
     }
     if (sql.startsWith('INSERT INTO payment_provider_events')) {
-      const [rowId, provider, merchantId, eventId, eventType, paymentId, hash, receivedAt] = values as
-        [string, string, string, string, string, string | null, string, string];
+      const rowId = values[0] as string;
+      const provider = values[1] as string;
+      const merchantId = values[2] as string;
+      const eventId = values[3] as string;
+      const eventType = values[4] as string;
+      // The mandate INSERT uses a SQL literal NULL for payment_id, so it has
+      // one fewer bound value than the payment-event INSERT variants.
+      const hasLiteralNullPaymentId = sql.includes("?, ?, ?, ?, ?, NULL, ?, 'RECEIVED'");
+      const paymentId = hasLiteralNullPaymentId ? null : values[5] as string | null;
+      const hash = values[hasLiteralNullPaymentId ? 5 : 6] as string;
+      const receivedAt = values[hasLiteralNullPaymentId ? 6 : 7] as string;
       if (this.events.some(e => e.provider === provider && e.merchant_id === merchantId && e.event_id === eventId)) {
         return result(0) as D1Result<T>; // ON CONFLICT DO NOTHING
       }
