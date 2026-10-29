@@ -469,8 +469,9 @@ const worker = {
               createdAt: item.createdAt,
               contentType: item.contentType,
               title: item.title,
-              // Search is metadata-only until the canonical visibility/entitlement
-              // recheck is admitted. Never expose protected body or media references.
+              accessMode: item.accessMode ?? 'PUBLIC',
+              // Feed remains metadata-only: a member must open the canonical
+              // detail route for the W07 entitlement check before refs are returned.
               updatedAt: item.updatedAt,
             })),
             nextCursor: page.nextCursor,
@@ -534,8 +535,9 @@ const worker = {
               createdAt: item.createdAt,
               contentType: item.contentType,
               title: item.title,
-              // Search is metadata-only until canonical visibility/entitlement
-              // rechecks are admitted. Never expose protected body/media references.
+              accessMode: item.accessMode ?? 'PUBLIC',
+              // Search is metadata-only: a member must open the canonical
+              // detail route for the W07 entitlement check before refs are returned.
               updatedAt: item.updatedAt,
             })),
             nextCursor: page.nextCursor,
@@ -631,19 +633,25 @@ const worker = {
         const items = await listPublishedContentsByIds(env.D1_02, ids)
         return json({
           data: {
-            items: items.map(item => ({
-              id: item.id,
-              slug: item.slug,
-              ownerUserId: item.ownerUserId,
-              creatorId: item.creatorId,
-              contentType: item.contentType,
-              title: item.title,
-              bodyRef: item.bodyRef,
-              mediaRefs: item.mediaRefs,
-              coverRef: item.coverRef,
-              createdAt: item.createdAt,
-              updatedAt: item.updatedAt,
-            })),
+            items: items.map(item => {
+              const membersOnly = item.accessMode === 'MEMBERS_ONLY'
+              return {
+                id: item.id,
+                slug: item.slug,
+                ownerUserId: item.ownerUserId,
+                creatorId: item.creatorId,
+                contentType: item.contentType,
+                title: item.title,
+                accessMode: item.accessMode ?? 'PUBLIC',
+                // Bookmark projections are not an authorization boundary.
+                // Always omit protected references here; detail checks W07.
+                bodyRef: membersOnly ? '' : item.bodyRef,
+                mediaRefs: membersOnly ? [] : item.mediaRefs,
+                coverRef: membersOnly ? null : item.coverRef,
+                createdAt: item.createdAt,
+                updatedAt: item.updatedAt,
+              }
+            }),
           },
           requestId: createRequestId(),
         })
@@ -1008,6 +1016,8 @@ const worker = {
               revision: item.revision,
               etag: item.etag,
               title: item.title,
+              accessMode: item.accessMode ?? 'PUBLIC',
+              // Creator-owned views are owner-scoped; keep the current body/media.
               bodyRef: item.bodyRef,
               mediaRefs: item.mediaRefs,
               coverRef: item.coverRef,
@@ -1043,19 +1053,25 @@ const worker = {
         )
         return json({
           data: {
-            items: page.items.map(item => ({
-              id: item.id,
-              slug: item.slug,
-              contentType: item.contentType,
-              state: item.state,
-              version: item.version,
-              etag: item.etag,
-              title: item.title,
-              bodyRef: item.bodyRef,
-              mediaRefs: item.mediaRefs,
-              coverRef: item.coverRef,
-              scheduledAt: item.scheduledAt,
-            })),
+            items: page.items.map(item => {
+              const membersOnly = item.accessMode === 'MEMBERS_ONLY'
+              return {
+                id: item.id,
+                slug: item.slug,
+                contentType: item.contentType,
+                state: item.state,
+                version: item.version,
+                etag: item.etag,
+                title: item.title,
+                accessMode: item.accessMode ?? 'PUBLIC',
+                // General list responses deliberately omit protected references.
+                // The detail endpoint is the single request-time entitlement gate.
+                bodyRef: membersOnly ? '' : item.bodyRef,
+                mediaRefs: membersOnly ? [] : item.mediaRefs,
+                coverRef: membersOnly ? null : item.coverRef,
+                scheduledAt: item.scheduledAt,
+              }
+            }),
             nextCursor: page.nextCursor,
             hasMore: page.hasMore,
           },
