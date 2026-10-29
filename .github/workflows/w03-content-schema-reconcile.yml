@@ -248,9 +248,10 @@ jobs:
             fs.appendFileSync(process.env.GITHUB_ENV, 'W03_MIGRATION_ACTION=none\n');
             fs.appendFileSync(process.env.GITHUB_OUTPUT, 'action=none\n');
           } else if (applied.length === 11) {
-            // Production D1-02 already has W03 migrations 0001-0011. Admit only
-            // migration 0012, and only when the schema exactly meets the reviewed
-            // post-0011 requirements and the allocator table is not unledgered.
+            // Production D1-02 already has W03 migrations 0001-0011. Admit
+            // the exact pending 0012 -> 0013 migration chain only when the live
+            // schema matches the reviewed post-0011 state with neither new table
+            // nor partial access_mode columns already present.
             const needed = {
               contents: ['id','content_type','owner_user_id','creator_id','state','version','revision','slug','scheduled_at','title','body_ref','media_refs_json','etag','created_at','updated_at'],
               content_revisions: ['id','content_id','revision','content_version','actor_user_id','operation','state','slug','title','body_ref','media_refs_json','etag','correlation_id','created_at'],
@@ -262,9 +263,11 @@ jobs:
               !tables.has(table) ? [table + ' table'] : names.filter((name) => !columns(table).has(name)).map((name) => table + '.' + name));
             const missingBaselineTables = ['contents','content_mutation_idempotency','content_outbox_events','content_txn_guard'].filter((table) => !tables.has(table));
             const missingBaselineTriggers = ['contents_after_insert_outbox','contents_after_update_outbox'].filter((trigger) => !triggers.has(trigger));
-            if (missing.length || missingBaselineTables.length || missingBaselineTriggers.length || tables.has('content_id_snowflake_state')) {
+            const partialAccessMode = columns('contents').has('access_mode') || columns('content_revisions').has('access_mode');
+            if (missing.length || missingBaselineTables.length || missingBaselineTriggers.length ||
+                tables.has('content_id_snowflake_state') || partialAccessMode) {
               throw new Error('Refusing remote mutation because live schema does not match the reviewed post-0011 state: ' +
-                JSON.stringify({missing,missingBaselineTables,missingBaselineTriggers,unrecordedAllocatorTable:tables.has('content_id_snowflake_state')}));
+                JSON.stringify({missing,missingBaselineTables,missingBaselineTriggers,unrecordedAllocatorTable:tables.has('content_id_snowflake_state'),partialAccessMode}));
             }
             fs.appendFileSync(process.env.GITHUB_ENV, 'W03_MIGRATION_ACTION=apply\n');
             fs.appendFileSync(process.env.GITHUB_OUTPUT, 'action=apply\n');
@@ -405,7 +408,7 @@ jobs:
           const columns = (table) => new Set(rows.filter((row) => row.table_name === table && !String(row.column_name).startsWith('__')).map((row) => row.column_name));
           const requirements = {
             contents: ['slug','scheduled_at','media_refs_json','access_mode'],
-            content_revisions: ['id','content_id','revision','content_version','actor_user_id','operation','state','slug','title','body_ref','media_refs_json','etag','correlation_id','created_at'],
+            content_revisions: ['id','content_id','revision','content_version','actor_user_id','operation','state','access_mode','slug','title','body_ref','media_refs_json','etag','correlation_id','created_at'],
             content_relationships: ['relationship_id','source_id','target_id','relation_type','position','status'],
             content_series: ['id','owner_user_id','creator_id','state'],
             content_collections: ['id','owner_user_id','creator_id','state'],
