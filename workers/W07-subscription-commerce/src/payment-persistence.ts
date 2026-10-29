@@ -1,6 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
 import { strictlyAfterCanonicalUtcTimestamp } from './canonical-utc-timestamp.js';
+import { CanonicalJsonError, sha256CanonicalJsonForIdempotency } from '../../W10-async/src/canonical-json-idempotency.js';
 
 import {
   verifyHyperswitchWebhookSignature,
@@ -232,6 +233,63 @@ async function sha256Hex(input: BufferSource): Promise<string> {
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
+const MAX_PAYMENT_ATTEMPT_FINGERPRINT_BYTES = 8192;
+
+type PaymentAttemptRequestHashes = Readonly<{
+  canonical: string;
+  compatible: readonly string[];
+}>;
+
+/**
+ * New payment attempts use W10's strict canonical JSON + SHA-256 implementation.
+ * The legacy hash is retained only as a replay-compatible alias for rows written
+ * before this migration; it is never persisted for a newly created attempt.
+ */
+async function paymentAttemptRequestHashes(input: Readonly<{
+  customerId: string;
+  orderId: string;
+  merchantId: string;
+  amountMinor: number;
+  currency: string;
+}>): Promise<PaymentAttemptRequestHashes> {
+  const payload = {
+    operation: 'createPaymentAttempt',
+    customerId: input.customerId,
+    orderId: input.orderId,
+    provider: PROVIDER,
+    merchantId: input.merchantId,
+    amountMinor: input.amountMinor,
+    currency: input.currency,
+  };
+
+  let canonical: string;
+  try {
+    const fingerprint = await sha256CanonicalJsonForIdempotency(
+      payload,
+      MAX_PAYMENT_ATTEMPT_FINGERPRINT_BYTES,
+    );
+    canonical = fingerprint.slice('sha256:'.length);
+  } catch (error) {
+    if (error instanceof CanonicalJsonError && error.code !== 'HASH_UNAVAILABLE') {
+      throw new PaymentPersistenceError('INTEGRITY_VIOLATION', 500);
+    }
+    throw new PaymentPersistenceError('SERVICE_UNAVAILABLE', 503);
+  }
+
+  let legacy: string;
+  try {
+    // Exact pre-W10 serialization is read-only compatibility for existing D1-04 rows.
+    legacy = await sha256Hex(new TextEncoder().encode(JSON.stringify(payload)));
+  } catch {
+    throw new PaymentPersistenceError('SERVICE_UNAVAILABLE', 503);
+  }
+
+  return {
+    canonical,
+    compatible: canonical === legacy ? [canonical] : [canonical, legacy],
+  };
+}
+
 function toDto(row: PaymentRow): PaymentAttemptDto {
   return {
     paymentId: row.payment_id,
@@ -272,10 +330,10 @@ async function readPaymentByOrder(
 
 function replayOrConflict(
   existing: PaymentRow,
-  requestHash: string,
+  compatibleRequestHashes: readonly string[],
   pricingMode: 'live' | 'demo',
 ): PaymentAttemptCreation {
-  if (existing.request_hash !== requestHash) {
+  if (!compatibleRequestHashes.includes(existing.request_hash)) {
     throw new PaymentPersistenceError('IDEMPOTENCY_KEY_REUSE_CONFLICT', 409);
   }
   return { payment: toDto(existing), replayed: true, pricingMode };
@@ -314,16 +372,14 @@ export async function createPaymentAttempt(
     throw new PaymentPersistenceError('SERVICE_UNAVAILABLE', 503);
   }
 
-  const hashRequest = async (orderId: string, amountMinor: number, currency: string) =>
-    sha256Hex(new TextEncoder().encode(JSON.stringify({
-      operation: 'createPaymentAttempt',
+  const hashRequest = (orderId: string, amountMinor: number, currency: string) =>
+    paymentAttemptRequestHashes({
       customerId: customerIdInput,
       orderId,
-      provider: PROVIDER,
       merchantId: expectedMerchantIdInput,
       amountMinor,
       currency,
-    })));
+    });
 
   // Read the immutable tax-mode marker before resolving a payment replay. This
   // prevents a Demo attempt from being retried after switching to production,
@@ -355,11 +411,8 @@ export async function createPaymentAttempt(
   try {
     const existing = await readPaymentByCustomerAndKey(db, customerIdInput, idempotencyKeyInput);
     if (existing) {
-      return replayOrConflict(
-        existing,
-        await hashRequest(orderIdInput, existing.amount_minor, existing.currency),
-        pricingMode,
-      );
+      const hashes = await hashRequest(orderIdInput, existing.amount_minor, existing.currency);
+      return replayOrConflict(existing, hashes.compatible, pricingMode);
     }
   } catch (error) {
     if (error instanceof PaymentPersistenceError) throw error;
@@ -375,7 +428,8 @@ export async function createPaymentAttempt(
     throw new PaymentPersistenceError('CONFLICT', 409);
   }
 
-  const requestHash = await hashRequest(order.order_id, order.total_minor, order.currency);
+  const requestHashes = await hashRequest(order.order_id, order.total_minor, order.currency);
+  const requestHash = requestHashes.canonical;
 
   const nowFn = dependencies.now ?? (() => new Date());
   const createdAt = parseDate(nowFn);
@@ -419,7 +473,7 @@ export async function createPaymentAttempt(
     // semantic key reuse, and a second live attempt for the same Order.
     try {
       const raced = await readPaymentByCustomerAndKey(db, customerIdInput, idempotencyKeyInput);
-      if (raced) return replayOrConflict(raced, requestHash, pricingMode);
+      if (raced) return replayOrConflict(raced, requestHashes.compatible, pricingMode);
       const live = await readPaymentByOrder(db, customerIdInput, order.order_id);
       if (live) throw new PaymentPersistenceError('CONFLICT', 409);
     } catch (recoveryError) {
