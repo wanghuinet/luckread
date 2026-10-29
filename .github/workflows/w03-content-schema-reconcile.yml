@@ -253,7 +253,7 @@ jobs:
             // post-0011 requirements and the allocator table is not unledgered.
             const needed = {
               contents: ['id','content_type','owner_user_id','creator_id','state','version','revision','slug','scheduled_at','title','body_ref','media_refs_json','etag','created_at','updated_at'],
-              content_revisions: ['id','content_id','revision','content_version','actor_user_id','operation','state','access_mode','slug','title','body_ref','media_refs_json','etag','correlation_id','created_at'],
+              content_revisions: ['id','content_id','revision','content_version','actor_user_id','operation','state','slug','title','body_ref','media_refs_json','etag','correlation_id','created_at'],
               content_relationships: ['relationship_id','source_id','target_id','relation_type','position','status'],
               content_series: ['id','owner_user_id','creator_id','state'],
               content_collections: ['id','owner_user_id','creator_id','state'],
@@ -288,8 +288,8 @@ jobs:
               throw new Error('Refusing access-mode migration because live schema does not match the reviewed post-0012 state: ' +
                 JSON.stringify({missing,missingBaselineTables,missingBaselineTriggers,partialAccessMode}));
             }
-            fs.appendFileSync(process.env.GITHUB_ENV, 'W03_MIGRATION_ACTION=apply\\n');
-            fs.appendFileSync(process.env.GITHUB_OUTPUT, 'action=apply\\n');
+            fs.appendFileSync(process.env.GITHUB_ENV, 'W03_MIGRATION_ACTION=apply\n');
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, 'action=apply\n');
           } else {
             // Retain the previously reviewed pre-0004 states for environments
             // whose W03 migration history is 0001-0002 or 0001-0003 only.
