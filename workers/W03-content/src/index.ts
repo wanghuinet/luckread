@@ -465,6 +465,7 @@ const worker = {
             items: page.items.map((item) => ({
               id: item.id,
               slug: item.slug,
+              ownerUserId: item.ownerUserId,
               creatorId: item.creatorId ?? item.ownerUserId,
               createdAt: item.createdAt,
               contentType: item.contentType,
@@ -531,6 +532,7 @@ const worker = {
             items: page.items.map((item) => ({
               id: item.id,
               slug: item.slug,
+              ownerUserId: item.ownerUserId,
               creatorId: item.creatorId ?? item.ownerUserId,
               createdAt: item.createdAt,
               contentType: item.contentType,
@@ -1068,6 +1070,8 @@ const worker = {
               return {
                 id: item.id,
                 slug: item.slug,
+                ownerUserId: item.ownerUserId,
+                creatorId: item.creatorId ?? item.ownerUserId,
                 contentType: item.contentType,
                 state: item.state,
                 version: item.version,
@@ -1164,6 +1168,7 @@ const worker = {
         return json({
           id: content.id,
           slug: content.slug,
+          ownerUserId: content.ownerUserId,
           creatorId: content.creatorId,
           contentType: content.contentType,
           state: content.state,
@@ -1275,6 +1280,8 @@ const worker = {
         return json({
           id: content.id,
           slug: content.slug,
+          ownerUserId: content.ownerUserId,
+          creatorId: content.creatorId,
           state: content.state,
           accessMode: content.accessMode ?? 'PUBLIC',
           accessGranted: true,
