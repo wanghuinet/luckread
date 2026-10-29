@@ -323,7 +323,7 @@ export default function PostDetailScreen() {
                 style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
                 contentContainerStyle={{ flexGrow: 1 }}
             >
-                <PostHeader username={authorHandle} targetUserId={findPost.creatorId || findPost.ownerUserId} contentId={postId} postId={postId} />
+                <PostHeader username={authorHandle} targetUserId={findPost.ownerUserId || findPost.creatorId} contentId={postId} postId={postId} />
                 {findPost.accessMode === 'MEMBERS_ONLY' && findPost.accessGranted !== true ? (
                     <View className="mx-4 mt-4 rounded-2xl border border-neutral-200 dark:border-neutral-800 p-5">
                         <Feather name="lock" size={26} color="#0EA5E9" />
