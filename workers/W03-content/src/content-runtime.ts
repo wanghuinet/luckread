@@ -335,21 +335,17 @@ export async function resolvePublishedMediaReferenceAccess(
 
   const memberRows = rows.filter((row) => row.access_mode === 'MEMBERS_ONLY')
   if (memberRows.length > 0) {
-    if (viewerUserId && memberRows.some((row) => row.owner_user_id === viewerUserId)) {
-      return { isPublic: false, isMemberContent: true, allowed: true }
-    }
-    if (!viewerUserId || !hasCreatorMembership) {
-      return { isPublic: false, isMemberContent: true, allowed: false }
-    }
-    const creatorIds = [...new Set(memberRows.map((row) => row.creator_id).filter(
-      (creatorId): creatorId is string => typeof creatorId === 'string' && creatorId.length > 0,
-    ))]
-    for (const creatorId of creatorIds) {
-      if (await hasCreatorMembership(creatorId)) {
-        return { isPublic: false, isMemberContent: true, allowed: true }
+    // A URL can be referenced by more than one content record. Do not grant the
+    // bytes because a viewer is entitled to one of several unrelated creators;
+    // every protected reference to this object must independently authorize it.
+    for (const row of memberRows) {
+      if (viewerUserId && row.owner_user_id === viewerUserId) continue
+      if (!viewerUserId || !hasCreatorMembership || !row.creator_id ||
+          !(await hasCreatorMembership(row.creator_id))) {
+        return { isPublic: false, isMemberContent: true, allowed: false }
       }
     }
-    return { isPublic: false, isMemberContent: true, allowed: false }
+    return { isPublic: false, isMemberContent: true, allowed: true }
   }
 
   const isPublic = rows.some((row) => row.content_type === 'post' && row.access_mode !== 'MEMBERS_ONLY')
