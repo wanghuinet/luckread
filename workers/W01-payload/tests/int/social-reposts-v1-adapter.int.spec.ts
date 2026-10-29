@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => {
     enforceWriteRateLimit: vi.fn(async (_request: Request) => undefined),
     enforceWriteAccountRateLimit: vi.fn(async (_accountId: string) => undefined),
     enforceWriteEndpointRateLimit: vi.fn(async (_endpoint: string) => undefined),
+    enforceWriteResourceRateLimit: vi.fn(async (_resourceType: string, _resourceId: string) => undefined),
     rateLimitResponse: vi.fn((_request: Request) => new Response('rate limited', { status: 429 })),
     resolvePrincipal: vi.fn(async (_request: Request) => ({ userId: 'user_test_01', layer: 'L2' })),
     callW05Social: vi.fn(async (_input: unknown) => Response.json({ data: { ok: true } }, { status: 200 })),
@@ -26,6 +27,7 @@ vi.mock('../../src/auth/traffic-limit.js', () => ({
   enforceW01WriteRateLimit: mocks.enforceWriteRateLimit,
   enforceW01WriteAccountRateLimit: mocks.enforceWriteAccountRateLimit,
   enforceW01WriteEndpointRateLimit: mocks.enforceWriteEndpointRateLimit,
+  enforceW01WriteResourceRateLimit: mocks.enforceWriteResourceRateLimit,
   rateLimitResponse: mocks.rateLimitResponse,
 }))
 
@@ -58,6 +60,8 @@ beforeEach(() => {
   mocks.enforceWriteAccountRateLimit.mockResolvedValue(undefined)
   mocks.enforceWriteEndpointRateLimit.mockReset()
   mocks.enforceWriteEndpointRateLimit.mockResolvedValue(undefined)
+  mocks.enforceWriteResourceRateLimit.mockReset()
+  mocks.enforceWriteResourceRateLimit.mockResolvedValue(undefined)
   mocks.rateLimitResponse.mockClear()
   mocks.resolvePrincipal.mockReset()
   mocks.resolvePrincipal.mockResolvedValue({ userId: 'user_test_01', layer: 'L2' })
@@ -93,10 +97,13 @@ describe('v1 repost adapter', () => {
     expect(mocks.enforceWriteAccountRateLimit).toHaveBeenNthCalledWith(2, 'user_test_01')
     expect(mocks.enforceWriteEndpointRateLimit).toHaveBeenNthCalledWith(1, 'postContentContentIdReposts')
     expect(mocks.enforceWriteEndpointRateLimit).toHaveBeenNthCalledWith(2, 'deleteContentContentIdReposts')
+    expect(mocks.enforceWriteResourceRateLimit).toHaveBeenNthCalledWith(1, 'content', 'content-1')
+    expect(mocks.enforceWriteResourceRateLimit).toHaveBeenNthCalledWith(2, 'content', 'content-1')
     expect(mocks.enforceWriteRateLimit.mock.invocationCallOrder[0]).toBeLessThan(mocks.resolvePrincipal.mock.invocationCallOrder[0])
     expect(mocks.resolvePrincipal.mock.invocationCallOrder[0]).toBeLessThan(mocks.enforceWriteAccountRateLimit.mock.invocationCallOrder[0])
     expect(mocks.enforceWriteAccountRateLimit.mock.invocationCallOrder[0]).toBeLessThan(mocks.enforceWriteEndpointRateLimit.mock.invocationCallOrder[0])
-    expect(mocks.enforceWriteEndpointRateLimit.mock.invocationCallOrder[0]).toBeLessThan(mocks.callW05Social.mock.invocationCallOrder[0])
+    expect(mocks.enforceWriteEndpointRateLimit.mock.invocationCallOrder[0]).toBeLessThan(mocks.enforceWriteResourceRateLimit.mock.invocationCallOrder[0])
+    expect(mocks.enforceWriteResourceRateLimit.mock.invocationCallOrder[0]).toBeLessThan(mocks.callW05Social.mock.invocationCallOrder[0])
     expect(mocks.callW05Social).toHaveBeenCalledTimes(2)
   })
 
@@ -149,6 +156,23 @@ describe('v1 repost adapter', () => {
         mocks.enforceWriteEndpointRateLimit.mockReset()
         mocks.enforceWriteEndpointRateLimit.mockResolvedValue(undefined)
       }
+    }
+  })
+  it('short-circuits POST and DELETE when the target-resource limiter rejects', async () => {
+    for (const [method, handler] of [
+      ['POST', POST],
+      ['DELETE', DELETE],
+    ] as const) {
+      mocks.enforceWriteResourceRateLimit.mockRejectedValueOnce(new mocks.MockTrafficLimitError())
+      const response = await handler(requestFor(method), context)
+
+      expect(response.status).toBe(429)
+      expect(mocks.enforceWriteResourceRateLimit).toHaveBeenCalledWith('content', 'content-1')
+      expect(mocks.callW05Social).not.toHaveBeenCalled()
+      mocks.enforceWriteResourceRateLimit.mockReset()
+      mocks.enforceWriteResourceRateLimit.mockResolvedValue(undefined)
+      mocks.callW05Social.mockClear()
+      mocks.rateLimitResponse.mockClear()
     }
   })
 })

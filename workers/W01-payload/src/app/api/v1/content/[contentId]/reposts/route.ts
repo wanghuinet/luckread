@@ -8,6 +8,7 @@ import {
   enforceW01WriteAccountRateLimit,
   enforceW01WriteEndpointRateLimit,
   enforceW01WriteRateLimit,
+  enforceW01WriteResourceRateLimit,
   rateLimitResponse,
 } from '../../../../../../auth/traffic-limit.js'
 
@@ -33,6 +34,7 @@ async function mutateRepost(
     await enforceW01WriteEndpointRateLimit(
       request.method === 'POST' ? 'postContentContentIdReposts' : 'deleteContentContentIdReposts',
     )
+    await enforceW01WriteResourceRateLimit('content', contentId)
     return await callW05Social({
       request,
       pathname: '/internal/social/content/' + encodeURIComponent(contentId) + '/reposts',

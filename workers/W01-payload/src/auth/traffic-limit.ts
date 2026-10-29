@@ -150,3 +150,30 @@ export async function enforceW01WriteEndpointRateLimit(endpoint: string): Promis
   const result = await limiter.limit({ key: 'w01-write:endpoint:' + encodeURIComponent(operation) })
   if (!result.success) throw new TrafficLimitError()
 }
+
+/**
+ * Apply a resource-scoped write bucket to a stable resource type and ID.
+ * Resource identifiers are bounded canonical IDs, never arbitrary request paths.
+ */
+export async function enforceW01WriteResourceRateLimit(resourceType: string, resourceId: string): Promise<void> {
+  const type = resourceType.trim()
+  const subject = resourceId.trim()
+  if (!/^[A-Za-z][A-Za-z0-9_-]{0,63}$/.test(type) ||
+      !/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(subject)) {
+    throw new Error('RATE_LIMIT_RESOURCE_SUBJECT_INVALID')
+  }
+
+  let env: Record<string, unknown>
+  try {
+    const context = await getCloudflareContext({ async: true })
+    env = context.env as unknown as Record<string, unknown>
+  } catch {
+    throw new Error('RATE_LIMIT_CONTEXT_UNAVAILABLE:W01_WRITE_LIMITER')
+  }
+
+  const limiter = env.W01_WRITE_LIMITER as RateLimitBinding | undefined
+  if (!limiter) throw new Error('RATE_LIMIT_BINDING_UNAVAILABLE:W01_WRITE_LIMITER')
+  const key = 'w01-write:resource:' + encodeURIComponent(type) + ':' + encodeURIComponent(subject)
+  const result = await limiter.limit({ key })
+  if (!result.success) throw new TrafficLimitError()
+}
