@@ -167,9 +167,13 @@ export async function sha256BytesToHex(
   bytes: Uint8Array,
   subtle: Pick<SubtleCrypto, 'digest'> = globalThis.crypto.subtle,
 ): Promise<string> {
+  // Copy to a definite ArrayBuffer-backed view for strict DOM BufferSource typings.
+  const digestInput = new Uint8Array(bytes.byteLength)
+  digestInput.set(bytes)
+
   let digest: ArrayBuffer
   try {
-    digest = await subtle.digest('SHA-256', bytes)
+    digest = await subtle.digest('SHA-256', digestInput.buffer)
   } catch {
     throw new CanonicalJsonError('HASH_UNAVAILABLE', 'SHA-256 payload hashing is unavailable')
   }
