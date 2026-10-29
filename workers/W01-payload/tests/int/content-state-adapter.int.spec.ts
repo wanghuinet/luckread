@@ -232,6 +232,7 @@ describe('Creator Center member-only publishing', () => {
     const publisher = read('src/app/(frontend)/publish/PublishComposer.tsx')
     const creatorCreate = read('src/app/(payload)/api/creator/contents/route.ts')
     const creatorDetail = read('src/app/(payload)/api/creator/contents/[contentId]/route.ts')
+    const publicDetailRoute = read('src/app/api/v1/contents/[contentId]/route.ts')
     const runtime = readFileSync(resolve(process.cwd(), '../W03-content/src/content-runtime.ts'), 'utf8')
 
     expect(publisher).toContain("contentBasePath === '/api/creator/contents'")
@@ -243,6 +244,10 @@ describe('Creator Center member-only publishing', () => {
     expect(creatorDetail).toContain('resolveVerifiedContentCreatorId')
     expect(creatorDetail).toContain("Object.hasOwn(body, 'accessMode')")
     expect(creatorDetail).toContain('verifiedCreatorId')
+    expect(creatorDetail).toContain('invalidatePublicContentVisibility(contentId)')
+    expect(creatorDetail).toContain('invalidatePublicContentList(request)')
+    expect(publicDetailRoute).toContain('invalidatePublicContentVisibility(contentId)')
+    expect(publicDetailRoute).toContain('invalidatePublicContentList(request)')
     expect(runtime).toContain("access_mode")
     expect(runtime).toContain('resolveCreatorMembershipAccess')
     expect(runtime).toContain("content.accessMode !== 'MEMBERS_ONLY'")
