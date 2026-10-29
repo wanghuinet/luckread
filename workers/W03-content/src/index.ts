@@ -243,7 +243,14 @@ const resolveCreatorMembershipAccess = async (
       !['ACTIVE_CREATOR_MEMBERSHIP', 'MEMBERSHIP_REQUIRED'].includes(String((data as { reason?: unknown }).reason))) {
     throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
   }
-  return (data as { allowed: boolean }).allowed
+  const decision = data as { allowed: boolean; reason: string }
+  // Reject internally contradictory policy DTOs rather than accepting a boolean
+  // that disagrees with W07's auditable reason code.
+  if ((decision.allowed && decision.reason !== 'ACTIVE_CREATOR_MEMBERSHIP') ||
+      (!decision.allowed && decision.reason !== 'MEMBERSHIP_REQUIRED')) {
+    throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
+  }
+  return decision.allowed
 }
 
 const getPath = (pathname: string): {id?: string; state?: boolean; preflight?: boolean; revisions?: boolean; relationships?: boolean; relationshipId?: string; revisionId?: string; rollback?: boolean; series?: boolean; seriesMembers?: boolean; seriesMemberContentId?: string; collections?: boolean; collectionMembers?: boolean; collectionMemberContentId?: string} | null => {
