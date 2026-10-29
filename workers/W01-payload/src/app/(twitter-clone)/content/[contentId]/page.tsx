@@ -14,6 +14,7 @@ type ContentType = 'article' | 'post' | 'video'
 type PublicContent = {
   id: string
   slug?: string
+  ownerUserId?: string | null
   creatorId?: string | null
   contentType: ContentType
   state: string
