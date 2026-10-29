@@ -41,17 +41,40 @@ export function canonicalizeJsonForIdempotency(
   }
 
   const ancestors = new WeakSet<object>()
+  const encoder = new TextEncoder()
+  let encodedBytes = 0
+
+  // Charge each serialized fragment before it is retained in a parent buffer.
+  // This avoids first building an arbitrarily large canonical string and only
+  // then enforcing the task's byte limit.
+  const append = (fragment: string): string => {
+    const bytes = encoder.encode(fragment).byteLength
+    if (bytes > maxBytes - encodedBytes) {
+      throw new CanonicalJsonError('PAYLOAD_TOO_LARGE', 'Canonical JSON exceeds the task contract limit')
+    }
+    encodedBytes += bytes
+    return fragment
+  }
+
+  const encodeString = (text: string): string => {
+    // Every UTF-16 code unit contributes at least one byte to JSON string
+    // output; reject obviously oversized strings before JSON.stringify creates
+    // an escaped copy. append() then checks the exact UTF-8 serialized size.
+    if (text.length > maxBytes) {
+      throw new CanonicalJsonError('PAYLOAD_TOO_LARGE', 'Canonical JSON exceeds the task contract limit')
+    }
+    return append(JSON.stringify(text))
+  }
 
   const encode = (current: unknown): string => {
-    if (current === null) return 'null'
+    if (current === null) return append('null')
 
-    if (typeof current === 'string' || typeof current === 'boolean') {
-      return JSON.stringify(current)
-    }
+    if (typeof current === 'string') return encodeString(current)
+    if (typeof current === 'boolean') return append(current ? 'true' : 'false')
 
     if (typeof current === 'number') {
       if (!Number.isFinite(current)) return invalidValue()
-      return JSON.stringify(current)
+      return append(JSON.stringify(current))
     }
 
     if (typeof current !== 'object') return invalidValue()
@@ -73,8 +96,10 @@ export function canonicalizeJsonForIdempotency(
           return invalidValue()
         }
 
+        append('[')
         const items: string[] = []
         for (let index = 0; index < current.length; index += 1) {
+          if (index > 0) append(',')
           const descriptor = Object.getOwnPropertyDescriptor(current, String(index))
           if (
             !descriptor ||
@@ -85,6 +110,7 @@ export function canonicalizeJsonForIdempotency(
           }
           items.push(encode(descriptor.value))
         }
+        append(']')
 
         return '[' + items.join(',') + ']'
       }
@@ -98,8 +124,11 @@ export function canonicalizeJsonForIdempotency(
       if (propertyNames.length !== enumerableNames.length) return invalidValue()
 
       const keys = enumerableNames.sort()
+      append('{')
       const fields: string[] = []
-      for (const key of keys) {
+      for (let index = 0; index < keys.length; index += 1) {
+        if (index > 0) append(',')
+        const key = keys[index]!
         const descriptor = Object.getOwnPropertyDescriptor(current, key)
         if (
           !descriptor ||
@@ -109,8 +138,11 @@ export function canonicalizeJsonForIdempotency(
           return invalidValue()
         }
 
-        fields.push(JSON.stringify(key) + ':' + encode(descriptor.value))
+        const encodedKey = encodeString(key)
+        append(':')
+        fields.push(encodedKey + ':' + encode(descriptor.value))
       }
+      append('}')
 
       return '{' + fields.join(',') + '}'
     } finally {
@@ -118,14 +150,7 @@ export function canonicalizeJsonForIdempotency(
     }
   }
 
-  const canonical = encode(value)
-  const byteLength = new TextEncoder().encode(canonical).byteLength
-
-  if (byteLength > maxBytes) {
-    throw new CanonicalJsonError('PAYLOAD_TOO_LARGE', 'Canonical JSON exceeds the task contract limit')
-  }
-
-  return canonical
+  return encode(value)
 }
 
 /**
