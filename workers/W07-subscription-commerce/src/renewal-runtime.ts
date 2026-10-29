@@ -1,5 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
+import { strictlyAfterCanonicalUtcTimestamp } from './canonical-utc-timestamp.js';
+
 import {
   addBillingPeriod,
   SubscriptionRuntimeError,
@@ -209,8 +211,11 @@ const nowIso = (now: () => Date): string => {
   return date.toISOString();
 };
 
-const strictlyAfter = (current: string, previous: string): string =>
-  current > previous ? current : new Date(Date.parse(previous) + 1).toISOString();
+const strictlyAfter = (current: string, previous: string): string => {
+  const next = strictlyAfterCanonicalUtcTimestamp(current, previous);
+  if (next === null) throw new RenewalRuntimeError('INTEGRITY_VIOLATION', 500);
+  return next;
+};
 
 const defaultLeaseToken = (): string => crypto.randomUUID().replace(/-/g, '');
 
