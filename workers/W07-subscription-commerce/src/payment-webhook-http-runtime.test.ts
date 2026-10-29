@@ -275,7 +275,7 @@ describe('W07 Hyperswitch webhook HTTP receiver', () => {
     expect(f.purchaseFulfillmentCalls[0]).toMatchObject({ paymentId, merchantId: MERCHANT });
     await expect(response?.json()).resolves.toMatchObject({
       data: {
-        receipt: 'DUPLICATE',
+        outcome: 'DUPLICATE',
         subscriptionSync: 'NO_RENEWAL_CYCLE',
         membershipPurchaseFulfillment: { outcome: 'ALREADY_APPLIED', fulfilledCount: 1 },
       },
