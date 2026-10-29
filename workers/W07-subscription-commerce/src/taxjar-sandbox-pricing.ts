@@ -139,6 +139,8 @@ export async function applyTaxJarSandboxPricing(
   try {
     response = await fetchImpl(TAXJAR_SANDBOX_TAXES_URL, {
       method: 'POST',
+      // Never forward sandbox credentials to a redirect target.
+      redirect: 'error',
       headers: {
         authorization: 'Bearer ' + config.apiKey,
         'content-type': 'application/json',
