@@ -1180,13 +1180,22 @@ const worker = {
       if (request.method === 'GET' && path.id) {
         // Published content is publicly readable; unpublished content remains owner-scoped in getContent().
         const principalUserId = request.headers.get('X-LuckRead-Principal-User-Id')?.trim() || null
+        const membershipCheckCache = new Map<string, Promise<boolean>>()
+        const resolveMembership = principalUserId
+          ? (creatorId: string): Promise<boolean> => {
+            let pending = membershipCheckCache.get(creatorId)
+            if (!pending) {
+              pending = resolveCreatorMembershipAccess(request, env, principalUserId, creatorId)
+              membershipCheckCache.set(creatorId, pending)
+            }
+            return pending
+          }
+          : undefined
         const content = await getContent(
           env.D1_02,
           path.id,
           principalUserId,
-          principalUserId
-            ? (creatorId) => resolveCreatorMembershipAccess(request, env, principalUserId, creatorId)
-            : undefined,
+          resolveMembership,
         )
         if (url.searchParams.get('bodyContext') === '1') {
           // A body object can be referenced by more than one content record.
@@ -1202,8 +1211,8 @@ const worker = {
             if (rows.length > 50) throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
             for (const row of rows) {
               if (principalUserId && principalUserId === row.owner_user_id) continue
-              if (!principalUserId || !row.creator_id ||
-                  !(await resolveCreatorMembershipAccess(request, env, principalUserId, row.creator_id))) {
+              if (!principalUserId || !row.creator_id || !resolveMembership ||
+                  !(await resolveMembership(row.creator_id))) {
                 bodyReferenceAllowed = false
                 break
               }
