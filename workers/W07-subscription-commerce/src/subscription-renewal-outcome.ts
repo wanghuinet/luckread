@@ -1,5 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
+import { strictlyAfterCanonicalUtcTimestamp } from './canonical-utc-timestamp.js';
+
 export type RenewalSubscriptionSyncOutcome =
   | 'APPLIED' | 'ALREADY_APPLIED' | 'NO_RENEWAL_CYCLE' | 'NOT_TERMINAL'
   | 'RECONCILIATION_REQUIRED' | 'PENDING_RETRY';
@@ -62,7 +64,9 @@ function nowIso(now: () => Date): string {
 }
 
 function strictlyAfter(now: string, previous: string): string {
-  return now > previous ? now : new Date(Date.parse(previous) + 1).toISOString();
+  const next = strictlyAfterCanonicalUtcTimestamp(now, previous);
+  if (next === null) throw new RenewalOutcomeSyncError('SERVICE_UNAVAILABLE', 503);
+  return next;
 }
 
 async function readCycleById(db: D1Database, cycleId: string): Promise<RenewalOutcomeCycle | null> {
@@ -196,6 +200,12 @@ export async function syncTerminalRenewalCycleToSubscription(
   if (cycle.state !== 'SUCCEEDED' && cycle.state !== 'FAILED') {
     return { cycleId: cycle.cycle_id, subscriptionId: cycle.subscription_id, outcome: 'NOT_TERMINAL' };
   }
+  // Do not normalize malformed persisted ordering data or mutate D1-01 first:
+  // the D1-04 sync marker must remain retryable when its own timestamp is corrupt.
+  if (!isCanonicalIso(cycle.updated_at) ||
+      (cycle.subscription_sync_updated_at !== null && !isCanonicalIso(cycle.subscription_sync_updated_at))) {
+    throw new RenewalOutcomeSyncError('SERVICE_UNAVAILABLE', 503);
+  }
   if (!validTerminalCycle(cycle)) return reconcile(env, cycle, 'TERMINAL_CYCLE_SNAPSHOT_INVALID', now);
 
   const subscription = await readSubscription(env.D1_01, cycle.subscription_id, cycle.subscriber_id);
@@ -203,6 +213,9 @@ export async function syncTerminalRenewalCycleToSubscription(
   if (subscription.subscription_id !== cycle.subscription_id || subscription.subscriber_id !== cycle.subscriber_id ||
       subscription.plan_id !== cycle.plan_id || subscription.plan_version !== cycle.plan_version) {
     return reconcile(env, cycle, 'SUBSCRIPTION_IDENTITY_OR_PLAN_MISMATCH', now);
+  }
+  if (!isCanonicalIso(subscription.updated_at)) {
+    return reconcile(env, cycle, 'SUBSCRIPTION_UPDATED_AT_INVALID', now);
   }
 
   // A matching period proves another concurrent/replayed sync applied this cycle.
