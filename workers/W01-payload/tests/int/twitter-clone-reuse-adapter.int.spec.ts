@@ -70,7 +70,7 @@ describe('Twitter Clone UI reuse through LuckRead API adapters', () => {
       expect(page).toContain("import LuckReadSocialPostCard from")
       expect(page).toContain("item.contentType === 'post'")
       expect(page).toContain('<LuckReadSocialPostCard')
-      expect(page).toContain('creatorId={item.creatorId}')
+      expect(page).toContain('creatorId={item.creatorId ?? item.ownerUserId}')
       expect(page).toContain('author={item.creator ?? item.author}')
       expect(page).toContain('mediaRefs={item.mediaRefs}')
       expect(page).toContain('locale={locale}')
