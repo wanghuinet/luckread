@@ -62,6 +62,7 @@
             "customerId, itemType, itemVersion, currency, prices, discount, tax, totals, payment status and provider identifiers are not accepted from the client.",
             "Repeated itemRef entries in one request are rejected; clients must send one line with the combined quantity.",
             "The same authenticated customer + operation + Idempotency-Key + semantic request hash replays the first completed response; key reuse with a different request hash is rejected.",
+            "This paid-checkout path rejects any zero-priced item and any computed order total below one minor currency unit until a separate zero-charge fulfillment contract is admitted.",
             "Item kind, immutable item version, currency, unit price, discounts and tax are server-resolved. Unsupported or unresolved items fail closed."
           ]
         }
@@ -154,7 +155,7 @@
         },
         "unitAmountMinor": {
           "type": "integer",
-          "minimum": 0
+          "minimum": 1
         },
         "lineSubtotalMinor": {
           "type": "integer",
@@ -234,7 +235,7 @@
         },
         "totalMinor": {
           "type": "integer",
-          "minimum": 0
+          "minimum": 1
         },
         "items": {
           "type": "array",
