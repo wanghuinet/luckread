@@ -2,6 +2,8 @@ import { buildAccountStateChangedAuditEvent, type AccountStateChangedAuditInput,
 import { persistAuditEvent } from './audit-event-persistence'
 import { consumeAccountStateChanged } from './auth-013-queue-consumer'
 import { consumeMfaAuditEvent } from './mfa-audit-queue-consumer'
+import { processQueueBatch } from '../../W10-async/src/queue-batch.js'
+import { QueueTaskFailure } from '../../W10-async/src/retry-policy.js'
 import {
   ModerationRuntimeError,
   decideModerationCase,
@@ -1157,27 +1159,27 @@ export default {
   },
 
   async queue(batch: MessageBatch<unknown>, env: Env): Promise<void> {
-    for (const message of batch.messages) {
+    await processQueueBatch(batch, async (raw) => {
       try {
-        const body = message.body && typeof message.body === 'object'
-          ? message.body as Record<string, unknown>
+        const body = raw && typeof raw === 'object'
+          ? raw as Record<string, unknown>
           : null
         if (typeof body?.eventType === 'string' && body.eventType.startsWith('auth.mfa.')) {
-          await consumeMfaAuditEvent(env.D1_03, message.body)
+          await consumeMfaAuditEvent(env.D1_03, raw)
         } else {
-          await consumeAccountStateChanged(env.D1_03, message.body)
+          await consumeAccountStateChanged(env.D1_03, raw)
         }
-        message.ack()
       } catch (error) {
         if (error instanceof Error &&
             (error.message === 'INVALID_AUTH_013_EVENT' || error.message === 'INVALID_AUTH_007_MFA_EVENT')) {
-          message.retry({ delaySeconds: 0 })
-          continue
+          throw new QueueTaskFailure('Invalid W06 audit queue event', 'poison', error.message)
         }
-        // Persistence errors and transient D1 failures use the queue's normal
-        // retry policy; duplicate logical events are acked by their consumer.
-        message.retry()
+        if (error instanceof Error && error.message === 'MFA_AUDIT_EVENT_IDENTITY_CONFLICT') {
+          throw new QueueTaskFailure('Conflicting W06 audit event identity', 'permanent', error.message)
+        }
+        // Unknown/storage failures remain transient; event consumers own validation and idempotency.
+        throw error
       }
-    }
+    })
   },
 }
