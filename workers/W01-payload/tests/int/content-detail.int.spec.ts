@@ -85,13 +85,13 @@ describe('public content detail', () => {
     const page = read('src/app/(frontend)/content/[contentId]/ContentDetailClient.tsx')
     expect(page).toContain("fetchJson<{ id?: string }>('/api/v1/users/me'")
     expect(page).toContain("setViewerUserId(typeof viewerData?.id === 'string' ? viewerData.id : null)")
-    expect(page).toContain('viewerUserId === content.creatorId')
+    expect(page).toContain('viewerUserId === authorUserId')
     expect(page).toContain('copy.detail.own')
   })
 
   it('connects the content detail page to author follow state and mutations', () => {
     const page = read('src/app/(frontend)/content/[contentId]/ContentDetailClient.tsx')
-    expect(page).toContain('creatorId?: string | null')
+    expect(page).toContain('ownerUserId?: string | null')
     expect(page).toContain('/api/v1/social/follows/')
     expect(page).toContain('followData?.data?.following')
     expect(page).toContain('relationship?.blocked')
@@ -148,7 +148,7 @@ describe('public content detail', () => {
 
 it('links published content to the public author profile when creatorId is present', () => {
   const page = readFileSync(resolve(process.cwd(), 'src/app/(frontend)/content/[contentId]/ContentDetailClient.tsx'), 'utf8')
-  expect(page).toContain("href={'/users/' + encodeURIComponent(content.creatorId)}")
+  expect(page).toContain("href={'/users/' + encodeURIComponent(authorUserId)}")
   expect(page).toContain('copy.detail.author')
 })
 
