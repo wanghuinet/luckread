@@ -5248,7 +5248,7 @@
     },
     {
       "featureId": "PAY-002",
-      "status": "PARTIAL",
+      "status": "UNRESOLVED",
       "apiOperationIds": [
         "createCommerceOrder",
         "getCommerceOrder"
