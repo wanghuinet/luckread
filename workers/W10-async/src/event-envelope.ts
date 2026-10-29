@@ -26,7 +26,6 @@ export interface EventEnvelopeMetadata {
 const RESOURCE_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/
 const IDEMPOTENCY_KEY = /^[A-Za-z0-9_-]{16,255}$/
 const EVENT_TYPE = /^[a-z][a-z0-9_-]*(?:\.[a-z][a-z0-9_-]*)+$/
-const SAFE_LABEL = /^[A-Za-z0-9][A-Za-z0-9._:_-]{0,254}$/
 const DATE_TIME =
   /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(Z|[+-](\d{2}):(\d{2}))$/
 
@@ -39,6 +38,9 @@ const isNonEmptyLabel = (value: unknown, maxLength: number): value is string =>
   value.length <= maxLength &&
   value.trim() === value &&
   !/[\u0000-\u001f\u007f]/.test(value)
+
+const isBoundedString = (value: unknown, maxLength: number): value is string =>
+  typeof value === 'string' && value.length > 0 && value.length <= maxLength
 
 const isDateTime = (value: unknown): value is string => {
   if (typeof value !== 'string') return false
@@ -127,10 +129,8 @@ export function parseEventEnvelopeMetadata(value: unknown): EventEnvelopeMetadat
     !RESOURCE_ID.test(resourceId) ||
     !isDateTime(occurredAt) ||
     !isDateTime(publishedAt) ||
-    !isNonEmptyLabel(correlationId, 255) ||
-    !SAFE_LABEL.test(correlationId) ||
-    !isNonEmptyLabel(causationId, 255) ||
-    !SAFE_LABEL.test(causationId) ||
+    !isBoundedString(correlationId, 255) ||
+    !isBoundedString(causationId, 255) ||
     typeof idempotencyKey !== 'string' ||
     !IDEMPOTENCY_KEY.test(idempotencyKey) ||
     !Number.isSafeInteger(attempt) ||
