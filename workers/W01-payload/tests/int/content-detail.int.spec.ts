@@ -190,11 +190,15 @@ it('uses the canonical public W01 API for server-rendered content detail and met
   expect(page).not.toContain('/internal/content/contents/')
 })
 
-it('keeps interactive content requests anonymous so signed-in browsers can use the shared cache', () => {
+it('rechecks member-only detail with the current session and never caches authorization decisions', () => {
   const page = read('src/app/(frontend)/content/[contentId]/ContentDetailClient.tsx')
-  expect(page).toContain("credentials: 'omit'")
+  const runtime = read('src/app/(frontend)/content/[contentId]/ContentDetailClient.tsx')
+  expect(page).toContain("initialContent?.accessMode === 'MEMBERS_ONLY'")
+  expect(page).toContain("credentials: 'include'")
   expect(page).toContain("headers: { accept: 'application/json' }")
   expect(page).toContain("cache: 'no-store'")
+  expect(page).toContain("resolved.accessGranted !== false")
+  expect(runtime).toContain("bodyRef: accessGranted ? content.bodyRef : ''")
 })
 
 
