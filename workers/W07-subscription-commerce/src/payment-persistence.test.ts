@@ -766,6 +766,33 @@ describe('PAY-001 payment attempt persistence candidate', () => {
     expect(db.mandates).toHaveLength(0);
   });
 
+  it('does not persist a saved method or mandate when signed consent has an impossible timestamp', async () => {
+    const db = new MemoryPaymentD1();
+    seedOrder(db);
+    seedPayment(db);
+    const payload = JSON.parse(bodyText('evt_invalid_consent_timestamp', NOW, true)) as {
+      content: { object: Record<string, unknown> };
+    };
+    const mandateData = payload.content.object.mandate_data as {
+      customer_acceptance: { accepted_at: string };
+    };
+    mandateData.customer_acceptance.accepted_at = '2026-02-31T12:00:00.000Z';
+    const signed = await signedBody(JSON.stringify(payload));
+    const applied = await receiveHyperswitchWebhook(
+      db as unknown as D1Database,
+      { ...signed, webhookSecret: SECRET, expectedMerchantId: MERCHANT },
+      fixedDeps(),
+    );
+
+    // The verified payment remains authoritative, but malformed consent must
+    // never create reusable payment credentials or an off-session mandate.
+    expect(applied).toMatchObject({ outcome: 'APPLIED', state: 'APPLIED' });
+    expect(db.payments[0]).toMatchObject({ status: 'succeeded' });
+    expect(db.orders[0]).toMatchObject({ status: 'CONFIRMED' });
+    expect(db.savedMethods).toHaveLength(0);
+    expect(db.mandates).toHaveLength(0);
+  });
+
   it('does not persist a token when signed provider consent belongs to another customer', async () => {
     const db = new MemoryPaymentD1();
     seedOrder(db);
