@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { addBillingPeriod, changeSubscriptionPlan, createMembershipPlanDraft, createSubscription, etagForVersion, getSubscription, listActiveMembershipPlans, listCreatorMembershipPlans, listSubscriptions, normalizeMembershipPlanDraft, parseBoundedPositiveInt, publishMembershipPlan, reviseMembershipPlan, transitionMembershipPlanLifecycle, transitionSubscription, type SubscriptionRow, type SubscriptionStatus } from './subscription-runtime.js'
+import { addBillingPeriod, changeSubscriptionPlan, createMembershipPlanDraft, createSubscription, etagForVersion, getSubscription, hasActiveCreatorMembership, listActiveMembershipPlans, listCreatorMembershipPlans, listSubscriptions, normalizeMembershipPlanDraft, parseBoundedPositiveInt, publishMembershipPlan, reviseMembershipPlan, transitionMembershipPlanLifecycle, transitionSubscription, type SubscriptionRow, type SubscriptionStatus } from './subscription-runtime.js'
 import w07 from './index.js'
 import { verifyD1SubscriptionPostflight, verifyD1SubscriptionPreflight } from '../scripts/verify-remote-preflight.mjs'
 
@@ -255,6 +255,64 @@ describe('subscription runtime', () => {
     expect(index).not.toContain('createSubscription(')
     expect(index).not.toContain('transitionSubscription(')
     expect(index).not.toContain('changeSubscriptionPlan(')
+  })
+
+  it('checks creator membership access only through the W03 internal transport and paid-through window', async () => {
+    const allowLimiter = { limit: async () => ({ success: true }) }
+    let lastSql = ''
+    let lastBindings: unknown[] = []
+    let readCount = 0
+    const membershipDb = {
+      prepare(sql: string) {
+        let values: unknown[] = []
+        const statement = {
+          bind(...args: unknown[]) { values = args; lastBindings = args; return statement },
+          async first<T>() {
+            lastSql = sql
+            readCount += 1
+            return { subscription_id: 'sub_active' } as T
+          },
+          async all<T>() { return { results: [] as T[] } },
+          async run() { return { meta: { changes: 0 } } },
+        }
+        return statement
+      },
+    } as unknown as D1Database
+    const env = {
+      D1_01: membershipDb,
+      D1_04: {} as D1Database,
+      SUBSCRIPTION_ORIGIN_GLOBAL_LIMITER: allowLimiter,
+      SUBSCRIPTION_READ_LIMITER: allowLimiter,
+      SUBSCRIPTION_WRITE_LIMITER: allowLimiter,
+    }
+    const makeRequest = (caller = 'W03') => new Request('https://luckread-w07.internal/internal/entitlements/check-creator-membership', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'X-LuckRead-Caller': caller,
+        'X-LuckRead-Transport-Version': '1.0',
+        'X-LuckRead-Correlation-Id': 'content-access-check',
+        'X-LuckRead-Principal-User-Id': 'user_1',
+        'X-LuckRead-Principal-Layer': 'L2',
+      },
+      body: JSON.stringify({ creatorId: 'creator_1' }),
+    })
+
+    const response = await w07.fetch(makeRequest(), env)
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({
+      data: { allowed: true, reason: 'ACTIVE_CREATOR_MEMBERSHIP' },
+    })
+    expect(lastSql).toContain("status = 'ACTIVE'")
+    expect(lastSql).toContain('current_period_start <= ?')
+    expect(lastSql).toContain('current_period_end > ?')
+    expect(lastSql).toContain('(cancel_at IS NULL OR cancel_at > ?)')
+    expect(lastBindings).toEqual(['user_1', 'creator_1', expect.any(String), expect.any(String), expect.any(String)])
+
+    const beforeDenied = readCount
+    const denied = await w07.fetch(makeRequest('W01'), env)
+    expect(denied.status).toBe(403)
+    expect(readCount).toBe(beforeDenied)
   })
 
   it('routes authenticated GET /plans through the active-public plan query', async () => {
