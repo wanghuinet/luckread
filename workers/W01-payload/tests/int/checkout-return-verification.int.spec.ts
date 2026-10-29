@@ -28,7 +28,7 @@ describe('checkout return verifies authoritative membership entitlement', () => 
     expect(resultClient).toContain("'/api/v1/commerce/orders/' + encodeURIComponent(orderId)")
     expect(resultClient).toContain("['CONFIRMED', 'PROCESSING', 'COMPLETED']")
     expect(resultClient).toContain("'/api/v1/contents/' + encodeURIComponent(contentId)")
-    expect(resultClient).toContain('contentResult.data?.data?.accessGranted === true')
+    expect(resultClient).toContain('contentResult.data?.accessGranted === true')
     expect(resultClient).toContain("window.location.replace('/content/' + encodeURIComponent(contentId))")
     expect(resultClient).toContain("cache: 'no-store'")
     expect(resultClient).not.toContain('accessGranted: true')
