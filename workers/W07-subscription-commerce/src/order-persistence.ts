@@ -1,6 +1,9 @@
 /// <reference types="@cloudflare/workers-types" />
 
+import { sha256CanonicalJsonForIdempotency } from '../../W10-async/src/canonical-json-idempotency.js';
 import {
+  MAX_ORDER_ITEMS,
+  MAX_ORDER_ITEM_REF_LENGTH,
   validateCreateCommerceOrderRequest,
   validateOrderCreateIdempotencyKey,
   type CreateCommerceOrderRequest,
@@ -175,18 +178,26 @@ const checkedMultiply = (left: number, right: number): number => {
   return result;
 };
 
-const canonicalRequestJson = (request: CreateCommerceOrderRequest): string =>
-  JSON.stringify({
-    // Item order has no business meaning in this API; sort the closed DTO
-    // deterministically so retries for the same basket share one fingerprint.
-    items: request.items
-      .map(({ itemRef, quantity }) => ({ itemRef, quantity }))
-      .sort((left, right) => left.itemRef < right.itemRef ? -1 : left.itemRef > right.itemRef ? 1 : 0),
-  });
+// Every admitted itemRef is at most 255 UTF-16 code units; JSON escaping can
+// expand a code unit to six ASCII bytes. Include bounded per-item JSON syntax.
+const MAX_ORDER_CANONICAL_REQUEST_BYTES = MAX_ORDER_ITEMS * (MAX_ORDER_ITEM_REF_LENGTH * 6 + 64) + 128;
 
-const sha256Hex = async (value: string): Promise<string> => {
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
-  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+const canonicalRequestPayload = (request: CreateCommerceOrderRequest) => ({
+  // Item order has no business meaning in this API; sort the closed DTO
+  // deterministically so retries for the same basket share one fingerprint.
+  items: request.items
+    .map(({ itemRef, quantity }) => ({ itemRef, quantity }))
+    .sort((left, right) => left.itemRef < right.itemRef ? -1 : left.itemRef > right.itemRef ? 1 : 0),
+});
+
+const orderRequestHash = async (request: CreateCommerceOrderRequest): Promise<string> => {
+  // Existing PAY-002 rows store the bare 64-character hex digest. Preserve that
+  // persisted format while delegating canonical JSON and SHA-256 to W10.
+  const fingerprint = await sha256CanonicalJsonForIdempotency(
+    canonicalRequestPayload(request),
+    MAX_ORDER_CANONICAL_REQUEST_BYTES,
+  );
+  return fingerprint.slice('sha256:'.length);
 };
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -478,7 +489,7 @@ export async function createCommerceOrder(
     throw new OrderPersistenceError(validation.error.code, validation.error.status);
   }
   const request = validation.value;
-  const requestHash = await sha256Hex(canonicalRequestJson(request));
+  const requestHash = await orderRequestHash(request);
   const nowFn = dependencies.now ?? (() => new Date());
   const nowDate = nowFn();
   if (!Number.isFinite(nowDate.getTime())) throw new OrderPersistenceError('INTEGRITY_VIOLATION', 500);

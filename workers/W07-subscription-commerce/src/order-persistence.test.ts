@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { webcrypto } from 'node:crypto';
 import {
   createCommerceOrder,
   getCommerceOrder,
@@ -249,6 +250,47 @@ describe('PAY-002 atomic D1-04 order persistence candidate', () => {
     expect(fullyDiscountedDb.state.orders).toHaveLength(0);
     expect(fullyDiscountedDb.state.lines).toHaveLength(0);
     expect(fullyDiscountedDb.state.idempotency).toHaveLength(0);
+  });
+
+  it('preserves the legacy raw SHA-256 request fingerprint while reusing W10 canonical JSON', async () => {
+    const db = new MemoryD1();
+    const basket = { items: [
+      { itemRef: 'plan_b', quantity: 1 },
+      { itemRef: 'plan_a', quantity: 2 },
+    ] };
+    const created = await createCommerceOrder(
+      db as unknown as D1Database,
+      'user_1',
+      'legacy_hash_key',
+      basket,
+      pricingFor,
+      deterministicDependencies('legacy_hash'),
+    );
+
+    // This byte sequence is the pre-W10 order fingerprint contract: sorted
+    // items, stable object-key order, and a bare lowercase SHA-256 hex digest.
+    const legacyCanonicalJson = '{"items":[{"itemRef":"plan_a","quantity":2},{"itemRef":"plan_b","quantity":1}]}';
+    const digest = await webcrypto.subtle.digest(
+      'SHA-256',
+      new TextEncoder().encode(legacyCanonicalJson),
+    );
+    const legacyHash = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+    expect(db.state.idempotency[0]?.request_hash).toBe(legacyHash);
+    expect(db.state.idempotency[0]?.request_hash).toMatch(/^[a-f0-9]{64}$/);
+
+    // A pre-existing row with the legacy hash must still replay successfully.
+    db.state.idempotency[0]!.request_hash = legacyHash;
+    const replay = await createCommerceOrder(
+      db as unknown as D1Database,
+      'user_1',
+      'legacy_hash_key',
+      { items: [...basket.items].reverse() },
+      async () => { throw new Error('a valid replay must not rerun pricing'); },
+      deterministicDependencies('legacy_hash_replay'),
+    );
+    expect(replay.replayed).toBe(true);
+    expect(replay.data).toEqual(created.data);
+    expect(db.batchCalls).toBe(1);
   });
 
   it('replays a completed request without resolving a now-retired offer or writing again', async () => {
