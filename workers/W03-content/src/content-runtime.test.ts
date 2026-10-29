@@ -226,6 +226,8 @@ describe('W03 content contract core', () => {
     expect(denied.status).toBe(200);
     await expect(denied.json()).resolves.toMatchObject({
       id: 'content_member_1',
+      ownerUserId: 'creator_user',
+      creatorId: 'creator_1',
       accessMode: 'MEMBERS_ONLY',
       accessGranted: false,
       title: 'Members-only title',
@@ -239,6 +241,8 @@ describe('W03 content contract core', () => {
     const entitled = await w03Worker.fetch(makeRequest(), env, {} as never);
     expect(entitled.status).toBe(200);
     await expect(entitled.json()).resolves.toMatchObject({
+      ownerUserId: 'creator_user',
+      creatorId: 'creator_1',
       accessMode: 'MEMBERS_ONLY',
       accessGranted: true,
       bodyRef: 'https://luckread.com/private-body',
