@@ -1,9 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
 import { processQueueBatch, type QueueMessageLike } from './queue-batch.js'
+import { QueueTaskFailure } from './retry-policy.js'
 
-function makeMessage<TBody>(body: TBody): QueueMessageLike<TBody> {
+function makeMessage<TBody>(body: TBody, attempts = 1): QueueMessageLike<TBody> {
   return {
     body,
+    attempts,
     ack: vi.fn(),
     retry: vi.fn(),
   }
@@ -22,9 +24,9 @@ describe('W10 queue batch execution', () => {
     expect(result).toEqual({ attempted: 1, acknowledged: 1, retried: 0 })
   })
 
-  it('retries a failed message and continues through the delivered batch', async () => {
+  it('retries a failed message with bounded delay and continues the batch', async () => {
     const first = makeMessage('first')
-    const failed = makeMessage('failed')
+    const failed = makeMessage('failed', 3)
     const last = makeMessage('last')
     const order: string[] = []
     const execute = vi.fn(async (body: string) => {
@@ -35,15 +37,36 @@ describe('W10 queue batch execution', () => {
     const result = await processQueueBatch(
       { messages: [first, failed, last] },
       execute,
+      { random: () => 0.5 },
     )
 
     expect(order).toEqual(['first', 'failed', 'last'])
     expect(first.ack).toHaveBeenCalledTimes(1)
     expect(first.retry).not.toHaveBeenCalled()
     expect(failed.ack).not.toHaveBeenCalled()
-    expect(failed.retry).toHaveBeenCalledTimes(1)
+    expect(failed.retry).toHaveBeenCalledWith({ delaySeconds: 11 })
     expect(last.ack).toHaveBeenCalledTimes(1)
     expect(result).toEqual({ attempted: 3, acknowledged: 2, retried: 1 })
+  })
+
+  it('routes explicitly permanent/poison failures toward native DLQ retry exhaustion', async () => {
+    const permanent = makeMessage('permanent')
+    const poison = makeMessage('poison')
+    const execute = vi.fn(async (body: string) => {
+      throw new QueueTaskFailure('classified failure', body === 'poison' ? 'poison' : 'permanent')
+    })
+
+    const result = await processQueueBatch(
+      { messages: [permanent, poison] },
+      execute,
+      { random: () => 0.9 },
+    )
+
+    expect(permanent.retry).toHaveBeenCalledWith({ delaySeconds: 1 })
+    expect(poison.retry).toHaveBeenCalledWith({ delaySeconds: 1 })
+    expect(permanent.ack).not.toHaveBeenCalled()
+    expect(poison.ack).not.toHaveBeenCalled()
+    expect(result).toEqual({ attempted: 2, acknowledged: 0, retried: 2 })
   })
 
   it('does not swallow a Queue retry-control failure', async () => {
@@ -57,7 +80,7 @@ describe('W10 queue batch execution', () => {
     })
 
     await expect(
-      processQueueBatch({ messages: [failed, later] }, execute),
+      processQueueBatch({ messages: [failed, later] }, execute, { random: () => 0 }),
     ).rejects.toThrow('retry control unavailable')
 
     expect(failed.ack).not.toHaveBeenCalled()
