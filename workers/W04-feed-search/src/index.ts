@@ -13,12 +13,14 @@
 // KV propagation-aware final gate.
 import { applyAccountStateProjection, parseAccountStateChanged, type ProjectionRecord } from './auth-013-projection.js'
 import { listTrendingSearches, recordSearchTrend } from './search-trends.js'
+import { processQueueBatch } from '../../W10-async/src/queue-batch.js'
+import { QueueTaskFailure } from '../../W10-async/src/retry-policy.js'
 
 interface ProjectionKV {
   get(key: string, type: 'json'): Promise<unknown>
   put(key: string, value: string): Promise<void>
 }
-interface QueueMessage { body: unknown; ack(): void; retry(): void }
+interface QueueMessage { body: unknown; attempts?: number; ack(): void; retry(options?: { delaySeconds: number }): void }
 interface MessageBatchLike { messages: QueueMessage[] }
 interface SocialFeedService {
   fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response>
@@ -343,18 +345,35 @@ export default {
   },
 
   async queue(batch: MessageBatchLike, env: Env): Promise<void> {
-    for (const message of batch.messages) {
+    await processQueueBatch(batch, async (body) => {
+      let event
       try {
-        const event = parseAccountStateChanged(message.body)
-        await applyAccountStateProjection(env.AUTH013_W04_DERIVED_PROJECTION, event)
-        message.ack()
-      } catch (error) {
+        event = parseAccountStateChanged(body)
+      } catch {
         console.error(JSON.stringify({
           event: 'auth013.w04.projection_consumer_error',
-          code: error instanceof Error ? error.message : 'UNKNOWN',
+          code: 'INVALID_AUTH_013_EVENT',
         }))
-        message.retry()
+        throw new QueueTaskFailure(
+          'Invalid AUTH-013 account-state event',
+          'poison',
+          'INVALID_AUTH_013_EVENT',
+        )
       }
-    }
+
+      try {
+        await applyAccountStateProjection(env.AUTH013_W04_DERIVED_PROJECTION, event)
+      } catch {
+        console.error(JSON.stringify({
+          event: 'auth013.w04.projection_consumer_error',
+          code: 'PROJECTION_APPLY_FAILED',
+        }))
+        throw new QueueTaskFailure(
+          'AUTH-013 projection update failed',
+          'transient',
+          'PROJECTION_APPLY_FAILED',
+        )
+      }
+    })
   },
 }
