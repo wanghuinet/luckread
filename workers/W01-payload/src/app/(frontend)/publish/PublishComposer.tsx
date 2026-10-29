@@ -52,6 +52,7 @@ type ContentResponse = {
   version: number
   etag: string
   contentType?: ContentType
+  accessMode?: 'PUBLIC' | 'MEMBERS_ONLY'
   title?: string
   bodyRef?: string
   mediaRefs?: string[]
@@ -200,6 +201,7 @@ export default function PublishComposer({
   const xButtonPrimary = 'inline-flex min-h-10 items-center justify-center rounded-full bg-main-accent px-5 py-2.5 text-sm font-bold text-white transition hover:brightness-90 disabled:cursor-not-allowed disabled:opacity-50'
   const xButtonDanger = xButtonBase + ' border border-red-500/50 text-red-600 dark:text-red-400'
   const [type, setType] = useState<ContentType>(initialType)
+  const [memberOnly, setMemberOnly] = useState(false)
   const [profile, setProfile] = useState<CurrentProfile | null>(null)
   const [replyAudience, setReplyAudience] = useState<ReplyAudience>('everyone')
   const [replyAudienceOpen, setReplyAudienceOpen] = useState(false)
@@ -297,6 +299,7 @@ export default function PublishComposer({
         latestDraftRef.current = recovered
         setDraft(recovered)
         setType(recovered.contentType ?? 'article')
+        setMemberOnly(recovered.accessMode === 'MEMBERS_ONLY')
         setReplyAudience(recoveredReplyAudience)
         setTitle(recovered.title ?? '')
         if ((recovered.contentType ?? 'article') === 'article') {
@@ -590,6 +593,12 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
           coverRef,
           type === 'article' ? mediaRefsFromArticleDocument(articleDocument) : [],
         ),
+        // Preserve backward-compatible public writes. Only Creator Center sends
+        // accessMode to W03 when enabling or explicitly removing an existing paywall.
+        ...(contentBasePath === '/api/creator/contents' &&
+            (memberOnly || currentDraft?.accessMode === 'MEMBERS_ONLY')
+          ? { accessMode: memberOnly ? 'MEMBERS_ONLY' as const : 'PUBLIC' as const }
+          : {}),
       }
 
       const isUpdate = Boolean(currentDraft?.id && currentDraft.etag)
@@ -748,11 +757,12 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
         autoSaveTimerRef.current = null
       }
     }
-  }, [title, body, type, assets, coverRef, busy, articleDocument, pollEnabled, pollOptions, pollDurationHours, replyAudience])
+  }, [title, body, type, assets, coverRef, busy, articleDocument, pollEnabled, pollOptions, pollDurationHours, replyAudience, memberOnly])
 
   function startNewContent() {
     latestDraftRef.current = null
     setDraft(null)
+    setMemberOnly(false)
     setSavedBody('')
     setSavedArticleSerialized('')
     setArticleDocument(createArticleDocument())
@@ -933,6 +943,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
       }
       latestDraftRef.current = null
       setDraft(null)
+      setMemberOnly(false)
       setSavedBody('')
       setSavedArticleSerialized('')
       setArticleDocument(createArticleDocument())
@@ -1081,6 +1092,32 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
           </button>
         ))}
       </div>
+      ) : null}
+
+      {contentBasePath === '/api/creator/contents' && !isTweetModal ? (
+        <section className={isXWorkspace
+          ? "mx-4 my-4 rounded-xl border border-light-border p-4 dark:border-dark-border"
+          : "lr-field rounded-xl border border-light-border p-4 dark:border-dark-border"}
+          aria-labelledby="creator-membership-access-title">
+          <label className="flex cursor-pointer items-start gap-3">
+            <input
+              checked={memberOnly}
+              disabled={busy || reviewLocked}
+              onChange={(event) => {
+                setMemberOnly(event.target.checked)
+                markDirty()
+                setError('')
+              }}
+              type="checkbox"
+            />
+            <span className="grid gap-1">
+              <strong id="creator-membership-access-title">会员专属内容</strong>
+              <span className="text-sm font-normal text-light-secondary dark:text-dark-secondary">
+                开启后，只有拥有该创作者有效会员订阅的用户可以读取正文和媒体。资格由服务器在读取时校验；普通公开内容保持原样。
+              </span>
+            </span>
+          </label>
+        </section>
       ) : null}
 
       {type !== 'post' ? (
