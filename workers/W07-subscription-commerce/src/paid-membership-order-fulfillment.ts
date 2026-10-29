@@ -247,14 +247,16 @@ function matchesExistingSubscription(
     periodEnd: string;
   },
 ): boolean {
+  // Billing periods and lifecycle status are mutable after the initial
+  // purchase (renewal, pause, cancellation, expiration). Replay identity must
+  // match only immutable order/subscription lineage and must never reactivate
+  // or reset the current period.
   return row.subscription_id === input.subscriptionId &&
     row.subscriber_id === input.subscriberId &&
     row.plan_id === input.snapshot.planId &&
     row.plan_version === input.snapshot.planVersion &&
     row.creator_id === input.snapshot.creatorId &&
     row.started_at === input.periodStart &&
-    row.current_period_start === input.periodStart &&
-    row.current_period_end === input.periodEnd &&
     row.entitlement_snapshot_ref === 'commerce-order:' + input.orderId + ':line:' + input.lineId;
 }
 
