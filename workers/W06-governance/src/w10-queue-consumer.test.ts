@@ -110,6 +110,24 @@ describe('W06 audit queue reuse of W10 batch executor', () => {
     expect(valid.retry).not.toHaveBeenCalled()
   })
 
+  it('rejects invalid shared event metadata before D1 access and keeps valid later messages flowing', async () => {
+    const { db, prepare } = createDb()
+    const invalid = message({
+      ...identityEvent,
+      publishedAt: '2026-02-31T00:00:00.000Z',
+    })
+    const valid = message(mfaEvent)
+
+    await invokeQueue([invalid, valid], db)
+
+    expect(invalid.ack).not.toHaveBeenCalled()
+    expect(invalid.retry).toHaveBeenCalledWith({ delaySeconds: 1 })
+    expect(valid.ack).toHaveBeenCalledOnce()
+    expect(valid.retry).not.toHaveBeenCalled()
+    // Only the valid MFA event is allowed to reach the audit store (read + insert).
+    expect(prepare).toHaveBeenCalledTimes(2)
+  })
+
   it('uses W10 bounded transient backoff for D1 failures without logging exception details', async () => {
     const db = {
       prepare: vi.fn(() => { throw new Error('sensitive database exception detail') }),
