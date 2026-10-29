@@ -76,6 +76,12 @@ export async function resolveCommerceOrderItems(
     if (!plan || plan.status !== 'ACTIVE' || plan.visibility !== 'PUBLIC') {
       throw new SubscriptionRuntimeError('RESOURCE_NOT_FOUND', 404);
     }
+    // This route creates payment intents that require a positive amount and
+    // fulfillment is tied to a verified paid webhook. Zero-price offers need a
+    // separate no-payment activation contract; never create an unpayable order.
+    if (!Number.isSafeInteger(plan.priceMinor) || plan.priceMinor < 1) {
+      throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400);
+    }
 
     const snapshot = {
       planId: plan.planId,
