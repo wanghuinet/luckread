@@ -250,6 +250,65 @@ describe('W07 Hyperswitch webhook HTTP receiver', () => {
     });
   });
 
+  it('retries initial membership fulfillment from a duplicate signed success event', async () => {
+    const f = fixture({
+      result: receipt('DUPLICATE'),
+      syncResult: { cycleId: '', outcome: 'NO_RENEWAL_CYCLE' },
+      purchaseFulfillmentResult: { outcome: 'ALREADY_APPLIED', fulfilledCount: 1 },
+    });
+    const paymentId = 'pay_' + 'e'.repeat(26);
+    const body = JSON.stringify({
+      event_id: 'evt_test_replayed',
+      event_type: 'payment_succeeded',
+      merchant_id: MERCHANT,
+      content_type: 'payment_details',
+      resource: { payment_id: paymentId },
+    });
+    const response = await handleHyperswitchWebhookRequest(
+      request({ body, signature: 'signed-provider-event' }),
+      f.env,
+      f.dependencies,
+    );
+
+    expect(response?.status).toBe(200);
+    expect(f.purchaseFulfillmentCalls).toHaveLength(1);
+    expect(f.purchaseFulfillmentCalls[0]).toMatchObject({ paymentId, merchantId: MERCHANT });
+    await expect(response?.json()).resolves.toMatchObject({
+      data: {
+        receipt: 'DUPLICATE',
+        subscriptionSync: 'NO_RENEWAL_CYCLE',
+        membershipPurchaseFulfillment: { outcome: 'ALREADY_APPLIED', fulfilledCount: 1 },
+      },
+    });
+  });
+
+  it('returns retryable service unavailable when paid-order fulfillment fails after payment was durably accepted', async () => {
+    const f = fixture({
+      result: receipt('APPLIED'),
+      syncResult: { cycleId: '', outcome: 'NO_RENEWAL_CYCLE' },
+    });
+    f.dependencies.fulfillPaidOrder = async () => {
+      throw new Error('temporary D1-01 write failure');
+    };
+    const body = JSON.stringify({
+      event_id: 'evt_test_fulfillment_retry',
+      event_type: 'payment_succeeded',
+      merchant_id: MERCHANT,
+      content_type: 'payment_details',
+      resource: { payment_id: 'pay_' + 'f'.repeat(26) },
+    });
+    const response = await handleHyperswitchWebhookRequest(
+      request({ body, signature: 'signed-provider-event' }),
+      f.env,
+      f.dependencies,
+    );
+
+    expect(response?.status).toBe(503);
+    await expect(response?.json()).resolves.toMatchObject({
+      error: { code: 'SERVICE_UNAVAILABLE' },
+    });
+  });
+
   it('does not fulfill an ordinary failed payment as an initial membership purchase', async () => {
     const f = fixture({
       result: receipt('APPLIED'),
