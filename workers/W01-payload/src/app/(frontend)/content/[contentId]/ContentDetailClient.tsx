@@ -15,6 +15,7 @@ type ContentType = 'article' | 'post' | 'video'
 type Content = {
   id: string
   slug?: string
+  ownerUserId?: string | null
   creatorId?: string | null
   contentType: ContentType
   state: string
@@ -70,6 +71,7 @@ export default function ContentDetailPage({
   }
 
   const [content, setContent] = useState<Content | null>(initialContent ?? null)
+  const authorUserId = content?.ownerUserId || content?.creatorId || ''
   const [body, setBody] = useState('')
   const [loading, setLoading] = useState(!initialContent)
   const [error, setError] = useState('')
@@ -176,7 +178,8 @@ export default function ContentDetailPage({
           } catch {
             // Unified social summary is optional; individual actions remain usable.
           }
-          if (resolved.creatorId) {
+          const authorUserId = resolved.ownerUserId || resolved.creatorId
+          if (authorUserId) {
             try {
               const { response: followResponse, data: followData } = await fetchJson<{
                 data?: {
@@ -184,7 +187,7 @@ export default function ContentDetailPage({
                   relationship?: { blocked?: boolean; blockedBy?: boolean }
                 }
               }>(
-                '/api/v1/social/follows/' + encodeURIComponent(resolved.creatorId),
+                '/api/v1/social/follows/' + encodeURIComponent(authorUserId),
                 { credentials: 'include', headers: { accept: 'application/json' }, cache: 'no-store', signal: controller.signal },
               )
               if (!cancelled && followResponse.ok) {
@@ -440,12 +443,12 @@ export default function ContentDetailPage({
   }
 
   async function toggleFollow() {
-    if (!content?.creatorId || followBusy) return
+    if (!authorUserId || followBusy) return
     setFollowBusy(true)
     setActionMessage('')
     try {
       const { response, data } = await fetchJson<{ data?: { following?: boolean }; error?: { message?: string } }>(
-        '/api/v1/social/follows/' + encodeURIComponent(content.creatorId),
+        '/api/v1/social/follows/' + encodeURIComponent(authorUserId),
         {
           method: following ? 'DELETE' : 'POST',
           credentials: 'include',
@@ -580,10 +583,10 @@ export default function ContentDetailPage({
         </div>
         <div className="flex flex-wrap items-center gap-2 text-sm">
           <span className="mr-1 text-xs text-light-secondary dark:text-dark-secondary">{typeLabels[content.contentType]} · {copy.detail.published}</span>
-          {content.creatorId ? (
+          {authorUserId ? (
             <>
-              <Link className="main-tab rounded-full border border-light-border px-4 py-2 text-sm font-bold hover:bg-light-primary/10 disabled:cursor-wait disabled:opacity-50 dark:border-dark-border dark:hover:bg-dark-primary/10" href={'/users/' + encodeURIComponent(content.creatorId)}>{copy.detail.author}</Link>
-              {viewerUserId === content.creatorId ? (
+              <Link className="main-tab rounded-full border border-light-border px-4 py-2 text-sm font-bold hover:bg-light-primary/10 disabled:cursor-wait disabled:opacity-50 dark:border-dark-border dark:hover:bg-dark-primary/10" href={'/users/' + encodeURIComponent(authorUserId)}>{copy.detail.author}</Link>
+              {viewerUserId === authorUserId ? (
                 <span className="text-sm text-light-secondary dark:text-dark-secondary">{copy.detail.own}</span>
               ) : followRestricted ? (
                 <span className="text-sm text-light-secondary dark:text-dark-secondary">{copy.detail.restricted}</span>
@@ -623,7 +626,7 @@ export default function ContentDetailPage({
           <button className="main-tab rounded-full border border-light-border px-4 py-2 text-sm font-bold hover:bg-light-primary/10 disabled:cursor-wait disabled:opacity-50 dark:border-dark-border dark:hover:bg-dark-primary/10" disabled={shareBusy} onClick={() => void copyContentLink()} type="button">
             {shareBusy ? copy.detail.generating : copied ? copy.detail.copied : copy.detail.share}
           </button>
-          {viewerUserId && viewerUserId !== content.creatorId ? (
+          {viewerUserId && viewerUserId !== authorUserId ? (
             <button
               className="main-tab rounded-full border border-light-border px-4 py-2 text-sm font-bold hover:bg-light-primary/10 disabled:cursor-wait disabled:opacity-50 dark:border-dark-border dark:hover:bg-dark-primary/10"
               disabled={reportBusy}
