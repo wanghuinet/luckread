@@ -191,6 +191,7 @@ describe('W03 content contract core', () => {
     };
     let providerStatus = 200;
     let allowed = false;
+    let reasonOverride: string | null = null;
     let providerCalls = 0;
     const allowLimiter = { limit: async () => ({ success: true }) };
     const env = {
@@ -203,7 +204,7 @@ describe('W03 content contract core', () => {
           expect(forwarded.headers.get('X-LuckRead-Principal-User-Id')).toBe('reader_user');
           expect(await forwarded.json()).toEqual({ creatorId: 'creator_1' });
           return Response.json({
-            data: { allowed, reason: allowed ? 'ACTIVE_CREATOR_MEMBERSHIP' : 'MEMBERSHIP_REQUIRED' },
+            data: { allowed, reason: reasonOverride ?? (allowed ? 'ACTIVE_CREATOR_MEMBERSHIP' : 'MEMBERSHIP_REQUIRED') },
             requestId: 'req-membership-test',
           }, { status: providerStatus });
         },
@@ -249,13 +250,22 @@ describe('W03 content contract core', () => {
     });
     expect(providerCalls).toBe(2);
 
+    reasonOverride = 'MEMBERSHIP_REQUIRED';
+    const contradictory = await w03Worker.fetch(makeRequest(), env, {} as never);
+    expect(contradictory.status).toBe(503);
+    await expect(contradictory.json()).resolves.toMatchObject({
+      error: { code: 'SERVICE_UNAVAILABLE' },
+    });
+    expect(providerCalls).toBe(3);
+
+    reasonOverride = null;
     providerStatus = 503;
     const unavailable = await w03Worker.fetch(makeRequest(), env, {} as never);
     expect(unavailable.status).toBe(503);
     await expect(unavailable.json()).resolves.toMatchObject({
       error: { code: 'SERVICE_UNAVAILABLE' },
     });
-    expect(providerCalls).toBe(3);
+    expect(providerCalls).toBe(4);
   });
 
   it('does not let a public content record expose bytes also referenced by another membership-only record', async () => {
