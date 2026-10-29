@@ -10,7 +10,7 @@ import {
   W05SocialClientError,
 } from '../../../../../../social/w05-social-client.js'
 import { callW03Content } from '../../../../../../content/w03-content-client.js'
-import { readTrustedArticleBodyForSocialTokens } from '../../../../../../lib/article-summary-preview.js'
+import { GET as readAuthorizedContentBody } from '../body/route.js'
 
 const errorResponse = (status: number, code: string, message: string) =>
   Response.json({ error: { code, message, details: {} }, requestId: crypto.randomUUID() }, { status })
@@ -84,11 +84,20 @@ export async function POST(
         return errorResponse(409, 'CONTENT_BODY_UNAVAILABLE', 'Content body is unavailable')
       }
 
-      const storedBody = await readTrustedArticleBodyForSocialTokens(record.bodyRef, new URL(request.url).origin)
-      if (storedBody === null) {
-        return errorResponse(409, 'CONTENT_BODY_UNAVAILABLE', 'Content body is unavailable')
+      // Reuse the same W01 body route that enforces current W03/W07 access,
+      // verifies the Payload asset owner, and streams a bounded no-store body.
+      // Never re-fetch bodyRef directly from the public media hostname here.
+      const bodyResponse = await readAuthorizedContentBody(request, {
+        params: Promise.resolve({ contentId }),
+      })
+      if (!bodyResponse.ok) {
+        return errorResponse(
+          bodyResponse.status === 404 ? 409 : bodyResponse.status,
+          bodyResponse.status === 404 ? 'CONTENT_BODY_UNAVAILABLE' : 'SERVICE_UNAVAILABLE',
+          'Content body is unavailable',
+        )
       }
-      text = storedBody
+      text = await bodyResponse.text()
     }
     if (typeof text !== 'string' || text.length > 10000) {
       return errorResponse(400, 'VALIDATION_FAILED', 'Invalid social metadata text')
