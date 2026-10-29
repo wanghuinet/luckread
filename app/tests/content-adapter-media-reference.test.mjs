@@ -59,6 +59,21 @@ test('does not map body or media fields from a denied member-only response', () 
   expect(mapped.media_url).toBeUndefined();
 });
 
+test('keeps canonical creator identity separate from author user identity', () => {
+  const mapped = mapContentToFeedContent({
+    id: 'content_member_author',
+    ownerUserId: 'user_author_123',
+    creatorId: 'creator_canonical_456',
+    title: 'Membership post',
+    accessMode: 'MEMBERS_ONLY',
+    accessGranted: true,
+  });
+
+  expect(mapped.poster_id).toBe('user_author_123');
+  expect(mapped.ownerUserId).toBe('user_author_123');
+  expect(mapped.creatorId).toBe('creator_canonical_456');
+});
+
 test('forwards session credentials only to the configured API and approved media delivery hosts', () => {
   expect(resolveNativeMediaSource('https://img.luckread.com/photo.webp', 'session-secret')).toEqual({
     uri: 'https://img.luckread.com/photo.webp',
