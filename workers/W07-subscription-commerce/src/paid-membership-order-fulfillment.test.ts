@@ -171,6 +171,10 @@ describe('paid membership order fulfillment', () => {
     await fulfillPaidMembershipOrder(f.env, paymentId, 'merchant_1');
     const [subscriptionId, row] = [...f.state.subscriptions.entries()][0]!;
     row.status = 'CANCELED';
+    // A later renewal or cancellation may have changed the current period.
+    // Replaying the original purchase must still converge without resetting it.
+    row.current_period_start = '2026-11-29T10:00:00.000Z';
+    row.current_period_end = '2026-12-29T10:00:00.000Z';
 
     const replay = await fulfillPaidMembershipOrder(f.env, paymentId, 'merchant_1');
     expect(replay).toEqual({ outcome: 'ALREADY_APPLIED', fulfilledCount: 1 });
