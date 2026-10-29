@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react'
 import { fetchJson } from '../../../../lib/client-api.js'
 
 type OrderResponse = { data?: { status?: unknown }; error?: { message?: unknown } }
-type ContentResponse = { data?: { accessGranted?: unknown; accessMode?: unknown }; error?: { message?: unknown } }
+type ContentResponse = { accessGranted?: unknown; accessMode?: unknown; data?: { accessGranted?: unknown; accessMode?: unknown }; error?: { message?: unknown } }
 type VerificationState = 'checking' | 'pending' | 'confirmed' | 'failed' | 'cancelled' | 'auth-required' | 'error'
 
 const validOrderId = (value: string) => /^ord_[A-Za-z0-9_-]{1,90}$/.test(value)
@@ -103,7 +103,8 @@ export default function CheckoutResultClient({
               setMessage('订单已确认，但需要重新登录才能验证会员内容访问权限。')
               return
             }
-            if (contentResult.response.ok && contentResult.data?.data?.accessGranted === true) {
+            if (contentResult.response.ok &&
+                (contentResult.data?.accessGranted === true || contentResult.data?.data?.accessGranted === true)) {
               setState('confirmed')
               setMessage('服务器已确认有效会员权限，正在返回已解锁的内容。')
               window.location.replace('/content/' + encodeURIComponent(contentId))
