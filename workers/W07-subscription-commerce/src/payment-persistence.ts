@@ -364,6 +364,7 @@ export async function getPaymentAttempt(
   if (
     row.payment_id !== paymentIdInput ||
     row.customer_id !== customerIdInput ||
+    !/^ord_[A-Za-z0-9_-]{1,90}$/.test(row.order_id) ||
     row.provider !== PROVIDER ||
     !nonBlank(row.merchant_id, 256) ||
     !safeMinor(row.amount_minor) ||
