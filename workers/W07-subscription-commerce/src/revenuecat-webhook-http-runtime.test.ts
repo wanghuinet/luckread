@@ -39,7 +39,7 @@ async function sign(body: ArrayBuffer) {
   bytes.set(new Uint8Array(body), prefix.byteLength)
   const signature = await crypto.subtle.sign('HMAC', key, bytes)
   const hex = Array.from(new Uint8Array(signature), (value) => value.toString(16).padStart(2, '0')).join('')
-  return \`t=\${NOW_SECONDS},v1=\${hex}\`
+  return `t=${NOW_SECONDS},v1=${hex}`
 }
 
 function request(body: ArrayBuffer, headers: Record<string, string> = {}) {
