@@ -71,12 +71,14 @@
     {
       "operationIdFamily": "membership",
       "publicPaths": [
+        "/api/v1/billing/documents",
         "/api/v1/commerce/orders",
         "/api/v1/commerce/orders/*",
         "/api/v1/membership/plans",
         "/api/v1/membership/plans/*",
         "/api/v1/memberships/subscriptions",
         "/api/v1/memberships/subscriptions/*",
+        "/api/v1/payments/history",
         "/api/v1/payments/intents",
         "/api/v1/payments/refunds",
         "/api/v1/plans"
