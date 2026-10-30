@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { sha256CanonicalJsonForIdempotency } from '../../W10-async/src/canonical-json-idempotency.js';
 import {
   createPaymentAttempt,
+  getPaymentAttempt,
   recordUnconfirmedHyperswitchIntent,
   receiveHyperswitchWebhook,
   PaymentPersistenceError,
@@ -549,6 +550,60 @@ describe('PAY-001 payment attempt persistence candidate', () => {
     );
     expect(created.pricingMode).toBe('demo');
     expect(db.payments).toHaveLength(1);
+  });
+
+  it('reads only the authenticated customer payment and returns the validated public-safe DTO', async () => {
+    const db = new MemoryPaymentD1();
+    seedPayment(db, {
+      status: 'processing',
+      version: 3,
+      provider_updated_at: LATER,
+      updated_at: LATER,
+    });
+
+    const payment = await getPaymentAttempt(db as unknown as D1Database, CUSTOMER, PAYMENT_ID);
+    expect(payment).toEqual({
+      paymentId: PAYMENT_ID,
+      orderId: 'ord_1',
+      amountMinor: 1200,
+      currency: 'USD',
+      status: 'processing',
+      version: 3,
+      providerUpdatedAt: LATER,
+      createdAt: NOW,
+      updatedAt: LATER,
+    });
+    expect(JSON.stringify(payment)).not.toContain('customer_id');
+    expect(JSON.stringify(payment)).not.toContain('merchant_id');
+    expect(JSON.stringify(payment)).not.toContain('idempotency_key');
+    expect(JSON.stringify(payment)).not.toContain('failure_code');
+  });
+
+  it('returns the same not-found result for a foreign-owned payment as for a nonexistent payment', async () => {
+    const db = new MemoryPaymentD1();
+    seedPayment(db);
+
+    await expectPaymentError(
+      getPaymentAttempt(db as unknown as D1Database, 'another-user', PAYMENT_ID),
+      'RESOURCE_NOT_FOUND',
+    );
+    await expectPaymentError(
+      getPaymentAttempt(db as unknown as D1Database, CUSTOMER, 'pay_' + 'b'.repeat(26)),
+      'RESOURCE_NOT_FOUND',
+    );
+  });
+
+  it('rejects malformed payment identifiers and corrupt persisted payment rows', async () => {
+    const db = new MemoryPaymentD1();
+    await expectPaymentError(
+      getPaymentAttempt(db as unknown as D1Database, CUSTOMER, 'bad-payment-id'),
+      'VALIDATION_FAILED',
+    );
+    seedPayment(db, { merchant_id: 'wrong-merchant' });
+    await expectPaymentError(
+      getPaymentAttempt(db as unknown as D1Database, CUSTOMER, PAYMENT_ID),
+      'INTEGRITY_VIOLATION',
+    );
   });
 
   it('creates a stable unconfirmed attempt and replays the same idempotency key without a second write', async () => {
