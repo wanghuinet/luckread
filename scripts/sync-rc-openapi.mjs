@@ -215,6 +215,40 @@ function insertIntoExistingPath(raw, rawPath, methodBlocks) {
   return [...before, ...methodBlocks.flatMap((b, i) => i ? ['', ...b.split('\n')] : b.split('\n')), ...after].join('\n');
 }
 
+function replaceExistingOpenApiOperation(raw, rawPath, method, methodBlock) {
+  const lines = raw.split('\n');
+  const header = \`  \${rawPath}:\`;
+  const pathStart = lines.findIndex((line) => line === header);
+  if (pathStart < 0) return null;
+
+  let pathEnd = lines.length;
+  for (let i = pathStart + 1; i < lines.length; i += 1) {
+    if (/^  \\/.*:\\s*$/.test(lines[i]) || lines[i] === 'components:') {
+      pathEnd = i;
+      break;
+    }
+  }
+
+  const methodName = String(method).toLowerCase();
+  const methodStart = lines.findIndex((line, index) =>
+    index > pathStart && index < pathEnd && line === \`    \${methodName}:\`,
+  );
+  if (methodStart < 0) return null;
+
+  let methodEnd = pathEnd;
+  for (let i = methodStart + 1; i < pathEnd; i += 1) {
+    if (/^    (get|post|put|patch|delete|head|options|trace):\\s*$/i.test(lines[i])) {
+      methodEnd = i;
+      break;
+    }
+  }
+
+  const replacement = methodBlock.split('\n');
+  const suffix = lines.slice(methodEnd);
+  if (suffix.length > 0 && suffix[0].trim() !== '') replacement.push('');
+  return [...lines.slice(0, methodStart), ...replacement, ...suffix].join('\n');
+}
+
 function addOpenApiOperations(raw, missing) {
   if (!missing.length) return { raw, added: 0 };
   let next = raw;
@@ -298,7 +332,31 @@ for (const [key, record] of inventoryMap) {
   missingOpenApi.push({ operationId, method, path, domain: record.domain });
 }
 
-const { raw: openapiNext, added: addedToOpenApi } = addOpenApiOperations(openapiRaw, missingOpenApi);
+let openapiPrepared = openapiRaw;
+let upgradedExistingOpenApiOperations = 0;
+for (const policy of domainPolicies) {
+  const key = operationKey(policy.method, policy.path);
+  if (!openapiMap.has(key)) continue;
+  const rawPath = openapiPathFromCanonical(policy.path);
+  const methodBlock = buildOpenApiOperation({
+    operationId: policy.operationId,
+    method: policy.method,
+    canonicalPath: policy.path,
+    domain: policy.domain ?? inferDomain(policy.path),
+  });
+  const upgraded = replaceExistingOpenApiOperation(
+    openapiPrepared,
+    rawPath,
+    policy.method,
+    methodBlock,
+  );
+  if (upgraded !== null && upgraded !== openapiPrepared) {
+    openapiPrepared = upgraded;
+    upgradedExistingOpenApiOperations += 1;
+  }
+}
+
+const { raw: openapiNext, added: addedToOpenApi } = addOpenApiOperations(openapiPrepared, missingOpenApi);
 if (openapiNext !== openapiRaw) fs.writeFileSync(`${root}/${openapiPath}`, openapiNext);
 
 const effectiveOpenApi = parseOpenApi(openapiNext);
@@ -343,7 +401,7 @@ for (const op of targetOperations) {
     optimisticLockRequired: retry?.requiresOptimisticConcurrency === true,
     idempotencyRequired: idempotency?.required === true,
     stateMachine,
-    'x-luckread-contract-status': 'DISCOVERY_DRAFT',
+    'x-luckread-contract-status': source?.status ?? 'DISCOVERY_DRAFT',
     'x-luckread-source': source?.__source ?? inventoryPath,
   });
 }
@@ -357,6 +415,7 @@ console.log(JSON.stringify({
   inventoryOperations: inventoryMap.size,
   addedToInventory,
   addedToOpenApi,
+  upgradedExistingOpenApiOperations,
   consolidatedPolicyOperations: consolidatedOperations.length,
   remainingInventoryWithoutOpenApi: inventoryMap.size - effectiveOpenApi.length,
 }, null, 2));
