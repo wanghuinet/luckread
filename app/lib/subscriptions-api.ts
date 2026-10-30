@@ -53,3 +53,50 @@ export function fetchMySubscriptionsPage(options: PageOptions = {}) {
     signal: options.signal,
   });
 }
+
+
+export type ActiveMembershipPlan = {
+  planId: string;
+  creatorId: string;
+  planVersion: number;
+  name: string;
+  tier: string;
+  billingInterval: 'MONTHLY' | 'YEARLY';
+  priceMinor: number;
+  currency: string;
+  benefits: string[];
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ActiveMembershipPlanPage = {
+  docs: ActiveMembershipPlan[];
+  limit: number;
+  hasMore: boolean;
+  nextCursor: string | null;
+};
+
+type PlanPageOptions = {
+  limit?: number;
+  cursor?: string | null;
+  signal?: AbortSignal;
+};
+
+/** Read only active/public plans from W01 -> W07; the client never supplies price or owner data. */
+export function fetchActiveMembershipPlansPage(options: PlanPageOptions = {}) {
+  const limit = options.limit ?? 20;
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > 50) {
+    throw new RangeError('Membership plan page size must be between 1 and 50.');
+  }
+  const cursor = options.cursor ?? null;
+  if (cursor !== null && (typeof cursor !== 'string' || cursor.length < 1 || cursor.length > 2048)) {
+    throw new RangeError('Membership plan cursor must be between 1 and 2048 characters.');
+  }
+
+  const query = new URLSearchParams({ limit: String(limit) });
+  if (cursor) query.set('cursor', cursor);
+  return apiRequest<unknown>('/plans?' + query.toString(), {
+    method: 'GET',
+    signal: options.signal,
+  });
+}
