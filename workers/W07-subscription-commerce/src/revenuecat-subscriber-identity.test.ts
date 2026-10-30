@@ -4,8 +4,14 @@ import {
   RevenueCatSubscriberIdentityError,
   type RevenueCatSubscriberIdentityErrorCode,
 } from './revenuecat-subscriber-identity.js';
+import type { RevenueCatSubscriberSnapshot } from './revenuecat-subscriber-api.js';
 
-const makeSnapshot = (overrides: Record<string, unknown> = {}) => ({
+type IdentitySnapshot = Pick<
+  RevenueCatSubscriberSnapshot,
+  'queriedAppUserId' | 'originalAppUserId' | 'aliases' | 'customerCreatedOnLookup'
+>;
+
+const makeSnapshot = (overrides: Partial<IdentitySnapshot> = {}): IdentitySnapshot => ({
   queriedAppUserId: 'luckread-user-123',
   originalAppUserId: 'luckread-user-123',
   aliases: ['luckread-user-123'],
