@@ -342,6 +342,10 @@ export function inspectD1_04OrderMigrationPreflight({ schemaSnapshot, migrationS
       REQUIRED_MIGRATION_IDS.slice(0, 4).some((id) => !state.names.includes(id))) {
     fail('RevenueCat webhook migration is recorded without its required commerce migrations; manual schema reconciliation is required')
   }
+  if (state.names.includes(REFUNDS_BILLING_MIGRATION_ID) &&
+      REQUIRED_MIGRATION_IDS.slice(0, 5).some((id) => !state.names.includes(id))) {
+    fail('refund/billing migration is recorded without its required prior commerce migrations; manual schema reconciliation is required')
+  }
   const byName = new Set(objects.map((object) => object.name))
 
   for (const migrationId of state.names.filter((name) => REQUIRED_MIGRATION_IDS.includes(name))) {
