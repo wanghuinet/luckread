@@ -584,6 +584,16 @@
         "newServiceBinding": false,
         "d1Authority": "D1-04",
         "crossD1Transactions": 0
+      },
+      "preProviderMutationAudit": {
+        "required": true,
+        "worker": "W06",
+        "internalPath": "/internal/audit-events/payment-refund-requested",
+        "eventAction": "commerce.payment_refund_requested",
+        "order": "W01 must receive W06 200 exact replay or 201 durable event confirmation before calling W07. On W06 failure/conflict W01 must not invoke W07.",
+        "actor": "W06 derives actor from W01 trusted private transport; body must not supply actor identity.",
+        "idempotency": "Event ID is deterministic from actorId, paymentId and Idempotency-Key digest; W06 checks exact amount semantics. Raw key is not persisted.",
+        "auditD1Authority": "D1-03"
       }
     },
     {
