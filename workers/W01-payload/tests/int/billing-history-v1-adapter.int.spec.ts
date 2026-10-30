@@ -108,7 +108,12 @@ describe('public customer payment and billing history adapters', () => {
       'getBillingDocuments',
     ]) {
       expect(sourcePolicy.operations.find((item: { operationId: string }) => item.operationId === operationId)).toBeTruthy()
-      expect(operationPolicy.operations.find((item: { operationId: string }) => item.operationId === operationId)).toBeTruthy()
+      const operation = operationPolicy.operations.find((item: { operationId: string }) => item.operationId === operationId)
+      expect(operation).toMatchObject({
+        permissions: [operationId === 'postPaymentsRefunds' ? 'payment.refund' : 'payment.read'],
+        'x-luckread-contract-status': 'CONTRACTED_PARTIAL',
+        'x-luckread-source': 'contracts/api/commerce-operation-policy.v1.json',
+      })
       expect(binding.operations.find((item: { operationId: string }) => item.operationId === operationId)).toBeTruthy()
     }
 
