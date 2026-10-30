@@ -76,7 +76,8 @@ describe('public content-list cache invalidation scope', () => {
     expect(runtime).toContain("const EDITABLE_STATES = new Set<ContentState>(['DRAFT', 'REJECTED', 'RESTORED'])")
     expect(createMutation).not.toContain('invalidatePublicContentList')
     expect(patchMutation).toContain('invalidatePublicContentDetail(request, contentId)')
-    expect(patchMutation).not.toContain('invalidatePublicContentList')
+    expect(patchMutation).toContain("if (updatedState === 'PUBLISHED') await invalidatePublicContentList(request)")
+    expect(patchMutation).toContain('Drafts are not part of anonymous public lists')
   })
 })
 

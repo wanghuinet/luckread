@@ -85,7 +85,9 @@ jobs:
           create_mutation = route.split('export async function POST', 1)[1]
           content_patch = detail.split('export async function PATCH', 1)[1].split('export async function DELETE', 1)[0]
           assert 'invalidatePublicContentList' not in create_mutation
-          assert 'invalidatePublicContentList' not in content_patch
+          assert 'changesAccessMode' in content_patch
+          assert "if (updatedState === 'PUBLISHED') await invalidatePublicContentList(request)" in content_patch
+          assert content_patch.count('invalidatePublicContentList') == 1
           assert 'invalidatePublicContentList' in detail
           assert 'invalidatePublicContentList' in state
           creator_state = Path('workers/W01-payload/src/app/(payload)/api/creator/contents/[contentId]/state/route.ts').read_text()

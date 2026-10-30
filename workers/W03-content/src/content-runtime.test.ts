@@ -7,23 +7,37 @@ import w03Worker, { hasCreatorContentPermission, hasSocialPostPermission, parseL
 
 describe('W03 content contract core', () => {
 
-  it('checks public media only when a known URL for it is referenced by a published social post', async () => {
+  it('classifies published public-post media and protects member-only media with W07 entitlement', async () => {
     const publicUrl = 'https://img.luckread.com/media/photo%20(1).png'
     const historicalUrl = 'https://cdn.luckread.com/media/photo%20(1).png'
     let query = ''
     let bindings: unknown[] = []
+    let matchingRows: Array<Record<string, unknown>> = []
+    const d1 = {
+      prepare(sql: string) {
+        query = sql
+        return {
+          bind(...values: unknown[]) {
+            bindings = values
+            return {
+              all: async () => ({ results: matchingRows }),
+            }
+          },
+        }
+      },
+    }
+    let w07Calls = 0
+    let w07Request: Request | null = null
     const env = {
-      D1_02: {
-        prepare(sql: string) {
-          query = sql
-          return {
-            bind(...values: unknown[]) {
-              bindings = values
-              return {
-                first: async () => values.includes(publicUrl) ? { id: 'post_public_1' } : null,
-              }
-            },
-          }
+      D1_02: d1,
+      W07_SUBSCRIPTION: {
+        fetch: async (input: RequestInfo | URL, init?: RequestInit) => {
+          w07Calls += 1
+          w07Request = input instanceof Request ? input : new Request(input, init)
+          return Response.json({
+            data: { allowed: true, reason: 'ACTIVE_CREATOR_MEMBERSHIP' },
+            requestId: 'req_w07_test',
+          })
         },
       },
     } as never
@@ -42,12 +56,29 @@ describe('W03 content contract core', () => {
         },
       },
     )
+    const publicPost = {
+      id: 'post_public_1',
+      owner_user_id: 'creator_user',
+      creator_id: 'creator_1',
+      content_type: 'post',
+      access_mode: 'PUBLIC',
+    }
+    const memberPost = {
+      id: 'post_member_1',
+      owner_user_id: 'creator_user',
+      creator_id: 'creator_1',
+      content_type: 'post',
+      access_mode: 'MEMBERS_ONLY',
+    }
 
+    matchingRows = [publicPost]
     const publicResponse = await w03Worker.fetch(request(publicUrl), env, {} as never)
     expect(publicResponse.status).toBe(200)
-    await expect(publicResponse.json()).resolves.toMatchObject({ data: { isPublic: true } })
+    await expect(publicResponse.json()).resolves.toMatchObject({
+      data: { isPublic: true, isMemberContent: false, allowed: true },
+    })
     expect(query).toContain("state = 'PUBLISHED'")
-    expect(query).toContain("content_type = 'post'")
+    expect(query).toContain('access_mode')
     expect(query).toContain('body_ref IN (')
     expect(query).toContain('cover_ref IN (')
     expect(query).toContain('json_each(contents.media_refs_json)')
@@ -59,26 +90,52 @@ describe('W03 content contract core', () => {
     expect(bindings[candidatesPerColumn]).toBe(publicUrl)
     expect(bindings[candidatesPerColumn * 2]).toBe(publicUrl)
     expect(bindings).not.toContain(historicalUrl)
-    expect(bindings.some((value) => typeof value === 'string' && value.startsWith('/api/media/file/'))).toBe(false)
+    expect(w07Calls).toBe(0)
 
-    // A published URL must not authorize a different object with the same
-    // filename under a private prefix.
-    const collisionResponse = await w03Worker.fetch(
-      request('https://img.luckread.com/private-prefix/photo%20(1).png'),
-      env,
-      {} as never,
-    )
-    expect(collisionResponse.status).toBe(200)
-    await expect(collisionResponse.json()).resolves.toMatchObject({ data: { isPublic: false } })
-    expect(bindings.some((value) => typeof value === 'string' && value.startsWith('/api/media/file/'))).toBe(false)
+    matchingRows = [memberPost]
+    const memberRequest = request(publicUrl, 'W01', {
+      'X-LuckRead-Principal-User-Id': 'user_subscriber',
+      'X-LuckRead-Principal-Layer': 'L2',
+    })
+    const memberResponse = await w03Worker.fetch(memberRequest, env, {} as never)
+    expect(memberResponse.status).toBe(200)
+    await expect(memberResponse.json()).resolves.toMatchObject({
+      data: { isPublic: false, isMemberContent: true, allowed: true },
+    })
+    expect(w07Calls).toBe(1)
+    expect(w07Request?.url).toContain('/internal/entitlements/check-creator-membership')
+    expect(w07Request?.headers.get('X-LuckRead-Caller')).toBe('W03')
+    expect(w07Request?.headers.get('X-LuckRead-Principal-User-Id')).toBe('user_subscriber')
+    expect(w07Request?.headers.get('Cookie')).toBeNull()
+    expect(await w07Request?.json()).toEqual({ creatorId: 'creator_1' })
 
+    // Without a logged-in member, a member-only reference must not be exposed as public.
+    w07Calls = 0
+    const anonymousMemberResponse = await w03Worker.fetch(request(publicUrl), env, {} as never)
+    expect(anonymousMemberResponse.status).toBe(200)
+    await expect(anonymousMemberResponse.json()).resolves.toMatchObject({
+      data: { isPublic: false, isMemberContent: true, allowed: false },
+    })
+    expect(w07Calls).toBe(0)
+
+    // If a URL appears in both public and member-only content, membership wins:
+    // it cannot become anonymous-public through the second reference.
+    matchingRows = [publicPost, memberPost]
+    const mixedReferenceResponse = await w03Worker.fetch(request(publicUrl), env, {} as never)
+    await expect(mixedReferenceResponse.json()).resolves.toMatchObject({
+      data: { isPublic: false, isMemberContent: true, allowed: false },
+    })
+
+    matchingRows = []
     const unpublishedResponse = await w03Worker.fetch(
       request('https://img.luckread.com/media/draft-only.png'),
       env,
       {} as never,
     )
     expect(unpublishedResponse.status).toBe(200)
-    await expect(unpublishedResponse.json()).resolves.toMatchObject({ data: { isPublic: false } })
+    await expect(unpublishedResponse.json()).resolves.toMatchObject({
+      data: { isPublic: false, isMemberContent: false, allowed: false },
+    })
 
     const unsupportedHostResponse = await w03Worker.fetch(
       request('https://attacker.example/media/photo.png'),
@@ -86,7 +143,9 @@ describe('W03 content contract core', () => {
       {} as never,
     )
     expect(unsupportedHostResponse.status).toBe(200)
-    await expect(unsupportedHostResponse.json()).resolves.toMatchObject({ data: { isPublic: false } })
+    await expect(unsupportedHostResponse.json()).resolves.toMatchObject({
+      data: { isPublic: false, isMemberContent: false, allowed: false },
+    })
 
     const untrustedCaller = await w03Worker.fetch(request(publicUrl, 'W04'), env, {} as never)
     expect(untrustedCaller.status).toBe(403)
@@ -98,6 +157,221 @@ describe('W03 content contract core', () => {
     )
     expect(forwardedCredential.status).toBe(403)
   })
+  it('strips member-only body and media on denial and fails closed when W07 is unavailable', async () => {
+    const contentRow = {
+      id: 'content_member_1',
+      content_type: 'article',
+      owner_user_id: 'creator_user',
+      creator_id: 'creator_1',
+      ip_id: null,
+      state: 'PUBLISHED',
+      scheduled_at: null,
+      access_mode: 'MEMBERS_ONLY',
+      version: 1,
+      revision: 1,
+      slug: 'member-article',
+      title: 'Members-only title',
+      body_ref: 'https://luckread.com/private-body',
+      media_refs_json: JSON.stringify(['https://img.luckread.com/private-image.webp']),
+      cover_ref: 'https://img.luckread.com/private-cover.webp',
+      etag: 'W/"1"',
+      created_at: '2026-10-29T00:00:00.000Z',
+      updated_at: '2026-10-29T00:00:00.000Z',
+    };
+    const db = {
+      prepare() {
+        return {
+          bind() {
+            return {
+              first: async () => ({ ...contentRow }),
+            };
+          },
+        };
+      },
+    };
+    let providerStatus = 200;
+    let allowed = false;
+    let reasonOverride: string | null = null;
+    let providerCalls = 0;
+    const allowLimiter = { limit: async () => ({ success: true }) };
+    const env = {
+      D1_02: db,
+      W07_SUBSCRIPTION: {
+        fetch: async (input: RequestInfo | URL, init?: RequestInit) => {
+          providerCalls += 1;
+          const forwarded = input instanceof Request ? input : new Request(input, init);
+          expect(forwarded.headers.get('X-LuckRead-Caller')).toBe('W03');
+          expect(forwarded.headers.get('X-LuckRead-Principal-User-Id')).toBe('reader_user');
+          expect(await forwarded.json()).toEqual({ creatorId: 'creator_1' });
+          return Response.json({
+            data: { allowed, reason: reasonOverride ?? (allowed ? 'ACTIVE_CREATOR_MEMBERSHIP' : 'MEMBERSHIP_REQUIRED') },
+            requestId: 'req-membership-test',
+          }, { status: providerStatus });
+        },
+      },
+      CONTENT_ORIGIN_GLOBAL_LIMITER: allowLimiter,
+      CONTENT_PUBLIC_READ_LIMITER: allowLimiter,
+      CONTENT_MUTATION_LIMITER: allowLimiter,
+    } as never;
+    const makeRequest = () => new Request('https://luckread-w03.internal/internal/content/contents/content_member_1', {
+      headers: {
+        'X-LuckRead-Caller': 'W01',
+        'X-LuckRead-Transport-Version': '1.0',
+        'X-LuckRead-Correlation-Id': 'content-membership-check',
+        'X-LuckRead-Principal-User-Id': 'reader_user',
+        'X-LuckRead-Principal-Layer': 'L2',
+      },
+    });
+
+    const denied = await w03Worker.fetch(makeRequest(), env, {} as never);
+    expect(denied.status).toBe(200);
+    await expect(denied.json()).resolves.toMatchObject({
+      id: 'content_member_1',
+      creatorId: 'creator_1',
+      accessMode: 'MEMBERS_ONLY',
+      accessGranted: false,
+      title: 'Members-only title',
+      bodyRef: '',
+      mediaRefs: [],
+      coverRef: null,
+    });
+    expect(providerCalls).toBe(1);
+
+    allowed = true;
+    const entitled = await w03Worker.fetch(makeRequest(), env, {} as never);
+    expect(entitled.status).toBe(200);
+    await expect(entitled.json()).resolves.toMatchObject({
+      creatorId: 'creator_1',
+      accessMode: 'MEMBERS_ONLY',
+      accessGranted: true,
+      bodyRef: 'https://luckread.com/private-body',
+      mediaRefs: ['https://img.luckread.com/private-image.webp'],
+      coverRef: 'https://img.luckread.com/private-cover.webp',
+    });
+    expect(providerCalls).toBe(2);
+
+    reasonOverride = 'MEMBERSHIP_REQUIRED';
+    const contradictory = await w03Worker.fetch(makeRequest(), env, {} as never);
+    expect(contradictory.status).toBe(503);
+    await expect(contradictory.json()).resolves.toMatchObject({
+      error: { code: 'SERVICE_UNAVAILABLE' },
+    });
+    expect(providerCalls).toBe(3);
+
+    reasonOverride = null;
+    providerStatus = 503;
+    const unavailable = await w03Worker.fetch(makeRequest(), env, {} as never);
+    expect(unavailable.status).toBe(503);
+    await expect(unavailable.json()).resolves.toMatchObject({
+      error: { code: 'SERVICE_UNAVAILABLE' },
+    });
+    expect(providerCalls).toBe(4);
+  });
+
+  it('does not let a public content record expose bytes also referenced by another membership-only record', async () => {
+    const bodyRef = 'https://img.luckread.com/users/owner/luckread-article-11111111-2222-4333-8444-555555555555.json'
+    const publicContentRow = {
+      id: 'content_public_1',
+      content_type: 'article',
+      owner_user_id: 'public_owner',
+      creator_id: 'public_creator',
+      ip_id: null,
+      state: 'PUBLISHED',
+      scheduled_at: null,
+      access_mode: 'PUBLIC',
+      version: 1,
+      revision: 1,
+      slug: 'public-article',
+      title: 'Public shell',
+      body_ref: bodyRef,
+      media_refs_json: '[]',
+      cover_ref: null,
+      etag: 'W/"1"',
+      created_at: '2026-10-29T00:00:00.000Z',
+      updated_at: '2026-10-29T00:00:00.000Z',
+    }
+    const memberReferenceRows = [
+      { owner_user_id: 'private_owner', creator_id: 'private_creator' },
+    ]
+    const queries: string[] = []
+    const db = {
+      prepare(sql: string) {
+        queries.push(sql)
+        return {
+          bind() {
+            return {
+              first: async () => ({ ...publicContentRow }),
+              all: async () => ({ results: memberReferenceRows.map((row) => ({ ...row })) }),
+            }
+          },
+        }
+      },
+    }
+    let allowed = false
+    let entitlementChecks = 0
+    const allowLimiter = { limit: async () => ({ success: true }) }
+    const env = {
+      D1_02: db,
+      W07_SUBSCRIPTION: {
+        fetch: async (input: RequestInfo | URL, init?: RequestInit) => {
+          entitlementChecks += 1
+          const forwarded = input instanceof Request ? input : new Request(input, init)
+          expect(forwarded.url).toContain('/internal/entitlements/check-creator-membership')
+          expect(await forwarded.json()).toEqual({ creatorId: 'private_creator' })
+          return Response.json({
+            data: {
+              allowed,
+              reason: allowed ? 'ACTIVE_CREATOR_MEMBERSHIP' : 'MEMBERSHIP_REQUIRED',
+            },
+            requestId: 'req-shared-body-test',
+          })
+        },
+      },
+      CONTENT_ORIGIN_GLOBAL_LIMITER: allowLimiter,
+      CONTENT_PUBLIC_READ_LIMITER: allowLimiter,
+      CONTENT_MUTATION_LIMITER: allowLimiter,
+    } as never
+    const makeRequest = () => new Request(
+      'https://luckread-w03.internal/internal/content/contents/content_public_1?bodyContext=1',
+      {
+        headers: {
+          'X-LuckRead-Caller': 'W01',
+          'X-LuckRead-Transport-Version': '1.0',
+          'X-LuckRead-Correlation-Id': 'shared-body-reference-test',
+          'X-LuckRead-Principal-User-Id': 'reader_user',
+          'X-LuckRead-Principal-Layer': 'L2',
+        },
+      },
+    )
+
+    const denied = await w03Worker.fetch(makeRequest(), env, {} as never)
+    expect(denied.status).toBe(200)
+    await expect(denied.json()).resolves.toMatchObject({
+      contentId: 'content_public_1',
+      accessMode: 'PUBLIC',
+      accessGranted: false,
+      bodyRef: '',
+    })
+    expect(entitlementChecks).toBe(1)
+    expect(queries.some((sql) =>
+      sql.includes("state = 'PUBLISHED' AND access_mode = 'MEMBERS_ONLY'"),
+    )).toBe(true)
+    expect(queries.some((sql) =>
+      sql.includes("access_mode = 'MEMBERS_ONLY'") && !sql.includes("state = 'PUBLISHED'"),
+    )).toBe(false)
+
+    allowed = true
+    const entitled = await w03Worker.fetch(makeRequest(), env, {} as never)
+    expect(entitled.status).toBe(200)
+    await expect(entitled.json()).resolves.toMatchObject({
+      contentId: 'content_public_1',
+      accessMode: 'PUBLIC',
+      accessGranted: true,
+      bodyRef,
+    })
+    expect(entitlementChecks).toBe(2)
+  })
+
   it('serves bookmarked contents only through authenticated W01 transport', async () => {
     const row = {
       id: 'content_1', content_type: 'post', owner_user_id: 'user_1', creator_id: 'user_1',
@@ -1460,6 +1734,9 @@ describe('1.1 content revision history', () => {
     expect(w01Detail).toContain('export async function GET')
     expect(w01Detail).not.toContain("export async function POST")
     expect(w01Rollback).toContain("pathname: '/internal/content/contents/' + encodeURIComponent(contentId) + '/revisions/' + encodeURIComponent(revisionId) + '/rollback'")
+    expect(w01Rollback).toContain('resolveVerifiedContentCreatorId(request, principal)')
+    expect(w01Rollback).toContain('verifiedCreatorId,')
+    expect(index).toContain("request.headers.get('X-LuckRead-Verified-Creator-Id')?.trim() || undefined")
   })
 
   it('records create, update and rollback history after the authoritative CAS guard', () => {
@@ -1487,6 +1764,8 @@ describe('1.1 content revision history', () => {
     expect(runtime.indexOf("operation: 'ROLLBACK'", rollbackIndex)).toBeGreaterThan(
       runtime.indexOf('atomicGuard(db)', rollbackIndex),
     )
+    expect(runtime).toContain("sourceAccessMode !== currentAccessMode")
+    expect(runtime).toContain("verifiedCreatorId !== content.creatorId")
   })
 })
 

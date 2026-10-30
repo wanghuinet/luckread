@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/transport/W03-W07-content-entitlement-http-binding.v1.json",
+  "title": "W03 to W07 Content Entitlement Decision Binding",
+  "version": "1.0.0",
+  "status": "CONTRACTED_PARTIAL",
+  "purpose": "Allow W03, the content authority, to obtain a bounded membership-access decision from W07 without transferring content authority or subscription persistence.",
+  "callerWorker": "W03",
+  "calleeWorker": "W07",
+  "serviceBinding": "W07_SUBSCRIPTION",
+  "endpoint": {
+    "method": "POST",
+    "path": "/internal/entitlements/check-creator-membership",
+    "request": {
+      "contentType": "application/json",
+      "properties": {
+        "creatorId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
+      },
+      "required": [
+        "creatorId"
+      ],
+      "additionalProperties": false,
+      "subscriberIdentity": "X-LuckRead-Principal-User-Id from trusted W01 -> W03 transport; never supplied in request body"
+    },
+    "response": {
+      "properties": {
+        "data": {
+          "properties": {
+            "allowed": {
+              "type": "boolean"
+            },
+            "reason": {
+              "enum": [
+                "ACTIVE_CREATOR_MEMBERSHIP",
+                "MEMBERSHIP_REQUIRED"
+              ]
+            }
+          }
+        }
+      },
+      "doesNotExpose": [
+        "subscriptionId",
+        "planId",
+        "paymentId",
+        "orderId",
+        "provider data",
+        "financial data"
+      ]
+    }
+  },
+  "invariants": [
+    "Only W03 is accepted as transport caller for this operation.",
+    "Cookie and Authorization headers are forbidden on the W03 -> W07 service request.",
+    "W07 is authoritative for membership subscription state and paid-through time.",
+    "A decision allows access only for ACTIVE subscription state, matching subscriber and creator, current_period_start <= now < current_period_end, and cancel_at is null or in the future.",
+    "W03 remains authoritative for content identity, publication state, accessMode, content body and media references.",
+    "No payment, order, subscription or entitlement state is written by this query.",
+    "No new Worker, D1, Queue or runtime namespace is introduced.",
+    "Unavailable or malformed W07 responses fail closed at W03; membership access is never inferred from client state."
+  ],
+  "requiredEvidence": [
+    "transport tests",
+    "period-boundary tests",
+    "owner-scope tests",
+    "paid-content leak tests",
+    "exact-head W03/W07 CI"
+  ],
+  "statusRationale": "Source integration is proposed in PR #1426; contract admission remains blocked on the repository-wide unified alignment gates."
+}
