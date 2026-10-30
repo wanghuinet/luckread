@@ -213,7 +213,7 @@ function parseSubscriptions(value: unknown): Record<string, RevenueCatSubscriber
       const transactionId = raw.store_transaction_id;
       if (transactionId !== null &&
           typeof transactionId !== 'string' &&
-          (typeof transactionId !== 'number' || !Number.isFinite(transactionId))) {
+          (typeof transactionId !== 'number' || !Number.isSafeInteger(transactionId) || transactionId < 0)) {
         throw new RevenueCatSubscriberApiError('INVALID_RESPONSE', false);
       }
       if (typeof transactionId === 'string' && transactionId.length > 255) {
