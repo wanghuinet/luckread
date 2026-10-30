@@ -26,6 +26,11 @@ CREATE TABLE payment_method_revocation_requests (
 CREATE INDEX ix_payment_method_revocation_status
   ON payment_method_revocation_requests(provider, merchant_id, customer_id, status, updated_at);
 
+-- An idempotency key is scoped to one customer and one saved-method removal.
+-- Reusing it for another saved method is a deterministic conflict.
+CREATE UNIQUE INDEX ux_payment_method_revocation_customer_idempotency
+  ON payment_method_revocation_requests(customer_id, idempotency_key);
+
 CREATE TRIGGER payment_method_revocation_request_requires_saved_method
 BEFORE INSERT ON payment_method_revocation_requests
 WHEN NOT EXISTS (
