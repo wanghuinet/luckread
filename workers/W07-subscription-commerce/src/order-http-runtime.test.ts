@@ -218,6 +218,7 @@ describe('private W07 commerce order HTTP handler', () => {
     const page: CommerceOrderListPage = {
       items: [{
         orderId: 'ord_test_1',
+        latestPaymentId: null,
         status: 'CONFIRMED',
         version: 2,
         currency: 'USD',
