@@ -4607,7 +4607,11 @@ paths:
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '403': { $ref: '#/components/responses/PermissionDenied' }
         '404': { $ref: '#/components/responses/NotFound' }
-        '409': { $ref: '#/components/responses/ClientError' }
+        '409':
+          description: The original revocation key differs or was reused for another method.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
         '428': { $ref: '#/components/responses/IdempotencyKeyRequired' }
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
