@@ -1275,7 +1275,15 @@ async function receiveHyperswitchMandateWebhook(
     PROVIDER, envelope.merchantId, envelope.eventId, payloadSha256,
   );
 
-  const statements: D1PreparedStatement[] = [insertEvent, updateMandate];
+  // A byte-identical mandate event that previously lacked a local source
+  // record may be replayed after the signed payment_succeeded event arrives.
+  // The migration permits only RECONCILIATION_REQUIRED -> RECEIVED; this batch
+  // then applies or re-records the same immutable provider event atomically.
+  const reopenReceipt = db.prepare(
+    "UPDATE payment_provider_events SET state = 'RECEIVED', processed_at = NULL, outcome_code = NULL " +
+    "WHERE provider = ? AND merchant_id = ? AND event_id = ? AND payload_sha256 = ? AND state = 'RECONCILIATION_REQUIRED'",
+  ).bind(PROVIDER, envelope.merchantId, envelope.eventId, payloadSha256);
+  const statements: D1PreparedStatement[] = [insertEvent, reopenReceipt, updateMandate];
   if (expectedStatus === 'REVOKED') {
     statements.push(buildCompletePaymentMethodRevocationOnMandateWebhook(
       db, envelope.merchantId, mandate.customer_id, paymentMethodId, now,
@@ -1398,7 +1406,9 @@ export async function receiveHyperswitchWebhook(
       conflictId,
     };
   }
-  if (existing && existing.state !== 'RECEIVED') {
+  const replayableMandateReceipt = existing?.state === 'RECONCILIATION_REQUIRED' &&
+    (envelope.eventType === 'mandate_active' || envelope.eventType === 'mandate_revoked');
+  if (existing && existing.state !== 'RECEIVED' && !replayableMandateReceipt) {
     return resultFromProviderEvent(existing, payloadSha256, existing.state === 'APPLIED' ? 'DUPLICATE' : undefined);
   }
 
