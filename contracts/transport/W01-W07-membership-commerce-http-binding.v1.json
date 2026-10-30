@@ -314,7 +314,7 @@
       },
       "ownerScope": "W01 authorizes order.read for the W02-authenticated principal; W07 independently filters D1-04 orders by the same server-derived customerId. A cursor is never an owner credential.",
       "ordering": "created_at DESC, order_id DESC; stable keyset continuation.",
-      "responseAuthority": "W07 D1-04 Order rows only. Return orderId, status, version, currency, subtotal/discount/tax/total minor amounts and createdAt/updatedAt. Exclude customerId, provider/merchant/payment references, credentials and internal item snapshots. Include latestPaymentId (the newest payment attempt's stable payment ID for this same customer/order, or null) so the owner can open the separately authorized payment status endpoint. This reference does not assert payment success.",
+      "responseAuthority": "W07 D1-04 Order rows and a correlated latest-payment lookup from the same D1-04 payments table. Return orderId, latestPaymentId (the newest attempt for the same customer and order, or null), status, version, currency, subtotal/discount/tax/total minor amounts and createdAt/updatedAt. latestPaymentId is only a navigation reference to the separately authorized GET /payments/{paymentId}; it does not assert success. Exclude customerId, provider/merchant IDs, provider references, payment credentials, client secrets, mandate/vault references and internal item snapshots.",
       "cache": "NO_STORE",
       "failurePolicy": {
         "invalidLimit": "400",
@@ -329,7 +329,33 @@
         "newServiceBinding": false,
         "d1Authority": "D1-04",
         "crossD1Transactions": 0
-      }
+      },
+      "responseFields": [
+        "orderId",
+        "latestPaymentId",
+        "status",
+        "version",
+        "currency",
+        "subtotalMinor",
+        "discountMinor",
+        "taxMinor",
+        "totalMinor",
+        "createdAt",
+        "updatedAt"
+      ],
+      "forbiddenResponseFields": [
+        "customerId",
+        "provider",
+        "merchantId",
+        "providerPaymentReference",
+        "clientSecret",
+        "paymentMethodId",
+        "mandateId",
+        "paymentToken",
+        "idempotencyKey",
+        "requestHash",
+        "itemSnapshotJson"
+      ]
     },
     {
       "operationId": "getCommerceOrder",
