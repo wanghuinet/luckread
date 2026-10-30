@@ -102,7 +102,7 @@ describe('RevenueCat subscriber identity guard', () => {
       'INVALID_SNAPSHOT',
     );
     expectIdentityError(
-      () => assertRevenueCatSubscriberIdentity(makeSnapshot({ aliases: [] }), 'luckread-user-123'),
+      () => assertRevenueCatSubscriberIdentity(makeSnapshot({ originalAppUserId: null, aliases: [] }), 'luckread-user-123'),
       'CUSTOMER_IDENTITY_UNVERIFIED',
     );
   });
