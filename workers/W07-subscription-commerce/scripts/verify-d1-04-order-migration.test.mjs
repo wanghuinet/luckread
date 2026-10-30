@@ -42,6 +42,10 @@ const paymentProviderEventsIdentityTriggerSql = refundsMigrationSql.match(
   /CREATE TRIGGER payment_provider_events_identity_immutable\b[\s\S]*?\bEND;/i,
 )?.[0]
 if (!paymentProviderEventsIdentityTriggerSql) throw new Error('0007 migration is missing its payment-provider event identity trigger')
+const paymentsCapturedAmountGuardSql = refundsMigrationSql.match(
+  /CREATE TRIGGER payments_captured_amount_observation_guard\b[\s\S]*?\bEND;/i,
+)?.[0]
+if (!paymentsCapturedAmountGuardSql) throw new Error('0007 migration is missing its captured amount guard')
 const wrapSchema = (objects) => ({ success: true, results: [{ results: objects }] })
 const wrapMigrationState = (names) => ({ success: true, results: [{ results: names.map((name) => ({ name })) }] })
 
@@ -69,8 +73,10 @@ function targetObjectsFor(migrationIds) {
   }))
   if (migrationIds.includes(REFUNDS_MIGRATION_ID)) {
     const eventsTable = objects.find((object) => object.type === 'table' && object.name === 'payment_provider_events')
-    if (!eventsTable) throw new Error('Refund migration fixture requires the prior payment-provider events table')
+    const paymentsTable = objects.find((object) => object.type === 'table' && object.name === 'payments')
+    if (!eventsTable || !paymentsTable) throw new Error('Refund migration fixture requires prior payment tables')
     eventsTable.sql = 'CREATE TABLE payment_provider_events (probe TEXT, refund_id TEXT REFERENCES refunds(refund_id))'
+    paymentsTable.sql = "CREATE TABLE payments (probe TEXT, amount_captured_minor INTEGER NOT NULL DEFAULT 0 CHECK (typeof(amount_captured_minor) = 'integer' AND amount_captured_minor BETWEEN 0 AND 9007199254740991))"
   }
   for (const [tableName, names] of Object.entries(REQUIRED_INDEXES)) {
     for (const name of names) {
@@ -85,7 +91,7 @@ function targetObjectsFor(migrationIds) {
   }
   for (const [tableName, names] of Object.entries(REQUIRED_TRIGGERS)) {
     for (const name of names) {
-      if (!tables.includes(tableName)) continue
+      if (!tables.includes(tableName) && !(tableName === 'payments' && name === 'payments_captured_amount_observation_guard' && migrationIds.includes(REFUNDS_MIGRATION_ID))) continue
       if (name === 'payment_provider_events_refund_binding_guard' && !migrationIds.includes(REFUNDS_MIGRATION_ID)) continue
       objects.push({
         type: 'trigger',
@@ -95,6 +101,8 @@ function targetObjectsFor(migrationIds) {
           ? paymentProviderEventsTerminalTriggerSql.replace(/;$/, '')
           : name === 'payment_provider_events_identity_immutable' && migrationIds.includes(REFUNDS_MIGRATION_ID)
             ? paymentProviderEventsIdentityTriggerSql.replace(/;$/, '')
+            : name === 'payments_captured_amount_observation_guard' && migrationIds.includes(REFUNDS_MIGRATION_ID)
+              ? paymentsCapturedAmountGuardSql.replace(/;$/, '')
             : 'CREATE TRIGGER ' + name + ' BEFORE UPDATE ON ' + tableName + ' BEGIN SELECT 1; END',
       })
     }
@@ -227,7 +235,7 @@ test('normalizes Wrangler .sql migration filenames for preflight and postflight 
   const report = verifyCompletePostflight({ migrationState })
   assert.equal(report.result, 'POSTFLIGHT_PASS')
   assert.deepEqual(report.appliedMigrations, REQUIRED_MIGRATION_IDS)
-  assert.equal(report.verifiedTriggers.length, 71)
+  assert.equal(report.verifiedTriggers.length, 72)
 })
 
 test('fails closed if any target object exists without matching migration history', () => {
