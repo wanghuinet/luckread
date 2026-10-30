@@ -33,6 +33,7 @@ type PaymentRow = {
   failure_code: string | null
   created_at: string
   updated_at: string
+  amount_captured_minor: number
 }
 type RefundRow = {
   refundId: string
@@ -98,6 +99,7 @@ class RefundTestD1 {
     provider: 'hyperswitch',
     merchant_id: MERCHANT,
     amount_minor: 1200,
+    amount_captured_minor: 1200,
     currency: 'USD',
     status: 'succeeded',
     version: 2,
@@ -153,6 +155,20 @@ class RefundTestD1 {
   }
 
   async run<T>(sql: string, values: unknown[]): Promise<D1Result<T>> {
+    if (sql.startsWith('UPDATE payments SET amount_captured_minor = ?')) {
+      const [captured, updatedAt, paymentId, customerId, merchantId, amount, currency, status, version, previousCaptured] =
+        values as [number, string, string, string, string, number, string, string, number, number]
+      const row = this.payment.payment_id === paymentId && this.payment.customer_id === customerId &&
+        this.payment.merchant_id === merchantId && this.payment.amount_minor === amount &&
+        this.payment.currency === currency && this.payment.status === status &&
+        this.payment.version === version && this.payment.amount_captured_minor === previousCaptured
+      if (!row || captured < previousCaptured || captured > amount) return d1Result(0) as D1Result<T>
+      this.payment.amount_captured_minor = captured
+      this.payment.version += 1
+      this.payment.updated_at = updatedAt
+      return d1Result(1) as D1Result<T>
+    }
+
     if (sql.startsWith('INSERT INTO refunds')) {
       const [refundId, paymentId, customerId, merchantId, amount, currency, reason, key, requestHash, createdAt, updatedAt] =
         values as [string, string, string, string, number, string, string | null, string, string, string, string]
@@ -385,6 +401,38 @@ function seedRefund(db: RefundTestD1, overrides: Partial<RefundRow> = {}) {
 }
 
 describe('W07 D1-04 refund persistence and signed provider lifecycle', () => {
+  it('records only a validated, monotonic captured-amount observation for the same succeeded payment', async () => {
+    const db = new RefundTestD1()
+    db.payment.amount_captured_minor = 0
+    const observed: HyperswitchPayment = {
+      paymentId: PAYMENT_ID,
+      merchantId: MERCHANT,
+      amount: 1200,
+      amountCaptured: 800,
+      currency: 'USD',
+      status: 'succeeded',
+      clientSecret: null,
+      customerId: CUSTOMER,
+    }
+    const first = await recordPaymentCapturedAmountObservation(
+      db as unknown as D1Database, CUSTOMER, observed, fixedDependencies(),
+    )
+    expect(first).toMatchObject({ paymentId: PAYMENT_ID, amountCapturedMinor: 800, version: 3, changed: true })
+    const replay = await recordPaymentCapturedAmountObservation(
+      db as unknown as D1Database, CUSTOMER, observed, fixedDependencies(),
+    )
+    expect(replay).toMatchObject({ amountCapturedMinor: 800, version: 3, changed: false })
+    await expect(recordPaymentCapturedAmountObservation(
+      db as unknown as D1Database, CUSTOMER, { ...observed, amountCaptured: 700 }, fixedDependencies(),
+    )).rejects.toMatchObject({ code: 'CONFLICT', status: 409 })
+    await expect(recordPaymentCapturedAmountObservation(
+      db as unknown as D1Database, 'another_customer', observed, fixedDependencies(),
+    )).rejects.toMatchObject({ code: 'RESOURCE_NOT_FOUND', status: 404 })
+    await expect(recordPaymentCapturedAmountObservation(
+      db as unknown as D1Database, CUSTOMER, { ...observed, amountCaptured: 1201 }, fixedDependencies(),
+    )).rejects.toMatchObject({ code: 'CONFLICT', status: 409 })
+  })
+
   it('reserves an owner-scoped refund once and returns the same stable request on an idempotent replay', async () => {
     const db = new RefundTestD1()
     const first = await createRefundRequest(db as unknown as D1Database, CUSTOMER, PAYMENT_ID, 400,
