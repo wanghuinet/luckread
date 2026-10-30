@@ -3466,15 +3466,75 @@ paths:
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
   /payments/{paymentId}:
+    parameters:
+      - name: paymentId
+        in: path
+        required: true
+        schema: { type: string, pattern: '^pay_[A-Za-z0-9]{26}$' }
     get:
-      tags: [Users]
-      summary: Discovery draft for GET undefined
+      tags: [Commerce]
+      summary: Get a payment owned by the current principal
+      description: >-
+        W01 authenticates the current session and authorizes order.read. W07
+        independently filters D1-04 by payment_id and the same server-derived
+        customer ID; absent and foreign payments are indistinguishable. The
+        payment object is the last persisted W07 D1-04 state. providerStatus is
+        a live Hyperswitch observation only: it does not update local payment
+        state, confirm an Order, or grant/revoke an entitlement. Only the
+        existing signature-verified webhook path advances persisted payment
+        status. Client secrets, merchant identifiers, payment method/vault
+        references, mandate identifiers and provider credentials are excluded.
       operationId: getPaymentsPaymentId
-      x-luckread-contract-status: DISCOVERY_DRAFT
-      x-luckread-source: contracts/api/api-inventory.v1.json
+      x-luckread-runtime-status: IMPLEMENTATION_CANDIDATE_PENDING_VERIFICATION
+      security:
+        - bearerAuth: []
+        - sessionCookieAuth: []
       responses:
-        default:
-          description: Discovery-only operation; detailed response contract remains to be closed.
+        '200':
+          description: Last persisted payment state plus a separately labelled provider observation.
+          headers:
+            Cache-Control:
+              schema: { type: string, const: no-store }
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [data, requestId]
+                properties:
+                  data:
+                    type: object
+                    additionalProperties: false
+                    required: [payment, providerStatus, providerStatusCheck, providerCheckedAt, statusAuthority]
+                    properties:
+                      payment:
+                        type: object
+                        additionalProperties: false
+                        required: [paymentId, orderId, amountMinor, currency, status, version, providerUpdatedAt, createdAt, updatedAt]
+                        properties:
+                          paymentId: { type: string, pattern: '^pay_[A-Za-z0-9]{26}$' }
+                          orderId: { type: string, pattern: '^ord_[A-Za-z0-9_-]{1,90}$' }
+                          amountMinor: { type: integer, minimum: 1, maximum: 9007199254740991 }
+                          currency: { type: string, pattern: '^[A-Z]{3}$' }
+                          status: { type: string, enum: [INITIATING, requires_payment_method, requires_confirmation, requires_customer_action, requires_merchant_action, requires_capture, processing, succeeded, failed, cancelled, cancelled_post_capture, partially_captured, partially_captured_and_capturable, expired] }
+                          version: { type: integer, minimum: 1 }
+                          providerUpdatedAt: { type: [string, 'null'], format: date-time }
+                          createdAt: { type: string, format: date-time }
+                          updatedAt: { type: string, format: date-time }
+                      providerStatus:
+                        oneOf:
+                          - type: string
+                            enum: [requires_payment_method, requires_confirmation, requires_customer_action, requires_merchant_action, requires_capture, processing, succeeded, failed, cancelled, cancelled_post_capture, partially_captured, partially_captured_and_capturable, expired]
+                          - type: 'null'
+                      providerStatusCheck: { type: string, enum: [MATCH, DIFFERS, UNAVAILABLE] }
+                      providerCheckedAt: { type: [string, 'null'], format: date-time }
+                      statusAuthority: { type: string, const: W07_D1_04 }
+                  requestId: { $ref: '#/components/schemas/RequestId' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/PermissionDenied' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
   /payments/intents:
     post:
