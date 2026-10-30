@@ -39,7 +39,7 @@ export const REQUIRED_COLUMNS = {
     ['currency', 'TEXT', 1, 0], ['status', 'TEXT', 1, 0], ['version', 'INTEGER', 1, 0],
     ['idempotency_key', 'TEXT', 1, 0], ['request_hash', 'TEXT', 1, 0],
     ['provider_updated_at', 'TEXT', 0, 0], ['failure_code', 'TEXT', 0, 0],
-    ['created_at', 'TEXT', 1, 0], ['updated_at', 'TEXT', 1, 0],
+    ['created_at', 'TEXT', 1, 0], ['updated_at', 'TEXT', 1, 0], ['amount_captured_minor', 'INTEGER', 1, 0],
   ],
   payment_provider_events: [
     ['event_row_id', 'TEXT', 1, 1], ['provider', 'TEXT', 1, 0], ['merchant_id', 'TEXT', 1, 0],
@@ -169,6 +169,7 @@ export const REQUIRED_TRIGGERS = {
   payments: [
     'payments_require_payable_order', 'payments_snapshot_immutable', 'payments_version_must_advance',
     'payments_terminal_status_guard', 'payments_provider_timestamp_monotonic', 'payments_retained',
+    'payments_captured_amount_observation_guard',
   ],
   payment_provider_events: [
     'payment_provider_events_identity_immutable',
@@ -261,7 +262,7 @@ const targetNamesFor = (migrationId) => {
             : migrationId === PAYMENT_METHOD_REVOCATION_MIGRATION_ID
               ? ['payment_method_revocation_requests']
               : migrationId === REFUNDS_MIGRATION_ID
-                ? ['refunds', 'payment_provider_events_refund_binding_guard']
+                ? ['refunds', 'payment_provider_events_refund_binding_guard', 'payments_captured_amount_observation_guard']
                 : []
   return new Set([
     ...tables,
@@ -553,9 +554,18 @@ export function verifyD1_04OrderMigrationPostflight({
       normalizeSqlDefinition(newObject.sql)
         .replace(/,\s*refund_id\s+text\s+references\s+refunds\s*\(\s*refund_id\s*\)/i, '') ===
         normalizeSqlDefinition(oldObject.sql)
+    const isReviewedRefundCapturedAmountColumnUpdate =
+      oldObject.type === 'table' &&
+      oldObject.name === 'payments' &&
+      state.names.includes(REFUNDS_MIGRATION_ID) &&
+      newObject && newObject.tableName === oldObject.tableName &&
+      typeof newObject.sql === 'string' &&
+      normalizeSqlDefinition(newObject.sql)
+        .replace(/,\s*amount_captured_minor\s+integer\s+not\s+null\s+default\s+0\s+check\s*\(\s*typeof\(amount_captured_minor\)\s*=\s*'integer'\s+and\s+amount_captured_minor\s+between\s+0\s+and\s+9007199254740991\s*\)/i, '') ===
+        normalizeSqlDefinition(oldObject.sql)
     if (!newObject || (JSON.stringify(newObject) !== JSON.stringify(oldObject) &&
         !isReviewedMandateReplayGuardUpdate && !isReviewedRefundIdentityGuardUpdate &&
-        !isReviewedRefundReferenceColumnUpdate)) {
+        !isReviewedRefundReferenceColumnUpdate && !isReviewedRefundCapturedAmountColumnUpdate)) {
       fail('pre-existing schema object was removed or changed: ' + oldObject.type + ':' + oldObject.name)
     }
   }
