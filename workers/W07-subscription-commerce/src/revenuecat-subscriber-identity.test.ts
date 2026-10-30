@@ -22,11 +22,12 @@ const makeSnapshot = (overrides: Partial<IdentitySnapshot> = {}): IdentitySnapsh
 function expectIdentityError(action: () => unknown, code: RevenueCatSubscriberIdentityErrorCode) {
   try {
     action();
-    throw new Error('Expected RevenueCat subscriber identity validation to fail');
   } catch (error) {
     expect(error).toBeInstanceOf(RevenueCatSubscriberIdentityError);
     expect(error).toMatchObject({ code });
+    return;
   }
+  throw new Error('Expected RevenueCat subscriber identity validation to fail');
 }
 
 describe('RevenueCat subscriber identity guard', () => {
@@ -81,10 +82,20 @@ describe('RevenueCat subscriber identity guard', () => {
     });
   });
 
-  it('rejects non-canonical or malformed identity input', () => {
+  it('rejects non-canonical IDs, control characters, and malformed aliases', () => {
     expectIdentityError(
       () => assertRevenueCatSubscriberIdentity(makeSnapshot(), ' luckread-user-123 '),
       'INVALID_PRINCIPAL_ID',
+    );
+    expectIdentityError(
+      () => assertRevenueCatSubscriberIdentity(makeSnapshot(), 'luckread-user-123\nforged'),
+      'INVALID_PRINCIPAL_ID',
+    );
+    expectIdentityError(
+      () => assertRevenueCatSubscriberIdentity(makeSnapshot({
+        aliases: ['luckread-user-123\nforged'],
+      }), 'luckread-user-123'),
+      'INVALID_SNAPSHOT',
     );
     expectIdentityError(
       () => assertRevenueCatSubscriberIdentity(makeSnapshot({ aliases: [''] }), 'luckread-user-123'),
