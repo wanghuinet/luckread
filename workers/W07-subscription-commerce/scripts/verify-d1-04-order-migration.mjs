@@ -9,7 +9,8 @@ export const SAVED_METHOD_MIGRATION_ID = '0003_saved_payment_methods_mandates'
 export const RENEWAL_MIGRATION_ID = '0004_subscription_renewal_cycles'
 export const REVENUECAT_WEBHOOK_MIGRATION_ID = '0005_revenuecat_webhook_inbox'
 export const PAYMENT_METHOD_REVOCATION_MIGRATION_ID = '0006_payment_method_revocation_requests'
-export const REQUIRED_MIGRATION_IDS = [ORDER_MIGRATION_ID, PAYMENT_MIGRATION_ID, SAVED_METHOD_MIGRATION_ID, RENEWAL_MIGRATION_ID, REVENUECAT_WEBHOOK_MIGRATION_ID, PAYMENT_METHOD_REVOCATION_MIGRATION_ID]
+export const REFUNDS_MIGRATION_ID = '0007_refunds'
+export const REQUIRED_MIGRATION_IDS = [ORDER_MIGRATION_ID, PAYMENT_MIGRATION_ID, SAVED_METHOD_MIGRATION_ID, RENEWAL_MIGRATION_ID, REVENUECAT_WEBHOOK_MIGRATION_ID, PAYMENT_METHOD_REVOCATION_MIGRATION_ID, REFUNDS_MIGRATION_ID]
 
 export const REQUIRED_COLUMNS = {
   orders: [
@@ -141,6 +142,11 @@ export const REQUIRED_INDEXES = {
     'ix_payment_method_revocation_status',
     'ux_payment_method_revocation_customer_idempotency',
   ],
+  refunds: [
+    'ix_refunds_customer_created_refund',
+    'ix_refunds_payment_created_refund',
+    'ix_refunds_status_updated_refund',
+  ],
 }
 
 export const REQUIRED_TRIGGERS = {
@@ -222,6 +228,18 @@ export const REQUIRED_TRIGGERS = {
     'payment_method_revocation_request_retained',
     'payment_method_revocation_request_completion_guard',
   ],
+  payment_provider_events: [
+    'payment_provider_events_refund_binding_guard',
+  ],
+  refunds: [
+    'refunds_require_captured_payment_and_available_amount',
+    'refunds_identity_immutable',
+    'refunds_version_guard',
+    'refunds_status_transition_guard',
+    'refunds_provider_timestamp_monotonic',
+    'refunds_retained',
+    'refunds_start_initiating',
+  ],
 }
 
 const targetNamesFor = (migrationId) => {
@@ -237,7 +255,9 @@ const targetNamesFor = (migrationId) => {
             ? ['revenuecat_webhook_events', 'revenuecat_webhook_event_conflicts']
             : migrationId === PAYMENT_METHOD_REVOCATION_MIGRATION_ID
               ? ['payment_method_revocation_requests']
-              : []
+              : migrationId === REFUNDS_MIGRATION_ID
+                ? ['refunds', 'payment_provider_events']
+                : []
   return new Set([
     ...tables,
     ...tables.flatMap((table) => REQUIRED_INDEXES[table] ?? []),
@@ -258,6 +278,14 @@ function expectedPaymentProviderEventsTerminalTriggerSql() {
   const migration = fs.readFileSync(migrationPath, 'utf8')
   const match = migration.match(/CREATE TRIGGER payment_provider_events_terminal_immutable\b[\s\S]*?\bEND;/i)
   if (!match) fail('0006 migration does not define the reviewed payment-provider event terminal trigger')
+  return normalizeSqlDefinition(match[0])
+}
+
+function expectedPaymentProviderEventsIdentityTriggerSql() {
+  const migrationPath = new URL('../migrations-d1-04/0007_refunds.sql', import.meta.url)
+  const migration = fs.readFileSync(migrationPath, 'utf8')
+  const match = migration.match(/CREATE TRIGGER payment_provider_events_identity_immutable\\b[\\s\\S]*?\\bEND;/i)
+  if (!match) fail('0007 migration does not define the reviewed payment-provider event identity trigger')
   return normalizeSqlDefinition(match[0])
 }
 
@@ -355,6 +383,10 @@ export function inspectD1_04OrderMigrationPreflight({ schemaSnapshot, migrationS
       REQUIRED_MIGRATION_IDS.slice(0, 5).some((id) => !state.names.includes(id))) {
     fail('payment-method revocation migration is recorded without its required commerce and RevenueCat migrations; manual schema reconciliation is required')
   }
+  if (state.names.includes(REFUNDS_MIGRATION_ID) &&
+      REQUIRED_MIGRATION_IDS.slice(0, 6).some((id) => !state.names.includes(id))) {
+    fail('refund migration is recorded without its required commerce and payment-method migrations; manual schema reconciliation is required')
+  }
   const byName = new Set(objects.map((object) => object.name))
 
   for (const migrationId of state.names.filter((name) => REQUIRED_MIGRATION_IDS.includes(name))) {
@@ -426,6 +458,7 @@ export function verifyD1_04OrderMigrationPostflight({
   revenueCatWebhookEventsTableInfo,
   revenueCatWebhookConflictsTableInfo,
   paymentMethodRevocationRequestsTableInfo,
+  refundsTableInfo,
 }) {
   const before = schemaObjects(preflightSchema)
   const after = schemaObjects(postflightSchema)
@@ -457,6 +490,7 @@ export function verifyD1_04OrderMigrationPostflight({
     revenuecat_webhook_events: revenueCatWebhookEventsTableInfo,
     revenuecat_webhook_event_conflicts: revenueCatWebhookConflictsTableInfo,
     payment_method_revocation_requests: paymentMethodRevocationRequestsTableInfo,
+    refunds: refundsTableInfo,
   }
   for (const [tableName, expectedColumns] of Object.entries(REQUIRED_COLUMNS)) {
     const actual = tableColumns(tableInfoByName[tableName], tableName)
@@ -498,7 +532,15 @@ export function verifyD1_04OrderMigrationPostflight({
       newObject && newObject.tableName === oldObject.tableName &&
       typeof newObject.sql === 'string' &&
       normalizeSqlDefinition(newObject.sql) === expectedPaymentProviderEventsTerminalTriggerSql()
-    if (!newObject || (JSON.stringify(newObject) !== JSON.stringify(oldObject) && !isReviewedMandateReplayGuardUpdate)) {
+    const isReviewedRefundIdentityGuardUpdate =
+      oldObject.type === 'trigger' &&
+      oldObject.name === 'payment_provider_events_identity_immutable' &&
+      state.names.includes(REFUNDS_MIGRATION_ID) &&
+      newObject && newObject.tableName === oldObject.tableName &&
+      typeof newObject.sql === 'string' &&
+      normalizeSqlDefinition(newObject.sql) === expectedPaymentProviderEventsIdentityTriggerSql()
+    if (!newObject || (JSON.stringify(newObject) !== JSON.stringify(oldObject) &&
+        !isReviewedMandateReplayGuardUpdate && !isReviewedRefundIdentityGuardUpdate)) {
       fail('pre-existing schema object was removed or changed: ' + oldObject.type + ':' + oldObject.name)
     }
   }
@@ -554,7 +596,7 @@ function main() {
     return
   }
   if (mode === 'postflight') {
-    if (args.length !== 17) throw new Error('Usage: verify-d1-04-order-migration.mjs postflight <preflight-schema.json> <postflight-schema.json> <migration-state.json> <orders-info.json> <order-lines-info.json> <idempotency-info.json> <payments-info.json> <provider-events-info.json> <event-conflicts-info.json> <saved-methods-info.json> <mandates-info.json> <renewal-cycles-info.json> <renewal-scheduler-state-info.json> <revenuecat-events-info.json> <revenuecat-conflicts-info.json> <payment-method-revocation-requests-info.json> <output.json>')
+    if (args.length !== 18) throw new Error('Usage: verify-d1-04-order-migration.mjs postflight <preflight-schema.json> <postflight-schema.json> <migration-state.json> <orders-info.json> <order-lines-info.json> <idempotency-info.json> <payments-info.json> <provider-events-info.json> <event-conflicts-info.json> <saved-methods-info.json> <mandates-info.json> <renewal-cycles-info.json> <renewal-scheduler-state-info.json> <revenuecat-events-info.json> <revenuecat-conflicts-info.json> <payment-method-revocation-requests-info.json> <refunds-info.json> <output.json>')
     const report = verifyD1_04OrderMigrationPostflight({
       preflightSchema: readJson(args[0]),
       postflightSchema: readJson(args[1]),
@@ -572,8 +614,9 @@ function main() {
       revenueCatWebhookEventsTableInfo: readJson(args[13]),
       revenueCatWebhookConflictsTableInfo: readJson(args[14]),
       paymentMethodRevocationRequestsTableInfo: readJson(args[15]),
+      refundsTableInfo: readJson(args[16]),
     })
-    writeReport(args[16], report)
+    writeReport(args[17], report)
     console.log(JSON.stringify(report, null, 2))
     return
   }
