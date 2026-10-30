@@ -59,7 +59,7 @@ describe('public customer payment refund adapter', () => {
     expect(w07Runtime).toContain('providerPayment.amountCaptured')
     expect(w07Runtime).toContain('providerPayment.merchantId')
     expect(w07Persistence).toContain('WHERE payment_id = ? AND customer_id = ?')
-    expect(w07Persistence).toContain('UNIQUE (customer_id, idempotency_key)')
+    expect(migration).toContain('UNIQUE (customer_id, idempotency_key)')
   })
 
   it('reuses the 30-character Hyperswitch refund ID and provider create/retrieve endpoints', () => {
@@ -78,7 +78,7 @@ describe('public customer payment refund adapter', () => {
     expect(w07Webhook).toContain("envelope.eventType === 'refund_review'")
     expect(w07Webhook).toContain('payloadSha256')
     expect(w07Webhook).toContain("state = 'RECEIVED'")
-    expect(w07Runtime).toContain('Only a signature-verified webhook may set SUCCEEDED or FAILED')
+    expect(w07Persistence).toContain('Only a signature-verified webhook may set SUCCEEDED or FAILED')
     expect(w07Runtime).not.toContain('grantEntitlement(')
   })
 
@@ -89,7 +89,9 @@ describe('public customer payment refund adapter', () => {
     expect(block).toContain('operationId: postPaymentsRefunds')
     expect(block).toContain('paymentId')
     expect(block).toContain('amountMinor')
-    expect(block).toContain('RefundCommandEnvelope')
+    expect(block).toContain('refundId')
+    expect(block).toContain('capturedAmountMinor')
+    expect(block).toContain('x-luckread-contract-status: CONTRACTED_PARTIAL')
     expect(apiInventory.domains.subscription_entitlement_payment.endpoint_groups)
       .toContain('POST /v1/payments/refunds')
     expect(operationPolicy.operations.find((item: { operationId: string }) => item.operationId === 'postPaymentsRefunds'))
