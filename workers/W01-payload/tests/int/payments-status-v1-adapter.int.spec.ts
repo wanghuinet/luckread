@@ -80,10 +80,25 @@ describe('public owner-scoped payment detail and status adapter', () => {
     expect(operation).toContain('client secrets')
   })
 
+  it('carries the persisted payment ID through the hosted checkout return path into server status lookup', () => {
+    const checkout = read('src/app/(frontend)/checkout/CheckoutClient.tsx')
+    const resultPage = read('src/app/(frontend)/checkout/result/page.tsx')
+    expect(checkout).toContain("returnUrl.searchParams.set('paymentId', intent.paymentId)")
+    expect(checkout).toContain("return_url: returnUrl.toString()")
+    expect(checkout).toContain("href={'/checkout/result?paymentId=' + encodeURIComponent(intent.paymentId)}")
+    expect(resultPage).toContain("'/api/v1/payments/' + encodeURIComponent(paymentId)")
+    expect(resultPage).toContain("payment.providerStatusCheck === 'DIFFERS'")
+    expect(resultPage).toContain("payment.payment.status === 'succeeded'")
+    expect(resultPage).toContain('本页面不会直接授予权限')
+    expect(resultPage).not.toContain('payment_succeeded')
+  })
+
   it('does not return provider credentials, mandate references, or browser-controlled payment truth', () => {
     const route = read('src/app/api/v1/payments/[paymentId]/route.ts')
     const runtime = read('../W07-subscription-commerce/src/payment-status-http-runtime.ts')
-    const dto = runtime.slice(runtime.indexOf('type PaymentStatusResponse'), runtime.indexOf('type PaymentStatusDependencies'))
+    const persistence = read('../W07-subscription-commerce/src/payment-persistence.ts')
+    const dto = runtime.slice(runtime.indexOf('type PaymentStatusResponse'), runtime.indexOf('export type PaymentStatusDependencies'))
+    expect(persistence).toContain("!/^ord_[A-Za-z0-9_-]{1,90}$/.test(row.order_id)")
     expect(route).not.toMatch(/clientSecret|merchantId|paymentMethodId|mandateId/)
     expect(dto).not.toMatch(/clientSecret|merchantId|paymentMethodId|mandateId|idempotencyKey|failureCode/)
     expect(runtime).toContain('A live provider read is an observation only')
