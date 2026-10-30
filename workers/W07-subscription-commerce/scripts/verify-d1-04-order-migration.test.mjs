@@ -154,7 +154,7 @@ test('an applied Order migration can advance pending Payment, mandate and renewa
     migrationState: wrapMigrationState([ORDER_MIGRATION_ID]),
   })
   assert.equal(result.action, 'APPLY')
-  assert.deepEqual(result.pendingMigrationIds, [PAYMENT_MIGRATION_ID, SAVED_METHOD_MIGRATION_ID, RENEWAL_MIGRATION_ID])
+  assert.deepEqual(result.pendingMigrationIds, [PAYMENT_MIGRATION_ID, SAVED_METHOD_MIGRATION_ID, RENEWAL_MIGRATION_ID, REVENUECAT_WEBHOOK_MIGRATION_ID])
   assert.equal(result.writesPerformed, false)
 })
 
