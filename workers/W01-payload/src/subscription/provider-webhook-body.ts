@@ -9,7 +9,7 @@ export async function readBoundedProviderWebhookBody(
 ): Promise<ArrayBuffer | Response> {
   const declaredLength = request.headers.get('content-length');
   if (declaredLength !== null) {
-    if (!/^\\d+$/.test(declaredLength)) {
+    if (!/^\d+$/.test(declaredLength)) {
       return errorResponse(400, 'WEBHOOK_REJECTED', 'Webhook request length is invalid');
     }
     if (Number(declaredLength) > MAX_PROVIDER_WEBHOOK_BODY_BYTES) {
