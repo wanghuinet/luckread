@@ -25,7 +25,6 @@ type RevenueCatWebhookRuntimeDependencies = Readonly<{
   nowMs?: () => number;
 }>;
 
-const MAX_WEBHOOK_BODY_BYTES = 1024 * 1024;
 const WEBHOOK_PATH = '/internal/webhooks/revenuecat';
 const AUTHORIZATION_HEADER = 'Authorization';
 const SIGNATURE_HEADER = 'X-RevenueCat-Webhook-Signature';
@@ -39,7 +38,7 @@ function errorResponse(status: number, code: string, message: string): Response 
 
 function nonBlank(value: unknown, maxLength: number): value is string {
   return typeof value === 'string' && value.length > 0 && value.length <= maxLength &&
-    value.trim() === value && !/[\\u0000-\\u001f\\u007f]/.test(value);
+    value.trim() === value && !/[\u0000-\u001f\u007f]/.test(value);
 }
 
 function allowedAppIds(value: string): ReadonlySet<string> | null {
@@ -98,8 +97,10 @@ export async function handleRevenueCatWebhookRequest(
 
   if (
     !nonBlank(env.REVENUECAT_WEBHOOK_AUTHORIZATION, 5000) ||
-    !nonBlank(env.REVENUECAT_WEBHOOK_SIGNING_SECRET, 4096) ||
-    !nonBlank(env.REVENUECAT_ALLOWED_APP_IDS, 4096)
+    !nonBlank(env.REVENUECAT_ALLOWED_APP_IDS, 4096) ||
+    (env.REVENUECAT_WEBHOOK_SIGNING_SECRET !== undefined &&
+      env.REVENUECAT_WEBHOOK_SIGNING_SECRET !== null &&
+      !nonBlank(env.REVENUECAT_WEBHOOK_SIGNING_SECRET, 4096))
   ) {
     return errorResponse(503, 'SERVICE_UNAVAILABLE', 'RevenueCat webhook is not configured');
   }
@@ -116,13 +117,18 @@ export async function handleRevenueCatWebhookRequest(
   const rawBody = await readBoundedProviderWebhookBody(request, errorResponse);
   if (rawBody instanceof Response) return rawBody;
 
-  const signatureValid = await verifyRevenueCatWebhookSignature(
-    rawBody,
-    request.headers.get(SIGNATURE_HEADER),
-    env.REVENUECAT_WEBHOOK_SIGNING_SECRET,
-    dependencies.nowMs?.() ?? Date.now(),
-  );
-  if (!signatureValid) return errorResponse(401, 'INVALID_SIGNATURE', 'Webhook signature is invalid');
+  // RevenueCat HMAC signing is optional in its dashboard. Authorization is
+  // always checked; once a signing secret is configured, a missing or invalid
+  // HMAC signature is rejected rather than silently falling back.
+  if (env.REVENUECAT_WEBHOOK_SIGNING_SECRET) {
+    const signatureValid = await verifyRevenueCatWebhookSignature(
+      rawBody,
+      request.headers.get(SIGNATURE_HEADER),
+      env.REVENUECAT_WEBHOOK_SIGNING_SECRET,
+      dependencies.nowMs?.() ?? Date.now(),
+    );
+    if (!signatureValid) return errorResponse(401, 'INVALID_SIGNATURE', 'Webhook signature is invalid');
+  }
 
   try {
     const event = parseRevenueCatWebhookEnvelope(rawBody, appIds);
