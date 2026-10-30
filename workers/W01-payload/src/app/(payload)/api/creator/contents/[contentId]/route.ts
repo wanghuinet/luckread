@@ -8,6 +8,7 @@ import {
 import {
   callW03Content,
   resolveCookieContentPrincipal,
+  resolveVerifiedContentCreatorId,
   W03ContentClientError,
 } from '../../../../../../content/w03-content-client.js'
 
@@ -86,13 +87,30 @@ export async function PATCH(
       return errorResponse(422, 'VALIDATION_FAILED', 'Invalid content request')
     }
 
-    return await callW03Content({
+    const changesAccessMode = body && typeof body === 'object' && !Array.isArray(body) && Object.hasOwn(body, 'accessMode')
+    let verifiedCreatorId: string | undefined
+    if (changesAccessMode) {
+      const resolved = await resolveVerifiedContentCreatorId(request, principal)
+      if (resolved instanceof Response) return resolved
+      verifiedCreatorId = resolved
+    }
+
+    const response = await callW03Content({
       request,
       pathname: `/internal/content/contents/${encodeURIComponent(contentId)}`,
       method: 'PATCH',
       body,
       principal,
+      verifiedCreatorId,
     })
+    if (response.ok) {
+      if (changesAccessMode) {
+        await invalidatePublicContentVisibility(contentId)
+        await invalidatePublicContentList(request)
+      }
+      await invalidatePublicContentDetail(request, contentId)
+    }
+    return response
   } catch (error) {
     if (error instanceof W03ContentClientError) {
       return errorResponse(error.status, error.code, 'Content service unavailable')

@@ -17,6 +17,7 @@ export type ContentState =
   | 'RESTORED'
 
 export type ContentType = 'article' | 'post' | 'video'
+export type ContentAccessMode = 'PUBLIC' | 'MEMBERS_ONLY'
 
 export interface ContentInput {
   contentType: ContentType
@@ -24,6 +25,7 @@ export interface ContentInput {
   bodyRef: string
   mediaRefs: string[]
   coverRef: string | null
+  accessMode?: ContentAccessMode
 }
 
 export interface ContentRecord {
@@ -34,6 +36,9 @@ export interface ContentRecord {
   ipId: string | null
   state: ContentState
   scheduledAt?: string | null
+  accessMode?: ContentAccessMode
+  /** Read-time authorization result; never persisted. */
+  accessGranted?: boolean
   version: number
   revision: number
   slug: string
@@ -58,6 +63,7 @@ export interface ContentRevision {
   sourceRevision: number | null
   operation: ContentRevisionOperation
   state: ContentState
+  accessMode?: ContentAccessMode
   slug: string
   title: string
   bodyRef: string
@@ -82,6 +88,7 @@ interface ContentRow {
   ip_id: string | null
   state: ContentState
   scheduled_at: string | null
+  access_mode?: ContentAccessMode
   version: number
   revision: number
   slug: string
@@ -104,6 +111,7 @@ interface ContentRevisionRow {
   source_revision: number | null
   operation: ContentRevisionOperation
   state: ContentState
+  access_mode?: ContentAccessMode
   slug: string
   title: string
   body_ref: string
@@ -188,6 +196,7 @@ const toContent = (row: ContentRow): ContentRecord => ({
   ipId: row.ip_id,
   state: row.state,
   scheduledAt: row.scheduled_at ?? null,
+  accessMode: row.access_mode === 'MEMBERS_ONLY' ? 'MEMBERS_ONLY' : 'PUBLIC',
   version: row.version,
   revision: row.revision,
   slug: row.slug,
@@ -200,19 +209,24 @@ const toContent = (row: ContentRow): ContentRecord => ({
   updatedAt: row.updated_at,
 })
 
-export const publicContent = (content: ContentRecord) => ({
-  id: content.id,
-  creatorId: content.creatorId,
-  state: content.state,
-  scheduledAt: content.scheduledAt,
-  version: content.version,
-  etag: content.etag,
-  slug: content.slug,
-  title: content.title,
-  bodyRef: content.bodyRef,
-  mediaRefs: content.mediaRefs,
-  coverRef: content.coverRef,
-})
+export const publicContent = (content: ContentRecord) => {
+  const accessGranted = content.accessGranted ?? content.accessMode !== 'MEMBERS_ONLY'
+  return {
+    id: content.id,
+    creatorId: content.creatorId,
+    state: content.state,
+    scheduledAt: content.scheduledAt,
+    accessMode: content.accessMode ?? 'PUBLIC',
+    accessGranted,
+    version: content.version,
+    etag: content.etag,
+    slug: content.slug,
+    title: content.title,
+    bodyRef: accessGranted ? content.bodyRef : '',
+    mediaRefs: accessGranted ? content.mediaRefs : [],
+    coverRef: accessGranted ? content.coverRef : null,
+  }
+}
 
 const publicPostMediaReferenceCandidates = (value: string): string[] => {
   if (value.length === 0 || value.length > 2048) return []
@@ -259,6 +273,85 @@ const publicPostMediaReferenceCandidates = (value: string): string[] => {
  * record yet, so the public resolver deliberately fails closed for those types.
  * W03 remains the authority for the live publication state.
  */
+export type PublishedMediaReferenceAccess = Readonly<{
+  isPublic: boolean
+  isMemberContent: boolean
+  allowed: boolean
+}>
+
+type PublishedMediaReferenceRow = Readonly<{
+  id: string
+  owner_user_id: string
+  creator_id: string | null
+  content_type: ContentType
+  access_mode: ContentAccessMode
+}>
+
+/**
+ * Resolves a delivery URL against currently published content references.
+ * Public media keeps the existing public-post-only rule. If a reference is used
+ * by any member-only content, the URL is protected and must pass a fresh
+ * subscription check; it cannot fall back to anonymous public delivery merely
+ * because the same object is also referenced by a public post.
+ */
+export async function resolvePublishedMediaReferenceAccess(
+  db: ContentD1,
+  mediaUrlValue: string,
+  viewerUserId: string | null,
+  hasCreatorMembership?: CreatorMembershipAccessResolver,
+): Promise<PublishedMediaReferenceAccess> {
+  const candidates = publicPostMediaReferenceCandidates(mediaUrlValue)
+  if (candidates.length === 0) {
+    return { isPublic: false, isMemberContent: false, allowed: false }
+  }
+  const placeholders = candidates.map(() => '?').join(', ')
+  const sql = [
+    'SELECT id, owner_user_id, creator_id, content_type, access_mode',
+    'FROM contents',
+    "WHERE state = 'PUBLISHED'",
+    '  AND (',
+    '    body_ref IN (' + placeholders + ')',
+    '    OR cover_ref IN (' + placeholders + ')',
+    '    OR EXISTS (',
+    '      SELECT 1',
+    '      FROM json_each(contents.media_refs_json) AS media_ref',
+    '      WHERE media_ref.value IN (' + placeholders + ')',
+    '    )',
+    '  )',
+    'ORDER BY id ASC',
+    'LIMIT 51',
+  ].join('\n')
+  let rows: PublishedMediaReferenceRow[]
+  try {
+    const result = await db.prepare(sql)
+      .bind(...candidates, ...candidates, ...candidates)
+      .all<PublishedMediaReferenceRow>()
+    rows = result.results ?? []
+  } catch {
+    throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
+  }
+  if (rows.length > 50) throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
+  if (rows.length === 0) return { isPublic: false, isMemberContent: false, allowed: false }
+
+  const memberRows = rows.filter((row) => row.access_mode === 'MEMBERS_ONLY')
+  if (memberRows.length > 0) {
+    // A URL can be referenced by more than one content record. Do not grant the
+    // bytes because a viewer is entitled to one of several unrelated creators;
+    // every protected reference to this object must independently authorize it.
+    for (const row of memberRows) {
+      if (viewerUserId && row.owner_user_id === viewerUserId) continue
+      if (!viewerUserId || !hasCreatorMembership || !row.creator_id ||
+          !(await hasCreatorMembership(row.creator_id))) {
+        return { isPublic: false, isMemberContent: true, allowed: false }
+      }
+    }
+    return { isPublic: false, isMemberContent: true, allowed: true }
+  }
+
+  const isPublic = rows.some((row) => row.content_type === 'post' && row.access_mode !== 'MEMBERS_ONLY')
+  return { isPublic, isMemberContent: false, allowed: isPublic }
+}
+
 export async function isPublishedPublicPostMediaReference(
   db: ContentD1,
   mediaUrlValue: string,
@@ -271,6 +364,7 @@ export async function isPublishedPublicPostMediaReference(
     'SELECT id',
     'FROM contents',
     "WHERE state = 'PUBLISHED'",
+    "  AND access_mode = 'PUBLIC'",
     "  AND content_type = 'post'",
     '  AND (',
     '    body_ref IN (' + placeholders + ')',
@@ -319,11 +413,15 @@ export const validateInput = (input: unknown): ContentInput => {
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
     throw new ContentRuntimeError('VALIDATION_FAILED', 400)
   }
-  const candidate = input as { contentType?: unknown; title?: unknown; bodyRef?: unknown; mediaRefs?: unknown; coverRef?: unknown }
+  const candidate = input as { contentType?: unknown; title?: unknown; bodyRef?: unknown; mediaRefs?: unknown; coverRef?: unknown; accessMode?: unknown }
   const contentType = candidate.contentType === undefined ? 'article' : candidate.contentType
   const mediaRefs = candidate.mediaRefs === undefined ? [] : candidate.mediaRefs
+  // Keep omission backward-compatible in the canonical idempotency hash.
+  // Persistence and read-time defaults still resolve omitted accessMode to PUBLIC.
+  const accessMode = candidate.accessMode
   if (
     !['article', 'post', 'video'].includes(String(contentType)) ||
+    (accessMode !== undefined && !['PUBLIC', 'MEMBERS_ONLY'].includes(String(accessMode))) ||
     !Array.isArray(mediaRefs) || mediaRefs.length > 20 ||
     (contentType === 'video' && mediaRefs.length === 0) ||
     mediaRefs.some(ref => typeof ref !== 'string' || ref.trim().length === 0 || ref.length > 2048) ||
@@ -337,7 +435,7 @@ export const validateInput = (input: unknown): ContentInput => {
   ) {
     throw new ContentRuntimeError('VALIDATION_FAILED', 400)
   }
-  return { contentType: contentType as ContentType, title: candidate.title.trim(), bodyRef: candidate.bodyRef.trim(), mediaRefs: mediaRefs.map(ref => ref.trim()), coverRef: candidate.coverRef === undefined || candidate.coverRef === null ? null : candidate.coverRef.trim() }
+  return { contentType: contentType as ContentType, title: candidate.title.trim(), bodyRef: candidate.bodyRef.trim(), mediaRefs: mediaRefs.map(ref => ref.trim()), coverRef: candidate.coverRef === undefined || candidate.coverRef === null ? null : candidate.coverRef.trim(), accessMode: accessMode as ContentAccessMode | undefined }
 }
 
 const canonicalize = (value: unknown): unknown => {
@@ -398,6 +496,7 @@ const toRevision = (row: ContentRevisionRow): ContentRevision => ({
   sourceRevision: row.source_revision,
   operation: row.operation,
   state: row.state,
+  accessMode: row.access_mode === 'MEMBERS_ONLY' ? 'MEMBERS_ONLY' : 'PUBLIC',
   slug: row.slug,
   title: row.title,
   bodyRef: row.body_ref,
@@ -421,11 +520,11 @@ const normalizeCorrelationId = (value: string): string => {
 const insertRevision = (db: ContentD1, revision: ContentRevision): D1PreparedStatement =>
   db.prepare(`INSERT INTO content_revisions
     (id, content_id, revision, content_version, actor_user_id, source_revision, operation,
-     state, slug, title, body_ref, media_refs_json, cover_ref, etag, reason, correlation_id, created_at)
-   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).bind(
+     state, access_mode, slug, title, body_ref, media_refs_json, cover_ref, etag, reason, correlation_id, created_at)
+   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).bind(
     revision.id, revision.contentId, revision.revision, revision.contentVersion,
     revision.actorUserId, revision.sourceRevision, revision.operation, revision.state,
-    revision.slug, revision.title, revision.bodyRef, JSON.stringify(revision.mediaRefs), revision.coverRef,
+    revision.accessMode ?? 'PUBLIC', revision.slug, revision.title, revision.bodyRef, JSON.stringify(revision.mediaRefs), revision.coverRef,
     revision.etag, revision.reason, revision.correlationId, revision.createdAt,
   )
 const emptyIdempotency = (): IdempotencyRow => ({
@@ -447,7 +546,7 @@ const loadMutationRow = async (
 ): Promise<{ content: ContentRecord | null; idempotency: IdempotencyRow }> => {
   const row = await db.prepare(
     `SELECT
-        c.id, c.content_type, c.owner_user_id, c.creator_id, c.ip_id, c.state, c.scheduled_at, c.version, c.revision,
+        c.id, c.content_type, c.owner_user_id, c.creator_id, c.ip_id, c.state, c.scheduled_at, c.access_mode, c.version, c.revision,
         c.slug, c.title, c.body_ref, c.media_refs_json, c.cover_ref, c.etag, c.created_at, c.updated_at,
         i.id AS idem_id,
         i.owner_user_id AS idem_owner_user_id,
@@ -550,21 +649,36 @@ const batchMutation = async (
   }
 }
 
+export type CreatorMembershipAccessResolver = (creatorId: string) => Promise<boolean>
+
 export async function getContent(
   db: ContentD1,
   contentId: string,
   principalUserId: string | null,
+  resolveCreatorMembershipAccess?: CreatorMembershipAccessResolver,
 ): Promise<ContentRecord> {
   assertContentReference(contentId)
   const row = await db.prepare(
-    `SELECT id, content_type, owner_user_id, creator_id, ip_id, state, scheduled_at, version, revision,
+    `SELECT id, content_type, owner_user_id, creator_id, ip_id, state, scheduled_at, access_mode, version, revision,
             slug, title, body_ref, media_refs_json, cover_ref, etag, created_at, updated_at
        FROM contents
       WHERE (id = ? OR slug = ?)
         AND (state = 'PUBLISHED' OR owner_user_id = ?)`,
   ).bind(contentId, contentId, principalUserId ?? '').first<ContentRow>()
   if (!row) throw new ContentRuntimeError('NOT_FOUND', 404)
-  return toContent(row)
+  const content = toContent(row)
+  if (content.accessMode !== 'MEMBERS_ONLY' ||
+      (principalUserId !== null && principalUserId === content.ownerUserId)) {
+    return { ...content, accessGranted: true }
+  }
+  let allowed = false
+  if (principalUserId && content.creatorId && resolveCreatorMembershipAccess) {
+    allowed = await resolveCreatorMembershipAccess(content.creatorId)
+  }
+  if (allowed) return { ...content, accessGranted: true }
+  // Keep a discoverable paywall shell, but never expose body or private media
+  // references to anonymous or non-member readers.
+  return { ...content, accessGranted: false, bodyRef: '', mediaRefs: [], coverRef: null }
 }
 
 export type OwnedPostContext = {
@@ -770,7 +884,7 @@ export async function listContentRevisions(
   const cursorBindings = decoded ? [decoded.updatedAt, decoded.updatedAt, decoded.id] : []
   const rows = await db.prepare(`
     SELECT r.id, r.content_id, r.revision, r.content_version, r.actor_user_id,
-           r.source_revision, r.operation, r.state, r.slug, r.title, r.body_ref,
+           r.source_revision, r.operation, r.state, r.access_mode, r.slug, r.title, r.body_ref,
            r.media_refs_json, r.cover_ref, r.etag, r.reason, r.correlation_id, r.created_at
       FROM content_revisions r
       JOIN contents c ON c.id = r.content_id
@@ -794,7 +908,7 @@ export async function getContentRevision(
   assertResourceId(revisionId)
   const row = await db.prepare(`
     SELECT r.id, r.content_id, r.revision, r.content_version, r.actor_user_id,
-           r.source_revision, r.operation, r.state, r.slug, r.title, r.body_ref,
+           r.source_revision, r.operation, r.state, r.access_mode, r.slug, r.title, r.body_ref,
            r.media_refs_json, r.cover_ref, r.etag, r.reason, r.correlation_id, r.created_at
       FROM content_revisions r
       JOIN contents c ON c.id = r.content_id
@@ -850,7 +964,7 @@ export async function listCreatorContents(
     bindings.push(decoded.updatedAt, decoded.updatedAt, decoded.id)
   }
   const rows = await db.prepare(
-    `SELECT id, content_type, owner_user_id, creator_id, ip_id, state, scheduled_at, version, revision,
+    `SELECT id, content_type, owner_user_id, creator_id, ip_id, state, scheduled_at, access_mode, version, revision,
             slug, title, body_ref, media_refs_json, cover_ref, etag, created_at, updated_at
        FROM contents
       WHERE ${conditions.join(' AND ')}
@@ -883,7 +997,7 @@ export async function listPublishedContentsByIds(
 
   const rows = await db.prepare(
     `SELECT c.id, c.content_type, c.owner_user_id, c.creator_id, c.ip_id, c.state,
-            c.scheduled_at, c.version, c.revision, c.slug, c.title, c.body_ref,
+            c.scheduled_at, c.access_mode, c.version, c.revision, c.slug, c.title, c.body_ref,
             c.media_refs_json, c.cover_ref, c.etag, c.created_at, c.updated_at
        FROM json_each(?) AS requested
        INNER JOIN contents AS c ON c.id = requested.value
@@ -901,20 +1015,26 @@ export async function listContents(
   limit: number,
   creatorId: string | null = null,
   contentType: ContentType | null = null,
+  ownerUserId: string | null = null,
 ): Promise<{ items: ContentRecord[]; nextCursor: string | null; hasMore: boolean }> {
   const pageSize = Math.min(Math.max(Number.isSafeInteger(limit) ? limit : 20, 1), 50)
   if (creatorId) assertResourceId(creatorId)
+  if (ownerUserId) assertResourceId(ownerUserId)
   if (contentType && !['article', 'post', 'video'].includes(contentType)) {
     throw new ContentRuntimeError('VALIDATION_FAILED', 400)
   }
 
-  const decoded = cursor ? decodeContentListCursor(cursor, creatorId, contentType) : null
+  const decoded = cursor ? decodeContentListCursor(cursor, creatorId, contentType, ownerUserId) : null
   const conditions = ["state = 'PUBLISHED'"]
   const bindings: unknown[] = []
 
   if (creatorId) {
     conditions.push('creator_id = ?')
     bindings.push(creatorId)
+  }
+  if (ownerUserId) {
+    conditions.push('owner_user_id = ?')
+    bindings.push(ownerUserId)
   }
   if (contentType) {
     conditions.push('content_type = ?')
@@ -927,7 +1047,7 @@ export async function listContents(
   }
 
   const rows = await db.prepare(
-    `SELECT id, content_type, owner_user_id, creator_id, ip_id, state, scheduled_at, version, revision,
+    `SELECT id, content_type, owner_user_id, creator_id, ip_id, state, scheduled_at, access_mode, version, revision,
             slug, title, body_ref, media_refs_json, cover_ref, etag, created_at, updated_at
        FROM contents
       WHERE ${conditions.join(' AND ')}
@@ -941,7 +1061,7 @@ export async function listContents(
   return {
     items: page,
     hasMore,
-    nextCursor: hasMore && last ? encodeContentListCursor(last.createdAt, last.id, creatorId, contentType) : null,
+    nextCursor: hasMore && last ? encodeContentListCursor(last.createdAt, last.id, creatorId, contentType, ownerUserId) : null,
   }
 }
 
@@ -976,7 +1096,7 @@ export async function searchPublishedContents(
     : []
 
   const rows = await db.prepare(`
-    SELECT id, content_type, owner_user_id, creator_id, ip_id, state, scheduled_at,
+    SELECT id, content_type, owner_user_id, creator_id, ip_id, state, scheduled_at, access_mode,
            version, revision, slug, title, body_ref, media_refs_json, cover_ref,
            etag, created_at, updated_at
       FROM contents
@@ -1079,7 +1199,7 @@ export async function listFollowingOwnerContents(
   const ownerIdsJson = JSON.stringify(ownerIds)
   const rows = await db.prepare(`
     SELECT c.id, c.content_type, c.owner_user_id, c.creator_id, c.ip_id, c.state,
-           c.scheduled_at, c.version, c.revision, c.slug, c.title, c.body_ref,
+           c.scheduled_at, c.access_mode, c.version, c.revision, c.slug, c.title, c.body_ref,
            c.media_refs_json, c.cover_ref, c.etag, c.created_at, c.updated_at
       FROM contents c
      WHERE c.state = 'PUBLISHED'
@@ -1118,6 +1238,7 @@ export async function createContent(
   idempotencyKey: string,
   now = new Date(),
   correlationId = 'runtime',
+  verifiedCreatorId?: string,
 ): Promise<ContentRecord> {
   assertResourceId(ownerUserId)
   if (!idempotencyKey || idempotencyKey.length > 256) {
@@ -1125,8 +1246,19 @@ export async function createContent(
   }
 
   const normalized = validateInput(input)
+  let creatorId = ownerUserId
+  if (normalized.accessMode === 'MEMBERS_ONLY') {
+    if (!verifiedCreatorId) throw new ContentRuntimeError('PERMISSION_DENIED', 403)
+    assertResourceId(verifiedCreatorId)
+    creatorId = verifiedCreatorId
+  }
   const operationId = 'createContent'
-  const hash = await requestHash(operationId, { ownerUserId, input: normalized })
+  // Keep old public-create idempotency material byte-for-byte compatible. A
+  // paid creator offer additionally binds the verified W08 creator identity.
+  const hashInput = normalized.accessMode === 'MEMBERS_ONLY'
+    ? { ownerUserId, input: normalized, verifiedCreatorId: creatorId }
+    : { ownerUserId, input: normalized }
+  const hash = await requestHash(operationId, hashInput)
 
   const existing = await db.prepare(
     `SELECT id AS idem_id, owner_user_id AS idem_owner_user_id, request_hash AS idem_request_hash,
@@ -1145,7 +1277,7 @@ export async function createContent(
       typeof parsed.id !== 'string' ||
       !['article', 'post', 'video'].includes(String(parsed.contentType)) ||
       parsed.ownerUserId !== ownerUserId ||
-      parsed.creatorId !== ownerUserId ||
+      parsed.creatorId !== creatorId ||
       parsed.ipId !== null ||
       !isState(parsed.state) ||
       typeof parsed.version !== 'number' ||
@@ -1154,6 +1286,7 @@ export async function createContent(
       parsed.revision < 1 ||
       typeof parsed.slug !== 'string' ||
       typeof parsed.title !== 'string' ||
+      (parsed.accessMode !== undefined && !['PUBLIC', 'MEMBERS_ONLY'].includes(String(parsed.accessMode))) ||
       typeof parsed.bodyRef !== 'string' ||
       !Array.isArray(parsed.mediaRefs) ||
       parsed.mediaRefs.some(ref => typeof ref !== 'string') ||
@@ -1188,10 +1321,12 @@ export async function createContent(
     id: contentId,
     contentType: normalized.contentType,
     ownerUserId,
-    creatorId: ownerUserId,
+    creatorId,
     ipId: null,
     state: 'DRAFT',
     scheduledAt: null,
+    accessMode: normalized.accessMode ?? 'PUBLIC',
+    accessGranted: true,
     version: 1,
     revision: 1,
     slug,
@@ -1209,9 +1344,9 @@ export async function createContent(
     insertCompletedIdempotency(db, ownerUserId, operationId, idempotencyKey, hash, 201, JSON.stringify(createdContent), createdAt, expiresAt),
     db.prepare(
       `INSERT INTO contents
-        (id, content_type, owner_user_id, creator_id, ip_id, state, scheduled_at, version, revision, slug, title, body_ref, media_refs_json, cover_ref, etag, created_at, updated_at)
-       VALUES (?, ?, ?, ?, NULL, 'DRAFT', NULL, 1, 1, ?, ?, ?, ?, ?, ?, ?, ?) `,
-    ).bind(contentId, normalized.contentType, ownerUserId, ownerUserId, slug, normalized.title, normalized.bodyRef, JSON.stringify(normalized.mediaRefs), normalized.coverRef, createdContent.etag, createdAt, createdAt),
+        (id, content_type, owner_user_id, creator_id, ip_id, state, scheduled_at, access_mode, version, revision, slug, title, body_ref, media_refs_json, cover_ref, etag, created_at, updated_at)
+       VALUES (?, ?, ?, ?, NULL, 'DRAFT', NULL, ?, 1, 1, ?, ?, ?, ?, ?, ?, ?, ?) `,
+    ).bind(contentId, normalized.contentType, ownerUserId, creatorId, normalized.accessMode ?? 'PUBLIC', slug, normalized.title, normalized.bodyRef, JSON.stringify(normalized.mediaRefs), normalized.coverRef, createdContent.etag, createdAt, createdAt),
     atomicGuard(db),
     insertRevision(db, {
       id: crypto.randomUUID(),
@@ -1222,6 +1357,7 @@ export async function createContent(
       sourceRevision: null,
       operation: 'CREATE',
       state: 'DRAFT',
+      accessMode: createdContent.accessMode,
       slug,
       title: normalized.title,
       bodyRef: normalized.bodyRef,
@@ -1247,6 +1383,7 @@ export async function updateContent(
   now = new Date(),
   correlationId = 'runtime',
   principalLayer?: string,
+  verifiedCreatorId?: string,
 ): Promise<ContentRecord> {
   assertResourceId(principalUserId)
   assertResourceId(contentId)
@@ -1270,6 +1407,24 @@ export async function updateContent(
   if (content.contentType !== normalized.contentType) {
     throw new ContentRuntimeError('VALIDATION_FAILED', 400)
   }
+  const currentAccessMode = content.accessMode ?? 'PUBLIC'
+  const nextAccessMode = normalized.accessMode ?? currentAccessMode
+  let nextCreatorId = content.creatorId
+  if (normalized.accessMode !== undefined) {
+    if (!verifiedCreatorId) throw new ContentRuntimeError('PERMISSION_DENIED', 403)
+    if (nextAccessMode === 'MEMBERS_ONLY' && content.creatorId !== verifiedCreatorId) {
+      // Older public content stored the author user ID in creator_id. W08 has
+      // just verified that this same owner has an active canonical Creator ID;
+      // allow the one-way reference normalization as part of paywall activation.
+      if (currentAccessMode !== 'PUBLIC' ||
+          (content.creatorId !== content.ownerUserId && content.creatorId !== null)) {
+        throw new ContentRuntimeError('PERMISSION_DENIED', 403)
+      }
+      nextCreatorId = verifiedCreatorId
+    } else if (currentAccessMode === 'MEMBERS_ONLY' && content.creatorId !== verifiedCreatorId) {
+      throw new ContentRuntimeError('PERMISSION_DENIED', 403)
+    }
+  }
   if (!EDITABLE_STATES.has(content.state)) throw new ContentRuntimeError('INVALID_STATE', 409)
 
   const nextVersion = content.version + 1
@@ -1277,7 +1432,10 @@ export async function updateContent(
   const updatedAt = now.toISOString()
   const updated: ContentRecord = {
     ...content,
+    creatorId: nextCreatorId,
     scheduledAt: content.scheduledAt,
+    accessMode: nextAccessMode,
+    accessGranted: true,
     title: normalized.title,
     bodyRef: normalized.bodyRef,
     mediaRefs: normalized.mediaRefs,
@@ -1295,9 +1453,9 @@ export async function updateContent(
     insertCompletedIdempotency(db, principalUserId, operationId, idempotencyKey, hash, 200, idempotencyResponseBody, updatedAt, expiresAt),
     db.prepare(
       `UPDATE contents
-          SET title = ?, body_ref = ?, media_refs_json = ?, cover_ref = ?, version = ?, revision = ?, etag = ?, updated_at = ?
+          SET creator_id = ?, title = ?, body_ref = ?, media_refs_json = ?, cover_ref = ?, access_mode = ?, version = ?, revision = ?, etag = ?, updated_at = ?
         WHERE id = ? AND owner_user_id = ? AND version = ? AND etag = ?`,
-    ).bind(updated.title, updated.bodyRef, JSON.stringify(updated.mediaRefs), updated.coverRef, nextVersion, nextRevision, updated.etag, updatedAt, content.id, principalUserId, content.version, content.etag),
+    ).bind(nextCreatorId, updated.title, updated.bodyRef, JSON.stringify(updated.mediaRefs), updated.coverRef, nextAccessMode, nextVersion, nextRevision, updated.etag, updatedAt, content.id, principalUserId, content.version, content.etag),
     atomicGuard(db),
     insertRevision(db, {
       id: crypto.randomUUID(),
@@ -1308,6 +1466,7 @@ export async function updateContent(
       sourceRevision: content.revision,
       operation: 'UPDATE',
       state: content.state,
+      accessMode: updated.accessMode,
       slug: updated.slug,
       title: updated.title,
       bodyRef: updated.bodyRef,
@@ -1333,6 +1492,7 @@ export async function rollbackContentRevision(
   reason: string | undefined,
   correlationId: string,
   now = new Date(),
+  verifiedCreatorId?: string,
 ): Promise<{ content: ContentRecord; sourceRevision: number; resultingRevision: number }> {
   assertResourceId(principalUserId)
   assertResourceId(contentId)
@@ -1358,10 +1518,18 @@ export async function rollbackContentRevision(
   }
 
   const source = await db.prepare(`SELECT id, content_id, revision, content_version, actor_user_id, source_revision, operation,
-       state, slug, title, body_ref, media_refs_json, cover_ref, etag, reason, correlation_id, created_at
+       state, access_mode, slug, title, body_ref, media_refs_json, cover_ref, etag, reason, correlation_id, created_at
   FROM content_revisions
  WHERE id = ? AND content_id = ?`).bind(revisionId, contentId).first<ContentRevisionRow>()
   if (!source) throw new ContentRuntimeError('NOT_FOUND', 404)
+
+  const sourceAccessMode = source.access_mode === 'MEMBERS_ONLY' ? 'MEMBERS_ONLY' : 'PUBLIC'
+  const currentAccessMode = content.accessMode ?? 'PUBLIC'
+  if (sourceAccessMode !== currentAccessMode &&
+      (sourceAccessMode === 'MEMBERS_ONLY' || currentAccessMode === 'MEMBERS_ONLY') &&
+      (!verifiedCreatorId || verifiedCreatorId !== content.creatorId)) {
+    throw new ContentRuntimeError('PERMISSION_DENIED', 403)
+  }
 
   const nextVersion = content.version + 1
   const nextRevision = content.revision + 1
@@ -1369,6 +1537,8 @@ export async function rollbackContentRevision(
   const updated: ContentRecord = {
     ...content,
     scheduledAt: null,
+    accessMode: sourceAccessMode,
+    accessGranted: true,
     slug: source.slug,
     title: source.title,
     bodyRef: source.body_ref,
@@ -1385,9 +1555,9 @@ export async function rollbackContentRevision(
     expireMutationRow(db, principalUserId, operationId, idempotencyKey, updatedAt),
     insertCompletedIdempotency(db, principalUserId, operationId, idempotencyKey, hash, 200, JSON.stringify(result), updatedAt, expiresAt),
     db.prepare(`UPDATE contents
-   SET title = ?, body_ref = ?, media_refs_json = ?, cover_ref = ?, version = ?, revision = ?, etag = ?, updated_at = ?
+   SET title = ?, body_ref = ?, media_refs_json = ?, cover_ref = ?, access_mode = ?, version = ?, revision = ?, etag = ?, updated_at = ?
  WHERE id = ? AND owner_user_id = ? AND version = ? AND etag = ?`).bind(
-      updated.title, updated.bodyRef, JSON.stringify(updated.mediaRefs), updated.coverRef,
+      updated.title, updated.bodyRef, JSON.stringify(updated.mediaRefs), updated.coverRef, updated.accessMode ?? 'PUBLIC',
       nextVersion, nextRevision, updated.etag, updatedAt,
       content.id, principalUserId, content.version, content.etag,
     ),
@@ -1401,6 +1571,7 @@ export async function rollbackContentRevision(
       sourceRevision: source.revision,
       operation: 'ROLLBACK',
       state: content.state,
+      accessMode: updated.accessMode,
       slug: updated.slug,
       title: updated.title,
       bodyRef: updated.bodyRef,
@@ -1749,6 +1920,7 @@ type ContentListCursor = {
   createdAt: string
   id: string
   creatorId: string | null
+  ownerUserId?: string | null
   contentType: ContentType | null
 }
 
@@ -1757,8 +1929,9 @@ export function encodeContentListCursor(
   id: string,
   creatorId: string | null,
   contentType: ContentType | null,
+  ownerUserId: string | null = null,
 ): string {
-  const raw = JSON.stringify({ version: 1, createdAt, id, creatorId, contentType } satisfies ContentListCursor)
+  const raw = JSON.stringify({ version: 1, createdAt, id, creatorId, ownerUserId, contentType } satisfies ContentListCursor)
   const bytes = new TextEncoder().encode(raw)
   let binary = ''
   for (const byte of bytes) binary += String.fromCharCode(byte)
@@ -1769,6 +1942,7 @@ export function decodeContentListCursor(
   value: string,
   creatorId: string | null,
   contentType: ContentType | null,
+  ownerUserId: string | null = null,
 ): ContentListCursor {
   try {
     if (!value || value.length > 2048 || !/^[A-Za-z0-9_-]+$/.test(value)) throw new Error('INVALID')
@@ -1783,11 +1957,13 @@ export function decodeContentListCursor(
       typeof decoded.id !== 'string' ||
       !/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(decoded.id) ||
       (decoded.creatorId !== null && typeof decoded.creatorId !== 'string') ||
+      (decoded.ownerUserId !== undefined && decoded.ownerUserId !== null && typeof decoded.ownerUserId !== 'string') ||
       (decoded.contentType !== null && !['article', 'post', 'video'].includes(decoded.contentType as string)) ||
       decoded.creatorId !== creatorId ||
+      (decoded.ownerUserId ?? null) !== ownerUserId ||
       decoded.contentType !== contentType
     ) throw new Error('INVALID')
-    return decoded as ContentListCursor
+    return { ...decoded, ownerUserId: decoded.ownerUserId ?? null } as ContentListCursor
   } catch {
     throw new ContentRuntimeError('INVALID_CURSOR', 400)
   }

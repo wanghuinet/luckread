@@ -257,6 +257,78 @@ describe('subscription runtime', () => {
     expect(index).not.toContain('changeSubscriptionPlan(')
   })
 
+
+  it('serves the creator membership decision only to W03 and returns no subscription details', async () => {
+    const allowLimiter = { limit: async () => ({ success: true }) }
+    let lastSql = ''
+    let readCount = 0
+    const membershipDb = {
+      prepare(sql: string) {
+        const statement = {
+          bind() { return statement },
+          async first<T>() {
+            lastSql = sql
+            readCount += 1
+            return { subscription_id: 'sub_active' } as T
+          },
+          async all<T>() { return { results: [] as T[] } },
+          async run() { return { meta: { changes: 0 } } },
+        }
+        return statement
+      },
+    } as unknown as D1Database
+    const env = {
+      D1_01: membershipDb,
+      D1_04: {} as D1Database,
+      SUBSCRIPTION_ORIGIN_GLOBAL_LIMITER: allowLimiter,
+      SUBSCRIPTION_READ_LIMITER: allowLimiter,
+      SUBSCRIPTION_WRITE_LIMITER: allowLimiter,
+    }
+    const makeRequest = (caller = 'W03') => new Request('https://luckread-w07.internal/internal/entitlements/check-creator-membership', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'X-LuckRead-Caller': caller,
+        'X-LuckRead-Transport-Version': '1.0',
+        'X-LuckRead-Correlation-Id': 'content-access-check',
+        'X-LuckRead-Principal-User-Id': 'user_1',
+        'X-LuckRead-Principal-Layer': 'L2',
+      },
+      body: JSON.stringify({ creatorId: 'creator_1' }),
+    })
+
+    const response = await w07.fetch(makeRequest(), env)
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({
+      data: { allowed: true, reason: 'ACTIVE_CREATOR_MEMBERSHIP' },
+    })
+    expect(lastSql).toContain("status = 'ACTIVE'")
+    expect(lastSql).toContain('current_period_start <= ?')
+    expect(lastSql).toContain('current_period_end > ?')
+    expect(lastSql).toContain('(cancel_at IS NULL OR cancel_at > ?)')
+
+    const beforeDenied = readCount
+    const denied = await w07.fetch(makeRequest('W01'), env)
+    expect(denied.status).toBe(403)
+    expect(readCount).toBe(beforeDenied)
+
+    const credentialed = await w07.fetch(new Request('https://luckread-w07.internal/internal/entitlements/check-creator-membership', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'X-LuckRead-Caller': 'W03',
+        'X-LuckRead-Transport-Version': '1.0',
+        'X-LuckRead-Correlation-Id': 'content-access-cookie-test',
+        'X-LuckRead-Principal-User-Id': 'user_1',
+        'X-LuckRead-Principal-Layer': 'L2',
+        Cookie: 'session=must-not-forward',
+      },
+      body: JSON.stringify({ creatorId: 'creator_1' }),
+    }), env)
+    expect(credentialed.status).toBe(403)
+    expect(readCount).toBe(beforeDenied)
+  })
+
   it('routes authenticated GET /plans through the active-public plan query', async () => {
     const allowLimiter = { limit: async () => ({ success: true }) }
     const request = new Request('https://luckread-w07.internal/plans?limit=10', {

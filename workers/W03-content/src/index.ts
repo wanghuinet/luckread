@@ -10,7 +10,7 @@ import {
   getPublishedOwnerPostContext,
   getPublishedContentSocialContext,
   getPublishedContentSocialContexts,
-  isPublishedPublicPostMediaReference,
+  resolvePublishedMediaReferenceAccess,
   listContents,
   searchPublishedContents,
   listFollowingOwnerContents,
@@ -66,6 +66,7 @@ type RateLimitBinding = { limit(input: { key: string }): Promise<{ success: bool
 
 interface Env {
   D1_02: D1Database
+  W07_SUBSCRIPTION?: { fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> }
   CONTENT_PUBLIC_READ_LIMITER?: RateLimitBinding
   CONTENT_MUTATION_LIMITER?: RateLimitBinding
   CONTENT_ORIGIN_GLOBAL_LIMITER?: RateLimitBinding
@@ -141,6 +142,14 @@ const requiredCreatorPrincipal = (request: Request): { userId: string; layer: st
   return principal
 }
 
+const requireVerifiedCreatorId = (request: Request): string => {
+  const creatorId = request.headers.get('X-LuckRead-Verified-Creator-Id')?.trim() ?? ''
+  if (!creatorId || creatorId.length > 256 || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,255}$/.test(creatorId)) {
+    throw new ContentRuntimeError('PERMISSION_DENIED', 403)
+  }
+  return creatorId
+}
+
 const requireIfMatch = (request: Request): string => {
   const value = request.headers.get('If-Match')?.trim() ?? ''
   if (!value) throw new ContentRuntimeError('PRECONDITION_REQUIRED', 428)
@@ -190,6 +199,58 @@ const decodePathSegment = (value: string): string => {
   } catch {
     throw new ContentRuntimeError('VALIDATION_FAILED', 400)
   }
+}
+
+const resolveCreatorMembershipAccess = async (
+  request: Request,
+  env: Env,
+  subscriberId: string,
+  creatorId: string,
+): Promise<boolean> => {
+  const service = env.W07_SUBSCRIPTION
+  if (!service) throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
+  const correlationId = request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? ''
+  const layer = request.headers.get('X-LuckRead-Principal-Layer')?.trim() ?? ''
+  if (!correlationId || !layer) throw new ContentRuntimeError('UNAUTHENTICATED', 401)
+  let response: Response
+  try {
+    response = await service.fetch(new Request('https://luckread-w07.internal/internal/entitlements/check-creator-membership', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json; charset=utf-8',
+        'X-LuckRead-Caller': 'W03',
+        'X-LuckRead-Transport-Version': '1.0',
+        'X-LuckRead-Correlation-Id': correlationId,
+        'X-LuckRead-Principal-User-Id': subscriberId,
+        'X-LuckRead-Principal-Layer': layer,
+      },
+      body: JSON.stringify({ creatorId }),
+    }))
+  } catch {
+    throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
+  }
+  if (!response.ok) throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
+  let payload: unknown
+  try { payload = await response.json() } catch {
+    throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
+  }
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
+  }
+  const data = (payload as { data?: unknown }).data
+  if (!data || typeof data !== 'object' || Array.isArray(data) ||
+      typeof (data as { allowed?: unknown }).allowed !== 'boolean' ||
+      !['ACTIVE_CREATOR_MEMBERSHIP', 'MEMBERSHIP_REQUIRED'].includes(String((data as { reason?: unknown }).reason))) {
+    throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
+  }
+  const decision = data as { allowed: boolean; reason: string }
+  // Reject internally contradictory policy DTOs rather than accepting a boolean
+  // that disagrees with W07's auditable reason code.
+  if ((decision.allowed && decision.reason !== 'ACTIVE_CREATOR_MEMBERSHIP') ||
+      (!decision.allowed && decision.reason !== 'MEMBERSHIP_REQUIRED')) {
+    throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
+  }
+  return decision.allowed
 }
 
 const getPath = (pathname: string): {id?: string; state?: boolean; preflight?: boolean; revisions?: boolean; relationships?: boolean; relationshipId?: string; revisionId?: string; rollback?: boolean; series?: boolean; seriesMembers?: boolean; seriesMemberContentId?: string; collections?: boolean; collectionMembers?: boolean; collectionMemberContentId?: string} | null => {
@@ -411,12 +472,14 @@ const worker = {
             items: page.items.map((item) => ({
               id: item.id,
               slug: item.slug,
+              ownerUserId: item.ownerUserId,
               creatorId: item.creatorId ?? item.ownerUserId,
               createdAt: item.createdAt,
               contentType: item.contentType,
               title: item.title,
-              // Search is metadata-only until the canonical visibility/entitlement
-              // recheck is admitted. Never expose protected body or media references.
+              accessMode: item.accessMode ?? 'PUBLIC',
+              // Feed remains metadata-only: a member must open the canonical
+              // detail route for the W07 entitlement check before refs are returned.
               updatedAt: item.updatedAt,
             })),
             nextCursor: page.nextCursor,
@@ -476,12 +539,14 @@ const worker = {
             items: page.items.map((item) => ({
               id: item.id,
               slug: item.slug,
+              ownerUserId: item.ownerUserId,
               creatorId: item.creatorId ?? item.ownerUserId,
               createdAt: item.createdAt,
               contentType: item.contentType,
               title: item.title,
-              // Search is metadata-only until canonical visibility/entitlement
-              // rechecks are admitted. Never expose protected body/media references.
+              accessMode: item.accessMode ?? 'PUBLIC',
+              // Search is metadata-only: a member must open the canonical
+              // detail route for the W07 entitlement check before refs are returned.
               updatedAt: item.updatedAt,
             })),
             nextCursor: page.nextCursor,
@@ -558,8 +623,16 @@ const worker = {
         if (!mediaUrl || mediaUrl.length > 2048) {
           throw new ContentRuntimeError('VALIDATION_FAILED', 400)
         }
-        const isPublic = await isPublishedPublicPostMediaReference(env.D1_02, mediaUrl)
-        return json({ data: { isPublic }, requestId: createRequestId() })
+        const viewerUserId = request.headers.get('X-LuckRead-Principal-User-Id')?.trim() || null
+        const access = await resolvePublishedMediaReferenceAccess(
+          env.D1_02,
+          mediaUrl,
+          viewerUserId,
+          viewerUserId
+            ? (creatorId) => resolveCreatorMembershipAccess(request, env, viewerUserId, creatorId)
+            : undefined,
+        )
+        return json({ data: access, requestId: createRequestId() })
       }
 
       if (url.pathname === '/internal/content/bookmarked-items') {
@@ -577,19 +650,25 @@ const worker = {
         const items = await listPublishedContentsByIds(env.D1_02, ids)
         return json({
           data: {
-            items: items.map(item => ({
-              id: item.id,
-              slug: item.slug,
-              ownerUserId: item.ownerUserId,
-              creatorId: item.creatorId,
-              contentType: item.contentType,
-              title: item.title,
-              bodyRef: item.bodyRef,
-              mediaRefs: item.mediaRefs,
-              coverRef: item.coverRef,
-              createdAt: item.createdAt,
-              updatedAt: item.updatedAt,
-            })),
+            items: items.map(item => {
+              const membersOnly = item.accessMode === 'MEMBERS_ONLY'
+              return {
+                id: item.id,
+                slug: item.slug,
+                ownerUserId: item.ownerUserId,
+                creatorId: item.creatorId,
+                contentType: item.contentType,
+                title: item.title,
+                accessMode: item.accessMode ?? 'PUBLIC',
+                // Bookmark projections are not an authorization boundary.
+                // Always omit protected references here; detail checks W07.
+                bodyRef: membersOnly ? '' : item.bodyRef,
+                mediaRefs: membersOnly ? [] : item.mediaRefs,
+                coverRef: membersOnly ? null : item.coverRef,
+                createdAt: item.createdAt,
+                updatedAt: item.updatedAt,
+              }
+            }),
           },
           requestId: createRequestId(),
         })
@@ -928,6 +1007,8 @@ const worker = {
           requireIdempotency(request),
           typeof body.reason === 'string' ? body.reason : undefined,
           request.headers.get('X-LuckRead-Correlation-Id')?.trim() || 'runtime',
+          new Date(),
+          request.headers.get('X-LuckRead-Verified-Creator-Id')?.trim() || undefined,
         )
         return json({
           ...result,
@@ -954,6 +1035,8 @@ const worker = {
               revision: item.revision,
               etag: item.etag,
               title: item.title,
+              accessMode: item.accessMode ?? 'PUBLIC',
+              // Creator-owned views are owner-scoped; keep the current body/media.
               bodyRef: item.bodyRef,
               mediaRefs: item.mediaRefs,
               coverRef: item.coverRef,
@@ -989,19 +1072,27 @@ const worker = {
         )
         return json({
           data: {
-            items: page.items.map(item => ({
-              id: item.id,
-              slug: item.slug,
-              contentType: item.contentType,
-              state: item.state,
-              version: item.version,
-              etag: item.etag,
-              title: item.title,
-              bodyRef: item.bodyRef,
-              mediaRefs: item.mediaRefs,
-              coverRef: item.coverRef,
-              scheduledAt: item.scheduledAt,
-            })),
+            items: page.items.map(item => {
+              const membersOnly = item.accessMode === 'MEMBERS_ONLY'
+              return {
+                id: item.id,
+                slug: item.slug,
+                ownerUserId: item.ownerUserId,
+                creatorId: item.creatorId ?? item.ownerUserId,
+                contentType: item.contentType,
+                state: item.state,
+                version: item.version,
+                etag: item.etag,
+                title: item.title,
+                accessMode: item.accessMode ?? 'PUBLIC',
+                // General list responses deliberately omit protected references.
+                // The detail endpoint is the single request-time entitlement gate.
+                bodyRef: membersOnly ? '' : item.bodyRef,
+                mediaRefs: membersOnly ? [] : item.mediaRefs,
+                coverRef: membersOnly ? null : item.coverRef,
+                scheduledAt: item.scheduledAt,
+              }
+            }),
             nextCursor: page.nextCursor,
             hasMore: page.hasMore,
           },
@@ -1065,9 +1156,13 @@ const worker = {
 
       if (request.method === 'POST' && path.id === undefined) {
         const body = await parseBody(request)
-        const principal = body.contentType === 'post'
-          ? requiredSocialPostPrincipal(request)
-          : requiredCreatorPrincipal(request)
+        const membersOnly = body.accessMode === 'MEMBERS_ONLY'
+        const principal = membersOnly
+          ? requiredCreatorPrincipal(request)
+          : body.contentType === 'post'
+            ? requiredSocialPostPrincipal(request)
+            : requiredCreatorPrincipal(request)
+        const verifiedCreatorId = membersOnly ? requireVerifiedCreatorId(request) : undefined
         const content = await createContent(
           env.D1_02,
           principal.userId,
@@ -1075,13 +1170,17 @@ const worker = {
           requireIdempotency(request),
           new Date(),
           request.headers.get('X-LuckRead-Correlation-Id')?.trim() || 'runtime',
+          verifiedCreatorId,
         )
         return json({
           id: content.id,
           slug: content.slug,
+          ownerUserId: content.ownerUserId,
           creatorId: content.creatorId,
           contentType: content.contentType,
           state: content.state,
+          accessMode: content.accessMode ?? 'PUBLIC',
+          accessGranted: true,
           version: content.version,
           etag: content.etag,
           title: content.title,
@@ -1095,13 +1194,62 @@ const worker = {
       if (request.method === 'GET' && path.id) {
         // Published content is publicly readable; unpublished content remains owner-scoped in getContent().
         const principalUserId = request.headers.get('X-LuckRead-Principal-User-Id')?.trim() || null
-        const content = await getContent(env.D1_02, path.id, principalUserId)
+        const membershipCheckCache = new Map<string, Promise<boolean>>()
+        const resolveMembership = principalUserId
+          ? (creatorId: string): Promise<boolean> => {
+            let pending = membershipCheckCache.get(creatorId)
+            if (!pending) {
+              pending = resolveCreatorMembershipAccess(request, env, principalUserId, creatorId)
+              membershipCheckCache.set(creatorId, pending)
+            }
+            return pending
+          }
+          : undefined
+        const content = await getContent(
+          env.D1_02,
+          path.id,
+          principalUserId,
+          resolveMembership,
+        )
+        if (url.searchParams.get('bodyContext') === '1') {
+          // A body object can be referenced by more than one content record.
+          // Apply the strictest current membership policy across every record
+          // that references these bytes, rather than letting a second PUBLIC
+          // record become a side door around a MEMBERS_ONLY article.
+          let bodyReferenceAllowed = true
+          if (content.bodyRef) {
+            const protectedReferences = await env.D1_02.prepare(
+              "SELECT owner_user_id, creator_id FROM contents WHERE body_ref = ? AND state = 'PUBLISHED' AND access_mode = 'MEMBERS_ONLY' LIMIT 51",
+            ).bind(content.bodyRef).all<{ owner_user_id: string; creator_id: string | null }>()
+            const rows = protectedReferences.results ?? []
+            if (rows.length > 50) throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
+            for (const row of rows) {
+              if (principalUserId && principalUserId === row.owner_user_id) continue
+              if (!principalUserId || !row.creator_id || !resolveMembership ||
+                  !(await resolveMembership(row.creator_id))) {
+                bodyReferenceAllowed = false
+                break
+              }
+            }
+          }
+          const accessGranted = (content.accessGranted ?? (content.accessMode !== 'MEMBERS_ONLY')) &&
+            bodyReferenceAllowed
+          return json({
+            contentId: content.id,
+            ownerUserId: content.ownerUserId,
+            accessMode: content.accessMode ?? 'PUBLIC',
+            accessGranted,
+            bodyRef: accessGranted ? content.bodyRef : '',
+          })
+        }
         return json({
           id: content.id,
           slug: content.slug,
           creatorId: content.creatorId,
           contentType: content.contentType,
           state: content.state,
+          accessMode: content.accessMode ?? 'PUBLIC',
+          accessGranted: content.accessGranted ?? (content.accessMode !== 'MEMBERS_ONLY'),
           version: content.version,
           revision: content.revision,
           etag: content.etag,
@@ -1117,9 +1265,13 @@ const worker = {
 
       if (request.method === 'PATCH' && path.id) {
         const body = await parseBody(request)
-        const principal = body.contentType === 'post'
-          ? requiredSocialPostPrincipal(request)
-          : requiredCreatorPrincipal(request)
+        const explicitlyChangesAccessMode = Object.hasOwn(body, 'accessMode')
+        const principal = explicitlyChangesAccessMode
+          ? requiredCreatorPrincipal(request)
+          : body.contentType === 'post'
+            ? requiredSocialPostPrincipal(request)
+            : requiredCreatorPrincipal(request)
+        const verifiedCreatorId = explicitlyChangesAccessMode ? requireVerifiedCreatorId(request) : undefined
         const content = await updateContent(
           env.D1_02,
           principal.userId,
@@ -1130,11 +1282,16 @@ const worker = {
           new Date(),
           request.headers.get('X-LuckRead-Correlation-Id')?.trim() || 'runtime',
           principal.layer,
+          verifiedCreatorId,
         )
         return json({
           id: content.id,
           slug: content.slug,
+          ownerUserId: content.ownerUserId,
+          creatorId: content.creatorId,
           state: content.state,
+          accessMode: content.accessMode ?? 'PUBLIC',
+          accessGranted: true,
           version: content.version,
           etag: content.etag,
           title: content.title,

@@ -16,6 +16,7 @@ import {
   callW03Content,
   resolveContentPrincipal,
   resolveOptionalCookieContentPrincipal,
+  resolveVerifiedContentCreatorId,
   W03ContentClientError,
 } from '../../../../../content/w03-content-client.js'
 
@@ -91,14 +92,34 @@ export async function PATCH(
     const mediaValidation = await validateOwnedPostMediaReferences(principal.userId, body, new URL(request.url).origin)
     if ('status' in mediaValidation) return mediaReferenceValidationResponse(mediaValidation)
 
+    const changesAccessMode = body && typeof body === 'object' && !Array.isArray(body) && Object.hasOwn(body, 'accessMode')
+    let verifiedCreatorId: string | undefined
+    if (changesAccessMode) {
+      const resolved = await resolveVerifiedContentCreatorId(request, principal)
+      if (resolved instanceof Response) return resolved
+      verifiedCreatorId = resolved
+    }
+
     const response = await callW03Content({
       request,
       pathname: contentPath(contentId),
       method: 'PATCH',
       body,
       principal,
+      verifiedCreatorId,
     })
     if (response.ok) {
+      if (changesAccessMode) {
+        await invalidatePublicContentVisibility(contentId)
+        const updatedValue: unknown = await response.clone().json().catch((): null => null)
+        const updatedState = updatedValue && typeof updatedValue === 'object' && !Array.isArray(updatedValue)
+          ? (updatedValue as { state?: unknown }).state
+          : undefined
+        // Drafts are not part of anonymous public lists. Only bump their shared
+        // generation after an access-mode edit if W03 confirms the content is
+        // currently published; never flush the global list for draft-only edits.
+        if (updatedState === 'PUBLISHED') await invalidatePublicContentList(request)
+      }
       await invalidatePublicContentDetail(request, contentId)
     }
     return response

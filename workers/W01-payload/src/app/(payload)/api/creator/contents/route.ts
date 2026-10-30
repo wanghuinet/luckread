@@ -1,6 +1,7 @@
 import {
   callW03Content,
   resolveCookieContentPrincipal,
+  resolveVerifiedContentCreatorId,
   W03ContentClientError,
 } from '../../../../../content/w03-content-client.js'
 
@@ -22,12 +23,21 @@ export async function POST(request: Request): Promise<Response> {
       return errorResponse(422, 'VALIDATION_FAILED', 'Invalid content request')
     }
 
+    let verifiedCreatorId: string | undefined
+    if (body && typeof body === 'object' && !Array.isArray(body) &&
+        (body as { accessMode?: unknown }).accessMode === 'MEMBERS_ONLY') {
+      const resolved = await resolveVerifiedContentCreatorId(request, principal)
+      if (resolved instanceof Response) return resolved
+      verifiedCreatorId = resolved
+    }
+
     return await callW03Content({
       request,
       pathname: '/internal/content/contents',
       method: 'POST',
       body,
       principal,
+      verifiedCreatorId,
     })
   } catch (error) {
     if (error instanceof W03ContentClientError) {
