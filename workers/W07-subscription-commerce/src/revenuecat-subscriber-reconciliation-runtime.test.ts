@@ -28,24 +28,29 @@ const request = (overrides: {
   method?: string;
   headers?: Record<string, string>;
   body?: string | null;
-} = {}) => new Request(
-  'https://luckread-w07.internal' + (overrides.path ?? '/internal/subscriptions/reconcile-revenuecat'),
-  {
-    method: overrides.method ?? 'POST',
-    headers: {
-      'X-LuckRead-Caller': 'W01',
-      'X-LuckRead-Transport-Version': '1.0',
-      'X-LuckRead-Correlation-Id': 'corr_revenuecat_test',
-      'X-LuckRead-Principal-User-Id': USER_ID,
-      'X-LuckRead-Principal-Layer': 'L2',
-      'content-type': 'application/json; charset=utf-8',
-      ...overrides.headers,
+} = {}) => {
+  const method = overrides.method ?? 'POST';
+  return new Request(
+    'https://luckread-w07.internal' + (overrides.path ?? '/internal/subscriptions/reconcile-revenuecat'),
+    {
+      method,
+      headers: {
+        'X-LuckRead-Caller': 'W01',
+        'X-LuckRead-Transport-Version': '1.0',
+        'X-LuckRead-Correlation-Id': 'corr_revenuecat_test',
+        'X-LuckRead-Principal-User-Id': USER_ID,
+        'X-LuckRead-Principal-Layer': 'L2',
+        'content-type': 'application/json; charset=utf-8',
+        ...overrides.headers,
+      },
+      body: method === 'GET' || method === 'HEAD'
+        ? undefined
+        : overrides.body === undefined
+          ? JSON.stringify({ appId: APP_ID })
+          : overrides.body,
     },
-    body: overrides.body === undefined
-      ? JSON.stringify({ appId: APP_ID })
-      : overrides.body,
-  },
-);
+  );
+};
 
 const env = (): RevenueCatSubscriberReconciliationRuntimeEnv => ({
   D1_01: {} as D1Database,
