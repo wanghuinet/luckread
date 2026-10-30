@@ -12,6 +12,7 @@ PAYMENT_MIGRATION = WORKER / "migrations-d1-04" / "0002_payment_provider_events.
 SAVED_METHOD_MIGRATION = WORKER / "migrations-d1-04" / "0003_saved_payment_methods_mandates.sql"
 RENEWAL_MIGRATION = WORKER / "migrations-d1-04" / "0004_subscription_renewal_cycles.sql"
 REVENUECAT_WEBHOOK_MIGRATION = WORKER / "migrations-d1-04" / "0005_revenuecat_webhook_inbox.sql"
+PAYMENT_METHOD_REVOCATION_MIGRATION = WORKER / "migrations-d1-04" / "0006_payment_method_revocation_requests.sql"
 CONFIG = WORKER / "wrangler.jsonc"
 NOW = "2026-10-28T00:00:00.000Z"
 LATER = "2026-10-28T00:00:01.000Z"
@@ -25,6 +26,7 @@ class D104OrderMigrationTests(unittest.TestCase):
         cls.saved_method_sql = SAVED_METHOD_MIGRATION.read_text(encoding="utf-8")
         cls.renewal_sql = RENEWAL_MIGRATION.read_text(encoding="utf-8")
         cls.revenuecat_webhook_sql = REVENUECAT_WEBHOOK_MIGRATION.read_text(encoding="utf-8")
+        cls.payment_method_revocation_sql = PAYMENT_METHOD_REVOCATION_MIGRATION.read_text(encoding="utf-8")
         config = json.loads(CONFIG.read_text(encoding="utf-8"))
         bindings = {item["binding"]: item for item in config["d1_databases"]}
         if bindings["D1_01"]["migrations_dir"] != "migrations":
@@ -41,9 +43,37 @@ class D104OrderMigrationTests(unittest.TestCase):
         self.db.executescript(self.saved_method_sql)
         self.db.executescript(self.renewal_sql)
         self.db.executescript(self.revenuecat_webhook_sql)
+        self.db.executescript(self.payment_method_revocation_sql)
 
     def tearDown(self):
         self.db.close()
+
+    def test_payment_method_revocation_migration_adds_persistent_guarded_state(self):
+        columns = [row[1] for row in self.db.execute('PRAGMA table_info("payment_method_revocation_requests")')]
+        self.assertEqual(columns, [
+            "revocation_request_id", "saved_payment_method_id", "payment_method_id", "provider",
+            "merchant_id", "customer_id", "idempotency_key", "status", "provider_method_deleted_at",
+            "version", "created_at", "updated_at",
+        ])
+        triggers = {row[0] for row in self.db.execute(
+            "SELECT name FROM sqlite_master WHERE type='trigger' AND tbl_name='payment_method_revocation_requests'"
+        )}
+        self.assertTrue({
+            "payment_method_revocation_request_requires_saved_method",
+            "payment_method_revocation_request_identity_immutable",
+            "payment_method_revocation_request_version_guard",
+            "payment_method_revocation_request_transition_guard",
+            "payment_method_revocation_request_provider_deleted_immutable",
+            "payment_method_revocation_request_retained",
+            "payment_method_revocation_request_completion_guard",
+        }.issubset(triggers))
+        event_trigger = self.db.execute(
+            "SELECT sql FROM sqlite_master WHERE type='trigger' AND name='payment_provider_events_terminal_immutable'"
+        ).fetchone()[0]
+        self.assertIn("mandate_revoked", event_trigger)
+        self.assertIn("RECONCILIATION_REQUIRED", event_trigger)
+        self.assertIn("APPLIED", event_trigger)
+        self.assertIn("REJECTED", event_trigger)
 
     def order(self, order_id="ord_1", customer="user_1", status="CREATED", version=1,
               currency="USD", subtotal=1000, discount=0, tax=0, total=1000,
