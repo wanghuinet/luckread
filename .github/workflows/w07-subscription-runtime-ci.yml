@@ -284,3 +284,5 @@ jobs:
 
       - name: Verify isolated D1-04 Order migration candidate
         run: python workers/W07-subscription-commerce/scripts/test_order_d1_04_migration.py
+      - name: Test D1-04 migration and W07 deploy admission gates
+        run: node --test workers/W07-subscription-commerce/scripts/verify-d1-04-order-migration.test.mjs
