@@ -768,7 +768,8 @@ async function persistNonApplicableWebhook(
       'ON CONFLICT(provider, merchant_id, event_id) DO NOTHING',
     ).bind(
       eventRowId, PROVIDER, envelope.merchantId, envelope.eventId, envelope.eventType,
-      envelope.contentType === 'payment_details' && typeof envelope.resource.payment_id === 'string' &&
+      (envelope.contentType === 'payment_details' || envelope.contentType === 'mandate_details') &&
+        typeof envelope.resource.payment_id === 'string' &&
         PAYMENT_ID_PATTERN.test(envelope.resource.payment_id) ? envelope.resource.payment_id : null,
       payloadSha256, now,
     ),
@@ -1248,9 +1249,12 @@ async function receiveHyperswitchMandateWebhook(
   const insertEvent = db.prepare(
     'INSERT INTO payment_provider_events ' +
     '(event_row_id, provider, merchant_id, event_id, event_type, payment_id, payload_sha256, state, received_at, processed_at, outcome_code) ' +
-    "VALUES (?, ?, ?, ?, ?, NULL, ?, 'RECEIVED', ?, NULL, NULL) " +
+    "VALUES (?, ?, ?, ?, ?, ?, ?, 'RECEIVED', ?, NULL, NULL) " +
     'ON CONFLICT(provider, merchant_id, event_id) DO NOTHING',
-  ).bind(eventRowId, PROVIDER, envelope.merchantId, envelope.eventId, envelope.eventType, payloadSha256, now);
+  ).bind(
+    eventRowId, PROVIDER, envelope.merchantId, envelope.eventId, envelope.eventType,
+    sourcePaymentId, payloadSha256, now,
+  );
 
   const updateMandate = db.prepare(
     'UPDATE payment_mandates SET provider_mandate_id = COALESCE(provider_mandate_id, ?), status = ?, ' +
