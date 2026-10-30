@@ -551,7 +551,7 @@ export function verifyD1_04OrderMigrationPostflight({
       newObject && newObject.tableName === oldObject.tableName &&
       typeof newObject.sql === 'string' &&
       normalizeSqlDefinition(newObject.sql)
-        .replace(/,\\s*refund_id\\s+text\\s+references\\s+refunds\\s*\\(\\s*refund_id\\s*\\)/i, '') ===
+        .replace(/,\s*refund_id\s+text\s+references\s+refunds\s*\(\s*refund_id\s*\)/i, '') ===
         normalizeSqlDefinition(oldObject.sql)
     if (!newObject || (JSON.stringify(newObject) !== JSON.stringify(oldObject) &&
         !isReviewedMandateReplayGuardUpdate && !isReviewedRefundIdentityGuardUpdate &&
