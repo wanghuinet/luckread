@@ -10,6 +10,7 @@ import {
 } from './hyperswitch-webhook-signature.js';
 import type { HyperswitchPayment } from './hyperswitch-client.js';
 import { validateHyperswitchPaymentWebhook } from './hyperswitch-webhook-payment-validation.js';
+import { persistHyperswitchRefundWebhook } from './refund-webhook-persistence.js';
 
 export type PaymentAttemptStatus =
   | 'INITIATING'
@@ -1381,6 +1382,13 @@ export async function receiveHyperswitchWebhook(
     return receiveHyperswitchMandateWebhook(
       db, envelope, payloadSha256, eventRowId, now, createConflictId,
     );
+  }
+
+  if (envelope.contentType === 'refund_details') {
+    return persistHyperswitchRefundWebhook(db, envelope, payloadSha256, {
+      now: () => new Date(now),
+      createEventRowId: () => eventRowId,
+    });
   }
 
   if (envelope.contentType !== 'payment_details') {
