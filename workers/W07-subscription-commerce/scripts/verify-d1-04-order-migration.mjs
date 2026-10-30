@@ -249,6 +249,18 @@ function fail(message) {
   throw new Error('W07_D1_04_MIGRATION_GATE_FAILED: ' + message)
 }
 
+function normalizeSqlDefinition(sql) {
+  return sql.replace(/\s+/g, ' ').trim().replace(/;$/, '').toLowerCase()
+}
+
+function expectedPaymentProviderEventsTerminalTriggerSql() {
+  const migrationPath = new URL('../migrations-d1-04/0006_payment_method_revocation_requests.sql', import.meta.url)
+  const migration = fs.readFileSync(migrationPath, 'utf8')
+  const match = migration.match(/CREATE TRIGGER payment_provider_events_terminal_immutable\b[\s\S]*?\bEND;/i)
+  if (!match) fail('0006 migration does not define the reviewed payment-provider event terminal trigger')
+  return normalizeSqlDefinition(match[0])
+}
+
 function collectObjects(value, output = [], seen = new Set()) {
   if (Array.isArray(value)) {
     for (const item of value) collectObjects(item, output, seen)
@@ -485,26 +497,16 @@ export function verifyD1_04OrderMigrationPostflight({
       state.names.includes(PAYMENT_METHOD_REVOCATION_MIGRATION_ID) &&
       newObject && newObject.tableName === oldObject.tableName &&
       typeof newObject.sql === 'string' &&
-      newObject.sql.toLowerCase().includes("old.state in ('applied','rejected')") &&
-      newObject.sql.toLowerCase().includes("old.state = 'reconciliation_required'") &&
-      newObject.sql.toLowerCase().includes("old.event_type in ('mandate_active','mandate_revoked')") &&
-      newObject.sql.toLowerCase().includes("new.state = 'received'") &&
-      newObject.sql.toLowerCase().includes('new.processed_at is null') &&
-      newObject.sql.toLowerCase().includes('new.outcome_code is null')
+      normalizeSqlDefinition(newObject.sql) === expectedPaymentProviderEventsTerminalTriggerSql()
     if (!newObject || (JSON.stringify(newObject) !== JSON.stringify(oldObject) && !isReviewedMandateReplayGuardUpdate)) {
       fail('pre-existing schema object was removed or changed: ' + oldObject.type + ':' + oldObject.name)
     }
   }
 
   const mandateReplayGuard = present.get('trigger\u0000payment_provider_events_terminal_immutable')
-  const mandateReplayGuardSql = typeof mandateReplayGuard?.sql === 'string' ? mandateReplayGuard.sql.toLowerCase() : ''
-  if (!mandateReplayGuardSql.includes("old.state in ('applied','rejected')") ||
-      !mandateReplayGuardSql.includes("old.state = 'reconciliation_required'") ||
-      !mandateReplayGuardSql.includes("old.event_type in ('mandate_active','mandate_revoked')") ||
-      !mandateReplayGuardSql.includes("new.state = 'received'") ||
-      !mandateReplayGuardSql.includes('new.processed_at is null') ||
-      !mandateReplayGuardSql.includes('new.outcome_code is null')) {
-    fail('payment provider event trigger does not permit only the reviewed mandate reconciliation replay')
+  if (typeof mandateReplayGuard?.sql !== 'string' ||
+      normalizeSqlDefinition(mandateReplayGuard.sql) !== expectedPaymentProviderEventsTerminalTriggerSql()) {
+    fail('payment provider event trigger differs from the exact reviewed mandate reconciliation replay definition')
   }
 
   const beforeKeys = new Set(before.map((object) => object.type + '\u0000' + object.name))
