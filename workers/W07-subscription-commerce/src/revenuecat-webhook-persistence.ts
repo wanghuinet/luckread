@@ -48,7 +48,8 @@ export async function recordRevenueCatWebhookEvent(
   dependencies: RevenueCatWebhookPersistenceDependencies = {},
 ): Promise<RevenueCatWebhookReceiptResult> {
   if (!(rawBody instanceof ArrayBuffer) || rawBody.byteLength > 1024 * 1024 ||
-      event.eventDataJson.length < 2 || event.eventDataJson.length > 16 * 1024) {
+      typeof event.eventDataJson !== 'string' || event.eventDataJson.length < 2 ||
+      new TextEncoder().encode(event.eventDataJson).byteLength > 16 * 1024) {
     throw new RevenueCatWebhookPersistenceError('INTEGRITY_VIOLATION');
   }
 
