@@ -495,11 +495,12 @@
       "scope": "own"
     },
     {
-      "name": "membership.plan.read.own",
+      "name": "membership.plan.lifecycle.own",
       "resource": "membership_plan",
-      "action": "read",
+      "action": "lifecycle",
       "minLayer": "L3",
-      "scope": "own"
+      "scope": "own",
+      "auditRequired": true
     },
     {
       "name": "membership.plan.publish.own",
@@ -510,17 +511,16 @@
       "auditRequired": true
     },
     {
+      "name": "membership.plan.read.own",
+      "resource": "membership_plan",
+      "action": "read",
+      "minLayer": "L3",
+      "scope": "own"
+    },
+    {
       "name": "membership.plan.update.own",
       "resource": "membership_plan",
       "action": "update",
-      "minLayer": "L3",
-      "scope": "own",
-      "auditRequired": true
-    },
-    {
-      "name": "membership.plan.lifecycle.own",
-      "resource": "membership_plan",
-      "action": "lifecycle",
       "minLayer": "L3",
       "scope": "own",
       "auditRequired": true
@@ -651,6 +651,21 @@
       "action": "role_manage",
       "minLayer": "L4",
       "scope": "organization",
+      "auditRequired": true
+    },
+    {
+      "name": "payment.read",
+      "resource": "payment",
+      "action": "read",
+      "minLayer": "L2",
+      "scope": "own"
+    },
+    {
+      "name": "payment.refund",
+      "resource": "payment",
+      "action": "refund",
+      "minLayer": "L2",
+      "scope": "own",
       "auditRequired": true
     },
     {
@@ -1049,6 +1064,8 @@
           "notification.update.self",
           "order.create",
           "order.read",
+          "payment.read",
+          "payment.refund",
           "report.create",
           "share.create",
           "social.follow",
@@ -1206,6 +1223,8 @@
           "notification.update.self",
           "order.create",
           "order.read",
+          "payment.read",
+          "payment.refund",
           "report.create",
           "revision.create.own",
           "role.assign",
@@ -1286,6 +1305,8 @@
           "notification.update.self",
           "order.create",
           "order.read",
+          "payment.read",
+          "payment.refund",
           "report.create",
           "revision.create.own",
           "role.assign",

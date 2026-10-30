@@ -8,7 +8,8 @@ export const PAYMENT_MIGRATION_ID = '0002_payment_provider_events'
 export const SAVED_METHOD_MIGRATION_ID = '0003_saved_payment_methods_mandates'
 export const RENEWAL_MIGRATION_ID = '0004_subscription_renewal_cycles'
 export const REVENUECAT_WEBHOOK_MIGRATION_ID = '0005_revenuecat_webhook_inbox'
-export const REQUIRED_MIGRATION_IDS = [ORDER_MIGRATION_ID, PAYMENT_MIGRATION_ID, SAVED_METHOD_MIGRATION_ID, RENEWAL_MIGRATION_ID, REVENUECAT_WEBHOOK_MIGRATION_ID]
+export const REFUNDS_BILLING_MIGRATION_ID = '0006_refunds_billing_documents'
+export const REQUIRED_MIGRATION_IDS = [ORDER_MIGRATION_ID, PAYMENT_MIGRATION_ID, SAVED_METHOD_MIGRATION_ID, RENEWAL_MIGRATION_ID, REVENUECAT_WEBHOOK_MIGRATION_ID, REFUNDS_BILLING_MIGRATION_ID]
 
 export const REQUIRED_COLUMNS = {
   orders: [
@@ -100,6 +101,20 @@ export const REQUIRED_COLUMNS = {
     ['existing_payload_sha256', 'TEXT', 1, 0], ['incoming_payload_sha256', 'TEXT', 1, 0],
     ['occurrence_count', 'INTEGER', 1, 0], ['first_seen_at', 'TEXT', 1, 0], ['last_seen_at', 'TEXT', 1, 0],
   ],
+  refunds: [
+    ['refund_id', 'TEXT', 1, 1], ['provider', 'TEXT', 1, 0], ['merchant_id', 'TEXT', 1, 0],
+    ['customer_id', 'TEXT', 1, 0], ['order_id', 'TEXT', 1, 0], ['payment_id', 'TEXT', 1, 0],
+    ['amount_minor', 'INTEGER', 1, 0], ['captured_amount_minor', 'INTEGER', 1, 0], ['currency', 'TEXT', 1, 0],
+    ['status', 'TEXT', 1, 0], ['reason', 'TEXT', 0, 0], ['idempotency_key', 'TEXT', 1, 0],
+    ['request_hash', 'TEXT', 1, 0], ['provider_updated_at', 'TEXT', 0, 0], ['outcome_code', 'TEXT', 0, 0],
+    ['version', 'INTEGER', 1, 0], ['created_at', 'TEXT', 1, 0], ['updated_at', 'TEXT', 1, 0],
+  ],
+  billing_documents: [
+    ['document_id', 'TEXT', 1, 1], ['document_type', 'TEXT', 1, 0], ['document_number', 'TEXT', 1, 0],
+    ['customer_id', 'TEXT', 1, 0], ['order_id', 'TEXT', 1, 0], ['payment_id', 'TEXT', 0, 0],
+    ['amount_minor', 'INTEGER', 1, 0], ['currency', 'TEXT', 1, 0], ['snapshot_json', 'TEXT', 1, 0],
+    ['issued_at', 'TEXT', 1, 0], ['created_at', 'TEXT', 1, 0],
+  ],
 }
 
 export const REQUIRED_INDEXES = {
@@ -129,6 +144,8 @@ export const REQUIRED_INDEXES = {
     'ix_revenuecat_webhook_events_user_received',
   ],
   revenuecat_webhook_event_conflicts: ['ix_revenuecat_webhook_conflicts_event'],
+  refunds: ['ix_refunds_customer_created', 'ix_refunds_payment_created', 'ix_refunds_status_updated'],
+  billing_documents: ['ix_billing_documents_customer_issued'],
 }
 
 export const REQUIRED_TRIGGERS = {
@@ -201,6 +218,13 @@ export const REQUIRED_TRIGGERS = {
     'revenuecat_webhook_conflicts_occurrence_guard',
     'revenuecat_webhook_conflicts_retained',
   ],
+  refunds: [
+    'refunds_require_captured_payment', 'refunds_identity_immutable', 'refunds_version_guard',
+    'refunds_state_transition_guard', 'refunds_provider_timestamp_monotonic', 'refunds_retained',
+  ],
+  billing_documents: [
+    'billing_documents_source_guard', 'billing_documents_identity_immutable', 'billing_documents_retained',
+  ],
 }
 
 const targetNamesFor = (migrationId) => {
@@ -214,7 +238,9 @@ const targetNamesFor = (migrationId) => {
           ? ['subscription_renewal_cycles', 'subscription_renewal_scheduler_state']
           : migrationId === REVENUECAT_WEBHOOK_MIGRATION_ID
             ? ['revenuecat_webhook_events', 'revenuecat_webhook_event_conflicts']
-            : []
+            : migrationId === REFUNDS_BILLING_MIGRATION_ID
+              ? ['refunds', 'billing_documents']
+              : []
   return new Set([
     ...tables,
     ...tables.flatMap((table) => REQUIRED_INDEXES[table] ?? []),
@@ -316,6 +342,10 @@ export function inspectD1_04OrderMigrationPreflight({ schemaSnapshot, migrationS
       REQUIRED_MIGRATION_IDS.slice(0, 4).some((id) => !state.names.includes(id))) {
     fail('RevenueCat webhook migration is recorded without its required commerce migrations; manual schema reconciliation is required')
   }
+  if (state.names.includes(REFUNDS_BILLING_MIGRATION_ID) &&
+      REQUIRED_MIGRATION_IDS.slice(0, 5).some((id) => !state.names.includes(id))) {
+    fail('refund/billing migration is recorded without its required prior commerce migrations; manual schema reconciliation is required')
+  }
   const byName = new Set(objects.map((object) => object.name))
 
   for (const migrationId of state.names.filter((name) => REQUIRED_MIGRATION_IDS.includes(name))) {
@@ -386,6 +416,8 @@ export function verifyD1_04OrderMigrationPostflight({
   renewalSchedulerStateTableInfo,
   revenueCatWebhookEventsTableInfo,
   revenueCatWebhookConflictsTableInfo,
+  refundsTableInfo,
+  billingDocumentsTableInfo,
 }) {
   const before = schemaObjects(preflightSchema)
   const after = schemaObjects(postflightSchema)
@@ -416,6 +448,8 @@ export function verifyD1_04OrderMigrationPostflight({
     subscription_renewal_scheduler_state: renewalSchedulerStateTableInfo,
     revenuecat_webhook_events: revenueCatWebhookEventsTableInfo,
     revenuecat_webhook_event_conflicts: revenueCatWebhookConflictsTableInfo,
+    refunds: refundsTableInfo,
+    billing_documents: billingDocumentsTableInfo,
   }
   for (const [tableName, expectedColumns] of Object.entries(REQUIRED_COLUMNS)) {
     const actual = tableColumns(tableInfoByName[tableName], tableName)
@@ -500,7 +534,7 @@ function main() {
     return
   }
   if (mode === 'postflight') {
-    if (args.length !== 16) throw new Error('Usage: verify-d1-04-order-migration.mjs postflight <preflight-schema.json> <postflight-schema.json> <migration-state.json> <orders-info.json> <order-lines-info.json> <idempotency-info.json> <payments-info.json> <provider-events-info.json> <event-conflicts-info.json> <saved-methods-info.json> <mandates-info.json> <renewal-cycles-info.json> <renewal-scheduler-state-info.json> <revenuecat-events-info.json> <revenuecat-conflicts-info.json> <output.json>')
+    if (args.length !== 18) throw new Error('Usage: verify-d1-04-order-migration.mjs postflight <preflight-schema.json> <postflight-schema.json> <migration-state.json> <orders-info.json> <order-lines-info.json> <idempotency-info.json> <payments-info.json> <provider-events-info.json> <event-conflicts-info.json> <saved-methods-info.json> <mandates-info.json> <renewal-cycles-info.json> <renewal-scheduler-state-info.json> <revenuecat-events-info.json> <revenuecat-conflicts-info.json> <refunds-info.json> <billing-documents-info.json> <output.json>')
     const report = verifyD1_04OrderMigrationPostflight({
       preflightSchema: readJson(args[0]),
       postflightSchema: readJson(args[1]),
@@ -517,8 +551,10 @@ function main() {
       renewalSchedulerStateTableInfo: readJson(args[12]),
       revenueCatWebhookEventsTableInfo: readJson(args[13]),
       revenueCatWebhookConflictsTableInfo: readJson(args[14]),
+      refundsTableInfo: readJson(args[15]),
+      billingDocumentsTableInfo: readJson(args[16]),
     })
-    writeReport(args[15], report)
+    writeReport(args[17], report)
     console.log(JSON.stringify(report, null, 2))
     return
   }

@@ -605,6 +605,21 @@
       "stateMachine": "none"
     },
     {
+      "operationId": "getBillingDocuments",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "payment.read"
+      ],
+      "auditRequired": false,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none",
+      "x-luckread-contract-status": "CONTRACTED_PARTIAL",
+      "x-luckread-source": "contracts/api/commerce-operation-policy.v1.json"
+    },
+    {
       "operationId": "getCommerceOrder",
       "auth": {
         "mode": "permission"
@@ -1182,6 +1197,36 @@
       "stateMachine": "none",
       "x-luckread-contract-status": "DISCOVERY_DRAFT",
       "x-luckread-source": "contracts/api/api-inventory.v1.json"
+    },
+    {
+      "operationId": "getPaymentsHistory",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "payment.read"
+      ],
+      "auditRequired": false,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none",
+      "x-luckread-contract-status": "CONTRACTED_PARTIAL",
+      "x-luckread-source": "contracts/api/commerce-operation-policy.v1.json"
+    },
+    {
+      "operationId": "getPaymentsRefunds",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "payment.read"
+      ],
+      "auditRequired": false,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none",
+      "x-luckread-contract-status": "CONTRACTED_PARTIAL",
+      "x-luckread-source": "contracts/api/commerce-operation-policy.v1.json"
     },
     {
       "operationId": "getPlans",
@@ -2581,6 +2626,21 @@
       "stateMachine": "none",
       "x-luckread-contract-status": "CONTRACTED_PARTIAL",
       "x-luckread-source": "contracts/api/api-inventory.v1.json"
+    },
+    {
+      "operationId": "postPaymentsRefunds",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "payment.refund"
+      ],
+      "auditRequired": true,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": true,
+      "stateMachine": "none",
+      "x-luckread-contract-status": "CONTRACTED_PARTIAL",
+      "x-luckread-source": "contracts/api/commerce-operation-policy.v1.json"
     },
     {
       "operationId": "postPosts",

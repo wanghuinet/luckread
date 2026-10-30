@@ -4498,6 +4498,148 @@ paths:
         '429': { $ref: '#/components/responses/RateLimited' }
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
+  /billing/documents:
+    get:
+      tags: [Commerce]
+      summary: List the authenticated customer invoices and receipts
+      operationId: getBillingDocuments
+      x-luckread-contract-status: CONTRACTED_PARTIAL
+      x-luckread-runtime-status: IMPLEMENTED_SOURCE_ONLY_PENDING_D1_04_MIGRATION
+      x-luckread-source: contracts/api/commerce-operation-policy.v1.json
+      security:
+        - sessionCookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+        - name: cursor
+          in: query
+          required: false
+          schema: { type: string, minLength: 1, maxLength: 512 }
+      responses:
+        '200':
+          description: Customer-owned records returned using bounded keyset pagination.
+          headers:
+            Cache-Control:
+              schema: { type: string, const: no-store }
+          content:
+            application/json:
+              schema: {"type":"object","additionalProperties":false,"required":["data","requestId"],"properties":{"data":{"type":"object","additionalProperties":false,"required":["items","nextCursor","hasMore"],"properties":{"items":{"type":"array","maxItems":50,"items":{"type":"object","additionalProperties":false,"required":["documentId","documentType","documentNumber","orderId","paymentId","amountMinor","currency","snapshot","issuedAt","createdAt"],"properties":{"documentId":{"type":"string","minLength":1,"maxLength":128},"documentType":{"type":"string","enum":["INVOICE","RECEIPT"]},"documentNumber":{"type":"string","minLength":1,"maxLength":128},"orderId":{"type":"string","pattern":"^ord_[A-Za-z0-9_-]{1,90}$"},"paymentId":{"type":["string","null"],"pattern":"^pay_[A-Za-z0-9]{26}$"},"amountMinor":{"type":"integer","minimum":1,"maximum":9007199254740991},"currency":{"type":"string","pattern":"^[A-Z]{3}$"},"snapshot":{"type":"object","additionalProperties":true},"issuedAt":{"type":"string","format":"date-time"},"createdAt":{"type":"string","format":"date-time"}}}},"nextCursor":{"type":["string","null"],"maxLength":512},"hasMore":{"type":"boolean"}}},"requestId":{"type":"string","pattern":"^req_[A-Za-z0-9_-]{1,123}$"}}}
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/PermissionDenied' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /payments/history:
+    get:
+      tags: [Commerce]
+      summary: List the authenticated customer payment history
+      operationId: getPaymentsHistory
+      x-luckread-contract-status: CONTRACTED_PARTIAL
+      x-luckread-runtime-status: IMPLEMENTED_SOURCE_ONLY_PENDING_D1_04_MIGRATION
+      x-luckread-source: contracts/api/commerce-operation-policy.v1.json
+      security:
+        - sessionCookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+        - name: cursor
+          in: query
+          required: false
+          schema: { type: string, minLength: 1, maxLength: 512 }
+      responses:
+        '200':
+          description: Customer-owned records returned using bounded keyset pagination.
+          headers:
+            Cache-Control:
+              schema: { type: string, const: no-store }
+          content:
+            application/json:
+              schema: {"type":"object","additionalProperties":false,"required":["data","requestId"],"properties":{"data":{"type":"object","additionalProperties":false,"required":["items","nextCursor","hasMore"],"properties":{"items":{"type":"array","maxItems":50,"items":{"type":"object","additionalProperties":false,"required":["paymentId","orderId","amountMinor","currency","status","version","providerUpdatedAt","createdAt","updatedAt","refundedMinor"],"properties":{"paymentId":{"type":"string","pattern":"^pay_[A-Za-z0-9]{26}$"},"orderId":{"type":"string","pattern":"^ord_[A-Za-z0-9_-]{1,90}$"},"amountMinor":{"type":"integer","minimum":1,"maximum":9007199254740991},"currency":{"type":"string","pattern":"^[A-Z]{3}$"},"status":{"type":"string","maxLength":64},"version":{"type":"integer","minimum":1},"providerUpdatedAt":{"type":["string","null"],"format":"date-time"},"createdAt":{"type":"string","format":"date-time"},"updatedAt":{"type":"string","format":"date-time"},"refundedMinor":{"type":"integer","minimum":0,"maximum":9007199254740991}}}},"nextCursor":{"type":["string","null"],"maxLength":512},"hasMore":{"type":"boolean"}}},"requestId":{"type":"string","pattern":"^req_[A-Za-z0-9_-]{1,123}$"}}}
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/PermissionDenied' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /payments/refunds:
+    post:
+      tags: [Commerce]
+      summary: Create a full or partial refund for an owned payment
+      description: W01 authorizes the own-Payment permission. W07 verifies D1-04 ownership and Hyperswitch amount_received, reserves a stable refund ID, and waits for a signed webhook to confirm the final refund state.
+      operationId: postPaymentsRefunds
+      x-luckread-contract-status: CONTRACTED_PARTIAL
+      x-luckread-runtime-status: IMPLEMENTED_SOURCE_ONLY_PENDING_D1_04_MIGRATION_AND_SECRETS
+      x-luckread-source: contracts/api/commerce-operation-policy.v1.json
+      security:
+        - sessionCookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"type":"object","additionalProperties":false,"required":["paymentId","amountMinor","currency"],"properties":{"paymentId":{"type":"string","pattern":"^pay_[A-Za-z0-9]{26}$"},"amountMinor":{"type":"integer","minimum":1,"maximum":9007199254740991},"currency":{"type":"string","pattern":"^[A-Z]{3}$"},"reason":{"type":"string","maxLength":255}}}
+      responses:
+        '202':
+          description: Refund submitted or awaiting signed provider confirmation.
+          content:
+            application/json:
+              schema: {"type":"object","additionalProperties":false,"required":["data","requestId"],"properties":{"data":{"type":"object","additionalProperties":false,"required":["refundId","paymentId","orderId","amountMinor","capturedAmountMinor","currency","status","reason","version","providerUpdatedAt","createdAt","updatedAt","replayed"],"properties":{"refundId":{"type":"string","pattern":"^ref_[A-Za-z0-9]{26}$"},"paymentId":{"type":"string","pattern":"^pay_[A-Za-z0-9]{26}$"},"orderId":{"type":"string","pattern":"^ord_[A-Za-z0-9_-]{1,90}$"},"amountMinor":{"type":"integer","minimum":1,"maximum":9007199254740991},"capturedAmountMinor":{"type":"integer","minimum":1,"maximum":9007199254740991},"currency":{"type":"string","pattern":"^[A-Z]{3}$"},"status":{"type":"string","enum":["REQUESTED","PENDING","SUCCEEDED","FAILED","REVIEW","RECONCILIATION_REQUIRED"]},"reason":{"type":["string","null"],"maxLength":255},"version":{"type":"integer","minimum":1},"providerUpdatedAt":{"type":["string","null"],"format":"date-time"},"createdAt":{"type":"string","format":"date-time"},"updatedAt":{"type":"string","format":"date-time"},"replayed":{"type":"boolean"}}},"requestId":{"type":"string","pattern":"^req_[A-Za-z0-9_-]{1,123}$"}}}
+        '200':
+          description: Idempotent replay of a finalized refund.
+          content:
+            application/json:
+              schema: {"type":"object","additionalProperties":false,"required":["data","requestId"],"properties":{"data":{"type":"object","additionalProperties":false,"required":["refundId","paymentId","orderId","amountMinor","capturedAmountMinor","currency","status","reason","version","providerUpdatedAt","createdAt","updatedAt","replayed"],"properties":{"refundId":{"type":"string","pattern":"^ref_[A-Za-z0-9]{26}$"},"paymentId":{"type":"string","pattern":"^pay_[A-Za-z0-9]{26}$"},"orderId":{"type":"string","pattern":"^ord_[A-Za-z0-9_-]{1,90}$"},"amountMinor":{"type":"integer","minimum":1,"maximum":9007199254740991},"capturedAmountMinor":{"type":"integer","minimum":1,"maximum":9007199254740991},"currency":{"type":"string","pattern":"^[A-Z]{3}$"},"status":{"type":"string","enum":["REQUESTED","PENDING","SUCCEEDED","FAILED","REVIEW","RECONCILIATION_REQUIRED"]},"reason":{"type":["string","null"],"maxLength":255},"version":{"type":"integer","minimum":1},"providerUpdatedAt":{"type":["string","null"],"format":"date-time"},"createdAt":{"type":"string","format":"date-time"},"updatedAt":{"type":"string","format":"date-time"},"replayed":{"type":"boolean"}}},"requestId":{"type":"string","pattern":"^req_[A-Za-z0-9_-]{1,123}$"}}}
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/PermissionDenied' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/InvalidState' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+    get:
+      tags: [Commerce]
+      summary: List the authenticated customer refund history
+      operationId: getPaymentsRefunds
+      x-luckread-contract-status: CONTRACTED_PARTIAL
+      x-luckread-runtime-status: IMPLEMENTED_SOURCE_ONLY_PENDING_D1_04_MIGRATION
+      x-luckread-source: contracts/api/commerce-operation-policy.v1.json
+      security:
+        - sessionCookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+        - name: cursor
+          in: query
+          required: false
+          schema: { type: string, minLength: 1, maxLength: 512 }
+      responses:
+        '200':
+          description: Customer-owned records returned using bounded keyset pagination.
+          headers:
+            Cache-Control:
+              schema: { type: string, const: no-store }
+          content:
+            application/json:
+              schema: {"type":"object","additionalProperties":false,"required":["data","requestId"],"properties":{"data":{"type":"object","additionalProperties":false,"required":["items","nextCursor","hasMore"],"properties":{"items":{"type":"array","maxItems":50,"items":{"type":"object","additionalProperties":false,"required":["refundId","paymentId","orderId","amountMinor","currency","status","reason","version","providerUpdatedAt","createdAt","updatedAt"],"properties":{"refundId":{"type":"string","pattern":"^ref_[A-Za-z0-9]{26}$"},"paymentId":{"type":"string","pattern":"^pay_[A-Za-z0-9]{26}$"},"orderId":{"type":"string","pattern":"^ord_[A-Za-z0-9_-]{1,90}$"},"amountMinor":{"type":"integer","minimum":1,"maximum":9007199254740991},"currency":{"type":"string","pattern":"^[A-Z]{3}$"},"status":{"type":"string","enum":["REQUESTED","PENDING","SUCCEEDED","FAILED","REVIEW","RECONCILIATION_REQUIRED"]},"reason":{"type":["string","null"],"maxLength":255},"version":{"type":"integer","minimum":1},"providerUpdatedAt":{"type":["string","null"],"format":"date-time"},"createdAt":{"type":"string","format":"date-time"},"updatedAt":{"type":"string","format":"date-time"}}}},"nextCursor":{"type":["string","null"],"maxLength":512},"hasMore":{"type":"boolean"}}},"requestId":{"type":"string","pattern":"^req_[A-Za-z0-9_-]{1,123}$"}}}
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/PermissionDenied' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
 components:
   securitySchemes:
     bearerAuth:

@@ -15,6 +15,7 @@ import {
   fulfillPaidMembershipOrder,
   type PaidMembershipPurchaseFulfillmentResult,
 } from './paid-membership-order-fulfillment.js';
+import { issueReceiptForPaidPayment } from './billing-persistence.js';
 
 type HyperswitchWebhookRuntimeEnv = Readonly<{
   D1_01: D1Database;
@@ -42,6 +43,7 @@ type HyperswitchWebhookRuntimeDependencies = Readonly<{
     options?: Readonly<{ limit?: number }>,
   ) => Promise<RenewalPendingRecoveryResult>;
   fulfillPaidOrder?: typeof fulfillPaidMembershipOrder;
+  issueReceipt?: typeof issueReceiptForPaidPayment;
 }>;
 
 const WEBHOOK_PATH = '/internal/webhooks/hyperswitch';
@@ -188,6 +190,13 @@ export async function handleHyperswitchWebhookRequest(
     const paymentId = (result.outcome === 'APPLIED' || result.outcome === 'DUPLICATE')
       ? paymentIdFromSignedPayload(rawBody)
       : null;
+    if (paymentId && isSignedPaymentSucceededEvent(rawBody)) {
+      // A receipt is created only after receiveHyperswitchWebhook has verified
+      // the raw HMAC signature and committed the successful Payment state.
+      // Duplicate signed events safely retry a previously interrupted receipt.
+      const issueReceipt = dependencies.issueReceipt ?? issueReceiptForPaidPayment;
+      await issueReceipt(env.D1_04, paymentId, env.HYPERSWITCH_MERCHANT_ID);
+    }
     if (paymentId) {
       const sync = dependencies.syncRenewalOutcome ?? syncRenewalCycleOutcomeForPayment;
       const renewalEnv = { D1_01: env.D1_01, D1_04: env.D1_04 };

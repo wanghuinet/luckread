@@ -9,6 +9,7 @@ import {
   SAVED_METHOD_MIGRATION_ID,
   RENEWAL_MIGRATION_ID,
   REVENUECAT_WEBHOOK_MIGRATION_ID,
+  REFUNDS_BILLING_MIGRATION_ID,
   REQUIRED_MIGRATION_IDS,
   REQUIRED_COLUMNS,
   REQUIRED_INDEXES,
@@ -36,7 +37,9 @@ function targetObjectsFor(migrationIds) {
           ? ['subscription_renewal_cycles', 'subscription_renewal_scheduler_state']
           : id === REVENUECAT_WEBHOOK_MIGRATION_ID
             ? ['revenuecat_webhook_events', 'revenuecat_webhook_event_conflicts']
-            : [])
+            : id === REFUNDS_BILLING_MIGRATION_ID
+              ? ['refunds', 'billing_documents']
+              : [])
   const objects = tables.map((tableName) => ({
     type: 'table',
     name: tableName,
@@ -100,6 +103,8 @@ const tableInfo = {
   renewalSchedulerState: tableInfoFor('subscription_renewal_scheduler_state'),
   revenueCatWebhookEvents: tableInfoFor('revenuecat_webhook_events'),
   revenueCatWebhookConflicts: tableInfoFor('revenuecat_webhook_event_conflicts'),
+  refunds: tableInfoFor('refunds'),
+  billingDocuments: tableInfoFor('billing_documents'),
 }
 
 function verifyCompletePostflight({ preflightSchema = schemaWithMigrations([]), postflightSchema = schemaWithMigrations(REQUIRED_MIGRATION_IDS), migrationState = wrapMigrationState(REQUIRED_MIGRATION_IDS) } = {}) {
@@ -119,6 +124,8 @@ function verifyCompletePostflight({ preflightSchema = schemaWithMigrations([]), 
     renewalSchedulerStateTableInfo: tableInfo.renewalSchedulerState,
     revenueCatWebhookEventsTableInfo: tableInfo.revenueCatWebhookEvents,
     revenueCatWebhookConflictsTableInfo: tableInfo.revenueCatWebhookConflicts,
+    refundsTableInfo: tableInfo.refunds,
+    billingDocumentsTableInfo: tableInfo.billingDocuments,
   })
 }
 
@@ -154,8 +161,16 @@ test('an applied Order migration can advance pending Payment, mandate and renewa
     migrationState: wrapMigrationState([ORDER_MIGRATION_ID]),
   })
   assert.equal(result.action, 'APPLY')
-  assert.deepEqual(result.pendingMigrationIds, [PAYMENT_MIGRATION_ID, SAVED_METHOD_MIGRATION_ID, RENEWAL_MIGRATION_ID, REVENUECAT_WEBHOOK_MIGRATION_ID])
+  assert.deepEqual(result.pendingMigrationIds, [PAYMENT_MIGRATION_ID, SAVED_METHOD_MIGRATION_ID, RENEWAL_MIGRATION_ID, REVENUECAT_WEBHOOK_MIGRATION_ID, REFUNDS_BILLING_MIGRATION_ID])
   assert.equal(result.writesPerformed, false)
+})
+
+
+test('refund and billing migration cannot be recorded before the prior commerce schema chain', () => {
+  assert.throws(() => inspectD1_04OrderMigrationPreflight({
+    schemaSnapshot: schemaWithMigrations([REFUNDS_BILLING_MIGRATION_ID]),
+    migrationState: wrapMigrationState([REFUNDS_BILLING_MIGRATION_ID]),
+  }), /refund\/billing migration is recorded without its required prior commerce migrations/)
 })
 
 test('all reviewed migrations already applied proceeds only to postflight verification', () => {
@@ -182,7 +197,7 @@ test('normalizes Wrangler .sql migration filenames for preflight and postflight 
   const report = verifyCompletePostflight({ migrationState })
   assert.equal(report.result, 'POSTFLIGHT_PASS')
   assert.deepEqual(report.appliedMigrations, REQUIRED_MIGRATION_IDS)
-  assert.equal(report.verifiedTriggers.length, 56)
+  assert.equal(report.verifiedTriggers.length, 65)
 })
 
 test('fails closed if any target object exists without matching migration history', () => {
@@ -211,9 +226,9 @@ test('postflight validates both migrations, all tables/columns/indexes/triggers,
   assert.equal(report.result, 'POSTFLIGHT_PASS')
   assert.equal(report.baselineSchemaPreserved, true)
   assert.deepEqual(report.appliedMigrations, REQUIRED_MIGRATION_IDS)
-  assert.equal(report.verifiedTables.length, 12)
-  assert.equal(report.verifiedIndexes.length, 25)
-  assert.equal(report.verifiedTriggers.length, 56)
+  assert.equal(report.verifiedTables.length, 14)
+  assert.equal(report.verifiedIndexes.length, 29)
+  assert.equal(report.verifiedTriggers.length, 65)
   assert.equal(report.databaseRowsExported, false)
 })
 
@@ -239,6 +254,7 @@ test('workflow is manual-only, gates exact SHA/name/confirmation, and never depl
   const workflow = fs.readFileSync(new URL('../../../.github/workflows/w07-d1-04-order-migration.yml', import.meta.url), 'utf8')
   const migration = fs.readFileSync(new URL('../migrations-d1-04/0004_subscription_renewal_cycles.sql', import.meta.url), 'utf8')
   const revenueCatMigration = fs.readFileSync(new URL('../migrations-d1-04/0005_revenuecat_webhook_inbox.sql', import.meta.url), 'utf8')
+  const refundsBillingMigration = fs.readFileSync(new URL('../migrations-d1-04/0006_refunds_billing_documents.sql', import.meta.url), 'utf8')
   assert.match(workflow, /workflow_dispatch:/)
   assert.doesNotMatch(workflow, /^\s{2}(push|pull_request):/m)
   assert.match(workflow, /source_sha:/)
@@ -256,6 +272,13 @@ test('workflow is manual-only, gates exact SHA/name/confirmation, and never depl
   assert.match(workflow, /0003_saved_payment_methods_mandates\.sql/)
   assert.match(workflow, /0004_subscription_renewal_cycles\.sql/)
   assert.match(workflow, /0005_revenuecat_webhook_inbox\.sql/)
+  assert.match(workflow, /0006_refunds_billing_documents\.sql/)
+  assert.match(workflow, /PRAGMA table_info\("refunds"\)/)
+  assert.match(workflow, /PRAGMA table_info\("billing_documents"\)/)
+  assert.match(refundsBillingMigration, /CREATE TABLE refunds/)
+  assert.match(refundsBillingMigration, /CREATE TABLE billing_documents/)
+  assert.match(refundsBillingMigration, /refunds_require_captured_payment/)
+  assert.match(refundsBillingMigration, /refunds_version_guard/)
   assert.match(workflow, /PRAGMA table_info\("saved_payment_methods"\)/)
   assert.match(workflow, /PRAGMA table_info\("payment_mandates"\)/)
   assert.match(workflow, /PRAGMA table_info\("subscription_renewal_cycles"\)/)

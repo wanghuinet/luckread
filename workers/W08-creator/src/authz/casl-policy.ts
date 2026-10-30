@@ -67,6 +67,7 @@ export const SUPPORTED_AUTHZ_SUBJECTS = [
   'Subscription',
   'MembershipPlan',
   'Order',
+  'Payment',
   'PlatformConfig',
   'FeatureFlag',
   'Secret',
@@ -100,6 +101,7 @@ const RESTRICTED_ACCOUNT_WRITE_DENIES = new Set([
   'comment.create',
   'subscription.manage.any',
   'order.create',
+  'payment.refund',
   'membership.plan.create.own',
   'membership.plan.publish.own',
   'membership.plan.update.own',
@@ -353,6 +355,8 @@ function buildLayerAbility(input: CaslPermissionInput) {
   if (input.layer !== 'L0' && input.layer !== 'L1' && input.subjectId) {
     grant('order.create', 'Order', selfOwnerCondition(input.subjectId))
     grant('order.read', 'Order', selfOwnerCondition(input.subjectId))
+    grant('payment.read', 'Payment', selfOwnerCondition(input.subjectId))
+    grant('payment.refund', 'Payment', selfOwnerCondition(input.subjectId))
   }
 
   // Creator application creation is deliberately L2-only; it is not inherited

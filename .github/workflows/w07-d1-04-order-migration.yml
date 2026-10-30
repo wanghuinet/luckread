@@ -69,6 +69,7 @@ jobs:
           test -f migrations-d1-04/0003_saved_payment_methods_mandates.sql
           test -f migrations-d1-04/0004_subscription_renewal_cycles.sql
           test -f migrations-d1-04/0005_revenuecat_webhook_inbox.sql
+          test -f migrations-d1-04/0006_refunds_billing_documents.sql
           python scripts/test_order_d1_04_migration.py
           test -f scripts/verify-d1-04-order-migration.mjs
           node - <<'NODE'
@@ -175,6 +176,8 @@ jobs:
           npx --yes wrangler@4.116.0 d1 execute "$D1_04_NAME" --remote --config wrangler.jsonc --command='PRAGMA table_info("subscription_renewal_scheduler_state")' --json > /tmp/w07-d1-04-renewal-scheduler-state-columns.json
           npx --yes wrangler@4.116.0 d1 execute "$D1_04_NAME" --remote --config wrangler.jsonc --command='PRAGMA table_info("revenuecat_webhook_events")' --json > /tmp/w07-d1-04-revenuecat-webhook-events-columns.json
           npx --yes wrangler@4.116.0 d1 execute "$D1_04_NAME" --remote --config wrangler.jsonc --command='PRAGMA table_info("revenuecat_webhook_event_conflicts")' --json > /tmp/w07-d1-04-revenuecat-webhook-conflicts-columns.json
+          npx --yes wrangler@4.116.0 d1 execute "$D1_04_NAME" --remote --config wrangler.jsonc --command='PRAGMA table_info("refunds")' --json > /tmp/w07-d1-04-refunds-columns.json
+          npx --yes wrangler@4.116.0 d1 execute "$D1_04_NAME" --remote --config wrangler.jsonc --command='PRAGMA table_info("billing_documents")' --json > /tmp/w07-d1-04-billing-documents-columns.json
           node scripts/verify-d1-04-order-migration.mjs postflight \
             /tmp/w07-d1-04-preflight-schema.json \
             /tmp/w07-d1-04-postflight-schema.json \
@@ -191,6 +194,8 @@ jobs:
             /tmp/w07-d1-04-renewal-scheduler-state-columns.json \
             /tmp/w07-d1-04-revenuecat-webhook-events-columns.json \
             /tmp/w07-d1-04-revenuecat-webhook-conflicts-columns.json \
+            /tmp/w07-d1-04-refunds-columns.json \
+            /tmp/w07-d1-04-billing-documents-columns.json \
             /tmp/w07-d1-04-postflight-report.json
 
       - name: Summarize migration and schema verification

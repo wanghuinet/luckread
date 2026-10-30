@@ -110,6 +110,12 @@ function parseOpenApi(raw = fs.readFileSync(`${root}/${openapiPath}`, 'utf8')) {
   };
 
   for (const line of lines) {
+    if (line === 'components:') {
+      flush();
+      currentPath = null;
+      currentMethod = null;
+      continue;
+    }
     const pathMatch = line.match(/^  (\/[^:#]+):\s*$/);
     if (pathMatch) {
       flush();
@@ -133,7 +139,273 @@ function parseOpenApi(raw = fs.readFileSync(`${root}/${openapiPath}`, 'utf8')) {
   return operations;
 }
 
+function buildCommerceOpenApiOperation({ operationId, method }) {
+  const security = [
+    '      security:',
+    '        - sessionCookieAuth: []',
+    '        - bearerAuth: []',
+  ];
+  const listParameters = [
+    '      parameters:',
+    '        - name: limit',
+    '          in: query',
+    '          required: false',
+    '          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }',
+    '        - name: cursor',
+    '          in: query',
+    '          required: false',
+    '          schema: { type: string, minLength: 1, maxLength: 512 }',
+  ];
+  const envelope = (item) => ({
+    type: 'object',
+    additionalProperties: false,
+    required: ['data', 'requestId'],
+    properties: {
+      data: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['items', 'nextCursor', 'hasMore'],
+        properties: {
+          items: { type: 'array', maxItems: 50, items: item },
+          nextCursor: { type: ['string', 'null'], maxLength: 512 },
+          hasMore: { type: 'boolean' },
+        },
+      },
+      requestId: { type: 'string', pattern: '^req_[A-Za-z0-9_-]{1,123}$' },
+    },
+  });
+  const itemSchemas = {
+    getPaymentsHistory: {
+      type: 'object', additionalProperties: false,
+      required: ['paymentId', 'orderId', 'amountMinor', 'currency', 'status', 'version', 'providerUpdatedAt', 'createdAt', 'updatedAt', 'refundedMinor'],
+      properties: {
+        paymentId: { type: 'string', pattern: '^pay_[A-Za-z0-9]{26}$' },
+        orderId: { type: 'string', pattern: '^ord_[A-Za-z0-9_-]{1,90}$' },
+        amountMinor: { type: 'integer', minimum: 1, maximum: 9007199254740991 },
+        currency: { type: 'string', pattern: '^[A-Z]{3}$' },
+        status: { type: 'string', maxLength: 64 },
+        version: { type: 'integer', minimum: 1 },
+        providerUpdatedAt: { type: ['string', 'null'], format: 'date-time' },
+        createdAt: { type: 'string', format: 'date-time' },
+        updatedAt: { type: 'string', format: 'date-time' },
+        refundedMinor: { type: 'integer', minimum: 0, maximum: 9007199254740991 },
+      },
+    },
+    getPaymentsRefunds: {
+      type: 'object', additionalProperties: false,
+      required: ['refundId', 'paymentId', 'orderId', 'amountMinor', 'currency', 'status', 'reason', 'version', 'providerUpdatedAt', 'createdAt', 'updatedAt'],
+      properties: {
+        refundId: { type: 'string', pattern: '^ref_[A-Za-z0-9]{26}$' },
+        paymentId: { type: 'string', pattern: '^pay_[A-Za-z0-9]{26}$' },
+        orderId: { type: 'string', pattern: '^ord_[A-Za-z0-9_-]{1,90}$' },
+        amountMinor: { type: 'integer', minimum: 1, maximum: 9007199254740991 },
+        currency: { type: 'string', pattern: '^[A-Z]{3}$' },
+        status: { type: 'string', enum: ['REQUESTED', 'PENDING', 'SUCCEEDED', 'FAILED', 'REVIEW', 'RECONCILIATION_REQUIRED'] },
+        reason: { type: ['string', 'null'], maxLength: 255 },
+        version: { type: 'integer', minimum: 1 },
+        providerUpdatedAt: { type: ['string', 'null'], format: 'date-time' },
+        createdAt: { type: 'string', format: 'date-time' },
+        updatedAt: { type: 'string', format: 'date-time' },
+      },
+    },
+    getBillingDocuments: {
+      type: 'object', additionalProperties: false,
+      required: ['documentId', 'documentType', 'documentNumber', 'orderId', 'paymentId', 'amountMinor', 'currency', 'snapshot', 'issuedAt', 'createdAt'],
+      properties: {
+        documentId: { type: 'string', minLength: 1, maxLength: 128 },
+        documentType: { type: 'string', enum: ['INVOICE', 'RECEIPT'] },
+        documentNumber: { type: 'string', minLength: 1, maxLength: 128 },
+        orderId: { type: 'string', pattern: '^ord_[A-Za-z0-9_-]{1,90}$' },
+        paymentId: { type: ['string', 'null'], pattern: '^pay_[A-Za-z0-9]{26}$' },
+        amountMinor: { type: 'integer', minimum: 1, maximum: 9007199254740991 },
+        currency: { type: 'string', pattern: '^[A-Z]{3}$' },
+        snapshot: { type: 'object', additionalProperties: true },
+        issuedAt: { type: 'string', format: 'date-time' },
+        createdAt: { type: 'string', format: 'date-time' },
+      },
+    },
+  };
+  const methods = {
+    getPaymentsHistory: 'List the authenticated customer payment history',
+    getPaymentsRefunds: 'List the authenticated customer refund history',
+    getBillingDocuments: 'List the authenticated customer invoices and receipts',
+  };
+  if (operationId === 'postPaymentsRefunds' && method === 'POST') {
+    const requestSchema = {
+      type: 'object', additionalProperties: false,
+      required: ['paymentId', 'amountMinor', 'currency'],
+      properties: {
+        paymentId: { type: 'string', pattern: '^pay_[A-Za-z0-9]{26}$' },
+        amountMinor: { type: 'integer', minimum: 1, maximum: 9007199254740991 },
+        currency: { type: 'string', pattern: '^[A-Z]{3}$' },
+        reason: { type: 'string', maxLength: 255 },
+      },
+    };
+    const responseSchema = {
+      type: 'object', additionalProperties: false,
+      required: ['data', 'requestId'],
+      properties: {
+        data: {
+          type: 'object', additionalProperties: false,
+          required: ['refundId', 'paymentId', 'orderId', 'amountMinor', 'capturedAmountMinor', 'currency', 'status', 'reason', 'version', 'providerUpdatedAt', 'createdAt', 'updatedAt', 'replayed'],
+          properties: {
+            refundId: { type: 'string', pattern: '^ref_[A-Za-z0-9]{26}$' },
+            paymentId: { type: 'string', pattern: '^pay_[A-Za-z0-9]{26}$' },
+            orderId: { type: 'string', pattern: '^ord_[A-Za-z0-9_-]{1,90}$' },
+            amountMinor: { type: 'integer', minimum: 1, maximum: 9007199254740991 },
+            capturedAmountMinor: { type: 'integer', minimum: 1, maximum: 9007199254740991 },
+            currency: { type: 'string', pattern: '^[A-Z]{3}$' },
+            status: { type: 'string', enum: ['REQUESTED', 'PENDING', 'SUCCEEDED', 'FAILED', 'REVIEW', 'RECONCILIATION_REQUIRED'] },
+            reason: { type: ['string', 'null'], maxLength: 255 },
+            version: { type: 'integer', minimum: 1 },
+            providerUpdatedAt: { type: ['string', 'null'], format: 'date-time' },
+            createdAt: { type: 'string', format: 'date-time' },
+            updatedAt: { type: 'string', format: 'date-time' },
+            replayed: { type: 'boolean' },
+          },
+        },
+        requestId: { type: 'string', pattern: '^req_[A-Za-z0-9_-]{1,123}$' },
+      },
+    };
+    return [
+      '    post:',
+      '      tags: [Commerce]',
+      '      summary: Create a full or partial refund for an owned payment',
+      '      description: W01 authorizes the own-Payment permission. W07 verifies D1-04 ownership and Hyperswitch amount_received, reserves a stable refund ID, and waits for a signed webhook to confirm the final refund state.',
+      '      operationId: postPaymentsRefunds',
+      '      x-luckread-contract-status: CONTRACTED_PARTIAL',
+      '      x-luckread-runtime-status: IMPLEMENTED_SOURCE_ONLY_PENDING_D1_04_MIGRATION_AND_SECRETS',
+      '      x-luckread-source: contracts/api/commerce-operation-policy.v1.json',
+      ...security,
+      '      parameters:',
+      "        - $ref: '#/components/parameters/IdempotencyKeyRequired'",
+      '      requestBody:',
+      '        required: true',
+      '        content:',
+      '          application/json:',
+      '            schema: ' + JSON.stringify(requestSchema),
+      '      responses:',
+      "        '202':",
+      '          description: Refund submitted or awaiting signed provider confirmation.',
+      '          content:',
+      '            application/json:',
+      '              schema: ' + JSON.stringify(responseSchema),
+      "        '200':",
+      '          description: Idempotent replay of a finalized refund.',
+      '          content:',
+      '            application/json:',
+      '              schema: ' + JSON.stringify(responseSchema),
+      "        '400': { $ref: '#/components/responses/ValidationFailed' }",
+      "        '401': { $ref: '#/components/responses/Unauthenticated' }",
+      "        '403': { $ref: '#/components/responses/PermissionDenied' }",
+      "        '404': { $ref: '#/components/responses/NotFound' }",
+      "        '409': { $ref: '#/components/responses/InvalidState' }",
+      "        '428': { $ref: '#/components/responses/PreconditionRequired' }",
+      "        '429': { $ref: '#/components/responses/RateLimited' }",
+      "        '503': { $ref: '#/components/responses/ServiceUnavailable' }",
+    ].join('\n');
+  }
+  if (method === 'GET' && Object.prototype.hasOwnProperty.call(itemSchemas, operationId)) {
+    return [
+      '    get:',
+      '      tags: [Commerce]',
+      "      summary: " + methods[operationId],
+      '      operationId: ' + operationId,
+      '      x-luckread-contract-status: CONTRACTED_PARTIAL',
+      '      x-luckread-runtime-status: IMPLEMENTED_SOURCE_ONLY_PENDING_D1_04_MIGRATION',
+      '      x-luckread-source: contracts/api/commerce-operation-policy.v1.json',
+      ...security,
+      ...listParameters,
+      '      responses:',
+      "        '200':",
+      '          description: Customer-owned records returned using bounded keyset pagination.',
+      '          headers:',
+      '            Cache-Control:',
+      '              schema: { type: string, const: no-store }',
+      '          content:',
+      '            application/json:',
+      '              schema: ' + JSON.stringify(envelope(itemSchemas[operationId])),
+      "        '400': { $ref: '#/components/responses/ValidationFailed' }",
+      "        '401': { $ref: '#/components/responses/Unauthenticated' }",
+      "        '403': { $ref: '#/components/responses/PermissionDenied' }",
+      "        '429': { $ref: '#/components/responses/RateLimited' }",
+      "        '503': { $ref: '#/components/responses/ServiceUnavailable' }",
+    ].join('\n');
+  }
+  return null;
+}
+
+function replaceExistingOpenApiOperation(raw, rawPath, method, methodBlock) {
+  const lines = raw.split('\n');
+  const pathHeader = '  ' + rawPath + ':';
+  const pathStart = lines.findIndex((line) => line === pathHeader);
+  if (pathStart < 0) return null;
+  const pathEnd = lines.findIndex((line, index) => index > pathStart && ((line.startsWith('  /') && line.endsWith(':')) || line === 'components:'));
+  const effectivePathEnd = pathEnd < 0 ? lines.length : pathEnd;
+  const methodHeader = '    ' + String(method).toLowerCase() + ':';
+  const methodStart = lines.findIndex((line, index) => index > pathStart && index < effectivePathEnd && line === methodHeader);
+  if (methodStart < 0) return null;
+  const methodHeaders = new Set(['    get:', '    post:', '    put:', '    patch:', '    delete:', '    head:', '    options:', '    trace:']);
+  let methodEnd = effectivePathEnd;
+  for (let index = methodStart + 1; index < effectivePathEnd; index += 1) {
+    if (methodHeaders.has(lines[index])) { methodEnd = index; break; }
+  }
+  return [...lines.slice(0, methodStart), ...methodBlock.split('\n'), ...lines.slice(methodEnd)].join('\n');
+}
+
+function insertIntoExistingPath(raw, rawPath, methodBlocks) {
+  let next = raw;
+  for (const methodBlock of methodBlocks) {
+    const lines = next.split('\n');
+    const pathHeader = '  ' + rawPath + ':';
+    const pathStart = lines.findIndex((line) => line === pathHeader);
+    if (pathStart < 0) return null;
+    let pathEnd = lines.length;
+    for (let index = pathStart + 1; index < lines.length; index += 1) {
+      if ((lines[index].startsWith('  /') && lines[index].endsWith(':')) || lines[index] === 'components:') { pathEnd = index; break; }
+    }
+    next = [...lines.slice(0, pathEnd), '', ...methodBlock.split('\n'), ...lines.slice(pathEnd)].join('\n');
+  }
+  return next;
+}
+
+function addOpenApiOperations(raw, missing) {
+  if (!missing.length) return { raw, added: 0 };
+  let next = raw;
+  let added = 0;
+  const existingOperations = parseOpenApi(next);
+  const existingKeys = new Set(existingOperations.map((item) => operationKey(item.method, item.path)));
+  const grouped = new Map();
+  for (const operation of missing) {
+    const key = operationKey(operation.method, operation.path);
+    if (existingKeys.has(key)) continue;
+    const rawPath = openapiPathFromCanonical(operation.path);
+    if (!grouped.has(rawPath)) grouped.set(rawPath, []);
+    grouped.get(rawPath).push(operation);
+  }
+  const newPaths = [];
+  for (const [rawPath, operations] of [...grouped.entries()].sort(([left], [right]) => left.localeCompare(right))) {
+    operations.sort((left, right) => left.method.localeCompare(right.method));
+    const methodBlocks = operations.map((operation) => buildOpenApiOperation(operation));
+    if (next.split('\n').includes('  ' + rawPath + ':')) {
+      const changed = insertIntoExistingPath(next, rawPath, methodBlocks);
+      if (changed !== null) { next = changed; added += operations.length; }
+    } else {
+      newPaths.push('  ' + rawPath + ':\n' + methodBlocks.join('\n\n'));
+      added += operations.length;
+    }
+  }
+  if (newPaths.length) {
+    const marker = '\ncomponents:\n';
+    const index = next.indexOf(marker);
+    if (index < 0) throw new Error('canonical OpenAPI components marker not found');
+    next = next.slice(0, index) + '\n' + newPaths.join('\n\n') + '\n' + next.slice(index);
+  }
+  return { raw: next, added };
+}
 function buildOpenApiOperation({ operationId, method, canonicalPath, domain }) {
+  const commerceBlock = buildCommerceOpenApiOperation({ operationId, method });
+  if (commerceBlock) return commerceBlock;
   const tagMap = {
     auth_identity: 'Auth',
     users_accounts: 'Users',
@@ -171,64 +443,6 @@ function buildOpenApiOperation({ operationId, method, canonicalPath, domain }) {
   lines.push('        default:');
   lines.push('          description: Discovery-only operation; detailed response contract remains to be closed.');
   return lines.join('\n');
-}
-
-function insertIntoExistingPath(raw, rawPath, methodBlocks) {
-  const lines = raw.split('\n');
-  const header = `  ${rawPath}:`;
-  const start = lines.findIndex((line) => line === header);
-  if (start < 0) return null;
-  let end = lines.length;
-  for (let i = start + 1; i < lines.length; i += 1) {
-    if (/^  \/.*:\s*$/.test(lines[i]) || lines[i] === 'components:') { end = i; break; }
-  }
-  const before = lines.slice(0, end);
-  const after = lines.slice(end);
-  if (before.length && before[before.length - 1] !== '') before.push('');
-  return [...before, ...methodBlocks.flatMap((b, i) => i ? ['', ...b.split('\n')] : b.split('\n')), ...after].join('\n');
-}
-
-function addOpenApiOperations(raw, missing) {
-  if (!missing.length) return { raw, added: 0 };
-  let next = raw;
-  let added = 0;
-  const existingPathNames = new Set([...next.matchAll(/^  (\/[^:#]+):\s*$/gm)].map((m) => m[1]));
-  const existingOperations = parseOpenApi(next);
-  const existingKeys = new Set(existingOperations.map((x) => operationKey(x.method, x.path)));
-  const grouped = new Map();
-
-  for (const op of missing) {
-    const key = operationKey(op.method, op.path);
-    if (existingKeys.has(key)) continue;
-    const rawPath = openapiPathFromCanonical(op.path);
-    if (!grouped.has(rawPath)) grouped.set(rawPath, []);
-    grouped.get(rawPath).push(op);
-  }
-
-  const newPathBlocks = [];
-  for (const [rawPath, ops] of [...grouped.entries()].sort(([a], [b]) => a.localeCompare(b))) {
-    ops.sort((a, b) => a.method.localeCompare(b.method));
-    const methodBlocks = ops.map((op) => buildOpenApiOperation(op));
-    if (existingPathNames.has(rawPath)) {
-      const changed = insertIntoExistingPath(next, rawPath, methodBlocks);
-      if (changed !== null) {
-        next = changed;
-        added += ops.length;
-        for (const op of ops) existingKeys.add(operationKey(op.method, op.path));
-      }
-    } else {
-      newPathBlocks.push(`  ${rawPath}:\n${methodBlocks.join('\n\n')}`);
-      added += ops.length;
-    }
-  }
-
-  if (newPathBlocks.length) {
-    const marker = '\ncomponents:\n';
-    const index = next.indexOf(marker);
-    if (index < 0) throw new Error('canonical OpenAPI components marker not found');
-    next = `${next.slice(0, index)}\n${newPathBlocks.join('\n\n')}\n${next.slice(index)}`;
-  }
-  return { raw: next, added };
 }
 
 const inventory = readJson(inventoryPath);
@@ -274,8 +488,23 @@ for (const [key, record] of inventoryMap) {
 const { raw: openapiNext, added: addedToOpenApi } = addOpenApiOperations(openapiRaw, missingOpenApi);
 if (openapiNext !== openapiRaw) fs.writeFileSync(`${root}/${openapiPath}`, openapiNext);
 
+
+
 const effectiveOpenApi = parseOpenApi(openapiNext);
 const effectiveByKey = new Map(effectiveOpenApi.map((x) => [operationKey(x.method, x.path), x]));
+
+const requiredCommerceOperationIds = new Set([
+  'postPaymentsRefunds',
+  'getPaymentsHistory',
+  'getPaymentsRefunds',
+  'getBillingDocuments',
+]);
+for (const policy of domainPolicies.filter((item) => requiredCommerceOperationIds.has(item.operationId))) {
+  const effective = effectiveByKey.get(operationKey(policy.method, policy.path));
+  if (!effective || effective.operationId !== policy.operationId) {
+    throw new Error(`commerce OpenAPI operation was not synchronized: ${policy.method} ${policy.path} (${policy.operationId})`);
+  }
+}
 
 const existingPolicy = fs.existsSync(`${root}/${consolidatedPolicyPath}`) ? readJson(consolidatedPolicyPath) : { version: '1.0.0', operations: [] };
 const existingPolicyById = new Map((existingPolicy.operations ?? []).map((x) => [x.operationId, x]));
@@ -293,7 +522,21 @@ for (const op of targetOperations) {
   usedIds.add(operationId);
 
   if (existing) {
-    consolidatedOperations.push({ ...existing, operationId });
+    const merged = { ...existing, operationId };
+    if (source?.__source === `${apiDir}/commerce-operation-policy.v1.json`) {
+      const method = String(op.method).toUpperCase();
+      const authorization = source.authorization;
+      merged.auth = {
+        mode: authorization?.required === false ? 'public' : 'permission',
+      };
+      merged.permissions = authorization?.permission ? [authorization.permission] : [];
+      merged.auditRequired = method !== 'GET' && method !== 'HEAD';
+      merged.idempotencyRequired = source.idempotency?.required === true;
+      merged.optimisticLockRequired = source.retry?.requiresOptimisticConcurrency === true;
+      merged['x-luckread-contract-status'] = source.status ?? merged['x-luckread-contract-status'] ?? 'DISCOVERY_DRAFT';
+      merged['x-luckread-source'] = source.__source ?? merged['x-luckread-source'] ?? inventoryPath;
+    }
+    consolidatedOperations.push(merged);
     continue;
   }
 
@@ -316,9 +559,18 @@ for (const op of targetOperations) {
     optimisticLockRequired: retry?.requiresOptimisticConcurrency === true,
     idempotencyRequired: idempotency?.required === true,
     stateMachine,
-    'x-luckread-contract-status': 'DISCOVERY_DRAFT',
+    'x-luckread-contract-status': source?.status ?? 'DISCOVERY_DRAFT',
     'x-luckread-source': source?.__source ?? inventoryPath,
   });
+}
+
+for (const operationId of requiredCommerceOperationIds) {
+  if (!consolidatedOperations.some((item) =>
+    item.operationId === operationId &&
+    item['x-luckread-contract-status'] === 'CONTRACTED_PARTIAL'
+  )) {
+    throw new Error(`commerce consolidated operation policy was not synchronized: ${operationId}`);
+  }
 }
 
 writeJson(inventoryPath, inventory);

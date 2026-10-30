@@ -10,6 +10,7 @@ import {
 } from './order-persistence.js';
 import { SubscriptionRuntimeError } from './subscription-runtime.js';
 import { validateCreateCommerceOrderRequest, validateOrderCreateIdempotencyKey } from './order-request-validation.js';
+import { issueInvoiceForOrder } from './billing-persistence.js';
 
 type OrderRuntimeEnv = Readonly<{
   D1_01: D1Database;
@@ -19,6 +20,7 @@ type OrderRuntimeEnv = Readonly<{
 type OrderRuntimeDependencies = Readonly<{
   createOrder?: typeof createCommerceOrder;
   getOrder?: typeof getCommerceOrder;
+  issueInvoice?: typeof issueInvoiceForOrder;
   /** Must be an admitted pricing authority that returns immutable offer versions, discounts, and tax decisions. */
   resolvePricing?: (request: unknown) => Promise<AuthoritativelyPricedOrder>;
 }>;
@@ -176,6 +178,11 @@ export async function handleCommerceOrderRequest(
         body,
         (validatedRequest) => dependencies.resolvePricing!(validatedRequest),
       );
+      // Invoice issuance is replay-safe on (INVOICE, order_id). Replays also
+      // repair the invoice if the previous request persisted its Order but
+      // the document write was interrupted.
+      const issueInvoice = dependencies.issueInvoice ?? issueInvoiceForOrder;
+      await issueInvoice(env.D1_04, customerId, result.data.orderId);
       return Response.json(
         { data: result.data, requestId: 'req_' + crypto.randomUUID() },
         { status: result.status, headers: { 'cache-control': 'no-store' } },

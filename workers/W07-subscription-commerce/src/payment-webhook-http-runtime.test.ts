@@ -9,6 +9,7 @@ import {
 import type { ReceiveHyperswitchWebhookInput } from './payment-persistence.js';
 import type { RenewalOutcomeSyncResult } from './subscription-renewal-outcome.js';
 import type { PaidMembershipPurchaseFulfillmentResult } from './paid-membership-order-fulfillment.js';
+import { type BillingDocumentDto } from './billing-persistence.js';
 
 const SECRET = 'hyperswitch-webhook-test-secret';
 const MERCHANT = 'merchant_test';
@@ -39,6 +40,7 @@ function fixture(options: {
   const syncCalls: Array<{ env: unknown; paymentId: string; merchantId: string }> = [];
   const pendingRecoveryCalls: Array<{ env: unknown; options?: Readonly<{ limit?: number }> }> = [];
   const purchaseFulfillmentCalls: Array<{ env: unknown; paymentId: string; merchantId: string }> = [];
+  const receiptCalls: Array<{ db: unknown; paymentId: string; merchantId: string }> = [];
   const receive: Receiver = async (db, input) => {
     calls.push({ db, input });
     if (options.error) throw options.error;
@@ -67,13 +69,21 @@ function fixture(options: {
     purchaseFulfillmentCalls.push({ env, paymentId, merchantId });
     return options.purchaseFulfillmentResult ?? { outcome: 'NOT_APPLICABLE', fulfilledCount: 0 };
   };
+  const issueReceipt = async (
+    db: D1Database,
+    paymentId: string,
+    merchantId: string,
+  ): Promise<BillingDocumentDto> => {
+    receiptCalls.push({ db, paymentId, merchantId });
+    return {} as BillingDocumentDto;
+  };
   const env = {
     D1_01: { marker: 'd1-01' } as unknown as D1Database,
     D1_04: { marker: 'd1-04' } as unknown as D1Database,
     HYPERSWITCH_WEBHOOK_SECRET: SECRET,
     HYPERSWITCH_MERCHANT_ID: MERCHANT,
   };
-  return { env, calls, syncCalls, pendingRecoveryCalls, purchaseFulfillmentCalls, dependencies: { receive, syncRenewalOutcome, syncPendingOutcomes, fulfillPaidOrder } };
+  return { env, calls, syncCalls, pendingRecoveryCalls, purchaseFulfillmentCalls, receiptCalls, dependencies: { receive, syncRenewalOutcome, syncPendingOutcomes, fulfillPaidOrder, issueReceipt } };
 }
 
 function request(options: {
@@ -236,6 +246,8 @@ describe('W07 Hyperswitch webhook HTTP receiver', () => {
     );
 
     expect(response?.status).toBe(200);
+    expect(f.receiptCalls).toHaveLength(1);
+    expect(f.receiptCalls[0]).toMatchObject({ paymentId, merchantId: MERCHANT });
     expect(f.purchaseFulfillmentCalls).toHaveLength(1);
     expect(f.purchaseFulfillmentCalls[0]).toMatchObject({
       env: { D1_01: f.env.D1_01, D1_04: f.env.D1_04 },

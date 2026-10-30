@@ -12,6 +12,7 @@ PAYMENT_MIGRATION = WORKER / "migrations-d1-04" / "0002_payment_provider_events.
 SAVED_METHOD_MIGRATION = WORKER / "migrations-d1-04" / "0003_saved_payment_methods_mandates.sql"
 RENEWAL_MIGRATION = WORKER / "migrations-d1-04" / "0004_subscription_renewal_cycles.sql"
 REVENUECAT_WEBHOOK_MIGRATION = WORKER / "migrations-d1-04" / "0005_revenuecat_webhook_inbox.sql"
+REFUNDS_BILLING_MIGRATION = WORKER / "migrations-d1-04" / "0006_refunds_billing_documents.sql"
 CONFIG = WORKER / "wrangler.jsonc"
 NOW = "2026-10-28T00:00:00.000Z"
 LATER = "2026-10-28T00:00:01.000Z"
@@ -25,6 +26,7 @@ class D104OrderMigrationTests(unittest.TestCase):
         cls.saved_method_sql = SAVED_METHOD_MIGRATION.read_text(encoding="utf-8")
         cls.renewal_sql = RENEWAL_MIGRATION.read_text(encoding="utf-8")
         cls.revenuecat_webhook_sql = REVENUECAT_WEBHOOK_MIGRATION.read_text(encoding="utf-8")
+        cls.refunds_billing_sql = REFUNDS_BILLING_MIGRATION.read_text(encoding="utf-8")
         config = json.loads(CONFIG.read_text(encoding="utf-8"))
         bindings = {item["binding"]: item for item in config["d1_databases"]}
         if bindings["D1_01"]["migrations_dir"] != "migrations":
@@ -41,6 +43,7 @@ class D104OrderMigrationTests(unittest.TestCase):
         self.db.executescript(self.saved_method_sql)
         self.db.executescript(self.renewal_sql)
         self.db.executescript(self.revenuecat_webhook_sql)
+        self.db.executescript(self.refunds_billing_sql)
 
     def tearDown(self):
         self.db.close()
@@ -193,7 +196,7 @@ class D104OrderMigrationTests(unittest.TestCase):
             "orders", "order_lines", "order_create_idempotency", "payments", "payment_provider_events",
             "payment_provider_event_conflicts", "saved_payment_methods", "payment_mandates",
             "subscription_renewal_cycles", "subscription_renewal_scheduler_state",
-            "revenuecat_webhook_events", "revenuecat_webhook_event_conflicts",
+            "revenuecat_webhook_events", "revenuecat_webhook_event_conflicts", "refunds", "billing_documents",
         })
         indexes = {row[0] for row in self.db.execute("SELECT name FROM sqlite_master WHERE type='index' AND sql IS NOT NULL")}
         self.assertTrue({
@@ -209,18 +212,124 @@ class D104OrderMigrationTests(unittest.TestCase):
             "ux_subscription_renewal_cycles_subscription_cycle", "ux_subscription_renewal_cycles_payment",
             "ix_subscription_renewal_cycles_state_updated", "ix_subscription_renewal_cycles_subscriber_cycle",
             "ix_revenuecat_webhook_events_state_received", "ix_revenuecat_webhook_events_user_received",
-            "ix_revenuecat_webhook_conflicts_event",
+            "ix_revenuecat_webhook_conflicts_event", "ix_refunds_customer_created", "ix_refunds_payment_created",
+            "ix_refunds_status_updated", "ix_billing_documents_customer_issued",
         }.issubset(indexes))
-        self.assertFalse(tables.intersection({"payment_intents", "ledger_entries", "refunds", "entitlements"}))
+        self.assertFalse(tables.intersection({"payment_intents", "ledger_entries", "entitlements"}))
         self.assertNotIn("client_secret", {r[1] for r in self.db.execute('PRAGMA table_info("payments")')})
         self.assertNotIn("raw_body", {r[1] for r in self.db.execute('PRAGMA table_info("payment_provider_events")')})
         for table in ("orders", "order_lines", "order_create_idempotency", "payments",
                       "payment_provider_events", "payment_provider_event_conflicts",
                       "saved_payment_methods", "payment_mandates", "subscription_renewal_cycles",
                       "subscription_renewal_scheduler_state", "revenuecat_webhook_events",
-                      "revenuecat_webhook_event_conflicts"):
+                      "revenuecat_webhook_event_conflicts", "refunds", "billing_documents"):
             self.assertEqual(self.db.execute(f'PRAGMA foreign_key_list("{table}")').fetchall(), [])
 
+
+
+    def test_refund_reservation_enforces_captured_amount_and_multiple_partial_refunds(self):
+        self.order(status="PENDING_PAYMENT")
+        self.payment(status="succeeded")
+        captured = 700
+        self.db.execute(
+            """INSERT INTO refunds(refund_id,provider,merchant_id,customer_id,order_id,payment_id,
+               amount_minor,captured_amount_minor,currency,status,reason,idempotency_key,request_hash,
+               created_at,updated_at)
+               VALUES('ref_11111111111111111111111111','hyperswitch','merchant_1','user_1','ord_1',?,300,?,'USD','PENDING',
+                      'partial 1','refund_key_1',?, ?, ?)""",
+            ("pay_" + "a"*26, captured, "d"*64, NOW, NOW),
+        )
+        self.db.execute(
+            """INSERT INTO refunds(refund_id,provider,merchant_id,customer_id,order_id,payment_id,
+               amount_minor,captured_amount_minor,currency,status,reason,idempotency_key,request_hash,
+               created_at,updated_at)
+               VALUES('ref_22222222222222222222222222','hyperswitch','merchant_1','user_1','ord_1',?,400,?,'USD','PENDING',
+                      'partial 2','refund_key_2',?, ?, ?)""",
+            ("pay_" + "a"*26, captured, "e"*64, NOW, NOW),
+        )
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute(
+                """INSERT INTO refunds(refund_id,provider,merchant_id,customer_id,order_id,payment_id,
+                   amount_minor,captured_amount_minor,currency,status,idempotency_key,request_hash,
+                   created_at,updated_at)
+                   VALUES('ref_33333333333333333333333333','hyperswitch','merchant_1','user_1','ord_1',?,1,?,'USD','REQUESTED',
+                          'refund_key_over',?, ?, ?)""",
+                ("pay_" + "a"*26, captured, "f"*64, NOW, NOW),
+            )
+        self.db.execute(
+            "UPDATE refunds SET status='FAILED',version=2,updated_at=? WHERE refund_id='ref_11111111111111111111111111'",
+            (LATER,),
+        )
+        self.db.execute(
+            """INSERT INTO refunds(refund_id,provider,merchant_id,customer_id,order_id,payment_id,
+               amount_minor,captured_amount_minor,currency,status,idempotency_key,request_hash,
+               created_at,updated_at)
+               VALUES('ref_44444444444444444444444444','hyperswitch','merchant_1','user_1','ord_1',?,300,?,'USD','REQUESTED',
+                      'refund_key_retry',?, ?, ?)""",
+            ("pay_" + "a"*26, captured, "a"*64, NOW, NOW),
+        )
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute("DELETE FROM refunds WHERE refund_id='ref_22222222222222222222222222'")
+
+    def test_refund_idempotency_unique_and_provider_status_monotonic(self):
+        self.order(status="PENDING_PAYMENT")
+        self.payment(status="succeeded")
+        values = ("ref_11111111111111111111111111","hyperswitch","merchant_1","user_1","ord_1","pay_" + "a"*26,
+                  250,500,"USD","PENDING","customer request","refund_key_1","a"*64,NOW,NOW)
+        self.db.execute(
+            """INSERT INTO refunds(refund_id,provider,merchant_id,customer_id,order_id,payment_id,
+               amount_minor,captured_amount_minor,currency,status,reason,idempotency_key,request_hash,
+               created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            values,
+        )
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute(
+                """INSERT INTO refunds(refund_id,provider,merchant_id,customer_id,order_id,payment_id,
+                   amount_minor,captured_amount_minor,currency,status,reason,idempotency_key,request_hash,
+                   created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                ("ref_22222222222222222222222222",)+values[1:],
+            )
+        self.db.execute(
+            "UPDATE refunds SET status='SUCCEEDED',provider_updated_at=?,version=2,updated_at=? WHERE refund_id='ref_11111111111111111111111111'",
+            ("2026-10-28T00:00:01.000Z",LATER),
+        )
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute(
+                "UPDATE refunds SET status='FAILED',provider_updated_at=?,version=3,updated_at=? WHERE refund_id='ref_11111111111111111111111111'",
+                ("2026-10-28T00:00:02.000Z","2026-10-28T00:00:02.000Z"),
+            )
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute(
+                "UPDATE refunds SET provider_updated_at=?,version=3,updated_at=? WHERE refund_id='ref_11111111111111111111111111'",
+                ("2026-10-28T00:00:01.000Z","2026-10-28T00:00:02.000Z"),
+            )
+
+    def test_billing_invoice_and_receipt_require_authoritative_sources_and_are_immutable(self):
+        self.order(status="PENDING_PAYMENT")
+        self.payment(status="succeeded")
+        self.db.execute(
+            """INSERT INTO billing_documents(document_id,document_type,document_number,customer_id,
+               order_id,payment_id,amount_minor,currency,snapshot_json,issued_at,created_at)
+               VALUES('doc_invoice','INVOICE','INV-001','user_1','ord_1',NULL,1000,'USD','{"order":"ord_1"}',?,?)""",
+            (NOW,NOW),
+        )
+        self.db.execute(
+            """INSERT INTO billing_documents(document_id,document_type,document_number,customer_id,
+               order_id,payment_id,amount_minor,currency,snapshot_json,issued_at,created_at)
+               VALUES('doc_receipt','RECEIPT','RCT-001','user_1','ord_1',?,1000,'USD','{"payment":"succeeded"}',?,?)""",
+            ("pay_"+"a"*26,NOW,NOW),
+        )
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute("UPDATE billing_documents SET document_number='INV-CHANGED' WHERE document_id='doc_invoice'")
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute("DELETE FROM billing_documents WHERE document_id='doc_receipt'")
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute(
+                """INSERT INTO billing_documents(document_id,document_type,document_number,customer_id,
+                   order_id,payment_id,amount_minor,currency,snapshot_json,issued_at,created_at)
+                   VALUES('bad_receipt','RECEIPT','RCT-002','user_1','ord_1',?,1000,'USD','{}',?,?)""",
+                ("pay_"+"b"*26,NOW,NOW),
+            )
 
     def test_order_insert_requires_matching_completed_idempotency_result(self):
         with self.assertRaises(sqlite3.IntegrityError):
