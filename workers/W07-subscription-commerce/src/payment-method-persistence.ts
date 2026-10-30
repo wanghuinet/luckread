@@ -226,6 +226,9 @@ export async function createPaymentMethodRevocationRequest(
     throw new PaymentMethodPersistenceError('SERVICE_UNAVAILABLE', 503);
   });
   if (existing) {
+    if (existing.idempotency_key !== idempotencyKeyInput) {
+      throw new PaymentMethodPersistenceError('CONFLICT', 409);
+    }
     return { request: toRequest(existing), replayed: true, dispatchProvider: true };
   }
 
@@ -252,6 +255,9 @@ export async function createPaymentMethodRevocationRequest(
     db, savedPaymentMethodId, customerId, merchantId,
   ).catch(() => null);
   if (!created) throw new PaymentMethodPersistenceError('RESOURCE_NOT_FOUND', 404);
+  if (created.idempotency_key !== idempotencyKeyInput) {
+    throw new PaymentMethodPersistenceError('CONFLICT', 409);
+  }
   // dispatchProvider=false for both the insertion winner and a concurrent
   // conflict-loser. Neither path may follow the INSERT with another D1 write.
   return {
