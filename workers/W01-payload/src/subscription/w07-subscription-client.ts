@@ -60,14 +60,23 @@ export async function callW07Subscription(input: {
 }
 
 
+/** Validate the configured RevenueCat App ID without normalizing it. */
+export function isValidRevenueCatAppId(value: unknown): value is string {
+  return typeof value === 'string' &&
+    value.length > 0 &&
+    value.length <= 255 &&
+    value.trim() === value &&
+    !/[\u0000-\u001f\u007f]/.test(value)
+}
+
 /** Request a read-only RevenueCat snapshot reconciliation for the W02 session principal. */
 export async function reconcileRevenueCatMembership(input: {
   request: Request
   principal: ContentPrincipal
   appId: string
 }): Promise<Response> {
-  const appId = input.appId.trim()
-  if (!appId || appId.length > 255 || /[\\u0000-\\u001f\\u007f]/.test(appId)) {
+  const appId = input.appId
+  if (!isValidRevenueCatAppId(appId)) {
     throw new W07SubscriptionClientError(400, 'VALIDATION_FAILED', 'RevenueCat app selection is invalid')
   }
   return callW07Subscription({
