@@ -161,6 +161,7 @@ export type CommerceOrderStatus =
 
 export type MyCommerceOrderSummary = {
   orderId: string;
+  latestPaymentId: string | null;
   status: CommerceOrderStatus;
   version: number;
   currency: string;
