@@ -38,6 +38,7 @@ const copy = (locale: PublicLocale) => locale === 'en'
       order: 'Order',
       amount: 'Order amount',
       created: 'Created',
+      viewPaymentStatus: 'View payment status',
       status: {
         CREATED: 'Created',
         PENDING_PAYMENT: 'Pending payment',
@@ -63,6 +64,7 @@ const copy = (locale: PublicLocale) => locale === 'en'
         order: '訂單',
         amount: '訂單金額',
         created: '建立時間',
+        viewPaymentStatus: '查看付款狀態',
         status: {
           CREATED: '已建立',
           PENDING_PAYMENT: '待付款',
@@ -87,6 +89,7 @@ const copy = (locale: PublicLocale) => locale === 'en'
         order: '订单',
         amount: '订单金额',
         created: '创建时间',
+        viewPaymentStatus: '查看支付状态',
         status: {
           CREATED: '已创建',
           PENDING_PAYMENT: '待付款',
@@ -250,6 +253,14 @@ export default function BillingHistoryPage() {
               <dd className="mt-1 text-sm font-medium">{formatDate(item.createdAt, locale)}</dd>
             </div>
           </dl>
+          {item.latestPaymentId ? (
+            <a
+              href={'/checkout/result?paymentId=' + encodeURIComponent(item.latestPaymentId)}
+              className="mt-3 inline-flex rounded-full border border-light-border px-4 py-2 text-xs font-bold text-main-accent dark:border-dark-border"
+            >
+              {labels.viewPaymentStatus}
+            </a>
+          ) : null}
         </article>
       ))}
       {hasMore && nextCursor ? (
