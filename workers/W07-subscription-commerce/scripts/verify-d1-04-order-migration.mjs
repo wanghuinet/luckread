@@ -384,6 +384,8 @@ export function verifyD1_04OrderMigrationPostflight({
   paymentMandatesTableInfo,
   renewalCyclesTableInfo,
   renewalSchedulerStateTableInfo,
+  revenueCatWebhookEventsTableInfo,
+  revenueCatWebhookConflictsTableInfo,
 }) {
   const before = schemaObjects(preflightSchema)
   const after = schemaObjects(postflightSchema)
@@ -412,6 +414,8 @@ export function verifyD1_04OrderMigrationPostflight({
     payment_mandates: paymentMandatesTableInfo,
     subscription_renewal_cycles: renewalCyclesTableInfo,
     subscription_renewal_scheduler_state: renewalSchedulerStateTableInfo,
+    revenuecat_webhook_events: revenueCatWebhookEventsTableInfo,
+    revenuecat_webhook_event_conflicts: revenueCatWebhookConflictsTableInfo,
   }
   for (const [tableName, expectedColumns] of Object.entries(REQUIRED_COLUMNS)) {
     const actual = tableColumns(tableInfoByName[tableName], tableName)
@@ -511,8 +515,10 @@ function main() {
       paymentMandatesTableInfo: readJson(args[10]),
       renewalCyclesTableInfo: readJson(args[11]),
       renewalSchedulerStateTableInfo: readJson(args[12]),
+      revenueCatWebhookEventsTableInfo: readJson(args[13]),
+      revenueCatWebhookConflictsTableInfo: readJson(args[14]),
     })
-    writeReport(args[13], report)
+    writeReport(args[15], report)
     console.log(JSON.stringify(report, null, 2))
     return
   }
