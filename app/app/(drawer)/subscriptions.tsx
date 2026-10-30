@@ -282,7 +282,10 @@ export default function MySubscriptionsScreen() {
                 // The first response confirms the D1-04 MIT block. Replay the
                 // same idempotent command once to perform provider-side revocation
                 // in a separate request/write-budget window.
-                if (result.response.status === 202) {
+                const firstStage = result.response.status === 202
+                  ? unwrapApiData<{ replayed?: boolean }>(result.data)
+                  : null;
+                if (result.response.status === 202 && firstStage?.replayed === false) {
                   result = await revokeSavedPaymentMethod(method.savedPaymentMethodId, idempotencyKey);
                 }
                 if (!result.response.ok) {
