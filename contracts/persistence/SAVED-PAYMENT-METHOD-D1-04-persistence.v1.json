@@ -16,7 +16,10 @@
     "migrationId": "0003_saved_payment_methods_mandates",
     "extensionMigrationFile": "0005_payment_method_revocation_requests.sql",
     "extensionMigrationId": "0005_payment_method_revocation_requests",
-    "extensionMigrationRequires": ["0003_saved_payment_methods_mandates", "0004_subscription_renewal_cycles"],
+    "extensionMigrationRequires": [
+      "0003_saved_payment_methods_mandates",
+      "0004_subscription_renewal_cycles"
+    ],
     "remoteApplied": false
   },
   "tables": {
@@ -232,22 +235,92 @@
       "purpose": "Durable one-way user request to stop future MIT charges and remove a saved Hyperswitch vault reference without rewriting provider mandate truth.",
       "primaryKey": "revocation_request_id",
       "columns": {
-        "revocation_request_id": { "type": "TEXT", "required": true, "nullable": false, "immutable": true },
-        "saved_payment_method_id": { "type": "TEXT", "required": true, "nullable": false, "immutable": true },
-        "payment_method_id": { "type": "TEXT", "required": true, "nullable": false, "apiExposure": "NONE", "immutable": true },
-        "provider": { "type": "TEXT", "required": true, "nullable": false, "allowedValues": ["hyperswitch"], "immutable": true },
-        "merchant_id": { "type": "TEXT", "required": true, "nullable": false, "apiExposure": "NONE", "immutable": true },
-        "customer_id": { "type": "TEXT", "required": true, "nullable": false, "apiExposure": "NONE", "immutable": true },
-        "idempotency_key": { "type": "TEXT", "required": true, "nullable": false, "sensitive": "REQUEST_DEDUPLICATION_KEY", "immutable": true },
-        "status": {
-          "type": "TEXT", "required": true, "nullable": false,
-          "allowedValues": ["REQUESTED", "PENDING_PROVIDER", "RECONCILIATION_REQUIRED", "COMPLETED"],
-          "terminalStates": ["COMPLETED"]
+        "revocation_request_id": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false,
+          "immutable": true
         },
-        "provider_method_deleted_at": { "type": "TEXT", "required": false, "nullable": true, "immutableAfterSet": true },
-        "version": { "type": "INTEGER", "required": true, "nullable": false, "optimisticConcurrency": true },
-        "created_at": { "type": "TEXT", "required": true, "nullable": false, "immutable": true },
-        "updated_at": { "type": "TEXT", "required": true, "nullable": false }
+        "saved_payment_method_id": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false,
+          "immutable": true
+        },
+        "payment_method_id": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false,
+          "apiExposure": "NONE",
+          "immutable": true
+        },
+        "provider": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false,
+          "allowedValues": [
+            "hyperswitch"
+          ],
+          "immutable": true
+        },
+        "merchant_id": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false,
+          "apiExposure": "NONE",
+          "immutable": true
+        },
+        "customer_id": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false,
+          "apiExposure": "NONE",
+          "immutable": true
+        },
+        "idempotency_key": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false,
+          "sensitive": "REQUEST_DEDUPLICATION_KEY",
+          "immutable": true
+        },
+        "status": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false,
+          "allowedValues": [
+            "REQUESTED",
+            "PENDING_PROVIDER",
+            "RECONCILIATION_REQUIRED",
+            "COMPLETED"
+          ],
+          "terminalStates": [
+            "COMPLETED"
+          ]
+        },
+        "provider_method_deleted_at": {
+          "type": "TEXT",
+          "required": false,
+          "nullable": true,
+          "immutableAfterSet": true
+        },
+        "version": {
+          "type": "INTEGER",
+          "required": true,
+          "nullable": false,
+          "optimisticConcurrency": true
+        },
+        "created_at": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false,
+          "immutable": true
+        },
+        "updated_at": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false
+        }
       },
       "invariants": [
         "The saved method must belong to the same provider, merchant and authenticated customer.",
@@ -256,10 +329,14 @@
         "An exact or new-key replay reads the existing request, performs provider revoke/delete outside D1, then commits provider deletion acknowledgement in one separate D1-04 write transaction.",
         "Each W07 public request is limited to one D1-04 write transaction; provider network calls never run inside a D1 transaction.",
         "The request identity is immutable and one request exists per saved payment method.",
-        "Idempotency keys are unique per customer so one logical request key cannot be reused for a different saved payment method.",
+        "Idempotency keys are unique per customer across saved methods; replay must use the exact original key, and a different key for the same removal is a conflict.",
         "COMPLETED requires provider_method_deleted_at and all linked mandates in REVOKED, FAILED or EXPIRED state.",
         "A provider revoke/delete API response does not rewrite payment_mandates.status; only signed mandate_revoked webhook evidence may do so.",
         "Revocation requests are immutable in identity and retained for audit; status changes use version CAS."
+      ],
+      "uniqueConstraints": [
+        "UNIQUE(saved_payment_method_id)",
+        "UNIQUE(customer_id, idempotency_key)"
       ]
     }
   },
