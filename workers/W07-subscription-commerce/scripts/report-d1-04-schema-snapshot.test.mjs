@@ -1,5 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import fs from 'node:fs'
 import {
   ADMITTED_D1_04_UUID,
   createD1_04SchemaSnapshotReport,
@@ -115,4 +116,18 @@ test('rejects migration entries when no d1_migrations table was reported', () =>
     schemaSnapshot: { results: [{ results: [] }] },
     migrationState: { results: [{ results: [{ name: '0001_orders' }] }] },
   }), /even though sqlite_master has no d1_migrations table/)
+})
+
+test('schema preflight runs read-only on main after migration or preflight workflow changes', () => {
+  const workflow = fs.readFileSync(new URL('../../../.github/workflows/w07-d1-04-schema-preflight.yml', import.meta.url), 'utf8')
+  assert.match(workflow, /^  push:/m)
+  assert.match(workflow, /branches: \[main\]/)
+  assert.match(workflow, /workers\/W07-subscription-commerce\/migrations-d1-04\/\*\*/)
+  assert.match(workflow, /github\.event_name == 'push'/)
+  assert.match(workflow, /inputs\.source_sha \|\| github\.sha/)
+  assert.match(workflow, /READ_ONLY_D1_04_SCHEMA_PREFLIGHT/)
+  assert.match(workflow, /SELECT type, name, tbl_name, sql FROM sqlite_master/)
+  assert.match(workflow, /SELECT name FROM d1_migrations/)
+  assert.doesNotMatch(workflow, /wrangler(?:@[\w.]+)?\s+deploy/)
+  assert.doesNotMatch(workflow, /d1 migrations apply/)
 })
