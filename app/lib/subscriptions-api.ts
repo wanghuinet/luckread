@@ -89,7 +89,7 @@ export function fetchSavedPaymentMethods(options: { signal?: AbortSignal } = {})
 /** Revoke provider mandates and remove a saved vault method; 202 means provider webhook confirmation is pending. */
 export function revokeSavedPaymentMethod(
   savedPaymentMethodId: string,
-  idempotencyKey: string = createIdempotencyKey(),
+  idempotencyKey: string = 'remove_' + savedPaymentMethodId,
 ) {
   if (!/^spm_[A-Za-z0-9]{26}$/.test(savedPaymentMethodId)) {
     throw new TypeError('Saved payment method ID is invalid.');
