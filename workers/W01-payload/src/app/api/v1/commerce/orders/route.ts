@@ -10,6 +10,54 @@ import { resolveCookieSubscriptionPrincipal, callW07Subscription, W07Subscriptio
 import { callW06CommerceOrderAudit, W06ModerationClientError } from '../../../../../moderation/w06-moderation-client.js'
 import { W08CreatorClientError } from '../../../../../auth/w08-creator-client.js'
 
+/** W01 authenticates and authorizes order reads; the W07 D1-04 query repeats the principal owner scope. */
+/** List only the current principal's orders; W07 independently applies the same owner predicate in D1-04. */
+export async function GET(request: Request): Promise<Response> {
+  try {
+    const url = new URL(request.url);
+    const allowedKeys = new Set(['cursor', 'limit']);
+    for (const key of url.searchParams.keys()) {
+      if (!allowedKeys.has(key)) return orderAdapterError(400, 'VALIDATION_FAILED', 'Unsupported order-list query parameter');
+    }
+    if (url.searchParams.getAll('limit').length > 1 || url.searchParams.getAll('cursor').length > 1) {
+      return orderAdapterError(400, 'VALIDATION_FAILED', 'Duplicate order-list query parameter');
+    }
+    const rawLimit = url.searchParams.get('limit');
+    if (rawLimit !== null && (!/^[1-9][0-9]*$/.test(rawLimit) || Number(rawLimit) > 50)) {
+      return orderAdapterError(400, 'VALIDATION_FAILED', 'Order-list limit is invalid');
+    }
+    const cursor = url.searchParams.get('cursor');
+    if (cursor !== null && (!cursor || cursor.length > 2048)) {
+      return orderAdapterError(400, 'INVALID_CURSOR', 'Invalid pagination cursor');
+    }
+
+    const principal = await resolveCookieSubscriptionPrincipal(request);
+    if (principal instanceof Response) return principal;
+
+    const denied = await authorizeOrderPermission(request, principal, 'order.read');
+    if (denied) return denied;
+
+    const query = new URLSearchParams();
+    if (rawLimit !== null) query.set('limit', rawLimit);
+    if (cursor !== null) query.set('cursor', cursor);
+    const suffix = query.size ? '?' + query.toString() : '';
+    return await callW07Subscription({
+      request,
+      pathname: '/commerce/orders' + suffix,
+      method: 'GET',
+      principal,
+    });
+  } catch (error) {
+    if (error instanceof W07SubscriptionClientError) {
+      return orderAdapterError(error.status, error.code, error.message);
+    }
+    if (error instanceof W08CreatorClientError) {
+      return orderAdapterError(503, 'AUTHORIZATION_UNAVAILABLE', 'Order authorization unavailable');
+    }
+    return mapOrderAdapterError(error);
+  }
+}
+
 /** W01 authenticates and authorizes order creation, then requires W06 durable audit confirmation for every successful W07 result. */
 export async function POST(request: Request): Promise<Response> {
   try {
