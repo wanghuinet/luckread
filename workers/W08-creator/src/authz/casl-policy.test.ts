@@ -447,6 +447,36 @@ describe('CASL L0-L8 authorization policy', () => {
     })).toMatchObject({ decision: 'DENY', reasonCode: 'ACCOUNT_FROZEN_READ_ONLY' })
   })
 
+  it('authorizes payment history reads only for the authenticated customer-owned Payment', () => {
+    expect(evaluate({
+      layer: 'L2',
+      action: 'payment.read',
+      resourceType: 'Payment',
+      resourceAttributes: { ownerId: 'user-1' },
+    })).toMatchObject({ decision: 'ALLOW' })
+
+    expect(evaluate({
+      layer: 'L2',
+      action: 'payment.read',
+      resourceType: 'Payment',
+      resourceAttributes: { ownerId: 'user-2' },
+    })).toMatchObject({ decision: 'DENY', reasonCode: 'PERMISSION_DENIED' })
+
+    expect(evaluate({
+      layer: 'L1',
+      action: 'payment.read',
+      resourceType: 'Payment',
+      resourceAttributes: { ownerId: 'user-1' },
+    })).toMatchObject({ decision: 'DENY' })
+
+    expect(evaluate({
+      accountState: 'FROZEN',
+      action: 'payment.read',
+      resourceType: 'Payment',
+      resourceAttributes: { ownerId: 'user-1' },
+    })).toMatchObject({ decision: 'DENY', reasonCode: 'ACCOUNT_FROZEN_READ_ONLY' })
+  })
+
   it('authorizes refunds only against the authenticated customer-owned Payment at L2+', () => {
     expect(evaluate({
       layer: 'L2',
