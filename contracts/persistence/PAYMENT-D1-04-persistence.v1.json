@@ -214,8 +214,9 @@
       "invariants": [
         "UNIQUE(provider, merchant_id, event_id) is the durable webhook deduplication key.",
         "A duplicate event ID with the same payload hash is a replay; different payload hash requires reconciliation.",
-        "Only RECEIVED can transition to a terminal processing outcome; processed events cannot be rewritten or deleted.",
-        "Raw webhook body, provider secret, client secret, card data, and entitlement information are never stored."
+        "Raw webhook body, provider secret, client secret, card data, and entitlement information are never stored.",
+        "APPLIED and REJECTED receipts remain immutable. Only mandate_active/mandate_revoked receipts in RECONCILIATION_REQUIRED may be reopened to RECEIVED for exact same event ID and payload SHA after the local source payment/mandate is available; the immutable event identity cannot change.",
+        "When supplied in a signed mandate_details webhook, payment_id is retained as a safe local correlation field to bind the event to the exact setup payment; raw webhook body is never retained."
       ]
     },
     "payment_provider_event_conflicts": {
