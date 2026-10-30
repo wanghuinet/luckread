@@ -177,7 +177,7 @@ export async function handleCommerceRefundRequest(
       !/^pay_[A-Za-z0-9]{26}$/.test(input.paymentId) ||
       typeof input.amountMinor !== 'number' || !Number.isSafeInteger(input.amountMinor) || input.amountMinor <= 0 ||
       typeof input.currency !== 'string' || !/^[A-Z]{3}$/.test(input.currency) ||
-      (input.reason !== undefined && !validText(input.reason, 512))
+      (input.reason !== undefined && !validText(input.reason, 255))
     ) {
       return errorResponse(400, 'VALIDATION_FAILED', 'Refund payment, amount and currency are required');
     }
