@@ -1152,13 +1152,15 @@ async function readMandateForWebhook(
   merchantId: string,
   providerMandateId: string,
   paymentMethodId: string,
+  sourcePaymentId: string | null,
 ): Promise<PaymentMandateRow | null> {
   return db.prepare(
     'SELECT mandate_record_id, provider, merchant_id, customer_id, payment_method_id, source_payment_id, source_event_id, ' +
     'consent_accepted_at, consent_acceptance_type, consent_scope, consent_terms_version, provider_mandate_id, status, version, ' +
     'provider_updated_at, created_at, updated_at FROM payment_mandates ' +
-    'WHERE provider = ? AND merchant_id = ? AND provider_mandate_id = ? AND payment_method_id = ? LIMIT 1',
-  ).bind(PROVIDER, merchantId, providerMandateId, paymentMethodId).first<PaymentMandateRow>();
+    'WHERE provider = ? AND merchant_id = ? AND payment_method_id = ? ' +
+    'AND (provider_mandate_id = ? OR (provider_mandate_id IS NULL AND source_payment_id = ?)) LIMIT 1',
+  ).bind(PROVIDER, merchantId, paymentMethodId, providerMandateId, sourcePaymentId ?? '').first<PaymentMandateRow>();
 }
 
 /**
@@ -1191,12 +1193,20 @@ async function receiveHyperswitchMandateWebhook(
   const resource = envelope.resource;
   const providerMandateId = resource.mandate_id;
   const paymentMethodId = resource.payment_method_id;
+  const rawSourcePaymentId = resource.payment_id;
+  const sourcePaymentId = typeof rawSourcePaymentId === 'string' &&
+      PAYMENT_ID_PATTERN.test(rawSourcePaymentId)
+    ? rawSourcePaymentId
+    : null;
+  const invalidSourcePaymentId = rawSourcePaymentId !== undefined &&
+    rawSourcePaymentId !== null && sourcePaymentId === null;
   const providerStatus = resource.status;
   if (
     expectedStatus === null ||
     !nonBlank(providerMandateId, 255) ||
     !nonBlank(paymentMethodId, 255) ||
     !/^[\x21-\x7e]{1,255}$/.test(paymentMethodId) ||
+    invalidSourcePaymentId ||
     (providerStatus !== 'active' && providerStatus !== 'revoked') ||
     providerStatus !== expectedStatus.toLowerCase() ||
     (resource.merchant_id !== undefined && resource.merchant_id !== envelope.merchantId)
@@ -1221,7 +1231,9 @@ async function receiveHyperswitchMandateWebhook(
 
   let mandate: PaymentMandateRow | null;
   try {
-    mandate = await readMandateForWebhook(db, envelope.merchantId, providerMandateId, paymentMethodId);
+    mandate = await readMandateForWebhook(
+      db, envelope.merchantId, providerMandateId, paymentMethodId, sourcePaymentId,
+    );
   } catch {
     throw new PaymentPersistenceError('SERVICE_UNAVAILABLE', 503);
   }
@@ -1241,8 +1253,10 @@ async function receiveHyperswitchMandateWebhook(
   ).bind(eventRowId, PROVIDER, envelope.merchantId, envelope.eventId, envelope.eventType, payloadSha256, now);
 
   const updateMandate = db.prepare(
-    'UPDATE payment_mandates SET status = ?, provider_updated_at = ?, version = version + 1, updated_at = ? ' +
-    'WHERE mandate_record_id = ? AND provider = ? AND merchant_id = ? AND provider_mandate_id = ? ' +
+    'UPDATE payment_mandates SET provider_mandate_id = COALESCE(provider_mandate_id, ?), status = ?, ' +
+    'provider_updated_at = ?, version = version + 1, updated_at = ? ' +
+    'WHERE mandate_record_id = ? AND provider = ? AND merchant_id = ? ' +
+    'AND (provider_mandate_id = ? OR (provider_mandate_id IS NULL AND source_payment_id = ?)) ' +
     'AND payment_method_id = ? AND version = ? AND status = ? ' +
     'AND (provider_updated_at IS NULL OR provider_updated_at < ?) ' +
     "AND ((? = 'ACTIVE' AND status IN ('PENDING_PROVIDER_CONFIRMATION','ACTIVE')) " +
@@ -1250,9 +1264,9 @@ async function receiveHyperswitchMandateWebhook(
     "AND EXISTS (SELECT 1 FROM payment_provider_events e WHERE e.provider = ? AND e.merchant_id = ? " +
     "AND e.event_id = ? AND e.payload_sha256 = ? AND e.state = 'RECEIVED')",
   ).bind(
-    expectedStatus, canonicalProviderTimestamp, updatedAt,
+    providerMandateId, expectedStatus, canonicalProviderTimestamp, updatedAt,
     mandate.mandate_record_id, PROVIDER, envelope.merchantId, providerMandateId,
-    paymentMethodId, mandate.version, mandate.status, canonicalProviderTimestamp,
+    sourcePaymentId ?? '', paymentMethodId, mandate.version, mandate.status, canonicalProviderTimestamp,
     expectedStatus, expectedStatus,
     PROVIDER, envelope.merchantId, envelope.eventId, payloadSha256,
   );
