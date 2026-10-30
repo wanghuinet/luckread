@@ -113,6 +113,7 @@ describe('RevenueCat read-only subscriber API adapter', () => {
   it('marks the RevenueCat get-or-create 201 response as a newly created empty customer', async () => {
     const fetcher = vi.fn(async () => okResponse({
       original_app_user_id: 'new-luckread-user',
+      management_url: null,
       entitlements: {},
       subscriptions: {},
     }, 201)) as unknown as typeof fetch;
@@ -124,6 +125,7 @@ describe('RevenueCat read-only subscriber API adapter', () => {
 
     expect(snapshot.customerCreatedOnLookup).toBe(true);
     expect(snapshot.originalAppUserId).toBe('new-luckread-user');
+    expect(snapshot.managementUrl).toBeNull();
     expect(snapshot.entitlements).toEqual({});
     expect(snapshot.subscriptions).toEqual({});
   });
