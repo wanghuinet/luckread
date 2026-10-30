@@ -618,6 +618,19 @@
       "stateMachine": "none"
     },
     {
+      "operationId": "listCommerceOrders",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "order.read"
+      ],
+      "auditRequired": false,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none"
+    },
+    {
       "operationId": "getCommerceOrder",
       "auth": {
         "mode": "permission"
