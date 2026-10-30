@@ -111,6 +111,21 @@ describe('RevenueCat read-only subscriber API adapter', () => {
     expect(JSON.stringify(snapshot)).not.toContain('subscriber_attributes');
   });
 
+  it('rejects numeric transaction IDs that cannot be represented exactly', async () => {
+    const unsafeNumericId = vi.fn(async () => new Response(
+      '{"subscriber":{"subscriptions":{"creator.gold:monthly-v1":{"expires_date":null,"purchase_date":"2026-10-02T00:00:00Z","store_transaction_id":9007199254740993}}}}',
+      { status: 200, headers: { 'content-type': 'application/json' } },
+    )) as unknown as typeof fetch;
+
+    await expect(fetchRevenueCatSubscriber(
+      { appUserId: 'user-1', secretApiKey: 'sk_server_only_secret' },
+      { fetcher: unsafeNumericId },
+    )).rejects.toMatchObject({
+      code: 'INVALID_RESPONSE',
+      retryable: false,
+    });
+  });
+
   it('marks the RevenueCat get-or-create 201 response as a newly created empty customer', async () => {
     const fetcher = vi.fn(async () => okResponse({
       original_app_user_id: 'new-luckread-user',
