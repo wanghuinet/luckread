@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest';
 import {
   createCommerceOrder,
   getCommerceOrder,
+  listCommerceOrders,
   OrderPersistenceError,
   type CreateOrderResult,
   type CommerceOrderData,
+  type CommerceOrderListPage,
   type AuthoritativelyPricedOrder,
 } from './order-persistence.js';
 import { handleCommerceOrderRequest } from './order-http-runtime.js';
@@ -212,6 +214,80 @@ describe('private W07 commerce order HTTP handler', () => {
     });
   });
 
+  it('lists only the authenticated customer orders using bounded cursor pagination and a summary DTO', async () => {
+    const page: CommerceOrderListPage = {
+      items: [{
+        orderId: 'ord_test_1',
+        status: 'CONFIRMED',
+        version: 2,
+        currency: 'USD',
+        subtotalMinor: 1200,
+        discountMinor: 0,
+        taxMinor: 0,
+        totalMinor: 1200,
+        createdAt: '2026-10-28T12:00:00.000Z',
+        updatedAt: '2026-10-28T12:01:00.000Z',
+      }],
+      limit: 10,
+      hasMore: true,
+      nextCursor: 'eyJ2ZXJzaW9uIjoxfQ',
+    };
+    let captured: Parameters<typeof listCommerceOrders> | undefined;
+    const mockList = (async (...args: Parameters<typeof listCommerceOrders>) => {
+      captured = args;
+      return page;
+    }) as typeof listCommerceOrders;
+    const response = await handleCommerceOrderRequest(
+      new Request('https://luckread-w07.internal/commerce/orders?limit=10&cursor=opaque_cursor'),
+      'user_42',
+      env,
+      { listOrders: mockList },
+    );
+
+    expect(response?.status).toBe(200);
+    expect(captured?.[1]).toBe('user_42');
+    expect(captured?.[2]).toBe(10);
+    expect(captured?.[3]).toBe('opaque_cursor');
+    const envelope = await parseResponse(response!);
+    expect(envelope.data).toEqual(page);
+    expect(JSON.stringify(envelope)).not.toContain('customerId');
+    expect(JSON.stringify(envelope)).not.toContain('provider');
+    expect(JSON.stringify(envelope)).not.toContain('itemSnapshotJson');
+    expect(response?.headers.get('cache-control')).toBe('no-store');
+  });
+
+  it('rejects unknown, repeated and out-of-range order history query parameters before D1 access', async () => {
+    const requests = [
+      'https://luckread-w07.internal/commerce/orders?offset=0',
+      'https://luckread-w07.internal/commerce/orders?limit=10&limit=20',
+      'https://luckread-w07.internal/commerce/orders?limit=51',
+      'https://luckread-w07.internal/commerce/orders?limit=0',
+      'https://luckread-w07.internal/commerce/orders?cursor=' + 'x'.repeat(2049),
+    ];
+    for (const url of requests) {
+      const response = await handleCommerceOrderRequest(new Request(url), 'user_42', env, {
+        listOrders: (async () => { throw new Error('must not query D1'); }) as typeof listCommerceOrders,
+      });
+      expect(response?.status).toBe(400);
+    }
+  });
+
+  it('maps a malformed or cross-endpoint cursor to the canonical invalid-cursor response', async () => {
+    const mockList = (async () => {
+      throw new OrderPersistenceError('INVALID_CURSOR', 400);
+    }) as unknown as typeof listCommerceOrders;
+    const response = await handleCommerceOrderRequest(
+      new Request('https://luckread-w07.internal/commerce/orders?cursor=not-a-valid-cursor'),
+      'user_42',
+      env,
+      { listOrders: mockList },
+    );
+    expect(response?.status).toBe(400);
+    expect(await parseResponse(response!)).toMatchObject({
+      error: { code: 'INVALID_CURSOR', message: 'Invalid pagination cursor' },
+    });
+  });
+
   it('returns not-found for methods and paths outside the admitted create/read operations', async () => {
     const badMethod = await handleCommerceOrderRequest(
       new Request('https://luckread-w07.internal/commerce/orders/ord_test_1', { method: 'DELETE' }),
@@ -221,11 +297,11 @@ describe('private W07 commerce order HTTP handler', () => {
     expect(badMethod?.status).toBe(404);
 
     const badShape = await handleCommerceOrderRequest(
-      new Request('https://luckread-w07.internal/commerce/orders'),
+      new Request('https://luckread-w07.internal/commerce/orders/ord_test_1/extra'),
       'user_42',
       env,
     );
-    expect(badShape?.status).toBe(404); // GET collection/list is not admitted by PAY-002.
+    expect(badShape?.status).toBe(404);
   });
 
   it('maps an uninitialized remote schema to a generic unavailable response without leaking SQL details', async () => {
