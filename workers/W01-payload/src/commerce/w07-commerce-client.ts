@@ -1,7 +1,7 @@
 import { callW08Creator, W08CreatorClientError } from '../auth/w08-creator-client.js'
 import type { ContentPrincipal } from '../content/w03-content-client.js'
 
-export type OrderPermission = 'order.create' | 'order.read'
+export type OrderPermission = 'order.create' | 'order.read' | 'order.refund.self'
 
 const errorResponse = (status: number, code: string, message: string): Response =>
   Response.json(
