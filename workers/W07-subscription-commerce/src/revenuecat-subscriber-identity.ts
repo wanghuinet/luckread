@@ -23,6 +23,7 @@ export class RevenueCatSubscriberIdentityError extends Error {
 }
 
 const MAX_APP_USER_ID_LENGTH = 255;
+const W02_USER_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
 function hasControlCharacter(value: string): boolean {
   for (let index = 0; index < value.length; index += 1) {
@@ -38,6 +39,10 @@ function isCanonicalAppUserId(value: unknown): value is string {
     value.length <= MAX_APP_USER_ID_LENGTH &&
     value.trim() === value &&
     !hasControlCharacter(value);
+}
+
+function isW02PrincipalId(value: unknown): value is string {
+  return isCanonicalAppUserId(value) && W02_USER_ID_PATTERN.test(value);
 }
 
 /**
@@ -60,7 +65,7 @@ export function assertRevenueCatSubscriberIdentity(
   >,
   expectedAppUserId: string,
 ): RevenueCatSubscriberIdentityMatch {
-  if (!isCanonicalAppUserId(expectedAppUserId)) {
+  if (!isW02PrincipalId(expectedAppUserId)) {
     throw new RevenueCatSubscriberIdentityError('INVALID_PRINCIPAL_ID');
   }
 
