@@ -16,7 +16,7 @@
     {"from":"ACTIVE","to":"PAUSED","actor":"user|admin"},
     {"from":"PAUSED","to":"ACTIVE","actor":"user|admin"},
     {"from":"ACTIVE","to":"CANCELED","actor":"user|creator|admin|system"},
-    {"from":"PAST_DUE","to":"CANCELED","actor":"admin|system"},
+    {"from":"PAST_DUE","to":"CANCELED","actor":"user|admin|system"},
     {"from":"PAUSED","to":"CANCELED","actor":"user|admin|system"},
     {"from":"ACTIVE","to":"EXPIRED","actor":"system"},
     {"from":"PAST_DUE","to":"EXPIRED","actor":"system"},
