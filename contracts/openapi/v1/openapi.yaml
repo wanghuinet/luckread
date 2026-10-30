@@ -48,122 +48,23 @@ paths:
   /auth/register:
     post:
       tags: [Auth]
-      summary: Register a new account
-      security: []
+      summary: Discovery draft for POST /auth/register
       operationId: authRegister
-      parameters:
-        - $ref: '#/components/parameters/IdempotencyKey'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [identityType, identity, credential, username, consent]
-              properties:
-                identityType: { enum: [email] }
-                identity: { type: string }
-                credential: { type: string, format: password }
-                username: { type: string }
-                consent:
-                  $ref: '#/components/schemas/AuthRegistrationConsent'
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
       responses:
-        '201':
-          description: Registered. Account enters PENDING_VERIFICATION.
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  userId: { $ref: '#/components/schemas/ResourceId' }
-                  accountState: { $ref: '#/components/schemas/AccountState' }
-        '422': { $ref: '#/components/responses/ValidationFailed' }
-        '429': { $ref: '#/components/responses/RateLimited' }
-
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
   /auth/login:
     post:
       tags: [Auth]
-      summary: Authenticate and establish the canonical LuckRead session
-      description: >-
-        Browser clients retain the HttpOnly session cookie from Set-Cookie.
-        Native clients read X-LuckRead-Session-Token and send it as
-        Authorization: Bearer <token>. Both carriers address the same
-        Better Auth server-side session. The opaque credential is never
-        included in the JSON body; this operation does not issue refresh tokens.
-      security: []
+      summary: Discovery draft for POST /auth/login
       operationId: authLogin
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [identity, credential]
-              additionalProperties: false
-              properties:
-                identity:
-                  type: string
-                  format: email
-                  maxLength: 254
-                credential:
-                  type: string
-                  format: password
-                  minLength: 1
-                  writeOnly: true
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
       responses:
-        '200':
-          description: Authenticated; a single native session is established.
-          headers:
-            X-LuckRead-Session-Token:
-              required: true
-              description: Opaque session credential for native clients. Send as Authorization Bearer; store only in platform secure storage.
-              schema: { type: string, minLength: 1 }
-            Set-Cookie:
-              description: HttpOnly browser session cookie; clients should use a cookie jar and must not parse or construct the cookie manually.
-              schema: { type: string }
-            Cache-Control:
-              schema: { type: string, const: no-store }
-          content:
-            application/json:
-              schema:
-                type: object
-                required: [data, requestId]
-                additionalProperties: false
-                properties:
-                  data:
-                    type: object
-                    required: [user]
-                    additionalProperties: false
-                    properties:
-                      user:
-                        $ref: '#/components/schemas/AuthSessionUser'
-                  requestId: { type: string }
-        '202':
-          description: MFA challenge required; no authenticated session is issued until the challenge is verified.
-          headers:
-            Set-Cookie:
-              description: Short-lived HttpOnly MFA challenge cookie issued by W02.
-              schema: { type: string }
-            Cache-Control:
-              schema: { type: string, const: no-store }
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/AuthMfaChallengeRequired' }
-        '400': { $ref: '#/components/responses/ValidationFailed' }
-        '401': { $ref: '#/components/responses/Unauthenticated' }
-        '422': { $ref: '#/components/responses/ValidationFailed' }
-        '403':
-          description: Email verification is required before sign-in.
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/ErrorResponse' }
-        '429': { $ref: '#/components/responses/RateLimited' }
-        '503':
-          description: Authentication service unavailable.
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/ErrorResponse' }
-
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
   /auth/principal:
     get:
       tags: [Auth]
@@ -211,771 +112,343 @@ paths:
   /auth/session:
     get:
       tags: [Auth]
-      summary: Read and validate the current session
-      description: >-
-        Use either the browser session cookie or the opaque token returned in
-        X-LuckRead-Session-Token as Authorization: Bearer <token>. Returns the
-        same session and user for either carrier. No valid session returns 401.
-        Successful responses are never cached.
+      summary: Discovery draft for GET /auth/session
       operationId: authSessionGet
-      security:
-        - sessionCookieAuth: []
-        - bearerAuth: []
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
       responses:
-        '200':
-          description: Current session is valid.
-          headers:
-            X-LuckRead-Session-Token:
-              description: Updated opaque session credential when the auth authority returns one.
-              schema: { type: string, minLength: 1 }
-            Set-Cookie:
-              description: Session cookie update, if emitted by the auth authority.
-              schema: { type: string }
-            Cache-Control:
-              schema: { type: string, const: no-store }
-          content:
-            application/json:
-              schema:
-                type: object
-                required: [data, requestId]
-                additionalProperties: false
-                properties:
-                  data:
-                    type: object
-                    required: [session, user]
-                    additionalProperties: false
-                    properties:
-                      session:
-                        type: object
-                        required: [id, expiresAt]
-                        additionalProperties: false
-                        properties:
-                          id: { $ref: '#/components/schemas/ResourceId' }
-                          expiresAt: { type: string, format: date-time }
-                      user:
-                        $ref: '#/components/schemas/AuthSessionUser'
-                  requestId: { type: string }
-        '401': { $ref: '#/components/responses/Unauthenticated' }
-        '429': { $ref: '#/components/responses/RateLimited' }
-        '503':
-          description: Authentication service unavailable.
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/ErrorResponse' }
-
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
   /auth/logout:
     post:
       tags: [Auth]
-      summary: Revoke the current session
-      description: >-
-        Accepts the same browser cookie or native Bearer session credential
-        used by protected APIs. Returns no body and clears the browser cookie
-        when present. The revoked credential must not be reused.
+      summary: Discovery draft for POST /auth/logout
       operationId: authLogout
-      security:
-        - sessionCookieAuth: []
-        - bearerAuth: []
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
       responses:
-        '204':
-          description: Logged out; no response body.
-          headers:
-            Set-Cookie:
-              description: Expired session cookie, when cookie authentication was used.
-              schema: { type: string }
-            Cache-Control:
-              schema: { type: string, const: no-store }
-        '503':
-          description: Authentication service unavailable.
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/ErrorResponse' }
-
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
   /auth/password/change:
     post:
       tags: [Auth]
-      summary: Change the current user's password
-      security:
-        - bearerAuth: []
+      summary: Discovery draft for POST /auth/password/change
       operationId: authPasswordChange
-      parameters:
-        - $ref: '#/components/parameters/IdempotencyKeyRequired'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [currentPassword, newPassword]
-              additionalProperties: false
-              properties:
-                currentPassword:
-                  type: string
-                  format: password
-                  minLength: 15
-                  maxLength: 128
-                  writeOnly: true
-                newPassword:
-                  type: string
-                  format: password
-                  minLength: 15
-                  maxLength: 128
-                  writeOnly: true
-                  description: Must satisfy the canonical password policy, including compromised-password screening.
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
       responses:
-        '204':
-          description: Password changed; no response body.
-        '4XX': { $ref: '#/components/responses/ClientError' }
-
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
   /auth/password/reset/request:
     post:
       tags: [Auth]
-      summary: Request a password recovery email or equivalent asynchronous delivery
-      security: []
+      summary: Discovery draft for POST /auth/password/reset/request
       operationId: authPasswordResetRequest
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [identifier]
-              additionalProperties: false
-              properties:
-                identifier:
-                  type: string
-                  minLength: 1
-                  description: Account/recovery identifier. Public semantics must not disclose whether an account exists.
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
       responses:
-        '202':
-          description: Recovery request accepted; no response body.
-        '4XX': { $ref: '#/components/responses/ClientError' }
-
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
   /auth/password/reset/confirm:
     post:
       tags: [Auth]
-      summary: Confirm a password recovery request
-      security: []
+      summary: Discovery draft for POST /auth/password/reset/confirm
       operationId: authPasswordResetConfirm
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [recoveryToken, newPassword]
-              additionalProperties: false
-              properties:
-                recoveryToken:
-                  type: string
-                  minLength: 1
-                  writeOnly: true
-                newPassword:
-                  type: string
-                  format: password
-                  minLength: 15
-                  maxLength: 128
-                  writeOnly: true
-                  description: Must satisfy the canonical password policy, including compromised-password screening.
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
       responses:
-        '204':
-          description: Password reset completed; no response body.
-        '4XX': { $ref: '#/components/responses/ClientError' }
-
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
   /auth/credentials:
     get:
       tags: [Auth]
-      summary: List current user's credentials
+      summary: Discovery draft for GET /auth/credentials
       operationId: authCredentialList
-      parameters:
-        - $ref: '#/components/parameters/Cursor'
-        - $ref: '#/components/parameters/Limit'
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
       responses:
-        '200':
-          description: Current user's credentials using the canonical cursor-paginated envelope; deterministic order is createdAt DESC, credentialId DESC.
-          content:
-            application/json:
-              schema:
-                type: object
-                required: [data, requestId]
-                additionalProperties: false
-                properties:
-                  data:
-                    type: object
-                    required: [items, nextCursor, hasMore]
-                    additionalProperties: false
-                    properties:
-                      items:
-                        type: array
-                        maxItems: 100
-                        items:
-                          $ref: '#/components/schemas/Credential'
-                      nextCursor:
-                        anyOf:
-                          - $ref: '#/components/schemas/Cursor'
-                          - type: 'null'
-                      hasMore:
-                        type: boolean
-                  requestId:
-                    $ref: '#/components/schemas/RequestId'
-                  traceId:
-                    $ref: '#/components/schemas/TraceId'
-        '400': { $ref: '#/components/responses/InvalidCursor' }
-        '401': { $ref: '#/components/responses/Unauthenticated' }
-        '403': { $ref: '#/components/responses/PermissionDenied' }
-        '422': { $ref: '#/components/responses/ClientError' }
-        '429': { $ref: '#/components/responses/RateLimited' }
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
     post:
       tags: [Auth]
-      summary: Add a credential for the current user
+      summary: Discovery draft for POST /auth/credentials
       operationId: authCredentialAdd
-      parameters:
-        - $ref: '#/components/parameters/IdempotencyKeyRequired'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [kind, value]
-              additionalProperties: false
-              properties:
-                kind:
-                  type: string
-                  enum: [username, email, phone]
-                value:
-                  type: string
-                  minLength: 1
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
       responses:
-        '201':
-          description: Credential added.
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/Credential' }
-        '401': { $ref: '#/components/responses/Unauthenticated' }
-        '403': { $ref: '#/components/responses/PermissionDenied' }
-        '409': { $ref: '#/components/responses/ClientError' }
-        '422': { $ref: '#/components/responses/ClientError' }
-        '429': { $ref: '#/components/responses/RateLimited' }
-
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
   /auth/credentials/{credentialId}:
     parameters:
       - $ref: '#/components/parameters/CredentialId'
     put:
       tags: [Auth]
-      summary: Replace a credential value for the current user
+      summary: Discovery draft for PUT /auth/credentials/{credentialId}
       operationId: authCredentialReplace
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
       parameters:
-        - $ref: '#/components/parameters/IdempotencyKeyRequired'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [value]
-              additionalProperties: false
-              properties:
-                value:
-                  type: string
-                  minLength: 1
+        - name: credentialId
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/ResourceId' }
       responses:
-        '200':
-          description: Credential replaced.
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/Credential' }
-        '401': { $ref: '#/components/responses/Unauthenticated' }
-        '403': { $ref: '#/components/responses/PermissionDenied' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '409': { $ref: '#/components/responses/ClientError' }
-        '422': { $ref: '#/components/responses/ClientError' }
-        '429': { $ref: '#/components/responses/RateLimited' }
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
     delete:
       tags: [Auth]
-      summary: Remove a credential from the current user
+      summary: Discovery draft for DELETE /auth/credentials/{credentialId}
       operationId: authCredentialRemove
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
       parameters:
-        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+        - name: credentialId
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/ResourceId' }
       responses:
-        '204':
-          description: Credential removed or already-retired for the current user.
-        '401': { $ref: '#/components/responses/Unauthenticated' }
-        '403': { $ref: '#/components/responses/PermissionDenied' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '409': { $ref: '#/components/responses/ClientError' }
-        '422': { $ref: '#/components/responses/ClientError' }
-        '429': { $ref: '#/components/responses/RateLimited' }
-
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
   /auth/sessions:
     get:
       tags: [Auth]
-      summary: List current user's sessions
+      summary: Discovery draft for GET /auth/sessions
       operationId: authSessionList
-      parameters:
-        - $ref: '#/components/parameters/Cursor'
-        - $ref: '#/components/parameters/Limit'
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
       responses:
-        '200':
-          description: Current user's sessions.
-          content:
-            application/json:
-              schema:
-                type: object
-                required: [items, currentSessionId]
-                properties:
-                  items:
-                    type: array
-                    maxItems: 50
-                    items:
-                      type: object
-                      required: [sessionId, createdAt, expiresAt]
-                      properties:
-                        sessionId:
-                          $ref: '#/components/schemas/ResourceId'
-                        deviceId:
-                          $ref: '#/components/schemas/ResourceId'
-                        createdAt:
-                          type: string
-                          format: date-time
-                        expiresAt:
-                          type: string
-                          format: date-time
-                        lastSeenAt:
-                          type: string
-                          format: date-time
-                          nullable: true
-                  currentSessionId:
-                    $ref: '#/components/schemas/ResourceId'
-                  nextCursor:
-                    type: string
-                    nullable: true
-        '4XX': { $ref: '#/components/responses/ClientError' }
-
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
   /auth/sessions/{sessionId}:
     delete:
       tags: [Auth]
-      summary: Revoke one current user's session
+      summary: Discovery draft for DELETE /auth/sessions/{sessionId}
       operationId: authSessionRevoke
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
       parameters:
-        - $ref: '#/components/parameters/SessionId'
-        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+        - name: sessionId
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/ResourceId' }
       responses:
-        '204':
-          description: Session revoked or already-revoked owned session.
-        '403': { $ref: '#/components/responses/PermissionDenied' }
-        '4XX': { $ref: '#/components/responses/ClientError' }
-
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
   /auth/mfa:
     get:
       tags: [Auth]
-      summary: Read the current user's MFA status
+      summary: Discovery draft for GET /auth/mfa
       operationId: authMfaStatus
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
       responses:
-        '200':
-          description: Factor state projected by W02; never includes factor secrets or internal lockout/replay data.
-          headers:
-            Cache-Control: { schema: { type: string, const: no-store } }
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/AuthMfaStatus' }
-        '401': { $ref: '#/components/responses/Unauthenticated' }
-        '403': { $ref: '#/components/responses/PermissionDenied' }
-        '429': { $ref: '#/components/responses/RateLimited' }
-        '503': { $ref: '#/components/responses/ServiceUnavailable' }
-
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
   /auth/mfa/enrollment:
     post:
       tags: [Auth]
-      summary: Start authenticated TOTP enrollment
-      description: >-
-        W01 validates the request and forwards it to W02. The secret-bearing
-        TOTP URI and plaintext recovery codes are returned only in this
-        no-store response and must never be logged or cached. Enrollment is
-        pending until a separate valid TOTP confirmation succeeds.
+      summary: Discovery draft for POST /auth/mfa/enrollment
       operationId: authMfaEnrollmentStart
-      parameters:
-        - $ref: '#/components/parameters/IdempotencyKeyRequired'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: '#/components/schemas/AuthMfaEnrollmentStartRequest' }
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
       responses:
-        '200':
-          description: Pending enrollment; TOTP URI and recovery codes disclosed once.
-          headers:
-            Cache-Control: { schema: { type: string, const: no-store } }
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/AuthMfaEnrollmentStartResponse' }
-        '400': { $ref: '#/components/responses/ValidationFailed' }
-        '401': { $ref: '#/components/responses/Unauthenticated' }
-        '403': { $ref: '#/components/responses/PermissionDenied' }
-        '409': { $ref: '#/components/responses/ClientError' }
-        '422': { $ref: '#/components/responses/ValidationFailed' }
-        '429': { $ref: '#/components/responses/RateLimited' }
-        '503': { $ref: '#/components/responses/ServiceUnavailable' }
-
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
   /auth/mfa/enrollment/confirm:
     post:
       tags: [Auth]
-      summary: Confirm TOTP enrollment with a valid one-time code
+      summary: Discovery draft for POST /auth/mfa/enrollment/confirm
       operationId: authMfaEnrollmentConfirm
-      parameters:
-        - $ref: '#/components/parameters/IdempotencyKeyRequired'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: '#/components/schemas/AuthMfaEnrollmentConfirmRequest' }
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
       responses:
-        '200':
-          description: Enrollment confirmed and factor state updated by W02.
-          headers:
-            X-LuckRead-Session-Token:
-              description: Rotated native session credential, when Better Auth refreshes the current session.
-              schema: { type: string }
-            Set-Cookie:
-              description: Refreshed HttpOnly browser session cookie, when issued by W02.
-              schema: { type: string }
-            Cache-Control: { schema: { type: string, const: no-store } }
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/AuthMfaStatus' }
-        '400': { $ref: '#/components/responses/ValidationFailed' }
-        '401': { $ref: '#/components/responses/Unauthenticated' }
-        '403': { $ref: '#/components/responses/PermissionDenied' }
-        '409': { $ref: '#/components/responses/ClientError' }
-        '422': { $ref: '#/components/responses/ValidationFailed' }
-        '429': { $ref: '#/components/responses/RateLimited' }
-        '503': { $ref: '#/components/responses/ServiceUnavailable' }
-
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
   /auth/mfa/challenge/verify:
     post:
       tags: [Auth]
-      summary: Complete a login MFA challenge
-      description: >-
-        This operation consumes a short-lived, identity-bound W02 challenge
-        cookie created by authLogin. It accepts a TOTP or single-use recovery
-        code, but never accepts trust-device flags or caller-supplied assurance.
-      security: []
+      summary: Discovery draft for POST /auth/mfa/challenge/verify
       operationId: authMfaChallengeVerify
-      parameters:
-        - $ref: '#/components/parameters/IdempotencyKeyRequired'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: '#/components/schemas/AuthMfaChallengeVerifyRequest' }
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
       responses:
-        '200':
-          description: Challenge consumed and authentication completed.
-          headers:
-            X-LuckRead-Session-Token:
-              required: true
-              description: Opaque native session credential; never returned in JSON.
-              schema: { type: string, minLength: 1 }
-            Set-Cookie:
-              description: HttpOnly browser session cookie.
-              schema: { type: string }
-            Cache-Control: { schema: { type: string, const: no-store } }
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/AuthMfaChallengeVerifyResponse' }
-        '400': { $ref: '#/components/responses/ValidationFailed' }
-        '401': { $ref: '#/components/responses/Unauthenticated' }
-        '409': { $ref: '#/components/responses/ClientError' }
-        '422': { $ref: '#/components/responses/ValidationFailed' }
-        '429': { $ref: '#/components/responses/RateLimited' }
-        '503': { $ref: '#/components/responses/ServiceUnavailable' }
-
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
   /auth/mfa/disable:
     post:
       tags: [Auth]
-      summary: Disable the current user's MFA factor after password and TOTP step-up
-      description: Disabling MFA cannot rely on a password check alone; a valid TOTP step-up is required.
+      summary: Discovery draft for POST /auth/mfa/disable
       operationId: authMfaDisable
-      parameters:
-        - $ref: '#/components/parameters/IdempotencyKeyRequired'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: '#/components/schemas/AuthMfaDisableRequest' }
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
       responses:
-        '204':
-          description: MFA disabled by W02; existing sessions are invalidated and privileged access fails closed.
-          headers:
-            Cache-Control: { schema: { type: string, const: no-store } }
-        '400': { $ref: '#/components/responses/ValidationFailed' }
-        '401': { $ref: '#/components/responses/Unauthenticated' }
-        '403': { $ref: '#/components/responses/PermissionDenied' }
-        '409': { $ref: '#/components/responses/ClientError' }
-        '422': { $ref: '#/components/responses/ValidationFailed' }
-        '429': { $ref: '#/components/responses/RateLimited' }
-        '503': { $ref: '#/components/responses/ServiceUnavailable' }
-
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
   /auth/mfa/recovery-codes/rotate:
     post:
       tags: [Auth]
-      summary: Rotate recovery codes after password and TOTP step-up
-      description: Old recovery codes are atomically invalidated; new plaintext codes are disclosed once.
+      summary: Discovery draft for POST /auth/mfa/recovery-codes/rotate
       operationId: authMfaRecoveryCodesRotate
-      parameters:
-        - $ref: '#/components/parameters/IdempotencyKeyRequired'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: '#/components/schemas/AuthMfaRecoveryCodesRotateRequest' }
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
       responses:
-        '200':
-          description: New one-time recovery codes; old recovery codes are no longer valid.
-          headers:
-            Cache-Control: { schema: { type: string, const: no-store } }
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/AuthMfaRecoveryCodesRotateResponse' }
-        '400': { $ref: '#/components/responses/ValidationFailed' }
-        '401': { $ref: '#/components/responses/Unauthenticated' }
-        '403': { $ref: '#/components/responses/PermissionDenied' }
-        '409': { $ref: '#/components/responses/ClientError' }
-        '422': { $ref: '#/components/responses/ValidationFailed' }
-        '429': { $ref: '#/components/responses/RateLimited' }
-        '503': { $ref: '#/components/responses/ServiceUnavailable' }
-
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
   /users/me:
     get:
       tags: [Users]
-      summary: Get current user profile
+      summary: Discovery draft for GET /users/me
       operationId: getMe
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
       responses:
-        '200':
-          description: Current user profile.
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/User' }
-        '4XX': { $ref: '#/components/responses/ClientError' }
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
     patch:
       tags: [Users]
-      summary: Update current user profile
+      summary: Discovery draft for PATCH /users/me
       operationId: updateMe
-      parameters:
-        - $ref: '#/components/parameters/IfMatchRequired'
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
       responses:
-        '200':
-          description: Updated.
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/User' }
-        '412': { $ref: '#/components/responses/PreconditionFailed' }
-        '428': { $ref: '#/components/responses/PreconditionRequired' }
-
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
   /users/{userId}/account-state:
     parameters:
       - $ref: '#/components/parameters/UserId'
     post:
-      tags: [Users, Admin]
-      summary: Transition account lifecycle state
+      tags: [Users]
+      summary: Discovery draft for POST /users/{userId}/account-state
       operationId: transitionAccountState
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
       parameters:
-        - $ref: '#/components/parameters/IfMatchRequired'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [to, reason]
-              properties:
-                to: { $ref: '#/components/schemas/AccountState' }
-                reason: { type: string, maxLength: 2048 }
+        - name: userId
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/ResourceId' }
       responses:
-        '200':
-          description: Transitioned.
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  from: { $ref: '#/components/schemas/AccountState' }
-                  to: { $ref: '#/components/schemas/AccountState' }
-                  auditEventId: { $ref: '#/components/schemas/ResourceId' }
-        '403': { $ref: '#/components/responses/PermissionDenied' }
-        '409': { $ref: '#/components/responses/InvalidState' }
-        '412': { $ref: '#/components/responses/PreconditionFailed' }
-        '428': { $ref: '#/components/responses/PreconditionRequired' }
-
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
   /contents:
     get:
       tags: [Contents]
-      summary: List content
+      summary: Discovery draft for GET /contents
       operationId: listContents
-      parameters:
-        - $ref: '#/components/parameters/Cursor'
-        - $ref: '#/components/parameters/Limit'
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
       responses:
-        '200':
-          description: Content list.
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/ListResponse' }
-        '4XX': { $ref: '#/components/responses/ClientError' }
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
     post:
       tags: [Contents]
-      summary: Create content draft
+      summary: Discovery draft for POST /contents
       operationId: createContent
-      parameters:
-        - $ref: '#/components/parameters/IdempotencyKey'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: '#/components/schemas/ContentInput' }
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
       responses:
-        '201':
-          description: Created in DRAFT.
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/Content' }
-        '403': { $ref: '#/components/responses/PermissionDenied' }
-
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
   /contents/{contentId}:
     parameters:
       - $ref: '#/components/parameters/ContentId'
     get:
       tags: [Contents]
-      summary: Get content by ID
+      summary: Discovery draft for GET /contents/{contentId}
       operationId: getContent
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      parameters:
+        - name: contentId
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/ResourceId' }
       responses:
-        '200':
-          description: >-
-            Content. Returns 404 rather than 403 when the caller may not access
-            it, to avoid existence disclosure.
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/Content' }
-        '404': { $ref: '#/components/responses/NotFound' }
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
     patch:
       tags: [Contents]
-      summary: Update content
+      summary: Discovery draft for PATCH /contents/{contentId}
       operationId: updateContent
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
       parameters:
-        - $ref: '#/components/parameters/IfMatchRequired'
-        - $ref: '#/components/parameters/IdempotencyKeyRequired'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: '#/components/schemas/ContentInput' }
+        - name: contentId
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/ResourceId' }
       responses:
-        '200':
-          description: Updated.
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/Content' }
-        '412': { $ref: '#/components/responses/PreconditionFailed' }
-        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
     delete:
       tags: [Contents]
-      summary: Delete content
+      summary: Discovery draft for DELETE /contents/{contentId}
       operationId: deleteContent
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
       parameters:
-        - $ref: '#/components/parameters/IfMatchRequired'
-        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+        - name: contentId
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/ResourceId' }
       responses:
-        '204':
-          description: Soft-deleted.
-        '412': { $ref: '#/components/responses/PreconditionFailed' }
-        '428': { $ref: '#/components/responses/PreconditionRequired' }
-
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
   /contents/{contentId}/state:
     parameters:
       - $ref: '#/components/parameters/ContentId'
     post:
       tags: [Contents]
-      summary: Transition content lifecycle state
+      summary: Discovery draft for POST /contents/{contentId}/state
       operationId: transitionContentState
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
       parameters:
-        - $ref: '#/components/parameters/IfMatchRequired'
-        - $ref: '#/components/parameters/IdempotencyKeyRequired'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [to]
-              properties:
-                to: { $ref: '#/components/schemas/ContentState' }
-                scheduledAt: { type: string, format: date-time }
-                reason: { type: string }
+        - name: contentId
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/ResourceId' }
       responses:
-        '200':
-          description: Transitioned.
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  from: { $ref: '#/components/schemas/ContentState' }
-                  to: { $ref: '#/components/schemas/ContentState' }
-                  version: { type: integer }
-                  etag: { $ref: '#/components/schemas/ETag' }
-        '409': { $ref: '#/components/responses/InvalidState' }
-        '412': { $ref: '#/components/responses/PreconditionFailed' }
-        '428': { $ref: '#/components/responses/PreconditionRequired' }
-
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
   /media:
     post:
-      tags: [Media]
-      summary: Initiate an upload (single or multipart)
+      tags: [Contents]
+      summary: Discovery draft for POST /media
       operationId: createMedia
-      parameters:
-        - $ref: '#/components/parameters/IdempotencyKey'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [mimeType, size, checksum]
-              properties:
-                mimeType: { type: string }
-                size: { type: integer, minimum: 1 }
-                checksum:
-                  type: string
-                  description: SHA-256 of the object
-                multipart: { type: boolean }
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
       responses:
-        '201':
-          description: Upload initiated.
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/Media' }
-        '415': { $ref: '#/components/responses/UnsupportedMediaType' }
-
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
   /media/{mediaId}:
     parameters:
       - $ref: '#/components/parameters/MediaId'
     get:
       tags: [Media]
-      summary: Get media metadata
+      summary: Discovery draft for GET /media/{mediaId}
       operationId: getMedia
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      parameters:
+        - name: mediaId
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/ResourceId' }
       responses:
-        '200':
-          description: Media metadata.
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/Media' }
-        '404': { $ref: '#/components/responses/NotFound' }
-
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
     delete:
       tags: [Media]
-      summary: Discovery draft for DELETE undefined
+      summary: Discovery draft for DELETE /media/{mediaId}
       operationId: deleteMedia
       x-luckread-contract-status: DISCOVERY_DRAFT
       x-luckread-source: contracts/api/api-inventory.v1.json
+      parameters:
+        - name: mediaId
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/ResourceId' }
       responses:
         default:
           description: Discovery-only operation; detailed response contract remains to be closed.
@@ -983,51 +456,33 @@ paths:
     parameters:
       - $ref: '#/components/parameters/ContentId'
     get:
-      tags: [Comments]
-      summary: List content comments
+      tags: [Contents]
+      summary: Discovery draft for GET /contents/{contentId}/comments
       operationId: listComments
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
       parameters:
-        - $ref: '#/components/parameters/Cursor'
-        - $ref: '#/components/parameters/Limit'
-        - name: sort
-          in: query
-          required: false
-          description: Stable comment order. relevant preserves the default order; recent sorts newest first; liked sorts by comment-like count then newest.
-          schema:
-            type: string
-            enum: [relevant, recent, liked]
-            default: relevant
+        - name: contentId
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/ResourceId' }
       responses:
-        '200':
-          description: Comment thread (cursor paginated, depth-limited).
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/ListResponse' }
-        '4XX': { $ref: '#/components/responses/ClientError' }
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
     post:
-      tags: [Comments]
-      summary: Create content comment
+      tags: [Contents]
+      summary: Discovery draft for POST /contents/{contentId}/comments
       operationId: createComment
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
       parameters:
-        - $ref: '#/components/parameters/IdempotencyKey'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [body]
-              properties:
-                body: { type: string, minLength: 1, maxLength: 10000 }
-                parentId: { $ref: '#/components/schemas/ResourceId' }
+        - name: contentId
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/ResourceId' }
       responses:
-        '201':
-          description: Created. May enter PENDING when moderation is required.
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/Comment' }
-        '429': { $ref: '#/components/responses/RateLimited' }
-
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
   /contents/{contentId}/poll:
     parameters:
       - $ref: '#/components/parameters/ContentId'
@@ -1216,67 +671,41 @@ paths:
   /interactions/likes:
     post:
       tags: [Interactions]
-      summary: Idempotent like. Repeating MUST NOT create a second like.
+      summary: Discovery draft for POST /interactions/likes
       operationId: like
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: '#/components/schemas/InteractionTarget' }
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
       responses:
-        '200':
-          description: Like recorded (idempotent).
-        '404': { $ref: '#/components/responses/NotFound' }
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
     delete:
       tags: [Interactions]
-      summary: Idempotent unlike.
+      summary: Discovery draft for DELETE /interactions/likes
       operationId: unlike
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: '#/components/schemas/InteractionTarget' }
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
       responses:
-        '204':
-          description: Like removed (idempotent).
-        '4XX': { $ref: '#/components/responses/ClientError' }
-
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
   /social/follows:
     post:
       tags: [Interactions]
-      summary: Idempotent follow.
+      summary: Discovery draft for POST /social/follows
       operationId: follow
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [targetUserId]
-              properties:
-                targetUserId: { $ref: '#/components/schemas/ResourceId' }
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
       responses:
-        '200':
-          description: Followed (idempotent).
-        '4XX': { $ref: '#/components/responses/ClientError' }
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
     delete:
       tags: [Interactions]
-      summary: Idempotent unfollow.
+      summary: Discovery draft for DELETE /social/follows
       operationId: unfollow
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [targetUserId]
-              properties:
-                targetUserId: { $ref: '#/components/schemas/ResourceId' }
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
       responses:
-        '204':
-          description: Unfollowed (idempotent).
-        '4XX': { $ref: '#/components/responses/ClientError' }
-
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
   /feed:
     get:
       tags: [Feed]
@@ -1476,66 +905,22 @@ paths:
   /interactions/blocks:
     get:
       tags: [Interactions]
-      summary: List the current user's blocked accounts
+      summary: Discovery draft for GET /interactions/blocks
       operationId: listBlockedUsers
-      parameters:
-        - $ref: '#/components/parameters/Cursor'
-        - $ref: '#/components/parameters/Limit'
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
       responses:
-        '200':
-          description: A cursor-paginated, private list of the current user's block relationships.
-          content:
-            application/json:
-              schema:
-                type: object
-                required: [data, requestId]
-                additionalProperties: false
-                properties:
-                  data:
-                    type: object
-                    required: [items, nextCursor, hasMore]
-                    additionalProperties: false
-                    properties:
-                      items:
-                        type: array
-                        maxItems: 50
-                        items:
-                          type: object
-                          required: [relationshipId, targetUserId, createdAt]
-                          additionalProperties: false
-                          properties:
-                            relationshipId: { $ref: '#/components/schemas/ResourceId' }
-                            targetUserId: { $ref: '#/components/schemas/ResourceId' }
-                            createdAt: { type: string, format: date-time }
-                      nextCursor:
-                        anyOf:
-                          - { $ref: '#/components/schemas/Cursor' }
-                          - { type: 'null' }
-                      hasMore: { type: boolean }
-                  requestId: { $ref: '#/components/schemas/RequestId' }
-        '401': { $ref: '#/components/responses/Unauthenticated' }
-        '403': { $ref: '#/components/responses/PermissionDenied' }
-        '422': { $ref: '#/components/responses/ClientError' }
-        '429': { $ref: '#/components/responses/RateLimited' }
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
     post:
       tags: [Interactions]
-      summary: Block a user
+      summary: Discovery draft for POST /interactions/blocks
       operationId: blockUser
-      parameters:
-        - $ref: '#/components/parameters/IdempotencyKeyRequired'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [targetUserId]
-              properties:
-                targetUserId: { $ref: '#/components/schemas/ResourceId' }
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
       responses:
-        '200': { description: Blocked (idempotent). }
-        '4XX': { $ref: '#/components/responses/ClientError' }
-
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
   /interactions/blocks/{targetUserId}:
     parameters:
       - name: targetUserId
@@ -1555,66 +940,22 @@ paths:
   /interactions/mutes:
     get:
       tags: [Interactions]
-      summary: List the current user's muted accounts
+      summary: Discovery draft for GET /interactions/mutes
       operationId: listMutedUsers
-      parameters:
-        - $ref: '#/components/parameters/Cursor'
-        - $ref: '#/components/parameters/Limit'
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
       responses:
-        '200':
-          description: A cursor-paginated, private list of the current user's mute relationships.
-          content:
-            application/json:
-              schema:
-                type: object
-                required: [data, requestId]
-                additionalProperties: false
-                properties:
-                  data:
-                    type: object
-                    required: [items, nextCursor, hasMore]
-                    additionalProperties: false
-                    properties:
-                      items:
-                        type: array
-                        maxItems: 50
-                        items:
-                          type: object
-                          required: [relationshipId, targetUserId, createdAt]
-                          additionalProperties: false
-                          properties:
-                            relationshipId: { $ref: '#/components/schemas/ResourceId' }
-                            targetUserId: { $ref: '#/components/schemas/ResourceId' }
-                            createdAt: { type: string, format: date-time }
-                      nextCursor:
-                        anyOf:
-                          - { $ref: '#/components/schemas/Cursor' }
-                          - { type: 'null' }
-                      hasMore: { type: boolean }
-                  requestId: { $ref: '#/components/schemas/RequestId' }
-        '401': { $ref: '#/components/responses/Unauthenticated' }
-        '403': { $ref: '#/components/responses/PermissionDenied' }
-        '422': { $ref: '#/components/responses/ClientError' }
-        '429': { $ref: '#/components/responses/RateLimited' }
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
     post:
       tags: [Interactions]
-      summary: Mute a user
+      summary: Discovery draft for POST /interactions/mutes
       operationId: muteUser
-      parameters:
-        - $ref: '#/components/parameters/IdempotencyKeyRequired'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [targetUserId]
-              properties:
-                targetUserId: { $ref: '#/components/schemas/ResourceId' }
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
       responses:
-        '200': { description: Muted (idempotent). }
-        '4XX': { $ref: '#/components/responses/ClientError' }
-
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
   /interactions/mutes/{targetUserId}:
     parameters:
       - name: targetUserId
@@ -1633,28 +974,14 @@ paths:
 
   /reports:
     post:
-      tags: [Admin]
-      summary: Create a moderation report
-      operationId: createReport
-      parameters:
-        - $ref: '#/components/parameters/IdempotencyKeyRequired'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [targetType, targetId, reasonCode]
-              properties:
-                targetType: { enum: [content, comment, creator, media, profile] }
-                targetId: { $ref: '#/components/schemas/ResourceId' }
-                reasonCode: { type: string, maxLength: 128 }
-                description: { type: string, maxLength: 4000 }
-                evidenceRefs: { type: array, maxItems: 20, items: { type: string, maxLength: 512 } }
+      tags: [Contents]
+      summary: Discovery draft for POST /reports
+      operationId: reportInteractionResource
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
       responses:
-        '201': { description: Report created (idempotent). }
-        '4XX': { $ref: '#/components/responses/ClientError' }
-
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
   /appeals:
     post:
       tags: [Admin]
@@ -2270,14 +1597,13 @@ paths:
 
     post:
       tags: [Admin]
-      summary: Discovery draft for POST undefined
+      summary: Discovery draft for POST /account/data-export
       operationId: exportMyAccountData
       x-luckread-contract-status: DISCOVERY_DRAFT
       x-luckread-source: contracts/api/api-inventory.v1.json
       responses:
         default:
           description: Discovery-only operation; detailed response contract remains to be closed.
-
   /account/deletion-request:
     post:
       tags: [Admin]
@@ -2390,145 +1716,13 @@ paths:
   /analytics/events:
     post:
       tags: [Analytics]
-      summary: Submit bounded client content telemetry
-      description: |
-        Accepts only allow-listed impression, reading and video measurement events.
-        Social mutations such as likes, comments, shares and follows are not accepted
-        here because their business facts remain authoritative in W05. Optional
-        session authentication is resolved by W01; client-supplied actor identities
-        are never trusted. This operation is rate-limited, bounded to 64 KiB and
-        90 events, and is never served from a shared cache.
+      summary: Discovery draft for POST /analytics/events
       operationId: postAnalyticsEvents
-      security: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              additionalProperties: false
-              required: [events]
-              properties:
-                events:
-                  type: array
-                  minItems: 1
-                  maxItems: 90
-                  items:
-                    type: object
-                    additionalProperties: false
-                    required: [eventId, dedupeKey, eventName, occurredAt, sessionId, contentId, contentType]
-                    properties:
-                      eventId:
-                        type: string
-                        minLength: 8
-                        maxLength: 160
-                        pattern: '^[A-Za-z0-9][A-Za-z0-9:_-]{7,159}$'
-                      dedupeKey:
-                        type: string
-                        minLength: 8
-                        maxLength: 160
-                        pattern: '^[A-Za-z0-9][A-Za-z0-9:_-]{7,159}$'
-                      eventName:
-                        type: string
-                        enum:
-                          - content_impression
-                          - content_open
-                          - read_start
-                          - read_progress_25
-                          - read_progress_50
-                          - read_progress_75
-                          - read_complete
-                          - read_dwell
-                          - dwell
-                          - complete_view
-                          - video_impression
-                          - video_play_request
-                          - video_play_success
-                          - video_progress_25
-                          - video_progress_50
-                          - video_progress_75
-                          - video_progress_90
-                          - video_complete
-                          - video_replay
-                          - video_watch
-                      occurredAt:
-                        type: string
-                        format: date-time
-                      sessionId:
-                        type: string
-                        minLength: 1
-                        maxLength: 128
-                        pattern: '^[A-Za-z0-9][A-Za-z0-9:_-]{0,127}$'
-                      contentId:
-                        type: string
-                        minLength: 1
-                        maxLength: 128
-                        pattern: '^[A-Za-z0-9][A-Za-z0-9:_-]{0,127}$'
-                      contentType:
-                        type: string
-                        enum: [article, post, video]
-                      durationMs:
-                        type: integer
-                        minimum: 1
-                        maximum: 86400000
-                      position:
-                        type: number
-                        minimum: 0
-                        maximum: 100
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
       responses:
-        '200':
-          description: Batch classified and deduplicated by W11. Invalid or late measurements are represented only in aggregate quality counts.
-          headers:
-            Cache-Control:
-              schema:
-                type: string
-                const: no-store
-          content:
-            application/json:
-              schema:
-                type: object
-                required: [data, requestId]
-                properties:
-                  data:
-                    type: object
-                    required: [received, qualityCounts, persistence]
-                    properties:
-                      received:
-                        type: integer
-                        minimum: 0
-                        maximum: 90
-                      qualityCounts:
-                        type: object
-                        required: [VALID, SUSPECT, INVALID, DUPLICATE, LATE, REJECTED]
-                        properties:
-                          VALID: { type: integer, minimum: 0 }
-                          SUSPECT: { type: integer, minimum: 0 }
-                          INVALID: { type: integer, minimum: 0 }
-                          DUPLICATE: { type: integer, minimum: 0 }
-                          LATE: { type: integer, minimum: 0 }
-                          REJECTED: { type: integer, minimum: 0 }
-                      persistence:
-                        type: object
-                        required: [attempted, inserted, duplicates, lateAttempted, lateInserted, lateDuplicates]
-                        properties:
-                          attempted: { type: integer, minimum: 0, maximum: 90 }
-                          inserted: { type: integer, minimum: 0, maximum: 90 }
-                          duplicates: { type: integer, minimum: 0, maximum: 90 }
-                          lateAttempted: { type: integer, minimum: 0, maximum: 90 }
-                          lateInserted: { type: integer, minimum: 0, maximum: 90 }
-                          lateDuplicates: { type: integer, minimum: 0, maximum: 90 }
-                  requestId:
-                    type: string
-        '413':
-          description: Request body is larger than 64 KiB.
-        '415':
-          description: Request Content-Type must be application/json.
-        '422':
-          description: Invalid request fields, forbidden event names, or batch size.
-        '429':
-          description: W01 rate limit exceeded.
-        '503':
-          description: Authentication, Service Binding or analytics storage is unavailable.
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
   /articles:
     post:
       tags: [Contents]
@@ -2575,50 +1769,13 @@ paths:
   /auth/refresh:
     post:
       tags: [Auth]
-      summary: Deprecated compatibility alias for reading the current session
-      description: >-
-        Deprecated. This route does not rotate refresh tokens and must not be
-        used as a token refresh API. Use GET /auth/session with the current
-        cookie or Authorization Bearer session credential instead.
-      deprecated: true
+      summary: Discovery draft for POST /auth/refresh
       operationId: authRefresh
-      security:
-        - sessionCookieAuth: []
-        - bearerAuth: []
-      x-luckread-contract-status: DEPRECATED_COMPATIBILITY_ALIAS
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
       responses:
-        '200':
-          description: Current session is valid; response shape matches GET /auth/session.
-          content:
-            application/json:
-              schema:
-                type: object
-                required: [data, requestId]
-                additionalProperties: false
-                properties:
-                  data:
-                    type: object
-                    required: [session, user]
-                    additionalProperties: false
-                    properties:
-                      session:
-                        type: object
-                        required: [id, expiresAt]
-                        additionalProperties: false
-                        properties:
-                          id: { $ref: '#/components/schemas/ResourceId' }
-                          expiresAt: { type: string, format: date-time }
-                      user:
-                        $ref: '#/components/schemas/AuthSessionUser'
-                  requestId: { type: string }
-        '401': { $ref: '#/components/responses/Unauthenticated' }
-        '429': { $ref: '#/components/responses/RateLimited' }
-        '503':
-          description: Authentication service unavailable.
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/ErrorResponse' }
-
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
   /auth/revoke:
     post:
       tags: [Auth]
@@ -3038,14 +2195,13 @@ paths:
   /feed/following:
     get:
       tags: [Feed]
-      summary: Discovery draft for GET undefined
+      summary: Discovery draft for GET /feed/following
       operationId: getFollowingFeed
       x-luckread-contract-status: DISCOVERY_DRAFT
       x-luckread-source: contracts/api/api-inventory.v1.json
       responses:
         default:
           description: Discovery-only operation; detailed response contract remains to be closed.
-
   /feed/recommended:
     get:
       tags: [Feed]
@@ -3222,14 +2378,18 @@ paths:
   /media/{mediaId}/variants:
     get:
       tags: [Media]
-      summary: Discovery draft for GET undefined
+      summary: Discovery draft for GET /media/{mediaId}/variants
       operationId: listMediaVariants
       x-luckread-contract-status: DISCOVERY_DRAFT
       x-luckread-source: contracts/api/api-inventory.v1.json
+      parameters:
+        - name: mediaId
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/ResourceId' }
       responses:
         default:
           description: Discovery-only operation; detailed response contract remains to be closed.
-
   /media/uploads:
     post:
       tags: [Media]
@@ -3244,14 +2404,18 @@ paths:
   /media/uploads/{uploadId}/complete:
     post:
       tags: [Media]
-      summary: Discovery draft for POST undefined
+      summary: Discovery draft for POST /media/uploads/{uploadId}/complete
       operationId: completeUpload
       x-luckread-contract-status: DISCOVERY_DRAFT
       x-luckread-source: contracts/api/api-inventory.v1.json
+      parameters:
+        - name: uploadId
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/ResourceId' }
       responses:
         default:
           description: Discovery-only operation; detailed response contract remains to be closed.
-
   /notification-preferences:
     get:
       tags: [Notifications]
@@ -3512,17 +2676,11 @@ paths:
     post:
       tags: [Commerce]
       summary: Create a full or partial refund for an owned payment
-      description: >-
-        W01 authenticates the customer session and checks payment.refund with W08
-        against the Payment owner. W07 re-reads the customer-owned payment in D1-04,
-        retrieves the provider-authoritative captured amount, reserves a stable
-        Hyperswitch refund_id under the required Idempotency-Key, and then calls
-        Hyperswitch. Only a verified signed refund webhook confirms the final state.
+      description: W01 authorizes the own-Payment permission. W07 verifies D1-04 ownership and Hyperswitch amount_received, reserves a stable refund ID, and waits for a signed webhook to confirm the final refund state.
       operationId: postPaymentsRefunds
       x-luckread-contract-status: CONTRACTED_PARTIAL
       x-luckread-runtime-status: IMPLEMENTED_SOURCE_ONLY_PENDING_D1_04_MIGRATION_AND_SECRETS
-      x-luckread-source: contracts/api/api-inventory.v1.json
-      x-luckread-max-body-bytes: 16384
+      x-luckread-source: contracts/api/commerce-operation-policy.v1.json
       security:
         - sessionCookieAuth: []
         - bearerAuth: []
@@ -3532,16 +2690,36 @@ paths:
         required: true
         content:
           application/json:
-            schema:
-              type: object
-              additionalProperties: false
-              required: [paymentId, amountMinor, currency]
-              properties:
-                paymentId: { type: string, pattern: '^pay_[A-Za-z0-9]{26}    get:
-      tags: [Creators]
-      summary: List active public creator membership plans
-      operationId: getPlans
-      description: Returns only ACTIVE and PUBLIC creator plans backed by an immutable current version. This catalog does not create subscriptions or grant entitlements.
+            schema: {"type":"object","additionalProperties":false,"required":["paymentId","amountMinor","currency"],"properties":{"paymentId":{"type":"string","pattern":"^pay_[A-Za-z0-9]{26}$"},"amountMinor":{"type":"integer","minimum":1,"maximum":9007199254740991},"currency":{"type":"string","pattern":"^[A-Z]{3}$"},"reason":{"type":"string","maxLength":255}}}
+      responses:
+        '202':
+          description: Refund submitted or awaiting signed provider confirmation.
+          content:
+            application/json:
+              schema: {"type":"object","additionalProperties":false,"required":["data","requestId"],"properties":{"data":{"type":"object","additionalProperties":false,"required":["refundId","paymentId","orderId","amountMinor","capturedAmountMinor","currency","status","reason","version","providerUpdatedAt","createdAt","updatedAt","replayed"],"properties":{"refundId":{"type":"string","pattern":"^ref_[A-Za-z0-9]{26}$"},"paymentId":{"type":"string","pattern":"^pay_[A-Za-z0-9]{26}$"},"orderId":{"type":"string","pattern":"^ord_[A-Za-z0-9_-]{1,90}$"},"amountMinor":{"type":"integer","minimum":1,"maximum":9007199254740991},"capturedAmountMinor":{"type":"integer","minimum":1,"maximum":9007199254740991},"currency":{"type":"string","pattern":"^[A-Z]{3}$"},"status":{"type":"string","enum":["REQUESTED","PENDING","SUCCEEDED","FAILED","REVIEW","RECONCILIATION_REQUIRED"]},"reason":{"type":["string","null"],"maxLength":255},"version":{"type":"integer","minimum":1},"providerUpdatedAt":{"type":["string","null"],"format":"date-time"},"createdAt":{"type":"string","format":"date-time"},"updatedAt":{"type":"string","format":"date-time"},"replayed":{"type":"boolean"}}},"requestId":{"type":"string","pattern":"^req_[A-Za-z0-9_-]{1,123}$"}}}
+        '200':
+          description: Idempotent replay of a finalized refund.
+          content:
+            application/json:
+              schema: {"type":"object","additionalProperties":false,"required":["data","requestId"],"properties":{"data":{"type":"object","additionalProperties":false,"required":["refundId","paymentId","orderId","amountMinor","capturedAmountMinor","currency","status","reason","version","providerUpdatedAt","createdAt","updatedAt","replayed"],"properties":{"refundId":{"type":"string","pattern":"^ref_[A-Za-z0-9]{26}$"},"paymentId":{"type":"string","pattern":"^pay_[A-Za-z0-9]{26}$"},"orderId":{"type":"string","pattern":"^ord_[A-Za-z0-9_-]{1,90}$"},"amountMinor":{"type":"integer","minimum":1,"maximum":9007199254740991},"capturedAmountMinor":{"type":"integer","minimum":1,"maximum":9007199254740991},"currency":{"type":"string","pattern":"^[A-Z]{3}$"},"status":{"type":"string","enum":["REQUESTED","PENDING","SUCCEEDED","FAILED","REVIEW","RECONCILIATION_REQUIRED"]},"reason":{"type":["string","null"],"maxLength":255},"version":{"type":"integer","minimum":1},"providerUpdatedAt":{"type":["string","null"],"format":"date-time"},"createdAt":{"type":"string","format":"date-time"},"updatedAt":{"type":"string","format":"date-time"},"replayed":{"type":"boolean"}}},"requestId":{"type":"string","pattern":"^req_[A-Za-z0-9_-]{1,123}$"}}}
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/PermissionDenied' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/InvalidState' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+    get:
+      tags: [Commerce]
+      summary: List the authenticated customer refund history
+      operationId: getPaymentsRefunds
+      x-luckread-contract-status: CONTRACTED_PARTIAL
+      x-luckread-runtime-status: IMPLEMENTED_SOURCE_ONLY_PENDING_D1_04_MIGRATION
+      x-luckread-source: contracts/api/commerce-operation-policy.v1.json
+      security:
+        - sessionCookieAuth: []
+        - bearerAuth: []
       parameters:
         - name: limit
           in: query
@@ -3550,57 +2728,21 @@ paths:
         - name: cursor
           in: query
           required: false
-          schema: { type: string, maxLength: 2048 }
+          schema: { type: string, minLength: 1, maxLength: 512 }
       responses:
-        '200':
-          description: Active public plan catalog.
+        200:
+          description: Customer-owned records returned using bounded keyset pagination.
+          headers:
+            Cache-Control:
+              schema: { type: string, const: no-store }
           content:
             application/json:
-              schema:
-                type: object
-                required: [data, requestId]
-                properties:
-                  data:
-                    type: object
-                    required: [docs, limit, hasMore, nextCursor]
-                    properties:
-                      docs:
-                        type: array
-                        items:
-                          type: object
-                          required: [planId, creatorId, planVersion, name, tier, billingInterval, priceMinor, currency, benefits, createdAt, updatedAt]
-                          properties:
-                            planId: { type: string, minLength: 1, maxLength: 256 }
-                            creatorId: { type: string, minLength: 1, maxLength: 256 }
-                            planVersion: { type: integer, minimum: 1 }
-                            name: { type: string, minLength: 1, maxLength: 120 }
-                            tier: { type: string, minLength: 1, maxLength: 64 }
-                            billingInterval: { type: string, enum: [MONTHLY, YEARLY] }
-                            priceMinor: { type: integer, minimum: 0, maximum: 2147483647 }
-                            currency: { type: string, pattern: '^[A-Z]{3}$' }
-                            benefits:
-                              type: array
-                              items: { type: string, minLength: 1, maxLength: 180 }
-                            createdAt: { type: string, format: date-time }
-                            updatedAt: { type: string, format: date-time }
-                      limit: { type: integer, minimum: 1, maximum: 50 }
-                      hasMore: { type: boolean }
-                      nextCursor: { type: [string, 'null'], maxLength: 2048 }
-                  requestId: { $ref: '#/components/schemas/RequestId' }
+              schema: {"type":"object","additionalProperties":false,"required":["data","requestId"],"properties":{"data":{"type":"object","additionalProperties":false,"required":["items","nextCursor","hasMore"],"properties":{"items":{"type":"array","maxItems":50,"items":{"type":"object","additionalProperties":false,"required":["refundId","paymentId","orderId","amountMinor","currency","status","reason","version","providerUpdatedAt","createdAt","updatedAt"],"properties":{"refundId":{"type":"string","pattern":"^ref_[A-Za-z0-9]{26}$"},"paymentId":{"type":"string","pattern":"^pay_[A-Za-z0-9]{26}$"},"orderId":{"type":"string","pattern":"^ord_[A-Za-z0-9_-]{1,90}$"},"amountMinor":{"type":"integer","minimum":1,"maximum":9007199254740991},"currency":{"type":"string","pattern":"^[A-Z]{3}$"},"status":{"type":"string","enum":["REQUESTED","PENDING","SUCCEEDED","FAILED","REVIEW","RECONCILIATION_REQUIRED"]},"reason":{"type":["string","null"],"maxLength":255},"version":{"type":"integer","minimum":1},"providerUpdatedAt":{"type":["string","null"],"format":"date-time"},"createdAt":{"type":"string","format":"date-time"},"updatedAt":{"type":"string","format":"date-time"}}}},"nextCursor":{"type":["string","null"],"maxLength":512},"hasMore":{"type":"boolean"}}},"requestId":{"type":"string","pattern":"^req_[A-Za-z0-9_-]{1,123}$"}}}
+        '400': { $ref: '#/components/responses/ValidationFailed' }
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '403': { $ref: '#/components/responses/PermissionDenied' }
         '429': { $ref: '#/components/responses/RateLimited' }
-        default: { $ref: '#/components/responses/ServiceUnavailable' }
-
-    get:
-      tags: [Users]
-      summary: Discovery draft for GET undefined
-      operationId: getPaymentsRefunds
-      x-luckread-contract-status: DISCOVERY_DRAFT
-      x-luckread-source: contracts/api/api-inventory.v1.json
-      responses:
-        default:
-          description: Discovery-only operation; detailed response contract remains to be closed.
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
   /posts:
     post:
       tags: [Contents]
@@ -3771,14 +2913,18 @@ paths:
   /users/{userId}:
     get:
       tags: [Users]
-      summary: Discovery draft for GET undefined
+      summary: Discovery draft for GET /users/{userId}
       operationId: getUserProfile
       x-luckread-contract-status: DISCOVERY_DRAFT
       x-luckread-source: contracts/api/api-inventory.v1.json
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/ResourceId' }
       responses:
         default:
           description: Discovery-only operation; detailed response contract remains to be closed.
-
     patch:
       tags: [Users]
       summary: Discovery draft for PATCH undefined
@@ -3846,90 +2992,44 @@ paths:
 
   /admin/moderation/cases/{caseId}:
     get:
-      tags: [Admin]
-      summary: Read a moderation case within the authenticated reviewer scope.
+      tags: [Contents]
+      summary: Discovery draft for GET /admin/moderation/cases/{caseId}
       operationId: getModerationCase
-      security:
-        - bearerAuth: []
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
       parameters:
         - name: caseId
           in: path
           required: true
           schema: { $ref: '#/components/schemas/ResourceId' }
       responses:
-        '200':
-          description: Moderation case.
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/ModerationCaseResponse' }
-        '401':
-          $ref: '#/components/responses/Unauthenticated'
-        '403':
-          $ref: '#/components/responses/PermissionDenied'
-        '404':
-          $ref: '#/components/responses/NotFound'
-
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
   /admin/moderation/cases/{caseId}/decision:
     post:
-      tags: [Admin]
-      summary: Record the authoritative moderation decision for a case.
+      tags: [Contents]
+      summary: Discovery draft for POST /admin/moderation/cases/{caseId}/decision
       operationId: decideModerationCase
-      security:
-        - bearerAuth: []
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
       parameters:
         - name: caseId
           in: path
           required: true
           schema: { $ref: '#/components/schemas/ResourceId' }
-        - $ref: '#/components/parameters/IdempotencyKeyRequired'
-        - $ref: '#/components/parameters/IfMatchRequired'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: '#/components/schemas/ModerationDecisionRequest' }
       responses:
-        '200':
-          description: Authoritative moderation decision result.
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/ModerationDecisionResponse' }
-        '400':
-          $ref: '#/components/responses/ValidationFailed'
-        '401':
-          $ref: '#/components/responses/Unauthenticated'
-        '403':
-          $ref: '#/components/responses/PermissionDenied'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '412':
-          $ref: '#/components/responses/PreconditionFailed'
-        '428':
-          $ref: '#/components/responses/PreconditionRequired'
-
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
   /admin/moderation/queue:
     get:
-      tags: [Admin]
-      summary: Read the bounded moderation queue for the authenticated reviewer scope.
+      tags: [Contents]
+      summary: Discovery draft for GET /admin/moderation/queue
       operationId: listModerationQueue
-      security:
-        - bearerAuth: []
-      parameters:
-        - $ref: '#/components/parameters/Cursor'
-        - $ref: '#/components/parameters/Limit'
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
       responses:
-        '200':
-          description: Bounded moderation queue page.
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/ModerationQueueResponse' }
-        '401':
-          $ref: '#/components/responses/Unauthenticated'
-        '403':
-          $ref: '#/components/responses/PermissionDenied'
-        '400':
-          $ref: '#/components/responses/InvalidCursor'
-
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
   /creator-applications:
     get:
       tags: [Creators]
@@ -4153,23 +3253,33 @@ paths:
     parameters:
       - $ref: '#/components/parameters/ContentId'
     post:
-      tags: [Interactions]
-      summary: Create a relation to the canonical published content.
+      tags: [Contents]
+      summary: Discovery draft for POST /content/{contentId}/reposts
       operationId: postContentContentIdReposts
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
       parameters:
-        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+        - name: contentId
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/ResourceId' }
       responses:
-        '201': { description: Repost relation created or already present. }
-        '4XX': { $ref: '#/components/responses/ClientError' }
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
     delete:
-      tags: [Interactions]
-      summary: Remove the current viewer's repost relation.
+      tags: [Contents]
+      summary: Discovery draft for DELETE /content/{contentId}/reposts
       operationId: deleteContentContentIdReposts
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
       parameters:
-        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+        - name: contentId
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/ResourceId' }
       responses:
-        '204': { description: Repost relation removed or already absent. }
-        '4XX': { $ref: '#/components/responses/ClientError' }
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
   /users/{userId}/pinned-content:
     parameters:
       - name: userId
@@ -4538,26 +3648,72 @@ paths:
 
   /billing/documents:
     get:
-      tags: [Users]
-      summary: Discovery draft for GET undefined
+      tags: [Commerce]
+      summary: List the authenticated customer invoices and receipts
       operationId: getBillingDocuments
-      x-luckread-contract-status: DISCOVERY_DRAFT
-      x-luckread-source: contracts/api/api-inventory.v1.json
+      x-luckread-contract-status: CONTRACTED_PARTIAL
+      x-luckread-runtime-status: IMPLEMENTED_SOURCE_ONLY_PENDING_D1_04_MIGRATION
+      x-luckread-source: contracts/api/commerce-operation-policy.v1.json
+      security:
+        - sessionCookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+        - name: cursor
+          in: query
+          required: false
+          schema: { type: string, minLength: 1, maxLength: 512 }
       responses:
-        default:
-          description: Discovery-only operation; detailed response contract remains to be closed.
-
+        200:
+          description: Customer-owned records returned using bounded keyset pagination.
+          headers:
+            Cache-Control:
+              schema: { type: string, const: no-store }
+          content:
+            application/json:
+              schema: {"type":"object","additionalProperties":false,"required":["data","requestId"],"properties":{"data":{"type":"object","additionalProperties":false,"required":["items","nextCursor","hasMore"],"properties":{"items":{"type":"array","maxItems":50,"items":{"type":"object","additionalProperties":false,"required":["documentId","documentType","documentNumber","orderId","paymentId","amountMinor","currency","snapshot","issuedAt","createdAt"],"properties":{"documentId":{"type":"string","minLength":1,"maxLength":128},"documentType":{"type":"string","enum":["INVOICE","RECEIPT"]},"documentNumber":{"type":"string","minLength":1,"maxLength":128},"orderId":{"type":"string","pattern":"^ord_[A-Za-z0-9_-]{1,90}$"},"paymentId":{"type":["string","null"],"pattern":"^pay_[A-Za-z0-9]{26}$"},"amountMinor":{"type":"integer","minimum":1,"maximum":9007199254740991},"currency":{"type":"string","pattern":"^[A-Z]{3}$"},"snapshot":{"type":"object","additionalProperties":true},"issuedAt":{"type":"string","format":"date-time"},"createdAt":{"type":"string","format":"date-time"}}}},"nextCursor":{"type":["string","null"],"maxLength":512},"hasMore":{"type":"boolean"}}},"requestId":{"type":"string","pattern":"^req_[A-Za-z0-9_-]{1,123}$"}}}
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/PermissionDenied' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
   /payments/history:
     get:
-      tags: [Users]
-      summary: Discovery draft for GET undefined
+      tags: [Commerce]
+      summary: List the authenticated customer payment history
       operationId: getPaymentsHistory
-      x-luckread-contract-status: DISCOVERY_DRAFT
-      x-luckread-source: contracts/api/api-inventory.v1.json
+      x-luckread-contract-status: CONTRACTED_PARTIAL
+      x-luckread-runtime-status: IMPLEMENTED_SOURCE_ONLY_PENDING_D1_04_MIGRATION
+      x-luckread-source: contracts/api/commerce-operation-policy.v1.json
+      security:
+        - sessionCookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+        - name: cursor
+          in: query
+          required: false
+          schema: { type: string, minLength: 1, maxLength: 512 }
       responses:
-        default:
-          description: Discovery-only operation; detailed response contract remains to be closed.
-
+        200:
+          description: Customer-owned records returned using bounded keyset pagination.
+          headers:
+            Cache-Control:
+              schema: { type: string, const: no-store }
+          content:
+            application/json:
+              schema: {"type":"object","additionalProperties":false,"required":["data","requestId"],"properties":{"data":{"type":"object","additionalProperties":false,"required":["items","nextCursor","hasMore"],"properties":{"items":{"type":"array","maxItems":50,"items":{"type":"object","additionalProperties":false,"required":["paymentId","orderId","amountMinor","currency","status","version","providerUpdatedAt","createdAt","updatedAt","refundedMinor"],"properties":{"paymentId":{"type":"string","pattern":"^pay_[A-Za-z0-9]{26}$"},"orderId":{"type":"string","pattern":"^ord_[A-Za-z0-9_-]{1,90}$"},"amountMinor":{"type":"integer","minimum":1,"maximum":9007199254740991},"currency":{"type":"string","pattern":"^[A-Z]{3}$"},"status":{"type":"string","maxLength":64},"version":{"type":"integer","minimum":1},"providerUpdatedAt":{"type":["string","null"],"format":"date-time"},"createdAt":{"type":"string","format":"date-time"},"updatedAt":{"type":"string","format":"date-time"},"refundedMinor":{"type":"integer","minimum":0,"maximum":9007199254740991}}}},"nextCursor":{"type":["string","null"],"maxLength":512},"hasMore":{"type":"boolean"}}},"requestId":{"type":"string","pattern":"^req_[A-Za-z0-9_-]{1,123}$"}}}
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/PermissionDenied' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
 components:
   securitySchemes:
     bearerAuth:

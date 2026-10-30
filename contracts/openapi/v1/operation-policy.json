@@ -122,12 +122,12 @@
       "idempotencyRequired": true,
       "stateMachine": "none",
       "x-luckread-contract-status": "DISCOVERY_DRAFT",
-      "x-luckread-source": "contracts/api/api-inventory.v1.json"
+      "x-luckread-source": "contracts/api/auth-operation-policy.v1.json"
     },
     {
       "operationId": "authSessionRevoke",
       "auth": {
-        "mode": "authenticated"
+        "mode": "permission"
       },
       "permissions": [
         "user.session.revoke"
@@ -135,7 +135,9 @@
       "auditRequired": true,
       "optimisticLockRequired": false,
       "idempotencyRequired": true,
-      "stateMachine": "none"
+      "stateMachine": "none",
+      "x-luckread-contract-status": "DISCOVERY_DRAFT",
+      "x-luckread-source": "contracts/api/auth-operation-policy.v1.json"
     },
     {
       "operationId": "deleteCommentsCommentId",
@@ -220,13 +222,15 @@
       "auth": {
         "mode": "permission"
       },
-      "permissions": [],
+      "permissions": [
+        "interaction.repost"
+      ],
       "auditRequired": true,
       "optimisticLockRequired": false,
       "idempotencyRequired": true,
       "stateMachine": "none",
-      "x-luckread-contract-status": "DISCOVERY_DRAFT",
-      "x-luckread-source": "contracts/api/api-inventory.v1.json"
+      "x-luckread-contract-status": "CONTRACTED_PARTIAL",
+      "x-luckread-source": "contracts/api/interaction-operation-policy.v1.json"
     },
     {
       "operationId": "deleteContent",
@@ -238,8 +242,10 @@
       ],
       "auditRequired": true,
       "optimisticLockRequired": true,
-      "idempotencyRequired": false,
-      "stateMachine": "none"
+      "idempotencyRequired": true,
+      "stateMachine": "none",
+      "x-luckread-contract-status": "CONTRACTED_PARTIAL",
+      "x-luckread-source": "contracts/api/content-operation-policy.v1.json"
     },
     {
       "operationId": "deleteContentsContentIdPoll",
@@ -302,10 +308,12 @@
       "permissions": [
         "interaction.like"
       ],
-      "auditRequired": false,
+      "auditRequired": true,
       "optimisticLockRequired": false,
-      "idempotencyRequired": false,
-      "stateMachine": "none"
+      "idempotencyRequired": true,
+      "stateMachine": "none",
+      "x-luckread-contract-status": "CONTRACTED_PARTIAL",
+      "x-luckread-source": "contracts/api/interaction-operation-policy.v1.json"
     },
     {
       "operationId": "unmuteUser",
@@ -359,7 +367,7 @@
       "optimisticLockRequired": false,
       "idempotencyRequired": true,
       "stateMachine": "none",
-      "x-luckread-contract-status": "DISCOVERY_DRAFT",
+      "x-luckread-contract-status": "MISSING",
       "x-luckread-source": "contracts/api/media-operation-policy.v1.json"
     },
     {
@@ -381,12 +389,14 @@
         "mode": "permission"
       },
       "permissions": [
-        "social.follow"
+        "interaction.follow"
       ],
-      "auditRequired": false,
+      "auditRequired": true,
       "optimisticLockRequired": false,
-      "idempotencyRequired": false,
-      "stateMachine": "none"
+      "idempotencyRequired": true,
+      "stateMachine": "none",
+      "x-luckread-contract-status": "CONTRACTED_PARTIAL",
+      "x-luckread-source": "contracts/api/interaction-operation-policy.v1.json"
     },
     {
       "operationId": "deleteSubscriptionsSubscriptionId",
@@ -491,7 +501,7 @@
       "optimisticLockRequired": false,
       "idempotencyRequired": false,
       "stateMachine": "none",
-      "x-luckread-contract-status": "DISCOVERY_DRAFT",
+      "x-luckread-contract-status": "CONTRACTED_OPENAPI_BOUND",
       "x-luckread-source": "contracts/api/moderation-operation-policy.v1.json"
     },
     {
@@ -506,7 +516,7 @@
       "optimisticLockRequired": false,
       "idempotencyRequired": false,
       "stateMachine": "none",
-      "x-luckread-contract-status": "DISCOVERY_DRAFT",
+      "x-luckread-contract-status": "CONTRACTED_OPENAPI_BOUND",
       "x-luckread-source": "contracts/api/moderation-operation-policy.v1.json"
     },
     {
@@ -548,7 +558,7 @@
       "idempotencyRequired": false,
       "stateMachine": "none",
       "x-luckread-contract-status": "DISCOVERY_DRAFT",
-      "x-luckread-source": "contracts/api/api-inventory.v1.json"
+      "x-luckread-source": "contracts/api/auth-operation-policy.v1.json"
     },
     {
       "operationId": "authMfaStatus",
@@ -561,7 +571,9 @@
       "auditRequired": false,
       "optimisticLockRequired": false,
       "idempotencyRequired": false,
-      "stateMachine": "none"
+      "stateMachine": "none",
+      "x-luckread-contract-status": "DISCOVERY_DRAFT",
+      "x-luckread-source": "contracts/api/auth-operation-policy.v1.json"
     },
     {
       "operationId": "authPrincipalGet",
@@ -594,7 +606,7 @@
     {
       "operationId": "authSessionList",
       "auth": {
-        "mode": "authenticated"
+        "mode": "permission"
       },
       "permissions": [
         "user.session.read"
@@ -602,7 +614,9 @@
       "auditRequired": false,
       "optimisticLockRequired": false,
       "idempotencyRequired": false,
-      "stateMachine": "none"
+      "stateMachine": "none",
+      "x-luckread-contract-status": "DISCOVERY_DRAFT",
+      "x-luckread-source": "contracts/api/auth-operation-policy.v1.json"
     },
     {
       "operationId": "getBillingDocuments",
@@ -617,7 +631,7 @@
       "idempotencyRequired": false,
       "stateMachine": "none",
       "x-luckread-contract-status": "CONTRACTED_PARTIAL",
-      "x-luckread-source": "contracts/api/api-inventory.v1.json"
+      "x-luckread-source": "contracts/api/commerce-operation-policy.v1.json"
     },
     {
       "operationId": "getCommerceOrder",
@@ -674,7 +688,7 @@
     {
       "operationId": "listContents",
       "auth": {
-        "mode": "permission"
+        "mode": "public"
       },
       "permissions": [
         "content.read.public"
@@ -682,12 +696,14 @@
       "auditRequired": false,
       "optimisticLockRequired": false,
       "idempotencyRequired": false,
-      "stateMachine": "none"
+      "stateMachine": "none",
+      "x-luckread-contract-status": "CONTRACTED_PARTIAL",
+      "x-luckread-source": "contracts/api/content-operation-policy.v1.json"
     },
     {
       "operationId": "getContent",
       "auth": {
-        "mode": "permission"
+        "mode": "public"
       },
       "permissions": [
         "content.read.public"
@@ -695,20 +711,24 @@
       "auditRequired": false,
       "optimisticLockRequired": false,
       "idempotencyRequired": false,
-      "stateMachine": "none"
+      "stateMachine": "none",
+      "x-luckread-contract-status": "CONTRACTED_PARTIAL",
+      "x-luckread-source": "contracts/api/content-operation-policy.v1.json"
     },
     {
       "operationId": "listComments",
       "auth": {
-        "mode": "permission"
+        "mode": "public"
       },
       "permissions": [
-        "content.read.public"
+        "comment.read"
       ],
       "auditRequired": false,
       "optimisticLockRequired": false,
       "idempotencyRequired": false,
-      "stateMachine": "none"
+      "stateMachine": "none",
+      "x-luckread-contract-status": "CONTRACTED_PARTIAL",
+      "x-luckread-source": "contracts/api/interaction-operation-policy.v1.json"
     },
     {
       "operationId": "getContentsContentIdPoll",
@@ -920,7 +940,7 @@
       "optimisticLockRequired": false,
       "idempotencyRequired": false,
       "stateMachine": "none",
-      "x-luckread-contract-status": "DISCOVERY_DRAFT",
+      "x-luckread-contract-status": "MISSING",
       "x-luckread-source": "contracts/api/feed-operation-policy.v1.json"
     },
     {
@@ -974,7 +994,7 @@
       "optimisticLockRequired": false,
       "idempotencyRequired": false,
       "stateMachine": "none",
-      "x-luckread-contract-status": "DISCOVERY_DRAFT",
+      "x-luckread-contract-status": "MISSING",
       "x-luckread-source": "contracts/api/interaction-operation-policy.v1.json"
     },
     {
@@ -989,7 +1009,7 @@
       "optimisticLockRequired": false,
       "idempotencyRequired": false,
       "stateMachine": "none",
-      "x-luckread-contract-status": "DISCOVERY_DRAFT",
+      "x-luckread-contract-status": "MISSING",
       "x-luckread-source": "contracts/api/interaction-operation-policy.v1.json"
     },
     {
@@ -1064,7 +1084,9 @@
       "auditRequired": false,
       "optimisticLockRequired": false,
       "idempotencyRequired": false,
-      "stateMachine": "none"
+      "stateMachine": "none",
+      "x-luckread-contract-status": "CONTRACTED_PARTIAL",
+      "x-luckread-source": "contracts/api/media-operation-policy.v1.json"
     },
     {
       "operationId": "getMediaMediaIdPlayback",
@@ -1098,13 +1120,13 @@
         "mode": "permission"
       },
       "permissions": [
-        "media.read"
+        "media.read.own"
       ],
       "auditRequired": false,
       "optimisticLockRequired": false,
       "idempotencyRequired": false,
       "stateMachine": "none",
-      "x-luckread-contract-status": "DISCOVERY_DRAFT",
+      "x-luckread-contract-status": "MISSING",
       "x-luckread-source": "contracts/api/media-operation-policy.v1.json"
     },
     {
@@ -1203,13 +1225,15 @@
       "auth": {
         "mode": "permission"
       },
-      "permissions": [],
+      "permissions": [
+        "payment.read"
+      ],
       "auditRequired": false,
       "optimisticLockRequired": false,
       "idempotencyRequired": false,
       "stateMachine": "none",
-      "x-luckread-contract-status": "DISCOVERY_DRAFT",
-      "x-luckread-source": "contracts/api/api-inventory.v1.json"
+      "x-luckread-contract-status": "CONTRACTED_PARTIAL",
+      "x-luckread-source": "contracts/api/commerce-operation-policy.v1.json"
     },
     {
       "operationId": "getPaymentsRefunds",
@@ -1224,7 +1248,7 @@
       "idempotencyRequired": false,
       "stateMachine": "none",
       "x-luckread-contract-status": "CONTRACTED_PARTIAL",
-      "x-luckread-source": "contracts/api/api-inventory.v1.json"
+      "x-luckread-source": "contracts/api/commerce-operation-policy.v1.json"
     },
     {
       "operationId": "getPlansOp",
@@ -1365,7 +1389,7 @@
       "optimisticLockRequired": false,
       "idempotencyRequired": false,
       "stateMachine": "none",
-      "x-luckread-contract-status": "DISCOVERY_DRAFT",
+      "x-luckread-contract-status": "MISSING",
       "x-luckread-source": "contracts/api/user-account-operation-policy.v1.json"
     },
     {
@@ -1448,7 +1472,9 @@
       "auditRequired": false,
       "optimisticLockRequired": false,
       "idempotencyRequired": false,
-      "stateMachine": "none"
+      "stateMachine": "none",
+      "x-luckread-contract-status": "CONTRACTED_PARTIAL",
+      "x-luckread-source": "contracts/api/user-account-operation-policy.v1.json"
     },
     {
       "operationId": "patchAccountsAccountId",
@@ -1512,8 +1538,10 @@
       ],
       "auditRequired": true,
       "optimisticLockRequired": true,
-      "idempotencyRequired": false,
-      "stateMachine": "none"
+      "idempotencyRequired": true,
+      "stateMachine": "none",
+      "x-luckread-contract-status": "CONTRACTED_PARTIAL",
+      "x-luckread-source": "contracts/api/content-operation-policy.v1.json"
     },
     {
       "operationId": "patchCreatorProfile",
@@ -1628,9 +1656,11 @@
         "user.update.self"
       ],
       "auditRequired": true,
-      "optimisticLockRequired": true,
-      "idempotencyRequired": false,
-      "stateMachine": "none"
+      "optimisticLockRequired": false,
+      "idempotencyRequired": true,
+      "stateMachine": "none",
+      "x-luckread-contract-status": "CONTRACTED_PARTIAL",
+      "x-luckread-source": "contracts/api/user-account-operation-policy.v1.json"
     },
     {
       "operationId": "exportMyAccountData",
@@ -1644,7 +1674,7 @@
       "optimisticLockRequired": false,
       "idempotencyRequired": true,
       "stateMachine": "none",
-      "x-luckread-contract-status": "DISCOVERY_DRAFT",
+      "x-luckread-contract-status": "MISSING",
       "x-luckread-source": "contracts/api/user-account-operation-policy.v1.json"
     },
     {
@@ -1737,7 +1767,7 @@
       "optimisticLockRequired": true,
       "idempotencyRequired": true,
       "stateMachine": "none",
-      "x-luckread-contract-status": "DISCOVERY_DRAFT",
+      "x-luckread-contract-status": "CONTRACTED_OPENAPI_BOUND",
       "x-luckread-source": "contracts/api/moderation-operation-policy.v1.json"
     },
     {
@@ -1758,8 +1788,10 @@
       "auth": {
         "mode": "public"
       },
-      "permissions": [],
-      "auditRequired": false,
+      "permissions": [
+        "analytics.events.ingest"
+      ],
+      "auditRequired": true,
       "optimisticLockRequired": false,
       "idempotencyRequired": false,
       "stateMachine": "none",
@@ -1805,7 +1837,7 @@
       "idempotencyRequired": true,
       "stateMachine": "none",
       "x-luckread-contract-status": "DISCOVERY_DRAFT",
-      "x-luckread-source": "contracts/api/api-inventory.v1.json"
+      "x-luckread-source": "contracts/api/auth-operation-policy.v1.json"
     },
     {
       "operationId": "authLogin",
@@ -1813,10 +1845,12 @@
         "mode": "public"
       },
       "permissions": [],
-      "auditRequired": false,
+      "auditRequired": true,
       "optimisticLockRequired": false,
       "idempotencyRequired": false,
-      "stateMachine": "none"
+      "stateMachine": "none",
+      "x-luckread-contract-status": "DISCOVERY_DRAFT",
+      "x-luckread-source": "contracts/api/auth-operation-policy.v1.json"
     },
     {
       "operationId": "authLogout",
@@ -1828,19 +1862,25 @@
       ],
       "auditRequired": true,
       "optimisticLockRequired": false,
-      "idempotencyRequired": false,
-      "stateMachine": "none"
+      "idempotencyRequired": true,
+      "stateMachine": "none",
+      "x-luckread-contract-status": "DISCOVERY_DRAFT",
+      "x-luckread-source": "contracts/api/auth-operation-policy.v1.json"
     },
     {
       "operationId": "authMfaChallengeVerify",
       "auth": {
         "mode": "public"
       },
-      "permissions": [],
+      "permissions": [
+        "challenge_bound"
+      ],
       "auditRequired": true,
       "optimisticLockRequired": false,
       "idempotencyRequired": true,
-      "stateMachine": "none"
+      "stateMachine": "none",
+      "x-luckread-contract-status": "DISCOVERY_DRAFT",
+      "x-luckread-source": "contracts/api/auth-operation-policy.v1.json"
     },
     {
       "operationId": "authMfaDisable",
@@ -1853,7 +1893,9 @@
       "auditRequired": true,
       "optimisticLockRequired": false,
       "idempotencyRequired": true,
-      "stateMachine": "none"
+      "stateMachine": "none",
+      "x-luckread-contract-status": "DISCOVERY_DRAFT",
+      "x-luckread-source": "contracts/api/auth-operation-policy.v1.json"
     },
     {
       "operationId": "authMfaEnrollmentStart",
@@ -1866,7 +1908,9 @@
       "auditRequired": true,
       "optimisticLockRequired": false,
       "idempotencyRequired": true,
-      "stateMachine": "none"
+      "stateMachine": "none",
+      "x-luckread-contract-status": "DISCOVERY_DRAFT",
+      "x-luckread-source": "contracts/api/auth-operation-policy.v1.json"
     },
     {
       "operationId": "authMfaEnrollmentConfirm",
@@ -1879,7 +1923,9 @@
       "auditRequired": true,
       "optimisticLockRequired": false,
       "idempotencyRequired": true,
-      "stateMachine": "none"
+      "stateMachine": "none",
+      "x-luckread-contract-status": "DISCOVERY_DRAFT",
+      "x-luckread-source": "contracts/api/auth-operation-policy.v1.json"
     },
     {
       "operationId": "authMfaRecoveryCodesRotate",
@@ -1892,12 +1938,14 @@
       "auditRequired": true,
       "optimisticLockRequired": false,
       "idempotencyRequired": true,
-      "stateMachine": "none"
+      "stateMachine": "none",
+      "x-luckread-contract-status": "DISCOVERY_DRAFT",
+      "x-luckread-source": "contracts/api/auth-operation-policy.v1.json"
     },
     {
       "operationId": "authPasswordChange",
       "auth": {
-        "mode": "authenticated"
+        "mode": "permission"
       },
       "permissions": [
         "user.credential.manage"
@@ -1905,18 +1953,24 @@
       "auditRequired": true,
       "optimisticLockRequired": false,
       "idempotencyRequired": true,
-      "stateMachine": "none"
+      "stateMachine": "none",
+      "x-luckread-contract-status": "DISCOVERY_DRAFT",
+      "x-luckread-source": "contracts/api/auth-operation-policy.v1.json"
     },
     {
       "operationId": "authPasswordResetConfirm",
       "auth": {
         "mode": "public"
       },
-      "permissions": [],
+      "permissions": [
+        "recovery_token"
+      ],
       "auditRequired": true,
       "optimisticLockRequired": false,
       "idempotencyRequired": false,
-      "stateMachine": "none"
+      "stateMachine": "none",
+      "x-luckread-contract-status": "DISCOVERY_DRAFT",
+      "x-luckread-source": "contracts/api/auth-operation-policy.v1.json"
     },
     {
       "operationId": "authPasswordResetRequest",
@@ -1927,7 +1981,9 @@
       "auditRequired": true,
       "optimisticLockRequired": false,
       "idempotencyRequired": false,
-      "stateMachine": "none"
+      "stateMachine": "none",
+      "x-luckread-contract-status": "DISCOVERY_DRAFT",
+      "x-luckread-source": "contracts/api/auth-operation-policy.v1.json"
     },
     {
       "operationId": "authRefresh",
@@ -1935,13 +1991,13 @@
         "mode": "permission"
       },
       "permissions": [
-        "user.session.refresh"
+        "user.session.read"
       ],
       "auditRequired": true,
       "optimisticLockRequired": false,
       "idempotencyRequired": false,
       "stateMachine": "none",
-      "x-luckread-contract-status": "DISCOVERY_DRAFT",
+      "x-luckread-contract-status": "DEPRECATED",
       "x-luckread-source": "contracts/api/auth-operation-policy.v1.json"
     },
     {
@@ -1950,10 +2006,12 @@
         "mode": "public"
       },
       "permissions": [],
-      "auditRequired": false,
+      "auditRequired": true,
       "optimisticLockRequired": false,
-      "idempotencyRequired": false,
-      "stateMachine": "none"
+      "idempotencyRequired": true,
+      "stateMachine": "none",
+      "x-luckread-contract-status": "DISCOVERY_DRAFT",
+      "x-luckread-source": "contracts/api/auth-operation-policy.v1.json"
     },
     {
       "operationId": "postAuthRevoke",
@@ -2077,13 +2135,15 @@
       "auth": {
         "mode": "permission"
       },
-      "permissions": [],
+      "permissions": [
+        "interaction.repost"
+      ],
       "auditRequired": true,
       "optimisticLockRequired": false,
       "idempotencyRequired": true,
       "stateMachine": "none",
-      "x-luckread-contract-status": "DISCOVERY_DRAFT",
-      "x-luckread-source": "contracts/api/api-inventory.v1.json"
+      "x-luckread-contract-status": "CONTRACTED_PARTIAL",
+      "x-luckread-source": "contracts/api/interaction-operation-policy.v1.json"
     },
     {
       "operationId": "createShare",
@@ -2122,8 +2182,10 @@
       ],
       "auditRequired": true,
       "optimisticLockRequired": false,
-      "idempotencyRequired": false,
-      "stateMachine": "none"
+      "idempotencyRequired": true,
+      "stateMachine": "none",
+      "x-luckread-contract-status": "CONTRACTED_PARTIAL",
+      "x-luckread-source": "contracts/api/content-operation-policy.v1.json"
     },
     {
       "operationId": "createComment",
@@ -2135,8 +2197,10 @@
       ],
       "auditRequired": true,
       "optimisticLockRequired": false,
-      "idempotencyRequired": false,
-      "stateMachine": "none"
+      "idempotencyRequired": true,
+      "stateMachine": "none",
+      "x-luckread-contract-status": "CONTRACTED_PARTIAL",
+      "x-luckread-source": "contracts/api/interaction-operation-policy.v1.json"
     },
     {
       "operationId": "postContentsContentIdPoll",
@@ -2181,13 +2245,17 @@
     {
       "operationId": "transitionContentState",
       "auth": {
-        "mode": "state-machine"
+        "mode": "permission"
       },
-      "permissions": [],
+      "permissions": [
+        "content.transition"
+      ],
       "auditRequired": true,
-      "optimisticLockRequired": true,
+      "optimisticLockRequired": false,
       "idempotencyRequired": true,
-      "stateMachine": "content"
+      "stateMachine": "content",
+      "x-luckread-contract-status": "CONTRACTED_PARTIAL",
+      "x-luckread-source": "contracts/api/content-operation-policy.v1.json"
     },
     {
       "operationId": "applyForCreator",
@@ -2293,7 +2361,8 @@
       "optimisticLockRequired": false,
       "idempotencyRequired": true,
       "stateMachine": "none",
-      "x-luckread-source": "contracts/api/block-mute.v1.json"
+      "x-luckread-source": "contracts/api/interaction-operation-policy.v1.json",
+      "x-luckread-contract-status": "MISSING"
     },
     {
       "operationId": "like",
@@ -2303,10 +2372,12 @@
       "permissions": [
         "interaction.like"
       ],
-      "auditRequired": false,
+      "auditRequired": true,
       "optimisticLockRequired": false,
-      "idempotencyRequired": false,
-      "stateMachine": "none"
+      "idempotencyRequired": true,
+      "stateMachine": "none",
+      "x-luckread-contract-status": "CONTRACTED_PARTIAL",
+      "x-luckread-source": "contracts/api/interaction-operation-policy.v1.json"
     },
     {
       "operationId": "muteUser",
@@ -2320,7 +2391,8 @@
       "optimisticLockRequired": false,
       "idempotencyRequired": true,
       "stateMachine": "none",
-      "x-luckread-source": "contracts/api/block-mute.v1.json"
+      "x-luckread-source": "contracts/api/interaction-operation-policy.v1.json",
+      "x-luckread-contract-status": "MISSING"
     },
     {
       "operationId": "postIpAssets",
@@ -2397,8 +2469,10 @@
       ],
       "auditRequired": true,
       "optimisticLockRequired": false,
-      "idempotencyRequired": false,
-      "stateMachine": "none"
+      "idempotencyRequired": true,
+      "stateMachine": "none",
+      "x-luckread-contract-status": "CONTRACTED_PARTIAL",
+      "x-luckread-source": "contracts/api/media-operation-policy.v1.json"
     },
     {
       "operationId": "postMediaMediaIdProcess",
@@ -2438,7 +2512,7 @@
       "optimisticLockRequired": false,
       "idempotencyRequired": true,
       "stateMachine": "none",
-      "x-luckread-contract-status": "DISCOVERY_DRAFT",
+      "x-luckread-contract-status": "MISSING",
       "x-luckread-source": "contracts/api/media-operation-policy.v1.json"
     },
     {
@@ -2626,17 +2700,19 @@
       "x-luckread-source": "contracts/api/api-inventory.v1.json"
     },
     {
-      "operationId": "getPlansOpOp",
+      "operationId": "postPaymentsRefunds",
       "auth": {
         "mode": "permission"
       },
-      "permissions": [],
-      "auditRequired": false,
+      "permissions": [
+        "payment.refund"
+      ],
+      "auditRequired": true,
       "optimisticLockRequired": false,
-      "idempotencyRequired": false,
+      "idempotencyRequired": true,
       "stateMachine": "none",
-      "x-luckread-contract-status": "DISCOVERY_DRAFT",
-      "x-luckread-source": "contracts/api/api-inventory.v1.json"
+      "x-luckread-contract-status": "CONTRACTED_PARTIAL",
+      "x-luckread-source": "contracts/api/commerce-operation-policy.v1.json"
     },
     {
       "operationId": "postPosts",
@@ -2678,7 +2754,7 @@
       "x-luckread-source": "contracts/api/api-inventory.v1.json"
     },
     {
-      "operationId": "createReport",
+      "operationId": "reportInteractionResource",
       "auth": {
         "mode": "permission"
       },
@@ -2688,7 +2764,9 @@
       "auditRequired": true,
       "optimisticLockRequired": false,
       "idempotencyRequired": true,
-      "stateMachine": "none"
+      "stateMachine": "none",
+      "x-luckread-contract-status": "MISSING",
+      "x-luckread-source": "contracts/api/interaction-operation-policy.v1.json"
     },
     {
       "operationId": "follow",
@@ -2698,10 +2776,12 @@
       "permissions": [
         "social.follow"
       ],
-      "auditRequired": false,
+      "auditRequired": true,
       "optimisticLockRequired": false,
-      "idempotencyRequired": false,
-      "stateMachine": "none"
+      "idempotencyRequired": true,
+      "stateMachine": "none",
+      "x-luckread-contract-status": "CONTRACTED_PARTIAL",
+      "x-luckread-source": "contracts/api/interaction-operation-policy.v1.json"
     },
     {
       "operationId": "postSubscriptions",
@@ -2719,13 +2799,17 @@
     {
       "operationId": "transitionAccountState",
       "auth": {
-        "mode": "state-machine"
+        "mode": "permission"
       },
-      "permissions": [],
+      "permissions": [
+        "per_transition_from_account_state_machine"
+      ],
       "auditRequired": true,
-      "optimisticLockRequired": true,
+      "optimisticLockRequired": false,
       "idempotencyRequired": false,
-      "stateMachine": "account"
+      "stateMachine": "account",
+      "x-luckread-contract-status": "CONTRACTED_PARTIAL",
+      "x-luckread-source": "contracts/api/user-account-operation-policy.v1.json"
     },
     {
       "operationId": "postUsersUserIdFollow",
@@ -2780,7 +2864,7 @@
       "idempotencyRequired": true,
       "stateMachine": "none",
       "x-luckread-contract-status": "DISCOVERY_DRAFT",
-      "x-luckread-source": "contracts/api/api-inventory.v1.json"
+      "x-luckread-source": "contracts/api/auth-operation-policy.v1.json"
     },
     {
       "operationId": "updateOwnMembershipPlan",
