@@ -117,8 +117,10 @@ const EVENT_STRING_FIELDS = [
   'environment',
   'transaction_id',
   'original_transaction_id',
-  'redeemed_by',
+  'entitlement_id',
   'redemption_outcome',
+  'redemption_platform',
+  'product_display_name',
   'period_type',
   'cancel_reason',
   'expiration_reason',
@@ -126,6 +128,12 @@ const EVENT_STRING_FIELDS = [
   'currency',
   'offer_code',
   'presented_offering_id',
+  'experiment_id',
+  'experiment_variant',
+  'offering_id',
+  'workflow_id',
+  'workflow_step_id',
+  'trace_id',
 ] as const;
 
 const EVENT_ARRAY_FIELDS = [
@@ -133,11 +141,18 @@ const EVENT_ARRAY_FIELDS = [
   'entitlement_ids',
   'transferred_from',
   'transferred_to',
+  'redeemed_from',
+  'redeemed_by',
 ] as const;
 
 const EVENT_NUMBER_FIELDS = [
   'expiration_at_ms',
   'purchased_at_ms',
+  'grace_period_expiration_at_ms',
+  'auto_resume_at_ms',
+  'renewal_number',
+  'experiment_enrolled_at_ms',
+  'enrolled_at_ms',
   'price',
   'price_in_purchased_currency',
   'quantity',
@@ -174,12 +189,13 @@ function sanitizedEventData(event: Record<string, unknown>): string {
     }
     data[key] = value;
   }
-  if (Object.hasOwn(event, 'is_family_share')) {
-    const value = event.is_family_share;
+  for (const key of ['is_family_share', 'is_trial_conversion'] as const) {
+    if (!Object.hasOwn(event, key)) continue;
+    const value = event[key];
     if (value !== null && typeof value !== 'boolean') {
       throw new RevenueCatWebhookValidationError('WEBHOOK_REJECTED');
     }
-    data.is_family_share = value;
+    data[key] = value;
   }
 
   const serialized = JSON.stringify(data);
