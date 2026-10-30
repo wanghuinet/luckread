@@ -255,7 +255,7 @@ function normalizePayment(value: unknown): HyperswitchPayment {
     client_secret: clientSecret,
     customer_id: customerId,
     payment_method_id: paymentMethodId,
-    amount_captured: amountCaptured,
+    amount_received: amountCaptured,
   } = value;
   if (
     typeof paymentId !== 'string' ||
@@ -650,7 +650,7 @@ function normalizeRefund(
   const amount = value.amount;
   const currency = value.currency;
   const status = value.status;
-  const updated = value.updated ?? value.last_updated ?? null;
+  const updated = value.updated_at ?? value.updated ?? null;
   if (
     refundId !== expected.refundId ||
     paymentId !== expected.paymentId ||
@@ -716,11 +716,11 @@ export async function createHyperswitchRefund(
   if (
     !input || typeof input !== 'object' ||
     typeof input.paymentId !== 'string' || !PAYMENT_ID_PATTERN.test(input.paymentId) ||
-    typeof input.refundId !== 'string' || !/^rfd_[A-Za-z0-9_-]{1,124}$/.test(input.refundId) ||
-    !Number.isSafeInteger(input.amount) || input.amount <= 0 ||
+    typeof input.refundId !== 'string' || !/^ref_[A-Za-z0-9]{26}$/.test(input.refundId) ||
+    !Number.isSafeInteger(input.amount) || input.amount < 100 ||
     typeof input.currency !== 'string' || !CURRENCY_PATTERN.test(input.currency) ||
     (input.reason !== undefined && input.reason !== null && (
-      typeof input.reason !== 'string' || input.reason.length > 512 ||
+      typeof input.reason !== 'string' || input.reason.length > 255 ||
       input.reason.trim() !== input.reason || /[\u0000-\u001f\u007f]/.test(input.reason)
     ))
   ) {
@@ -748,9 +748,9 @@ export async function retrieveHyperswitchRefund(
 ): Promise<HyperswitchRefund> {
   if (
     !input || typeof input !== 'object' ||
-    typeof input.refundId !== 'string' || !/^rfd_[A-Za-z0-9_-]{1,124}$/.test(input.refundId) ||
+    typeof input.refundId !== 'string' || !/^ref_[A-Za-z0-9]{26}$/.test(input.refundId) ||
     typeof input.paymentId !== 'string' || !PAYMENT_ID_PATTERN.test(input.paymentId) ||
-    !Number.isSafeInteger(input.amount) || input.amount <= 0 ||
+    !Number.isSafeInteger(input.amount) || input.amount < 100 ||
     typeof input.currency !== 'string' || !CURRENCY_PATTERN.test(input.currency)
   ) {
     throw new HyperswitchClientError('REQUEST_INVALID', 'Refund lookup identity is malformed.');
