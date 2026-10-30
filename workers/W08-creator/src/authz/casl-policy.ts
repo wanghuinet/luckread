@@ -354,6 +354,7 @@ function buildLayerAbility(input: CaslPermissionInput) {
   if (input.layer !== 'L0' && input.layer !== 'L1' && input.subjectId) {
     grant('order.create', 'Order', selfOwnerCondition(input.subjectId))
     grant('order.read', 'Order', selfOwnerCondition(input.subjectId))
+    grant('order.refund.self', 'Order', selfOwnerCondition(input.subjectId))
     grant('payment_method.read.self', 'PaymentMethod', selfOwnerCondition(input.subjectId))
     grant('payment_method.revoke.self', 'PaymentMethod', selfOwnerCondition(input.subjectId))
   }
