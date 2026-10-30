@@ -314,7 +314,7 @@
       },
       "ownerScope": "W01 authorizes order.read for the W02-authenticated principal; W07 independently filters D1-04 orders by the same server-derived customerId. A cursor is never an owner credential.",
       "ordering": "created_at DESC, order_id DESC; stable keyset continuation.",
-      "responseAuthority": "W07 D1-04 Order rows only. Return orderId, status, version, currency, subtotal/discount/tax/total minor amounts and createdAt/updatedAt. Exclude customerId, provider/merchant/payment references, credentials and internal item snapshots.",
+      "responseAuthority": "W07 D1-04 Order rows only. Return orderId, status, version, currency, subtotal/discount/tax/total minor amounts and createdAt/updatedAt. Exclude customerId, provider/merchant/payment references, credentials and internal item snapshots. Include latestPaymentId (the newest payment attempt's stable payment ID for this same customer/order, or null) so the owner can open the separately authorized payment status endpoint. This reference does not assert payment success.",
       "cache": "NO_STORE",
       "failurePolicy": {
         "invalidLimit": "400",
