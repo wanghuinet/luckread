@@ -3592,6 +3592,15 @@ paths:
         '429': { $ref: '#/components/responses/RateLimited' }
         default: { $ref: '#/components/responses/ServiceUnavailable' }
 
+    get:
+      tags: [Users]
+      summary: Discovery draft for GET undefined
+      operationId: getPaymentsRefunds
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
   /posts:
     post:
       tags: [Contents]
@@ -4526,6 +4535,28 @@ paths:
         '428': { $ref: '#/components/responses/PreconditionRequired' }
         '429': { $ref: '#/components/responses/RateLimited' }
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /billing/documents:
+    get:
+      tags: [Users]
+      summary: Discovery draft for GET undefined
+      operationId: getBillingDocuments
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /payments/history:
+    get:
+      tags: [Users]
+      summary: Discovery draft for GET undefined
+      operationId: getPaymentsHistory
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
 
 components:
   securitySchemes:
