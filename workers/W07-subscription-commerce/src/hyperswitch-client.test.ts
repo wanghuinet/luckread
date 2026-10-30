@@ -372,6 +372,13 @@ describe('Hyperswitch server-side payment intent client', () => {
     expect(payment.status).toBe('succeeded')
   })
 
+  it('forces a provider-side status refresh only when explicitly requested', async () => {
+    const fake = fakeFetch(jsonResponse(responsePayment({ status: 'processing' })))
+    await retrieveHyperswitchPayment(config, input.paymentId, fake.fetcher, true)
+    expect(fake.captured[0].url).toBe(`https://sandbox.hyperswitch.io/payments/${input.paymentId}?force_sync=true`)
+    expect(fake.captured[0].init.method).toBe('GET')
+  })
+
   it('exposes a validated opaque payment_method_id from provider reconciliation responses', async () => {
     const saved = fakeFetch(jsonResponse(responsePayment({
       status: 'succeeded',
