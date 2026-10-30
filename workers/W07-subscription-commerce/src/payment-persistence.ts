@@ -1650,7 +1650,7 @@ export async function createRefundRequest(
   let payment: PaymentRow | null;
   try {
     payment = await db.prepare(
-      'SELECT payment_id, order_id, customer_id, provider, merchant_id, amount_minor, currency, status, version, ' +
+      'SELECT payment_id, order_id, customer_id, provider, merchant_id, amount_minor, amount_captured_minor, currency, status, version, ' +
       'idempotency_key, request_hash, provider_updated_at, failure_code, created_at, updated_at ' +
       'FROM payments WHERE payment_id = ? AND customer_id = ? LIMIT 1',
     ).bind(paymentIdInput, customerIdInput).first<PaymentRow>();
