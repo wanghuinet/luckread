@@ -112,6 +112,14 @@ function optionalText(record: UnknownRecord, key: string, maxLength: number): st
   return value;
 }
 
+function optionalNullableText(record: UnknownRecord, key: string, maxLength: number): string | null | undefined {
+  if (!Object.hasOwn(record, key)) return undefined;
+  const value = record[key];
+  if (value === null) return null;
+  if (!isBoundedText(value, maxLength)) throw new RevenueCatSubscriberApiError('INVALID_RESPONSE', false);
+  return value;
+}
+
 function parseEntitlements(value: unknown): Record<string, RevenueCatSubscriberEntitlement> {
   if (value === undefined) return {};
   if (!isRecord(value) || Object.keys(value).length > 256) {
@@ -222,10 +230,10 @@ function parseSubscriber(
 ): RevenueCatSubscriberSnapshot {
   if (!isRecord(value)) throw new RevenueCatSubscriberApiError('INVALID_RESPONSE', false);
 
-  const originalAppUserId = optionalText(value, 'original_app_user_id', 255) ?? null;
+  const originalAppUserId = optionalNullableText(value, 'original_app_user_id', 255) ?? null;
   const firstSeen = optionalNullableDate(value, 'first_seen') ?? null;
   const originalPurchaseDate = optionalNullableDate(value, 'original_purchase_date') ?? null;
-  const managementUrl = optionalText(value, 'management_url', 2_048) ?? null;
+  const managementUrl = optionalNullableText(value, 'management_url', 2_048) ?? null;
 
   let aliases: string[] = [];
   if (Object.hasOwn(value, 'aliases')) {
