@@ -134,8 +134,9 @@ describe('public customer payment and billing history adapters', () => {
     }
     expect(openapiSync).toContain('buildCommerceOpenApiOperation')
     expect(openapiSync).toContain("operationId === 'postPaymentsRefunds'")
-    expect(openapiSync).toContain("operationId === 'getPaymentsHistory'")
-    expect(openapiSync).toContain("operationId === 'getPaymentsRefunds'")
-    expect(openapiSync).toContain("operationId === 'getBillingDocuments'")
+    expect(openapiSync).toContain('getPaymentsHistory:')
+    expect(openapiSync).toContain('getPaymentsRefunds:')
+    expect(openapiSync).toContain('getBillingDocuments:')
+    expect(openapiSync).toContain("Object.prototype.hasOwnProperty.call(itemSchemas, operationId)")
   })
 })
