@@ -362,3 +362,50 @@ export async function recordHyperswitchRefundAcknowledgement(
   if (!latest) throw new RefundPersistenceError('SERVICE_UNAVAILABLE', 503);
   return toDto(latest);
 }
+
+export type RefundPaymentReference = Readonly<{
+  paymentId: string;
+  orderId: string;
+  amountMinor: number;
+  currency: string;
+  merchantId: string;
+}>;
+
+/** Check local payment ownership before any merchant-authenticated provider lookup. */
+export async function resolveRefundPaymentReference(
+  db: D1Database,
+  customerId: string,
+  paymentId: string,
+  expectedMerchantId: string,
+): Promise<RefundPaymentReference> {
+  if (!nonBlank(customerId, 256) || !PAYMENT_ID_PATTERN.test(paymentId) ||
+      !nonBlank(expectedMerchantId, 256)) {
+    throw new RefundPersistenceError('VALIDATION_FAILED', 400);
+  }
+  let payment: PaymentForRefund | null;
+  try {
+    payment = await db.prepare(
+      'SELECT payment_id, order_id, customer_id, merchant_id, provider, amount_minor, currency, status ' +
+      'FROM payments WHERE payment_id = ? AND customer_id = ? LIMIT 1',
+    ).bind(paymentId, customerId).first<PaymentForRefund>();
+  } catch {
+    throw new RefundPersistenceError('SERVICE_UNAVAILABLE', 503);
+  }
+  if (!payment) throw new RefundPersistenceError('RESOURCE_NOT_FOUND', 404);
+  if (
+    payment.provider !== PROVIDER ||
+    payment.merchant_id !== expectedMerchantId ||
+    !['succeeded', 'partially_captured'].includes(payment.status) ||
+    !safeMinor(payment.amount_minor) ||
+    !CURRENCY_PATTERN.test(payment.currency)
+  ) {
+    throw new RefundPersistenceError('CONFLICT', 409);
+  }
+  return {
+    paymentId: payment.payment_id,
+    orderId: payment.order_id,
+    amountMinor: payment.amount_minor,
+    currency: payment.currency,
+    merchantId: payment.merchant_id,
+  };
+}
