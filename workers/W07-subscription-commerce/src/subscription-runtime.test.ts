@@ -602,6 +602,15 @@ describe('subscription runtime', () => {
     expect(result.updatedAt).toBe('2026-10-02T12:00:01.000Z')
   })
 
+  it('allows a subscriber to cancel a past-due subscription and stop further renewal retries', async () => {
+    const db = fakeDb([baseRow({ status: 'PAST_DUE' })])
+    const before = await getSubscription(db, 'user_1', 'sub_existing')
+    const result = await transitionSubscription(db, 'user_1', 'sub_existing', 'cancel', before.etag)
+    expect(result.status).toBe('CANCELED')
+    expect(result.cancelAt).toBe(result.updatedAt)
+    expect(result.version).toBe(before.version + 1)
+  })
+
   it('treats a repeated cancel with a stale If-Match as an idempotent success', async () => {
     const db = fakeDb([baseRow({ status: 'CANCELED', updated_at: '2026-10-02T12:00:01.000Z', cancel_at: '2026-10-02T12:00:01.000Z', version: 2 })])
     const result = await transitionSubscription(db, 'user_1', 'sub_existing', 'cancel', etagForVersion(1))
