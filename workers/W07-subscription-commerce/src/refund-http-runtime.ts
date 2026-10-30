@@ -4,6 +4,7 @@ import {
   createHyperswitchRefund,
   HyperswitchClientError,
   retrieveHyperswitchPayment,
+  retrieveHyperswitchRefund,
   type HyperswitchClientConfig,
 } from './hyperswitch-client.js';
 import {
@@ -28,6 +29,7 @@ type RefundRuntimeDependencies = Readonly<{
   retrievePayment?: typeof retrieveHyperswitchPayment;
   reserve?: typeof createRefundReservation;
   findExistingReservation?: typeof findExistingRefundReservation;
+  retrieveProviderRefund?: typeof retrieveHyperswitchRefund;
   createProviderRefund?: typeof createHyperswitchRefund;
   recordAcknowledgement?: typeof recordHyperswitchRefundAcknowledgement;
 }>;
@@ -253,17 +255,39 @@ export async function handleCommerceRefundRequest(
       return refundResponse(reservation.refund, reservation.replayed);
     }
 
-    const create = dependencies.createProviderRefund ?? createHyperswitchRefund;
-    const providerRefund = await create(config, {
+    const providerIdentity = {
       paymentId: reservation.refund.paymentId,
       refundId: reservation.refund.refundId,
       amount: reservation.refund.amountMinor,
       currency: reservation.refund.currency,
+    };
+    const retrieveProviderRefund = dependencies.retrieveProviderRefund ?? retrieveHyperswitchRefund;
+    let providerRefund: Awaited<ReturnType<typeof retrieveHyperswitchRefund>> | null = null;
+    try {
+      // A previous POST may have succeeded even when its response was lost.
+      // Reconcile by the durable provider refund_id before ever issuing another
+      // create call. A GET result cannot finalize state; the signed webhook can.
+      providerRefund = await retrieveProviderRefund(config, providerIdentity);
+    } catch (error) {
+      if (!(error instanceof HyperswitchClientError) || error.status !== 404) throw error;
+      // Provider confirms this refund_id does not exist; a retry may submit the
+      // original immutable request using the same idempotency identity.
+    }
+
+    if (providerRefund) {
+      const record = dependencies.recordAcknowledgement ?? recordHyperswitchRefundAcknowledgement;
+      const persisted = await record(env.D1_04, providerRefund);
+      return refundResponse(persisted, reservation.replayed);
+    }
+
+    const create = dependencies.createProviderRefund ?? createHyperswitchRefund;
+    const createdRefund = await create(config, {
+      ...providerIdentity,
       reason: reservation.refund.reason,
     });
 
     const record = dependencies.recordAcknowledgement ?? recordHyperswitchRefundAcknowledgement;
-    const persisted = await record(env.D1_04, providerRefund);
+    const persisted = await record(env.D1_04, createdRefund);
     return refundResponse(persisted, reservation.replayed);
   } catch (error) {
     if (error instanceof RefundPersistenceError) return mapPersistenceError(error);
