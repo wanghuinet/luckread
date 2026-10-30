@@ -8,7 +8,7 @@ import {
   parseHyperswitchWebhookEnvelope,
   parseHyperswitchRfc3339Timestamp,
 } from './hyperswitch-webhook-signature.js';
-import type { HyperswitchPayment } from './hyperswitch-client.js';
+import type { HyperswitchPayment, HyperswitchRefund, HyperswitchRefundStatus } from './hyperswitch-client.js';
 import { buildCompletePaymentMethodRevocationOnMandateWebhook } from './payment-method-persistence.js';
 import { validateHyperswitchPaymentWebhook } from './hyperswitch-webhook-payment-validation.js';
 
@@ -39,6 +39,30 @@ export type PaymentAttemptDto = Readonly<{
   createdAt: string;
   updatedAt: string;
 }>;
+
+export type RefundStatus = 'INITIATING' | HyperswitchRefundStatus;
+
+export type RefundDto = Readonly<{
+  refundId: string;
+  paymentId: string;
+  amountMinor: number;
+  currency: string;
+  reason: string | null;
+  status: RefundStatus;
+  version: number;
+  providerUpdatedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}>;
+
+export type RefundRequestCreation = Readonly<{ refund: RefundDto; replayed: boolean }>;
+
+type RefundRow = {
+  refund_id: string; payment_id: string; customer_id: string; provider: string; merchant_id: string;
+  amount_minor: number; currency: string; reason: string | null; status: RefundStatus;
+  idempotency_key: string; request_hash: string; version: number; provider_updated_at: string | null;
+  created_at: string; updated_at: string;
+};
 
 export type PaymentPersistenceErrorCode =
   | 'VALIDATION_FAILED'
@@ -157,6 +181,7 @@ export type PaymentPersistenceDependencies = Readonly<{
   createConflictId?: () => string;
   createSavedPaymentMethodId?: () => string;
   createPaymentMandateId?: () => string;
+  createRefundId?: () => string;
   paymentEnvironment?: 'sandbox' | 'production';
 }>;
 
@@ -177,6 +202,7 @@ export type WebhookReceiptResult = Readonly<{
 
 const PROVIDER = 'hyperswitch';
 const PAYMENT_ID_PATTERN = /^pay_[A-Za-z0-9]{26}$/;
+const REFUND_ID_PATTERN = /^ref_[A-Za-z0-9]{26}$/;
 const IDEMPOTENCY_KEY_PATTERN = /^[A-Za-z0-9_-]{1,128}$/;
 const CURRENCY_PATTERN = /^[A-Z]{3}$/;
 const SHA256_PATTERN = /^[0-9a-f]{64}$/;
@@ -227,6 +253,10 @@ function defaultSavedPaymentMethodId(): string {
 
 function defaultPaymentMandateId(): string {
   return 'mnd_' + crypto.randomUUID().replace(/-/g, '').slice(0, 26);
+}
+
+function defaultRefundId(): string {
+  return 'ref_' + crypto.randomUUID().replace(/-/g, '').slice(0, 26);
 }
 
 /**
@@ -838,7 +868,7 @@ async function persistNonApplicableWebhook(
       'ON CONFLICT(provider, merchant_id, event_id) DO NOTHING',
     ).bind(
       eventRowId, PROVIDER, envelope.merchantId, envelope.eventId, envelope.eventType,
-      (envelope.contentType === 'payment_details' || envelope.contentType === 'mandate_details') &&
+      (envelope.contentType === 'payment_details' || envelope.contentType === 'mandate_details' || envelope.contentType === 'refund_details') &&
         typeof envelope.resource.payment_id === 'string' &&
         PAYMENT_ID_PATTERN.test(envelope.resource.payment_id) ? envelope.resource.payment_id : null,
       payloadSha256, now,
@@ -1432,6 +1462,349 @@ async function receiveHyperswitchMandateWebhook(
  * passing an ArrayBuffer here. This function does not confirm Orders, post
  * ledger facts, or grant/revoke subscription entitlements.
  */
+
+function toRefundDto(row: RefundRow): RefundDto {
+  return {
+    refundId: row.refund_id, paymentId: row.payment_id, amountMinor: row.amount_minor,
+    currency: row.currency, reason: row.reason, status: row.status, version: row.version,
+    providerUpdatedAt: row.provider_updated_at, createdAt: row.created_at, updatedAt: row.updated_at,
+  };
+}
+
+function canonicalRefundTimestamp(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const parsed = parseHyperswitchRfc3339Timestamp(value);
+  return parsed === null ? null : new Date(parsed).toISOString();
+}
+
+async function refundRequestHash(input: Readonly<{
+  customerId: string; paymentId: string; merchantId: string; amountMinor: number;
+  currency: string; reason: string | null;
+}>): Promise<string> {
+  try {
+    const hash = await sha256CanonicalJsonForIdempotency({
+      operation: 'createRefundRequest', customerId: input.customerId, paymentId: input.paymentId,
+      provider: PROVIDER, merchantId: input.merchantId, amountMinor: input.amountMinor,
+      currency: input.currency, reason: input.reason,
+    }, 4096);
+    return hash.slice('sha256:'.length);
+  } catch (error) {
+    if (error instanceof CanonicalJsonError && error.code !== 'HASH_UNAVAILABLE') {
+      throw new PaymentPersistenceError('INTEGRITY_VIOLATION', 500);
+    }
+    throw new PaymentPersistenceError('SERVICE_UNAVAILABLE', 503);
+  }
+}
+
+async function readRefundByCustomerAndKey(db: D1Database, customerId: string, key: string): Promise<RefundRow | null> {
+  return db.prepare(
+    'SELECT refund_id, payment_id, customer_id, provider, merchant_id, amount_minor, currency, reason, status, ' +
+    'idempotency_key, request_hash, version, provider_updated_at, created_at, updated_at ' +
+    'FROM refunds WHERE customer_id = ? AND idempotency_key = ? LIMIT 1',
+  ).bind(customerId, key).first<RefundRow>();
+}
+
+async function readRefundByOwner(db: D1Database, customerId: string, refundId: string): Promise<RefundRow | null> {
+  return db.prepare(
+    'SELECT refund_id, payment_id, customer_id, provider, merchant_id, amount_minor, currency, reason, status, ' +
+    'idempotency_key, request_hash, version, provider_updated_at, created_at, updated_at ' +
+    'FROM refunds WHERE customer_id = ? AND refund_id = ? LIMIT 1',
+  ).bind(customerId, refundId).first<RefundRow>();
+}
+
+/** Reserve an owner-scoped refund in D1-04 before provider I/O; provider rechecks captured balance. */
+export async function createRefundRequest(
+  db: D1Database,
+  customerIdInput: string,
+  paymentIdInput: string,
+  amountMinorInput: number,
+  idempotencyKeyInput: string | null | undefined,
+  reasonInput?: string | null,
+  dependencies: Pick<PaymentPersistenceDependencies, 'now' | 'createRefundId'> = {},
+): Promise<RefundRequestCreation> {
+  if (!nonBlank(customerIdInput, 256) || !PAYMENT_ID_PATTERN.test(paymentIdInput) ||
+      !safeMinor(amountMinorInput) ||
+      (reasonInput !== undefined && reasonInput !== null && !nonBlank(reasonInput, 255))) {
+    throw new PaymentPersistenceError('VALIDATION_FAILED', 400);
+  }
+  if (idempotencyKeyInput == null || idempotencyKeyInput.trim() === '') {
+    throw new PaymentPersistenceError('PRECONDITION_REQUIRED', 428);
+  }
+  if (!IDEMPOTENCY_KEY_PATTERN.test(idempotencyKeyInput)) {
+    throw new PaymentPersistenceError('VALIDATION_FAILED', 400);
+  }
+  const reason = reasonInput ?? null;
+  let payment: PaymentRow | null;
+  try {
+    payment = await db.prepare(
+      'SELECT payment_id, order_id, customer_id, provider, merchant_id, amount_minor, currency, status, version, ' +
+      'idempotency_key, request_hash, provider_updated_at, failure_code, created_at, updated_at ' +
+      'FROM payments WHERE payment_id = ? AND customer_id = ? LIMIT 1',
+    ).bind(paymentIdInput, customerIdInput).first<PaymentRow>();
+  } catch {
+    throw new PaymentPersistenceError('SERVICE_UNAVAILABLE', 503);
+  }
+  if (!payment) throw new PaymentPersistenceError('RESOURCE_NOT_FOUND', 404);
+  if (payment.provider !== PROVIDER || !nonBlank(payment.merchant_id, 256) ||
+      !CURRENCY_PATTERN.test(payment.currency) || payment.status !== 'succeeded' ||
+      !safeMinor(payment.amount_minor)) {
+    throw new PaymentPersistenceError('CONFLICT', 409);
+  }
+  const requestHash = await refundRequestHash({
+    customerId: customerIdInput, paymentId: payment.payment_id, merchantId: payment.merchant_id,
+    amountMinor: amountMinorInput, currency: payment.currency, reason,
+  });
+  try {
+    const existing = await readRefundByCustomerAndKey(db, customerIdInput, idempotencyKeyInput);
+    if (existing) {
+      if (existing.request_hash !== requestHash) {
+        throw new PaymentPersistenceError('IDEMPOTENCY_KEY_REUSE_CONFLICT', 409);
+      }
+      return { refund: toRefundDto(existing), replayed: true };
+    }
+  } catch (error) {
+    if (error instanceof PaymentPersistenceError) throw error;
+    throw new PaymentPersistenceError('SERVICE_UNAVAILABLE', 503);
+  }
+  let reservedMinor: number;
+  try {
+    const reservation = await db.prepare(
+      "SELECT COALESCE(SUM(amount_minor), 0) AS reserved_minor FROM refunds " +
+      "WHERE payment_id = ? AND status IN ('INITIATING','pending','review','succeeded')",
+    ).bind(payment.payment_id).first<{ reserved_minor: number }>();
+    reservedMinor = reservation?.reserved_minor ?? 0;
+  } catch {
+    throw new PaymentPersistenceError('SERVICE_UNAVAILABLE', 503);
+  }
+  if (!Number.isSafeInteger(reservedMinor) || reservedMinor < 0 ||
+      amountMinorInput + reservedMinor > payment.amount_minor) {
+    throw new PaymentPersistenceError('CONFLICT', 409);
+  }
+  const now = parseDate(dependencies.now ?? (() => new Date()));
+  const refundId = (dependencies.createRefundId ?? defaultRefundId)();
+  if (!REFUND_ID_PATTERN.test(refundId)) throw new PaymentPersistenceError('INTEGRITY_VIOLATION', 500);
+  try {
+    const inserted = await db.prepare(
+      'INSERT INTO refunds (refund_id, payment_id, customer_id, provider, merchant_id, amount_minor, currency, ' +
+      'reason, status, idempotency_key, request_hash, version, provider_updated_at, created_at, updated_at) ' +
+      "VALUES (?, ?, ?, 'hyperswitch', ?, ?, ?, ?, 'INITIATING', ?, ?, 1, NULL, ?, ?)",
+    ).bind(
+      refundId, payment.payment_id, customerIdInput, payment.merchant_id, amountMinorInput,
+      payment.currency, reason, idempotencyKeyInput, requestHash, now, now,
+    ).run();
+    if (Number(inserted.meta?.changes ?? 0) !== 1) throw new PaymentPersistenceError('INTEGRITY_VIOLATION', 500);
+    return { refund: {
+      refundId, paymentId: payment.payment_id, amountMinor: amountMinorInput, currency: payment.currency,
+      reason, status: 'INITIATING', version: 1, providerUpdatedAt: null, createdAt: now, updatedAt: now,
+    }, replayed: false };
+  } catch (error) {
+    if (error instanceof PaymentPersistenceError) throw error;
+    try {
+      const raced = await readRefundByCustomerAndKey(db, customerIdInput, idempotencyKeyInput);
+      if (raced) {
+        if (raced.request_hash !== requestHash) throw new PaymentPersistenceError('IDEMPOTENCY_KEY_REUSE_CONFLICT', 409);
+        return { refund: toRefundDto(raced), replayed: true };
+      }
+    } catch (recoveryError) {
+      if (recoveryError instanceof PaymentPersistenceError) throw recoveryError;
+      throw new PaymentPersistenceError('SERVICE_UNAVAILABLE', 503);
+    }
+    throw new PaymentPersistenceError('CONFLICT', 409);
+  }
+}
+
+/** Owner-scoped refund detail without provider secrets or connector identifiers. */
+export async function getRefundRequest(db: D1Database, customerId: string, refundId: string): Promise<RefundDto> {
+  if (!nonBlank(customerId, 256) || !REFUND_ID_PATTERN.test(refundId)) {
+    throw new PaymentPersistenceError('VALIDATION_FAILED', 400);
+  }
+  let row: RefundRow | null;
+  try { row = await readRefundByOwner(db, customerId, refundId); }
+  catch { throw new PaymentPersistenceError('SERVICE_UNAVAILABLE', 503); }
+  if (!row) throw new PaymentPersistenceError('RESOURCE_NOT_FOUND', 404);
+  if (row.provider !== PROVIDER || !nonBlank(row.merchant_id, 256) ||
+      !PAYMENT_ID_PATTERN.test(row.payment_id) || !safeMinor(row.amount_minor) ||
+      !CURRENCY_PATTERN.test(row.currency) ||
+      !['INITIATING','pending','succeeded','failed','review'].includes(row.status) ||
+      !Number.isSafeInteger(row.version) || row.version < 1 ||
+      !(row.provider_updated_at === null || canonicalRefundTimestamp(row.provider_updated_at) !== null) ||
+      !isCanonicalPaymentTimestamp(row.created_at) || !isCanonicalPaymentTimestamp(row.updated_at)) {
+    throw new PaymentPersistenceError('INTEGRITY_VIOLATION', 500);
+  }
+  return toRefundDto(row);
+}
+
+/** Persist API response only while INITIATING; a signed webhook that wins the race remains authoritative. */
+export async function recordRefundProviderResponse(
+  db: D1Database,
+  customerId: string,
+  providerRefund: HyperswitchRefund,
+  dependencies: Pick<PaymentPersistenceDependencies, 'now'> = {},
+): Promise<RefundDto> {
+  if (!nonBlank(customerId, 256) || !REFUND_ID_PATTERN.test(providerRefund.refundId) ||
+      !PAYMENT_ID_PATTERN.test(providerRefund.paymentId) || !safeMinor(providerRefund.amount) ||
+      !CURRENCY_PATTERN.test(providerRefund.currency) ||
+      !['pending','succeeded','failed','review'].includes(providerRefund.status)) {
+    throw new PaymentPersistenceError('VALIDATION_FAILED', 400);
+  }
+  let row: RefundRow | null;
+  try { row = await readRefundByOwner(db, customerId, providerRefund.refundId); }
+  catch { throw new PaymentPersistenceError('SERVICE_UNAVAILABLE', 503); }
+  if (!row) throw new PaymentPersistenceError('RESOURCE_NOT_FOUND', 404);
+  if (row.payment_id !== providerRefund.paymentId || row.amount_minor !== providerRefund.amount ||
+      row.currency !== providerRefund.currency || row.provider !== PROVIDER) {
+    throw new PaymentPersistenceError('INTEGRITY_VIOLATION', 500);
+  }
+  if (row.status !== 'INITIATING') return toRefundDto(row);
+  const providerUpdatedAt = providerRefund.updatedAt === null ? null : canonicalRefundTimestamp(providerRefund.updatedAt);
+  if (providerRefund.updatedAt !== null && providerUpdatedAt === null) {
+    throw new PaymentPersistenceError('INTEGRITY_VIOLATION', 500);
+  }
+  const updatedAt = strictlyAfter(parseDate(dependencies.now ?? (() => new Date())), row.updated_at);
+  try {
+    await db.prepare(
+      'UPDATE refunds SET status = ?, provider_updated_at = ?, version = version + 1, updated_at = ? ' +
+      "WHERE refund_id = ? AND customer_id = ? AND payment_id = ? AND amount_minor = ? AND currency = ? " +
+      "AND version = ? AND status = 'INITIATING'",
+    ).bind(
+      providerRefund.status, providerUpdatedAt, updatedAt, row.refund_id, row.customer_id,
+      row.payment_id, row.amount_minor, row.currency, row.version,
+    ).run();
+  } catch { throw new PaymentPersistenceError('SERVICE_UNAVAILABLE', 503); }
+  try {
+    const current = await readRefundByOwner(db, customerId, providerRefund.refundId);
+    if (!current) throw new PaymentPersistenceError('RESOURCE_NOT_FOUND', 404);
+    return toRefundDto(current);
+  } catch (error) {
+    if (error instanceof PaymentPersistenceError) throw error;
+    throw new PaymentPersistenceError('SERVICE_UNAVAILABLE', 503);
+  }
+}
+
+async function readRefundForWebhook(db: D1Database, refundId: string): Promise<RefundRow | null> {
+  return db.prepare(
+    'SELECT refund_id, payment_id, customer_id, provider, merchant_id, amount_minor, currency, reason, status, ' +
+    'idempotency_key, request_hash, version, provider_updated_at, created_at, updated_at ' +
+    'FROM refunds WHERE refund_id = ? LIMIT 1',
+  ).bind(refundId).first<RefundRow>();
+}
+
+function canApplyRefundStatusTransition(current: RefundStatus, next: HyperswitchRefundStatus): boolean {
+  if (current === 'INITIATING' || current === 'pending') return true;
+  if (current === 'review') return next === 'review' || next === 'succeeded' || next === 'failed';
+  return current === next;
+}
+
+async function receiveHyperswitchRefundWebhook(
+  db: D1Database,
+  envelope: NonNullable<ReturnType<typeof parseHyperswitchWebhookEnvelope>>,
+  payloadSha256: string,
+  eventRowId: string,
+  now: string,
+  createConflictId: () => string,
+): Promise<WebhookReceiptResult> {
+  if (envelope.contentType !== 'refund_details') {
+    return persistNonApplicableWebhook(db, envelope, payloadSha256, eventRowId, now,
+      'RECONCILIATION_REQUIRED', 'REFUND_EVENT_CONTENT_TYPE_MISMATCH', createConflictId);
+  }
+  const expectedStatus: HyperswitchRefundStatus = envelope.eventType === 'refund_succeeded'
+    ? 'succeeded' : envelope.eventType === 'refund_failed' ? 'failed' : 'review';
+  const resource = envelope.resource;
+  const refundId = resource.refund_id;
+  const paymentId = resource.payment_id;
+  const amount = resource.amount;
+  const currency = resource.currency;
+  const status = resource.status;
+  const providerUpdatedAt = canonicalRefundTimestamp(resource.updated_at ?? resource.modified_at);
+  if (
+    typeof refundId !== 'string' || !REFUND_ID_PATTERN.test(refundId) ||
+    typeof paymentId !== 'string' || !PAYMENT_ID_PATTERN.test(paymentId) ||
+    !safeMinor(amount) || typeof currency !== 'string' || !CURRENCY_PATTERN.test(currency) ||
+    (status !== undefined && status !== expectedStatus) ||
+    (resource.merchant_id !== undefined && resource.merchant_id !== envelope.merchantId) ||
+    providerUpdatedAt === null
+  ) {
+    return persistNonApplicableWebhook(db, envelope, payloadSha256, eventRowId, now,
+      'RECONCILIATION_REQUIRED', 'REFUND_RESOURCE_MISMATCH_OR_TIMESTAMP_MISSING', createConflictId);
+  }
+  let refund: RefundRow | null;
+  try { refund = await readRefundForWebhook(db, refundId); }
+  catch { throw new PaymentPersistenceError('SERVICE_UNAVAILABLE', 503); }
+  if (!refund) return persistNonApplicableWebhook(db, envelope, payloadSha256, eventRowId, now,
+    'RECONCILIATION_REQUIRED', 'UNKNOWN_LOCAL_REFUND', createConflictId);
+  if (refund.payment_id !== paymentId || refund.merchant_id !== envelope.merchantId ||
+      refund.amount_minor !== amount || refund.currency !== currency || refund.provider !== PROVIDER) {
+    return persistNonApplicableWebhook(db, envelope, payloadSha256, eventRowId, now,
+      'REJECTED', 'REFUND_COMMERCIAL_SNAPSHOT_MISMATCH', createConflictId);
+  }
+  const providerTime = parseHyperswitchRfc3339Timestamp(providerUpdatedAt);
+  const previousProviderTime = refund.provider_updated_at === null ? null :
+    parseHyperswitchRfc3339Timestamp(refund.provider_updated_at);
+  if ((previousProviderTime !== null && (providerTime === null || providerTime <= previousProviderTime)) ||
+      !canApplyRefundStatusTransition(refund.status, expectedStatus)) {
+    return persistNonApplicableWebhook(db, envelope, payloadSha256, eventRowId, now,
+      'RECONCILIATION_REQUIRED', 'STALE_OR_FORBIDDEN_REFUND_TRANSITION', createConflictId);
+  }
+  const updatedAt = strictlyAfter(now, refund.updated_at);
+  const insertEvent = db.prepare(
+    'INSERT INTO payment_provider_events ' +
+    '(event_row_id, provider, merchant_id, event_id, event_type, payment_id, payload_sha256, state, received_at, processed_at, outcome_code, refund_id) ' +
+    "VALUES (?, ?, ?, ?, ?, ?, ?, 'RECEIVED', ?, NULL, NULL, ?) " +
+    'ON CONFLICT(provider, merchant_id, event_id) DO NOTHING',
+  ).bind(eventRowId, PROVIDER, envelope.merchantId, envelope.eventId, envelope.eventType,
+    paymentId, payloadSha256, now, refundId);
+  const updateRefund = db.prepare(
+    'UPDATE refunds SET status = ?, provider_updated_at = ?, version = version + 1, updated_at = ? ' +
+    'WHERE refund_id = ? AND payment_id = ? AND customer_id = ? AND merchant_id = ? AND provider = ? ' +
+    'AND amount_minor = ? AND currency = ? AND version = ? AND status = ? ' +
+    'AND (provider_updated_at IS NULL OR provider_updated_at < ?) ' +
+    "AND EXISTS (SELECT 1 FROM payment_provider_events e WHERE e.provider = ? AND e.merchant_id = ? " +
+    "AND e.event_id = ? AND e.payload_sha256 = ? AND e.refund_id = ? AND e.state = 'RECEIVED')",
+  ).bind(expectedStatus, providerUpdatedAt, updatedAt, refund.refund_id, refund.payment_id,
+    refund.customer_id, refund.merchant_id, refund.provider, refund.amount_minor, refund.currency,
+    refund.version, refund.status, providerUpdatedAt, PROVIDER, envelope.merchantId,
+    envelope.eventId, payloadSha256, refundId);
+  const updateReceipt = db.prepare(
+    'UPDATE payment_provider_events SET state = CASE WHEN EXISTS (' +
+    'SELECT 1 FROM refunds r WHERE r.refund_id = ? AND r.payment_id = ? AND r.merchant_id = ? ' +
+    'AND r.amount_minor = ? AND r.currency = ? AND r.status = ? AND r.provider_updated_at = ?) ' +
+    "THEN 'APPLIED' ELSE 'RECONCILIATION_REQUIRED' END, processed_at = ?, " +
+    'outcome_code = CASE WHEN EXISTS (' +
+    'SELECT 1 FROM refunds r WHERE r.refund_id = ? AND r.payment_id = ? AND r.merchant_id = ? ' +
+    'AND r.amount_minor = ? AND r.currency = ? AND r.status = ? AND r.provider_updated_at = ?) ' +
+    "THEN 'REFUND_STATUS_APPLIED' ELSE 'REFUND_STATUS_CAS_LOST_OR_OUT_OF_ORDER' END " +
+    "WHERE provider = ? AND merchant_id = ? AND event_id = ? AND payload_sha256 = ? AND refund_id = ? AND state = 'RECEIVED'",
+  ).bind(refundId, paymentId, envelope.merchantId, amount, currency, expectedStatus, providerUpdatedAt, now,
+    refundId, paymentId, envelope.merchantId, amount, currency, expectedStatus, providerUpdatedAt,
+    PROVIDER, envelope.merchantId, envelope.eventId, payloadSha256, refundId);
+
+  let batchResults: D1Result[];
+  try { batchResults = await db.batch([insertEvent, updateRefund, updateReceipt]); }
+  catch {
+    const raced = await readProviderEvent(db, envelope.merchantId, envelope.eventId).catch(() => null);
+    if (!raced) throw new PaymentPersistenceError('SERVICE_UNAVAILABLE', 503);
+    if (raced.payload_sha256 !== payloadSha256) {
+      const conflictId = await recordWebhookConflict(db, raced, payloadSha256, now, createConflictId);
+      return { outcome: 'PAYLOAD_CONFLICT', eventId: raced.event_id, receiptId: raced.event_row_id,
+        state: raced.state, payloadSha256, conflictId };
+    }
+    if (raced.state !== 'RECEIVED') return resultFromProviderEvent(raced, payloadSha256,
+      raced.state === 'APPLIED' ? 'DUPLICATE' : undefined);
+    throw new PaymentPersistenceError('SERVICE_UNAVAILABLE', 503);
+  }
+  const stored = await readProviderEvent(db, envelope.merchantId, envelope.eventId).catch(() => null);
+  if (!stored) throw new PaymentPersistenceError('SERVICE_UNAVAILABLE', 503);
+  if (stored.payload_sha256 !== payloadSha256) {
+    const conflictId = await recordWebhookConflict(db, stored, payloadSha256, now, createConflictId);
+    return { outcome: 'PAYLOAD_CONFLICT', eventId: stored.event_id, receiptId: stored.event_row_id,
+      state: stored.state, payloadSha256, conflictId };
+  }
+  if (stored.state === 'RECEIVED') throw new PaymentPersistenceError('SERVICE_UNAVAILABLE', 503);
+  if (stored.state === 'APPLIED' && Number(batchResults[1]?.meta?.changes ?? 0) === 1 &&
+      Number(batchResults[2]?.meta?.changes ?? 0) === 1) return resultFromProviderEvent(stored, payloadSha256, 'APPLIED');
+  return resultFromProviderEvent(stored, payloadSha256, stored.state === 'APPLIED' ? 'DUPLICATE' : undefined);
+}
+
 export async function receiveHyperswitchWebhook(
   db: D1Database,
   input: ReceiveHyperswitchWebhookInput,
@@ -1484,6 +1857,10 @@ export async function receiveHyperswitchWebhook(
 
   const eventRowId = existing?.event_row_id ?? (dependencies.createEventRowId ?? defaultEventRowId)();
   const createConflictId = dependencies.createConflictId ?? defaultConflictId;
+
+  if (envelope.eventType === 'refund_succeeded' || envelope.eventType === 'refund_failed' || envelope.eventType === 'refund_review') {
+    return receiveHyperswitchRefundWebhook(db, envelope, payloadSha256, eventRowId, now, createConflictId);
+  }
 
   if (envelope.eventType === 'mandate_active' || envelope.eventType === 'mandate_revoked') {
     return receiveHyperswitchMandateWebhook(
