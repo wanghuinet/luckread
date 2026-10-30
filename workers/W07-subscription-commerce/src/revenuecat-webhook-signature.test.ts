@@ -144,7 +144,26 @@ describe('RevenueCat webhook authentication and parsing', () => {
       .toThrow('WEBHOOK_REJECTED');
   });
 
-  it('rejects an app ID outside the explicit app allowlist', () => {
+  it('classifies unlinked experiment enrollment as non-store without requiring app_id', () => {
+    const body = bodyFor({
+      type: 'EXPERIMENT_ENROLLMENT',
+      app_id: undefined,
+      product_id: undefined,
+      store: undefined,
+    })
+    const event = parseRevenueCatWebhookEnvelope(body, new Set(['app_luckread_android']))
+    expect(event.appId).toBeNull()
+    expect(event.eventType).toBe('EXPERIMENT_ENROLLMENT')
+  })
+
+  it('classifies promotional events as non-store when app_id is omitted', () => {
+    const body = bodyFor({ type: 'CANCELLATION', app_id: undefined, store: 'PROMOTIONAL' })
+    const event = parseRevenueCatWebhookEnvelope(body, new Set(['app_luckread_android']))
+    expect(event.appId).toBeNull()
+    expect(event.store).toBe('PROMOTIONAL')
+  })
+
+  it('rejects an app ID outside the explicit app allowlist for store-backed events', () => {
     expect(() => parseRevenueCatWebhookEnvelope(bodyFor(), new Set(['another-app'])))
       .toThrow('WEBHOOK_REJECTED')
   })

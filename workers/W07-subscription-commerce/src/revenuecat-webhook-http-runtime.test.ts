@@ -167,6 +167,45 @@ describe('RevenueCat private W07 webhook receiver', () => {
     expect(json.data.entitlementApplied).toBe(false)
   })
 
+  it('acknowledges experiment enrollment without app_id and never persists it as a purchase', async () => {
+    const body = makeBody({
+      type: 'EXPERIMENT_ENROLLMENT',
+      app_id: undefined,
+      product_id: undefined,
+      store: undefined,
+    })
+    const receive = vi.fn(async () => receipt)
+    const response = await handleRevenueCatWebhookRequest(request(body), envBase, { receive })
+    expect(response?.status).toBe(200)
+    expect(receive).not.toHaveBeenCalled()
+    const json = await response!.json() as { data: { outcome: string; entitlementApplied: boolean } }
+    expect(json.data.outcome).toBe('IGNORED_NON_STORE_SOURCE')
+    expect(json.data.entitlementApplied).toBe(false)
+  })
+
+  it('acknowledges promotional events without app_id without creating store purchase receipts', async () => {
+    const body = makeBody({
+      type: 'CANCELLATION',
+      app_id: undefined,
+      store: 'PROMOTIONAL',
+    })
+    const receive = vi.fn(async () => receipt)
+    const response = await handleRevenueCatWebhookRequest(request(body), envBase, { receive })
+    expect(response?.status).toBe(200)
+    expect(receive).not.toHaveBeenCalled()
+    const json = await response!.json() as { data: { outcome: string; entitlementApplied: boolean } }
+    expect(json.data.outcome).toBe('IGNORED_NON_STORE_SOURCE')
+    expect(json.data.entitlementApplied).toBe(false)
+  })
+
+  it('still rejects store purchase events that omit app_id', async () => {
+    const body = makeBody({ app_id: undefined })
+    const receive = vi.fn(async () => receipt)
+    const response = await handleRevenueCatWebhookRequest(request(body), envBase, { receive })
+    expect(response?.status).toBe(400)
+    expect(receive).not.toHaveBeenCalled()
+  })
+
   it('returns 503 when required configuration is missing and 413 over the body cap', async () => {
     const body = makeBody()
     const unconfigured = await handleRevenueCatWebhookRequest(
