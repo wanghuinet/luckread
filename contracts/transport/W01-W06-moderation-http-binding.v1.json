@@ -363,6 +363,37 @@
         "payment credentials",
         "raw request body"
       ]
+    },
+    {
+      "operationId": "auditPaymentRefundRequest",
+      "method": "POST",
+      "publicPath": "/api/v1/payments/{paymentId}/refunds",
+      "internalPath": "/internal/audit-events/payment-refund-requested",
+      "principalRequired": true,
+      "actorAuthority": "W06 derives actor userId and L2-L8 layer only from trusted W01 private transport headers; request body cannot supply actor identity.",
+      "eventId": "Stable evt_payment_refund_requested_{sha256(actorId, paymentId, Idempotency-Key)}.",
+      "targetType": "Payment",
+      "auditRequired": true,
+      "idempotency": "W01 must pass Idempotency-Key as both a private header and replay credential. Same actor/payment/key with the same amount confirms the immutable prior intent; the same event ID with changed amount conflicts. The raw Idempotency-Key is not persisted in D1-03.",
+      "successPolicy": "W01 must confirm W06 200 exact replay or 201 durable insert before calling W07. W06 failure or conflicting intent prevents any W07 refund reservation or Hyperswitch call.",
+      "cache": "NO_STORE",
+      "auditedFields": [
+        "paymentId",
+        "amountMinor",
+        "operation"
+      ],
+      "sensitiveDataExcluded": [
+        "raw Idempotency-Key",
+        "customerId",
+        "merchantId",
+        "provider API key",
+        "clientSecret",
+        "paymentMethodId",
+        "vault reference",
+        "card data",
+        "reason text",
+        "raw request body"
+      ]
     }
   ],
   "headers": {
