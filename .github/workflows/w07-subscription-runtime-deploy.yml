@@ -75,6 +75,7 @@ jobs:
           test -f migrations/0002_subscription_version_cas.sql
           test -f migrations/0003_membership_plans.sql
           test -f migrations-d1-04/0001_order_commerce.sql
+          test -f migrations-d1-04/0006_refunds_billing_documents.sql
           test -f src/index.ts
           test -f src/subscription-runtime.ts
       - name: Typecheck W07
@@ -125,6 +126,51 @@ jobs:
             /tmp/w07-plan-indexes.json \
             /tmp/w07-plan-version-indexes.json \
             /tmp/w07-plan-triggers.json
+
+      - name: Require D1-04 refund and billing migration readiness
+        id: d1_04_deploy_preflight
+        working-directory: workers/W07-subscription-commerce
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -s /tmp/w07-d1-list.json
+
+          D1_04_NAME="$(node --input-type=commonjs - <<'NODE'
+          const fs = require('node:fs')
+          const config = JSON.parse(fs.readFileSync('wrangler.jsonc', 'utf8'))
+          const d1 = (config.d1_databases || []).find((entry) => entry.binding === 'D1_04')
+          if (!d1 || typeof d1.database_name !== 'string' ||
+              !/^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/.test(d1.database_name)) {
+            throw new Error('D1_04 database name is invalid')
+          }
+          process.stdout.write(d1.database_name)
+          NODE
+          )"
+
+          npx --yes wrangler@4.116.0 d1 execute "$D1_04_NAME" --remote --config wrangler.jsonc --command="SELECT type, name, tbl_name, sql FROM sqlite_master WHERE type IN ('table', 'view', 'index', 'trigger') AND name NOT LIKE 'sqlite_%' ORDER BY type, name" --json > /tmp/w07-d1-04-deploy-schema.json
+          HAS_MIGRATION_TABLE="$(node scripts/verify-d1-04-order-migration.mjs has-migration-table /tmp/w07-d1-04-deploy-schema.json)"
+          if [[ "$HAS_MIGRATION_TABLE" == "true" ]]; then
+            npx --yes wrangler@4.116.0 d1 execute "$D1_04_NAME" --remote --config wrangler.jsonc --command="SELECT name FROM d1_migrations ORDER BY name" --json > /tmp/w07-d1-04-deploy-migrations.json
+          else
+            printf '{"querySkipped":"d1_migrations table not present"}\\n' > /tmp/w07-d1-04-deploy-migrations.json
+          fi
+
+          node scripts/verify-d1-04-order-migration.mjs preflight \
+            /tmp/w07-d1-04-deploy-schema.json \
+            /tmp/w07-d1-04-deploy-migrations.json \
+            /tmp/w07-d1-04-deploy-report.json
+
+          ACTION="$(node -p "require('/tmp/w07-d1-04-deploy-report.json').action")"
+          if [[ "$ACTION" != "VERIFY_ONLY" ]]; then
+            echo "::error::D1-04 refund and billing migrations are pending or inconsistent. Complete the separate explicit D1-04 migration workflow and postflight before deploying W07."
+            node -e "const r=require('/tmp/w07-d1-04-deploy-report.json'); console.error('Pending migrations:', (r.pendingMigrationIds || []).join(', '))"
+            exit 1
+          fi
+          echo "D1-04 deployment preflight passed: all reviewed commerce migrations and schema objects are already present."
 
       - name: Apply D1-01 Subscription migration
         if: steps.d1_preflight.outputs.migration_action == 'apply'
