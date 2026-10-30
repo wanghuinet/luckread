@@ -439,64 +439,6 @@ function buildOpenApiOperation({ operationId, method, canonicalPath, domain }) {
   return lines.join('\n');
 }
 
-function insertIntoExistingPath(raw, rawPath, methodBlocks) {
-  const lines = raw.split('\n');
-  const header = `  ${rawPath}:`;
-  const start = lines.findIndex((line) => line === header);
-  if (start < 0) return null;
-  let end = lines.length;
-  for (let i = start + 1; i < lines.length; i += 1) {
-    if (/^  \/.*:\s*$/.test(lines[i]) || lines[i] === 'components:') { end = i; break; }
-  }
-  const before = lines.slice(0, end);
-  const after = lines.slice(end);
-  if (before.length && before[before.length - 1] !== '') before.push('');
-  return [...before, ...methodBlocks.flatMap((b, i) => i ? ['', ...b.split('\n')] : b.split('\n')), ...after].join('\n');
-}
-
-function addOpenApiOperations(raw, missing) {
-  if (!missing.length) return { raw, added: 0 };
-  let next = raw;
-  let added = 0;
-  const existingPathNames = new Set([...next.matchAll(/^  (\/[^:#]+):\s*$/gm)].map((m) => m[1]));
-  const existingOperations = parseOpenApi(next);
-  const existingKeys = new Set(existingOperations.map((x) => operationKey(x.method, x.path)));
-  const grouped = new Map();
-
-  for (const op of missing) {
-    const key = operationKey(op.method, op.path);
-    if (existingKeys.has(key)) continue;
-    const rawPath = openapiPathFromCanonical(op.path);
-    if (!grouped.has(rawPath)) grouped.set(rawPath, []);
-    grouped.get(rawPath).push(op);
-  }
-
-  const newPathBlocks = [];
-  for (const [rawPath, ops] of [...grouped.entries()].sort(([a], [b]) => a.localeCompare(b))) {
-    ops.sort((a, b) => a.method.localeCompare(b.method));
-    const methodBlocks = ops.map((op) => buildOpenApiOperation(op));
-    if (existingPathNames.has(rawPath)) {
-      const changed = insertIntoExistingPath(next, rawPath, methodBlocks);
-      if (changed !== null) {
-        next = changed;
-        added += ops.length;
-        for (const op of ops) existingKeys.add(operationKey(op.method, op.path));
-      }
-    } else {
-      newPathBlocks.push(`  ${rawPath}:\n${methodBlocks.join('\n\n')}`);
-      added += ops.length;
-    }
-  }
-
-  if (newPathBlocks.length) {
-    const marker = '\ncomponents:\n';
-    const index = next.indexOf(marker);
-    if (index < 0) throw new Error('canonical OpenAPI components marker not found');
-    next = `${next.slice(0, index)}\n${newPathBlocks.join('\n\n')}\n${next.slice(index)}`;
-  }
-  return { raw: next, added };
-}
-
 const inventory = readJson(inventoryPath);
 const domainPolicies = loadDomainPolicies();
 const openapiRaw = fs.readFileSync(`${root}/${openapiPath}`, 'utf8');
