@@ -2033,6 +2033,10 @@ paths:
     post:
       tags: [Users]
       summary: Cancel a subscription
+      description: >-
+        The subscriber may cancel an ACTIVE, PAUSED, or PAST_DUE subscription.
+        Cancellation immediately stops member access and prevents future renewal
+        retries. Completed payments are not automatically refunded.
       operationId: cancelSubscription
       parameters:
         - $ref: '#/components/parameters/IfMatchRequired'
