@@ -182,8 +182,10 @@ function sanitizedEventData(event: Record<string, unknown>): string {
   for (const key of EVENT_NUMBER_FIELDS) {
     if (!Object.hasOwn(event, key)) continue;
     const value = event[key];
+    const signedRefundAmount = key === 'price' || key === 'price_in_purchased_currency';
     if (value !== null && (typeof value !== 'number' || !Number.isFinite(value) ||
-        value < 0 || value > Number.MAX_SAFE_INTEGER)) {
+        (signedRefundAmount ? Math.abs(value) > Number.MAX_SAFE_INTEGER :
+          value < 0 || value > Number.MAX_SAFE_INTEGER))) {
       throw new RevenueCatWebhookValidationError('WEBHOOK_REJECTED');
     }
     data[key] = value;
