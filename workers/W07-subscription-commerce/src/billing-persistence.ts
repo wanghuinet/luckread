@@ -114,7 +114,7 @@ export type BillingList<T> = Readonly<{
 }>;
 
 export class BillingPersistenceError extends Error {
-  constructor(readonly code: 'VALIDATION_FAILED' | 'RESOURCE_NOT_FOUND' | 'INTEGRITY_VIOLATION' | 'SERVICE_UNAVAILABLE', readonly status: number) {
+  constructor(readonly code: 'VALIDATION_FAILED' | 'RESOURCE_NOT_FOUND' | 'CONFLICT' | 'INTEGRITY_VIOLATION' | 'SERVICE_UNAVAILABLE', readonly status: number) {
     super(code);
     this.name = 'BillingPersistenceError';
   }
@@ -410,7 +410,7 @@ export async function listBillingDocumentsForCustomer(
   if (!validId(customerIdInput)) throw new BillingPersistenceError('VALIDATION_FAILED', 400);
   const limit = pageSize(limitInput);
   const cursor = decodeCursor(cursorInput);
-  let result: D1Result<BillingDocumentRow[]>;
+  let result: D1Result<BillingDocumentRow>;
   try {
     result = cursor
       ? await db.prepare(
@@ -445,7 +445,7 @@ export async function listPaymentHistoryForCustomer(
   if (!validId(customerIdInput)) throw new BillingPersistenceError('VALIDATION_FAILED', 400);
   const limit = pageSize(limitInput);
   const cursor = decodeCursor(cursorInput);
-  let result: D1Result<Array<PaymentForBilling & { refunded_minor: number }>>;
+  let result: D1Result<PaymentForBilling & { refunded_minor: number }>;
   const columns =
     'SELECT p.payment_id, p.order_id, p.customer_id, p.provider, p.merchant_id, p.amount_minor, p.currency, ' +
     'p.status, p.version, p.provider_updated_at, p.created_at, p.updated_at, ' +
@@ -495,7 +495,7 @@ export async function listRefundHistoryForCustomer(
   if (!validId(customerIdInput)) throw new BillingPersistenceError('VALIDATION_FAILED', 400);
   const limit = pageSize(limitInput);
   const cursor = decodeCursor(cursorInput);
-  let result: D1Result<RefundHistoryRow[]>;
+  let result: D1Result<RefundHistoryRow>;
   const base = 'SELECT refund_id, payment_id, order_id, amount_minor, currency, status, reason, version, provider_updated_at, created_at, updated_at ' +
     'FROM refunds WHERE customer_id = ?';
   try {
