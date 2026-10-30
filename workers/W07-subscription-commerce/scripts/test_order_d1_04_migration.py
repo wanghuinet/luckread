@@ -236,8 +236,8 @@ class D104OrderMigrationTests(unittest.TestCase):
         )
 
     def test_refunds_reserve_only_captured_owner_payment_amount_and_release_failed_amount(self):
-        self.order()
-        self.payment(status="succeeded", provider_updated_at=NOW)
+        self.order(subtotal=1200, total=1200)
+        self.payment(status="succeeded", amount=1200, provider_updated_at=NOW)
 
         self.refund(amount=600, key="refund_key_1")
         self.refund(refund_id="ref_" + "b"*26, amount=500, key="refund_key_2",
