@@ -110,6 +110,8 @@ export interface HyperswitchPayment {
   customerId?: string | null;
   /** Opaque Hyperswitch vault reference; not consent evidence and not a fulfillment signal. */
   paymentMethodId?: string | null;
+  /** Provider-reported captured amount in smallest currency units; absent on endpoints that omit it. */
+  amountCaptured?: number | null;
 }
 
 export type HyperswitchClientErrorCode =
@@ -277,6 +279,7 @@ function normalizePayment(value: unknown): HyperswitchPayment {
     client_secret: clientSecret,
     customer_id: customerId,
     payment_method_id: paymentMethodId,
+    amount_captured: amountCaptured,
   } = value;
   if (
     typeof paymentId !== 'string' ||
@@ -288,6 +291,8 @@ function normalizePayment(value: unknown): HyperswitchPayment {
     typeof currency !== 'string' ||
     !CURRENCY_PATTERN.test(currency) ||
     !isHyperswitchPaymentStatus(status) ||
+    (amountCaptured !== undefined && amountCaptured !== null &&
+      (typeof amountCaptured !== 'number' || !Number.isSafeInteger(amountCaptured) || amountCaptured < 0 || amountCaptured > amount)) ||
     (clientSecret !== undefined && clientSecret !== null && typeof clientSecret !== 'string') ||
     (customerId !== undefined && customerId !== null && (
       typeof customerId !== 'string' ||
@@ -316,6 +321,7 @@ function normalizePayment(value: unknown): HyperswitchPayment {
     clientSecret: typeof clientSecret === 'string' ? clientSecret : null,
     ...(typeof customerId === 'string' ? { customerId } : {}),
     paymentMethodId: typeof paymentMethodId === 'string' ? paymentMethodId : null,
+    ...(typeof amountCaptured === 'number' ? { amountCaptured } : {}),
   };
 }
 
