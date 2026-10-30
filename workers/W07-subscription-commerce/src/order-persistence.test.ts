@@ -3,6 +3,7 @@ import { webcrypto } from 'node:crypto';
 import {
   createCommerceOrder,
   getCommerceOrder,
+  listCommerceOrders,
   OrderPersistenceError,
   type AuthoritativelyPricedOrder,
   type OrderPersistenceDependencies,
@@ -58,6 +59,25 @@ class MemoryD1 {
   }
 
   async all<T>(sql: string, values: unknown[]): Promise<D1Result<T[]>> {
+    if (sql.includes('FROM orders WHERE customer_id = ?')) {
+      const [customerId, cursorCreatedAt, cursorCreatedAtAgain, cursorOrderId, rawLimit] = values;
+      if (!sql.includes('ORDER BY created_at DESC, order_id DESC')) {
+        throw new Error('Order history must use deterministic keyset ordering');
+      }
+      let rows = this.state.orders.filter((row) => row.customer_id === customerId);
+      if (sql.includes('AND (created_at < ? OR (created_at = ? AND order_id < ?))')) {
+        if (cursorCreatedAt !== cursorCreatedAtAgain) throw new Error('Cursor timestamp binding mismatch');
+        rows = rows.filter((row) =>
+          String(row.created_at) < String(cursorCreatedAt) ||
+          (String(row.created_at) === String(cursorCreatedAt) && String(row.order_id) < String(cursorOrderId)));
+      }
+      rows.sort((left, right) => {
+        const timestamp = String(right.created_at).localeCompare(String(left.created_at));
+        return timestamp !== 0 ? timestamp : String(right.order_id).localeCompare(String(left.order_id));
+      });
+      const limit = Number(rawLimit);
+      return { success: true, results: clone(rows.slice(0, limit)) as T[], meta: {} } as D1Result<T[]>;
+    }
     if (!sql.includes('FROM order_lines WHERE order_id = ?')) throw new Error('Unexpected all query: ' + sql);
     const [orderId] = values;
     const results = this.state.lines.filter((r) => r.order_id === orderId)
@@ -412,6 +432,71 @@ describe('PAY-002 atomic D1-04 order persistence candidate', () => {
     const error = await getCommerceOrder(db as unknown as D1Database, 'user_1', 'legacy_zero_order')
       .then(() => null, (e: unknown) => e);
     expect(errorCode(error)).toBe('INTEGRITY_VIOLATION');
+  });
+
+  it('lists the authenticated customer order summaries in stable cursor pages without leaking owner fields', async () => {
+    const db = new MemoryD1();
+    const addOrder = (orderId: string, customerId: string, createdAt: string) => db.state.orders.push({
+      order_id: orderId,
+      customer_id: customerId,
+      status: 'CONFIRMED',
+      version: 2,
+      currency: 'USD',
+      subtotal_minor: 1200,
+      discount_minor: 0,
+      tax_minor: 0,
+      total_minor: 1200,
+      created_at: createdAt,
+      updated_at: createdAt,
+      confirmed_at: createdAt,
+      cancelled_at: null,
+      failure_code: null,
+    });
+    addOrder('ord_owner_01', 'user_1', '2026-10-25T12:00:00.000Z');
+    addOrder('ord_owner_02', 'user_1', '2026-10-26T12:00:00.000Z');
+    addOrder('ord_owner_03', 'user_1', '2026-10-27T12:00:00.000Z');
+    addOrder('ord_foreign_01', 'user_2', '2026-10-28T12:00:00.000Z');
+
+    const first = await listCommerceOrders(db as unknown as D1Database, 'user_1', 2);
+    expect(first.items.map((item) => item.orderId)).toEqual(['ord_owner_03', 'ord_owner_02']);
+    expect(first.hasMore).toBe(true);
+    expect(first.nextCursor).toBeTruthy();
+    expect(first.items[0]).not.toHaveProperty('customerId');
+    expect(first.items[0]).not.toHaveProperty('provider');
+    expect(first.items[0]).not.toHaveProperty('items');
+
+    const second = await listCommerceOrders(db as unknown as D1Database, 'user_1', 2, first.nextCursor);
+    expect(second.items.map((item) => item.orderId)).toEqual(['ord_owner_01']);
+    expect(second.hasMore).toBe(false);
+    expect(second.nextCursor).toBeNull();
+  });
+
+  it('binds order history cursors to the current owner and rejects a cursor from another customer scope', async () => {
+    const db = new MemoryD1();
+    const addOrder = (orderId: string, customerId: string, createdAt: string) => db.state.orders.push({
+      order_id: orderId, customer_id: customerId, status: 'CONFIRMED', version: 1, currency: 'USD',
+      subtotal_minor: 100, discount_minor: 0, tax_minor: 0, total_minor: 100,
+      created_at: createdAt, updated_at: createdAt,
+    });
+    addOrder('ord_owner_01', 'user_1', '2026-10-25T12:00:00.000Z');
+    addOrder('ord_owner_02', 'user_1', '2026-10-26T12:00:00.000Z');
+    const first = await listCommerceOrders(db as unknown as D1Database, 'user_1', 1);
+    expect(first.nextCursor).toBeTruthy();
+
+    const error = await listCommerceOrders(db as unknown as D1Database, 'user_2', 1, first.nextCursor)
+      .then(() => null, (cause: unknown) => cause);
+    expect(errorCode(error)).toBe('INVALID_CURSOR');
+  });
+
+  it('rejects invalid order history bounds and malformed cursors without querying D1', async () => {
+    const db = new MemoryD1();
+    const invalidLimit = await listCommerceOrders(db as unknown as D1Database, 'user_1', 51)
+      .then(() => null, (cause: unknown) => cause);
+    expect(errorCode(invalidLimit)).toBe('VALIDATION_FAILED');
+    const invalidCursor = await listCommerceOrders(db as unknown as D1Database, 'user_1', 20, 'not-a-cursor')
+      .then(() => null, (cause: unknown) => cause);
+    expect(errorCode(invalidCursor)).toBe('INVALID_CURSOR');
+    expect(db.firstCalls).toBe(0);
   });
 
   it('rejects duplicate item references in persisted order lines', async () => {
