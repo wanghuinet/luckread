@@ -485,32 +485,10 @@ for (const [key, record] of inventoryMap) {
   missingOpenApi.push({ operationId, method, path, domain: record.domain });
 }
 
-let openapiPrepared = openapiRaw;
-let upgradedExistingOpenApiOperations = 0;
-for (const sourceOperation of domainPolicies) {
-  const key = operationKey(sourceOperation.method, sourceOperation.path);
-  if (!openapiMap.has(key)) continue;
-  const rawPath = openapiPathFromCanonical(sourceOperation.path);
-  const methodBlock = buildOpenApiOperation({
-    operationId: sourceOperation.operationId,
-    method: sourceOperation.method,
-    canonicalPath: sourceOperation.path,
-    domain: sourceOperation.domain ?? inferDomain(sourceOperation.path),
-  });
-  const upgraded = replaceExistingOpenApiOperation(
-    openapiPrepared,
-    rawPath,
-    sourceOperation.method,
-    methodBlock,
-  );
-  if (upgraded !== null && upgraded !== openapiPrepared) {
-    openapiPrepared = upgraded;
-    upgradedExistingOpenApiOperations += 1;
-  }
-}
-
-const { raw: openapiNext, added: addedToOpenApi } = addOpenApiOperations(openapiPrepared, missingOpenApi);
+const { raw: openapiNext, added: addedToOpenApi } = addOpenApiOperations(openapiRaw, missingOpenApi);
 if (openapiNext !== openapiRaw) fs.writeFileSync(`${root}/${openapiPath}`, openapiNext);
+
+
 
 const effectiveOpenApi = parseOpenApi(openapiNext);
 const effectiveByKey = new Map(effectiveOpenApi.map((x) => [operationKey(x.method, x.path), x]));
@@ -604,7 +582,6 @@ console.log(JSON.stringify({
   inventoryOperations: inventoryMap.size,
   addedToInventory,
   addedToOpenApi,
-  upgradedExistingOpenApiOperations,
   consolidatedPolicyOperations: consolidatedOperations.length,
   remainingInventoryWithoutOpenApi: inventoryMap.size - effectiveOpenApi.length,
 }, null, 2));
