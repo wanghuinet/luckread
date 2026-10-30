@@ -109,7 +109,7 @@ export async function forwardW07RevenueCatWebhook(input: {
   const suppliedCorrelation = input.request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? ''
   const correlationId = suppliedCorrelation.length > 0 &&
     suppliedCorrelation.length <= 128 &&
-    !/[\\u0000-\\u001f\\u007f]/.test(suppliedCorrelation)
+    !/[\u0000-\u001f\u007f]/.test(suppliedCorrelation)
     ? suppliedCorrelation
     : crypto.randomUUID()
   const headers = new Headers({
