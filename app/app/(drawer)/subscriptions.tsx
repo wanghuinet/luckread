@@ -276,7 +276,7 @@ export default function MySubscriptionsScreen() {
             void (async () => {
               try {
                 const idempotencyKey = paymentMethodIdempotencyKeys.current.get(method.savedPaymentMethodId) ??
-                  createIdempotencyKey();
+                  'remove_' + method.savedPaymentMethodId;
                 paymentMethodIdempotencyKeys.current.set(method.savedPaymentMethodId, idempotencyKey);
                 let result = await revokeSavedPaymentMethod(method.savedPaymentMethodId, idempotencyKey);
                 // The first response confirms the D1-04 MIT block. Replay the
