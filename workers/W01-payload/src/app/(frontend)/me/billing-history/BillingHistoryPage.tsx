@@ -25,6 +25,7 @@ type OrderResponse = { data?: OrderPage; error?: { code?: string; message?: stri
 const copy = (locale: PublicLocale) => locale === 'en'
   ? {
       title: 'Billing and orders',
+      refresh: 'Refresh',
       description: 'Private order summaries for your account. An order record is not a tax invoice and does not by itself prove payment success or content entitlement.',
       loading: 'Loading order history…',
       empty: 'No orders yet',
@@ -49,6 +50,7 @@ const copy = (locale: PublicLocale) => locale === 'en'
   : locale === 'tw'
     ? {
         title: '帳單與訂單',
+        refresh: '重新整理',
         description: '僅顯示目前帳戶擁有的訂單摘要。訂單記錄不是稅務發票，也不能單獨證明付款成功或內容權益已生效。',
         loading: '正在讀取訂單記錄…',
         empty: '目前沒有訂單',
@@ -72,6 +74,7 @@ const copy = (locale: PublicLocale) => locale === 'en'
       }
     : {
         title: '账单与订单',
+        refresh: '刷新',
         description: '仅显示当前账户拥有的订单摘要。订单记录不是税务发票，也不能单独证明付款成功或内容权益已生效。',
         loading: '正在读取订单记录…',
         empty: '暂无订单记录',
@@ -206,7 +209,7 @@ export default function BillingHistoryPage() {
           onClick={() => void load()}
           className="mt-3 rounded-full border border-light-border px-4 py-2 text-sm font-bold disabled:opacity-50 dark:border-dark-border"
         >
-          {loading ? labels.loadingMore : labels.retry}
+          {loading ? labels.loadingMore : labels.refresh}
         </button>
       </header>
       {error ? (
