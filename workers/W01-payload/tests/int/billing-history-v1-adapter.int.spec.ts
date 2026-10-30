@@ -14,6 +14,7 @@ const orderRuntime = read('../W07-subscription-commerce/src/order-http-runtime.t
 const webhookRuntime = read('../W07-subscription-commerce/src/payment-webhook-http-runtime.ts')
 const apiInventory = JSON.parse(read('../../contracts/api/api-inventory.v1.json'))
 const operationPolicy = JSON.parse(read('../../contracts/openapi/v1/operation-policy.json'))
+const openapi = read('../../contracts/openapi/v1/openapi.yaml')
 const sourcePolicy = JSON.parse(read('../../contracts/api/commerce-operation-policy.v1.json'))
 const binding = JSON.parse(read('../../contracts/transport/W01-W07-membership-commerce-http-binding.v1.json'))
 const routing = JSON.parse(read('../../contracts/transport/public-worker-terminal-routing.v1.json'))
