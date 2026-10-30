@@ -230,3 +230,33 @@ export async function authorizePaymentRefundPermission(
   if (decision === 'DENY') return errorResponse(403, 'PERMISSION_DENIED', 'Payment refund permission required')
   return errorResponse(503, 'AUTHORIZATION_UNAVAILABLE', 'Payment authorization response could not be verified')
 }
+
+
+/** Customer-owned payment history is read through W08's own-Payment permission. */
+export async function authorizePaymentReadPermission(
+  request: Request,
+  principal: ContentPrincipal,
+): Promise<Response | null> {
+  const headers = new Headers(request.headers)
+  headers.delete('host')
+  headers.delete('content-length')
+  headers.set('content-type', 'application/json; charset=utf-8')
+  const permissionRequest = new Request(request.url, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      action: 'payment.read',
+      resourceType: 'Payment',
+      resourceAttributes: { ownerId: principal.userId },
+    }),
+  })
+  const response = await callW08Creator(permissionRequest, '/internal/authz/check-permission', 'POST')
+  if (!response.ok) return errorResponse(503, 'AUTHORIZATION_UNAVAILABLE', 'Payment authorization unavailable')
+  const value: unknown = await response.json().catch((): null => null)
+  const decision = value && typeof value === 'object'
+    ? (value as { data?: { decision?: unknown } }).data?.decision
+    : undefined
+  if (decision === 'ALLOW') return null
+  if (decision === 'DENY') return errorResponse(403, 'PERMISSION_DENIED', 'Payment read permission required')
+  return errorResponse(503, 'AUTHORIZATION_UNAVAILABLE', 'Payment authorization response could not be verified')
+}
