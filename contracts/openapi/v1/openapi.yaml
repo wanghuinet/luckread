@@ -1786,8 +1786,14 @@ paths:
       operationId: listCommerceOrders
       x-luckread-runtime-status: IMPLEMENTATION_CANDIDATE_PENDING_VERIFICATION
       parameters:
-        - $ref: '#/components/parameters/Cursor'
-        - $ref: '#/components/parameters/Limit'
+        - name: cursor
+          in: query
+          required: false
+          schema: { type: string, minLength: 1, maxLength: 2048 }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
       responses:
         '200':
           description: Current-principal order history.
