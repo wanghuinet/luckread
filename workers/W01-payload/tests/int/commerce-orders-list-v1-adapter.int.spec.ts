@@ -66,6 +66,9 @@ describe('current-principal commerce order history adapter', () => {
       d1Authority: 'D1-04',
       crossD1Transactions: 0,
     })
+    expect(transport.responseFields).toContain('latestPaymentId')
+    expect(transport.forbiddenResponseFields).toContain('clientSecret')
+    expect(transport.responseAuthority).toContain('same customer and order')
     expect(operation).toContain('maximum: 50')
     expect(operation).toContain('maxLength: 2048')
     expect(operation).toContain("nextCursor: { type: [string, 'null'], maxLength: 2048 }")
