@@ -9,7 +9,8 @@ WHEN OLD.state IN ('APPLIED','REJECTED')
   OR (
     OLD.state = 'RECONCILIATION_REQUIRED'
     AND NOT (
-      NEW.state = 'RECEIVED'
+      OLD.event_type IN ('mandate_active','mandate_revoked')
+      AND NEW.state = 'RECEIVED'
       AND NEW.processed_at IS NULL
       AND NEW.outcome_code IS NULL
     )
