@@ -24,12 +24,20 @@ export class RevenueCatSubscriberIdentityError extends Error {
 
 const MAX_APP_USER_ID_LENGTH = 255;
 
+function hasControlCharacter(value: string): boolean {
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    if (code <= 0x1f || code === 0x7f) return true;
+  }
+  return false;
+}
+
 function isCanonicalAppUserId(value: unknown): value is string {
   return typeof value === 'string' &&
     value.length > 0 &&
     value.length <= MAX_APP_USER_ID_LENGTH &&
     value.trim() === value &&
-    !/[\\u0000-\\u001f\\u007f]/.test(value);
+    !hasControlCharacter(value);
 }
 
 /**
