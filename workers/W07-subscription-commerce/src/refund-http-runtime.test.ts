@@ -66,6 +66,8 @@ function createFixture(options: {
   acknowledgedRefund?: RefundDto;
   retrieveError?: Error;
   reserveError?: Error;
+  findExistingError?: Error;
+  existingReservation?: RefundReservation | null;
   createProviderError?: Error;
   env?: Record<string, unknown>;
 } = {}) {
@@ -73,6 +75,7 @@ function createFixture(options: {
     resolvePayment: [] as unknown[][],
     retrievePayment: [] as unknown[][],
     reserve: [] as unknown[][],
+    findExistingReservation: [] as unknown[][],
     createProviderRefund: [] as unknown[][],
     recordAcknowledgement: [] as unknown[][],
   };
@@ -119,6 +122,11 @@ function createFixture(options: {
       calls.reserve.push(args);
       if (options.reserveError) throw options.reserveError;
       return reservation;
+    },
+    findExistingReservation: async (...args) => {
+      calls.findExistingReservation.push(args);
+      if (options.findExistingError) throw options.findExistingError;
+      return options.existingReservation ?? null;
     },
     createProviderRefund: async (...args) => {
       calls.createProviderRefund.push(args);
@@ -181,6 +189,16 @@ describe('W07 internal customer refund runtime', () => {
 
     expect(response?.status).toBe(202);
     expect(fixture.calls.resolvePayment).toHaveLength(1);
+    expect(fixture.calls.findExistingReservation).toHaveLength(1);
+    expect(fixture.calls.findExistingReservation[0]?.[1]).toMatchObject({
+      customerId: CUSTOMER_ID,
+      paymentId: PAYMENT_ID,
+      amountMinor: 300,
+      currency: 'USD',
+      reason: 'Customer request',
+      idempotencyKey: IDEMPOTENCY_KEY,
+      expectedMerchantId: MERCHANT_ID,
+    });
     expect(fixture.calls.resolvePayment[0]?.slice(1)).toEqual([
       CUSTOMER_ID,
       PAYMENT_ID,
@@ -256,9 +274,38 @@ describe('W07 internal customer refund runtime', () => {
     }
   });
 
+  it('retries a durable REQUESTED refund with the same provider refund_id without re-reading the Payment', async () => {
+    const fixture = createFixture({
+      existingReservation: { refund: requestedRefund, replayed: true },
+    });
+    const response = await handleCommerceRefundRequest(
+      request({
+        idempotencyKey: IDEMPOTENCY_KEY,
+        body: { paymentId: PAYMENT_ID, amountMinor: 300, currency: 'USD', reason: 'Customer request' },
+      }),
+      CUSTOMER_ID,
+      fixture.env,
+      fixture.dependencies,
+    );
+    expect(response?.status).toBe(202);
+    expect(fixture.calls.findExistingReservation).toHaveLength(1);
+    expect(fixture.calls.retrievePayment).toHaveLength(0);
+    expect(fixture.calls.reserve).toHaveLength(0);
+    expect(fixture.calls.createProviderRefund[0]?.[1]).toMatchObject({
+      paymentId: PAYMENT_ID,
+      refundId: REFUND_ID,
+      amount: 300,
+      currency: 'USD',
+    });
+    expect(fixture.calls.recordAcknowledgement).toHaveLength(1);
+    expect(await response?.json()).toMatchObject({
+      data: { refundId: REFUND_ID, status: 'PENDING', replayed: true },
+    });
+  });
+
   it('returns an existing accepted refund without creating another provider refund', async () => {
     const fixture = createFixture({
-      reservation: {
+      existingReservation: {
         refund: { ...requestedRefund, status: 'PENDING', version: 2, updatedAt: LATER },
         replayed: true,
       },
@@ -273,7 +320,9 @@ describe('W07 internal customer refund runtime', () => {
       fixture.dependencies,
     );
     expect(response?.status).toBe(202);
-    expect(fixture.calls.reserve).toHaveLength(1);
+    expect(fixture.calls.findExistingReservation).toHaveLength(1);
+    expect(fixture.calls.retrievePayment).toHaveLength(0);
+    expect(fixture.calls.reserve).toHaveLength(0);
     expect(fixture.calls.createProviderRefund).toHaveLength(0);
     expect(fixture.calls.recordAcknowledgement).toHaveLength(0);
     expect(await response?.json()).toMatchObject({
@@ -336,7 +385,7 @@ describe('W07 internal customer refund runtime', () => {
     expect(missingKey.calls.createProviderRefund).toHaveLength(0);
 
     const conflict = createFixture({
-      reserveError: new RefundPersistenceError('IDEMPOTENCY_KEY_REUSE_CONFLICT', 409),
+      findExistingError: new RefundPersistenceError('IDEMPOTENCY_KEY_REUSE_CONFLICT', 409),
     });
     const conflictResponse = await handleCommerceRefundRequest(
       request({
