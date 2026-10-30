@@ -1,4 +1,21 @@
 -- PAY-004 durable refund request and provider lifecycle facts in existing D1-04.
+-- Record the last authenticated provider-reported captured balance so concurrent
+-- partial refund reservations are bounded by amount_captured, not intent amount.
+-- 0007 is additive; old payments start at zero and require a live provider
+-- retrieve before any refund can be reserved.
+ALTER TABLE payments
+  ADD COLUMN amount_captured_minor INTEGER NOT NULL DEFAULT 0
+  CHECK (typeof(amount_captured_minor) = 'integer'
+    AND amount_captured_minor BETWEEN 0 AND 9007199254740991);
+
+CREATE TRIGGER payments_captured_amount_observation_guard
+BEFORE UPDATE OF amount_captured_minor ON payments
+WHEN NEW.amount_captured_minor < OLD.amount_captured_minor
+  OR NEW.amount_captured_minor > NEW.amount_minor
+  OR (NEW.amount_captured_minor <> OLD.amount_captured_minor
+      AND NEW.status NOT IN ('succeeded','partially_captured','partially_captured_and_capturable'))
+BEGIN SELECT RAISE(ABORT, 'captured amount must be a monotonic bounded provider observation'); END;
+
 -- Refunds are separate immutable financial-reversal facts. They never mutate
 -- Payment snapshots, write the Wallet/Ledger, or change D1-01 entitlements.
 -- This source migration is not applied remotely by this change.
@@ -46,13 +63,14 @@ WHEN NOT EXISTS (
     AND p.provider = NEW.provider
     AND p.merchant_id = NEW.merchant_id
     AND p.currency = NEW.currency
-    AND p.status = 'succeeded'
-    AND NEW.amount_minor <= p.amount_minor
+    AND p.status IN ('succeeded','partially_captured','partially_captured_and_capturable')
+    AND p.amount_captured_minor > 0
+    AND NEW.amount_minor <= p.amount_captured_minor
     AND NEW.amount_minor + COALESCE((
       SELECT SUM(r.amount_minor) FROM refunds r
       WHERE r.payment_id = p.payment_id
         AND r.status IN ('INITIATING','pending','review','succeeded')
-    ), 0) <= p.amount_minor
+    ), 0) <= p.amount_captured_minor
 )
 BEGIN SELECT RAISE(ABORT, 'refund requires an owned captured payment and available refundable amount'); END;
 
