@@ -60,7 +60,11 @@ export async function handleCommerceBillingReadRequest(
     if (!allowedParams.has(key)) return errorResponse(400, 'VALIDATION_FAILED', 'Unsupported billing query parameter');
   }
   const rawLimit = url.searchParams.get('limit');
-  if (rawLimit !== null && !/^\d+$/.test(rawLimit)) {
+  if (rawLimit !== null && (
+    !/^[1-9]\d*$/.test(rawLimit) ||
+    !Number.isSafeInteger(Number(rawLimit)) ||
+    Number(rawLimit) > 50
+  )) {
     return errorResponse(400, 'VALIDATION_FAILED', 'Billing page size is invalid');
   }
   const limit = parseBoundedPositiveInt(rawLimit, 20, 50);
