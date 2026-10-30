@@ -3,6 +3,8 @@ import {
   confirmHyperswitchCustomerInitiatedSetupPayment,
   createHyperswitchCustomerInitiatedSetupIntent,
   createHyperswitchMerchantInitiatedPayment,
+  createHyperswitchRefund,
+  retrieveHyperswitchRefund,
   createHyperswitchPaymentIntent,
   HyperswitchClientError,
   retrieveCustomerBoundHyperswitchPaymentMethod,
@@ -453,5 +455,113 @@ describe('Hyperswitch server-side payment intent client', () => {
     const mismatched = fakeFetch(jsonResponse(responsePayment({ payment_id: 'pay_aaaaaaaaaaaaaaaaaaaaaaaaaa' })))
     await expect(retrieveHyperswitchPayment(config, input.paymentId, mismatched.fetcher))
       .rejects.toMatchObject({ code: 'UPSTREAM_INVALID_RESPONSE' })
+  })
+})
+
+
+const refundInput = {
+  refundId: 'ref_mbabizu24mvu3mela5njyhpit4',
+  paymentId: input.paymentId,
+  amount: 500,
+  currency: 'USD',
+  reason: 'requested_by_customer',
+}
+const responseRefund = (overrides: Record<string, unknown> = {}) => ({
+  refund_id: refundInput.refundId,
+  payment_id: refundInput.paymentId,
+  amount: refundInput.amount,
+  currency: refundInput.currency,
+  status: 'pending',
+  reason: refundInput.reason,
+  created_at: '2026-10-30T12:00:00Z',
+  updated_at: '2026-10-30T12:00:00Z',
+  connector: 'stripe',
+  raw_connector_response: 'must-not-be-exposed',
+  error_message: 'provider-private-detail',
+  ...overrides,
+})
+
+describe('Hyperswitch server-side refund adapter', () => {
+  it('creates an instant partial refund with a stable refund ID and normalizes only safe fields', async () => {
+    const fake = fakeFetch(jsonResponse(responseRefund()))
+    const refund = await createHyperswitchRefund(config, refundInput, fake.fetcher)
+
+    expect(fake.captured).toHaveLength(1)
+    expect(fake.captured[0].url).toBe('https://sandbox.hyperswitch.io/refunds')
+    expect(fake.captured[0].init.method).toBe('POST')
+    expect(new Headers(fake.captured[0].init.headers).get('api-key')).toBe(config.apiKey)
+    expect(JSON.parse(String(fake.captured[0].init.body))).toEqual({
+      payment_id: refundInput.paymentId,
+      refund_id: refundInput.refundId,
+      amount: refundInput.amount,
+      refund_type: 'instant',
+      reason: refundInput.reason,
+    })
+    expect(refund).toEqual({
+      refundId: refundInput.refundId,
+      paymentId: refundInput.paymentId,
+      amount: refundInput.amount,
+      currency: 'USD',
+      status: 'pending',
+      reason: refundInput.reason,
+      createdAt: '2026-10-30T12:00:00Z',
+      updatedAt: '2026-10-30T12:00:00Z',
+    })
+    expect(JSON.stringify(refund)).not.toContain('raw_connector_response')
+    expect(JSON.stringify(refund)).not.toContain('provider-private-detail')
+  })
+
+  it('retrieves one refund by its stable ID and verifies its persisted payment and amount snapshot', async () => {
+    const fake = fakeFetch(jsonResponse(responseRefund({ status: 'succeeded' })))
+    const refund = await retrieveHyperswitchRefund(config, refundInput, fake.fetcher)
+    expect(fake.captured[0].url).toBe('https://sandbox.hyperswitch.io/refunds/' + refundInput.refundId)
+    expect(fake.captured[0].init.method).toBe('GET')
+    expect(refund.status).toBe('succeeded')
+  })
+
+  it('rejects malformed refund IDs, payments, amounts, currencies and reasons before network I/O', async () => {
+    const invalidInputs = [
+      { ...refundInput, refundId: 'ref_short' },
+      { ...refundInput, paymentId: 'pay_short' },
+      { ...refundInput, amount: 0 },
+      { ...refundInput, amount: 1.2 },
+      { ...refundInput, amount: Number.MAX_SAFE_INTEGER + 1 },
+      { ...refundInput, currency: 'usd' },
+      { ...refundInput, reason: 'bad\\nreason' },
+      { ...refundInput, reason: 'x'.repeat(256) },
+    ]
+    for (const invalid of invalidInputs) {
+      const fake = fakeFetch(jsonResponse(responseRefund()))
+      await expect(createHyperswitchRefund(config, invalid, fake.fetcher))
+        .rejects.toMatchObject({ code: 'REQUEST_INVALID' })
+      expect(fake.captured).toHaveLength(0)
+    }
+  })
+
+  it('rejects mismatched provider refund, payment, amount, currency and status', async () => {
+    for (const mismatch of [
+      { refund_id: 'ref_aaaaaaaaaaaaaaaaaaaaaaaaaa' },
+      { payment_id: 'pay_aaaaaaaaaaaaaaaaaaaaaaaaaa' },
+      { amount: refundInput.amount + 1 },
+      { currency: 'EUR' },
+      { status: 'unknown' },
+    ]) {
+      const fake = fakeFetch(jsonResponse(responseRefund(mismatch)))
+      await expect(createHyperswitchRefund(config, refundInput, fake.fetcher))
+        .rejects.toMatchObject({ code: 'UPSTREAM_INVALID_RESPONSE' })
+    }
+  })
+
+  it('does not treat a provider refund response with malformed timestamps as authoritative', async () => {
+    const fake = fakeFetch(jsonResponse(responseRefund({ updated_at: '2026-02-31T12:00:00Z' })))
+    await expect(createHyperswitchRefund(config, refundInput, fake.fetcher))
+      .rejects.toMatchObject({ code: 'UPSTREAM_INVALID_RESPONSE' })
+  })
+
+  it('rejects an invalid lookup reference before network I/O', async () => {
+    const fake = fakeFetch(jsonResponse(responseRefund()))
+    await expect(retrieveHyperswitchRefund(config, { ...refundInput, refundId: 'bad' }, fake.fetcher))
+      .rejects.toMatchObject({ code: 'REQUEST_INVALID' })
+    expect(fake.captured).toHaveLength(0)
   })
 })
