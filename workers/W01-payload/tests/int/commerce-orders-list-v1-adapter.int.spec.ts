@@ -39,6 +39,7 @@ describe('current-principal commerce order history adapter', () => {
     const policy = JSON.parse(read('../../contracts/openapi/v1/operation-policy.json'))
     const binding = JSON.parse(read('../../contracts/transport/W01-W07-membership-commerce-http-binding.v1.json'))
     const openapi = read('../../contracts/openapi/v1/openapi.yaml')
+    const orderHistoryOperation = openapi.split('operationId: listCommerceOrders')[1]?.split('    post:')[0] ?? ''
     expect(inventory.domains.subscription_entitlement_payment.endpoint_groups).toContain('GET /v1/commerce/orders')
     expect(policy.operations.find((item: { operationId: string }) => item.operationId === 'listCommerceOrders')).toMatchObject({
       permissions: ['order.read'],
@@ -64,6 +65,31 @@ describe('current-principal commerce order history adapter', () => {
     expect(openapi).toContain('operationId: listCommerceOrders')
     expect(openapi).toContain('x-luckread-runtime-status: IMPLEMENTATION_CANDIDATE_PENDING_VERIFICATION')
     expect(openapi).toContain('not a tax invoice')
+    expect(orderHistoryOperation).toContain('maximum: 50')
+    expect(orderHistoryOperation).toContain('maxLength: 2048')
+    expect(orderHistoryOperation).toContain("nextCursor: { type: [string, 'null'], maxLength: 2048 }")
+    expect(orderHistoryOperation).toContain("pattern: '^ord_[A-Za-z0-9_-]{1,90}
+  })
+
+  it('exposes purchase history in Android and H5 without introducing client-side payment authority', () => {
+    const androidApi = read('../../app/lib/subscriptions-api.ts')
+    const androidScreen = read('../../app/app/(drawer)/billing-history.tsx')
+    const subscriptions = read('../../app/app/(drawer)/subscriptions.tsx')
+    const h5Page = read('src/app/(frontend)/me/billing-history/BillingHistoryPage.tsx')
+    const h5Subscriptions = read('src/app/(frontend)/me/subscriptions/MySubscriptionsPage.tsx')
+    const h5Route = read('src/app/(twitter-clone)/me/billing-history/page.tsx')
+    expect(androidApi).toContain("apiRequest<unknown>('/commerce/orders?' + query.toString()")
+    expect(androidScreen).toContain('fetchMyCommerceOrdersPage')
+    expect(subscriptions).toContain("router.push('/billing-history' as never)")
+    expect(h5Page).toContain("'/api/v1/commerce/orders?' + query.toString()")
+    expect(h5Page).toContain("window.location.assign('/login?returnTo=' + encodeURIComponent(returnTo))")
+    expect(h5Subscriptions).toContain('href="/me/billing-history"')
+    expect(h5Route).toContain('<BillingHistoryPage />')
+    expect(androidScreen).not.toMatch(/paymentToken|clientSecret|merchantId/)
+    expect(h5Page).not.toMatch(/paymentToken|clientSecret|merchantId/)
+  })
+})
+")
   })
 
   it('exposes purchase history in Android and H5 without introducing client-side payment authority', () => {
