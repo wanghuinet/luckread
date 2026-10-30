@@ -954,6 +954,102 @@ describe('W06 runtime', () => {
     expect(await response.json()).toEqual({ error: 'AUDIT_EVENT_PERSISTENCE_FAILED' })
   })
 
+  it('persists and replays the L2+ payment refund intent before W07 mutation', async () => {
+    const { db, rows, prepare } = createPlanAuditDb()
+    const runtime = await import('./index')
+    const input = {
+      eventId: 'evt_payment_refund_requested_' + 'a'.repeat(64),
+      paymentId: 'pay_' + 'b'.repeat(26),
+      amountMinor: 500,
+      idempotencyKey: 'refund-audit-key-01',
+    }
+    const makeRequest = (
+      body: typeof input,
+      requestId = 'req_refund_audit_1',
+      layer = 'L2',
+      headerKey = input.idempotencyKey,
+    ) => new Request('https://w06.internal/internal/audit-events/payment-refund-requested', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'Idempotency-Key': headerKey,
+        'X-LuckRead-Caller': 'W01',
+        'X-LuckRead-Transport-Version': '1.0',
+        'X-LuckRead-Principal-User-Id': 'buyer_user_001',
+        'X-LuckRead-Principal-Layer': layer,
+        'X-LuckRead-Correlation-Id': 'refund-audit-correlation',
+        'X-LuckRead-Request-Id': requestId,
+      },
+      body: JSON.stringify(body),
+    })
+
+    const first = await runtime.default.fetch(makeRequest(input), { D1_03: db })
+    const replay = await runtime.default.fetch(
+      makeRequest(input, 'req_refund_audit_retry'),
+      { D1_03: db },
+    )
+    expect(first.status).toBe(201)
+    expect(replay.status).toBe(200)
+    expect(await replay.json()).toMatchObject({
+      eventId: input.eventId,
+      action: 'commerce.payment_refund_requested',
+      targetType: 'Payment',
+      targetId: input.paymentId,
+      replayed: true,
+    })
+    expect(rows.size).toBe(1)
+    const stored = [...rows.values()][0]!
+    expect(stored.after_json).toBe(JSON.stringify({ amountMinor: 500, operation: 'refund_requested' }))
+    expect(stored.after_json).not.toContain(input.idempotencyKey)
+    expect(prepare).toHaveBeenCalled()
+
+    const conflicting = await runtime.default.fetch(
+      makeRequest({ ...input, amountMinor: 501 }),
+      { D1_03: db },
+    )
+    expect(conflicting.status).toBe(409)
+    expect(await conflicting.json()).toEqual({ error: 'AUDIT_EVENT_CONFLICT' })
+    expect(rows.size).toBe(1)
+  })
+
+  it('fails closed for missing private W01 transport, lower-than-L2 actors and mismatched idempotency headers', async () => {
+    const { db, prepare } = createPlanAuditDb()
+    const runtime = await import('./index')
+    const input = {
+      eventId: 'evt_payment_refund_requested_' + 'c'.repeat(64),
+      paymentId: 'pay_' + 'd'.repeat(26),
+      amountMinor: 500,
+      idempotencyKey: 'refund-audit-key-02',
+    }
+    const request = (headers: Record<string, string>) => new Request(
+      'https://w06.internal/internal/audit-events/payment-refund-requested',
+      { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify(input) },
+    )
+    const missingTransport = await runtime.default.fetch(request({}), { D1_03: db })
+    expect(missingTransport.status).toBe(403)
+    const lowLayer = await runtime.default.fetch(request({
+      'Idempotency-Key': input.idempotencyKey,
+      'X-LuckRead-Caller': 'W01',
+      'X-LuckRead-Transport-Version': '1.0',
+      'X-LuckRead-Principal-User-Id': 'buyer_user_001',
+      'X-LuckRead-Principal-Layer': 'L1',
+      'X-LuckRead-Correlation-Id': 'refund-audit-correlation',
+      'X-LuckRead-Request-Id': 'req_refund_audit_l1',
+    }), { D1_03: db })
+    expect(lowLayer.status).toBe(403)
+    const wrongKey = await runtime.default.fetch(request({
+      'Idempotency-Key': 'another-refund-key',
+      'X-LuckRead-Caller': 'W01',
+      'X-LuckRead-Transport-Version': '1.0',
+      'X-LuckRead-Principal-User-Id': 'buyer_user_001',
+      'X-LuckRead-Principal-Layer': 'L2',
+      'X-LuckRead-Correlation-Id': 'refund-audit-correlation',
+      'X-LuckRead-Request-Id': 'req_refund_audit_bad_key',
+    }), { D1_03: db })
+    expect(wrongKey.status).toBe(400)
+    expect(prepare).not.toHaveBeenCalled()
+  })
+
   it('persists a canonical AUTH-013 account-state AuditEvent', async () => {
     const { db, prepare, bind, run } = createDb(true)
     const runtime = await import('./index')
