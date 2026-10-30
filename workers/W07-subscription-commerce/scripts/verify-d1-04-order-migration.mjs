@@ -544,8 +544,18 @@ export function verifyD1_04OrderMigrationPostflight({
       newObject && newObject.tableName === oldObject.tableName &&
       typeof newObject.sql === 'string' &&
       normalizeSqlDefinition(newObject.sql) === expectedPaymentProviderEventsIdentityTriggerSql()
+    const isReviewedRefundReferenceColumnUpdate =
+      oldObject.type === 'table' &&
+      oldObject.name === 'payment_provider_events' &&
+      state.names.includes(REFUNDS_MIGRATION_ID) &&
+      newObject && newObject.tableName === oldObject.tableName &&
+      typeof newObject.sql === 'string' &&
+      normalizeSqlDefinition(newObject.sql)
+        .replace(/,\\s*refund_id\\s+text\\s+references\\s+refunds\\s*\\(\\s*refund_id\\s*\\)/i, '') ===
+        normalizeSqlDefinition(oldObject.sql)
     if (!newObject || (JSON.stringify(newObject) !== JSON.stringify(oldObject) &&
-        !isReviewedMandateReplayGuardUpdate && !isReviewedRefundIdentityGuardUpdate)) {
+        !isReviewedMandateReplayGuardUpdate && !isReviewedRefundIdentityGuardUpdate &&
+        !isReviewedRefundReferenceColumnUpdate)) {
       fail('pre-existing schema object was removed or changed: ' + oldObject.type + ':' + oldObject.name)
     }
   }
