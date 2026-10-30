@@ -9,6 +9,7 @@ import type { PublicLocale } from '../../i18n/public-locale'
 type OrderStatus = 'CREATED' | 'PENDING_PAYMENT' | 'CONFIRMED' | 'PROCESSING' | 'COMPLETED' | 'CANCELLED' | 'FAILED'
 type OrderSummary = {
   orderId: string
+  latestPaymentId: string | null
   status: OrderStatus
   version: number
   currency: string
@@ -102,6 +103,7 @@ const isOrderSummary = (value: unknown): value is OrderSummary => {
   const item = value as Record<string, unknown>
   const statuses = ['CREATED', 'PENDING_PAYMENT', 'CONFIRMED', 'PROCESSING', 'COMPLETED', 'CANCELLED', 'FAILED']
   return typeof item.orderId === 'string' && /^ord_[A-Za-z0-9_-]{1,90}$/.test(item.orderId) &&
+    (item.latestPaymentId === null || (typeof item.latestPaymentId === 'string' && /^pay_[A-Za-z0-9]{26}$/.test(item.latestPaymentId))) &&
     typeof item.status === 'string' && statuses.includes(item.status) &&
     Number.isSafeInteger(item.version) && Number(item.version) >= 1 &&
     typeof item.currency === 'string' && /^[A-Z]{3}$/.test(item.currency) &&
