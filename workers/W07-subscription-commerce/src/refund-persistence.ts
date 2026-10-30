@@ -346,7 +346,7 @@ export async function recordHyperswitchRefundAcknowledgement(
   const updatedAt = nextTimestamp(now, row.updated_at);
   const updated = await db.prepare(
     'UPDATE refunds SET status = ?, outcome_code = ?, version = version + 1, updated_at = ? ' +
-    'WHERE refund_id = ? AND version = ? AND status IN (\\'REQUESTED\\',\\'RECONCILIATION_REQUIRED\\')',
+    "WHERE refund_id = ? AND version = ? AND status IN ('REQUESTED','RECONCILIATION_REQUIRED')",
   ).bind(
     nextStatus, outcomeCode, updatedAt, row.refund_id, row.version,
   ).run().catch(() => {
