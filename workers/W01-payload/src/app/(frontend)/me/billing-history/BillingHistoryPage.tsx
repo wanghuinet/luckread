@@ -161,7 +161,7 @@ export default function BillingHistoryPage() {
         return
       }
       if (!response.ok) {
-        throw new Error(data?.error?.message || getApiErrorMessage(data, labels.error, response.status))
+        throw new Error(data?.error?.message || getApiErrorMessage(data, labels.error))
       }
       const page = data?.data
       if (
