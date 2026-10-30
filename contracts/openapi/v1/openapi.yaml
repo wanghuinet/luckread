@@ -1780,9 +1780,9 @@ paths:
       description: >-
         Private, read-only purchase history. W01 authenticates and authorizes
         order.read; W07 independently filters D1-04 orders by the server-derived
-        customer ID. The opaque cursor is endpoint-scoped and the stable order is
-        createdAt DESC, orderId DESC. The summary excludes customer, provider,
-        payment credential and internal item snapshot fields. It is not a tax invoice.
+        customer ID. The opaque cursor is owner- and endpoint-scoped; results are
+        ordered by createdAt DESC, orderId DESC. The summary excludes customer,
+        provider, payment credential and internal item snapshot fields. It is not a tax invoice.
       operationId: listCommerceOrders
       x-luckread-runtime-status: IMPLEMENTATION_CANDIDATE_PENDING_VERIFICATION
       parameters:
@@ -1818,123 +1818,24 @@ paths:
                           additionalProperties: false
                           required: [orderId, status, version, currency, subtotalMinor, discountMinor, taxMinor, totalMinor, createdAt, updatedAt]
                           properties:
-                            orderId: { type: string, pattern: '^ord_[A-Za-z0-9_-]{1,90}
-      tags: [Commerce]
-      summary: Create a purchase order
-      description: >-
-        Contracted request and response shape only. Runtime creation remains blocked
-        until PAY-002 authoritative offer resolution, D1-04 persistence, atomic
-        idempotency, and security evidence are admitted. All item versions and
-        prices are resolved by the server; client-supplied totals and payment state
-        are never accepted.
-      operationId: createCommerceOrder
-      x-luckread-runtime-status: BLOCKED_PENDING_PAY002_EVIDENCE
-      x-luckread-max-body-bytes: 16384
-      parameters:
-        - $ref: '#/components/parameters/IdempotencyKeyRequired'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CommerceOrderCreateRequest'
-      responses:
-        '201':
-          description: Order contract response; runtime creation is not yet enabled.
-          headers:
-            Cache-Control:
-              schema: { type: string, const: no-store }
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/CommerceOrderResponse' }
-        '4XX': { $ref: '#/components/responses/ClientError' }
-        '503': { $ref: '#/components/responses/ServiceUnavailable' }
-
-  /commerce/orders/{orderId}:
-    parameters:
-      - name: orderId
-        in: path
-        required: true
-        schema:
-          type: string
-          minLength: 1
-          maxLength: 255
-    get:
-      tags: [Commerce]
-      summary: Get an order owned by the current principal
-      description: >-
-        Owner-only order read contract. The runtime handler remains blocked
-        until PAY-002 persistence and owner-isolation evidence are admitted.
-      operationId: getCommerceOrder
-      x-luckread-runtime-status: BLOCKED_PENDING_PAY002_EVIDENCE
-      responses:
-        '200':
-          description: Order response.
-          headers:
-            Cache-Control:
-              schema: { type: string, const: no-store }
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/CommerceOrderResponse' }
-        '4XX': { $ref: '#/components/responses/ClientError' }
-        '503': { $ref: '#/components/responses/ServiceUnavailable' }
-
-  /membership/plans:
-    get:
-      tags: [Creators]
-      summary: List the authenticated creator's own membership plans
-      operationId: listOwnMembershipPlans
-      description: Requires membership.plan.read.own. W08 resolves the active creator identity; only that creator's plans, including private drafts, are returned.
-      parameters:
-        - name: limit
-          in: query
-          required: false
-          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
-        - name: cursor
-          in: query
-          required: false
-          schema: { type: string, maxLength: 2048 }
-      responses:
-        '200':
-          description: Creator-owned plan list.
-          content:
-            application/json:
-              schema:
-                type: object
-                required: [data, requestId]
-                properties:
-                  data:
-                    type: object
-                    required: [docs, limit, hasMore, nextCursor]
-                    properties:
-                      docs:
-                        type: array
-                        items:
-                          type: object
-                          required: [planId, creatorId, planVersion, name, tier, billingInterval, priceMinor, currency, benefits, status, visibility, version, createdAt, updatedAt, etag]
-                          properties:
-                            planId: { type: string }
-                            creatorId: { type: string }
-                            planVersion: { type: integer, minimum: 1 }
-                            name: { type: string, minLength: 1, maxLength: 120 }
-                            tier: { type: string, minLength: 1, maxLength: 64 }
-                            billingInterval: { type: string, enum: [MONTHLY, YEARLY] }
-                            priceMinor: { type: integer, minimum: 0, maximum: 2147483647 }
-                            currency: { type: string, pattern: '^[A-Z]{3}$' }
-                            benefits: { type: array, items: { type: string, minLength: 1, maxLength: 180 } }
-                            status: { type: string, enum: [DRAFT, ACTIVE, PAUSED, RETIRED] }
-                            visibility: { type: string, enum: [PRIVATE, PUBLIC] }
+                            orderId: { type: string, pattern: '^ord_[A-Za-z0-9_-]{1,90}$' }
+                            status: { type: string, enum: [CREATED, PENDING_PAYMENT, CONFIRMED, PROCESSING, COMPLETED, CANCELLED, FAILED] }
                             version: { type: integer, minimum: 1 }
+                            currency: { type: string, pattern: '^[A-Z]{3}$' }
+                            subtotalMinor: { type: integer, minimum: 0 }
+                            discountMinor: { type: integer, minimum: 0 }
+                            taxMinor: { type: integer, minimum: 0 }
+                            totalMinor: { type: integer, minimum: 0 }
                             createdAt: { type: string, format: date-time }
                             updatedAt: { type: string, format: date-time }
-                            etag: { type: string }
                       limit: { type: integer, minimum: 1, maximum: 50 }
                       hasMore: { type: boolean }
                       nextCursor: { type: [string, 'null'], maxLength: 2048 }
                   requestId: { $ref: '#/components/schemas/RequestId' }
-        '401': { $ref: '#/components/responses/Unauthenticated' }
-        '403': { $ref: '#/components/responses/PermissionDenied' }
-        default: { $ref: '#/components/responses/ServiceUnavailable' }
+        '400': { $ref: '#/components/responses/InvalidCursor' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
     post:
       tags: [Creators]
       summary: Create a private membership plan draft
