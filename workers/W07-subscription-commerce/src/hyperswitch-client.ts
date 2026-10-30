@@ -717,7 +717,7 @@ export async function createHyperswitchRefund(
     !input || typeof input !== 'object' ||
     typeof input.paymentId !== 'string' || !PAYMENT_ID_PATTERN.test(input.paymentId) ||
     typeof input.refundId !== 'string' || !/^ref_[A-Za-z0-9]{26}$/.test(input.refundId) ||
-    !Number.isSafeInteger(input.amount) || input.amount < 100 ||
+    !Number.isSafeInteger(input.amount) || input.amount <= 0 ||
     typeof input.currency !== 'string' || !CURRENCY_PATTERN.test(input.currency) ||
     (input.reason !== undefined && input.reason !== null && (
       typeof input.reason !== 'string' || input.reason.length > 255 ||
@@ -750,7 +750,7 @@ export async function retrieveHyperswitchRefund(
     !input || typeof input !== 'object' ||
     typeof input.refundId !== 'string' || !/^ref_[A-Za-z0-9]{26}$/.test(input.refundId) ||
     typeof input.paymentId !== 'string' || !PAYMENT_ID_PATTERN.test(input.paymentId) ||
-    !Number.isSafeInteger(input.amount) || input.amount < 100 ||
+    !Number.isSafeInteger(input.amount) || input.amount <= 0 ||
     typeof input.currency !== 'string' || !CURRENCY_PATTERN.test(input.currency)
   ) {
     throw new HyperswitchClientError('REQUEST_INVALID', 'Refund lookup identity is malformed.');
