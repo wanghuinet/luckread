@@ -71,14 +71,15 @@
     {
       "operationIdFamily": "membership",
       "publicPaths": [
-        "/api/v1/plans",
+        "/api/v1/commerce/orders",
+        "/api/v1/commerce/orders/*",
         "/api/v1/membership/plans",
         "/api/v1/membership/plans/*",
         "/api/v1/memberships/subscriptions",
         "/api/v1/memberships/subscriptions/*",
-        "/api/v1/commerce/orders",
-        "/api/v1/commerce/orders/*",
-        "/api/v1/payments/intents"
+        "/api/v1/payments/intents",
+        "/api/v1/payments/refunds",
+        "/api/v1/plans"
       ],
       "ingressWorker": "W01",
       "terminalWorker": "W07",
