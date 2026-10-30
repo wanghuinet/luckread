@@ -2730,7 +2730,7 @@ paths:
           required: false
           schema: { type: string, minLength: 1, maxLength: 512 }
       responses:
-        200:
+        '200':
           description: Customer-owned records returned using bounded keyset pagination.
           headers:
             Cache-Control:
@@ -3667,7 +3667,7 @@ paths:
           required: false
           schema: { type: string, minLength: 1, maxLength: 512 }
       responses:
-        200:
+        '200':
           description: Customer-owned records returned using bounded keyset pagination.
           headers:
             Cache-Control:
@@ -3701,7 +3701,7 @@ paths:
           required: false
           schema: { type: string, minLength: 1, maxLength: 512 }
       responses:
-        200:
+        '200':
           description: Customer-owned records returned using bounded keyset pagination.
           headers:
             Cache-Control:
