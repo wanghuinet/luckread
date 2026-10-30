@@ -190,7 +190,7 @@ function validateCreateInput(input: CreateHyperswitchPaymentIntentInput): void {
   if (typeof input.paymentId !== 'string' || !PAYMENT_ID_PATTERN.test(input.paymentId)) {
     throw new HyperswitchClientError('REQUEST_INVALID', 'Payment ID must be the stable 30-character Hyperswitch payment identifier.');
   }
-  if (!Number.isSafeInteger(input.amount) || input.amount <= 0) {
+  if (!Number.isSafeInteger(input.amount) || input.amount < 100) {
     throw new HyperswitchClientError('REQUEST_INVALID', 'Amount must be a positive safe integer in the currency smallest unit.');
   }
   if (typeof input.currency !== 'string' || !CURRENCY_PATTERN.test(input.currency)) {
@@ -810,14 +810,14 @@ function validateRefundInput(input: CreateHyperswitchRefundInput): void {
     throw new HyperswitchClientError('REQUEST_INVALID', 'Payment ID must be the stable 30-character payment identifier.')
   }
   if (!Number.isSafeInteger(input.amount) || input.amount <= 0) {
-    throw new HyperswitchClientError('REQUEST_INVALID', 'Refund amount must be a positive safe integer in the currency smallest unit.')
+    throw new HyperswitchClientError('REQUEST_INVALID', 'Refund amount must be at least 100 and a safe integer in the currency smallest unit.')
   }
   if (typeof input.currency !== 'string' || !CURRENCY_PATTERN.test(input.currency)) {
     throw new HyperswitchClientError('REQUEST_INVALID', 'Refund currency must be a three-letter uppercase code.')
   }
   if (input.reason !== undefined && (
     typeof input.reason !== 'string' || input.reason.length > 255 ||
-    input.reason.trim() !== input.reason || /[\\u0000-\\u001f\\u007f]/.test(input.reason)
+    input.reason.trim() !== input.reason || /[\u0000-\u001f\u007f]/.test(input.reason)
   )) {
     throw new HyperswitchClientError('REQUEST_INVALID', 'Refund reason is malformed.')
   }
@@ -843,7 +843,7 @@ function normalizeHyperswitchRefund(
     typeof status !== 'string' || !REFUND_STATUSES.has(status as HyperswitchRefundStatus) ||
     (reason !== undefined && reason !== null && (
       typeof reason !== 'string' || reason.length > 255 || reason.trim() !== reason ||
-      /[\\u0000-\\u001f\\u007f]/.test(reason)
+      /[\u0000-\u001f\u007f]/.test(reason)
     )) ||
     (createdAt !== undefined && createdAt !== null && (
       typeof createdAt !== 'string' || parseHyperswitchRfc3339Timestamp(createdAt) === null
