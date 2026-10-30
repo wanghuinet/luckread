@@ -354,6 +354,15 @@ export default function MySubscriptionsPage() {
         </button>
       </header>
 
+      <nav className="border-b border-light-border px-4 py-3 dark:border-dark-border" aria-label={locale === 'en' ? 'Billing history' : locale === 'tw' ? '帳單記錄' : '账单记录'}>
+        <Link
+          href="/me/billing-history"
+          className="inline-flex items-center gap-2 rounded-full border border-light-border px-4 py-2 text-sm font-bold text-main-accent hover:bg-light-primary/10 dark:border-dark-border dark:hover:bg-dark-primary/10"
+        >
+          {locale === 'en' ? 'View billing and order history' : locale === 'tw' ? '查看帳單與訂單記錄' : '查看账单与订单记录'} <span aria-hidden="true">›</span>
+        </Link>
+      </nav>
+
       {error ? <p className="border-b border-light-border px-4 py-3 text-sm text-rose-700 dark:border-dark-border dark:text-rose-300" role="alert">{error}</p> : null}
       <section className="border-b border-light-border bg-light-primary/5 px-4 py-4 dark:border-dark-border dark:bg-dark-primary/5">
         <div className="flex items-center justify-between gap-3">
