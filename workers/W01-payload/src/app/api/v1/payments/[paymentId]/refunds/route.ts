@@ -1,3 +1,4 @@
+import type { ContentPrincipal } from '../../../../../../content/w03-content-client.js'
 import {
   authorizeOrderPermission,
   mapOrderAdapterError,
@@ -11,6 +12,7 @@ import {
   W07SubscriptionClientError,
 } from '../../../../../../subscription/w07-subscription-client.js'
 import { W08CreatorClientError } from '../../../../../../auth/w08-creator-client.js'
+import { callW06PaymentRefundRequestAudit, W06ModerationClientError } from '../../../../../../moderation/w06-moderation-client.js'
 
 type RouteContext = { params: Promise<{ paymentId: string }> }
 
@@ -20,6 +22,17 @@ const REFUND_STATUSES = new Set(['INITIATING', 'pending', 'succeeded', 'failed',
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
+
+async function refundAuditEventId(
+  principalUserId: string,
+  paymentId: string,
+  idempotencyKey: string,
+): Promise<string> {
+  const input = new TextEncoder().encode(JSON.stringify([principalUserId, paymentId, idempotencyKey]))
+  const digest = await crypto.subtle.digest('SHA-256', input)
+  const hex = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('')
+  return 'evt_payment_refund_requested_' + hex
+}
 
 function validRefundDto(value: unknown, expectedPaymentId: string): boolean {
   if (!isRecord(value) || Object.keys(value).length !== 10) return false
@@ -87,6 +100,35 @@ export async function POST(request: Request, context: RouteContext): Promise<Res
       return orderAdapterError(400, 'VALIDATION_FAILED', 'A positive amountMinor and optional reason are required')
     }
 
+    const eventId = await refundAuditEventId(principal.userId, paymentId, idempotencyKey)
+    let auditResponse: Response
+    try {
+      auditResponse = await callW06PaymentRefundRequestAudit({
+        request,
+        principal: principal as ContentPrincipal,
+        body: {
+          eventId,
+          paymentId,
+          amountMinor: parsed.value.amountMinor,
+          idempotencyKey,
+        },
+      })
+    } catch {
+      return orderAdapterError(503, 'AUDIT_UNAVAILABLE', 'Refund intent could not be durably recorded')
+    }
+    const auditValue: unknown = await auditResponse.clone().json().catch((): null => null)
+    if (
+      (auditResponse.status !== 200 && auditResponse.status !== 201) ||
+      !isRecord(auditValue) ||
+      auditValue.eventId !== eventId ||
+      auditValue.action !== 'commerce.payment_refund_requested' ||
+      auditValue.targetType !== 'Payment' ||
+      auditValue.targetId !== paymentId
+    ) {
+      if (auditResponse.status === 409) return orderAdapterError(409, 'CONFLICT', 'A conflicting refund intent already exists')
+      return orderAdapterError(503, 'AUDIT_UNAVAILABLE', 'Refund intent was not durably confirmed')
+    }
+
     const response = await callW07Subscription({
       request,
       pathname: '/payments/' + encodeURIComponent(paymentId) + '/refunds',
@@ -112,6 +154,9 @@ export async function POST(request: Request, context: RouteContext): Promise<Res
   } catch (error) {
     if (error instanceof W07SubscriptionClientError) {
       return orderAdapterError(error.status, error.code, error.message)
+    }
+    if (error instanceof W06ModerationClientError) {
+      return orderAdapterError(503, 'AUDIT_UNAVAILABLE', 'Refund audit service unavailable')
     }
     if (error instanceof W08CreatorClientError) {
       return orderAdapterError(503, 'AUTHORIZATION_UNAVAILABLE', 'Refund authorization unavailable')
