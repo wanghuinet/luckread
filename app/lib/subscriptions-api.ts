@@ -62,6 +62,7 @@ export function mutateMySubscription(
   subscriptionId: string,
   operation: SubscriptionMutation,
   etag: string,
+  idempotencyKey: string,
 ) {
   if (!/^sub_[A-Za-z0-9_-]{1,128}$/.test(subscriptionId)) {
     throw new TypeError('Subscription ID is invalid.');
@@ -72,11 +73,14 @@ export function mutateMySubscription(
   if (!/^"lr-v[1-9][0-9]*"$/.test(etag)) {
     throw new TypeError('Subscription version is invalid.');
   }
+  if (!/^[A-Za-z0-9_-]{1,128}$/.test(idempotencyKey)) {
+    throw new TypeError('Subscription mutation idempotency key is invalid.');
+  }
   return apiRequest<unknown>(
     '/memberships/subscriptions/' + encodeURIComponent(subscriptionId) + '/' + operation,
     {
       method: 'POST',
-      headers: { 'If-Match': etag },
+      headers: { 'If-Match': etag, 'Idempotency-Key': idempotencyKey },
     },
   );
 }
