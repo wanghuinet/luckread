@@ -10,8 +10,7 @@ import { resolveCookieSubscriptionPrincipal, callW07Subscription, W07Subscriptio
 import { callW06CommerceOrderAudit, W06ModerationClientError } from '../../../../../moderation/w06-moderation-client.js'
 import { W08CreatorClientError } from '../../../../../auth/w08-creator-client.js'
 
-/** W01 authenticates and authorizes order reads; the W07 D1-04 query repeats the principal owner scope. */
-/** List only the current principal's orders; W07 independently applies the same owner predicate in D1-04. */
+/** Authenticate and authorize the current principal; W07 independently repeats the owner filter in D1-04. */
 export async function GET(request: Request): Promise<Response> {
   try {
     const url = new URL(request.url);
