@@ -179,7 +179,7 @@ export default function CheckoutClient({ orderId }: { orderId: string }) {
       returnUrl.searchParams.set('paymentId', intent.paymentId)
       const result: unknown = await hyper.confirmPayment({
         elements,
-        confirmParams: { return_url: returnUrl },
+        confirmParams: { return_url: returnUrl.toString() },
         redirect: 'if_required',
       })
       const payload = result && typeof result === 'object' ? result as { error?: { message?: unknown } } : {}
