@@ -490,6 +490,7 @@ describe('Hyperswitch server-side refund adapter', () => {
     expect(fake.captured[0].url).toBe('https://sandbox.hyperswitch.io/refunds')
     expect(fake.captured[0].init.method).toBe('POST')
     expect(new Headers(fake.captured[0].init.headers).get('api-key')).toBe(config.apiKey)
+    expect(new Headers(fake.captured[0].init.headers).get('Idempotency-Key')).toBe(refundInput.refundId)
     expect(JSON.parse(String(fake.captured[0].init.body))).toEqual({
       payment_id: refundInput.paymentId,
       refund_id: refundInput.refundId,
