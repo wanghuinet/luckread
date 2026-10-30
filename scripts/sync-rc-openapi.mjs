@@ -523,7 +523,7 @@ for (const op of targetOperations) {
 
   if (existing) {
     const merged = { ...existing, operationId };
-    if (source) {
+    if (source?.__source === `${apiDir}/commerce-operation-policy.v1.json`) {
       const method = String(op.method).toUpperCase();
       const authorization = source.authorization;
       merged.auth = {
