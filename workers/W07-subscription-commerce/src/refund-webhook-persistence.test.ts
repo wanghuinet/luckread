@@ -129,6 +129,22 @@ describe('D1-04 signed Hyperswitch refund webhook persistence', () => {
     ]);
   });
 
+  it('accepts a valid one-minor-unit refund webhook without an arbitrary minimum', async () => {
+    const db = new FakeD1(refund({ amount_minor: 1 }));
+    const result = await run(db, envelope({ resource: {
+      refund_id: REFUND_ID,
+      payment_id: PAYMENT_ID,
+      merchant_id: MERCHANT,
+      amount: 1,
+      currency: 'USD',
+      status: 'succeeded',
+      updated: '2026-10-30T10:00:01.000Z',
+    } }));
+    expect(result.outcome).toBe('APPLIED');
+    const update = db.statements.find((statement) => statement.sql.includes('UPDATE refunds SET status'));
+    expect(update?.values).toContain(1);
+  });
+
   it('persists a reconciliation receipt, not a financial state change, for an unknown refund', async () => {
     const db = new FakeD1(null);
     const result = await run(db);
