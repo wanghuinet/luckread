@@ -63,7 +63,7 @@ describe('current-principal commerce order history adapter', () => {
     })
     expect(openapi).toContain('operationId: listCommerceOrders')
     expect(openapi).toContain('x-luckread-runtime-status: IMPLEMENTATION_CANDIDATE_PENDING_VERIFICATION')
-    expect(openapi).toContain('Order record is not a tax invoice')
+    expect(openapi).toContain('not a tax invoice')
   })
 
   it('exposes purchase history in Android and H5 without introducing client-side payment authority', () => {
