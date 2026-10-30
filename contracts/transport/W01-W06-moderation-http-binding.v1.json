@@ -301,6 +301,9 @@
         "card data",
         "provider credentials",
         "raw request body"
+      ],
+      "excludedFields": [
+        "raw Idempotency-Key"
       ]
     },
     {
