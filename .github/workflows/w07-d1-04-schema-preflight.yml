@@ -1,6 +1,14 @@
 name: W07 D1-04 Read-only Schema Preflight
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/w07-d1-04-schema-preflight.yml'
+      - 'workers/W07-subscription-commerce/scripts/report-d1-04-live-name.mjs'
+      - 'workers/W07-subscription-commerce/scripts/report-d1-04-schema-snapshot.mjs'
+      - 'workers/W07-subscription-commerce/migrations-d1-04/**'
+      - 'workers/W07-subscription-commerce/wrangler.jsonc'
   workflow_dispatch:
     inputs:
       source_sha:
@@ -17,7 +25,7 @@ permissions:
 
 jobs:
   inspect-d1-04-schema:
-    if: ${{ inputs.confirm == 'READ_ONLY_D1_04_SCHEMA_PREFLIGHT' }}
+    if: ${{ github.event_name == 'push' || inputs.confirm == 'READ_ONLY_D1_04_SCHEMA_PREFLIGHT' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -28,18 +36,21 @@ jobs:
           fetch-depth: 0
       - name: Validate explicit source SHA and read-only confirmation
         env:
-          SOURCE_SHA: ${{ inputs.source_sha }}
+          SOURCE_SHA: ${{ inputs.source_sha || github.sha }}
           PREFLIGHT_CONFIRM: ${{ inputs.confirm }}
+          EVENT_NAME: ${{ github.event_name }}
         run: |
           set -euo pipefail
           [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
-          [[ "$PREFLIGHT_CONFIRM" == "READ_ONLY_D1_04_SCHEMA_PREFLIGHT" ]]
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            [[ "$PREFLIGHT_CONFIRM" == "READ_ONLY_D1_04_SCHEMA_PREFLIGHT" ]]
+          fi
           git cat-file -e "$SOURCE_SHA^{commit}"
           git merge-base --is-ancestor "$SOURCE_SHA" origin/main
           echo "Validated source SHA is an ancestor of reviewed main."
       - name: Checkout validated source commit
         env:
-          SOURCE_SHA: ${{ inputs.source_sha }}
+          SOURCE_SHA: ${{ inputs.source_sha || github.sha }}
         run: git checkout --detach "$SOURCE_SHA"
       - name: Setup Node 24
         uses: actions/setup-node@v4
@@ -124,7 +135,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: w07-d1-04-schema-preflight-${{ inputs.source_sha }}
+          name: w07-d1-04-schema-preflight-${{ inputs.source_sha || github.sha }}
           path: /tmp/w07-d1-04-schema-preflight-report.json
           if-no-files-found: warn
           retention-days: 90

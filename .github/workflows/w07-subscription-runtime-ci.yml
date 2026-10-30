@@ -284,3 +284,9 @@ jobs:
 
       - name: Verify isolated D1-04 Order migration candidate
         run: python workers/W07-subscription-commerce/scripts/test_order_d1_04_migration.py
+      - name: Test D1-04 migration, schema preflight, and W07 deploy admission gates
+        run: |
+          node --test \
+            workers/W07-subscription-commerce/scripts/verify-d1-04-order-migration.test.mjs \
+            workers/W07-subscription-commerce/scripts/report-d1-04-live-name.test.mjs \
+            workers/W07-subscription-commerce/scripts/report-d1-04-schema-snapshot.test.mjs
