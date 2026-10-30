@@ -274,7 +274,7 @@ export async function handleCommerceRefundRequest(
         // A GET result cannot finalize state; only the signed webhook can.
         providerRefund = await retrieveProviderRefund(config, providerIdentity);
       } catch (error) {
-        if (!(error instanceof HyperswitchClientError) || error.status !== 404) throw error;
+        if (!(error instanceof HyperswitchClientError) || error.upstreamStatus !== 404) throw error;
         // Provider confirms this refund_id does not exist; retry the immutable
         // request with the same identity rather than minting a second refund ID.
       }
