@@ -2461,7 +2461,7 @@
       "auditRequired": true,
       "optimisticLockRequired": true,
       "idempotencyRequired": true,
-      "stateMachine": "none"
+      "stateMachine": "contracts/state-machines/subscription.json"
     },
     {
       "operationId": "changeSubscriptionPlan",
@@ -2481,26 +2481,26 @@
       "auth": {
         "mode": "permission"
       },
-      "permissions": [],
+      "permissions": [
+        "subscription.pause"
+      ],
       "auditRequired": true,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": false,
-      "stateMachine": "none",
-      "x-luckread-contract-status": "DISCOVERY_DRAFT",
-      "x-luckread-source": "contracts/api/api-inventory.v1.json"
+      "optimisticLockRequired": true,
+      "idempotencyRequired": true,
+      "stateMachine": "contracts/state-machines/subscription.json"
     },
     {
       "operationId": "resumeSubscription",
       "auth": {
         "mode": "permission"
       },
-      "permissions": [],
+      "permissions": [
+        "subscription.resume"
+      ],
       "auditRequired": true,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": false,
-      "stateMachine": "none",
-      "x-luckread-contract-status": "DISCOVERY_DRAFT",
-      "x-luckread-source": "contracts/api/api-inventory.v1.json"
+      "optimisticLockRequired": true,
+      "idempotencyRequired": true,
+      "stateMachine": "contracts/state-machines/subscription.json"
     },
     {
       "operationId": "postNotificationsNotificationIdRead",
