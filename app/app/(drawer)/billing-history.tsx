@@ -63,7 +63,7 @@ function isOrderSummary(value: unknown): value is MyCommerceOrderSummary {
     typeof order.updatedAt === 'string' && Number.isFinite(Date.parse(order.updatedAt));
 }
 
-function OrderCard({ item }: { item: MyCommerceOrderSummary }) {
+function OrderCard({ item, onViewPayment }: { item: MyCommerceOrderSummary; onViewPayment: (paymentId: string) => void }) {
   return (
     <View className="mx-4 mb-3 rounded-2xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-950">
       <View className="flex-row items-start justify-between gap-3">
@@ -96,6 +96,15 @@ function OrderCard({ item }: { item: MyCommerceOrderSummary }) {
       <Text className="mt-3 text-[11px] leading-4 text-neutral-400">
         订单状态不等同于支付成功凭证或内容权益记录。
       </Text>
+      {item.latestPaymentId ? (
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => onViewPayment(item.latestPaymentId!)}
+          className="mt-3 self-start rounded-full border border-sky-200 px-4 py-2 dark:border-sky-900"
+        >
+          <Text className="text-xs font-bold text-sky-700 dark:text-sky-300">查看支付状态</Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -245,7 +254,12 @@ export default function BillingHistoryScreen() {
       <FlatList
         data={items}
         keyExtractor={(item) => item.orderId}
-        renderItem={({ item }) => <OrderCard item={item} />}
+        renderItem={({ item }) => (
+          <OrderCard
+            item={item}
+            onViewPayment={(paymentId) => router.push(('/payment-status?paymentId=' + encodeURIComponent(paymentId)) as never)}
+          />
+        )}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void loadPage(null, false, true)} />}
         contentContainerStyle={{ paddingTop: 14, paddingBottom: 36, flexGrow: 1 }}
         ListEmptyComponent={(
