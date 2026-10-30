@@ -6,7 +6,7 @@ import {
 
 const MERCHANT = 'merchant_1';
 const PAYMENT_ID = 'pay_' + 'a'.repeat(26);
-const REFUND_ID = 'refund-test-001';
+const REFUND_ID = 'ref_' + 'r'.repeat(26);
 const HASH = 'a'.repeat(64);
 
 type RefundFixture = {
