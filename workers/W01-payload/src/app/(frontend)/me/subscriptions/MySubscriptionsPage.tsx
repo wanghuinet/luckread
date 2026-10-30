@@ -265,6 +265,9 @@ export default function MySubscriptionsPage() {
       setPaymentMethods(records)
     } catch (caught) {
       setPaymentMethodError(caught instanceof Error ? caught.message : labels.paymentMethodError)
+      // The first request may have durably blocked MIT even when provider
+      // replay fails; refresh the authoritative status instead of showing stale ACTIVE.
+      void loadPaymentMethods()
     } finally {
       setPaymentMethodsLoading(false)
     }
