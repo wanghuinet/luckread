@@ -165,6 +165,17 @@ function SubscriptionCard({
             <Text className="text-sm font-bold text-rose-700 dark:text-rose-300">立即取消</Text>
           </Pressable>
         </View>
+      ) : item.status === 'PAST_DUE' ? (
+        <View className="mt-4 flex-row gap-2">
+          <Pressable
+            accessibilityRole="button"
+            disabled={busy}
+            onPress={() => onMutation(item, 'cancel')}
+            className="flex-1 items-center rounded-full border border-rose-300 px-4 py-3 disabled:opacity-50 dark:border-rose-800"
+          >
+            <Text className="text-sm font-bold text-rose-700 dark:text-rose-300">立即取消并停止续费重试</Text>
+          </Pressable>
+        </View>
       ) : null}
       {busy ? <ActivityIndicator className="mt-3" color={PRIMARY} /> : null}
     </View>
@@ -183,6 +194,7 @@ export default function MySubscriptionsScreen() {
   const [authRequired, setAuthRequired] = useState(false);
   const [error, setError] = useState('');
   const [mutatingId, setMutatingId] = useState<string | null>(null);
+  const mutationKeysRef = useRef(new Map<string, string>());
   const requestRef = useRef<AbortController | null>(null);
 
   const openLogin = useCallback(() => {
@@ -261,7 +273,7 @@ export default function MySubscriptionsScreen() {
         ? '立即暂停订阅？'
         : '恢复订阅？';
     const message = operation === 'cancel'
-      ? '取消后将立即停止会员内容访问。已完成的付款不会因此自动退款。'
+      ? '取消后将立即停止会员内容访问及后续续费重试。已完成的付款不会因此自动退款。'
       : operation === 'pause'
         ? '暂停后将立即停止会员内容访问；当前已付款周期不会自动延长。'
         : '仅当当前已付款周期尚未结束时，才能恢复该订阅。';
@@ -275,14 +287,24 @@ export default function MySubscriptionsScreen() {
           setError('');
           void (async () => {
             try {
-              const result = await mutateMySubscription(item.subscriptionId, operation, item.etag);
+              const mutationSignature = item.subscriptionId + ':' + operation + ':' + item.etag;
+              let idempotencyKey = mutationKeysRef.current.get(mutationSignature);
+              if (!idempotencyKey) {
+                idempotencyKey = createIdempotencyKey();
+                mutationKeysRef.current.set(mutationSignature, idempotencyKey);
+              }
+              const result = await mutateMySubscription(item.subscriptionId, operation, item.etag, idempotencyKey);
               if (!result.response.ok) {
+                if (result.response.status < 500 && result.response.status !== 408 && result.response.status !== 429) {
+                  mutationKeysRef.current.delete(mutationSignature);
+                }
                 throw new Error(result.error?.message || getApiErrorMessage(
                   result.data,
                   '订阅状态更新失败，请稍后重试。',
                   result.response.status,
                 ));
               }
+              mutationKeysRef.current.delete(mutationSignature);
               await loadPage(1, false);
             } catch (cause) {
               setError(cause instanceof Error ? cause.message : '订阅状态更新失败，请稍后重试。');
