@@ -44,7 +44,6 @@ type HyperswitchWebhookRuntimeDependencies = Readonly<{
   fulfillPaidOrder?: typeof fulfillPaidMembershipOrder;
 }>;
 
-const MAX_WEBHOOK_BODY_BYTES = 1024 * 1024;
 const WEBHOOK_PATH = '/internal/webhooks/hyperswitch';
 const SIGNATURE_HEADER = 'X-Webhook-Signature-512';
 
