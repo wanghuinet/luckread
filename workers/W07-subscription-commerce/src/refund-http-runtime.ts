@@ -175,7 +175,7 @@ export async function handleCommerceRefundRequest(
       !Object.hasOwn(input, 'currency') ||
       typeof input.paymentId !== 'string' ||
       !/^pay_[A-Za-z0-9]{26}$/.test(input.paymentId) ||
-      typeof input.amountMinor !== 'number' || !Number.isSafeInteger(input.amountMinor) || input.amountMinor <= 0 ||
+      typeof input.amountMinor !== 'number' || !Number.isSafeInteger(input.amountMinor) || input.amountMinor < 100 ||
       typeof input.currency !== 'string' || !/^[A-Z]{3}$/.test(input.currency) ||
       (input.reason !== undefined && !validText(input.reason, 255))
     ) {
