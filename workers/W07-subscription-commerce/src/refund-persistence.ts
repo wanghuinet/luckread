@@ -214,7 +214,7 @@ export async function createRefundReservation(
   if (!PAYMENT_ID_PATTERN.test(input.paymentId)) {
     throw new RefundPersistenceError('VALIDATION_FAILED', 400);
   }
-  if (!safeMinor(input.amountMinor) || input.amountMinor < 100 || !safeMinor(input.capturedAmountMinor)) {
+  if (!safeMinor(input.amountMinor) || !safeMinor(input.capturedAmountMinor)) {
     throw new RefundPersistenceError('VALIDATION_FAILED', 400);
   }
   if (!CURRENCY_PATTERN.test(input.currency) || !nonBlank(input.expectedMerchantId, 256)) {
