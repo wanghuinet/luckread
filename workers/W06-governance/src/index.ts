@@ -759,7 +759,7 @@ async function persistSubscriptionMutationRequestAudit(env: Env, event: AuditEve
   const before = event.before as Record<string, unknown>
   const after = event.after as Record<string, unknown>
   const allowedFrom: Record<MembershipSubscriptionMutationOperation, readonly string[]> = {
-    cancel: ['ACTIVE', 'PAUSED'],
+    cancel: ['ACTIVE', 'PAST_DUE', 'PAUSED'],
     pause: ['ACTIVE'],
     resume: ['PAUSED'],
   }
