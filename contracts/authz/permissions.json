@@ -591,6 +591,14 @@
       "scope": "own"
     },
     {
+      "name": "order.refund.self",
+      "resource": "order",
+      "action": "refund",
+      "minLayer": "L2",
+      "scope": "own",
+      "auditRequired": true
+    },
+    {
       "name": "payment_method.read.self",
       "resource": "payment_method",
       "action": "read",
