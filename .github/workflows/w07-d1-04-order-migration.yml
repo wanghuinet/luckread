@@ -70,6 +70,7 @@ jobs:
           test -f migrations-d1-04/0004_subscription_renewal_cycles.sql
           test -f migrations-d1-04/0005_revenuecat_webhook_inbox.sql
           test -f migrations-d1-04/0006_payment_method_revocation_requests.sql
+          test -f migrations-d1-04/0007_refunds.sql
           python scripts/test_order_d1_04_migration.py
           test -f scripts/verify-d1-04-order-migration.mjs
           node - <<'NODE'
@@ -141,7 +142,7 @@ jobs:
           echo "migration_action=$ACTION"
           echo "No D1 writes were performed in this step."
 
-      - name: Apply only pending isolated D1-04 order and payment migrations
+      - name: Apply only pending isolated D1-04 order, payment and refund migrations
         if: steps.schema_preflight.outputs.action == 'APPLY'
         working-directory: workers/W07-subscription-commerce
         env:
@@ -177,6 +178,7 @@ jobs:
           npx --yes wrangler@4.116.0 d1 execute "$D1_04_NAME" --remote --config wrangler.jsonc --command='PRAGMA table_info("revenuecat_webhook_events")' --json > /tmp/w07-d1-04-revenuecat-webhook-events-columns.json
           npx --yes wrangler@4.116.0 d1 execute "$D1_04_NAME" --remote --config wrangler.jsonc --command='PRAGMA table_info("revenuecat_webhook_event_conflicts")' --json > /tmp/w07-d1-04-revenuecat-webhook-conflicts-columns.json
           npx --yes wrangler@4.116.0 d1 execute "$D1_04_NAME" --remote --config wrangler.jsonc --command='PRAGMA table_info("payment_method_revocation_requests")' --json > /tmp/w07-d1-04-payment-method-revocation-requests-columns.json
+          npx --yes wrangler@4.116.0 d1 execute "$D1_04_NAME" --remote --config wrangler.jsonc --command='PRAGMA table_info("refunds")' --json > /tmp/w07-d1-04-refunds-columns.json
           node scripts/verify-d1-04-order-migration.mjs postflight \
             /tmp/w07-d1-04-preflight-schema.json \
             /tmp/w07-d1-04-postflight-schema.json \
@@ -201,7 +203,7 @@ jobs:
         run: |
           set -euo pipefail
           {
-            echo '# W07 D1-04 Order and Payment Migrations'
+            echo '# W07 D1-04 Order, Payment and Refund Migrations'
             echo
             echo '- Source SHA: ${{ inputs.source_sha }}'
             echo '- Expected database name: ${{ inputs.target_database_name }}'
