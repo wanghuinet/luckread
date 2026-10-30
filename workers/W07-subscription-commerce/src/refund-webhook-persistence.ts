@@ -90,7 +90,7 @@ export async function persistHyperswitchRefundWebhook(
     !expectedState ||
     typeof rawRefundId !== 'string' || !/^ref_[A-Za-z0-9]{26}$/.test(rawRefundId) ||
     typeof rawPaymentId !== 'string' || !PAYMENT_ID_PATTERN.test(rawPaymentId) ||
-    typeof rawAmount !== 'number' || !Number.isSafeInteger(rawAmount) || rawAmount < 100 ||
+    typeof rawAmount !== 'number' || !Number.isSafeInteger(rawAmount) || rawAmount <= 0 ||
     typeof rawCurrency !== 'string' || !CURRENCY_PATTERN.test(rawCurrency) ||
     rawStatus !== expectedState.toLowerCase() ||
     typeof rawUpdated !== 'string' ||
