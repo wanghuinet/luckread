@@ -131,14 +131,17 @@ function buildCurrentState(
     ? null
     : laterDate([latestExpiry, gracePeriodExpiresAt]);
 
-  const refundedAt = subscription.refunded_at ?? null;
-  if (refundedAt !== null && Date.parse(refundedAt) <= nowMs) {
-    return { currentState: 'REFUNDED', effectiveExpiresAt, gracePeriodExpiresAt };
-  }
-
+  // RevenueCat's current entitlement snapshot is the access authority. A
+  // cancellation/refund metadata field must not override another still-active
+  // entitlement or a restored purchase visible in that same snapshot.
   const active = effectiveExpiresAt === null || Date.parse(effectiveExpiresAt) > nowMs;
+  const refundedAt = subscription.refunded_at ?? null;
   return {
-    currentState: active ? 'ACTIVE' : 'EXPIRED',
+    currentState: active
+      ? 'ACTIVE'
+      : refundedAt !== null && Date.parse(refundedAt) <= nowMs
+        ? 'REFUNDED'
+        : 'EXPIRED',
     effectiveExpiresAt,
     gracePeriodExpiresAt,
   };
