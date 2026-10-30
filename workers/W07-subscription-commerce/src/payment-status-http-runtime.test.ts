@@ -54,10 +54,12 @@ function request(url = 'https://luckread-w07.internal/payments/' + PAYMENT_ID, m
 function dependencies(overrides: Partial<PaymentStatusDependencies> = {}) {
   let providerCalls = 0
   let receivedForceSync = false
+  let receivedMerchantId: string | undefined
   const deps: PaymentStatusDependencies = {
-    readPayment: (async (_db, customerId, paymentId) => {
+    readPayment: (async (_db, customerId, paymentId, expectedMerchantId) => {
       expect(customerId).toBe(CUSTOMER)
       expect(paymentId).toBe(PAYMENT_ID)
+      receivedMerchantId = expectedMerchantId
       return payment
     }) as NonNullable<PaymentStatusDependencies['readPayment']>,
     retrieveProvider: (async (_config, paymentId, _fetch, forceSync) => {
@@ -69,7 +71,12 @@ function dependencies(overrides: Partial<PaymentStatusDependencies> = {}) {
     now: () => new Date(LATER),
     ...overrides,
   }
-  return { deps, providerCalls: () => providerCalls, forceSync: () => receivedForceSync }
+  return {
+    deps,
+    providerCalls: () => providerCalls,
+    forceSync: () => receivedForceSync,
+    merchantId: () => receivedMerchantId,
+  }
 }
 
 async function body(response: Response) {
@@ -94,6 +101,7 @@ describe('owner-scoped payment status runtime', () => {
     expect(response?.status).toBe(200)
     expect(fixture.providerCalls()).toBe(1)
     expect(fixture.forceSync()).toBe(true)
+    expect(fixture.merchantId()).toBe('merchant_test')
     expect(value.data).toMatchObject({
       payment,
       providerStatus: 'processing',
@@ -144,6 +152,7 @@ describe('owner-scoped payment status runtime', () => {
 
     expect(response?.status).toBe(200)
     expect(fixture.providerCalls()).toBe(0)
+    expect(fixture.merchantId()).toBeUndefined()
     expect(value.data).toMatchObject({
       payment,
       providerStatus: null,
