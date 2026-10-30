@@ -8,7 +8,8 @@ export const PAYMENT_MIGRATION_ID = '0002_payment_provider_events'
 export const SAVED_METHOD_MIGRATION_ID = '0003_saved_payment_methods_mandates'
 export const RENEWAL_MIGRATION_ID = '0004_subscription_renewal_cycles'
 export const REVENUECAT_WEBHOOK_MIGRATION_ID = '0005_revenuecat_webhook_inbox'
-export const REQUIRED_MIGRATION_IDS = [ORDER_MIGRATION_ID, PAYMENT_MIGRATION_ID, SAVED_METHOD_MIGRATION_ID, RENEWAL_MIGRATION_ID, REVENUECAT_WEBHOOK_MIGRATION_ID]
+export const PAYMENT_METHOD_REVOCATION_MIGRATION_ID = '0006_payment_method_revocation_requests'
+export const REQUIRED_MIGRATION_IDS = [ORDER_MIGRATION_ID, PAYMENT_MIGRATION_ID, SAVED_METHOD_MIGRATION_ID, RENEWAL_MIGRATION_ID, REVENUECAT_WEBHOOK_MIGRATION_ID, PAYMENT_METHOD_REVOCATION_MIGRATION_ID]
 
 export const REQUIRED_COLUMNS = {
   orders: [
@@ -100,6 +101,13 @@ export const REQUIRED_COLUMNS = {
     ['existing_payload_sha256', 'TEXT', 1, 0], ['incoming_payload_sha256', 'TEXT', 1, 0],
     ['occurrence_count', 'INTEGER', 1, 0], ['first_seen_at', 'TEXT', 1, 0], ['last_seen_at', 'TEXT', 1, 0],
   ],
+  payment_method_revocation_requests: [
+    ['revocation_request_id', 'TEXT', 1, 1], ['saved_payment_method_id', 'TEXT', 1, 0],
+    ['payment_method_id', 'TEXT', 1, 0], ['provider', 'TEXT', 1, 0], ['merchant_id', 'TEXT', 1, 0],
+    ['customer_id', 'TEXT', 1, 0], ['idempotency_key', 'TEXT', 1, 0], ['status', 'TEXT', 1, 0],
+    ['provider_method_deleted_at', 'TEXT', 0, 0], ['version', 'INTEGER', 1, 0],
+    ['created_at', 'TEXT', 1, 0], ['updated_at', 'TEXT', 1, 0],
+  ],
 }
 
 export const REQUIRED_INDEXES = {
@@ -129,6 +137,10 @@ export const REQUIRED_INDEXES = {
     'ix_revenuecat_webhook_events_user_received',
   ],
   revenuecat_webhook_event_conflicts: ['ix_revenuecat_webhook_conflicts_event'],
+  payment_method_revocation_requests: [
+    'ix_payment_method_revocation_status',
+    'ux_payment_method_revocation_customer_idempotency',
+  ],
 }
 
 export const REQUIRED_TRIGGERS = {
@@ -201,6 +213,15 @@ export const REQUIRED_TRIGGERS = {
     'revenuecat_webhook_conflicts_occurrence_guard',
     'revenuecat_webhook_conflicts_retained',
   ],
+  payment_method_revocation_requests: [
+    'payment_method_revocation_request_requires_saved_method',
+    'payment_method_revocation_request_identity_immutable',
+    'payment_method_revocation_request_version_guard',
+    'payment_method_revocation_request_transition_guard',
+    'payment_method_revocation_request_provider_deleted_immutable',
+    'payment_method_revocation_request_retained',
+    'payment_method_revocation_request_completion_guard',
+  ],
 }
 
 const targetNamesFor = (migrationId) => {
@@ -214,7 +235,9 @@ const targetNamesFor = (migrationId) => {
           ? ['subscription_renewal_cycles', 'subscription_renewal_scheduler_state']
           : migrationId === REVENUECAT_WEBHOOK_MIGRATION_ID
             ? ['revenuecat_webhook_events', 'revenuecat_webhook_event_conflicts']
-            : []
+            : migrationId === PAYMENT_METHOD_REVOCATION_MIGRATION_ID
+              ? ['payment_method_revocation_requests']
+              : []
   return new Set([
     ...tables,
     ...tables.flatMap((table) => REQUIRED_INDEXES[table] ?? []),
@@ -316,6 +339,10 @@ export function inspectD1_04OrderMigrationPreflight({ schemaSnapshot, migrationS
       REQUIRED_MIGRATION_IDS.slice(0, 4).some((id) => !state.names.includes(id))) {
     fail('RevenueCat webhook migration is recorded without its required commerce migrations; manual schema reconciliation is required')
   }
+  if (state.names.includes(PAYMENT_METHOD_REVOCATION_MIGRATION_ID) &&
+      REQUIRED_MIGRATION_IDS.slice(0, 5).some((id) => !state.names.includes(id))) {
+    fail('payment-method revocation migration is recorded without its required commerce and RevenueCat migrations; manual schema reconciliation is required')
+  }
   const byName = new Set(objects.map((object) => object.name))
 
   for (const migrationId of state.names.filter((name) => REQUIRED_MIGRATION_IDS.includes(name))) {
@@ -386,6 +413,7 @@ export function verifyD1_04OrderMigrationPostflight({
   renewalSchedulerStateTableInfo,
   revenueCatWebhookEventsTableInfo,
   revenueCatWebhookConflictsTableInfo,
+  paymentMethodRevocationRequestsTableInfo,
 }) {
   const before = schemaObjects(preflightSchema)
   const after = schemaObjects(postflightSchema)
@@ -416,6 +444,7 @@ export function verifyD1_04OrderMigrationPostflight({
     subscription_renewal_scheduler_state: renewalSchedulerStateTableInfo,
     revenuecat_webhook_events: revenueCatWebhookEventsTableInfo,
     revenuecat_webhook_event_conflicts: revenueCatWebhookConflictsTableInfo,
+    payment_method_revocation_requests: paymentMethodRevocationRequestsTableInfo,
   }
   for (const [tableName, expectedColumns] of Object.entries(REQUIRED_COLUMNS)) {
     const actual = tableColumns(tableInfoByName[tableName], tableName)
@@ -450,9 +479,26 @@ export function verifyD1_04OrderMigrationPostflight({
   for (const oldObject of before) {
     const key = oldObject.type + '\u0000' + oldObject.name
     const newObject = afterByKey.get(key)
-    if (!newObject || JSON.stringify(newObject) !== JSON.stringify(oldObject)) {
+    const isReviewedMandateReplayGuardUpdate =
+      oldObject.type === 'trigger' &&
+      oldObject.name === 'payment_provider_events_terminal_immutable' &&
+      state.names.includes(PAYMENT_METHOD_REVOCATION_MIGRATION_ID) &&
+      newObject && newObject.tableName === oldObject.tableName &&
+      typeof newObject.sql === 'string' &&
+      newObject.sql.toLowerCase().includes('reconciliation_required') &&
+      newObject.sql.toLowerCase().includes('mandate_active') &&
+      newObject.sql.toLowerCase().includes('mandate_revoked')
+    if (!newObject || (JSON.stringify(newObject) !== JSON.stringify(oldObject) && !isReviewedMandateReplayGuardUpdate)) {
       fail('pre-existing schema object was removed or changed: ' + oldObject.type + ':' + oldObject.name)
     }
+  }
+
+  const mandateReplayGuard = present.get('trigger\u0000payment_provider_events_terminal_immutable')
+  const mandateReplayGuardSql = typeof mandateReplayGuard?.sql === 'string' ? mandateReplayGuard.sql.toLowerCase() : ''
+  if (!mandateReplayGuardSql.includes('reconciliation_required') ||
+      !mandateReplayGuardSql.includes('mandate_active') ||
+      !mandateReplayGuardSql.includes('mandate_revoked')) {
+    fail('payment provider event trigger does not permit only the reviewed mandate reconciliation replay')
   }
 
   const beforeKeys = new Set(before.map((object) => object.type + '\u0000' + object.name))
@@ -500,7 +546,7 @@ function main() {
     return
   }
   if (mode === 'postflight') {
-    if (args.length !== 16) throw new Error('Usage: verify-d1-04-order-migration.mjs postflight <preflight-schema.json> <postflight-schema.json> <migration-state.json> <orders-info.json> <order-lines-info.json> <idempotency-info.json> <payments-info.json> <provider-events-info.json> <event-conflicts-info.json> <saved-methods-info.json> <mandates-info.json> <renewal-cycles-info.json> <renewal-scheduler-state-info.json> <revenuecat-events-info.json> <revenuecat-conflicts-info.json> <output.json>')
+    if (args.length !== 17) throw new Error('Usage: verify-d1-04-order-migration.mjs postflight <preflight-schema.json> <postflight-schema.json> <migration-state.json> <orders-info.json> <order-lines-info.json> <idempotency-info.json> <payments-info.json> <provider-events-info.json> <event-conflicts-info.json> <saved-methods-info.json> <mandates-info.json> <renewal-cycles-info.json> <renewal-scheduler-state-info.json> <revenuecat-events-info.json> <revenuecat-conflicts-info.json> <payment-method-revocation-requests-info.json> <output.json>')
     const report = verifyD1_04OrderMigrationPostflight({
       preflightSchema: readJson(args[0]),
       postflightSchema: readJson(args[1]),
@@ -517,8 +563,9 @@ function main() {
       renewalSchedulerStateTableInfo: readJson(args[12]),
       revenueCatWebhookEventsTableInfo: readJson(args[13]),
       revenueCatWebhookConflictsTableInfo: readJson(args[14]),
+      paymentMethodRevocationRequestsTableInfo: readJson(args[15]),
     })
-    writeReport(args[15], report)
+    writeReport(args[16], report)
     console.log(JSON.stringify(report, null, 2))
     return
   }
