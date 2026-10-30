@@ -355,6 +355,7 @@ function buildLayerAbility(input: CaslPermissionInput) {
   if (input.layer !== 'L0' && input.layer !== 'L1' && input.subjectId) {
     grant('order.create', 'Order', selfOwnerCondition(input.subjectId))
     grant('order.read', 'Order', selfOwnerCondition(input.subjectId))
+    grant('payment.read', 'Payment', selfOwnerCondition(input.subjectId))
     grant('payment.refund', 'Payment', selfOwnerCondition(input.subjectId))
   }
 
