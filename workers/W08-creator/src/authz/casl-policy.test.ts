@@ -418,6 +418,34 @@ describe('CASL L0-L8 authorization policy', () => {
       resourceType: 'Order',
       resourceAttributes: { ownerId: 'user-1' },
     })).toMatchObject({ decision: 'ALLOW' })
+    expect(evaluate({
+      action: 'order.refund.self',
+      resourceType: 'Order',
+      resourceAttributes: { ownerId: 'user-1' },
+    })).toMatchObject({ decision: 'ALLOW' })
+    expect(evaluate({
+      layer: 'L7',
+      action: 'order.refund.self',
+      resourceType: 'Order',
+      resourceAttributes: { ownerId: 'user-1' },
+    })).toMatchObject({ decision: 'ALLOW' })
+    expect(evaluate({
+      action: 'order.refund.self',
+      resourceType: 'Order',
+      resourceAttributes: { ownerId: 'user-2' },
+    })).toMatchObject({ decision: 'DENY', reasonCode: 'PERMISSION_DENIED' })
+    expect(evaluate({
+      layer: 'L1',
+      action: 'order.refund.self',
+      resourceType: 'Order',
+      resourceAttributes: { ownerId: 'user-1' },
+    })).toMatchObject({ decision: 'DENY' })
+    expect(evaluate({
+      accountState: 'FROZEN',
+      action: 'order.refund.self',
+      resourceType: 'Order',
+      resourceAttributes: { ownerId: 'user-1' },
+    })).toMatchObject({ decision: 'DENY', reasonCode: 'ACCOUNT_FROZEN_READ_ONLY' })
 
     for (const action of ['order.create', 'order.read']) {
       expect(evaluate({
