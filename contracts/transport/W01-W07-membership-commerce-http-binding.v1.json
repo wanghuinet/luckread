@@ -101,6 +101,42 @@
       "auditTransportBinding": "W01-W06-moderation-http-binding.v1"
     },
     {
+      "operationId": "getBillingDocuments",
+      "method": "GET",
+      "publicPath": "/api/v1/billing/documents",
+      "internalPath": "/commerce/billing/documents",
+      "principalRequired": true,
+      "permission": "payment.read",
+      "minimumGlobalLayer": "L2",
+      "ownerScope": "W07 lists only D1-04 billing_documents whose customer_id equals the server-derived W02 principal.",
+      "queryParameters": [
+        "limit",
+        "cursor"
+      ],
+      "pagination": "Opaque keyset cursor ordered by issued_at and document_id; max 50; no offsets.",
+      "responseFields": [
+        "documentId",
+        "documentType",
+        "documentNumber",
+        "orderId",
+        "paymentId",
+        "amountMinor",
+        "currency",
+        "snapshot",
+        "issuedAt",
+        "createdAt"
+      ],
+      "responsePolicy": "Immutable, sanitized invoice/receipt snapshots; no PAN, provider key, client secret, or raw provider webhook body.",
+      "cache": "NO_STORE",
+      "topologyConstraints": {
+        "newWorker": false,
+        "newDatabase": false,
+        "newQueue": false,
+        "newServiceBinding": false,
+        "crossD1Transactions": 0
+      }
+    },
+    {
       "operationId": "getCommerceOrder",
       "method": "GET",
       "publicPath": "/api/v1/commerce/orders/{orderId}",
@@ -111,6 +147,78 @@
       "ownerScope": "W01 authorizes order.read for the W02-authenticated principal; W07 independently queries D1-04 by both orderId and the same server-derived customerId. Cross-owner requests return RESOURCE_NOT_FOUND.",
       "responseAuthority": "W07 D1-04 Order and OrderLine rows only; DTO excludes customerId, provider fields, payment credentials and internal snapshots.",
       "cache": "NO_STORE"
+    },
+    {
+      "operationId": "getPaymentsHistory",
+      "method": "GET",
+      "publicPath": "/api/v1/payments/history",
+      "internalPath": "/commerce/payments/history",
+      "principalRequired": true,
+      "permission": "payment.read",
+      "minimumGlobalLayer": "L2",
+      "ownerScope": "W01 authenticates the W02 session; W07 re-queries D1-04 with the same server-derived customerId.",
+      "queryParameters": [
+        "limit",
+        "cursor"
+      ],
+      "pagination": "Opaque keyset cursor ordered by created_at and payment_id; max 50; no offsets.",
+      "responseFields": [
+        "paymentId",
+        "orderId",
+        "amountMinor",
+        "currency",
+        "status",
+        "version",
+        "providerUpdatedAt",
+        "createdAt",
+        "updatedAt",
+        "refundedMinor"
+      ],
+      "responsePolicy": "NO_STORE; do not expose merchant_id, idempotency keys, provider secrets or card details.",
+      "cache": "NO_STORE",
+      "topologyConstraints": {
+        "newWorker": false,
+        "newDatabase": false,
+        "newQueue": false,
+        "newServiceBinding": false,
+        "crossD1Transactions": 0
+      }
+    },
+    {
+      "operationId": "getPaymentsRefunds",
+      "method": "GET",
+      "publicPath": "/api/v1/payments/refunds",
+      "internalPath": "/commerce/payments/refunds",
+      "principalRequired": true,
+      "permission": "payment.read",
+      "minimumGlobalLayer": "L2",
+      "ownerScope": "W07 lists only D1-04 refunds whose customer_id equals the server-derived W02 principal.",
+      "queryParameters": [
+        "limit",
+        "cursor"
+      ],
+      "pagination": "Opaque keyset cursor ordered by created_at and refund_id; max 50; no offsets.",
+      "responseFields": [
+        "refundId",
+        "paymentId",
+        "orderId",
+        "amountMinor",
+        "currency",
+        "status",
+        "reason",
+        "version",
+        "providerUpdatedAt",
+        "createdAt",
+        "updatedAt"
+      ],
+      "cache": "NO_STORE",
+      "topologyConstraints": {
+        "newWorker": false,
+        "newDatabase": false,
+        "newQueue": false,
+        "newServiceBinding": false,
+        "crossD1Transactions": 0
+      }
     },
     {
       "operationId": "listActiveMembershipPlans",
