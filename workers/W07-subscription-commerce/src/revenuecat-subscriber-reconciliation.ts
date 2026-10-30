@@ -2,9 +2,6 @@ import {
   assertRevenueCatSubscriberIdentity,
   type RevenueCatSubscriberIdentityMatch,
 } from './revenuecat-subscriber-identity.js';
-import {
-  RevenueCatSubscriberIdentityError,
-} from './revenuecat-subscriber-identity.js';
 import type {
   RevenueCatSubscriberEntitlement,
   RevenueCatSubscriberSnapshot,
@@ -82,7 +79,7 @@ function isBoundedCanonicalText(value: unknown, maxLength: number): value is str
     value.length > 0 &&
     value.length <= maxLength &&
     value.trim() === value &&
-    !/[\\u0000-\\u001f\\u007f]/.test(value);
+    !/[\u0000-\u001f\u007f]/.test(value);
 }
 
 function isValidDateOrNull(value: unknown): value is string | null {
@@ -126,7 +123,9 @@ function buildCurrentState(
   const hasNonExpiringEntitlement = entries.some(({ entitlement }) => entitlement.expires_date === null);
   const latestExpiry = laterDate(entries.map(({ entitlement }) => entitlement.expires_date));
   const gracePeriodExpiresAt = laterDate(entries.map(({ entitlement }) =>
-    entitlement.grace_period_expires_date ?? subscription.grace_period_expires_date ?? null,
+    entitlement.grace_period_expires_date !== undefined
+      ? entitlement.grace_period_expires_date
+      : subscription.grace_period_expires_date ?? null,
   ));
   const effectiveExpiresAt = hasNonExpiringEntitlement
     ? null
@@ -150,6 +149,10 @@ function validateSnapshot(snapshot: RevenueCatSubscriberSnapshot): void {
       !snapshot.entitlements || typeof snapshot.entitlements !== 'object' || Array.isArray(snapshot.entitlements) ||
       !snapshot.subscriptions || typeof snapshot.subscriptions !== 'object' || Array.isArray(snapshot.subscriptions) ||
       typeof snapshot.customerCreatedOnLookup !== 'boolean') {
+    throw new RevenueCatSubscriberReconciliationError('INVALID_SNAPSHOT');
+  }
+
+  if (Object.keys(snapshot.entitlements).length > 256 || Object.keys(snapshot.subscriptions).length > 256) {
     throw new RevenueCatSubscriberReconciliationError('INVALID_SNAPSHOT');
   }
 
