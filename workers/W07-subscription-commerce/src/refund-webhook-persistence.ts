@@ -80,7 +80,7 @@ export async function persistHyperswitchRefundWebhook(
   const rawAmount = resource.amount;
   const rawCurrency = resource.currency;
   const rawStatus = resource.status;
-  const rawUpdated = resource.updated;
+  const rawUpdated = resource.updated_at ?? resource.updated;
   const expectedState = envelope.eventType === 'refund_succeeded' ? 'SUCCEEDED'
     : envelope.eventType === 'refund_failed' ? 'FAILED'
       : envelope.eventType === 'refund_review' ? 'REVIEW' : null;
@@ -88,9 +88,9 @@ export async function persistHyperswitchRefundWebhook(
   if (
     envelope.contentType !== 'refund_details' ||
     !expectedState ||
-    !validText(rawRefundId, 128) ||
+    typeof rawRefundId !== 'string' || !/^ref_[A-Za-z0-9]{26}$/.test(rawRefundId) ||
     typeof rawPaymentId !== 'string' || !PAYMENT_ID_PATTERN.test(rawPaymentId) ||
-    typeof rawAmount !== 'number' || !Number.isSafeInteger(rawAmount) || rawAmount <= 0 ||
+    typeof rawAmount !== 'number' || !Number.isSafeInteger(rawAmount) || rawAmount < 100 ||
     typeof rawCurrency !== 'string' || !CURRENCY_PATTERN.test(rawCurrency) ||
     rawStatus !== expectedState.toLowerCase() ||
     typeof rawUpdated !== 'string' ||
