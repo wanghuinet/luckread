@@ -966,7 +966,9 @@ export default {
         targetType: 'PaymentMethod',
         targetId: input.savedPaymentMethodId,
         before: {},
-        after: { idempotencyKey: input.idempotencyKey, operation: 'remove_saved_payment_method' },
+        // The idempotency key is only a replay credential; the event ID is
+        // already derived from its digest, so never persist the raw key in D1-03.
+        after: { operation: 'remove_saved_payment_method' },
         occurredAt: new Date().toISOString(),
       }
       return persistMembershipPlanMutationRequestAudit(env, event)
