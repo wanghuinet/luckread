@@ -28,7 +28,7 @@ function validateRefundEnvelope(value: unknown): boolean {
     typeof data.refundId === 'string' && /^ref_[A-Za-z0-9]{26}$/.test(data.refundId) &&
     typeof data.paymentId === 'string' && /^pay_[A-Za-z0-9]{26}$/.test(data.paymentId) &&
     typeof data.orderId === 'string' && /^ord_[A-Za-z0-9_-]{1,90}$/.test(data.orderId) &&
-    typeof data.amountMinor === 'number' && Number.isSafeInteger(data.amountMinor) && data.amountMinor >= 100 &&
+    typeof data.amountMinor === 'number' && Number.isSafeInteger(data.amountMinor) && data.amountMinor > 0 &&
     typeof data.capturedAmountMinor === 'number' && Number.isSafeInteger(data.capturedAmountMinor) &&
     data.capturedAmountMinor >= data.amountMinor &&
     typeof data.currency === 'string' && /^[A-Z]{3}$/.test(data.currency) &&
@@ -71,7 +71,7 @@ export async function POST(request: Request): Promise<Response> {
       !/^pay_[A-Za-z0-9]{26}$/.test(parsed.value.paymentId) ||
       typeof parsed.value.amountMinor !== 'number' ||
       !Number.isSafeInteger(parsed.value.amountMinor) ||
-      parsed.value.amountMinor < 100 ||
+      parsed.value.amountMinor <= 0 ||
       typeof parsed.value.currency !== 'string' ||
       !/^[A-Z]{3}$/.test(parsed.value.currency) ||
       (parsed.value.reason !== undefined && (
@@ -148,7 +148,7 @@ function validateRefundHistoryEnvelope(value: unknown): boolean {
     typeof item.refundId === 'string' && /^ref_[A-Za-z0-9]{26}$/.test(item.refundId) &&
     typeof item.paymentId === 'string' && /^pay_[A-Za-z0-9]{26}$/.test(item.paymentId) &&
     typeof item.orderId === 'string' && /^ord_[A-Za-z0-9_-]{1,90}$/.test(item.orderId) &&
-    typeof item.amountMinor === 'number' && Number.isSafeInteger(item.amountMinor) && item.amountMinor >= 100 &&
+    typeof item.amountMinor === 'number' && Number.isSafeInteger(item.amountMinor) && item.amountMinor > 0 &&
     typeof item.currency === 'string' && /^[A-Z]{3}$/.test(item.currency) &&
     ['REQUESTED', 'PENDING', 'SUCCEEDED', 'FAILED', 'REVIEW', 'RECONCILIATION_REQUIRED'].includes(String(item.status)) &&
     (item.reason === null || (typeof item.reason === 'string' && item.reason.length <= 255)) &&
