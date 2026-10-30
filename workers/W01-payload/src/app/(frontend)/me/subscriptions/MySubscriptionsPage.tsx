@@ -45,7 +45,7 @@ const copy = (locale: PublicLocale) => locale === 'en'
       id: 'Subscription ID',
       period: 'Current period',
       cancelAt: 'Cancellation date',
-      mutationsNotice: 'Pausing or canceling stops member access immediately. Completed payments are not automatically refunded; resume is available only before the paid-through period ends.',
+      mutationsNotice: 'Pausing or canceling stops member access immediately. Canceling a past-due subscription also stops further renewal retries. Completed payments are not automatically refunded; resume is available only before the paid-through period ends.',
 pauseAction: 'Pause subscription',
 resumeAction: 'Resume subscription',
 cancelAction: 'Cancel now',
@@ -81,7 +81,7 @@ cancelAction: 'Cancel now',
         id: '訂閱 ID',
         period: '目前週期',
         cancelAt: '取消時間',
-        mutationsNotice: '暫停或取消會立即停止會員內容存取；已完成付款不會自動退款。只有在已付款週期結束前才能恢復。',
+        mutationsNotice: '暫停或取消會立即停止會員內容存取；逾期訂閱取消後也會停止後續續費重試。已完成付款不會自動退款。只有在已付款週期結束前才能恢復。',
 pauseAction: '暫停訂閱',
 resumeAction: '恢復訂閱',
 cancelAction: '立即取消',
@@ -116,7 +116,7 @@ cancelAction: '立即取消',
         id: '订阅 ID',
         period: '当前周期',
         cancelAt: '取消时间',
-        mutationsNotice: '暂停或取消会立即停止会员内容访问；已完成付款不会自动退款。只有当前已付款周期尚未结束时才能恢复。',
+        mutationsNotice: '暂停或取消会立即停止会员内容访问；逾期订阅取消后也会停止后续续费重试。已完成付款不会自动退款。只有当前已付款周期尚未结束时才能恢复。',
 pauseAction: '暂停订阅',
 resumeAction: '恢复订阅',
 cancelAction: '立即取消',
@@ -193,10 +193,10 @@ export default function MySubscriptionsPage() {
   async function mutate(item: Subscription, operation: 'cancel' | 'pause' | 'resume') {
     const message = operation === 'cancel'
       ? (locale === 'en'
-        ? 'Cancel now? Member access will stop immediately. Completed payments are not automatically refunded.'
+        ? 'Cancel now? Member access and future renewal retries will stop. Completed payments are not automatically refunded.'
         : locale === 'tw'
-          ? '確定立即取消？會員內容存取會立即停止，已完成的付款不會自動退款。'
-          : '确定立即取消？会员内容访问会立即停止，已完成的付款不会自动退款。')
+          ? '確定立即取消？會員內容存取及後續續費重試會停止，已完成的付款不會自動退款。'
+          : '确定立即取消？会员内容访问及后续续费重试会停止，已完成的付款不会自动退款。')
       : operation === 'pause'
         ? (locale === 'en'
           ? 'Pause now? Member access will stop immediately.'
@@ -322,7 +322,7 @@ export default function MySubscriptionsPage() {
               ) : null}
             </dl>
 
-            {(item.status === 'ACTIVE' || item.status === 'PAUSED') ? (
+            {(item.status === 'ACTIVE' || item.status === 'PAUSED' || item.status === 'PAST_DUE') ? (
               <div className="mt-4 flex flex-wrap gap-2">
                 {item.status === 'ACTIVE' ? (
                   <button
@@ -333,7 +333,7 @@ export default function MySubscriptionsPage() {
                   >
                     {labels.pauseAction}
                   </button>
-                ) : (
+                ) : item.status === 'PAUSED' ? (
                   <button
                     type="button"
                     disabled={mutatingId !== null || loading}
@@ -342,7 +342,7 @@ export default function MySubscriptionsPage() {
                   >
                     {labels.resumeAction}
                   </button>
-                )}
+                ) : null}
                 <button
                   type="button"
                   disabled={mutatingId !== null || loading}
@@ -371,7 +371,7 @@ export default function MySubscriptionsPage() {
         </div>
       ) : null}
 
-      {items.some((item) => item.status === 'ACTIVE' || item.status === 'PAUSED') ? (
+      {items.some((item) => item.status === 'ACTIVE' || item.status === 'PAUSED' || item.status === 'PAST_DUE') ? (
         <p className="px-4 py-4 text-xs leading-5 text-light-secondary dark:text-dark-secondary">{labels.mutationsNotice}</p>
       ) : null}
       <p className="px-4 py-4 text-xs leading-5 text-light-secondary dark:text-dark-secondary">
