@@ -23,6 +23,15 @@ const migrationTable = {
   type: 'table', name: 'd1_migrations', tbl_name: 'd1_migrations',
   sql: 'CREATE TABLE d1_migrations (name TEXT PRIMARY KEY)',
 }
+
+const paymentMethodRevocationMigrationSql = fs.readFileSync(
+  new URL('../migrations-d1-04/0006_payment_method_revocation_requests.sql', import.meta.url),
+  'utf8',
+)
+const paymentProviderEventsTerminalTriggerSql = paymentMethodRevocationMigrationSql.match(
+  /CREATE TRIGGER payment_provider_events_terminal_immutable\\b[\\s\\S]*?\\bEND;/i,
+)?.[0]
+if (!paymentProviderEventsTerminalTriggerSql) throw new Error('0006 migration is missing its payment-provider event terminal trigger')
 const wrapSchema = (objects) => ({ success: true, results: [{ results: objects }] })
 const wrapMigrationState = (names) => ({ success: true, results: [{ results: names.map((name) => ({ name })) }] })
 
@@ -65,7 +74,7 @@ function targetObjectsFor(migrationIds) {
         name,
         tbl_name: tableName,
         sql: name === 'payment_provider_events_terminal_immutable' && migrationIds.includes(PAYMENT_METHOD_REVOCATION_MIGRATION_ID)
-          ? "CREATE TRIGGER payment_provider_events_terminal_immutable BEFORE UPDATE ON payment_provider_events WHEN OLD.state IN ('APPLIED','REJECTED') OR (OLD.state = 'RECONCILIATION_REQUIRED' AND NOT (OLD.event_type IN ('mandate_active','mandate_revoked') AND NEW.state = 'RECEIVED' AND NEW.processed_at IS NULL AND NEW.outcome_code IS NULL)) BEGIN SELECT 1; END"
+          ? paymentProviderEventsTerminalTriggerSql.replace(/;$/, '')
           : 'CREATE TRIGGER ' + name + ' BEFORE UPDATE ON ' + tableName + ' BEGIN SELECT 1; END',
       })
     }
