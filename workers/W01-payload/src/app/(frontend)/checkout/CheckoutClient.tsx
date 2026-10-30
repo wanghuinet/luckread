@@ -214,6 +214,9 @@ export default function CheckoutClient({ orderId }: { orderId: string }) {
       ) : null}
       <p>订单金额：{money(intent.amountMinor, intent.currency)}</p>
       <p>订单：{intent.orderId}</p>
+      <p className="mb-2 text-sm leading-6 text-neutral-600 dark:text-neutral-300">
+        可选：勾选支付表单中的“保存付款方式”，即授权 LuckRead 将该付款方式用于后续会员自动续费。未勾选仅完成本次付款；保存后可随时在“订阅管理”中移除并撤销自动扣款授权。
+      </p>
       <div id="luckread-payment-element" aria-label="Hyperswitch 安全支付表单" />
       <p>
         如需将支付方式用于后续周期扣款，请只在 Hyperswitch 托管支付表单明确显示的“保存支付方式”选项中主动勾选授权。
