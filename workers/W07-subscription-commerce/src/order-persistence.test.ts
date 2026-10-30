@@ -18,7 +18,7 @@ type IdemRow = {
   response_status: number | null; response_json: string | null; created_at: string; expires_at: string;
 };
 type Row = Record<string, unknown>;
-type State = { idempotency: IdemRow[]; orders: Row[]; lines: Row[] };
+type State = { idempotency: IdemRow[]; orders: Row[]; lines: Row[]; payments: Row[] };
 
 const clone = <T>(value: T): T => structuredClone(value);
 const scopeKey = (customer: unknown, operation: unknown, key: unknown): string =>
@@ -34,7 +34,7 @@ class MemoryStatement {
 }
 
 class MemoryD1 {
-  state: State = { idempotency: [], orders: [], lines: [] };
+  state: State = { idempotency: [], orders: [], lines: [], payments: [] };
   failOnLineInsert = false;
   firstCalls = 0;
   batchCalls = 0;
@@ -77,7 +77,16 @@ class MemoryD1 {
         return timestamp !== 0 ? timestamp : String(right.order_id).localeCompare(String(left.order_id));
       });
       const limit = Number(hasCursor ? values[4] : values[1]);
-      return { success: true, results: clone(rows.slice(0, limit)) as T[], meta: {} } as D1Result<T[]>;
+      const results = rows.slice(0, limit).map((row) => ({
+        ...row,
+        latest_payment_id: this.state.payments
+          .filter((payment) => payment.order_id === row.order_id && payment.customer_id === row.customer_id)
+          .sort((left, right) => {
+            const created = String(right.created_at).localeCompare(String(left.created_at));
+            return created !== 0 ? created : String(right.payment_id).localeCompare(String(left.payment_id));
+          })[0]?.payment_id ?? null,
+      }));
+      return { success: true, results: clone(results) as T[], meta: {} } as D1Result<T[]>;
     }
     if (!sql.includes('FROM order_lines WHERE order_id = ?')) throw new Error('Unexpected all query: ' + sql);
     const [orderId] = values;
@@ -457,6 +466,11 @@ describe('PAY-002 atomic D1-04 order persistence candidate', () => {
     addOrder('ord_owner_02', 'user_1', '2026-10-26T12:00:00.000Z');
     addOrder('ord_owner_03', 'user_1', '2026-10-27T12:00:00.000Z');
     addOrder('ord_foreign_01', 'user_2', '2026-10-28T12:00:00.000Z');
+    db.state.payments.push(
+      { payment_id: 'pay_' + 'a'.repeat(26), order_id: 'ord_owner_03', customer_id: 'user_1', created_at: '2026-10-27T12:01:00.000Z' },
+      { payment_id: 'pay_' + 'b'.repeat(26), order_id: 'ord_owner_03', customer_id: 'user_1', created_at: '2026-10-27T12:02:00.000Z' },
+      { payment_id: 'pay_' + 'c'.repeat(26), order_id: 'ord_foreign_01', customer_id: 'user_2', created_at: '2026-10-28T12:01:00.000Z' },
+    );
 
     const first = await listCommerceOrders(db as unknown as D1Database, 'user_1', 2);
     expect(first.items.map((item) => item.orderId)).toEqual(['ord_owner_03', 'ord_owner_02']);
@@ -465,6 +479,8 @@ describe('PAY-002 atomic D1-04 order persistence candidate', () => {
     expect(first.items[0]).not.toHaveProperty('customerId');
     expect(first.items[0]).not.toHaveProperty('provider');
     expect(first.items[0]).not.toHaveProperty('items');
+    expect(first.items[0]?.latestPaymentId).toBe('pay_' + 'b'.repeat(26));
+    expect(first.items[1]?.latestPaymentId).toBeNull();
 
     const second = await listCommerceOrders(db as unknown as D1Database, 'user_1', 2, first.nextCursor);
     expect(second.items.map((item) => item.orderId)).toEqual(['ord_owner_01']);
