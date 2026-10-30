@@ -2698,6 +2698,20 @@
       "x-luckread-idempotency": "provider + merchant_id + event_id + payload SHA-256; enforced by the unique D1-04 webhook receipt identity and immutable payload-conflict record, not by an HTTP Idempotency-Key header"
     },
     {
+      "operationId": "receiveRevenueCatWebhook",
+      "auth": {
+        "mode": "public"
+      },
+      "permissions": [],
+      "auditRequired": false,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none",
+      "x-luckread-contract-status": "IMPLEMENTED_SOURCE_ONLY_PENDING_D1_04_MIGRATION_AND_REVENUECAT_CONFIGURATION",
+      "x-luckread-authentication": "Public provider callback. W07 always compares the configured dashboard Authorization value in constant time; when HMAC is enabled, it verifies X-RevenueCat-Webhook-Signature HMAC-SHA256 over the exact raw bytes.",
+      "x-luckread-idempotency": "app_id + event.id + raw payload SHA-256; same payload is an idempotent duplicate, changed payload is retained separately as a durable conflict."
+    },
+    {
       "operationId": "authCredentialReplace",
       "auth": {
         "mode": "permission"
