@@ -23,7 +23,7 @@ type Row = Record<string, unknown>;
 type Order = { order_id: string; customer_id: string; status: string; version: number; currency: string; total_minor: number; has_demo_pricing: number; updated_at: string; confirmed_at: string | null };
 type Payment = {
   payment_id: string; order_id: string; customer_id: string; provider: string; merchant_id: string;
-  amount_minor: number; currency: string; status: PaymentAttemptStatus; version: number;
+  amount_minor: number; amount_captured_minor: number; currency: string; status: PaymentAttemptStatus; version: number;
   idempotency_key: string; request_hash: string; provider_updated_at: string | null;
   failure_code: string | null; created_at: string; updated_at: string;
 };
@@ -418,6 +418,7 @@ function seedPayment(db: MemoryPaymentD1, overrides: Partial<Payment> = {}) {
     provider: 'hyperswitch',
     merchant_id: MERCHANT,
     amount_minor: 1200,
+    amount_captured_minor: 0,
     currency: 'USD',
     status: 'INITIATING',
     version: 1,
