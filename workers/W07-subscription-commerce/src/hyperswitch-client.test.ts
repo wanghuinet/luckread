@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import {
   confirmHyperswitchCustomerInitiatedSetupPayment,
   createHyperswitchCustomerInitiatedSetupIntent,
+  createHyperswitchRefund,
+  retrieveHyperswitchRefund,
   createHyperswitchMerchantInitiatedPayment,
   createHyperswitchPaymentIntent,
   HyperswitchClientError,
@@ -447,4 +449,112 @@ describe('Hyperswitch server-side payment intent client', () => {
     await expect(retrieveHyperswitchPayment(config, input.paymentId, mismatched.fetcher))
       .rejects.toMatchObject({ code: 'UPSTREAM_INVALID_RESPONSE' })
   })
+
+  it('creates a provider refund with a stable merchant refund_id for idempotent retries', async () => {
+    const refundId = 'rfd_123e4567-e89b-42d3-a456-426614174000'
+    const body = {
+      refund_id: refundId,
+      payment_id: input.paymentId,
+      amount: 600,
+      currency: 'USD',
+      status: 'pending',
+      updated: '2026-10-30T10:00:00.000Z',
+    }
+    const fake = fakeFetch(jsonResponse(body))
+    const result = await createHyperswitchRefund(config, {
+      refundId,
+      paymentId: input.paymentId,
+      amount: 600,
+      currency: 'USD',
+      reason: 'Customer request',
+    }, fake.fetcher)
+
+    expect(fake.captured).toHaveLength(1)
+    expect(fake.captured[0].url).toBe('https://sandbox.hyperswitch.io/refunds')
+    expect(fake.captured[0].init.method).toBe('POST')
+    expect(new Headers(fake.captured[0].init.headers).get('api-key')).toBe(config.apiKey)
+    expect(JSON.parse(String(fake.captured[0].init.body))).toEqual({
+      refund_id: refundId,
+      payment_id: input.paymentId,
+      amount: 600,
+      reason: 'Customer request',
+      refund_type: 'instant',
+    })
+    expect(result).toMatchObject({ refundId, paymentId: input.paymentId, amount: 600, currency: 'USD', status: 'pending' })
+  })
+
+  it('rejects invalid refund identifiers and provider responses that mismatch the stable refund request', async () => {
+    const refundId = 'rfd_123e4567-e89b-42d3-a456-426614174000'
+    const invalid = fakeFetch(jsonResponse({}))
+    await expect(createHyperswitchRefund(config, {
+      refundId: 'not-a-refund',
+      paymentId: input.paymentId,
+      amount: 100,
+      currency: 'USD',
+    }, invalid.fetcher)).rejects.toMatchObject({ code: 'REQUEST_INVALID' })
+    expect(invalid.captured).toHaveLength(0)
+
+    for (const mismatch of [
+      { refund_id: 'rfd_different' },
+      { payment_id: 'pay_aaaaaaaaaaaaaaaaaaaaaaaaaa' },
+      { amount: 601 },
+      { currency: 'EUR' },
+      { status: 'unknown' },
+    ]) {
+      const fake = fakeFetch(jsonResponse({
+        refund_id: refundId,
+        payment_id: input.paymentId,
+        amount: 600,
+        currency: 'USD',
+        status: 'pending',
+        ...mismatch,
+      }))
+      await expect(createHyperswitchRefund(config, {
+        refundId,
+        paymentId: input.paymentId,
+        amount: 600,
+        currency: 'USD',
+      }, fake.fetcher)).rejects.toMatchObject({ code: 'UPSTREAM_INVALID_RESPONSE' })
+    }
+  })
+
+  it('retrieves a previously submitted refund by stable refund_id for reconciliation', async () => {
+    const refundId = 'rfd_123e4567-e89b-42d3-a456-426614174000'
+    const fake = fakeFetch(jsonResponse({
+      refund_id: refundId,
+      payment_id: input.paymentId,
+      amount: 600,
+      currency: 'USD',
+      status: 'succeeded',
+      updated: '2026-10-30T10:00:00.000Z',
+    }))
+    const result = await retrieveHyperswitchRefund(config, {
+      refundId,
+      paymentId: input.paymentId,
+      amount: 600,
+      currency: 'USD',
+    }, fake.fetcher)
+    expect(fake.captured[0].url).toBe('https://sandbox.hyperswitch.io/refunds/' + refundId)
+    expect(fake.captured[0].init.method).toBe('GET')
+    expect(result.status).toBe('succeeded')
+  })
+
+  it('exposes only a validated captured amount when the provider payment retrieve includes it', async () => {
+    const fake = fakeFetch(jsonResponse(responsePayment({
+      status: 'succeeded',
+      amount_captured: 900,
+    })))
+    const payment = await retrieveHyperswitchPayment(config, input.paymentId, fake.fetcher)
+    expect(payment.amountCaptured).toBe(900)
+
+    for (const amountCaptured of [-1, 1.5, input.amount + 1, '900']) {
+      const invalid = fakeFetch(jsonResponse(responsePayment({
+        status: 'succeeded',
+        amount_captured: amountCaptured,
+      })))
+      await expect(retrieveHyperswitchPayment(config, input.paymentId, invalid.fetcher))
+        .rejects.toMatchObject({ code: 'UPSTREAM_INVALID_RESPONSE' })
+    }
+  })
+
 })
