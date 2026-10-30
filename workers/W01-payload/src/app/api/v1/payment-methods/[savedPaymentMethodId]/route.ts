@@ -85,7 +85,7 @@ export async function DELETE(request: Request, context: RouteContext): Promise<R
     const idempotencyKey = validateIdempotencyKey(request.headers.get('Idempotency-Key'))
     if (idempotencyKey instanceof Response) return idempotencyKey
     if (request.body !== null) {
-      await request.body.cancel().catch(() => undefined)
+      await request.body.cancel().catch((): void => undefined)
       return errorResponse(400, 'VALIDATION_FAILED', 'Payment method removal does not accept a request body')
     }
 
