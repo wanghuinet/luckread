@@ -81,6 +81,7 @@ describe('RevenueCat read-only subscriber API adapter', () => {
       'https://api.revenuecat.com/v1/subscribers/luckread%2Fuser%20%2B%201',
     );
     expect(requestedInit?.method).toBe('GET');
+    expect(requestedInit?.cache).toBe('no-store');
     expect(new Headers(requestedInit?.headers).get('authorization')).toBe('Bearer sk_server_only_secret');
     expect(new Headers(requestedInit?.headers).get('accept')).toBe('application/json');
     expect(new Headers(requestedInit?.headers).has('x-platform')).toBe(false);
