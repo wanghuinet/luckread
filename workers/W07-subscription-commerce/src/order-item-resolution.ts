@@ -57,6 +57,13 @@ export async function resolveCommerceOrderItems(
   if (!validated.ok) {
     throw new SubscriptionRuntimeError(validated.error.code, validated.error.status);
   }
+  // Beta paid-membership fulfillment is intentionally a single subscription
+  // per Order. Reject multi-plan carts here rather than charging successfully
+  // and discovering after the signed webhook that the fulfillment contract
+  // cannot atomically authorize every line.
+  if (validated.value.items.length !== 1) {
+    throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400);
+  }
 
   const planIds = toPlanIds(validated.value.items);
   const plans = await resolvePurchasableMembershipPlanOffers(db, planIds);
@@ -68,6 +75,12 @@ export async function resolveCommerceOrderItems(
     const plan = planById.get(item.itemRef);
     if (!plan || plan.status !== 'ACTIVE' || plan.visibility !== 'PUBLIC') {
       throw new SubscriptionRuntimeError('RESOURCE_NOT_FOUND', 404);
+    }
+    // This route creates payment intents that require a positive amount and
+    // fulfillment is tied to a verified paid webhook. Zero-price offers need a
+    // separate no-payment activation contract; never create an unpayable order.
+    if (!Number.isSafeInteger(plan.priceMinor) || plan.priceMinor < 1) {
+      throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400);
     }
 
     const snapshot = {

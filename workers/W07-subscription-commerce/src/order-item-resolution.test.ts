@@ -122,7 +122,7 @@ async function expectRuntimeError(
 }
 
 describe('PAY-002 read-only membership offer resolution', () => {
-  it('resolves authoritative current prices/versions and preserves request order with one D1 read', async () => {
+  it('resolves the authoritative current price/version with one D1 read', async () => {
     const a = fixture(planA, {
       current_version: 2,
       versions: [
@@ -130,24 +130,17 @@ describe('PAY-002 read-only membership offer resolution', () => {
         { plan_version: 2, name: 'Current A', tier: 'plus', billing_interval: 'YEARLY', price_minor: 4900, currency: 'USD', benefits_json: JSON.stringify(['Archive']), created_at: at },
       ],
     });
-    const b = fixture(planB, {
-      owner_id: 'creator_456',
-      versions: [
-        { plan_version: 1, name: 'Current B', tier: 'basic', billing_interval: 'MONTHLY', price_minor: 800, currency: 'USD', benefits_json: JSON.stringify(['Posts']), created_at: at },
-      ],
-    });
-    const { db, queries } = fakeDb([a, b]);
+    const { db, queries } = fakeDb([a]);
 
     const result = await resolveCommerceOrderItems(db, {
-      items: [{ itemRef: planB, quantity: 1 }, { itemRef: planA, quantity: 1 }],
+      items: [{ itemRef: planA, quantity: 1 }],
     });
 
     expect(result.currency).toBe('USD');
     expect(result.items.map((item) => [item.itemRef, item.itemVersion, item.unitAmountMinor])).toEqual([
-      [planB, '1', 800],
       [planA, '2', 4900],
     ]);
-    expect(JSON.parse(result.items[1]!.itemSnapshotJson)).toMatchObject({
+    expect(JSON.parse(result.items[0]!.itemSnapshotJson)).toMatchObject({
       planId: planA,
       planVersion: 2,
       creatorId: 'creator_123',
@@ -160,7 +153,7 @@ describe('PAY-002 read-only membership offer resolution', () => {
     expect(queries[0]!.sql).toContain("p.owner_type = 'CREATOR'");
     expect(queries[0]!.sql).toContain("p.status = 'ACTIVE'");
     expect(queries[0]!.sql).toContain("p.visibility = 'PUBLIC'");
-    expect(queries[0]!.values).toEqual([planB, planA]);
+    expect(queries[0]!.values).toEqual([planA]);
   });
 
   it('normalizes D1/schema read failures without exposing database details', async () => {
@@ -212,6 +205,33 @@ describe('PAY-002 read-only membership offer resolution', () => {
     expect(queries).toHaveLength(0);
   });
 
+  it('rejects multi-plan orders before charging because Beta fulfills one subscription per order', async () => {
+    const { db, queries } = fakeDb([fixture(planA), fixture(planB)]);
+    await expectRuntimeError(
+      () => resolveCommerceOrderItems(db, {
+        items: [{ itemRef: planA, quantity: 1 }, { itemRef: planB, quantity: 1 }],
+      }),
+      'VALIDATION_FAILED',
+      400,
+    );
+    expect(queries).toHaveLength(0);
+  });
+
+  it('rejects a membership plus non-membership line before D1 reads because Beta fulfillment only supports a single-line order', async () => {
+    const { db, queries } = fakeDb([fixture(planA)]);
+    await expectRuntimeError(
+      () => resolveCommerceOrderItems(db, {
+        items: [
+          { itemRef: planA, quantity: 1 },
+          { itemRef: 'content_post_123', quantity: 1 },
+        ],
+      }),
+      'VALIDATION_FAILED',
+      400,
+    );
+    expect(queries).toHaveLength(0);
+  });
+
   it('rejects client-supplied price, currency and unknown fields before reading D1', async () => {
     const { db, queries } = fakeDb([fixture(planA)]);
     await expectRuntimeError(
@@ -247,7 +267,7 @@ describe('PAY-002 read-only membership offer resolution', () => {
     );
   });
 
-  it('allows a zero-priced offer as pricing data only; it does not create or confirm anything', async () => {
+  it('rejects zero-priced offers on the paid checkout path because no positive payment can be confirmed', async () => {
     const free = fixture(planA, {
       versions: [{
         plan_version: 1,
@@ -261,11 +281,13 @@ describe('PAY-002 read-only membership offer resolution', () => {
       }],
     });
     const { db, queries } = fakeDb([free]);
-    const result = await resolveCommerceOrderItems(db, { items: [{ itemRef: planA, quantity: 1 }] });
-    expect(result.items[0]!.unitAmountMinor).toBe(0);
+    await expectRuntimeError(
+      () => resolveCommerceOrderItems(db, { items: [{ itemRef: planA, quantity: 1 }] }),
+      'VALIDATION_FAILED',
+      400,
+    );
     expect(queries).toHaveLength(1);
   });
-
   it('rejects mixed-currency items rather than silently converting or aggregating them', async () => {
     const eur = fixture(planB, {
       versions: [{

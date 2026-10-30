@@ -8,6 +8,7 @@ import {
 } from './payment-persistence.js';
 import type { ReceiveHyperswitchWebhookInput } from './payment-persistence.js';
 import type { RenewalOutcomeSyncResult } from './subscription-renewal-outcome.js';
+import type { PaidMembershipPurchaseFulfillmentResult } from './paid-membership-order-fulfillment.js';
 
 const SECRET = 'hyperswitch-webhook-test-secret';
 const MERCHANT = 'merchant_test';
@@ -32,10 +33,12 @@ function fixture(options: {
   error?: Error;
   syncResult?: RenewalOutcomeSyncResult;
   pendingRecoveryResult?: Readonly<{ scanned: number; applied: number; reconciliationRequired: number; pendingRetry: number }>;
+  purchaseFulfillmentResult?: PaidMembershipPurchaseFulfillmentResult;
 } = {}) {
   const calls: Array<{ db: unknown; input: ReceiveHyperswitchWebhookInput }> = [];
   const syncCalls: Array<{ env: unknown; paymentId: string; merchantId: string }> = [];
   const pendingRecoveryCalls: Array<{ env: unknown; options?: Readonly<{ limit?: number }> }> = [];
+  const purchaseFulfillmentCalls: Array<{ env: unknown; paymentId: string; merchantId: string }> = [];
   const receive: Receiver = async (db, input) => {
     calls.push({ db, input });
     if (options.error) throw options.error;
@@ -56,13 +59,21 @@ function fixture(options: {
     pendingRecoveryCalls.push({ env, options: recoveryOptions });
     return options.pendingRecoveryResult ?? { scanned: 0, applied: 0, reconciliationRequired: 0, pendingRetry: 0 };
   };
+  const fulfillPaidOrder = async (
+    env: { D1_01: D1Database; D1_04: D1Database },
+    paymentId: string,
+    merchantId: string,
+  ): Promise<PaidMembershipPurchaseFulfillmentResult> => {
+    purchaseFulfillmentCalls.push({ env, paymentId, merchantId });
+    return options.purchaseFulfillmentResult ?? { outcome: 'NOT_APPLICABLE', fulfilledCount: 0 };
+  };
   const env = {
     D1_01: { marker: 'd1-01' } as unknown as D1Database,
     D1_04: { marker: 'd1-04' } as unknown as D1Database,
     HYPERSWITCH_WEBHOOK_SECRET: SECRET,
     HYPERSWITCH_MERCHANT_ID: MERCHANT,
   };
-  return { env, calls, syncCalls, pendingRecoveryCalls, dependencies: { receive, syncRenewalOutcome, syncPendingOutcomes } };
+  return { env, calls, syncCalls, pendingRecoveryCalls, purchaseFulfillmentCalls, dependencies: { receive, syncRenewalOutcome, syncPendingOutcomes, fulfillPaidOrder } };
 }
 
 function request(options: {
@@ -202,6 +213,124 @@ describe('W07 Hyperswitch webhook HTTP receiver', () => {
         pendingRenewalRecovery: { scanned: 10, applied: 8, reconciliationRequired: 1, pendingRetry: 1 },
       },
     });
+  });
+
+  it('fulfills an initial membership purchase only after a verified payment_succeeded receipt has no renewal cycle', async () => {
+    const f = fixture({
+      result: receipt('APPLIED'),
+      syncResult: { cycleId: '', outcome: 'NO_RENEWAL_CYCLE' },
+      purchaseFulfillmentResult: { outcome: 'APPLIED', fulfilledCount: 1 },
+    });
+    const paymentId = 'pay_' + 'c'.repeat(26);
+    const body = JSON.stringify({
+      event_id: 'evt_test_001',
+      event_type: 'payment_succeeded',
+      merchant_id: MERCHANT,
+      content_type: 'payment_details',
+      resource: { payment_id: paymentId },
+    });
+    const response = await handleHyperswitchWebhookRequest(
+      request({ body, signature: 'signed-provider-event' }),
+      f.env,
+      f.dependencies,
+    );
+
+    expect(response?.status).toBe(200);
+    expect(f.purchaseFulfillmentCalls).toHaveLength(1);
+    expect(f.purchaseFulfillmentCalls[0]).toMatchObject({
+      env: { D1_01: f.env.D1_01, D1_04: f.env.D1_04 },
+      paymentId,
+      merchantId: MERCHANT,
+    });
+    expect(await response?.json()).toMatchObject({
+      data: {
+        subscriptionSync: 'NO_RENEWAL_CYCLE',
+        membershipPurchaseFulfillment: { outcome: 'APPLIED', fulfilledCount: 1 },
+      },
+    });
+  });
+
+  it('retries initial membership fulfillment from a duplicate signed success event', async () => {
+    const f = fixture({
+      result: receipt('DUPLICATE'),
+      syncResult: { cycleId: '', outcome: 'NO_RENEWAL_CYCLE' },
+      purchaseFulfillmentResult: { outcome: 'ALREADY_APPLIED', fulfilledCount: 1 },
+    });
+    const paymentId = 'pay_' + 'e'.repeat(26);
+    const body = JSON.stringify({
+      event_id: 'evt_test_replayed',
+      event_type: 'payment_succeeded',
+      merchant_id: MERCHANT,
+      content_type: 'payment_details',
+      resource: { payment_id: paymentId },
+    });
+    const response = await handleHyperswitchWebhookRequest(
+      request({ body, signature: 'signed-provider-event' }),
+      f.env,
+      f.dependencies,
+    );
+
+    expect(response?.status).toBe(200);
+    expect(f.purchaseFulfillmentCalls).toHaveLength(1);
+    expect(f.purchaseFulfillmentCalls[0]).toMatchObject({ paymentId, merchantId: MERCHANT });
+    await expect(response?.json()).resolves.toMatchObject({
+      data: {
+        outcome: 'DUPLICATE',
+        subscriptionSync: 'NO_RENEWAL_CYCLE',
+        membershipPurchaseFulfillment: { outcome: 'ALREADY_APPLIED', fulfilledCount: 1 },
+      },
+    });
+  });
+
+  it('returns retryable service unavailable when paid-order fulfillment fails after payment was durably accepted', async () => {
+    const f = fixture({
+      result: receipt('APPLIED'),
+      syncResult: { cycleId: '', outcome: 'NO_RENEWAL_CYCLE' },
+    });
+    f.dependencies.fulfillPaidOrder = async () => {
+      throw new Error('temporary D1-01 write failure');
+    };
+    const body = JSON.stringify({
+      event_id: 'evt_test_fulfillment_retry',
+      event_type: 'payment_succeeded',
+      merchant_id: MERCHANT,
+      content_type: 'payment_details',
+      resource: { payment_id: 'pay_' + 'f'.repeat(26) },
+    });
+    const response = await handleHyperswitchWebhookRequest(
+      request({ body, signature: 'signed-provider-event' }),
+      f.env,
+      f.dependencies,
+    );
+
+    expect(response?.status).toBe(503);
+    await expect(response?.json()).resolves.toMatchObject({
+      error: { code: 'SERVICE_UNAVAILABLE' },
+    });
+  });
+
+  it('does not fulfill an ordinary failed payment as an initial membership purchase', async () => {
+    const f = fixture({
+      result: receipt('APPLIED'),
+      syncResult: { cycleId: '', outcome: 'NO_RENEWAL_CYCLE' },
+      purchaseFulfillmentResult: { outcome: 'APPLIED', fulfilledCount: 1 },
+    });
+    const body = JSON.stringify({
+      event_id: 'evt_test_001',
+      event_type: 'payment_failed',
+      merchant_id: MERCHANT,
+      content_type: 'payment_details',
+      resource: { payment_id: 'pay_' + 'd'.repeat(26) },
+    });
+    const response = await handleHyperswitchWebhookRequest(
+      request({ body, signature: 'signed-provider-event' }),
+      f.env,
+      f.dependencies,
+    );
+
+    expect(response?.status).toBe(200);
+    expect(f.syncCalls).toHaveLength(1);
+    expect(f.purchaseFulfillmentCalls).toHaveLength(0);
   });
 
   it('does not scan pending renewal outcomes for an ordinary payment with no renewal cycle', async () => {

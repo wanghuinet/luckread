@@ -10,6 +10,10 @@ import {
   syncPendingRenewalOutcomes,
   type RenewalOutcomeSyncResult,
 } from './subscription-renewal-outcome.js';
+import {
+  fulfillPaidMembershipOrder,
+  type PaidMembershipPurchaseFulfillmentResult,
+} from './paid-membership-order-fulfillment.js';
 
 type HyperswitchWebhookRuntimeEnv = Readonly<{
   D1_01: D1Database;
@@ -36,6 +40,7 @@ type HyperswitchWebhookRuntimeDependencies = Readonly<{
     env: Readonly<{ D1_01: D1Database; D1_04: D1Database }>,
     options?: Readonly<{ limit?: number }>,
   ) => Promise<RenewalPendingRecoveryResult>;
+  fulfillPaidOrder?: typeof fulfillPaidMembershipOrder;
 }>;
 
 const MAX_WEBHOOK_BODY_BYTES = 1024 * 1024;
@@ -103,6 +108,7 @@ function receiptResponse(
   result: WebhookReceiptResult,
   subscriptionSync?: RenewalOutcomeSyncResult,
   pendingRecovery?: RenewalPendingRecoveryResult,
+  purchaseFulfillment?: PaidMembershipPurchaseFulfillmentResult,
 ): Response {
   // D1-04 receipt application and D1-01 subscription synchronization are a
   // retryable saga. A durable receipt can be acknowledged as 202 when the
@@ -128,11 +134,27 @@ function receiptResponse(
           ...(subscriptionSync.subscriptionId ? { subscriptionId: subscriptionSync.subscriptionId } : {}),
         } : {}),
         ...(pendingRecovery ? { pendingRenewalRecovery: pendingRecovery } : {}),
+        ...(purchaseFulfillment ? {
+          membershipPurchaseFulfillment: {
+            outcome: purchaseFulfillment.outcome,
+            fulfilledCount: purchaseFulfillment.fulfilledCount,
+          },
+        } : {}),
       },
       requestId: 'req_' + crypto.randomUUID(),
     },
     { status, headers: { 'cache-control': 'no-store' } },
   );
+}
+
+function isSignedPaymentSucceededEvent(rawBody: ArrayBuffer): boolean {
+  try {
+    const parsed: unknown = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(rawBody));
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return false;
+    return (parsed as Record<string, unknown>).event_type === 'payment_succeeded';
+  } catch {
+    return false;
+  }
 }
 
 function paymentIdFromSignedPayload(rawBody: ArrayBuffer): string | null {
@@ -204,6 +226,7 @@ export async function handleHyperswitchWebhookRequest(
     // may the same signed payload identify a renewal cycle for D1-01 sync.
     let subscriptionSync: RenewalOutcomeSyncResult | undefined;
     let pendingRecovery: RenewalPendingRecoveryResult | undefined;
+    let purchaseFulfillment: PaidMembershipPurchaseFulfillmentResult | undefined;
     const paymentId = (result.outcome === 'APPLIED' || result.outcome === 'DUPLICATE')
       ? paymentIdFromSignedPayload(rawBody)
       : null;
@@ -216,6 +239,15 @@ export async function handleHyperswitchWebhookRequest(
         env.HYPERSWITCH_MERCHANT_ID,
       );
 
+      // Initial creator-membership purchases have no renewal-cycle row. Only a
+      // verified payment_succeeded event may fulfill one, and fulfillment reads
+      // the durable D1-04 Payment + Order + immutable OrderLine snapshot before
+      // performing an idempotent scoped transition in D1-01.
+      if (subscriptionSync.outcome === 'NO_RENEWAL_CYCLE' && isSignedPaymentSucceededEvent(rawBody)) {
+        const fulfill = dependencies.fulfillPaidOrder ?? fulfillPaidMembershipOrder;
+        purchaseFulfillment = await fulfill(renewalEnv, paymentId, env.HYPERSWITCH_MERCHANT_ID);
+      }
+
       // A verified terminal renewal payment is an existing, trusted execution
       // opportunity to drain a small bounded batch of older D1-04 -> D1-01
       // outcome-sync work. This is recovery only: it does not schedule new
@@ -225,7 +257,7 @@ export async function handleHyperswitchWebhookRequest(
         pendingRecovery = await recover(renewalEnv, { limit: 10 });
       }
     }
-    return receiptResponse(result, subscriptionSync, pendingRecovery);
+    return receiptResponse(result, subscriptionSync, pendingRecovery, purchaseFulfillment);
   } catch (error) {
     if (error instanceof PaymentPersistenceError) {
       if (error.code === 'INVALID_SIGNATURE') {

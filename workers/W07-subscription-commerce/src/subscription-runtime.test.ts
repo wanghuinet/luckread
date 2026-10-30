@@ -544,9 +544,9 @@ describe('subscription runtime', () => {
     const after = await transitionSubscription(db, 'user_1', 'sub_existing', 'pause', before.etag)
     expect(Date.parse(after.updatedAt)).toBe(Date.parse(before.updatedAt) + 1)
   })
-  it('changes plan only to an active authoritative version and updates the creator reference', async () => {
+  it('changes plan only within the same creator and preserves the authoritative creator reference', async () => {
     const db = fakeDb([baseRow({ creator_id: 'creator_1' })], [activePlan('plan_pro', { current_version: 7, owner_id: 'creator_1' })]); const before = await getSubscription(db, 'user_1', 'sub_existing'); const after = await changeSubscriptionPlan(db, 'user_1', 'sub_existing', 'plan_pro', before.etag)
-    expect(after.planId).toBe('plan_pro'); expect(after.planVersion).toBe(7); expect(after.creatorId).toBe('creator_pro'); expect(after.status).toBe('ACTIVE'); expect(after.version).toBe(before.version + 1); expect(after.etag).toBe(etagForVersion(2))
+    expect(after.planId).toBe('plan_pro'); expect(after.planVersion).toBe(7); expect(after.creatorId).toBe('creator_1'); expect(after.status).toBe('ACTIVE'); expect(after.version).toBe(before.version + 1); expect(after.etag).toBe(etagForVersion(2))
   })
 
   it('refuses a plan change to a missing or unavailable plan', async () => {

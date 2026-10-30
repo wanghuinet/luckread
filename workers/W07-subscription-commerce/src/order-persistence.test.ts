@@ -362,7 +362,7 @@ describe('PAY-002 atomic D1-04 order persistence candidate', () => {
     expect(await getCommerceOrder(db as unknown as D1Database, 'user_1', created.data.orderId)).toEqual(created.data);
   });
 
-  it('rejects a persisted zero-value order whose order lines have disappeared', async () => {
+  it('rejects a zero-value checkout before persisting an order', async () => {
     const db = new MemoryD1();
     const zeroPricing: typeof pricingFor = async (req) => ({
       currency: 'USD',
@@ -378,12 +378,38 @@ describe('PAY-002 atomic D1-04 order persistence candidate', () => {
         itemSnapshotJson: JSON.stringify({ planId: item.itemRef, planVersion: 1 }),
       })),
     });
-    const created = await createCommerceOrder(db as unknown as D1Database, 'user_1', 'zero_key',
-      request, zeroPricing, deterministicDependencies('zero'));
-    expect(created.data.totalMinor).toBe(0);
-    db.state.lines = [];
+    const error = await createCommerceOrder(db as unknown as D1Database, 'user_1', 'zero_key',
+      request, zeroPricing, deterministicDependencies('zero')).then(() => null, (e: unknown) => e);
 
-    const error = await getCommerceOrder(db as unknown as D1Database, 'user_1', created.data.orderId)
+    // Zero-charge entitlements require a separate fulfillment contract; this
+    // Beta checkout flow must reject before writing an Order or OrderLines.
+    expect(errorCode(error)).toBe('CONFLICT');
+    expect(db.state.orders).toHaveLength(0);
+    expect(db.state.lines).toHaveLength(0);
+  });
+
+  it('rejects a persisted order whose order lines have disappeared', async () => {
+    const db = new MemoryD1();
+    // Simulate legacy/corrupt persisted state without going through the current
+    // create path, which correctly rejects zero-value checkout orders.
+    db.state.orders.push({
+      order_id: 'legacy_zero_order',
+      customer_id: 'user_1',
+      status: 'CREATED',
+      version: 1,
+      currency: 'USD',
+      subtotal_minor: 0,
+      discount_minor: 0,
+      tax_minor: 0,
+      total_minor: 0,
+      created_at: '2026-10-28T12:00:00.000Z',
+      updated_at: '2026-10-28T12:00:00.000Z',
+      confirmed_at: null,
+      cancelled_at: null,
+      failure_code: null,
+    });
+
+    const error = await getCommerceOrder(db as unknown as D1Database, 'user_1', 'legacy_zero_order')
       .then(() => null, (e: unknown) => e);
     expect(errorCode(error)).toBe('INTEGRITY_VIOLATION');
   });
