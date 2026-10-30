@@ -547,11 +547,13 @@ export async function retrieveHyperswitchPayment(
   config: HyperswitchClientConfig,
   paymentId: string,
   fetchImpl: typeof fetch = fetch,
+  forceSync = false,
 ): Promise<HyperswitchPayment> {
   if (typeof paymentId !== 'string' || !PAYMENT_ID_PATTERN.test(paymentId)) {
     throw new HyperswitchClientError('REQUEST_INVALID', 'Payment ID must be the stable 30-character Hyperswitch payment identifier.');
   }
-  const payment = await requestPayment(config, `/payments/${encodeURIComponent(paymentId)}`, {
+  const path = `/payments/${encodeURIComponent(paymentId)}` + (forceSync ? '?force_sync=true' : '');
+  const payment = await requestPayment(config, path, {
     method: 'GET',
   }, fetchImpl);
   if (payment.paymentId !== paymentId) {
