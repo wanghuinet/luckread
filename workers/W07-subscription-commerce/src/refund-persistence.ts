@@ -86,7 +86,7 @@ export type RefundPersistenceDependencies = Readonly<{
 
 const PROVIDER = 'hyperswitch';
 const PAYMENT_ID_PATTERN = /^pay_[A-Za-z0-9]{26}$/;
-const REFUND_ID_PATTERN = /^rfd_[A-Za-z0-9-]{36}$/;
+const REFUND_ID_PATTERN = /^ref_[A-Za-z0-9]{26}$/;
 const IDEMPOTENCY_KEY_PATTERN = /^[A-Za-z0-9_-]{1,128}$/;
 const CURRENCY_PATTERN = /^[A-Z]{3}$/;
 
@@ -114,7 +114,7 @@ function nextTimestamp(now: string, previous: string): string {
 }
 
 function defaultRefundId(): string {
-  return 'rfd_' + crypto.randomUUID();
+  return 'ref_' + crypto.randomUUID().replace(/-/g, '').slice(0, 26);
 }
 
 function toDto(row: RefundRow): RefundDto {
@@ -214,7 +214,7 @@ export async function createRefundReservation(
   if (!PAYMENT_ID_PATTERN.test(input.paymentId)) {
     throw new RefundPersistenceError('VALIDATION_FAILED', 400);
   }
-  if (!safeMinor(input.amountMinor) || !safeMinor(input.capturedAmountMinor)) {
+  if (!safeMinor(input.amountMinor) || input.amountMinor < 100 || !safeMinor(input.capturedAmountMinor)) {
     throw new RefundPersistenceError('VALIDATION_FAILED', 400);
   }
   if (!CURRENCY_PATTERN.test(input.currency) || !nonBlank(input.expectedMerchantId, 256)) {
