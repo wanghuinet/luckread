@@ -655,6 +655,7 @@ async function requestHyperswitchJson(
   method: 'GET' | 'POST' | 'DELETE',
   fetchImpl: typeof fetch,
   body?: Readonly<Record<string, unknown>>,
+  idempotencyKey?: string,
 ): Promise<Record<string, unknown>> {
   const { baseUrl, apiKey, expectedMerchantId } = resolveConfig(config)
   let response: Response
@@ -667,6 +668,7 @@ async function requestHyperswitchJson(
         'api-key': apiKey,
         accept: 'application/json',
         ...(method === 'POST' ? { 'content-type': 'application/json' } : {}),
+        ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}),
       },
       ...(body ? { body: JSON.stringify(body) } : {}),
     })
@@ -884,7 +886,7 @@ export async function createHyperswitchRefund(
     amount: input.amount,
     refund_type: 'instant',
     ...(input.reason !== undefined ? { reason: input.reason } : {}),
-  })
+  }, input.refundId)
   return normalizeHyperswitchRefund(value, input)
 }
 
