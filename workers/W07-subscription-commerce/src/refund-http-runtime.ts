@@ -164,6 +164,14 @@ export async function handleCommerceRefundRequest(
     return new Response(null, { status: 405, headers: { Allow: 'POST', 'cache-control': 'no-store' } });
   }
 
+  const idempotencyKey = request.headers.get('Idempotency-Key');
+  if (idempotencyKey === null || idempotencyKey.trim() === '') {
+    return errorResponse(428, 'PRECONDITION_REQUIRED', 'Idempotency-Key is required');
+  }
+  if (!/^[A-Za-z0-9_-]{1,128}$/.test(idempotencyKey)) {
+    return errorResponse(400, 'VALIDATION_FAILED', 'Idempotency-Key is invalid');
+  }
+
   try {
     const input = await readBody(request);
     if (
@@ -220,7 +228,7 @@ export async function handleCommerceRefundRequest(
       amountMinor: input.amountMinor,
       currency: input.currency,
       capturedAmountMinor: providerPayment.amountCaptured,
-      idempotencyKey: request.headers.get('Idempotency-Key'),
+      idempotencyKey,
       reason: typeof input.reason === 'string' ? input.reason : null,
       expectedMerchantId: config.expectedMerchantId as string,
     });
