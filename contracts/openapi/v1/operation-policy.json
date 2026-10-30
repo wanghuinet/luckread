@@ -2777,36 +2777,6 @@
       "optimisticLockRequired": true,
       "idempotencyRequired": true,
       "stateMachine": "none"
-    },
-    {
-      "operationId": "postPaymentsPaymentIdRefunds",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "order.refund.self"
-      ],
-      "auditRequired": false,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": true,
-      "stateMachine": "refund",
-      "x-luckread-contract-status": "IMPLEMENTATION_CANDIDATE_PENDING_VERIFICATION",
-      "x-luckread-source": "contracts/transport/W01-W07-membership-commerce-http-binding.v1.json"
-    },
-    {
-      "operationId": "getRefundsRefundId",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "order.read"
-      ],
-      "auditRequired": false,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": false,
-      "stateMachine": "refund",
-      "x-luckread-contract-status": "IMPLEMENTATION_CANDIDATE_PENDING_VERIFICATION",
-      "x-luckread-source": "contracts/transport/W01-W07-membership-commerce-http-binding.v1.json"
     }
   ]
 }
