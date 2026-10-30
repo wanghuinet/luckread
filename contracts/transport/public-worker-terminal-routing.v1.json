@@ -78,7 +78,8 @@
         "/api/v1/memberships/subscriptions/*",
         "/api/v1/commerce/orders",
         "/api/v1/commerce/orders/*",
-        "/api/v1/payments/intents"
+        "/api/v1/payments/intents",
+        "/api/v1/payments/{paymentId}"
       ],
       "ingressWorker": "W01",
       "terminalWorker": "W07",
