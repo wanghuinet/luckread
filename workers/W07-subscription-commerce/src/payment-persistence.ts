@@ -313,6 +313,72 @@ function toDto(row: PaymentRow): PaymentAttemptDto {
   };
 }
 
+const PAYMENT_ATTEMPT_STATUSES = new Set<PaymentAttemptStatus>([
+  'INITIATING',
+  'requires_payment_method',
+  'requires_confirmation',
+  'requires_customer_action',
+  'requires_merchant_action',
+  'requires_capture',
+  'processing',
+  'succeeded',
+  'failed',
+  'cancelled',
+  'cancelled_post_capture',
+  'partially_captured',
+  'partially_captured_and_capturable',
+  'expired',
+]);
+
+function isCanonicalPaymentTimestamp(value: unknown): value is string {
+  return typeof value === 'string' && value.length <= 64 &&
+    Number.isFinite(Date.parse(value)) && new Date(value).toISOString() === value;
+}
+
+/**
+ * Owner-scoped read of the persisted Payment record. Provider/merchant,
+ * amount, currency, timestamps and status are verified before any value is
+ * returned. Payment IDs are not authorization credentials.
+ */
+export async function getPaymentAttempt(
+  db: D1Database,
+  customerIdInput: string,
+  paymentIdInput: string,
+): Promise<PaymentAttemptDto> {
+  if (!nonBlank(customerIdInput, 256) || !PAYMENT_ID_PATTERN.test(paymentIdInput)) {
+    throw new PaymentPersistenceError('VALIDATION_FAILED', 400);
+  }
+
+  let row: PaymentRow | null;
+  try {
+    row = await db.prepare(
+      'SELECT payment_id, order_id, customer_id, provider, merchant_id, amount_minor, currency, status, version, ' +
+      'idempotency_key, request_hash, provider_updated_at, failure_code, created_at, updated_at ' +
+      'FROM payments WHERE payment_id = ? AND customer_id = ? LIMIT 1',
+    ).bind(paymentIdInput, customerIdInput).first<PaymentRow>();
+  } catch {
+    throw new PaymentPersistenceError('SERVICE_UNAVAILABLE', 503);
+  }
+  if (!row) throw new PaymentPersistenceError('RESOURCE_NOT_FOUND', 404);
+
+  if (
+    row.payment_id !== paymentIdInput ||
+    row.customer_id !== customerIdInput ||
+    row.provider !== PROVIDER ||
+    !nonBlank(row.merchant_id, 256) ||
+    !safeMinor(row.amount_minor) ||
+    typeof row.currency !== 'string' || !CURRENCY_PATTERN.test(row.currency) ||
+    !PAYMENT_ATTEMPT_STATUSES.has(row.status) ||
+    !Number.isSafeInteger(row.version) || row.version < 1 ||
+    !(row.provider_updated_at === null || isCanonicalPaymentTimestamp(row.provider_updated_at)) ||
+    !isCanonicalPaymentTimestamp(row.created_at) ||
+    !isCanonicalPaymentTimestamp(row.updated_at)
+  ) {
+    throw new PaymentPersistenceError('INTEGRITY_VIOLATION', 500);
+  }
+  return toDto(row);
+}
+
 async function readPaymentByCustomerAndKey(
   db: D1Database,
   customerId: string,
