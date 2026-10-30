@@ -235,7 +235,7 @@ class D104OrderMigrationTests(unittest.TestCase):
             """INSERT INTO refunds(refund_id,provider,merchant_id,customer_id,order_id,payment_id,
                amount_minor,captured_amount_minor,currency,status,reason,idempotency_key,request_hash,
                created_at,updated_at)
-               VALUES('rfd_1','hyperswitch','merchant_1','user_1','ord_1',?,300,?,'USD','PENDING',
+               VALUES('ref_11111111111111111111111111','hyperswitch','merchant_1','user_1','ord_1',?,300,?,'USD','PENDING',
                       'partial 1','refund_key_1',?, ?, ?)""",
             ("pay_" + "a"*26, captured, "d"*64, NOW, NOW),
         )
@@ -243,7 +243,7 @@ class D104OrderMigrationTests(unittest.TestCase):
             """INSERT INTO refunds(refund_id,provider,merchant_id,customer_id,order_id,payment_id,
                amount_minor,captured_amount_minor,currency,status,reason,idempotency_key,request_hash,
                created_at,updated_at)
-               VALUES('rfd_2','hyperswitch','merchant_1','user_1','ord_1',?,400,?,'USD','PENDING',
+               VALUES('ref_22222222222222222222222222','hyperswitch','merchant_1','user_1','ord_1',?,400,?,'USD','PENDING',
                       'partial 2','refund_key_2',?, ?, ?)""",
             ("pay_" + "a"*26, captured, "e"*64, NOW, NOW),
         )
@@ -252,29 +252,29 @@ class D104OrderMigrationTests(unittest.TestCase):
                 """INSERT INTO refunds(refund_id,provider,merchant_id,customer_id,order_id,payment_id,
                    amount_minor,captured_amount_minor,currency,status,idempotency_key,request_hash,
                    created_at,updated_at)
-                   VALUES('rfd_over','hyperswitch','merchant_1','user_1','ord_1',?,1,?,'USD','REQUESTED',
+                   VALUES('ref_33333333333333333333333333','hyperswitch','merchant_1','user_1','ord_1',?,1,?,'USD','REQUESTED',
                           'refund_key_over',?, ?, ?)""",
                 ("pay_" + "a"*26, captured, "f"*64, NOW, NOW),
             )
         self.db.execute(
-            "UPDATE refunds SET status='FAILED',version=2,updated_at=? WHERE refund_id='rfd_1'",
+            "UPDATE refunds SET status='FAILED',version=2,updated_at=? WHERE refund_id='ref_11111111111111111111111111'",
             (LATER,),
         )
         self.db.execute(
             """INSERT INTO refunds(refund_id,provider,merchant_id,customer_id,order_id,payment_id,
                amount_minor,captured_amount_minor,currency,status,idempotency_key,request_hash,
                created_at,updated_at)
-               VALUES('rfd_retry','hyperswitch','merchant_1','user_1','ord_1',?,300,?,'USD','REQUESTED',
+               VALUES('ref_44444444444444444444444444','hyperswitch','merchant_1','user_1','ord_1',?,300,?,'USD','REQUESTED',
                       'refund_key_retry',?, ?, ?)""",
             ("pay_" + "a"*26, captured, "a"*64, NOW, NOW),
         )
         with self.assertRaises(sqlite3.IntegrityError):
-            self.db.execute("DELETE FROM refunds WHERE refund_id='rfd_2'")
+            self.db.execute("DELETE FROM refunds WHERE refund_id='ref_22222222222222222222222222'")
 
     def test_refund_idempotency_unique_and_provider_status_monotonic(self):
         self.order(status="PENDING_PAYMENT")
         self.payment(status="succeeded")
-        values = ("rfd_1","hyperswitch","merchant_1","user_1","ord_1","pay_" + "a"*26,
+        values = ("ref_11111111111111111111111111","hyperswitch","merchant_1","user_1","ord_1","pay_" + "a"*26,
                   250,500,"USD","PENDING","customer request","refund_key_1","a"*64,NOW,NOW)
         self.db.execute(
             """INSERT INTO refunds(refund_id,provider,merchant_id,customer_id,order_id,payment_id,
@@ -287,20 +287,20 @@ class D104OrderMigrationTests(unittest.TestCase):
                 """INSERT INTO refunds(refund_id,provider,merchant_id,customer_id,order_id,payment_id,
                    amount_minor,captured_amount_minor,currency,status,reason,idempotency_key,request_hash,
                    created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                ("rfd_2",)+values[1:],
+                ("ref_22222222222222222222222222",)+values[1:],
             )
         self.db.execute(
-            "UPDATE refunds SET status='SUCCEEDED',provider_updated_at=?,version=2,updated_at=? WHERE refund_id='rfd_1'",
+            "UPDATE refunds SET status='SUCCEEDED',provider_updated_at=?,version=2,updated_at=? WHERE refund_id='ref_11111111111111111111111111'",
             ("2026-10-28T00:00:01.000Z",LATER),
         )
         with self.assertRaises(sqlite3.IntegrityError):
             self.db.execute(
-                "UPDATE refunds SET status='FAILED',provider_updated_at=?,version=3,updated_at=? WHERE refund_id='rfd_1'",
+                "UPDATE refunds SET status='FAILED',provider_updated_at=?,version=3,updated_at=? WHERE refund_id='ref_11111111111111111111111111'",
                 ("2026-10-28T00:00:02.000Z","2026-10-28T00:00:02.000Z"),
             )
         with self.assertRaises(sqlite3.IntegrityError):
             self.db.execute(
-                "UPDATE refunds SET provider_updated_at=?,version=3,updated_at=? WHERE refund_id='rfd_1'",
+                "UPDATE refunds SET provider_updated_at=?,version=3,updated_at=? WHERE refund_id='ref_11111111111111111111111111'",
                 ("2026-10-28T00:00:01.000Z","2026-10-28T00:00:02.000Z"),
             )
 
