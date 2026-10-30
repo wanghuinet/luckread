@@ -374,6 +374,13 @@ type PaymentMethodRevocationRequestAuditInput = {
   idempotencyKey: string
 }
 
+type PaymentRefundRequestAuditInput = {
+  eventId: string
+  paymentId: string
+  amountMinor: number
+  idempotencyKey: string
+}
+
 type CommerceOrderAuditInput = {
   eventId: string
   orderId: string
@@ -548,6 +555,23 @@ function parsePaymentMethodRevocationRequestAuditInput(value: unknown): PaymentM
     typeof body.idempotencyKey !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(body.idempotencyKey)
   ) throw new Error('INVALID_PAYMENT_METHOD_REVOCATION_REQUEST_AUDIT')
   return body as PaymentMethodRevocationRequestAuditInput
+}
+
+function parsePaymentRefundRequestAuditInput(value: unknown): PaymentRefundRequestAuditInput {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('INVALID_PAYMENT_REFUND_REQUEST_AUDIT')
+  const body = value as Record<string, unknown>
+  const allowed = new Set(['eventId', 'paymentId', 'amountMinor', 'idempotencyKey'])
+  if (Object.keys(body).some((key) => !allowed.has(key)) || Object.keys(body).length !== allowed.size) {
+    throw new Error('INVALID_PAYMENT_REFUND_REQUEST_AUDIT')
+  }
+  if (
+    typeof body.eventId !== 'string' || !/^evt_payment_refund_requested_[a-f0-9]{64}$/.test(body.eventId) ||
+    typeof body.paymentId !== 'string' || !/^pay_[A-Za-z0-9]{26}$/.test(body.paymentId) ||
+    typeof body.amountMinor !== 'number' || !Number.isSafeInteger(body.amountMinor) ||
+      body.amountMinor <= 0 || body.amountMinor > Number.MAX_SAFE_INTEGER ||
+    typeof body.idempotencyKey !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(body.idempotencyKey)
+  ) throw new Error('INVALID_PAYMENT_REFUND_REQUEST_AUDIT')
+  return body as PaymentRefundRequestAuditInput
 }
 
 function parseMembershipPlanLifecycleAuditInput(value: unknown): MembershipPlanLifecycleAuditInput {
@@ -969,6 +993,33 @@ export default {
         // The idempotency key is only a replay credential; the event ID is
         // already derived from its digest, so never persist the raw key in D1-03.
         after: { operation: 'remove_saved_payment_method' },
+        occurredAt: new Date().toISOString(),
+      }
+      return persistMembershipPlanMutationRequestAudit(env, event)
+    }
+
+    if (request.method === 'POST' && url.pathname === '/internal/audit-events/payment-refund-requested') {
+      let principal: ReturnType<typeof requireW01Transport>
+      try { principal = requireW01Transport(request) }
+      catch (error) { return errorResponse(error, request.headers.get('X-LuckRead-Request-Id')?.trim()) }
+      if (!/^L[2-8]$/.test(principal.layer)) return json({ error: 'PERMISSION_DENIED' }, 403)
+      let input: PaymentRefundRequestAuditInput
+      try { input = parsePaymentRefundRequestAuditInput(await readBoundedAuditJson(request, 1024)) }
+      catch { return json({ error: 'INVALID_PAYMENT_REFUND_REQUEST_AUDIT' }, 400) }
+      if (request.headers.get('Idempotency-Key')?.trim() !== input.idempotencyKey) {
+        return json({ error: 'IDEMPOTENCY_KEY_MISMATCH' }, 400)
+      }
+      const event: AuditEvent = {
+        eventId: input.eventId,
+        requestId: principal.requestId,
+        traceId: principal.correlationId,
+        actor: { actorId: principal.userId, actorType: 'user', layer: principal.layer as AuditEvent['actor']['layer'] },
+        action: 'commerce.payment_refund_requested',
+        targetType: 'Payment',
+        targetId: input.paymentId,
+        before: {},
+        // Do not persist the raw Idempotency-Key or a customer/provider secret.
+        after: { amountMinor: input.amountMinor, operation: 'refund_requested' },
         occurredAt: new Date().toISOString(),
       }
       return persistMembershipPlanMutationRequestAudit(env, event)
