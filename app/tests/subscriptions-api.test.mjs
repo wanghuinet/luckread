@@ -68,7 +68,7 @@ test('keeps subscription mutations and mobile checkout disabled until store bill
   const drawer = readFileSync(new URL('../app/(drawer)/_layout.tsx', import.meta.url), 'utf8');
   const billingHistoryScreen = readFileSync(new URL('../app/(drawer)/billing-history.tsx', import.meta.url), 'utf8');
 
-  expect(Object.keys(api).sort()).toEqual(['fetchActiveMembershipPlansPage', 'fetchMyCommerceOrdersPage', 'fetchMySubscriptionsPage'].sort());
+  expect(Object.keys(api).sort()).toEqual(['fetchActiveMembershipPlansPage', 'fetchMyCommerceOrdersPage', 'fetchMySubscriptionsPage', 'fetchSavedPaymentMethods', 'revokeSavedPaymentMethod'].sort());
   expect(subscriptionsScreen).not.toContain('transitionMySubscription');
   expect(subscriptionsScreen).not.toContain('onTransition');
   expect(subscriptionsScreen).not.toContain('取消订阅');
