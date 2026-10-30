@@ -547,6 +547,93 @@
         "d1Authority": "D1-04",
         "crossD1Transactions": 0
       }
+    },
+    {
+      "operationId": "postPaymentsPaymentIdRefunds",
+      "method": "POST",
+      "publicPath": "/api/v1/payments/{paymentId}/refunds",
+      "internalPath": "/payments/{paymentId}/refunds",
+      "principalRequired": true,
+      "permission": "order.refund.self",
+      "minimumGlobalLayer": "L2",
+      "pathParameters": {
+        "paymentId": "required stable pay_ identifier; no client owner or merchant fields"
+      },
+      "customerId": "Derived only from the W02-authenticated W01 session principal; W07 independently filters D1-04 by payment_id and customer_id.",
+      "requestBody": {
+        "required": [
+          "amountMinor"
+        ],
+        "additionalProperties": false,
+        "amountMinor": "Positive safe integer in the currency's smallest unit.",
+        "reason": "Optional bounded customer reason; no client-supplied customer, provider, merchant, currency or amountCaptured fields."
+      },
+      "idempotency": "Idempotency-Key is mandatory. D1-04 reserves one stable refund_id per customer-scoped key and a semantic request hash. Reusing the same key with different payment, amount, currency or reason conflicts.",
+      "capturedAmount": "W07 force-refreshes the exact Hyperswitch payment; requires matching payment_id, customer_id (when supplied), merchant_id, amount, currency and payment status. It persists monotonic provider-reported amount_captured_minor in D1-04, then atomically reserves the refund amount only when all active INITIATING/pending/review/succeeded reservations plus the new request do not exceed the captured amount. Hyperswitch independently checks actual captured balance.",
+      "providerCall": "W07 invokes the existing Hyperswitch /refunds API outside D1 writes, using the persisted stable refund_id as the provider idempotency key. A network timeout leaves the local INITIATING reservation; retry uses the same Idempotency-Key and refund_id.",
+      "responseAuthority": "W07 D1-04 Refund row. The safe response contains refundId, paymentId, amountMinor, currency, reason, status, version, providerUpdatedAt, createdAt, updatedAt, replayed and statusAuthority. No provider tokens, merchant ID or connector raw response.",
+      "stateMachine": "contracts/state-machines/refund.json",
+      "financialEffect": "NONE in this module. Provider refund state does not post/reverse Ledger facts and does not itself revoke W03/W07 subscription entitlement in D1-01; those are separate authorized workflows.",
+      "cache": "NO_STORE",
+      "providerNetworkCallsInsideD1Transaction": false,
+      "d1WriteTransactionMaxPerRequest": 2,
+      "topologyConstraints": {
+        "newWorker": false,
+        "newDatabase": false,
+        "newQueue": false,
+        "newServiceBinding": false,
+        "d1Authority": "D1-04",
+        "crossD1Transactions": 0
+      }
+    },
+    {
+      "operationId": "getRefundsRefundId",
+      "method": "GET",
+      "publicPath": "/api/v1/refunds/{refundId}",
+      "internalPath": "/refunds/{refundId}",
+      "principalRequired": true,
+      "permission": "order.read",
+      "minimumGlobalLayer": "L2",
+      "pathParameters": {
+        "refundId": "required stable ref_ identifier; no client owner or merchant fields"
+      },
+      "ownerScope": "W07 filters refunds by refund_id and the W02-derived customer_id. Missing and foreign refunds are both RESOURCE_NOT_FOUND/404.",
+      "responseAuthority": "Read-only W07 D1-04 Refund row. This endpoint does not call Hyperswitch or update any payment/refund/ledger/entitlement state.",
+      "responseFields": [
+        "refund.refundId",
+        "refund.paymentId",
+        "refund.amountMinor",
+        "refund.currency",
+        "refund.reason",
+        "refund.status",
+        "refund.version",
+        "refund.providerUpdatedAt",
+        "refund.createdAt",
+        "refund.updatedAt",
+        "statusAuthority"
+      ],
+      "forbiddenResponseFields": [
+        "customerId",
+        "merchantId",
+        "provider",
+        "provider API key",
+        "clientSecret",
+        "paymentMethodId",
+        "mandateId",
+        "vaultReference",
+        "idempotencyKey",
+        "requestHash",
+        "rawProviderResponse"
+      ],
+      "cache": "NO_STORE",
+      "topologyConstraints": {
+        "newWorker": false,
+        "newDatabase": false,
+        "newQueue": false,
+        "newServiceBinding": false,
+        "d1Authority": "D1-04",
+        "crossD1Transactions": 0
+      }
     }
   ],
   "trustBoundary": {
