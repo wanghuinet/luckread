@@ -155,6 +155,7 @@ export const REQUIRED_TRIGGERS = {
     'payment_mandates_retained',
   ],
   subscription_renewal_cycles: [
+    'subscription_renewal_cycles_initial_state_guard',
     'subscription_renewal_cycles_identity_immutable',
     'subscription_renewal_cycles_resolved_snapshot_immutable',
     'subscription_renewal_cycles_version_guard',
@@ -233,7 +234,7 @@ function migrationNames(input) {
   return [...new Set(collectObjects(input)
     .filter((row) => Object.keys(row).length === 1 &&
       typeof row.name === 'string' && row.name.trim() === row.name && row.name.length > 0)
-    .map((row) => row.name))].sort()
+    .map((row) => row.name.endsWith('.sql') ? row.name.slice(0, -4) : row.name))].sort()
 }
 
 function migrationTablePresent(objects) {
