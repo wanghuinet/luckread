@@ -60,6 +60,25 @@ export async function callW07Subscription(input: {
 }
 
 
+/** Request a read-only RevenueCat snapshot reconciliation for the W02 session principal. */
+export async function reconcileRevenueCatMembership(input: {
+  request: Request
+  principal: ContentPrincipal
+  appId: string
+}): Promise<Response> {
+  const appId = input.appId.trim()
+  if (!appId || appId.length > 255 || /[\\u0000-\\u001f\\u007f]/.test(appId)) {
+    throw new W07SubscriptionClientError(400, 'VALIDATION_FAILED', 'RevenueCat app selection is invalid')
+  }
+  return callW07Subscription({
+    request: input.request,
+    pathname: '/internal/subscriptions/reconcile-revenuecat',
+    method: 'POST',
+    principal: input.principal,
+    body: { appId },
+  })
+}
+
 /**
  * Relay a provider callback to W07 without parsing or re-serializing the signed
  * payload. Only the exact raw bytes, signature and generated transport
