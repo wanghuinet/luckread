@@ -8,6 +8,7 @@ import { applyTaxJarSandboxPricing } from './taxjar-sandbox-pricing.js'
 import { handleCommercePaymentIntentRequest } from './payment-intent-http-runtime.js'
 import { handleHyperswitchWebhookRequest } from './payment-webhook-http-runtime.js'
 import { handleRevenueCatWebhookRequest } from './revenuecat-webhook-http-runtime.js'
+import { handleRevenueCatSubscriberReconciliationRequest } from './revenuecat-subscriber-reconciliation-runtime.js'
 
 interface RateLimitBinding { limit(input: { key: string }): Promise<{ success: boolean }> }
 interface Env {
@@ -21,6 +22,7 @@ interface Env {
   REVENUECAT_WEBHOOK_AUTHORIZATION?: string
   REVENUECAT_WEBHOOK_SIGNING_SECRET?: string
   REVENUECAT_ALLOWED_APP_IDS?: string
+  REVENUECAT_SECRET_API_KEY?: string
   COMMERCE_DEMO_TAX_PROVIDER?: string
   TAXJAR_SANDBOX_API_KEY?: string
   TAXJAR_DEMO_FROM_STREET?: string
@@ -168,6 +170,18 @@ export default {
         if (webhookResponse) return webhookResponse
       }
 
+      if (new URL(request.url).pathname === '/internal/subscriptions/reconcile-revenuecat') {
+        if (request.method !== 'POST') return new Response(null, { status: 405, headers: { Allow: 'POST' } })
+        await enforceRateLimit(request, env, 'read')
+        requireTransport(request, 'W01')
+        if (request.headers.has('Authorization') || request.headers.has('Cookie')) {
+          throw new SubscriptionRuntimeError('PERMISSION_DENIED', 403)
+        }
+        requirePrincipal(request)
+        requireLayer(request)
+        const reconciliationResponse = await handleRevenueCatSubscriberReconciliationRequest(request, env)
+        if (reconciliationResponse) return reconciliationResponse
+      }
 
       // W03 may ask for a bounded membership decision; this endpoint never
       // returns subscription, plan, payment, order, or financial records.
