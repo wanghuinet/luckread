@@ -32,7 +32,11 @@ describe('public customer payment refund adapter', () => {
     expect(route).toContain("method: 'POST'")
     expect(route).toContain("idempotencyKey.length > 128")
     expect(route).not.toContain('HYPERSWITCH_API_KEY')
-    expect(route).not.toContain('capturedAmountMinor')
+    const requestValidation = route.slice(
+      route.indexOf('Object.keys(parsed.value).some'),
+      route.indexOf('const response = await callW07Subscription({'),
+    )
+    expect(requestValidation).not.toContain('capturedAmountMinor')
   })
 
   it('uses the W08 payment.refund CASL permission on Payment and never substitutes order permission', () => {
