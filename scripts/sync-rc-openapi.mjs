@@ -110,6 +110,12 @@ function parseOpenApi(raw = fs.readFileSync(`${root}/${openapiPath}`, 'utf8')) {
   };
 
   for (const line of lines) {
+    if (line === 'components:') {
+      flush();
+      currentPath = null;
+      currentMethod = null;
+      continue;
+    }
     const pathMatch = line.match(/^  (\/[^:#]+):\s*$/);
     if (pathMatch) {
       flush();
@@ -509,6 +515,19 @@ if (openapiNext !== openapiRaw) fs.writeFileSync(`${root}/${openapiPath}`, opena
 const effectiveOpenApi = parseOpenApi(openapiNext);
 const effectiveByKey = new Map(effectiveOpenApi.map((x) => [operationKey(x.method, x.path), x]));
 
+const requiredCommerceOperationIds = new Set([
+  'postPaymentsRefunds',
+  'getPaymentsHistory',
+  'getPaymentsRefunds',
+  'getBillingDocuments',
+]);
+for (const policy of domainPolicies.filter((item) => requiredCommerceOperationIds.has(item.operationId))) {
+  const effective = effectiveByKey.get(operationKey(policy.method, policy.path));
+  if (!effective || effective.operationId !== policy.operationId) {
+    throw new Error(`commerce OpenAPI operation was not synchronized: ${policy.method} ${policy.path} (${policy.operationId})`);
+  }
+}
+
 const existingPolicy = fs.existsSync(`${root}/${consolidatedPolicyPath}`) ? readJson(consolidatedPolicyPath) : { version: '1.0.0', operations: [] };
 const existingPolicyById = new Map((existingPolicy.operations ?? []).map((x) => [x.operationId, x]));
 const policyByMethodPath = new Map(domainPolicies.map((p) => [operationKey(p.method, p.path), p]));
@@ -565,6 +584,15 @@ for (const op of targetOperations) {
     'x-luckread-contract-status': source?.status ?? 'DISCOVERY_DRAFT',
     'x-luckread-source': source?.__source ?? inventoryPath,
   });
+}
+
+for (const operationId of requiredCommerceOperationIds) {
+  if (!consolidatedOperations.some((item) =>
+    item.operationId === operationId &&
+    item['x-luckread-contract-status'] === 'CONTRACTED_PARTIAL'
+  )) {
+    throw new Error(`commerce consolidated operation policy was not synchronized: ${operationId}`);
+  }
 }
 
 writeJson(inventoryPath, inventory);
