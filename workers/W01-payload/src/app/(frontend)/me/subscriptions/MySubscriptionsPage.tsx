@@ -298,10 +298,14 @@ export default function MySubscriptionsPage() {
         },
       )
       let result = await sendRemoval()
-      // First request durably blocks new MIT charges. Replaying the same
-      // idempotency key in a separate request performs provider revocation
-      // without exceeding D1-04's one-write-transaction budget per request.
-      if (result.response.status === 202) result = await sendRemoval()
+      // A 202 with replayed=false means this request only created the durable
+      // MIT block. Replay exactly once to perform provider I/O in a new request.
+      const firstStage = result.data && typeof result.data === 'object'
+        ? (result.data as { data?: { replayed?: unknown } }).data
+        : undefined
+      if (result.response.status === 202 && firstStage?.replayed === false) {
+        result = await sendRemoval()
+      }
       const { response, data } = result
       if (response.status === 401) {
         const returnTo = window.location.pathname + window.location.search + window.location.hash
