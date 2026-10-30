@@ -213,8 +213,17 @@ class MemoryPaymentD1 {
       return result(1) as D1Result<T>;
     }
     if (sql.startsWith('INSERT INTO payment_provider_events')) {
-      const [rowId, provider, merchantId, eventId, eventType, paymentId, hash, receivedAt] = values as
-        [string, string, string, string, string, string | null, string, string];
+      const rowId = values[0] as string;
+      const provider = values[1] as string;
+      const merchantId = values[2] as string;
+      const eventId = values[3] as string;
+      const eventType = values[4] as string;
+      // The mandate INSERT uses a SQL literal NULL for payment_id, so it has
+      // one fewer bound value than the payment-event INSERT variants.
+      const hasLiteralNullPaymentId = sql.includes("?, ?, ?, ?, ?, NULL, ?, 'RECEIVED'");
+      const paymentId = hasLiteralNullPaymentId ? null : values[5] as string | null;
+      const hash = values[hasLiteralNullPaymentId ? 5 : 6] as string;
+      const receivedAt = values[hasLiteralNullPaymentId ? 6 : 7] as string;
       if (this.events.some(e => e.provider === provider && e.merchant_id === merchantId && e.event_id === eventId)) {
         return result(0) as D1Result<T>; // ON CONFLICT DO NOTHING
       }
@@ -354,8 +363,9 @@ class MemoryPaymentD1 {
       return result(1) as D1Result<T>;
     }
     if (sql.startsWith('INSERT INTO payment_provider_event_conflicts')) {
-      const [conflictId, provider, merchantId, eventId, oldHash, newHash, state, count, version, firstAt, lastAt] = values as
-        [string, string, string, string, string, string, Conflict['state'], number, number, string, string];
+      // State/count/version are SQL literals ('OPEN', 1, 1), not bound values.
+      const [conflictId, provider, merchantId, eventId, oldHash, newHash, firstAt, lastAt] = values as
+        [string, string, string, string, string, string, string, string];
       const firstReceipt = this.events.find(e => e.provider === provider && e.merchant_id === merchantId &&
         e.event_id === eventId && e.payload_sha256 === oldHash);
       if (!firstReceipt || oldHash === newHash) throw new Error('constraint: first receipt evidence');
@@ -363,8 +373,8 @@ class MemoryPaymentD1 {
         c.event_id === eventId && c.incoming_payload_sha256 === newHash)) throw new Error('constraint: conflict uniqueness');
       this.conflicts.push({
         conflict_id: conflictId, provider, merchant_id: merchantId, event_id: eventId,
-        existing_payload_sha256: oldHash, incoming_payload_sha256: newHash, state,
-        occurrence_count: count, version, first_seen_at: firstAt, last_seen_at: lastAt,
+        existing_payload_sha256: oldHash, incoming_payload_sha256: newHash, state: 'OPEN',
+        occurrence_count: 1, version: 1, first_seen_at: firstAt, last_seen_at: lastAt,
         resolved_at: null, resolution_code: null,
       });
       return result(1) as D1Result<T>;
@@ -503,7 +513,7 @@ const bodyText = (
   });
 };
 
-async function signedBody(text: string, secret = SECRET): Promise<{ rawBody: ArrayBuffer; signature: string }> {
+async function signedBody(text: string, secret = SECRET): Promise<{ rawBody: ArrayBuffer; signature: string; signatureHeader: string }> {
   const bytes = new TextEncoder().encode(text);
   const key = await crypto.subtle.importKey(
     'raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-512' }, false, ['sign'],
@@ -512,7 +522,10 @@ async function signedBody(text: string, secret = SECRET): Promise<{ rawBody: Arr
   const signature = Array.from(signatureBytes, b => b.toString(16).padStart(2, '0')).join('');
   return {
     rawBody: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer,
+    // Keep the cryptographic value named for both legacy test helpers and the
+    // production receive contract so spreading this object cannot omit the header.
     signature,
+    signatureHeader: signature,
   };
 }
 
