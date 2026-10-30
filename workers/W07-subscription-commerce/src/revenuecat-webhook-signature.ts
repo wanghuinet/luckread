@@ -152,7 +152,6 @@ const EVENT_NUMBER_FIELDS = [
   'auto_resume_at_ms',
   'renewal_number',
   'experiment_enrolled_at_ms',
-  'enrolled_at_ms',
   'price',
   'price_in_purchased_currency',
   'quantity',
