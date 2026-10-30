@@ -247,6 +247,16 @@ test('postflight rejects a missing Payment migration record', () => {
   }), /does not contain required migrations/)
 })
 
+test('postflight rejects a widened mandate-webhook replay trigger', () => {
+  const postflightSchema = schemaWithMigrations(REQUIRED_MIGRATION_IDS)
+  const trigger = postflightSchema.results[0].results.find((object) =>
+    object.type === 'trigger' && object.name === 'payment_provider_events_terminal_immutable'
+  )
+  assert.ok(trigger)
+  trigger.sql = trigger.sql.replace("NEW.state = 'RECEIVED'", "NEW.state = 'RECEIVED' OR 1=1")
+  assert.throws(() => verifyCompletePostflight({ postflightSchema }), /pre-existing schema object was removed or changed/)
+})
+
 test('postflight rejects changed existing schema objects', () => {
   const changedBase = wrapSchema([{ ...baseSchema[0], sql: 'CREATE TABLE _cf_KV (key TEXT, value TEXT)' }])
   assert.throws(() => verifyCompletePostflight({
