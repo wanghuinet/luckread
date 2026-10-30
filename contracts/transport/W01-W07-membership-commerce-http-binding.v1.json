@@ -246,7 +246,7 @@
       "ownerScope": "D1-04 saved_payment_methods row must match authenticated W02 customer ID and configured Hyperswitch merchant.",
       "idempotency": "Idempotency-Key",
       "successRule": "W01 first confirms durable W06 payment_method.revocation_requested intent. The first W07 invocation writes only the D1-04 revocation request (one write transaction), immediately blocking all new MIT renewal selection, and returns 202 without provider I/O. W01 clients then replay DELETE with the same Idempotency-Key in a separate request. That replay performs Hyperswitch mandate revocation and vault deletion, then uses at most one D1-04 write transaction to persist provider deletion acknowledgement. Local payment_mandates rows become REVOKED only through a matching signature-verified mandate_revoked webhook; the public response remains 202 until all linked mandates are terminal and provider method deletion is durably confirmed.",
-      "replay": "The saved method has one durable revocation request. The initial request only establishes the local MIT block; an exact or new-key request replay reads the existing row, reattempts the same idempotent provider revoke/delete operations, and commits at most one D1-04 write transaction in that separate request. No replay creates another local request or mandate.",
+      "replay": "The saved method has one durable revocation request. The initial request only establishes the local MIT block; only a replay with the exact original Idempotency-Key may reattempt provider revoke/delete operations. A different key for the same method, or reuse of the same customer key on another method, returns 409. No replay creates a second local request or mandate.",
       "cache": "NO_STORE",
       "d1WriteTransactionMaxPerRequest": 1,
       "providerNetworkCallsInsideD1Transaction": false,
@@ -256,7 +256,8 @@
         "foreignCustomerOrMerchant": "404",
         "authorizationDenied": "403",
         "providerUnconfirmed": "202; local MIT block remains active",
-        "missingW06AuditConfirmation": "503; W07 is not called"
+        "missingW06AuditConfirmation": "503; W07 is not called",
+        "idempotencyKeyMismatch": "409; only the exact original key can replay the saved method revocation request"
       },
       "topologyConstraints": {
         "newWorker": false,
