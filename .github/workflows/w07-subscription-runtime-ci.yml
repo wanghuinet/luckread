@@ -12,6 +12,7 @@ on:
       - 'workers/W01-payload/src/app/(frontend)/checkout/**'
       - 'workers/W01-payload/src/moderation/w06-moderation-client.ts'
       - 'workers/W01-payload/tests/int/commerce-order-v1-adapter.int.spec.ts'
+      - 'workers/W01-payload/tests/int/payments-intent-v1-adapter.int.spec.ts'
       - 'workers/W01-payload/tests/int/hyperswitch-webhook-v1-adapter.int.spec.ts'
       - 'workers/W01-payload/tests/int/revenuecat-webhook-v1-adapter.int.spec.ts'
       - 'workers/W01-payload/tests/int/provider-webhook-body.int.spec.ts'
