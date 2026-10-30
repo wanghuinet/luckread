@@ -232,6 +232,7 @@
       "endpoint_groups": [
         "DELETE /v1/payment-methods/{savedPaymentMethodId}",
         "DELETE /v1/subscriptions/{subscriptionId}",
+        "GET /v1/commerce/orders",
         "GET /v1/commerce/orders/{orderId}",
         "GET /v1/entitlements",
         "GET /v1/entitlements/{subjectId}",
