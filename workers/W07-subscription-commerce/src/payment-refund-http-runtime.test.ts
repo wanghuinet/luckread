@@ -6,10 +6,11 @@ import type {
   HyperswitchPayment,
   HyperswitchRefund,
 } from './hyperswitch-client.js'
-import type {
-  PaymentAttemptDto,
-  RefundDto,
-  RefundRequestCreation,
+import {
+  PaymentPersistenceError,
+  type PaymentAttemptDto,
+  type RefundDto,
+  type RefundRequestCreation,
 } from './payment-persistence.js'
 
 const CUSTOMER = 'refund-owner-1'
@@ -250,14 +251,21 @@ describe('W07 owner-scoped refund HTTP runtime', () => {
   it('allows partial refunds only within the provider-reported captured balance', async () => {
     const fixture = createDependencies({
       retrievePayment: async () => ({ ...providerPayment, amountCaptured: 499 }),
+      createRefundRequest: async () => {
+        throw new PaymentPersistenceError('CONFLICT', 409)
+      },
     })
     const response = await handlePaymentRefundRequest(
       createRequest(), CUSTOMER, env, fixture.dependencies,
     )
     expect(response?.status).toBe(409)
-    expect((await responseJson(response!)).error?.code).toBe('REFUND_CAPTURED_AMOUNT_UNAVAILABLE')
-    expect(fixture.calls).toEqual(['readPayment', 'recordCapturedAmount'])
-      .filter(() => false)
+    expect((await responseJson(response!)).error?.code).toBe('CONFLICT')
+    expect(fixture.calls).toEqual([
+      'readPayment',
+      'retrievePayment',
+      'recordCapturedAmount',
+      'createRefundRequest',
+    ])
   })
 
   it('rejects a provider observation whose captured amount exceeds the payment intent amount', async () => {
@@ -344,7 +352,7 @@ describe('W07 owner-scoped refund HTTP runtime', () => {
   it('hides absent and foreign refund IDs behind the same not-found response', async () => {
     const fixture = createDependencies({
       readRefund: async () => {
-        throw { code: 'RESOURCE_NOT_FOUND', status: 404 }
+        throw new PaymentPersistenceError('RESOURCE_NOT_FOUND', 404)
       },
     })
     const response = await handlePaymentRefundRequest(
@@ -353,7 +361,8 @@ describe('W07 owner-scoped refund HTTP runtime', () => {
       env,
       fixture.dependencies,
     )
-    expect(response?.status).toBe(503)
+    expect(response?.status).toBe(404)
+    expect((await responseJson(response!)).error?.code).toBe('RESOURCE_NOT_FOUND')
   })
 
   it('requires Idempotency-Key and rejects malformed paths, bodies and query parameters before provider access', async () => {
