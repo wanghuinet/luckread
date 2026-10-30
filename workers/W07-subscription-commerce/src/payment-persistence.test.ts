@@ -606,6 +606,15 @@ describe('PAY-001 payment attempt persistence candidate', () => {
     );
   });
 
+  it('rejects a locally owned payment whose merchant does not match the configured provider account', async () => {
+    const db = new MemoryPaymentD1();
+    seedPayment(db);
+    await expectPaymentError(
+      getPaymentAttempt(db as unknown as D1Database, CUSTOMER, PAYMENT_ID, 'another-merchant'),
+      'INTEGRITY_VIOLATION',
+    );
+  });
+
   it('creates a stable unconfirmed attempt and replays the same idempotency key without a second write', async () => {
     const db = new MemoryPaymentD1();
     seedOrder(db);
