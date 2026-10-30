@@ -301,6 +301,9 @@ export default function MySubscriptionsScreen() {
                 }
               } catch (cause) {
                 setError(cause instanceof Error ? cause.message : '付款方式移除失败，请稍后重试。');
+                // The first request may already have committed the MIT block
+                // even when the provider replay failed; refresh authoritative state.
+                void loadPaymentMethods();
               } finally {
                 setRevokingPaymentMethodId(null);
               }
