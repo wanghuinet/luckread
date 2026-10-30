@@ -48,6 +48,9 @@ export async function handleCommerceBillingReadRequest(
   }
   const kind = ROUTES.get(url.pathname);
   if (!kind) return null;
+  // The same customer refund path serves GET history and POST refund command.
+  // Let the command handler own POST; all other non-GET read methods remain 405.
+  if (kind === 'refunds' && request.method === 'POST') return null;
   if (request.method !== 'GET') {
     return new Response(null, { status: 405, headers: { Allow: 'GET', 'cache-control': 'no-store' } });
   }
