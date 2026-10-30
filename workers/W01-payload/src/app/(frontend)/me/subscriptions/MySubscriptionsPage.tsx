@@ -279,7 +279,7 @@ export default function MySubscriptionsPage() {
     if (!window.confirm(confirmText)) return
     let idempotencyKey = paymentMethodIdempotencyKeys.current.get(method.savedPaymentMethodId)
     if (!idempotencyKey) {
-      idempotencyKey = crypto.randomUUID().replaceAll('-', '')
+      idempotencyKey = 'remove_' + method.savedPaymentMethodId
       paymentMethodIdempotencyKeys.current.set(method.savedPaymentMethodId, idempotencyKey)
     }
     setRemovingPaymentMethodId(method.savedPaymentMethodId)
