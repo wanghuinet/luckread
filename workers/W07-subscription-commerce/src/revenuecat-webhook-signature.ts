@@ -244,7 +244,13 @@ export function parseRevenueCatWebhookEnvelope(
     eventTimestampMs: event.event_timestamp_ms as number,
     appUserId: optionalString('app_user_id'),
     productId: optionalString('product_id'),
-    store: optionalString('store'),
+    store: (() => {
+      const value = optionalString('store');
+      if (value !== null && value.length > 64) {
+        throw new RevenueCatWebhookValidationError('WEBHOOK_REJECTED');
+      }
+      return value;
+    })(),
     environment: environmentValue,
     transactionId: optionalString('transaction_id'),
     originalTransactionId: optionalString('original_transaction_id'),
