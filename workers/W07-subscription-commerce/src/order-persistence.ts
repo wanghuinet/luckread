@@ -47,6 +47,15 @@ export type CommerceOrderData = Readonly<{
   updatedAt: string;
 }>;
 
+export type CommerceOrderSummary = Omit<CommerceOrderData, 'items'>;
+
+export type CommerceOrderListPage = Readonly<{
+  items: readonly CommerceOrderSummary[];
+  limit: number;
+  hasMore: boolean;
+  nextCursor: string | null;
+}>;
+
 /**
  * Result of authoritative offer + pricing resolution. In particular,
  * discount/tax are required outputs: this persistence layer never invents a
@@ -78,6 +87,7 @@ export type OrderPersistenceErrorCode =
   | 'CONFLICT'
   | 'IDEMPOTENCY_KEY_REUSE_CONFLICT'
   | 'IDEMPOTENCY_IN_PROGRESS'
+  | 'INVALID_CURSOR'
   | 'INTEGRITY_VIOLATION';
 
 export class OrderPersistenceError extends Error {
@@ -653,4 +663,128 @@ export async function getCommerceOrder(
     updatedAt: order.updated_at,
   };
   return parseStoredOrderData(JSON.stringify(publicData));
+}
+
+
+type OrderListRow = {
+  order_id: string;
+  status: CommerceOrderStatus;
+  version: number;
+  currency: string;
+  subtotal_minor: number;
+  discount_minor: number;
+  tax_minor: number;
+  total_minor: number;
+  created_at: string;
+  updated_at: string;
+};
+
+type CommerceOrderListCursor = {
+  version: 1;
+  scope: 'commerce-orders';
+  createdAt: string;
+  orderId: string;
+};
+
+const MAX_ORDER_LIST_LIMIT = 50;
+
+function encodeCommerceOrderListCursor(createdAt: string, orderId: string): string {
+  const bytes = new TextEncoder().encode(JSON.stringify({
+    version: 1,
+    scope: 'commerce-orders',
+    createdAt,
+    orderId,
+  } satisfies CommerceOrderListCursor));
+  let binary = '';
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/g, '');
+}
+
+function decodeCommerceOrderListCursor(value: string | null): { createdAt: string; orderId: string } | null {
+  if (value === null) return null;
+  try {
+    if (!value || value.length > 2048 || !/^[A-Za-z0-9_-]+$/.test(value)) throw new Error('invalid cursor');
+    const normalized = value.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = normalized + '='.repeat((4 - normalized.length % 4) % 4);
+    const bytes = Uint8Array.from(atob(padded), (character) => character.charCodeAt(0));
+    const parsed: unknown = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('invalid cursor shape');
+    const candidate = parsed as Record<string, unknown>;
+    if (
+      candidate.version !== 1 ||
+      candidate.scope !== 'commerce-orders' ||
+      typeof candidate.createdAt !== 'string' ||
+      candidate.createdAt.length > 64 ||
+      !Number.isFinite(Date.parse(candidate.createdAt)) ||
+      typeof candidate.orderId !== 'string' ||
+      !/^ord_[A-Za-z0-9_-]{1,90}$/.test(candidate.orderId)
+    ) throw new Error('invalid cursor fields');
+    return { createdAt: candidate.createdAt, orderId: candidate.orderId };
+  } catch {
+    throw new OrderPersistenceError('INVALID_CURSOR', 400);
+  }
+}
+
+/**
+ * Read-only purchase history. The query is always constrained by the authenticated
+ * customer ID, uses the existing customer/created/order index, and returns only a
+ * safe order summary (never customer, provider, payment-credential or item snapshot fields).
+ */
+export async function listCommerceOrders(
+  db: D1Database,
+  customerIdInput: string,
+  limitInput = 20,
+  cursorValue: string | null = null,
+): Promise<CommerceOrderListPage> {
+  const customerId = requireIdentifier(customerIdInput, 'customerId');
+  if (!Number.isSafeInteger(limitInput) || limitInput < 1 || limitInput > MAX_ORDER_LIST_LIMIT) {
+    throw new OrderPersistenceError('VALIDATION_FAILED', 400);
+  }
+  const cursor = decodeCommerceOrderListCursor(cursorValue);
+  const baseSql =
+    'SELECT order_id, status, version, currency, subtotal_minor, discount_minor, tax_minor, total_minor, created_at, updated_at ' +
+    'FROM orders WHERE customer_id = ? ';
+  const statement = cursor
+    ? db.prepare(baseSql + 'AND (created_at < ? OR (created_at = ? AND order_id < ?)) ORDER BY created_at DESC, order_id DESC LIMIT ?')
+      .bind(customerId, cursor.createdAt, cursor.createdAt, cursor.orderId, limitInput + 1)
+    : db.prepare(baseSql + 'ORDER BY created_at DESC, order_id DESC LIMIT ?').bind(customerId, limitInput + 1);
+  const rows = await statement.all<OrderListRow>();
+  const candidates = rows.results ?? [];
+  const hasMore = candidates.length > limitInput;
+  const page = candidates.slice(0, limitInput);
+  const items = page.map((row): CommerceOrderSummary => {
+    if (
+      !/^ord_[A-Za-z0-9_-]{1,90}$/.test(row.order_id) ||
+      !isValidOrderStatus(row.status) ||
+      !Number.isSafeInteger(row.version) || row.version < 1 ||
+      !/^[A-Z]{3}$/.test(row.currency) ||
+      ![row.subtotal_minor, row.discount_minor, row.tax_minor, row.total_minor].every((value) =>
+        Number.isSafeInteger(value) && value >= 0 && value <= 2_147_483_647) ||
+      row.discount_minor > row.subtotal_minor ||
+      row.total_minor !== row.subtotal_minor - row.discount_minor + row.tax_minor ||
+      typeof row.created_at !== 'string' || !Number.isFinite(Date.parse(row.created_at)) ||
+      typeof row.updated_at !== 'string' || !Number.isFinite(Date.parse(row.updated_at))
+    ) {
+      throw new OrderPersistenceError('INTEGRITY_VIOLATION', 500);
+    }
+    return {
+      orderId: row.order_id,
+      status: row.status,
+      version: row.version,
+      currency: row.currency,
+      subtotalMinor: row.subtotal_minor,
+      discountMinor: row.discount_minor,
+      taxMinor: row.tax_minor,
+      totalMinor: row.total_minor,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    };
+  });
+  const last = page.at(-1);
+  return {
+    items,
+    limit: limitInput,
+    hasMore,
+    nextCursor: hasMore && last ? encodeCommerceOrderListCursor(last.created_at, last.order_id) : null,
+  };
 }
