@@ -110,6 +110,7 @@ type PaymentRow = {
   failure_code: string | null;
   created_at: string;
   updated_at: string;
+  amount_captured_minor?: number;
 };
 
 type OrderForWebhookRow = {
@@ -385,9 +386,9 @@ export async function getPaymentAttempt(
   try {
     row = await db.prepare(
       'SELECT payment_id, order_id, customer_id, provider, merchant_id, amount_minor, currency, status, version, ' +
-      'idempotency_key, request_hash, provider_updated_at, failure_code, created_at, updated_at ' +
+      'idempotency_key, request_hash, provider_updated_at, failure_code, created_at, updated_at, amount_captured_minor ' +
       'FROM payments WHERE payment_id = ? AND customer_id = ? LIMIT 1',
-    ).bind(paymentIdInput, customerIdInput).first<PaymentRow>();
+    ).bind(paymentIdInput, customerIdInput).first<PaymentRow & { amount_captured_minor: number }>();
   } catch {
     throw new PaymentPersistenceError('SERVICE_UNAVAILABLE', 503);
   }
@@ -1512,6 +1513,118 @@ async function readRefundByOwner(db: D1Database, customerId: string, refundId: s
   ).bind(customerId, refundId).first<RefundRow>();
 }
 
+export type CapturedAmountObservation = Readonly<{
+  paymentId: string;
+  amountCapturedMinor: number;
+  version: number;
+  updatedAt: string;
+  changed: boolean;
+}>;
+
+/**
+ * Record the exact captured amount returned by an authenticated, force-synced
+ * Hyperswitch payment retrieve. This is a monotonic financial observation only:
+ * it never changes payment status, confirms an Order or grants entitlement.
+ */
+export async function recordPaymentCapturedAmountObservation(
+  db: D1Database,
+  customerId: string,
+  observed: HyperswitchPayment,
+  dependencies: Pick<PaymentPersistenceDependencies, 'now'> = {},
+): Promise<CapturedAmountObservation> {
+  if (
+    !nonBlank(customerId, 256) ||
+    !PAYMENT_ID_PATTERN.test(observed.paymentId) ||
+    !nonBlank(observed.merchantId, 256) ||
+    !safeMinor(observed.amount) ||
+    !CURRENCY_PATTERN.test(observed.currency) ||
+    !['succeeded','partially_captured','partially_captured_and_capturable'].includes(observed.status) ||
+    !safeMinor(observed.amountCaptured) ||
+    observed.amountCaptured > observed.amount ||
+    (observed.customerId !== undefined && observed.customerId !== null && observed.customerId !== customerId)
+  ) {
+    throw new PaymentPersistenceError('CONFLICT', 409);
+  }
+
+  let row: (PaymentRow & { amount_captured_minor: number }) | null;
+  try {
+    row = await db.prepare(
+      'SELECT payment_id, order_id, customer_id, provider, merchant_id, amount_minor, amount_captured_minor, ' +
+      'currency, status, version, idempotency_key, request_hash, provider_updated_at, failure_code, created_at, updated_at ' +
+      'FROM payments WHERE payment_id = ? AND customer_id = ? LIMIT 1',
+    ).bind(observed.paymentId, customerId).first<PaymentRow & { amount_captured_minor: number }>();
+  } catch {
+    throw new PaymentPersistenceError('SERVICE_UNAVAILABLE', 503);
+  }
+  if (!row) throw new PaymentPersistenceError('RESOURCE_NOT_FOUND', 404);
+  if (
+    row.provider !== PROVIDER || row.merchant_id !== observed.merchantId ||
+    row.amount_minor !== observed.amount || row.currency !== observed.currency ||
+    row.status !== observed.status ||
+    !Number.isSafeInteger(row.amount_captured_minor) || row.amount_captured_minor < 0 ||
+    row.amount_captured_minor > row.amount_minor ||
+    observed.amountCaptured < row.amount_captured_minor
+  ) {
+    throw new PaymentPersistenceError('CONFLICT', 409);
+  }
+  if (observed.amountCaptured === row.amount_captured_minor) {
+    return {
+      paymentId: row.payment_id,
+      amountCapturedMinor: row.amount_captured_minor,
+      version: row.version,
+      updatedAt: row.updated_at,
+      changed: false,
+    };
+  }
+
+  const updatedAt = strictlyAfter(parseDate(dependencies.now ?? (() => new Date())), row.updated_at);
+  let result: D1Result;
+  try {
+    result = await db.prepare(
+      'UPDATE payments SET amount_captured_minor = ?, version = version + 1, updated_at = ? ' +
+      'WHERE payment_id = ? AND customer_id = ? AND merchant_id = ? AND amount_minor = ? AND currency = ? ' +
+      'AND status = ? AND version = ? AND amount_captured_minor = ?',
+    ).bind(
+      observed.amountCaptured, updatedAt, row.payment_id, row.customer_id, row.merchant_id,
+      row.amount_minor, row.currency, row.status, row.version, row.amount_captured_minor,
+    ).run();
+  } catch {
+    throw new PaymentPersistenceError('SERVICE_UNAVAILABLE', 503);
+  }
+  if (Number(result.meta?.changes ?? 0) === 1) {
+    return {
+      paymentId: row.payment_id,
+      amountCapturedMinor: observed.amountCaptured,
+      version: row.version + 1,
+      updatedAt,
+      changed: true,
+    };
+  }
+
+  let current: (PaymentRow & { amount_captured_minor: number }) | null;
+  try {
+    current = await db.prepare(
+      'SELECT payment_id, order_id, customer_id, provider, merchant_id, amount_minor, amount_captured_minor, ' +
+      'currency, status, version, idempotency_key, request_hash, provider_updated_at, failure_code, created_at, updated_at ' +
+      'FROM payments WHERE payment_id = ? AND customer_id = ? LIMIT 1',
+    ).bind(observed.paymentId, customerId).first<PaymentRow & { amount_captured_minor: number }>();
+  } catch {
+    throw new PaymentPersistenceError('SERVICE_UNAVAILABLE', 503);
+  }
+  if (!current || current.status !== observed.status || current.merchant_id !== observed.merchantId ||
+      current.amount_minor !== observed.amount || current.currency !== observed.currency ||
+      current.amount_captured_minor < observed.amountCaptured) {
+    throw new PaymentPersistenceError('CONFLICT', 409);
+  }
+  return {
+    paymentId: current.payment_id,
+    amountCapturedMinor: current.amount_captured_minor,
+    version: current.version,
+    updatedAt: current.updated_at,
+    changed: false,
+  };
+}
+
 /** Reserve an owner-scoped refund in D1-04 before provider I/O; provider rechecks captured balance. */
 export async function createRefundRequest(
   db: D1Database,
@@ -1546,8 +1659,10 @@ export async function createRefundRequest(
   }
   if (!payment) throw new PaymentPersistenceError('RESOURCE_NOT_FOUND', 404);
   if (payment.provider !== PROVIDER || !nonBlank(payment.merchant_id, 256) ||
-      !CURRENCY_PATTERN.test(payment.currency) || payment.status !== 'succeeded' ||
-      !safeMinor(payment.amount_minor)) {
+      !CURRENCY_PATTERN.test(payment.currency) ||
+      !['succeeded','partially_captured','partially_captured_and_capturable'].includes(payment.status) ||
+      !safeMinor(payment.amount_minor) || !safeMinor(payment.amount_captured_minor) ||
+      payment.amount_captured_minor <= 0 || payment.amount_captured_minor > payment.amount_minor) {
     throw new PaymentPersistenceError('CONFLICT', 409);
   }
   const requestHash = await refundRequestHash({
@@ -1577,7 +1692,7 @@ export async function createRefundRequest(
     throw new PaymentPersistenceError('SERVICE_UNAVAILABLE', 503);
   }
   if (!Number.isSafeInteger(reservedMinor) || reservedMinor < 0 ||
-      amountMinorInput + reservedMinor > payment.amount_minor) {
+      amountMinorInput + reservedMinor > payment.amount_captured_minor) {
     throw new PaymentPersistenceError('CONFLICT', 409);
   }
   const now = parseDate(dependencies.now ?? (() => new Date()));
