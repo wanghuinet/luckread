@@ -1,4 +1,4 @@
-import { apiRequest, createIdempotencyKey } from './api-client';
+import { apiRequest } from './api-client';
 
 export type SubscriptionStatus =
   | 'PENDING'
