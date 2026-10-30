@@ -197,3 +197,49 @@ export function fetchMyCommerceOrdersPage(options: PlanPageOptions = {}) {
     signal: options.signal,
   });
 }
+
+
+export type PaymentAttemptStatus =
+  | 'INITIATING'
+  | 'requires_payment_method'
+  | 'requires_confirmation'
+  | 'requires_customer_action'
+  | 'requires_merchant_action'
+  | 'requires_capture'
+  | 'processing'
+  | 'succeeded'
+  | 'failed'
+  | 'cancelled'
+  | 'cancelled_post_capture'
+  | 'partially_captured'
+  | 'partially_captured_and_capturable'
+  | 'expired';
+
+export type MyPaymentStatusData = {
+  payment: {
+    paymentId: string;
+    orderId: string;
+    amountMinor: number;
+    currency: string;
+    status: PaymentAttemptStatus;
+    version: number;
+    providerUpdatedAt: string | null;
+    createdAt: string;
+    updatedAt: string;
+  };
+  providerStatus: Exclude<PaymentAttemptStatus, 'INITIATING'> | null;
+  providerStatusCheck: 'MATCH' | 'DIFFERS' | 'UNAVAILABLE';
+  providerCheckedAt: string | null;
+  statusAuthority: 'W07_D1_04';
+};
+
+/** Read only the authenticated user's payment detail through W01 -> W07. */
+export function fetchMyPaymentStatus(paymentId: string, options: { signal?: AbortSignal } = {}) {
+  if (typeof paymentId !== 'string' || !/^pay_[A-Za-z0-9]{26}$/.test(paymentId)) {
+    throw new RangeError('Payment ID is invalid.');
+  }
+  return apiRequest<unknown>('/payments/' + encodeURIComponent(paymentId), {
+    method: 'GET',
+    signal: options.signal,
+  });
+}
