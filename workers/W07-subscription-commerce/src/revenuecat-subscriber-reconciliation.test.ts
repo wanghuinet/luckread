@@ -141,9 +141,8 @@ describe('RevenueCat current subscriber reconciliation candidates', () => {
 
   it('returns no purchase candidate for a RevenueCat 201 get-or-create empty customer', async () => {
     const { db, statements } = fakeDb();
-    const snapshot = baseSnapshot();
-    const emptySnapshot: RevenueCatSubscriberSnapshot = {
-      ...snapshot,
+    const snapshot: RevenueCatSubscriberSnapshot = {
+      ...baseSnapshot(),
       originalAppUserId: W02_USER_ID,
       aliases: [W02_USER_ID],
       entitlements: {},
@@ -153,7 +152,7 @@ describe('RevenueCat current subscriber reconciliation candidates', () => {
 
     const result = await buildRevenueCatSubscriberReconciliationCandidates(
       db,
-      { ...options, snapshot: emptySnapshot },
+      { ...options, snapshot },
       { nowMs: () => NOW },
     );
 
@@ -163,8 +162,10 @@ describe('RevenueCat current subscriber reconciliation candidates', () => {
   });
 
   it('rejects an inconsistent non-empty customer-created snapshot', async () => {
-    const snapshot = baseSnapshot();
-    snapshot.customerCreatedOnLookup = true;
+    const snapshot: RevenueCatSubscriberSnapshot = {
+      ...baseSnapshot(),
+      customerCreatedOnLookup: true,
+    };
     const { db, statements } = fakeDb();
 
     await expect(buildRevenueCatSubscriberReconciliationCandidates(
@@ -176,16 +177,25 @@ describe('RevenueCat current subscriber reconciliation candidates', () => {
   });
 
   it('keeps an entitlement active during its grace period after the base expiry', async () => {
-    const snapshot = baseSnapshot();
-    snapshot.entitlements.creator_gold = {
-      ...snapshot.entitlements.creator_gold!,
-      expires_date: '2026-10-29T00:00:00.000Z',
-      grace_period_expires_date: '2026-10-31T00:00:00.000Z',
-    };
-    snapshot.subscriptions[PRODUCT_ID] = {
-      ...snapshot.subscriptions[PRODUCT_ID]!,
-      expires_date: '2026-10-29T00:00:00.000Z',
-      grace_period_expires_date: '2026-10-31T00:00:00.000Z',
+    const base = baseSnapshot();
+    const snapshot: RevenueCatSubscriberSnapshot = {
+      ...base,
+      entitlements: {
+        ...base.entitlements,
+        creator_gold: {
+          ...base.entitlements.creator_gold!,
+          expires_date: '2026-10-29T00:00:00.000Z',
+          grace_period_expires_date: '2026-10-31T00:00:00.000Z',
+        },
+      },
+      subscriptions: {
+        ...base.subscriptions,
+        [PRODUCT_ID]: {
+          ...base.subscriptions[PRODUCT_ID]!,
+          expires_date: '2026-10-29T00:00:00.000Z',
+          grace_period_expires_date: '2026-10-31T00:00:00.000Z',
+        },
+      },
     };
     const { db } = fakeDb();
 
@@ -199,16 +209,25 @@ describe('RevenueCat current subscriber reconciliation candidates', () => {
   });
 
   it('marks an expired entitlement inactive based on the current snapshot', async () => {
-    const snapshot = baseSnapshot();
-    snapshot.entitlements.creator_gold = {
-      ...snapshot.entitlements.creator_gold!,
-      expires_date: '2026-10-29T00:00:00.000Z',
-      grace_period_expires_date: null,
-    };
-    snapshot.subscriptions[PRODUCT_ID] = {
-      ...snapshot.subscriptions[PRODUCT_ID]!,
-      expires_date: '2026-10-29T00:00:00.000Z',
-      grace_period_expires_date: null,
+    const base = baseSnapshot();
+    const snapshot: RevenueCatSubscriberSnapshot = {
+      ...base,
+      entitlements: {
+        ...base.entitlements,
+        creator_gold: {
+          ...base.entitlements.creator_gold!,
+          expires_date: '2026-10-29T00:00:00.000Z',
+          grace_period_expires_date: null,
+        },
+      },
+      subscriptions: {
+        ...base.subscriptions,
+        [PRODUCT_ID]: {
+          ...base.subscriptions[PRODUCT_ID]!,
+          expires_date: '2026-10-29T00:00:00.000Z',
+          grace_period_expires_date: null,
+        },
+      },
     };
     const { db } = fakeDb();
 
@@ -222,11 +241,17 @@ describe('RevenueCat current subscriber reconciliation candidates', () => {
   });
 
   it('marks a provider-confirmed refund inactive without treating cancellation as immediate revocation', async () => {
-    const refunded = baseSnapshot();
-    refunded.subscriptions[PRODUCT_ID] = {
-      ...refunded.subscriptions[PRODUCT_ID]!,
-      refunded_at: '2026-10-30T10:00:00.000Z',
-      unsubscribe_detected_at: null,
+    const base = baseSnapshot();
+    const refunded: RevenueCatSubscriberSnapshot = {
+      ...base,
+      subscriptions: {
+        ...base.subscriptions,
+        [PRODUCT_ID]: {
+          ...base.subscriptions[PRODUCT_ID]!,
+          refunded_at: '2026-10-30T10:00:00.000Z',
+          unsubscribe_detected_at: null,
+        },
+      },
     };
     const { db } = fakeDb();
     const result = await buildRevenueCatSubscriberReconciliationCandidates(
@@ -236,10 +261,15 @@ describe('RevenueCat current subscriber reconciliation candidates', () => {
     );
     expect(result.candidates[0]?.currentState).toBe('REFUNDED');
 
-    const cancelled = baseSnapshot();
-    cancelled.subscriptions[PRODUCT_ID] = {
-      ...cancelled.subscriptions[PRODUCT_ID]!,
-      unsubscribe_detected_at: '2026-10-30T10:00:00.000Z',
+    const cancelled: RevenueCatSubscriberSnapshot = {
+      ...base,
+      subscriptions: {
+        ...base.subscriptions,
+        [PRODUCT_ID]: {
+          ...base.subscriptions[PRODUCT_ID]!,
+          unsubscribe_detected_at: '2026-10-30T10:00:00.000Z',
+        },
+      },
     };
     const cancelledDb = fakeDb();
     const cancelledResult = await buildRevenueCatSubscriberReconciliationCandidates(
@@ -251,10 +281,16 @@ describe('RevenueCat current subscriber reconciliation candidates', () => {
   });
 
   it('deduplicates multiple entitlements granted by one store product', async () => {
-    const snapshot = baseSnapshot();
-    snapshot.entitlements.creator_plus = {
-      ...snapshot.entitlements.creator_gold!,
-      product_identifier: PRODUCT_ID,
+    const base = baseSnapshot();
+    const snapshot: RevenueCatSubscriberSnapshot = {
+      ...base,
+      entitlements: {
+        ...base.entitlements,
+        creator_plus: {
+          ...base.entitlements.creator_gold!,
+          product_identifier: PRODUCT_ID,
+        },
+      },
     };
     const { db, statements } = fakeDb();
 
@@ -269,10 +305,16 @@ describe('RevenueCat current subscriber reconciliation candidates', () => {
   });
 
   it('fails closed for unmapped products instead of returning partial candidates', async () => {
-    const snapshot = baseSnapshot();
-    snapshot.entitlements.creator_gold = {
-      ...snapshot.entitlements.creator_gold!,
-      product_identifier: 'unmapped.product:monthly',
+    const base = baseSnapshot();
+    const snapshot: RevenueCatSubscriberSnapshot = {
+      ...base,
+      entitlements: {
+        ...base.entitlements,
+        creator_gold: {
+          ...base.entitlements.creator_gold!,
+          product_identifier: 'unmapped.product:monthly',
+        },
+      },
     };
     const { db, statements } = fakeDb(null);
 
@@ -285,10 +327,16 @@ describe('RevenueCat current subscriber reconciliation candidates', () => {
   });
 
   it('rejects unsupported stores and entitlements without a subscription snapshot', async () => {
-    const unsupported = baseSnapshot();
-    unsupported.subscriptions[PRODUCT_ID] = {
-      ...unsupported.subscriptions[PRODUCT_ID]!,
-      store: 'PROMOTIONAL',
+    const base = baseSnapshot();
+    const unsupported: RevenueCatSubscriberSnapshot = {
+      ...base,
+      subscriptions: {
+        ...base.subscriptions,
+        [PRODUCT_ID]: {
+          ...base.subscriptions[PRODUCT_ID]!,
+          store: 'PROMOTIONAL',
+        },
+      },
     };
     const unsupportedDb = fakeDb();
     await expect(buildRevenueCatSubscriberReconciliationCandidates(
@@ -298,8 +346,10 @@ describe('RevenueCat current subscriber reconciliation candidates', () => {
     )).rejects.toMatchObject({ code: 'UNSUPPORTED_STORE' });
     expect(unsupportedDb.statements).toHaveLength(0);
 
-    const missingSubscription = baseSnapshot();
-    missingSubscription.subscriptions = {};
+    const missingSubscription: RevenueCatSubscriberSnapshot = {
+      ...base,
+      subscriptions: {},
+    };
     const missingDb = fakeDb();
     await expect(buildRevenueCatSubscriberReconciliationCandidates(
       missingDb.db,
@@ -310,8 +360,11 @@ describe('RevenueCat current subscriber reconciliation candidates', () => {
   });
 
   it('requires a real snapshot request timestamp and validates malformed provider maps', async () => {
-    const missingVersion = baseSnapshot();
-    missingVersion.requestDateMs = null;
+    const base = baseSnapshot();
+    const missingVersion: RevenueCatSubscriberSnapshot = {
+      ...base,
+      requestDateMs: null,
+    };
     const missingDb = fakeDb();
 
     await expect(buildRevenueCatSubscriberReconciliationCandidates(
@@ -321,10 +374,15 @@ describe('RevenueCat current subscriber reconciliation candidates', () => {
     )).rejects.toMatchObject({ code: 'SNAPSHOT_VERSION_MISSING' });
     expect(missingDb.statements).toHaveLength(0);
 
-    const malformed = baseSnapshot();
-    malformed.entitlements.creator_gold = {
-      ...malformed.entitlements.creator_gold!,
-      purchase_date: 'not-a-date',
+    const malformed: RevenueCatSubscriberSnapshot = {
+      ...base,
+      entitlements: {
+        ...base.entitlements,
+        creator_gold: {
+          ...base.entitlements.creator_gold!,
+          purchase_date: 'not-a-date',
+        },
+      },
     };
     const malformedDb = fakeDb();
     await expect(buildRevenueCatSubscriberReconciliationCandidates(
@@ -333,5 +391,16 @@ describe('RevenueCat current subscriber reconciliation candidates', () => {
       { nowMs: () => NOW },
     )).rejects.toMatchObject({ code: 'INVALID_SNAPSHOT' });
     expect(malformedDb.statements).toHaveLength(0);
+  });
+
+  it('fails closed when the RevenueCat product-binding database is unavailable', async () => {
+    const { db, statements } = fakeDb(undefined, new Error('private D1 error'));
+
+    await expect(buildRevenueCatSubscriberReconciliationCandidates(
+      db,
+      { ...options, snapshot: baseSnapshot() },
+      { nowMs: () => NOW },
+    )).rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE', status: 503 });
+    expect(statements).toHaveLength(1);
   });
 });
