@@ -171,6 +171,25 @@ describe('RevenueCat read-only subscriber API adapter', () => {
     )).rejects.toMatchObject({ code: 'INVALID_RESPONSE', retryable: false });
   });
 
+  it('preserves special provider map keys without mutating object prototypes', async () => {
+    const specialSubscriber = JSON.parse(
+      '{"entitlements":{"__proto__":{"expires_date":null,"product_identifier":"product-special","purchase_date":"2026-10-02T00:00:00Z"}},' +
+      '"subscriptions":{"__proto__":{"expires_date":null,"purchase_date":"2026-10-02T00:00:00Z"}}}',
+    ) as unknown;
+    const fetcher = vi.fn(async () => okResponse(specialSubscriber)) as unknown as typeof fetch;
+
+    const snapshot = await fetchRevenueCatSubscriber(
+      { appUserId: 'user-1', secretApiKey: 'sk_server_only_secret' },
+      { fetcher },
+    );
+
+    expect(Object.hasOwn(snapshot.entitlements, '__proto__')).toBe(true);
+    expect(snapshot.entitlements['__proto__']?.product_identifier).toBe('product-special');
+    expect(Object.getPrototypeOf(snapshot.entitlements)).toBe(Object.prototype);
+    expect(Object.hasOwn(snapshot.subscriptions, '__proto__')).toBe(true);
+    expect(Object.getPrototypeOf(snapshot.subscriptions)).toBe(Object.prototype);
+  });
+
   it('treats bad server credentials as a non-retryable configuration rejection', async () => {
     const fetcher = vi.fn(async () => new Response('do not expose this body', { status: 401 })) as unknown as typeof fetch;
     await expect(fetchRevenueCatSubscriber(
