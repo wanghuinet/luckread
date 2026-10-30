@@ -511,6 +511,14 @@ describe('Hyperswitch server-side refund adapter', () => {
     expect(JSON.stringify(refund)).not.toContain('provider-private-detail')
   })
 
+  it('accepts a one-minor-unit refund without imposing an arbitrary currency minimum', async () => {
+    const oneMinorUnit = { ...refundInput, amount: 1 }
+    const fake = fakeFetch(jsonResponse(responseRefund({ amount: 1 })))
+    const refund = await createHyperswitchRefund(config, oneMinorUnit, fake.fetcher)
+    expect(refund.amount).toBe(1)
+    expect(JSON.parse(String(fake.captured[0].init.body)).amount).toBe(1)
+  })
+
   it('retrieves one refund by its stable ID and verifies its persisted payment and amount snapshot', async () => {
     const fake = fakeFetch(jsonResponse(responseRefund({ status: 'succeeded' })))
     const refund = await retrieveHyperswitchRefund(config, refundInput, fake.fetcher)
