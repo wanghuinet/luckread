@@ -266,7 +266,7 @@ class D104OrderMigrationTests(unittest.TestCase):
 
     def test_refunds_reject_unowned_uncaptured_overdrawn_and_noninitial_requests(self):
         self.order()
-        self.payment(status="succeeded", provider_updated_at=NOW)
+        self.payment(status="failed", provider_updated_at=NOW)
         with self.assertRaises(sqlite3.IntegrityError):
             self.refund(customer="user_2")
         with self.assertRaises(sqlite3.IntegrityError):
