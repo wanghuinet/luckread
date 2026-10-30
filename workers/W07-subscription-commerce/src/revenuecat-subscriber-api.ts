@@ -355,6 +355,7 @@ export async function fetchRevenueCatSubscriber(
         Authorization: 'Bearer ' + apiKey,
         Accept: 'application/json',
       },
+      cache: 'no-store',
       redirect: 'error',
       signal: AbortSignal.timeout(timeoutMs),
     });
