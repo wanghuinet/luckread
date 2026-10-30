@@ -339,6 +339,27 @@ describe('W07 internal customer refund runtime', () => {
     expect(fixture.calls.recordAcknowledgement).toHaveLength(1);
   });
 
+  it('fails closed when provider reconciliation is unavailable and never retries POST', async () => {
+    const fixture = createFixture({
+      existingReservation: { refund: requestedRefund, replayed: true },
+      retrieveProviderRefundError: new HyperswitchClientError('UPSTREAM_UNAVAILABLE', 'provider read timed out'),
+    });
+    const response = await handleCommerceRefundRequest(
+      request({
+        idempotencyKey: IDEMPOTENCY_KEY,
+        body: { paymentId: PAYMENT_ID, amountMinor: 300, currency: 'USD', reason: 'Customer request' },
+      }),
+      CUSTOMER_ID,
+      fixture.env,
+      fixture.dependencies,
+    );
+    expect(response?.status).toBe(503);
+    expect(await response?.json()).toMatchObject({ error: { code: 'SERVICE_UNAVAILABLE' } });
+    expect(fixture.calls.retrieveProviderRefund).toHaveLength(1);
+    expect(fixture.calls.createProviderRefund).toHaveLength(0);
+    expect(fixture.calls.recordAcknowledgement).toHaveLength(0);
+  });
+
   it('returns an existing accepted refund without creating another provider refund', async () => {
     const fixture = createFixture({
       existingReservation: {
