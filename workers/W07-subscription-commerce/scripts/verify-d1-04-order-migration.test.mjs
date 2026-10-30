@@ -29,7 +29,7 @@ const paymentMethodRevocationMigrationSql = fs.readFileSync(
   'utf8',
 )
 const paymentProviderEventsTerminalTriggerSql = paymentMethodRevocationMigrationSql.match(
-  /CREATE TRIGGER payment_provider_events_terminal_immutable\\b[\\s\\S]*?\\bEND;/i,
+  /CREATE TRIGGER payment_provider_events_terminal_immutable\b[\s\S]*?\bEND;/i,
 )?.[0]
 if (!paymentProviderEventsTerminalTriggerSql) throw new Error('0006 migration is missing its payment-provider event terminal trigger')
 const wrapSchema = (objects) => ({ success: true, results: [{ results: objects }] })
