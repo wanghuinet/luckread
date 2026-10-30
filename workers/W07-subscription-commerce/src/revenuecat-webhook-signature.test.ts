@@ -91,6 +91,26 @@ describe('RevenueCat webhook authentication and parsing', () => {
     expect(event.eventDataJson).not.toContain('new_provider_field')
   })
 
+  it('preserves negative refund amounts while keeping lifecycle counters and timestamps non-negative', () => {
+    const refund = bodyFor({
+      type: 'CANCELLATION',
+      price: -2.49,
+      price_in_purchased_currency: -2.49,
+    });
+    const event = parseRevenueCatWebhookEnvelope(refund, new Set(['app_luckread_android']));
+    const data = JSON.parse(event.eventDataJson) as Record<string, unknown>;
+    expect(data.price).toBe(-2.49);
+    expect(data.price_in_purchased_currency).toBe(-2.49);
+
+    const invalidRenewal = bodyFor({ type: 'RENEWAL', renewal_number: -1 });
+    expect(() => parseRevenueCatWebhookEnvelope(invalidRenewal, new Set(['app_luckread_android'])))
+      .toThrow('WEBHOOK_REJECTED');
+
+    const invalidPurchaseTime = bodyFor({ type: 'INITIAL_PURCHASE', purchased_at_ms: -1 });
+    expect(() => parseRevenueCatWebhookEnvelope(invalidPurchaseTime, new Set(['app_luckread_android'])))
+      .toThrow('WEBHOOK_REJECTED');
+  });
+
   it('preserves RevenueCat PURCHASE_REDEEMED identity arrays with their documented array types', () => {
     const body = bodyFor({
       type: 'PURCHASE_REDEEMED',
