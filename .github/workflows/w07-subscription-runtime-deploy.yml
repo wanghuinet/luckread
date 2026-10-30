@@ -156,7 +156,7 @@ jobs:
           if [[ "$HAS_MIGRATION_TABLE" == "true" ]]; then
             npx --yes wrangler@4.116.0 d1 execute "$D1_04_NAME" --remote --config wrangler.jsonc --command="SELECT name FROM d1_migrations ORDER BY name" --json > /tmp/w07-d1-04-deploy-migrations.json
           else
-            printf '{"querySkipped":"d1_migrations table not present"}\\n' > /tmp/w07-d1-04-deploy-migrations.json
+            printf '{"querySkipped":"d1_migrations table not present"}\n' > /tmp/w07-d1-04-deploy-migrations.json
           fi
 
           node scripts/verify-d1-04-order-migration.mjs preflight \
