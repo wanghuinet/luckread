@@ -290,8 +290,8 @@
       "successPolicy": "W01 must confirm the durable W06 intent before W07 writes a D1-04 revocation request or makes any Hyperswitch calls.",
       "cache": "NO_STORE",
       "auditedFields": [
+        "eventId",
         "savedPaymentMethodId",
-        "idempotencyKey",
         "operation"
       ],
       "sensitiveDataExcluded": [
@@ -303,7 +303,8 @@
         "raw request body"
       ],
       "excludedFields": [
-        "raw Idempotency-Key"
+        "raw Idempotency-Key",
+        "idempotencyKey request value"
       ]
     },
     {
