@@ -47,7 +47,9 @@ export type CommerceOrderData = Readonly<{
   updatedAt: string;
 }>;
 
-export type CommerceOrderSummary = Omit<CommerceOrderData, 'items'>;
+export type CommerceOrderSummary = Omit<CommerceOrderData, 'items'> & Readonly<{
+  latestPaymentId: string | null;
+}>;
 
 export type CommerceOrderListPage = Readonly<{
   items: readonly CommerceOrderSummary[];
@@ -677,6 +679,7 @@ type OrderListRow = {
   total_minor: number;
   created_at: string;
   updated_at: string;
+  latest_payment_id: string | null;
 };
 
 type CommerceOrderListCursor = {
@@ -757,7 +760,9 @@ export async function listCommerceOrders(
   const scopeHash = await commerceOrderListScopeHash(customerId);
   const cursor = decodeCommerceOrderListCursor(cursorValue, scopeHash);
   const baseSql =
-    'SELECT order_id, status, version, currency, subtotal_minor, discount_minor, tax_minor, total_minor, created_at, updated_at ' +
+    'SELECT order_id, status, version, currency, subtotal_minor, discount_minor, tax_minor, total_minor, created_at, updated_at, ' +
+    '(SELECT p.payment_id FROM payments AS p WHERE p.order_id = orders.order_id AND p.customer_id = orders.customer_id ' +
+    'ORDER BY p.created_at DESC, p.payment_id DESC LIMIT 1) AS latest_payment_id ' +
     'FROM orders WHERE customer_id = ? ';
   const statement = cursor
     ? db.prepare(baseSql + 'AND (created_at < ? OR (created_at = ? AND order_id < ?)) ORDER BY created_at DESC, order_id DESC LIMIT ?')
@@ -770,6 +775,7 @@ export async function listCommerceOrders(
   const items = page.map((row): CommerceOrderSummary => {
     if (
       !/^ord_[A-Za-z0-9_-]{1,90}$/.test(row.order_id) ||
+      !(row.latest_payment_id === null || (typeof row.latest_payment_id === 'string' && /^pay_[A-Za-z0-9]{26}$/.test(row.latest_payment_id))) ||
       !isValidOrderStatus(row.status) ||
       !Number.isSafeInteger(row.version) || row.version < 1 ||
       !/^[A-Z]{3}$/.test(row.currency) ||
@@ -793,6 +799,7 @@ export async function listCommerceOrders(
       totalMinor: row.total_minor,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
+      latestPaymentId: row.latest_payment_id,
     };
   });
   const last = page.at(-1);
