@@ -65,7 +65,7 @@ function targetObjectsFor(migrationIds) {
         name,
         tbl_name: tableName,
         sql: name === 'payment_provider_events_terminal_immutable' && migrationIds.includes(PAYMENT_METHOD_REVOCATION_MIGRATION_ID)
-          ? "CREATE TRIGGER payment_provider_events_terminal_immutable BEFORE UPDATE ON payment_provider_events WHEN OLD.state = 'RECONCILIATION_REQUIRED' AND NEW.event_type IN ('mandate_active','mandate_revoked') BEGIN SELECT 1; END"
+          ? "CREATE TRIGGER payment_provider_events_terminal_immutable BEFORE UPDATE ON payment_provider_events WHEN OLD.state IN ('APPLIED','REJECTED') OR (OLD.state = 'RECONCILIATION_REQUIRED' AND NOT (OLD.event_type IN ('mandate_active','mandate_revoked') AND NEW.state = 'RECEIVED' AND NEW.processed_at IS NULL AND NEW.outcome_code IS NULL)) BEGIN SELECT 1; END"
           : 'CREATE TRIGGER ' + name + ' BEFORE UPDATE ON ' + tableName + ' BEGIN SELECT 1; END',
       })
     }
@@ -153,6 +153,13 @@ test('fails closed when saved-method migration history exists without both earli
     schemaSnapshot: schemaWithMigrations([SAVED_METHOD_MIGRATION_ID]),
     migrationState: wrapMigrationState([SAVED_METHOD_MIGRATION_ID]),
   }), /saved-method migration is recorded without its required Order and Payment migrations/)
+})
+
+test('fails closed when payment-method revocation migration is recorded without the first five migrations', () => {
+  assert.throws(() => inspectD1_04OrderMigrationPreflight({
+    schemaSnapshot: schemaWithMigrations([PAYMENT_METHOD_REVOCATION_MIGRATION_ID]),
+    migrationState: wrapMigrationState([PAYMENT_METHOD_REVOCATION_MIGRATION_ID]),
+  }), /payment-method revocation migration is recorded without its required commerce and RevenueCat migrations/)
 })
 
 test('an applied Order migration can advance pending Payment, mandate and renewal migrations', () => {
