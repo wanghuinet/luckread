@@ -379,6 +379,18 @@ export default function MySubscriptionsScreen() {
         <Text className="text-xs leading-5 text-neutral-500 dark:text-neutral-400">
           订阅状态由 W07 提供。订阅记录本身不证明付款已完成或内容权益已生效；在支付渠道、续费与退款同步通过验收前，APP 仅提供真实记录查询，不开放暂停、恢复或取消操作。
         </Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="查看账单与订单历史"
+          onPress={() => router.push('/billing-history' as never)}
+          className="mt-3 flex-row items-center justify-between rounded-xl border border-neutral-200 px-3 py-3 dark:border-neutral-700"
+        >
+          <View className="flex-row items-center gap-2">
+            <Feather name="file-text" size={17} color={PRIMARY} />
+            <Text className="text-sm font-bold text-neutral-800 dark:text-neutral-100">查看账单与订单历史</Text>
+          </View>
+          <Feather name="chevron-right" size={17} color="#667085" />
+        </Pressable>
       </View>
 
       {error ? (
