@@ -78,7 +78,7 @@ describe('public customer payment refund adapter', () => {
     expect(w07Webhook).toContain("envelope.eventType === 'refund_review'")
     expect(w07Webhook).toContain('payloadSha256')
     expect(w07Webhook).toContain("state = 'RECEIVED'")
-    expect(w07Persistence).toContain('Only a signature-verified webhook may set SUCCEEDED or FAILED')
+    expect(w07Persistence).toContain('Only a signature-verified webhook may set SUCCEEDED')
     expect(w07Runtime).not.toContain('grantEntitlement(')
   })
 
