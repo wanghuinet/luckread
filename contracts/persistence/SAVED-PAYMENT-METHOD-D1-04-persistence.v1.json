@@ -14,11 +14,12 @@
     "migrationDirectory": "migrations-d1-04",
     "migrationFile": "0003_saved_payment_methods_mandates.sql",
     "migrationId": "0003_saved_payment_methods_mandates",
-    "extensionMigrationFile": "0005_payment_method_revocation_requests.sql",
-    "extensionMigrationId": "0005_payment_method_revocation_requests",
+    "extensionMigrationFile": "0006_payment_method_revocation_requests.sql",
+    "extensionMigrationId": "0006_payment_method_revocation_requests",
     "extensionMigrationRequires": [
       "0003_saved_payment_methods_mandates",
-      "0004_subscription_renewal_cycles"
+      "0004_subscription_renewal_cycles",
+      "0005_revenuecat_webhook_inbox"
     ],
     "remoteApplied": false
   },
