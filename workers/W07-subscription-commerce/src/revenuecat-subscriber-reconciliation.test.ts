@@ -325,6 +325,11 @@ describe('RevenueCat current subscriber reconciliation candidates', () => {
           product_identifier: 'unmapped.product:monthly',
         },
       },
+      subscriptions: {
+        'unmapped.product:monthly': {
+          ...base.subscriptions[PRODUCT_ID]!,
+        },
+      },
     };
     const { db, statements } = fakeDb(null);
 
