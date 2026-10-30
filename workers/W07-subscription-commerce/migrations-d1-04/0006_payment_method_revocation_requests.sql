@@ -37,7 +37,6 @@ CREATE TABLE payment_method_revocation_requests (
   created_at TEXT NOT NULL CHECK (length(created_at) BETWEEN 1 AND 64),
   updated_at TEXT NOT NULL CHECK (length(updated_at) BETWEEN 1 AND 64 AND updated_at >= created_at),
   UNIQUE (saved_payment_method_id),
-  UNIQUE (customer_id, idempotency_key),
   FOREIGN KEY (saved_payment_method_id) REFERENCES saved_payment_methods(saved_payment_method_id)
 );
 
