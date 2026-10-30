@@ -1,4 +1,21 @@
 -- PAY-003 saved-payment-method revocation coordination in existing D1-04.
+-- Permit only byte-identical mandate webhook receipts previously marked
+-- RECONCILIATION_REQUIRED to be reopened by W07 for a later source-row replay.
+-- APPLIED and REJECTED provider receipts remain permanently immutable.
+DROP TRIGGER IF EXISTS payment_provider_events_terminal_immutable;
+CREATE TRIGGER payment_provider_events_terminal_immutable
+BEFORE UPDATE ON payment_provider_events
+WHEN OLD.state IN ('APPLIED','REJECTED')
+  OR (
+    OLD.state = 'RECONCILIATION_REQUIRED'
+    AND NOT (
+      NEW.state = 'RECEIVED'
+      AND NEW.processed_at IS NULL
+      AND NEW.outcome_code IS NULL
+    )
+  )
+BEGIN SELECT RAISE(ABORT, 'processed provider webhook events are immutable except exact reconciliation replay'); END;
+
 -- A local request immediately blocks new MIT renewal submissions. It does not
 -- rewrite provider mandate truth: only the signed mandate_revoked webhook may
 -- finalize payment_mandates.status = REVOKED.
