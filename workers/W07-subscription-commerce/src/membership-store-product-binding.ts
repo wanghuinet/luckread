@@ -1,6 +1,7 @@
 import { SubscriptionRuntimeError } from './subscription-runtime.js';
 
 export type RevenueCatStore = 'APP_STORE' | 'PLAY_STORE';
+export type RevenueCatStoreInput = RevenueCatStore | 'app_store' | 'play_store';
 export type RevenueCatBindingPurpose = 'NEW_PURCHASE' | 'EXISTING_TRANSACTION';
 
 export type RevenueCatMembershipProductBinding = {
@@ -15,6 +16,15 @@ type RevenueCatMembershipProductBindingRow = {
   plan_version: number;
   creator_id: string;
   billing_interval: string;
+};
+
+const normalizeRevenueCatStore = (value: unknown): RevenueCatStore => {
+  // RevenueCat Webhooks use APP_STORE / PLAY_STORE, while its Subscriber API
+  // serializes the same stores as app_store / play_store. Normalize only those
+  // exact documented forms; promotional, Stripe and unknown stores fail closed.
+  if (value === 'APP_STORE' || value === 'app_store') return 'APP_STORE';
+  if (value === 'PLAY_STORE' || value === 'play_store') return 'PLAY_STORE';
+  throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400);
 };
 
 const MAX_APP_ID_LENGTH = 128;
@@ -49,17 +59,15 @@ export async function resolveRevenueCatMembershipProduct(
   db: D1Database,
   input: {
     revenueCatAppId: string;
-    store: RevenueCatStore;
+    store: RevenueCatStoreInput;
     productId: string;
     purpose: RevenueCatBindingPurpose;
   },
 ): Promise<RevenueCatMembershipProductBinding> {
   const appId = requireCanonicalIdentifier(input.revenueCatAppId, MAX_APP_ID_LENGTH);
   const productId = requireCanonicalIdentifier(input.productId, MAX_PRODUCT_ID_LENGTH);
-  if (
-    (input.store !== 'APP_STORE' && input.store !== 'PLAY_STORE') ||
-    (input.purpose !== 'NEW_PURCHASE' && input.purpose !== 'EXISTING_TRANSACTION')
-  ) {
+  const store = normalizeRevenueCatStore(input.store);
+  if (input.purpose !== 'NEW_PURCHASE' && input.purpose !== 'EXISTING_TRANSACTION') {
     throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400);
   }
 
@@ -77,7 +85,7 @@ export async function resolveRevenueCatMembershipProduct(
       "WHERE b.revenuecat_app_id = ? AND b.store = ? AND b.product_id = ? AND p.owner_type = 'CREATOR' " +
       sellableOnly +
       'LIMIT 1',
-    ).bind(appId, input.store, productId).first<RevenueCatMembershipProductBindingRow>();
+    ).bind(appId, store, productId).first<RevenueCatMembershipProductBindingRow>();
   } catch {
     throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
   }

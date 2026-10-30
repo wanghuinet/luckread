@@ -72,6 +72,30 @@ describe('RevenueCat membership product binding', () => {
     expect(getSql()).toContain("p.owner_type = 'CREATOR'");
   });
 
+  it('normalizes the lowercase Subscriber API store identifiers to the D1 binding enum', async () => {
+    const appStore = fakeDb({ row: validRow });
+    await expect(resolveRevenueCatMembershipProduct(appStore.db, {
+      ...input,
+      store: 'app_store',
+    })).resolves.toMatchObject({ planId: 'plan_creator_gold' });
+    expect(appStore.getBindings()).toEqual([
+      'app_luckread_android',
+      'APP_STORE',
+      'creator.gold:monthly-v1',
+    ]);
+
+    const playStore = fakeDb({ row: validRow });
+    await expect(resolveRevenueCatMembershipProduct(playStore.db, {
+      ...input,
+      store: 'play_store',
+    })).resolves.toMatchObject({ planId: 'plan_creator_gold' });
+    expect(playStore.getBindings()).toEqual([
+      'app_luckread_android',
+      'PLAY_STORE',
+      'creator.gold:monthly-v1',
+    ]);
+  });
+
   it('keeps retired historical bindings resolvable for existing transactions only', async () => {
     const { db, getSql } = fakeDb({ row: validRow });
 
