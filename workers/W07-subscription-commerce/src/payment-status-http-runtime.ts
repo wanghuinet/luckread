@@ -131,7 +131,7 @@ export async function handlePaymentStatusRequest(
       providerCheckedAt = checkedAt.toISOString();
       try {
         const retrieveProvider = dependencies.retrieveProvider ?? retrieveHyperswitchPayment;
-        const observed = await retrieveProvider(config, payment.paymentId);
+        const observed = await retrieveProvider(config, payment.paymentId, undefined, true);
         const identityMatches =
           observed.paymentId === payment.paymentId &&
           observed.merchantId === config.expectedMerchantId &&
