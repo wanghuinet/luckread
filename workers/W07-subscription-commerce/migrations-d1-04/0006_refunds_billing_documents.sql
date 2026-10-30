@@ -5,7 +5,7 @@
 -- is stored here.
 
 CREATE TABLE refunds (
-  refund_id TEXT PRIMARY KEY NOT NULL CHECK (length(refund_id) BETWEEN 1 AND 128),
+  refund_id TEXT PRIMARY KEY NOT NULL CHECK (length(refund_id) = 30 AND substr(refund_id, 1, 4) = 'ref_' AND substr(refund_id, 5) NOT GLOB '*[^A-Za-z0-9]*'),
   provider TEXT NOT NULL CHECK (provider = 'hyperswitch'),
   merchant_id TEXT NOT NULL CHECK (length(merchant_id) BETWEEN 1 AND 256),
   customer_id TEXT NOT NULL CHECK (length(customer_id) BETWEEN 1 AND 256),
@@ -15,7 +15,7 @@ CREATE TABLE refunds (
   captured_amount_minor INTEGER NOT NULL CHECK (typeof(captured_amount_minor) = 'integer' AND captured_amount_minor BETWEEN 1 AND 9007199254740991),
   currency TEXT NOT NULL CHECK (length(currency) = 3 AND currency GLOB '[A-Z][A-Z][A-Z]'),
   status TEXT NOT NULL DEFAULT 'REQUESTED' CHECK (status IN ('REQUESTED','PENDING','SUCCEEDED','FAILED','REVIEW','RECONCILIATION_REQUIRED')),
-  reason TEXT CHECK (reason IS NULL OR length(reason) BETWEEN 1 AND 512),
+  reason TEXT CHECK (reason IS NULL OR length(reason) BETWEEN 1 AND 255),
   idempotency_key TEXT NOT NULL CHECK (length(idempotency_key) BETWEEN 1 AND 128),
   request_hash TEXT NOT NULL CHECK (length(request_hash) = 64 AND request_hash NOT GLOB '*[^0-9a-f]*'),
   provider_updated_at TEXT CHECK (provider_updated_at IS NULL OR length(provider_updated_at) BETWEEN 1 AND 64),
