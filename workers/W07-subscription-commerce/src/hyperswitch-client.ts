@@ -810,7 +810,7 @@ function validateRefundInput(input: CreateHyperswitchRefundInput): void {
     throw new HyperswitchClientError('REQUEST_INVALID', 'Payment ID must be the stable 30-character payment identifier.')
   }
   if (!Number.isSafeInteger(input.amount) || input.amount <= 0) {
-    throw new HyperswitchClientError('REQUEST_INVALID', 'Refund amount must be at least 100 and a safe integer in the currency smallest unit.')
+    throw new HyperswitchClientError('REQUEST_INVALID', 'Refund amount must be a positive safe integer in the currency smallest unit.')
   }
   if (typeof input.currency !== 'string' || !CURRENCY_PATTERN.test(input.currency)) {
     throw new HyperswitchClientError('REQUEST_INVALID', 'Refund currency must be a three-letter uppercase code.')
