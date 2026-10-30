@@ -144,7 +144,7 @@ jobs:
         run: LUCKREAD_VITEST_SCOPE=w07-unit pnpm exec vitest run --config workers/W01-payload/vitest.config.mts --root ../..
       - name: Run W01 commerce/subscription/payment adapter integration tests
         working-directory: workers/W01-payload
-        run: pnpm exec vitest run --config ./vitest.config.mts tests/int/subscription-v1-adapter.int.spec.ts tests/int/commerce-order-v1-adapter.int.spec.ts tests/int/payments-intent-v1-adapter.int.spec.ts tests/int/hyperswitch-webhook-v1-adapter.int.spec.ts tests/int/revenuecat-webhook-v1-adapter.int.spec.ts tests/int/provider-webhook-body.int.spec.ts
+        run: pnpm exec vitest run --config ./vitest.config.mts tests/int/subscription-v1-adapter.int.spec.ts tests/int/commerce-order-v1-adapter.int.spec.ts tests/int/payments-intent-v1-adapter.int.spec.ts tests/int/hyperswitch-webhook-v1-adapter.int.spec.ts tests/int/revenuecat-webhook-v1-adapter.int.spec.ts tests/int/provider-webhook-body.int.spec.ts tests/int/payments-refund-v1-adapter.int.spec.ts tests/int/billing-history-v1-adapter.int.spec.ts
       - name: Verify Subscription migration shape
         run: |
           set -euo pipefail
