@@ -59,6 +59,30 @@ export interface CreateHyperswitchMerchantInitiatedPaymentInput extends CreateHy
   paymentMethodId: string;
 }
 
+export type HyperswitchRefundStatus = 'pending' | 'succeeded' | 'failed' | 'review';
+
+export type HyperswitchRefund = Readonly<{
+  refundId: string;
+  paymentId: string;
+  amount: number;
+  currency: string;
+  status: HyperswitchRefundStatus;
+  reason: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+}>;
+
+export type CreateHyperswitchRefundInput = Readonly<{
+  /** Stable, merchant-generated 30-character refund ID reused for retries. */
+  refundId: string;
+  paymentId: string;
+  /** Positive amount in the currency's smallest unit; captured-balance limits are enforced by Hyperswitch. */
+  amount: number;
+  /** Expected currency from the authoritative local payment row. */
+  currency: string;
+  reason?: string;
+}>;
+
 export type HyperswitchPaymentStatus =
   | 'requires_payment_method'
   | 'requires_confirmation'
@@ -630,7 +654,8 @@ async function requestHyperswitchJson(
   path: string,
   method: 'GET' | 'POST' | 'DELETE',
   fetchImpl: typeof fetch,
-): Promise<unknown> {
+  body?: Readonly<Record<string, unknown>>,
+): Promise<Record<string, unknown>> {
   const { baseUrl, apiKey, expectedMerchantId } = resolveConfig(config)
   let response: Response
   try {
@@ -643,6 +668,7 @@ async function requestHyperswitchJson(
         accept: 'application/json',
         ...(method === 'POST' ? { 'content-type': 'application/json' } : {}),
       },
+      ...(body ? { body: JSON.stringify(body) } : {}),
     })
   } catch {
     throw new HyperswitchClientError('UPSTREAM_UNAVAILABLE', 'Hyperswitch request failed or timed out.')
@@ -652,7 +678,7 @@ async function requestHyperswitchJson(
   }
   const value = await readJsonResponse(response)
   if (!isRecord(value)) {
-    throw new HyperswitchClientError('UPSTREAM_INVALID_RESPONSE', 'Hyperswitch returned an invalid payment-method response.')
+    throw new HyperswitchClientError('UPSTREAM_INVALID_RESPONSE', 'Hyperswitch returned an invalid provider response.')
   }
   if (typeof value.merchant_id === 'string' && value.merchant_id !== expectedMerchantId) {
     throw new HyperswitchClientError('UPSTREAM_INVALID_RESPONSE', 'Hyperswitch returned a different merchant.')
@@ -770,4 +796,117 @@ export async function deleteHyperswitchPaymentMethod(
   if (value.payment_method_id !== paymentMethodId || value.deleted !== true) {
     throw new HyperswitchClientError('UPSTREAM_INVALID_RESPONSE', 'Hyperswitch did not confirm deletion of the requested payment method.')
   }
+}
+
+
+const REFUND_ID_PATTERN = /^ref_[A-Za-z0-9]{26}$/;
+const REFUND_STATUSES = new Set<HyperswitchRefundStatus>(['pending', 'succeeded', 'failed', 'review']);
+
+function validateRefundInput(input: CreateHyperswitchRefundInput): void {
+  if (typeof input.refundId !== 'string' || !REFUND_ID_PATTERN.test(input.refundId)) {
+    throw new HyperswitchClientError('REQUEST_INVALID', 'Refund ID must be a stable 30-character identifier.')
+  }
+  if (typeof input.paymentId !== 'string' || !PAYMENT_ID_PATTERN.test(input.paymentId)) {
+    throw new HyperswitchClientError('REQUEST_INVALID', 'Payment ID must be the stable 30-character payment identifier.')
+  }
+  if (!Number.isSafeInteger(input.amount) || input.amount <= 0) {
+    throw new HyperswitchClientError('REQUEST_INVALID', 'Refund amount must be a positive safe integer in the currency smallest unit.')
+  }
+  if (typeof input.currency !== 'string' || !CURRENCY_PATTERN.test(input.currency)) {
+    throw new HyperswitchClientError('REQUEST_INVALID', 'Refund currency must be a three-letter uppercase code.')
+  }
+  if (input.reason !== undefined && (
+    typeof input.reason !== 'string' || input.reason.length > 255 ||
+    input.reason.trim() !== input.reason || /[\\u0000-\\u001f\\u007f]/.test(input.reason)
+  )) {
+    throw new HyperswitchClientError('REQUEST_INVALID', 'Refund reason is malformed.')
+  }
+}
+
+function normalizeHyperswitchRefund(
+  value: Record<string, unknown>,
+  expected: Pick<CreateHyperswitchRefundInput, 'refundId' | 'paymentId' | 'amount' | 'currency'>,
+): HyperswitchRefund {
+  const refundId = value.refund_id
+  const paymentId = value.payment_id
+  const amount = value.amount
+  const currency = value.currency
+  const status = value.status
+  const reason = value.reason
+  const createdAt = value.created_at
+  const updatedAt = value.updated_at
+  if (
+    typeof refundId !== 'string' || !REFUND_ID_PATTERN.test(refundId) || refundId !== expected.refundId ||
+    typeof paymentId !== 'string' || !PAYMENT_ID_PATTERN.test(paymentId) || paymentId !== expected.paymentId ||
+    typeof amount !== 'number' || !Number.isSafeInteger(amount) || amount <= 0 || amount !== expected.amount ||
+    typeof currency !== 'string' || !CURRENCY_PATTERN.test(currency) || currency !== expected.currency ||
+    typeof status !== 'string' || !REFUND_STATUSES.has(status as HyperswitchRefundStatus) ||
+    (reason !== undefined && reason !== null && (
+      typeof reason !== 'string' || reason.length > 255 || reason.trim() !== reason ||
+      /[\\u0000-\\u001f\\u007f]/.test(reason)
+    )) ||
+    (createdAt !== undefined && createdAt !== null && (
+      typeof createdAt !== 'string' || parseHyperswitchRfc3339Timestamp(createdAt) === null
+    )) ||
+    (updatedAt !== undefined && updatedAt !== null && (
+      typeof updatedAt !== 'string' || parseHyperswitchRfc3339Timestamp(updatedAt) === null
+    ))
+  ) {
+    throw new HyperswitchClientError('UPSTREAM_INVALID_RESPONSE', 'Hyperswitch returned a refund that did not match the requested financial facts.')
+  }
+  return {
+    refundId,
+    paymentId,
+    amount,
+    currency,
+    status: status as HyperswitchRefundStatus,
+    reason: typeof reason === 'string' ? reason : null,
+    createdAt: typeof createdAt === 'string' ? createdAt : null,
+    updatedAt: typeof updatedAt === 'string' ? updatedAt : null,
+  }
+}
+
+/**
+ * Reuse Hyperswitch's existing refund orchestration rather than implement
+ * connector-specific refund execution. The caller must persist the stable
+ * refund ID and bind it to an owner-scoped local Payment before calling.
+ * A pending/review response is never a successful refund.
+ */
+export async function createHyperswitchRefund(
+  config: HyperswitchClientConfig,
+  input: CreateHyperswitchRefundInput,
+  fetchImpl: typeof fetch = fetch,
+): Promise<HyperswitchRefund> {
+  validateRefundInput(input)
+  const value = await requestHyperswitchJson(config, '/refunds', 'POST', fetchImpl, {
+    payment_id: input.paymentId,
+    refund_id: input.refundId,
+    amount: input.amount,
+    refund_type: 'instant',
+    ...(input.reason !== undefined ? { reason: input.reason } : {}),
+  })
+  return normalizeHyperswitchRefund(value, input)
+}
+
+/** Retrieve one provider refund and verify it against the persisted local request snapshot. */
+export async function retrieveHyperswitchRefund(
+  config: HyperswitchClientConfig,
+  expected: Pick<CreateHyperswitchRefundInput, 'refundId' | 'paymentId' | 'amount' | 'currency'>,
+  fetchImpl: typeof fetch = fetch,
+): Promise<HyperswitchRefund> {
+  if (typeof expected.refundId !== 'string' || !REFUND_ID_PATTERN.test(expected.refundId)) {
+    throw new HyperswitchClientError('REQUEST_INVALID', 'Refund ID must be a stable 30-character identifier.')
+  }
+  if (typeof expected.paymentId !== 'string' || !PAYMENT_ID_PATTERN.test(expected.paymentId) ||
+      !Number.isSafeInteger(expected.amount) || expected.amount <= 0 ||
+      typeof expected.currency !== 'string' || !CURRENCY_PATTERN.test(expected.currency)) {
+    throw new HyperswitchClientError('REQUEST_INVALID', 'Expected local refund facts are malformed.')
+  }
+  const value = await requestHyperswitchJson(
+    config,
+    '/refunds/' + encodeURIComponent(expected.refundId),
+    'GET',
+    fetchImpl,
+  )
+  return normalizeHyperswitchRefund(value, expected)
 }
