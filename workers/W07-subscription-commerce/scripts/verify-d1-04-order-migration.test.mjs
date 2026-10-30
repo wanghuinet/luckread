@@ -8,6 +8,7 @@ import {
   PAYMENT_MIGRATION_ID,
   SAVED_METHOD_MIGRATION_ID,
   RENEWAL_MIGRATION_ID,
+  REVENUECAT_WEBHOOK_MIGRATION_ID,
   REQUIRED_MIGRATION_IDS,
   REQUIRED_COLUMNS,
   REQUIRED_INDEXES,
@@ -31,9 +32,11 @@ function targetObjectsFor(migrationIds) {
       ? ['payments', 'payment_provider_events', 'payment_provider_event_conflicts']
       : id === SAVED_METHOD_MIGRATION_ID
         ? ['saved_payment_methods', 'payment_mandates']
-        : id === '0004_subscription_renewal_cycles'
+        : id === RENEWAL_MIGRATION_ID
           ? ['subscription_renewal_cycles', 'subscription_renewal_scheduler_state']
-          : [])
+          : id === REVENUECAT_WEBHOOK_MIGRATION_ID
+            ? ['revenuecat_webhook_events', 'revenuecat_webhook_event_conflicts']
+            : [])
   const objects = tables.map((tableName) => ({
     type: 'table',
     name: tableName,
@@ -95,6 +98,8 @@ const tableInfo = {
   paymentMandates: tableInfoFor('payment_mandates'),
   renewalCycles: tableInfoFor('subscription_renewal_cycles'),
   renewalSchedulerState: tableInfoFor('subscription_renewal_scheduler_state'),
+  revenueCatWebhookEvents: tableInfoFor('revenuecat_webhook_events'),
+  revenueCatWebhookConflicts: tableInfoFor('revenuecat_webhook_event_conflicts'),
 }
 
 function verifyCompletePostflight({ preflightSchema = schemaWithMigrations([]), postflightSchema = schemaWithMigrations(REQUIRED_MIGRATION_IDS), migrationState = wrapMigrationState(REQUIRED_MIGRATION_IDS) } = {}) {
@@ -112,6 +117,8 @@ function verifyCompletePostflight({ preflightSchema = schemaWithMigrations([]), 
     paymentMandatesTableInfo: tableInfo.paymentMandates,
     renewalCyclesTableInfo: tableInfo.renewalCycles,
     renewalSchedulerStateTableInfo: tableInfo.renewalSchedulerState,
+    revenueCatWebhookEventsTableInfo: tableInfo.revenueCatWebhookEvents,
+    revenueCatWebhookConflictsTableInfo: tableInfo.revenueCatWebhookConflicts,
   })
 }
 
@@ -175,7 +182,7 @@ test('normalizes Wrangler .sql migration filenames for preflight and postflight 
   const report = verifyCompletePostflight({ migrationState })
   assert.equal(report.result, 'POSTFLIGHT_PASS')
   assert.deepEqual(report.appliedMigrations, REQUIRED_MIGRATION_IDS)
-  assert.equal(report.verifiedTriggers.length, 49)
+  assert.equal(report.verifiedTriggers.length, 56)
 })
 
 test('fails closed if any target object exists without matching migration history', () => {
@@ -204,8 +211,8 @@ test('postflight validates both migrations, all tables/columns/indexes/triggers,
   assert.equal(report.result, 'POSTFLIGHT_PASS')
   assert.equal(report.baselineSchemaPreserved, true)
   assert.deepEqual(report.appliedMigrations, REQUIRED_MIGRATION_IDS)
-  assert.equal(report.verifiedTables.length, 10)
-  assert.equal(report.verifiedIndexes.length, 22)
+  assert.equal(report.verifiedTables.length, 12)
+  assert.equal(report.verifiedIndexes.length, 25)
   assert.equal(report.verifiedTriggers.length, 49)
   assert.equal(report.databaseRowsExported, false)
 })
@@ -230,7 +237,7 @@ test('postflight rejects changed existing schema objects', () => {
 
 test('workflow is manual-only, gates exact SHA/name/confirmation, and never deploys a Worker', () => {
   const workflow = fs.readFileSync(new URL('../../../.github/workflows/w07-d1-04-order-migration.yml', import.meta.url), 'utf8')
-  const migration = fs.readFileSync(new URL('../migrations-d1-04/0004_subscription_renewal_cycles.sql', import.meta.url), 'utf8')
+  const migration = fs.readFileSync(new URL('../migrations-d1-04/0004_subscription_renewal_cycles.sql', import.meta.url), 'utf8')\n  const revenueCatMigration = fs.readFileSync(new URL('../migrations-d1-04/0005_revenuecat_webhook_inbox.sql', import.meta.url), 'utf8')
   assert.match(workflow, /workflow_dispatch:/)
   assert.doesNotMatch(workflow, /^\s{2}(push|pull_request):/m)
   assert.match(workflow, /source_sha:/)
