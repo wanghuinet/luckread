@@ -1056,8 +1056,8 @@ console.log(JSON.stringify({
   remainingInventoryWithoutOpenApi: inventoryMap.size - effectiveOpenApi.length,
 }, null, 2));
  },
-            amountMinor: { type: 'integer', minimum: 100 },
-            capturedAmountMinor: { type: 'integer', minimum: 100 },
+            amountMinor: { type: 'integer', minimum: 1 },
+            capturedAmountMinor: { type: 'integer', minimum: 1 },
             currency: { type: 'string', pattern: '^[A-Z]{3}
   const tagMap = {
     auth_identity: 'Auth',
@@ -1692,7 +1692,7 @@ console.log(JSON.stringify({
   remainingInventoryWithoutOpenApi: inventoryMap.size - effectiveOpenApi.length,
 }, null, 2));
  },
-          amountMinor: { type: 'integer', minimum: 100, maximum: 9007199254740991 },
+          amountMinor: { type: 'integer', minimum: 1, maximum: 9007199254740991 },
           currency: { type: 'string', pattern: '^[A-Z]{3}
   const tagMap = {
     auth_identity: 'Auth',
@@ -3161,7 +3161,7 @@ console.log(JSON.stringify({
   remainingInventoryWithoutOpenApi: inventoryMap.size - effectiveOpenApi.length,
 }, null, 2));
  },
-        amountMinor: { type: 'integer', minimum: 100 },
+        amountMinor: { type: 'integer', minimum: 1 },
         currency: { type: 'string', pattern: '^[A-Z]{3}
   const tagMap = {
     auth_identity: 'Auth',
