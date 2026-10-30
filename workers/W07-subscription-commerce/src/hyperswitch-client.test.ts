@@ -518,6 +518,25 @@ describe('Hyperswitch server-side payment intent client', () => {
     }
   })
 
+  it('accepts a one-minor-unit partial refund without imposing a platform-wide minimum', async () => {
+    const refundId = 'ref_' + '3'.repeat(26)
+    const fake = fakeFetch(jsonResponse({
+      refund_id: refundId,
+      payment_id: input.paymentId,
+      amount: 1,
+      currency: 'USD',
+      status: 'pending',
+      updated_at: '2026-10-30T10:00:00.000Z',
+    }))
+    const result = await createHyperswitchRefund(config, {
+      refundId,
+      paymentId: input.paymentId,
+      amount: 1,
+      currency: 'USD',
+    }, fake.fetcher)
+    expect(result).toMatchObject({ refundId, amount: 1, status: 'pending' })
+  })
+
   it('retrieves a previously submitted refund by stable refund_id for reconciliation', async () => {
     const refundId = 'ref_' + '1'.repeat(26)
     const fake = fakeFetch(jsonResponse({
