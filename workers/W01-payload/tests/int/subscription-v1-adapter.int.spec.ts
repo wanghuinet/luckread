@@ -184,19 +184,23 @@ describe('v1 subscription adapter', () => {
     expect(writeGuard).toBeGreaterThan(-1)
     expect(transportCall).toBeGreaterThan(writeGuard)
     expect(route).toContain("'SERVICE_UNAVAILABLE'")
-    expect(route).toContain('verified payment-provider synchronization flow')
+    expect(route).toContain('price proration and payment synchronization are implemented')
+    expect(route).toContain('Subscription creation must go through the paid commerce checkout flow.')
     expect(route).not.toContain("requireHeader(request, 'Idempotency-Key')")
     expect(route).not.toContain("requireHeader(request, 'If-Match')")
   })
 
-  it('keeps subscription management read-only while verified provider synchronization is gated', () => {
-    expect(route).toContain('Subscription writes are disabled until a verified payment-provider synchronization flow is available.')
-    expect(mySubscriptionsPage).toContain('mutationsUnavailable')
-    expect(mySubscriptionsPage).not.toContain("transition(item, 'pause')")
-    expect(mySubscriptionsPage).not.toContain("transition(item, 'resume')")
-    expect(mySubscriptionsPage).not.toContain("transition(item, 'cancel')")
-    expect(mySubscriptionsPage).toContain('payment-provider synchronization')
-    expect(mySubscriptionsPage).toContain("fetchJson<ListResponse>('/api/v1/memberships/subscriptions?limit=20&page='")
+  it('exposes audited subscriber lifecycle controls while keeping paid plan changes gated', () => {
+    expect(route).toContain("['cancel', 'pause', 'resume'].includes(parts[1]!)")
+    expect(route).toContain('mutateSubscription(request, principal, subscriptionId, parts[1] as SubscriptionMutation)')
+    expect(mySubscriptionsPage).toContain("mutate(item, 'pause')")
+    expect(mySubscriptionsPage).toContain("mutate(item, 'resume')")
+    expect(mySubscriptionsPage).toContain("mutate(item, 'cancel')")
+    expect(mySubscriptionsPage).toContain("item.status === 'ACTIVE' || item.status === 'PAUSED' || item.status === 'PAST_DUE'")
+    expect(w06Worker).toContain("cancel: ['ACTIVE', 'PAST_DUE', 'PAUSED']")
+    expect(route).toContain('price proration and payment synchronization are implemented')
+    expect(route).toContain('Subscription creation must go through the paid commerce checkout flow.')
+    expect(route).toContain("fetchJson<ListResponse>('/api/v1/memberships/subscriptions?limit=20&page='")
   })
 
   it('declares the existing subscription collection list operation', () => {
