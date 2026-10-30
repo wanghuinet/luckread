@@ -135,7 +135,7 @@ describe('RevenueCat current subscriber reconciliation candidates', () => {
         snapshot: baseSnapshot(),
       },
       { nowMs: () => NOW },
-    )).rejects.toMatchObject({ code: 'CUSTOMER_IDENTITY_UNVERIFIED' });
+    )).rejects.toMatchObject({ code: 'SNAPSHOT_QUERY_MISMATCH' });
     expect(statements).toHaveLength(0);
   });
 
@@ -244,10 +244,20 @@ describe('RevenueCat current subscriber reconciliation candidates', () => {
     const base = baseSnapshot();
     const refunded: RevenueCatSubscriberSnapshot = {
       ...base,
+      entitlements: {
+        ...base.entitlements,
+        creator_gold: {
+          ...base.entitlements.creator_gold!,
+          expires_date: '2026-10-29T00:00:00.000Z',
+          grace_period_expires_date: null,
+        },
+      },
       subscriptions: {
         ...base.subscriptions,
         [PRODUCT_ID]: {
           ...base.subscriptions[PRODUCT_ID]!,
+          expires_date: '2026-10-29T00:00:00.000Z',
+          grace_period_expires_date: null,
           refunded_at: '2026-10-30T10:00:00.000Z',
           unsubscribe_detected_at: null,
         },
@@ -394,7 +404,7 @@ describe('RevenueCat current subscriber reconciliation candidates', () => {
   });
 
   it('fails closed when the RevenueCat product-binding database is unavailable', async () => {
-    const { db, statements } = fakeDb(undefined, new Error('private D1 error'));
+    const { db, statements } = fakeDb(null, new Error('private D1 error'));
 
     await expect(buildRevenueCatSubscriberReconciliationCandidates(
       db,
