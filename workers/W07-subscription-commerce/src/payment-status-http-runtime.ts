@@ -29,7 +29,7 @@ type PaymentStatusResponse = Readonly<{
   statusAuthority: 'W07_D1_04';
 }>;
 
-type PaymentStatusDependencies = Readonly<{
+export type PaymentStatusDependencies = Readonly<{
   readPayment?: typeof getPaymentAttempt;
   retrieveProvider?: typeof retrieveHyperswitchPayment;
   now?: () => Date;
