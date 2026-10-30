@@ -306,7 +306,7 @@ describe('W07 internal customer refund runtime', () => {
     const response = await handleCommerceRefundRequest(
       request({
         idempotencyKey: IDEMPOTENCY_KEY,
-        body: { paymentId: PAYMENT_ID, amountMinor: 99, currency: 'USD' },
+        body: { paymentId: PAYMENT_ID, amountMinor: 0, currency: 'USD' },
       }),
       CUSTOMER_ID,
       fixture.env,
