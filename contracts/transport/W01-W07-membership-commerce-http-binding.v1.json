@@ -25,32 +25,34 @@
   },
   "operations": [
     {
-      "operationId": "listActiveMembershipPlans",
-      "method": "GET",
-      "publicPath": "/api/v1/plans",
-      "internalPath": "/plans",
+      "operationId": "createCommerceOrder",
+      "method": "POST",
+      "publicPath": "/api/v1/commerce/orders",
+      "internalPath": "/commerce/orders",
       "principalRequired": true,
+      "permission": "order.create",
       "minimumGlobalLayer": "L2",
-      "query": {
-        "limit": "optional integer 1..50, default 20",
-        "cursor": "optional opaque keyset cursor"
-      },
-      "cache": "NO_STORE",
-      "responseAuthority": "W07 returns only ACTIVE, PUBLIC creator plans backed by an immutable current plan version."
-    },
-    {
-      "operationId": "listOwnMembershipPlans",
-      "method": "GET",
-      "publicPath": "/api/v1/membership/plans",
-      "internalPath": "/membership/plans",
-      "principalRequired": true,
-      "permission": "membership.plan.read.own",
-      "minimumGlobalLayer": "L3",
-      "query": {
-        "limit": "optional integer 1..50, default 20",
-        "cursor": "optional opaque keyset cursor"
-      },
-      "ownerId": "W08-resolved ACTIVE creator ID only; never taken from public query or body",
+      "idempotency": "Idempotency-Key",
+      "maximumBodyBytes": 16384,
+      "clientWritableFields": [
+        "items[].itemRef",
+        "items[].quantity"
+      ],
+      "serverControlledFields": [
+        "customerId",
+        "itemType",
+        "itemVersion",
+        "currency",
+        "unitAmountMinor",
+        "discountMinor",
+        "taxMinor",
+        "lineTotalMinor",
+        "orderId",
+        "paymentStatus",
+        "providerReferences"
+      ],
+      "successRule": "W07 creates the Order atomically in D1-04 only after authoritative item, immutable version, price, discount and tax decisions are admitted. W01 validates the complete response and waits for W06 D1-03 durable audit confirmation before returning any 2xx response. Until the pricing/tax adapter is admitted, W07 must return 503 without order writes.",
+      "auditTransportBinding": "W01-W06-moderation-http-binding.v1",
       "cache": "NO_STORE"
     },
     {
@@ -99,148 +101,6 @@
       "auditTransportBinding": "W01-W06-moderation-http-binding.v1"
     },
     {
-      "operationId": "publishOwnMembershipPlan",
-      "method": "POST",
-      "publicPath": "/api/v1/membership/plans/{planId}/publish",
-      "internalPath": "/membership/plans/{planId}/publish",
-      "principalRequired": true,
-      "permission": "membership.plan.publish.own",
-      "minimumGlobalLayer": "L3",
-      "precondition": "If-Match",
-      "ownerId": "W08-resolved ACTIVE creator ID only; never taken from public query or body",
-      "requestBody": "NONE",
-      "cache": "NO_STORE",
-      "auditRequired": true,
-      "successRule": "W01 first validates owner authorization and obtains a durable W06 membership.plan.publish_requested intent event for the expected version; only then may W07 perform the owner-scoped DRAFT/PRIVATE to ACTIVE/PUBLIC version-CAS. W01 validates the W07 DTO and waits for W06 immutable membership.plan.published confirmation before returning success.",
-      "auditTransportBinding": "W01-W06-moderation-http-binding.v1",
-      "failurePolicy": {
-        "missingIfMatch": "428",
-        "staleVersion": "412",
-        "nonDraftState": "409",
-        "missingOrForeignOwnerPlan": "404",
-        "missingW06AuditConfirmation": "503; publish intent is written before W07 mutation, and final published event is retried/reconciled using the deterministic plan-version event ID"
-      }
-    },
-    {
-      "operationId": "updateOwnMembershipPlan",
-      "method": "PUT",
-      "publicPath": "/api/v1/membership/plans/{planId}",
-      "internalPath": "/membership/plans/{planId}",
-      "principalRequired": true,
-      "permission": "membership.plan.update.own",
-      "minimumGlobalLayer": "L3",
-      "precondition": "If-Match",
-      "ownerId": "W08-resolved ACTIVE creator ID only; never taken from public query or body",
-      "requestBody": {
-        "required": [
-          "name",
-          "tier",
-          "billingInterval",
-          "priceMinor",
-          "currency",
-          "benefits"
-        ],
-        "additionalProperties": false
-      },
-      "immutableVersioning": "Append plan_version=current_version+1; never update/delete existing membership_plan_versions rows. Existing subscriptions retain the exact prior plan version accepted.",
-      "cache": "NO_STORE",
-      "auditRequired": true,
-      "successRule": "W01 confirms a durable W06 update-request intent before W07 appends a version and CAS-updates the current pointer in D1-01. W01 validates the full W07 DTO and confirms the immutable W06 membership.plan.updated event before returning success.",
-      "auditTransportBinding": "W01-W06-moderation-http-binding.v1",
-      "failurePolicy": {
-        "missingIfMatch": "428",
-        "staleVersion": "412",
-        "retiredPlan": "409",
-        "missingOrForeignOwnerPlan": "404",
-        "missingW06AuditConfirmation": "503; durable intent precedes mutation and final audit has a deterministic version ID",
-        "missingIdempotencyKey": "428",
-        "keyReuseWithDifferentBody": "409"
-      },
-      "topologyConstraints": {
-        "newWorker": false,
-        "newDatabase": false,
-        "newQueue": false,
-        "newServiceBinding": false,
-        "crossD1Transactions": 0
-      },
-      "idempotency": "Idempotency-Key"
-    },
-    {
-      "operationId": "transitionOwnMembershipPlanLifecycle",
-      "method": "POST",
-      "publicPath": "/api/v1/membership/plans/{planId}/lifecycle",
-      "internalPath": "/membership/plans/{planId}/lifecycle",
-      "principalRequired": true,
-      "permission": "membership.plan.lifecycle.own",
-      "minimumGlobalLayer": "L3",
-      "precondition": "If-Match",
-      "ownerId": "W08-resolved ACTIVE creator ID only; never taken from public body.",
-      "requestBody": {
-        "required": [
-          "action"
-        ],
-        "additionalProperties": false,
-        "action": {
-          "enum": [
-            "pause",
-            "resume",
-            "retire"
-          ]
-        }
-      },
-      "lifecycle": "pause ACTIVE/PUBLIC to PAUSED/PRIVATE; resume PAUSED/PRIVATE to ACTIVE/PUBLIC; retire PAUSED/PRIVATE to RETIRED/PRIVATE. An ACTIVE/PUBLIC plan must be paused before retirement. RETIRED plans cannot transition.",
-      "effect": "Controls future catalog visibility/new sales only; existing subscriptions and accepted plan_version remain unchanged.",
-      "cache": "NO_STORE",
-      "auditRequired": true,
-      "successRule": "W01 confirms durable W06 intent before W07 owner-scoped D1-01 If-Match CAS and confirms the immutable W06 final event before success.",
-      "auditTransportBinding": "W01-W06-moderation-http-binding.v1",
-      "failurePolicy": {
-        "missingIfMatch": "428",
-        "staleVersion": "412",
-        "invalidSourceState": "409",
-        "missingOrForeignOwnerPlan": "404",
-        "missingW06AuditConfirmation": "503"
-      },
-      "topologyConstraints": {
-        "newWorker": false,
-        "newDatabase": false,
-        "newQueue": false,
-        "newServiceBinding": false,
-        "crossD1Transactions": 0
-      }
-    },
-    {
-      "operationId": "createCommerceOrder",
-      "method": "POST",
-      "publicPath": "/api/v1/commerce/orders",
-      "internalPath": "/commerce/orders",
-      "principalRequired": true,
-      "permission": "order.create",
-      "minimumGlobalLayer": "L2",
-      "idempotency": "Idempotency-Key",
-      "maximumBodyBytes": 16384,
-      "clientWritableFields": [
-        "items[].itemRef",
-        "items[].quantity"
-      ],
-      "serverControlledFields": [
-        "customerId",
-        "itemType",
-        "itemVersion",
-        "currency",
-        "unitAmountMinor",
-        "discountMinor",
-        "taxMinor",
-        "lineTotalMinor",
-        "orderId",
-        "paymentStatus",
-        "providerReferences"
-      ],
-      "successRule": "W07 creates the Order atomically in D1-04 only after authoritative item, immutable version, price, discount and tax decisions are admitted. W01 validates the complete response and waits for W06 D1-03 durable audit confirmation before returning any 2xx response. Until the pricing/tax adapter is admitted, W07 must return 503 without order writes.",
-      "auditTransportBinding": "W01-W06-moderation-http-binding.v1",
-      "cache": "NO_STORE"
-    },
-    {
       "operationId": "getCommerceOrder",
       "method": "GET",
       "publicPath": "/api/v1/commerce/orders/{orderId}",
@@ -250,6 +110,35 @@
       "minimumGlobalLayer": "L2",
       "ownerScope": "W01 authorizes order.read for the W02-authenticated principal; W07 independently queries D1-04 by both orderId and the same server-derived customerId. Cross-owner requests return RESOURCE_NOT_FOUND.",
       "responseAuthority": "W07 D1-04 Order and OrderLine rows only; DTO excludes customerId, provider fields, payment credentials and internal snapshots.",
+      "cache": "NO_STORE"
+    },
+    {
+      "operationId": "listActiveMembershipPlans",
+      "method": "GET",
+      "publicPath": "/api/v1/plans",
+      "internalPath": "/plans",
+      "principalRequired": true,
+      "minimumGlobalLayer": "L2",
+      "query": {
+        "limit": "optional integer 1..50, default 20",
+        "cursor": "optional opaque keyset cursor"
+      },
+      "cache": "NO_STORE",
+      "responseAuthority": "W07 returns only ACTIVE, PUBLIC creator plans backed by an immutable current plan version."
+    },
+    {
+      "operationId": "listOwnMembershipPlans",
+      "method": "GET",
+      "publicPath": "/api/v1/membership/plans",
+      "internalPath": "/membership/plans",
+      "principalRequired": true,
+      "permission": "membership.plan.read.own",
+      "minimumGlobalLayer": "L3",
+      "query": {
+        "limit": "optional integer 1..50, default 20",
+        "cursor": "optional opaque keyset cursor"
+      },
+      "ownerId": "W08-resolved ACTIVE creator ID only; never taken from public query or body",
       "cache": "NO_STORE"
     },
     {
@@ -301,6 +190,91 @@
         "newQueue": false,
         "newServiceBinding": false,
         "crossD1Transactions": 0
+      }
+    },
+    {
+      "operationId": "postPaymentsRefunds",
+      "method": "POST",
+      "publicPath": "/api/v1/payments/refunds",
+      "internalPath": "/commerce/payments/refunds",
+      "principalRequired": true,
+      "permission": "payment.refund",
+      "minimumGlobalLayer": "L2",
+      "idempotency": "Idempotency-Key",
+      "maximumBodyBytes": 16384,
+      "requestBody": {
+        "required": [
+          "paymentId",
+          "amountMinor",
+          "currency"
+        ],
+        "optional": [
+          "reason"
+        ],
+        "additionalProperties": false,
+        "amountMinor": {
+          "minimum": 100
+        },
+        "paymentId": "Customer-owned D1-04 Payment identifier; provider amount and captured balance are never accepted from the browser"
+      },
+      "customerId": "Derived only from W01 session; W07 independently reads D1-04 by payment_id and customer_id",
+      "capturedAmount": "Retrieved server-side from Hyperswitch payment.amount_received; no browser-controlled captured amount",
+      "provider": "Hyperswitch POST /refunds with stable 30-character ref_ refund_id and refund_type=instant",
+      "stateAuthority": "Only HMAC-SHA512 verified refund_succeeded/refund_failed/refund_review events advance the final refund state in D1-04",
+      "responseFields": [
+        "refundId",
+        "paymentId",
+        "orderId",
+        "amountMinor",
+        "capturedAmountMinor",
+        "currency",
+        "status",
+        "reason",
+        "version",
+        "providerUpdatedAt",
+        "createdAt",
+        "updatedAt",
+        "replayed"
+      ],
+      "failurePolicy": {
+        "missingPrincipal": "401",
+        "CASLDeny": "403",
+        "foreignPayment": "404",
+        "missingIdempotencyKey": "428",
+        "remainingCapturedAmountExceeded": "409",
+        "ambiguousProviderResponse": "503"
+      },
+      "successRule": "D1-04 reserves refund ID/idempotency before Hyperswitch I/O; W01 returns only the normalized refund receipt. Refund never directly changes subscription entitlement.",
+      "cache": "NO_STORE",
+      "topologyConstraints": {
+        "newWorker": false,
+        "newDatabase": false,
+        "newQueue": false,
+        "newServiceBinding": false,
+        "crossD1Transactions": 0
+      }
+    },
+    {
+      "operationId": "publishOwnMembershipPlan",
+      "method": "POST",
+      "publicPath": "/api/v1/membership/plans/{planId}/publish",
+      "internalPath": "/membership/plans/{planId}/publish",
+      "principalRequired": true,
+      "permission": "membership.plan.publish.own",
+      "minimumGlobalLayer": "L3",
+      "precondition": "If-Match",
+      "ownerId": "W08-resolved ACTIVE creator ID only; never taken from public query or body",
+      "requestBody": "NONE",
+      "cache": "NO_STORE",
+      "auditRequired": true,
+      "successRule": "W01 first validates owner authorization and obtains a durable W06 membership.plan.publish_requested intent event for the expected version; only then may W07 perform the owner-scoped DRAFT/PRIVATE to ACTIVE/PUBLIC version-CAS. W01 validates the W07 DTO and waits for W06 immutable membership.plan.published confirmation before returning success.",
+      "auditTransportBinding": "W01-W06-moderation-http-binding.v1",
+      "failurePolicy": {
+        "missingIfMatch": "428",
+        "staleVersion": "412",
+        "nonDraftState": "409",
+        "missingOrForeignOwnerPlan": "404",
+        "missingW06AuditConfirmation": "503; publish intent is written before W07 mutation, and final published event is retried/reconciled using the deterministic plan-version event ID"
       }
     },
     {
@@ -373,6 +347,94 @@
         "d1Authority": "D1-04",
         "crossD1Transactions": 0
       }
+    },
+    {
+      "operationId": "transitionOwnMembershipPlanLifecycle",
+      "method": "POST",
+      "publicPath": "/api/v1/membership/plans/{planId}/lifecycle",
+      "internalPath": "/membership/plans/{planId}/lifecycle",
+      "principalRequired": true,
+      "permission": "membership.plan.lifecycle.own",
+      "minimumGlobalLayer": "L3",
+      "precondition": "If-Match",
+      "ownerId": "W08-resolved ACTIVE creator ID only; never taken from public body.",
+      "requestBody": {
+        "required": [
+          "action"
+        ],
+        "additionalProperties": false,
+        "action": {
+          "enum": [
+            "pause",
+            "resume",
+            "retire"
+          ]
+        }
+      },
+      "lifecycle": "pause ACTIVE/PUBLIC to PAUSED/PRIVATE; resume PAUSED/PRIVATE to ACTIVE/PUBLIC; retire PAUSED/PRIVATE to RETIRED/PRIVATE. An ACTIVE/PUBLIC plan must be paused before retirement. RETIRED plans cannot transition.",
+      "effect": "Controls future catalog visibility/new sales only; existing subscriptions and accepted plan_version remain unchanged.",
+      "cache": "NO_STORE",
+      "auditRequired": true,
+      "successRule": "W01 confirms durable W06 intent before W07 owner-scoped D1-01 If-Match CAS and confirms the immutable W06 final event before success.",
+      "auditTransportBinding": "W01-W06-moderation-http-binding.v1",
+      "failurePolicy": {
+        "missingIfMatch": "428",
+        "staleVersion": "412",
+        "invalidSourceState": "409",
+        "missingOrForeignOwnerPlan": "404",
+        "missingW06AuditConfirmation": "503"
+      },
+      "topologyConstraints": {
+        "newWorker": false,
+        "newDatabase": false,
+        "newQueue": false,
+        "newServiceBinding": false,
+        "crossD1Transactions": 0
+      }
+    },
+    {
+      "operationId": "updateOwnMembershipPlan",
+      "method": "PUT",
+      "publicPath": "/api/v1/membership/plans/{planId}",
+      "internalPath": "/membership/plans/{planId}",
+      "principalRequired": true,
+      "permission": "membership.plan.update.own",
+      "minimumGlobalLayer": "L3",
+      "precondition": "If-Match",
+      "ownerId": "W08-resolved ACTIVE creator ID only; never taken from public query or body",
+      "requestBody": {
+        "required": [
+          "name",
+          "tier",
+          "billingInterval",
+          "priceMinor",
+          "currency",
+          "benefits"
+        ],
+        "additionalProperties": false
+      },
+      "immutableVersioning": "Append plan_version=current_version+1; never update/delete existing membership_plan_versions rows. Existing subscriptions retain the exact prior plan version accepted.",
+      "cache": "NO_STORE",
+      "auditRequired": true,
+      "successRule": "W01 confirms a durable W06 update-request intent before W07 appends a version and CAS-updates the current pointer in D1-01. W01 validates the full W07 DTO and confirms the immutable W06 membership.plan.updated event before returning success.",
+      "auditTransportBinding": "W01-W06-moderation-http-binding.v1",
+      "failurePolicy": {
+        "missingIfMatch": "428",
+        "staleVersion": "412",
+        "retiredPlan": "409",
+        "missingOrForeignOwnerPlan": "404",
+        "missingW06AuditConfirmation": "503; durable intent precedes mutation and final audit has a deterministic version ID",
+        "missingIdempotencyKey": "428",
+        "keyReuseWithDifferentBody": "409"
+      },
+      "topologyConstraints": {
+        "newWorker": false,
+        "newDatabase": false,
+        "newQueue": false,
+        "newServiceBinding": false,
+        "crossD1Transactions": 0
+      },
+      "idempotency": "Idempotency-Key"
     }
   ],
   "trustBoundary": {
