@@ -1,7 +1,7 @@
 const MAX_WEBHOOK_BODY_BYTES = 1024 * 1024;
 const MAX_EVENT_DATA_JSON_BYTES = 16 * 1024;
 const SIGNATURE_TOLERANCE_SECONDS = 300;
-const SIGNATURE_PATTERN = /^t=(\\d{1,12}),v1=([0-9a-f]{64})$/;
+const SIGNATURE_PATTERN = /^t=(\d{1,12}),v1=([0-9a-f]{64})$/;
 
 export class RevenueCatWebhookValidationError extends Error {
   constructor(readonly code: 'INVALID_SIGNATURE' | 'WEBHOOK_REJECTED') {
@@ -33,7 +33,7 @@ const isBoundedString = (value: unknown, maxLength: number): value is string =>
   value.length >= 1 &&
   value.length <= maxLength &&
   value.trim() === value &&
-  !/[\\u0000-\\u001f\\u007f]/.test(value);
+  !/[\u0000-\u001f\u007f]/.test(value);
 
 function constantTimeBytesEqual(left: Uint8Array, right: Uint8Array): boolean {
   const length = Math.max(left.length, right.length);
