@@ -116,9 +116,14 @@ export async function handlePaymentStatusRequest(
   if (route instanceof Response) return route;
 
   try {
-    const readPayment = dependencies.readPayment ?? getPaymentAttempt;
-    const payment = await readPayment(env.D1_04, customerId, route.paymentId);
     const config = resolveProviderConfig(env);
+    const readPayment = dependencies.readPayment ?? getPaymentAttempt;
+    const payment = await readPayment(
+      env.D1_04,
+      customerId,
+      route.paymentId,
+      config?.expectedMerchantId,
+    );
     let providerStatus: HyperswitchPaymentStatus | null = null;
     let providerStatusCheck: ProviderStatusCheck = 'UNAVAILABLE';
     let providerCheckedAt: string | null = null;
