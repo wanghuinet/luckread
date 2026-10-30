@@ -251,6 +251,7 @@
         "POST /v1/memberships/subscriptions/{subscriptionId}/pause",
         "POST /v1/memberships/subscriptions/{subscriptionId}/resume",
         "POST /v1/payments/intents",
+        "POST /v1/payments/refunds",
         "POST /v1/subscriptions",
         "POST /v1/webhooks/hyperswitch",
         "POST /v1/webhooks/revenuecat",
