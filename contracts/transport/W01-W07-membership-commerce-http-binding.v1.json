@@ -229,7 +229,7 @@
       "idempotency": "Idempotency-Key; W06 D1-03 stores a durable deterministic request intent and final immutable outcome.",
       "requestBody": "NONE",
       "stateTransitions": {
-        "cancel": "ACTIVE or PAUSED to CANCELED; user cancellation is immediate and does not issue a refund.",
+        "cancel": "ACTIVE, PAST_DUE or PAUSED to CANCELED; user cancellation immediately stops member access and prevents further renewal retries, and does not issue a refund.",
         "pause": "ACTIVE to PAUSED; member-only access stops immediately.",
         "resume": "PAUSED to ACTIVE only while current_period_end is still in the future."
       },
