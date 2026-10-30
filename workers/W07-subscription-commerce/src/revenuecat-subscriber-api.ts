@@ -136,12 +136,17 @@ function parseEntitlements(value: unknown): Record<string, RevenueCatSubscriberE
       throw new RevenueCatSubscriberApiError('INVALID_RESPONSE', false);
     }
     const grace = optionalNullableDate(raw, 'grace_period_expires_date');
-    result[key] = {
-      expires_date: raw.expires_date,
-      ...(grace === undefined ? {} : { grace_period_expires_date: grace }),
-      product_identifier: raw.product_identifier,
-      purchase_date: raw.purchase_date,
-    };
+    Object.defineProperty(result, key, {
+      value: {
+        expires_date: raw.expires_date,
+        ...(grace === undefined ? {} : { grace_period_expires_date: grace }),
+        product_identifier: raw.product_identifier,
+        purchase_date: raw.purchase_date,
+      },
+      enumerable: true,
+      configurable: true,
+      writable: true,
+    });
   }
   return result;
 }
@@ -216,7 +221,12 @@ function parseSubscriptions(value: unknown): Record<string, RevenueCatSubscriber
       }
       parsed.store_transaction_id = transactionId as string | number | null;
     }
-    result[productId] = parsed;
+    Object.defineProperty(result, productId, {
+      value: parsed,
+      enumerable: true,
+      configurable: true,
+      writable: true,
+    });
   }
   return result;
 }
