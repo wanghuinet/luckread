@@ -197,3 +197,36 @@ export function mapOrderAdapterError(error: unknown): Response {
   }
   return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Order service unavailable')
 }
+
+
+/**
+ * Refund permission is checked against the Payment subject, not Order. W07
+ * independently resolves payment ownership from D1-04 before provider access.
+ */
+export async function authorizePaymentRefundPermission(
+  request: Request,
+  principal: ContentPrincipal,
+): Promise<Response | null> {
+  const headers = new Headers(request.headers)
+  headers.delete('host')
+  headers.delete('content-length')
+  headers.set('content-type', 'application/json; charset=utf-8')
+  const permissionRequest = new Request(request.url, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      action: 'payment.refund',
+      resourceType: 'Payment',
+      resourceAttributes: { ownerId: principal.userId },
+    }),
+  })
+  const response = await callW08Creator(permissionRequest, '/internal/authz/check-permission', 'POST')
+  if (!response.ok) return errorResponse(503, 'AUTHORIZATION_UNAVAILABLE', 'Payment authorization unavailable')
+  const value: unknown = await response.json().catch((): null => null)
+  const decision = value && typeof value === 'object'
+    ? (value as { data?: { decision?: unknown } }).data?.decision
+    : undefined
+  if (decision === 'ALLOW') return null
+  if (decision === 'DENY') return errorResponse(403, 'PERMISSION_DENIED', 'Payment refund permission required')
+  return errorResponse(503, 'AUTHORIZATION_UNAVAILABLE', 'Payment authorization response could not be verified')
+}
