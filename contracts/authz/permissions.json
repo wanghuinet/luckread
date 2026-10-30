@@ -654,6 +654,13 @@
       "auditRequired": true
     },
     {
+      "name": "payment.read",
+      "resource": "payment",
+      "action": "read",
+      "minLayer": "L2",
+      "scope": "own"
+    },
+    {
       "name": "payment.refund",
       "resource": "payment",
       "action": "refund",
@@ -1057,6 +1064,7 @@
           "notification.update.self",
           "order.create",
           "order.read",
+          "payment.read",
           "payment.refund",
           "report.create",
           "share.create",
@@ -1215,6 +1223,7 @@
           "notification.update.self",
           "order.create",
           "order.read",
+          "payment.read",
           "payment.refund",
           "report.create",
           "revision.create.own",
@@ -1296,6 +1305,7 @@
           "notification.update.self",
           "order.create",
           "order.read",
+          "payment.read",
           "payment.refund",
           "report.create",
           "revision.create.own",
