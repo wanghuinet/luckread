@@ -12,6 +12,7 @@ mock.module('../lib/api-client.ts', () => ({
 const {
   fetchActiveMembershipPlansPage,
   fetchMySubscriptionsPage,
+  mutateMySubscription,
 } = await import('../lib/subscriptions-api.ts');
 
 beforeEach(() => {
@@ -26,6 +27,24 @@ test('loads the signed-in subscriber list through the canonical W01 route', asyn
   expect(calls[0]?.path).toBe('/memberships/subscriptions?limit=15&page=2');
   expect(calls[0]?.options.method).toBe('GET');
   expect(calls[0]?.options.signal).toBe(controller.signal);
+});
+
+test('posts owner-scoped subscription lifecycle commands with If-Match and Idempotency-Key', async () => {
+  await mutateMySubscription('sub_existing', 'cancel', '"lr-v3"', 'cancel-key-1');
+
+  expect(calls).toHaveLength(1);
+  expect(calls[0]?.path).toBe('/memberships/subscriptions/sub_existing/cancel');
+  expect(calls[0]?.options.method).toBe('POST');
+  expect(calls[0]?.options.headers).toEqual({
+    'If-Match': '"lr-v3"',
+    'Idempotency-Key': 'cancel-key-1',
+  });
+});
+
+test('rejects malformed subscription lifecycle mutation inputs before making a request', () => {
+  expect(() => mutateMySubscription('sub_existing', 'cancel', 'invalid', 'cancel-key-1')).toThrow('version is invalid');
+  expect(() => mutateMySubscription('sub_existing', 'cancel', '"lr-v3"', '')).toThrow('idempotency key is invalid');
+  expect(calls).toHaveLength(0);
 });
 
 test('loads active public membership plans through the existing W01 catalog route', async () => {
@@ -47,18 +66,17 @@ test('rejects invalid pagination bounds before making a request', () => {
   expect(calls).toHaveLength(0);
 });
 
-test('keeps subscription mutations and mobile checkout disabled until store billing is verified', async () => {
+test('exposes only subscriber-owned lifecycle controls and keeps mobile checkout disabled', async () => {
   const api = await import('../lib/subscriptions-api.ts');
   const subscriptionsScreen = readFileSync(new URL('../app/(drawer)/subscriptions.tsx', import.meta.url), 'utf8');
   const plansScreen = readFileSync(new URL('../app/(drawer)/membership-plans.tsx', import.meta.url), 'utf8');
   const drawer = readFileSync(new URL('../app/(drawer)/_layout.tsx', import.meta.url), 'utf8');
 
-  expect(Object.keys(api).sort()).toEqual(['fetchActiveMembershipPlansPage', 'fetchMySubscriptionsPage'].sort());
-  expect(subscriptionsScreen).not.toContain('transitionMySubscription');
-  expect(subscriptionsScreen).not.toContain('onTransition');
-  expect(subscriptionsScreen).not.toContain('取消订阅');
-  expect(subscriptionsScreen).not.toContain('暂停订阅');
-  expect(subscriptionsScreen).not.toContain('恢复订阅');
+  expect(Object.keys(api).sort()).toEqual(['fetchActiveMembershipPlansPage', 'fetchMySubscriptionsPage', 'mutateMySubscription'].sort());
+  expect(subscriptionsScreen).toContain('mutateMySubscription');
+  expect(subscriptionsScreen).toContain("item.status === 'PAST_DUE'");
+  expect(subscriptionsScreen).toContain("onMutation(item, 'cancel')");
+  expect(subscriptionsScreen).toContain('立即取消并停止续费重试');
   expect(plansScreen).toContain('fetchActiveMembershipPlansPage');
   expect(plansScreen).toContain('W07 已发布的公开会员目录');
   expect(plansScreen).toContain('暂不开放购买操作');
