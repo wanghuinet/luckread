@@ -344,8 +344,10 @@ export async function getPaymentAttempt(
   db: D1Database,
   customerIdInput: string,
   paymentIdInput: string,
+  expectedMerchantIdInput?: string,
 ): Promise<PaymentAttemptDto> {
-  if (!nonBlank(customerIdInput, 256) || !PAYMENT_ID_PATTERN.test(paymentIdInput)) {
+  if (!nonBlank(customerIdInput, 256) || !PAYMENT_ID_PATTERN.test(paymentIdInput) ||
+      (expectedMerchantIdInput !== undefined && !nonBlank(expectedMerchantIdInput, 256))) {
     throw new PaymentPersistenceError('VALIDATION_FAILED', 400);
   }
 
@@ -367,6 +369,7 @@ export async function getPaymentAttempt(
     !/^ord_[A-Za-z0-9_-]{1,90}$/.test(row.order_id) ||
     row.provider !== PROVIDER ||
     !nonBlank(row.merchant_id, 256) ||
+    (expectedMerchantIdInput !== undefined && row.merchant_id !== expectedMerchantIdInput) ||
     !safeMinor(row.amount_minor) ||
     typeof row.currency !== 'string' || !CURRENCY_PATTERN.test(row.currency) ||
     !PAYMENT_ATTEMPT_STATUSES.has(row.status) ||
