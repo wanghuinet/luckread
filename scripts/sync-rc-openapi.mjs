@@ -317,7 +317,7 @@ function buildCommerceOpenApiOperation({ operationId, method }) {
       ...security,
       ...listParameters,
       '      responses:',
-      '        200:',
+      "        '200':",
       '          description: Customer-owned records returned using bounded keyset pagination.',
       '          headers:',
       '            Cache-Control:',
