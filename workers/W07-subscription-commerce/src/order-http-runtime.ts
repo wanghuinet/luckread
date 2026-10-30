@@ -3,9 +3,11 @@
 import {
   createCommerceOrder,
   getCommerceOrder,
+  listCommerceOrders,
   OrderPersistenceError,
   type CreateOrderResult,
   type CommerceOrderData,
+  type CommerceOrderListPage,
   type AuthoritativelyPricedOrder,
 } from './order-persistence.js';
 import { SubscriptionRuntimeError } from './subscription-runtime.js';
@@ -19,12 +21,14 @@ type OrderRuntimeEnv = Readonly<{
 type OrderRuntimeDependencies = Readonly<{
   createOrder?: typeof createCommerceOrder;
   getOrder?: typeof getCommerceOrder;
+  listOrders?: typeof listCommerceOrders;
   /** Must be an admitted pricing authority that returns immutable offer versions, discounts, and tax decisions. */
   resolvePricing?: (request: unknown) => Promise<AuthoritativelyPricedOrder>;
 }>;
 
 type OrderRoute =
   | { operation: 'create'; orderId: null }
+  | { operation: 'list'; limit: number; cursor: string | null }
   | { operation: 'get'; orderId: string };
 
 const MAX_ORDER_BODY_BYTES = 16_384;
@@ -37,9 +41,11 @@ function errorResponse(status: number, code: string, message: string): Response 
 }
 
 function resolveRoute(request: Request): OrderRoute | Response | null {
+  let url: URL;
   let segments: string[];
   try {
-    segments = new URL(request.url).pathname.split('/').filter(Boolean).map((segment) => decodeURIComponent(segment));
+    url = new URL(request.url);
+    segments = url.pathname.split('/').filter(Boolean).map((segment) => decodeURIComponent(segment));
   } catch {
     return errorResponse(400, 'VALIDATION_FAILED', 'Invalid order path');
   }
@@ -47,6 +53,30 @@ function resolveRoute(request: Request): OrderRoute | Response | null {
   if (segments[0] !== 'commerce' || segments[1] !== 'orders') return null;
   if (request.method === 'POST' && segments.length === 2) {
     return { operation: 'create', orderId: null };
+  }
+  if (request.method === 'GET' && segments.length === 2) {
+    const allowedKeys = new Set(['cursor', 'limit']);
+    for (const key of url.searchParams.keys()) {
+      if (!allowedKeys.has(key)) return errorResponse(400, 'VALIDATION_FAILED', 'Unsupported order-list query parameter');
+    }
+    const limitValues = url.searchParams.getAll('limit');
+    const cursorValues = url.searchParams.getAll('cursor');
+    if (limitValues.length > 1 || cursorValues.length > 1) {
+      return errorResponse(400, 'VALIDATION_FAILED', 'Duplicate order-list query parameter');
+    }
+    const rawLimit = limitValues[0] ?? '20';
+    if (!/^[1-9][0-9]*$/.test(rawLimit)) {
+      return errorResponse(400, 'VALIDATION_FAILED', 'Order-list limit is invalid');
+    }
+    const limit = Number(rawLimit);
+    if (!Number.isSafeInteger(limit) || limit < 1 || limit > 50) {
+      return errorResponse(400, 'VALIDATION_FAILED', 'Order-list limit is outside the allowed range');
+    }
+    const cursor = cursorValues.length ? cursorValues[0]! : null;
+    if (cursor !== null && cursor.length > 2048) {
+      return errorResponse(400, 'INVALID_CURSOR', 'Invalid pagination cursor');
+    }
+    return { operation: 'list', limit, cursor };
   }
   if (request.method === 'GET' && segments.length === 3 && segments[2]!.length > 0) {
     return { operation: 'get', orderId: segments[2]! };
@@ -111,6 +141,7 @@ function mapOrderError(error: OrderPersistenceError | SubscriptionRuntimeError):
       error.code === 'IDEMPOTENCY_IN_PROGRESS' ? 'An order request with this key is still in progress' :
       error.code === 'CONFLICT' ? 'Order request conflicts with the current state' :
       error.code === 'VALIDATION_FAILED' ? 'Order request validation failed' :
+      error.code === 'INVALID_CURSOR' ? 'Invalid pagination cursor' :
       error.code === 'INTEGRITY_VIOLATION' ? 'Order persistence integrity check failed' :
       'Order service unavailable';
     return errorResponse(error.status, error.code, message);
@@ -179,6 +210,15 @@ export async function handleCommerceOrderRequest(
       return Response.json(
         { data: result.data, requestId: 'req_' + crypto.randomUUID() },
         { status: result.status, headers: { 'cache-control': 'no-store' } },
+      );
+    }
+
+    if (route.operation === 'list') {
+      const listOrders = dependencies.listOrders ?? listCommerceOrders;
+      const page: CommerceOrderListPage = await listOrders(env.D1_04, customerId, route.limit, route.cursor);
+      return Response.json(
+        { data: page, requestId: 'req_' + crypto.randomUUID() },
+        { status: 200, headers: { 'cache-control': 'no-store' } },
       );
     }
 
