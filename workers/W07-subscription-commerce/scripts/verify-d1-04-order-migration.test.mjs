@@ -258,7 +258,7 @@ test('postflight validates both migrations, all tables/columns/indexes/triggers,
   assert.deepEqual(report.appliedMigrations, REQUIRED_MIGRATION_IDS)
   assert.equal(report.verifiedTables.length, 14)
   assert.equal(report.verifiedIndexes.length, 30)
-  assert.equal(report.verifiedTriggers.length, 63)
+  assert.equal(report.verifiedTriggers.length, 71)
   assert.equal(report.databaseRowsExported, false)
 })
 
@@ -322,6 +322,7 @@ test('workflow is manual-only, gates exact SHA/name/confirmation, and never depl
   assert.match(workflow, /PRAGMA table_info\("revenuecat_webhook_events"\)/)
   assert.match(workflow, /PRAGMA table_info\("revenuecat_webhook_event_conflicts"\)/)
   assert.match(workflow, /PRAGMA table_info\("payment_method_revocation_requests"\)/)
+  assert.match(workflow, /PRAGMA table_info\("refunds"\)/)
   assert.match(revenueCatMigration, /CREATE TABLE revenuecat_webhook_events/)
   assert.match(revenueCatMigration, /CREATE TABLE revenuecat_webhook_event_conflicts/)
   assert.match(paymentMethodRevocationMigration, /CREATE TABLE payment_method_revocation_requests/)
