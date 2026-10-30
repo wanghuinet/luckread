@@ -45,7 +45,7 @@ export const REQUIRED_COLUMNS = {
     ['event_row_id', 'TEXT', 1, 1], ['provider', 'TEXT', 1, 0], ['merchant_id', 'TEXT', 1, 0],
     ['event_id', 'TEXT', 1, 0], ['event_type', 'TEXT', 1, 0], ['payment_id', 'TEXT', 0, 0],
     ['payload_sha256', 'TEXT', 1, 0], ['state', 'TEXT', 1, 0], ['received_at', 'TEXT', 1, 0],
-    ['processed_at', 'TEXT', 0, 0], ['outcome_code', 'TEXT', 0, 0],
+    ['processed_at', 'TEXT', 0, 0], ['outcome_code', 'TEXT', 0, 0], ['refund_id', 'TEXT', 0, 0],
   ],
   payment_provider_event_conflicts: [
     ['conflict_id', 'TEXT', 1, 1], ['provider', 'TEXT', 1, 0], ['merchant_id', 'TEXT', 1, 0],
@@ -109,6 +109,13 @@ export const REQUIRED_COLUMNS = {
     ['provider_method_deleted_at', 'TEXT', 0, 0], ['version', 'INTEGER', 1, 0],
     ['created_at', 'TEXT', 1, 0], ['updated_at', 'TEXT', 1, 0],
   ],
+  refunds: [
+    ['refund_id', 'TEXT', 1, 1], ['payment_id', 'TEXT', 1, 0], ['customer_id', 'TEXT', 1, 0],
+    ['provider', 'TEXT', 1, 0], ['merchant_id', 'TEXT', 1, 0], ['amount_minor', 'INTEGER', 1, 0],
+    ['currency', 'TEXT', 1, 0], ['reason', 'TEXT', 0, 0], ['status', 'TEXT', 1, 0],
+    ['idempotency_key', 'TEXT', 1, 0], ['request_hash', 'TEXT', 1, 0], ['version', 'INTEGER', 1, 0],
+    ['provider_updated_at', 'TEXT', 0, 0], ['created_at', 'TEXT', 1, 0], ['updated_at', 'TEXT', 1, 0],
+  ],
 }
 
 export const REQUIRED_INDEXES = {
@@ -167,6 +174,7 @@ export const REQUIRED_TRIGGERS = {
     'payment_provider_events_identity_immutable',
     'payment_provider_events_terminal_immutable',
     'payment_provider_events_retained',
+    'payment_provider_events_refund_binding_guard',
   ],
   payment_provider_event_conflicts: [
     'payment_provider_event_conflicts_identity_immutable',
@@ -228,9 +236,6 @@ export const REQUIRED_TRIGGERS = {
     'payment_method_revocation_request_retained',
     'payment_method_revocation_request_completion_guard',
   ],
-  payment_provider_events: [
-    'payment_provider_events_refund_binding_guard',
-  ],
   refunds: [
     'refunds_require_captured_payment_and_available_amount',
     'refunds_identity_immutable',
@@ -284,7 +289,7 @@ function expectedPaymentProviderEventsTerminalTriggerSql() {
 function expectedPaymentProviderEventsIdentityTriggerSql() {
   const migrationPath = new URL('../migrations-d1-04/0007_refunds.sql', import.meta.url)
   const migration = fs.readFileSync(migrationPath, 'utf8')
-  const match = migration.match(/CREATE TRIGGER payment_provider_events_identity_immutable\\b[\\s\\S]*?\\bEND;/i)
+  const match = migration.match(/CREATE TRIGGER payment_provider_events_identity_immutable\b[\s\S]*?\bEND;/i)
   if (!match) fail('0007 migration does not define the reviewed payment-provider event identity trigger')
   return normalizeSqlDefinition(match[0])
 }
