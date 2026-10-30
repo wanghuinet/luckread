@@ -124,6 +124,13 @@ describe('public customer payment and billing history adapters', () => {
       '/api/v1/billing/documents',
     ]) expect(paths).toContain(path)
 
+    for (const path of ['/payments/history', '/billing/documents', '/payments/refunds']) {
+      const start = openapi.indexOf(`  ${path}:`)
+      const next = openapi.indexOf('\\n  /', start + 1)
+      const block = openapi.slice(start, next < 0 ? openapi.length : next)
+      const get = block.indexOf('    get:')
+      expect(block.slice(get)).toContain("        '200':")
+    }
     expect(openapiSync).toContain('buildCommerceOpenApiOperation')
     expect(openapiSync).toContain("operationId === 'postPaymentsRefunds'")
     expect(openapiSync).toContain("operationId === 'getPaymentsHistory'")
