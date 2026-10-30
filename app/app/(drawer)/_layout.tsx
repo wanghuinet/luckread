@@ -236,7 +236,18 @@ function CustomDrawerContent(props: any) {
         swipeEdgeWidth={width}
       >
         <DrawerMenuItem icon="user" label="个人资料" onPress={openMyProfile} isDark={isDark} />
-        <DrawerMenuItem icon="award" label="Premium" onPress={() => showUnavailable('Premium')} isDark={isDark} />
+        <DrawerMenuItem
+          icon="award"
+          label="Premium"
+          isDark={isDark}
+          onPress={() => {
+            if (authStatus !== 'authenticated') {
+              router.push(('/login?returnTo=' + encodeURIComponent('/membership-plans')) as never);
+            } else {
+              router.push('/membership-plans' as never);
+            }
+          }}
+        />
         <DrawerMenuItem
           icon="credit-card"
           label="我的订阅"
