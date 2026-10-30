@@ -1,0 +1,133 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/state-machines/refund.json",
+  "title": "D1-04 Refund State Machine Candidate",
+  "type": "object",
+  "x-luckread": {
+    "entity": "Refund",
+    "domain": "D1-04",
+    "state-field": "status",
+    "version-field": "version",
+    "requires-optimistic-lock": true,
+    "initial-state": "INITIATING",
+    "states": [
+      "INITIATING",
+      "pending",
+      "review",
+      "succeeded",
+      "failed"
+    ],
+    "terminal-states": [
+      "succeeded",
+      "failed"
+    ],
+    "admissionStatus": "CANDIDATE_NOT_GREEN",
+    "note": "Only exact, signature-verified Hyperswitch refund_details resources may advance persisted provider state; create API responses may set the initial reservation's first provider observation but signed webhooks remain the asynchronous lifecycle authority."
+  },
+  "x-transitions": [
+    {
+      "from": "INITIATING",
+      "to": "pending",
+      "actor": "system|payment-provider",
+      "precondition": "An owner-scoped refund reservation exists in D1-04 with a stable refund_id, customer-scoped idempotency key and immutable payment/amount/currency snapshot; the Hyperswitch response matches the snapshot."
+    },
+    {
+      "from": "INITIATING",
+      "to": "review",
+      "actor": "system|payment-provider",
+      "precondition": "Exact signed refund_details webhook or matching create-refund response identifies the same refund_id, payment_id, merchant, amount and currency."
+    },
+    {
+      "from": "INITIATING",
+      "to": "succeeded",
+      "actor": "system|payment-provider",
+      "precondition": "Exact signed refund_details webhook or matching provider response confirms succeeded; the resource timestamp is valid and local version CAS succeeds."
+    },
+    {
+      "from": "INITIATING",
+      "to": "failed",
+      "actor": "system|payment-provider",
+      "precondition": "Exact signed refund_details webhook or matching provider response confirms failed; the resource timestamp is valid and local version CAS succeeds."
+    },
+    {
+      "from": "pending",
+      "to": "pending",
+      "actor": "system|payment-provider",
+      "precondition": "A newer, matching signed refund_details event or same-state provider observation is bound to the local refund and passes version CAS."
+    },
+    {
+      "from": "pending",
+      "to": "review",
+      "actor": "system|payment-provider",
+      "precondition": "A newer, matching signed refund_review event confirms manual/connector review."
+    },
+    {
+      "from": "pending",
+      "to": "succeeded",
+      "actor": "system|payment-provider",
+      "precondition": "A newer, matching signed refund_succeeded event confirms provider refund success."
+    },
+    {
+      "from": "pending",
+      "to": "failed",
+      "actor": "system|payment-provider",
+      "precondition": "A newer, matching signed refund_failed event confirms provider refund failure."
+    },
+    {
+      "from": "review",
+      "to": "review",
+      "actor": "system|payment-provider",
+      "precondition": "A newer matching signed refund_review event confirms the refund remains under review."
+    },
+    {
+      "from": "review",
+      "to": "succeeded",
+      "actor": "system|payment-provider",
+      "precondition": "A newer matching signed refund_succeeded event confirms final success."
+    },
+    {
+      "from": "review",
+      "to": "failed",
+      "actor": "system|payment-provider",
+      "precondition": "A newer matching signed refund_failed event confirms final failure."
+    },
+    {
+      "from": "succeeded",
+      "to": "succeeded",
+      "actor": "system|payment-provider",
+      "precondition": "Exact duplicate observation only; no new financial mutation is applied. A succeeded refund is terminal."
+    },
+    {
+      "from": "failed",
+      "to": "failed",
+      "actor": "system|payment-provider",
+      "precondition": "Exact duplicate observation only; no new financial mutation is applied. A failed refund is terminal."
+    }
+  ],
+  "x-global-guards": [
+    "Every refund is bound to the authenticated customer, original payment, provider and merchant; client-supplied owner IDs are never trusted.",
+    "A stable refund_id and customer-scoped idempotency key identify one semantic refund request; key reuse with a changed payment, amount, currency or reason conflicts.",
+    "Refund amounts use integer minor units; local active reservations cannot exceed the payment amount and Hyperswitch independently enforces actual amount_captured.",
+    "INITIATING, pending, review and succeeded amounts remain reserved. Failed refunds release the reserved amount.",
+    "Every state update requires version = current_version + 1 and a strictly increasing canonical provider_updated_at; stale or invalid timestamps require reconciliation.",
+    "A webhook receipt can apply only when event type, refund_id, payment_id, merchant_id, amount and currency match the immutable local snapshot and signature verification succeeds.",
+    "Same provider/merchant/event_id and same payload hash is an idempotent replay; same event identity with a different hash creates a conflict record and cannot overwrite the first receipt.",
+    "Refund state is not a Ledger entry, wallet balance mutation or subscription-entitlement transition. Financial posting and D1-01 entitlement changes require separate authorized workflows."
+  ],
+  "x-failure-semantics": {
+    "unknownRefund": "RECONCILIATION_REQUIRED",
+    "identityOrAmountMismatch": "REJECTED",
+    "invalidOrStaleProviderTimestamp": "RECONCILIATION_REQUIRED",
+    "providerTimeout": "Keep the durable INITIATING reservation; retry with the same refund_id and idempotency key.",
+    "providerReview": "Persist review; keep the amount reserved.",
+    "providerFailure": "Persist failed; release the local refund reservation without deleting the request.",
+    "webhookPayloadConflict": "Retain first receipt and record conflict; no refund transition."
+  },
+  "x-topology": {
+    "newWorker": false,
+    "newD1": false,
+    "newQueue": false,
+    "newServiceBinding": false,
+    "authority": "W07 / D1-04"
+  }
+}
