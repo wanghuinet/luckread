@@ -91,6 +91,59 @@ describe('RevenueCat webhook authentication and parsing', () => {
     expect(event.eventDataJson).not.toContain('new_provider_field')
   })
 
+  it('preserves RevenueCat PURCHASE_REDEEMED identity arrays with their documented array types', () => {
+    const body = bodyFor({
+      type: 'PURCHASE_REDEEMED',
+      redeemed_from: ['$RCAnonymousID:source-user'],
+      redeemed_by: ['luckread-user-123'],
+      redemption_outcome: 'transfer',
+      redemption_platform: 'ios',
+    });
+    const event = parseRevenueCatWebhookEnvelope(body, new Set(['app_luckread_android']));
+    const data = JSON.parse(event.eventDataJson) as Record<string, unknown>;
+    expect(data.redeemed_from).toEqual(['$RCAnonymousID:source-user']);
+    expect(data.redeemed_by).toEqual(['luckread-user-123']);
+    expect(data.redemption_outcome).toBe('transfer');
+    expect(data.redemption_platform).toBe('ios');
+    expect(event.eventDataJson).not.toContain('subscriber_attributes');
+  });
+
+  it('preserves subscription reconciliation fields for grace periods, paused renewals, and trial conversion', () => {
+    const billingIssue = bodyFor({
+      type: 'BILLING_ISSUE',
+      grace_period_expiration_at_ms: NOW_MS + 86_400_000,
+      renewal_number: 2,
+    });
+    const billingIssueEvent = parseRevenueCatWebhookEnvelope(
+      billingIssue,
+      new Set(['app_luckread_android']),
+    );
+    const billingIssueData = JSON.parse(billingIssueEvent.eventDataJson) as Record<string, unknown>;
+    expect(billingIssueData.grace_period_expiration_at_ms).toBe(NOW_MS + 86_400_000);
+    expect(billingIssueData.renewal_number).toBe(2);
+
+    const paused = bodyFor({
+      type: 'SUBSCRIPTION_PAUSED',
+      auto_resume_at_ms: NOW_MS + 172_800_000,
+    });
+    const pausedEvent = parseRevenueCatWebhookEnvelope(paused, new Set(['app_luckread_android']));
+    const pausedData = JSON.parse(pausedEvent.eventDataJson) as Record<string, unknown>;
+    expect(pausedData.auto_resume_at_ms).toBe(NOW_MS + 172_800_000);
+
+    const renewal = bodyFor({ type: 'RENEWAL', is_trial_conversion: true });
+    const renewalEvent = parseRevenueCatWebhookEnvelope(renewal, new Set(['app_luckread_android']));
+    expect(JSON.parse(renewalEvent.eventDataJson).is_trial_conversion).toBe(true);
+  });
+
+  it('rejects scalar redeemed_by values instead of silently accepting an invalid redemption shape', () => {
+    const body = bodyFor({
+      type: 'PURCHASE_REDEEMED',
+      redeemed_by: 'luckread-user-123',
+    });
+    expect(() => parseRevenueCatWebhookEnvelope(body, new Set(['app_luckread_android'])))
+      .toThrow('WEBHOOK_REJECTED');
+  });
+
   it('rejects an app ID outside the explicit app allowlist', () => {
     expect(() => parseRevenueCatWebhookEnvelope(bodyFor(), new Set(['another-app'])))
       .toThrow('WEBHOOK_REJECTED')
