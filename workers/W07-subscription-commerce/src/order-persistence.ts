@@ -682,16 +682,26 @@ type OrderListRow = {
 type CommerceOrderListCursor = {
   version: 1;
   scope: 'commerce-orders';
+  scopeHash: string;
   createdAt: string;
   orderId: string;
 };
 
 const MAX_ORDER_LIST_LIMIT = 50;
 
-function encodeCommerceOrderListCursor(createdAt: string, orderId: string): string {
+async function commerceOrderListScopeHash(customerId: string): Promise<string> {
+  const digest = await crypto.subtle.digest(
+    'SHA-256',
+    new TextEncoder().encode('commerce-orders\\u0000' + customerId),
+  );
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+function encodeCommerceOrderListCursor(createdAt: string, orderId: string, scopeHash: string): string {
   const bytes = new TextEncoder().encode(JSON.stringify({
     version: 1,
     scope: 'commerce-orders',
+    scopeHash,
     createdAt,
     orderId,
   } satisfies CommerceOrderListCursor));
@@ -700,7 +710,10 @@ function encodeCommerceOrderListCursor(createdAt: string, orderId: string): stri
   return btoa(binary).replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/g, '');
 }
 
-function decodeCommerceOrderListCursor(value: string | null): { createdAt: string; orderId: string } | null {
+function decodeCommerceOrderListCursor(
+  value: string | null,
+  expectedScopeHash: string,
+): { createdAt: string; orderId: string } | null {
   if (value === null) return null;
   try {
     if (!value || value.length > 2048 || !/^[A-Za-z0-9_-]+$/.test(value)) throw new Error('invalid cursor');
@@ -713,6 +726,7 @@ function decodeCommerceOrderListCursor(value: string | null): { createdAt: strin
     if (
       candidate.version !== 1 ||
       candidate.scope !== 'commerce-orders' ||
+      candidate.scopeHash !== expectedScopeHash ||
       typeof candidate.createdAt !== 'string' ||
       candidate.createdAt.length > 64 ||
       !Number.isFinite(Date.parse(candidate.createdAt)) ||
@@ -740,7 +754,8 @@ export async function listCommerceOrders(
   if (!Number.isSafeInteger(limitInput) || limitInput < 1 || limitInput > MAX_ORDER_LIST_LIMIT) {
     throw new OrderPersistenceError('VALIDATION_FAILED', 400);
   }
-  const cursor = decodeCommerceOrderListCursor(cursorValue);
+  const scopeHash = await commerceOrderListScopeHash(customerId);
+  const cursor = decodeCommerceOrderListCursor(cursorValue, scopeHash);
   const baseSql =
     'SELECT order_id, status, version, currency, subtotal_minor, discount_minor, tax_minor, total_minor, created_at, updated_at ' +
     'FROM orders WHERE customer_id = ? ';
@@ -785,6 +800,6 @@ export async function listCommerceOrders(
     items,
     limit: limitInput,
     hasMore,
-    nextCursor: hasMore && last ? encodeCommerceOrderListCursor(last.created_at, last.order_id) : null,
+    nextCursor: hasMore && last ? encodeCommerceOrderListCursor(last.created_at, last.order_id, scopeHash) : null,
   };
 }
