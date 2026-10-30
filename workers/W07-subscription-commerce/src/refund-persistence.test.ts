@@ -35,7 +35,17 @@ type PaymentRow = {
   created_at: string
   updated_at: string
 }
-type RefundRow = RefundDto & {
+type RefundRow = {
+  refundId: string
+  paymentId: string
+  amountMinor: number
+  currency: string
+  reason: string | null
+  status: RefundStatus
+  version: number
+  providerUpdatedAt: string | null
+  createdAt: string
+  updatedAt: string
   refund_id: string
   payment_id: string
   customer_id: string
@@ -62,7 +72,6 @@ type EventRow = {
   outcome_code: string | null
   refund_id: string | null
 }
-type AnyRow = Record<string, unknown>
 
 const d1Result = (changes: number): D1Result =>
   ({ success: true, meta: { changes } }) as D1Result
@@ -111,7 +120,7 @@ class RefundTestD1 {
     if (sql.includes('FROM payments') && sql.includes('payment_id = ? AND customer_id = ?')) {
       const [paymentId, customerId] = values
       return this.payment.payment_id === paymentId && this.payment.customer_id === customerId
-        ? structuredClone(this.payment) as T
+        ? structuredClone(this.payment) as unknown as T
         : null
     }
     if (sql.includes('FROM payment_provider_events')) {
