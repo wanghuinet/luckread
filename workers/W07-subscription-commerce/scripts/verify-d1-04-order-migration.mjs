@@ -261,7 +261,7 @@ const targetNamesFor = (migrationId) => {
             : migrationId === PAYMENT_METHOD_REVOCATION_MIGRATION_ID
               ? ['payment_method_revocation_requests']
               : migrationId === REFUNDS_MIGRATION_ID
-                ? ['refunds', 'payment_provider_events']
+                ? ['refunds', 'payment_provider_events_refund_binding_guard']
                 : []
   return new Set([
     ...tables,
