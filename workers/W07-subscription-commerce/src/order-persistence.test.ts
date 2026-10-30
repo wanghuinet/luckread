@@ -60,12 +60,13 @@ class MemoryD1 {
 
   async all<T>(sql: string, values: unknown[]): Promise<D1Result<T[]>> {
     if (sql.includes('FROM orders WHERE customer_id = ?')) {
-      const [customerId, cursorCreatedAt, cursorCreatedAtAgain, cursorOrderId, rawLimit] = values;
+      const hasCursor = sql.includes('AND (created_at < ? OR (created_at = ? AND order_id < ?))');
+      const [customerId, cursorCreatedAt, cursorCreatedAtAgain, cursorOrderId] = values;
       if (!sql.includes('ORDER BY created_at DESC, order_id DESC')) {
         throw new Error('Order history must use deterministic keyset ordering');
       }
       let rows = this.state.orders.filter((row) => row.customer_id === customerId);
-      if (sql.includes('AND (created_at < ? OR (created_at = ? AND order_id < ?))')) {
+      if (hasCursor) {
         if (cursorCreatedAt !== cursorCreatedAtAgain) throw new Error('Cursor timestamp binding mismatch');
         rows = rows.filter((row) =>
           String(row.created_at) < String(cursorCreatedAt) ||
@@ -75,7 +76,7 @@ class MemoryD1 {
         const timestamp = String(right.created_at).localeCompare(String(left.created_at));
         return timestamp !== 0 ? timestamp : String(right.order_id).localeCompare(String(left.order_id));
       });
-      const limit = Number(rawLimit);
+      const limit = Number(hasCursor ? values[4] : values[1]);
       return { success: true, results: clone(rows.slice(0, limit)) as T[], meta: {} } as D1Result<T[]>;
     }
     if (!sql.includes('FROM order_lines WHERE order_id = ?')) throw new Error('Unexpected all query: ' + sql);
