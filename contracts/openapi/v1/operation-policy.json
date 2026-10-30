@@ -71,6 +71,7 @@
               "account",
               "content",
               "creator",
+              "refund",
               "none"
             ]
           }
