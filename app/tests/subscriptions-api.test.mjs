@@ -13,6 +13,7 @@ const {
   fetchActiveMembershipPlansPage,
   fetchMySubscriptionsPage,
   fetchMyCommerceOrdersPage,
+  fetchMyPaymentStatus,
 } = await import('../lib/subscriptions-api.ts');
 
 beforeEach(() => {
@@ -39,6 +40,17 @@ test('loads current-user purchase history through the private W01 order route', 
   expect(calls[0]?.options.signal).toBe(controller.signal);
 });
 
+test('loads the current user's payment status through the owner-scoped W01 route', async () => {
+  const controller = new AbortController();
+  const paymentId = 'pay_' + 'a'.repeat(26);
+  await fetchMyPaymentStatus(paymentId, { signal: controller.signal });
+
+  expect(calls).toHaveLength(1);
+  expect(calls[0]?.path).toBe('/payments/' + paymentId);
+  expect(calls[0]?.options.method).toBe('GET');
+  expect(calls[0]?.options.signal).toBe(controller.signal);
+});
+
 test('loads active public membership plans through the existing W01 catalog route', async () => {
   const controller = new AbortController();
   await fetchActiveMembershipPlansPage({ limit: 10, cursor: 'opaque/cursor', signal: controller.signal });
@@ -58,6 +70,7 @@ test('rejects invalid pagination bounds before making a request', () => {
   expect(() => fetchMyCommerceOrdersPage({ limit: 51 })).toThrow('between 1 and 50');
   expect(() => fetchMyCommerceOrdersPage({ cursor: '' })).toThrow('between 1 and 2048');
   expect(() => fetchMyCommerceOrdersPage({ cursor: 'x'.repeat(2049) })).toThrow('between 1 and 2048');
+  expect(() => fetchMyPaymentStatus('bad-payment-id')).toThrow('Payment ID is invalid.');
   expect(calls).toHaveLength(0);
 });
 
@@ -67,8 +80,9 @@ test('keeps subscription mutations and mobile checkout disabled until store bill
   const plansScreen = readFileSync(new URL('../app/(drawer)/membership-plans.tsx', import.meta.url), 'utf8');
   const drawer = readFileSync(new URL('../app/(drawer)/_layout.tsx', import.meta.url), 'utf8');
   const billingHistoryScreen = readFileSync(new URL('../app/(drawer)/billing-history.tsx', import.meta.url), 'utf8');
+  const paymentStatusScreen = readFileSync(new URL('../app/(drawer)/payment-status.tsx', import.meta.url), 'utf8');
 
-  expect(Object.keys(api).sort()).toEqual(['fetchActiveMembershipPlansPage', 'fetchMyCommerceOrdersPage', 'fetchMySubscriptionsPage', 'fetchSavedPaymentMethods', 'revokeSavedPaymentMethod'].sort());
+  expect(Object.keys(api).sort()).toEqual(['fetchActiveMembershipPlansPage', 'fetchMyCommerceOrdersPage', 'fetchMyPaymentStatus', 'fetchMySubscriptionsPage', 'fetchSavedPaymentMethods', 'revokeSavedPaymentMethod'].sort());
   expect(subscriptionsScreen).not.toContain('transitionMySubscription');
   expect(subscriptionsScreen).not.toContain('onTransition');
   expect(subscriptionsScreen).not.toContain('取消订阅');
@@ -84,6 +98,11 @@ test('keeps subscription mutations and mobile checkout disabled until store bill
   expect(billingHistoryScreen).toContain('fetchMyCommerceOrdersPage');
   expect(billingHistoryScreen).toContain('nextCursor');
   expect(billingHistoryScreen).toContain('orderId');
+  expect(billingHistoryScreen).toContain('latestPaymentId');
+  expect(billingHistoryScreen).toContain("'/payment-status?paymentId='");
+  expect(paymentStatusScreen).toContain('fetchMyPaymentStatus');
+  expect(paymentStatusScreen).toContain("payment.providerStatusCheck === 'DIFFERS'");
+  expect(paymentStatusScreen).not.toContain('clientSecret');
   expect(billingHistoryScreen).not.toContain('paymentToken');
   expect(billingHistoryScreen).not.toContain('merchantId');
 });
