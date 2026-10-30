@@ -59,7 +59,7 @@ function dependencies(overrides: Partial<PaymentStatusDependencies> = {}) {
       expect(customerId).toBe(CUSTOMER)
       expect(paymentId).toBe(PAYMENT_ID)
       return payment
-    }) as typeof PaymentStatusDependencies extends never ? never : PaymentStatusDependencies['readPayment'],
+    }) as NonNullable<PaymentStatusDependencies['readPayment']>,
     retrieveProvider: (async (_config, paymentId, _fetch, forceSync) => {
       providerCalls += 1
       receivedForceSync = forceSync === true
@@ -174,14 +174,14 @@ describe('owner-scoped payment status runtime', () => {
       request('https://luckread-w07.internal/payments/' + PAYMENT_ID + '?force_sync=true'),
       CUSTOMER, env, fixture.deps,
     )
-    const withBody = new Request('https://luckread-w07.internal/payments/' + PAYMENT_ID, {
-      method: 'GET',
+    const nonGet = new Request('https://luckread-w07.internal/payments/' + PAYMENT_ID, {
+      method: 'POST',
       body: 'unexpected',
     })
-    const bodyResponse = await handlePaymentStatusRequest(withBody, CUSTOMER, env, fixture.deps)
+    const methodResponse = await handlePaymentStatusRequest(nonGet, CUSTOMER, env, fixture.deps)
     expect(malformed?.status).toBe(404)
     expect(query?.status).toBe(400)
-    expect(bodyResponse?.status).toBe(400)
+    expect(methodResponse?.status).toBe(404)
     expect(fixture.providerCalls()).toBe(0)
   })
 
