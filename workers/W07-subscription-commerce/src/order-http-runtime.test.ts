@@ -8,6 +8,7 @@ import {
   type AuthoritativelyPricedOrder,
 } from './order-persistence.js';
 import { handleCommerceOrderRequest } from './order-http-runtime.js';
+import { issueInvoiceForOrder } from './billing-persistence.js';
 
 const env = {
   D1_01: {} as D1Database,
@@ -78,10 +79,15 @@ describe('private W07 commerce order HTTP handler', () => {
 
   it('creates an order using the authenticated principal, bounded request body, and forwarded idempotency key', async () => {
     let captured: Parameters<typeof createCommerceOrder> | undefined;
+    let invoiceCall: Parameters<typeof issueInvoiceForOrder> | undefined;
     const mockCreate = (async (...args: Parameters<typeof createCommerceOrder>) => {
       captured = args;
       return createResult;
     }) as typeof createCommerceOrder;
+    const mockInvoice = (async (...args: Parameters<typeof issueInvoiceForOrder>) => {
+      invoiceCall = args;
+      return {} as Awaited<ReturnType<typeof issueInvoiceForOrder>>;
+    }) as typeof issueInvoiceForOrder;
 
     const response = await handleCommerceOrderRequest(
       postRequest({ items: [{ itemRef: 'plan_' + 'a'.repeat(64), quantity: 1 }] }, {
@@ -89,13 +95,15 @@ describe('private W07 commerce order HTTP handler', () => {
       }),
       'user_42',
       env,
-      { createOrder: mockCreate, resolvePricing: async () => explicitTestPricing },
+      { createOrder: mockCreate, issueInvoice: mockInvoice, resolvePricing: async () => explicitTestPricing },
     );
 
     expect(response?.status).toBe(201);
     expect(captured?.[1]).toBe('user_42');
     expect(captured?.[2]).toBe('purchase_attempt_01');
-    expect(captured?.[3]).toEqual({ items: [{ itemRef: 'plan_' + 'a'.repeat(64), quantity: 1 }] });
+    expect(captured?.[3]).toEqual({ items: [{ itemRef: 'plan_' + 'a'.repeat(64), quantity: 1 }] })
+    expect(invoiceCall?.slice(0, 2)).toEqual([env.D1_04, 'user_42'])
+    expect(invoiceCall?.[2]).toBe(orderData.orderId);
     const envelope = await parseResponse(response!);
     expect(envelope.data).toEqual(orderData);
     expect(envelope.requestId).toMatch(/^req_/);
