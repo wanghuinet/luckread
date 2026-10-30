@@ -8,6 +8,7 @@ import {
 } from './hyperswitch-client.js';
 import {
   createRefundReservation,
+  findExistingRefundReservation,
   recordHyperswitchRefundAcknowledgement,
   resolveRefundPaymentReference,
   RefundPersistenceError,
@@ -26,6 +27,7 @@ type RefundRuntimeDependencies = Readonly<{
   resolvePayment?: typeof resolveRefundPaymentReference;
   retrievePayment?: typeof retrieveHyperswitchPayment;
   reserve?: typeof createRefundReservation;
+  findExistingReservation?: typeof findExistingRefundReservation;
   createProviderRefund?: typeof createHyperswitchRefund;
   recordAcknowledgement?: typeof recordHyperswitchRefundAcknowledgement;
 }>;
@@ -203,35 +205,47 @@ export async function handleCommerceRefundRequest(
       return errorResponse(409, 'CONFLICT', 'Refund currency does not match the original payment');
     }
 
-    // The provider retrieval is server-authenticated and merchant-bound. The
-    // browser cannot supply amount_captured or use the original order total.
-    const retrievePayment = dependencies.retrievePayment ?? retrieveHyperswitchPayment;
-    const providerPayment = await retrievePayment(config, input.paymentId);
-    if (
-      providerPayment.paymentId !== paymentReference.paymentId ||
-      providerPayment.merchantId !== paymentReference.merchantId ||
-      providerPayment.amount !== paymentReference.amountMinor ||
-      providerPayment.currency !== paymentReference.currency ||
-      !['succeeded', 'partially_captured'].includes(providerPayment.status) ||
-      typeof providerPayment.amountCaptured !== 'number' ||
-      !Number.isSafeInteger(providerPayment.amountCaptured) ||
-      providerPayment.amountCaptured <= 0 ||
-      providerPayment.amountCaptured > providerPayment.amount
-    ) {
-      return errorResponse(409, 'REFUND_CAPTURE_NOT_CONFIRMED', 'Captured amount could not be verified for this payment');
-    }
-
-    const reserve = dependencies.reserve ?? createRefundReservation;
-    const reservation: RefundReservation = await reserve(env.D1_04, {
+    const idempotencyInput = {
       customerId,
       paymentId: input.paymentId,
       amountMinor: input.amountMinor,
       currency: input.currency,
-      capturedAmountMinor: providerPayment.amountCaptured,
-      idempotencyKey,
       reason: typeof input.reason === 'string' ? input.reason : null,
+      idempotencyKey,
       expectedMerchantId: config.expectedMerchantId as string,
-    });
+    };
+
+    // Check the durable D1-04 idempotency record before external I/O. A replay
+    // can return the accepted state during provider downtime; REQUESTED retries
+    // reuse the same refund_id without re-reading the original Payment.
+    const findExisting = dependencies.findExistingReservation ?? findExistingRefundReservation;
+    let reservation: RefundReservation | null = await findExisting(env.D1_04, idempotencyInput);
+
+    if (!reservation) {
+      // The provider retrieval is server-authenticated and merchant-bound.
+      // Captured amount is never accepted from the browser.
+      const retrievePayment = dependencies.retrievePayment ?? retrieveHyperswitchPayment;
+      const providerPayment = await retrievePayment(config, input.paymentId);
+      if (
+        providerPayment.paymentId !== paymentReference.paymentId ||
+        providerPayment.merchantId !== paymentReference.merchantId ||
+        providerPayment.amount !== paymentReference.amountMinor ||
+        providerPayment.currency !== paymentReference.currency ||
+        !['succeeded', 'partially_captured'].includes(providerPayment.status) ||
+        typeof providerPayment.amountCaptured !== 'number' ||
+        !Number.isSafeInteger(providerPayment.amountCaptured) ||
+        providerPayment.amountCaptured <= 0 ||
+        providerPayment.amountCaptured > providerPayment.amount
+      ) {
+        return errorResponse(409, 'REFUND_CAPTURE_NOT_CONFIRMED', 'Captured amount could not be verified for this payment');
+      }
+
+      const reserve = dependencies.reserve ?? createRefundReservation;
+      reservation = await reserve(env.D1_04, {
+        ...idempotencyInput,
+        capturedAmountMinor: providerPayment.amountCaptured,
+      });
+    }
 
     // Do not issue another POST for already accepted, completed, or ambiguous
     // refunds. An ambiguous state requires provider retrieve/manual reconciliation.
