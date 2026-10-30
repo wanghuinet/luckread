@@ -12,7 +12,7 @@ export class RevenueCatWebhookValidationError extends Error {
 
 export type RevenueCatWebhookEvent = Readonly<{
   apiVersion: string;
-  appId: string;
+  appId: string | null;
   eventId: string;
   eventType: string;
   eventTimestampMs: number;
@@ -117,8 +117,10 @@ const EVENT_STRING_FIELDS = [
   'environment',
   'transaction_id',
   'original_transaction_id',
-  'redeemed_by',
+  'entitlement_id',
   'redemption_outcome',
+  'redemption_platform',
+  'product_display_name',
   'period_type',
   'cancel_reason',
   'expiration_reason',
@@ -126,6 +128,12 @@ const EVENT_STRING_FIELDS = [
   'currency',
   'offer_code',
   'presented_offering_id',
+  'experiment_id',
+  'experiment_variant',
+  'offering_id',
+  'workflow_id',
+  'workflow_step_id',
+  'trace_id',
 ] as const;
 
 const EVENT_ARRAY_FIELDS = [
@@ -133,11 +141,17 @@ const EVENT_ARRAY_FIELDS = [
   'entitlement_ids',
   'transferred_from',
   'transferred_to',
+  'redeemed_from',
+  'redeemed_by',
 ] as const;
 
 const EVENT_NUMBER_FIELDS = [
   'expiration_at_ms',
   'purchased_at_ms',
+  'grace_period_expiration_at_ms',
+  'auto_resume_at_ms',
+  'renewal_number',
+  'experiment_enrolled_at_ms',
   'price',
   'price_in_purchased_currency',
   'quantity',
@@ -168,18 +182,21 @@ function sanitizedEventData(event: Record<string, unknown>): string {
   for (const key of EVENT_NUMBER_FIELDS) {
     if (!Object.hasOwn(event, key)) continue;
     const value = event[key];
+    const signedRefundAmount = key === 'price' || key === 'price_in_purchased_currency';
     if (value !== null && (typeof value !== 'number' || !Number.isFinite(value) ||
-        value < 0 || value > Number.MAX_SAFE_INTEGER)) {
+        (signedRefundAmount ? Math.abs(value) > Number.MAX_SAFE_INTEGER :
+          value < 0 || value > Number.MAX_SAFE_INTEGER))) {
       throw new RevenueCatWebhookValidationError('WEBHOOK_REJECTED');
     }
     data[key] = value;
   }
-  if (Object.hasOwn(event, 'is_family_share')) {
-    const value = event.is_family_share;
+  for (const key of ['is_family_share', 'is_trial_conversion'] as const) {
+    if (!Object.hasOwn(event, key)) continue;
+    const value = event[key];
     if (value !== null && typeof value !== 'boolean') {
       throw new RevenueCatWebhookValidationError('WEBHOOK_REJECTED');
     }
-    data.is_family_share = value;
+    data[key] = value;
   }
 
   const serialized = JSON.stringify(data);
@@ -217,8 +234,6 @@ export function parseRevenueCatWebhookEnvelope(
       !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,254}$/.test(event.id) ||
       !isBoundedString(event.type, 64) ||
       !/^[A-Z][A-Z0-9_]{0,63}$/.test(event.type) ||
-      !isBoundedString(event.app_id, 255) ||
-      !allowedAppIds.has(event.app_id) ||
       !Number.isSafeInteger(event.event_timestamp_ms) ||
       (event.event_timestamp_ms as number) < 1) {
     throw new RevenueCatWebhookValidationError('WEBHOOK_REJECTED');
@@ -231,26 +246,36 @@ export function parseRevenueCatWebhookEnvelope(
     return value;
   };
 
+  const storeValue = optionalString('store');
+  if (storeValue !== null && storeValue.length > 64) {
+    throw new RevenueCatWebhookValidationError('WEBHOOK_REJECTED');
+  }
   const environmentValue = optionalString('environment');
   if (environmentValue !== null && environmentValue !== 'PRODUCTION' && environmentValue !== 'SANDBOX') {
     throw new RevenueCatWebhookValidationError('WEBHOOK_REJECTED');
   }
 
+  // Experiments are not store transactions; promotional grants are not
+  // mapped to Apple/Google store products. Neither can create LuckRead paid access.
+  const ignoredNonStoreEvent = event.type === 'EXPERIMENT_ENROLLMENT' || storeValue === 'PROMOTIONAL';
+  if (event.app_id !== undefined && event.app_id !== null && !isBoundedString(event.app_id, 255)) {
+    throw new RevenueCatWebhookValidationError('WEBHOOK_REJECTED');
+  }
+  if (!ignoredNonStoreEvent &&
+      (!isBoundedString(event.app_id, 255) || !allowedAppIds.has(event.app_id))) {
+    throw new RevenueCatWebhookValidationError('WEBHOOK_REJECTED');
+  }
+  const appId = ignoredNonStoreEvent ? null : event.app_id as string;
+
   return {
     apiVersion: decoded.api_version,
-    appId: event.app_id,
+    appId,
     eventId: event.id,
     eventType: event.type,
     eventTimestampMs: event.event_timestamp_ms as number,
     appUserId: optionalString('app_user_id'),
     productId: optionalString('product_id'),
-    store: (() => {
-      const value = optionalString('store');
-      if (value !== null && value.length > 64) {
-        throw new RevenueCatWebhookValidationError('WEBHOOK_REJECTED');
-      }
-      return value;
-    })(),
+    store: storeValue,
     environment: environmentValue,
     transactionId: optionalString('transaction_id'),
     originalTransactionId: optionalString('original_transaction_id'),

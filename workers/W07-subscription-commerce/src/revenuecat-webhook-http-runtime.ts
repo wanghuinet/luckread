@@ -66,10 +66,10 @@ function receiptResponse(result: RevenueCatWebhookReceiptResult): Response {
 }
 
 /**
- * W01-only private receiver. The webhook is acknowledged with 200 only after
- * the sanitized event receipt (or an idempotent duplicate/conflict record)
- * is durable in D1-04. This endpoint never activates a subscription or grants
- * a content entitlement.
+ * W01-only private receiver. Store-backed events are acknowledged with 200
+ * only after a sanitized receipt is durable in D1-04. Non-store experiment and
+ * promotional events are acknowledged as ignored without creating a purchase
+ * receipt. This endpoint never activates a subscription or grants entitlement.
  */
 export async function handleRevenueCatWebhookRequest(
   request: Request,
@@ -135,6 +135,20 @@ export async function handleRevenueCatWebhookRequest(
     if (event.eventType === 'TEST') {
       return Response.json(
         { data: { outcome: 'TEST_ACKNOWLEDGED', eventId: event.eventId, entitlementApplied: false }, requestId: 'req_' + crypto.randomUUID() },
+        { status: 200, headers: { 'cache-control': 'no-store' } },
+      );
+    }
+    if (event.appId === null) {
+      // No store-backed product mapping exists for these events; acknowledge
+      // them without creating a purchase receipt or changing subscription state.
+      console.log(JSON.stringify({
+        event: 'revenuecat.webhook.ignored_non_store_source',
+        eventId: event.eventId,
+        eventType: event.eventType,
+        store: event.store,
+      }));
+      return Response.json(
+        { data: { outcome: 'IGNORED_NON_STORE_SOURCE', eventId: event.eventId, entitlementApplied: false }, requestId: 'req_' + crypto.randomUUID() },
         { status: 200, headers: { 'cache-control': 'no-store' } },
       );
     }
