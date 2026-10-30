@@ -368,6 +368,32 @@ type MembershipPlanLifecycleAuditInput = {
   planVersion: number; action: 'pause' | 'resume' | 'retire'; status: 'PAUSED' | 'ACTIVE' | 'RETIRED'
   visibility: 'PRIVATE' | 'PUBLIC'; version: number; occurredAt: string
 }
+type MembershipSubscriptionStatus = 'PENDING' | 'ACTIVE' | 'PAST_DUE' | 'PAUSED' | 'CANCELED' | 'EXPIRED'
+type MembershipSubscriptionMutationOperation = 'cancel' | 'pause' | 'resume'
+type MembershipSubscriptionMutationRequestAuditInput = {
+  eventId: string
+  subscriptionId: string
+  idempotencyKey: string
+  expectedVersion: number
+  observedVersion: number
+  operation: MembershipSubscriptionMutationOperation
+  beforeStatus: MembershipSubscriptionStatus
+  beforePlanId: string
+  beforePlanVersion: number
+}
+type MembershipSubscriptionMutationAppliedAuditInput = {
+  eventId: string
+  intentEventId: string
+  subscriptionId: string
+  idempotencyKey: string
+  expectedVersion: number
+  operation: MembershipSubscriptionMutationOperation
+  status: 'ACTIVE' | 'PAUSED' | 'CANCELED'
+  version: number
+  planId: string
+  planVersion: number
+  updatedAt: string
+}
 
 type CommerceOrderAuditInput = {
   eventId: string
@@ -550,6 +576,47 @@ function parseMembershipPlanLifecycleAuditInput(value: unknown): MembershipPlanL
   return body as MembershipPlanLifecycleAuditInput
 }
 
+function parseSubscriptionMutationRequestAuditInput(value: unknown): MembershipSubscriptionMutationRequestAuditInput {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('INVALID_SUBSCRIPTION_MUTATION_REQUEST_AUDIT')
+  const body = value as Record<string, unknown>
+  const allowed = new Set(['eventId', 'subscriptionId', 'idempotencyKey', 'expectedVersion', 'observedVersion', 'operation', 'beforeStatus', 'beforePlanId', 'beforePlanVersion'])
+  if (Object.keys(body).some((key) => !allowed.has(key)) || Object.keys(body).length !== allowed.size) throw new Error('INVALID_SUBSCRIPTION_MUTATION_REQUEST_AUDIT')
+  if (
+    typeof body.eventId !== 'string' || !/^evt_sub_mutation_requested_[a-f0-9]{64}$/.test(body.eventId) ||
+    typeof body.subscriptionId !== 'string' || !/^sub_[A-Za-z0-9_-]{1,128}$/.test(body.subscriptionId) ||
+    typeof body.idempotencyKey !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(body.idempotencyKey) ||
+    typeof body.expectedVersion !== 'number' || !Number.isSafeInteger(body.expectedVersion) || body.expectedVersion < 1 ||
+    typeof body.observedVersion !== 'number' || !Number.isSafeInteger(body.observedVersion) || body.observedVersion < 1 ||
+    (body.operation !== 'cancel' && body.operation !== 'pause' && body.operation !== 'resume') ||
+    !['ACTIVE', 'PAST_DUE', 'PAUSED', 'CANCELED'].includes(String(body.beforeStatus)) ||
+    typeof body.beforePlanId !== 'string' || !/^plan_[a-f0-9]{64}$/.test(body.beforePlanId) ||
+    typeof body.beforePlanVersion !== 'number' || !Number.isSafeInteger(body.beforePlanVersion) || body.beforePlanVersion < 1
+  ) throw new Error('INVALID_SUBSCRIPTION_MUTATION_REQUEST_AUDIT')
+  return body as MembershipSubscriptionMutationRequestAuditInput
+}
+
+function parseSubscriptionMutationAppliedAuditInput(value: unknown): MembershipSubscriptionMutationAppliedAuditInput {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('INVALID_SUBSCRIPTION_MUTATION_APPLIED_AUDIT')
+  const body = value as Record<string, unknown>
+  const allowed = new Set(['eventId', 'intentEventId', 'subscriptionId', 'idempotencyKey', 'expectedVersion', 'operation', 'status', 'version', 'planId', 'planVersion', 'updatedAt'])
+  if (Object.keys(body).some((key) => !allowed.has(key)) || Object.keys(body).length !== allowed.size) throw new Error('INVALID_SUBSCRIPTION_MUTATION_APPLIED_AUDIT')
+  const expectedStatus = body.operation === 'cancel' ? 'CANCELED' : body.operation === 'pause' ? 'PAUSED' : body.operation === 'resume' ? 'ACTIVE' : null
+  if (
+    typeof body.eventId !== 'string' || !/^evt_sub_mutation_applied_[a-f0-9]{64}$/.test(body.eventId) ||
+    typeof body.intentEventId !== 'string' || !/^evt_sub_mutation_requested_[a-f0-9]{64}$/.test(body.intentEventId) ||
+    body.eventId !== body.intentEventId.replace('evt_sub_mutation_requested_', 'evt_sub_mutation_applied_') ||
+    typeof body.subscriptionId !== 'string' || !/^sub_[A-Za-z0-9_-]{1,128}$/.test(body.subscriptionId) ||
+    typeof body.idempotencyKey !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(body.idempotencyKey) ||
+    typeof body.expectedVersion !== 'number' || !Number.isSafeInteger(body.expectedVersion) || body.expectedVersion < 1 ||
+    expectedStatus === null || body.status !== expectedStatus ||
+    typeof body.version !== 'number' || !Number.isSafeInteger(body.version) || body.version < body.expectedVersion + 1 ||
+    typeof body.planId !== 'string' || !/^plan_[a-f0-9]{64}$/.test(body.planId) ||
+    typeof body.planVersion !== 'number' || !Number.isSafeInteger(body.planVersion) || body.planVersion < 1 ||
+    typeof body.updatedAt !== 'string' || !Number.isFinite(Date.parse(body.updatedAt)) || new Date(body.updatedAt).toISOString() !== body.updatedAt
+  ) throw new Error('INVALID_SUBSCRIPTION_MUTATION_APPLIED_AUDIT')
+  return body as MembershipSubscriptionMutationAppliedAuditInput
+}
+
 function parseMembershipPlanUpdateAuditInput(value: unknown): MembershipPlanUpdateAuditInput {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('INVALID_MEMBERSHIP_PLAN_UPDATE_AUDIT')
   const body = value as Record<string, unknown>
@@ -637,6 +704,144 @@ function matchesMembershipPlanMutationRequestAudit(existing: StoredAuditEvent, e
  * therefore ignores only the newly generated timestamp and confirms that the
  * first immutable request-intent event is already durable.
  */
+function sameAuditActor(existing: StoredAuditEvent, expected: AuditEvent): boolean {
+  try {
+    const storedActor = JSON.parse(existing.actor_json) as Record<string, unknown>
+    const expectedActor = expected.actor as unknown as Record<string, unknown>
+    return storedActor.actorId === expectedActor.actorId &&
+      storedActor.actorType === expectedActor.actorType &&
+      storedActor.layer === expectedActor.layer
+  } catch {
+    return false
+  }
+}
+
+function matchesSubscriptionMutationIntent(existing: StoredAuditEvent, expected: AuditEvent): boolean {
+  try {
+    const storedAfter = JSON.parse(existing.after_json) as Record<string, unknown>
+    const expectedAfter = expected.after as Record<string, unknown>
+    return existing.event_id === expected.eventId &&
+      sameAuditActor(existing, expected) &&
+      existing.action === expected.action &&
+      existing.target_type === expected.targetType &&
+      existing.target_id === expected.targetId &&
+      storedAfter.operation === expectedAfter.operation &&
+      storedAfter.idempotencyKey === expectedAfter.idempotencyKey &&
+      storedAfter.expectedVersion === expectedAfter.expectedVersion
+  } catch {
+    return false
+  }
+}
+
+async function persistSubscriptionMutationRequestAudit(env: Env, event: AuditEvent): Promise<Response> {
+  const responseFor = (stored: StoredAuditEvent, replayed: boolean, status: number): Response => {
+    let before: unknown
+    let after: unknown
+    try {
+      before = JSON.parse(stored.before_json) as unknown
+      after = JSON.parse(stored.after_json) as unknown
+    } catch {
+      return json({ error: 'AUDIT_EVENT_INVALID' }, 503)
+    }
+    return json({ data: { eventId: stored.event_id, action: stored.action, targetId: stored.target_id, before, after, replayed },
+      requestId: event.requestId }, status)
+  }
+  let existing: StoredAuditEvent | null
+  try {
+    existing = await findAuditEvent(env.D1_03, event.eventId)
+  } catch {
+    return json({ error: 'AUDIT_EVENT_LOOKUP_FAILED' }, 503)
+  }
+  if (existing) {
+    if (!matchesSubscriptionMutationIntent(existing, event)) return json({ error: 'AUDIT_EVENT_CONFLICT' }, 409)
+    return responseFor(existing, true, 200)
+  }
+  const before = event.before as Record<string, unknown>
+  const after = event.after as Record<string, unknown>
+  const allowedFrom: Record<MembershipSubscriptionMutationOperation, readonly string[]> = {
+    cancel: ['ACTIVE', 'PAUSED'],
+    pause: ['ACTIVE'],
+    resume: ['PAUSED'],
+  }
+  const operation = after.operation as MembershipSubscriptionMutationOperation
+  if (before.version !== after.expectedVersion) return json({ error: 'PRECONDITION_FAILED' }, 412)
+  if (!allowedFrom[operation]?.includes(String(before.status))) return json({ error: 'INVALID_STATE' }, 409)
+  try {
+    await persistAuditEvent(env.D1_03, event)
+    const stored = await findAuditEvent(env.D1_03, event.eventId)
+    if (!stored || !matchesSubscriptionMutationIntent(stored, event)) return json({ error: 'AUDIT_EVENT_PERSISTENCE_UNCONFIRMED' }, 503)
+    return responseFor(stored, false, 201)
+  } catch {
+    try {
+      const raced = await findAuditEvent(env.D1_03, event.eventId)
+      if (raced && matchesSubscriptionMutationIntent(raced, event)) return responseFor(raced, true, 200)
+    } catch {
+      // Keep the lifecycle mutation closed if its durable intent cannot be confirmed.
+    }
+    return json({ error: 'AUDIT_EVENT_PERSISTENCE_FAILED' }, 503)
+  }
+}
+
+async function persistSubscriptionMutationAppliedAudit(
+  env: Env, principal: ReturnType<typeof requireW01Transport>,
+  input: MembershipSubscriptionMutationAppliedAuditInput,
+): Promise<Response> {
+  let intent: StoredAuditEvent | null
+  try {
+    intent = await findAuditEvent(env.D1_03, input.intentEventId)
+  } catch {
+    return json({ error: 'SUBSCRIPTION_MUTATION_INTENT_LOOKUP_FAILED' }, 503)
+  }
+  if (!intent || !sameAuditActor(intent, {
+      actor: { actorId: principal.userId, actorType: 'user', layer: principal.layer as AuditEvent['actor']['layer'] },
+    } as AuditEvent) ||
+    intent.action !== 'membership.subscription.' + input.operation + '_requested' ||
+    intent.target_type !== 'Subscription' || intent.target_id !== input.subscriptionId) {
+    return json({ error: 'SUBSCRIPTION_MUTATION_INTENT_MISMATCH' }, 409)
+  }
+  let intentAfter: Record<string, unknown>
+  let intentBefore: Record<string, unknown>
+  try {
+    intentAfter = JSON.parse(intent.after_json) as Record<string, unknown>
+    intentBefore = JSON.parse(intent.before_json) as Record<string, unknown>
+  } catch {
+    return json({ error: 'SUBSCRIPTION_MUTATION_INTENT_INVALID' }, 503)
+  }
+  if (
+    intentAfter.operation !== input.operation ||
+    intentAfter.idempotencyKey !== input.idempotencyKey ||
+    intentAfter.expectedVersion !== input.expectedVersion ||
+    intentBefore.version !== input.expectedVersion ||
+    intentBefore.planId !== input.planId ||
+    intentBefore.planVersion !== input.planVersion ||
+    input.version < input.expectedVersion + 1
+  ) return json({ error: 'SUBSCRIPTION_MUTATION_INTENT_MISMATCH' }, 409)
+
+  const action = input.operation === 'cancel' ? 'membership.subscription.canceled'
+    : input.operation === 'pause' ? 'membership.subscription.paused'
+      : 'membership.subscription.resumed'
+  const event: AuditEvent = {
+    eventId: input.eventId,
+    requestId: principal.requestId,
+    traceId: principal.correlationId,
+    actor: { actorId: principal.userId, actorType: 'user', layer: principal.layer as AuditEvent['actor']['layer'] },
+    action,
+    targetType: 'Subscription',
+    targetId: input.subscriptionId,
+    before: intentBefore,
+    after: {
+      status: input.status,
+      version: input.version,
+      planId: input.planId,
+      planVersion: input.planVersion,
+      updatedAt: input.updatedAt,
+      idempotencyKey: input.idempotencyKey,
+    },
+    occurredAt: input.updatedAt,
+  }
+  return persistImmutableAuditEvent(env, event)
+}
+
 async function persistMembershipPlanMutationRequestAudit(env: Env, event: AuditEvent): Promise<Response> {
   let existing: StoredAuditEvent | null
   try {
@@ -966,6 +1171,55 @@ export default {
       return persistMembershipPlanMutationRequestAudit(env, event)
     }
 
+
+    if (request.method === 'POST' && url.pathname === '/internal/audit-events/subscription-mutation-requested') {
+      let principal: ReturnType<typeof requireW01Transport>
+      try { principal = requireW01Transport(request) }
+      catch (error) { return errorResponse(error, request.headers.get('X-LuckRead-Request-Id')?.trim()) }
+      if (!/^L[2-8]$/.test(principal.layer)) return json({ error: 'PERMISSION_DENIED' }, 403)
+      let input: MembershipSubscriptionMutationRequestAuditInput
+      try { input = parseSubscriptionMutationRequestAuditInput(await readBoundedAuditJson(request, 2048)) }
+      catch { return json({ error: 'INVALID_SUBSCRIPTION_MUTATION_REQUEST_AUDIT' }, 400) }
+      if (request.headers.get('Idempotency-Key')?.trim() !== input.idempotencyKey) {
+        return json({ error: 'IDEMPOTENCY_KEY_MISMATCH' }, 400)
+      }
+      const event: AuditEvent = {
+        eventId: input.eventId,
+        requestId: principal.requestId,
+        traceId: principal.correlationId,
+        actor: { actorId: principal.userId, actorType: 'user', layer: principal.layer as AuditEvent['actor']['layer'] },
+        action: 'membership.subscription.' + input.operation + '_requested',
+        targetType: 'Subscription',
+        targetId: input.subscriptionId,
+        before: {
+          status: input.beforeStatus,
+          planId: input.beforePlanId,
+          planVersion: input.beforePlanVersion,
+          version: input.observedVersion,
+        },
+        after: {
+          operation: input.operation,
+          idempotencyKey: input.idempotencyKey,
+          expectedVersion: input.expectedVersion,
+        },
+        occurredAt: new Date().toISOString(),
+      }
+      return persistSubscriptionMutationRequestAudit(env, event)
+    }
+
+    if (request.method === 'POST' && url.pathname === '/internal/audit-events/subscription-mutation-applied') {
+      let principal: ReturnType<typeof requireW01Transport>
+      try { principal = requireW01Transport(request) }
+      catch (error) { return errorResponse(error, request.headers.get('X-LuckRead-Request-Id')?.trim()) }
+      if (!/^L[2-8]$/.test(principal.layer)) return json({ error: 'PERMISSION_DENIED' }, 403)
+      let input: MembershipSubscriptionMutationAppliedAuditInput
+      try { input = parseSubscriptionMutationAppliedAuditInput(await readBoundedAuditJson(request, 2048)) }
+      catch { return json({ error: 'INVALID_SUBSCRIPTION_MUTATION_APPLIED_AUDIT' }, 400) }
+      if (request.headers.get('Idempotency-Key')?.trim() !== input.idempotencyKey) {
+        return json({ error: 'IDEMPOTENCY_KEY_MISMATCH' }, 400)
+      }
+      return persistSubscriptionMutationAppliedAudit(env, principal, input)
+    }
 
     if (request.method === 'POST' && url.pathname === '/internal/audit-events/membership-plan-lifecycle-requested') {
       let principal: ReturnType<typeof requireW01Transport>

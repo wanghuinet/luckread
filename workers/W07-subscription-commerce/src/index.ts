@@ -1,6 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 
-import { createMembershipPlanDraft, reviseMembershipPlan, getSubscription, hasActiveCreatorMembership, listActiveMembershipPlans, listCreatorMembershipPlans, listSubscriptions, parseBoundedPositiveInt, publishMembershipPlan, transitionMembershipPlanLifecycle, SubscriptionRuntimeError, validatePrincipal } from './subscription-runtime.js'
+import { createMembershipPlanDraft, reviseMembershipPlan, getSubscription, hasActiveCreatorMembership, listActiveMembershipPlans, listCreatorMembershipPlans, listSubscriptions, parseBoundedPositiveInt, publishMembershipPlan, transitionMembershipPlanLifecycle, transitionSubscription, validateIdempotencyKey, SubscriptionRuntimeError, validatePrincipal } from './subscription-runtime.js'
 import { handleCommerceOrderRequest } from './order-http-runtime.js'
 import { resolveCommerceOrderItems } from './order-item-resolution.js'
 import { applyDemoTaxPricing, isDemoPricingEnabled } from './demo-tax-pricing.js'
@@ -303,6 +303,31 @@ export default {
         )
         return json({ data: result, requestId: crypto.randomUUID() }, 200, result.etag)
       }
+      const subscriptionMutationMatch = /^\/memberships\/subscriptions\/([^/]+)\/(cancel|pause|resume)$/.exec(pathname)
+      if (request.method === 'POST' && subscriptionMutationMatch) {
+        const segments = parseSegments(pathname)
+        if (segments.length !== 4 || segments[0] !== 'memberships' || segments[1] !== 'subscriptions') {
+          return new Response(null, { status: 404 })
+        }
+        const action = segments[3]
+        if (action !== 'cancel' && action !== 'pause' && action !== 'resume') {
+          return new Response(null, { status: 404 })
+        }
+        validateIdempotencyKey(request.headers.get('Idempotency-Key'))
+        if (request.body !== null) {
+          await request.body.cancel().catch(() => undefined)
+          throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
+        }
+        const result = await transitionSubscription(
+          env.D1_01,
+          principal,
+          segments[2]!,
+          action,
+          request.headers.get('If-Match') ?? '',
+        )
+        return json({ data: result, requestId: crypto.randomUUID() }, 200, result.etag)
+      }
+
       if (request.method === 'POST' && operation?.operation !== 'createPlan') {
         return json({
           error: {

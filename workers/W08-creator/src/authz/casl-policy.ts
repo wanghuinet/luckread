@@ -87,6 +87,10 @@ const SAFE_FROZEN_ACTIONS = new Set([
 ])
 
 const RESTRICTED_ACCOUNT_WRITE_DENIES = new Set([
+  'subscription.cancel',
+  'subscription.pause',
+  'subscription.resume',
+  'subscription.change_plan',
   'content.create',
   'content.update.own',
   'content.delete.own',
@@ -353,6 +357,10 @@ function buildLayerAbility(input: CaslPermissionInput) {
   if (input.layer !== 'L0' && input.layer !== 'L1' && input.subjectId) {
     grant('order.create', 'Order', selfOwnerCondition(input.subjectId))
     grant('order.read', 'Order', selfOwnerCondition(input.subjectId))
+    grant('subscription.read', 'Subscription', selfOwnerCondition(input.subjectId))
+    grant('subscription.cancel', 'Subscription', selfOwnerCondition(input.subjectId))
+    grant('subscription.pause', 'Subscription', selfOwnerCondition(input.subjectId))
+    grant('subscription.resume', 'Subscription', selfOwnerCondition(input.subjectId))
   }
 
   // Creator application creation is deliberately L2-only; it is not inherited

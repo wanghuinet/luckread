@@ -171,6 +171,57 @@ export async function callW06MembershipPlanLifecycleAudit(input: {
   return callW06Moderation({ request: input.request, pathname: '/internal/audit-events/membership-plan-lifecycle-changed', method: 'POST', principal: input.principal, body: input.body })
 }
 
+/** Durable intent audit for a subscriber-owned cancel/pause/resume command. */
+export async function callW06SubscriptionMutationRequestAudit(input: {
+  request: Request
+  principal: ContentPrincipal
+  body: {
+    eventId: string
+    subscriptionId: string
+    idempotencyKey: string
+    expectedVersion: number
+    operation: 'cancel' | 'pause' | 'resume'
+    beforeStatus: 'ACTIVE' | 'PAST_DUE' | 'PAUSED'
+    beforePlanId: string
+    beforePlanVersion: number
+  }
+}): Promise<Response> {
+  return callW06Moderation({
+    request: input.request,
+    pathname: '/internal/audit-events/subscription-mutation-requested',
+    method: 'POST',
+    principal: input.principal,
+    body: input.body,
+  })
+}
+
+/** Final immutable audit is written only after W07 confirms the mutation. */
+export async function callW06SubscriptionMutationAppliedAudit(input: {
+  request: Request
+  principal: ContentPrincipal
+  body: {
+    eventId: string
+    intentEventId: string
+    subscriptionId: string
+    idempotencyKey: string
+    expectedVersion: number
+    operation: 'cancel' | 'pause' | 'resume'
+    status: 'ACTIVE' | 'PAUSED' | 'CANCELED'
+    version: number
+    planId: string
+    planVersion: number
+    updatedAt: string
+  }
+}): Promise<Response> {
+  return callW06Moderation({
+    request: input.request,
+    pathname: '/internal/audit-events/subscription-mutation-applied',
+    method: 'POST',
+    principal: input.principal,
+    body: input.body,
+  })
+}
+
 /** Dedicated durable audit path for a validated, newly created W07 Order DTO. */
 export async function callW06CommerceOrderAudit(input: {
   request: Request

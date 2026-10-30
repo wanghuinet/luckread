@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Pressable,
   RefreshControl,
@@ -15,8 +16,10 @@ import { getApiErrorMessage } from '~/lib/api-client';
 import { unwrapApiData } from '~/lib/content-adapter';
 import {
   fetchMySubscriptionsPage,
+  mutateMySubscription,
   type MySubscription,
   type MySubscriptionPage,
+  type SubscriptionMutation,
   type SubscriptionStatus,
 } from '~/lib/subscriptions-api';
 import { useAuthStore } from '~/store/auth-store';
@@ -63,7 +66,15 @@ function isSubscriptionRecord(value: unknown): value is MySubscription {
     typeof item.etag === 'string' && item.etag.length > 0;
 }
 
-function SubscriptionCard({ item }: { item: MySubscription }) {
+function SubscriptionCard({
+  item,
+  onMutation,
+  busy,
+}: {
+  item: MySubscription
+  onMutation: (item: MySubscription, operation: SubscriptionMutation) => void
+  busy: boolean
+}) {
   return (
     <View className="mx-4 mb-3 rounded-2xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-950">
       <View className="flex-row items-start justify-between gap-3">
@@ -116,6 +127,46 @@ function SubscriptionCard({ item }: { item: MySubscription }) {
       <Text selectable className="mt-3 text-[11px] leading-4 text-neutral-400">
         订阅 ID：{item.subscriptionId}
       </Text>
+      {item.status === 'ACTIVE' ? (
+        <View className="mt-4 flex-row gap-2">
+          <Pressable
+            accessibilityRole="button"
+            disabled={busy}
+            onPress={() => onMutation(item, 'pause')}
+            className="flex-1 items-center rounded-full border border-amber-300 px-4 py-3 disabled:opacity-50 dark:border-amber-800"
+          >
+            <Text className="text-sm font-bold text-amber-700 dark:text-amber-300">暂停订阅</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            disabled={busy}
+            onPress={() => onMutation(item, 'cancel')}
+            className="flex-1 items-center rounded-full border border-rose-300 px-4 py-3 disabled:opacity-50 dark:border-rose-800"
+          >
+            <Text className="text-sm font-bold text-rose-700 dark:text-rose-300">立即取消</Text>
+          </Pressable>
+        </View>
+      ) : item.status === 'PAUSED' ? (
+        <View className="mt-4 flex-row gap-2">
+          <Pressable
+            accessibilityRole="button"
+            disabled={busy}
+            onPress={() => onMutation(item, 'resume')}
+            className="flex-1 items-center rounded-full bg-sky-500 px-4 py-3 disabled:opacity-50"
+          >
+            <Text className="text-sm font-bold text-white">恢复订阅</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            disabled={busy}
+            onPress={() => onMutation(item, 'cancel')}
+            className="flex-1 items-center rounded-full border border-rose-300 px-4 py-3 disabled:opacity-50 dark:border-rose-800"
+          >
+            <Text className="text-sm font-bold text-rose-700 dark:text-rose-300">立即取消</Text>
+          </Pressable>
+        </View>
+      ) : null}
+      {busy ? <ActivityIndicator className="mt-3" color={PRIMARY} /> : null}
     </View>
   );
 }
@@ -131,6 +182,7 @@ export default function MySubscriptionsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [authRequired, setAuthRequired] = useState(false);
   const [error, setError] = useState('');
+  const [mutatingId, setMutatingId] = useState<string | null>(null);
   const requestRef = useRef<AbortController | null>(null);
 
   const openLogin = useCallback(() => {
@@ -202,6 +254,47 @@ export default function MySubscriptionsScreen() {
     }
   }, [authStatus]);
 
+  const requestMutation = useCallback((item: MySubscription, operation: SubscriptionMutation) => {
+    const title = operation === 'cancel'
+      ? '立即取消订阅？'
+      : operation === 'pause'
+        ? '立即暂停订阅？'
+        : '恢复订阅？';
+    const message = operation === 'cancel'
+      ? '取消后将立即停止会员内容访问。已完成的付款不会因此自动退款。'
+      : operation === 'pause'
+        ? '暂停后将立即停止会员内容访问；当前已付款周期不会自动延长。'
+        : '仅当当前已付款周期尚未结束时，才能恢复该订阅。';
+    Alert.alert(title, message, [
+      { text: '再想想', style: 'cancel' },
+      {
+        text: operation === 'cancel' ? '立即取消' : operation === 'pause' ? '确认暂停' : '确认恢复',
+        style: operation === 'cancel' ? 'destructive' : 'default',
+        onPress: () => {
+          setMutatingId(item.subscriptionId);
+          setError('');
+          void (async () => {
+            try {
+              const result = await mutateMySubscription(item.subscriptionId, operation, item.etag);
+              if (!result.response.ok) {
+                throw new Error(result.error?.message || getApiErrorMessage(
+                  result.data,
+                  '订阅状态更新失败，请稍后重试。',
+                  result.response.status,
+                ));
+              }
+              await loadPage(1, false);
+            } catch (cause) {
+              setError(cause instanceof Error ? cause.message : '订阅状态更新失败，请稍后重试。');
+            } finally {
+              setMutatingId(null);
+            }
+          })();
+        },
+      },
+    ]);
+  }, [loadPage]);
+
   useEffect(() => {
     if (authStatus !== 'loading') void loadPage(1, false);
     return () => requestRef.current?.abort();
@@ -256,7 +349,7 @@ export default function MySubscriptionsScreen() {
 
       <View className="border-b border-neutral-100 bg-white px-4 py-3 dark:border-neutral-800 dark:bg-black">
         <Text className="text-xs leading-5 text-neutral-500 dark:text-neutral-400">
-          订阅状态由 W07 提供。订阅记录本身不证明付款已完成或内容权益已生效；在支付渠道、续费与退款同步通过验收前，APP 仅提供真实记录查询，不开放暂停、恢复或取消操作。
+          订阅状态由 W07 提供。暂停或取消会立即停止会员内容访问；已完成的付款不会因此自动退款。恢复仅适用于当前已付款周期尚未结束的暂停订阅。
         </Text>
       </View>
 
@@ -274,7 +367,13 @@ export default function MySubscriptionsScreen() {
         keyExtractor={(item) => item.subscriptionId}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void loadPage(1, false, true)} />}
         contentContainerStyle={{ paddingTop: 14, paddingBottom: 36, flexGrow: 1 }}
-        renderItem={({ item }) => <SubscriptionCard item={item} />}
+        renderItem={({ item }) => (
+          <SubscriptionCard
+            item={item}
+            onMutation={requestMutation}
+            busy={mutatingId === item.subscriptionId || loading}
+          />
+        )}
         ListEmptyComponent={(
           <View className="flex-1 items-center justify-center px-8 py-12">
             {loading ? <ActivityIndicator size="large" color={PRIMARY} /> : (

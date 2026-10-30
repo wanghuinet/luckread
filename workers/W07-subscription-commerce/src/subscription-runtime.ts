@@ -257,7 +257,7 @@ export async function listSubscriptions(
   }
 }
 
-const transitionTargets: Record<'cancel' | 'pause' | 'resume', SubscriptionStatus[]> = { cancel: ['ACTIVE', 'PAST_DUE', 'PAUSED'], pause: ['ACTIVE'], resume: ['PAUSED'] }
+const transitionTargets: Record<'cancel' | 'pause' | 'resume', SubscriptionStatus[]> = { cancel: ['ACTIVE', 'PAUSED'], pause: ['ACTIVE'], resume: ['PAUSED'] }
 const nextStates: Record<'cancel' | 'pause' | 'resume', SubscriptionStatus> = { cancel: 'CANCELED', pause: 'PAUSED', resume: 'ACTIVE' }
 const nextState = (operation: 'cancel' | 'pause' | 'resume'): SubscriptionStatus => nextStates[operation]
 
@@ -272,6 +272,9 @@ export async function transitionSubscription(db: D1Database, subscriberId: strin
     throw new SubscriptionRuntimeError('PRECONDITION_FAILED', 412)
   }
   if (!transitionTargets[operation].includes(row.status)) throw new SubscriptionRuntimeError('INVALID_STATE', 409)
+  if (operation === 'resume' && Date.parse(row.current_period_end) <= Date.now()) {
+    throw new SubscriptionRuntimeError('INVALID_STATE', 409)
+  }
   const updatedAt = nextUpdatedAt(row.updated_at)
   const result = await db.prepare('UPDATE membership_subscriptions SET status = ?, cancel_at = ?, updated_at = ?, version = version + 1 WHERE subscription_id = ? AND subscriber_id = ? AND version = ?')
     .bind(nextState(operation), operation === 'cancel' ? updatedAt : row.cancel_at, updatedAt, row.subscription_id, subscriber, expectedVersion).run()

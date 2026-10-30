@@ -210,6 +210,51 @@
       }
     },
     {
+      "operationId": "transitionOwnSubscriptionLifecycle",
+      "method": "POST",
+      "publicPath": "/api/v1/memberships/subscriptions/{subscriptionId}/{operation}",
+      "internalPath": "/memberships/subscriptions/{subscriptionId}/{operation}",
+      "principalRequired": true,
+      "permission": "subscription.cancel | subscription.pause | subscription.resume",
+      "minimumGlobalLayer": "L2",
+      "ownerScope": "The authenticated W02 subscriber only; W01 verifies the W07 subscriberId and W08 CASL evaluates Subscription.ownerId against the same W02 principal.",
+      "operation": {
+        "enum": [
+          "cancel",
+          "pause",
+          "resume"
+        ]
+      },
+      "precondition": "If-Match",
+      "idempotency": "Idempotency-Key; W06 D1-03 stores a durable deterministic request intent and final immutable outcome.",
+      "requestBody": "NONE",
+      "stateTransitions": {
+        "cancel": "ACTIVE or PAUSED to CANCELED; user cancellation is immediate and does not issue a refund.",
+        "pause": "ACTIVE to PAUSED; member-only access stops immediately.",
+        "resume": "PAUSED to ACTIVE only while current_period_end is still in the future."
+      },
+      "successRule": "W01 reads and verifies the subscriber-owned W07 DTO, obtains W08 CASL authorization, confirms W06 durable intent, invokes the W07 owner-scoped D1-01 version-CAS, validates the result DTO, and confirms the W06 immutable outcome before returning success.",
+      "replay": "Exact Idempotency-Key + If-Match replay returns the original transition result without applying a second state change. A different key requires the current ETag.",
+      "cache": "NO_STORE",
+      "auditTransportBinding": "W01-W06-moderation-http-binding.v1",
+      "failurePolicy": {
+        "missingIfMatch": "428",
+        "missingIdempotencyKey": "428",
+        "staleVersion": "412",
+        "invalidStateTransition": "409",
+        "crossSubscriberOrForeignSubscription": "404",
+        "authorizationDenied": "403",
+        "missingW06IntentOrOutcomeConfirmation": "503; W01 does not acknowledge the mutation without durable audit."
+      },
+      "topologyConstraints": {
+        "newWorker": false,
+        "newDatabase": false,
+        "newQueue": false,
+        "newServiceBinding": false,
+        "crossD1Transactions": 0
+      }
+    },
+    {
       "operationId": "createCommerceOrder",
       "method": "POST",
       "publicPath": "/api/v1/commerce/orders",

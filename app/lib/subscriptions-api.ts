@@ -55,6 +55,32 @@ export function fetchMySubscriptionsPage(options: PageOptions = {}) {
 }
 
 
+export type SubscriptionMutation = 'cancel' | 'pause' | 'resume';
+
+/** Apply an owner-scoped subscription lifecycle command using the current DTO ETag. */
+export function mutateMySubscription(
+  subscriptionId: string,
+  operation: SubscriptionMutation,
+  etag: string,
+) {
+  if (!/^sub_[A-Za-z0-9_-]{1,128}$/.test(subscriptionId)) {
+    throw new TypeError('Subscription ID is invalid.');
+  }
+  if (!['cancel', 'pause', 'resume'].includes(operation)) {
+    throw new TypeError('Subscription operation is invalid.');
+  }
+  if (!/^"lr-v[1-9][0-9]*"$/.test(etag)) {
+    throw new TypeError('Subscription version is invalid.');
+  }
+  return apiRequest<unknown>(
+    '/memberships/subscriptions/' + encodeURIComponent(subscriptionId) + '/' + operation,
+    {
+      method: 'POST',
+      headers: { 'If-Match': etag },
+    },
+  );
+}
+
 export type ActiveMembershipPlan = {
   planId: string;
   creatorId: string;

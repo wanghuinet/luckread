@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { fetchJson, getApiErrorMessage } from '../../../../lib/client-api.js'
 import { usePublicLocale } from '../../i18n/PublicLanguageToggle'
@@ -31,7 +31,7 @@ type ListResponse = {
 const copy = (locale: PublicLocale) => locale === 'en'
   ? {
       eyebrow: 'LUCKREAD · MEMBERSHIP',
-      description: 'Review subscription status and billing periods. Subscription records do not prove payment completion or access entitlement. Pause, resume, and cancellation are temporarily unavailable until verified payment-provider synchronization is admitted.',
+      description: 'Review your subscription status and billing period. Pausing or canceling stops member access immediately; completed payments are not automatically refunded.',
       discover: 'Explore content',
       refresh: 'Refresh',
       refreshing: 'Refreshing…',
@@ -45,7 +45,11 @@ const copy = (locale: PublicLocale) => locale === 'en'
       id: 'Subscription ID',
       period: 'Current period',
       cancelAt: 'Cancellation date',
-      mutationsUnavailable: 'Subscription changes are temporarily unavailable while verified payment-provider synchronization is being admitted. Your status and billing-period records remain available.',
+      mutationsNotice: 'Pausing or canceling stops member access immediately. Completed payments are not automatically refunded; resume is available only before the paid-through period ends.',
+pauseAction: 'Pause subscription',
+resumeAction: 'Resume subscription',
+cancelAction: 'Cancel now',
+
       loadMore: 'Load more subscriptions',
       loadingMore: 'Loading more…',
       loadError: 'Could not load subscriptions.',
@@ -63,7 +67,7 @@ const copy = (locale: PublicLocale) => locale === 'en'
   : locale === 'tw'
     ? {
         eyebrow: 'LUCKREAD · 會員訂閱',
-        description: '查看訂閱狀態與週期。訂閱記錄本身不代表付款完成或已取得內容權益；暫停、恢復及取消操作將在付款服務商同步驗證通過後開放。',
+        description: '查看訂閱狀態與週期。暫停或取消會立即停止會員內容存取；已完成的付款不會自動退款。',
         discover: '探索內容',
         refresh: '重新整理',
         refreshing: '正在重新整理…',
@@ -77,7 +81,11 @@ const copy = (locale: PublicLocale) => locale === 'en'
         id: '訂閱 ID',
         period: '目前週期',
         cancelAt: '取消時間',
-        mutationsUnavailable: '付款服務商同步驗證尚未通過，暫時無法變更訂閱；目前仍可查看狀態與週期記錄。',
+        mutationsNotice: '暫停或取消會立即停止會員內容存取；已完成付款不會自動退款。只有在已付款週期結束前才能恢復。',
+pauseAction: '暫停訂閱',
+resumeAction: '恢復訂閱',
+cancelAction: '立即取消',
+
         loadMore: '載入更多訂閱',
         loadingMore: '載入中…',
         loadError: '無法讀取訂閱。',
@@ -94,7 +102,7 @@ const copy = (locale: PublicLocale) => locale === 'en'
       }
     : {
         eyebrow: 'LUCKREAD · 会员订阅',
-        description: '查看订阅状态与周期。订阅记录不代表付款完成或内容权益；暂停、恢复与取消操作将在付款服务商同步验证通过后开放。',
+        description: '查看订阅状态与周期。暂停或取消会立即停止会员内容访问；已完成的付款不会自动退款。',
         discover: '发现内容',
         refresh: '刷新',
         refreshing: '刷新中…',
@@ -108,7 +116,11 @@ const copy = (locale: PublicLocale) => locale === 'en'
         id: '订阅 ID',
         period: '当前周期',
         cancelAt: '取消时间',
-        mutationsUnavailable: '付款服务商同步验证尚未通过，暂时无法变更订阅；目前仍可查看状态与周期记录。',
+        mutationsNotice: '暂停或取消会立即停止会员内容访问；已完成付款不会自动退款。只有当前已付款周期尚未结束时才能恢复。',
+pauseAction: '暂停订阅',
+resumeAction: '恢复订阅',
+cancelAction: '立即取消',
+
         loadMore: '加载更多订阅',
         loadingMore: '加载中…',
         loadError: '订阅读取失败。',
@@ -146,6 +158,8 @@ export default function MySubscriptionsPage() {
   const [pageNumber, setPageNumber] = useState(1)
   const [hasNextPage, setHasNextPage] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
+  const [mutatingId, setMutatingId] = useState<string | null>(null)
+  const mutationKeysRef = useRef(new Map<string, string>())
 
   async function load(page = 1, append = false) {
     if (append) setLoadingMore(true)
@@ -173,6 +187,67 @@ export default function MySubscriptionsPage() {
     } finally {
       setLoading(false)
       setLoadingMore(false)
+    }
+  }
+
+  async function mutate(item: Subscription, operation: 'cancel' | 'pause' | 'resume') {
+    const message = operation === 'cancel'
+      ? (locale === 'en'
+        ? 'Cancel now? Member access will stop immediately. Completed payments are not automatically refunded.'
+        : locale === 'tw'
+          ? '確定立即取消？會員內容存取會立即停止，已完成的付款不會自動退款。'
+          : '确定立即取消？会员内容访问会立即停止，已完成的付款不会自动退款。')
+      : operation === 'pause'
+        ? (locale === 'en'
+          ? 'Pause now? Member access will stop immediately.'
+          : locale === 'tw'
+            ? '確定立即暫停？會員內容存取會立即停止。'
+            : '确定立即暂停？会员内容访问会立即停止。')
+        : (locale === 'en'
+          ? 'Resume this subscription? The paid-through period must not have ended.'
+          : locale === 'tw'
+            ? '確定恢復訂閱？目前已付款週期必須尚未結束。'
+            : '确定恢复订阅？当前已付款周期必须尚未结束。')
+    if (!window.confirm(message)) return
+    const mutationSignature = item.subscriptionId + ':' + operation + ':' + item.etag
+    let idempotencyKey = mutationKeysRef.current.get(mutationSignature)
+    if (!idempotencyKey) {
+      idempotencyKey = crypto.randomUUID().replaceAll('-', '')
+      mutationKeysRef.current.set(mutationSignature, idempotencyKey)
+    }
+    setMutatingId(item.subscriptionId)
+    setError('')
+    try {
+      const { response, data } = await fetchJson<unknown>(
+        '/api/v1/memberships/subscriptions/' + encodeURIComponent(item.subscriptionId) + '/' + operation,
+        {
+          method: 'POST',
+          credentials: 'include',
+          cache: 'no-store',
+          headers: {
+            accept: 'application/json',
+            'If-Match': item.etag,
+            'Idempotency-Key': idempotencyKey,
+          },
+        },
+      )
+      if (response.status === 401) {
+        const returnTo = window.location.pathname + window.location.search + window.location.hash
+        window.location.assign('/login?returnTo=' + encodeURIComponent(returnTo))
+        return
+      }
+      if (!response.ok) {
+        if (response.status < 500 && response.status !== 408 && response.status !== 429) {
+          mutationKeysRef.current.delete(mutationSignature)
+        }
+        throw new Error(getApiErrorMessage(data, labels.updateError))
+      }
+      mutationKeysRef.current.delete(mutationSignature)
+      await load()
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : labels.updateError)
+    } finally {
+      setMutatingId(null)
     }
   }
 
@@ -247,10 +322,37 @@ export default function MySubscriptionsPage() {
               ) : null}
             </dl>
 
-            {['ACTIVE', 'PAST_DUE', 'PAUSED'].includes(item.status) ? (
-              <p className="mt-4 rounded-xl border border-light-border px-4 py-3 text-xs leading-5 text-light-secondary dark:border-dark-border dark:text-dark-secondary">
-                {labels.mutationsUnavailable}
-              </p>
+            {(item.status === 'ACTIVE' || item.status === 'PAUSED') ? (
+              <div className="mt-4 flex flex-wrap gap-2">
+                {item.status === 'ACTIVE' ? (
+                  <button
+                    type="button"
+                    disabled={mutatingId !== null || loading}
+                    onClick={() => void mutate(item, 'pause')}
+                    className="rounded-full border border-amber-300 px-4 py-2 text-sm font-bold text-amber-700 disabled:opacity-50 dark:border-amber-800 dark:text-amber-300"
+                  >
+                    {labels.pauseAction}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={mutatingId !== null || loading}
+                    onClick={() => void mutate(item, 'resume')}
+                    className="rounded-full bg-main-accent px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
+                  >
+                    {labels.resumeAction}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  disabled={mutatingId !== null || loading}
+                  onClick={() => void mutate(item, 'cancel')}
+                  className="rounded-full border border-rose-300 px-4 py-2 text-sm font-bold text-rose-700 disabled:opacity-50 dark:border-rose-800 dark:text-rose-300"
+                >
+                  {labels.cancelAction}
+                </button>
+                {mutatingId === item.subscriptionId ? <span className="self-center text-xs text-light-secondary">Updating…</span> : null}
+              </div>
             ) : null}
           </article>
         )
@@ -269,6 +371,9 @@ export default function MySubscriptionsPage() {
         </div>
       ) : null}
 
+      {items.some((item) => item.status === 'ACTIVE' || item.status === 'PAUSED') ? (
+        <p className="px-4 py-4 text-xs leading-5 text-light-secondary dark:text-dark-secondary">{labels.mutationsNotice}</p>
+      ) : null}
       <p className="px-4 py-4 text-xs leading-5 text-light-secondary dark:text-dark-secondary">
         {locale === 'en'
           ? 'This page reflects Subscription facts only; it does not treat subscription status as Entitlement or proof of payment.'

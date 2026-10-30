@@ -332,6 +332,66 @@
         "payment credentials",
         "raw request body"
       ]
+    },
+    {
+      "operationId": "auditSubscriptionMutationRequest",
+      "method": "POST",
+      "publicPath": "/api/v1/memberships/subscriptions/{subscriptionId}/{operation}",
+      "internalPath": "/internal/audit-events/subscription-mutation-requested",
+      "principalRequired": true,
+      "actorAuthority": "W06 derives subscriber actor identity and layer only from trusted W01 private transport headers.",
+      "eventId": "Stable evt_sub_mutation_requested_{sha256(actorId, subscriptionId, Idempotency-Key)}.",
+      "targetType": "Subscription",
+      "auditRequired": true,
+      "idempotency": "Exact actor/operation/target/key/version replay returns the original stored before-state even after W07 has applied the transition; a new key must match the current If-Match version.",
+      "successPolicy": "W01 must confirm the durable W06 mutation intent before calling W07; the intent records the before state and expected version.",
+      "cache": "NO_STORE",
+      "auditedFields": [
+        "subscriptionId",
+        "idempotencyKey",
+        "expectedVersion",
+        "operation",
+        "beforeStatus",
+        "beforePlanId",
+        "beforePlanVersion",
+        "observedVersion"
+      ],
+      "sensitiveDataExcluded": [
+        "payment credentials",
+        "provider secrets",
+        "raw request body",
+        "ledger details"
+      ]
+    },
+    {
+      "operationId": "auditSubscriptionMutationApplied",
+      "method": "POST",
+      "publicPath": "/api/v1/memberships/subscriptions/{subscriptionId}/{operation}",
+      "internalPath": "/internal/audit-events/subscription-mutation-applied",
+      "principalRequired": true,
+      "actorAuthority": "W06 derives subscriber actor identity and layer only from trusted W01 private transport headers and links the result to the immutable request intent.",
+      "eventId": "Stable evt_sub_mutation_applied_{same intent digest}.",
+      "targetType": "Subscription",
+      "auditRequired": true,
+      "idempotency": "The final event is immutable; exact replay confirms the same resulting state/version/timestamp.",
+      "successPolicy": "W01 returns success only after W07 confirms the D1-01 version-CAS result and W06 confirms the final immutable audit.",
+      "cache": "NO_STORE",
+      "auditedFields": [
+        "subscriptionId",
+        "operation",
+        "status",
+        "version",
+        "planId",
+        "planVersion",
+        "updatedAt",
+        "idempotencyKey"
+      ],
+      "sensitiveDataExcluded": [
+        "payment credentials",
+        "provider secrets",
+        "raw request body",
+        "ledger details"
+      ]
     }
   ],
   "headers": {
