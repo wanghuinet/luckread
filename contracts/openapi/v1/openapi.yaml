@@ -3295,6 +3295,64 @@ paths:
         default:
           description: Discovery-only operation; detailed response contract remains to be closed.
 
+  /webhooks/revenuecat:
+    post:
+      tags: [Commerce]
+      summary: Receive a RevenueCat provider webhook
+      description: >-
+        Public provider callback ingress has no browser-session authentication.
+        W01 preserves the bounded raw payload and the configured RevenueCat
+        Authorization value. W07 always validates Authorization and validates
+        X-RevenueCat-Webhook-Signature HMAC-SHA256 over the exact raw body when
+        HMAC signing is enabled for the integration. A durable receipt does not
+        itself activate a LuckRead subscription or entitlement. New/duplicate
+        events are acknowledged only after the inbox decision is durable.
+      security: []
+      operationId: receiveRevenueCatWebhook
+      x-luckread-runtime-status: IMPLEMENTED_SOURCE_ONLY_PENDING_D1_04_MIGRATION_AND_REVENUECAT_CONFIGURATION
+      x-luckread-max-body-bytes: 1048576
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          description: Exact Authorization header value configured for this RevenueCat webhook integration.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 5000
+        - name: X-RevenueCat-Webhook-Signature
+          in: header
+          required: false
+          description: Required whenever RevenueCat HMAC signing is enabled; t=Unix timestamp and v1=HMAC-SHA256 hex digest over timestamp dot exact raw request bytes.
+          schema:
+            type: string
+            pattern: '^t=[0-9]{1,12},v1=[0-9a-f]{64}$'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [api_version, event]
+              additionalProperties: true
+      responses:
+        '200':
+          description: Durable receipt, duplicate, conflict, or RevenueCat dashboard TEST event acknowledged; no entitlement is granted by this endpoint.
+          headers:
+            Cache-Control:
+              schema: { type: string, const: no-store }
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '400':
+          description: Malformed or unsupported webhook envelope.
+        '401':
+          description: RevenueCat Authorization or enabled HMAC signature is invalid.
+        '413':
+          description: Webhook body exceeds 1 MiB.
+        '503':
+          description: Configuration or durable D1-04 receipt persistence is unavailable.
+
   /webhooks/hyperswitch:
     post:
       tags: [Commerce]
