@@ -45,7 +45,7 @@ async function signatureFor(body: ArrayBuffer, secret = SECRET, timestamp = Math
   bytes.set(new Uint8Array(body), prefix.byteLength)
   const digest = await crypto.subtle.sign('HMAC', key, bytes)
   const hex = Array.from(new Uint8Array(digest), (value) => value.toString(16).padStart(2, '0')).join('')
-  return \`t=\${timestamp},v1=\${hex}\`
+  return `t=${timestamp},v1=${hex}`
 }
 
 describe('RevenueCat webhook authentication and parsing', () => {
