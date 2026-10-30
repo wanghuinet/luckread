@@ -451,14 +451,14 @@ describe('Hyperswitch server-side payment intent client', () => {
   })
 
   it('creates a provider refund with a stable merchant refund_id for idempotent retries', async () => {
-    const refundId = 'rfd_123e4567-e89b-42d3-a456-426614174000'
+    const refundId = 'ref_' + '1'.repeat(26)
     const body = {
       refund_id: refundId,
       payment_id: input.paymentId,
       amount: 600,
       currency: 'USD',
       status: 'pending',
-      updated: '2026-10-30T10:00:00.000Z',
+      updated_at: '2026-10-30T10:00:00.000Z',
     }
     const fake = fakeFetch(jsonResponse(body))
     const result = await createHyperswitchRefund(config, {
@@ -484,7 +484,7 @@ describe('Hyperswitch server-side payment intent client', () => {
   })
 
   it('rejects invalid refund identifiers and provider responses that mismatch the stable refund request', async () => {
-    const refundId = 'rfd_123e4567-e89b-42d3-a456-426614174000'
+    const refundId = 'ref_' + '1'.repeat(26)
     const invalid = fakeFetch(jsonResponse({}))
     await expect(createHyperswitchRefund(config, {
       refundId: 'not-a-refund',
@@ -495,7 +495,7 @@ describe('Hyperswitch server-side payment intent client', () => {
     expect(invalid.captured).toHaveLength(0)
 
     for (const mismatch of [
-      { refund_id: 'rfd_different' },
+      { refund_id: 'ref_' + '2'.repeat(26) },
       { payment_id: 'pay_aaaaaaaaaaaaaaaaaaaaaaaaaa' },
       { amount: 601 },
       { currency: 'EUR' },
@@ -519,14 +519,14 @@ describe('Hyperswitch server-side payment intent client', () => {
   })
 
   it('retrieves a previously submitted refund by stable refund_id for reconciliation', async () => {
-    const refundId = 'rfd_123e4567-e89b-42d3-a456-426614174000'
+    const refundId = 'ref_' + '1'.repeat(26)
     const fake = fakeFetch(jsonResponse({
       refund_id: refundId,
       payment_id: input.paymentId,
       amount: 600,
       currency: 'USD',
       status: 'succeeded',
-      updated: '2026-10-30T10:00:00.000Z',
+      updated_at: '2026-10-30T10:00:00.000Z',
     }))
     const result = await retrieveHyperswitchRefund(config, {
       refundId,
@@ -542,7 +542,7 @@ describe('Hyperswitch server-side payment intent client', () => {
   it('exposes only a validated captured amount when the provider payment retrieve includes it', async () => {
     const fake = fakeFetch(jsonResponse(responsePayment({
       status: 'succeeded',
-      amount_captured: 900,
+      amount_received: 900,
     })))
     const payment = await retrieveHyperswitchPayment(config, input.paymentId, fake.fetcher)
     expect(payment.amountCaptured).toBe(900)
@@ -550,7 +550,7 @@ describe('Hyperswitch server-side payment intent client', () => {
     for (const amountCaptured of [-1, 1.5, input.amount + 1, '900']) {
       const invalid = fakeFetch(jsonResponse(responsePayment({
         status: 'succeeded',
-        amount_captured: amountCaptured,
+        amount_received: amountCaptured,
       })))
       await expect(retrieveHyperswitchPayment(config, input.paymentId, invalid.fetcher))
         .rejects.toMatchObject({ code: 'UPSTREAM_INVALID_RESPONSE' })
