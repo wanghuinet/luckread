@@ -1662,7 +1662,7 @@ export async function recordRefundProviderResponse(
   }
   const updatedAt = strictlyAfter(parseDate(dependencies.now ?? (() => new Date())), row.updated_at);
   try {
-    await db.prepare(
+    const updated = await db.prepare(
       'UPDATE refunds SET status = ?, provider_updated_at = ?, version = version + 1, updated_at = ? ' +
       "WHERE refund_id = ? AND customer_id = ? AND payment_id = ? AND amount_minor = ? AND currency = ? " +
       "AND version = ? AND status = 'INITIATING'",
@@ -1670,6 +1670,12 @@ export async function recordRefundProviderResponse(
       providerRefund.status, providerUpdatedAt, updatedAt, row.refund_id, row.customer_id,
       row.payment_id, row.amount_minor, row.currency, row.version,
     ).run();
+    if (Number(updated.meta?.changes ?? 0) !== 1) {
+      const raced = await readRefundByOwner(db, customerId, providerRefund.refundId);
+      if (!raced) throw new PaymentPersistenceError('RESOURCE_NOT_FOUND', 404);
+      if (raced.status === 'INITIATING') throw new PaymentPersistenceError('CONFLICT', 409);
+      return toRefundDto(raced);
+    }
   } catch { throw new PaymentPersistenceError('SERVICE_UNAVAILABLE', 503); }
   try {
     const current = await readRefundByOwner(db, customerId, providerRefund.refundId);
@@ -1720,7 +1726,7 @@ async function receiveHyperswitchRefundWebhook(
     typeof refundId !== 'string' || !REFUND_ID_PATTERN.test(refundId) ||
     typeof paymentId !== 'string' || !PAYMENT_ID_PATTERN.test(paymentId) ||
     !safeMinor(amount) || typeof currency !== 'string' || !CURRENCY_PATTERN.test(currency) ||
-    (status !== undefined && status !== expectedStatus) ||
+    status !== expectedStatus ||
     (resource.merchant_id !== undefined && resource.merchant_id !== envelope.merchantId) ||
     providerUpdatedAt === null
   ) {
@@ -1740,8 +1746,12 @@ async function receiveHyperswitchRefundWebhook(
   const providerTime = parseHyperswitchRfc3339Timestamp(providerUpdatedAt);
   const previousProviderTime = refund.provider_updated_at === null ? null :
     parseHyperswitchRfc3339Timestamp(refund.provider_updated_at);
-  if ((previousProviderTime !== null && (providerTime === null || providerTime <= previousProviderTime)) ||
-      !canApplyRefundStatusTransition(refund.status, expectedStatus)) {
+  if (
+    providerTime === null ||
+    (refund.provider_updated_at !== null && previousProviderTime === null) ||
+    (previousProviderTime !== null && providerTime <= previousProviderTime) ||
+    !canApplyRefundStatusTransition(refund.status, expectedStatus)
+  ) {
     return persistNonApplicableWebhook(db, envelope, payloadSha256, eventRowId, now,
       'RECONCILIATION_REQUIRED', 'STALE_OR_FORBIDDEN_REFUND_TRANSITION', createConflictId);
   }
