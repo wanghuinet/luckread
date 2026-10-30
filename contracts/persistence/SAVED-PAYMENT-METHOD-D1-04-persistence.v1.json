@@ -226,9 +226,10 @@
         "The provider method is removed only after every linked provider mandate has a revoke acknowledgement; only the matching signature-verified mandate_revoked webhook may transition local payment_mandates.status to REVOKED.",
         "The retained revocation request is completed only when provider method deletion is acknowledged and every linked mandate is terminal; a timeout or uncertain provider response keeps the MIT block in place.",
         "No cross-D1 foreign keys or distributed transactions are used; D1-01 continues to own subscription entitlements.",
-        "Only signature-verified mandate_active/mandate_revoked events with matching merchant, provider mandate ID, payment method ID and status may update mandate state.",
+        "Only signature-verified mandate_active/mandate_revoked events with matching merchant, payment method and provider mandate ID (or the exact source payment ID when the local provider ID is still NULL) may update mandate state; provider ID is write-once.",
         "Mandate webhook event IDs are durably deduplicated in payment_provider_events; stale timestamps, missing local identity, and forbidden reactivation are stored as reconciliation-required evidence.",
-        "A revoked mandate cannot be reactivated by an out-of-order mandate_active event."
+        "A revoked mandate cannot be reactivated by an out-of-order mandate_active event.",
+        "A byte-identical Mandate webhook previously recorded as RECONCILIATION_REQUIRED may be retried after the local payment_succeeded source row arrives; APPLIED, REJECTED and payload-conflicting receipts remain immutable."
       ]
     },
     "payment_method_revocation_requests": {
