@@ -46,12 +46,12 @@ function isMembershipPlan(value: unknown): value is ActiveMembershipPlan {
 function isMembershipPlanPage(value: unknown): value is ActiveMembershipPlanPage {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const page = value as Record<string, unknown>;
-  return Array.isArray(page.docs) && page.docs.every(isMembershipPlan) &&
-    typeof page.limit === 'number' && Number.isSafeInteger(page.limit) && page.limit >= 1 && page.limit <= 50 &&
+  return typeof page.limit === 'number' && Number.isSafeInteger(page.limit) && page.limit >= 1 && page.limit <= 50 &&
+    Array.isArray(page.docs) && page.docs.length <= page.limit && page.docs.every(isMembershipPlan) &&
     typeof page.hasMore === 'boolean' &&
-    (page.nextCursor === null || (typeof page.nextCursor === 'string' &&
-      page.nextCursor.length > 0 && page.nextCursor.length <= 2048)) &&
-    (!page.hasMore || typeof page.nextCursor === 'string');
+    (page.hasMore
+      ? typeof page.nextCursor === 'string' && page.nextCursor.length > 0 && page.nextCursor.length <= 2048
+      : page.nextCursor === null);
 }
 
 function formatPrice(priceMinor: number, currency: string): string {
