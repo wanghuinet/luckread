@@ -1,0 +1,95 @@
+name: Global Governance Audit
+
+on:
+  pull_request:
+    paths:
+      - 'package.json'
+      - 'package-lock.json'
+      - 'contracts/**'
+      - 'docs/**'
+      - 'scripts/**'
+      - 'workers/W07-subscription-commerce/**'
+      - 'workers/W01-payload/src/subscription/**'
+      - 'workers/W01-payload/src/app/api/v1/memberships/**'
+      - 'workers/W01-payload/tests/int/subscription-v1-adapter.int.spec.ts'
+      - 'workers/W01-payload/wrangler.jsonc'
+      - '.github/workflows/contract-admission-v2.yml'
+      - '.github/workflows/global-governance-audit.yml'
+      - '.github/workflows/w07-d1-04-binding-preflight.yml'
+      - '.github/workflows/w07-d1-04-order-migration.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'package.json'
+      - 'package-lock.json'
+      - 'contracts/**'
+      - 'docs/**'
+      - 'scripts/**'
+      - 'workers/W07-subscription-commerce/**'
+      - 'workers/W01-payload/src/subscription/**'
+      - 'workers/W01-payload/src/app/api/v1/memberships/**'
+      - 'workers/W01-payload/tests/int/subscription-v1-adapter.int.spec.ts'
+      - 'workers/W01-payload/wrangler.jsonc'
+      - '.github/workflows/contract-admission-v2.yml'
+      - '.github/workflows/global-governance-audit.yml'
+      - '.github/workflows/w07-d1-04-binding-preflight.yml'
+      - '.github/workflows/w07-d1-04-order-migration.yml'
+  workflow_dispatch:
+    inputs:
+      checkout_ref:
+        description: 'Exact commit SHA to validate'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  CHECKOUT_REF: ${{ github.event.inputs.checkout_ref || github.sha }}
+
+jobs:
+  five-way-alignment-audit:
+    name: Five-Way Alignment Global Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.CHECKOUT_REF }}
+      - uses: actions/setup-node@v4
+        with: {node-version: 24, cache: npm}
+      - run: npm ci
+      - name: Materialize canonical mappings
+        run: node scripts/materialize-canonical-mapping.mjs
+      - name: Verify five-way alignment
+        run: node scripts/alignment-ci.mjs
+      - name: Verify generated inventories are deterministic
+        run: git diff --exit-code -- contracts/alignment/cross-system-mapping.v1.json contracts/alignment/feature-inventory.v1.json contracts/alignment/api-inventory.v1.json contracts/alignment/payload-inventory.v1.json contracts/alignment/code-evidence-inventory.v1.json contracts/alignment/five-way-reconciliation.v1.json contracts/alignment/change-impact.v1.json
+
+  strict-downstream-evidence-audit:
+    name: Strict R4 / Mapping 0 / R5 Global Evidence Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.CHECKOUT_REF }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with: {node-version: 24, cache: npm}
+      - run: npm ci
+      - name: Generate R4 evidence gap report
+        run: node scripts/mapping-0-r4-evidence-gap-report.mjs
+      - name: Verify complete feature/entity/persistence registry
+        run: node scripts/feature-entity-persistence-registry-check.mjs
+      - name: Validate canonical Mapping 0 Evidence Registry
+        if: ${{ always() }}
+        run: node scripts/mapping-0-evidence-registry-final-check.mjs
+      - name: Upload R4 evidence gap report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: global-r4-evidence-gap-${{ github.run_id }}
+          path: artifacts/mapping-0/r4-evidence-gap-report.json
+          if-no-files-found: error
+          retention-days: 14
+      - name: Verify R5 foundation contracts
+        run: node scripts/r5-foundation-contract-check.mjs
