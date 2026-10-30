@@ -2542,6 +2542,9 @@ console.log(JSON.stringify({
       '      x-luckread-contract-status: CONTRACTED_PARTIAL',
       '      x-luckread-runtime-status: IMPLEMENTED_SOURCE_ONLY_PENDING_D1_04_MIGRATION',
       '      x-luckread-source: contracts/api/commerce-operation-policy.v1.json',
+      '      security:',
+      '        - sessionCookieAuth: []',
+      '        - bearerAuth: []',
       ...parameters,
       ...response(listEnvelope(item)),
     ].join('\n');
@@ -3372,6 +3375,9 @@ console.log(JSON.stringify({
       '      x-luckread-contract-status: CONTRACTED_PARTIAL',
       '      x-luckread-runtime-status: IMPLEMENTED_SOURCE_ONLY_PENDING_D1_04_MIGRATION',
       '      x-luckread-source: contracts/api/commerce-operation-policy.v1.json',
+      '      security:',
+      '        - sessionCookieAuth: []',
+      '        - bearerAuth: []',
       ...parameters,
       ...response(listEnvelope(item)),
     ].join('\n');
@@ -4001,6 +4007,9 @@ console.log(JSON.stringify({
       '      x-luckread-contract-status: CONTRACTED_PARTIAL',
       '      x-luckread-runtime-status: IMPLEMENTED_SOURCE_ONLY_PENDING_D1_04_MIGRATION',
       '      x-luckread-source: contracts/api/commerce-operation-policy.v1.json',
+      '      security:',
+      '        - sessionCookieAuth: []',
+      '        - bearerAuth: []',
       ...parameters,
       ...response(listEnvelope(item)),
     ].join('\n');
