@@ -527,7 +527,7 @@ describe('Hyperswitch server-side refund adapter', () => {
       { ...refundInput, amount: 1.2 },
       { ...refundInput, amount: Number.MAX_SAFE_INTEGER + 1 },
       { ...refundInput, currency: 'usd' },
-      { ...refundInput, reason: 'bad\\nreason' },
+      { ...refundInput, reason: 'bad\nreason' },
       { ...refundInput, reason: 'x'.repeat(256) },
     ]
     for (const invalid of invalidInputs) {
