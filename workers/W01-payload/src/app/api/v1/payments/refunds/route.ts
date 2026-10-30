@@ -1,4 +1,5 @@
 import {
+  authorizePaymentReadPermission,
   authorizePaymentRefundPermission,
   mapOrderAdapterError,
   orderAdapterError,
@@ -101,6 +102,86 @@ export async function POST(request: Request): Promise<Response> {
     headers.set('cache-control', 'no-store')
     headers.set('pragma', 'no-cache')
     return new Response(response.body, { status: response.status, headers })
+  } catch (error) {
+    if (error instanceof W07SubscriptionClientError) {
+      return orderAdapterError(error.status, error.code, error.message)
+    }
+    if (error instanceof W08CreatorClientError) {
+      return orderAdapterError(503, 'AUTHORIZATION_UNAVAILABLE', 'Payment authorization unavailable')
+    }
+    return mapOrderAdapterError(error)
+  }
+}
+
+
+function readListQuery(request: Request): string | Response {
+  const url = new URL(request.url)
+  for (const key of url.searchParams.keys()) {
+    if (key !== 'limit' && key !== 'cursor') {
+      return orderAdapterError(400, 'VALIDATION_FAILED', 'Unsupported payment history query parameter')
+    }
+  }
+  const limit = url.searchParams.get('limit')
+  const cursor = url.searchParams.get('cursor')
+  if (limit !== null && (!/^\\d+$/.test(limit) || Number(limit) < 1 || Number(limit) > 50)) {
+    return orderAdapterError(400, 'VALIDATION_FAILED', 'Payment history page size is invalid')
+  }
+  if (cursor !== null && (cursor.length < 1 || cursor.length > 512)) {
+    return orderAdapterError(400, 'VALIDATION_FAILED', 'Payment history cursor is invalid')
+  }
+  const query = new URLSearchParams()
+  if (limit !== null) query.set('limit', limit)
+  if (cursor !== null) query.set('cursor', cursor)
+  return query.size > 0 ? '?' + query.toString() : ''
+}
+
+function validateRefundHistoryEnvelope(value: unknown): boolean {
+  if (!isRecord(value) || Object.keys(value).length !== 2 ||
+      !Object.hasOwn(value, 'data') || !Object.hasOwn(value, 'requestId') ||
+      typeof value.requestId !== 'string' || !/^req_[A-Za-z0-9_-]{1,123}$/.test(value.requestId)) return false
+  const data = value.data
+  if (!isRecord(data) || Object.keys(data).length !== 3 ||
+      !Array.isArray(data.items) || data.items.length > 50 ||
+      !(data.nextCursor === null || (typeof data.nextCursor === 'string' && data.nextCursor.length <= 512)) ||
+      typeof data.hasMore !== 'boolean') return false
+  return data.items.every((item) => isRecord(item) &&
+    typeof item.refundId === 'string' && /^ref_[A-Za-z0-9]{26}$/.test(item.refundId) &&
+    typeof item.paymentId === 'string' && /^pay_[A-Za-z0-9]{26}$/.test(item.paymentId) &&
+    typeof item.orderId === 'string' && /^ord_[A-Za-z0-9_-]{1,90}$/.test(item.orderId) &&
+    typeof item.amountMinor === 'number' && Number.isSafeInteger(item.amountMinor) && item.amountMinor >= 100 &&
+    typeof item.currency === 'string' && /^[A-Z]{3}$/.test(item.currency) &&
+    ['REQUESTED', 'PENDING', 'SUCCEEDED', 'FAILED', 'REVIEW', 'RECONCILIATION_REQUIRED'].includes(String(item.status)) &&
+    (item.reason === null || (typeof item.reason === 'string' && item.reason.length <= 255)) &&
+    typeof item.version === 'number' && Number.isSafeInteger(item.version) && item.version >= 1 &&
+    (item.providerUpdatedAt === null || typeof item.providerUpdatedAt === 'string') &&
+    typeof item.createdAt === 'string' && typeof item.updatedAt === 'string')
+}
+
+/** List all partial/full refunds owned by the authenticated customer. */
+export async function GET(request: Request): Promise<Response> {
+  try {
+    const principal = await resolveCookieSubscriptionPrincipal(request)
+    if (principal instanceof Response) return principal
+    const denied = await authorizePaymentReadPermission(request, principal)
+    if (denied) return denied
+    const query = readListQuery(request)
+    if (query instanceof Response) return query
+
+    const response = await callW07Subscription({
+      request,
+      pathname: '/commerce/payments/refunds' + query,
+      method: 'GET',
+      principal,
+    })
+    if (!response.ok) return response
+    if (response.status !== 200 ||
+        !validateRefundHistoryEnvelope(await response.clone().json().catch((): null => null))) {
+      return orderAdapterError(503, 'REFUND_HISTORY_RESPONSE_INVALID', 'Refund history could not be verified')
+    }
+    const headers = new Headers(response.headers)
+    headers.set('cache-control', 'no-store')
+    headers.set('pragma', 'no-cache')
+    return new Response(response.body, { status: 200, headers })
   } catch (error) {
     if (error instanceof W07SubscriptionClientError) {
       return orderAdapterError(error.status, error.code, error.message)
