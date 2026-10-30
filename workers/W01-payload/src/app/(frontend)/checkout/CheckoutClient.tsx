@@ -175,7 +175,8 @@ export default function CheckoutClient({ orderId }: { orderId: string }) {
     setConfirming(true)
     setStatusMessage('')
     try {
-      const returnUrl = new URL('/checkout/result', window.location.origin).toString()
+      const returnUrl = new URL('/checkout/result', window.location.origin)
+      returnUrl.searchParams.set('paymentId', intent.paymentId)
       const result: unknown = await hyper.confirmPayment({
         elements,
         confirmParams: { return_url: returnUrl },
@@ -226,6 +227,14 @@ export default function CheckoutClient({ orderId }: { orderId: string }) {
         {confirming ? '正在提交…' : '确认支付'}
       </button>
       {statusMessage ? <p role="status" aria-live="polite">{statusMessage}</p> : null}
+      {statusMessage ? (
+        <a
+          className="mt-3 inline-flex text-sm font-bold text-main-accent underline"
+          href={'/checkout/result?paymentId=' + encodeURIComponent(intent.paymentId)}
+        >
+          查询服务器支付状态
+        </a>
+      ) : null}
       <small>支付引用：{intent.paymentId}</small>
     </section>
   )
