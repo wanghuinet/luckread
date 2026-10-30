@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 const route = readFileSync(resolve(process.cwd(), 'src/app/api/v1/webhooks/hyperswitch/route.ts'), 'utf8')
+const bodyReader = readFileSync(resolve(process.cwd(), 'src/subscription/provider-webhook-body.ts'), 'utf8')
 const client = readFileSync(resolve(process.cwd(), 'src/subscription/w07-subscription-client.ts'), 'utf8')
 const receiver = readFileSync(resolve(process.cwd(), '../../workers/W07-subscription-commerce/src/payment-webhook-http-runtime.ts'), 'utf8')
 const persistence = readFileSync(resolve(process.cwd(), '../../workers/W07-subscription-commerce/src/payment-persistence.ts'), 'utf8')
@@ -13,9 +14,10 @@ const policy = JSON.parse(readFileSync(resolve(process.cwd(), '../../contracts/o
 
 describe('Hyperswitch provider webhook ingress', () => {
   it('bounds the public raw body before forwarding it to W07', () => {
-    expect(route).toContain('MAX_WEBHOOK_BODY_BYTES = 1024 * 1024')
-    expect(route).toContain('request.body.getReader()')
-    expect(route).toContain('length > MAX_WEBHOOK_BODY_BYTES')
+    expect(route).toContain('readBoundedProviderWebhookBody(request, errorResponse)')
+    expect(bodyReader).toContain('MAX_PROVIDER_WEBHOOK_BODY_BYTES = 1024 * 1024')
+    expect(bodyReader).toContain('request.body.getReader()')
+    expect(bodyReader).toContain('length > MAX_PROVIDER_WEBHOOK_BODY_BYTES')
     expect(route).toContain('forwardW07HyperswitchWebhook({ request, rawBody })')
     expect(route).not.toContain('request.json()')
     expect(route).not.toContain('JSON.stringify')
