@@ -126,3 +126,10 @@ WHEN NEW.refund_id IS NOT NULL
       AND r.merchant_id = NEW.merchant_id
   )
 BEGIN SELECT RAISE(ABORT, 'refund webhook receipt requires matching local refund and payment'); END;
+
+-- Every refund starts as a local request reservation; provider status must
+-- be learned from the Hyperswitch response or a signature-verified webhook.
+CREATE TRIGGER refunds_start_initiating
+BEFORE INSERT ON refunds
+WHEN NEW.status <> 'INITIATING'
+BEGIN SELECT RAISE(ABORT, 'refund requests must begin in INITIATING'); END;
