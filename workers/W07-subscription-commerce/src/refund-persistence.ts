@@ -190,6 +190,58 @@ function replayOrConflict(row: RefundRow, requestHash: string): RefundReservatio
 }
 
 /**
+ * Resolve a prior durable refund before any provider network request. This is
+ * what makes a repeated Idempotency-Key a local replay even while Hyperswitch
+ * is unavailable. REQUESTED records are returned too, so the caller can retry
+ * POST /refunds with the same stable refund_id.
+ */
+export async function findExistingRefundReservation(
+  db: D1Database,
+  input: Readonly<{
+    customerId: string;
+    paymentId: string;
+    amountMinor: number;
+    currency: string;
+    reason?: string | null;
+    idempotencyKey: string | null;
+    expectedMerchantId: string;
+  }>,
+): Promise<RefundReservation | null> {
+  if (!nonBlank(input.customerId, 256) ||
+      !PAYMENT_ID_PATTERN.test(input.paymentId) ||
+      !safeMinor(input.amountMinor) ||
+      !CURRENCY_PATTERN.test(input.currency) ||
+      !nonBlank(input.expectedMerchantId, 256)) {
+    throw new RefundPersistenceError('VALIDATION_FAILED', 400);
+  }
+  if (input.idempotencyKey == null || input.idempotencyKey.trim() === '') {
+    throw new RefundPersistenceError('PRECONDITION_REQUIRED', 428);
+  }
+  if (!IDEMPOTENCY_KEY_PATTERN.test(input.idempotencyKey)) {
+    throw new RefundPersistenceError('VALIDATION_FAILED', 400);
+  }
+  const reason = input.reason ?? null;
+  if (reason !== null && !nonBlank(reason, 255)) {
+    throw new RefundPersistenceError('VALIDATION_FAILED', 400);
+  }
+  const requestHash = await refundRequestHash({
+    customerId: input.customerId,
+    merchantId: input.expectedMerchantId,
+    paymentId: input.paymentId,
+    amountMinor: input.amountMinor,
+    currency: input.currency,
+    reason,
+  });
+  let existing: RefundRow | null;
+  try {
+    existing = await readRefundByCustomerAndKey(db, input.customerId, input.idempotencyKey);
+  } catch {
+    throw new RefundPersistenceError('SERVICE_UNAVAILABLE', 503);
+  }
+  return existing ? replayOrConflict(existing, requestHash) : null;
+}
+
+/**
  * Reserve a stable provider refund ID before any POST /refunds network call.
  * Captured amount is supplied only from a merchant-authenticated Hyperswitch
  * payment retrieval, never from the browser or the immutable original charge.
