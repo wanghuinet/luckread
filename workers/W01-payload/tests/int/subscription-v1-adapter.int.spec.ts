@@ -1,11 +1,19 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
+import { isValidRevenueCatAppId } from '../../src/subscription/w07-subscription-client.js'
 
 const openapi = readFileSync(resolve(process.cwd(), '../../contracts/openapi/v1/openapi.yaml'), 'utf8')
 const apiInventory = JSON.parse(readFileSync(resolve(process.cwd(), '../../contracts/api/api-inventory.v1.json'), 'utf8'))
 
 describe('v1 subscription adapter', () => {
+  it('accepts canonical RevenueCat app IDs and rejects controls or non-canonical values', () => {
+    expect(isValidRevenueCatAppId('luckread-ios-production')).toBe(true)
+    expect(isValidRevenueCatAppId('luckread-android-production')).toBe(true)
+    for (const value of ['', ' luckread-ios-production', 'luckread-ios-production ', 'luckread\nproduction', 'luckread\u0000production', 'x'.repeat(256)]) {
+      expect(isValidRevenueCatAppId(value)).toBe(false)
+    }
+  })
   const route = readFileSync(resolve(process.cwd(), 'src/app/api/v1/memberships/subscriptions/[[...segments]]/route.ts'), 'utf8')
   const mySubscriptionsPage = readFileSync(resolve(process.cwd(), 'src/app/(frontend)/me/subscriptions/MySubscriptionsPage.tsx'), 'utf8')
   const plansRoute = readFileSync(resolve(process.cwd(), 'src/app/api/v1/plans/route.ts'), 'utf8')
