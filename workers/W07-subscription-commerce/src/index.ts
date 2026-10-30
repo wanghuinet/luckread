@@ -9,6 +9,7 @@ import { handleCommercePaymentIntentRequest } from './payment-intent-http-runtim
 import { handleHyperswitchWebhookRequest } from './payment-webhook-http-runtime.js'
 import { handleRevenueCatWebhookRequest } from './revenuecat-webhook-http-runtime.js'
 import { handleRevenueCatSubscriberReconciliationRequest } from './revenuecat-subscriber-reconciliation-runtime.js'
+import { listOwnedSavedPaymentMethods, revokeOwnedSavedPaymentMethod, PaymentMethodRuntimeError } from './payment-method-runtime.js'
 
 interface RateLimitBinding { limit(input: { key: string }): Promise<{ success: boolean }> }
 interface Env {
@@ -215,6 +216,25 @@ export default {
       requireLayer(request)
       const paymentIntentResponse = await handleCommercePaymentIntentRequest(request, principal, env)
       if (paymentIntentResponse) return paymentIntentResponse
+      const paymentMethodPath = new URL(request.url).pathname
+      if (paymentMethodPath === '/payment-methods' && request.method === 'GET') {
+        const methods = await listOwnedSavedPaymentMethods(env, principal)
+        return json({ data: { docs: methods }, requestId: crypto.randomUUID() })
+      }
+      const revokePaymentMethodMatch = /^\/payment-methods\/(spm_[A-Za-z0-9]{26})$/.exec(paymentMethodPath)
+      if (revokePaymentMethodMatch && request.method === 'DELETE') {
+        if (request.body !== null) {
+          await request.body.cancel().catch(() => undefined)
+          throw new PaymentMethodRuntimeError('VALIDATION_FAILED', 400)
+        }
+        const result = await revokeOwnedSavedPaymentMethod(
+          env,
+          principal,
+          revokePaymentMethodMatch[1]!,
+          request.headers.get('Idempotency-Key'),
+        )
+        return json({ data: result, requestId: crypto.randomUUID() }, result.status === 'REMOVED' ? 200 : 202)
+      }
       const orderDependencies = isDemoPricingEnabled(env.COMMERCE_PRICING_MODE, env.HYPERSWITCH_ENVIRONMENT)
         ? {
             resolvePricing: async (input: unknown) => {
@@ -350,6 +370,19 @@ export default {
       const result = await getSubscription(env.D1_01, principal, operation.subscriptionId)
       return json({ data: result, requestId: crypto.randomUUID() }, 200, result.etag)
     } catch (error) {
+      if (error instanceof PaymentMethodRuntimeError) {
+        const messages: Record<string, string> = {
+          VALIDATION_FAILED: 'Payment-method request validation failed',
+          PRECONDITION_REQUIRED: 'Idempotency-Key is required',
+          RESOURCE_NOT_FOUND: 'Saved payment method not found',
+          CONFLICT: 'Payment-method revocation conflicts with an existing request',
+          SERVICE_UNAVAILABLE: 'Payment-method provider service unavailable',
+        }
+        return json({
+          error: { code: error.code, message: messages[error.code] ?? 'Payment-method service unavailable', details: {} },
+          requestId: crypto.randomUUID(),
+        }, error.status)
+      }
       if (error instanceof SubscriptionRuntimeError) {
         const message = error.code === 'PERMISSION_DENIED' ? 'permission denied' : error.code === 'PRECONDITION_REQUIRED' ? 'precondition required' : error.code === 'PRECONDITION_FAILED' ? 'precondition failed' : error.code === 'RESOURCE_NOT_FOUND' ? 'resource not found' : error.code === 'INVALID_STATE' ? 'invalid subscription state' : error.code === 'PLAN_NOT_ACTIVE' ? 'membership plan is unavailable' : error.code === 'CONFLICT' ? 'subscription conflict' : error.code === 'VALIDATION_FAILED' ? 'validation failed' : error.code === 'RATE_LIMITED' ? 'too many requests' : error.code === 'SERVICE_UNAVAILABLE' ? 'service unavailable' : error.code
         return new Response(JSON.stringify({ error: { code: error.code, message, details: error.code === 'RATE_LIMITED' ? { retryAfter: 60 } : {} }, requestId: crypto.randomUUID() }), { status: error.status, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', ...(error.code === 'RATE_LIMITED' ? { 'retry-after': '60' } : {}) } })

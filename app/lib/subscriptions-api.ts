@@ -1,4 +1,4 @@
-import { apiRequest } from './api-client';
+import { apiRequest, createIdempotencyKey } from './api-client';
 
 export type SubscriptionStatus =
   | 'PENDING'
@@ -54,6 +54,54 @@ export function fetchMySubscriptionsPage(options: PageOptions = {}) {
   });
 }
 
+
+export type SavedPaymentMethodStatus = 'ACTIVE' | 'SETUP_PENDING' | 'NO_RECURRING' | 'REVOCATION_PENDING';
+export type SavedPaymentMethodMandateStatus =
+  | 'ACTIVE'
+  | 'PENDING_PROVIDER_CONFIRMATION'
+  | 'REVOKED'
+  | 'FAILED'
+  | 'EXPIRED'
+  | 'NONE';
+
+export type SavedPaymentMethod = {
+  savedPaymentMethodId: string;
+  paymentMethod: string;
+  paymentMethodType: string | null;
+  brand: string | null;
+  last4: string | null;
+  expiryMonth: string | null;
+  expiryYear: string | null;
+  createdAt: string;
+  recurringEnabled: boolean;
+  mandateStatus: SavedPaymentMethodMandateStatus;
+  status: SavedPaymentMethodStatus;
+};
+
+/** Read only verified saved methods owned by the current W02 principal. */
+export function fetchSavedPaymentMethods(options: { signal?: AbortSignal } = {}) {
+  return apiRequest<unknown>('/payment-methods', {
+    method: 'GET',
+    signal: options.signal,
+  });
+}
+
+/** Revoke provider mandates and remove a saved vault method; 202 means provider webhook confirmation is pending. */
+export function revokeSavedPaymentMethod(
+  savedPaymentMethodId: string,
+  idempotencyKey: string = createIdempotencyKey(),
+) {
+  if (!/^spm_[A-Za-z0-9]{26}$/.test(savedPaymentMethodId)) {
+    throw new TypeError('Saved payment method ID is invalid.');
+  }
+  if (!/^[A-Za-z0-9_-]{1,128}$/.test(idempotencyKey)) {
+    throw new TypeError('Payment method removal idempotency key is invalid.');
+  }
+  return apiRequest<unknown>('/payment-methods/' + encodeURIComponent(savedPaymentMethodId), {
+    method: 'DELETE',
+    idempotencyKey,
+  });
+}
 
 export type ActiveMembershipPlan = {
   planId: string;

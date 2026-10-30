@@ -277,6 +277,33 @@
       ]
     },
     {
+      "operationId": "auditPaymentMethodRevocationRequest",
+      "method": "POST",
+      "publicPath": "/api/v1/payment-methods/{savedPaymentMethodId}",
+      "internalPath": "/internal/audit-events/payment-method-revocation-requested",
+      "principalRequired": true,
+      "actorAuthority": "W06 derives actor ID and layer only from trusted W01 private transport headers.",
+      "eventId": "Stable evt_pm_revoke_requested_{sha256(actorId, savedPaymentMethodId, Idempotency-Key)}.",
+      "targetType": "PaymentMethod",
+      "auditRequired": true,
+      "idempotency": "Exact actor/resource/idempotency-key replay confirms the original durable intent; conflicting immutable facts are rejected.",
+      "successPolicy": "W01 must confirm the durable W06 intent before W07 writes a D1-04 revocation request or makes any Hyperswitch calls.",
+      "cache": "NO_STORE",
+      "auditedFields": [
+        "savedPaymentMethodId",
+        "idempotencyKey",
+        "operation"
+      ],
+      "sensitiveDataExcluded": [
+        "payment_method_id",
+        "provider_mandate_id",
+        "payment_token",
+        "card data",
+        "provider credentials",
+        "raw request body"
+      ]
+    },
+    {
       "operationId": "auditMembershipPlanLifecycleRequest",
       "method": "POST",
       "publicPath": "/api/v1/membership/plans/{planId}/lifecycle",

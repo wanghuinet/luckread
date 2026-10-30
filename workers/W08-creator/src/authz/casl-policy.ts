@@ -65,6 +65,7 @@ export const SUPPORTED_AUTHZ_SUBJECTS = [
   'Appeal',
   'RoleAssignment',
   'Subscription',
+  'PaymentMethod',
   'MembershipPlan',
   'Order',
   'PlatformConfig',
@@ -353,6 +354,8 @@ function buildLayerAbility(input: CaslPermissionInput) {
   if (input.layer !== 'L0' && input.layer !== 'L1' && input.subjectId) {
     grant('order.create', 'Order', selfOwnerCondition(input.subjectId))
     grant('order.read', 'Order', selfOwnerCondition(input.subjectId))
+    grant('payment_method.read.self', 'PaymentMethod', selfOwnerCondition(input.subjectId))
+    grant('payment_method.revoke.self', 'PaymentMethod', selfOwnerCondition(input.subjectId))
   }
 
   // Creator application creation is deliberately L2-only; it is not inherited

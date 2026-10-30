@@ -9,6 +9,7 @@ import {
   parseHyperswitchRfc3339Timestamp,
 } from './hyperswitch-webhook-signature.js';
 import type { HyperswitchPayment } from './hyperswitch-client.js';
+import { buildCompletePaymentMethodRevocationOnMandateWebhook } from './payment-method-persistence.js';
 import { validateHyperswitchPaymentWebhook } from './hyperswitch-webhook-payment-validation.js';
 
 export type PaymentAttemptStatus =
@@ -1256,6 +1257,13 @@ async function receiveHyperswitchMandateWebhook(
     PROVIDER, envelope.merchantId, envelope.eventId, payloadSha256,
   );
 
+  const statements: D1PreparedStatement[] = [insertEvent, updateMandate];
+  if (expectedStatus === 'REVOKED') {
+    statements.push(buildCompletePaymentMethodRevocationOnMandateWebhook(
+      db, envelope.merchantId, mandate.customer_id, paymentMethodId, now,
+    ));
+  }
+
   const updateReceipt = db.prepare(
     'UPDATE payment_provider_events SET state = CASE WHEN EXISTS (' +
     'SELECT 1 FROM payment_mandates m WHERE m.mandate_record_id = ? AND m.provider = ? AND m.merchant_id = ? ' +
@@ -1274,9 +1282,11 @@ async function receiveHyperswitchMandateWebhook(
     PROVIDER, envelope.merchantId, envelope.eventId, payloadSha256,
   );
 
+  statements.push(updateReceipt);
+  const updateReceiptIndex = statements.length - 1;
   let batchResults: D1Result[];
   try {
-    batchResults = await db.batch([insertEvent, updateMandate, updateReceipt]);
+    batchResults = await db.batch(statements);
   } catch {
     const raced = await readProviderEvent(db, envelope.merchantId, envelope.eventId).catch(() => null);
     if (!raced) throw new PaymentPersistenceError('SERVICE_UNAVAILABLE', 503);
@@ -1312,7 +1322,7 @@ async function receiveHyperswitchMandateWebhook(
   if (
     stored.state === 'APPLIED' &&
     Number(batchResults[1]?.meta?.changes ?? 0) === 1 &&
-    Number(batchResults[2]?.meta?.changes ?? 0) === 1
+    Number(batchResults[updateReceiptIndex]?.meta?.changes ?? 0) === 1
   ) return resultFromProviderEvent(stored, payloadSha256, 'APPLIED');
   return resultFromProviderEvent(stored, payloadSha256, stored.state === 'APPLIED' ? 'DUPLICATE' : undefined);
 }

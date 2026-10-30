@@ -591,6 +591,21 @@
       "scope": "own"
     },
     {
+      "name": "payment_method.read.self",
+      "resource": "payment_method",
+      "action": "read",
+      "minLayer": "L2",
+      "scope": "own"
+    },
+    {
+      "name": "payment_method.revoke.self",
+      "resource": "payment_method",
+      "action": "revoke",
+      "minLayer": "L2",
+      "scope": "own",
+      "auditRequired": true
+    },
+    {
       "name": "org.billing.read.scope",
       "resource": "org",
       "action": "billing_read",
@@ -1049,6 +1064,8 @@
           "notification.update.self",
           "order.create",
           "order.read",
+          "payment_method.read.self",
+          "payment_method.revoke.self",
           "report.create",
           "share.create",
           "social.follow",
@@ -1081,6 +1098,8 @@
           "creator.read.self",
           "creator.stats.read.self",
           "creator.update.self",
+          "payment_method.read.self",
+          "payment_method.revoke.self",
           "media.read.own",
           "media.upload",
           "revision.create.own",
@@ -1206,6 +1225,8 @@
           "notification.update.self",
           "order.create",
           "order.read",
+          "payment_method.read.self",
+          "payment_method.revoke.self",
           "report.create",
           "revision.create.own",
           "role.assign",
@@ -1286,6 +1307,8 @@
           "notification.update.self",
           "order.create",
           "order.read",
+          "payment_method.read.self",
+          "payment_method.revoke.self",
           "report.create",
           "revision.create.own",
           "role.assign",

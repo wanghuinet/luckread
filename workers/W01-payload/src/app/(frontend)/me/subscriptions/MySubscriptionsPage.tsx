@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { fetchJson, getApiErrorMessage } from '../../../../lib/client-api.js'
 import { usePublicLocale } from '../../i18n/PublicLanguageToggle'
@@ -25,6 +25,24 @@ type ListResponse = {
     page?: number
     limit?: number
   }
+  error?: { code?: string; message?: string }
+}
+type SavedPaymentMethod = {
+  savedPaymentMethodId: string
+  paymentMethod: string
+  paymentMethodType: string | null
+  brand: string | null
+  last4: string | null
+  expiryMonth: string | null
+  expiryYear: string | null
+  createdAt: string
+  recurringEnabled: boolean
+  mandateStatus: 'ACTIVE' | 'PENDING_PROVIDER_CONFIRMATION' | 'REVOKED' | 'FAILED' | 'EXPIRED' | 'NONE'
+  status: 'ACTIVE' | 'SETUP_PENDING' | 'NO_RECURRING' | 'REVOCATION_PENDING'
+}
+
+type PaymentMethodListResponse = {
+  data?: { docs?: SavedPaymentMethod[] }
   error?: { code?: string; message?: string }
 }
 
@@ -51,6 +69,19 @@ const copy = (locale: PublicLocale) => locale === 'en'
       loadError: 'Could not load subscriptions.',
       updateError: 'Could not update subscription.',
       sessionExpired: 'Your session has expired. Sign in again.',
+      paymentMethodsTitle: 'Saved payment methods',
+      paymentMethodsEmpty: 'No saved payment methods yet.',
+      paymentMethodsLoading: 'Loading saved payment methods…',
+      removePaymentMethod: 'Remove',
+      retryRemoval: 'Retry removal',
+      activeMandate: 'Recurring authorization active',
+      setupPending: 'Provider authorization pending',
+      revocationPending: 'Removal pending · new automatic charges are paused',
+      noRecurring: 'No active automatic-renewal authorization',
+      removeConfirm: 'Removing this method blocks new automatic renewal charges and requests provider-side mandate revocation. Existing payments are not refunded.',
+      removalAccepted: 'Removal is pending provider confirmation. New automatic charges remain paused until signed confirmation arrives.',
+      removalComplete: 'The provider confirmed that this payment method was removed.',
+      paymentMethodError: 'Could not load or remove saved payment methods.',
       status: {
         PENDING: 'Pending',
         ACTIVE: 'Active',
@@ -83,6 +114,19 @@ const copy = (locale: PublicLocale) => locale === 'en'
         loadError: '無法讀取訂閱。',
         updateError: '無法更新訂閱狀態。',
         sessionExpired: '登入已失效，請重新登入。',
+        paymentMethodsTitle: '已儲存的付款方式',
+        paymentMethodsEmpty: '目前沒有已儲存的付款方式。',
+        paymentMethodsLoading: '正在讀取付款方式…',
+        removePaymentMethod: '移除',
+        retryRemoval: '重試移除',
+        activeMandate: '自動續費授權有效',
+        setupPending: '等待支付渠道確認授權',
+        revocationPending: '移除處理中 · 已暫停新的自動扣款',
+        noRecurring: '目前沒有有效的自動續費授權',
+        removeConfirm: '移除後會阻止新的自動續費扣款並請求支付渠道撤銷授權。已完成的付款不會退款。',
+        removalAccepted: '支付渠道確認仍在處理。簽名確認到達前，新的自動扣款會維持暫停。',
+        removalComplete: '支付渠道已確認移除這項付款方式。',
+        paymentMethodError: '無法讀取或移除已儲存的付款方式。',
         status: {
           PENDING: '待處理',
           ACTIVE: '有效',
@@ -114,6 +158,19 @@ const copy = (locale: PublicLocale) => locale === 'en'
         loadError: '订阅读取失败。',
         updateError: '订阅状态更新失败。',
         sessionExpired: '登录已失效，请重新登录。',
+        paymentMethodsTitle: '已保存的付款方式',
+        paymentMethodsEmpty: '目前没有已保存的付款方式。',
+        paymentMethodsLoading: '正在读取付款方式…',
+        removePaymentMethod: '移除',
+        retryRemoval: '重试移除',
+        activeMandate: '自动续费授权有效',
+        setupPending: '等待支付渠道确认授权',
+        revocationPending: '移除处理中 · 已暂停新的自动扣款',
+        noRecurring: '当前没有有效的自动续费授权',
+        removeConfirm: '移除后会阻止新的自动续费扣款并请求支付渠道撤销授权。已完成的付款不会退款。',
+        removalAccepted: '支付渠道仍在处理确认。签名确认到达前，新的自动扣款会保持暂停。',
+        removalComplete: '支付渠道已确认移除该付款方式。',
+        paymentMethodError: '无法读取或移除已保存的付款方式。',
         status: {
           PENDING: '待处理',
           ACTIVE: '有效',
@@ -146,6 +203,11 @@ export default function MySubscriptionsPage() {
   const [pageNumber, setPageNumber] = useState(1)
   const [hasNextPage, setHasNextPage] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
+  const [paymentMethods, setPaymentMethods] = useState<SavedPaymentMethod[]>([])
+  const [paymentMethodsLoading, setPaymentMethodsLoading] = useState(true)
+  const [paymentMethodError, setPaymentMethodError] = useState('')
+  const [removingPaymentMethodId, setRemovingPaymentMethodId] = useState<string | null>(null)
+  const paymentMethodIdempotencyKeys = useRef(new Map<string, string>())
 
   async function load(page = 1, append = false) {
     if (append) setLoadingMore(true)
@@ -176,8 +238,98 @@ export default function MySubscriptionsPage() {
     }
   }
 
+  async function loadPaymentMethods() {
+    setPaymentMethodsLoading(true)
+    setPaymentMethodError('')
+    try {
+      const { response, data } = await fetchJson<PaymentMethodListResponse>('/api/v1/payment-methods', {
+        credentials: 'include',
+        cache: 'no-store',
+        headers: { accept: 'application/json' },
+      })
+      if (response.status === 401) {
+        const returnTo = window.location.pathname + window.location.search + window.location.hash
+        window.location.assign('/login?returnTo=' + encodeURIComponent(returnTo))
+        return
+      }
+      if (!response.ok || !Array.isArray(data?.data?.docs)) {
+        throw new Error(getApiErrorMessage(data, labels.paymentMethodError))
+      }
+      const records = data.data.docs
+      if (!records.every((item) =>
+        item && typeof item.savedPaymentMethodId === 'string' &&
+        /^spm_[A-Za-z0-9]{26}$/.test(item.savedPaymentMethodId) &&
+        typeof item.paymentMethod === 'string' &&
+        ['ACTIVE', 'SETUP_PENDING', 'NO_RECURRING', 'REVOCATION_PENDING'].includes(item.status)
+      )) throw new Error(labels.paymentMethodError)
+      setPaymentMethods(records)
+    } catch (caught) {
+      setPaymentMethodError(caught instanceof Error ? caught.message : labels.paymentMethodError)
+    } finally {
+      setPaymentMethodsLoading(false)
+    }
+  }
+
+  async function removePaymentMethod(method: SavedPaymentMethod) {
+    const confirmText = labels.removeConfirm + '\n\n' +
+      (method.brand || method.paymentMethod) + (method.last4 ? ' •••• ' + method.last4 : '')
+    if (!window.confirm(confirmText)) return
+    let idempotencyKey = paymentMethodIdempotencyKeys.current.get(method.savedPaymentMethodId)
+    if (!idempotencyKey) {
+      idempotencyKey = crypto.randomUUID().replaceAll('-', '')
+      paymentMethodIdempotencyKeys.current.set(method.savedPaymentMethodId, idempotencyKey)
+    }
+    setRemovingPaymentMethodId(method.savedPaymentMethodId)
+    setPaymentMethodError('')
+    try {
+      const sendRemoval = () => fetchJson<unknown>(
+        '/api/v1/payment-methods/' + encodeURIComponent(method.savedPaymentMethodId),
+        {
+          method: 'DELETE',
+          credentials: 'include',
+          cache: 'no-store',
+          headers: {
+            accept: 'application/json',
+            'Idempotency-Key': idempotencyKey,
+          },
+        },
+      )
+      let result = await sendRemoval()
+      // First request durably blocks new MIT charges. Replaying the same
+      // idempotency key in a separate request performs provider revocation
+      // without exceeding D1-04's one-write-transaction budget per request.
+      if (result.response.status === 202) result = await sendRemoval()
+      const { response, data } = result
+      if (response.status === 401) {
+        const returnTo = window.location.pathname + window.location.search + window.location.hash
+        window.location.assign('/login?returnTo=' + encodeURIComponent(returnTo))
+        return
+      }
+      if (!response.ok) {
+        if (response.status < 500 && response.status !== 408 && response.status !== 429) {
+          paymentMethodIdempotencyKeys.current.delete(method.savedPaymentMethodId)
+        }
+        throw new Error(getApiErrorMessage(data, labels.paymentMethodError))
+      }
+      if (response.status === 200) {
+        paymentMethodIdempotencyKeys.current.delete(method.savedPaymentMethodId)
+        window.alert(labels.removalComplete)
+      } else {
+        window.alert(labels.removalAccepted)
+      }
+      await loadPaymentMethods()
+    } catch (caught) {
+      setPaymentMethodError(caught instanceof Error ? caught.message : labels.paymentMethodError)
+    } finally {
+      setRemovingPaymentMethodId(null)
+    }
+  }
+
   useEffect(() => {
-    const timer = window.setTimeout(() => { void load() }, 0)
+    const timer = window.setTimeout(() => {
+      void load()
+      void loadPaymentMethods()
+    }, 0)
     return () => window.clearTimeout(timer)
   }, [])
 
@@ -199,6 +351,55 @@ export default function MySubscriptionsPage() {
       </header>
 
       {error ? <p className="border-b border-light-border px-4 py-3 text-sm text-rose-700 dark:border-dark-border dark:text-rose-300" role="alert">{error}</p> : null}
+      <section className="border-b border-light-border bg-light-primary/5 px-4 py-4 dark:border-dark-border dark:bg-dark-primary/5">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-base font-bold">{labels.paymentMethodsTitle}</h2>
+          <button
+            type="button"
+            disabled={paymentMethodsLoading || removingPaymentMethodId !== null}
+            onClick={() => void loadPaymentMethods()}
+            className="rounded-full border border-light-border px-3 py-1.5 text-xs font-bold disabled:opacity-50 dark:border-dark-border"
+          >
+            {labels.refresh}
+          </button>
+        </div>
+        {paymentMethodsLoading ? (
+          <p className="mt-3 text-sm text-light-secondary dark:text-dark-secondary">{labels.paymentMethodsLoading}</p>
+        ) : paymentMethodError ? (
+          <p className="mt-3 text-sm text-rose-700 dark:text-rose-300" role="alert">{paymentMethodError}</p>
+        ) : paymentMethods.length === 0 ? (
+          <p className="mt-3 text-sm text-light-secondary dark:text-dark-secondary">{labels.paymentMethodsEmpty}</p>
+        ) : paymentMethods.map((method) => (
+          <article key={method.savedPaymentMethodId} className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-light-border bg-white px-3 py-3 dark:border-dark-border dark:bg-dark-bg">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold">
+                {method.brand || method.paymentMethod}
+                {method.last4 ? ' •••• ' + method.last4 : ''}
+              </p>
+              <p className="mt-1 text-xs text-light-secondary dark:text-dark-secondary">
+                {method.status === 'REVOCATION_PENDING'
+                  ? labels.revocationPending
+                  : method.status === 'ACTIVE'
+                    ? labels.activeMandate
+                    : method.status === 'SETUP_PENDING'
+                    ? labels.setupPending
+                    : labels.noRecurring}
+                {method.expiryMonth && method.expiryYear ? ' · ' + method.expiryMonth + '/' + method.expiryYear : ''}
+              </p>
+            </div>
+            <button
+              type="button"
+              disabled={removingPaymentMethodId !== null}
+              onClick={() => void removePaymentMethod(method)}
+              className="shrink-0 rounded-full border border-rose-300 px-3 py-2 text-xs font-bold text-rose-700 disabled:opacity-50 dark:border-rose-800 dark:text-rose-300"
+            >
+              {removingPaymentMethodId === method.savedPaymentMethodId
+                ? labels.refreshing
+                : method.status === 'REVOCATION_PENDING' ? labels.retryRemoval : labels.removePaymentMethod}
+            </button>
+          </article>
+        ))}
+      </section>
 
       {loading && items.length === 0 ? (
         <section className="px-4 py-6 text-sm text-light-secondary dark:text-dark-secondary" role="status">{labels.loading}</section>
