@@ -447,6 +447,49 @@ describe('CASL L0-L8 authorization policy', () => {
     })).toMatchObject({ decision: 'DENY', reasonCode: 'ACCOUNT_FROZEN_READ_ONLY' })
   })
 
+  it('authorizes refunds only against the authenticated customer-owned Payment at L2+', () => {
+    expect(evaluate({
+      layer: 'L2',
+      action: 'payment.refund',
+      resourceType: 'Payment',
+      resourceAttributes: { ownerId: 'user-1' },
+    })).toMatchObject({ decision: 'ALLOW' })
+
+    expect(evaluate({
+      layer: 'L3',
+      action: 'payment.refund',
+      resourceType: 'Payment',
+      resourceAttributes: { ownerId: 'user-1' },
+    })).toMatchObject({ decision: 'ALLOW' })
+
+    expect(evaluate({
+      action: 'payment.refund',
+      resourceType: 'Payment',
+      resourceAttributes: { ownerId: 'user-2' },
+    })).toMatchObject({ decision: 'DENY', reasonCode: 'PERMISSION_DENIED' })
+
+    expect(evaluate({
+      layer: 'L1',
+      action: 'payment.refund',
+      resourceType: 'Payment',
+      resourceAttributes: { ownerId: 'user-1' },
+    })).toMatchObject({ decision: 'DENY' })
+
+    expect(evaluate({
+      accountState: 'RESTRICTED',
+      action: 'payment.refund',
+      resourceType: 'Payment',
+      resourceAttributes: { ownerId: 'user-1' },
+    })).toMatchObject({ decision: 'DENY', reasonCode: 'ACCOUNT_RESTRICTED' })
+
+    expect(evaluate({
+      accountState: 'FROZEN',
+      action: 'payment.refund',
+      resourceType: 'Payment',
+      resourceAttributes: { ownerId: 'user-1' },
+    })).toMatchObject({ decision: 'DENY', reasonCode: 'ACCOUNT_FROZEN_READ_ONLY' })
+  })
+
   it('denies unknown permissions, unsupported subjects, and malformed attributes', () => {
     expect(evaluate({ action: 'permission.not.registered' })).toMatchObject({ decision: 'DENY', reasonCode: 'UNKNOWN_PERMISSION' })
     expect(evaluate({
