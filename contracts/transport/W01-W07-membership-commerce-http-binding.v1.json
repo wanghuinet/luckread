@@ -344,6 +344,63 @@
       "cache": "NO_STORE"
     },
     {
+      "operationId": "getPaymentsPaymentId",
+      "method": "GET",
+      "publicPath": "/api/v1/payments/{paymentId}",
+      "internalPath": "/payments/{paymentId}",
+      "principalRequired": true,
+      "permission": "order.read",
+      "minimumGlobalLayer": "L2",
+      "pathParameters": {
+        "paymentId": "required stable pay_ identifier; no client owner/merchant fields"
+      },
+      "customerId": "Derived only from the W02-authenticated W01 session principal; W07 independently queries D1-04 by payment_id and customer_id. Foreign and absent payments both return 404.",
+      "responseAuthority": "Payment.status, version and providerUpdatedAt come only from the validated W07 D1-04 Payment row. A separate providerStatus observation may be returned after a forced Hyperswitch GET, but it never changes D1-04 status, confirms an Order, or grants/revokes an entitlement.",
+      "responseFields": [
+        "payment.paymentId",
+        "payment.orderId",
+        "payment.amountMinor",
+        "payment.currency",
+        "payment.status",
+        "payment.version",
+        "payment.providerUpdatedAt",
+        "payment.createdAt",
+        "payment.updatedAt",
+        "providerStatus",
+        "providerStatusCheck",
+        "providerCheckedAt",
+        "statusAuthority"
+      ],
+      "forbiddenResponseFields": [
+        "customerId",
+        "merchantId",
+        "provider API key",
+        "clientSecret",
+        "paymentMethodId",
+        "mandateId",
+        "idempotencyKey",
+        "requestHash",
+        "failureCode"
+      ],
+      "cache": "NO_STORE",
+      "successRule": "W01 validates the exact W07 owner-scoped DTO before returning it. Only W07's existing signed Hyperswitch webhook path advances persisted payment status; a provider status mismatch remains an observation and is explicitly labelled.",
+      "failurePolicy": {
+        "invalidPaymentId": "404",
+        "missingOrForeignOwner": "404 RESOURCE_NOT_FOUND",
+        "authorizationDenied": "403",
+        "providerUnavailable": "200 with last persisted D1-04 state and providerStatusCheck=UNAVAILABLE",
+        "integrityFailure": "500/503"
+      },
+      "topologyConstraints": {
+        "newWorker": false,
+        "newDatabase": false,
+        "newQueue": false,
+        "newServiceBinding": false,
+        "d1Authority": "D1-04",
+        "crossD1Transactions": 0
+      }
+    },
+    {
       "operationId": "postPaymentsIntents",
       "method": "POST",
       "publicPath": "/api/v1/payments/intents",
